@@ -41,10 +41,18 @@ _KIND_HINTS: list[tuple[str, tuple[str, ...]]] = [
 def parse_intent(text: str, *, llm: LLM | None = None,
                  default_repo: str = "vllm-omni", model: str | None = None) -> IntentResult:
     result = _parse_deterministic(text, default_repo)
+    if result is not None and result.spec is not None:
+        return result
+    # Deterministic parse is uncertain: let the LLM try before clarifying.
+    if llm is not None and llm.available:
+        llm_result = _parse_llm(text, llm, default_repo, model)
+        if llm_result.spec is not None:
+            return llm_result
+        if result is not None:  # keep the more specific deterministic question
+            return result
+        return llm_result
     if result is not None:
         return result
-    if llm is not None and llm.available:
-        return _parse_llm(text, llm, default_repo, model)
     return IntentResult(clarify=(
         "I couldn't map that to a task. Try e.g. 'rebase pr 123', 'debug the CI of "
         "pr 123', 'review pr 123', 'answer issue 45', 'triage new issues', or "
