@@ -31,6 +31,7 @@ from .review.reviewer import run_plan_review
 from .run_trace import RunTrace
 from .targets.base import PushPolicy
 from .task_spec import TaskSpec
+from .ui import style
 
 
 class Copilot:
@@ -71,11 +72,11 @@ class Copilot:
         try:
             resolution = self.resolve(spec)
         except PlanningError as exc:
-            print(f"✋ cannot plan: {exc}")
+            print(style("✋ cannot plan: ", "red", "bold") + str(exc))
             return BLOCKED_EXIT
 
-        print(f"→ task: {spec.describe()}")
-        print(f"→ plan: {resolution.mode} {resolution.playbook.name}"
+        print(style("→ task: ", "bold", "cyan") + spec.describe())
+        print(style("→ plan: ", "bold", "magenta") + f"{resolution.mode} {resolution.playbook.name}"
               f"@{resolution.playbook.version} ({resolution.playbook.status}) "
               f"steps={[s.step for s in resolution.playbook.steps]}")
         for note in resolution.notes:
@@ -113,8 +114,9 @@ class Copilot:
         kind = playbook.task_kinds[0]
         spec = TaskSpec(kind=kind, repo=self.settings.default_repo,
                         report_only=report_only, params=params or {})
-        print(f"→ task: {spec.describe()}  [explicit playbook override]")
-        print(f"→ plan: explicit {playbook.name}@{playbook.version} "
+        print(style("→ task: ", "bold", "cyan") + spec.describe()
+              + style("  [explicit playbook override]", "yellow"))
+        print(style("→ plan: ", "bold", "magenta") + f"explicit {playbook.name}@{playbook.version} "
               f"({playbook.status}) steps={[s.step for s in playbook.steps]}")
         if plan_only:
             return 0
@@ -158,11 +160,11 @@ class Copilot:
         outcome = asyncio.run(executor.run(playbook, state))
 
         for step_id, r in outcome.step_results.items():
-            mark = "✓" if r.ok else "✗"
+            mark = style("✓", "green") if r.ok else style("✗", "red", "bold")
             print(f"  {mark} {step_id}: {r.summary}")
         print(f"run {run_dir.name}: {outcome.status}  ({run_dir})")
         if outcome.status == "blocked":
-            print(f"  ⚠ {outcome.blocked_reason}\n  see {run_dir / 'ESCALATION.md'}")
+            print(style("  ⚠ ", "yellow", "bold") + f"{outcome.blocked_reason}\n  see {run_dir / 'ESCALATION.md'}")
             return BLOCKED_EXIT
         return 0 if outcome.status == "done" else 1
 

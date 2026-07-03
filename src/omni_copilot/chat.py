@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Callable
 
 from .run_trace import RunTrace
 from .task_spec import TaskSpec
+from .ui import make_ui
 
 if TYPE_CHECKING:  # pragma: no cover
     from .cli import Copilot
@@ -128,10 +129,10 @@ TOOL_DEFS: list[dict] = [
 
 class ChatSession:
     def __init__(self, copilot: "Copilot", *, assume_yes: bool = False,
-                 out: Callable[[str], None] = None):
+                 out: Callable[[str], None] = None, ui=None):
         self.copilot = copilot
         self.assume_yes = assume_yes
-        self.out = out or (lambda s: print(s, end="", flush=True))
+        self.ui = ui or make_ui(out)  # explicit writer -> PlainUI (tests/pipes)
         self.messages: list[dict] = []
         sessions_dir = copilot.settings.run_root.parent / "sessions"
         self.trace = RunTrace(
@@ -235,16 +236,13 @@ class ChatSession:
         self.messages.append({"role": "user", "content": user_text})
         self._trim_history()
         final_text = ""
+        ended = False
         for _round in range(_MAX_TOOL_ROUNDS):
-            streamed: list[str] = []
-
-            def stream(delta: str) -> None:
-                streamed.append(delta)
-                self.out(delta)
-
+            self.ui.stream_start()
             reply = self.copilot.llm.create(
                 system=SYSTEM_PROMPT, messages=self.messages, tools=TOOL_DEFS,
-                model=self.copilot.settings.agent_model, on_text=stream,
+                model=self.copilot.settings.agent_model,
+                on_text=self.ui.stream_delta,
             )
             assistant_content: list[dict] = []
             for b in reply.blocks:
@@ -260,18 +258,23 @@ class ChatSession:
 
             uses = reply.tool_uses
             if not uses:
+                self.ui.stream_end(final_text)
+                ended = True
                 break
             results = []
             for use in uses:
-                self.out(f"\n⚙ {use.name}({json.dumps(use.input, ensure_ascii=False)[:120]})\n")
+                self.ui.tool_call(use.name,
+                                  json.dumps(use.input, ensure_ascii=False)[:120])
                 self.trace.record("tool_use", tool=use.name, input=use.input)
                 result = self._handle_tool(use.name, use.input)
                 self.trace.record("tool_result", tool=use.name,
                                   result=str(result)[:500])
+                self.ui.tool_result(str(result)[:110].replace("\n", " · "))
                 results.append({"type": "tool_result", "tool_use_id": use.id,
                                 "content": str(result)[:20_000]})
             self.messages.append({"role": "user", "content": results})
-        self.out("\n")
+        if not ended:
+            self.ui.stream_end("")
         self.trace.record("assistant", text=final_text)
         return final_text
 
@@ -289,16 +292,41 @@ class ChatSession:
         self.messages = self.messages[keep_from:]
 
 
+def _setup_history(copilot: "Copilot") -> None:
+    """Arrow-key history + line editing across sessions (stdlib readline)."""
+    try:
+        import atexit
+        import readline
+
+        histfile = copilot.settings.run_root.parent / "history"
+        histfile.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            readline.read_history_file(str(histfile))
+        except (FileNotFoundError, OSError):
+            pass
+        readline.set_history_length(500)
+        atexit.register(lambda: readline.write_history_file(str(histfile)))
+    except ImportError:
+        pass
+
+
 def chat_repl(copilot: "Copilot", *, assume_yes: bool = False,
               handle_builtin=None) -> int:
     """Interactive chat loop. `/`-commands are handled by the caller's builtin
     handler (fast, deterministic); everything else is conversation."""
-    session = ChatSession(copilot, assume_yes=assume_yes)
-    print("omni-copilot chat — talk to me about the repo, or ask me to run tasks.")
-    print("(/status /logs /playbooks /resume /quit still work; Ctrl+C to stop a turn)")
+    ui = make_ui()
+    session = ChatSession(copilot, assume_yes=assume_yes, ui=ui)
+    _setup_history(copilot)
+    ui.banner({
+        "model": copilot.settings.agent_model,
+        "repo": copilot.settings.default_repo,
+        "playbooks": ", ".join(f"{p.name}[{p.status[0].upper()}]"
+                               for p in copilot.store.all()) or "none",
+        "run_root": str(copilot.settings.run_root),
+    })
     while True:
         try:
-            line = input("copilot> ").strip()
+            line = input(ui.prompt()).strip()
         except (EOFError, KeyboardInterrupt):
             print()
             return 0
@@ -312,6 +340,6 @@ def chat_repl(copilot: "Copilot", *, assume_yes: bool = False,
         try:
             session.turn(line)
         except KeyboardInterrupt:
-            print("\n(turn interrupted)")
+            ui.error("turn interrupted")
         except Exception as exc:
-            print(f"\n⚠ chat error: {type(exc).__name__}: {exc}")
+            ui.error(f"chat error: {type(exc).__name__}: {exc}")

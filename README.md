@@ -38,7 +38,11 @@ omni-copilot --resume                     # re-enter the last run's first incomp
 Built-ins inside the REPL: `/status`, `/logs [n]`, `/playbooks`, `/resume`, `/quit`.
 
 **Chat mode** (default when an LLM is configured): a persistent conversation with
-streaming replies. The model answers questions about the repo and past runs,
+streaming replies and full terminal chrome — session banner, spinner while
+thinking, live streaming tail that resolves into markdown-rendered replies
+(tables, headers, bold), color-coded tool calls and step results, and
+arrow-key input history (`~/.omni-copilot/history`). Everything degrades to
+plain text on pipes/non-TTY, so scripting output stays stable. The model answers questions about the repo and past runs,
 and executes work through tools — `run_task`/`run_playbook` (same TaskSpec,
 planner, and [y/N] confirmation path as the flag CLI; chat can never widen
 permissions), `get_status`/`get_logs`/`read_run_report`, and `repo_read`/
