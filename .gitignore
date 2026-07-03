@@ -12,3 +12,4 @@ dist/
 .venv/
 runs/
 *.db
+eval/raw/*.diff
