@@ -1,0 +1,13 @@
+# Issue filtering/triage — read-only classification table.
+name: issue-triage
+version: 1
+status: active
+provenance: {created_by: human, source: promoted from the generated L2 plan}
+task_kinds: [issue_filter]
+repos: [vllm-omni]
+params: {}
+steps:
+  - {id: fetch, step: issue.fetch}
+  - {id: triage, step: agent.triage_issues}
+  - {id: report, step: report.final_summary}
+success: triage table with type/module/priority/labels per issue

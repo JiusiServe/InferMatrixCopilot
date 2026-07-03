@@ -1,0 +1,22 @@
+# PR rebase — vetted L1 playbook. Push targets the PR head branch only
+# (never protected branches; force is with-lease only, required post-rebase).
+name: pr-rebase
+version: 1
+status: active
+provenance:
+  created_by: human
+  source: DESIGN_PR_REBASE.md folded into the target/playbook model
+task_kinds: [pr_rebase]
+repos: [vllm-omni]
+params:
+  force_push: {type: bool, default: true}
+steps:
+  - {id: guard, step: workspace.guard_clean}
+  - {id: checkout, step: pr.checkout_branch, params: {force_push: true}}
+  - {id: rebase, step: pr.rebase_onto_base}
+  - {id: analyze, step: pr.analyze_diff}
+  - {id: verify, step: agent.verify_module, foreach: affected_modules}
+  - {id: gate, step: review.patch_gate, params: {pre_push: true}, when: not report_only}
+  - {id: push, step: ci.push, when: not report_only}
+  - {id: report, step: report.final_summary}
+success: PR head replayed onto latest base, verified, gated, pushed with-lease

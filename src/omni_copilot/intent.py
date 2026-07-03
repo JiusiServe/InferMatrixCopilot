@@ -25,6 +25,9 @@ class IntentResult:
         return self.spec is None
 
 
+_COMPOUND_SPLIT = re.compile(r"\s*(?:;|,\s*then\b|\bthen\b|，然后|然后|接着|之后再|再帮我)\s*",
+                             re.IGNORECASE)
+
 _PR = re.compile(r"(?:pr|pull request)\s*#?\s*(\d+)", re.IGNORECASE)
 _ISSUE = re.compile(r"issue\s*#?\s*(\d+)", re.IGNORECASE)
 
@@ -58,6 +61,33 @@ def parse_intent(text: str, *, llm: LLM | None = None,
         "pr 123', 'review pr 123', 'answer issue 45', 'triage new issues', or "
         "'rebase the repo'."
     ))
+
+
+def parse_intents(text: str, *, llm: LLM | None = None,
+                  default_repo: str = "vllm-omni",
+                  model: str | None = None) -> list[IntentResult]:
+    """Compound commands ("rebase pr 12, then review it") -> ordered TaskSpecs.
+    Segments inherit the previous segment's PR/issue when they omit it ("it").
+    Any ambiguous segment surfaces its clarification instead of guessing."""
+    segments = [s.strip() for s in _COMPOUND_SPLIT.split(text) if s.strip()]
+    if len(segments) <= 1:
+        return [parse_intent(text, llm=llm, default_repo=default_repo, model=model)]
+    results: list[IntentResult] = []
+    last_pr: int | None = None
+    last_issue: int | None = None
+    for seg in segments:
+        seg = re.sub(r"^(and|also|and then|再|并且)\s+", "", seg, flags=re.IGNORECASE)
+        carried = seg
+        if last_pr and not _PR.search(seg) and not _ISSUE.search(seg):
+            carried = f"{seg} pr {last_pr}"
+        elif last_issue and not _ISSUE.search(seg) and not _PR.search(seg):
+            carried = f"{seg} issue {last_issue}"
+        r = parse_intent(carried, llm=llm, default_repo=default_repo, model=model)
+        if r.spec is not None:
+            last_pr = r.spec.pr or last_pr
+            last_issue = r.spec.issue or last_issue
+        results.append(r)
+    return results
 
 
 def _parse_deterministic(text: str, default_repo: str) -> IntentResult | None:

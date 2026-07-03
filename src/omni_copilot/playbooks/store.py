@@ -23,6 +23,7 @@ class PlaybookStep:
     step: str
     params: dict = field(default_factory=dict)
     foreach: str | None = None  # state key holding a list to fan out over
+    when: str | None = None     # TaskSpec condition: "post" / "not report_only"
 
 
 @dataclass
@@ -42,6 +43,25 @@ class Playbook:
         return self.status == "locked"
 
 
+def playbook_to_doc(pb: Playbook) -> dict:
+    return {
+        "name": pb.name, "version": pb.version, "status": pb.status,
+        "task_kinds": pb.task_kinds, "repos": pb.repos, "params": pb.params,
+        "provenance": pb.provenance, "success": pb.success,
+        "steps": [
+            {"id": s.id, "step": s.step,
+             **({"params": s.params} if s.params else {}),
+             **({"foreach": s.foreach} if s.foreach else {}),
+             **({"when": s.when} if s.when else {})}
+            for s in pb.steps
+        ],
+    }
+
+
+def parse_playbook(doc: dict, source: str = "<inline>") -> Playbook:
+    return _parse(doc, source)
+
+
 def _parse(doc: dict, source: str) -> Playbook:
     for key in ("name", "status", "task_kinds", "steps"):
         if key not in doc:
@@ -51,7 +71,7 @@ def _parse(doc: dict, source: str) -> Playbook:
     steps = [
         PlaybookStep(
             id=s["id"], step=s["step"], params=s.get("params", {}) or {},
-            foreach=s.get("foreach"),
+            foreach=s.get("foreach"), when=s.get("when"),
         )
         for s in doc["steps"]
     ]
@@ -114,17 +134,7 @@ class PlaybookStore:
         pb.status = "candidate"
         self.directory.mkdir(parents=True, exist_ok=True)
         path = self.directory / f"{pb.name}.yaml"
-        doc = {
-            "name": pb.name, "version": pb.version, "status": pb.status,
-            "task_kinds": pb.task_kinds, "repos": pb.repos, "params": pb.params,
-            "provenance": pb.provenance, "success": pb.success,
-            "steps": [
-                {"id": s.id, "step": s.step,
-                 **({"params": s.params} if s.params else {}),
-                 **({"foreach": s.foreach} if s.foreach else {})}
-                for s in pb.steps
-            ],
-        }
-        path.write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True))
+        path.write_text(yaml.safe_dump(playbook_to_doc(pb), sort_keys=False,
+                                       allow_unicode=True))
         self._playbooks[pb.name] = pb
         return path

@@ -1,8 +1,10 @@
-"""omni-copilot — conversational CLI (design §3.Y).
+"""omni-copilot — conversational CLI (design §3.Y, phases A+B).
 
-REPL + one-shot (-p). NL -> intent -> TaskSpec (echoed; write/push tasks need
-confirmation) -> planner (reuse > adapt > generate) -> executor. Built-ins:
-/status /logs /playbooks /quit. Blocked runs exit 3.
+REPL + one-shot (-p). NL -> intent -> TaskSpec(s) (echoed; write/push tasks
+need confirmation) -> inline plan review for adapted/generated plans ->
+planner (reuse > adapt > generate) -> executor. Compound commands ("rebase
+pr 12, then review it") become an ordered task queue. Built-ins: /status
+/logs /playbooks /resume /quit. Blocked runs exit 3.
 """
 
 from __future__ import annotations
@@ -14,15 +16,18 @@ import sys
 import time
 from pathlib import Path
 
+import yaml
+
 from .config import Settings
 from .engine.builtin_steps import register_builtin_steps
 from .engine.executor import Executor
 from .engine.planner import Planner, PlanningError, Resolution
 from .engine.registry import StepRegistry
-from .intent import parse_intent
+from .intent import parse_intents
 from .llm import LLM
 from .notify import BLOCKED_EXIT, Notifier
-from .playbooks.store import PlaybookStore
+from .playbooks.store import PlaybookStore, parse_playbook, playbook_to_doc
+from .review.reviewer import run_plan_review
 from .run_trace import RunTrace
 from .targets.base import PushPolicy
 from .task_spec import TaskSpec
@@ -37,10 +42,30 @@ class Copilot:
         self.planner = Planner(self.store, self.registry)
         self.last_run_dir: Path | None = None
 
-    # -- dispatch --------------------------------------------------------------
+    # -- planning ---------------------------------------------------------------
     def resolve(self, spec: TaskSpec) -> Resolution:
         return self.planner.resolve(spec)
 
+    def _plan_review_gate(self, resolution: Resolution, spec: TaskSpec,
+                          assume_yes: bool) -> bool:
+        """Inline Plan-Review for adapted/generated plans. LLM verdict shown in
+        the session; block stops; no reviewer -> the human confirm IS the gate."""
+        if not resolution.requires_review:
+            return True
+        doc = yaml.safe_dump(playbook_to_doc(resolution.playbook), sort_keys=False)
+        verdict = run_plan_review(self.llm, playbook_doc=doc, task=spec.describe(),
+                                  model=self.settings.reviewer)
+        if verdict.verdict == "unavailable":
+            print("  ⚠ no reviewer LLM — your confirmation is the plan-review gate")
+            return True
+        print(f"  plan review: {verdict.verdict}"
+              + (f" — {verdict.critiques}" if verdict.critiques else ""))
+        if verdict.verdict == "block":
+            print("✋ plan blocked by reviewer.")
+            return False
+        return True  # lgtm, or revise surfaced to the user before their confirm
+
+    # -- execution -----------------------------------------------------------------
     def run_task(self, spec: TaskSpec, *, assume_yes: bool = False,
                  plan_only: bool = False) -> int:
         try:
@@ -58,6 +83,8 @@ class Copilot:
         if plan_only:
             return 0
 
+        if not self._plan_review_gate(resolution, spec, assume_yes):
+            return BLOCKED_EXIT
         if (spec.confirm_required or resolution.requires_review) and not assume_yes:
             answer = input("Proceed? [y/N] ").strip().lower()
             if answer not in ("y", "yes"):
@@ -67,35 +94,76 @@ class Copilot:
         run_id = f"run-{time.strftime('%Y%m%d-%H%M%S')}"
         run_dir = self.settings.run_root / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
+        (run_dir / "task.json").write_text(json.dumps({
+            "spec": spec.model_dump(), "playbook": playbook_to_doc(resolution.playbook),
+        }, indent=2))
+        return self._execute(resolution.playbook, spec, run_dir,
+                             resolution_mode=resolution.mode, tier=resolution.tier)
+
+    def _execute(self, playbook, spec: TaskSpec, run_dir: Path, *,
+                 resolution_mode: str = "resume", tier: str = "?") -> int:
         self.last_run_dir = run_dir
         trace = RunTrace(run_dir / "run_trace.jsonl")
-        notifier = Notifier(self.settings, run_dir, trace, run_id)
-        trace.record("task", spec=spec.model_dump(), resolution=resolution.mode,
-                     playbook=resolution.playbook.name, tier=resolution.tier)
-
+        notifier = Notifier(self.settings, run_dir, trace, run_dir.name)
+        trace.record("task", spec=spec.model_dump(), resolution=resolution_mode,
+                     playbook=playbook.name, tier=tier)
         state: dict = {
             "task_spec": spec.model_dump(),
             "repo_path": str(self.settings.repo_path(spec.repo) or ""),
-            "push_policy": PushPolicy(),  # pushes stay disallowed unless a target enables them
+            "push_policy": PushPolicy(),  # steps may replace with a derived policy
             "protected_branches": self.settings.protected_branches,
         }
         executor = Executor(self.registry, self.settings, run_dir=run_dir,
                             trace=trace, llm=self.llm, notifier=notifier)
-        outcome = asyncio.run(executor.run(resolution.playbook, state))
+        outcome = asyncio.run(executor.run(playbook, state))
 
         for step_id, r in outcome.step_results.items():
             mark = "✓" if r.ok else "✗"
             print(f"  {mark} {step_id}: {r.summary}")
-        print(f"run {run_id}: {outcome.status}  ({run_dir})")
+        print(f"run {run_dir.name}: {outcome.status}  ({run_dir})")
         if outcome.status == "blocked":
             print(f"  ⚠ {outcome.blocked_reason}\n  see {run_dir / 'ESCALATION.md'}")
             return BLOCKED_EXIT
         return 0 if outcome.status == "done" else 1
 
+    def run_queue(self, specs: list[TaskSpec], *, assume_yes: bool = False,
+                  plan_only: bool = False) -> int:
+        """Ordered task queue for compound commands; stops on failure/blocked."""
+        if len(specs) > 1:
+            print(f"⧉ queued {len(specs)} tasks:")
+            for i, s in enumerate(specs, 1):
+                print(f"  {i}. {s.describe()}")
+        for i, spec in enumerate(specs, 1):
+            if len(specs) > 1:
+                print(f"\n── task {i}/{len(specs)} ──")
+            code = self.run_task(spec, assume_yes=assume_yes, plan_only=plan_only)
+            if code != 0:
+                if i < len(specs):
+                    print(f"⏸ queue stopped: {len(specs) - i} task(s) not run")
+                return code
+        return 0
+
+    def resume_last(self) -> int:
+        """Re-enter the most recent run at its first incomplete step."""
+        runs = sorted(self.settings.run_root.glob("run-*")) \
+            if self.settings.run_root.exists() else []
+        for run_dir in reversed(runs):
+            task_file = run_dir / "task.json"
+            if not task_file.exists():
+                continue
+            saved = json.loads(task_file.read_text())
+            spec = TaskSpec(**saved["spec"])
+            playbook = parse_playbook(saved["playbook"], str(task_file))
+            print(f"↻ resuming {run_dir.name}: {spec.describe()}")
+            return self._execute(playbook, spec, run_dir)
+        print("no resumable run found")
+        return 1
+
     # -- built-ins ---------------------------------------------------------------
     def status(self) -> str:
         if not self.last_run_dir:
-            runs = sorted(self.settings.run_root.glob("run-*")) if self.settings.run_root.exists() else []
+            runs = sorted(self.settings.run_root.glob("run-*")) \
+                if self.settings.run_root.exists() else []
             if not runs:
                 return "no runs yet"
             self.last_run_dir = runs[-1]
@@ -120,7 +188,8 @@ class Copilot:
         ) or "(none)"
 
 
-def _handle_line(copilot: Copilot, line: str, assume_yes: bool, plan_only: bool) -> int | None:
+def _handle_line(copilot: Copilot, line: str, assume_yes: bool,
+                 plan_only: bool) -> int | None:
     line = line.strip()
     if not line:
         return None
@@ -136,13 +205,18 @@ def _handle_line(copilot: Copilot, line: str, assume_yes: bool, plan_only: bool)
     if line == "/playbooks":
         print(copilot.playbooks())
         return None
-    result = parse_intent(line, llm=copilot.llm,
-                          default_repo=copilot.settings.default_repo,
-                          model=copilot.settings.intent)
-    if result.needs_clarification:
-        print(f"? {result.clarify}")
+    if line == "/resume":
+        return copilot.resume_last()
+
+    results = parse_intents(line, llm=copilot.llm,
+                            default_repo=copilot.settings.default_repo,
+                            model=copilot.settings.intent)
+    unclear = [r for r in results if r.needs_clarification]
+    if unclear:
+        print(f"? {unclear[0].clarify}")
         return None
-    return copilot.run_task(result.spec, assume_yes=assume_yes, plan_only=plan_only)
+    return copilot.run_queue([r.spec for r in results],
+                             assume_yes=assume_yes, plan_only=plan_only)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -153,15 +227,20 @@ def main(argv: list[str] | None = None) -> int:
                         help="skip confirmation prompts (headless)")
     parser.add_argument("--plan-only", action="store_true",
                         help="resolve and print the plan without executing")
+    parser.add_argument("--resume", action="store_true",
+                        help="resume the most recent run at its first incomplete step")
     args = parser.parse_args(argv)
 
     copilot = Copilot()
 
+    if args.resume:
+        return copilot.resume_last()
     if args.prompt:
         code = _handle_line(copilot, args.prompt, args.yes, args.plan_only)
         return int(code) if code not in (None, -1) else 0
 
-    print("omni-copilot — natural-language repo maintenance. /status /logs /playbooks /quit")
+    print("omni-copilot — natural-language repo maintenance. "
+          "/status /logs /playbooks /resume /quit")
     while True:
         try:
             line = input("copilot> ")

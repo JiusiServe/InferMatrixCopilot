@@ -1,0 +1,15 @@
+# PR review — read-only analysis; the comment is posted only with the explicit
+# post flag AND ALLOW_POST=1 (otherwise dry-run).
+name: pr-review
+version: 1
+status: active
+provenance: {created_by: human, source: promoted from the generated L2 plan}
+task_kinds: [pr_review]
+repos: [vllm-omni]
+params: {}
+steps:
+  - {id: fetch, step: pr.fetch_diff}
+  - {id: review, step: agent.review_diff}
+  - {id: post, step: pr.post_review, when: post}
+  - {id: report, step: report.final_summary}
+success: findings list produced; posted only on explicit request

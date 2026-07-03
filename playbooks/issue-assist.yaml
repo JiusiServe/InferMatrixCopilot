@@ -1,0 +1,14 @@
+# Issue answering — draft by default; posting needs the explicit post flag.
+name: issue-answer
+version: 1
+status: active
+provenance: {created_by: human, source: promoted from the generated L2 plan}
+task_kinds: [issue_answer]
+repos: [vllm-omni]
+params: {}
+steps:
+  - {id: fetch, step: issue.fetch}
+  - {id: draft, step: agent.draft_issue_answer}
+  - {id: post, step: issue.post_answer, when: post}
+  - {id: report, step: report.final_summary}
+success: grounded draft produced; posted only on explicit request

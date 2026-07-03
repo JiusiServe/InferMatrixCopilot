@@ -35,7 +35,12 @@ class Settings(BaseSettings):
 
     # Push safety — dry-run by default; protected branches never force-pushed.
     allow_push: bool = False
+    allow_post: bool = False  # outward writes (PR comments / issue replies) dry-run by default
     protected_branches: list[str] = ["main"]
+
+    # PR debug
+    buildkite_api_token: str = ""
+    pr_debug_max_groups: int = 6
 
     # External locked rebase pipeline (the existing 5-phase orchestrator)
     rebase_orchestrator_cmd: str = "omni-rebase-orchestrator --dry-run"

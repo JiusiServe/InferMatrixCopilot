@@ -6,6 +6,7 @@ Wrap-don't-rewrite: the locked repo-rebase playbook delegates to the existing
 
 from __future__ import annotations
 
+import json
 import shlex
 import subprocess
 from pathlib import Path
@@ -177,9 +178,20 @@ async def _issue_fetch(ctx: StepContext) -> StepResult:
         return StepResult(True, summary="issue from state")
     spec = ctx.state.get("task_spec") or {}
     issue = spec.get("issue") if isinstance(spec, dict) else None
+    kind = spec.get("kind") if isinstance(spec, dict) else ""
     repo = _repo_path(ctx)
     if not issue:
-        return StepResult(False, FailureKind.BLOCKED, "no issue number in task spec")
+        if kind != "issue_filter":
+            return StepResult(False, FailureKind.BLOCKED, "no issue number in task spec")
+        # triage mode: recent open issues instead of a single one
+        limit = str(ctx.params.get("limit", 20))
+        code, out = _gh(["issue", "list", "--state", "open", "--limit", limit,
+                         "--json", "number,title,labels,createdAt"], cwd=repo)
+        if code != 0:
+            return StepResult(False, FailureKind.BLOCKED, f"gh issue list failed: {out[:500]}")
+        ctx.state["issue_text"] = out
+        n = len(json.loads(out or "[]"))
+        return StepResult(True, summary=f"fetched {n} open issues for triage")
     code, out = _gh(["issue", "view", str(issue), "--json",
                      "title,body,labels,comments"], cwd=repo)
     if code != 0:
@@ -253,4 +265,8 @@ def register_builtin_steps(registry: StepRegistry) -> StepRegistry:
                      "issue_text", "triage_table"),
                  "Classify/label/route issues (read-only).",
                  tool_scope=read_only_scope()))
+
+    from .pr_steps import register_pr_steps  # late import: pr_steps imports helpers above
+
+    register_pr_steps(registry)
     return registry

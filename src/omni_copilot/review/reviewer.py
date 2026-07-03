@@ -35,6 +35,29 @@ class ReviewVerdict:
         return self.verdict == "lgtm"
 
 
+_PLAN_SYSTEM = """You review an EXECUTION PLAN (playbook) an autonomous repo-maintenance
+agent generated or adapted, BEFORE it runs. Judge: does the step sequence match the
+stated task; are the steps safe for the task's tier (read-only tasks must contain no
+write/push steps); is anything missing that would make results untrustworthy?
+Respond with JSON only: {"verdict": "lgtm" | "revise" | "block", "critiques": ["..."]}"""
+
+
+def run_plan_review(llm: LLM | None, *, playbook_doc: str, task: str,
+                    model: str | None = None) -> ReviewVerdict:
+    """Plan-Review gate for adapted/generated playbooks. Fail-closed like
+    patch review: no reviewer -> `unavailable` (caller must gate on a human)."""
+    if llm is None or not llm.available:
+        return ReviewVerdict("unavailable", ["no reviewer LLM configured"])
+    prompt = f"Task: {task}\n\nPlan:\n```yaml\n{playbook_doc[:20_000]}\n```"
+    reply = llm.create(system=_PLAN_SYSTEM,
+                       messages=[{"role": "user", "content": prompt}], model=model)
+    obj = parse_json_reply(reply.text)
+    if not obj or obj.get("verdict") not in ("lgtm", "revise", "block"):
+        return ReviewVerdict("revise", ["reviewer reply unparseable"], reply.text)
+    return ReviewVerdict(obj["verdict"], [str(c) for c in obj.get("critiques", [])],
+                         reply.text)
+
+
 def run_patch_review(
     llm: LLM | None,
     *,

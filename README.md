@@ -30,9 +30,11 @@ omni-copilot                              # REPL: natural-language commands
 omni-copilot -p "rebase the repo" --plan-only
 omni-copilot -p "debug the CI of pr 2744, report only"
 omni-copilot -p "review pr 4830" --yes
+omni-copilot -p "rebase pr 4830, then review it"   # compound -> ordered queue
+omni-copilot --resume                     # re-enter the last run's first incomplete step
 ```
 
-Built-ins inside the REPL: `/status`, `/logs [n]`, `/playbooks`, `/quit`.
+Built-ins inside the REPL: `/status`, `/logs [n]`, `/playbooks`, `/resume`, `/quit`.
 
 Natural language is parsed into a **TaskSpec** (kind, PR/issue, flags) and echoed
 back; write/push-capable tasks require confirmation; ambiguous commands get a
@@ -41,9 +43,14 @@ clarifying question, never a guessed execution. The planner then resolves
 
 - `repo_rebase` → the **locked** `repo-rebase` playbook, run verbatim (L0). It
   delegates to the proven 5-phase orchestrator (`REBASE_ORCHESTRATOR_CMD`).
-- `pr_rebase` / `pr_debug` → vetted playbooks, parameterized (L1).
-- `pr_review` / `issue_answer` / `issue_filter` → generated read-only plans
-  (L2), plan-review gated; generation is structurally barred from write/push steps.
+- `pr_rebase` / `pr_debug` → vetted playbooks (L1): fork-aware checkout,
+  rebase with agent conflict resolution (abort+escalate without an LLM),
+  per-module verification, signature-grouped CI debugging — force-with-lease
+  only for the rebased PR head, strictly additive pushes for debug fixes.
+- `pr_review` / `issue_answer` / `issue_filter` → vetted read-only playbooks;
+  posting needs the explicit `post` intent AND `ALLOW_POST=1` (dry-run otherwise).
+  Kinds without a vetted playbook fall back to generated plans (L2), plan-review
+  gated; generation is structurally barred from write/push steps.
 
 ## Safety posture
 

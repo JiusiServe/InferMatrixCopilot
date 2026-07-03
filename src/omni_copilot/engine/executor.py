@@ -65,6 +65,10 @@ class Executor:
         state.setdefault("playbook", playbook.name)
 
         for pstep in playbook.steps:
+            if pstep.when and not _eval_when(pstep.when, state):
+                outcome.step_results[pstep.id] = StepResult(
+                    True, summary=f"skipped (when: {pstep.when})")
+                continue
             if pstep.id in progress["completed"]:
                 cached = progress["completed"][pstep.id]
                 outcome.step_results[pstep.id] = StepResult(
@@ -135,6 +139,16 @@ class Executor:
                 return last
             self.trace.record("step_retry", spec=spec.name, attempt=attempt)
         return last  # exhausted retries
+
+
+def _eval_when(when: str, state: dict) -> bool:
+    """Evaluate a step condition against the TaskSpec: "post" / "not report_only"."""
+    spec = state.get("task_spec") or {}
+    expr = when.strip()
+    negate = expr.startswith("not ")
+    key = expr[4:].strip() if negate else expr
+    value = bool(spec.get(key))
+    return (not value) if negate else value
 
 
 def _merge(results: list[StepResult]) -> StepResult:

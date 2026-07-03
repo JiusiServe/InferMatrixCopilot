@@ -1,0 +1,22 @@
+# PR debug — vetted L1 playbook. Additive commits only: force_push stays false.
+# report_only stops after grouping (read-only triage, independently useful).
+name: pr-debug
+version: 1
+status: active
+provenance:
+  created_by: human
+  source: PLAN_PR_DEBUG_MODE.md folded into the target/playbook model
+task_kinds: [pr_debug]
+repos: [vllm-omni]
+params:
+  max_groups: {type: int, default: 6}
+steps:
+  - {id: guard, step: workspace.guard_clean}
+  - {id: checkout, step: pr.checkout_branch, params: {force_push: false}}
+  - {id: fetch_ci, step: pr.fetch_ci_failures}
+  - {id: group, step: pr.group_failures}
+  - {id: debug, step: agent.debug_group, foreach: failure_groups, when: not report_only}
+  - {id: gate, step: review.patch_gate, params: {pre_push: true}, when: not report_only}
+  - {id: push, step: ci.push, when: not report_only}
+  - {id: report, step: report.final_summary}
+success: each failure group fixed at root cause or escalated; additive push only
