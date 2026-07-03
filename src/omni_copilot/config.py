@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     rebase_agent_root: Path = Path("/rebase/vllm-omni-rebase-agent")
     rebase_poll_interval: int = 30
 
+    # PR-review step: tool-loop budget for evidence gathering
+    review_max_iters: int = 12
+
     # Patch-review trigger thresholds
     large_diff_lines: int = 400
     large_diff_files: int = 8

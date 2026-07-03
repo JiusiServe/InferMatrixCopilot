@@ -76,7 +76,7 @@ GROUND_TRUTH: dict[int, list[dict]] = {
 # pure_skill (simulated Claude-Code+skill) was removed after the REAL
 # claudecode_skill arm superseded it — the simulation measured harness
 # absence, not the skill (see ANALYSIS.md); raw artifacts remain in raw/.
-ARMS = ["pure_copilot", "copilot_skill", "claudecode_skill"]
+ARMS = ["pure_copilot", "copilot_skill", "claudecode_skill", "copilot_v2"]
 
 COPILOT_REVIEWER_SYSTEM = (
     "You are a meticulous code reviewer for the vLLM-Omni repo. "
@@ -163,6 +163,31 @@ def arm_pure_copilot(pr: int, diff: str, meta: dict, llm: CountingLLM) -> str:
     reply = llm.create(system=COPILOT_REVIEWER_SYSTEM,
                        messages=[{"role": "user", "content": prompt}])
     return reply.text
+
+
+def arm_copilot_v2(pr: int, diff: str, meta: dict, llm: CountingLLM) -> str:
+    """The copilot's IMPROVED shipped review path (pr-review@4): real gate-check
+    + evidence-grounded two-stage agent.review_diff, executed via the actual
+    step handlers. Note: gate checks are retroactively inert on merged PRs."""
+    import asyncio
+
+    from omni_copilot.engine.builtin_steps import register_builtin_steps
+    from omni_copilot.engine.registry import StepRegistry
+    from omni_copilot.engine.step import StepContext
+    from omni_copilot.run_trace import RunTrace
+
+    registry = register_builtin_steps(StepRegistry())
+    run_dir = RAW / "copilot_v2_work"
+    run_dir.mkdir(exist_ok=True)
+    state = {"diff_text": pr_header(pr, meta) + "\n" + diff,
+             "task_spec": {"kind": "pr_review", "pr": pr},
+             "repo_path": "/rebase/vllm-omni"}
+    ctx = StepContext(settings=Settings(), state=state, params={},
+                      run_dir=run_dir, trace=RunTrace(run_dir / "trace.jsonl"),
+                      llm=llm)
+    asyncio.run(registry.get("pr.gate_check").handler(ctx))
+    result = asyncio.run(registry.get("agent.review_diff").handler(ctx))
+    return state.get("review_text") or f"(review failed: {result.summary})"
 
 
 def arm_copilot_skill(pr: int, diff: str, meta: dict, llm: CountingLLM,
@@ -327,6 +352,8 @@ def main() -> int:
                 cc_cost = None
                 if arm == "pure_copilot":
                     review = arm_pure_copilot(pr, diff, meta, counting)
+                elif arm == "copilot_v2":
+                    review = arm_copilot_v2(pr, diff, meta, counting)
                 elif arm == "claudecode_skill":
                     review, cc_cost = arm_claudecode(pr, Path(args.skill_dir))
                 else:

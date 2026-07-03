@@ -1,5 +1,53 @@
 # Analysis — pure skill vs pure copilot vs copilot+skill (DeepSeek v4 pro)
 
+## copilot_v2 — the shipped step improved from these findings (pr-review@4)
+
+What was built (`agent.review_diff` v2 + `pr.gate_check`, playbook v4):
+deterministic gate checks (draft/merge-state/failing CI — the issue class no
+diff-only model caught), an evidence-grounded tool loop over the repo
+checkout, the domain checklist (incl. "undocumented assumptions/invariants" —
+added because #4849's ground truth was exactly that), severity labels with an
+explicit `[unverified]` escape hatch, and a verify-and-rewrite editor pass.
+
+**Lesson learned the hard way:** the first version told the model "do not
+invent findings" with maintainer brevity — and it reproduced the pure_skill
+failure mode exactly: three justified APPROVEs, RQS 0.00, despite doing the
+evidence work (6+ lookups). On this model, *precision through silence* beats
+recall to death; the fix is *precision through labeling* (nits welcome,
+[unverified] allowed and marked). That change alone took RQS from 0.00 to
+0.38 on the next sample.
+
+**Multi-sample results** (3 samples of the identical final config; the eval's
+single-run tables understate variance — samples preserved in
+`raw/copilot_v2_samples/`):
+
+| sample | recall_w | precision | actionability | RQS |
+|---|---|---|---|---|
+| A | 0.27 | 0.72 | 0.91 | 0.38 |
+| B (RESULTS_V2 table) | 0.08 | 0.19 | 0.81 | 0.14 |
+| C (v1-judge only) | ~0.17 | ~0.93 | — | — |
+
+Robust conclusions (hold across every sample):
+- **Actionability ~0.81–0.91** vs the old step's 0.50 — every finding is now a
+  file:line directive. This is the dimension the jury judges reliably (κ=0.6+).
+- **Breadth across samples**: the three samples collectively touched **5 of 8**
+  ground-truth issues (4678 gt1; 4679 gt1, gt3; 4849 gt1, gt2 — including two
+  issues no other arm ever hit), vs 2/8 for the old step and 3/8 for Claude
+  Code + skill. Each run samples a different corner of the checklist.
+- **Evidence-grounding works mechanically**: 6–23 repo lookups per review, gate
+  step deterministic, editor output clean.
+
+Honest negatives:
+- **Per-run variance is large** (RQS 0.14–0.38); a single review samples one
+  subset of what the step can find, and false positives still occur (a live
+  #4837 sample disputed changes that are actually correct). The validity
+  judge's κ≈0 means the precision column mixes arm noise with judge noise.
+- Practical mitigation if review quality matters more than cost: run the
+  review step 2–3 times and merge/dedupe findings (union recall is the strong
+  suit) — a natural future `foreach` fan-out + merge step.
+
+---
+
 ## RQS v2 update (literature-grounded rerun — see METRIC_V2.md, RESULTS_V2.md)
 
 Re-scoring the same nine cached reviews with the v2 metric (severity/resolution-

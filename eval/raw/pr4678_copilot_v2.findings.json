@@ -1,0 +1,32 @@
+[
+ {
+  "file": "transformer_cosmos3.py",
+  "line": 1378,
+  "summary": "The error message in `_validate_gen_sequence_parallel` is confusing because the pipeline pads sound latents automatically; reword it to clarify that this check only applies when the transformer is called without pipeline-level padding."
+ },
+ {
+  "file": "tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py",
+  "line": 1468,
+  "summary": "The test lambda now silently accepts the new `sp_video_shape` keyword, so the pipeline-level padding path when sequence parallelism is active is not exercised; add a test that mocks `get_ulysses_parallel_world_size` to 2, passes a non-None `sp_video_shape`, and asserts the padded latent frame count."
+ },
+ {
+  "file": "tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py",
+  "line": 864,
+  "summary": "The `StubCosmos3Transformer` lacks the new `sound_latent_frames_for_sequence_parallel` method, risking AttributeError in future tests; verify CI coverage and consider adding the method or documenting the fragility."
+ },
+ {
+  "file": "transformer_cosmos3.py",
+  "line": 1398,
+  "summary": "The pad expression `pad = (-(base + sound_frames)) % ulysses_size` is correct but dense; add an inline comment to improve readability."
+ },
+ {
+  "file": "transformer_cosmos3.py",
+  "line": 1390,
+  "summary": "The method comment does not clarify that `video_shape` expects latent-space dimensions; add a note that the tuple must be in latent space."
+ },
+ {
+  "file": "pipeline_cosmos3.py",
+  "line": 1666,
+  "summary": "The `sp_num_vision_items` parameter in `_prepare_sound_latents` is dead code because it is never passed a value >1 and sound is already rejected for transfer/control; either remove it or document it as future-proofing and add a test."
+ }
+]

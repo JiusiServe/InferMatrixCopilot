@@ -1,0 +1,32 @@
+[
+ {
+  "file": "vllm_omni/entrypoints/openai/serving_speech.py",
+  "line": 4063,
+  "summary": "Add a matching check in validate_streaming_constraints to raise a 422 for word_timestamps=true with any streaming request."
+ },
+ {
+  "file": "vllm_omni/benchmarks/patch/patch.py",
+  "line": 1147,
+  "summary": "Move stream_format='audio' assignment after _update_payload_common to prevent it from being overwritten."
+ },
+ {
+  "file": "vllm_omni/entrypoints/openai/protocol/audio.py",
+  "line": 297,
+  "summary": "Add a comment above is_sse_stream() explaining the intentional short-circuit that prevents stream=True from overriding an explicit stream_format='audio'."
+ },
+ {
+  "file": "docs/serving/speech_api.md",
+  "line": 125,
+  "summary": "Replace the 'If omitted, stream=true selects SSE' phrase with 'When stream=true, the default is sse; use stream_format='audio' to override.' to eliminate ambiguity."
+ },
+ {
+  "file": "tests/e2e/online_serving/test_qwen3_tts_base.py",
+  "line": 100,
+  "summary": "Verify that all other e2e tests sending stream=true without stream_format now explicitly opt in to raw audio."
+ },
+ {
+  "file": "tests/helpers/runtime.py",
+  "line": 1772,
+  "summary": "Confirm that no raw-audio test uses a direct httpx call without updating the payload to include stream_format."
+ }
+]
