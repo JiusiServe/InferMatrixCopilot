@@ -1,0 +1,18 @@
+# The nightly full rebase as a LOCKED playbook (zero regression):
+# recalled verbatim (L0), never regenerated or adapted. It delegates to the
+# proven 5-phase orchestrator in vllm-omni-rebase-agent.
+name: repo-rebase
+version: 1
+status: locked
+provenance:
+  created_by: human
+  source: vllm-omni-rebase-agent 5-phase LangGraph orchestrator (frozen 2026-07)
+task_kinds: [repo_rebase]
+repos: [vllm-omni]
+params:
+  report_only: {type: bool, default: true}
+steps:
+  - {id: guard, step: workspace.guard_clean}
+  - {id: rebase, step: rebase.run_external}
+  - {id: report, step: report.final_summary}
+success: external orchestrator exits 0 with clean CI

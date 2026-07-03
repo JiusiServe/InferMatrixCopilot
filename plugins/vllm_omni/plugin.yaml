@@ -1,0 +1,55 @@
+# Plugin zero — vllm-omni repo knowledge extracted to the edge.
+name: vllm_omni
+status: active
+created_by: human
+schema_version: 1
+
+repo:
+  path: /rebase/vllm-omni
+  default_branch: main
+  rebase_branch: dev/vllm-align
+  language: python
+
+upstream:
+  kind: fork_tracking
+  repo_path: /rebase/vllm
+  remote: origin
+
+modules:
+  worker_runner:
+    local_paths: [vllm_omni/worker/]
+    wave: 1
+  model_executor:
+    local_paths: [vllm_omni/model_executor/]
+    wave: 1
+  input_output:
+    local_paths: [vllm_omni/inputs/, vllm_omni/outputs/]
+    wave: 1
+  scheduler:
+    local_paths: [vllm_omni/core/]
+    wave: 1
+  online_serving:
+    local_paths: [vllm_omni/entrypoints/]
+    wave: 1
+  model_config:
+    local_paths: [vllm_omni/config/]
+    wave: 1
+  platform:
+    local_paths: [vllm_omni/platforms/]
+    wave: 1
+  benchmarks:
+    local_paths: [benchmarks/]
+    wave: 2
+
+validation:
+  test_manifest_sources: [.buildkite/]
+  precommit: true
+
+ci:
+  provider: buildkite
+  org: vllm
+
+push:
+  default_remote: origin
+  protected_branches: [main]
+  allowed: false   # deliver via PR; never direct-push main

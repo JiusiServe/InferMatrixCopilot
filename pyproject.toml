@@ -1,0 +1,28 @@
+[project]
+name = "omni-copilot"
+version = "0.1.0"
+description = "vLLM-Omni Copilot — playbook-driven repo-maintenance agent (engine substrate, targets, plugins, conversational CLI)"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.7",
+    "pydantic-settings>=2.2",
+    "PyYAML>=6.0",
+    "anthropic>=0.34",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+omni-copilot = "omni_copilot.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+addopts = "-q"

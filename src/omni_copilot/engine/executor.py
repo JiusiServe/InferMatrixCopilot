@@ -1,0 +1,152 @@
+"""Executor — runs a Playbook's step graph with task-agnostic guarantees:
+per-step checkpoint/resume, bounded retries, typed failure routing, RunTrace,
+and escalation on BLOCKED/ESCALATE.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import TYPE_CHECKING, Optional
+
+from .step import FailureKind, StepContext, StepResult
+from .registry import StepRegistry
+
+if TYPE_CHECKING:  # pragma: no cover
+    from ..config import Settings
+    from ..llm import LLM
+    from ..notify import Notifier
+    from ..playbooks.store import Playbook
+    from ..run_trace import RunTrace
+
+
+@dataclass
+class RunOutcome:
+    status: str  # "done" | "failed" | "blocked"
+    step_results: dict[str, StepResult] = field(default_factory=dict)
+    blocked_reason: str = ""
+
+
+class Executor:
+    def __init__(
+        self,
+        registry: StepRegistry,
+        settings: "Settings",
+        *,
+        run_dir: Path,
+        trace: "RunTrace",
+        llm: Optional["LLM"] = None,
+        notifier: Optional["Notifier"] = None,
+    ):
+        self.registry = registry
+        self.settings = settings
+        self.run_dir = Path(run_dir)
+        self.trace = trace
+        self.llm = llm
+        self.notifier = notifier
+        self.progress_file = self.run_dir / "progress.json"
+
+    # -- checkpoint / resume ------------------------------------------------
+    def _load_progress(self) -> dict:
+        if self.progress_file.exists():
+            return json.loads(self.progress_file.read_text())
+        return {"completed": {}}
+
+    def _save_progress(self, progress: dict) -> None:
+        self.run_dir.mkdir(parents=True, exist_ok=True)
+        self.progress_file.write_text(json.dumps(progress, indent=2, default=str))
+
+    # -- execution ------------------------------------------------------------
+    async def run(self, playbook: "Playbook", state: dict) -> RunOutcome:
+        progress = self._load_progress()
+        outcome = RunOutcome(status="done")
+        state.setdefault("playbook", playbook.name)
+
+        for pstep in playbook.steps:
+            if pstep.id in progress["completed"]:
+                cached = progress["completed"][pstep.id]
+                outcome.step_results[pstep.id] = StepResult(
+                    ok=True, summary=cached.get("summary", "(resumed)"),
+                    outputs=cached.get("outputs", {}),
+                )
+                continue
+
+            spec = self.registry.get(pstep.step)
+            items = state.get(pstep.foreach, [None]) if pstep.foreach else [None]
+            if pstep.foreach and not isinstance(items, list):
+                items = [items]
+
+            results = await asyncio.gather(
+                *(self._run_step(spec, pstep.params, state, item) for item in items)
+            )
+            result = _merge(results)
+            outcome.step_results[pstep.id] = result
+            self.trace.record(
+                "step_result", step=pstep.id, spec=spec.name, ok=result.ok,
+                failure=result.failure.value if result.failure else None,
+                summary=result.summary,
+            )
+
+            if result.ok:
+                progress["completed"][pstep.id] = {
+                    "summary": result.summary, "outputs": result.outputs,
+                }
+                self._save_progress(progress)
+                state.setdefault("outputs", {})[pstep.id] = result.outputs
+                continue
+
+            # -- typed failure routing --
+            if result.failure in (FailureKind.BLOCKED, FailureKind.ESCALATE,
+                                  FailureKind.FORBIDDEN):
+                reason = f"step '{pstep.id}' ({spec.name}): {result.summary}"
+                if self.notifier is not None:
+                    self.notifier.escalate(
+                        reason=reason, phase=pstep.id,
+                        severity="blocked", state_summary={"playbook": playbook.name},
+                        artifacts=[str(self.progress_file)],
+                    )
+                outcome.status = "blocked"
+                outcome.blocked_reason = reason
+                return outcome
+
+            outcome.status = "failed"
+            outcome.blocked_reason = f"step '{pstep.id}' failed: {result.summary}"
+            return outcome
+
+        return outcome
+
+    async def _run_step(self, spec, params: dict, state: dict, item) -> StepResult:
+        ctx = StepContext(
+            settings=self.settings, state=state, params=params or {},
+            run_dir=self.run_dir, trace=self.trace, llm=self.llm,
+            notifier=self.notifier, item=item,
+        )
+        attempts = 1 + max(0, self.settings.max_step_retries)
+        last: StepResult | None = None
+        for attempt in range(1, attempts + 1):
+            try:
+                last = await spec.handler(ctx)
+            except Exception as exc:  # handler bug != typed failure
+                last = StepResult(False, FailureKind.BLOCKED,
+                                  f"unhandled error: {type(exc).__name__}: {exc}")
+            if last.ok or last.failure is not FailureKind.RETRYABLE:
+                return last
+            self.trace.record("step_retry", spec=spec.name, attempt=attempt)
+        return last  # exhausted retries
+
+
+def _merge(results: list[StepResult]) -> StepResult:
+    """Merge foreach fan-out results: first failure wins, outputs keyed by index."""
+    if len(results) == 1:
+        return results[0]
+    failed = [r for r in results if not r.ok]
+    merged_outputs = {str(i): r.outputs for i, r in enumerate(results)}
+    changed = [f for r in results for f in r.changed_files]
+    if failed:
+        worst = failed[0]
+        return StepResult(False, worst.failure,
+                          f"{len(failed)}/{len(results)} items failed: {worst.summary}",
+                          merged_outputs, changed)
+    return StepResult(True, None, f"all {len(results)} items ok", merged_outputs, changed)

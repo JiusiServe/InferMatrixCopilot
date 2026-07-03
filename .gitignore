@@ -1,0 +1,14 @@
+# secrets — never commit
+.env
+.env.*
+!.env.template
+
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.venv/
+runs/
+*.db
