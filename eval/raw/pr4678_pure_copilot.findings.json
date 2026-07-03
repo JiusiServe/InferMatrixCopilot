@@ -1,0 +1,12 @@
+[
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/pipeline_cosmos3.py",
+  "line": null,
+  "summary": "The pipeline never passes sp_num_vision_items to _prepare_sound_latents, always defaulting to 1, which may cause mismatch if generation constraints change."
+ },
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/transformer_cosmos3.py",
+  "line": 1375,
+  "summary": "The new padding logic in sound_latent_frames_for_sequence_parallel can cause non-bit-exact output when sequence parallelism is active."
+ }
+]

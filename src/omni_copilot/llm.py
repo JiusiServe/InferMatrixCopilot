@@ -27,6 +27,7 @@ class Block:
 class Reply:
     blocks: list[Block]
     stop_reason: str = "end_turn"
+    usage: dict | None = None  # {"input_tokens": int, "output_tokens": int}
 
     @property
     def text(self) -> str:
@@ -90,7 +91,12 @@ class LLM:
                 blocks.append(Block(type="text", text=b.text))
             elif b.type == "tool_use":
                 blocks.append(Block(type="tool_use", id=b.id, name=b.name, input=dict(b.input)))
-        return Reply(blocks=blocks, stop_reason=resp.stop_reason or "end_turn")
+        usage = None
+        if getattr(resp, "usage", None) is not None:
+            usage = {"input_tokens": getattr(resp.usage, "input_tokens", 0),
+                     "output_tokens": getattr(resp.usage, "output_tokens", 0)}
+        return Reply(blocks=blocks, stop_reason=resp.stop_reason or "end_turn",
+                     usage=usage)
 
 
 def parse_json_reply(text: str) -> dict | None:

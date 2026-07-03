@@ -1,0 +1,7 @@
+[
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/transformer_cosmos3.py",
+  "line": 1395,
+  "summary": "Lazy import inside method body could be moved to top-level import behind TYPE_CHECKING for cleanup."
+ }
+]

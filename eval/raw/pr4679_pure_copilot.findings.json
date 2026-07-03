@@ -1,0 +1,12 @@
+[
+ {
+  "file": "tests/entrypoints/openai_api/test_serving_speech.py",
+  "line": null,
+  "summary": "Verify test fixture `streaming_app` routes to updated server SSE logic to avoid assertion failures."
+ },
+ {
+  "file": "",
+  "line": null,
+  "summary": "Backward compatibility break: clients setting `stream=True` without `stream_format` now receive SSE instead of raw audio."
+ }
+]

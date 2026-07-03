@@ -1,0 +1,12 @@
+[
+ {
+  "file": "",
+  "line": null,
+  "summary": "Run affected e2e tests to validate streaming config changes."
+ },
+ {
+  "file": "",
+  "line": null,
+  "summary": "Verify that the benchmark still measures TTFP correctly after stream_format change."
+ }
+]

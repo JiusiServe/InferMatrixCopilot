@@ -1,0 +1,7 @@
+[
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 195,
+  "summary": "Log message now hardcodes 'Request 0' instead of dynamic index; may be less informative if reused in multi-request context."
+ }
+]

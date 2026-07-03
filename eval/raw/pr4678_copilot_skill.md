@@ -1,0 +1,4 @@
+- **`vllm_omni/diffusion/models/cosmos3/transformer_cosmos3.py:1392-1393`** — Padding logic is correct: `pad = (-(base + sound_frames)) % ulysses_size`. No‑op when `ulysses_size ≤ 1` or `sound_frames ≤ 0`, so the fix is safe for non‑SP paths.
+- **`vllm_omni/diffusion/models/cosmos3/pipeline_cosmos3.py:1625-1627`** — `_prepare_sound_latents` gains keyword‑only `sp_video_shape`/`sp_num_vision_items` with defaults. Backward‑compatible; only the SP‑active path in `forward` supplies them.
+- **`tests/diffusion/models/cosmos3/test_cosmos3_transformer.py:333-352`** — New unit test covers SP‑inactive, ulysses=2 (odd → even, already‑even) and ulysses=4 with action/control. No regressions in the existing test’s lambda signature update (`**kwargs` added).
+- No correctness, reliability, breaking‑change, or security issues detected.

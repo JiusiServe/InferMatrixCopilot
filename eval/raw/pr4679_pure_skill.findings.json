@@ -1,0 +1,7 @@
+[
+ {
+  "file": "tests/entrypoints/openai_api/test_serving_speech.py",
+  "line": null,
+  "summary": "No unit test covering the SSE path rejection for word_timestamps=true with stream=True."
+ }
+]

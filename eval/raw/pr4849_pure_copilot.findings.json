@@ -1,0 +1,12 @@
+[
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": null,
+  "summary": "Empty ar_output.outputs leads to IndexError (pre-existing, not introduced by this change)."
+ },
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": null,
+  "summary": "Prompt list containing None may cause AttributeError (pre-existing fragility, not expected in normal usage)."
+ }
+]
