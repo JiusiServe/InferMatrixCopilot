@@ -90,14 +90,20 @@ TOOLS: dict[str, ToolDef] = {
 }
 
 
-def tool_definitions_for(scope: ToolScope | None) -> list[dict]:
-    """Anthropic-format tool defs, filtered to the scope's allowed set."""
+def tool_definitions_for(scope: ToolScope | None,
+                         extra: dict[str, ToolDef] | None = None) -> list[dict]:
+    """Anthropic-format tool defs: builtin tools filtered to the scope's
+    allowed set, plus step-provided extra tools (already vetted by the step)."""
     names = scope.allowed_tools if scope else set(TOOLS)
-    return [
+    defs = [
         {"name": t.name, "description": t.description, "input_schema": t.input_schema}
         for t in TOOLS.values()
         if t.name in names
     ]
+    for t in (extra or {}).values():
+        defs.append({"name": t.name, "description": t.description,
+                     "input_schema": t.input_schema})
+    return defs
 
 
 def dispatch(
@@ -106,11 +112,25 @@ def dispatch(
     *,
     scope: ToolScope | None = None,
     trace: RunTrace | None = None,
+    extra: dict[str, ToolDef] | None = None,
 ) -> dict:
     """Returns {"ok": bool, "result"|"error": str, "out_of_scope": bool}."""
-    tool = TOOLS.get(name)
+    tool = (extra or {}).get(name) or TOOLS.get(name)
     if tool is None:
         return {"ok": False, "error": f"unknown tool: {name}", "out_of_scope": False}
+    if extra and name in extra:  # extra tools bypass the builtin allowlist only
+        try:
+            result = tool.handler(**args)
+            if trace:
+                trace.record("tool_call", tool=name, ok=True, out_of_scope=False,
+                             path=None)
+            return {"ok": True, "result": result, "out_of_scope": False}
+        except Exception as exc:
+            if trace:
+                trace.record("tool_call", tool=name, ok=False, out_of_scope=False,
+                             path=None)
+            return {"ok": False, "error": f"{type(exc).__name__}: {exc}",
+                    "out_of_scope": False}
 
     write_path = args.get(tool.write_path_arg) if tool.write_path_arg else None
     out_of_scope = False

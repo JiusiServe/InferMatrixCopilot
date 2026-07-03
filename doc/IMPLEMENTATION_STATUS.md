@@ -22,6 +22,34 @@ Task numbers from `copilot_design` §四 (milestones from `docs/copilot/implemen
 | 14 | Plugin registry + Phase-0 bootstrap | ✅ | `plugins/base.py`: resolve by name/path; deterministic fingerprint → draft plugin + BOOTSTRAP_REPORT.md, stops for human review; high-risk sections human-only |
 | 15 | Conversational CLI | ✅ phases A+B+C | `cli.py` + `intent.py`: one-shot `-p`, `--plan-only`, `--resume`; compound commands → ordered queue with target carry-over; inline plan review; TaskSpec confirm. **Phase C** (`chat.py`): Claude-Code-style interactive chat is the default REPL — persistent history (trim never splits tool pairs), streaming replies, tool round-trips (run_task/run_playbook via the same confirm gates, status/logs/reports, repo_read/repo_grep jailed to configured repos with `.env*` refused), session transcripts under `~/.omni-copilot/sessions/`; `--no-chat` keeps the deterministic REPL |
 
+## Agent Step 修正方案 (code review of 2026-07-03) — status
+
+Implemented per its own P0-P3 plan (`/rebase/vLLM-Omni Copilot Agent Step 修正方案.md`):
+- **P0** `engine/agent_runtime.py::run_agent_step` — the single entry for every
+  `kind == "agent"` step: AgentDispatchContext (task/step/repo/evidence/
+  previous-steps/permissions/skills/memories/output-contract), evidence pack
+  replacing 60k truncation (per-item cap + full text archived in the run dir),
+  base+extension JSON output contract with one repair round, typed
+  status→FailureKind mapping, agent_dispatch/agent_output RunTrace events with
+  token cost; budget-exhausted runs force a final answer instead of discarding
+  the investigation.
+- **P1** migrated read-only steps: `agent.review_diff` (review_comments
+  contract, deterministic markdown render), `agent.draft_issue_answer`,
+  `agent.triage_issues`; read-only gh tools (`gh_pr_view`/`gh_issue_view`/
+  `gh_ci_read`) + knowledge tools (`skill_search`/`memory_search`/
+  `skill_update_candidate` — candidates only, curator-gated). Skills seeded
+  under `skills/` and retrieved per task into the dispatch context.
+- **P2** migrated write steps: `agent.debug_group` (root_cause/fix_summary/
+  verification contract) and the conflict agent inside `pr.rebase_onto_base` —
+  both on PathScoped write scopes through the dispatcher (out-of-scope edits
+  recorded); playbook patch gates unchanged as the post-edit review condition.
+- **P3** cleanup: `_agent_step` factory deleted; `agent.verify_module`
+  re-kinded `validation` (plain-LLM advisory, no longer masquerading);
+  `rebase.module_rebase` re-kinded `script` (delegation to the parent's own
+  governed agent). `kind == "agent"` now means unified-runtime-governed —
+  pinned by a parametrized test asserting the agent_dispatch event.
+- Locked repo-rebase playbook untouched (acceptance #10).
+
 ## Repo-rebase promotion path (native candidate -> default)
 
 1. Nightly keeps resolving the locked `repo-rebase` (candidates are invisible

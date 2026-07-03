@@ -13,7 +13,6 @@ import re
 import subprocess
 from pathlib import Path
 
-from ..agent_loop import run_agent
 from ..scopes import post_plan_scope
 from ..targets.base import PushPolicy
 from .builtin_steps import _gh, _repo_path
@@ -87,14 +86,15 @@ async def _pr_checkout(ctx: StepContext) -> StepResult:
                       outputs={"local_branch": local, "base": base, "remote": remote})
 
 
-_CONFLICT_SYSTEM = """You are resolving git rebase conflicts inside a repo-maintenance agent.
-Work only inside the repository. Process:
+_CONFLICT_GUIDANCE = """You are resolving git rebase conflicts. Work only inside the repository.
+Process:
 1. run_shell `git status` and `git diff` to see conflicted files.
 2. Edit each conflicted file to a correct merged state (keep BOTH sides' intent;
    never delete functionality to silence a conflict).
 3. run_shell `git add -A` then `git -c core.editor=true rebase --continue`.
-4. Repeat until the rebase completes. Reply DONE when `git status` shows no
-   rebase in progress, or STUCK <reason> if you cannot resolve it correctly."""
+4. Repeat until `git status` shows no rebase in progress.
+Set status=success only when the rebase has fully completed; otherwise
+status=blocked with the reason."""
 
 
 async def _pr_rebase_onto_base(ctx: StepContext) -> StepResult:
@@ -116,24 +116,32 @@ async def _pr_rebase_onto_base(ctx: StepContext) -> StepResult:
     ctx.trace.record("rebase_conflict", files=conflict_files)
 
     if ctx.llm is not None and ctx.llm.available:
-        scope = post_plan_scope(repo)  # write the workspace; run_shell allowed
-        outcome = run_agent(
-            ctx.llm, system=_CONFLICT_SYSTEM,
-            prompt=(f"Rebase of the current branch onto {base_remote}/{base} hit "
-                    f"conflicts in: {conflict_files}. Repo: {repo}. Resolve them. "
-                    f"All shell commands must run with cwd={repo}."),
-            scope=scope, trace=ctx.trace,
+        from .agent_runtime import run_agent_step
+
+        result, output = await run_agent_step(
+            ctx, step_name="pr.rebase_conflicts",
+            purpose=f"Resolve the rebase conflicts onto {base_remote}/{base} "
+                    "and complete the rebase.",
+            guidance=_CONFLICT_GUIDANCE,
+            expected="status=success only when the rebase fully completed",
+            evidence={"conflict_files": "\n".join(conflict_files),
+                      "repo_note": f"Repo: {repo}. All shell commands must run "
+                                   f"with cwd={repo}."},
+            output_extension={"resolution_summary":
+                              "how each conflict was resolved"},
+            scope=post_plan_scope(repo),  # write the workspace; run_shell allowed
             max_iters=ctx.settings.max_agent_iters,
         )
         in_progress = (Path(repo) / ".git" / "rebase-merge").exists() or \
                       (Path(repo) / ".git" / "rebase-apply").exists()
-        if not in_progress and outcome.text.strip().upper().startswith("DONE"):
+        if result.ok and not in_progress:
             return StepResult(True, summary=f"conflicts resolved by agent "
-                                            f"({len(conflict_files)} files)",
-                              changed_files=conflict_files)
+                                            f"({len(conflict_files)} files): "
+                                            f"{output.get('resolution_summary', '')[:150]}",
+                              changed_files=conflict_files, outputs=result.outputs)
         _git(repo, "rebase", "--abort")
         return StepResult(False, FailureKind.ESCALATE,
-                          f"agent could not resolve conflicts: {outcome.text[:300]}",
+                          f"agent could not resolve conflicts: {result.summary[:300]}",
                           outputs={"conflicts": conflict_files})
 
     _git(repo, "rebase", "--abort")
@@ -258,32 +266,44 @@ async def _pr_group_failures(ctx: StepContext) -> StepResult:
                       outputs={"signatures": [g["signature"] for g in group_list]})
 
 
-_DEBUG_SYSTEM = """You are debugging one grouped CI failure in a repo checkout.
+_DEBUG_GUIDANCE = """You are debugging one grouped CI failure in a repo checkout.
 Fix the ROOT CAUSE, not the symptom. Process: reproduce/inspect with read_file,
 grep and run_shell; make the minimal correct edit; verify (run the relevant
-test if possible); then run_shell `git add -A && git commit -m "fix: <signature>"`.
-Reply FIXED <one-line summary> or STUCK <reason>."""
+test if possible, record it in tests_run); then run_shell
+`git add -A && git commit -m "fix: <signature>"`.
+status=success only after the fix is committed; otherwise status=failed with
+failure_kind=escalate and an honest root_cause of what you found."""
 
 
 async def _pr_debug_group(ctx: StepContext) -> StepResult:
     group = ctx.item or {}
     sig = group.get("signature", "unknown")
-    if ctx.llm is None or not ctx.llm.available:
-        return StepResult(False, FailureKind.BLOCKED,
-                          f"cannot debug '{sig}': no LLM configured")
     repo = _repo_path(ctx)
-    scope = post_plan_scope(repo)
-    outcome = run_agent(
-        ctx.llm, system=_DEBUG_SYSTEM,
-        prompt=(f"Repo: {repo} (all shell commands with cwd={repo}).\n"
-                f"Failure signature: {sig}\nFailing jobs: {group.get('jobs')}\n"
-                f"<untrusted_data>\n{group.get('log_excerpt', '(no log)')}\n</untrusted_data>"),
-        scope=scope, trace=ctx.trace, max_iters=ctx.settings.max_agent_iters,
+    if repo is None:
+        return StepResult(False, FailureKind.BLOCKED, "no repo path")
+    from .agent_runtime import run_agent_step
+
+    result, output = await run_agent_step(
+        ctx, step_name="agent.debug_group",
+        purpose=f"Fix the root cause of the grouped CI failure: {sig}",
+        guidance=_DEBUG_GUIDANCE,
+        expected="root_cause + fix_summary + verification; fix committed",
+        evidence={"failure_signature": sig,
+                  "failing_jobs": str(group.get("jobs")),
+                  "ci_log_excerpt": group.get("log_excerpt", "(no log)"),
+                  "repo_note": f"Repo: {repo}; all shell commands with cwd={repo}."},
+        output_extension={"root_cause": "the actual root cause found",
+                          "fix_summary": "what was changed",
+                          "verification": "how the fix was verified"},
+        scope=post_plan_scope(repo),
+        max_iters=ctx.settings.max_agent_iters,
     )
-    text = outcome.text.strip()
-    if text.upper().startswith("FIXED"):
-        return StepResult(True, summary=f"'{sig}': {text[:200]}")
-    return StepResult(False, FailureKind.ESCALATE, f"'{sig}': {text[:300]}")
+    if result.ok:
+        result.summary = (f"'{sig}': {output.get('fix_summary', '')[:150]} "
+                          f"(verified: {output.get('verification', '?')[:80]})")
+    else:
+        result.summary = f"'{sig}': {result.summary[:250]}"
+    return result
 
 
 # -- gated outward posting -----------------------------------------------------
@@ -314,11 +334,13 @@ def register_pr_steps(registry: StepRegistry) -> StepRegistry:
     add(StepSpec("pr.checkout_branch", "deterministic", "read", _pr_checkout,
                  "Checkout PR head (fork-aware); derive PushPolicy."))
     add(StepSpec("pr.rebase_onto_base", "agent", "write_workspace", _pr_rebase_onto_base,
-                 "git rebase onto latest base; conflicts -> agent or abort+escalate."))
+                 "git rebase onto latest base; conflicts -> governed agent step "
+                 "(unified runtime) or abort+escalate."))
     add(StepSpec("pr.analyze_diff", "deterministic", "read", _pr_analyze_diff,
                  "Changed files -> affected modules (plugin map)."))
-    add(StepSpec("agent.verify_module", "agent", "read", _verify_module,
-                 "Per-module rebase-damage check (advisory; gate is patch review)."))
+    add(StepSpec("agent.verify_module", "validation", "read", _verify_module,
+                 "Per-module rebase-damage check — plain-LLM advisory validation, "
+                 "NOT a governed agent step (gate is patch review)."))
     add(StepSpec("pr.fetch_ci_failures", "deterministic", "read", _pr_fetch_ci_failures,
                  "Collect failing checks for a PR (gh; injectable)."))
     add(StepSpec("pr.group_failures", "deterministic", "read", _pr_group_failures,

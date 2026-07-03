@@ -47,10 +47,15 @@ def test_agent_loop_scope_refusal_fed_back(tmp_path, trace):
     assert last_user["content"][0]["is_error"] is True
 
 
-def test_agent_loop_max_iters(tmp_path, trace):
+def test_agent_loop_max_iters_forces_final_answer(tmp_path, trace):
     scope = pre_plan_scope(tmp_path / "plans")
     loop_reply = Reply(blocks=[Block(type="tool_use", id="t", name="read_file",
                                      input={"path": str(tmp_path / "nope.txt")})])
-    llm = ScriptedLLM([loop_reply] * 3)
+    final = Reply(blocks=[Block(type="text", text="best effort answer")])
+    llm = ScriptedLLM([loop_reply] * 3 + [final])
     outcome = run_agent(llm, system="s", prompt="p", scope=scope, trace=trace, max_iters=3)
     assert outcome.truncated
+    # the investigation is not discarded: a forced no-tools final call runs
+    assert outcome.text == "best effort answer"
+    last_call = llm.sent_messages[-1]
+    assert "budget is exhausted" in str(last_call)

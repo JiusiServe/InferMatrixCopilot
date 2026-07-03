@@ -376,9 +376,10 @@ def register_rebase_native_steps(registry: StepRegistry) -> StepRegistry:
                  "Parent Phase 1 (init/merge/drift analysis) via its own wrapper."))
     add(StepSpec("rebase.phase2_prepare", "deterministic", "read", _phase2_prepare,
                  "Pre-flight curator + phase-2 progress init."))
-    add(StepSpec("rebase.module_rebase", "agent", "write_workspace", _module_rebase,
-                 "One module rebase via the parent's node_rebase_module "
-                 "(SDK loop + plan-review gate + debug retries)."))
+    add(StepSpec("rebase.module_rebase", "script", "write_workspace", _module_rebase,
+                 "One module rebase DELEGATED to the parent's node_rebase_module "
+                 "(the parent's own governed SDK loop + plan-review gate + debug "
+                 "retries) — kind=script because the agent runtime is the parent's."))
     add(StepSpec("rebase.phase2_finalize", "deterministic", "read", _phase2_finalize,
                  "Advance parent marker to local_testing after both waves."))
     add(StepSpec("rebase.phase3", "validation", "write_workspace",

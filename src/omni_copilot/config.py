@@ -49,8 +49,12 @@ class Settings(BaseSettings):
     rebase_agent_root: Path = Path("/rebase/vllm-omni-rebase-agent")
     rebase_poll_interval: int = 30
 
-    # PR-review step: tool-loop budget for evidence gathering
-    review_max_iters: int = 12
+    # Agent-step runtime (engine/agent_runtime.py)
+    review_max_iters: int = 12          # tool-loop budget for agent steps
+    skills_dir: Path = _REPO_ROOT / "skills"
+    memory_db: Path = Path.home() / ".omni-copilot" / "debug_memory.db"
+    evidence_item_chars: int = 6000     # per-item cap; full text archived to run dir
+    skills_top_k: int = 3
 
     # Patch-review trigger thresholds
     large_diff_lines: int = 400

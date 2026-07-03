@@ -18,6 +18,8 @@ def settings(tmp_path: Path) -> Settings:
         allow_push=False,
         rebase_agent_root=tmp_path / "agent_root",  # never the real one in tests
         rebase_poll_interval=1,
+        skills_dir=tmp_path / "skills",  # never the shipped skills in tests
+        memory_db=tmp_path / "memory.db",
     )
 
 
