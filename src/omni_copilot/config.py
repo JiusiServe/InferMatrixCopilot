@@ -10,8 +10,10 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
+    # the repo's own .env loads regardless of cwd; a cwd-local .env overrides it
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+        env_file=(str(_REPO_ROOT / ".env"), ".env"),
+        env_file_encoding="utf-8", extra="ignore",
     )
 
     # LLM (Anthropic-SDK-compatible endpoint; DeepSeek's /anthropic works)

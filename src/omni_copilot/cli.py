@@ -148,7 +148,7 @@ class Copilot:
                      playbook=playbook.name, tier=tier)
         state: dict = {
             "task_spec": spec.model_dump(),
-            "repo_path": str(self.settings.repo_path(spec.repo) or ""),
+            "repo_path": self._resolve_repo_path(spec.repo),
             "push_policy": PushPolicy(),  # steps may replace with a derived policy
             "protected_branches": self.settings.protected_branches,
             "resuming": resuming,
@@ -198,6 +198,23 @@ class Copilot:
             return self._execute(playbook, spec, run_dir, resuming=True)
         print("no resumable run found")
         return 1
+
+    def _resolve_repo_path(self, repo: str) -> str:
+        """REPO_PATHS first; fall back to the repo's plugin manifest (plugin zero
+        declares repo.path), so runs work even without a .env in reach."""
+        p = self.settings.repo_path(repo)
+        if p:
+            return str(p)
+        try:
+            from .plugins.base import PluginRegistry
+
+            plugin = PluginRegistry(self.settings.plugins_dir).resolve(
+                name=repo.replace("-", "_"))
+            if plugin and plugin.repo_path:
+                return plugin.repo_path
+        except Exception:
+            pass
+        return ""
 
     # -- built-ins ---------------------------------------------------------------
     def status(self) -> str:

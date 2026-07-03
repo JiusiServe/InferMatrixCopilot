@@ -237,6 +237,10 @@ async def _pr_fetch_diff(ctx: StepContext) -> StepResult:
     repo = _repo_path(ctx)
     if not pr:
         return StepResult(False, FailureKind.BLOCKED, "no PR number in task spec")
+    if repo is None or not repo.exists():
+        return StepResult(False, FailureKind.BLOCKED,
+                          f"repo checkout not configured (repo_path={repo}) — set "
+                          "REPO_PATHS in .env or a plugin repo.path")
     code, out = _gh(["pr", "diff", str(pr)], cwd=repo)
     if code != 0:
         return StepResult(False, FailureKind.BLOCKED, f"gh pr diff failed: {out[:500]}")
@@ -251,6 +255,10 @@ async def _issue_fetch(ctx: StepContext) -> StepResult:
     issue = spec.get("issue") if isinstance(spec, dict) else None
     kind = spec.get("kind") if isinstance(spec, dict) else ""
     repo = _repo_path(ctx)
+    if repo is None or not repo.exists():
+        return StepResult(False, FailureKind.BLOCKED,
+                          f"repo checkout not configured (repo_path={repo}) — set "
+                          "REPO_PATHS in .env or a plugin repo.path")
     if not issue:
         if kind != "issue_filter":
             return StepResult(False, FailureKind.BLOCKED, "no issue number in task spec")
