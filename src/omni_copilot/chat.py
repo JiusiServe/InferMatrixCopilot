@@ -106,9 +106,15 @@ TOOL_DEFS: list[dict] = [
     {
         "name": "repo_read",
         "description": "Read a file inside a configured repository (read-only, "
-                       "size-capped; secrets are refused).",
+                       "size-capped; secrets are refused). Relative paths "
+                       "resolve against the default repo root. Use offset/limit "
+                       "to read a specific line range.",
         "input_schema": {"type": "object",
-                         "properties": {"path": {"type": "string"}},
+                         "properties": {"path": {"type": "string"},
+                                        "offset": {"type": "integer",
+                                                   "description": "1-based start line"},
+                                        "limit": {"type": "integer",
+                                                  "description": "number of lines"}},
                          "required": ["path"]},
     },
     {
@@ -143,6 +149,16 @@ class ChatSession:
         roots = [Path(p).resolve() for p in self.copilot.settings.repo_paths.values()]
         roots.append(self.copilot.settings.run_root.resolve())
         return roots
+
+    def _resolve_path(self, path: str) -> Path:
+        """Relative paths resolve against the default repo root, not the cwd."""
+        p = Path(path)
+        if not p.is_absolute():
+            repo_root = self.copilot._resolve_repo_path(
+                self.copilot.settings.default_repo)
+            if repo_root:
+                return Path(repo_root) / p
+        return p
 
     def _check_read(self, path: str) -> str | None:
         p = Path(path).resolve()
@@ -199,14 +215,24 @@ class ChatSession:
                     parts.append(f"## {f}\n{p.read_text()[:8_000]}")
             return "\n\n".join(parts) or "no reports in this run"
         if name == "repo_read":
-            err = self._check_read(args["path"])
+            path = self._resolve_path(args["path"])
+            err = self._check_read(str(path))
             if err:
                 return err
-            return Path(args["path"]).read_text(encoding="utf-8",
-                                                errors="replace")[:20_000]
+            text = path.read_text(encoding="utf-8", errors="replace")
+            offset, limit = args.get("offset"), args.get("limit")
+            if offset or limit:
+                lines = text.splitlines()
+                start = max(0, int(offset or 1) - 1)
+                end = start + int(limit or 200)
+                numbered = [f"{i + 1}: {line}" for i, line in
+                            enumerate(lines[start:end], start=start)]
+                return "\n".join(numbered)[:20_000] or "(past end of file)"
+            return text[:20_000]
         if name == "repo_grep":
             root = args.get("path") or next(
                 iter(self.copilot.settings.repo_paths.values()), "")
+            root = str(self._resolve_path(root)) if root else ""
             err = self._check_read(root or "/nonexistent")
             if err:
                 return err

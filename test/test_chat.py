@@ -96,6 +96,12 @@ def test_chat_read_jail(copilot, git_repo, tmp_path):
     # inside the repo: allowed
     assert "A = 1" in session._dispatch_tool("repo_read",
                                              {"path": str(git_repo / "mod_a.py")})
+    # relative paths resolve against the default repo root, not the cwd
+    assert "A = 1" in session._dispatch_tool("repo_read", {"path": "mod_a.py"})
+    # offset/limit return a numbered line range
+    ranged = session._dispatch_tool("repo_read",
+                                    {"path": "mod_a.py", "offset": 1, "limit": 1})
+    assert ranged == "1: A = 1"
     # outside any allowed root: refused
     secret = tmp_path / "outside.txt"
     secret.write_text("nope")
