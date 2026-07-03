@@ -49,14 +49,6 @@ class Settings(BaseSettings):
     rebase_agent_root: Path = Path("/rebase/vllm-omni-rebase-agent")
     rebase_poll_interval: int = 30
 
-    # Review engine: headless Claude Code + the vllm-omni-review skill
-    # (eval-validated: best actionability/GT-hit; see eval/ANALYSIS.md).
-    # Empty review_skill_dir -> the step falls back to the single-shot reviewer.
-    review_skill_dir: str = ""
-    claudecode_bin: str = "claude"
-    claudecode_max_turns: int = 60
-    claudecode_timeout_sec: int = 2400
-
     # Patch-review trigger thresholds
     large_diff_lines: int = 400
     large_diff_files: int = 8

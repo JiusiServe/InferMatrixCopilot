@@ -1,21 +1,22 @@
-# PR review — engine: headless Claude Code + the vllm-omni-review skill
-# (eval-validated, see eval/ANALYSIS.md; read-only gh allowlist inside the
-# engine, automatic fallback to the single-shot reviewer when the CLI or
-# REVIEW_SKILL_DIR is unavailable). The comment is posted only with the
-# explicit post flag AND ALLOW_POST=1 (otherwise dry-run).
+# PR review — read-only analysis by the copilot's own reviewer step; the
+# comment is posted only with the explicit post flag AND ALLOW_POST=1
+# (otherwise dry-run).
+#
+# Note: a Claude Code + skill engine was evaluated (eval/ANALYSIS.md) and
+# briefly integrated as v2, then removed by owner decision — that path is
+# EVAL-ONLY and must not run in the production copilot.
 name: pr-review
-version: 2
+version: 3
 status: active
 provenance:
   created_by: human
-  source: v1 single-shot promoted to Claude Code + vllm-omni-review skill
-    after the eval/ comparison (RQS 0.27 vs 0.26, actionability 0.92 vs 0.50)
+  source: v1 single-shot reviewer restored; Claude Code engine kept eval-only
 task_kinds: [pr_review]
 repos: [vllm-omni]
 params: {}
 steps:
   - {id: fetch, step: pr.fetch_diff}
-  - {id: review, step: review.claudecode_skill}
+  - {id: review, step: agent.review_diff}
   - {id: post, step: pr.post_review, when: post}
   - {id: report, step: report.final_summary}
-success: grounded findings list produced; posted only on explicit request
+success: findings list produced; posted only on explicit request

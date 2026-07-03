@@ -345,11 +345,9 @@ def register_builtin_steps(registry: StepRegistry) -> StepRegistry:
                  "Classify/label/route issues (read-only).",
                  tool_scope=read_only_scope()))
 
-    from .cc_review import register_cc_review_steps
     from .pr_steps import register_pr_steps  # late import: pr_steps imports helpers above
     from .rebase_native_steps import register_rebase_native_steps
 
     register_pr_steps(registry)
     register_rebase_native_steps(registry)
-    register_cc_review_steps(registry)
     return registry
