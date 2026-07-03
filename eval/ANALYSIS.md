@@ -24,8 +24,12 @@ single-run tables understate variance — samples preserved in
 | sample | recall_w | precision | actionability | RQS |
 |---|---|---|---|---|
 | A | 0.27 | 0.72 | 0.91 | 0.38 |
-| B (RESULTS_V2 table) | 0.08 | 0.19 | 0.81 | 0.14 |
-| C (v1-judge only) | ~0.17 | ~0.93 | — | — |
+| B | 0.08 | 0.19 | 0.81 | 0.14 |
+| C (RESULTS_V2 table) | 0.21 | 0.53 | 0.76 | 0.23 |
+| **mean (range)** | 0.19 | 0.48 | **0.83** | **0.25 (0.14–0.38)** |
+
+Mean RQS ≈ pure_copilot (0.26) and claudecode_skill (0.27) — which are single
+samples with presumably similar variance — at ~1/4 of Claude Code's tokens.
 
 Robust conclusions (hold across every sample):
 - **Actionability ~0.81–0.91** vs the old step's 0.50 — every finding is now a
