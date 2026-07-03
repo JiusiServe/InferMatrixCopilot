@@ -26,7 +26,8 @@ cp .env.template .env       # fill in keys; .env is git-ignored, NEVER commit it
 ## Use
 
 ```bash
-omni-copilot                              # REPL: natural-language commands
+omni-copilot                              # conversational chat (Claude-Code-style)
+omni-copilot --no-chat                    # deterministic command REPL instead
 omni-copilot -p "rebase the repo" --plan-only
 omni-copilot -p "debug the CI of pr 2744, report only"
 omni-copilot -p "review pr 4830" --yes
@@ -35,6 +36,15 @@ omni-copilot --resume                     # re-enter the last run's first incomp
 ```
 
 Built-ins inside the REPL: `/status`, `/logs [n]`, `/playbooks`, `/resume`, `/quit`.
+
+**Chat mode** (default when an LLM is configured): a persistent conversation with
+streaming replies. The model answers questions about the repo and past runs,
+and executes work through tools — `run_task`/`run_playbook` (same TaskSpec,
+planner, and [y/N] confirmation path as the flag CLI; chat can never widen
+permissions), `get_status`/`get_logs`/`read_run_report`, and `repo_read`/
+`repo_grep` jailed to the configured repos (secret files refused). Sessions are
+traced to `~/.omni-copilot/sessions/`. One-shot `-p` keeps the deterministic
+parser (cheap, scriptable).
 
 Natural language is parsed into a **TaskSpec** (kind, PR/issue, flags) and echoed
 back; write/push-capable tasks require confirmation; ambiguous commands get a

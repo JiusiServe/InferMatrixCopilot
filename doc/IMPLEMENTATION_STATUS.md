@@ -20,7 +20,7 @@ Task numbers from `copilot_design` §四 (milestones from `docs/copilot/implemen
 | 12 | Issue answering & filtering | ✅ here | `issue-answer.yaml` (gated post) + `issue-triage.yaml` (no number → recent open issues); live-verified triage of 20 real issues |
 | 13 | Plugin zero | ✅ here | `plugins/vllm_omni/plugin.yaml` (modules, waves, push: allowed=false, protected main); consumed by `pr.analyze_diff` module mapping |
 | 14 | Plugin registry + Phase-0 bootstrap | ✅ | `plugins/base.py`: resolve by name/path; deterministic fingerprint → draft plugin + BOOTSTRAP_REPORT.md, stops for human review; high-risk sections human-only |
-| 15 | Conversational CLI | ✅ phases A+B | `cli.py` + `intent.py`: REPL, one-shot `-p`, `--plan-only`, `--resume`; compound commands → ordered queue with target carry-over ("rebase pr 12, then review it"); inline plan review; TaskSpec confirm; /status /logs /playbooks /resume |
+| 15 | Conversational CLI | ✅ phases A+B+C | `cli.py` + `intent.py`: one-shot `-p`, `--plan-only`, `--resume`; compound commands → ordered queue with target carry-over; inline plan review; TaskSpec confirm. **Phase C** (`chat.py`): Claude-Code-style interactive chat is the default REPL — persistent history (trim never splits tool pairs), streaming replies, tool round-trips (run_task/run_playbook via the same confirm gates, status/logs/reports, repo_read/repo_grep jailed to configured repos with `.env*` refused), session transcripts under `~/.omni-copilot/sessions/`; `--no-chat` keeps the deterministic REPL |
 
 ## Repo-rebase promotion path (native candidate -> default)
 

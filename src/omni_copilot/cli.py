@@ -293,6 +293,9 @@ def main(argv: list[str] | None = None) -> int:
                         metavar="KEY=VALUE",
                         help="with --playbook: task param (repeatable), "
                              "e.g. --task-param local_ci_only=true")
+    parser.add_argument("--no-chat", action="store_true",
+                        help="use the deterministic command REPL instead of the "
+                             "conversational interface")
     args = parser.parse_args(argv)
 
     copilot = Copilot()
@@ -315,6 +318,17 @@ def main(argv: list[str] | None = None) -> int:
     if args.prompt:
         code = _handle_line(copilot, args.prompt, args.yes, args.plan_only)
         return int(code) if code not in (None, -1) else 0
+
+    # Interactive: conversational chat (Claude-Code-style) when an LLM is
+    # configured; deterministic command REPL otherwise / with --no-chat.
+    if copilot.llm.available and not args.no_chat:
+        from .chat import chat_repl
+
+        return chat_repl(
+            copilot, assume_yes=args.yes,
+            handle_builtin=lambda line: _handle_line(copilot, line, args.yes,
+                                                     args.plan_only),
+        )
 
     print("omni-copilot — natural-language repo maintenance. "
           "/status /logs /playbooks /resume /quit")

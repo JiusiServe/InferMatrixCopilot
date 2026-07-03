@@ -64,16 +64,26 @@ class LLM:
         tools: list[dict] | None = None,
         model: str | None = None,
         max_tokens: int | None = None,
+        on_text=None,
     ) -> Reply:
+        """`on_text(delta)` streams text as it is generated (terminal chat UX);
+        the returned Reply is identical either way."""
         if self._client is None:
             raise RuntimeError("LLM not configured (ANTHROPIC_API_KEY missing)")
-        resp = self._client.messages.create(
+        kwargs = dict(
             model=model or self.settings.agent_model,
             system=system,
             messages=messages,
             tools=tools or [],
             max_tokens=max_tokens or self.settings.llm_max_tokens,
         )
+        if on_text is not None:
+            with self._client.messages.stream(**kwargs) as stream:
+                for delta in stream.text_stream:
+                    on_text(delta)
+                resp = stream.get_final_message()
+        else:
+            resp = self._client.messages.create(**kwargs)
         blocks = []
         for b in resp.content:
             if b.type == "text":
