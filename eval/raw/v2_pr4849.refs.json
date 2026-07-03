@@ -1,0 +1,14 @@
+[
+ "The return type of `ar2diffusion` changes from `list[dict[str, Any]]` to `dict[str, Any] | None`, breaking any callers that iterate or index into the result.",
+ "The function now only processes the first element of `source_outputs` (index 0), assuming the orchestrator passes `[parent, *cfg_companions]`; all subsequent outputs are ignored.",
+ "If `source_outputs` is empty, the function returns `None` instead of an empty list, altering the contract for callers expecting an iterable.",
+ "When `prompt` is a list, only `prompt[0]` is used; previously, each AR output could be paired with a corresponding prompt element via loop indexing.",
+ "Log and warning messages now hardcode `'Request 0'` instead of using a dynamic index, losing the ability to identify which request triggered the message in a batch.",
+ "The loop removal eliminates per-request handling; only the first AR output's multimodal data, system prompt, and sampling params are forwarded to the diffusion input.",
+ "The updated docstring explicitly states that the function produces one diffusion request per parent AR request and expects companion outputs to be present but ignored.",
+ "Tests in `test_multi_resolution.py` are updated from `len(result) == 1` and `result[0]` to `result is not None` and direct dict access, confirming the return type change.",
+ "New tests in `test_hunyuan_image3_bridge.py` verify that the function returns a single dict, uses the parent output when companions are present, and returns `None` for empty inputs.",
+ "The `requires_multimodal_data` parameter is still accepted in the signature but no longer referenced in the function body, so it is silently ignored.",
+ "The prompt normalization logic is simplified: it directly selects `original_prompt` from the first list element or the raw prompt, rather than constructing a repeated list of length `len(ar_outputs)`.",
+ "There is no explicit validation that the first element of `source_outputs` is indeed the parent output; if the orchestrator ever changes the order, the wrong output may be used."
+]

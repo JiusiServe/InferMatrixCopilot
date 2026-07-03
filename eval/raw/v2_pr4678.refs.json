@@ -1,0 +1,16 @@
+[
+ "The new method `sound_latent_frames_for_sequence_parallel` pads `sound_frames` so that the total sequence length (vision base + sound) is divisible by the ulysses parallel world size, ensuring correct sequence parallelism behavior.",
+ "Padding sound frames alters the output compared to non-SP runs (not bit-exact), as stated in the method's docstring. This is a non-trivial behavior change for sequence‑parallel inference.",
+ "`_prepare_sound_latents` now accepts optional keyword arguments `sp_video_shape` and `sp_num_vision_items`; when `sp_video_shape` is provided, the computed `latent_frames` is adjusted by calling the new padding method.",
+ "In `forward`, the computation of `video_shape` (from `latents.shape`) is moved before the call to `_prepare_sound_latents` and passed as `sp_video_shape`. This ensures the padding calculation uses the actual latent dimensions.",
+ "The test `test_forward_i2v_sound_and_action_routes` updates its lambda for `_prepare_sound_latents` to accept `**kwargs`, which is required to avoid TypeError when the pipeline now passes extra keyword arguments.",
+ "A new test `test_sound_latent_frames_padded_for_sequence_parallel` verifies the padding logic for ulysses sizes 1, 2, and 4, including an edge case where `num_vision_items=2` and the total length is checked for divisibility.",
+ "The method assumes sound is the only additional modality paired with vision in the GEN sequence (action and sound are never generated together). If this assumption is violated, `num_vision_items` may need adjustment.",
+ "The default value of `num_vision_items` is 1 in both the method and the pipeline call; the test with `num_vision_items=2` indicates future or alternative configurations might pass multiple vision items.",
+ "The padding logic uses `self._pad_to_patch_size(h, w)` to compute the number of vision tokens per spatial location, which is consistent with the transformer's token count calculation.",
+ "The change introduces a new dependency on the `ulysses_parallel_world_size` within the transformer method, which is retrieved via a global function (`get_ulysses_parallel_world_size`).",
+ "The test relies on monkeypatching `parallel_state.get_ulysses_parallel_world_size`, which is fragile if the import structure changes or if other tests inadvertently modify the same global state.",
+ "The `sound_latent_frames_for_sequence_parallel` method is only called from `_prepare_sound_latents`; no new calls are added elsewhere, so the impact is scoped to sound generation during sequence‑parallel inference.",
+ "The pipeline change moves the `video_shape` computation before sound preparation, but this does not change any intermediate values because the latents are not modified between the two steps.",
+ "If `sp_video_shape` is `None` (the default), `_prepare_sound_latents` behaves exactly as before the change, maintaining backward compatibility for callers that do not pass the new arguments."
+]

@@ -1,5 +1,47 @@
 # Analysis — pure skill vs pure copilot vs copilot+skill (DeepSeek v4 pro)
 
+## RQS v2 update (literature-grounded rerun — see METRIC_V2.md, RESULTS_V2.md)
+
+Re-scoring the same nine cached reviews with the v2 metric (severity/resolution-
+weighted recall, jury-judged precision + actionability, CRScore-style
+pseudo-reference comprehensiveness/conciseness, 2-judge jury with Cohen's κ):
+
+| arm | recall_w | precision | actionability | comprehensiveness | conciseness | **RQS** |
+|---|---|---|---|---|---|---|
+| pure_copilot | 0.15 | 0.83 | 0.50 | 0.04 | 0.17 | **0.26** |
+| copilot_skill | 0.08 | 0.50 | 0.33 | 0.18 | 0.67 | **0.10** |
+| pure_skill | 0.00 | 0.33 | 0.67 | 0.01 | 0.17 | **0.00** |
+
+What v2 adds beyond confirming the v1 ranking:
+
+1. **The ranking is metric-robust.** A completely different construction
+   (weighted GT, juries, pseudo-references, harmonic aggregate) preserves
+   pure_copilot > copilot_skill > pure_skill. That ordering is now hard to
+   attribute to metric artifacts.
+2. **Judge noise is real and now measured.** Inter-judge agreement:
+   validity κ=0.23 (poor!), alignment κ=0.44 (moderate), actionability κ=0.65
+   (substantial). v1's precision numbers carried invisible ±noise — e.g. the
+   pure-skill nit on #4678 flipped from valid (v1 judge) to invalid (v2 jury).
+   Any future precision claims need the jury; actionability is the most
+   reliably judgeable dimension.
+3. **Comprehensiveness exposes the brevity ceiling.** Against ~12
+   pseudo-references per PR, even the best arm covers ≤0.46 — 1-2-finding
+   reviews structurally cannot cover a diff's reviewable surface. The skill's
+   comment budget optimizes precision at a hard cap on comprehensiveness.
+4. **copilot_skill has a distinct profile v1 hid**: best comprehensiveness
+   (0.18) and conciseness (0.67) — its findings align with legitimate review
+   topics — but weakest actionability (0.33): the skill guidance produced
+   on-topic but non-directive comments on this model.
+5. The harmonic RQS zeroes any arm with a zero component (per spec) — read the
+   sub-scores, not just the headline, at this n.
+
+v2 limitations: same-family 2-model jury (cross-family slot is env-pluggable
+via `V2_JUDGE_MODELS`); alignment is judge-based, not embedding-based; n=3.
+
+---
+
+## v1 analysis (original)
+
 Numbers in [RESULTS.md](./RESULTS.md); metric in [README.md](./README.md);
 raw reviews/judgments in `raw/`.
 

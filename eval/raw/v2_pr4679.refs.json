@@ -1,0 +1,16 @@
+[
+ "The `stream_format` field is added to two payload-building functions in `bench_speaker_cache.py` with value `\"audio\"` when streaming is enabled.",
+ "Documentation in `speech_api.md` updates the `stream` parameter description: `true` now defaults to SSE streaming, and `stream_format=\"audio\"` is required for raw audio.",
+ "In `speech_api.md`, the raw audio stream section now states that only `stream_format=\"audio\"` yields raw audio, removing the earlier equivalence with `stream=true`.",
+ "The SSE stream section in `speech_api.md` now says `stream=true` or `stream_format=\"sse\"` selects SSE events.",
+ "Multiple example files (e.g., `text_to_speech.md`, `README.md`, recipe markdown files) now include `\"stream_format\": \"audio\"` in curl commands and code snippets that intend to use raw PCM streaming.",
+ "Client scripts (e.g., `speech_client.py` for cosyvoice3, fish_speech, etc.) set `payload[\"stream_format\"] = \"audio\"` when `args.stream` is true.",
+ "Gradio demo apps (fish_speech, glm_tts, voxcpm2, moss_tts_nano, etc.) conditionally add `\"stream_format\": \"audio\"` to the payload when streaming is enabled.",
+ "End-to-end test files for all TTS models (cosyvoice3, glm_tts, higgs_audio, indextts2, ming_tts, moss_tts, qwen3_tts, voxcpm2, voxtral) now include `\"stream_format\": \"audio\"` in streaming request payloads.",
+ "In `test_serving_speech.py`, `test_stream_valid` now asserts that `stream=true` results in `is_sse_stream()==True` and `is_raw_audio_stream()==False`.",
+ "`is_raw_audio_stream()` in `OpenAICreateSpeechRequest` is changed from `self.stream or self.stream_format == \"audio\"` to `self.stream_format == \"audio\"`.",
+ "`is_sse_stream()` is changed from `self.stream_format == \"sse\" and not self.is_raw_audio_stream()` to `(self.stream or self.stream_format == \"sse\") and not self.is_raw_audio_stream()`.",
+ "In `serving_speech.py`, the word_timestamps check is moved outside the `is_raw_audio_stream()` block; it now applies to any streaming mode via `is_streaming()`.",
+ "The benchmark patch script (`patch.py`) now includes `\"stream_format\": \"audio\"` in its request payload and updates its docstring to require it for raw PCM streaming.",
+ "The `send_audio_speech_request` helper in `tests/helpers/runtime.py` now forwards the `\"stream_format\"` key in `extra_body`."
+]
