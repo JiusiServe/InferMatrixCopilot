@@ -69,9 +69,10 @@ def test_external_rebase_step_runs_command(settings, trace, tmp_path):
     result = asyncio.run(step.handler(ctx))
     assert result.ok and "hello-rebase" in result.outputs["tail"]
 
+    # exit 1 with no parent state.json at all -> blocked at/before init
     ctx = _ctx(settings, trace, tmp_path, params={"command": "false"})
     result = asyncio.run(step.handler(ctx))
-    assert not result.ok and result.failure is FailureKind.ESCALATE
+    assert not result.ok and result.failure is FailureKind.BLOCKED
 
 
 def test_agent_step_blocked_without_llm(settings, trace, tmp_path):

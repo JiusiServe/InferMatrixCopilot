@@ -100,8 +100,47 @@ class Copilot:
         return self._execute(resolution.playbook, spec, run_dir,
                              resolution_mode=resolution.mode, tier=resolution.tier)
 
+    def run_playbook(self, name: str, *, params: dict | None = None,
+                     report_only: bool = False, assume_yes: bool = False,
+                     plan_only: bool = False) -> int:
+        """Explicit playbook override — the only way to execute a CANDIDATE
+        (e.g. repo-rebase-native for side-by-side validation). Always treated
+        as requiring review + confirmation."""
+        playbook = self.store.get(name)
+        if playbook is None:
+            print(f"✋ no playbook named {name!r} (see /playbooks)")
+            return BLOCKED_EXIT
+        kind = playbook.task_kinds[0]
+        spec = TaskSpec(kind=kind, repo=self.settings.default_repo,
+                        report_only=report_only, params=params or {})
+        print(f"→ task: {spec.describe()}  [explicit playbook override]")
+        print(f"→ plan: explicit {playbook.name}@{playbook.version} "
+              f"({playbook.status}) steps={[s.step for s in playbook.steps]}")
+        if plan_only:
+            return 0
+        from .engine.planner import Resolution
+
+        resolution = Resolution(mode="explicit", playbook=playbook,
+                                tier=spec.tier, requires_review=True)
+        if not self._plan_review_gate(resolution, spec, assume_yes):
+            return BLOCKED_EXIT
+        if not assume_yes:
+            answer = input(f"Run {playbook.status} playbook '{name}'? [y/N] ").strip().lower()
+            if answer not in ("y", "yes"):
+                print("aborted.")
+                return 1
+        run_id = f"run-{time.strftime('%Y%m%d-%H%M%S')}"
+        run_dir = self.settings.run_root / run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+        (run_dir / "task.json").write_text(json.dumps({
+            "spec": spec.model_dump(), "playbook": playbook_to_doc(playbook),
+        }, indent=2))
+        return self._execute(playbook, spec, run_dir,
+                             resolution_mode="explicit", tier=spec.tier)
+
     def _execute(self, playbook, spec: TaskSpec, run_dir: Path, *,
-                 resolution_mode: str = "resume", tier: str = "?") -> int:
+                 resolution_mode: str = "resume", tier: str = "?",
+                 resuming: bool = False) -> int:
         self.last_run_dir = run_dir
         trace = RunTrace(run_dir / "run_trace.jsonl")
         notifier = Notifier(self.settings, run_dir, trace, run_dir.name)
@@ -112,6 +151,7 @@ class Copilot:
             "repo_path": str(self.settings.repo_path(spec.repo) or ""),
             "push_policy": PushPolicy(),  # steps may replace with a derived policy
             "protected_branches": self.settings.protected_branches,
+            "resuming": resuming,
         }
         executor = Executor(self.registry, self.settings, run_dir=run_dir,
                             trace=trace, llm=self.llm, notifier=notifier)
@@ -155,7 +195,7 @@ class Copilot:
             spec = TaskSpec(**saved["spec"])
             playbook = parse_playbook(saved["playbook"], str(task_file))
             print(f"↻ resuming {run_dir.name}: {spec.describe()}")
-            return self._execute(playbook, spec, run_dir)
+            return self._execute(playbook, spec, run_dir, resuming=True)
         print("no resumable run found")
         return 1
 
@@ -168,10 +208,25 @@ class Copilot:
                 return "no runs yet"
             self.last_run_dir = runs[-1]
         progress = self.last_run_dir / "progress.json"
+        lines = []
         if progress.exists():
             done = list(json.loads(progress.read_text()).get("completed", {}))
-            return f"{self.last_run_dir.name}: completed steps: {done}"
-        return f"{self.last_run_dir.name}: no progress recorded"
+            lines.append(f"{self.last_run_dir.name}: completed steps: {done}")
+        else:
+            lines.append(f"{self.last_run_dir.name}: no progress recorded")
+        rebase_status = self.last_run_dir / "rebase_status.json"
+        if rebase_status.exists():
+            s = json.loads(rebase_status.read_text())
+            mods = s.get("modules", {})
+            tests = s.get("tests", {})
+            lines.append(
+                f"  rebase: phase={s.get('phase')} modules(done={mods.get('done', 0)} "
+                f"failed={mods.get('failed', 0)}) tests(completed={tests.get('completed', 0)} "
+                f"failed={len(tests.get('failed', []))}"
+                + (f" current={tests.get('current')}" if tests.get("current") else "")
+                + f") ci={s.get('ci_result') or '-'}"
+            )
+        return "\n".join(lines)
 
     def logs(self, n: int = 20) -> str:
         if not self.last_run_dir:
@@ -229,12 +284,34 @@ def main(argv: list[str] | None = None) -> int:
                         help="resolve and print the plan without executing")
     parser.add_argument("--resume", action="store_true",
                         help="resume the most recent run at its first incomplete step")
+    parser.add_argument("--playbook",
+                        help="run a specific playbook by name (incl. candidates, "
+                             "e.g. repo-rebase-native for validation)")
+    parser.add_argument("--report-only", action="store_true",
+                        help="with --playbook: read-only variant of the task")
+    parser.add_argument("--task-param", action="append", default=[],
+                        metavar="KEY=VALUE",
+                        help="with --playbook: task param (repeatable), "
+                             "e.g. --task-param local_ci_only=true")
     args = parser.parse_args(argv)
 
     copilot = Copilot()
 
     if args.resume:
         return copilot.resume_last()
+    if args.playbook:
+        params: dict = {}
+        for kv in args.task_param:
+            key, _, raw = kv.partition("=")
+            value: object = raw
+            if raw.lower() in ("true", "false"):
+                value = raw.lower() == "true"
+            elif raw.isdigit():
+                value = int(raw)
+            params[key.strip()] = value
+        return copilot.run_playbook(args.playbook, params=params,
+                                    report_only=args.report_only,
+                                    assume_yes=args.yes, plan_only=args.plan_only)
     if args.prompt:
         code = _handle_line(copilot, args.prompt, args.yes, args.plan_only)
         return int(code) if code not in (None, -1) else 0

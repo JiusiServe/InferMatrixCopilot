@@ -13,7 +13,7 @@ Task numbers from `copilot_design` §四 (milestones from `docs/copilot/implemen
 | 5 | Playbook registry + reuse>adapt>generate | ✅ here | `playbooks/store.py`, `engine/planner.py`; locked refuses adapt; generate read-only-only; candidates never auto-recalled; all six task kinds recall a vetted playbook |
 | 6 | Escalation channel | ✅ here | `notify.py`: ESCALATION.md + Resend/SMTP email + exit 3; wired into executor failure routing |
 | 7 | Conditional Patch Review | ✅ here | `review/`: always-on diff summary, 7 trigger rules, read-only reviewer, fail-closed; **plan review** (`run_plan_review`) gates adapted/generated plans inline in the CLI |
-| 8 | RebaseTarget + locked playbook | ✅ | `playbooks/repo-rebase.yaml` (locked, L0) delegating to the existing orchestrator; `targets/base.py` types + `guard_push`. Native ModuleSchedule decomposition stays in the parent repo per milestone M2 |
+| 8 | RebaseTarget + locked playbook | ✅ | `playbooks/repo-rebase.yaml` (locked, L0, v2 params) — now a **monitored** delegation: live per-phase/per-module progress from the parent's state.json into RunTrace + `/status`, typed failure classification (stale-state guard included), escalation with FINAL_SUMMARY/module-log artifacts, `/resume` → parent `--resume` (`rebase/monitor.py`). Plus **`repo-rebase-native`** (candidate): the 5-phase pipeline decomposed into copilot steps that import the parent's own functions — prelude (env/log-dirs/stores via `agent.orchestrator`), phase wrappers, per-module `node_rebase_module` fan-out with wave-1 gate and parent-resume-granularity skip, patch gate, push-guarded phase 4, comparison artifact (`engine/rebase_native_steps.py`). Invisible to the planner until promoted; run via `--playbook repo-rebase-native` |
 | 9 | PR rebase | ✅ here | `engine/pr_steps.py` + `playbooks/pr-rebase.yaml` (active, L1): fork-aware checkout → rebase (conflicts: agent-resolve or abort+escalate, workspace always restored) → analyze modules → per-module verify → patch gate → push with-lease to the PR head only |
 | 10 | PR debug | ✅ here | `playbooks/pr-debug.yaml` (active, L1): failing checks → signature grouping (root-cause preferred over symptom; hard cap escalates) → per-group debug agent commits fixes → gate → **additive** push; `report_only` = read-only triage |
 | 11 | PR review | ✅ here | `playbooks/pr-review.yaml` (active): fetch → review → gated post (`post` flag AND `ALLOW_POST=1`, else dry-run); live-verified on PR #4830 |
@@ -22,11 +22,27 @@ Task numbers from `copilot_design` §四 (milestones from `docs/copilot/implemen
 | 14 | Plugin registry + Phase-0 bootstrap | ✅ | `plugins/base.py`: resolve by name/path; deterministic fingerprint → draft plugin + BOOTSTRAP_REPORT.md, stops for human review; high-risk sections human-only |
 | 15 | Conversational CLI | ✅ phases A+B | `cli.py` + `intent.py`: REPL, one-shot `-p`, `--plan-only`, `--resume`; compound commands → ordered queue with target carry-over ("rebase pr 12, then review it"); inline plan review; TaskSpec confirm; /status /logs /playbooks /resume |
 
-## Deliberate v1 boundaries
+## Repo-rebase promotion path (native candidate -> default)
 
-- The nightly rebase remains one locked external step (`rebase.run_external`);
-  decomposing it into native waves/module-agent steps is parent-repo milestone
-  M2 work and must land there first (zero-regression harness lives there).
+1. Nightly keeps resolving the locked `repo-rebase` (candidates are invisible
+   to `PlaybookStore.find()` — pinned by test).
+2. Validate native off-nights: `omni-copilot --playbook repo-rebase-native --yes
+   --task-param local_ci_only=true` first, then full runs;
+   `rebase.compare_with_locked` writes COMPARISON.md (verdict equal/better/worse)
+   against a locked run's `rebase_status.json`.
+3. After ~3 consecutive equal/better full runs, a human flips native ->
+   `status: active` (nightly still prefers locked). Final cutover is one
+   reviewed commit: native -> `locked`, old -> `retired`. Rollback = revert.
+   The monitored `rebase.run_external` step stays registered as the fallback.
+
+Caveats (documented, by design): the native prelude exports the parent's
+settings into this process's env (delta traced as `env_exported`) — don't run
+other tasks in the same session after a native rebase; never run copilot resume
+and `omni-rebase-orchestrator --resume` concurrently (copilot progress.json is
+authoritative inside a copilot run; parent markers are still written so the
+parent's resume works after abandoning the copilot run).
+
+## Deliberate v1 boundaries
 - Playbooks are ordered step lists with `foreach` fan-out and `when:` conditions —
   no cross-step DAG edges yet; none of the six playbooks needs one.
 - PR-debug log collection uses `gh pr checks` (+ injected logs in tests);

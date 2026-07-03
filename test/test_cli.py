@@ -26,7 +26,7 @@ def test_plan_only_never_executes(copilot, capsys):
     code = copilot.run_task(TaskSpec(kind="repo_rebase"), plan_only=True)
     assert code == 0
     out = capsys.readouterr().out
-    assert "reuse repo-rebase@1 (locked)" in out
+    assert "reuse repo-rebase@2 (locked)" in out
     assert not (copilot.settings.run_root.exists()
                 and list(copilot.settings.run_root.iterdir()))
 

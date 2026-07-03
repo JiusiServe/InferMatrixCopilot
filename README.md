@@ -42,7 +42,14 @@ clarifying question, never a guessed execution. The planner then resolves
 **reuse > adapt > generate**:
 
 - `repo_rebase` → the **locked** `repo-rebase` playbook, run verbatim (L0). It
-  delegates to the proven 5-phase orchestrator (`REBASE_ORCHESTRATOR_CMD`).
+  delegates to the proven 5-phase orchestrator (`REBASE_ORCHESTRATOR_CMD`),
+  **monitored**: per-phase/per-module progress streams from the parent's
+  state.json into `/status` and the run trace, failures are classified and
+  escalated with artifacts, and `/resume` maps onto the parent's `--resume`.
+  A native decomposition (`repo-rebase-native`, candidate) wraps the parent
+  package's own phase wrappers + per-module agents as copilot steps — run it
+  explicitly with `--playbook repo-rebase-native` for side-by-side validation;
+  see `doc/IMPLEMENTATION_STATUS.md` for the promotion path.
 - `pr_rebase` / `pr_debug` → vetted playbooks (L1): fork-aware checkout,
   rebase with agent conflict resolution (abort+escalate without an LLM),
   per-module verification, signature-grouped CI debugging — force-with-lease

@@ -1,0 +1,36 @@
+# Native decomposition of the nightly rebase — CANDIDATE: invisible to the
+# planner (find() only recalls active/locked), runnable only via
+# `omni-copilot --playbook repo-rebase-native`. The nightly keeps using the
+# locked `repo-rebase` until this is validated side-by-side and promoted
+# (candidate -> active -> locked; old playbook -> retired; rollback = revert).
+name: repo-rebase-native
+version: 1
+status: candidate
+provenance:
+  created_by: human
+  source: native decomposition of repo-rebase v1; wraps vllm-omni-rebase-agent's
+    own phase wrappers and node_rebase_module
+task_kinds: [repo_rebase]
+repos: [vllm-omni]
+params:
+  report_only: {type: bool, default: true}
+  local_ci_only: {type: bool, default: false}
+  remote_ci_only: {type: bool, default: false}
+  main_ci_idx: {type: int, default: 0}
+  continue_on_module_failure: {type: bool, default: false}
+steps:
+  - {id: guard, step: workspace.guard_clean}
+  - {id: prelude, step: rebase.prelude}
+  - {id: phase1, step: rebase.phase1}
+  - {id: p2prep, step: rebase.phase2_prepare}
+  - {id: wave1, step: rebase.module_rebase, foreach: wave1_modules}
+  - {id: wave2, step: rebase.module_rebase, foreach: wave2_modules}
+  - {id: p2done, step: rebase.phase2_finalize}
+  - {id: gate, step: review.patch_gate, params: {pre_push: true}}
+  - {id: phase3, step: rebase.phase3}
+  - {id: phase4, step: rebase.phase4}
+  - {id: phase5, step: rebase.phase5}
+  - {id: compare, step: rebase.compare_with_locked}
+  - {id: report, step: report.final_summary}
+success: parent FINAL_SUMMARY.md written with phase=done; module/test outcomes
+  match the locked pipeline (COMPARISON.md verdict equal/better)

@@ -44,6 +44,8 @@ class Settings(BaseSettings):
 
     # External locked rebase pipeline (the existing 5-phase orchestrator)
     rebase_orchestrator_cmd: str = "omni-rebase-orchestrator --dry-run"
+    rebase_agent_root: Path = Path("/rebase/vllm-omni-rebase-agent")
+    rebase_poll_interval: int = 30
 
     # Patch-review trigger thresholds
     large_diff_lines: int = 400

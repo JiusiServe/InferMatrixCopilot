@@ -89,6 +89,20 @@ def test_blocked_escalates(env, tmp_path):
     assert (tmp_path / "run" / "ESCALATION.md").exists()
 
 
+def test_escalation_summary_and_artifacts_forwarded(env):
+    registry, executor, notifier = env
+    registry.register(make_step(
+        "s.rich_fail", lambda ctx: StepResult(
+            False, FailureKind.ESCALATE, "module failed",
+            outputs={"escalation_summary": {"module": "scheduler", "exit_code": 1},
+                     "artifacts": ["/logs/module-scheduler.log"]})))
+    outcome = asyncio.run(executor.run(playbook([PlaybookStep("a", "s.rich_fail")]), {}))
+    assert outcome.status == "blocked"
+    esc = notifier.sent[0]
+    assert esc.state_summary["module"] == "scheduler"
+    assert "/logs/module-scheduler.log" in esc.artifacts
+
+
 def test_foreach_fanout(env):
     registry, executor, _ = env
     seen = []

@@ -71,9 +71,14 @@ class Executor:
                 continue
             if pstep.id in progress["completed"]:
                 cached = progress["completed"][pstep.id]
+                cached_outputs = cached.get("outputs", {}) or {}
+                # steps may publish JSON-simple state keys via outputs.state_updates
+                # so resumed runs recover them without re-running the step
+                state.update(cached_outputs.get("state_updates") or {})
+                state.setdefault("outputs", {})[pstep.id] = cached_outputs
                 outcome.step_results[pstep.id] = StepResult(
                     ok=True, summary=cached.get("summary", "(resumed)"),
-                    outputs=cached.get("outputs", {}),
+                    outputs=cached_outputs,
                 )
                 continue
 
@@ -98,6 +103,7 @@ class Executor:
                     "summary": result.summary, "outputs": result.outputs,
                 }
                 self._save_progress(progress)
+                state.update((result.outputs or {}).get("state_updates") or {})
                 state.setdefault("outputs", {})[pstep.id] = result.outputs
                 continue
 
@@ -106,10 +112,12 @@ class Executor:
                                   FailureKind.FORBIDDEN):
                 reason = f"step '{pstep.id}' ({spec.name}): {result.summary}"
                 if self.notifier is not None:
+                    extra = result.outputs.get("escalation_summary") or {}
                     self.notifier.escalate(
-                        reason=reason, phase=pstep.id,
-                        severity="blocked", state_summary={"playbook": playbook.name},
-                        artifacts=[str(self.progress_file)],
+                        reason=reason, phase=pstep.id, severity="blocked",
+                        state_summary={"playbook": playbook.name, **extra},
+                        artifacts=[str(self.progress_file),
+                                   *result.outputs.get("artifacts", [])],
                     )
                 outcome.status = "blocked"
                 outcome.blocked_reason = reason
@@ -160,6 +168,11 @@ def _merge(results: list[StepResult]) -> StepResult:
     changed = [f for r in results for f in r.changed_files]
     if failed:
         worst = failed[0]
+        # surface the failing item's escalation material at the top level so
+        # the notifier (which reads result.outputs directly) still sees it
+        for key in ("escalation_summary", "artifacts"):
+            if key in worst.outputs:
+                merged_outputs[key] = worst.outputs[key]
         return StepResult(False, worst.failure,
                           f"{len(failed)}/{len(results)} items failed: {worst.summary}",
                           merged_outputs, changed)
