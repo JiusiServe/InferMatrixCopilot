@@ -1,32 +1,22 @@
 [
  {
-  "file": "vllm_omni/engine/orchestrator.py",
-  "line": 1270,
-  "summary": "When diffusion_prompt is a list with more than one element, the orchestrator silently falls through; add an explicit error branch or verify that mammoth_moda2.ar2dit never returns multi-element lists."
- },
- {
   "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
   "line": 175,
-  "summary": "The logger.info call uses len(generated_token_ids) which may be None; change to len(generated_token_ids or []) for defensive safety."
+  "summary": "Log messages hardcode 'Request 0' instead of a real request identifier, making log correlation impossible in multi-request scenarios."
+ },
+ {
+  "file": "vllm_omni/engine/orchestrator.py",
+  "line": 1276,
+  "summary": "The orchestrator's list-to-singleton unwrap path may be dead code if all bridges now return dicts; confirm and remove if unused."
  },
  {
   "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
-  "line": 97,
-  "summary": "Update docstring to explain that when prompt is a list, only the first element is used, matching the single-request contract."
- },
- {
-  "file": "tests/diffusion/models/hunyuan_image3/test_multi_resolution.py",
-  "line": 559,
-  "summary": "The test unnecessarily wraps prompt in a list; pass the fake prompt directly to align with the production calling convention."
+  "line": 115,
+  "summary": "Consider adding a debug assertion to ensure source_outputs[0] is present and has expected attributes, to fail fast if the invariant is violated."
  },
  {
   "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
-  "line": 116,
-  "summary": "The fallback chain uses 'or' which can leak raw text when cumulative_text is an empty string; use 'cumulative_text if cumulative_text is not None else ...' to properly prefer the accumulated field."
- },
- {
-  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
-  "line": 124,
-  "summary": "The prompt normalization block is now identical to the GLM-Image bridge; consider extracting into a shared helper to prevent future drift."
+  "line": 66,
+  "summary": "The ar2diffusion docstring should note that the bridge avoids importing transformers/tokenizers, as it is a hot-path invariant."
  }
 ]

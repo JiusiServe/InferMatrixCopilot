@@ -1,27 +1,22 @@
 [
  {
-  "file": "tests/e2e/online_serving/test_indextts2.py",
-  "line": 6,
-  "summary": "Update the module and function docstrings to reflect that the test explicitly requests raw audio streaming with `stream_format=\"audio\"`."
+  "file": "docs/serving/speech_api.md",
+  "line": 125,
+  "summary": "Add a migration notice for the stream field's default behavior change from raw audio to SSE to avoid breaking downstream users."
  },
  {
-  "file": "vllm_omni/entrypoints/openai/serving_speech.py",
-  "line": 4154,
-  "summary": "Replace hardcoded `stream=true` log messages in `_generate_audio_chunks` with the actual streaming mode to avoid misleading operators."
+  "file": "vllm_omni/entrypoints/openai/protocol/audio.py",
+  "line": 301,
+  "summary": "Add an inline comment in is_sse_stream() to document that raw audio takes precedence over SSE when both stream=True and stream_format='audio' are set."
+ },
+ {
+  "file": "examples/online_serving/text_to_speech/glm_tts/openai_speech_client.py",
+  "line": 44,
+  "summary": "Add a comment clarifying that streaming overrides response_format to PCM regardless of user input."
  },
  {
   "file": "vllm_omni/entrypoints/openai/serving_speech.py",
   "line": 4063,
-  "summary": "Add a note in the endpoint\u2019s docstring or PR summary that SSE streaming also rejects `word_timestamps=true`, as this changes the error surface for consumers."
- },
- {
-  "file": "tests/e2e/online_serving/test_voxtral_tts_expansion.py",
-  "line": 56,
-  "summary": "Confirm that the Voxtral expansion test passes against a live server to ensure raw audio streaming still works after the default flip to SSE."
- },
- {
-  "file": "vllm_omni/entrypoints/openai/serving_speech.py",
-  "line": null,
-  "summary": "Verify whether `CancelledError` in `_generate_audio_sse_events` should yield a terminal `speech.audio.error` SSE event for proxy/caching consistency."
+  "summary": "Update the word_timestamps rejection error message to mention that SSE streaming also lacks support, not just the WebSocket path."
  }
 ]

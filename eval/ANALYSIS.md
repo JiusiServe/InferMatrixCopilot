@@ -23,10 +23,21 @@ single-run tables understate variance — samples preserved in
 
 | sample | recall_w | precision | actionability | RQS |
 |---|---|---|---|---|
-| A | 0.27 | 0.72 | 0.91 | 0.38 |
-| B | 0.08 | 0.19 | 0.81 | 0.14 |
-| C (RESULTS_V2 table) | 0.21 | 0.53 | 0.76 | 0.23 |
-| **mean (range)** | 0.19 | 0.48 | **0.83** | **0.25 (0.14–0.38)** |
+| A (prompt-based step) | 0.27 | 0.72 | 0.91 | 0.38 |
+| B (prompt-based step) | 0.08 | 0.19 | 0.81 | 0.14 |
+| C (prompt-based step) | 0.21 | 0.53 | 0.76 | 0.23 |
+| D (unified agent runtime, RESULTS_V2 table) | 0.12 | 0.29 | **1.00** | 0.11 |
+| **mean (range)** | 0.17 | 0.43 | **0.87** | **0.22 (0.11–0.38)** |
+
+Sample D is the 修正方案 runtime step (dispatch context, evidence pack, skill
+injection, output contract). Its per-PR results show the seeded skills doing
+their job — both skill-targeted GT classes hit (#4679 gt1 breaking-change
+consumers 0.5, #4849 gt1 undocumented assumption 0.25) and actionability a
+perfect 1.00 (the structured review_comments contract). Its jury precision is
+demonstrably noise: on #4679 the validity jury scored all 4 findings invalid
+while the coverage judge matched one of those same findings to ground truth —
+mutually contradictory judgments (validity κ=0.32). Read actionability,
+coverage, and cost; not the precision column.
 
 Mean RQS ≈ pure_copilot (0.26) and claudecode_skill (0.27) — which are single
 samples with presumably similar variance — at ~1/4 of Claude Code's tokens.

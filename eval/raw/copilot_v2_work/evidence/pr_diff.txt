@@ -1,0 +1,412 @@
+PR #4849: [image][bugfix] Fix HunyuanImage3 bridge request batching
+Files changed: tests/diffusion/models/hunyuan_image3/test_multi_resolution.py, tests/model_executor/stage_input_processors/test_hunyuan_image3_bridge.py, vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py
+PR description:
+## What broke
+
+After request-level batching landed in #4079, HunyuanImage3 image editing fails while forwarding the AR output to the diffusion stage:
+
+```text
+ValueError: Diffusion list-prompt batch requests are no longer supported.
+Submit multiple independent requests to use scheduler batching.
+```
+
+## Reproduction
+
+```bash
+pytest -s -v \
+  tests/e2e/accuracy/test_hunyuan_image3.py::test_image_to_image_alignment_online
+```
+
+## Root cause
+
+The orchestrator passes the parent AR output followed by any CFG companion outputs to the stage-input processor. HunyuanImage3 iterated over every source output and returned a list of diffusion payloads. Under #4079, a list represents the removed list-prompt batching API and is rejected by `StagePool`.
+
+CFG companion outputs belong to the same parent request; they are not independent downstream diffusion requests.
+
+## Fix
+
+- Return one diffusion payload for one parent AR request, matching the request-level batching contract and the existing GLM-Image bridge pattern.
+- Use the first source output as the parent output instead of creating requests for CFG companions.
+- Return `None` when no parent output is available.
+- Update the existing HunyuanImage3 bridge and multi-resolution tests to use the single-payload contract.
+
+This does not restore list-prompt batching. Genuine multi-request lists remain rejected by the diffusion stage.
+
+## Validation
+
+- Verified the fix on the vLLM/vllm-ascend 0.23.0 NPU stack with #4079 and #4344 backported.
+- HunyuanImage3 MoE EP+SP inference passed on NPU.
+- `test_image_to_image_alignment_online` passed without the list-prompt error.
+- `python -m compileall` and `git diff --check` passed for the changed files.
+
+Fixes #4832
+
+
+diff --git a/tests/diffusion/models/hunyuan_image3/test_multi_resolution.py b/tests/diffusion/models/hunyuan_image3/test_multi_resolution.py
+index dc4d49b111b..9609a39baf5 100644
+--- a/tests/diffusion/models/hunyuan_image3/test_multi_resolution.py
++++ b/tests/diffusion/models/hunyuan_image3/test_multi_resolution.py
+@@ -524,11 +524,11 @@ def _call_ar2diffusion(
+         self,
+         token_ids: list[int],
+         prompt_kwargs: dict[str, Any] | None = None,
+-    ) -> tuple[Any, Any]:
++    ) -> dict[str, Any] | None:
+         """Invoke ``ar2diffusion`` with a single fake AR output.
+ 
+-        Returns ``(diffusion_inputs, ar_predicted_sizes)`` so callers can
+-        assert on the resolved height/width.
++        Returns the diffusion request payload so callers can assert on the
++        resolved height/width.
+         """
+         from vllm_omni.model_executor.stage_input_processors.hunyuan_image3 import (
+             ar2diffusion,
+@@ -601,8 +601,8 @@ def test_ar2diffusion_extracts_height_width(self, ratio_idx):
+             token_ids=[150000, 150001, token_id],
+             prompt_kwargs={"height": 1024, "width": 1024, "image_base_size": 1024},
+         )
+-        assert len(result) == 1
+-        diffusion_input = result[0]
++        assert result is not None
++        diffusion_input = result
+         assert diffusion_input["height"] == expected_h, (
+             f"ratio_idx={ratio_idx}: expected height {expected_h}, got {diffusion_input['height']}"
+         )
+@@ -617,8 +617,8 @@ def test_no_ratio_token_falls_back_to_prompt_size(self):
+             token_ids=[150000, 150001],  # no ratio tokens
+             prompt_kwargs={"height": 768, "width": 1024, "image_base_size": 1024},
+         )
+-        assert len(result) == 1
+-        diffusion_input = result[0]
++        assert result is not None
++        diffusion_input = result
+         assert diffusion_input["height"] == 768
+         assert diffusion_input["width"] == 1024
+ 
+@@ -633,9 +633,9 @@ def test_out_of_range_ratio_index_falls_back(self):
+                 token_ids=[150000],
+                 prompt_kwargs={"height": 512, "width": 512, "image_base_size": 1024},
+             )
+-        assert len(result) == 1
+-        assert result[0]["height"] == 512
+-        assert result[0]["width"] == 512
++        assert result is not None
++        assert result["height"] == 512
++        assert result["width"] == 512
+ 
+     # -- cache behaviour -----------------------------------------------------
+ 
+diff --git a/tests/model_executor/stage_input_processors/test_hunyuan_image3_bridge.py b/tests/model_executor/stage_input_processors/test_hunyuan_image3_bridge.py
+index 76f3e500622..19405f28fa7 100644
+--- a/tests/model_executor/stage_input_processors/test_hunyuan_image3_bridge.py
++++ b/tests/model_executor/stage_input_processors/test_hunyuan_image3_bridge.py
+@@ -45,6 +45,33 @@ def test_truncate_at_cot_end_strips_tail_after_recaption_marker():
+     assert text == "body text</recaption>"
+ 
+ 
++def test_ar2diffusion_returns_one_request_payload_for_request_level_batching():
++    result = ar2diffusion(
++        [_source_output([100], text="thought")],
++        prompt={"prompt": "edit"},
++    )
++
++    assert isinstance(result, dict)
++    assert result["prompt"] == "edit"
++
++
++def test_ar2diffusion_uses_parent_output_when_companions_are_present():
++    result = ar2diffusion(
++        [
++            _source_output([100], text="parent thought"),
++            _source_output([200], text="companion thought"),
++        ],
++        prompt={"prompt": "edit"},
++    )
++
++    assert result is not None
++    assert result["extra"]["ar_generated_text"] == "parent thought"
++
++
++def test_ar2diffusion_returns_none_without_parent_output():
++    assert ar2diffusion([], prompt={"prompt": "edit"}) is None
++
++
+ def test_ar2diffusion_applies_ratio_and_truncates_tail_without_tokenizer(monkeypatch: pytest.MonkeyPatch):
+     real_import = builtins.__import__
+ 
+@@ -67,10 +94,10 @@ def _block_transformers_import(name, *args, **kwargs):
+         prompt=[{"prompt": "edit", "height": 64, "width": 64}],
+     )
+ 
+-    assert len(result) == 1
+-    assert (result[0]["height"], result[0]["width"]) == (512, 2048)
+-    assert result[0]["extra"]["ar_generated_text"] == "decoded without special tokens"
+-    assert "ar_token_ids" not in result[0]["extra"]
++    assert result is not None
++    assert (result["height"], result["width"]) == (512, 2048)
++    assert result["extra"]["ar_generated_text"] == "decoded without special tokens"
++    assert "ar_token_ids" not in result["extra"]
+ 
+ 
+ def test_ar2diffusion_forwards_custom_system_prompt_body():
+@@ -88,5 +115,6 @@ def test_ar2diffusion_forwards_custom_system_prompt_body():
+         ],
+     )
+ 
+-    assert result[0]["use_system_prompt"] == "custom"
+-    assert result[0]["system_prompt"] == marker
++    assert result is not None
++    assert result["use_system_prompt"] == "custom"
++    assert result["system_prompt"] == marker
+diff --git a/vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py b/vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py
+index 9a81a8cc3ab..963adb9c2a0 100644
+--- a/vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py
++++ b/vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py
+@@ -95,128 +95,130 @@ def ar2diffusion(
+     source_outputs: list[Any],
+     prompt: OmniTokensPrompt | TextPrompt | list | None = None,
+     requires_multimodal_data: bool = False,
+-) -> list[dict[str, Any]]:
++) -> dict[str, Any] | None:
+     """Process AR stage outputs to create Diffusion stage inputs.
+ 
++    HunyuanImage3 produces one downstream diffusion request per parent AR
++    request. ``source_outputs`` may include companion outputs, but the parent
++    output is expected first: the orchestrator bundles diffusion inputs as
++    ``[parent_output, *cfg_companion_outputs]`` before invoking this bridge.
++
+     Args:
+         prompt: Original user prompt (may contain multimodal data).
+         requires_multimodal_data: Whether to forward multimodal data.
+ 
+     Returns:
+-        List of dicts, each consumable by the HunyuanImage3 diffusion pipeline.
++        One prompt dict consumable by the HunyuanImage3 diffusion pipeline, or
++        ``None`` when no parent output is available.
+     """
+-    ar_outputs = source_outputs
+-    diffusion_inputs = []
+-
+-    # Normalize prompt to list
+-    if not isinstance(prompt, list):
+-        prompt = [prompt] if prompt is not None else [{}]
+-
+-    for i, ar_output in enumerate(ar_outputs):
+-        output = ar_output.outputs[0]
+-        generated_token_ids = output.cumulative_token_ids
+-        # Prefer cumulative_text, fallback to text if aggregation dropped it
+-        generated_text = getattr(output, "cumulative_text", None) or getattr(output, "text", "") or ""
+-
+-        # Get original prompt info
+-        original_prompt = prompt[i] if i < len(prompt) else {}
+-        if isinstance(original_prompt, dict):
+-            pass
+-        elif hasattr(original_prompt, "_asdict"):
+-            original_prompt = original_prompt._asdict()
+-        elif hasattr(original_prompt, "__dict__"):
+-            original_prompt = vars(original_prompt)
+-        else:
+-            original_prompt = {}
+-
+-        height = original_prompt.get("height", 1024)
+-        width = original_prompt.get("width", 1024)
+-        text_prompt = original_prompt.get("prompt", "")
+-        use_system_prompt = original_prompt.get("use_system_prompt")
+-        custom_system_prompt = original_prompt.get("system_prompt")
+-
+-        # Prefer the AR's predicted output aspect (`<img_size_*><img_ratio_*>`
+-        # tail emitted by `HunyuanImage3ForCausalMM.sample` under the
+-        # ratio-restriction logits processor) over the carried-through
+-        # height/width, which the serving layer fills with the first
+-        # reference image's bucket and so collapses non-square targets to
+-        # square in the multi-image / mismatched-aspect case. Mirrors the
+-        # official upstream where `reso_group[ratio_index]` is the
+-        # canonical source of the diffusion target shape.
+-        ratio_idx = _extract_ratio_index(generated_token_ids)
+-        ar_predicted = False
+-        if ratio_idx is not None:
+-            base_size = int(original_prompt.get("image_base_size", 1024))
+-            reso_group: ResolutionGroup = get_cached_resolution_group(base_size=base_size)
+-            try:
+-                reso: Resolution = reso_group[ratio_idx]
+-                height = reso.height
+-                width = reso.width
+-                ar_predicted = True
+-            except IndexError:
+-                logger.warning(
+-                    "[ar2diffusion] Request %d: ratio_index=%d out of range [0,%d), keeping prompt size %dx%d",
+-                    i,
+-                    ratio_idx,
+-                    len(reso_group),
+-                    height,
+-                    width,
+-                )
+-
+-        cot_text_for_dit = _truncate_at_cot_end(generated_text)
+-
+-        logger.info(
+-            "[ar2diffusion] Request %d: AR generated %d tokens, text length=%d, "
+-            "cot_text length=%d, target size=%dx%d (%s)",
+-            i,
+-            len(generated_token_ids),
+-            len(generated_text),
+-            len(cot_text_for_dit),
+-            height,
+-            width,
+-            f"AR ratio_idx={ratio_idx}" if ar_predicted else "from prompt (no AR ratio token)",
+-        )
+-
+-        diffusion_input: dict[str, Any] = {
+-            "prompt": text_prompt,
+-            "height": height,
+-            "width": width,
+-            "extra": {
+-                "ar_generated_text": cot_text_for_dit,
+-            },
+-        }
+-
+-        # Forward use_system_prompt so the DiT can build the same system prefix.
+-        # Also forward the custom system prompt body when sys_type=custom so
+-        # DiT's `get_system_prompt(use, "image", body)` doesn't fall back to
+-        # an empty prefix and silently diverge from AR.
+-        if use_system_prompt is not None:
+-            diffusion_input["use_system_prompt"] = use_system_prompt
+-        if custom_system_prompt is not None:
+-            diffusion_input["system_prompt"] = custom_system_prompt
+-
+-        # Forward multimodal data (original image for IT2I conditioning).
+-        # The diffusion pre_process_func reads multi_modal_data["image"], which
+-        # matches vLLM's standard prompt schema, so we only need to pass it once.
+-        mm_data = original_prompt.get("multi_modal_data")
+-        if mm_data:
+-            prompt_images = mm_data.get("image")
+-            if prompt_images is None:
+-                prompt_images = mm_data.get("images")
+-            if prompt_images is not None:
+-                diffusion_input["multi_modal_data"] = {"image": prompt_images}
+-
+-        # Forward multimodal output from AR (if any)
+-        if hasattr(ar_output, "multimodal_output") and ar_output.multimodal_output:
+-            mm_output = ar_output.multimodal_output
+-            if isinstance(mm_output, Mapping):
+-                diffusion_input["extra"]["ar_multimodal_output"] = mm_output
+-
+-        # Forward sampling params
+-        for key in ["seed", "num_inference_steps", "guidance_scale", "negative_prompt"]:
+-            if key in original_prompt:
+-                diffusion_input[key] = original_prompt[key]
+-
+-        diffusion_inputs.append(diffusion_input)
+-
+-    return diffusion_inputs
++    if not source_outputs:
++        return None
++
++    # The orchestrator constructs this list as [parent, *cfg_companions].
++    ar_output = source_outputs[0]
++    output = ar_output.outputs[0]
++    generated_token_ids = output.cumulative_token_ids
++    # Prefer cumulative_text, fallback to text if aggregation dropped it
++    generated_text = getattr(output, "cumulative_text", None) or getattr(output, "text", "") or ""
++
++    if isinstance(prompt, list):
++        original_prompt = prompt[0] if prompt else {}
++    elif prompt is not None:
++        original_prompt = prompt
++    else:
++        original_prompt = {}
++    if isinstance(original_prompt, dict):
++        pass
++    elif hasattr(original_prompt, "_asdict"):
++        original_prompt = original_prompt._asdict()
++    elif hasattr(original_prompt, "__dict__"):
++        original_prompt = vars(original_prompt)
++    else:
++        original_prompt = {}
++
++    height = original_prompt.get("height", 1024)
++    width = original_prompt.get("width", 1024)
++    text_prompt = original_prompt.get("prompt", "")
++    use_system_prompt = original_prompt.get("use_system_prompt")
++    custom_system_prompt = original_prompt.get("system_prompt")
++
++    # Prefer the AR's predicted output aspect (`<img_size_*><img_ratio_*>`
++    # tail emitted by `HunyuanImage3ForCausalMM.sample` under the
++    # ratio-restriction logits processor) over the carried-through
++    # height/width, which the serving layer fills with the first
++    # reference image's bucket and so collapses non-square targets to
++    # square in the multi-image / mismatched-aspect case. Mirrors the
++    # official upstream where `reso_group[ratio_index]` is the
++    # canonical source of the diffusion target shape.
++    ratio_idx = _extract_ratio_index(generated_token_ids)
++    ar_predicted = False
++    if ratio_idx is not None:
++        base_size = int(original_prompt.get("image_base_size", 1024))
++        reso_group: ResolutionGroup = get_cached_resolution_group(base_size=base_size)
++        try:
++            reso: Resolution = reso_group[ratio_idx]
++            height = reso.height
++            width = reso.width
++            ar_predicted = True
++        except IndexError:
++            logger.warning(
++                "[ar2diffusion] Request 0: ratio_index=%d out of range [0,%d), keeping prompt size %dx%d",
++                ratio_idx,
++                len(reso_group),
++                height,
++                width,
++            )
++
++    cot_text_for_dit = _truncate_at_cot_end(generated_text)
++
++    logger.info(
++        "[ar2diffusion] Request 0: AR generated %d tokens, text length=%d, cot_text length=%d, target size=%dx%d (%s)",
++        len(generated_token_ids),
++        len(generated_text),
++        len(cot_text_for_dit),
++        height,
++        width,
++        f"AR ratio_idx={ratio_idx}" if ar_predicted else "from prompt (no AR ratio token)",
++    )
++
++    diffusion_input: dict[str, Any] = {
++        "prompt": text_prompt,
++        "height": height,
++        "width": width,
++        "extra": {
++            "ar_generated_text": cot_text_for_dit,
++        },
++    }
++
++    # Forward use_system_prompt so the DiT can build the same system prefix.
++    # Also forward the custom system prompt body when sys_type=custom so
++    # DiT's `get_system_prompt(use, "image", body)` doesn't fall back to
++    # an empty prefix and silently diverge from AR.
++    if use_system_prompt is not None:
++        diffusion_input["use_system_prompt"] = use_system_prompt
++    if custom_system_prompt is not None:
++        diffusion_input["system_prompt"] = custom_system_prompt
++
++    # Forward multimodal data (original image for IT2I conditioning).
++    # The diffusion pre_process_func reads multi_modal_data["image"], which
++    # matches vLLM's standard prompt schema, so we only need to pass it once.
++    mm_data = original_prompt.get("multi_modal_data")
++    if mm_data:
++        prompt_images = mm_data.get("image")
++        if prompt_images is None:
++            prompt_images = mm_data.get("images")
++        if prompt_images is not None:
++            diffusion_input["multi_modal_data"] = {"image": prompt_images}
++
++    # Forward multimodal output from AR (if any)
++    if hasattr(ar_output, "multimodal_output") and ar_output.multimodal_output:
++        mm_output = ar_output.multimodal_output
++        if isinstance(mm_output, Mapping):
++            diffusion_input["extra"]["ar_multimodal_output"] = mm_output
++
++    # Forward sampling params
++    for key in ["seed", "num_inference_steps", "guidance_scale", "negative_prompt"]:
++        if key in original_prompt:
++            diffusion_input[key] = original_prompt[key]
++
++    return diffusion_input
