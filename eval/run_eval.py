@@ -22,10 +22,8 @@ REPO = "vllm-project/vllm-omni"
 
 sys.path.insert(0, str(EVAL_DIR.parent / "src"))
 
-from omni_copilot.agent_loop import run_agent  # noqa: E402
 from omni_copilot.config import Settings  # noqa: E402
 from omni_copilot.llm import LLM, parse_json_reply  # noqa: E402
-from omni_copilot.scopes import ToolScope, READ_TOOLS  # noqa: E402
 
 PRS = [4678, 4679, 4849]
 
@@ -75,7 +73,10 @@ GROUND_TRUTH: dict[int, list[dict]] = {
     ],
 }
 
-ARMS = ["pure_skill", "pure_copilot", "copilot_skill", "claudecode_skill"]
+# pure_skill (simulated Claude-Code+skill) was removed after the REAL
+# claudecode_skill arm superseded it — the simulation measured harness
+# absence, not the skill (see ANALYSIS.md); raw artifacts remain in raw/.
+ARMS = ["pure_copilot", "copilot_skill", "claudecode_skill"]
 
 COPILOT_REVIEWER_SYSTEM = (
     "You are a meticulous code reviewer for the vLLM-Omni repo. "
@@ -151,34 +152,6 @@ def route_references(refs_dir: Path, diff: str) -> str:
 
 
 # ── arms ─────────────────────────────────────────────────────────────────────
-
-def arm_pure_skill(pr: int, diff: str, meta: dict, llm: CountingLLM,
-                   skill_md: str, refs_dir: Path, omni_repo: str) -> str:
-    """Claude-Code+skill style: tool-using agent, SKILL.md as its instructions."""
-    diff_path = RAW / f"pr{pr}.diff"
-    system = (
-        "You are an AI code-review assistant operating in a CLI harness with "
-        "read-only tools (read_file, list_dir, grep). Follow the skill "
-        "instructions below. Notes for this harness: `gh` is NOT available — the "
-        "PR diff and metadata are already provided as local files; you cannot "
-        "post to GitHub, so produce the complete review as your final message; "
-        "skill reference files can be opened with read_file. Budget: at most 14 "
-        "tool calls, then write the final review.\n\n"
-        "==== SKILL: vllm-omni-review ====\n" + skill_md
-    )
-    prompt = (
-        pr_header(pr, meta) +
-        f"\nThe full diff is in the file: {diff_path}\n"
-        f"Skill reference files are in: {refs_dir}\n"
-        f"A checkout of vllm-omni (post-merge main) is at: {omni_repo}\n\n"
-        "Review this PR per the skill. Output the final review (verdict + "
-        "comments with file:line) as markdown."
-    )
-    scope = ToolScope(name="review_ro", allowed_tools=READ_TOOLS, read_only=True)
-    outcome = run_agent(llm, system=system, prompt=prompt, scope=scope,
-                        trace=None, max_iters=18)
-    return outcome.text
-
 
 def arm_pure_copilot(pr: int, diff: str, meta: dict, llm: CountingLLM) -> str:
     """omni-copilot's shipped agent.review_diff step, verbatim behavior."""
@@ -352,10 +325,7 @@ def main() -> int:
                 counting = CountingLLM(base_llm)
                 t0 = time.time()
                 cc_cost = None
-                if arm == "pure_skill":
-                    review = arm_pure_skill(pr, diff, meta, counting, skill_md,
-                                            refs_dir, args.omni_repo)
-                elif arm == "pure_copilot":
+                if arm == "pure_copilot":
                     review = arm_pure_copilot(pr, diff, meta, counting)
                 elif arm == "claudecode_skill":
                     review, cc_cost = arm_claudecode(pr, Path(args.skill_dir))
