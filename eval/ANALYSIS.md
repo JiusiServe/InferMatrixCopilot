@@ -38,6 +38,47 @@ What v2 adds beyond confirming the v1 ranking:
 v2 limitations: same-family 2-model jury (cross-family slot is env-pluggable
 via `V2_JUDGE_MODELS`); alignment is judge-based, not embedding-based; n=3.
 
+## Fourth arm: REAL Claude Code + skill (same DeepSeek model)
+
+`claudecode_skill` = genuine headless Claude Code (v2.1.199, `claude -p`,
+`ANTHROPIC_BASE_URL` → DeepSeek, model deepseek-v4-pro) with the skill
+installed as a project skill, subagents enabled, and `gh` restricted to
+read-only PR subcommands (posting structurally impossible).
+
+| arm | recall_w | precision | actionability | conciseness | **RQS v2** | turns | sec |
+|---|---|---|---|---|---|---|---|
+| claudecode_skill | 0.15 | 0.69 | **0.92** | **0.78** | **0.27** | 20–27 | ~180 |
+| pure_copilot | 0.15 | 0.83 | 0.50 | 0.17 | 0.26 | 1 | 52 |
+| copilot_skill | 0.08 | 0.50 | 0.33 | 0.67 | 0.10 | 1 | 65 |
+| pure_skill (simulated) | 0.00 | 0.33 | 0.67 | 0.17 | 0.00 | ≤18 | 94 |
+
+Takeaways:
+
+1. **The harness was most of the skill's missing value.** Real Claude Code +
+   skill scores RQS 0.27 where our simulated skill arm scored 0.00 — same
+   model, same skill. Subagents, `gh` evidence, and Claude Code's execution
+   discipline are what make the skill work; the skill text alone (arms 1/3)
+   does not transfer.
+2. **Best actionability (0.92) and best single ground-truth hit** (0.75 on
+   #4679's blocking SSE-compat issue). Its #4679 finding was genuinely novel:
+   a recipe file added to the repo *after* the PR merged that still carries
+   the exact bug class the human reviewer flagged elsewhere — real follow-up
+   work the humans missed (scored only in precision, not recall, per design).
+3. **Cost is in a different league**: ~640k input tokens/review (inflated by
+   per-turn cache reads across 20–27 turns — turns and wall-clock ~180s are
+   the fairer comparators, vs 1 call / ~52s for pure_copilot). Roughly even
+   RQS with pure_copilot at ~60× the tokens: the copilot's cheap pass buys
+   almost the same headline score, while Claude Code buys actionability,
+   verification depth, and novel findings.
+4. **Contamination caveat**: on merged PRs, `gh pr view` exposes the human
+   review threads our ground truth comes from — the review header shows it saw
+   review metadata (round count, approval). Its recall numbers should be read
+   as an upper bound; rerunning on open PRs (or blocking review fields) is the
+   clean protocol.
+5. Validity κ dropped to 0.02 with the new data — precision columns are noise
+   at this sample size; actionability (κ=0.61) and the ranking are the
+   trustworthy signals.
+
 ---
 
 ## v1 analysis (original)

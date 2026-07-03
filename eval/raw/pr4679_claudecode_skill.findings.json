@@ -1,0 +1,7 @@
+[
+ {
+  "file": "recipes/mistralai/Voxtral-TTS.md",
+  "line": 89,
+  "summary": "Streaming PCM curl example missing 'stream_format: audio', causing SSE response instead of raw PCM and breaking the ffmpeg command."
+ }
+]

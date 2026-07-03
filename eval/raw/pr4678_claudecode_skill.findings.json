@@ -1,0 +1,17 @@
+[
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/pipeline_cosmos3.py",
+  "line": 1672,
+  "summary": "The `sp_num_vision_items` parameter is never used by production callers and should be documented or removed if it remains unused."
+ },
+ {
+  "file": "tests/diffusion/models/cosmos3/test_cosmos3_transformer.py",
+  "line": 350,
+  "summary": "The magic number `192` in the assertion should be commented for clarity, as it represents the per-rank slice under ulysses parallel."
+ },
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/transformer_cosmos3.py",
+  "line": 1392,
+  "summary": "The import of `get_ulysses_parallel_world_size` inside the method body may be moved to the top unless needed for circular-import avoidance."
+ }
+]

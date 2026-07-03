@@ -75,7 +75,7 @@ GROUND_TRUTH: dict[int, list[dict]] = {
     ],
 }
 
-ARMS = ["pure_skill", "pure_copilot", "copilot_skill"]
+ARMS = ["pure_skill", "pure_copilot", "copilot_skill", "claudecode_skill"]
 
 COPILOT_REVIEWER_SYSTEM = (
     "You are a meticulous code reviewer for the vLLM-Omni repo. "
@@ -212,6 +212,56 @@ def arm_copilot_skill(pr: int, diff: str, meta: dict, llm: CountingLLM,
     return reply.text
 
 
+def arm_claudecode(pr: int, skill_root: Path) -> tuple[str, dict]:
+    """REAL Claude Code CLI (headless) + the skill installed as a project skill,
+    on the same DeepSeek model — the genuine 'Claude Code + skill' config with
+    subagents and gh available. Tool allowlist restricts gh to read-only PR
+    subcommands so nothing can be posted to the live repo."""
+    import os
+    import shutil
+
+    workdir = RAW / "cc_workdir"
+    skill_dst = workdir / ".claude" / "skills" / "vllm-omni-review"
+    if not skill_dst.exists():
+        skill_dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(skill_root, skill_dst)
+
+    env = dict(os.environ)
+    parent_env = Path("/rebase/vllm-omni-rebase-agent/.env")
+    if parent_env.exists():
+        for line in parent_env.read_text().splitlines():
+            if "=" in line and not line.startswith("#"):
+                k, v = line.split("=", 1)
+                if k.strip().startswith(("ANTHROPIC", "CLAUDE_CODE")):
+                    env[k.strip()] = v.strip()
+    env["ANTHROPIC_MODEL"] = "deepseek-v4-pro"
+
+    allowed = ["Skill", "Task", "Agent", "Read", "Grep", "Glob", "LS", "TodoWrite",
+               "Bash(gh pr view:*)", "Bash(gh pr diff:*)", "Bash(gh pr checks:*)"]
+    prompt = (
+        f"Use the vllm-omni-review skill to review PR #{pr} of "
+        f"vllm-project/vllm-omni. A read-only checkout of the repo (post-merge "
+        f"main) is at /rebase/vllm-omni. IMPORTANT: do NOT post anything to "
+        f"GitHub — output the complete review (verdict + comments with "
+        f"file:line) as your final message."
+    )
+    out = subprocess.run(
+        ["claude", "-p", prompt, "--output-format", "json", "--max-turns", "60",
+         "--allowedTools", ",".join(allowed)],
+        capture_output=True, text=True, timeout=2400, env=env, cwd=str(workdir))
+    try:
+        data = json.loads(out.stdout)
+    except json.JSONDecodeError:
+        data = {"result": out.stdout or out.stderr, "usage": {}, "num_turns": 0}
+    usage = data.get("usage") or {}
+    cost = {"calls": data.get("num_turns", 0),
+            "input_tokens": usage.get("input_tokens", 0)
+            + usage.get("cache_read_input_tokens", 0)
+            + usage.get("cache_creation_input_tokens", 0),
+            "output_tokens": usage.get("output_tokens", 0)}
+    return str(data.get("result") or "(no output)"), cost
+
+
 # ── judging (blind: no arm names anywhere in judge prompts) ───────────────────
 
 def extract_findings(review: str, llm: LLM) -> list[dict]:
@@ -301,20 +351,23 @@ def main() -> int:
                 print(f"[run ] PR {pr} · {arm}", flush=True)
                 counting = CountingLLM(base_llm)
                 t0 = time.time()
+                cc_cost = None
                 if arm == "pure_skill":
                     review = arm_pure_skill(pr, diff, meta, counting, skill_md,
                                             refs_dir, args.omni_repo)
                 elif arm == "pure_copilot":
                     review = arm_pure_copilot(pr, diff, meta, counting)
+                elif arm == "claudecode_skill":
+                    review, cc_cost = arm_claudecode(pr, Path(args.skill_dir))
                 else:
                     review = arm_copilot_skill(pr, diff, meta, counting,
                                                skill_md, refs_dir)
                 out_file.write_text(review)
                 cost_file.write_text(json.dumps({
                     "seconds": round(time.time() - t0, 1),
-                    "calls": counting.calls,
-                    "input_tokens": counting.input_tokens,
-                    "output_tokens": counting.output_tokens,
+                    **(cc_cost or {"calls": counting.calls,
+                                   "input_tokens": counting.input_tokens,
+                                   "output_tokens": counting.output_tokens}),
                 }))
             results[pr][arm] = {"review": out_file.read_text(),
                                 "cost": json.loads(cost_file.read_text())}

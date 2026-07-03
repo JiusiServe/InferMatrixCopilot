@@ -1,0 +1,12 @@
+[
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 165,
+  "summary": "Hardcoded 'Request 0' in log message is misleading in multi-request sessions; consider dropping the request index."
+ },
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 97,
+  "summary": "Parameter 'requires_multimodal_data' is accepted but never used, making it dead code."
+ }
+]

@@ -13,3 +13,4 @@ dist/
 runs/
 *.db
 eval/raw/*.diff
+eval/raw/cc_workdir/
