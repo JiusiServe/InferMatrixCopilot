@@ -61,3 +61,5 @@ python eval/run_eval.py --skill-dir /path/to/vllm-omni-skills/skills/vllm-omni-r
 
 Requires: `.env` with the DeepSeek key, `gh` authenticated, /rebase/vllm-omni checkout.
 All stages cache into `eval/raw/` — reruns only redo missing pieces.
+
+Metric v2 (literature-grounded redesign): see [METRIC_V2.md](./METRIC_V2.md).
