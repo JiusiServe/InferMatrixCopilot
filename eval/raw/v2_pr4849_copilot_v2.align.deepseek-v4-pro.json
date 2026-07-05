@@ -1,10 +1,4 @@
 {
- "covered_refs": [
-  4,
-  11
- ],
- "aligned_findings": [
-  0,
-  2
- ]
+ "covered_refs": [],
+ "aligned_findings": []
 }

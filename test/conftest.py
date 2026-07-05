@@ -20,6 +20,7 @@ def settings(tmp_path: Path) -> Settings:
         rebase_poll_interval=1,
         skills_dir=tmp_path / "skills",  # never the shipped skills in tests
         memory_db=tmp_path / "memory.db",
+        review_ensemble=False,  # ensemble tests opt in explicitly
     )
 
 

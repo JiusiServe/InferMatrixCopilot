@@ -1,5 +1,42 @@
 # Analysis — pure skill vs pure copilot vs copilot+skill (DeepSeek v4 pro)
 
+## Sample E: the 3-lens ensemble (run_agent_step_ensemble) — RQS 0.34, best arm
+
+The robustness mechanism the multi-sample analysis below kept pointing at is
+now shipped: `agent.review_diff` runs as a perspective-diverse ensemble
+(lenses: logic/simplifiability, behavior/in-repo consumers, contracts/docs/
+assumptions — each sample goes DEEP on one slice instead of sampling one
+corner of the whole checklist), followed by a verify-and-merge reduction
+(dedupe with consensus weighting, per-item verification against the diff,
+self-contained rewrite; base contract fields are merged deterministically in
+code — reducers truncate when asked to re-emit whole contracts, and they
+conflate step status with the artifact's verdict, both hit live and now
+pinned by tests).
+
+| arm (v2 metric) | recall_w | precision | actionability | **RQS** | tokens |
+|---|---|---|---|---|---|
+| **copilot_v2 ensemble (E)** | **0.19** | 0.81 | 0.92 | **0.34** | 738,675 |
+| claudecode_skill | 0.15 | 0.69 | 0.92 | 0.27 | 637,883 |
+| pure_copilot (old step) | 0.15 | 0.83 | 0.50 | 0.26 | 10,188 |
+| copilot_skill | 0.08 | 0.50 | 0.33 | 0.10 | 24,903 |
+
+Sample E is the best arm on both metrics (v1 F1 0.33 vs 0.19/0.13; v2 RQS
+0.34 vs 0.27) — best recall, near-best precision, near-best actionability
+simultaneously, where every earlier configuration traded one for another.
+Notable: on #4678 (the "pure domain knowledge" PR where every arm ever
+measured scored recall 0 on the v2 jury) the ensemble scored gt1=0.5 AND
+gt2=0.25 — the simplifiability lens caught the re-derived
+`get_ulysses_parallel_world_size` idiom class. RQS 0.62 on that PR.
+
+Honest costs and caveats:
+- ~740k tokens/review (3 tool-loop lenses + reducer) — Claude Code territory,
+  ~70x the old single-shot. `REVIEW_ENSEMBLE=0` restores the cheap path.
+- #4849 recall was 0 this run (v2 jury; the v1 judge scored the same review
+  gt1=0.5 — judge noise cuts both ways). Variance is reduced, not eliminated.
+- Validity κ collapsed to 0.03 pooled — precision columns remain
+  jury-noise-limited at this n; the RANKING and the recall/actionability
+  columns are the trustworthy signals.
+
 ## copilot_v2 — the shipped step improved from these findings (pr-review@4)
 
 What was built (`agent.review_diff` v2 + `pr.gate_check`, playbook v4):
@@ -26,8 +63,9 @@ single-run tables understate variance — samples preserved in
 | A (prompt-based step) | 0.27 | 0.72 | 0.91 | 0.38 |
 | B (prompt-based step) | 0.08 | 0.19 | 0.81 | 0.14 |
 | C (prompt-based step) | 0.21 | 0.53 | 0.76 | 0.23 |
-| D (unified agent runtime, RESULTS_V2 table) | 0.12 | 0.29 | **1.00** | 0.11 |
-| **mean (range)** | 0.17 | 0.43 | **0.87** | **0.22 (0.11–0.38)** |
+| D (unified agent runtime) | 0.12 | 0.29 | **1.00** | 0.11 |
+| E (runtime + 3-lens ensemble, RESULTS_V2 table) | 0.19 | 0.81 | 0.92 | **0.34** |
+| **mean A–D (range)** | 0.17 | 0.43 | 0.87 | **0.22 (0.11–0.38)** |
 
 Sample D is the 修正方案 runtime step (dispatch context, evidence pack, skill
 injection, output contract). Its per-PR results show the seeded skills doing

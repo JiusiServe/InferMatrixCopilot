@@ -1,0 +1,22 @@
+[
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/transformer_cosmos3.py",
+  "line": 1376,
+  "summary": "Add docstring for `sound_latent_frames_for_sequence_parallel` covering divisibility invariant, `num_vision_items`, no-op, and non-bit-exact SP output."
+ },
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/pipeline_cosmos3.py",
+  "line": 1666,
+  "summary": "Add documentation for `sp_video_shape` and `sp_num_vision_items` keyword arguments in `_prepare_sound_latents` docstring."
+ },
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/transformer_cosmos3.py",
+  "line": 1383,
+  "summary": "Add note that `num_vision_items` exists for forward compatibility with future transfer+sound support."
+ },
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/transformer_cosmos3.py",
+  "line": 1395,
+  "summary": "Add comment that the token-count calculation must stay consistent with `_validate_gen_sequence_parallel` and `forward`'s `s_video` computation."
+ }
+]

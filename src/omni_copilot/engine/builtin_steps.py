@@ -291,25 +291,63 @@ specific, and useful — real reviewers leave nits and doc asks, not just blocke
 Sweep EVERY item of this checklist and, for each, state in one line what evidence you \
 checked (a file you read, a grep you ran, or the diff hunk):
 1. Correctness of changed logic (None/empty handling, off-by-one, error paths, concurrency).
-2. Breaking behavior: changed defaults or API/protocol shifts — grep for IN-REPO consumers \
+2. Simplifiability: branches for cases that cannot co-occur, values re-derived by hand \
+where an existing helper already provides them (grep the repo for such helpers).
+3. Breaking behavior: changed defaults or API/protocol shifts — grep for IN-REPO consumers \
 (examples, docs, clients, tests) that still assume the old behavior; list any you find.
-3. Rebase/merge damage: dropped hunks, duplicated code, references to moved/renamed symbols.
-4. Tests: behavior changed without test changes? new skips or loosened thresholds justified?
-5. Docs/docstrings/comments made stale or misleading by the change.
-6. Undocumented assumptions or invariants the change introduces or relies on (ordering, \
+4. Rebase/merge damage: dropped hunks, duplicated code, references to moved/renamed symbols.
+5. Tests: behavior changed without test changes? new skips or loosened thresholds justified?
+6. Docs/docstrings/comments made stale or misleading by the change.
+7. Undocumented assumptions or invariants the change introduces or relies on (ordering, \
 "first element is X", implicit units/thresholds) — these deserve a comment or an assert.
-7. Scope: files touched beyond the PR's stated purpose.
+8. Scope: files touched beyond the PR's stated purpose.
 
 Then emit review_comments per the output contract:
 - Each comment: file, line, severity (blocker|major|minor|nit), WHAT to change and WHY \
 (directive), and the evidence you checked.
-- Nits, docstring fixes, and "add a comment documenting this assumption" ARE welcome \
-comments when grounded in the diff.
+- SELF-GROUNDING: phrase every comment so it can be verified against the diff alone — \
+first the concrete behavior the diff introduces (quote or paraphrase the hunk), then the \
+directive. `line` must be a line the diff actually touches.
+- Behavior/correctness findings outrank documentation asks: at most 2 comments whose only \
+ask is adding a comment or docstring.
 - Up to 2 comments you could not fully verify are allowed — set evidence to \
 "UNVERIFIED: <exactly what to check>"; labeling honestly beats silence AND beats guessing.
 - No praise-only comments; no bare process asks ("run the tests") unless tied to a \
 specific identified risk. At most 6 comments + 2 unverified.
 - Only if the sweep truly surfaces nothing: empty review_comments with a one-line summary."""
+
+# Perspective-diverse ensemble lenses (run_agent_step_ensemble): each sample
+# goes DEEP on a slice of the checklist instead of sampling one corner of all
+# of it — the eval showed single runs collapse into whichever failure mode the
+# first finding anchors (e.g. all-doc-nits), while unions across runs hit 5/8
+# ground-truth issues.
+_REVIEW_LENSES = [
+    {"name": "logic",
+     "focus": "Checklist items 1, 2 and 4: correctness of the changed logic "
+              "(None/empty handling, off-by-one, error paths, concurrency), "
+              "rebase/merge damage, and SIMPLIFIABILITY — branches for cases "
+              "that cannot co-occur, values re-derived by hand where an "
+              "existing helper already provides them (grep the repo for such "
+              "helpers before flagging)."},
+    {"name": "behavior",
+     "focus": "Checklist item 3: changed defaults, API/protocol/output-format "
+              "shifts. grep the repo for IN-REPO consumers (examples/, docs/, "
+              "clients, tests, READMEs) that still assume the old behavior and "
+              "name each one that needs updating in this PR."},
+    {"name": "contracts",
+     "focus": "Checklist items 5-7: behavior changed without test changes; "
+              "docs/docstrings made stale or misleading; undocumented "
+              "assumptions or invariants (ordering, 'first element is X', "
+              "implicit units/thresholds) that deserve an assert or comment."},
+]
+
+_REVIEW_MERGE = (
+    "Keep at most 6 review_comments ordered by severity, preferring "
+    "behavior/correctness findings — at most 2 whose only ask is adding a "
+    "comment or docstring. Each kept comment must first state the concrete "
+    "change the diff makes (quote or paraphrase the hunk), then WHAT to "
+    "change WHERE and WHY, so it is verifiable from the diff alone; `line` "
+    "must be a line the diff actually touches.")
 
 _SEVERITY_ORDER = {"blocker": 0, "major": 1, "minor": 2, "nit": 3}
 
@@ -367,15 +405,17 @@ def _render_review_md(output: dict) -> str:
 
 async def _review_diff(ctx: StepContext) -> StepResult:
     """PR review as a governed agent step (unified runtime): evidence pack,
-    skill retrieval, enforced read-only tools, structured review_comments."""
-    from .agent_runtime import run_agent_step
+    skill retrieval, enforced read-only tools, structured review_comments.
+    By default runs as a 3-lens ensemble with verify-and-merge (robustness:
+    single runs have high variance; see eval/ANALYSIS.md)."""
+    from .agent_runtime import run_agent_step, run_agent_step_ensemble
 
     diff = ctx.state.get("diff_text", "")
     if not diff:
         return StepResult(False, FailureKind.BLOCKED, "no diff_text in state")
     spec = ctx.state.get("task_spec") or {}
-    result, output = await run_agent_step(
-        ctx, step_name="agent.review_diff",
+    common = dict(
+        step_name="agent.review_diff",
         purpose=f"Review PR #{spec.get('pr')} like an engaged maintainer: "
                 "grounded, specific, useful findings.",
         guidance=_REVIEW_SYSTEM,
@@ -388,6 +428,12 @@ async def _review_diff(ctx: StepContext) -> StepResult:
                           "comment, evidence}"},
         extra_tools=_gh_read_tools(_repo_path(ctx)),
     )
+    if ctx.settings.review_ensemble:
+        result, output = await run_agent_step_ensemble(
+            ctx, lenses=_REVIEW_LENSES, merge_key="review_comments",
+            merge_guidance=_REVIEW_MERGE, **common)
+    else:
+        result, output = await run_agent_step(ctx, **common)
     if result.ok:
         review_md = _render_review_md(output)
         ctx.state["review_text"] = review_md

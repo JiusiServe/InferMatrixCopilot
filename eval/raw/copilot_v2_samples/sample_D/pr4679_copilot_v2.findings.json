@@ -1,0 +1,22 @@
+[
+ {
+  "file": "docs/serving/speech_api.md",
+  "line": 125,
+  "summary": "Add a migration notice for the stream field's default behavior change from raw audio to SSE to avoid breaking downstream users."
+ },
+ {
+  "file": "vllm_omni/entrypoints/openai/protocol/audio.py",
+  "line": 301,
+  "summary": "Add an inline comment in is_sse_stream() to document that raw audio takes precedence over SSE when both stream=True and stream_format='audio' are set."
+ },
+ {
+  "file": "examples/online_serving/text_to_speech/glm_tts/openai_speech_client.py",
+  "line": 44,
+  "summary": "Add a comment clarifying that streaming overrides response_format to PCM regardless of user input."
+ },
+ {
+  "file": "vllm_omni/entrypoints/openai/serving_speech.py",
+  "line": 4063,
+  "summary": "Update the word_timestamps rejection error message to mention that SSE streaming also lacks support, not just the WebSocket path."
+ }
+]

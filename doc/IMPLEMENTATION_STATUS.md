@@ -50,6 +50,25 @@ Implemented per its own P0-P3 plan (`/rebase/vLLM-Omni Copilot Agent Step 修正
   pinned by a parametrized test asserting the agent_dispatch event.
 - Locked repo-rebase playbook untouched (acceptance #10).
 
+### Ensemble agent steps (robustness follow-up, 2026-07-05)
+`run_agent_step_ensemble` (agent_runtime.py): the eval showed single agent-step
+runs have high variance (RQS 0.11–0.38 on identical configs) while the UNION of
+runs covered 5/8 ground-truth issues — so the runtime now offers a
+perspective-diverse fan-out (each sample goes deep on one lens of the step's
+checklist) followed by a verify-and-merge reduction (dedupe with consensus
+weighting, per-item verification against the evidence, self-contained
+rewrite). Fail-open: if the reduction itself fails, the unverified union is
+returned rather than losing the samples. `agent.review_diff` uses a 3-lens
+ensemble (logic / behavior / contracts) by default (`REVIEW_ENSEMBLE=0` to
+disable); the mechanism is step-agnostic — any agent step with a list-valued
+extension output (triage rows, debug hypotheses) can adopt it by passing
+lenses + merge guidance. Eval result (sample E): RQS 0.34 — best arm on both
+metrics, above claudecode_skill (0.27) and the old single-shot (0.26), at
+~740k tokens/review. Reducer hardening pinned by tests: deterministic base-
+field merge (whole-contract re-emission truncates), status from samples (the
+reducer conflates step status with the artifact's verdict), no repair round
+on empty reducer output, fail-open to unverified union.
+
 ## Repo-rebase promotion path (native candidate -> default)
 
 1. Nightly keeps resolving the locked `repo-rebase` (candidates are invisible

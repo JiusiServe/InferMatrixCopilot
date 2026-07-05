@@ -63,7 +63,7 @@ here; the rationale lives in those source docs.
 | `src/omni_copilot/engine/executor.py` | engine substrate: checkpoint/resume, typed failure routing |
 | `src/omni_copilot/engine/planner.py` | §3.2 reuse > adapt > generate, L0/L1/L2 |
 | `src/omni_copilot/engine/builtin_steps.py` | initial step palette (guard, rebase, review gate, push, gh reads, agent steps) |
-| `src/omni_copilot/engine/agent_runtime.py` | unified Agent-Step runtime (修正方案): AgentDispatchContext, evidence pack (cap+archive), skill/memory retrieval + gated candidates, enforced scopes, structured output contract, full RunTrace |
+| `src/omni_copilot/engine/agent_runtime.py` | unified Agent-Step runtime (修正方案): AgentDispatchContext, evidence pack (cap+archive), skill/memory retrieval + gated candidates, enforced scopes, structured output contract, full RunTrace; `run_agent_step_ensemble` — perspective-diverse fan-out + verify-and-merge for run-to-run robustness (eval-informed; any list-output agent step) |
 | `src/omni_copilot/playbooks/store.py`, `playbooks/*.yaml` | Playbook registry: versioned, provenance, candidate/active/locked/retired |
 | `src/omni_copilot/scopes.py`, `tools.py`, `agent_loop.py` | 框架层改进 (2): ToolScope/PathScope at one choke point |
 | `src/omni_copilot/review/` | 框架层改进 (3): diff summary → trigger rules → read-only patch reviewer |

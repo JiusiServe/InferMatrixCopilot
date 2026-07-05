@@ -1,13 +1,8 @@
 {
  "covered_refs": [
-  0,
-  1,
-  4,
-  11
+  9
  ],
  "aligned_findings": [
-  0,
-  1,
-  2
+  0
  ]
 }

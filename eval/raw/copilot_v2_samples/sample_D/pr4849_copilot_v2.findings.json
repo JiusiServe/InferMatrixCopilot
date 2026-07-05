@@ -1,0 +1,22 @@
+[
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 175,
+  "summary": "Log messages hardcode 'Request 0' instead of a real request identifier, making log correlation impossible in multi-request scenarios."
+ },
+ {
+  "file": "vllm_omni/engine/orchestrator.py",
+  "line": 1276,
+  "summary": "The orchestrator's list-to-singleton unwrap path may be dead code if all bridges now return dicts; confirm and remove if unused."
+ },
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 115,
+  "summary": "Consider adding a debug assertion to ensure source_outputs[0] is present and has expected attributes, to fail fast if the invariant is violated."
+ },
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 66,
+  "summary": "The ar2diffusion docstring should note that the bridge avoids importing transformers/tokenizers, as it is a hot-path invariant."
+ }
+]

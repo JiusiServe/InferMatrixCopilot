@@ -56,6 +56,12 @@ class Settings(BaseSettings):
     evidence_item_chars: int = 6000     # per-item cap; full text archived to run dir
     skills_top_k: int = 3
 
+    # Ensemble agent steps (run_agent_step_ensemble): perspective-diverse
+    # fan-out + verify-and-merge — trades tokens for run-to-run robustness.
+    review_ensemble: bool = True        # pr-review uses the 3-lens ensemble
+    ensemble_lens_max_iters: int = 8    # per-lens tool budget (lenses are narrower)
+    ensemble_merge_evidence_chars: int = 50_000  # the merger has no tools
+
     # Patch-review trigger thresholds
     large_diff_lines: int = 400
     large_diff_files: int = 8

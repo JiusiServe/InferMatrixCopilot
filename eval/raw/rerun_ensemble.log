@@ -1,0 +1,30 @@
+[run ] PR 4678 · copilot_v2
+[extr] PR 4678 · copilot_v2
+[vald] PR 4678 · copilot_v2
+[covr] PR 4678 · copilot_v2
+[run ] PR 4679 · copilot_v2
+[extr] PR 4679 · copilot_v2
+[vald] PR 4679 · copilot_v2
+[covr] PR 4679 · copilot_v2
+[run ] PR 4849 · copilot_v2
+[extr] PR 4849 · copilot_v2
+[vald] PR 4849 · copilot_v2
+[covr] PR 4849 · copilot_v2
+done -> /rebase/vllm-omni-copilot/eval/RESULTS.md
+jury: ['deepseek-v4-pro', 'deepseek-v4-flash']; claims: deepseek-v4-flash
+PR 4678: 14 pseudo-references
+[judge] PR 4678 · pure_copilot (2 findings)
+[judge] PR 4678 · copilot_skill (0 findings)
+[judge] PR 4678 · claudecode_skill (3 findings)
+[judge] PR 4678 · copilot_v2 (0 findings)
+PR 4679: 14 pseudo-references
+[judge] PR 4679 · pure_copilot (2 findings)
+[judge] PR 4679 · copilot_skill (2 findings)
+[judge] PR 4679 · claudecode_skill (1 findings)
+[judge] PR 4679 · copilot_v2 (2 findings)
+PR 4849: 12 pseudo-references
+[judge] PR 4849 · pure_copilot (2 findings)
+[judge] PR 4849 · copilot_skill (1 findings)
+[judge] PR 4849 · claudecode_skill (2 findings)
+[judge] PR 4849 · copilot_v2 (2 findings)
+done -> /rebase/vllm-omni-copilot/eval/RESULTS_V2.md
