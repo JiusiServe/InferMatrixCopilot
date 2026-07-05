@@ -58,7 +58,10 @@ class Settings(BaseSettings):
 
     # Ensemble agent steps (run_agent_step_ensemble): perspective-diverse
     # fan-out + verify-and-merge — trades tokens for run-to-run robustness.
-    review_ensemble: bool = True        # pr-review uses the 3-lens ensemble
+    review_ensemble: bool = True        # pr-review uses the lens ensemble
+    ensemble_parallel: bool = True      # lenses are independent — run concurrently
+    ensemble_samples_per_lens: int = 1  # >1 buys union recall at ~linear cost;
+                                        # measured: 2x cost, no recall gain (eval iter-3)
     ensemble_lens_max_iters: int = 8    # per-lens tool budget (lenses are narrower)
     ensemble_merge_evidence_chars: int = 50_000  # the merger has no tools
 

@@ -69,6 +69,29 @@ field merge (whole-contract re-emission truncates), status from samples (the
 reducer conflates step status with the artifact's verdict), no repair round
 on empty reducer output, fail-open to unverified union.
 
+### Ensemble v2 — parallel lenses + per-item verdict reduction (2026-07-06)
+Six-cycle optimization campaign (eval/ANALYSIS.md "Optimization campaign"):
+- Lenses now run **concurrently** (`ENSEMBLE_PARALLEL`, default on;
+  `run_agent` offloaded via `asyncio.to_thread`, RunTrace append is locked,
+  evidence archiving atomic): review wall-clock 12.8 → ~6 min; lens count is
+  free in time. A 4th `verification` lens (named test/benchmark + regression
+  risk) joined logic/behavior/contracts.
+- The reducer no longer re-emits the merged list (free-form regeneration
+  silently lost findings): it returns one keep/drop/dup verdict per NUMBERED
+  candidate; code assembles deterministically; **unmentioned candidates are
+  kept** (fail-open per item). Repo-cited claims are judged on the coherence
+  of the cited evidence — the reducer holds only the diff pack and must not
+  drop what it cannot see (info-asymmetry fix). Comment budget is code-side
+  (severity-ordered cap 5).
+- Verdict coherence: severities above nit mean "belongs in this PR", so any
+  such comment ⇒ REQUEST CHANGES (deterministic in `_render_review_md`).
+  Decision correctness vs human outcomes went 0.33 → 1.00 in 14/15 PR-runs —
+  the most reproducible gain of the campaign.
+- `ENSEMBLE_SAMPLES_PER_LENS` (default 1): ×2 measured 2× cost, no recall
+  gain. RQS3 across replicate runs: best single run 0.686 (RQS3e 0.505),
+  shipped-config runs 0.58-0.59 — recall/precision judge+generation noise is
+  ±0.1 RQS3 per run; see the campaign table before trusting any single roll.
+
 ## Repo-rebase promotion path (native candidate -> default)
 
 1. Nightly keeps resolving the locked `repo-rebase` (candidates are invisible

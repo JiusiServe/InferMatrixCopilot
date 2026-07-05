@@ -1,478 +1,212 @@
-{"ts": 1783072635.1121018, "kind": "agent_dispatch", "step": "agent.review_diff", "evidence": {"pr_diff": 6028, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783072639.7534564, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072639.7566175, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072639.7613428, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072639.7634335, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072670.1947992, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072676.1611233, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072681.9365747, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072686.010942, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072686.0138834, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072712.9910161, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072712.994415, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072749.2771585, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072754.5513213, "kind": "tool_call", "tool": "gh_ci_read", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072758.9324448, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072794.7467349, "kind": "agent_output", "step": "agent.review_diff", "ok": true, "tool_calls": 14, "tools_used": ["read_file", "read_file", "read_file", "read_file", "grep", "grep", "grep", "read_file", "read_file", "read_file", "read_file", "grep", "gh_ci_read", "read_file"], "truncated": false, "input_tokens": 244903, "output_tokens": 6807, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783072858.3868504, "kind": "agent_dispatch", "step": "agent.review_diff", "evidence": {"pr_diff": 6029, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783072861.2232234, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072861.8970125, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072867.6099398, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072877.9739976, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072883.8295584, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072888.2943835, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072894.5280056, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072904.4136143, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072904.4162056, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072904.4250836, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072940.4603014, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072940.4680178, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072940.4706564, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072947.3682415, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072947.3728058, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072959.4982612, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072962.4927626, "kind": "tool_call", "tool": "list_dir", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072965.0749955, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783072969.4912167, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783073024.4655397, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783073024.5183582, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783073039.162095, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783073111.3596134, "kind": "agent_output", "step": "agent.review_diff", "ok": true, "tool_calls": 22, "tools_used": ["read_file", "gh_pr_view", "read_file", "grep", "grep", "grep", "grep", "read_file", "read_file", "read_file", "grep", "grep", "read_file", "grep", "grep", "grep", "list_dir", "read_file", "read_file", "read_file", "read_file", "read_file"], "truncated": true, "input_tokens": 327203, "output_tokens": 11477, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783073173.6298773, "kind": "agent_dispatch", "step": "agent.review_diff", "evidence": {"pr_diff": 6029, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783073178.326159, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783073178.378832, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783073178.3953452, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783073237.3861318, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783073286.5508356, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783073290.1638741, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783073290.189734, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783073295.1941679, "kind": "tool_call", "tool": "gh_ci_read", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783073295.7756145, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783073297.9971042, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783073363.6249588, "kind": "tool_call", "tool": "grep", "ok": false, "out_of_scope": false, "path": null}
-{"ts": 1783073372.3765185, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783073375.8788471, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783073375.8843946, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783073441.0015273, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783073448.1515129, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783073453.4268253, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783073471.0346022, "kind": "tool_call", "tool": "read_file", "ok": false, "out_of_scope": false, "path": null}
-{"ts": 1783073518.333995, "kind": "tool_call", "tool": "read_file", "ok": false, "out_of_scope": false, "path": null}
-{"ts": 1783073520.7182581, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783073604.5621376, "kind": "agent_output", "step": "agent.review_diff", "ok": true, "tool_calls": 20, "tools_used": ["read_file", "read_file", "read_file", "grep", "grep", "read_file", "read_file", "gh_ci_read", "gh_pr_view", "read_file", "grep", "grep", "read_file", "read_file", "grep", "grep", "read_file", "read_file", "read_file", "read_file"], "truncated": true, "input_tokens": 139632, "output_tokens": 11625, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783245152.663335, "kind": "agent_dispatch", "step": "agent.review_diff#logic", "evidence": {"pr_diff": 6028, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783245155.1764877, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245159.445282, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245159.4541345, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245159.4596035, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245219.545459, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245226.0903373, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245232.1222317, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245249.9590054, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245249.9639766, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245302.6073227, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245302.6134603, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245310.684948, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245338.5435963, "kind": "agent_output", "step": "agent.review_diff#logic", "ok": true, "tool_calls": 12, "tools_used": ["read_file", "read_file", "read_file", "read_file", "grep", "grep", "grep", "read_file", "read_file", "grep", "grep", "read_file"], "truncated": false, "input_tokens": 139313, "output_tokens": 9154, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783245338.563166, "kind": "agent_dispatch", "step": "agent.review_diff#behavior", "evidence": {"pr_diff": 6028, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783245342.4459298, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245342.9784052, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245359.9078543, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245365.4409485, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245371.0132425, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245378.0796506, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245378.0848384, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245378.0878415, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245394.3007703, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245394.3053405, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245428.7662914, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245434.21353, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245443.4523203, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245449.0289066, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245499.1772559, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245499.1809802, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245560.3912678, "kind": "agent_output", "step": "agent.review_diff#behavior", "ok": true, "tool_calls": 16, "tools_used": ["read_file", "gh_pr_view", "grep", "grep", "grep", "read_file", "read_file", "read_file", "read_file", "read_file", "grep", "grep", "grep", "grep", "read_file", "read_file"], "truncated": false, "input_tokens": 171818, "output_tokens": 8663, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783245560.4172266, "kind": "agent_dispatch", "step": "agent.review_diff#contracts", "evidence": {"pr_diff": 6028, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783245562.8609836, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245563.3311346, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245569.4242654, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245569.4287937, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245569.431874, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245584.9733632, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245584.99187, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245584.996435, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245640.7156014, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245649.0469308, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245654.5834923, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245659.1723285, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245659.175866, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245680.8228896, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245722.2640553, "kind": "agent_output", "step": "agent.review_diff#contracts", "ok": true, "tool_calls": 14, "tools_used": ["read_file", "gh_pr_view", "read_file", "read_file", "read_file", "grep", "grep", "read_file", "grep", "grep", "grep", "read_file", "read_file", "read_file"], "truncated": false, "input_tokens": 191646, "output_tokens": 7781, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783245821.3007414, "kind": "agent_ensemble", "step": "agent.review_diff", "lenses": ["logic", "behavior", "contracts"], "candidates": 8, "merged": 0, "verified": true}
-{"ts": 1783245826.174985, "kind": "agent_dispatch", "step": "agent.review_diff#logic", "evidence": {"pr_diff": 6029, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783245829.9540079, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245833.6068833, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245833.6117637, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245833.6148608, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245845.4985688, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245845.5023873, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245874.0790331, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245874.3402774, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245875.9816358, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245889.3331912, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245889.353876, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245957.646993, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245957.6533425, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245979.6711187, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783245979.7548206, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246002.3875706, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246091.8612807, "kind": "agent_output", "step": "agent.review_diff#logic", "ok": true, "tool_calls": 16, "tools_used": ["gh_pr_view", "read_file", "read_file", "read_file", "read_file", "read_file", "grep", "grep", "grep", "grep", "grep", "grep", "read_file", "read_file", "grep", "read_file"], "truncated": true, "input_tokens": 369198, "output_tokens": 12923, "status": "failed", "confidence": "low", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783246091.8876543, "kind": "agent_dispatch", "step": "agent.review_diff#behavior", "evidence": {"pr_diff": 6029, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783246095.6629267, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246095.668242, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246113.195676, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246118.8053327, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246124.349541, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246130.5441842, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246130.5481417, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246143.037916, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246143.1914544, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246143.2928147, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246148.4318504, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246148.587354, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246149.2715406, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246162.4309983, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246162.4354053, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246168.909819, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246168.9138572, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246177.4626439, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246185.6610525, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246191.1659007, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246320.6256425, "kind": "agent_output", "step": "agent.review_diff#behavior", "ok": true, "tool_calls": 20, "tools_used": ["gh_pr_view", "read_file", "grep", "grep", "grep", "read_file", "read_file", "grep", "grep", "grep", "grep", "grep", "grep", "grep", "read_file", "read_file", "read_file", "grep", "read_file", "grep"], "truncated": true, "input_tokens": 195036, "output_tokens": 10130, "status": "success", "confidence": "medium", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783246320.6479788, "kind": "agent_dispatch", "step": "agent.review_diff#contracts", "evidence": {"pr_diff": 6029, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783246323.7087035, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246324.7574418, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246330.0265012, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246330.0314527, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246375.7062743, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246375.7957728, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246380.1546679, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246380.1623344, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246414.762823, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246414.819531, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246428.7676713, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246435.3020468, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246436.0055196, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246446.2321036, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246516.311153, "kind": "agent_output", "step": "agent.review_diff#contracts", "ok": true, "tool_calls": 14, "tools_used": ["read_file", "gh_pr_view", "read_file", "read_file", "grep", "grep", "read_file", "grep", "grep", "grep", "grep", "grep", "grep", "grep"], "truncated": true, "input_tokens": 165915, "output_tokens": 10839, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783246667.1140747, "kind": "agent_ensemble", "step": "agent.review_diff", "lenses": ["logic", "behavior", "contracts"], "candidates": 6, "merged": 4, "verified": true}
-{"ts": 1783246704.1633434, "kind": "agent_dispatch", "step": "agent.review_diff#logic", "evidence": {"pr_diff": 6029, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783246708.6456926, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246708.6507328, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246711.6114037, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246711.616126, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246725.874771, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246731.4082606, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246736.899789, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246741.0387673, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246746.6159666, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246750.1794963, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246750.2109349, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246752.7423809, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246809.7615328, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246936.7197967, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783246938.0183077, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247059.0188146, "kind": "agent_output", "step": "agent.review_diff#logic", "ok": true, "tool_calls": 15, "tools_used": ["gh_pr_view", "read_file", "read_file", "read_file", "grep", "grep", "grep", "read_file", "grep", "grep", "grep", "read_file", "read_file", "read_file", "grep"], "truncated": true, "input_tokens": 125392, "output_tokens": 16578, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783247059.0395372, "kind": "agent_dispatch", "step": "agent.review_diff#behavior", "evidence": {"pr_diff": 6029, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783247063.5001514, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247065.647393, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247079.2931194, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247084.8639157, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247093.9105248, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247095.0804513, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247099.003243, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247099.0067482, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247115.562837, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247124.0825987, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247131.1127052, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247137.1618123, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247137.1660671, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247145.1129434, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247249.8723211, "kind": "agent_output", "step": "agent.review_diff#behavior", "ok": true, "tool_calls": 14, "tools_used": ["gh_pr_view", "read_file", "grep", "grep", "grep", "grep", "read_file", "read_file", "grep", "grep", "grep", "read_file", "read_file", "read_file"], "truncated": true, "input_tokens": 114449, "output_tokens": 8258, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783247249.8921375, "kind": "agent_dispatch", "step": "agent.review_diff#contracts", "evidence": {"pr_diff": 6029, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783247253.372176, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247253.887965, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247258.2031379, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247258.2090828, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247268.9404724, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247274.0593395, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247274.0636544, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247280.3517916, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247389.7280426, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247390.6222258, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247402.490295, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247407.1035144, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247407.1270125, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247410.7136893, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247411.9115477, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247415.1115258, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247499.5201876, "kind": "agent_output", "step": "agent.review_diff#contracts", "ok": true, "tool_calls": 16, "tools_used": ["read_file", "gh_pr_view", "read_file", "read_file", "grep", "read_file", "read_file", "grep", "grep", "grep", "grep", "grep", "grep", "read_file", "grep", "grep"], "truncated": true, "input_tokens": 83416, "output_tokens": 11934, "status": "success", "confidence": "medium", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783247577.4424224, "kind": "agent_ensemble", "step": "agent.review_diff", "lenses": ["logic", "behavior", "contracts"], "candidates": 5, "merged": 4, "verified": true}
-{"ts": 1783247923.3388104, "kind": "agent_dispatch", "step": "agent.review_diff#logic", "evidence": {"pr_diff": 6028, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783247927.0674908, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247927.074337, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783247927.0774121, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248026.5925493, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248032.150319, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248037.7009985, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248064.7520618, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248064.7554908, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248115.7772548, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248167.0901058, "kind": "agent_output", "step": "agent.review_diff#logic", "ok": true, "tool_calls": 9, "tools_used": ["read_file", "read_file", "read_file", "grep", "grep", "grep", "read_file", "read_file", "read_file"], "truncated": false, "input_tokens": 111995, "output_tokens": 11461, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783248167.1147134, "kind": "agent_dispatch", "step": "agent.review_diff#behavior", "evidence": {"pr_diff": 6028, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783248170.3056586, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248172.5216696, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248187.1988506, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248192.690625, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248198.3010685, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248203.9015615, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248208.4797516, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248225.8456633, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248231.349804, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248236.8495362, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248244.087337, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248259.9794352, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248291.8109787, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248381.987709, "kind": "agent_output", "step": "agent.review_diff#behavior", "ok": true, "tool_calls": 13, "tools_used": ["gh_pr_view", "read_file", "grep", "grep", "grep", "grep", "read_file", "grep", "grep", "grep", "read_file", "read_file", "grep"], "truncated": true, "input_tokens": 171076, "output_tokens": 7669, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783248382.005041, "kind": "agent_dispatch", "step": "agent.review_diff#contracts", "evidence": {"pr_diff": 6028, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783248385.0856233, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248385.5894897, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248389.9755628, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248389.9801927, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248389.9844022, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248436.6678586, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248442.1115448, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248447.60073, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248454.4864264, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248454.4915667, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248482.1619594, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248525.9297743, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248538.0358088, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248554.6495574, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248639.7235336, "kind": "agent_output", "step": "agent.review_diff#contracts", "ok": true, "tool_calls": 14, "tools_used": ["read_file", "gh_pr_view", "read_file", "read_file", "read_file", "grep", "grep", "grep", "read_file", "read_file", "read_file", "read_file", "read_file", "read_file"], "truncated": true, "input_tokens": 419136, "output_tokens": 12017, "status": "success", "confidence": "medium", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783248807.808033, "kind": "agent_ensemble", "step": "agent.review_diff", "lenses": ["logic", "behavior", "contracts"], "candidates": 10, "merged": 1, "verified": true}
-{"ts": 1783248836.6983614, "kind": "agent_dispatch", "step": "agent.review_diff#logic", "evidence": {"pr_diff": 6029, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783248840.125555, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248840.1306708, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248844.8570936, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248844.8649557, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248891.7753363, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248891.9342637, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248896.1810815, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248897.0964715, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248900.0768983, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248903.0323205, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248924.5671759, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248925.4679775, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248925.5123596, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248936.7209494, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783248936.7243776, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249063.0860322, "kind": "agent_output", "step": "agent.review_diff#logic", "ok": true, "tool_calls": 15, "tools_used": ["gh_pr_view", "read_file", "read_file", "read_file", "grep", "grep", "grep", "grep", "grep", "read_file", "grep", "grep", "grep", "read_file", "read_file"], "truncated": true, "input_tokens": 159845, "output_tokens": 10696, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783249063.1111724, "kind": "agent_dispatch", "step": "agent.review_diff#behavior", "evidence": {"pr_diff": 6029, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783249066.1778488, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249066.7345924, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249081.9142318, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249087.5089555, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249093.0751257, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249100.9196382, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249100.925961, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249100.930158, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249100.932745, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249100.9368231, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249116.3244302, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249116.3365748, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249116.344815, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249119.6348855, "kind": "tool_call", "tool": "list_dir", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249119.644175, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249140.130164, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249140.3350348, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249148.5611823, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249148.5650907, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249148.5679307, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249148.5706706, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249148.574927, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249158.93347, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249158.9392593, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249158.944972, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249243.6602914, "kind": "agent_output", "step": "agent.review_diff#behavior", "ok": true, "tool_calls": 25, "tools_used": ["read_file", "gh_pr_view", "grep", "grep", "grep", "read_file", "read_file", "read_file", "read_file", "read_file", "read_file", "grep", "grep", "list_dir", "grep", "grep", "grep", "read_file", "read_file", "read_file", "read_file", "read_file", "grep", "grep", "grep"], "truncated": true, "input_tokens": 126963, "output_tokens": 10056, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783249243.6842682, "kind": "agent_dispatch", "step": "agent.review_diff#contracts", "evidence": {"pr_diff": 6029, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783249246.6330113, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249254.7194672, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249254.7236452, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249275.0688944, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249280.625884, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249294.541191, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249294.546312, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249309.9756505, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249309.980486, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249328.215315, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249328.313322, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249333.1073148, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249350.0304978, "kind": "tool_call", "tool": "read_file", "ok": false, "out_of_scope": false, "path": null}
-{"ts": 1783249350.0415254, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249473.6672719, "kind": "agent_output", "step": "agent.review_diff#contracts", "ok": true, "tool_calls": 14, "tools_used": ["read_file", "read_file", "read_file", "grep", "grep", "read_file", "read_file", "read_file", "read_file", "grep", "grep", "grep", "read_file", "grep"], "truncated": true, "input_tokens": 162163, "output_tokens": 13106, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783249547.8321457, "kind": "agent_ensemble", "step": "agent.review_diff", "lenses": ["logic", "behavior", "contracts"], "candidates": 2, "merged": 2, "verified": true}
-{"ts": 1783249670.2452106, "kind": "agent_dispatch", "step": "agent.review_diff#logic", "evidence": {"pr_diff": 6028, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783249674.6397922, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249674.643614, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249772.923404, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249772.9291286, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249788.3061738, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249788.3112009, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249798.3086977, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249798.3141878, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249821.027751, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249828.0982015, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249835.3915756, "kind": "tool_call", "tool": "gh_ci_read", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249842.7783713, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249958.883957, "kind": "agent_output", "step": "agent.review_diff#logic", "ok": true, "tool_calls": 12, "tools_used": ["read_file", "read_file", "read_file", "read_file", "grep", "grep", "read_file", "read_file", "grep", "read_file", "gh_ci_read", "read_file"], "truncated": true, "input_tokens": 337128, "output_tokens": 15991, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783249958.9053717, "kind": "agent_dispatch", "step": "agent.review_diff#behavior", "evidence": {"pr_diff": 6028, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783249962.358968, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249962.3624003, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249982.29921, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249987.8177404, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249994.6163805, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249994.6216674, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783249994.625368, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250053.74384, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250053.8509493, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250063.4958684, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250068.9824116, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250073.7090664, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250087.4748898, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250097.4111958, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250168.6767316, "kind": "agent_output", "step": "agent.review_diff#behavior", "ok": true, "tool_calls": 14, "tools_used": ["read_file", "read_file", "grep", "grep", "read_file", "read_file", "read_file", "grep", "grep", "grep", "grep", "read_file", "read_file", "read_file"], "truncated": true, "input_tokens": 402588, "output_tokens": 8926, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783250168.7014837, "kind": "agent_dispatch", "step": "agent.review_diff#contracts", "evidence": {"pr_diff": 6028, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783250171.26359, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250177.7140825, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250177.7184994, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250177.7219424, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250249.3509772, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250254.8307192, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250260.3671615, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250264.0207286, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250297.525918, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250297.5322332, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250323.5673366, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250332.9945474, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250356.7483172, "kind": "agent_output", "step": "agent.review_diff#contracts", "ok": true, "tool_calls": 12, "tools_used": ["read_file", "read_file", "read_file", "read_file", "grep", "grep", "grep", "read_file", "read_file", "read_file", "grep", "grep"], "truncated": false, "input_tokens": 134851, "output_tokens": 10702, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783250461.9844997, "kind": "agent_ensemble", "step": "agent.review_diff", "lenses": ["logic", "behavior", "contracts"], "candidates": 7, "merged": 7, "dropped": 0, "verified": false}
-{"ts": 1783250528.3619144, "kind": "agent_dispatch", "step": "agent.review_diff#logic", "evidence": {"pr_diff": 6029, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783250531.3433285, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250531.8716905, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250536.4241152, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250536.428633, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250557.0220473, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250557.055975, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250567.812533, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250573.3192618, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250579.0162723, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250596.4669497, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250596.4728312, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250623.47533, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250623.4892807, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250629.22624, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250629.2915277, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250690.66188, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250690.6678784, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250810.8323424, "kind": "agent_output", "step": "agent.review_diff#logic", "ok": true, "tool_calls": 17, "tools_used": ["read_file", "gh_pr_view", "read_file", "read_file", "grep", "grep", "grep", "grep", "grep", "read_file", "read_file", "read_file", "grep", "read_file", "grep", "read_file", "read_file"], "truncated": true, "input_tokens": 432473, "output_tokens": 15490, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783250810.854539, "kind": "agent_dispatch", "step": "agent.review_diff#behavior", "evidence": {"pr_diff": 6029, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783250815.6658773, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250815.6718493, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250833.4546416, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250838.9692397, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250841.0921762, "kind": "tool_call", "tool": "list_dir", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250843.6974232, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250844.6135416, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250848.4906828, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250848.49567, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250856.3264835, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250856.4837368, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250865.0214944, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250870.50179, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250870.659389, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250880.688894, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783250880.6943529, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251007.606111, "kind": "agent_output", "step": "agent.review_diff#behavior", "ok": true, "tool_calls": 16, "tools_used": ["gh_pr_view", "read_file", "grep", "grep", "list_dir", "grep", "grep", "read_file", "read_file", "grep", "grep", "grep", "grep", "grep", "read_file", "read_file"], "truncated": true, "input_tokens": 70427, "output_tokens": 9887, "status": "needs_review", "confidence": "low", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783251007.630042, "kind": "agent_dispatch", "step": "agent.review_diff#contracts", "evidence": {"pr_diff": 6029, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783251011.505328, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251013.619556, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251020.7047007, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251020.7081392, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251020.7128494, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251083.0817244, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251083.1943674, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251088.8260262, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251088.93543, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251094.456682, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251094.4599388, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251131.9673607, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251131.9752944, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251157.4290802, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251157.4493394, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251244.7737021, "kind": "agent_output", "step": "agent.review_diff#contracts", "ok": true, "tool_calls": 15, "tools_used": ["gh_pr_view", "read_file", "read_file", "read_file", "read_file", "grep", "grep", "grep", "grep", "read_file", "read_file", "read_file", "read_file", "grep", "grep"], "truncated": true, "input_tokens": 306158, "output_tokens": 13507, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783251327.395175, "kind": "agent_ensemble", "step": "agent.review_diff", "lenses": ["logic", "behavior", "contracts"], "candidates": 4, "merged": 3, "dropped": 1, "verified": true}
-{"ts": 1783251382.5460048, "kind": "agent_dispatch", "step": "agent.review_diff#logic", "evidence": {"pr_diff": 6029, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783251386.0564873, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251386.0616305, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251395.1553648, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251395.162143, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251395.1662524, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251425.3043249, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251430.8733087, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251436.7323291, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251437.6448922, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251440.290599, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251448.0184398, "kind": "tool_call", "tool": "read_file", "ok": false, "out_of_scope": false, "path": null}
-{"ts": 1783251450.1803412, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251477.2651894, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251478.675063, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251585.6962595, "kind": "agent_output", "step": "agent.review_diff#logic", "ok": true, "tool_calls": 14, "tools_used": ["gh_pr_view", "read_file", "read_file", "read_file", "read_file", "grep", "grep", "grep", "grep", "read_file", "read_file", "read_file", "grep", "grep"], "truncated": true, "input_tokens": 108255, "output_tokens": 11805, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783251585.718529, "kind": "agent_dispatch", "step": "agent.review_diff#behavior", "evidence": {"pr_diff": 6029, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783251589.7137227, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251589.719637, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251603.5529535, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251609.1154544, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251614.610387, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251622.2588944, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251623.169308, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251626.7103486, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251626.7135267, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251635.1004581, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251635.1034405, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251639.7965355, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251639.7994924, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251647.51046, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251647.515508, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251657.194313, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251657.199818, "kind": "tool_call", "tool": "list_dir", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251726.8566008, "kind": "agent_output", "step": "agent.review_diff#behavior", "ok": true, "tool_calls": 17, "tools_used": ["gh_pr_view", "read_file", "grep", "grep", "grep", "grep", "grep", "read_file", "read_file", "grep", "read_file", "read_file", "read_file", "read_file", "read_file", "grep", "list_dir"], "truncated": true, "input_tokens": 163607, "output_tokens": 6663, "status": "success", "confidence": "medium", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783251726.8819172, "kind": "agent_dispatch", "step": "agent.review_diff#contracts", "evidence": {"pr_diff": 6029, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
-{"ts": 1783251731.0860608, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251731.091531, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251735.3183885, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251735.3230543, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251746.0973425, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251757.7275, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251757.7322218, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251763.37863, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251772.230942, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251773.152991, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251776.471443, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251776.47492, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251881.634691, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251881.6588073, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251906.6118526, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783251914.3053348, "kind": "tool_call", "tool": "gh_ci_read", "ok": true, "out_of_scope": false, "path": null}
-{"ts": 1783252024.910844, "kind": "agent_output", "step": "agent.review_diff#contracts", "ok": true, "tool_calls": 16, "tools_used": ["read_file", "read_file", "read_file", "read_file", "grep", "grep", "read_file", "grep", "grep", "grep", "read_file", "read_file", "grep", "grep", "read_file", "gh_ci_read"], "truncated": true, "input_tokens": 105834, "output_tokens": 16074, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
-{"ts": 1783252096.293718, "kind": "agent_ensemble", "step": "agent.review_diff", "lenses": ["logic", "behavior", "contracts"], "candidates": 7, "merged": 3, "dropped": 4, "verified": true}
+{"ts": 1783277006.5823927, "kind": "agent_dispatch", "step": "agent.review_diff#logic", "evidence": {"pr_diff": 6028, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
+{"ts": 1783277006.6178384, "kind": "agent_dispatch", "step": "agent.review_diff#behavior", "evidence": {"pr_diff": 6028, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
+{"ts": 1783277006.6535888, "kind": "agent_dispatch", "step": "agent.review_diff#contracts", "evidence": {"pr_diff": 6028, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
+{"ts": 1783277006.6877768, "kind": "agent_dispatch", "step": "agent.review_diff#verification", "evidence": {"pr_diff": 6028, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
+{"ts": 1783277010.3504212, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277011.1827636, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277011.2054863, "kind": "tool_call", "tool": "gh_ci_read", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277011.7294736, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277011.7383204, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277011.745123, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277012.2670083, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277012.6550071, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277013.6251001, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277014.432932, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277014.445042, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277017.2922301, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277017.3010116, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277025.662899, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277025.6671443, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277026.0815895, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277026.0844502, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277026.0872018, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277026.6331944, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277035.065578, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277035.0657248, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277040.9245777, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277040.954611, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277046.6148086, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277053.140384, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277053.1450055, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277053.1520286, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277076.3795059, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277081.2952557, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277082.1677842, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277086.9575121, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277088.0055647, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277091.7887318, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277092.6731331, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277092.7743049, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277092.778009, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277098.1400998, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277103.9056525, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277110.1202679, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277110.124697, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277124.666347, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277124.671002, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277141.417768, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277142.832225, "kind": "tool_call", "tool": "read_file", "ok": false, "out_of_scope": false, "path": null}
+{"ts": 1783277150.140107, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277150.1432128, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277151.5210316, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277155.985588, "kind": "tool_call", "tool": "read_file", "ok": false, "out_of_scope": false, "path": null}
+{"ts": 1783277159.0978484, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277161.6783319, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277167.244561, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277172.814986, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277178.6273468, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277180.1573775, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277180.8498359, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277182.925472, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277182.9308424, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277185.0887585, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277185.0992439, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277187.143804, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277190.484184, "kind": "agent_output", "step": "agent.review_diff#verification", "ok": true, "tool_calls": 12, "tools_used": ["gh_pr_view", "gh_ci_read", "read_file", "read_file", "read_file", "read_file", "grep", "grep", "grep", "grep", "read_file", "read_file"], "truncated": false, "input_tokens": 137373, "output_tokens": 8786, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
+{"ts": 1783277193.693675, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277264.8022845, "kind": "agent_output", "step": "agent.review_diff#contracts", "ok": true, "tool_calls": 16, "tools_used": ["read_file", "read_file", "read_file", "read_file", "read_file", "read_file", "grep", "grep", "grep", "read_file", "read_file", "read_file", "grep", "read_file", "read_file", "gh_pr_view"], "truncated": true, "input_tokens": 387652, "output_tokens": 10694, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
+{"ts": 1783277295.3032541, "kind": "agent_output", "step": "agent.review_diff#logic", "ok": true, "tool_calls": 13, "tools_used": ["gh_pr_view", "read_file", "read_file", "read_file", "read_file", "grep", "grep", "read_file", "read_file", "grep", "grep", "grep", "read_file"], "truncated": true, "input_tokens": 265844, "output_tokens": 14527, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
+{"ts": 1783277310.1472208, "kind": "agent_output", "step": "agent.review_diff#behavior", "ok": true, "tool_calls": 20, "tools_used": ["read_file", "gh_pr_view", "grep", "grep", "grep", "read_file", "read_file", "read_file", "grep", "grep", "grep", "read_file", "read_file", "grep", "grep", "grep", "grep", "grep", "grep", "grep"], "truncated": true, "input_tokens": 308958, "output_tokens": 11208, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
+{"ts": 1783277426.567516, "kind": "agent_ensemble", "step": "agent.review_diff", "lenses": ["logic", "behavior", "contracts", "verification"], "candidates": 7, "merged": 6, "dropped": 0, "verified": true}
+{"ts": 1783277525.6072958, "kind": "agent_dispatch", "step": "agent.review_diff#logic", "evidence": {"pr_diff": 6029, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
+{"ts": 1783277525.6381502, "kind": "agent_dispatch", "step": "agent.review_diff#behavior", "evidence": {"pr_diff": 6029, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
+{"ts": 1783277525.666464, "kind": "agent_dispatch", "step": "agent.review_diff#contracts", "evidence": {"pr_diff": 6029, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
+{"ts": 1783277525.6922116, "kind": "agent_dispatch", "step": "agent.review_diff#verification", "evidence": {"pr_diff": 6029, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
+{"ts": 1783277529.3943624, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277529.3989115, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277529.4222822, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277529.4259105, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277529.4341865, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277529.6492145, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277529.969809, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277532.4496713, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277535.6251783, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277535.6307707, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277536.2483041, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277536.2525878, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277543.3819618, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277543.3849447, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277548.4799786, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277551.6753979, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277551.6783326, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277554.2093627, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277571.847501, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277571.8529003, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277571.8593357, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277571.8649416, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277571.8694723, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277571.8759875, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277571.88036, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277572.4732955, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277572.5151846, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277573.216474, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277576.0429144, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277577.2016244, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277577.2070928, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277577.9353127, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277577.9411588, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277581.6025674, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277581.7526596, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277582.4503953, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277585.0062563, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277591.4500673, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277591.4550092, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277599.3653135, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277604.9797523, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277613.3672225, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277613.3908782, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277613.509699, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277613.5376575, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277614.1781046, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277615.0971498, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277619.5764577, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277619.5803483, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277619.583377, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277619.586024, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277628.6044858, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277628.61058, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277638.214143, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277643.8622508, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277645.3672736, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277669.4250073, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277669.429231, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277676.150681, "kind": "agent_output", "step": "agent.review_diff#verification", "ok": true, "tool_calls": 15, "tools_used": ["read_file", "gh_pr_view", "read_file", "read_file", "grep", "grep", "grep", "read_file", "grep", "read_file", "grep", "grep", "grep", "grep", "grep"], "truncated": false, "input_tokens": 118131, "output_tokens": 7890, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
+{"ts": 1783277677.5847652, "kind": "agent_output", "step": "agent.review_diff#contracts", "ok": true, "tool_calls": 14, "tools_used": ["gh_pr_view", "read_file", "read_file", "read_file", "read_file", "read_file", "grep", "grep", "grep", "read_file", "read_file", "read_file", "read_file", "read_file"], "truncated": false, "input_tokens": 155291, "output_tokens": 8455, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
+{"ts": 1783277703.2935238, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277709.9810038, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783277744.4512844, "kind": "agent_output", "step": "agent.review_diff#behavior", "ok": true, "tool_calls": 17, "tools_used": ["gh_pr_view", "read_file", "grep", "grep", "grep", "grep", "grep", "grep", "grep", "grep", "grep", "read_file", "grep", "read_file", "grep", "grep", "grep"], "truncated": true, "input_tokens": 101692, "output_tokens": 10739, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
+{"ts": 1783277863.5912318, "kind": "agent_output", "step": "agent.review_diff#logic", "ok": true, "tool_calls": 14, "tools_used": ["gh_pr_view", "read_file", "read_file", "read_file", "grep", "grep", "read_file", "read_file", "grep", "grep", "grep", "read_file", "read_file", "read_file"], "truncated": true, "input_tokens": 221667, "output_tokens": 17555, "status": "failed", "confidence": "low", "skills_injected": ["pr-review-breaking-changes"]}
+{"ts": 1783277957.2367272, "kind": "agent_ensemble", "step": "agent.review_diff", "lenses": ["logic", "behavior", "contracts", "verification"], "candidates": 7, "merged": 6, "dropped": 0, "verified": true}
+{"ts": 1783278030.8100681, "kind": "agent_dispatch", "step": "agent.review_diff#logic", "evidence": {"pr_diff": 6029, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
+{"ts": 1783278030.8415182, "kind": "agent_dispatch", "step": "agent.review_diff#behavior", "evidence": {"pr_diff": 6029, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
+{"ts": 1783278030.8695357, "kind": "agent_dispatch", "step": "agent.review_diff#contracts", "evidence": {"pr_diff": 6029, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
+{"ts": 1783278030.9050148, "kind": "agent_dispatch", "step": "agent.review_diff#verification", "evidence": {"pr_diff": 6029, "gate_report": 42}, "skills": ["pr-review-breaking-changes"], "memories": 0, "permissions": {"tools": ["grep", "list_dir", "read_file", "gh_ci_read", "gh_issue_view", "gh_pr_view", "memory_search", "skill_search", "skill_update_candidate"], "read_only": true, "writable_paths": [], "shell": false, "push": false}}
+{"ts": 1783278033.7507002, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278034.0514536, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278034.0552304, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278034.196521, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278034.715571, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278034.7278984, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278035.0317059, "kind": "tool_call", "tool": "gh_pr_view", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278035.037391, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278037.7337532, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278037.7394593, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278038.0754151, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278038.0786574, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278038.2874188, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278038.2915115, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278038.2955272, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278041.5999844, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278042.0326393, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278045.2216938, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278046.1140485, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278047.6290846, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278047.6293542, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278049.867798, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278051.1218996, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278051.1272187, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278053.1560607, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278054.5446408, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278055.3133378, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278057.5076418, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278057.5123036, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278057.5735402, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278058.8502545, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278060.5516765, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278061.0831997, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278061.1242046, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278061.4653234, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278064.7243702, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278065.233807, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278065.2366703, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278065.550254, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278065.552955, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278065.6673458, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278065.7972834, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278071.3782887, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278071.6559381, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278073.026097, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278073.9451013, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278077.30741, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278077.7225544, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278077.72621, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278080.5527217, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278081.4820821, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278084.8806505, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278084.8841314, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278088.6627502, "kind": "tool_call", "tool": "gh_ci_read", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278088.678637, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278091.77031, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278091.7743034, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278105.904136, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278105.9073937, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278112.9356985, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278118.718055, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278141.621301, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278142.5334327, "kind": "tool_call", "tool": "grep", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278145.382543, "kind": "tool_call", "tool": "read_file", "ok": true, "out_of_scope": false, "path": null}
+{"ts": 1783278160.3032181, "kind": "agent_output", "step": "agent.review_diff#verification", "ok": true, "tool_calls": 18, "tools_used": ["read_file", "gh_pr_view", "read_file", "read_file", "read_file", "grep", "grep", "grep", "grep", "read_file", "read_file", "grep", "grep", "grep", "read_file", "read_file", "gh_ci_read", "grep"], "truncated": true, "input_tokens": 114599, "output_tokens": 7220, "status": "success", "confidence": "medium", "skills_injected": ["pr-review-breaking-changes"]}
+{"ts": 1783278186.086735, "kind": "agent_output", "step": "agent.review_diff#logic", "ok": true, "tool_calls": 13, "tools_used": ["gh_pr_view", "read_file", "read_file", "read_file", "grep", "grep", "read_file", "grep", "grep", "grep", "grep", "grep", "grep"], "truncated": true, "input_tokens": 46929, "output_tokens": 9305, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
+{"ts": 1783278198.984391, "kind": "agent_output", "step": "agent.review_diff#behavior", "ok": true, "tool_calls": 18, "tools_used": ["read_file", "gh_pr_view", "grep", "grep", "grep", "read_file", "grep", "grep", "grep", "grep", "read_file", "grep", "read_file", "read_file", "read_file", "read_file", "grep", "grep"], "truncated": true, "input_tokens": 133394, "output_tokens": 8252, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
+{"ts": 1783278240.4004736, "kind": "agent_output", "step": "agent.review_diff#contracts", "ok": true, "tool_calls": 15, "tools_used": ["read_file", "read_file", "read_file", "read_file", "grep", "grep", "grep", "grep", "read_file", "read_file", "read_file", "read_file", "grep", "grep", "read_file"], "truncated": true, "input_tokens": 117390, "output_tokens": 13350, "status": "success", "confidence": "high", "skills_injected": ["pr-review-breaking-changes"]}
+{"ts": 1783278356.4093022, "kind": "agent_ensemble", "step": "agent.review_diff", "lenses": ["logic", "behavior", "contracts", "verification"], "candidates": 8, "merged": 5, "dropped": 3, "verified": true}

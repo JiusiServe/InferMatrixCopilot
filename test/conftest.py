@@ -21,6 +21,9 @@ def settings(tmp_path: Path) -> Settings:
         skills_dir=tmp_path / "skills",  # never the shipped skills in tests
         memory_db=tmp_path / "memory.db",
         review_ensemble=False,  # ensemble tests opt in explicitly
+        ensemble_parallel=False,  # ordered ScriptedLLM fakes need determinism;
+                                  # the parallel path has its own keyed-fake test
+        ensemble_samples_per_lens=1,  # sampling tests opt in explicitly
     )
 
 

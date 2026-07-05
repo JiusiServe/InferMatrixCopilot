@@ -21,7 +21,9 @@ provides what the design promised and ad-hoc `ctx.llm.create()` calls did not:
 
 from __future__ import annotations
 
+import asyncio
 import json
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -115,7 +117,10 @@ def _build_evidence(ctx: StepContext, evidence: dict[str, str],
         if len(text) > cap:
             ev_dir.mkdir(parents=True, exist_ok=True)
             path = ev_dir / f"{name}.txt"
-            path.write_text(text, encoding="utf-8")
+            # concurrent lenses archive the same evidence — write atomically
+            tmp = ev_dir / f".{name}.{threading.get_ident()}.tmp"
+            tmp.write_text(text, encoding="utf-8")
+            tmp.replace(path)
             refs[name] = str(path)
             head = text[: int(cap * 0.75)]
             tail = text[-int(cap * 0.25):]
@@ -292,7 +297,10 @@ async def run_agent_step(
         "CONTRACT — no prose around it.\n\n"
         + (f"## Step guidance\n{guidance}" if guidance else "")
     )
-    outcome = run_agent(
+    # the tool loop is synchronous (blocking LLM calls) — run it in a worker
+    # thread so concurrent agent steps (ensemble lenses) actually overlap
+    outcome = await asyncio.to_thread(
+        run_agent,
         ctx.llm, system=system, prompt=dispatch_ctx.render(), scope=scope,
         trace=ctx.trace, extra_tools=all_extra, max_iters=budget,
     )
@@ -350,33 +358,56 @@ async def run_agent_step_ensemble(
                            "LLM not configured — cannot run agent step"), {})
 
     budget = max_iters or ctx.settings.ensemble_lens_max_iters
-    samples: list[tuple[str, dict]] = []
-    last_result: StepResult | None = None
-    for lens in lenses:
+    k = max(1, int(ctx.settings.ensemble_samples_per_lens))
+
+    async def _one_lens(lens: dict, j: int) -> tuple[str, StepResult, dict]:
+        suffix = f"/{j}" if k > 1 else ""
         lens_guidance = (
             f"{guidance}\n\n## Your assigned lens: {lens['name']}\n"
             f"{lens['focus']}\nGo DEEP on this lens — it is your depth "
             "priority; report other issues only if they surface on the way. "
             "Peer agents cover the other lenses.")
         result, output = await run_agent_step(
-            ctx, step_name=f"{step_name}#{lens['name']}", purpose=purpose,
+            ctx, step_name=f"{step_name}#{lens['name']}{suffix}",
+            purpose=purpose,
             evidence=evidence, guidance=lens_guidance, expected=expected,
             output_extension=output_extension, scope=scope,
             extra_tools=extra_tools, max_iters=budget)
-        last_result = result
-        if output:
-            samples.append((str(lens["name"]), output))
+        return str(lens["name"]), result, output
+
+    # lenses (and repeat samples of each lens — a single sample's item list is
+    # the highest-variance link, so the union over samples is the recall
+    # floor) are independent by construction — run them concurrently; the
+    # sequential ensemble's wall-clock was its whole efficiency penalty
+    jobs = [(lens, j) for lens in lenses for j in range(1, k + 1)]
+    if ctx.settings.ensemble_parallel and len(jobs) > 1:
+        runs = await asyncio.gather(*(_one_lens(lens, j) for lens, j in jobs))
+    else:
+        runs = [await _one_lens(lens, j) for lens, j in jobs]
+    samples = [(name, output) for name, _, output in runs if output]
+    last_result = runs[-1][1] if runs else None
     if not samples:
         return (last_result or StepResult(
             False, FailureKind.RETRYABLE,
             f"{step_name}: all ensemble samples failed"), {})
 
+    # collapse EXACT duplicates before numbering — identical items from repeat
+    # samples carry consensus, not new information
     candidates: list[dict] = []
+    by_sig: dict[str, dict] = {}
     for name, output in samples:
         for item in output.get(merge_key) or []:
-            tagged = dict(item) if isinstance(item, dict) else {"item": item}
-            tagged["lens"] = name
-            candidates.append(tagged)
+            base = dict(item) if isinstance(item, dict) else {"item": item}
+            sig = json.dumps(base, ensure_ascii=False, sort_keys=True)
+            if sig in by_sig:
+                tagged = by_sig[sig]
+                tagged["consensus"] += 1
+                if name not in tagged["lenses"]:
+                    tagged["lenses"].append(name)
+            else:
+                tagged = {**base, "lenses": [name], "consensus": 1}
+                by_sig[sig] = tagged
+                candidates.append(tagged)
 
     def _dedup_union(key: str) -> list:
         out, seen = [], set()
@@ -401,10 +432,18 @@ async def run_agent_step_ensemble(
     if any(o.get("status") == "success" for _, o in samples):
         merged["status"] = "success"
 
-    item_schema = (output_extension or {}).get(merge_key) or "list of items"
-    reduce_contract = {merge_key: f"the merged, verified items — {item_schema}",
-                       "summary": "one-paragraph merged outcome",
-                       "dropped": "list of short strings: item dropped + why"}
+    # the reducer never re-emits the merged list (free-form regeneration is
+    # where findings silently died in live runs): it returns one verdict PER
+    # NUMBERED CANDIDATE and code assembles the result deterministically —
+    # any candidate it fails to mention is KEPT (fail-open per item)
+    reduce_contract = {
+        "verdicts": ('list of {"i": candidate index, "action": '
+                     '"keep"|"drop"|"dup", "of": null | index this '
+                     'duplicates, "severity": optional corrected severity, '
+                     '"comment": optional self-contained rewrite, '
+                     '"why": one line}'),
+        "summary": "one-paragraph merged outcome",
+    }
     # the reducer verifies against the evidence, so it needs far more of it
     # than the per-lens dispatch cap (the lenses had tools; the reducer has none)
     capped, _ = _build_evidence(ctx, evidence,
@@ -412,39 +451,48 @@ async def run_agent_step_ensemble(
     ev_text = "\n\n".join(f"### {k}\n{v}" for k, v in capped.items())
     merge_system = (
         "You are the verify-and-merge reducer for an ensemble of independent "
-        "agent samples of the same step. You receive their candidate items "
-        "(each tagged with the lens that produced it) plus the evidence.\n"
-        "Rules:\n"
-        "1. DEDUPE: the same file+issue reported by several lenses is ONE item "
-        "— keep the most precise phrasing and the highest severity; multi-lens "
-        "consensus makes an item high-confidence.\n"
-        "2. VERIFY: check every item against the evidence. DROP items that "
-        "misread it; fix line numbers so they point at lines actually visible "
-        "in the evidence.\n"
-        "3. SELF-CONTAINED: rewrite each kept item so a reader holding only "
-        "the evidence can verify it — first the concrete behavior it is "
-        "grounded in, then the directive (what to change, where, why).\n"
+        "agent samples of the same step. You receive their NUMBERED candidate "
+        "items (tagged with the lens(es) that produced each and a consensus "
+        "count) plus the evidence. Emit one verdict per candidate index:\n"
+        "1. VERIFY each candidate, then action=drop the ones that fail: "
+        "misreads of the evidence, claims the evidence already handles, "
+        "vague items, and pure stylistic alternatives to correct behavior — "
+        "give the why. IMPORTANT: the candidates come from agents that had "
+        "repo tools; you hold only this evidence pack. A claim grounded in "
+        "cited repo evidence (a named file/grep and what it showed) is "
+        "judged on coherence and specificity — NEVER drop it merely because "
+        "the cited file is outside your evidence. A candidate with "
+        "consensus >= 2 needs a concrete refutation to drop. A verified "
+        "item is never dropped just for low severity.\n"
+        "2. action=dup with of=<index> when two candidates report the same "
+        "underlying issue — rewrite the surviving index with the most "
+        "precise phrasing and the highest severity of the pair.\n"
+        "3. action=keep otherwise; use 'comment' to rewrite the item so it "
+        "is self-contained and verifiable: FIRST the concrete fact from the "
+        "evidence it is grounded in, THEN the directive (what to change, "
+        "where, why). Fix line numbers to lines actually visible in the "
+        "evidence. Unmentioned candidates are kept unchanged.\n"
         + (f"4. {merge_guidance}\n" if merge_guidance else "")
-        + f"\nOutput the '{merge_key}' list FIRST. Your FINAL message must be "
-        "a single JSON object with exactly these fields:\n"
-        + json.dumps(reduce_contract, ensure_ascii=False))
+        + "\nYour FINAL message must be a single JSON object with exactly "
+        "these fields:\n" + json.dumps(reduce_contract, ensure_ascii=False))
+    numbered = [{"i": i, **c} for i, c in enumerate(candidates)]
     reply = ctx.llm.create(
         system=merge_system,
         messages=[{"role": "user", "content":
                    f"## CANDIDATE ITEMS ({merge_key}, from "
                    f"{len(samples)} samples)\n"
-                   + json.dumps(candidates, ensure_ascii=False, indent=1)
+                   + json.dumps(numbered, ensure_ascii=False, indent=1)
                    + f"\n\n## EVIDENCE\n{ev_text}"}],
         max_tokens=max(6000, ctx.settings.llm_max_tokens))
     try:  # archive the reduction exchange — reducer failures are hard to debug
         ctx.run_dir.mkdir(parents=True, exist_ok=True)
         (ctx.run_dir / f"ensemble_{step_name.replace('/', '_')}.json").write_text(
-            json.dumps({"candidates": candidates, "reply": reply.text},
+            json.dumps({"candidates": numbered, "reply": reply.text},
                        ensure_ascii=False, indent=1), encoding="utf-8")
     except OSError:
         pass
     reduced = parse_json_reply(reply.text or "")
-    if not (isinstance(reduced, dict) and isinstance(reduced.get(merge_key), list)):
+    if not (isinstance(reduced, dict) and isinstance(reduced.get("verdicts"), list)):
         reduced = None
         if (reply.text or "").strip():  # one repair round (never on empty text)
             fix = ctx.llm.create(
@@ -454,32 +502,49 @@ async def run_agent_step_ensemble(
                 messages=[{"role": "user", "content": str(reply.text)[:20_000]}],
                 max_tokens=max(6000, ctx.settings.llm_max_tokens))
             obj = parse_json_reply(fix.text)
-            if isinstance(obj, dict) and isinstance(obj.get(merge_key), list):
+            if isinstance(obj, dict) and isinstance(obj.get("verdicts"), list):
                 reduced = obj
     verified = reduced is not None
+    kept: dict[int, dict] = {i: dict(c) for i, c in enumerate(candidates)}
+    dropped: list[str] = []
     if reduced is not None:
-        merged[merge_key] = reduced[merge_key]
+        by_i: dict[int, dict] = {}
+        for v in reduced.get("verdicts") or []:
+            if isinstance(v, dict) and isinstance(v.get("i"), int) \
+                    and 0 <= v["i"] < len(candidates):
+                by_i[v["i"]] = v
+        for i, v in by_i.items():  # drops first
+            if str(v.get("action", "")).lower() == "drop":
+                kept.pop(i, None)
+                dropped.append(f"[{i}] {v.get('why', '')}")
+        for i, v in by_i.items():  # then dups (a dup of a dropped item stays)
+            of = v.get("of")
+            if str(v.get("action", "")).lower() == "dup" \
+                    and isinstance(of, int) and of != i and of in kept \
+                    and i in kept:
+                kept[of]["consensus"] = kept[of].get("consensus", 1) + 1
+                kept.pop(i)
+        for i, v in by_i.items():  # then rewrites
+            if i in kept:
+                if isinstance(v.get("comment"), str) and v["comment"].strip() \
+                        and "comment" in kept[i]:
+                    kept[i]["comment"] = v["comment"]
+                if v.get("severity") and "severity" in kept[i]:
+                    kept[i]["severity"] = str(v["severity"])
         merged["summary"] = str(reduced.get("summary")
                                 or merged.get("summary") or "")
     else:
-        # fail open on the reduction: an unverified union beats losing the work
-        seen: set[str] = set()
-        union = []
-        for c in candidates:
-            item = {k: v for k, v in c.items() if k != "lens"}
-            sig = json.dumps(item, ensure_ascii=False, sort_keys=True)
-            if sig not in seen:
-                seen.add(sig)
-                union.append(item)
-        merged[merge_key] = union
         merged["summary"] = (f"ensemble of {len(samples)} samples "
                              "(merge reduction failed; unverified union)")
+    merged[merge_key] = [
+        {k: v for k, v in kept[i].items() if k not in ("lenses", "consensus")}
+        for i in sorted(kept)]
     ctx.trace.record(
         "agent_ensemble", step=step_name,
         lenses=[name for name, _ in samples],
         candidates=len(candidates),
         merged=len(merged.get(merge_key) or []),
-        dropped=len((reduced or {}).get("dropped") or []),
+        dropped=len(dropped),
         verified=verified)
     prefix = f"[ensemble x{len(samples)}] "
     return _to_step_result(merged, prefix), merged

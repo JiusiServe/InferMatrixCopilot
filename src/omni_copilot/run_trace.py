@@ -7,6 +7,7 @@ triggers, escalation reports, and audits.
 from __future__ import annotations
 
 import json
+import threading
 import time
 from pathlib import Path
 from typing import Any, Iterator
@@ -16,10 +17,11 @@ class RunTrace:
     def __init__(self, path: Path):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._lock = threading.Lock()  # concurrent agent steps share one trace
 
     def record(self, kind: str, **fields: Any) -> None:
         event = {"ts": time.time(), "kind": kind, **fields}
-        with self.path.open("a", encoding="utf-8") as f:
+        with self._lock, self.path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(event, ensure_ascii=False, default=str) + "\n")
 
     def events(self, kind: str | None = None) -> Iterator[dict]:

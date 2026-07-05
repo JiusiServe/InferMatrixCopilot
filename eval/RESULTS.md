@@ -10,9 +10,9 @@ Model: DeepSeek v4 pro (all arms + judge). Metric: see README.md.
 | copilot_skill | 0 | 0.00 | 0.00 | **0.00** | 0.00 | 31,550 | 50 |
 | claudecode_skill | 3 | 0.00 | 1.00 | **0.00** | 1.00 | 490,291 | 202 |
 | claudecode_opus_skill | 1 | 0.00 | 1.00 | **0.00** | 1.00 | 398,757 | 283 |
-| copilot_v2 | 7 | 0.25 | 0.86 | **0.39** | 1.00 | 922,479 | 792 |
+| copilot_v2 | 5 | 0.00 | 0.80 | **0.00** | 1.00 | 1,156,383 | 421 |
 
-Per-issue coverage: pure_copilot: gt1=0,gt2=0; copilot_skill: gt1=0,gt2=0; claudecode_skill: gt1=0,gt2=0; claudecode_opus_skill: gt1=0,gt2=0; copilot_v2: gt1=0.5,gt2=0
+Per-issue coverage: pure_copilot: gt1=0,gt2=0; copilot_skill: gt1=0,gt2=0; claudecode_skill: gt1=0,gt2=0; claudecode_opus_skill: gt1=0,gt2=0; copilot_v2: gt1=0,gt2=0
 
 ## PR #4679  (4 ground-truth issues)
 
@@ -22,9 +22,9 @@ Per-issue coverage: pure_copilot: gt1=0,gt2=0; copilot_skill: gt1=0,gt2=0; claud
 | copilot_skill | 2 | 0.00 | 1.00 | **0.00** | 0.00 | 29,217 | 69 |
 | claudecode_skill | 1 | 0.12 | 0.00 | **0.00** | 1.00 | 658,383 | 156 |
 | claudecode_opus_skill | 2 | 0.12 | 0.00 | **0.00** | 1.00 | 4,340,800 | 573 |
-| copilot_v2 | 3 | 0.12 | 0.67 | **0.21** | 1.00 | 870,446 | 800 |
+| copilot_v2 | 5 | 0.00 | 0.80 | **0.00** | 1.00 | 664,065 | 432 |
 
-Per-issue coverage: pure_copilot: gt1=0.5,gt2=0,gt3=0,gt4=0; copilot_skill: gt1=0,gt2=0,gt3=0,gt4=0; claudecode_skill: gt1=0.5,gt2=0,gt3=0,gt4=0; claudecode_opus_skill: gt1=0.5,gt2=0,gt3=0,gt4=0; copilot_v2: gt1=0.5,gt2=0,gt3=0,gt4=0
+Per-issue coverage: pure_copilot: gt1=0.5,gt2=0,gt3=0,gt4=0; copilot_skill: gt1=0,gt2=0,gt3=0,gt4=0; claudecode_skill: gt1=0.5,gt2=0,gt3=0,gt4=0; claudecode_opus_skill: gt1=0.5,gt2=0,gt3=0,gt4=0; copilot_v2: gt1=0,gt2=0,gt3=0,gt4=0
 
 ## PR #4849  (2 ground-truth issues)
 
@@ -34,9 +34,9 @@ Per-issue coverage: pure_copilot: gt1=0.5,gt2=0,gt3=0,gt4=0; copilot_skill: gt1=
 | copilot_skill | 1 | 0.25 | 1.00 | **0.40** | 1.00 | 13,941 | 76 |
 | claudecode_skill | 2 | 0.25 | 1.00 | **0.40** | 1.00 | 764,975 | 187 |
 | claudecode_opus_skill | 2 | 0.00 | 1.00 | **0.00** | 1.00 | 704,305 | 132 |
-| copilot_v2 | 3 | 0.25 | 1.00 | **0.40** | 1.00 | 423,099 | 714 |
+| copilot_v2 | 5 | 0.00 | 0.60 | **0.00** | 1.00 | 468,169 | 326 |
 
-Per-issue coverage: pure_copilot: gt1=0.5,gt2=0; copilot_skill: gt1=0.5,gt2=0; claudecode_skill: gt1=0.5,gt2=0; claudecode_opus_skill: gt1=0,gt2=0; copilot_v2: gt1=0.5,gt2=0
+Per-issue coverage: pure_copilot: gt1=0.5,gt2=0; copilot_skill: gt1=0.5,gt2=0; claudecode_skill: gt1=0.5,gt2=0; claudecode_opus_skill: gt1=0,gt2=0; copilot_v2: gt1=0,gt2=0
 
 ## Aggregate (mean over PRs)
 
@@ -46,4 +46,4 @@ Per-issue coverage: pure_copilot: gt1=0.5,gt2=0; copilot_skill: gt1=0.5,gt2=0; c
 | copilot_skill | 0.08 | 0.67 | **0.13** | 0.33 | 24,903 | 65 |
 | claudecode_skill | 0.12 | 0.67 | **0.13** | 1.00 | 637,883 | 182 |
 | claudecode_opus_skill | 0.04 | 0.67 | **0.00** | 1.00 | 1,814,621 | 330 |
-| copilot_v2 | 0.21 | 0.84 | **0.33** | 1.00 | 738,675 | 769 |
+| copilot_v2 | 0.00 | 0.73 | **0.00** | 1.00 | 762,872 | 393 |

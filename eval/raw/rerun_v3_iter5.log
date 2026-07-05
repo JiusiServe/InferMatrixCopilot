@@ -1,0 +1,17 @@
+v3 jury: ['deepseek-v4-pro', 'deepseek-v4-flash'] x 3 trials
+[v3] PR 4678 · pure_copilot (2 findings)
+[v3] PR 4678 · copilot_skill (0 findings)
+[v3] PR 4678 · claudecode_skill (3 findings)
+[v3] PR 4678 · claudecode_opus_skill (1 findings)
+[v3] PR 4678 · copilot_v2 (5 findings)
+[v3] PR 4679 · pure_copilot (2 findings)
+[v3] PR 4679 · copilot_skill (2 findings)
+[v3] PR 4679 · claudecode_skill (1 findings)
+[v3] PR 4679 · claudecode_opus_skill (2 findings)
+[v3] PR 4679 · copilot_v2 (5 findings)
+[v3] PR 4849 · pure_copilot (2 findings)
+[v3] PR 4849 · copilot_skill (1 findings)
+[v3] PR 4849 · claudecode_skill (2 findings)
+[v3] PR 4849 · claudecode_opus_skill (2 findings)
+[v3] PR 4849 · copilot_v2 (3 findings)
+done -> /rebase/vllm-omni-copilot/eval/RESULTS_V3.md

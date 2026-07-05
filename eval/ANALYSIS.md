@@ -1,5 +1,76 @@
 # Analysis — pure skill vs pure copilot vs copilot+skill (DeepSeek v4 pro)
 
+## Optimization campaign toward RQS3>0.6 / RQS3e>0.5 (2026-07-05/06)
+
+Six full eval cycles on the copilot_v2 arm, one mechanism change at a time —
+every change is task-general (audited: no PR numbers, file names, or
+benchmark tokens in any prompt). Numbers are single-run measurements of the
+whole chain (fresh reviews + fresh v3 judging):
+
+| iter | change (cumulative unless noted) | RQS3 | RQS3e | $ | min |
+|---|---|---|---|---|---|
+| base | 3 sequential lenses, free-form verify-merge | 0.50 | 0.34 | 0.24 | 12.8 |
+| 1 | **parallel** lenses; **4th (verification) lens**; severity semantics + **coherent verdict rule** (minor+ ⇒ request changes); evidence-grounding widened to cited repo reads; simplify-over-document | **0.686** | **0.505** | 0.28 | 6.9 |
+| 2 | + anti-self-censorship, exhaustive docstring sweep, demote-don't-drop | 0.498 | 0.374 | 0.28 | 6.0 |
+| 3 | + samples×2/lens, per-item verdict reducer with per-item fail-open | 0.530 | 0.370 | 0.57 | 5.8 |
+| 4 | samples×1; reducer drop duty re-armed; code-side severity cap | 0.527 | 0.403 | 0.26 | 5.5 |
+| 5 | + reducer info-asymmetry fix (never drop for citing repo files outside its evidence pack); verification asks first-class; anti-censorship removed | 0.591 | 0.450 | 0.27 | 5.6 |
+| 6 | + diff-anchored first sentence enforced at lens level | 0.577 | 0.431 | 0.26 | 6.6 |
+
+What is STABLE across all runs of the iter-1+ stack (vs. 0.50/0.34 baseline):
+
+- **decision 0.33 → 1.00** in 14 of 15 PR-runs — the coherent-verdict rule
+  (approving while asking for in-PR changes is incoherent) plus the ensemble
+  fail-open, which all but guarantees a minor+ comment survives. This is the
+  single largest and most reproducible gain (worth +0.13 RQS3 alone).
+- **wall-clock 12.8 → 5.5-7 min** (parallel lenses; lens count is now free in
+  time, paid only in tokens). This is most of the RQS3e recovery.
+- **actionability ~1.0** in every run (verify-and-merge rewrite).
+- cost stable at ~$0.26/review (samples×2 doubled it for no recall gain and
+  was reverted — Cost-of-Pass's "majority voting rarely justifies its cost"
+  reproduced exactly).
+
+What is NOT stable — and the honest headline: **recall_w and precision swing
+±0.2 per PR between runs of identical code** (4849 recall across runs: 0.60,
+0.10, 0.00, 0.60, 0.30; 4678 precision: 1.00, 0.83, 0.42, 0.72, 0.07, 0.63).
+Two sources, both measured: (a) lens finding-generation variance — the same
+lens rolls 0-6 candidates on the same diff; (b) judge noise — validity κ≈0
+cross-model, and the coverage judge pattern-matches GT file names (it scored
+gt1 "miss" on a review that found the *same stale-consumer defect* in a file
+the human reviewers missed). With 3 PRs × ≤6 findings, single-run RQS3 has
+±0.1 noise: **iteration 1 measured 0.686/0.505 — the only run to cross both
+bars — but replicates of near-identical configs (0.50-0.59) show that roll
+cannot be claimed as stable.** The shipped default is the iter-6 stack (best
+structural properties; its two runs: 0.591/0.450, 0.577/0.431).
+
+Reducer lessons that generalize (now pinned in test_agent_ensemble.py):
+
+1. **Free-form reducers silently lose findings** — asking the merge LLM to
+   re-emit the final list let it keep 1 of 10 candidates (iter-1's 4678).
+   The reducer now returns one keep/drop/dup verdict per NUMBERED candidate;
+   code assembles deterministically and unmentioned candidates are KEPT
+   (fail-open per item, not per call).
+2. **Per-item fail-open without an armed drop duty inverts the failure**:
+   iter-3's reducer dropped 0 of 12 — precision collapsed to 0.31-0.44. The
+   verify duty and the fail-open must coexist: verify each, drop refuted,
+   keep unmentioned.
+3. **The reducer has less evidence than the lenses** (diff pack vs. repo
+   tools) — untreated, "verify" degenerates into "drop whatever I can't
+   see", which deletes exactly the repo-impact findings the v3 rubric
+   legitimizes (measured: it dropped a correct benchmark-verification ask as
+   "not a concrete defect" and a repo-context finding as "not in the PR
+   diff"). Verdicts on repo-cited claims are now judged on coherence of the
+   cited evidence, not visibility in the reducer's pack.
+4. **Caps must be code, not prompt** — reducers ignored a prompted 6-comment
+   cap; the budget is now deterministic (severity-ordered, cap 5).
+
+Next steps the data supports: (a) replicate-mean evaluation (report mean ±
+spread over N runs per config — single runs cannot rank configs at this n);
+(b) more PRs with unresolved GT (resolution contamination caps achievable
+recall: the final merged diff already contains the fixes reviewers asked
+for); (c) a cross-family judge for validity (κ≈0 within-family); (d) the
+c-CRAB executable-verification direction for the recall judge.
+
 ## RQS v3 (second literature pass — see METRIC_V3.md, RESULTS_V3.md)
 
 v3 fixes the two failure modes v2's own reliability stats exposed: validity

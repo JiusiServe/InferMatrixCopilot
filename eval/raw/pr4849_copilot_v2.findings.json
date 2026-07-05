@@ -1,17 +1,27 @@
 [
  {
   "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
-  "line": 97,
-  "summary": "The `requires_multimodal_data` parameter (line 97) is documented as 'Whether to forward multimodal data', but the function body never gates forwarding on it\u2014`multi_modal_data` is copied unconditionally (lines ~196-203 in the new code)."
+  "line": 215,
+  "summary": "Add a truthiness guard to prevent empty image lists from being forwarded to the diffusion payload."
  },
  {
   "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
-  "line": 108,
-  "summary": "The new code unconditionally accesses `ar_output.outputs[0]` (line 108) without verifying that `outputs` is non-empty."
+  "line": 96,
+  "summary": "Either implement gating with the orphaned requires_multimodal_data parameter or drop it to prevent confusion."
+ },
+ {
+  "file": "tests/e2e/accuracy/test_hunyuan_image3.py",
+  "line": 414,
+  "summary": "Attach actual metric values (PSNR, SSIM, CLIP score, COT similarity) to confirm no silent quality regression in the e2e test."
+ },
+ {
+  "file": "tests/diffusion/models/hunyuan_image3/test_multi_resolution.py",
+  "line": 528,
+  "summary": "Update the helper docstring to reflect that the return can be None, matching the production docstring."
  },
  {
   "file": "tests/model_executor/stage_input_processors/test_hunyuan_image3_bridge.py",
-  "line": 69,
-  "summary": "The new test only asserts that `result['extra']['ar_generated_text']` equals the parent text (line 69), but does not verify that companion-specific data is absent from the result."
+  "line": 58,
+  "summary": "Add assertions on height and width to ensure companion-specific data does not leak into the diffusion request payload."
  }
 ]

@@ -292,35 +292,58 @@ Sweep EVERY item of this checklist and, for each, state in one line what evidenc
 checked (a file you read, a grep you ran, or the diff hunk):
 1. Correctness of changed logic (None/empty handling, off-by-one, error paths, concurrency).
 2. Simplifiability: branches for cases that cannot co-occur, values re-derived by hand \
-where an existing helper already provides them (grep the repo for such helpers).
+where an existing helper already provides them (grep the repo for such helpers). The right \
+ask for dead or redundant code is REMOVE/simplify it — documenting it is the wrong fix.
 3. Breaking behavior: changed defaults or API/protocol shifts — grep for IN-REPO consumers \
-(examples, docs, clients, tests) that still assume the old behavior; list any you find.
+(examples, docs, clients, tests, READMEs) that assume the old behavior, then check whether \
+THIS diff updates each one; name every consumer left stale.
 4. Rebase/merge damage: dropped hunks, duplicated code, references to moved/renamed symbols.
-5. Tests: behavior changed without test changes? new skips or loosened thresholds justified?
-6. Docs/docstrings/comments made stale or misleading by the change.
+5. Tests & verification: behavior changed without test changes? new skips or loosened \
+thresholds justified? For model/pipeline behavior changes, name the specific existing \
+test or benchmark that validates the changed path and whether the PR shows it was run.
+6. Docs/docstrings/comments made stale or misleading by the change — re-read every \
+docstring and doc paragraph in the touched files and check each still tells the truth \
+under the NEW behavior.
 7. Undocumented assumptions or invariants the change introduces or relies on (ordering, \
 "first element is X", implicit units/thresholds) — these deserve a comment or an assert.
 8. Scope: files touched beyond the PR's stated purpose.
 
+Severity semantics (they drive the verdict, so assign them honestly):
+- blocker: merging as-is causes breakage or data loss.
+- major: a real defect, or a consumer/doc/test update this change requires but the diff \
+does not contain.
+- minor: a concrete improvement that belongs in THIS PR (a simplification, a stale \
+docstring fix, a missing assert, a missing verification run).
+- nit: optional polish; does NOT block approval.
+
 Then emit review_comments per the output contract:
-- Each comment: file, line, severity (blocker|major|minor|nit), WHAT to change and WHY \
-(directive), and the evidence you checked.
-- SELF-GROUNDING: phrase every comment so it can be verified against the diff alone — \
-first the concrete behavior the diff introduces (quote or paraphrase the hunk), then the \
-directive. `line` must be a line the diff actually touches.
+- Each comment: file, line, severity, WHAT to change and WHY (directive), and the \
+evidence you checked.
+- EVIDENCE-GROUNDING: every comment must be verifiable from the diff or from repo \
+evidence you actually gathered and NAME in the comment (the file you read or grep you \
+ran, and what it showed). The comment's FIRST sentence must state the concrete change \
+THIS DIFF makes (quote or paraphrase the hunk) — only then the repo-side consequence \
+and the directive; a reader holding only the diff must see immediately which change the \
+comment hangs on. For comments about diff code, `line` is a line the diff touches; for \
+repo-impact comments (a consumer/doc/test elsewhere that this change breaks or leaves \
+stale), point file/line at that repo location and quote it.
+- A verification ask is a first-class comment when it names the exact test/benchmark \
+command and the specific regression risk it guards; bare process asks ("run the tests") \
+are still banned.
 - Behavior/correctness findings outrank documentation asks: at most 2 comments whose only \
 ask is adding a comment or docstring.
 - Up to 2 comments you could not fully verify are allowed — set evidence to \
 "UNVERIFIED: <exactly what to check>"; labeling honestly beats silence AND beats guessing.
-- No praise-only comments; no bare process asks ("run the tests") unless tied to a \
-specific identified risk. At most 6 comments + 2 unverified.
-- Only if the sweep truly surfaces nothing: empty review_comments with a one-line summary."""
+- No praise-only comments. At most 6 comments + 2 unverified.
+- Only if the sweep truly surfaces nothing that belongs in this PR: empty review_comments \
+with a one-line summary."""
 
 # Perspective-diverse ensemble lenses (run_agent_step_ensemble): each sample
 # goes DEEP on a slice of the checklist instead of sampling one corner of all
 # of it — the eval showed single runs collapse into whichever failure mode the
 # first finding anchors (e.g. all-doc-nits), while unions across runs hit 5/8
-# ground-truth issues.
+# ground-truth issues. Lenses run concurrently, so a finer decomposition costs
+# tokens but no wall-clock.
 _REVIEW_LENSES = [
     {"name": "logic",
      "focus": "Checklist items 1, 2 and 4: correctness of the changed logic "
@@ -328,26 +351,53 @@ _REVIEW_LENSES = [
               "rebase/merge damage, and SIMPLIFIABILITY — branches for cases "
               "that cannot co-occur, values re-derived by hand where an "
               "existing helper already provides them (grep the repo for such "
-              "helpers before flagging)."},
+              "helpers before flagging). When you find dead or redundant "
+              "code, ask to REMOVE or simplify it — documenting it is the "
+              "wrong fix."},
     {"name": "behavior",
      "focus": "Checklist item 3: changed defaults, API/protocol/output-format "
               "shifts. grep the repo for IN-REPO consumers (examples/, docs/, "
-              "clients, tests, READMEs) that still assume the old behavior and "
-              "name each one that needs updating in this PR."},
+              "clients, tests, READMEs) that assume the old behavior, then "
+              "check whether THIS diff updates each one — name every consumer "
+              "the diff leaves stale, pointing file/line at the consumer "
+              "itself and quoting it."},
     {"name": "contracts",
-     "focus": "Checklist items 5-7: behavior changed without test changes; "
-              "docs/docstrings made stale or misleading; undocumented "
-              "assumptions or invariants (ordering, 'first element is X', "
-              "implicit units/thresholds) that deserve an assert or comment."},
+     "focus": "Checklist items 6 and 7: docs/docstrings/comments made stale "
+              "or misleading — read EVERY docstring, inline comment, and "
+              "field description in each touched file (not just the first "
+              "suspicious one — stopping after one is the most common "
+              "failure) and verify each still tells the truth under the NEW "
+              "behavior, quoting any that don't. Undocumented "
+              "assumptions and invariants: for each indexed or first-element "
+              "access the diff adds (xs[0], 'first element is X', ordering, "
+              "implicit units/thresholds), state the assumption it encodes "
+              "and what guarantees it — if nothing does, ask for an assert "
+              "or comment."},
+    {"name": "verification",
+     "focus": "Checklist item 5: behavior changed without test changes; new "
+              "skips or loosened thresholds. Then REQUIRED VERIFICATION: "
+              "find the specific existing test/benchmark that validates the "
+              "changed path (grep tests/, benchmarks/), and if the PR gives "
+              "no sign it was run or extended, ask for exactly that "
+              "run/extension, citing the concrete regression risk it "
+              "guards."},
 ]
 
 _REVIEW_MERGE = (
-    "Keep at most 6 review_comments ordered by severity, preferring "
-    "behavior/correctness findings — at most 2 whose only ask is adding a "
-    "comment or docstring. Each kept comment must first state the concrete "
-    "change the diff makes (quote or paraphrase the hunk), then WHAT to "
-    "change WHERE and WHY, so it is verifiable from the diff alone; `line` "
-    "must be a line the diff actually touches.")
+    "Severity semantics: blocker = breaks on merge; major = defect or "
+    "required update the diff lacks; minor = concrete change that belongs in "
+    "THIS PR; nit = optional polish. Severities above nit request changes — "
+    "demote to nit anything genuinely optional; a VERIFIED but optional "
+    "comment is demoted, not dropped. Drop comments whose evidence is "
+    "UNVERIFIED unless a second lens corroborates them. When you rewrite a "
+    "comment, its "
+    "FIRST sentence must state the concrete change the diff makes (quote or "
+    "paraphrase the hunk) — for repo-impact comments too, where the "
+    "consequence elsewhere (named consumer/doc/test file, quoted) comes "
+    "second. Comments about diff code must point `line` at a line the diff "
+    "touches. A verification ask that names the exact test/benchmark "
+    "command and the concrete regression risk it guards is a first-class "
+    "comment, not a process nit.")
 
 _SEVERITY_ORDER = {"blocker": 0, "major": 1, "minor": 2, "nit": 3}
 
@@ -396,8 +446,12 @@ def _render_review_md(output: dict) -> str:
         ev = f" (evidence: {c['evidence']})" if c.get("evidence") else ""
         lines.append(f"{loc} [{c.get('severity', 'minor')}] — "
                      f"{c.get('comment', '')}{ev}")
-    blocking = any(str(c.get("severity", "")).lower() in ("blocker", "major")
-                   for c in comments)
+    # verdict coherence: severities above nit mean "belongs in THIS PR", and
+    # asking for in-PR changes while approving is incoherent (the eval's
+    # decision metric caught exactly that: all-minor reviews said APPROVE on
+    # PRs whose human maintainers requested changes)
+    blocking = any(str(c.get("severity", "")).lower()
+                   in ("blocker", "major", "minor") for c in comments)
     verdict = "REQUEST CHANGES" if blocking else "APPROVE"
     body = "\n\n".join(lines) if lines else output.get("summary", "No findings.")
     return f"{body}\n\n**Verdict:** {verdict}"
@@ -432,6 +486,13 @@ async def _review_diff(ctx: StepContext) -> StepResult:
         result, output = await run_agent_step_ensemble(
             ctx, lenses=_REVIEW_LENSES, merge_key="review_comments",
             merge_guidance=_REVIEW_MERGE, **common)
+        # deterministic comment budget: severity-ordered, capped at 5 — the
+        # low-signal tail goes first (reducers ignored a prompted cap, and
+        # human reviews of comparable PRs raise 2-4 issues)
+        comments = sorted(output.get("review_comments") or [],
+                          key=lambda c: _SEVERITY_ORDER.get(
+                              str(c.get("severity", "minor")).lower(), 2))
+        output["review_comments"] = comments[:5]
     else:
         result, output = await run_agent_step(ctx, **common)
     if result.ok:

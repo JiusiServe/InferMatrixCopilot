@@ -89,21 +89,25 @@ COPILOT_REVIEWER_SYSTEM = (
 
 
 class CountingLLM:
-    """Wraps LLM; accumulates token usage + call count for cost reporting."""
+    """Wraps LLM; accumulates token usage + call count for cost reporting.
+    Thread-safe: the copilot_v2 arm runs ensemble lenses concurrently."""
 
     def __init__(self, inner: LLM):
+        import threading
         self.inner = inner
         self.available = inner.available
         self.calls = 0
         self.input_tokens = 0
         self.output_tokens = 0
+        self._lock = threading.Lock()
 
     def create(self, **kwargs):
-        self.calls += 1
         reply = self.inner.create(**kwargs)
-        if reply.usage:
-            self.input_tokens += reply.usage.get("input_tokens", 0)
-            self.output_tokens += reply.usage.get("output_tokens", 0)
+        with self._lock:
+            self.calls += 1
+            if reply.usage:
+                self.input_tokens += reply.usage.get("input_tokens", 0)
+                self.output_tokens += reply.usage.get("output_tokens", 0)
         return reply
 
 

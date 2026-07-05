@@ -36,6 +36,12 @@ def contract(status="success", **extra):
     return Reply(blocks=[Block(type="text", text=json.dumps(base))])
 
 
+def verdicts_reply(*vs, summary="merged", **extra):
+    """A reducer reply in the per-candidate verdict contract."""
+    return Reply(blocks=[Block(type="text", text=json.dumps(
+        {"verdicts": list(vs), "summary": summary, **extra}))])
+
+
 def _ctx(settings, trace, tmp_path, state=None, llm=None):
     return StepContext(settings=settings, state=state or {"task_spec": {"pr": 1}},
                        params={}, run_dir=tmp_path / "run", trace=trace, llm=llm)
@@ -57,25 +63,27 @@ def test_ensemble_fans_out_and_merges(settings, trace, tmp_path):
     llm = ScriptedLLM([
         contract(items=[{"name": "shared"}, {"name": "only-a"}]),   # lens a
         contract(items=[{"name": "shared"}]),                       # lens b
-        contract(items=[{"name": "shared"}, {"name": "only-a"}],    # merge
-                 summary="merged"),
+        verdicts_reply({"i": 0, "action": "keep"},
+                       {"i": 1, "action": "keep"}),                 # reduce
     ])
     result, output = _run(_ctx(settings, trace, tmp_path, llm=llm))
     assert result.ok
     assert [i["name"] for i in output["items"]] == ["shared", "only-a"]
+    assert "lenses" not in output["items"][0]  # tags stripped from the result
     assert result.summary.startswith("[ensemble x2]")
 
-    # each lens got its focus; the merger got the tagged candidates + evidence
+    # each lens got its focus; the merger got the numbered candidates + evidence
     assert "look at A" in llm.calls[0]["system"]
     assert "look at B" in llm.calls[1]["system"]
     merge = llm.calls[2]
     assert "verify-and-merge" in merge["system"]
     body = merge["messages"][0]["content"]
-    assert body.count('"lens": "a"') == 2 and body.count('"lens": "b"') == 1
+    # "shared" collapsed to ONE candidate carrying cross-lens consensus
+    assert '"consensus": 2' in body and '"only-a"' in body
     assert "the evidence" in body
 
     ev = next(trace.events("agent_ensemble"))
-    assert ev["lenses"] == ["a", "b"] and ev["candidates"] == 3
+    assert ev["lenses"] == ["a", "b"] and ev["candidates"] == 2
     assert ev["merged"] == 2 and ev["verified"] is True
 
 
@@ -89,7 +97,7 @@ def test_ensemble_merge_failure_falls_open_to_union(settings, trace, tmp_path):
     result, output = _run(_ctx(settings, trace, tmp_path, llm=llm))
     assert result.ok
     assert [i["name"] for i in output["items"]] == ["x", "y"]
-    assert "lens" not in output["items"][0]
+    assert "lenses" not in output["items"][0]
     assert "unverified union" in output["summary"]
     assert next(trace.events("agent_ensemble"))["verified"] is False
 
@@ -116,7 +124,7 @@ def test_ensemble_status_comes_from_samples_not_reducer(settings, trace,
     llm = ScriptedLLM([
         contract(items=[{"name": "x"}]),
         contract(items=[{"name": "x"}]),
-        contract(status="needs_review", items=[{"name": "x"}]),
+        verdicts_reply({"i": 0, "action": "keep"}, status="needs_review"),
     ])
     result, output = _run(_ctx(settings, trace, tmp_path, llm=llm))
     assert result.ok and output["status"] == "success"
@@ -140,7 +148,7 @@ def test_ensemble_survives_one_failed_lens(settings, trace, tmp_path):
         Reply(blocks=[Block(type="text", text="prose")]),    # lens a: no contract
         Reply(blocks=[Block(type="text", text="prose")]),    # ...repair fails too
         contract(items=[{"name": "y"}]),                     # lens b ok
-        contract(items=[{"name": "y"}]),                     # merge
+        verdicts_reply({"i": 0, "action": "keep"}),          # merge
     ])
     result, output = _run(_ctx(settings, trace, tmp_path, llm=llm))
     assert result.ok
@@ -154,6 +162,137 @@ def test_ensemble_all_lenses_failed(settings, trace, tmp_path):
     assert output == {}
 
 
+class KeyedLLM:
+    """Thread-safe fake for the PARALLEL ensemble path: picks the reply by a
+    key found in the system prompt, so lens completion order doesn't matter."""
+
+    def __init__(self, by_key: dict):
+        import threading
+        self._by_key = by_key
+        self._lock = threading.Lock()
+        self.calls = []
+        self.available = True
+
+    def create(self, *, system, messages, tools=None, model=None,
+               max_tokens=None, on_text=None):
+        with self._lock:
+            self.calls.append({"system": system, "messages": [*messages]})
+        for key, reply in self._by_key.items():
+            if key in system:
+                return reply
+        raise AssertionError(f"no scripted reply matches system: {system[:80]}")
+
+
+def test_ensemble_parallel_lenses_merge(settings, trace, tmp_path):
+    """ensemble_parallel=True runs lenses concurrently; the merge must still
+    see every lens's candidates and samples keep lens order."""
+    settings.ensemble_parallel = True
+    llm = KeyedLLM({
+        "Your assigned lens: a": contract(items=[{"name": "from-a"}]),
+        "Your assigned lens: b": contract(items=[{"name": "from-b"}]),
+        "verify-and-merge": verdicts_reply({"i": 0, "action": "keep"},
+                                           {"i": 1, "action": "keep"}),
+    })
+    result, output = _run(_ctx(settings, trace, tmp_path, llm=llm))
+    assert result.ok
+    assert [i["name"] for i in output["items"]] == ["from-a", "from-b"]
+    ev = next(trace.events("agent_ensemble"))
+    assert ev["lenses"] == ["a", "b"] and ev["candidates"] == 2
+    merge_call = next(c for c in llm.calls if "verify-and-merge" in c["system"])
+    body = merge_call["messages"][0]["content"]
+    assert '"from-a"' in body and '"from-b"' in body
+
+
+def test_ensemble_reducer_verdicts_drop_dup_and_failopen(settings, trace,
+                                                         tmp_path):
+    """Per-candidate reduction: drops need a why, dups consolidate into the
+    survivor, and any candidate the reducer does not mention is KEPT (the
+    fail-open is per item — free-form reducers silently lost findings)."""
+    llm = ScriptedLLM([
+        contract(items=[{"name": "real", "comment": "c1"},
+                        {"name": "misread", "comment": "c2"},
+                        {"name": "same-as-real", "comment": "c3"}]),  # lens a
+        contract(items=[{"name": "unjudged", "comment": "c4"}]),      # lens b
+        verdicts_reply({"i": 0, "action": "keep", "comment": "rewritten"},
+                       {"i": 1, "action": "drop", "why": "misreads evidence"},
+                       {"i": 2, "action": "dup", "of": 0}),
+        # candidate 3 (unjudged) is never mentioned -> kept unchanged
+    ])
+    result, output = _run(_ctx(settings, trace, tmp_path, llm=llm))
+    assert result.ok
+    assert [i["name"] for i in output["items"]] == ["real", "unjudged"]
+    assert output["items"][0]["comment"] == "rewritten"
+    assert output["items"][1]["comment"] == "c4"
+    ev = next(trace.events("agent_ensemble"))
+    assert ev["candidates"] == 4 and ev["merged"] == 2 and ev["dropped"] == 1
+    assert ev["verified"] is True
+
+
+def test_ensemble_samples_per_lens_union(settings, trace, tmp_path):
+    """Repeat samples per lens: identical items collapse with a consensus
+    count; the union across samples is what reaches the reducer."""
+    settings.ensemble_samples_per_lens = 2
+    llm = ScriptedLLM([
+        contract(items=[{"name": "x"}]),   # a/1
+        contract(items=[{"name": "x"}]),   # a/2 — identical -> consensus 2
+        contract(items=[{"name": "y"}]),   # b/1
+        contract(items=[]),                # b/2 came up empty
+        verdicts_reply({"i": 0, "action": "keep"}, {"i": 1, "action": "keep"}),
+    ])
+    result, output = _run(_ctx(settings, trace, tmp_path, llm=llm))
+    assert result.ok
+    assert [i["name"] for i in output["items"]] == ["x", "y"]
+    assert result.summary.startswith("[ensemble x4]")
+    assert '"consensus": 2' in llm.calls[4]["messages"][0]["content"]
+    dispatches = [e["step"] for e in trace.events("agent_dispatch")]
+    assert dispatches == ["t.step#a/1", "t.step#a/2",
+                          "t.step#b/1", "t.step#b/2"]
+
+
+def test_review_step_caps_comments_deterministically(settings, trace, tmp_path,
+                                                     git_repo):
+    """The comment budget is enforced in code (severity-ordered, cap 5) — the
+    low-signal nit tail goes first. Reducers ignored a prompted cap."""
+    settings.review_ensemble = True
+    many = ([{"file": "m.py", "line": i, "severity": "nit",
+              "comment": f"n{i}", "evidence": "hunk"} for i in range(4)]
+            + [{"file": "m.py", "line": 9, "severity": "major",
+                "comment": "big", "evidence": "hunk"}]
+            + [{"file": "m.py", "line": 20 + i, "severity": "minor",
+                "comment": f"m{i}", "evidence": "hunk"} for i in range(3)])
+    from omni_copilot.engine.builtin_steps import register_builtin_steps
+    llm = ScriptedLLM(
+        [contract(review_comments=many)]
+        + [contract(review_comments=[])] * (len(_REVIEW_LENSES) - 1)
+        + [verdicts_reply()])   # reducer silent -> all 8 kept, then capped
+    state = {"diff_text": "diff --git a/m.py b/m.py\n+A = 1",
+             "task_spec": {"pr": 9}, "repo_path": str(git_repo)}
+    registry = register_builtin_steps(StepRegistry())
+    result = asyncio.run(registry.get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+    assert result.ok, result.summary
+    kept = result.outputs["review_comments"]
+    assert len(kept) == 5
+    sevs = [c["severity"] for c in kept]
+    assert sevs == ["major", "minor", "minor", "minor", "nit"]
+    assert state["review_text"].endswith("**Verdict:** REQUEST CHANGES")
+
+
+def test_render_verdict_minor_requests_changes():
+    """Severities above nit mean 'belongs in this PR' — approving while asking
+    for in-PR changes is incoherent, so minor+ flips the verdict."""
+    from omni_copilot.engine.builtin_steps import _render_review_md
+
+    minor = {"review_comments": [{"file": "a.py", "line": 1, "severity":
+                                  "minor", "comment": "simplify", "evidence": "hunk"}]}
+    assert _render_review_md(minor).endswith("**Verdict:** REQUEST CHANGES")
+    nit_only = {"review_comments": [{"file": "a.py", "line": 1, "severity":
+                                     "nit", "comment": "polish", "evidence": "hunk"}]}
+    assert _render_review_md(nit_only).endswith("**Verdict:** APPROVE")
+    assert _render_review_md({"summary": "clean"}).endswith(
+        "**Verdict:** APPROVE")
+
+
 def test_review_step_uses_ensemble_when_enabled(settings, trace, tmp_path,
                                                 git_repo):
     settings.review_ensemble = True
@@ -162,7 +301,7 @@ def test_review_step_uses_ensemble_when_enabled(settings, trace, tmp_path,
                  "evidence": "hunk"}]
     llm = ScriptedLLM(
         [contract(review_comments=comments)] * len(_REVIEW_LENSES)
-        + [contract(review_comments=comments)]     # merge
+        + [verdicts_reply({"i": 0, "action": "keep"})]     # merge
     )
     state = {"diff_text": "diff --git a/mod_a.py b/mod_a.py\n+A = 1",
              "task_spec": {"pr": 9}, "repo_path": str(git_repo)}
