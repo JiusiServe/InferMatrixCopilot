@@ -1,5 +1,46 @@
 # Analysis — pure skill vs pure copilot vs copilot+skill (DeepSeek v4 pro)
 
+## RQS v3 (second literature pass — see METRIC_V3.md, RESULTS_V3.md)
+
+v3 fixes the two failure modes v2's own reliability stats exposed: validity
+judging at κ≈0, and harmonic zeroing of silent reviews (the Opus arm's 0.14).
+Grounded in: multi-trial majority + anchored rubrics (arXiv 2606.13685),
+decision-level correctness / true negatives (Sphinx, arXiv 2601.04252),
+weak-signal aggregation (arXiv 2604.24525), determinism-over-judging
+(c-CRAB, arXiv 2603.23448).
+
+| arm | recall_w | precision | actionability | decision | **RQS3** | tokens |
+|---|---|---|---|---|---|---|
+| **copilot_v2 ensemble** | **0.19** | 0.75 | **0.92** | **0.33** | **0.50** | 739k |
+| claudecode_skill (DeepSeek) | 0.15 | 0.89 | 0.92 | 0.00 | **0.46** | 638k |
+| pure_copilot | 0.15 | 0.83 | 0.50 | 0.00 | **0.36** | 10k |
+| claudecode_opus_skill | 0.10 | 0.78 | 0.50 | 0.00 | **0.33** | 1.81M |
+| copilot_skill | 0.08 | 0.42 | 0.33 | 0.17 | **0.23** | 25k |
+
+What v3 shows:
+
+1. **The ranking survives a third metric construction** — copilot_v2 ensemble
+   stays on top (0.50), claudecode_skill second. Three differently-built
+   metrics (v1 F1, v2 harmonic RQS, v3 weighted-arithmetic RQS3) now agree on
+   the top two, which is no longer attributable to metric artifacts.
+2. **The Opus arm recovers from 0.14 to 0.33** — the arithmetic aggregate
+   prices its two silent APPROVEs at their component weight instead of
+   zeroing whole PRs, and the anchored rubric lifts its precision to 0.78.
+   Its residual gap is now legible: decision 0.00 (it approved all three PRs
+   humans requested changes on) — a defensible-judgment-vs-GT disagreement,
+   not a metric artifact.
+3. **The decision column is the cleanest new signal**: on #4679 (two blocking
+   human issues) copilot_v2 was the ONLY arm of five to output REQUEST
+   CHANGES. Deterministically extracted, no judge involved.
+4. **Honest reliability read**: even with anchored rubrics and 3 trials,
+   validity self-consistency κ=0.23 and cross-model κ=0.00 — the coin-flip
+   diagnosis (arXiv 2606.13685) holds for this judge family; 6-vote share
+   averaging smooths the *score* but per-finding agreement stays poor.
+   Precision remains the weakest column at this n; recall/actionability/
+   decision are the load-bearing ones. The c-CRAB direction (executable tests
+   derived from review comments — no LLM judge at all) is the right long-term
+   fix.
+
 ## Sample E: the 3-lens ensemble (run_agent_step_ensemble) — RQS 0.34, best arm
 
 The robustness mechanism the multi-sample analysis below kept pointing at is
