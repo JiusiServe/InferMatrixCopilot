@@ -76,7 +76,10 @@ GROUND_TRUTH: dict[int, list[dict]] = {
 # pure_skill (simulated Claude-Code+skill) was removed after the REAL
 # claudecode_skill arm superseded it — the simulation measured harness
 # absence, not the skill (see ANALYSIS.md); raw artifacts remain in raw/.
-ARMS = ["pure_copilot", "copilot_skill", "claudecode_skill", "copilot_v2"]
+# claudecode_opus_skill = same Claude Code harness + skill on REAL Opus 4.8
+# (native CLI auth) — the only arm on a different generator model.
+ARMS = ["pure_copilot", "copilot_skill", "claudecode_skill",
+        "claudecode_opus_skill", "copilot_v2"]
 
 COPILOT_REVIEWER_SYSTEM = (
     "You are a meticulous code reviewer for the vLLM-Omni repo. "
@@ -210,11 +213,13 @@ def arm_copilot_skill(pr: int, diff: str, meta: dict, llm: CountingLLM,
     return reply.text
 
 
-def arm_claudecode(pr: int, skill_root: Path) -> tuple[str, dict]:
-    """REAL Claude Code CLI (headless) + the skill installed as a project skill,
-    on the same DeepSeek model — the genuine 'Claude Code + skill' config with
-    subagents and gh available. Tool allowlist restricts gh to read-only PR
-    subcommands so nothing can be posted to the live repo."""
+def arm_claudecode(pr: int, skill_root: Path,
+                   model: str | None = None) -> tuple[str, dict]:
+    """REAL Claude Code CLI (headless) + the skill installed as a project skill.
+    Default: same DeepSeek model as every other arm (parent .env routes the
+    Anthropic SDK to DeepSeek). With `model` set (e.g. claude-opus-4-8): native
+    CLI credentials, real Anthropic model. Tool allowlist restricts gh to
+    read-only PR subcommands so nothing can be posted to the live repo."""
     import os
     import shutil
 
@@ -225,14 +230,21 @@ def arm_claudecode(pr: int, skill_root: Path) -> tuple[str, dict]:
         shutil.copytree(skill_root, skill_dst)
 
     env = dict(os.environ)
-    parent_env = Path("/rebase/vllm-omni-rebase-agent/.env")
-    if parent_env.exists():
-        for line in parent_env.read_text().splitlines():
-            if "=" in line and not line.startswith("#"):
-                k, v = line.split("=", 1)
-                if k.strip().startswith(("ANTHROPIC", "CLAUDE_CODE")):
-                    env[k.strip()] = v.strip()
-    env["ANTHROPIC_MODEL"] = "deepseek-v4-pro"
+    extra_args: list[str] = []
+    if model:
+        # native auth: make sure no DeepSeek routing leaks into the CLI
+        for k in [k for k in env if k.startswith(("ANTHROPIC", "CLAUDE_CODE"))]:
+            env.pop(k)
+        extra_args = ["--model", model]
+    else:
+        parent_env = Path("/rebase/vllm-omni-rebase-agent/.env")
+        if parent_env.exists():
+            for line in parent_env.read_text().splitlines():
+                if "=" in line and not line.startswith("#"):
+                    k, v = line.split("=", 1)
+                    if k.strip().startswith(("ANTHROPIC", "CLAUDE_CODE")):
+                        env[k.strip()] = v.strip()
+        env["ANTHROPIC_MODEL"] = "deepseek-v4-pro"
 
     allowed = ["Skill", "Task", "Agent", "Read", "Grep", "Glob", "LS", "TodoWrite",
                "Bash(gh pr view:*)", "Bash(gh pr diff:*)", "Bash(gh pr checks:*)"]
@@ -245,7 +257,7 @@ def arm_claudecode(pr: int, skill_root: Path) -> tuple[str, dict]:
     )
     out = subprocess.run(
         ["claude", "-p", prompt, "--output-format", "json", "--max-turns", "60",
-         "--allowedTools", ",".join(allowed)],
+         "--allowedTools", ",".join(allowed), *extra_args],
         capture_output=True, text=True, timeout=2400, env=env, cwd=str(workdir))
     try:
         data = json.loads(out.stdout)
@@ -257,6 +269,8 @@ def arm_claudecode(pr: int, skill_root: Path) -> tuple[str, dict]:
             + usage.get("cache_read_input_tokens", 0)
             + usage.get("cache_creation_input_tokens", 0),
             "output_tokens": usage.get("output_tokens", 0)}
+    if data.get("total_cost_usd") is not None:
+        cost["cost_usd"] = data["total_cost_usd"]
     return str(data.get("result") or "(no output)"), cost
 
 
@@ -356,6 +370,9 @@ def main() -> int:
                     review = arm_copilot_v2(pr, diff, meta, counting)
                 elif arm == "claudecode_skill":
                     review, cc_cost = arm_claudecode(pr, Path(args.skill_dir))
+                elif arm == "claudecode_opus_skill":
+                    review, cc_cost = arm_claudecode(pr, Path(args.skill_dir),
+                                                     model="claude-opus-4-8")
                 else:
                     review = arm_copilot_skill(pr, diff, meta, counting,
                                                skill_md, refs_dir)

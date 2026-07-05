@@ -1,0 +1,7 @@
+[
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/transformer_cosmos3.py",
+  "line": 1381,
+  "summary": "num_vision_items is always 1 at the only call site, so the ulysses=4, num_vision_items=2 test branch exercises a path production never hits; worth a note that it's forward-looking."
+ }
+]

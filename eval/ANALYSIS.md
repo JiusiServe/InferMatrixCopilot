@@ -37,6 +37,36 @@ Honest costs and caveats:
   jury-noise-limited at this n; the RANKING and the recall/actionability
   columns are the trustworthy signals.
 
+## Fifth arm: REAL Claude Code + skill on REAL Opus 4.8 (native CLI auth)
+
+Same Claude Code harness, skill, and read-only allowlist as claudecode_skill —
+only the generator differs (the one cross-model arm; judges remain the
+DeepSeek jury).
+
+| arm (v2) | recall_w | precision | actionability | **RQS** | tokens | $ |
+|---|---|---|---|---|---|---|
+| claudecode_opus_skill | 0.10 | 0.83 | 0.50 | **0.14** | 1.81M | $9.59 total |
+| claudecode_skill (DeepSeek) | 0.15 | 0.69 | 0.92 | 0.27 | 638k | — |
+| copilot_v2 ensemble | 0.19 | 0.81 | 0.92 | 0.34 | 739k | — |
+
+Per PR: #4679 RQS **0.41** with gt1=0.75 — the deepest verification of the
+blocking SSE issue any arm produced (53 turns, 4.3M tokens). #4678 and #4849:
+confident APPROVE with 1-2 non-GT findings → recall 0 → RQS 0.
+
+The result is the cleanest demonstration yet of the skill's brevity ethos:
+Opus obeys "most PRs get few comments; some get an empty APPROVE" *better*
+than DeepSeek does — it verifies the checklist thoroughly (blocker-scan table,
+all PASS), concludes the PR is fine, and approves. Precision 0.83 (highest of
+the CC arms), recall starved. **Precision through silence is a property of
+the skill's comment budget, not of model weakness** — upgrading the model
+made it stronger, not weaker. The ensemble beats it on this GT-recall metric
+because its lenses are *obligated* to sweep and report labeled findings.
+
+Caveats: same merged-PR contamination bound as the other CC arm; the DeepSeek
+jury judging Opus output is the one cross-family judging cell (self-preference
+bias, arXiv 2604.22891, would deflate it); n=3; actionability 0.50 is computed
+over very few findings.
+
 ## copilot_v2 — the shipped step improved from these findings (pr-review@4)
 
 What was built (`agent.review_diff` v2 + `pr.gate_check`, playbook v4):

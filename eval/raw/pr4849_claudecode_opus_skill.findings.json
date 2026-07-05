@@ -1,0 +1,12 @@
+[
+ {
+  "file": "hunyuan_image3.py",
+  "line": null,
+  "summary": "Log lines are hardcoded to 'Request 0' instead of using req_id, making them less informative (though orchestrator logs req_id alongside)."
+ },
+ {
+  "file": "hunyuan_image3.py",
+  "line": null,
+  "summary": "The `requires_multimodal_data` parameter is accepted but unused (pre-existing)."
+ }
+]

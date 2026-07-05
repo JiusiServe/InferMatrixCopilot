@@ -1,0 +1,12 @@
+[
+ {
+  "file": "recipes/mistralai/Voxtral-TTS.md",
+  "line": 88,
+  "summary": "Missing `stream_format: \"audio\"` causes raw PCM example to receive SSE event-stream text, breaking ffmpeg decode."
+ },
+ {
+  "file": "docs/serving/speech_api.md",
+  "line": null,
+  "summary": "Missing documentation flag for breaking change: `stream=True` now returns SSE, not raw audio."
+ }
+]
