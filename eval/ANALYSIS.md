@@ -41,19 +41,34 @@ What v3 shows:
    derived from review comments — no LLM judge at all) is the right long-term
    fix.
 
-### Efficiency (cost/time in the comparison — Cost-of-Pass, arXiv 2504.13359)
+### Efficiency in the metric: RQS3e (cost/time folded in — Cost-of-Pass, arXiv 2504.13359)
 
-| arm | RQS3 | $/review | min/review | $-of-quality | min-of-quality | Pareto ($, RQS3) |
+RQS3e = RQS3 · f($) · f(min), f(x) = 1/(1+log10(1+x/ref)), refs $1 / 10 min
+per review (explicit budget assumptions, env-overridable — see METRIC_V3.md).
+
+| arm | RQS3 | $/review | min/review | **RQS3e** | $-of-quality | Pareto ($, RQS3) |
 |---|---|---|---|---|---|---|
-| pure_copilot | 0.36 | $0.01 | 0.9 | $0.01 | 2.4 | **frontier** |
-| copilot_skill | 0.23 | $0.01 | 1.1 | $0.04 | 4.6 | dominated |
-| claudecode_skill | 0.46 | $0.19 | 3.0 | $0.41 | 6.6 | **frontier** |
-| claudecode_opus_skill | 0.33 | $3.20 | 5.5 | $9.70 | 16.7 | dominated |
-| copilot_v2 | 0.50 | $0.24 | 12.8 | $0.48 | 25.4 | **frontier** |
+| claudecode_skill | 0.46 | $0.19 | 3.0 | **0.38** | $0.41 | **frontier** |
+| pure_copilot | 0.36 | $0.01 | 0.9 | **0.35** | $0.01 | **frontier** |
+| copilot_v2 | 0.50 | $0.24 | 12.8 | **0.34** | $0.48 | **frontier** |
+| copilot_skill | 0.23 | $0.01 | 1.1 | **0.22** | $0.04 | dominated |
+| claudecode_opus_skill | 0.33 | $3.20 | 5.5 | **0.17** | $9.70 | dominated |
 
 (Opus = actual CLI-billed USD; DeepSeek arms = cache-miss list-rate estimate,
-an upper bound. Cost/time deliberately NOT folded into the RQS3 scalar —
-the frontier makes the deployment choice explicit.)
+an upper bound.)
+
+**With time and cost in the score, the headline flips**: claudecode_skill
+takes RQS3e 0.38 — the ensemble's quality lead (+0.04 RQS3) doesn't cover a
+4.3x wall-clock disadvantage at the 10-min reference budget. The ensemble's
+dollar discount is negligible (f($0.24)=0.92); its TIME discount is the
+whole penalty (f(12.8 min)=0.74) and comes from the three lenses running
+sequentially. Since the lenses are independent by construction, running
+them concurrently (~5 min projected incl. reduction) puts RQS3e at ~0.39 —
+narrowly back above claudecode_skill (0.38) without touching quality. That
+concurrency change in `run_agent_step_ensemble` is the single
+highest-leverage optimization the metric identifies. Under an async/nightly
+budget (V3_TIME_REF_MIN=60) the two are statistically tied already
+(0.422 vs 0.419) — at nightly latencies the quality column should decide.
 
 - The dollar frontier has three points: pure_copilot (cheap floor),
   claudecode_skill (middle), copilot_v2 (quality ceiling). In DOLLARS the

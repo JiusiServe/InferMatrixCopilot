@@ -58,18 +58,31 @@ Per PR and arm:
 Reported alongside: validity self-consistency κ per judge model, cross-model
 κ on majority votes, and the v2 coverage/actionability κ.
 
-## Efficiency dimension (Cost-of-Pass, arXiv 2504.13359)
+## Efficiency in the metric: RQS3e (Cost-of-Pass, arXiv 2504.13359)
 
-Quality is reported jointly with what it costs to obtain (their central
-claim: inference-time techniques like majority voting often don't justify
-their marginal cost — which is exactly the question our ensemble raises).
-Per arm: `$/review` (Opus arm: actual CLI-billed USD; DeepSeek arms: token
-estimate at cache-miss list rates — an upper bound), `min/review`,
-**cost-of-quality** = $/RQS3 point, **min-of-quality** = minutes/RQS3 point,
-and Pareto-frontier membership on ($, RQS3). Cost/time are NOT folded into
-the RQS3 scalar — a single blended number would hide the deployment choice
-the frontier makes explicit (which arm to run depends on the budget axis
-that binds: latency, dollars, or maintainer attention).
+Cost and time are part of the metric (their central claim: inference-time
+techniques like majority voting often don't justify their marginal cost —
+exactly the question our ensemble raises). The efficiency-adjusted headline:
+
+`RQS3e = RQS3 · f(usd) · f(minutes)`, with `f(x) = 1 / (1 + log10(1 + x/ref))`
+
+- Log-scale discount, because arm costs span orders of magnitude
+  ($0.01–$3.20): a linear penalty would be dictated entirely by the most
+  expensive arm, and a ratio (quality/$) degenerates toward whichever arm is
+  cheapest regardless of quality.
+- The references are EXPLICIT budget assumptions, env-overridable
+  (`V3_COST_REF_USD=1.0`, `V3_TIME_REF_MIN=10`): at the ref cost the
+  discount is ~23%; well under it, ~0. $1 and 10 min approximate the scale
+  at which an automated review starts to rival a maintainer's skim of the
+  PR. For a nightly/async deployment where latency is nearly free, raise
+  `V3_TIME_REF_MIN` and RQS3e converges back to RQS3.
+- Cost inputs: Opus arm = actual CLI-billed USD; DeepSeek arms = token
+  estimate at cache-miss list rates (an upper bound).
+
+Alongside RQS3e, the report keeps the undiscounted RQS3, **cost-of-quality**
+($/RQS3 point), **min-of-quality**, and Pareto-frontier membership on
+($, RQS3) — the frontier still shows the full deployment tradeoff that any
+single scalar necessarily collapses.
 
 ## Limitations
 

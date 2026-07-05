@@ -44,14 +44,14 @@ Validity reliability: validity_self kappa=0.23, validity_cross kappa=0.00
 | claudecode_opus_skill | 0.10 | 0.78 | 0.50 | 0.00 | **0.33** | 1,814,621 |
 | copilot_v2 | 0.19 | 0.75 | 0.92 | 0.33 | **0.50** | 738,675 |
 
-## Efficiency (cost/time taken into the comparison)
+## Efficiency — RQS3e headline (cost/time folded in)
 
-Cost model: Opus arm = actual CLI-billed USD; DeepSeek arms = token estimate at $0.28/M in, $1.1/M out (cache-miss list rate — an upper bound). cost-of-quality = $/RQS3 point (lower is better); frontier per Cost-of-Pass.
+RQS3e = RQS3 x f($) x f(min), f(x) = 1/(1 + log10(1 + x/ref)); refs: $1.0/review, 10.0 min/review (env-overridable). Cost model: Opus arm = actual CLI-billed USD; DeepSeek arms = token estimate at $0.28/M in, $1.1/M out (cache-miss list rate — an upper bound). cost-of-quality = $/RQS3 point; frontier per Cost-of-Pass.
 
-| arm | RQS3 | $/review | min/review | $-of-quality | min-of-quality | Pareto ($,RQS3) |
-|---|---|---|---|---|---|---|
-| pure_copilot | 0.36 | $0.01 | 0.9 | $0.01 | 2.4 | frontier |
-| copilot_skill | 0.23 | $0.01 | 1.1 | $0.04 | 4.6 | dominated |
-| claudecode_skill | 0.46 | $0.19 | 3.0 | $0.41 | 6.6 | frontier |
-| claudecode_opus_skill | 0.33 | $3.20 | 5.5 | $9.70 | 16.7 | dominated |
-| copilot_v2 | 0.50 | $0.24 | 12.8 | $0.48 | 25.4 | frontier |
+| arm | RQS3 | $/review | min/review | **RQS3e** | $-of-quality | min-of-quality | Pareto ($,RQS3) |
+|---|---|---|---|---|---|---|---|
+| pure_copilot | 0.36 | $0.01 | 0.9 | **0.35** | $0.01 | 2.4 | frontier |
+| copilot_skill | 0.23 | $0.01 | 1.1 | **0.22** | $0.04 | 4.6 | dominated |
+| claudecode_skill | 0.46 | $0.19 | 3.0 | **0.38** | $0.41 | 6.6 | frontier |
+| claudecode_opus_skill | 0.33 | $3.20 | 5.5 | **0.17** | $9.70 | 16.7 | dominated |
+| copilot_v2 | 0.50 | $0.24 | 12.8 | **0.34** | $0.48 | 25.4 | frontier |

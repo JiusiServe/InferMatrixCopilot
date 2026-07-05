@@ -47,6 +47,27 @@ WEIGHTS = {"recall_w": 0.35, "precision": 0.25, "actionability": 0.20,
 # actual total_cost_usd is recorded in cost.json and used directly.
 DEEPSEEK_PRICE = {"input": 0.28, "output": 1.10}
 
+# Efficiency-adjusted headline: RQS3e = RQS3 * f($) * f(minutes), where
+# f(x) = 1 / (1 + log10(1 + x/ref)) — a log-scale discount, since arm costs
+# span orders of magnitude and a linear penalty would be dominated by the
+# most expensive arm. References are explicit budget assumptions
+# (env-overridable): $1/review and 10 min/review ~ the attention scale at
+# which an automated review's cost starts to rival a maintainer's skim.
+import math  # noqa: E402
+import os  # noqa: E402
+
+COST_REF_USD = float(os.environ.get("V3_COST_REF_USD", "1.0"))
+TIME_REF_MIN = float(os.environ.get("V3_TIME_REF_MIN", "10.0"))
+
+
+def efficiency_factor(x: float, ref: float) -> float:
+    return 1.0 / (1.0 + math.log10(1.0 + max(x, 0.0) / ref))
+
+
+def rqs3e(quality: float, usd: float, minutes: float) -> float:
+    return (quality * efficiency_factor(usd, COST_REF_USD)
+            * efficiency_factor(minutes, TIME_REF_MIN))
+
 
 def review_cost_usd(cost: dict) -> float:
     if cost.get("cost_usd") is not None:
@@ -249,15 +270,17 @@ def write_results(rows: dict, kappas: dict) -> None:
             f"**{a['rqs3']:.2f}** | {a['tokens']:,.0f} |")
 
     # -- efficiency (Cost-of-Pass, arXiv 2504.13359) ---------------------------
-    lines += ["", "## Efficiency (cost/time taken into the comparison)", "",
-              "Cost model: Opus arm = actual CLI-billed USD; DeepSeek arms = "
-              f"token estimate at ${DEEPSEEK_PRICE['input']}/M in, "
-              f"${DEEPSEEK_PRICE['output']}/M out (cache-miss list rate — an "
-              "upper bound). cost-of-quality = $/RQS3 point (lower is "
-              "better); frontier per Cost-of-Pass.", "",
-              "| arm | RQS3 | $/review | min/review | $-of-quality | "
-              "min-of-quality | Pareto ($,RQS3) |",
-              "|---|---|---|---|---|---|---|"]
+    lines += ["", "## Efficiency — RQS3e headline (cost/time folded in)", "",
+              "RQS3e = RQS3 x f($) x f(min), f(x) = 1/(1 + log10(1 + x/ref)); "
+              f"refs: ${COST_REF_USD}/review, {TIME_REF_MIN} min/review "
+              "(env-overridable). Cost model: Opus arm = actual CLI-billed "
+              f"USD; DeepSeek arms = token estimate at "
+              f"${DEEPSEEK_PRICE['input']}/M in, ${DEEPSEEK_PRICE['output']}/M "
+              "out (cache-miss list rate — an upper bound). cost-of-quality = "
+              "$/RQS3 point; frontier per Cost-of-Pass.", "",
+              "| arm | RQS3 | $/review | min/review | **RQS3e** | "
+              "$-of-quality | min-of-quality | Pareto ($,RQS3) |",
+              "|---|---|---|---|---|---|---|---|"]
     effs = {arm: (agg[arm]["rqs3"], agg[arm]["usd"], agg[arm]["minutes"])
             for arm in ARMS}
     for arm in ARMS:
@@ -266,6 +289,7 @@ def write_results(rows: dict, kappas: dict) -> None:
                         for a2, (q2, u2, _) in effs.items() if a2 != arm)
         lines.append(
             f"| {arm} | {q:.2f} | ${usd:.2f} | {mins:.1f} | "
+            f"**{rqs3e(q, usd, mins):.2f}** | "
             f"{'$' + format(usd / q, '.2f') if q > 0 else 'inf'} | "
             f"{mins / q:.1f} | {'frontier' if not dominated else 'dominated'} |")
     (EVAL_DIR / "RESULTS_V3.md").write_text("\n".join(lines) + "\n")
