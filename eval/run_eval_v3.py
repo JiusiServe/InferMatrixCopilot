@@ -41,6 +41,19 @@ VALIDITY_TRIALS = 3
 WEIGHTS = {"recall_w": 0.35, "precision": 0.25, "actionability": 0.20,
            "decision": 0.20}
 
+# Cost model (Cost-of-Pass, arXiv 2504.13359): cost-of-quality = $/RQS3 point.
+# DeepSeek arms: estimated from token counts at list cache-miss rates ($/1M) —
+# an UPPER bound (our counts don't split cache hits). Opus arm: the CLI's
+# actual total_cost_usd is recorded in cost.json and used directly.
+DEEPSEEK_PRICE = {"input": 0.28, "output": 1.10}
+
+
+def review_cost_usd(cost: dict) -> float:
+    if cost.get("cost_usd") is not None:
+        return float(cost["cost_usd"])
+    return (cost.get("input_tokens", 0) * DEEPSEEK_PRICE["input"]
+            + cost.get("output_tokens", 0) * DEEPSEEK_PRICE["output"]) / 1e6
+
 # All three benchmark PRs drew substantive human change requests before merge
 # (that is why they carry GT issues) — see METRIC_V3.md for the clean-approve
 # extension this implies.
@@ -180,6 +193,8 @@ def main() -> int:
                 "findings": n, **comps, "verdict": verdict,
                 "rqs3": sum(WEIGHTS[k] * v for k, v in comps.items()),
                 "tokens": cost["input_tokens"] + cost["output_tokens"],
+                "usd": review_cost_usd(cost),
+                "minutes": cost.get("seconds", 0.0) / 60.0,
             }
 
     kappas = {
@@ -197,7 +212,7 @@ def main() -> int:
 
 def write_results(rows: dict, kappas: dict) -> None:
     cols = ("findings", "recall_w", "precision", "actionability", "decision",
-            "rqs3", "tokens")
+            "rqs3", "tokens", "usd", "minutes")
     lines = ["# RQS v3 results", "",
              "Metric: METRIC_V3.md (anchored-rubric multi-trial validity, "
              "decision correctness, arithmetic aggregate). "
@@ -232,6 +247,27 @@ def write_results(rows: dict, kappas: dict) -> None:
             f"| {arm} | {a['recall_w']:.2f} | {a['precision']:.2f} | "
             f"{a['actionability']:.2f} | {a['decision']:.2f} | "
             f"**{a['rqs3']:.2f}** | {a['tokens']:,.0f} |")
+
+    # -- efficiency (Cost-of-Pass, arXiv 2504.13359) ---------------------------
+    lines += ["", "## Efficiency (cost/time taken into the comparison)", "",
+              "Cost model: Opus arm = actual CLI-billed USD; DeepSeek arms = "
+              f"token estimate at ${DEEPSEEK_PRICE['input']}/M in, "
+              f"${DEEPSEEK_PRICE['output']}/M out (cache-miss list rate — an "
+              "upper bound). cost-of-quality = $/RQS3 point (lower is "
+              "better); frontier per Cost-of-Pass.", "",
+              "| arm | RQS3 | $/review | min/review | $-of-quality | "
+              "min-of-quality | Pareto ($,RQS3) |",
+              "|---|---|---|---|---|---|---|"]
+    effs = {arm: (agg[arm]["rqs3"], agg[arm]["usd"], agg[arm]["minutes"])
+            for arm in ARMS}
+    for arm in ARMS:
+        q, usd, mins = effs[arm]
+        dominated = any(q2 > q and u2 < usd
+                        for a2, (q2, u2, _) in effs.items() if a2 != arm)
+        lines.append(
+            f"| {arm} | {q:.2f} | ${usd:.2f} | {mins:.1f} | "
+            f"{'$' + format(usd / q, '.2f') if q > 0 else 'inf'} | "
+            f"{mins / q:.1f} | {'frontier' if not dominated else 'dominated'} |")
     (EVAL_DIR / "RESULTS_V3.md").write_text("\n".join(lines) + "\n")
 
 

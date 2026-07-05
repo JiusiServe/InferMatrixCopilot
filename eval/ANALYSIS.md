@@ -41,6 +41,36 @@ What v3 shows:
    derived from review comments — no LLM judge at all) is the right long-term
    fix.
 
+### Efficiency (cost/time in the comparison — Cost-of-Pass, arXiv 2504.13359)
+
+| arm | RQS3 | $/review | min/review | $-of-quality | min-of-quality | Pareto ($, RQS3) |
+|---|---|---|---|---|---|---|
+| pure_copilot | 0.36 | $0.01 | 0.9 | $0.01 | 2.4 | **frontier** |
+| copilot_skill | 0.23 | $0.01 | 1.1 | $0.04 | 4.6 | dominated |
+| claudecode_skill | 0.46 | $0.19 | 3.0 | $0.41 | 6.6 | **frontier** |
+| claudecode_opus_skill | 0.33 | $3.20 | 5.5 | $9.70 | 16.7 | dominated |
+| copilot_v2 | 0.50 | $0.24 | 12.8 | $0.48 | 25.4 | **frontier** |
+
+(Opus = actual CLI-billed USD; DeepSeek arms = cache-miss list-rate estimate,
+an upper bound. Cost/time deliberately NOT folded into the RQS3 scalar —
+the frontier makes the deployment choice explicit.)
+
+- The dollar frontier has three points: pure_copilot (cheap floor),
+  claudecode_skill (middle), copilot_v2 (quality ceiling). In DOLLARS the
+  ensemble is nearly free to prefer over Claude Code (+$0.05/review for
+  +0.04 RQS3) because DeepSeek tokens are cheap.
+- The ensemble's real price is TIME: 12.8 min/review (3 sequential lens
+  loops + reduction) vs 3.0 for Claude Code. Its lenses are independent —
+  running them concurrently would cut wall-clock ~3x to ~4-5 min; that is
+  the identified next optimization, not a metric issue.
+- claudecode_opus_skill is Pareto-dominated on every axis ($9.70/quality
+  point, 24x claudecode_skill) — consistent with Cost-of-Pass's finding
+  that premium models pay off only where cheaper ones fail the task class;
+  here the harness+skill, not model strength, was binding.
+- copilot_skill is dominated (skill-as-prompt adds cost, subtracts quality);
+  pure_copilot remains the right choice when review latency/budget is
+  capped (72% of the ensemble's quality at 4% of its dollar cost).
+
 ## Sample E: the 3-lens ensemble (run_agent_step_ensemble) — RQS 0.34, best arm
 
 The robustness mechanism the multi-sample analysis below kept pointing at is

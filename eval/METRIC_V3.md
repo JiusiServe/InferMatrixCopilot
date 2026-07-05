@@ -58,6 +58,19 @@ Per PR and arm:
 Reported alongside: validity self-consistency κ per judge model, cross-model
 κ on majority votes, and the v2 coverage/actionability κ.
 
+## Efficiency dimension (Cost-of-Pass, arXiv 2504.13359)
+
+Quality is reported jointly with what it costs to obtain (their central
+claim: inference-time techniques like majority voting often don't justify
+their marginal cost — which is exactly the question our ensemble raises).
+Per arm: `$/review` (Opus arm: actual CLI-billed USD; DeepSeek arms: token
+estimate at cache-miss list rates — an upper bound), `min/review`,
+**cost-of-quality** = $/RQS3 point, **min-of-quality** = minutes/RQS3 point,
+and Pareto-frontier membership on ($, RQS3). Cost/time are NOT folded into
+the RQS3 scalar — a single blended number would hide the deployment choice
+the frontier makes explicit (which arm to run depends on the budget axis
+that binds: latency, dollars, or maintainer attention).
+
 ## Limitations
 
 Same-family jury for DeepSeek-generated arms and cross-family for the Opus
