@@ -357,6 +357,8 @@ async def run_agent_step_ensemble(
         return (StepResult(False, FailureKind.BLOCKED,
                            "LLM not configured — cannot run agent step"), {})
 
+    from ..agent_loop import run_agent
+
     budget = max_iters or ctx.settings.ensemble_lens_max_iters
     k = max(1, int(ctx.settings.ensemble_samples_per_lens))
 
@@ -432,6 +434,22 @@ async def run_agent_step_ensemble(
     if any(o.get("status") == "success" for _, o in samples):
         merged["status"] = "success"
 
+    if len(candidates) <= 2 and all(c.get("consensus", 1) >= 2
+                                    for c in candidates):
+        # fast path: a small union whose every item was independently
+        # replicated across samples needs no arbitration — skip the
+        # reducer's latency. A single-lens singleton does NOT qualify: an
+        # unreplicated claim must still face verification (a hallucinated
+        # blocker once sailed through here and became the entire review)
+        merged[merge_key] = [
+            {k: v for k, v in c.items() if k not in ("lenses", "consensus")}
+            for c in candidates]
+        ctx.trace.record("agent_ensemble", step=step_name,
+                         lenses=[name for name, _ in samples],
+                         candidates=len(candidates), merged=len(candidates),
+                         dropped=0, verified=False)
+        return _to_step_result(merged, f"[ensemble x{len(samples)}] "), merged
+
     # the reducer never re-emits the merged list (free-form regeneration is
     # where findings silently died in live runs): it returns one verdict PER
     # NUMBERED CANDIDATE and code assembles the result deterministically —
@@ -456,7 +474,9 @@ async def run_agent_step_ensemble(
         "count) plus the evidence. Emit one verdict per candidate index:\n"
         "1. VERIFY each candidate, then action=drop the ones that fail: "
         "misreads of the evidence, claims the evidence already handles, "
-        "vague items, and pure stylistic alternatives to correct behavior — "
+        "vague items, cited evidence that contradicts the diff (e.g. a "
+        "quoted stacktrace or file content inconsistent with the shown "
+        "change), and pure stylistic alternatives to correct behavior — "
         "give the why. IMPORTANT: the candidates come from agents that had "
         "repo tools; you hold only this evidence pack. A claim grounded in "
         "cited repo evidence (a named file/grep and what it showed) is "
@@ -476,30 +496,35 @@ async def run_agent_step_ensemble(
         + "\nYour FINAL message must be a single JSON object with exactly "
         "these fields:\n" + json.dumps(reduce_contract, ensure_ascii=False))
     numbered = [{"i": i, **c} for i, c in enumerate(candidates)]
-    reply = ctx.llm.create(
-        system=merge_system,
-        messages=[{"role": "user", "content":
-                   f"## CANDIDATE ITEMS ({merge_key}, from "
-                   f"{len(samples)} samples)\n"
-                   + json.dumps(numbered, ensure_ascii=False, indent=1)
-                   + f"\n\n## EVIDENCE\n{ev_text}"}],
+    # single untooled reduction call: a tool-looped reducer measurably
+    # over-dropped (reviews shrank to 1-2 comments, starving recall and
+    # flipping verdicts) and added 1-2 min of latency; repo-cited claims are
+    # judged on coherence, not re-derived
+    merge_prompt = (
+        f"## CANDIDATE ITEMS ({merge_key}, from {len(samples)} samples)\n"
+        + json.dumps(numbered, ensure_ascii=False, indent=1)
+        + f"\n\n## EVIDENCE\n{ev_text}")
+    reply = await asyncio.to_thread(
+        ctx.llm.create, system=merge_system,
+        messages=[{"role": "user", "content": merge_prompt}],
         max_tokens=max(6000, ctx.settings.llm_max_tokens))
+    reply_text = reply.text
     try:  # archive the reduction exchange — reducer failures are hard to debug
         ctx.run_dir.mkdir(parents=True, exist_ok=True)
         (ctx.run_dir / f"ensemble_{step_name.replace('/', '_')}.json").write_text(
-            json.dumps({"candidates": numbered, "reply": reply.text},
+            json.dumps({"candidates": numbered, "reply": reply_text},
                        ensure_ascii=False, indent=1), encoding="utf-8")
     except OSError:
         pass
-    reduced = parse_json_reply(reply.text or "")
+    reduced = parse_json_reply(reply_text or "")
     if not (isinstance(reduced, dict) and isinstance(reduced.get("verdicts"), list)):
         reduced = None
-        if (reply.text or "").strip():  # one repair round (never on empty text)
+        if (reply_text or "").strip():  # one repair round (never on empty text)
             fix = ctx.llm.create(
                 system=("Convert the draft into a single JSON object matching "
                         "this contract exactly (keep all substance):\n"
                         + json.dumps(reduce_contract, ensure_ascii=False)),
-                messages=[{"role": "user", "content": str(reply.text)[:20_000]}],
+                messages=[{"role": "user", "content": str(reply_text)[:20_000]}],
                 max_tokens=max(6000, ctx.settings.llm_max_tokens))
             obj = parse_json_reply(fix.text)
             if isinstance(obj, dict) and isinstance(obj.get("verdicts"), list):

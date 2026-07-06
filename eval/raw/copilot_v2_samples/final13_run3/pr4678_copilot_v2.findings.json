@@ -1,0 +1,12 @@
+[
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/pipeline_cosmos3.py",
+  "line": 1666,
+  "summary": "Add a docstring to _prepare_sound_latents explaining that sp_video_shape triggers sequence-parallelism padding, rounding up sound frames and that extra frames are trimmed on decode due to non-bit-exact SP output."
+ },
+ {
+  "file": "tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py",
+  "line": 1398,
+  "summary": "Add an integration test in TestForwardRouting that exercises the SP-padding path by monkeypatching get_ulysses_parallel_world_size=2 and verifying that the padded sound latent length is passed to the transformer."
+ }
+]

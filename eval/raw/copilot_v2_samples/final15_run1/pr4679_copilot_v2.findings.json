@@ -1,0 +1,17 @@
+[
+ {
+  "file": "tests/entrypoints/openai_api/test_serving_speech.py",
+  "line": null,
+  "summary": "Add a unit test for the SSE streaming path to reject word_timestamps=true, guarding against a regression where stream=True silently accepts it."
+ },
+ {
+  "file": "tests/e2e/online_serving/test_qwen3_tts_customvoice.py",
+  "line": 95,
+  "summary": "Run the e2e test with GPU to ensure stream_format='audio' is passed through the client handler correctly, preventing silent fallback to the new SSE default."
+ },
+ {
+  "file": "vllm_omni/entrypoints/openai/protocol/audio.py",
+  "line": 297,
+  "summary": "Add a docstring to is_sse_stream() explaining that stream=True now selects SSE as the new default."
+ }
+]

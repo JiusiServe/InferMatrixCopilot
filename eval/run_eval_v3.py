@@ -42,10 +42,11 @@ WEIGHTS = {"recall_w": 0.35, "precision": 0.25, "actionability": 0.20,
            "decision": 0.20}
 
 # Cost model (Cost-of-Pass, arXiv 2504.13359): cost-of-quality = $/RQS3 point.
-# DeepSeek arms: estimated from token counts at list cache-miss rates ($/1M) —
-# an UPPER bound (our counts don't split cache hits). Opus arm: the CLI's
-# actual total_cost_usd is recorded in cost.json and used directly.
-DEEPSEEK_PRICE = {"input": 0.28, "output": 1.10}
+# DeepSeek arms: token counts at list rates ($/1M). The endpoint reports
+# cache reads separately (excluded from input_tokens); when a run recorded
+# them they are priced at the cache-hit rate — the same real-billing basis
+# the Opus arm gets via the CLI's actual total_cost_usd.
+DEEPSEEK_PRICE = {"input": 0.28, "output": 1.10, "cache_read": 0.028}
 
 # Efficiency-adjusted headline: RQS3e = RQS3 * f($) * f(minutes), where
 # f(x) = 1 / (1 + log10(1 + x/ref)) — a log-scale discount, since arm costs
@@ -73,6 +74,7 @@ def review_cost_usd(cost: dict) -> float:
     if cost.get("cost_usd") is not None:
         return float(cost["cost_usd"])
     return (cost.get("input_tokens", 0) * DEEPSEEK_PRICE["input"]
+            + cost.get("cache_read_tokens", 0) * DEEPSEEK_PRICE["cache_read"]
             + cost.get("output_tokens", 0) * DEEPSEEK_PRICE["output"]) / 1e6
 
 # All three benchmark PRs drew substantive human change requests before merge
@@ -89,12 +91,20 @@ _VALIDITY_RUBRIC = (
     "including claims about repository context the change affects (in-repo "
     "consumers, docs, tests, callers) when the diff makes such impact "
     "plausible, even though that context is not itself in the diff.\n"
+    "REQUESTED CHANGES: most review findings REQUEST something (add a test, "
+    "update a docstring, add an assert, run a benchmark). Judge such a "
+    "finding on whether the underlying issue it points at is real in the "
+    "diff — the requested change being ABSENT from the diff is the "
+    "finding's entire point and is NEVER a reason to vote invalid.\n"
     "INVALID: misreads the diff (wrong file/behavior/line), claims something "
     "the shown code already handles, or is too vague to check at all.\n"
     "Anchored examples:\n"
     "- 'The diff makes stream=True default to SSE; in-repo example clients "
     "still assume raw PCM and need stream_format=audio' -> VALID "
     "(diff-grounded claim, plausible repo impact).\n"
+    "- 'Add a test for the widened rejection path', where the diff really "
+    "does widen the rejection and adds no such test -> VALID (the absence "
+    "of the requested test is the point, not a misread).\n"
     "- 'This function may be slow' with no location or mechanism -> INVALID "
     "(unverifiable).\n"
     "Judge substance, not style; never mark a finding invalid merely for "

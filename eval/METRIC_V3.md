@@ -40,6 +40,21 @@ zeroed two PRs. v3 fixes both, based on a second literature pass.
    keeps v2's deterministic severity/resolution GT weights. Executable-test
    scoring is the long-term direction; out of scope at n=3.
 
+### v3.1 rubric fix: requested-change findings (2026-07-06)
+
+A live probe (judge re-run with a `why` field) showed the validity jury
+systematically voting INVALID on findings phrased as requests — "Add a test
+for the widened rejection path" was rejected with "diff does not contain any
+such test; claim of added test unverifiable". The jury was verifying asks as
+if they were descriptions of the diff, contradicting this metric's own
+design (requested actions are findings; doc-asks are never invalid per se —
+Sphinx's decision-level framing assumes reviews request things). v3.1 adds
+one rubric clause + one anchored example: a requested-change finding is
+judged on whether the underlying issue is real in the diff; the requested
+change being absent from the diff is the finding's point, never a reason to
+vote invalid. Applied identically to every arm; all validity caches
+re-judged under the same 6-vote protocol.
+
 ## Definition
 
 Per PR and arm:

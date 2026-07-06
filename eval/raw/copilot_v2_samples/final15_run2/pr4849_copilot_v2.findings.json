@@ -1,0 +1,22 @@
+[
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 96,
+  "summary": "The `requires_multimodal_data` parameter is never used; either gate mm_data forwarding on it or remove the unused parameter."
+ },
+ {
+  "file": "tests/model_executor/stage_input_processors/test_hunyuan_image3_bridge.py",
+  "line": 48,
+  "summary": "Multimodal-data forwarding block lacks test coverage; add a test passing multi_modal_data and asserting it appears in result."
+ },
+ {
+  "file": "tests/model_executor/stage_input_processors/test_hunyuan_image3_bridge.py",
+  "line": 23,
+  "summary": "AR multimodal-output forwarding block untested; add a test with non-None multimodal_output and check extra['ar_multimodal_output']."
+ },
+ {
+  "file": "tests/e2e/accuracy/test_hunyuan_image3.py",
+  "line": 414,
+  "summary": "Key integration test is skipped in CI due to GPU requirement; request author run it on multi-GPU node and attach results."
+ }
+]

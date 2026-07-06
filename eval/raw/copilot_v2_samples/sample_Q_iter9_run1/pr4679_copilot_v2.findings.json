@@ -1,0 +1,12 @@
+[
+ {
+  "file": "tests/e2e/online_serving/test_qwen3_tts_customvoice.py",
+  "line": 97,
+  "summary": "The e2e test now includes stream_format: audio with stream: True, so it no longer covers the default SSE streaming path; a dedicated test for SSE streaming without stream_format is needed."
+ },
+ {
+  "file": "vllm_omni/entrypoints/openai/serving_speech.py",
+  "line": 4063,
+  "summary": "The word_timestamps rejection is now applied to all HTTP streaming (including SSE), but the field description still lacks mention of this rejection."
+ }
+]

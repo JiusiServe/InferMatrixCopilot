@@ -288,8 +288,13 @@ async def _issue_fetch(ctx: StepContext) -> StepResult:
 _REVIEW_SYSTEM = """You review vLLM-Omni pull requests like an engaged maintainer: grounded, \
 specific, and useful — real reviewers leave nits and doc asks, not just blockers.
 
-Sweep EVERY item of this checklist and, for each, state in one line what evidence you \
-checked (a file you read, a grep you ran, or the diff hunk):
+Sweep EVERY item of this checklist. The `sweep_targets` evidence enumerates the diff's \
+indexed accesses, new branches, and touched files — your sweep MUST address every listed \
+entry relevant to your lens; they were extracted mechanically, so "I didn't notice it" \
+is not possible. Record the sweep in the `findings` base field — one line per checklist \
+item: what you checked (file read, grep run, or diff hunk) and the result. Complete the \
+whole sweep BEFORE writing review_comments; an item with no line in `findings` is a \
+missed sweep, and a thin sweep is where reviews silently fail:
 1. Correctness of changed logic (None/empty handling, off-by-one, error paths, concurrency).
 2. Simplifiability: branches for cases that cannot co-occur, values re-derived by hand \
 where an existing helper already provides them (grep the repo for such helpers). The right \
@@ -332,9 +337,9 @@ command and the specific regression risk it guards; bare process asks ("run the 
 are still banned.
 - Behavior/correctness findings outrank documentation asks: at most 2 comments whose only \
 ask is adding a comment or docstring.
-- Up to 2 comments you could not fully verify are allowed — set evidence to \
-"UNVERIFIED: <exactly what to check>"; labeling honestly beats silence AND beats guessing.
-- No praise-only comments. At most 6 comments + 2 unverified.
+- A suspicion you could NOT verify goes in the `findings` base field, NEVER in \
+review_comments — a posted review comment must stand on checked evidence.
+- No praise-only comments. At most 6 comments.
 - Only if the sweep truly surfaces nothing that belongs in this PR: empty review_comments \
 with a one-line summary."""
 
@@ -346,41 +351,45 @@ with a one-line summary."""
 # tokens but no wall-clock.
 _REVIEW_LENSES = [
     {"name": "logic",
-     "focus": "Checklist items 1, 2 and 4: correctness of the changed logic "
-              "(None/empty handling, off-by-one, error paths, concurrency), "
-              "rebase/merge damage, and SIMPLIFIABILITY — branches for cases "
-              "that cannot co-occur, values re-derived by hand where an "
-              "existing helper already provides them (grep the repo for such "
-              "helpers before flagging). When you find dead or redundant "
-              "code, ask to REMOVE or simplify it — documenting it is the "
-              "wrong fix."},
+     "focus": "Checklist items 1, 2 and 4, as a MECHANICAL SWEEP OF THE DIFF: "
+              "for EVERY hunk, in order, ask (a) can the new branches/"
+              "conditions actually all occur — a branch for a case that "
+              "cannot co-occur is a finding whose fix is REMOVE/simplify, "
+              "never document; (b) does the new code re-derive by hand a "
+              "value an existing helper provides (grep the repo for the "
+              "computation before flagging); (c) None/empty handling, "
+              "off-by-one, error paths; (d) rebase/merge damage (duplicated "
+              "code, moved/renamed symbols). Work hunk by hunk; do not skip "
+              "any. Use repo tools only to CONFIRM a suspicion from the "
+              "diff."},
     {"name": "behavior",
-     "focus": "Checklist item 3: changed defaults, API/protocol/output-format "
-              "shifts. grep the repo for IN-REPO consumers (examples/, docs/, "
-              "clients, tests, READMEs) that assume the old behavior, then "
-              "check whether THIS diff updates each one — name every consumer "
-              "the diff leaves stale, pointing file/line at the consumer "
-              "itself and quoting it."},
+     "focus": "Checklist item 3, diff-first: for EVERY hunk that changes a "
+              "default, API, protocol or output format, list who depends on "
+              "the OLD behavior — grep the repo for in-repo consumers "
+              "(examples/, docs/, clients, tests, READMEs) — then check "
+              "whether THIS diff updates each one; name every consumer left "
+              "stale, quoting it. If the diff changes no default/API, say so "
+              "and report nothing for this item."},
     {"name": "contracts",
-     "focus": "Checklist items 6 and 7: docs/docstrings/comments made stale "
-              "or misleading — read EVERY docstring, inline comment, and "
-              "field description in each touched file (not just the first "
-              "suspicious one — stopping after one is the most common "
-              "failure) and verify each still tells the truth under the NEW "
-              "behavior, quoting any that don't. Undocumented "
-              "assumptions and invariants: for each indexed or first-element "
-              "access the diff adds (xs[0], 'first element is X', ordering, "
-              "implicit units/thresholds), state the assumption it encodes "
-              "and what guarantees it — if nothing does, ask for an assert "
-              "or comment."},
+     "focus": "Checklist items 6 and 7, as a MECHANICAL SWEEP OF THE TOUCHED "
+              "FILES: (a) enumerate EVERY docstring, inline comment, and "
+              "field description in each touched file that the change makes "
+              "stale or misleading — verify each still tells the truth under "
+              "the NEW behavior, quoting any that don't (stopping after the "
+              "first is the most common failure); (b) for EVERY indexed or "
+              "first-element access the diff adds (xs[0], 'first element is "
+              "X', ordering, implicit units/thresholds), state the "
+              "assumption it encodes and what guarantees it — if nothing "
+              "does, ask for an assert or comment."},
     {"name": "verification",
-     "focus": "Checklist item 5: behavior changed without test changes; new "
-              "skips or loosened thresholds. Then REQUIRED VERIFICATION: "
-              "find the specific existing test/benchmark that validates the "
-              "changed path (grep tests/, benchmarks/), and if the PR gives "
-              "no sign it was run or extended, ask for exactly that "
-              "run/extension, citing the concrete regression risk it "
-              "guards."},
+     "focus": "Checklist item 5, diff-first: for EVERY behavior-changing "
+              "hunk, name the specific existing test or benchmark that "
+              "exercises the changed path (grep tests/, benchmarks/ for the "
+              "touched symbols). Behavior changed with no test change, a "
+              "changed path no test exercises, new skips, or loosened "
+              "thresholds are findings. If the PR gives no sign the relevant "
+              "test/benchmark was run, ask for exactly that run/extension, "
+              "citing the concrete regression risk it guards."},
 ]
 
 _REVIEW_MERGE = (
@@ -400,6 +409,60 @@ _REVIEW_MERGE = (
     "comment, not a process nit.")
 
 _SEVERITY_ORDER = {"blocker": 0, "major": 1, "minor": 2, "nit": 3}
+
+
+def _sweep_targets(diff: str) -> str:
+    """Deterministic sweep targets extracted from the diff's added lines.
+
+    Injected as evidence so lens coverage of the ENUMERABLE classes (index
+    assumptions, new branches, untested files) never depends on the model
+    enumerating the diff itself — stochastic self-enumeration was the
+    highest-variance link in review recall (whole classes silently skipped
+    on some runs)."""
+    import re
+
+    current: str | None = None
+    new_line = 0
+    subs: list[str] = []
+    branches: list[str] = []
+    files: set[str] = set()
+    test_files: set[str] = set()
+    for line in diff.splitlines():
+        if line.startswith("+++ b/"):
+            current = line[6:]
+            files.add(current)
+            if current.startswith("tests/") or "/tests/" in current:
+                test_files.add(current)
+        elif line.startswith("@@"):
+            m = re.search(r"\+(\d+)", line)
+            new_line = int(m.group(1)) if m else 0
+        elif current and line.startswith("+") and not line.startswith("+++"):
+            code = line[1:]
+            stripped = code.strip()
+            if re.search(r"\w\[\s*0\s*\]|\.pop\(0\)|next\(iter\(", code):
+                subs.append(f"{current}:{new_line} `{stripped[:90]}`")
+            if re.match(r"(el)?if\b|else\b", stripped):
+                branches.append(f"{current}:{new_line} `{stripped[:90]}`")
+            new_line += 1
+        elif current and not line.startswith("-"):
+            new_line += 1
+    non_test = sorted(f for f in files if f not in test_files)
+    out: list[str] = []
+    if subs:
+        out.append("INDEXED/FIRST-ELEMENT ACCESSES ADDED — contracts lens "
+                   "must state the assumption + what guarantees it for EACH:")
+        out += [f"- {s}" for s in subs[:20]]
+    if branches:
+        out.append("NEW/CHANGED BRANCHES — logic lens must answer for EACH: "
+                   "can all arms occur? dead/redundant?")
+        out += [f"- {b}" for b in branches[:25]]
+    if non_test:
+        out.append("NON-TEST FILES TOUCHED — verification lens must name the "
+                   "test/benchmark covering each changed path:")
+        out += [f"- {f}" for f in non_test[:20]]
+    out.append("TEST FILES TOUCHED IN THIS DIFF: "
+               + (", ".join(sorted(test_files)) or "NONE"))
+    return "\n".join(out)
 
 
 def _gh_read_tools(repo: Path | None) -> dict:
@@ -476,7 +539,8 @@ async def _review_diff(ctx: StepContext) -> StepResult:
         expected="review_comments with file/line/severity/comment/evidence; "
                  "APPROVE-equivalent = empty review_comments with a summary.",
         evidence={"pr_diff": str(diff),
-                  "gate_report": ctx.state.get("gate_report", "")},
+                  "gate_report": ctx.state.get("gate_report", ""),
+                  "sweep_targets": _sweep_targets(str(diff))},
         output_extension={"review_comments":
                           "list of {file, line, severity: blocker|major|minor|nit, "
                           "comment, evidence}"},
@@ -487,8 +551,7 @@ async def _review_diff(ctx: StepContext) -> StepResult:
             ctx, lenses=_REVIEW_LENSES, merge_key="review_comments",
             merge_guidance=_REVIEW_MERGE, **common)
         # deterministic comment budget: severity-ordered, capped at 5 — the
-        # low-signal tail goes first (reducers ignored a prompted cap, and
-        # human reviews of comparable PRs raise 2-4 issues)
+        # low-signal tail goes first (reducers ignored a prompted cap)
         comments = sorted(output.get("review_comments") or [],
                           key=lambda c: _SEVERITY_ORDER.get(
                               str(c.get("severity", "minor")).lower(), 2))

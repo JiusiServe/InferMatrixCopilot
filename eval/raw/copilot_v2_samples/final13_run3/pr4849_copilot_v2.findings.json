@@ -1,0 +1,7 @@
+[
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 100,
+  "summary": "Update the Args section for prompt in ar2diffusion docstring to document list-indexing behavior where only prompt[0] is used."
+ }
+]

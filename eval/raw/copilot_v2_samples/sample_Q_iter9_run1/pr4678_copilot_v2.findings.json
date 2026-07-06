@@ -1,0 +1,22 @@
+[
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/transformer_cosmos3.py",
+  "line": 1376,
+  "summary": "New public method `sound_latent_frames_for_sequence_parallel` lacks a docstring describing parameters, padding algorithm, no-op guarantee, and non-bit-exact caveat."
+ },
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/transformer_cosmos3.py",
+  "line": 1379,
+  "summary": "Inline comment about vision token base omits the transfer control restriction, which should be noted alongside the action+sound rejection."
+ },
+ {
+  "file": "tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py",
+  "line": 1401,
+  "summary": "Test `test_forward_i2v_sound_and_action_routes` patches `_prepare_sound_latents` and ignores new SP arguments, missing pipeline-level SP coverage; add a test with monkeypatched ulysses world size to exercise the SP-padding call chain."
+ },
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/pipeline_cosmos3.py",
+  "line": 1620,
+  "summary": "`_prepare_sound_latents` now accepts `sp_video_shape` and `sp_num_vision_items` but lacks a docstring explaining these parameters and their effect on returned latent frames."
+ }
+]

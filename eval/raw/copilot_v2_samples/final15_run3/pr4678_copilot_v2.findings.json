@@ -1,0 +1,17 @@
+[
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/pipeline_cosmos3.py",
+  "line": 1666,
+  "summary": "The `_prepare_sound_latents` method lacks a docstring; add one documenting its `sp_video_shape` and `sp_num_vision_items` keyword-only parameters."
+ },
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/transformer_cosmos3.py",
+  "line": 1376,
+  "summary": "The `video_shape` parameter in `sound_latent_frames_for_sequence_parallel` is expected to be latent-space dimensions but this is undocumented; add a docstring or assertion."
+ },
+ {
+  "file": "tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py",
+  "line": 1468,
+  "summary": "Stubbed `_prepare_sound_latents` in `test_forward_i2v_sound_and_action_routes` discards `sp_video_shape`, leaving the SP-padding branch untested; add an integration test for the pipeline path."
+ }
+]

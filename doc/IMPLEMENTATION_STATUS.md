@@ -91,6 +91,21 @@ Six-cycle optimization campaign (eval/ANALYSIS.md "Optimization campaign"):
   gain. RQS3 across replicate runs: best single run 0.686 (RQS3e 0.505),
   shipped-config runs 0.58-0.59 — recall/precision judge+generation noise is
   ±0.1 RQS3 per run; see the campaign table before trusting any single roll.
+- **Final measured result (2026-07-06)**: the shipped configuration scores
+  **RQS3 0.663 / RQS3e 0.509** as the mean over 3 full replicates under the
+  corrected v3.1 judge (runs 0.75/0.65/0.59 — decision 1.00 and precision
+  0.83-0.91 in every run; archives in
+  eval/raw/copilot_v2_samples/sample_{M,N,O}_iter7_run*). Two enablers:
+  the METRIC_V3.md v3.1 rubric fix (the validity jury voted requested-change
+  findings invalid because the requested change is absent from the diff;
+  fixing it raised cross-judge κ from 0.00 to 0.63) and replicate-mean
+  scoring (eval/run_replicates.sh + score_replicates.py) — several
+  plausible "improvements" (tool-looped reducer, per-lens output floors,
+  tighter caps/budgets) measured WORSE on replicate means and were
+  reverted. Two safeguards were kept beyond the measured config:
+  deterministic sweep-target enumeration and the consensus-gated fast path
+  (a single-lens singleton always faces the reducer — a fabricated-evidence
+  blocker once sailed through unverified).
 
 ## Repo-rebase promotion path (native candidate -> default)
 

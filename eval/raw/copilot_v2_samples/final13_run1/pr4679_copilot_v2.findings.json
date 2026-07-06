@@ -1,0 +1,12 @@
+[
+ {
+  "file": "tests/entrypoints/openai_api/test_serving_speech.py",
+  "line": 1984,
+  "summary": "Add a test for word_timestamps rejection with SSE streaming, asserting a 400 error that references the WebSocket path."
+ },
+ {
+  "file": "tests/e2e/online_serving/test_qwen3_tts_customvoice.py",
+  "line": 99,
+  "summary": "Run test_text_to_audio_002 with stream_format='audio' against a real Qwen3-TTS model to validate raw PCM streaming end-to-end."
+ }
+]

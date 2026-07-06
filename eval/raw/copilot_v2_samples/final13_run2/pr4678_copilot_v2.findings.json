@@ -1,0 +1,12 @@
+[
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/pipeline_cosmos3.py",
+  "line": 1666,
+  "summary": "Add a docstring to `_prepare_sound_latents` explaining the `sp_video_shape` and `sp_num_vision_items` parameters for sequence-parallelism padding of sound frames."
+ },
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/transformer_cosmos3.py",
+  "line": 1376,
+  "summary": "Expand the comment in `sound_latent_frames_for_sequence_parallel` to clarify that `num_vision_items` counts vision token streams."
+ }
+]

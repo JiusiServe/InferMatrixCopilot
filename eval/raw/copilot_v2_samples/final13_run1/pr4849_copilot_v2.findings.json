@@ -1,0 +1,7 @@
+[
+ {
+  "file": "",
+  "line": null,
+  "summary": "Add a test or confirm existing coverage for orchestrator handling None returned by HunyuanImage3's ar2diffusion when source_outputs is empty."
+ }
+]

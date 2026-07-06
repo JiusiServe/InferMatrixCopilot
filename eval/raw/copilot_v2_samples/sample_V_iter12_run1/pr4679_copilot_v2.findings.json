@@ -1,0 +1,17 @@
+[
+ {
+  "file": "tests/entrypoints/openai_api/test_serving_speech.py",
+  "line": 1939,
+  "summary": "Add a test for rejecting SSE streaming requests with word_timestamps=true via a 4xx error, as the guard was widened from raw-audio-only to all HTTP streaming."
+ },
+ {
+  "file": "tests/e2e/online_serving/test_indextts2.py",
+  "line": 6,
+  "summary": "Update docstrings to clarify the new stream_format='audio' raw-audio streaming path and that stream=True now means SSE."
+ },
+ {
+  "file": "vllm_omni/entrypoints/openai/serving_speech.py",
+  "line": 4063,
+  "summary": "Add a docstring note that word_timestamps=true is rejected for all HTTP streaming (including SSE) and to use the WebSocket endpoint instead."
+ }
+]

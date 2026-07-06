@@ -1,0 +1,22 @@
+[
+ {
+  "file": "tests/e2e/accuracy/test_hunyuan_image3.py",
+  "line": 1,
+  "summary": "Run the specific regression test in CI and share the result, or document why it cannot be run."
+ },
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 108,
+  "summary": "Either gate multimodal data forwarding with the unused requires_multimodal_data parameter or remove it and update the docstring."
+ },
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 122,
+  "summary": "Add a guard for an empty outputs list to avoid an IndexError and fail gracefully with a warning."
+ },
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 104,
+  "summary": "Add a source_outputs entry to the formal Args list in the docstring."
+ }
+]

@@ -1,0 +1,22 @@
+[
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/pipeline_cosmos3.py",
+  "line": 3087,
+  "summary": "Remove or wire through unreachable `sp_num_vision_items` parameter in `_prepare_sound_latents` since pipeline always defaults to 1."
+ },
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/pipeline_cosmos3.py",
+  "line": 1618,
+  "summary": "Add docstring to `_prepare_sound_latents` explaining `sp_video_shape` and `sp_num_vision_items` parameters and behavior."
+ },
+ {
+  "file": "tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py",
+  "line": 826,
+  "summary": "Add test case that calls `_prepare_sound_latents` with `sp_video_shape` to cover the sequence-parallel padding branch."
+ },
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/transformer_cosmos3.py",
+  "line": 1391,
+  "summary": "Unreachable `sound_frames <= 0` guard in `sound_latent_frames_for_sequence_parallel` from pipeline caller; consider leaving as defensive check or add comment."
+ }
+]

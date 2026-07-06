@@ -1,0 +1,12 @@
+[
+ {
+  "file": "tests/e2e/online_serving/test_qwen3_tts_base.py",
+  "line": 103,
+  "summary": "Run e2e test against a live server to verify that adding `stream_format: \"audio\"` at line 103 preserves raw-audio streaming, not SSE text."
+ },
+ {
+  "file": "tests/entrypoints/openai_api/test_serving_speech.py",
+  "line": 4063,
+  "summary": "Add a unit test that sends SSE streaming with `word_timestamps=True, response_format='pcm'` and asserts a 400/422 rejection."
+ }
+]

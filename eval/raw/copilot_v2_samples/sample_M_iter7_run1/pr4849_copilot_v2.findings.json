@@ -1,0 +1,27 @@
+[
+ {
+  "file": "tests/model_executor/stage_input_processors/test_hunyuan_image3_bridge.py",
+  "line": 103,
+  "summary": "Add missing unit test for multi_modal_data and ar_multimodal_output forwarding in hunyuan_image3 bridge."
+ },
+ {
+  "file": "tests/e2e/accuracy/test_hunyuan_image3.py",
+  "line": 414,
+  "summary": "Attach a run log snippet or confirm environment for the end-to-end accuracy test to validate the fix."
+ },
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 98,
+  "summary": "The requires_multimodal_data parameter in ar2diffusion is unused; guard forwarding or document it as reserved."
+ },
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 129,
+  "summary": "source_outputs[0] assumes parent ordering without runtime assertion; add assertion or document the invariant."
+ },
+ {
+  "file": "tests/model_executor/stage_input_processors/test_hunyuan_image3_bridge.py",
+  "line": 103,
+  "summary": "Add missing unit test for sampling parameters forwarding (seed, guidance_scale, etc.) in hunyuan_image3 bridge."
+ }
+]

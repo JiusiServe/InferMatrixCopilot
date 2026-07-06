@@ -1,0 +1,22 @@
+[
+ {
+  "file": "tests/e2e/accuracy/test_hunyuan_image3.py",
+  "line": 1,
+  "summary": "Please run the e2e test `tests/e2e/accuracy/test_hunyuan_image3.py::test_image_to_image_alignment_online` to validate the orchestrator dispatch path end-to-end, or add a regression test that exercises that path."
+ },
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 107,
+  "summary": "Update the docstring of `requires_multimodal_data` to state that it is reserved for interface compatibility and multimodal data is always forwarded."
+ },
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 117,
+  "summary": "Add an assertion `assert len(source_outputs) >= 1` after the empty guard to enforce that the parent output is always first."
+ },
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 165,
+  "summary": "Remove the hardcoded `'Request 0:'` prefix from the log string since the function now processes exactly one request."
+ }
+]

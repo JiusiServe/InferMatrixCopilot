@@ -1,0 +1,17 @@
+[
+ {
+  "file": "recipes/mistralai/Voxtral-TTS.md",
+  "line": 155,
+  "summary": "Add \"stream_format\": \"audio\" to the second curl example to avoid breaking existing clients that expect raw PCM audio instead of SSE events."
+ },
+ {
+  "file": "tests/e2e/online_serving/test_qwen3_tts_base.py",
+  "line": 102,
+  "summary": "Add a companion e2e test that sends stream=True without stream_format to validate the new default SSE streaming path."
+ },
+ {
+  "file": "vllm_omni/entrypoints/openai/serving_speech.py",
+  "line": 4063,
+  "summary": "Update error message to clarify that word_timestamps is unsupported for all HTTP streaming modes, not just the WebSocket path."
+ }
+]

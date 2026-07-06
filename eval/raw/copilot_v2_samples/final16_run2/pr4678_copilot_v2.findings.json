@@ -1,0 +1,27 @@
+[
+ {
+  "file": "tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py",
+  "line": null,
+  "summary": "Test coverage for sound latent sequence parallelism is missing: StubCosmos3Transformer lacks the new method, and existing tests bypass the new pad-for-SP branch via a lambda; extend the stub and add a test variant that exercises sp_video_shape."
+ },
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/transformer_cosmos3.py",
+  "line": 1376,
+  "summary": "Add docstring to the new method sound_latent_frames_for_sequence_parallel."
+ },
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/pipeline_cosmos3.py",
+  "line": 1666,
+  "summary": "Add docstring to _prepare_sound_latents documenting the new sp_video_shape and sp_num_vision_items parameters."
+ },
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/transformer_cosmos3.py",
+  "line": 1384,
+  "summary": "Broaden inline comment to mention that transfer+sound is also rejected alongside action+sound."
+ },
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/transformer_cosmos3.py",
+  "line": 1391,
+  "summary": "Remove dead condition 'sound_frames <= 0' as the sole call site always passes >=1; replace with an assert if desired."
+ }
+]

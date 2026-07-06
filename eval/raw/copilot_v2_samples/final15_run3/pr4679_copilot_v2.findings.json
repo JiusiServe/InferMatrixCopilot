@@ -1,0 +1,27 @@
+[
+ {
+  "file": "tests/e2e/online_serving/test_voxtral_tts_expansion.py",
+  "line": 58,
+  "summary": "Run full e2e tests with stream_format='audio' for raw audio streaming against an actual server to prevent regression, as only unit tests were run."
+ },
+ {
+  "file": "tests/e2e/online_serving/test_indextts2.py",
+  "line": 6,
+  "summary": "Module docstring should be updated to reflect stream=True + stream_format='audio' raw-audio path instead of just 'stream=True compatibility path'."
+ },
+ {
+  "file": "tests/e2e/online_serving/test_indextts2.py",
+  "line": 65,
+  "summary": "Function docstring should be updated from 'stream=True compatibility' to 'stream=True + stream_format='audio' raw-audio path'."
+ },
+ {
+  "file": "vllm_omni/entrypoints/openai/protocol/audio.py",
+  "line": 182,
+  "summary": "word_timestamps field description is stale; update to note it is rejected for all HTTP streaming and direct users to WebSocket endpoint."
+ },
+ {
+  "file": "tests/entrypoints/openai_api/test_serving_speech.py",
+  "line": null,
+  "summary": "Add unit test for word_timestamps=true with stream=True (SSE) returning 400 error with WebSocket guidance, covering widened rejection guard."
+ }
+]

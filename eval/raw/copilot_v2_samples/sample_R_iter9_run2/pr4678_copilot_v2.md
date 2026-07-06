@@ -1,0 +1,3 @@
+`/rebase/vllm-omni/tests/diffusion/models/cosmos3/test_cosmos3_transformer.py:318` [blocker] — Device is set to `None` unconditionally when `torch.distributed.get_world_size() > 1`, causing `Unknown device type None` in the subsequent `self.model.sample(...)` call. (evidence: Stacktrace shows `Unknown device type None` originating at line 319 (`inputs = self.model.sample(...)`) after `device` was forced to `None` at line 318.)
+
+**Verdict:** REQUEST CHANGES

@@ -1,0 +1,27 @@
+[
+ {
+  "file": "vllm_omni/entrypoints/openai/serving_speech.py",
+  "line": 4063,
+  "summary": "Add test coverage for word_timestamps rejection in SSE streaming to prevent regression."
+ },
+ {
+  "file": "tests/e2e/online_serving/test_voxcpm2_tts.py",
+  "line": 89,
+  "summary": "Run full e2e tests with --run-hardware to validate raw audio streaming configuration."
+ },
+ {
+  "file": "tests/e2e/online_serving/test_indextts2.py",
+  "line": 6,
+  "summary": "Update docstring to reflect that the test covers raw audio streaming with stream_format='audio'."
+ },
+ {
+  "file": "vllm_omni/entrypoints/openai/serving_speech.py",
+  "line": 4063,
+  "summary": "Improve error message for SSE callers when word_timestamps is used to suggest omitting it instead of referencing WebSocket."
+ },
+ {
+  "file": "tests/entrypoints/openai_api/test_serving_speech.py",
+  "line": 1950,
+  "summary": "Add integration test for SSE streaming with WAV format to confirm base64 chunk output."
+ }
+]

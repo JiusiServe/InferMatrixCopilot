@@ -1,0 +1,17 @@
+[
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/transformer_cosmos3.py",
+  "line": 1362,
+  "summary": "Update the `adjust_detail` string at line 1362 to remove 'sound duration, or sound latent FPS' since the new padding logic prevents this validation from ever firing for sound cases."
+ },
+ {
+  "file": "tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py",
+  "line": 864,
+  "summary": "Extend this test to also call `_prepare_sound_latents(21, generator, sp_video_shape=(3, 16, 16))` and assert the returned `latent_frames` reflects the padding computed by `sound_latent_frames_for_sequence_parallel`."
+ },
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/pipeline_cosmos3.py",
+  "line": 1672,
+  "summary": "Add an inline comment on the `sp_num_vision_items: int = 1` parameter noting that the default is safe because the pipeline rejects sound+transfer and sound+action, guaranteeing at most one vision item when sound is enabled."
+ }
+]

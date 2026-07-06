@@ -1,0 +1,17 @@
+[
+ {
+  "file": "tests/e2e/accuracy/test_hunyuan_image3.py",
+  "line": 414,
+  "summary": "No GPU CI evidence that the change to ar2diffusion's return type (list[dict] to dict|None) passes the e2e test on the main GPU stack; a pass log from a \u22654-GPU machine is needed."
+ },
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 108,
+  "summary": "The docstring for requires_multimodal_data states the parameter determines whether to forward multimodal data but the function never reads it; the docstring should clarify it's only for signature compatibility."
+ },
+ {
+  "file": "tests/model_executor/stage_input_processors/test_hunyuan_image3_bridge.py",
+  "line": 72,
+  "summary": "The bridge tests lack a case for ar2diffusion with prompt=None and non-empty source_outputs, leaving the else branch that sets original_prompt={} untested."
+ }
+]

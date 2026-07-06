@@ -1,0 +1,17 @@
+[
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 119,
+  "summary": "Accessing `ar_output.outputs[0]` without checking if `ar_output.outputs` is non-empty may cause IndexError; add a defensive check or document the contract."
+ },
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 208,
+  "summary": "The check `if prompt_images is None:` at line 208 does not catch empty lists, potentially forwarding an empty list; use `if not prompt_images` instead."
+ },
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 97,
+  "summary": "The `requires_multimodal_data` parameter is accepted but never checked; either gate multimodal data forwarding on it or update the docstring."
+ }
+]

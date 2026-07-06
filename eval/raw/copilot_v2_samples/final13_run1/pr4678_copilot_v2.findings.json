@@ -1,0 +1,12 @@
+[
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/pipeline_cosmos3.py",
+  "line": 1666,
+  "summary": "Add docstring explaining sp_video_shape and sp_num_vision_items parameters to _prepare_sound_latents."
+ },
+ {
+  "file": "tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py",
+  "line": 864,
+  "summary": "Extend test_prepare_latents_for_video_image_sound_and_action to cover sp_video_shape path for basic integration coverage."
+ }
+]

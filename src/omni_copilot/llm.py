@@ -94,7 +94,11 @@ class LLM:
         usage = None
         if getattr(resp, "usage", None) is not None:
             usage = {"input_tokens": getattr(resp.usage, "input_tokens", 0),
-                     "output_tokens": getattr(resp.usage, "output_tokens", 0)}
+                     "output_tokens": getattr(resp.usage, "output_tokens", 0),
+                     # the endpoint reports cache reads separately (and
+                     # excludes them from input_tokens) — capture for billing
+                     "cache_read_input_tokens":
+                         getattr(resp.usage, "cache_read_input_tokens", 0) or 0}
         return Reply(blocks=blocks, stop_reason=resp.stop_reason or "end_turn",
                      usage=usage)
 

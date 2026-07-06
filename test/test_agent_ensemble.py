@@ -62,13 +62,15 @@ def _run(ctx, **kw):
 def test_ensemble_fans_out_and_merges(settings, trace, tmp_path):
     llm = ScriptedLLM([
         contract(items=[{"name": "shared"}, {"name": "only-a"}]),   # lens a
-        contract(items=[{"name": "shared"}]),                       # lens b
+        contract(items=[{"name": "shared"}, {"name": "only-b"}]),   # lens b
         verdicts_reply({"i": 0, "action": "keep"},
-                       {"i": 1, "action": "keep"}),                 # reduce
+                       {"i": 1, "action": "keep"},
+                       {"i": 2, "action": "keep"}),                 # reduce
     ])
     result, output = _run(_ctx(settings, trace, tmp_path, llm=llm))
     assert result.ok
-    assert [i["name"] for i in output["items"]] == ["shared", "only-a"]
+    assert [i["name"] for i in output["items"]] == ["shared", "only-a",
+                                                    "only-b"]
     assert "lenses" not in output["items"][0]  # tags stripped from the result
     assert result.summary.startswith("[ensemble x2]")
 
@@ -83,20 +85,56 @@ def test_ensemble_fans_out_and_merges(settings, trace, tmp_path):
     assert "the evidence" in body
 
     ev = next(trace.events("agent_ensemble"))
-    assert ev["lenses"] == ["a", "b"] and ev["candidates"] == 2
-    assert ev["merged"] == 2 and ev["verified"] is True
+    assert ev["lenses"] == ["a", "b"] and ev["candidates"] == 3
+    assert ev["merged"] == 3 and ev["verified"] is True
+
+
+def test_ensemble_small_union_skips_reduction(settings, trace, tmp_path):
+    """A small union whose every item has cross-lens consensus needs no
+    arbitration — the reducer is never called (its latency was ~25% of
+    ensemble wall-clock on small PRs)."""
+    llm = ScriptedLLM([
+        contract(items=[{"name": "x"}]),   # lens a
+        contract(items=[{"name": "x"}]),   # lens b — same item, consensus 2
+    ])
+    result, output = _run(_ctx(settings, trace, tmp_path, llm=llm))
+    assert result.ok
+    assert [i["name"] for i in output["items"]] == ["x"]
+    assert "lenses" not in output["items"][0]
+    assert len(llm.calls) == 2  # no reducer call
+    ev = next(trace.events("agent_ensemble"))
+    assert ev["candidates"] == 1 and ev["merged"] == 1
+
+
+def test_ensemble_singleton_without_consensus_still_verified(settings, trace,
+                                                             tmp_path):
+    """An unreplicated single-lens claim must face the reducer — a
+    hallucinated blocker once skipped verification via the small-union fast
+    path and became the entire review."""
+    llm = ScriptedLLM([
+        contract(items=[{"name": "maybe-hallucinated"}]),  # lens a only
+        contract(items=[]),                                # lens b: nothing
+        verdicts_reply({"i": 0, "action": "drop",
+                        "why": "not grounded in the evidence"}),
+    ])
+    result, output = _run(_ctx(settings, trace, tmp_path, llm=llm))
+    assert result.ok
+    assert output["items"] == []
+    assert len(llm.calls) == 3  # reducer WAS called
+    ev = next(trace.events("agent_ensemble"))
+    assert ev["dropped"] == 1 and ev["verified"] is True
 
 
 def test_ensemble_merge_failure_falls_open_to_union(settings, trace, tmp_path):
     llm = ScriptedLLM([
-        contract(items=[{"name": "x"}]),
+        contract(items=[{"name": "x"}, {"name": "x2"}]),
         contract(items=[{"name": "y"}]),
         Reply(blocks=[Block(type="text", text="prose")]),   # merge unparseable
         Reply(blocks=[Block(type="text", text="still prose")]),  # repair fails
     ])
     result, output = _run(_ctx(settings, trace, tmp_path, llm=llm))
     assert result.ok
-    assert [i["name"] for i in output["items"]] == ["x", "y"]
+    assert [i["name"] for i in output["items"]] == ["x", "x2", "y"]
     assert "lenses" not in output["items"][0]
     assert "unverified union" in output["summary"]
     assert next(trace.events("agent_ensemble"))["verified"] is False
@@ -107,13 +145,13 @@ def test_ensemble_empty_merge_reply_falls_open_without_repair(settings, trace,
     """An empty reducer reply must NOT go through the repair round (which would
     hallucinate a contract from nothing — live bug on PR 4678)."""
     llm = ScriptedLLM([
-        contract(items=[{"name": "x"}]),
-        contract(items=[{"name": "x"}]),
+        contract(items=[{"name": "x"}, {"name": "x2"}]),
+        contract(items=[{"name": "y"}]),
         Reply(blocks=[Block(type="text", text="")]),   # reducer returns nothing
     ])
     result, output = _run(_ctx(settings, trace, tmp_path, llm=llm))
     assert result.ok
-    assert [i["name"] for i in output["items"]] == ["x"]  # deduped union
+    assert [i["name"] for i in output["items"]] == ["x", "x2", "y"]  # union
     assert len(llm.calls) == 3  # no repair call happened
 
 
@@ -132,14 +170,14 @@ def test_ensemble_status_comes_from_samples_not_reducer(settings, trace,
 
 def test_ensemble_reducer_losing_payload_falls_open(settings, trace, tmp_path):
     llm = ScriptedLLM([
-        contract(items=[{"name": "x"}]),
+        contract(items=[{"name": "x"}, {"name": "x2"}]),
         contract(items=[{"name": "y"}]),
-        contract(),  # contract-shaped but the items key vanished
+        contract(),  # contract-shaped but no verdicts key
         contract(),  # ...and the repair round loses it again
     ])
     result, output = _run(_ctx(settings, trace, tmp_path, llm=llm))
     assert result.ok
-    assert [i["name"] for i in output["items"]] == ["x", "y"]
+    assert [i["name"] for i in output["items"]] == ["x", "x2", "y"]
     assert next(trace.events("agent_ensemble"))["verified"] is False
 
 
@@ -188,16 +226,19 @@ def test_ensemble_parallel_lenses_merge(settings, trace, tmp_path):
     see every lens's candidates and samples keep lens order."""
     settings.ensemble_parallel = True
     llm = KeyedLLM({
-        "Your assigned lens: a": contract(items=[{"name": "from-a"}]),
+        "Your assigned lens: a": contract(items=[{"name": "from-a"},
+                                                 {"name": "from-a2"}]),
         "Your assigned lens: b": contract(items=[{"name": "from-b"}]),
         "verify-and-merge": verdicts_reply({"i": 0, "action": "keep"},
-                                           {"i": 1, "action": "keep"}),
+                                           {"i": 1, "action": "keep"},
+                                           {"i": 2, "action": "keep"}),
     })
     result, output = _run(_ctx(settings, trace, tmp_path, llm=llm))
     assert result.ok
-    assert [i["name"] for i in output["items"]] == ["from-a", "from-b"]
+    assert [i["name"] for i in output["items"]] == ["from-a", "from-a2",
+                                                    "from-b"]
     ev = next(trace.events("agent_ensemble"))
-    assert ev["lenses"] == ["a", "b"] and ev["candidates"] == 2
+    assert ev["lenses"] == ["a", "b"] and ev["candidates"] == 3
     merge_call = next(c for c in llm.calls if "verify-and-merge" in c["system"])
     body = merge_call["messages"][0]["content"]
     assert '"from-a"' in body and '"from-b"' in body
@@ -236,12 +277,13 @@ def test_ensemble_samples_per_lens_union(settings, trace, tmp_path):
         contract(items=[{"name": "x"}]),   # a/1
         contract(items=[{"name": "x"}]),   # a/2 — identical -> consensus 2
         contract(items=[{"name": "y"}]),   # b/1
-        contract(items=[]),                # b/2 came up empty
-        verdicts_reply({"i": 0, "action": "keep"}, {"i": 1, "action": "keep"}),
+        contract(items=[{"name": "z"}]),   # b/2
+        verdicts_reply({"i": 0, "action": "keep"}, {"i": 1, "action": "keep"},
+                       {"i": 2, "action": "keep"}),
     ])
     result, output = _run(_ctx(settings, trace, tmp_path, llm=llm))
     assert result.ok
-    assert [i["name"] for i in output["items"]] == ["x", "y"]
+    assert [i["name"] for i in output["items"]] == ["x", "y", "z"]
     assert result.summary.startswith("[ensemble x4]")
     assert '"consensus": 2' in llm.calls[4]["messages"][0]["content"]
     dispatches = [e["step"] for e in trace.events("agent_dispatch")]

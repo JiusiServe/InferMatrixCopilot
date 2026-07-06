@@ -1,0 +1,17 @@
+[
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/pipeline_cosmos3.py",
+  "line": 1666,
+  "summary": "Add a docstring to `_prepare_sound_latents` documenting `sp_video_shape`, `sp_num_vision_items`, and the SP-aware padding behavior."
+ },
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/transformer_cosmos3.py",
+  "line": 1376,
+  "summary": "Add a docstring to `sound_latent_frames_for_sequence_parallel` documenting its purpose, parameter, return invariant, and no-masking behavior."
+ },
+ {
+  "file": "tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py",
+  "line": 864,
+  "summary": "Add pipeline-level tests for `_prepare_sound_latents` with `sp_video_shape` to cover the new SP-padding branch."
+ }
+]

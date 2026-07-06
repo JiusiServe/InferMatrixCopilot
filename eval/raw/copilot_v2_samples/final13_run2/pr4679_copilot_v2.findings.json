@@ -1,0 +1,17 @@
+[
+ {
+  "file": "vllm_omni/entrypoints/openai/serving_speech.py",
+  "line": 4063,
+  "summary": "Add a unit test that sends word_timestamps=true with stream_format='sse' and response_format='pcm' and asserts a 400/422 rejection, because the check was moved to a broader is_streaming() condition and no test covers it."
+ },
+ {
+  "file": "tests/e2e/online_serving/test_qwen3_tts_customvoice.py",
+  "line": 96,
+  "summary": "Add at least one e2e test that sends stream=true without stream_format and validates SSE speech.audio.delta events, since all existing e2e tests use stream_format='audio'."
+ },
+ {
+  "file": "tests/entrypoints/openai_api/test_serving_speech.py",
+  "line": 3042,
+  "summary": "Add a sibling test test_wav_sse_streaming in TestStreamingResponse that sends stream=true, response_format='wav' (no stream_format) and asserts text/event-stream with WAV response_format in delta payloads, as the old WAV streaming test was converted to use stream_format='audio'."
+ }
+]

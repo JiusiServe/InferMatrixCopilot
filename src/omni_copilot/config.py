@@ -62,8 +62,10 @@ class Settings(BaseSettings):
     ensemble_parallel: bool = True      # lenses are independent — run concurrently
     ensemble_samples_per_lens: int = 1  # >1 buys union recall at ~linear cost;
                                         # measured: 2x cost, no recall gain (eval iter-3)
-    ensemble_lens_max_iters: int = 8    # per-lens tool budget (lenses are narrower)
-    ensemble_merge_evidence_chars: int = 50_000  # the merger has no tools
+    ensemble_lens_max_iters: int = 6    # per-lens tool budget — replicate means
+                                        # dropped when this was cut to 4 (recall
+                                        # starvation); 6 is the measured setting
+    ensemble_merge_evidence_chars: int = 35_000
 
     # Patch-review trigger thresholds
     large_diff_lines: int = 400

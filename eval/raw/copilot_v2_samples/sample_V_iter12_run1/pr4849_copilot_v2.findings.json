@@ -1,0 +1,12 @@
+[
+ {
+  "file": "vllm_omni/engine/orchestrator.py",
+  "line": 1029,
+  "summary": "ar2diffusion return type changed from list[dict] to dict|None; requested to run pytest regression test if not already in CI."
+ },
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 98,
+  "summary": "Unused 'requires_multimodal_data' parameter in ar2diffusion function; remove unused parameter or implement conditional forwarding guard."
+ }
+]

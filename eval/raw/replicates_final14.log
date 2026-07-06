@@ -1,0 +1,41 @@
+=== replicate 1/3 (final14) ===
+[run ] PR 4678 · copilot_v2
+[extr] PR 4678 · copilot_v2
+[vald] PR 4678 · copilot_v2
+[covr] PR 4678 · copilot_v2
+[run ] PR 4679 · copilot_v2
+[extr] PR 4679 · copilot_v2
+[vald] PR 4679 · copilot_v2
+[covr] PR 4679 · copilot_v2
+[run ] PR 4849 · copilot_v2
+[extr] PR 4849 · copilot_v2
+[vald] PR 4849 · copilot_v2
+[covr] PR 4849 · copilot_v2
+done -> /rebase/vllm-omni-copilot/eval/RESULTS.md
+jury: ['deepseek-v4-pro', 'deepseek-v4-flash']; claims: deepseek-v4-flash
+PR 4678: 14 pseudo-references
+[judge] PR 4678 · pure_copilot (2 findings)
+[judge] PR 4678 · copilot_skill (0 findings)
+[judge] PR 4678 · claudecode_skill (3 findings)
+[judge] PR 4678 · claudecode_opus_skill (1 findings)
+[judge] PR 4678 · copilot_v2 (2 findings)
+PR 4679: 14 pseudo-references
+[judge] PR 4679 · pure_copilot (2 findings)
+[judge] PR 4679 · copilot_skill (2 findings)
+[judge] PR 4679 · claudecode_skill (1 findings)
+[judge] PR 4679 · claudecode_opus_skill (2 findings)
+[judge] PR 4679 · copilot_v2 (3 findings)
+Traceback (most recent call last):
+  File "/rebase/vllm-omni-copilot/eval/run_eval_v2.py", line 352, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/rebase/vllm-omni-copilot/eval/run_eval_v2.py", line 288, in main
+    cost = json.loads((RAW / f"pr{pr}_{arm}.cost.json").read_text())
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/pathlib.py", line 1027, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/pathlib.py", line 1013, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/rebase/vllm-omni-copilot/eval/raw/pr4679_copilot_v2.cost.json'

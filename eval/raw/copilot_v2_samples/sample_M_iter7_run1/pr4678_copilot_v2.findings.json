@@ -1,0 +1,12 @@
+[
+ {
+  "file": "tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py",
+  "line": 864,
+  "summary": "The pipeline test mocks _prepare_sound_latents with a lambda that ignores sp_video_shape, so the pad logic is never exercised in pipeline integration; add an integration test or adjust the mock to pass through the method."
+ },
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/transformer_cosmos3.py",
+  "line": 1367,
+  "summary": "The error message advises users to adjust sound duration or sound latent FPS, but sound is now auto-padded; update the message to clarify that sound is handled automatically."
+ }
+]

@@ -1,0 +1,27 @@
+[
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 98,
+  "summary": "Gate multimodal-data forwarding behind requires_multimodal_data or remove unused parameter."
+ },
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 175,
+  "summary": "Wrap len(generated_token_ids) with None check to avoid TypeError."
+ },
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 103,
+  "summary": "Update docstring for requires_multimodal_data to reflect unconditional forwarding or remove entry."
+ },
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 206,
+  "summary": "Add test for multi_modal_data forwarding to prevent silent conditioning failure."
+ },
+ {
+  "file": "vllm_omni/model_executor/stage_input_processors/hunyuan_image3.py",
+  "line": 220,
+  "summary": "Add test for sampling-params forwarding to ensure seed and guidance_scale are passed."
+ }
+]

@@ -1,0 +1,17 @@
+[
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/transformer_cosmos3.py",
+  "line": 1376,
+  "summary": "The method `sound_latent_frames_for_sequence_parallel` is missing a docstring; add one explaining its purpose, the padding formula, and the sequence divisibility guarantee."
+ },
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/pipeline_cosmos3.py",
+  "line": 1666,
+  "summary": "The method `_prepare_sound_latents` lacks a docstring for its new parameters `sp_video_shape` and `sp_num_vision_items`; add a description of these parameters and their roles."
+ },
+ {
+  "file": "tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py",
+  "line": 864,
+  "summary": "Add a test sub-case for `_prepare_sound_latents` that passes `sp_video_shape=(1,2,2)` to cover the sequence parallel path and verify correct padding."
+ }
+]

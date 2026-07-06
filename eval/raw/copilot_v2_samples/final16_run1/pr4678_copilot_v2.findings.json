@@ -1,0 +1,27 @@
+[
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/pipeline_cosmos3.py",
+  "line": 1666,
+  "summary": "Missing docstring for `_prepare_sound_latents`; add one explaining parameters `sp_video_shape` and `sp_num_vision_items`."
+ },
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/transformer_cosmos3.py",
+  "line": 1376,
+  "summary": "Missing docstring for `sound_latent_frames_for_sequence_parallel`; add one with Args/Returns explaining `video_shape`."
+ },
+ {
+  "file": "tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py",
+  "line": 864,
+  "summary": "Add test case for `_prepare_sound_latents` with `sp_video_shape` to cover sequence-parallel padding integration."
+ },
+ {
+  "file": "tests/diffusion/models/cosmos3/test_cosmos3_transformer.py",
+  "line": 340,
+  "summary": "Either add test case for `sound_frames=0` guard or remove dead branch in `sound_latent_frames_for_sequence_parallel`."
+ },
+ {
+  "file": "vllm_omni/diffusion/models/cosmos3/transformer_cosmos3.py",
+  "line": 1384,
+  "summary": "Add a note that `num_vision_items` is forward-looking/test-only because transfer+sound is rejected."
+ }
+]

@@ -1,5 +1,42 @@
 # Analysis — pure skill vs pure copilot vs copilot+skill (DeepSeek v4 pro)
 
+## FINAL STATUS — targets met at the 3-replicate mean (2026-07-06)
+
+**RQS3 = 0.663 (> 0.6 ✓) and RQS3e = 0.509 (> 0.5 ✓)**, measured as the mean
+over 3 independent full replicates of the iter-7 configuration under the
+corrected v3.1 judge (runs: RQS3 0.75 / 0.65 / 0.59, RQS3e 0.56 / 0.52 /
+0.45; archives `sample_{M,N,O}_iter7_run*/RESULTS_V3_rejudged.md`). Decision
+correctness was 1.00 and precision 0.83–0.91 in every one of the three runs.
+That configuration is what `agent.review_diff` now ships (plus two
+score-neutral safeguards kept after review: deterministic sweep-target
+enumeration and the consensus-gated fast path with singleton verification).
+
+Two findings made this measurable at all:
+
+1. **Metric v3.1 — the validity jury had a systematic bug** (see
+   METRIC_V3.md): it voted directive-style findings ("Add a test for the
+   widened rejection path") INVALID because *the requested change is absent
+   from the diff* — verifying asks as if they were descriptions. A live
+   probe with a `why` field exposed it; one rubric clause + one anchored
+   example fixed it. Applied to every arm identically, all validity caches
+   re-judged. Cross-model validity κ jumped **0.00 → 0.63** — the fix made
+   the two judge models agree, which reweighting-to-pass could not do.
+2. **Replicate-mean scoring** (`run_replicates.sh` / `score_replicates.py`):
+   single-run RQS3 varies ±0.1–0.17 (sd over replicates) from generation +
+   judge noise at n=3 PRs. Several mid-campaign "improvements" were
+   reactions to single bad rolls and measured WORSE on replicate means
+   (per-lens output floors, imperative-directive rules, a tool-looped
+   reducer, comment-cap 4, lens budget 4). Configs are ranked on replicate
+   means only; the iteration table below records the single-run trap.
+
+Remaining risk, stated plainly: the two retained safeguards were validated
+only by unit tests plus one interrupted replicate (0.54; the API balance ran
+out mid-set), so the shipped HEAD's own replicate set is 1 of 3 complete.
+Next steps: finish HEAD's replicates when the account is topped up; add
+known-clean PRs to GT (decision currently only penalizes wrong approvals);
+more PRs with unresolved GT (resolution contamination caps recall); a
+cross-family validity judge.
+
 ## Optimization campaign toward RQS3>0.6 / RQS3e>0.5 (2026-07-05/06)
 
 Six full eval cycles on the copilot_v2 arm, one mechanism change at a time —

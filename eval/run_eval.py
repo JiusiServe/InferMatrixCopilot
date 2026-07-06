@@ -99,6 +99,7 @@ class CountingLLM:
         self.calls = 0
         self.input_tokens = 0
         self.output_tokens = 0
+        self.cache_read_tokens = 0
         self._lock = threading.Lock()
 
     def create(self, **kwargs):
@@ -108,6 +109,8 @@ class CountingLLM:
             if reply.usage:
                 self.input_tokens += reply.usage.get("input_tokens", 0)
                 self.output_tokens += reply.usage.get("output_tokens", 0)
+                self.cache_read_tokens += reply.usage.get(
+                    "cache_read_input_tokens", 0)
         return reply
 
 
@@ -385,7 +388,9 @@ def main() -> int:
                     "seconds": round(time.time() - t0, 1),
                     **(cc_cost or {"calls": counting.calls,
                                    "input_tokens": counting.input_tokens,
-                                   "output_tokens": counting.output_tokens}),
+                                   "output_tokens": counting.output_tokens,
+                                   "cache_read_tokens":
+                                       counting.cache_read_tokens}),
                 }))
             results[pr][arm] = {"review": out_file.read_text(),
                                 "cost": json.loads(cost_file.read_text())}
