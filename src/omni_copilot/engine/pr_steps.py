@@ -199,6 +199,10 @@ async def _verify_module(ctx: StepContext) -> StepResult:
         messages=[{"role": "user", "content":
                    f"Module: {module}\n<untrusted_data>\n{diff[:50_000]}\n</untrusted_data>"}],
     )
+    if reply.usage:  # plain-LLM call — trace usage for the run's cost metrics
+        ctx.trace.record("llm_usage", step="agent.verify_module",
+                         input_tokens=reply.usage.get("input_tokens", 0),
+                         output_tokens=reply.usage.get("output_tokens", 0))
     text = reply.text.strip()
     if text.upper().startswith("PROBLEM"):
         return StepResult(False, FailureKind.REPLAN, f"{module}: {text[:400]}")
@@ -236,6 +240,12 @@ async def _pr_fetch_ci_failures(ctx: StepContext) -> StepResult:
     if code != 0:
         return StepResult(False, FailureKind.BLOCKED, f"gh pr checks failed: {out[:400]}")
     checks = json.loads(out or "[]")
+    # full pre-fix snapshot (not just failures): the F2P/P2P metric needs the
+    # before-state to compare a post-push snapshot against (METRICS_RESEARCH §2)
+    snapshot = {c.get("name", "?"): (c.get("bucket") or c.get("state", ""))
+                for c in checks}
+    ctx.state["ci_check_snapshot"] = snapshot
+    ctx.trace.record("ci_check_snapshot", when="pre_fix", checks=snapshot)
     failing = [c for c in checks if c.get("bucket") == "fail"
                or c.get("state", "").upper() in ("FAILURE", "ERROR")]
     ctx.state["ci_failures"] = [
@@ -325,7 +335,14 @@ def _post_step(state_key: str, gh_args: staticmethod, what: str):
         code, out = _gh(args, cwd=repo)
         if code != 0:
             return StepResult(False, FailureKind.ESCALATE, f"posting failed: {out[:400]}")
-        return StepResult(True, summary=f"posted {what}")
+        # gh prints the comment URL — record it so the feedback collector can
+        # track resolution/reactions on exactly what we posted (metrics `useful`)
+        url_match = re.search(r"https://\S+", out or "")
+        url = url_match.group(0) if url_match else ""
+        ctx.trace.record("posted_artifact", what=what, url=url,
+                         pr=spec.get("pr"), issue=spec.get("issue"))
+        return StepResult(True, summary=f"posted {what}",
+                          outputs={"url": url} if url else {})
     return handler
 
 

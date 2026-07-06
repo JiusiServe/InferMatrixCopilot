@@ -159,6 +159,21 @@ class Copilot:
                             trace=trace, llm=self.llm, notifier=notifier)
         outcome = asyncio.run(executor.run(playbook, state))
 
+        if self.settings.metrics_enabled:
+            try:  # metrics are facts about the run; never let them break it
+                from .metrics import collect_run_metrics
+                m = collect_run_metrics(run_dir, self.settings, outcome.status)
+                cost, risk = m["cost"], m["risk"]
+                catq = m["catq"]
+                print(f"  metrics: usd≈{cost['usd']:.2f} "
+                      f"{cost['minutes']:.1f}min S={risk['safety_multiplier']:.2f}"
+                      + (f" CATQ={catq:.3f}"
+                         + ("*" if m["quality"]["partial"] else "")
+                         if catq is not None else "")
+                      + f"  ({run_dir / 'metrics.json'})")
+            except Exception as exc:
+                trace.record("metrics_error", error=f"{type(exc).__name__}: {exc}")
+
         for step_id, r in outcome.step_results.items():
             mark = style("✓", "green") if r.ok else style("✗", "red", "bold")
             print(f"  {mark} {step_id}: {r.summary}")

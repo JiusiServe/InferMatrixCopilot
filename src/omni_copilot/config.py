@@ -72,6 +72,23 @@ class Settings(BaseSettings):
     large_diff_files: int = 8
     high_risk_modules: list[str] = ["worker_runner", "model_executor", "scheduler"]
 
+    # Metrics (eval/METRICS_RESEARCH.md) — per-run metrics.json: CATQ = Q·S/C.
+    # Reference budgets are EXPLICIT deployment assumptions (RQS3e precedent):
+    # at the ref cost the log discount is ~23%; raise a ref where that
+    # resource is nearly free in your deployment.
+    metrics_enabled: bool = True
+    token_price_in_per_mtok: float = 0.0   # 0 -> metrics.MODEL_PRICES table
+    token_price_out_per_mtok: float = 0.0
+    ci_rate_usd_per_min: float = 0.0       # billed CI $/min, folded into usd
+    cost_ref_usd: dict[str, float] = {
+        "default": 1.0, "pr_review": 1.0, "pr_debug": 3.0, "pr_rebase": 3.0,
+        "repo_rebase": 10.0, "issue_answer": 0.30, "issue_filter": 0.10,
+    }
+    cost_ref_min: dict[str, float] = {
+        "default": 10.0, "pr_review": 10.0, "pr_debug": 30.0, "pr_rebase": 30.0,
+        "repo_rebase": 240.0, "issue_answer": 5.0, "issue_filter": 2.0,
+    }
+
     # Escalation email
     notify_email: str = ""
     resend_api_key: str = ""

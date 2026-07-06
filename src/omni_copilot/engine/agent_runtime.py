@@ -509,6 +509,8 @@ async def run_agent_step_ensemble(
         messages=[{"role": "user", "content": merge_prompt}],
         max_tokens=max(6000, ctx.settings.llm_max_tokens))
     reply_text = reply.text
+    reduce_in = (reply.usage or {}).get("input_tokens", 0)
+    reduce_out = (reply.usage or {}).get("output_tokens", 0)
     try:  # archive the reduction exchange — reducer failures are hard to debug
         ctx.run_dir.mkdir(parents=True, exist_ok=True)
         (ctx.run_dir / f"ensemble_{step_name.replace('/', '_')}.json").write_text(
@@ -526,6 +528,8 @@ async def run_agent_step_ensemble(
                         + json.dumps(reduce_contract, ensure_ascii=False)),
                 messages=[{"role": "user", "content": str(reply_text)[:20_000]}],
                 max_tokens=max(6000, ctx.settings.llm_max_tokens))
+            reduce_in += (fix.usage or {}).get("input_tokens", 0)
+            reduce_out += (fix.usage or {}).get("output_tokens", 0)
             obj = parse_json_reply(fix.text)
             if isinstance(obj, dict) and isinstance(obj.get("verdicts"), list):
                 reduced = obj
@@ -570,6 +574,8 @@ async def run_agent_step_ensemble(
         candidates=len(candidates),
         merged=len(merged.get(merge_key) or []),
         dropped=len(dropped),
-        verified=verified)
+        verified=verified,
+        # reducer-call usage (lens usage is on each lens's agent_output event)
+        input_tokens=reduce_in, output_tokens=reduce_out)
     prefix = f"[ensemble x{len(samples)}] "
     return _to_step_result(merged, prefix), merged

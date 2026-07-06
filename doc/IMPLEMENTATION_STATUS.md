@@ -107,6 +107,27 @@ Six-cycle optimization campaign (eval/ANALYSIS.md "Optimization campaign"):
   (a single-lens singleton always faces the reducer — a fabricated-evidence
   blocker once sailed through unverified).
 
+### Run metrics — CATQ machinery (2026-07-06)
+`metrics.py` implements eval/METRICS_RESEARCH.md's cross-task framework:
+`CATQ = Q·S/C` per run, written to `<run-dir>/metrics.json` after every run
+(cli, `metrics_enabled`, failures never break the run). Q = weighted
+arithmetic mean per task kind over KNOWN components only (renormalized,
+`partial` flagged; judged/GT components are merged later via
+`extra_components` — never fabricated); fixed safe-abstain scores
+(rebase 0.35 / answer 0.30 / debug 0.25) on escalated-blocked runs. S =
+geometric per-incident decay (severe 0.5, moderate 0.8, minor 0.95), hard
+zero on catastrophic; incidents derive from explicit `incident` events
+(`record_incident`) plus existing out_of_scope_edit/tool_refused/
+patch_review-revise. C = RQS3e-style log cost index over USD (price table +
+settings overrides, CI minutes·rate) and wall-clock vs per-task reference
+budgets (settings.cost_ref_usd/min). Instrumentation added: posted_artifact
+events (comment URL) on real posts, pre-fix ci_check_snapshot in
+pr.fetch_ci_failures (F2P/P2P before-state), reducer token usage on
+agent_ensemble events, llm_usage on agent.verify_module. Offline tests in
+test/test_metrics.py. Not yet built (per the doc's roadmap): the gh feedback
+collector filling useful/accepted/conflict online, post-push CI snapshot,
+per-hunk conflict records, dashboards.
+
 ## Repo-rebase promotion path (native candidate -> default)
 
 1. Nightly keeps resolving the locked `repo-rebase` (candidates are invisible
