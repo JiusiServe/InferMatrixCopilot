@@ -1,0 +1,23 @@
+# Repo profile establishment — design v2 §V2.3.3 Stages 0-1.5. Read-only
+# toward the target repo; writes only plugins/<repo>/ (knowledge). The result
+# is a DRAFT: human review flips plugin status and promotes facts (Stage 2).
+# Repo-neutral by design: `repos: []` matches any repo without its own
+# override — this is the playbook that onboards repo #2.
+name: repo-profile
+version: 1
+status: active
+provenance:
+  created_by: human
+  source: design v2 repo-profile pipeline (fingerprint -> deterministic drafts
+    -> human-doc ingestion -> evidence-gated profiling agent)
+task_kinds: [repo_profile]
+repos: []
+params: {}
+steps:
+  - {id: fingerprint, step: profile.fingerprint}
+  - {id: structure, step: profile.structure_scan}
+  - {id: ingest, step: profile.ingest_docs}
+  - {id: derive, step: agent.profile_repo, when: not report_only}
+  - {id: report, step: report.final_summary}
+success: draft plugin + evidence-cited profile facts + PROFILE_REPORT.md;
+  human review gate before any promotion

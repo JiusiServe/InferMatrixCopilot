@@ -277,12 +277,10 @@ def test_plugin_zero_declares_risk_tiers():
 # list can only shrink. A new repo-specific literal anywhere else fails.
 _KNOWN_LEAKS = {
     "__init__.py": 1,            # package docstring
-    "chat.py": 1,                # chat system prompt names the repo
     "config.py": 3,              # default_repo + rebase_agent_root default
-    "engine/agent_runtime.py": 1,  # governed-step system prompt names the repo
-    "engine/builtin_steps.py": 3,  # review prompt + issue-step purposes
+    "engine/builtin_steps.py": 1,  # orchestrator-not-found hint (delegation)
     "engine/rebase_native_steps.py": 6,  # parent-package delegation (by design)
-    "intent.py": 2,              # parser docstring + default_repo
+    "intent.py": 2,              # parse_* default_repo parameter defaults
     "rebase/monitor.py": 1,      # locked-pipeline delegation (by design)
     "task_spec.py": 1,           # TaskSpec.repo default
 }

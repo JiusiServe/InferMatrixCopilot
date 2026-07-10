@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 TaskKind = Literal[
     "repo_rebase", "pr_rebase", "pr_debug", "pr_review", "issue_answer", "issue_filter",
+    "repo_profile",
 ]
 
 READ_ONLY_KINDS: frozenset[str] = frozenset({"pr_review", "issue_answer", "issue_filter"})
@@ -24,6 +25,9 @@ KIND_TIER: dict[str, str] = {
     "pr_review": "L2",
     "issue_answer": "L2",
     "issue_filter": "L2",
+    # profile establishment reads the target repo but writes knowledge
+    # (plugins/<repo>/) — confirm-gated like other write-capable kinds
+    "repo_profile": "L2",
 }
 
 

@@ -292,7 +292,7 @@ async def _issue_fetch(ctx: StepContext) -> StepResult:
 # arm precise; a domain checklist fixes topicality; a verify-and-rewrite pass
 # fixes actionability (the skill-injected arm's weakest score).
 
-_REVIEW_SYSTEM = """You review vLLM-Omni pull requests like an engaged maintainer: grounded, \
+_REVIEW_SYSTEM = """You review pull requests like an engaged maintainer: grounded, \
 specific, and useful — real reviewers leave nits and doc asks, not just blockers.
 
 Sweep EVERY item of this checklist. The `sweep_targets` evidence enumerates the diff's \
@@ -418,16 +418,25 @@ _REVIEW_MERGE = (
 _SEVERITY_ORDER = {"blocker": 0, "major": 1, "minor": 2, "nit": 3}
 
 
-def _sweep_targets(diff: str) -> str:
+def _sweep_targets(diff: str, language: str = "python") -> str:
     """Deterministic sweep targets extracted from the diff's added lines.
 
     Injected as evidence so lens coverage of the ENUMERABLE classes (index
     assumptions, new branches, untested files) never depends on the model
     enumerating the diff itself — stochastic self-enumeration was the
     highest-variance link in review recall (whole classes silently skipped
-    on some runs)."""
+    on some runs).
+
+    The line-level extractors are language-keyed (from the repo profile);
+    an unknown language degrades to the file-level sections only — recorded
+    honestly instead of running Python heuristics on foreign syntax."""
     import re
 
+    line_rules = {
+        "python": (re.compile(r"\w\[\s*0\s*\]|\.pop\(0\)|next\(iter\("),
+                   re.compile(r"(el)?if\b|else\b")),
+    }
+    rules = line_rules.get(language)
     current: str | None = None
     new_line = 0
     subs: list[str] = []
@@ -446,10 +455,11 @@ def _sweep_targets(diff: str) -> str:
         elif current and line.startswith("+") and not line.startswith("+++"):
             code = line[1:]
             stripped = code.strip()
-            if re.search(r"\w\[\s*0\s*\]|\.pop\(0\)|next\(iter\(", code):
-                subs.append(f"{current}:{new_line} `{stripped[:90]}`")
-            if re.match(r"(el)?if\b|else\b", stripped):
-                branches.append(f"{current}:{new_line} `{stripped[:90]}`")
+            if rules is not None:
+                if rules[0].search(code):
+                    subs.append(f"{current}:{new_line} `{stripped[:90]}`")
+                if rules[1].match(stripped):
+                    branches.append(f"{current}:{new_line} `{stripped[:90]}`")
             new_line += 1
         elif current and not line.startswith("-"):
             new_line += 1
@@ -538,16 +548,35 @@ async def _review_diff(ctx: StepContext) -> StepResult:
     if not diff:
         return StepResult(False, FailureKind.BLOCKED, "no diff_text in state")
     spec = ctx.state.get("task_spec") or {}
+
+    # repo knowledge from the profile, not the core (design §V2.2.2): domain
+    # checklist extension + the language key for the sweep extractors
+    from .agent_runtime import _resolve_plugin
+    plugin = _resolve_plugin(ctx)
+    language = "python"
+    guidance = _REVIEW_SYSTEM
+    if plugin is not None:
+        language = str(plugin.manifest.get("repo", {}).get("language")
+                       or "python")
+        review_md = plugin.profile_dir / "review.md"
+        try:
+            if review_md.exists():
+                guidance += ("\n\n## Repo-specific review checklist "
+                             "(from the repo profile)\n"
+                             + review_md.read_text(encoding="utf-8")[:4_000])
+        except OSError:
+            pass
+
     common = dict(
         step_name="agent.review_diff",
         purpose=f"Review PR #{spec.get('pr')} like an engaged maintainer: "
                 "grounded, specific, useful findings.",
-        guidance=_REVIEW_SYSTEM,
+        guidance=guidance,
         expected="review_comments with file/line/severity/comment/evidence; "
                  "APPROVE-equivalent = empty review_comments with a summary.",
         evidence={"pr_diff": str(diff),
                   "gate_report": ctx.state.get("gate_report", ""),
-                  "sweep_targets": _sweep_targets(str(diff))},
+                  "sweep_targets": _sweep_targets(str(diff), language)},
         output_extension={"review_comments":
                           "list of {file, line, severity: blocker|major|minor|nit, "
                           "comment, evidence}"},
@@ -694,7 +723,7 @@ def register_builtin_steps(registry: StepRegistry) -> StepRegistry:
     add(StepSpec("agent.draft_issue_answer", "agent", "read",
                  _issue_agent_step(
                      "agent.draft_issue_answer",
-                     "Draft a helpful, factual answer to the vLLM-Omni issue.",
+                     "Draft a helpful, factual answer to the repository issue.",
                      "Ground every claim in the issue text or code you actually "
                      "read (use your repo tools). Never invent APIs; say plainly "
                      "when unsure. The draft is never auto-posted.",
@@ -716,8 +745,10 @@ def register_builtin_steps(registry: StepRegistry) -> StepRegistry:
                  tool_scope=read_only_scope()))
 
     from .pr_steps import register_pr_steps  # late import: pr_steps imports helpers above
+    from .profile_steps import register_profile_steps
     from .rebase_native_steps import register_rebase_native_steps
 
     register_pr_steps(registry)
     register_rebase_native_steps(registry)
+    register_profile_steps(registry)
     return registry

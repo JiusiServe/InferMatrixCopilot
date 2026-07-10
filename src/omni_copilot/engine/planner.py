@@ -81,7 +81,10 @@ class Planner:
                 f"no playbook for write-capable task '{spec.kind}' — generation is "
                 "not allowed for code-modifying tasks (L0/L1 only); escalate"
             )
-        template = _GENERATE_TEMPLATES[spec.kind]
+        template = _GENERATE_TEMPLATES.get(spec.kind)
+        if template is None:
+            raise PlanningError(
+                f"no playbook and no generate template for '{spec.kind}' — escalate")
         steps = []
         for step_id, step_name in template:
             s = self.registry.get(step_name)

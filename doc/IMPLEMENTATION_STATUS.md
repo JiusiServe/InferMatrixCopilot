@@ -179,10 +179,29 @@ never lose cited evidence; superseded text → `history`), merge stubs,
 staleness as status, `ops_log.jsonl`, PROFILE_REPORT.md, and the
 word-budgeted `render_briefing()` (briefing channel only). Wired:
 `RepoPlugin.profile_dir`/`briefing()` and the `## REPO BRIEFING` section in
-`AgentDispatchContext` (`test/test_profile_store.py`). Still to do in P1:
-Stage-0/1 establishment agents + Stage-1.5 redundancy filter,
-review/sweep/intent parameterization off the profile. P2 (repo-neutral
-execution), P3 (measured invariance): not started — see doc/DESIGN.md §V2.4.
+`AgentDispatchContext` (`test/test_profile_store.py`).
+
+**P1 establishment pipeline (2026-07-10, done):** new task kind
+`repo_profile` (L2, confirm-gated knowledge writes) + the repo-neutral
+`repo-profile` playbook (`repos: []` — the playbook that onboards repo #2):
+`profile.fingerprint` (Stage 0; draft plugin for unknown repos, stops at
+`status: draft`), `profile.structure_scan` (deterministic module draft,
+never overwrites declared modules), `profile.ingest_docs` (AGENTS.md/
+CLAUDE.md/copilot-instructions bullets → human-source briefing facts),
+`agent.profile_repo` (governed Stage-1 agent: non-obvious facts only,
+evidence-cited or rejected, typed-op applied; optional
+`profile/review.md` checklist; graceful no-LLM skip). Stage 1.5 redundancy
+filter (`profiles/establish.py`): 6-word-shingle containment against
+README+docs — doc-redundant briefing facts are dropped (ETH-study rule).
+Prompt de-leak: review/agent-runtime/chat prompts are repo-neutral;
+`agent.review_diff` pulls the domain checklist from the repo profile and
+keys `_sweep_targets` extractors on `repo.language` (unknown language →
+file-level sweep only, recorded honestly). Leak ceilings tightened in
+`test_v2_p0.py`. Tests: `test_profile_steps.py` (12) + suite green (185).
+
+P2 (repo-neutral playbook matching, CI/forge adapters, capability-gap
+degradation, repo_map tool), P3 (cross-repo eval + profile ablation +
+consolidation/judge loops): not started — see doc/DESIGN.md §V2.4.
 
 ## Deliberate v1 boundaries
 - Playbooks are ordered step lists with `foreach` fan-out and `when:` conditions —

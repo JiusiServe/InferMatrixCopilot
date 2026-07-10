@@ -38,6 +38,7 @@ _KIND_HINTS: list[tuple[str, tuple[str, ...]]] = [
     ("issue_answer", ("answer", "reply", "respond", "回答")),
     ("issue_filter", ("triage", "filter", "classify", "label", "分类")),
     ("repo_rebase", ("rebase",)),
+    ("repo_profile", ("profile", "onboard", "bootstrap")),
 ]
 
 
@@ -107,7 +108,7 @@ def _parse_deterministic(text: str, default_repo: str) -> IntentResult | None:
                 continue
             if kind.startswith("issue_") and not issue and kind != "issue_filter":
                 continue
-            if kind == "repo_rebase" and pr:
+            if kind.startswith("repo_") and pr:
                 continue
             if kind not in matched:
                 matched.append(kind)
@@ -130,7 +131,8 @@ def _parse_deterministic(text: str, default_repo: str) -> IntentResult | None:
 
 
 _LLM_SYSTEM = """You convert one user command for a repo-maintenance copilot into JSON.
-Task kinds: repo_rebase, pr_rebase, pr_debug, pr_review, issue_answer, issue_filter.
+Task kinds: repo_rebase, pr_rebase, pr_debug, pr_review, issue_answer, issue_filter,
+repo_profile (establish/refresh the repo's profile).
 Output ONLY JSON:
 {"kind": "...", "pr": int|null, "issue": int|null, "report_only": bool, "post": bool,
  "confidence": 0.0-1.0, "clarify": "question if ambiguous else empty"}

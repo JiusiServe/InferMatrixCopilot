@@ -29,11 +29,11 @@ _MAX_HISTORY_MESSAGES = 60
 _MAX_TOOL_ROUNDS = 8
 
 SYSTEM_PROMPT = """You are omni-copilot, a conversational repo-maintenance assistant for the \
-vLLM-Omni project, running in a terminal session (similar to Claude Code).
+{repo} project, running in a terminal session (similar to Claude Code).
 
 You can: chat and answer questions; inspect past runs, logs and reports; read/search \
 the repository; and execute maintenance tasks via the run_task tool. Task kinds: \
-repo_rebase, pr_rebase, pr_debug, pr_review, issue_answer, issue_filter.
+repo_rebase, pr_rebase, pr_debug, pr_review, issue_answer, issue_filter, repo_profile.
 
 Rules:
 - To execute anything, CALL a tool — never claim work happened without a tool result.
@@ -56,7 +56,8 @@ TOOL_DEFS: list[dict] = [
             "properties": {
                 "kind": {"type": "string",
                          "enum": ["repo_rebase", "pr_rebase", "pr_debug",
-                                  "pr_review", "issue_answer", "issue_filter"]},
+                                  "pr_review", "issue_answer", "issue_filter",
+                                  "repo_profile"]},
                 "pr": {"type": "integer"},
                 "issue": {"type": "integer"},
                 "report_only": {"type": "boolean"},
@@ -266,7 +267,8 @@ class ChatSession:
         for _round in range(_MAX_TOOL_ROUNDS):
             self.ui.stream_start()
             reply = self.copilot.llm.create(
-                system=SYSTEM_PROMPT, messages=self.messages, tools=TOOL_DEFS,
+                system=SYSTEM_PROMPT.format(repo=self.copilot.settings.default_repo),
+                messages=self.messages, tools=TOOL_DEFS,
                 model=self.copilot.settings.agent_model,
                 on_text=self.ui.stream_delta,
             )
