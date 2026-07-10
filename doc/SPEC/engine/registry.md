@@ -7,7 +7,7 @@
 resolves to a handler.
 
 ## Functionality
-`register`/`get`/`__contains__`/`names`/`read_only_names`.
+`register`/`get`/`__contains__`/`names`.
 
 ## Public contract
 `StepRegistry` with the methods above.

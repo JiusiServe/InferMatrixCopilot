@@ -8,7 +8,7 @@ but out-of-scope (write inside writable but outside the module's primary files
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from fnmatch import fnmatch
 from pathlib import Path
 

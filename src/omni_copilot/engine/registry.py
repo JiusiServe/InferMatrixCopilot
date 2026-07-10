@@ -26,6 +26,3 @@ class StepRegistry:
 
     def names(self) -> list[str]:
         return sorted(self._steps)
-
-    def read_only_names(self) -> list[str]:
-        return sorted(n for n, s in self._steps.items() if s.risk in ("read", "report"))

@@ -6,7 +6,6 @@ the wiring that turns argv/stdin into calls on it.
 from __future__ import annotations
 
 import argparse
-import sys
 
 from ..intent import parse_intents
 from .copilot import Copilot
