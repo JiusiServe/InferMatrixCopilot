@@ -69,10 +69,35 @@ cli.py:main            解析参数;单次 -p / chat / REPL
 
 ## 3. 执行 —— 引擎底座
 
-- **`engine/step.py`**(约 70 行,建议通读)。核心词汇:`StepSpec`
-  (name/kind/risk/handler)、`StepResult`(ok + 带类型的 `FailureKind`)、
+引擎按执行顺序分散在 §2–§5 讲(planner 在"规划",runtime 在"核心",
+steps 在"库")。先给 `engine/` 目录一个整体清单,再逐个深入:
+
+```
+engine/
+  step.py          基础词汇: StepSpec / StepResult / StepContext /
+                   FailureKind / Kind / Risk(仅类型,无行为)         → §3
+  registry.py      StepRegistry: 名字 -> StepSpec 的注册表
+                   (名字解析成 handler 的唯一入口)                    → §3
+  executor.py      执行底座: checkpoint/resume、foreach、when:、
+                   类型化失败路由、state_updates 契约                 → §3
+  planner.py       reuse > adapt > generate + 能力匹配                → §2
+  agent_runtime.py 受治理 agent 运行时 + 评审 ensemble(核心)        → §4
+  steps/           vetted step 库,一个领域一个模块,自注册          → §5
+```
+
+引擎之下、被它调用的原始能力在 `omni_copilot/` 顶层(不在 `engine/` 内):
+`agent_loop.py`(工具循环)、`tools.py`(原子能力 + dispatch choke point)、
+`scopes.py`(工具/路径权限)、`push.py`(推送授权)——见 §4。
+
+- **`engine/step.py`**(约 60 行,建议通读)。核心词汇:`StepSpec`
+  (name/kind/risk/handler/description——去掉了没人读的 tool_scope/
+  patch_review_triggers)、`StepResult`(ok + 带类型的 `FailureKind`)、
   `StepContext`(handler 可触碰的一切)。六种失败类型走不同路由——这正是
-  重点。
+  重点。`risk` 会被 planner 强制(C2),`kind` 只是描述(`agent` ⇒ 走受治理
+  运行时,是约定)。
+- **`engine/registry.py`**(约 30 行)。`StepRegistry` = 一个 `dict[str,
+  StepSpec]`:`register` 存、`get` 取(未知名字大声报错)。它是"名字字符串
+  → handler"的**唯一**解析点;由 `steps.register_builtin_steps` 填充。
 - **`engine/executor.py`**(约 200 行,建议通读)。与任务无关的保证:
   每 step 的 checkpoint(`progress.json`)、`foreach` 扇出
   (asyncio.gather + `_merge`)、`when:` 条件、仅对 RETRYABLE 的有界重试、
