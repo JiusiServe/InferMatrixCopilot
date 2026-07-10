@@ -36,13 +36,15 @@ cli.py:main            解析参数;单次 -p / chat / REPL
   **kind 的属性**——不存在任何 LLM 或用户可设置来扩大权限的字段。
   `read_only`/`confirm_required` 由 kind + flag 推导。v2 新增 `repo_profile`
   kind(L2,因写入知识而需确认门禁)。
-- **`intent.py`**。先走确定性关键词解析器(`_KIND_HINTS` + PR/issue 正则),
-  LLM 解析仅作兜底,而且**歧义永远转为澄清提问**——绝不猜测执行。注意几处
-  守卫:没有 PR 号的 `pr_*` kind 永不匹配;有 PR 时 `repo_*` kind 拒绝匹配。
-  只有终端输入进入此函数——拉取的 GitHub 文本永不进入(指令通道与数据通道
-  分离,防 prompt 注入)。
-  由 `test/test_intent_taskspec.py`、
-  `test_profile_steps.py::test_intent_parses_profile_command` 固定。
+- **`intent.py`**(**LLM-only**)。分类完全交给 LLM:把一条终端命令转成
+  `TaskSpec`,**歧义/离题/注入 → 澄清提问**,绝不猜测执行(LLM 置信度
+  <0.7 或返回 clarify 即澄清;无 LLM 或空命令也澄清)。已去掉确定性关键词
+  解析器(`_KIND_HINTS`/`_parse_deterministic`)。仅保留 `parse_intents` 的
+  **复合命令切分**与 PR/issue **引用接续**("… then review it")——那是分句,
+  不是分类。只有终端输入进入此函数——拉取的 GitHub 文本永不进入(指令通道与
+  数据通道分离,防 prompt 注入)。
+  由 `test/test_intent_taskspec.py`(LLM 路径契约)、`test_phase_b.py`
+  (切分+接续,用 fake 分类器)固定。
 
 ## 2. 规划 —— reuse > adapt > generate,现已加入能力匹配
 

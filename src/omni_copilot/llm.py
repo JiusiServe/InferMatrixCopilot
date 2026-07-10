@@ -78,13 +78,20 @@ class LLM:
             tools=tools or [],
             max_tokens=max_tokens or self.settings.llm_max_tokens,
         )
-        if on_text is not None:
-            with self._client.messages.stream(**kwargs) as stream:
-                for delta in stream.text_stream:
-                    on_text(delta)
-                resp = stream.get_final_message()
-        else:
-            resp = self._client.messages.create(**kwargs)
+        from . import tracing
+
+        with tracing.span("llm", model=kwargs["model"],
+                          n_tools=len(kwargs["tools"])) as _sp:
+            if on_text is not None:
+                with self._client.messages.stream(**kwargs) as stream:
+                    for delta in stream.text_stream:
+                        _sp.mark_ttft()  # first streamed token = prefill done
+                        on_text(delta)
+                    resp = stream.get_final_message()
+            else:
+                resp = self._client.messages.create(**kwargs)
+            tracing.set_usage(_sp, getattr(resp, "usage", None),
+                              stop_reason=getattr(resp, "stop_reason", "") or "")
         blocks = []
         for b in resp.content:
             if b.type == "text":

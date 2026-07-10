@@ -1,9 +1,11 @@
-"""Intent parsing: natural language -> TaskSpec (design §3.Y.2).
+"""Intent parsing: natural language -> TaskSpec (design §3.Y.2), LLM-only.
 
-Deterministic parser first (fast, offline, injection-resistant); LLM assist for
-phrasing the deterministic parser can't handle. Ambiguity -> a clarifying
-question, never a guessed execution (§3.Y.4). Only terminal user input ever
-reaches this function — fetched PR/issue/CI text is data, not instructions.
+The LLM classifies one terminal command into a TaskSpec; ambiguity, an
+off-topic request, or an injection attempt -> a clarifying question, never a
+guessed execution (§3.Y.4). Only terminal user input ever reaches this
+function — fetched PR/issue/CI text is data, not instructions. Compound
+commands are split first, and each segment inherits the prior segment's
+PR/issue when it omits one ("… then review it").
 """
 
 from __future__ import annotations
@@ -25,43 +27,23 @@ class IntentResult:
         return self.spec is None
 
 
+# compound-command segmentation + reference carry-over (not classification)
 _COMPOUND_SPLIT = re.compile(r"\s*(?:;|,\s*then\b|\bthen\b|，然后|然后|接着|之后再|再帮我)\s*",
                              re.IGNORECASE)
 
 _PR = re.compile(r"(?:pr|pull request)\s*#?\s*(\d+)", re.IGNORECASE)
 _ISSUE = re.compile(r"issue\s*#?\s*(\d+)", re.IGNORECASE)
 
-_KIND_HINTS: list[tuple[str, tuple[str, ...]]] = [
-    ("pr_debug", ("debug", "fix ci", "ci fail", "failing ci", "fix the ci", "红", "修")),
-    ("pr_rebase", ("rebase",)),
-    ("pr_review", ("review",)),
-    ("issue_answer", ("answer", "reply", "respond", "回答")),
-    ("issue_filter", ("triage", "filter", "classify", "label", "分类")),
-    ("repo_rebase", ("rebase",)),
-    ("repo_profile", ("profile", "onboard", "bootstrap")),
-]
-
 
 def parse_intent(text: str, *, llm: LLM | None = None,
                  default_repo: str = "vllm-omni", model: str | None = None) -> IntentResult:
-    result = _parse_deterministic(text, default_repo)
-    if result is not None and result.spec is not None:
-        return result
-    # Deterministic parse is uncertain: let the LLM try before clarifying.
-    if llm is not None and llm.available:
-        llm_result = _parse_llm(text, llm, default_repo, model)
-        if llm_result.spec is not None:
-            return llm_result
-        if result is not None:  # keep the more specific deterministic question
-            return result
-        return llm_result
-    if result is not None:
-        return result
-    return IntentResult(clarify=(
-        "I couldn't map that to a task. Try e.g. 'rebase pr 123', 'debug the CI of "
-        "pr 123', 'review pr 123', 'answer issue 45', 'triage new issues', or "
-        "'rebase the repo'."
-    ))
+    if not text.strip():
+        return IntentResult(clarify="Empty command — what should I do?")
+    if llm is None or not llm.available:
+        return IntentResult(clarify=(
+            "Intent parsing needs an LLM, but none is configured — set "
+            "ANTHROPIC_API_KEY (or use the flag CLI / --playbook)."))
+    return _parse_llm(text, llm, default_repo, model)
 
 
 def parse_intents(text: str, *, llm: LLM | None = None,
@@ -89,45 +71,6 @@ def parse_intents(text: str, *, llm: LLM | None = None,
             last_issue = r.spec.issue or last_issue
         results.append(r)
     return results
-
-
-def _parse_deterministic(text: str, default_repo: str) -> IntentResult | None:
-    t = text.strip().lower()
-    if not t:
-        return IntentResult(clarify="Empty command — what should I do?")
-    pr = _PR.search(t)
-    issue = _ISSUE.search(t)
-    report_only = any(w in t for w in ("report only", "report-only", "analyze only",
-                                       "analyze-only", "dry run", "dry-run"))
-    post = " post" in f" {t}" or "发布" in t
-
-    matched: list[str] = []
-    for kind, hints in _KIND_HINTS:
-        if any(h in t for h in hints):
-            if kind.startswith("pr_") and not pr:
-                continue
-            if kind.startswith("issue_") and not issue and kind != "issue_filter":
-                continue
-            if kind.startswith("repo_") and pr:
-                continue
-            if kind not in matched:
-                matched.append(kind)
-
-    if len(matched) != 1:
-        if pr and not matched:
-            return IntentResult(clarify=f"What should I do with PR #{pr.group(1)} — "
-                                        "rebase, debug its CI, or review it?")
-        return None  # let the LLM (or the help text) handle it
-    kind = matched[0]
-    if kind == "repo_rebase" and ("repo" not in t and "仓库" not in t and "full" not in t):
-        # bare "rebase" is ambiguous between repo and PR rebase
-        return IntentResult(clarify="Rebase what — the whole repo, or a PR (give its number)?")
-    return IntentResult(spec=TaskSpec(
-        kind=kind, repo=default_repo,
-        pr=int(pr.group(1)) if pr else None,
-        issue=int(issue.group(1)) if issue else None,
-        report_only=report_only, post=post,
-    ))
 
 
 _LLM_SYSTEM = """You convert one user command for a repo-maintenance copilot into JSON.

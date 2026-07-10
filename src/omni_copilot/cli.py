@@ -157,6 +157,8 @@ class Copilot:
                  resolution_mode: str = "resume", tier: str = "?",
                  resuming: bool = False) -> int:
         self.last_run_dir = run_dir
+        from . import tracing
+        tracing.init(run_dir.name, run_dir / "trace.jsonl")
         trace = RunTrace(run_dir / "run_trace.jsonl")
         notifier = Notifier(self.settings, run_dir, trace, run_dir.name)
         trace.record("task", spec=spec.model_dump(), resolution=resolution_mode,

@@ -140,6 +140,8 @@ class Executor:
         return outcome
 
     async def _run_step(self, spec, params: dict, state: dict, item) -> StepResult:
+        from .. import tracing
+
         ctx = StepContext(
             settings=self.settings, state=state, params=params or {},
             run_dir=self.run_dir, trace=self.trace, llm=self.llm, item=item,
@@ -148,7 +150,8 @@ class Executor:
         last: StepResult | None = None
         for attempt in range(1, attempts + 1):
             try:
-                last = await spec.handler(ctx)
+                with tracing.span("step", step=spec.name, attempt=attempt):
+                    last = await spec.handler(ctx)
             except Exception as exc:  # handler bug != typed failure
                 last = StepResult(False, FailureKind.BLOCKED,
                                   f"unhandled error: {type(exc).__name__}: {exc}")

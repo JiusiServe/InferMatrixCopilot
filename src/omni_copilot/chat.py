@@ -142,8 +142,10 @@ class ChatSession:
         self.ui = ui or make_ui(out)  # explicit writer -> PlainUI (tests/pipes)
         self.messages: list[dict] = []
         sessions_dir = copilot.settings.run_root.parent / "sessions"
-        self.trace = RunTrace(
-            sessions_dir / f"session-{time.strftime('%Y%m%d-%H%M%S')}.jsonl")
+        _stamp = time.strftime("%Y%m%d-%H%M%S")
+        from . import tracing
+        tracing.init(f"session-{_stamp}", sessions_dir / f"session-{_stamp}-trace.jsonl")
+        self.trace = RunTrace(sessions_dir / f"session-{_stamp}.jsonl")
 
     # -- read jail ---------------------------------------------------------------
     def _allowed_roots(self) -> list[Path]:

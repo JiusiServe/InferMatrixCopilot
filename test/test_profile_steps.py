@@ -201,14 +201,19 @@ def test_planner_recalls_repo_profile_for_any_repo():
 
 
 def test_intent_parses_profile_command():
+    # intent is LLM-only; verify repo_profile maps end-to-end through a fake reply
     from omni_copilot.intent import parse_intent
+    from omni_copilot.llm import Block, Reply
 
-    r = parse_intent("profile the repo")
+    class _LLM:
+        available = True
+
+        def create(self, **kw):
+            return Reply(blocks=[Block(type="text", text=json.dumps(
+                {"kind": "repo_profile", "confidence": 0.9}))])
+
+    r = parse_intent("profile the repo", llm=_LLM())
     assert r.spec is not None and r.spec.kind == "repo_profile"
-    r = parse_intent("bootstrap the repo profile")
-    assert r.spec is not None and r.spec.kind == "repo_profile"
-    r = parse_intent("profile pr 12")           # PR target -> not a repo task
-    assert r.spec is None
 
 
 def test_sweep_targets_language_degrades_to_files():

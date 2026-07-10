@@ -1,6 +1,7 @@
 """CLI phase B: when-gating, compound commands, resume, inline plan review."""
 
 import asyncio
+import json
 import shutil
 
 import pytest
@@ -48,21 +49,48 @@ def test_when_gating_skips_steps(settings, trace, tmp_path):
     assert "skipped (when: post)" in outcome.step_results["c"].summary
 
 
+class KindLLM:
+    """Fake classifier standing in for the intent LLM: maps a segment to a kind
+    by keyword and reads pr/issue/report_only from the (carry-over-expanded)
+    text. Lets us test parse_intents' segmentation + reference carry-over
+    without a real model (intent is now LLM-only)."""
+    available = True
+
+    def create(self, *, system, messages, model=None, max_tokens=None, **kw):
+        import re as _re
+
+        t = messages[-1]["content"].lower()
+        pr = _re.search(r"pr (\d+)", t)
+        issue = _re.search(r"issue (\d+)", t)
+        kind = ("pr_debug" if "debug" in t else "pr_rebase" if "rebase" in t
+                else "pr_review" if "review" in t else "issue_filter" if "triage" in t
+                else "issue_answer" if "answer" in t else None)
+        if kind is None:
+            payload = {"confidence": 0.2, "clarify": "unclear"}
+        else:
+            payload = {"kind": kind, "pr": int(pr.group(1)) if pr else None,
+                       "issue": int(issue.group(1)) if issue else None,
+                       "report_only": "report only" in t, "post": False,
+                       "confidence": 0.9}
+        return Reply(blocks=[Block(type="text", text=json.dumps(payload))])
+
+
 def test_compound_command_parsing_carries_target():
-    results = parse_intents("rebase pr 12, then review it")
+    llm = KindLLM()
+    results = parse_intents("rebase pr 12, then review it", llm=llm)
     assert all(r.spec for r in results)
     assert [r.spec.kind for r in results] == ["pr_rebase", "pr_review"]
     assert [r.spec.pr for r in results] == [12, 12]  # "it" carries PR 12
 
-    results = parse_intents("review pr 12 then triage the new issues")
+    results = parse_intents("review pr 12 then triage the new issues", llm=llm)
     assert [r.spec.kind for r in results] == ["pr_review", "issue_filter"]
 
     # ambiguous segment surfaces a clarification, nothing runs
-    results = parse_intents("rebase pr 12; do magic")
+    results = parse_intents("rebase pr 12; do magic", llm=llm)
     assert any(r.needs_clarification for r in results)
 
     # single command unaffected
-    results = parse_intents("debug the ci of pr 99, report only")
+    results = parse_intents("debug the ci of pr 99, report only", llm=llm)
     assert len(results) == 1 and results[0].spec.kind == "pr_debug"
     assert results[0].spec.report_only
 
