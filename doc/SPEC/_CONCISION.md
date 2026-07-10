@@ -40,8 +40,17 @@ preserved via re-exporting `__init__`s, so no importer changed):
 - `engine/steps/review.py` (341 LOC) → `engine/steps/review/` —
   `prompts` (eval-tuned text) + `utils` (deterministic helpers) + `steps`
   (handlers).
-In both, the stateless helpers moved to a `utils.py` so the class/handler files
-carry control flow, not plumbing. Eval-citation comments moved with their code.
+- `engine/steps/pr.py` (484 LOC) → `engine/steps/pr/` — split by concern:
+  `fetch` (read-only) + `rebase` + `debug` + `publish` (both risk=push steps)
+  + `utils` (`extract_signature`).
+- `cli.py` (406 LOC) → `cli/` — `copilot` (the orchestrator class, kept whole)
+  + `entry` (argparse/REPL) + `utils` (pure formatters); `__init__`/`__main__`
+  preserve the `omni_copilot.cli:main` entry point and `python -m` parity.
+In every case the stateless/pure helpers moved to a `utils.py` so the class/
+handler files carry control flow, not plumbing. Eval-citation comments moved
+with their code, and public import surfaces were preserved via re-exporting
+`__init__`s (one test's white-box monkeypatch target was updated to the new
+submodule — `pr.debug._gh` — the only test change across all four splits).
 
 ## Rules the concision refactor must not break
 

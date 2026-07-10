@@ -32,7 +32,7 @@ only for read-only kinds.
 ## 3. The three layers + the engine substrate
 
 ```
- Interface   cli.py / chat.py / ui.py            NL & flags -> one dispatcher
+ Interface   cli/ / chat.py / ui.py              NL & flags -> one dispatcher
      │
  Task        task_spec.py / intent.py            NL -> TaskSpec (tier from kind)
      │
@@ -71,7 +71,7 @@ not violate:
 1. Leaf edge packages (`profiles/`, `ci/`, `plugins/`, `review/`, `memory/`)
    and safety primitives (`scopes.py`, `push.py`) MUST NOT import `engine/`.
    The engine depends on them.
-2. Interface (`cli.py`, `chat.py`) MUST NOT be imported by any lower layer.
+2. Interface (`cli/`, `chat.py`) MUST NOT be imported by any lower layer.
    `chat.py` may reference `cli.Copilot` under `TYPE_CHECKING` only.
 3. `engine/step.py` is the base vocabulary: it may depend only on `run_trace`.
    Nothing task- or repo-specific.

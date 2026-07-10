@@ -1,0 +1,105 @@
+"""CLI entry: argument parsing, the one-shot/REPL dispatch, and the built-in
+command router. The orchestration lives in `Copilot` (copilot.py); this file is
+the wiring that turns argv/stdin into calls on it.
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+
+from ..intent import parse_intents
+from .copilot import Copilot
+from .utils import parse_task_params
+
+
+def _handle_line(copilot: Copilot, line: str, assume_yes: bool,
+                 plan_only: bool) -> int | None:
+    line = line.strip()
+    if not line:
+        return None
+    if line in ("/quit", "/exit", "exit", "quit"):
+        return -1
+    if line == "/status":
+        print(copilot.status())
+        return None
+    if line.startswith("/logs"):
+        parts = line.split()
+        print(copilot.logs(int(parts[1]) if len(parts) > 1 else 20))
+        return None
+    if line == "/playbooks":
+        print(copilot.playbooks())
+        return None
+    if line == "/resume":
+        return copilot.resume_last()
+
+    results = parse_intents(line, llm=copilot.llm,
+                            default_repo=copilot.settings.default_repo,
+                            model=copilot.settings.intent)
+    unclear = [r for r in results if r.needs_clarification]
+    if unclear:
+        print(f"? {unclear[0].clarify}")
+        return None
+    return copilot.run_queue([r.spec for r in results],
+                             assume_yes=assume_yes, plan_only=plan_only)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="omni-copilot",
+                                     description="Conversational repo-maintenance copilot")
+    parser.add_argument("-p", "--prompt", help="one-shot natural-language command")
+    parser.add_argument("--yes", action="store_true",
+                        help="skip confirmation prompts (headless)")
+    parser.add_argument("--plan-only", action="store_true",
+                        help="resolve and print the plan without executing")
+    parser.add_argument("--resume", action="store_true",
+                        help="resume the most recent run at its first incomplete step")
+    parser.add_argument("--playbook",
+                        help="run a specific playbook by name (incl. candidates, "
+                             "e.g. repo-rebase-native for validation)")
+    parser.add_argument("--report-only", action="store_true",
+                        help="with --playbook: read-only variant of the task")
+    parser.add_argument("--task-param", action="append", default=[],
+                        metavar="KEY=VALUE",
+                        help="with --playbook: task param (repeatable), "
+                             "e.g. --task-param local_ci_only=true")
+    parser.add_argument("--no-chat", action="store_true",
+                        help="use the plain command REPL instead of the "
+                             "conversational interface")
+    args = parser.parse_args(argv)
+
+    copilot = Copilot()
+
+    if args.resume:
+        return copilot.resume_last()
+    if args.playbook:
+        params = parse_task_params(args.task_param)
+        return copilot.run_playbook(args.playbook, params=params,
+                                    report_only=args.report_only,
+                                    assume_yes=args.yes, plan_only=args.plan_only)
+    if args.prompt:
+        code = _handle_line(copilot, args.prompt, args.yes, args.plan_only)
+        return int(code) if code not in (None, -1) else 0
+
+    # Interactive: conversational chat (Claude-Code-style) when an LLM is
+    # configured; plain command REPL otherwise / with --no-chat.
+    if copilot.llm.available and not args.no_chat:
+        from ..chat import chat_repl
+
+        return chat_repl(
+            copilot, assume_yes=args.yes,
+            handle_builtin=lambda line: _handle_line(copilot, line, args.yes,
+                                                     args.plan_only),
+        )
+
+    print("omni-copilot — natural-language repo maintenance. "
+          "/status /logs /playbooks /resume /quit")
+    while True:
+        try:
+            line = input("copilot> ")
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return 0
+        code = _handle_line(copilot, line, args.yes, args.plan_only)
+        if code == -1:
+            return 0

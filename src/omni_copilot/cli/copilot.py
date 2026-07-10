@@ -1,37 +1,34 @@
-"""omni-copilot — conversational CLI (design §3.Y, phases A+B).
+"""The `Copilot` orchestrator: NL-resolved TaskSpec → plan (reuse > adapt >
+generate) → plan-review gate → executor, plus the compound-command queue,
+resume, and the /status /logs /playbooks built-ins.
 
-REPL + one-shot (-p). NL -> intent -> TaskSpec(s) (echoed; write/push tasks
-need confirmation) -> inline plan review for adapted/generated plans ->
-planner (reuse > adapt > generate) -> executor. Compound commands ("rebase
-pr 12, then review it") become an ordered task queue. Built-ins: /status
-/logs /playbooks /resume /quit. Blocked runs exit 3.
+This is the orchestration core; the argparse/REPL wiring lives in `entry.py` and
+the pure formatters in `utils.py`.
 """
 
 from __future__ import annotations
 
-import argparse
 import asyncio
 import json
-import sys
 import time
 from pathlib import Path
 
 import yaml
 
-from .config import Settings
-from .engine.steps import register_builtin_steps
-from .engine.executor import Executor
-from .engine.planner import Planner, PlanningError, Resolution
-from .engine.registry import StepRegistry
-from .intent import parse_intents
-from .llm import LLM
-from .notify import BLOCKED_EXIT, Notifier
-from .playbooks.store import PlaybookStore, parse_playbook, playbook_to_doc
-from .review.reviewer import run_plan_review
-from .run_trace import RunTrace
-from .push import PushPolicy
-from .task_spec import TaskSpec
-from .ui import style
+from ..config import Settings
+from ..engine.executor import Executor
+from ..engine.planner import Planner, PlanningError, Resolution
+from ..engine.registry import StepRegistry
+from ..engine.steps import register_builtin_steps
+from ..llm import LLM
+from ..notify import BLOCKED_EXIT, Notifier
+from ..playbooks.store import PlaybookStore, parse_playbook, playbook_to_doc
+from ..push import PushPolicy
+from ..review.reviewer import run_plan_review
+from ..run_trace import RunTrace
+from ..task_spec import TaskSpec
+from ..ui import style
+from .utils import format_metrics_line
 
 
 class Copilot:
@@ -135,8 +132,6 @@ class Copilot:
               f"({playbook.status}) steps={[s.step for s in playbook.steps]}")
         if plan_only:
             return 0
-        from .engine.planner import Resolution
-
         resolution = Resolution(mode="explicit", playbook=playbook,
                                 tier=spec.tier, requires_review=True)
         code = self._gate_and_confirm(
@@ -157,7 +152,7 @@ class Copilot:
                  resolution_mode: str = "resume", tier: str = "?",
                  resuming: bool = False) -> int:
         self.last_run_dir = run_dir
-        from . import tracing
+        from .. import tracing
         tracing.init(run_dir.name, run_dir / "trace.jsonl")
         trace = RunTrace(run_dir / "run_trace.jsonl")
         notifier = Notifier(self.settings, run_dir, trace, run_dir.name)
@@ -182,16 +177,9 @@ class Copilot:
 
         if self.settings.metrics_enabled:
             try:  # metrics are facts about the run; never let them break it
-                from .metrics import collect_run_metrics
+                from ..metrics import collect_run_metrics
                 m = collect_run_metrics(run_dir, self.settings, outcome.status)
-                cost, risk = m["cost"], m["risk"]
-                catq = m["catq"]
-                print(f"  metrics: usd≈{cost['usd']:.2f} "
-                      f"{cost['minutes']:.1f}min S={risk['safety_multiplier']:.2f}"
-                      + (f" CATQ={catq:.3f}"
-                         + ("*" if m["quality"]["partial"] else "")
-                         if catq is not None else "")
-                      + f"  ({run_dir / 'metrics.json'})")
+                print(format_metrics_line(m, run_dir))
             except Exception as exc:
                 trace.record("metrics_error", error=f"{type(exc).__name__}: {exc}")
 
@@ -240,7 +228,7 @@ class Copilot:
     def _plugin_for(self, repo: str):
         """The repo's registered plugin, or None (never raises)."""
         try:
-            from .plugins.base import PluginRegistry
+            from ..plugins.base import PluginRegistry
 
             return PluginRegistry(self.settings.plugins_dir).resolve(
                 name=repo.replace("-", "_"))
@@ -300,107 +288,3 @@ class Copilot:
             f"{p.name}@{p.version} [{p.status}] kinds={p.task_kinds}"
             for p in self.store.all()
         ) or "(none)"
-
-
-def _handle_line(copilot: Copilot, line: str, assume_yes: bool,
-                 plan_only: bool) -> int | None:
-    line = line.strip()
-    if not line:
-        return None
-    if line in ("/quit", "/exit", "exit", "quit"):
-        return -1
-    if line == "/status":
-        print(copilot.status())
-        return None
-    if line.startswith("/logs"):
-        parts = line.split()
-        print(copilot.logs(int(parts[1]) if len(parts) > 1 else 20))
-        return None
-    if line == "/playbooks":
-        print(copilot.playbooks())
-        return None
-    if line == "/resume":
-        return copilot.resume_last()
-
-    results = parse_intents(line, llm=copilot.llm,
-                            default_repo=copilot.settings.default_repo,
-                            model=copilot.settings.intent)
-    unclear = [r for r in results if r.needs_clarification]
-    if unclear:
-        print(f"? {unclear[0].clarify}")
-        return None
-    return copilot.run_queue([r.spec for r in results],
-                             assume_yes=assume_yes, plan_only=plan_only)
-
-
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="omni-copilot",
-                                     description="Conversational repo-maintenance copilot")
-    parser.add_argument("-p", "--prompt", help="one-shot natural-language command")
-    parser.add_argument("--yes", action="store_true",
-                        help="skip confirmation prompts (headless)")
-    parser.add_argument("--plan-only", action="store_true",
-                        help="resolve and print the plan without executing")
-    parser.add_argument("--resume", action="store_true",
-                        help="resume the most recent run at its first incomplete step")
-    parser.add_argument("--playbook",
-                        help="run a specific playbook by name (incl. candidates, "
-                             "e.g. repo-rebase-native for validation)")
-    parser.add_argument("--report-only", action="store_true",
-                        help="with --playbook: read-only variant of the task")
-    parser.add_argument("--task-param", action="append", default=[],
-                        metavar="KEY=VALUE",
-                        help="with --playbook: task param (repeatable), "
-                             "e.g. --task-param local_ci_only=true")
-    parser.add_argument("--no-chat", action="store_true",
-                        help="use the plain command REPL instead of the "
-                             "conversational interface")
-    args = parser.parse_args(argv)
-
-    copilot = Copilot()
-
-    if args.resume:
-        return copilot.resume_last()
-    if args.playbook:
-        params: dict = {}
-        for kv in args.task_param:
-            key, _, raw = kv.partition("=")
-            value: object = raw
-            if raw.lower() in ("true", "false"):
-                value = raw.lower() == "true"
-            elif raw.isdigit():
-                value = int(raw)
-            params[key.strip()] = value
-        return copilot.run_playbook(args.playbook, params=params,
-                                    report_only=args.report_only,
-                                    assume_yes=args.yes, plan_only=args.plan_only)
-    if args.prompt:
-        code = _handle_line(copilot, args.prompt, args.yes, args.plan_only)
-        return int(code) if code not in (None, -1) else 0
-
-    # Interactive: conversational chat (Claude-Code-style) when an LLM is
-    # configured; plain command REPL otherwise / with --no-chat.
-    if copilot.llm.available and not args.no_chat:
-        from .chat import chat_repl
-
-        return chat_repl(
-            copilot, assume_yes=args.yes,
-            handle_builtin=lambda line: _handle_line(copilot, line, args.yes,
-                                                     args.plan_only),
-        )
-
-    print("omni-copilot — natural-language repo maintenance. "
-          "/status /logs /playbooks /resume /quit")
-    while True:
-        try:
-            line = input("copilot> ")
-        except (EOFError, KeyboardInterrupt):
-            print()
-            return 0
-        code = _handle_line(copilot, line, args.yes, args.plan_only)
-        if code == -1:
-            return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

@@ -112,7 +112,9 @@ def test_provider_selection_and_gaps(settings):
 def test_fetch_ci_records_capability_gap(settings, trace, tmp_path, git_repo,
                                          monkeypatch):
     """Live fetch path with no provider: gap recorded, run continues."""
-    from omni_copilot.engine.steps import pr as steps_pr
+    # pr.fetch_ci_failures lives in the pr.debug submodule (its `_gh` binding is
+    # what the step calls) after the pr package split — patch it there.
+    from omni_copilot.engine.steps.pr import debug as steps_pr
 
     monkeypatch.setattr(steps_pr, "_gh", lambda args, cwd=None: (0, json.dumps([
         {"name": "gpu-test", "state": "FAILURE", "bucket": "fail",

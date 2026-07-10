@@ -1,0 +1,47 @@
+"""Outward-writing PR steps (risk=push): the guarded push and the gated review
+comment. Both are the choke points the safety model governs — `ci.push` runs
+through `guard_push` (PushPolicy AND protected branches, dry-run by default) and
+`pr.post_review` is built from the shared `post_step` factory (explicit post
+flag + ALLOW_POST).
+"""
+
+from __future__ import annotations
+
+import subprocess
+
+from ....push import PushPolicy, guard_push
+from ...step import FailureKind, StepContext, StepResult, StepSpec
+from .._common import register_step, step
+from .._common import post_step as _post_step
+from .._common import repo_path as _repo_path
+
+
+@step("ci.push", "script", "push",
+      "Guarded push (PushPolicy AND protected branches; dry-run default).")
+async def _push(ctx: StepContext) -> StepResult:
+    repo = _repo_path(ctx)
+    raw = ctx.state.get("push_policy")
+    policy = raw if isinstance(raw, PushPolicy) else PushPolicy(**(raw or {}))
+    protected = ctx.state.get("protected_branches") or ctx.settings.protected_branches
+    ctx.trace.record("push_requested", remote=policy.remote, branch=policy.branch)
+    decision = guard_push(policy, list(protected))
+    if not decision.allowed:
+        return StepResult(False, FailureKind.FORBIDDEN, decision.reason)
+    if not ctx.settings.allow_push:
+        return StepResult(True, summary=f"dry-run (ALLOW_PUSH=0): {' '.join(decision.command)}",
+                          outputs={"dry_run": True, "command": list(decision.command)})
+    out = subprocess.run(list(decision.command), cwd=str(repo), capture_output=True,
+                         text=True, timeout=300)
+    if out.returncode != 0:
+        return StepResult(False, FailureKind.ESCALATE,
+                          f"push failed: {out.stderr[-1_000:]}")
+    return StepResult(True, summary=f"pushed {policy.remote} HEAD:{policy.branch}")
+
+
+register_step(StepSpec(
+    "pr.post_review", "script", "push",
+    _post_step("review_text",
+               lambda spec, body: ["pr", "comment", str(spec.get("pr")),
+                                    "--body", body],
+               "PR review comment"),
+    "Post the review as a PR comment (explicit post flag + ALLOW_POST)."))

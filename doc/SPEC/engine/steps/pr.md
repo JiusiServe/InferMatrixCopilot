@@ -1,10 +1,21 @@
-# engine/steps/pr.py — spec
+# engine/steps/pr/ — spec
 
-`LOC ~493 · step library (PR) · refactor-status: split-candidate`
+`LOC ~500 across 6 files · step library (PR) · refactor-status: split-applied (2026-07-11)`
 
 ## Responsibility
 Guarded push, read-only PR fetch/gate, PR rebase, PR debug, gated review
-posting.
+posting. Formerly one 484-line module; now a package split by concern.
+
+## Package layout (one concern per file)
+- `__init__.py` — side-effect imports of the submodules (`@step`/`register_step`
+  registration); re-exports `extract_signature`. No logic.
+- `fetch.py` — read-only fetches: `pr.fetch_diff`, `pr.gate_check`.
+- `rebase.py` — `pr.checkout_branch`, `pr.rebase_onto_base`, `pr.analyze_diff`,
+  `agent.verify_module`.
+- `debug.py` — `pr.fetch_ci_failures` (+ `_enrich_ci_logs`), `pr.group_failures`,
+  `agent.debug_group`.
+- `publish.py` — outward writes (risk=push): `ci.push`, `pr.post_review`.
+- `utils.py` — the pure `extract_signature` (+ its regex).
 
 ## Steps (11)
 `ci.push` (script/push); `pr.fetch_diff`, `pr.gate_check`, `pr.checkout_branch`,
@@ -14,7 +25,7 @@ posting.
 `pr.post_review` (script/push).
 
 ## Public contract (importable from `engine.steps.pr`)
-`extract_signature`.
+`extract_signature` (re-exported from `utils`; used by tests).
 
 ## Invariants
 - `ci.push` delegates all safety to `guard_push` (**C4**).
@@ -34,25 +45,16 @@ mechanics (that is `ci/providers`); no agent governance (that is
 
 ## Dependencies (allowed)
 `scopes`, `push`, `ci/*`, `plugins/base` (analyze), `engine/step`,
-`._common`, `..agent_runtime`.
+`.._common`, `..agent_runtime`.
 
 ## Tests
-`test_pr_steps.py`, `test_push_and_steps.py`, `test_ci_and_repo_map.py`.
+`test_pr_steps.py`, `test_push_and_steps.py`, `test_ci_and_repo_map.py`
+(note: `test_ci_and_repo_map` monkeypatches `pr.debug._gh`, the submodule where
+`pr.fetch_ci_failures` binds `gh`).
 
 ## Refactor notes
-Largest step file; three loosely-related flows share helpers. **Suggested
-split** once it grows further: `steps/pr_rebase.py` (checkout / rebase_onto_base
-/ analyze_diff / verify_module), `steps/pr_debug.py` (fetch_ci / enrich / group
-/ debug_group + `extract_signature`), and keep `ci.push`/`pr.fetch_diff`/
-`pr.gate_check`/`pr.post_review` in `pr.py`. They only share `_common` helpers,
-so the split creates no cross-import. `_enrich_ci_logs` is the seam to
-`ci/providers` — keep it thin.
-
-## Concision — **K3/K4/K7** (do before any split)
-Several repo-guard sites (K3 `require_repo`), verbose `state_updates` literals
-(K4 `published(...)`), and the `pr.fetch_diff`/`pr.gate_check`/
-`pr.fetch_ci_failures` "injected in state" early-returns (K7 `from_state`) can
-collapse to single calls. `agent.verify_module`'s no-LLM block is a K3
-`no_llm_gap` site. Do these first — the file may shrink enough that the
-cohesion split above becomes optional. Preserve: B2 (PushPolicy still published
-serialized), C4, C5, E2.
+Split **applied**. The submodules share only `_common` helpers, so the split
+creates no cross-import. The read/write axis is explicit: `fetch` is read-only,
+`publish` holds both risk=push steps. K3/K4/K7 concision (require_repo/published/
+from_state) is in place across the submodules. `_enrich_ci_logs` stays the thin
+seam to `ci/providers`.

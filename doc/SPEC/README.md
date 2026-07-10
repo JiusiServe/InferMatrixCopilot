@@ -2,7 +2,7 @@
 
 A **normative, file-level** specification. The `doc/SPEC/` tree mirrors
 `src/omni_copilot/`: **one spec file per source file**, at the same relative
-path (`engine/steps/pr.py` → `doc/SPEC/engine/steps/pr.md`). Each spec covers a
+path (`engine/steps/pr/` → `doc/SPEC/engine/steps/pr.md`). Each spec covers a
 fixed set of lenses. Two cross-cutting docs sit at the root and are referenced
 (not repeated) by every per-file spec.
 

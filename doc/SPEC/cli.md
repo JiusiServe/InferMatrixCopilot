@@ -1,26 +1,31 @@
-# cli.py — spec
+# cli/ — spec
 
-`LOC ~395 · interface + orchestration façade · refactor-status: split-candidate`
+`LOC ~410 across 4 files · interface + orchestration façade · refactor-status: split-applied (2026-07-11)`
 
 ## Responsibility
 The flag CLI and the `Copilot` façade: resolve → gate → execute; own the run
-directory, RunTrace, notifier, and metrics wiring.
+directory, RunTrace, notifier, and metrics wiring. Formerly one 406-line module;
+now a package that separates the argparse/REPL wiring from the orchestrator.
 
-## Functionality
-Arg parsing (`-p`, `--yes`, `--plan-only`, `--resume`, `--playbook`,
-`--report-only`, `--task-param`, `--no-chat`); `Copilot.resolve/run_task/
-run_playbook/run_queue/resume_last`; built-in REPL commands; plan-review gate +
-confirm gate; single `_execute` entry.
+## Package layout (one concern per file)
+- `__init__.py` — re-exports `Copilot`, `main` (surface below); no logic.
+- `__main__.py` — `python -m omni_copilot.cli` parity.
+- `copilot.py` — the `Copilot` orchestrator (resolve/run_task/run_playbook/
+  run_queue/resume_last/_execute + built-ins).
+- `entry.py` — `argparse`, `_handle_line`, `main` (turns argv/stdin into calls
+  on `Copilot`).
+- `utils.py` — pure formatters: `parse_task_params`, `format_metrics_line`.
 
-## Public contract
+## Public contract (importable from `omni_copilot.cli`)
 `main(argv)`; `Copilot` (`resolve`, `run_task`, `run_playbook`, `run_queue`,
 `resume_last`, `status`, `logs`, `playbooks`, `_execute`, `_plugin_for`,
-`_resolve_repo_path`).
+`_resolve_repo_path`). The re-exporting `__init__` keeps `omni_copilot.cli:main`
+(entry point) and `from omni_copilot.cli import Copilot` unchanged.
 
 ## Invariants
 - `resolve` feeds capabilities (plugin + REPO_PATHS) to the planner.
 - Plan-review gate before confirm; confirm fires for
-  `confirm_required or requires_review` unless `--yes`.
+  `confirm_required or requires_review` unless `--yes` (`_gate_and_confirm`, K6).
 - `_execute` is the single execution path (task / explicit-playbook / resume).
 - Repo knowledge (protected branches, high-risk modules) comes from the plugin
   into run state (**A5**); blocked → exit 3 (`BLOCKED_EXIT`).
@@ -36,19 +41,14 @@ only.
 `chat`. MUST NOT be imported by any lower layer (**§ARCH.4.2**).
 
 ## Extension points
-New REPL command → `_handle_line`; new run wiring → `_execute`.
+New REPL command → `_handle_line` (entry.py); new run wiring → `_execute`
+(copilot.py); new pure formatter → utils.py.
 
 ## Tests
-`test_cli.py`, `test_phase_b.py`.
+`test_cli.py`, `test_phase_b.py`, `test_chat.py`, `test_ui.py`.
 
 ## Refactor notes
-Two responsibilities are entangled: (1) `argparse`/REPL front-end and
-(2) the `Copilot` façade (resolve/execute/metrics). **Suggested split**:
-`cli.py` (arg parsing + `_handle_line` + `main`) and `copilot.py` (the
-`Copilot` class). Keep `_execute` as the single execution seam either way.
-## Concision — **K6** (dedupe gate+confirm)
-`run_task` and `run_playbook` repeat the plan-review + `[y/N]` confirm sequence.
-Extract `_gate_and_confirm(resolution, spec, assume_yes) -> bool` (~15 LOC).
-Preserve: plan-review before confirm; confirm fires for `confirm_required or
-requires_review`. (This is independent of the optional cli→copilot cohesion
-split above.)
+Split **applied** (was a cohesion-split candidate). The `Copilot` class stays
+whole in `copilot.py` so the resolve→execute flow is followed in one file; only
+the argparse/REPL front-end (`entry.py`) and the two pure formatters (`utils.py`)
+moved out. K6 (`_gate_and_confirm`) is done and lives on the class.

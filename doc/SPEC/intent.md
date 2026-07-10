@@ -45,7 +45,7 @@ carry-over via a fake classifier).
 ## Refactor notes
 `default_repo="vllm-omni"` default args are the 2 allowed repo literals
 (leak-capped) — leave them; do not add more. Production always passes an LLM
-(`cli.py`); intent now requires one — there is no offline fast-path (the
+(`cli/`); intent now requires one — there is no offline fast-path (the
 deliberate cost of LLM-only). If the LLM ever needs to also handle compound
 splitting, `parse_intents` could return a list directly and `_COMPOUND_SPLIT`/
 carry-over would go too — a bigger change, not needed yet.

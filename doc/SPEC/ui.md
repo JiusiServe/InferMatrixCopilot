@@ -31,6 +31,6 @@ New rendered element → a method on the UI; keep the `PlainUI` fallback in sync
 `test_ui.py`.
 
 ## Refactor notes
-Clean separation. The only smell: `cli.py`/`chat.py` format some strings inline
+Clean separation. The only smell: `cli/`/`chat.py` format some strings inline
 before handing to `ui`; a refactor could move more of that formatting here so
 callers pass structured data, not pre-formatted strings.
