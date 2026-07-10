@@ -66,6 +66,18 @@ class RepoPlugin:
     def debug_memory_db(self) -> Path:
         return self.root / "store" / "debug_memory.db"
 
+    @property
+    def profile_dir(self) -> Path:
+        return self.root / "profile"
+
+    def briefing(self) -> str:
+        """The repo's always-on prompt slice (empty when no profile exists)."""
+        if not (self.profile_dir / "profile.yaml").exists():
+            return ""
+        from ..profiles.store import ProfileStore
+
+        return ProfileStore(self.profile_dir).render_briefing()
+
 
 def load_plugin(plugin_dir: str | Path) -> RepoPlugin:
     root = Path(plugin_dir)

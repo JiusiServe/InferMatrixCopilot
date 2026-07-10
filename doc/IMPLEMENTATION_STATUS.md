@@ -169,8 +169,20 @@ parent's resume works after abandoning the copilot run).
 - `test_repo_neutral_core`: repo-specific literals in `src/` are capped at
   the known v1 leak list (§V2.1(b)) — it can only shrink.
 
-P1 (profile substrate), P2 (repo-neutral execution), P3 (measured
-invariance): not started — see doc/DESIGN.md §V2.4.
+**P1 — profile substrate (started 2026-07-10):** `profiles/store.py`
+implements §V2.3.2's curated layer: typed patch ops as the only write
+surface (`add_fact`/`add_evidence`/`bump_confirmed` per-run;
+`rewrite_fact`/`merge_facts`/`mark_stale` consolidation-tier only),
+per-fact provenance (source/evidence/first_seen/last_confirmed/
+confirmations; evidence-free facts rejected), stability gate (stable facts
+never lose cited evidence; superseded text → `history`), merge stubs,
+staleness as status, `ops_log.jsonl`, PROFILE_REPORT.md, and the
+word-budgeted `render_briefing()` (briefing channel only). Wired:
+`RepoPlugin.profile_dir`/`briefing()` and the `## REPO BRIEFING` section in
+`AgentDispatchContext` (`test/test_profile_store.py`). Still to do in P1:
+Stage-0/1 establishment agents + Stage-1.5 redundancy filter,
+review/sweep/intent parameterization off the profile. P2 (repo-neutral
+execution), P3 (measured invariance): not started — see doc/DESIGN.md §V2.4.
 
 ## Deliberate v1 boundaries
 - Playbooks are ordered step lists with `foreach` fan-out and `when:` conditions —

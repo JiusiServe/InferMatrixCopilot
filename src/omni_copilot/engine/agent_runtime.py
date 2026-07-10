@@ -64,6 +64,7 @@ class AgentDispatchContext:
     task: dict = field(default_factory=dict)
     step: dict = field(default_factory=dict)
     repo: dict = field(default_factory=dict)
+    briefing: str = ""                                 # repo profile prompt slice
     evidence: dict = field(default_factory=dict)       # name -> capped text
     evidence_refs: dict = field(default_factory=dict)  # name -> archived path
     previous_steps: list = field(default_factory=list)
@@ -78,6 +79,9 @@ class AgentDispatchContext:
             "## THIS STEP\n" + json.dumps(self.step, ensure_ascii=False, indent=1),
             "## REPO\n" + json.dumps(self.repo, ensure_ascii=False, indent=1),
         ]
+        if self.briefing:
+            parts.append("## REPO BRIEFING (curated repo-specific directives)\n"
+                         + self.briefing)
         if self.previous_steps:
             parts.append("## PREVIOUS STEPS (key conclusions)\n"
                          + json.dumps(self.previous_steps, ensure_ascii=False, indent=1))
@@ -321,11 +325,20 @@ async def run_agent_step(
     knowledge = _knowledge_tools(store, ctx)
     all_extra = {**knowledge, **(extra_tools or {})}
 
+    plugin = _resolve_plugin(ctx)
+    briefing = ""
+    if plugin is not None:
+        try:
+            briefing = plugin.briefing()
+        except Exception:
+            briefing = ""
+
     dispatch_ctx = AgentDispatchContext(
         task={"kind": spec.get("kind"), "pr": spec.get("pr"),
               "issue": spec.get("issue"), "repo": spec.get("repo"),
               "report_only": spec.get("report_only"),
               "goal": purpose},
+        briefing=briefing,
         step={"name": step_name, "purpose": purpose, "expected_output": expected,
               "on_failure": "set status/failure_kind honestly; never fabricate"},
         repo={"path": ctx.state.get("repo_path", ""),
