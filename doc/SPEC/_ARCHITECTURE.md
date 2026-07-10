@@ -73,8 +73,8 @@ not violate:
    The engine depends on them.
 2. Interface (`cli.py`, `chat.py`) MUST NOT be imported by any lower layer.
    `chat.py` may reference `cli.Copilot` under `TYPE_CHECKING` only.
-3. `engine/step.py` is the base vocabulary: it may depend only on `run_trace`
-   and `scopes`. Nothing task- or repo-specific.
+3. `engine/step.py` is the base vocabulary: it may depend only on `run_trace`.
+   Nothing task- or repo-specific.
 4. `engine/steps/*` compose tools and edge packages; they reach the agent
    runtime via `engine.agent_runtime`. A step MUST NOT be imported by the
    engine substrate (steps sit above it).

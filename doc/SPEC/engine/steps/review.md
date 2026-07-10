@@ -7,8 +7,7 @@ The conditional patch gate + the PR-review agent step and its repo-neutral
 prompt system.
 
 ## Steps
-`review.patch_gate` (validation/read, `patch_review_triggers=(before_push,)`),
-`agent.review_diff` (agent/read, read-only scope).
+`review.patch_gate` (validation/read), `agent.review_diff` (agent/read).
 
 ## Public contract (re-exported by the `builtin_steps` shim)
 `_REVIEW_LENSES`, `_render_review_md`, `_sweep_targets`.

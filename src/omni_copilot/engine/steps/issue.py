@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 
-from ...scopes import read_only_scope
 from ..step import FailureKind, StepContext, StepResult, StepSpec
 from ._common import from_state, register_step, require_repo, step
 from ._common import gh as _gh
@@ -102,8 +101,7 @@ register_step(StepSpec(
         "when unsure. The draft is never auto-posted.",
         {"answer_draft": "the complete draft reply (markdown)"},
         _render_answer),
-    "Draft an issue answer (governed agent step; never auto-posted).",
-    read_only_scope()))
+    "Draft an issue answer (governed agent step; never auto-posted)."))
 
 register_step(StepSpec(
     "agent.triage_issues", "agent", "read",
@@ -116,8 +114,7 @@ register_step(StepSpec(
         {"triage_table":
          "list of {number, title, type, module, priority, labels}"},
         _render_triage),
-    "Classify/label/route issues (governed agent step, read-only).",
-    read_only_scope()))
+    "Classify/label/route issues (governed agent step, read-only)."))
 
 register_step(StepSpec(
     "issue.post_answer", "script", "push",

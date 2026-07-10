@@ -11,20 +11,25 @@ Defines the failure taxonomy, the step result/context/spec dataclasses, and the
 
 ## Public contract
 `FailureKind` (RETRYABLE, REPLAN, TEST_FAILURE, BLOCKED, FORBIDDEN, ESCALATE);
-`StepResult(ok, failure?, summary, outputs, changed_files)`; `StepContext`;
-`StepSpec(name, kind, risk, handler, description, tool_scope?,
-patch_review_triggers)`. `Kind ∈ {deterministic, script, agent, validation,
-report}`; `Risk ∈ {read, write_workspace, push, knowledge, report}`.
+`StepResult(ok, failure?, summary, outputs, changed_files)`;
+`StepContext(settings, state, params, run_dir, trace, llm?, item?)`;
+`StepSpec(name, kind, risk, handler, description)`. `Kind ∈ {deterministic,
+script, agent, validation, report}`; `Risk ∈ {read, write_workspace, push,
+knowledge, report}`.
 
 ## Invariants
 - Repo- and task-agnostic; `StepSpec` is frozen.
 - The six `FailureKind`s are the complete routing vocabulary (**B1**).
+- `risk` is enforced (planner C2); `kind` is descriptive (`agent` ⇒ governed
+  runtime by convention). No decorative fields: a `StepSpec` field must be read
+  by something (the `tool_scope`/`patch_review_triggers` fields were removed
+  because nothing enforced them — scope/triggers are handler-local).
 
 ## Scope — not here
 Types only — no behavior, no registry, no execution.
 
 ## Dependencies (allowed)
-Only `run_trace` and `scopes` (**§ARCH.4.3**). Nothing task/repo-specific.
+Only `run_trace` (**§ARCH.4.3**). Nothing task/repo-specific.
 
 ## Extension points
 A new `Kind`/`Risk` value or `FailureKind` is a deliberate vocabulary change —

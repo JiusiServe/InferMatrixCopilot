@@ -1,6 +1,6 @@
 """Step — the engine's minimal governable execution unit (design §3.X).
 
-A Step is one stable engineering action with declared risk, scope, and failure
+A Step is one stable engineering action with declared risk and failure
 semantics. Tools live below (inside steps); Playbooks above (graphs of steps).
 """
 
@@ -12,12 +12,10 @@ from pathlib import Path
 from typing import Any, Awaitable, Callable, Literal, Optional, TYPE_CHECKING
 
 from ..run_trace import RunTrace
-from ..scopes import ToolScope
 
 if TYPE_CHECKING:  # pragma: no cover
     from ..config import Settings
     from ..llm import LLM
-    from ..notify import Notifier
 
 
 class FailureKind(str, enum.Enum):
@@ -48,7 +46,6 @@ class StepContext:
     run_dir: Path
     trace: RunTrace
     llm: Optional["LLM"] = None
-    notifier: Optional["Notifier"] = None
     item: Any = None                 # current foreach item, if any
 
 
@@ -59,9 +56,7 @@ Kind = Literal["deterministic", "script", "agent", "validation", "report"]
 @dataclass(frozen=True)
 class StepSpec:
     name: str                        # e.g. "workspace.guard_clean"
-    kind: Kind
-    risk: Risk
+    kind: Kind                       # descriptive; `agent` ⇒ governed runtime
+    risk: Risk                       # enforced: planner bars write/push in generate
     handler: Callable[[StepContext], Awaitable[StepResult]]
     description: str = ""
-    tool_scope: ToolScope | None = None          # agent steps only
-    patch_review_triggers: tuple[str, ...] = ()  # rules from review.triggers

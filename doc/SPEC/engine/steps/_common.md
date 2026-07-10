@@ -10,8 +10,8 @@ The step self-registration surface + cross-module helpers shared by step files.
 `repo_path`, `task_spec`, `gh`, `git`, `gh_read_tools`, `post_step`.
 
 ## Public contract
-`step(name, kind, risk, description, *, tool_scope?, patch_review_triggers?)`;
-`register_step(StepSpec)`; `collected()`; the six helpers above.
+`step(name, kind, risk, description)`; `register_step(StepSpec)`;
+`collected()`; the helpers above (incl. the K3/K4/K7 guard helpers).
 
 ## Invariants
 - Duplicate step name → raise at import (**A4**).

@@ -34,13 +34,11 @@ def register_step(spec: StepSpec) -> StepSpec:
     return spec
 
 
-def step(name: str, kind: str, risk: str, description: str = "", *,
-         tool_scope=None, patch_review_triggers: tuple[str, ...] = ()):
+def step(name: str, kind: str, risk: str, description: str = ""):
     """Decorator: bind a handler to its name + metadata in one place."""
 
     def deco(fn):
-        register_step(StepSpec(name, kind, risk, fn, description,
-                               tool_scope, patch_review_triggers))
+        register_step(StepSpec(name, kind, risk, fn, description))
         return fn
 
     return deco

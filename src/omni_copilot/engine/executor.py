@@ -142,8 +142,7 @@ class Executor:
     async def _run_step(self, spec, params: dict, state: dict, item) -> StepResult:
         ctx = StepContext(
             settings=self.settings, state=state, params=params or {},
-            run_dir=self.run_dir, trace=self.trace, llm=self.llm,
-            notifier=self.notifier, item=item,
+            run_dir=self.run_dir, trace=self.trace, llm=self.llm, item=item,
         )
         attempts = 1 + max(0, self.settings.max_step_retries)
         last: StepResult | None = None

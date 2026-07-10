@@ -15,7 +15,6 @@ import subprocess
 from ...review.diff_summary import build_diff_summary
 from ...review.reviewer import run_patch_review
 from ...review.triggers import evaluate_triggers
-from ...scopes import read_only_scope
 from ..step import FailureKind, StepContext, StepResult
 from ._common import gh_read_tools as _gh_read_tools
 from ._common import repo_path as _repo_path
@@ -23,8 +22,7 @@ from ._common import step
 
 
 @step("review.patch_gate", "validation", "read",
-      "Conditional patch review; fail-closed before pushes.",
-      patch_review_triggers=("before_push",))
+      "Conditional patch review; fail-closed before pushes.")
 async def _patch_gate(ctx: StepContext) -> StepResult:
     """Conditional Patch Review: cheap summary always; LLM review only on triggers."""
     repo = _repo_path(ctx)
@@ -276,8 +274,7 @@ def _render_review_md(output: dict) -> str:
 
 @step("agent.review_diff", "agent", "read",
       "Evidence-grounded two-stage review: tool-loop investigation draft, "
-      "then verify-and-rewrite editor pass.",
-      tool_scope=read_only_scope())
+      "then verify-and-rewrite editor pass.")
 async def _review_diff(ctx: StepContext) -> StepResult:
     """PR review as a governed agent step (unified runtime): evidence pack,
     skill retrieval, enforced read-only tools, structured review_comments.
