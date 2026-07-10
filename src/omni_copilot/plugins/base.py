@@ -53,6 +53,12 @@ class RepoPlugin:
         return None
 
     @property
+    def high_risk_modules(self) -> list[str]:
+        """Modules declared `risk: high` — feeds the patch-review trigger."""
+        return [m for m, spec in self.modules.items()
+                if str((spec or {}).get("risk", "")).lower() == "high"]
+
+    @property
     def skills_dir(self) -> Path:
         return self.root / "skills"
 

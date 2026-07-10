@@ -130,25 +130,82 @@ def _build_evidence(ctx: StepContext, evidence: dict[str, str],
     return capped, refs
 
 
-def _retrieve_skills(ctx: StepContext, query: str) -> tuple[list[dict], SkillStore]:
-    store = SkillStore(ctx.settings.skills_dir)
+def _resolve_plugin(ctx: StepContext):
+    """The active repo's plugin, when one is registered (never raises)."""
+    from ..plugins.base import PluginRegistry
+
+    registry = PluginRegistry(ctx.settings.plugins_dir)
+    spec = ctx.state.get("task_spec") or {}
+    try:
+        plugin = registry.resolve(repo_path=ctx.state.get("repo_path") or None)
+        if plugin is None and spec.get("repo"):
+            plugin = registry.resolve(name=str(spec["repo"]).replace("-", "_"))
+        return plugin
+    except Exception:
+        return None
+
+
+class _ScopedKnowledge:
+    """Skill retrieval scoped per repo: the repo plugin's own store first, the
+    shared pool second (v2 P0 — the per-repo dirs existed on RepoPlugin but
+    were never wired in). Proposals land in the repo's namespace when one
+    exists, so knowledge never leaks across repos."""
+
+    def __init__(self, stores: list[SkillStore]):
+        self.stores = stores  # ordered: repo store first, shared pool last
+
+    def find(self, query: str = "", module: str = "", k: int = 3):
+        out, seen = [], set()
+        for store in self.stores:
+            for s in store.find(query=query, module=module, k=k):
+                if s.name not in seen:
+                    seen.add(s.name)
+                    out.append(s)
+        return out[:k]
+
+    def propose(self, **kwargs) -> None:
+        self.stores[0].propose(**kwargs)
+
+
+def _knowledge_stores(ctx: StepContext) -> _ScopedKnowledge:
+    stores: list[SkillStore] = []
+    plugin = _resolve_plugin(ctx)
+    if plugin is not None and plugin.skills_dir != Path(ctx.settings.skills_dir):
+        stores.append(SkillStore(plugin.skills_dir))
+    stores.append(SkillStore(ctx.settings.skills_dir))
+    return _ScopedKnowledge(stores)
+
+
+def _retrieve_skills(ctx: StepContext, query: str) -> tuple[list[dict], "_ScopedKnowledge"]:
+    store = _knowledge_stores(ctx)
     hits = store.find(query=query, k=ctx.settings.skills_top_k)
     summaries = [{"name": s.name, "summary": s.description or s.body[:200]}
                  for s in hits]
     return summaries, store
 
 def _retrieve_memories(ctx: StepContext, query: str) -> list[str]:
-    try:
-        if not Path(ctx.settings.memory_db).exists():
-            return []
-        dm = DebugMemory(ctx.settings.memory_db)
-        return [f"[{h['module']}] {h['symptom']} -> {h['fix_summary']}"
-                for h in dm.search(query, k=3)]
-    except Exception:
-        return []
+    dbs: list[Path] = []
+    plugin = _resolve_plugin(ctx)
+    if plugin is not None:
+        dbs.append(Path(plugin.debug_memory_db))
+    dbs.append(Path(ctx.settings.memory_db))
+    hits: list[str] = []
+    seen: set[str] = set()
+    for db in dbs:  # repo-scoped memories rank before the shared pool's
+        try:
+            if not db.exists():
+                continue
+            for h in DebugMemory(db).search(query, k=3):
+                line = f"[{h['module']}] {h['symptom']} -> {h['fix_summary']}"
+                if line not in seen:
+                    seen.add(line)
+                    hits.append(line)
+        except Exception:
+            continue
+    return hits[:3]
 
 
-def _knowledge_tools(store: SkillStore, ctx: StepContext) -> dict[str, ToolDef]:
+def _knowledge_tools(store: "_ScopedKnowledge", ctx: StepContext) -> dict[str, ToolDef]:
     """Read-only knowledge tools + governed skill-candidate proposals."""
 
     def skill_search(query: str, **_: Any) -> str:

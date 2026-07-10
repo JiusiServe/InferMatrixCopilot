@@ -148,6 +148,30 @@ and `omni-rebase-orchestrator --resume` concurrently (copilot progress.json is
 authoritative inside a copilot run; parent markers are still written so the
 parent's resume works after abandoning the copilot run).
 
+## Design v2 (doc/DESIGN.md Part II) — status
+
+**P0 — correctness (2026-07-10, done):** the §V2.1(a) fixes, pinned by
+`test/test_v2_p0.py`:
+- Resume state contract: every state key a later step consumes is published
+  via `outputs.state_updates` (fetch/gate/review/issue/checkout/rebase/
+  analyze/ci steps; PushPolicy serialized JSON-simple, `ci.push` rehydrates).
+  Previously `--resume` past a completed fetch re-entered review with no
+  `diff_text` (spurious BLOCKED) and resumed pr-rebase pushes saw the
+  deny-all default policy (spurious FORBIDDEN).
+- `_merge` lifts fan-out items' `state_updates` into the merged result.
+- `when:` reads TaskSpec first, then state keys; unknown keys block loudly
+  instead of silently evaluating false.
+- Per-repo knowledge wired: agent runtime resolves the repo plugin's
+  `skills/` + `store/debug_memory.db` ahead of the shared pool; proposals
+  land in the repo namespace (`_ScopedKnowledge`).
+- High-risk modules come from the plugin (`modules.<m>.risk: high` in
+  plugin zero) via run state; `settings.high_risk_modules` is fallback only.
+- `test_repo_neutral_core`: repo-specific literals in `src/` are capped at
+  the known v1 leak list (§V2.1(b)) — it can only shrink.
+
+P1 (profile substrate), P2 (repo-neutral execution), P3 (measured
+invariance): not started — see doc/DESIGN.md §V2.4.
+
 ## Deliberate v1 boundaries
 - Playbooks are ordered step lists with `foreach` fan-out and `when:` conditions —
   no cross-step DAG edges yet; none of the six playbooks needs one.

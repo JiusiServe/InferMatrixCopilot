@@ -155,6 +155,12 @@ class Copilot:
             "protected_branches": self.settings.protected_branches,
             "resuming": resuming,
         }
+        plugin = self._plugin_for(spec.repo)
+        if plugin is not None:
+            # repo knowledge from the plugin, not core settings (v2 P0 fix #5)
+            state["protected_branches"] = plugin.protected_branches
+            if plugin.high_risk_modules:
+                state["high_risk_modules"] = plugin.high_risk_modules
         executor = Executor(self.registry, self.settings, run_dir=run_dir,
                             trace=trace, llm=self.llm, notifier=notifier)
         outcome = asyncio.run(executor.run(playbook, state))
@@ -216,21 +222,25 @@ class Copilot:
         print("no resumable run found")
         return 1
 
+    def _plugin_for(self, repo: str):
+        """The repo's registered plugin, or None (never raises)."""
+        try:
+            from .plugins.base import PluginRegistry
+
+            return PluginRegistry(self.settings.plugins_dir).resolve(
+                name=repo.replace("-", "_"))
+        except Exception:
+            return None
+
     def _resolve_repo_path(self, repo: str) -> str:
         """REPO_PATHS first; fall back to the repo's plugin manifest (plugin zero
         declares repo.path), so runs work even without a .env in reach."""
         p = self.settings.repo_path(repo)
         if p:
             return str(p)
-        try:
-            from .plugins.base import PluginRegistry
-
-            plugin = PluginRegistry(self.settings.plugins_dir).resolve(
-                name=repo.replace("-", "_"))
-            if plugin and plugin.repo_path:
-                return plugin.repo_path
-        except Exception:
-            pass
+        plugin = self._plugin_for(repo)
+        if plugin and plugin.repo_path:
+            return plugin.repo_path
         return ""
 
     # -- built-ins ---------------------------------------------------------------

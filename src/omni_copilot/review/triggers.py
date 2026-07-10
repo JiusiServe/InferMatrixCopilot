@@ -25,11 +25,16 @@ def evaluate_triggers(
     touched_modules: tuple[str, ...] = (),
     pre_push: bool = False,
     knowledge_edit: bool = False,
+    high_risk_modules: list[str] | None = None,
 ) -> list[str]:
+    # repo-specific risk knowledge comes from the repo's plugin when available
+    # (settings.high_risk_modules is only the fallback — v2 P0 fix #5)
+    risky = settings.high_risk_modules if high_risk_modules is None \
+        else list(high_risk_modules)
     fired: list[str] = []
     if summary.out_of_scope_files:
         fired.append("out_of_scope_edits")
-    if any(m in settings.high_risk_modules for m in touched_modules):
+    if any(m in risky for m in touched_modules):
         fired.append("high_risk_modules")
     if (summary.total_lines > settings.large_diff_lines
             or len(summary.changed_files) > settings.large_diff_files):

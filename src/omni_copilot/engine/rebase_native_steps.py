@@ -301,7 +301,9 @@ async def _phase2_finalize(ctx: StepContext) -> StepResult:
         m for m, info in state.get("modules", {}).items()
         if (info or {}).get("status") in ("done", "failed")
     ]
-    return StepResult(True, summary="phase 2 complete; marker -> local_testing")
+    return StepResult(True, summary="phase 2 complete; marker -> local_testing",
+                      outputs={"state_updates":
+                               {"touched_modules": ctx.state["touched_modules"]}})
 
 
 async def _phase4_guarded(ctx: StepContext) -> StepResult:

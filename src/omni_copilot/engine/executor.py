@@ -65,10 +65,20 @@ class Executor:
         state.setdefault("playbook", playbook.name)
 
         for pstep in playbook.steps:
-            if pstep.when and not _eval_when(pstep.when, state):
-                outcome.step_results[pstep.id] = StepResult(
-                    True, summary=f"skipped (when: {pstep.when})")
-                continue
+            if pstep.when:
+                try:
+                    applies = _eval_when(pstep.when, state)
+                except KeyError as exc:
+                    outcome.status = "blocked"
+                    outcome.blocked_reason = (
+                        f"step '{pstep.id}': unknown `when:` key {exc} — "
+                        "conditions may only reference TaskSpec fields or "
+                        "state keys published by earlier steps")
+                    return outcome
+                if not applies:
+                    outcome.step_results[pstep.id] = StepResult(
+                        True, summary=f"skipped (when: {pstep.when})")
+                    continue
             if pstep.id in progress["completed"]:
                 cached = progress["completed"][pstep.id]
                 cached_outputs = cached.get("outputs", {}) or {}
@@ -150,12 +160,19 @@ class Executor:
 
 
 def _eval_when(when: str, state: dict) -> bool:
-    """Evaluate a step condition against the TaskSpec: "post" / "not report_only"."""
+    """Evaluate a step condition: TaskSpec fields first (v1 semantics), then
+    state keys published by earlier steps. Unknown keys raise KeyError instead
+    of silently evaluating false (v2 P0 fix #3)."""
     spec = state.get("task_spec") or {}
     expr = when.strip()
     negate = expr.startswith("not ")
     key = expr[4:].strip() if negate else expr
-    value = bool(spec.get(key))
+    if key in spec:
+        value = bool(spec.get(key))
+    elif key in state:
+        value = bool(state.get(key))
+    else:
+        raise KeyError(key)
     return (not value) if negate else value
 
 
@@ -165,6 +182,13 @@ def _merge(results: list[StepResult]) -> StepResult:
         return results[0]
     failed = [r for r in results if not r.ok]
     merged_outputs = {str(i): r.outputs for i, r in enumerate(results)}
+    # lift state_updates to the top level (last writer wins per key) so the
+    # executor's state.update / resume path sees fan-out publications too
+    merged_updates: dict = {}
+    for r in results:
+        merged_updates.update((r.outputs or {}).get("state_updates") or {})
+    if merged_updates:
+        merged_outputs["state_updates"] = merged_updates
     changed = [f for r in results for f in r.changed_files]
     if failed:
         worst = failed[0]

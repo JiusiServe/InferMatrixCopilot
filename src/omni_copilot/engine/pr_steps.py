@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+from dataclasses import asdict
 from pathlib import Path
 
 from ..scopes import post_plan_scope
@@ -74,16 +75,23 @@ async def _pr_checkout(ctx: StepContext) -> StepResult:
         return StepResult(False, FailureKind.BLOCKED, f"checkout failed: {out[:400]}")
 
     force = bool(ctx.params.get("force_push", False))
+    policy = PushPolicy(
+        allowed=not spec.get("report_only", False),
+        remote=remote, branch=head_ref, force_with_lease=force,
+    )
     ctx.state.update(
         pr_head_ref=head_ref, pr_head_remote=remote, pr_base_branch=base,
-        pr_local_branch=local,
-        push_policy=PushPolicy(
-            allowed=not spec.get("report_only", False),
-            remote=remote, branch=head_ref, force_with_lease=force,
-        ),
+        pr_local_branch=local, push_policy=policy,
     )
     return StepResult(True, summary=f"checked out PR #{pr} ({remote}/{head_ref} -> {local})",
-                      outputs={"local_branch": local, "base": base, "remote": remote})
+                      outputs={"local_branch": local, "base": base, "remote": remote,
+                               # push_policy serialized JSON-simple; ci.push
+                               # rehydrates dicts back into a PushPolicy
+                               "state_updates": {
+                                   "pr_head_ref": head_ref, "pr_head_remote": remote,
+                                   "pr_base_branch": base, "pr_local_branch": local,
+                                   "push_policy": asdict(policy),
+                               }})
 
 
 _CONFLICT_GUIDANCE = """You are resolving git rebase conflicts. Work only inside the repository.
@@ -109,7 +117,8 @@ async def _pr_rebase_onto_base(ctx: StepContext) -> StepResult:
 
     rc, out = _git(repo, "rebase", "FETCH_HEAD")
     if rc == 0:
-        return StepResult(True, summary=f"rebased onto {base_remote}/{base} cleanly")
+        return StepResult(True, summary=f"rebased onto {base_remote}/{base} cleanly",
+                          outputs={"state_updates": {"rebase_base_sha": base_sha}})
 
     _, conflicts = _git(repo, "diff", "--name-only", "--diff-filter=U")
     conflict_files = conflicts.splitlines()
@@ -135,10 +144,12 @@ async def _pr_rebase_onto_base(ctx: StepContext) -> StepResult:
         in_progress = (Path(repo) / ".git" / "rebase-merge").exists() or \
                       (Path(repo) / ".git" / "rebase-apply").exists()
         if result.ok and not in_progress:
+            outputs = {**result.outputs}
+            outputs.setdefault("state_updates", {})["rebase_base_sha"] = base_sha
             return StepResult(True, summary=f"conflicts resolved by agent "
                                             f"({len(conflict_files)} files): "
                                             f"{output.get('resolution_summary', '')[:150]}",
-                              changed_files=conflict_files, outputs=result.outputs)
+                              changed_files=conflict_files, outputs=outputs)
         _git(repo, "rebase", "--abort")
         return StepResult(False, FailureKind.ESCALATE,
                           f"agent could not resolve conflicts: {result.summary[:300]}",
@@ -179,7 +190,12 @@ async def _pr_analyze_diff(ctx: StepContext) -> StepResult:
     ctx.state["touched_modules"] = modules
     ctx.state["primary_files"] = [f"*{c}" for c in changed]
     return StepResult(True, summary=f"{len(changed)} files across modules {modules}",
-                      outputs={"changed_files": changed, "modules": modules})
+                      outputs={"changed_files": changed, "modules": modules,
+                               "state_updates": {
+                                   "affected_modules": modules,
+                                   "touched_modules": modules,
+                                   "primary_files": ctx.state["primary_files"],
+                               }})
 
 
 async def _verify_module(ctx: StepContext) -> StepResult:
@@ -230,7 +246,9 @@ def extract_signature(log: str) -> str:
 async def _pr_fetch_ci_failures(ctx: StepContext) -> StepResult:
     if "ci_failures" in ctx.state:  # injected (tests / offline)
         n = len(ctx.state["ci_failures"])
-        return StepResult(True, summary=f"{n} failing checks (from state)")
+        return StepResult(True, summary=f"{n} failing checks (from state)",
+                          outputs={"state_updates":
+                                   {"ci_failures": ctx.state["ci_failures"]}})
     repo = _repo_path(ctx)
     spec = _task_spec(ctx)
     pr = spec.get("pr")
@@ -252,7 +270,11 @@ async def _pr_fetch_ci_failures(ctx: StepContext) -> StepResult:
         {"name": c.get("name", "?"), "log": "", "link": c.get("link", "")} for c in failing
     ]
     return StepResult(True, summary=f"{len(failing)}/{len(checks)} checks failing",
-                      outputs={"failing": [c.get("name") for c in failing]})
+                      outputs={"failing": [c.get("name") for c in failing],
+                               "state_updates": {
+                                   "ci_failures": ctx.state["ci_failures"],
+                                   "ci_check_snapshot": snapshot,
+                               }})
 
 
 async def _pr_group_failures(ctx: StepContext) -> StepResult:
@@ -273,7 +295,8 @@ async def _pr_group_failures(ctx: StepContext) -> StepResult:
                           outputs={"signatures": [g["signature"] for g in group_list]})
     ctx.state["failure_groups"] = group_list
     return StepResult(True, summary=f"{len(failures)} failures -> {len(group_list)} root-cause groups",
-                      outputs={"signatures": [g["signature"] for g in group_list]})
+                      outputs={"signatures": [g["signature"] for g in group_list],
+                               "state_updates": {"failure_groups": group_list}})
 
 
 _DEBUG_GUIDANCE = """You are debugging one grouped CI failure in a repo checkout.

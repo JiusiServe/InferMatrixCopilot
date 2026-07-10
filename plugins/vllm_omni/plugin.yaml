@@ -19,15 +19,18 @@ modules:
   worker_runner:
     local_paths: [vllm_omni/worker/]
     wave: 1
+    risk: high
   model_executor:
     local_paths: [vllm_omni/model_executor/]
     wave: 1
+    risk: high
   input_output:
     local_paths: [vllm_omni/inputs/, vllm_omni/outputs/]
     wave: 1
   scheduler:
     local_paths: [vllm_omni/core/]
     wave: 1
+    risk: high
   online_serving:
     local_paths: [vllm_omni/entrypoints/]
     wave: 1

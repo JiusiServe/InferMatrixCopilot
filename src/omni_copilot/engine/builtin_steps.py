@@ -159,6 +159,7 @@ async def _patch_gate(ctx: StepContext) -> StepResult:
         touched_modules=tuple(ctx.state.get("touched_modules", ())),
         pre_push=bool(ctx.params.get("pre_push", False)),
         knowledge_edit=bool(ctx.state.get("knowledge_edit", False)),
+        high_risk_modules=ctx.state.get("high_risk_modules"),
     )
     ctx.trace.record("patch_review_triggers", fired=fired)
     if not fired:
@@ -231,7 +232,9 @@ def _gh(args: list[str], cwd: Path | None = None) -> tuple[int, str]:
 
 async def _pr_fetch_diff(ctx: StepContext) -> StepResult:
     if "diff_text" in ctx.state:  # injected (tests / offline)
-        return StepResult(True, summary="diff from state", outputs={"chars": len(ctx.state["diff_text"])})
+        return StepResult(True, summary="diff from state",
+                          outputs={"chars": len(ctx.state["diff_text"]),
+                                   "state_updates": {"diff_text": ctx.state["diff_text"]}})
     spec = ctx.state.get("task_spec") or {}
     pr = spec.get("pr") if isinstance(spec, dict) else None
     repo = _repo_path(ctx)
@@ -245,12 +248,14 @@ async def _pr_fetch_diff(ctx: StepContext) -> StepResult:
     if code != 0:
         return StepResult(False, FailureKind.BLOCKED, f"gh pr diff failed: {out[:500]}")
     ctx.state["diff_text"] = out
-    return StepResult(True, summary=f"fetched PR #{pr} diff ({len(out)} chars)")
+    return StepResult(True, summary=f"fetched PR #{pr} diff ({len(out)} chars)",
+                      outputs={"state_updates": {"diff_text": out}})
 
 
 async def _issue_fetch(ctx: StepContext) -> StepResult:
     if "issue_text" in ctx.state:
-        return StepResult(True, summary="issue from state")
+        return StepResult(True, summary="issue from state",
+                          outputs={"state_updates": {"issue_text": ctx.state["issue_text"]}})
     spec = ctx.state.get("task_spec") or {}
     issue = spec.get("issue") if isinstance(spec, dict) else None
     kind = spec.get("kind") if isinstance(spec, dict) else ""
@@ -270,13 +275,15 @@ async def _issue_fetch(ctx: StepContext) -> StepResult:
             return StepResult(False, FailureKind.BLOCKED, f"gh issue list failed: {out[:500]}")
         ctx.state["issue_text"] = out
         n = len(json.loads(out or "[]"))
-        return StepResult(True, summary=f"fetched {n} open issues for triage")
+        return StepResult(True, summary=f"fetched {n} open issues for triage",
+                          outputs={"state_updates": {"issue_text": out}})
     code, out = _gh(["issue", "view", str(issue), "--json",
                      "title,body,labels,comments"], cwd=repo)
     if code != 0:
         return StepResult(False, FailureKind.BLOCKED, f"gh issue view failed: {out[:500]}")
     ctx.state["issue_text"] = out
-    return StepResult(True, summary=f"fetched issue #{issue}")
+    return StepResult(True, summary=f"fetched issue #{issue}",
+                      outputs={"state_updates": {"issue_text": out}})
 
 
 # -- PR review (eval-informed; see eval/ANALYSIS.md) ---------------------------
@@ -562,6 +569,7 @@ async def _review_diff(ctx: StepContext) -> StepResult:
         review_md = _render_review_md(output)
         ctx.state["review_text"] = review_md
         result.outputs["review_text"] = review_md[:4_000]
+        result.outputs.setdefault("state_updates", {})["review_text"] = review_md
         result.summary = (f"review produced ({len(output.get('review_comments') or [])} "
                           f"comments) — {result.summary}")
     return result
@@ -572,7 +580,8 @@ async def _pr_gate_check(ctx: StepContext) -> StepResult:
     class the eval showed no diff-only reviewer catches. Non-blocking: the
     findings go into the review context and the report."""
     if "gate_report" in ctx.state:  # injected (tests / offline)
-        return StepResult(True, summary="gate report from state")
+        return StepResult(True, summary="gate report from state",
+                          outputs={"state_updates": {"gate_report": ctx.state["gate_report"]}})
     spec = ctx.state.get("task_spec") or {}
     pr = spec.get("pr") if isinstance(spec, dict) else None
     if not pr:
@@ -584,7 +593,9 @@ async def _pr_gate_check(ctx: StepContext) -> StepResult:
     if code != 0:
         ctx.state["gate_report"] = "gate check unavailable (gh failed)"
         return StepResult(True, summary="gate check unavailable (gh failed) — "
-                                        "continuing without it")
+                                        "continuing without it",
+                          outputs={"state_updates":
+                                   {"gate_report": ctx.state["gate_report"]}})
     data = json.loads(out or "{}")
     if data.get("isDraft"):
         lines.append("PR is a DRAFT — review findings are provisional.")
@@ -606,7 +617,8 @@ async def _pr_gate_check(ctx: StepContext) -> StepResult:
     report = "\n".join(lines) or "gates clean (mergeable, no failing checks)"
     ctx.state["gate_report"] = report
     return StepResult(True, summary=report.splitlines()[0][:120],
-                      outputs={"gate_report": report})
+                      outputs={"gate_report": report,
+                               "state_updates": {"gate_report": report}})
 
 
 def _issue_agent_step(step_name: str, purpose: str, guidance: str,
@@ -629,6 +641,7 @@ def _issue_agent_step(step_name: str, purpose: str, guidance: str,
             key, text = render(output)
             ctx.state[key] = text
             result.outputs[key] = text[:4_000]
+            result.outputs.setdefault("state_updates", {})[key] = text
             result.summary = f"{key} produced — {result.summary}"
         return result
 
