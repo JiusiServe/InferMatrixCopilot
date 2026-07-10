@@ -16,7 +16,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from ...scopes import post_plan_scope
-from ...targets.base import PushPolicy, guard_push
+from ...push import PushPolicy, guard_push
 from ..step import FailureKind, StepContext, StepResult, StepSpec
 from ._common import (from_state, no_llm_gap, published, register_step,
                       require_repo, step)

@@ -56,7 +56,7 @@ wrong even if it "works".
   enforces `ToolScope`/`PathScope` and traces. Three outcomes: allowed / refused
   / executed-but-recorded (out-of-scope write inside the writable wall). Agent
   steps only ever see tools their scope allows.
-- **C4 — One push choke point.** Every push passes `targets.base.guard_push`:
+- **C4 — One push choke point.** Every push passes `push.guard_push`:
   needs an allowing `PushPolicy` AND a non-protected branch; force is
   with-lease only; dry-run unless `ALLOW_PUSH=1`. Protected branches are never
   pushed to, policy or not.
@@ -111,7 +111,7 @@ wrong even if it "works".
 | B3 | `when:` known keys | `engine/executor.py` | `test_v2_p0.py` |
 | B4 | governed agent I/O | `engine/agent_runtime.py` | `test_agent_runtime.py` |
 | C3 | tool choke point | `tools.py` + `scopes.py` | `test_scopes_tools.py` |
-| C4 | push choke point | `targets/base.py` | `test_push_and_steps.py` |
+| C4 | push choke point | `push.py` | `test_push_and_steps.py` |
 | A5 | repo-neutral core | whole `src/` | `test_v2_p0.py::test_repo_neutral_core` |
 | D3 | provenance + stability | `profiles/store.py` | `test_profile_store.py` |
 | D2 | judge/agent read-only-to-active | `profiles/*`,`plugins/base.py` | `test_p3_machinery.py` |

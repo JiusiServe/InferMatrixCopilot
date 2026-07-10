@@ -1,8 +1,9 @@
-"""Target-layer data structures (DESIGN_REBASE_TARGET) + the unified push guard.
+"""Push authorization — the single push choke point (constraint C4).
 
 Push safety is explicit and ANDed (plugin AND policy): a push happens only when
 the PushPolicy allows it, and force-with-lease is the only force ever used —
-never against a protected branch, regardless of policy.
+never against a protected branch, regardless of policy. Every push in the
+codebase routes through `guard_push`.
 """
 
 from __future__ import annotations

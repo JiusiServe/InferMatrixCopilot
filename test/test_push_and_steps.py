@@ -5,7 +5,7 @@ from omni_copilot.engine.executor import Executor
 from omni_copilot.engine.registry import StepRegistry
 from omni_copilot.engine.step import FailureKind, StepContext
 from omni_copilot.notify import Notifier
-from omni_copilot.targets.base import PushPolicy, guard_push
+from omni_copilot.push import PushPolicy, guard_push
 
 
 def test_guard_push_matrix():

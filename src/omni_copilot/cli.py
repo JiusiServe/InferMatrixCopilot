@@ -29,7 +29,7 @@ from .notify import BLOCKED_EXIT, Notifier
 from .playbooks.store import PlaybookStore, parse_playbook, playbook_to_doc
 from .review.reviewer import run_plan_review
 from .run_trace import RunTrace
-from .targets.base import PushPolicy
+from .push import PushPolicy
 from .task_spec import TaskSpec
 from .ui import style
 

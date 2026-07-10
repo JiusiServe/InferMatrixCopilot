@@ -28,12 +28,12 @@ posting.
 - `pr.post_review` double-gated (**C5**).
 
 ## Scope — not here
-No push authorization logic (that is `targets/base`); no CI log fetching
+No push authorization logic (that is `push`); no CI log fetching
 mechanics (that is `ci/providers`); no agent governance (that is
 `agent_runtime`).
 
 ## Dependencies (allowed)
-`scopes`, `targets/base`, `ci/*`, `plugins/base` (analyze), `engine/step`,
+`scopes`, `push`, `ci/*`, `plugins/base` (analyze), `engine/step`,
 `._common`, `..agent_runtime`.
 
 ## Tests

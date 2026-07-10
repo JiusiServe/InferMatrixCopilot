@@ -44,9 +44,16 @@ only for read-only kinds.
      │
  Steps       engine/steps/*                       the vetted step library
      │
- Edge        plugins/, targets/, ci/, profiles/   repo knowledge & capabilities
+ Edge        plugins/, ci/, profiles/             repo knowledge & capabilities
              review/, memory/, run_trace, notify, metrics   cross-cutting
+             scopes.py, push.py                   pure safety primitives
 ```
+
+There are three code layers (Interface / Task+Planning / Engine+Steps) over an
+edge of repo knowledge and cross-cutting services. The design's "Target layer"
+is **not** a code layer: its task-definition role is carried by `TaskSpec` +
+`Playbook`, and its only surviving artifact — push authorization — is the
+`push.py` safety primitive (sibling of `scopes.py`).
 
 - **Engine is a substrate, not a pipeline.** It provides a vetted step library,
   task-agnostic execution guarantees (checkpoint/resume, typed failure routing,
@@ -61,8 +68,9 @@ only for read-only kinds.
 Imports may only point **down and outward**. Verified constraints a change may
 not violate:
 
-1. Leaf edge packages (`profiles/`, `ci/`, `plugins/`, `targets/`, `review/`,
-   `memory/`) MUST NOT import `engine/`. The engine depends on them.
+1. Leaf edge packages (`profiles/`, `ci/`, `plugins/`, `review/`, `memory/`)
+   and safety primitives (`scopes.py`, `push.py`) MUST NOT import `engine/`.
+   The engine depends on them.
 2. Interface (`cli.py`, `chat.py`) MUST NOT be imported by any lower layer.
    `chat.py` may reference `cli.Copilot` under `TYPE_CHECKING` only.
 3. `engine/step.py` is the base vocabulary: it may depend only on `run_trace`

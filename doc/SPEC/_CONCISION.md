@@ -44,7 +44,7 @@ dedup, and only if the file is still hard to navigate.
 
 ### K1 — Delete dead target dataclasses  ·  ~35 LOC  ·  risk: none
 `ModuleTask`, `ModuleSchedule`, `ValidationPlan`, `RebaseRunSpec` in
-`targets/base.py` are used nowhere but their `targets/__init__.py` re-exports
+`targets/base.py` (now `push.py`) were used nowhere but their re-exports
 (verified: 0 other importers). Delete the four dataclasses + their re-exports.
 **Keep** `PushPolicy`/`PushDecision`/`guard_push` (the live push guard).
 *Invariant to preserve:* C4 (push guard) untouched.

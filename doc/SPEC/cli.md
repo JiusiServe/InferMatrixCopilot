@@ -32,7 +32,7 @@ only.
 
 ## Dependencies (allowed)
 `engine/*`, `playbooks/*`, `intent`, `task_spec`, `plugins/base`,
-`targets/base`, `review/reviewer`, `notify`, `run_trace`, `config`, `ui`,
+`push`, `review/reviewer`, `notify`, `run_trace`, `config`, `ui`,
 `chat`. MUST NOT be imported by any lower layer (**§ARCH.4.2**).
 
 ## Extension points

@@ -35,7 +35,7 @@ is pointed at.
       review/ (diff summary → triggers → read-only reviewer) §3.3(3)
       memory/ (RunTrace, DebugMemory FTS5, gated skills)     §3.3(4)
       plugins/ (repo knowledge, draft bootstrap)             plugin layer
-      targets/ (PushPolicy + guard_push)                     target layer
+      push.py  (PushPolicy + guard_push)                     push authorization
       notify.py (ESCALATION.md + email, exit 3)              goal #4
 ```
 
@@ -80,7 +80,7 @@ is pointed at.
 | `src/omni_copilot/review/` | 框架层改进 (3): diff summary → trigger rules → read-only patch reviewer |
 | `src/omni_copilot/run_trace.py`, `memory/` | 框架层改进 (4): RunTrace / DebugMemory / gated skills |
 | `src/omni_copilot/plugins/` | RepoPlugin: plugin zero, registry, deterministic bootstrap → draft |
-| `src/omni_copilot/targets/base.py` | Target-layer types + unified `guard_push` |
+| `src/omni_copilot/push.py` | Push authorization: `PushPolicy` + unified `guard_push` (no separate Target layer) |
 | `src/omni_copilot/notify.py` | goal #4: escalation channel, blocked exit code 3 |
 
 ## Data & artifacts per run
