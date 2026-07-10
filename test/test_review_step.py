@@ -115,13 +115,13 @@ def test_review_blocked_without_diff(settings, trace, tmp_path):
     assert not result.ok and "no diff_text" in result.summary
 
 
-def test_pr_review_playbook_v4_shape():
+def test_pr_review_playbook_shape():
     from omni_copilot.config import _REPO_ROOT
     from omni_copilot.playbooks.store import PlaybookStore
 
     store = PlaybookStore(_REPO_ROOT / "playbooks", _registry())
     pb = store.get("pr-review")
-    assert pb.version == 4
+    assert pb.version == 5  # v5 = repo-neutral (repos: [] + requires)
     assert [s.step for s in pb.steps] == [
         "pr.fetch_diff", "pr.gate_check", "agent.review_diff",
         "pr.post_review", "report.final_summary"]

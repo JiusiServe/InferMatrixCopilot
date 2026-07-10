@@ -70,6 +70,25 @@ class RepoPlugin:
     def profile_dir(self) -> Path:
         return self.root / "profile"
 
+    @property
+    def capabilities(self) -> set[str]:
+        """What this repo's profile provides — matched against playbook
+        `requires:` (design §V2.2.3). Derived facts plus the manifest's
+        explicit `capabilities:` list."""
+        caps: set[str] = set(self.manifest.get("capabilities") or [])
+        repo = self.manifest.get("repo", {}) or {}
+        if repo.get("path"):
+            caps.add("repo.path")
+        if repo.get("language"):
+            caps.add(f"language.{repo['language']}")
+        if (self.manifest.get("ci") or {}).get("provider"):
+            caps.add("ci.provider")
+        if (self.manifest.get("upstream") or {}).get("kind"):
+            caps.add(f"upstream.{self.manifest['upstream']['kind']}")
+        if self.modules:
+            caps.add("modules")
+        return caps
+
     def briefing(self) -> str:
         """The repo's always-on prompt slice (empty when no profile exists)."""
         if not (self.profile_dir / "profile.yaml").exists():

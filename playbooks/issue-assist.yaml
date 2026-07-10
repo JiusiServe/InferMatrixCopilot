@@ -1,10 +1,12 @@
 # Issue answering — draft by default; posting needs the explicit post flag.
 name: issue-answer
-version: 1
+version: 2
 status: active
 provenance: {created_by: human, source: promoted from the generated L2 plan}
 task_kinds: [issue_answer]
-repos: [vllm-omni]
+# repo-neutral (design v2 P2): any repo whose profile satisfies `requires`
+repos: []
+requires: [repo.path]
 params: {}
 steps:
   - {id: fetch, step: issue.fetch}

@@ -199,9 +199,21 @@ keys `_sweep_targets` extractors on `repo.language` (unknown language →
 file-level sweep only, recorded honestly). Leak ceilings tightened in
 `test_v2_p0.py`. Tests: `test_profile_steps.py` (12) + suite green (185).
 
-P2 (repo-neutral playbook matching, CI/forge adapters, capability-gap
-degradation, repo_map tool), P3 (cross-repo eval + profile ablation +
-consolidation/judge loops): not started — see doc/DESIGN.md §V2.4.
+**P2 — repo-neutral execution (started 2026-07-10):** capability matching
+done (`test_capabilities.py`): playbooks carry `requires:`; the pr/issue
+playbooks are now repo-neutral (`repos: []` + `requires: [repo.path]`,
+version-bumped); `RepoPlugin.capabilities` derives repo.path/language.*/
+ci.provider/upstream.*/modules plus the manifest's explicit `capabilities:`
+(plugin zero adds `orchestrator.external`, required by both rebase
+playbooks). `PlaybookStore.find` matches kind → exact repo → neutral with
+requires ⊆ capabilities (`capabilities=None` keeps v1 behavior);
+`Copilot.resolve` feeds capabilities from the plugin + REPO_PATHS. Gap
+handling: write-capable kinds raise a "capability gap … run repo_profile"
+PlanningError; read-only kinds degrade to the generate path. Still to do in
+P2: CI/forge adapter interface (Buildkite log download), `repo_map`
+on-demand tool, `capability_gap` RunTrace events inside steps. P3
+(cross-repo eval + profile ablation + consolidation/judge loops): not
+started — see doc/DESIGN.md §V2.4.
 
 ## Deliberate v1 boundaries
 - Playbooks are ordered step lists with `foreach` fan-out and `when:` conditions —

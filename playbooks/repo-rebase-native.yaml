@@ -12,6 +12,7 @@ provenance:
     own phase wrappers and node_rebase_module
 task_kinds: [repo_rebase]
 repos: [vllm-omni]
+requires: [orchestrator.external]
 params:
   report_only: {type: bool, default: true}
   local_ci_only: {type: bool, default: false}

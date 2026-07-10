@@ -32,9 +32,10 @@ class Playbook:
     version: int
     status: str
     task_kinds: list[str]
-    repos: list[str]
+    repos: list[str]                 # explicit repos win; [] = repo-neutral
     steps: list[PlaybookStep]
     params: dict = field(default_factory=dict)  # declared adaptation surface
+    requires: list[str] = field(default_factory=list)  # profile capabilities
     provenance: dict = field(default_factory=dict)
     success: str = ""
 
@@ -47,6 +48,7 @@ def playbook_to_doc(pb: Playbook) -> dict:
     return {
         "name": pb.name, "version": pb.version, "status": pb.status,
         "task_kinds": pb.task_kinds, "repos": pb.repos, "params": pb.params,
+        **({"requires": pb.requires} if pb.requires else {}),
         "provenance": pb.provenance, "success": pb.success,
         "steps": [
             {"id": s.id, "step": s.step,
@@ -82,6 +84,7 @@ def _parse(doc: dict, source: str) -> Playbook:
         name=doc["name"], version=int(doc.get("version", 1)), status=doc["status"],
         task_kinds=list(doc["task_kinds"]), repos=list(doc.get("repos", [])),
         steps=steps, params=doc.get("params", {}) or {},
+        requires=list(doc.get("requires", []) or []),
         provenance=doc.get("provenance", {}) or {}, success=doc.get("success", ""),
     )
 
@@ -116,17 +119,40 @@ class PlaybookStore:
     def all(self) -> list[Playbook]:
         return list(self._playbooks.values())
 
-    def find(self, task_kind: str, repo: str | None = None) -> Playbook | None:
-        """Recall: exact task-kind match, preferring repo match, locked > active."""
+    def find(self, task_kind: str, repo: str | None = None,
+             capabilities: set[str] | None = None) -> Playbook | None:
+        """Recall: exact task-kind match, preferring repo match, locked > active.
+
+        Repo-neutral playbooks (`repos: []`) additionally declare `requires:` —
+        the profile capabilities they need (design §V2.2.3). With a known
+        capability set they only match when satisfied; `capabilities=None`
+        means "unknown" and skips the filter (v1-compatible)."""
         candidates = [
             p for p in self._playbooks.values()
             if task_kind in p.task_kinds and p.status in ("active", "locked")
         ]
         if repo:
             scoped = [p for p in candidates if repo in p.repos]
-            candidates = scoped or [p for p in candidates if not p.repos]
+            if not scoped:
+                scoped = [p for p in candidates if not p.repos]
+                if capabilities is not None:
+                    scoped = [p for p in scoped
+                              if set(p.requires) <= capabilities]
+            candidates = scoped
         candidates.sort(key=lambda p: (p.status != "locked", -p.version))
         return candidates[0] if candidates else None
+
+    def missing_capabilities(self, task_kind: str,
+                             capabilities: set[str]) -> dict[str, list[str]]:
+        """Per repo-neutral playbook of this kind: the unmet requirements
+        (escalation material for capability_gap reporting)."""
+        return {
+            p.name: sorted(set(p.requires) - capabilities)
+            for p in self._playbooks.values()
+            if task_kind in p.task_kinds and not p.repos
+            and p.status in ("active", "locked")
+            and not set(p.requires) <= capabilities
+        }
 
     def save_candidate(self, pb: Playbook) -> Path:
         """Successful generated/adapted plans enter the registry as candidates

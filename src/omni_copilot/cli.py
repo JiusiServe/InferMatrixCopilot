@@ -45,7 +45,11 @@ class Copilot:
 
     # -- planning ---------------------------------------------------------------
     def resolve(self, spec: TaskSpec) -> Resolution:
-        return self.planner.resolve(spec)
+        plugin = self._plugin_for(spec.repo)
+        capabilities = set(plugin.capabilities) if plugin is not None else set()
+        if self._resolve_repo_path(spec.repo):  # REPO_PATHS works plugin-less
+            capabilities.add("repo.path")
+        return self.planner.resolve(spec, capabilities=capabilities)
 
     def _plan_review_gate(self, resolution: Resolution, spec: TaskSpec,
                           assume_yes: bool) -> bool:

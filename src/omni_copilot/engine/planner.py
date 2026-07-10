@@ -53,8 +53,20 @@ class Planner:
         self.store = store
         self.registry = registry
 
-    def resolve(self, spec: TaskSpec) -> Resolution:
-        playbook = self.store.find(spec.kind, spec.repo)
+    def resolve(self, spec: TaskSpec,
+                capabilities: set[str] | None = None) -> Resolution:
+        playbook = self.store.find(spec.kind, spec.repo, capabilities)
+        if playbook is None and capabilities is not None:
+            gaps = self.store.missing_capabilities(spec.kind, capabilities)
+            if gaps and spec.kind not in READ_ONLY_KINDS:
+                # a vetted playbook exists but the repo profile can't feed it:
+                # declared degradation, not silent failure (§V2.2.4)
+                raise PlanningError(
+                    f"capability gap for '{spec.kind}' on {spec.repo}: "
+                    + "; ".join(f"{name} requires {missing}"
+                                for name, missing in sorted(gaps.items()))
+                    + " — establish/extend the repo profile first "
+                      "(run repo_profile)")
 
         # 1. Reuse — exact recall, parameterize only the declared surface.
         if playbook is not None:

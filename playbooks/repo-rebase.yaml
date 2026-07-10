@@ -9,6 +9,7 @@ provenance:
   source: vllm-omni-rebase-agent 5-phase LangGraph orchestrator (frozen 2026-07)
 task_kinds: [repo_rebase]
 repos: [vllm-omni]
+requires: [orchestrator.external]
 params:
   # steps are unchanged from v1 — v2 only widens the declared adaptation
   # surface (whitelisted orchestrator flag passthrough); reuse stays L0.

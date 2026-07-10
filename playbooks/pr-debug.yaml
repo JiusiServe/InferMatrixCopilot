@@ -1,13 +1,15 @@
 # PR debug — vetted L1 playbook. Additive commits only: force_push stays false.
 # report_only stops after grouping (read-only triage, independently useful).
 name: pr-debug
-version: 1
+version: 2
 status: active
 provenance:
   created_by: human
   source: PLAN_PR_DEBUG_MODE.md folded into the target/playbook model
 task_kinds: [pr_debug]
-repos: [vllm-omni]
+# repo-neutral (design v2 P2): any repo whose profile satisfies `requires`
+repos: []
+requires: [repo.path]
 params:
   max_groups: {type: int, default: 6}
 steps:

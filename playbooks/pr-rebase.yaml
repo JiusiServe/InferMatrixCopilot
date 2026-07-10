@@ -1,13 +1,15 @@
 # PR rebase — vetted L1 playbook. Push targets the PR head branch only
 # (never protected branches; force is with-lease only, required post-rebase).
 name: pr-rebase
-version: 1
+version: 2
 status: active
 provenance:
   created_by: human
   source: DESIGN_PR_REBASE.md folded into the target/playbook model
 task_kinds: [pr_rebase]
-repos: [vllm-omni]
+# repo-neutral (design v2 P2): any repo whose profile satisfies `requires`
+repos: []
+requires: [repo.path]
 params:
   force_push: {type: bool, default: true}
 steps:
