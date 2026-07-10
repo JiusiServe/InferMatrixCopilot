@@ -104,7 +104,8 @@ being a forge other than what a CI/forge adapter declares; storing secrets
 
 Five independent gates, ANDed — a change may strengthen but not remove any:
 
-1. **Tier from kind** — NL/user text can never widen permissions (§01-C1).
+1. **Tier from kind** — NL/user text can never widen permissions
+   (`_CONSTRAINTS.md` C1).
 2. **Plan review** — adapted/generated plans are reviewed before execution;
    generation is structurally barred from write/push steps.
 3. **ToolScope/PathScope** — every tool call passes one dispatcher; out-of-scope

@@ -1,51 +1,72 @@
-# vllm-omni-copilot — Specification
+# vllm-omni-copilot — Specification (file-level)
 
-A **normative** specification of the copilot, written level by level to mirror
-the code tree. Where `CODE_TOUR.md` is a *reading guide* (how to walk the code)
-and `DESIGN.md` is the *rationale* (why it is shaped this way), this SPEC is the
-*contract*: what each layer and each module MUST do, MUST NOT do, and the
-invariants a change may not break. Use it in review to decide whether a change
-belongs where it was put and whether it keeps the code clean.
+A **normative, file-level** specification. The `doc/SPEC/` tree mirrors
+`src/omni_copilot/`: **one spec file per source file**, at the same relative
+path (`engine/steps/pr.py` → `doc/SPEC/engine/steps/pr.md`). Each spec covers a
+fixed set of lenses. Two cross-cutting docs sit at the root and are referenced
+(not repeated) by every per-file spec.
 
-## How the SPEC is organized
+This SPEC is written to drive a **codebase refactor**: for any source file you
+touch, its spec tells you what the file must keep guaranteeing, what does not
+belong in it, which global constraints bind it, and where it is currently messy.
 
-Cross-cutting first, then one file per architectural level (each level maps to
-directories/files under `src/omni_copilot/`):
+## Cross-cutting (read first)
 
-| File | Covers | Code |
-|---|---|---|
-| [00-architecture.md](00-architecture.md) | Layers, dependency rules, functionality, scope, data & artifacts, safety model | whole tree |
-| [01-constraints.md](01-constraints.md) | Global programming constraints + the invariant catalog | whole tree |
-| [02-task-and-cli.md](02-task-and-cli.md) | Task layer & interfaces | `task_spec.py` `intent.py` `cli.py` `chat.py` `ui.py` `config.py` |
-| [03-planning.md](03-planning.md) | Planning & playbook registry | `engine/planner.py` `playbooks/` |
-| [04-engine.md](04-engine.md) | Engine substrate & governed agent runtime | `engine/{step,registry,executor,agent_runtime}.py` `agent_loop.py` `tools.py` `scopes.py` `llm.py` |
-| [05-steps.md](05-steps.md) | The vetted step library | `engine/steps/*` |
-| [06-profiles.md](06-profiles.md) | Repo-profile knowledge subsystem | `profiles/*` |
-| [07-edge.md](07-edge.md) | Repo edge: plugins, targets, CI, rebase monitor | `plugins/` `targets/` `ci/` `rebase/monitor.py` |
-| [08-crosscut.md](08-crosscut.md) | Review, memory, observability, escalation, metrics | `review/` `memory/` `run_trace.py` `notify.py` `metrics.py` |
+- **[_ARCHITECTURE.md](_ARCHITECTURE.md)** — layers, dependency direction rules,
+  functionality (the 7 task kinds), scope, data & artifacts, safety model,
+  repo-invariance contract. The "big picture" every per-file spec assumes.
+- **[_CONSTRAINTS.md](_CONSTRAINTS.md)** — global programming constraints
+  (A structural, B contract, C safety, D knowledge, E observability) + the
+  invariant catalog. Per-file specs cite these by id (e.g. `A2`, `C4`) instead
+  of restating them.
 
-## Per-module spec template
+## Per-file spec template (the lenses)
 
-Every module entry in files 02–08 is specified against a fixed set of lenses.
-A reviewer checks a change against exactly these:
+Every `*.md` under the mirrored tree uses these headings, in this order:
 
-- **Responsibility** — the one thing this module owns. (If a change adds a
-  second unrelated responsibility, it belongs elsewhere.)
-- **Public contract** — the symbols other code may use and the guarantees they
-  make. Changing a guarantee is a breaking change.
-- **Invariants** — properties that must hold on every path. These are the
-  "must not break" list.
-- **Scope** — what explicitly does NOT belong in this module.
-- **Depends on** — the only imports allowed (enforces the dependency rules in
-  §00). Anything outside this list is a layering violation.
-- **Extension points** — the sanctioned way to add capability here.
-- **Tests** — the guard tests that pin the invariants.
+1. **Header line** — `LOC ~N · role · refactor-status`.
+   `refactor-status ∈ {ok, oversized, split-candidate, shim-to-retire,
+   trivial}`.
+2. **Responsibility** — the single thing the file owns.
+3. **Functionality** — what it actually does (behavior), briefly.
+4. **Public contract** — exported symbols other code may use + their guarantees.
+5. **Invariants** — properties that must hold on every path (the "don't break"
+   list), each tagged with the constraint id it realizes.
+6. **Scope — not here** — what explicitly does NOT belong in this file.
+7. **Dependencies (allowed)** — the imports this file may have (enforces the
+   §_ARCHITECTURE dependency rules). Anything else is a layering violation.
+8. **Extension points** — the sanctioned way to add capability here.
+9. **Tests** — the guard tests that pin the invariants.
+10. **Refactor notes** — size/cohesion/coupling smells and concrete suggested
+    moves/splits. This is the lens the refactor consumes.
 
-## Status & authority
+## How to use this during refactor
 
-- This SPEC describes the code at `main` after the v2 work and the
-  `engine/steps/` refactor (211 offline tests). When code and SPEC disagree,
-  that is a bug in one of them — reconcile, do not ignore.
-- `IMPLEMENTATION_STATUS.md` tracks *what is built vs planned*; this SPEC
-  specifies *what built code must guarantee*. Planned-but-unbuilt items are
-  marked `[planned]` here.
+- **Before editing a file**: read its spec. If your change adds a responsibility
+  the spec doesn't list, the change belongs in a different file (or a new one) —
+  add/adjust the spec first.
+- **When splitting a file**: create the new spec files, move the relevant
+  lenses, and keep the "Dependencies (allowed)" honest — a split that creates a
+  cross-import the rules forbid is not done.
+- **When deleting a shim** (`refactor-status: shim-to-retire`): migrate importers
+  to the real module first (the spec lists who imports it), then delete both the
+  code and its spec.
+- **Invariants are the contract**: a refactor may move code freely but must
+  preserve every invariant and every guard test named in the spec. If a test
+  must change, the invariant changed — call it out.
+
+## File index (mirrors `src/omni_copilot/`)
+
+| Layer | Spec files |
+|---|---|
+| Interface / task | `task_spec` `intent` `cli` `chat` `ui` `config` |
+| Engine substrate | `engine/step` `engine/registry` `engine/executor` `engine/planner` `engine/agent_runtime` `agent_loop` `tools` `scopes` `llm` |
+| Step library | `engine/steps/__init__` `engine/steps/_common` `engine/steps/{workspace,rebase_ext,review,report,pr,issue,profile,rebase_native}` |
+| Compat shims | `engine/{builtin_steps,pr_steps,rebase_native_steps}` (shim-to-retire) |
+| Planning data | `playbooks/store` `playbooks/PLAYBOOKS` (the yaml) |
+| Edge | `plugins/base` `targets/base` `ci/normalize` `ci/providers` `rebase/monitor` |
+| Profiles | `profiles/store` `profiles/establish` `profiles/repo_map` `profiles/consolidate` |
+| Cross-cutting | `review/{diff_summary,triggers,reviewer}` `memory/{debug_memory,skills}` `run_trace` `notify` `metrics` |
+
+Trivial `__init__.py` re-export files are not specified individually
+(`engine/steps/__init__` is, because it defines `register_builtin_steps`).

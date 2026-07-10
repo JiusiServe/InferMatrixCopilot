@@ -6,10 +6,11 @@ wrong even if it "works".
 
 ## A. Structural constraints (organization)
 
-- **A1 — One responsibility per module.** A module's spec (files 02–08) names
-  its single responsibility. Adding an unrelated concern means a new module, not
-  a bigger one.
-- **A2 — Dependency direction is down/outward only.** See §00.4. Leaf packages
+- **A1 — One responsibility per module.** Each per-file spec names its single
+  responsibility. Adding an unrelated concern means a new module, not a bigger
+  one.
+- **A2 — Dependency direction is down/outward only.** See `_ARCHITECTURE.md` §4.
+  Leaf packages
   never import `engine/`; interface is never imported downward; step modules
   never import each other (shared code → `engine/steps/_common.py`).
 - **A3 — Steps compose tools; the planner composes steps.** The planner MUST NOT
