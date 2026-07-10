@@ -5,6 +5,8 @@ architecture in `vllm-omni-rebase-agent/docs/copilot/copilot_design`
 (3-layer RepoPlugin / Target / Engine, Step abstraction, dynamic pipelines with
 reuse > adapt > generate, conversational CLI). See [doc/DESIGN.md](doc/DESIGN.md);
 new readers: start with the code walkthrough in [doc/CODE_TOUR.md](doc/CODE_TOUR.md).
+The normative per-layer specification (contracts, invariants, constraints) is
+in [doc/SPEC/](doc/SPEC/README.md).
 
 ## Layout
 
