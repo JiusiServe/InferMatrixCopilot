@@ -77,14 +77,6 @@ def extract_directives(doc_text: str, *, min_words: int = 4,
     return out
 
 
-# language -> source-file suffixes for the deterministic module scan
-LANGUAGE_SUFFIXES = {
-    "python": (".py",),
-    "rust": (".rs",),
-    "go": (".go",),
-    "javascript": (".ts", ".js", ".tsx", ".jsx"),
-}
-
 _NON_MODULE_DIRS = {"docs", "doc", "examples", "example", "scripts", "assets",
                     "third_party", "vendor"}
 
@@ -92,14 +84,15 @@ _NON_MODULE_DIRS = {"docs", "doc", "examples", "example", "scripts", "assets",
 def scan_modules(repo: Path, language: str, *, min_files: int = 3) -> dict:
     """Deterministic module draft: top-level directories holding enough source
     files. Tests keep their own module so wave scheduling can order them."""
-    suffixes = LANGUAGE_SUFFIXES.get(language, ())
+    from .languages import suffixes as _suffixes
+    sfx = _suffixes(language)
     modules: dict[str, dict] = {}
     for entry in sorted(repo.iterdir()):
         if (not entry.is_dir() or entry.name.startswith(".")
                 or entry.name in _NON_MODULE_DIRS):
             continue
         count = sum(1 for p in entry.rglob("*")
-                    if p.is_file() and p.suffix in suffixes)
+                    if p.is_file() and p.suffix in sfx)
         if count >= min_files:
             wave = 2 if entry.name in ("tests", "test", "benchmarks") else 1
             modules[entry.name] = {"local_paths": [f"{entry.name}/"],

@@ -206,11 +206,8 @@ def _sweep_targets(diff: str, language: str = "python") -> str:
     honestly instead of running Python heuristics on foreign syntax."""
     import re
 
-    line_rules = {
-        "python": (re.compile(r"\w\[\s*0\s*\]|\.pop\(0\)|next\(iter\("),
-                   re.compile(r"(el)?if\b|else\b")),
-    }
-    rules = line_rules.get(language)
+    from ...profiles.languages import sweep_re
+    rules = sweep_re(language)
     current: str | None = None
     new_line = 0
     subs: list[str] = []

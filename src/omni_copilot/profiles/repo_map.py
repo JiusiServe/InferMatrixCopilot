@@ -16,20 +16,9 @@ import re
 import subprocess
 from pathlib import Path
 
-_SYMBOL_RES: dict[str, re.Pattern] = {
-    "python": re.compile(r"^\s*(?:async\s+def|def|class)\s+\w+[^\n]*", re.M),
-    "go": re.compile(r"^(?:func|type)\s+[^\n{]+", re.M),
-    "rust": re.compile(r"^\s*(?:pub\s+)?(?:fn|struct|enum|trait|impl)\s+[^\n{;]+",
-                       re.M),
-    "javascript": re.compile(
-        r"^\s*(?:export\s+)?(?:function|class|const|interface)\s+\w+[^\n]*", re.M),
-}
-_SUFFIXES = {
-    "python": (".py",),
-    "go": (".go",),
-    "rust": (".rs",),
-    "javascript": (".ts", ".js", ".tsx", ".jsx"),
-}
+from .languages import suffixes as _suffixes
+from .languages import symbol_re as _symbol_re
+
 _SKIP_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__", "build",
               "dist", ".tox"}
 
@@ -46,8 +35,8 @@ def _head_commit(repo: Path) -> str:
 def build_index(repo: Path, language: str, *, max_files: int = 4_000,
                 max_file_bytes: int = 200_000,
                 max_symbols_per_file: int = 40) -> dict[str, list[str]]:
-    pattern = _SYMBOL_RES.get(language)
-    suffixes = _SUFFIXES.get(language, ())
+    pattern = _symbol_re(language)
+    suffixes = _suffixes(language)
     if pattern is None:
         return {}
     index: dict[str, list[str]] = {}
@@ -85,7 +74,7 @@ class RepoMap:
 
     @property
     def supported(self) -> bool:
-        return self.language in _SYMBOL_RES
+        return _symbol_re(self.language) is not None
 
     def index(self) -> dict[str, list[str]]:
         if self._index is not None:
