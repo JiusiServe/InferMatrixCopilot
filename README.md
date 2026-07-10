@@ -3,7 +3,8 @@
 Playbook-driven repo-maintenance copilot for [vLLM-Omni], implementing the
 architecture in `vllm-omni-rebase-agent/docs/copilot/copilot_design`
 (3-layer RepoPlugin / Target / Engine, Step abstraction, dynamic pipelines with
-reuse > adapt > generate, conversational CLI). See [doc/DESIGN.md](doc/DESIGN.md).
+reuse > adapt > generate, conversational CLI). See [doc/DESIGN.md](doc/DESIGN.md);
+new readers: start with the code walkthrough in [doc/CODE_TOUR.md](doc/CODE_TOUR.md).
 
 ## Layout
 
