@@ -1,6 +1,6 @@
-"""Profile-establishment steps (doc/DESIGN.md §V2.3.3, Stages 0–1.5) — the
-`repo-profile` playbook. Read-only toward the TARGET repo; writes land only
-under plugins/<repo>/ (knowledge risk, curator/human-gated downstream):
+"""Profile establishment + Stage-4 maintenance steps (doc/DESIGN.md §V2.3.3).
+Read-only toward the TARGET repo; writes land only under plugins/<repo>/
+(knowledge risk, curator/human-gated downstream):
 
 - profile.fingerprint    Stage 0: deterministic fingerprint; draft plugin for
                          unknown repos (stops at `status: draft` — human gate)
@@ -8,22 +8,22 @@ under plugins/<repo>/ (knowledge risk, curator/human-gated downstream):
 - profile.ingest_docs    Stage 1.5 input: existing AGENTS.md/CLAUDE.md et al.
                          ingested as human-authored briefing facts
 - agent.profile_repo     Stage 1: governed agent derives non-obvious facts
-                         (evidence-cited, typed ops, redundancy-filtered)
+- profile.detect_drift / decay_stale / consolidate / judge  Stage 4 maintenance
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from ..plugins.base import (PluginRegistry, RepoPlugin, draft_plugin,
+from ...plugins.base import (PluginRegistry, RepoPlugin, draft_plugin,
                             fingerprint_repo, load_plugin, update_manifest)
-from ..profiles.establish import (HUMAN_DOC_NAMES, build_doc_corpus,
+from ...profiles.establish import (HUMAN_DOC_NAMES, build_doc_corpus,
                                   extract_directives, fact_id, is_redundant,
                                   scan_modules)
-from ..profiles.store import ProfileStore
-from .builtin_steps import _repo_path
-from .registry import StepRegistry
-from .step import FailureKind, StepContext, StepResult, StepSpec
+from ...profiles.store import ProfileStore
+from ..step import FailureKind, StepContext, StepResult
+from ._common import repo_path as _repo_path
+from ._common import step
 
 
 def _plugin_from_state(ctx: StepContext) -> RepoPlugin | StepResult:
@@ -34,6 +34,9 @@ def _plugin_from_state(ctx: StepContext) -> RepoPlugin | StepResult:
     return load_plugin(root)
 
 
+@step("profile.fingerprint", "deterministic", "knowledge",
+      "Stage 0: deterministic repo fingerprint; draft plugin for unknown "
+      "repos (stops at status: draft).")
 async def _fingerprint(ctx: StepContext) -> StepResult:
     repo = _repo_path(ctx)
     if repo is None or not repo.exists():
@@ -59,6 +62,9 @@ async def _fingerprint(ctx: StepContext) -> StepResult:
                                "created": created, "state_updates": updates})
 
 
+@step("profile.structure_scan", "deterministic", "knowledge",
+      "Stage 0: deterministic module draft into plugin.yaml (never overwrites "
+      "declared modules).")
 async def _structure_scan(ctx: StepContext) -> StepResult:
     plugin = _plugin_from_state(ctx)
     if isinstance(plugin, StepResult):
@@ -80,6 +86,9 @@ async def _structure_scan(ctx: StepContext) -> StepResult:
                       outputs={"modules": modules})
 
 
+@step("profile.ingest_docs", "deterministic", "knowledge",
+      "Ingest AGENTS.md/CLAUDE.md-style human directives as briefing facts "
+      "(doc-redundant lines dropped).")
 async def _ingest_docs(ctx: StepContext) -> StepResult:
     plugin = _plugin_from_state(ctx)
     if isinstance(plugin, StepResult):
@@ -137,6 +146,9 @@ Emit at most 15 facts. Also emit review_checklist lines ONLY for repo-specific
 review concerns a generic checklist would miss (empty list is a fine answer)."""
 
 
+@step("agent.profile_repo", "agent", "knowledge",
+      "Stage 1: governed agent derives non-obvious, evidence-cited profile "
+      "facts; redundancy-filtered, typed-op applied.")
 async def _profile_repo_agent(ctx: StepContext) -> StepResult:
     plugin = _plugin_from_state(ctx)
     if isinstance(plugin, StepResult):
@@ -148,7 +160,7 @@ async def _profile_repo_agent(ctx: StepContext) -> StepResult:
         return StepResult(True, summary="agent profiling skipped (no LLM) — "
                                         "deterministic stages already produced "
                                         "the draft profile")
-    from .agent_runtime import run_agent_step
+    from ..agent_runtime import run_agent_step
 
     repo = Path(plugin.repo_path or ctx.state.get("repo_path", ""))
     evidence: dict[str, str] = {
@@ -225,11 +237,14 @@ async def _profile_repo_agent(ctx: StepContext) -> StepResult:
 
 # -- Stage 4: scheduled consolidation & audit (design §V2.3.3) -----------------
 
+@step("profile.detect_drift", "deterministic", "read",
+      "Stage 4: deterministic drift report (moved module paths, orphaned fact "
+      "joins) — refresh material, never auto-fixed.")
 async def _detect_drift(ctx: StepContext) -> StepResult:
     plugin = _plugin_from_state(ctx)
     if isinstance(plugin, StepResult):
         return plugin
-    from ..profiles.consolidate import detect_drift
+    from ...profiles.consolidate import detect_drift
 
     findings = detect_drift(plugin, ProfileStore(plugin.profile_dir))
     if findings:
@@ -241,11 +256,14 @@ async def _detect_drift(ctx: StepContext) -> StepResult:
                                "state_updates": {"profile_drift": findings}})
 
 
+@step("profile.decay_stale", "deterministic", "knowledge",
+      "Stage 4: dormancy decay — unconfirmed facts flip to stale (excluded, "
+      "never deleted).")
 async def _decay_stale(ctx: StepContext) -> StepResult:
     plugin = _plugin_from_state(ctx)
     if isinstance(plugin, StepResult):
         return plugin
-    from ..profiles.consolidate import decay_stale
+    from ...profiles.consolidate import decay_stale
 
     stale = decay_stale(ProfileStore(plugin.profile_dir),
                         days=ctx.settings.profile_stale_days)
@@ -271,6 +289,9 @@ sharper facts beat many vague ones — the briefing channel has a hard word
 budget. Emit an empty ops list when the profile is already clean."""
 
 
+@step("agent.profile_consolidate", "agent", "knowledge",
+      "Stage 4: the ONLY rewrite/merge tier — whole-profile consolidation via "
+      "typed ops, stability gates enforced.")
 async def _profile_consolidate(ctx: StepContext) -> StepResult:
     plugin = _plugin_from_state(ctx)
     if isinstance(plugin, StepResult):
@@ -281,7 +302,7 @@ async def _profile_consolidate(ctx: StepContext) -> StepResult:
                          effect="only deterministic decay/drift ran")
         return StepResult(True, summary="consolidation skipped (no LLM); "
                                         "decay and drift detection already ran")
-    from .agent_runtime import run_agent_step
+    from ..agent_runtime import run_agent_step
 
     store = ProfileStore(plugin.profile_dir)
     if not store.facts:
@@ -323,6 +344,9 @@ are vague or read like generated overview prose. For each finding cite the \
 fact id and WHY. An empty findings list is a fine answer."""
 
 
+@step("profile.judge", "agent", "read",
+      "Stage 4: read-only profile audit -> JUDGE_REPORT.md; findings surfaced, "
+      "never auto-applied.")
 async def _profile_judge(ctx: StepContext) -> StepResult:
     plugin = _plugin_from_state(ctx)
     if isinstance(plugin, StepResult):
@@ -331,7 +355,7 @@ async def _profile_judge(ctx: StepContext) -> StepResult:
         ctx.trace.record("capability_gap", capability="llm",
                          step="profile.judge", effect="profile audit skipped")
         return StepResult(True, summary="profile audit skipped (no LLM)")
-    from .agent_runtime import run_agent_step
+    from ..agent_runtime import run_agent_step
 
     store = ProfileStore(plugin.profile_dir)
     profile_text = store.profile_file.read_text(encoding="utf-8") \
@@ -361,34 +385,3 @@ async def _profile_judge(ctx: StepContext) -> StepResult:
     result.summary = f"audit: {len(findings)} finding(s) — JUDGE_REPORT.md"
     result.outputs.update(findings=findings)
     return result
-
-
-def register_profile_steps(registry: StepRegistry) -> StepRegistry:
-    add = registry.register
-    add(StepSpec("profile.fingerprint", "deterministic", "knowledge", _fingerprint,
-                 "Stage 0: deterministic repo fingerprint; draft plugin for "
-                 "unknown repos (stops at status: draft)."))
-    add(StepSpec("profile.structure_scan", "deterministic", "knowledge",
-                 _structure_scan,
-                 "Stage 0: deterministic module draft into plugin.yaml "
-                 "(never overwrites declared modules)."))
-    add(StepSpec("profile.ingest_docs", "deterministic", "knowledge", _ingest_docs,
-                 "Ingest AGENTS.md/CLAUDE.md-style human directives as "
-                 "briefing facts (doc-redundant lines dropped)."))
-    add(StepSpec("agent.profile_repo", "agent", "knowledge", _profile_repo_agent,
-                 "Stage 1: governed agent derives non-obvious, evidence-cited "
-                 "profile facts; redundancy-filtered, typed-op applied."))
-    add(StepSpec("profile.detect_drift", "deterministic", "read", _detect_drift,
-                 "Stage 4: deterministic drift report (moved module paths, "
-                 "orphaned fact joins) — refresh material, never auto-fixed."))
-    add(StepSpec("profile.decay_stale", "deterministic", "knowledge", _decay_stale,
-                 "Stage 4: dormancy decay — unconfirmed facts flip to stale "
-                 "(excluded, never deleted)."))
-    add(StepSpec("agent.profile_consolidate", "agent", "knowledge",
-                 _profile_consolidate,
-                 "Stage 4: the ONLY rewrite/merge tier — whole-profile "
-                 "consolidation via typed ops, stability gates enforced."))
-    add(StepSpec("profile.judge", "agent", "read", _profile_judge,
-                 "Stage 4: read-only profile audit -> JUDGE_REPORT.md; "
-                 "findings surfaced, never auto-applied."))
-    return registry

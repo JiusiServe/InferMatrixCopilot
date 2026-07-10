@@ -278,8 +278,8 @@ def test_plugin_zero_declares_risk_tiers():
 _KNOWN_LEAKS = {
     "__init__.py": 1,            # package docstring
     "config.py": 3,              # default_repo + rebase_agent_root default
-    "engine/builtin_steps.py": 1,  # orchestrator-not-found hint (delegation)
-    "engine/rebase_native_steps.py": 6,  # parent-package delegation (by design)
+    "engine/steps/rebase_ext.py": 1,     # orchestrator-not-found hint (delegation)
+    "engine/steps/rebase_native.py": 6,  # parent-package delegation (by design)
     "intent.py": 2,              # parse_* default_repo parameter defaults
     "rebase/monitor.py": 1,      # locked-pipeline delegation (by design)
     "task_spec.py": 1,           # TaskSpec.repo default

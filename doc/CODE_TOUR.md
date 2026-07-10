@@ -20,7 +20,7 @@ cli.py:main            parse flags; one-shot -p / chat / REPL
       playbooks/store.py  registry: candidate/active/locked; find()
   cli.py:run_task      echo plan; plan-review gate; [y/N] confirm
   engine/executor.py   run steps: checkpoint/resume, foreach, when:, retries
-    engine/builtin_steps.py   the step handlers (incl. agent.review_diff)
+    engine/steps/*.py         the step handlers (self-registered via @step)
       engine/agent_runtime.py governed agent execution (the heart)
         agent_loop.py        the raw tool loop
         tools.py + scopes.py the single scope-enforcing dispatcher
@@ -116,32 +116,54 @@ Suggested reading order = the sections below, top to bottom.
   write inside the writable wall). Agent steps never see a tool their scope
   doesn't allow. Pinned by `test_scopes_tools.py`, `test_agent_loop.py`.
 
-## 5. The step library — what the playbooks are made of
+## 5. The step library — `engine/steps/` (self-registering)
 
-- **`engine/builtin_steps.py`**. Skim top-to-bottom, stop at:
-  - `_run_external_rebase` — the locked nightly: monitored subprocess
-    delegation to the parent orchestrator (state.json → progress events,
-    stale-state guard, failure classification → escalation artifacts).
-  - `_patch_gate` — Conditional Patch Review: cheap diff summary always,
-    LLM review only when `review/triggers.py` rules fire (high-risk modules
-    now come from the *plugin*, settings is fallback — v2 P0).
-  - `_push` — thin: all safety is in `targets/base.py::guard_push`.
-  - `_REVIEW_SYSTEM` + `_REVIEW_LENSES` + `_sweep_targets` — the review
-    prompt system. v2: repo-neutral core; the domain checklist extends from
-    the profile's `review.md`; sweep extractors are keyed on
-    `repo.language` and degrade honestly for unknown languages.
-- **`engine/pr_steps.py`**. PR rebase (fork-aware checkout → PushPolicy
-  derivation → rebase → conflict agent or abort+escalate) and PR debug
-  (fetch failing checks → **CI log enrichment** → signature grouping →
-  per-group debug agent → additive push). v2 P2.2 wired
-  `_enrich_ci_logs` + normalized grouping here.
+Steps live in the `engine/steps/` package, one module per domain, each step
+**self-registered** at its definition — a `@step(name, kind, risk, desc)`
+decorator (or `register_step(StepSpec(...))` for factory-built handlers) binds
+the name, metadata and handler together. There is no central
+`add(StepSpec(...))` block: importing the package runs the decorators, and
+`steps/__init__.register_builtin_steps` flushes the collected specs into a
+`StepRegistry`. To find a step, grep its name string:
+`grep -rn '"pr.fetch_diff"' src/omni_copilot/engine/steps/`.
+
+- **`steps/_common.py`** — the shared floor: the `@step`/`register_step`
+  decorator + collection, and the helpers every step file uses (`gh`,
+  `repo_path`, `git`, `task_spec`, `gh_read_tools`, `post_step`). One home
+  instead of the old late-import chain between step files.
+- **`steps/workspace.py`** — `workspace.guard_clean`, `analysis.diff_summary`.
+- **`steps/rebase_ext.py`** — `rebase.run_external`: the locked nightly's
+  monitored subprocess delegation (state.json → progress events, stale-state
+  guard, failure classification → escalation artifacts).
+- **`steps/review.py`** — `review.patch_gate` (Conditional Patch Review: cheap
+  diff summary always, LLM review only when `review/triggers.py` rules fire;
+  high-risk modules come from the *plugin*, settings is fallback) and
+  `agent.review_diff` with the review prompt system (`_REVIEW_SYSTEM`,
+  `_REVIEW_LENSES`, `_sweep_targets`) — repo-neutral core; the domain
+  checklist extends from the profile's `review.md`; sweep extractors keyed on
+  `repo.language` and degrade honestly for unknown languages.
+- **`steps/pr.py`** — `ci.push` (thin: all safety is in
+  `targets/base.py::guard_push`), the read-only fetch/gate steps, PR rebase
+  (fork-aware checkout → PushPolicy derivation → rebase → conflict agent or
+  abort+escalate) and PR debug (fetch failing checks → **CI log enrichment** →
+  normalized signature grouping → per-group debug agent → additive push).
+- **`steps/issue.py`** — `issue.fetch`, the drafted-answer and triage agent
+  steps, and gated `issue.post_answer`.
+- **`steps/report.py`** — `report.final_summary`.
+- **`steps/profile.py`** — the profile establishment + Stage-4 maintenance
+  steps (see §6).
+- **`steps/rebase_native.py`** — the candidate native decomposition of the
+  nightly (imports the parent's own phase wrappers; registered imperatively).
+  Only read when working on the promotion path.
 - **`targets/base.py`** (~80 lines, read fully). `guard_push` is the single
   push choke point: PushPolicy AND protected branches; force is
   with-lease-only and *never* against a protected branch. Everything else
   about push safety is commentary on this function.
-- **`engine/rebase_native_steps.py`** — the candidate native decomposition
-  of the nightly (imports the parent's own phase wrappers). Only read when
-  working on the promotion path.
+
+> Compat shims: `engine/builtin_steps.py`, `engine/pr_steps.py`,
+> `engine/rebase_native_steps.py` are now thin re-export shims pointing at
+> `engine/steps/` — kept so old imports keep resolving. New code imports from
+> `engine.steps` directly.
 
 ## 6. Repo profiles (v2) — the knowledge subsystem
 
@@ -242,8 +264,9 @@ blocked). Profiles: `plugins/<repo>/profile/` (`profile.yaml`,
 
 - New repo → `omni-copilot -p "profile the repo"`, review the draft plugin +
   PROFILE_REPORT, flip `status`, done — zero core edits is the contract.
-- New step → implement in an `engine/*_steps.py`, register with an honest
-  `risk`, publish consumed state via `state_updates`, add a guard test.
+- New step → add a handler in the right `engine/steps/*.py`, decorate it with
+  `@step(name, kind, risk, desc)` (honest `risk`), publish consumed state via
+  `state_updates`, add a guard test. No central registration to edit.
 - New task kind → `task_spec.py` (kind + tier) → playbook yaml → intent
   hints → chat enum. The planner and executor need nothing.
 - New repo knowledge → a profile fact via typed ops (or a skill), never a

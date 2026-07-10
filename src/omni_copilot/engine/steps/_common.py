@@ -1,0 +1,141 @@
+"""Shared step infrastructure.
+
+Two things live here so a step's definition can be self-contained:
+
+1. the `@step` / `register_step` **self-registration** surface — decorating a
+   handler (or calling `register_step` for factory-built handlers) records a
+   `StepSpec` into the package-level collection; `steps.register_builtin_steps`
+   flushes that collection into a `StepRegistry`. There is no separate
+   `add(StepSpec(...))` block to keep in sync anymore.
+2. the cross-module helpers every step file shares (`gh`, `repo_path`, `git`,
+   `task_spec`, `gh_read_tools`, `post_step`) — one home instead of a
+   late-import chain between step modules.
+"""
+
+from __future__ import annotations
+
+import re
+import subprocess
+from pathlib import Path
+
+from ..step import FailureKind, StepContext, StepResult, StepSpec
+
+# -- self-registration ---------------------------------------------------------
+
+_COLLECTED: dict[str, StepSpec] = {}
+
+
+def register_step(spec: StepSpec) -> StepSpec:
+    """Imperative registration — for factory-built handlers (issue/post/phase
+    steps whose handler is a closure, not a module-level `async def`)."""
+    if spec.name in _COLLECTED:
+        raise ValueError(f"step already registered: {spec.name}")
+    _COLLECTED[spec.name] = spec
+    return spec
+
+
+def step(name: str, kind: str, risk: str, description: str = "", *,
+         tool_scope=None, patch_review_triggers: tuple[str, ...] = ()):
+    """Decorator: bind a handler to its name + metadata in one place."""
+
+    def deco(fn):
+        register_step(StepSpec(name, kind, risk, fn, description,
+                               tool_scope, patch_review_triggers))
+        return fn
+
+    return deco
+
+
+def collected() -> list[StepSpec]:
+    return list(_COLLECTED.values())
+
+
+# -- cross-module helpers ------------------------------------------------------
+
+def repo_path(ctx: StepContext) -> Path | None:
+    p = ctx.params.get("repo_path") or ctx.state.get("repo_path")
+    return Path(p) if p else None
+
+
+def task_spec(ctx: StepContext) -> dict:
+    spec = ctx.state.get("task_spec")
+    return spec if isinstance(spec, dict) else {}
+
+
+def gh(args: list[str], cwd: Path | None = None) -> tuple[int, str]:
+    try:
+        out = subprocess.run(["gh", *args], cwd=str(cwd) if cwd else None,
+                             capture_output=True, text=True, timeout=120)
+        return out.returncode, out.stdout or out.stderr
+    except FileNotFoundError:
+        return 127, "gh CLI not installed"
+
+
+def git(repo: Path, *args: str, timeout: int = 120) -> tuple[int, str]:
+    out = subprocess.run(["git", *args], cwd=str(repo), capture_output=True,
+                         text=True, timeout=timeout)
+    return out.returncode, (out.stdout + out.stderr).strip()
+
+
+def gh_read_tools(repo: Path | None) -> dict:
+    """Read-only gh tools for agent steps (int-coerced args — no injection)."""
+    from ...tools import ToolDef
+
+    def _view(kind: str, number, fields: str) -> str:
+        code, out = gh([kind, "view", str(int(number)), "--json", fields],
+                       cwd=repo)
+        return out[:15_000] if code == 0 else f"gh failed: {out[:400]}"
+
+    def gh_pr_view(pr, **_: object) -> str:
+        return _view("pr", pr, "title,body,state,isDraft,mergeable,files")
+
+    def gh_issue_view(issue, **_: object) -> str:
+        return _view("issue", issue, "title,body,labels,comments")
+
+    def gh_ci_read(pr, **_: object) -> str:
+        code, out = gh(["pr", "checks", str(int(pr)), "--json",
+                        "name,state,bucket"], cwd=repo)
+        return out[:10_000] if code == 0 else f"gh failed: {out[:400]}"
+
+    n = {"type": "integer"}
+    return {
+        "gh_pr_view": ToolDef("gh_pr_view", "Read PR metadata (read-only).",
+                              {"type": "object", "properties": {"pr": n},
+                               "required": ["pr"]}, gh_pr_view),
+        "gh_issue_view": ToolDef("gh_issue_view", "Read an issue (read-only).",
+                                 {"type": "object", "properties": {"issue": n},
+                                  "required": ["issue"]}, gh_issue_view),
+        "gh_ci_read": ToolDef("gh_ci_read", "Read a PR's CI checks (read-only).",
+                              {"type": "object", "properties": {"pr": n},
+                               "required": ["pr"]}, gh_ci_read),
+    }
+
+
+def post_step(state_key: str, gh_args, what: str):
+    """Factory for gated outward posting (PR comment / issue reply): explicit
+    `post` intent AND ALLOW_POST=1, else dry-run."""
+
+    async def handler(ctx: StepContext) -> StepResult:
+        body = ctx.state.get(state_key, "")
+        spec = task_spec(ctx)
+        if not body:
+            return StepResult(False, FailureKind.BLOCKED, f"no {state_key} to post")
+        if not spec.get("post"):
+            return StepResult(True, summary=f"not posting {what} (post flag not set)")
+        if not ctx.settings.allow_post:
+            return StepResult(True, summary=f"dry-run (ALLOW_POST=0): would post {what} "
+                                            f"({len(body)} chars)",
+                              outputs={"dry_run": True, "body": body[:2_000]})
+        repo = repo_path(ctx)
+        args = gh_args(spec, body)
+        code, out = gh(args, cwd=repo)
+        if code != 0:
+            return StepResult(False, FailureKind.ESCALATE, f"posting failed: {out[:400]}")
+        url_match = re.search(r"https://\S+", out or "")
+        url = url_match.group(0) if url_match else ""
+        ctx.trace.record("posted_artifact", what=what, url=url,
+                         pr=spec.get("pr"), issue=spec.get("issue"))
+        return StepResult(True, summary=f"posted {what}",
+                          outputs={"url": url} if url else {})
+
+    return handler

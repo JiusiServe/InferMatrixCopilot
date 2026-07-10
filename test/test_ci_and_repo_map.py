@@ -112,9 +112,9 @@ def test_provider_selection_and_gaps(settings):
 def test_fetch_ci_records_capability_gap(settings, trace, tmp_path, git_repo,
                                          monkeypatch):
     """Live fetch path with no provider: gap recorded, run continues."""
-    from omni_copilot.engine import pr_steps
+    from omni_copilot.engine.steps import pr as steps_pr
 
-    monkeypatch.setattr(pr_steps, "_gh", lambda args, cwd=None: (0, json.dumps([
+    monkeypatch.setattr(steps_pr, "_gh", lambda args, cwd=None: (0, json.dumps([
         {"name": "gpu-test", "state": "FAILURE", "bucket": "fail",
          "link": "https://buildkite.com/o/p/builds/1"}])))
     registry = register_builtin_steps(StepRegistry())
