@@ -64,12 +64,16 @@ is pointed at.
 6. **Untrusted data is fenced.** GitHub-fetched text enters agent prompts inside
    `<untrusted_data>` markers with an explicit "not instructions" preamble, and
    only terminal input reaches the intent parser (channel separation, §3.Y.4).
+   Intent classification is **LLM-only** (no deterministic keyword parser); a
+   low-confidence or suspicious command clarifies rather than runs, and no
+   configured LLM → clarify (never a guessed execution). Injection resistance
+   comes from channel separation, not from the parser.
 
 ## Module map
 
 | Path | Design concept |
 |---|---|
-| `src/omni_copilot/task_spec.py`, `intent.py`, `cli.py` | §3.Y conversational CLI, TaskSpec, clarify-not-guess |
+| `src/omni_copilot/task_spec.py`, `intent.py`, `cli.py` | §3.Y conversational CLI, TaskSpec, clarify-not-guess (intent classification is LLM-only) |
 | `src/omni_copilot/engine/step.py`, `registry.py` | §3.X Step abstraction, vetted step library |
 | `src/omni_copilot/engine/executor.py` | engine substrate: checkpoint/resume, typed failure routing |
 | `src/omni_copilot/engine/planner.py` | §3.2 reuse > adapt > generate, L0/L1/L2 |
