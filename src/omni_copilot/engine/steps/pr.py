@@ -18,12 +18,12 @@ from pathlib import Path
 from ...scopes import post_plan_scope
 from ...targets.base import PushPolicy, guard_push
 from ..step import FailureKind, StepContext, StepResult, StepSpec
+from ._common import (from_state, no_llm_gap, published, register_step,
+                      require_repo, step)
 from ._common import gh as _gh
 from ._common import git as _git
 from ._common import post_step as _post_step
-from ._common import register_step
 from ._common import repo_path as _repo_path
-from ._common import step
 from ._common import task_spec as _task_spec
 
 
@@ -56,19 +56,16 @@ async def _push(ctx: StepContext) -> StepResult:
 @step("pr.fetch_diff", "deterministic", "read",
       "Fetch a PR diff via gh (read-only).")
 async def _pr_fetch_diff(ctx: StepContext) -> StepResult:
-    if "diff_text" in ctx.state:  # injected (tests / offline)
-        return StepResult(True, summary="diff from state",
-                          outputs={"chars": len(ctx.state["diff_text"]),
-                                   "state_updates": {"diff_text": ctx.state["diff_text"]}})
+    cached = from_state(ctx, "diff_text")
+    if cached is not None:
+        return cached
     spec = ctx.state.get("task_spec") or {}
     pr = spec.get("pr") if isinstance(spec, dict) else None
-    repo = _repo_path(ctx)
     if not pr:
         return StepResult(False, FailureKind.BLOCKED, "no PR number in task spec")
-    if repo is None or not repo.exists():
-        return StepResult(False, FailureKind.BLOCKED,
-                          f"repo checkout not configured (repo_path={repo}) — set "
-                          "REPO_PATHS in .env or a plugin repo.path")
+    repo = require_repo(ctx)
+    if isinstance(repo, StepResult):
+        return repo
     code, out = _gh(["pr", "diff", str(pr)], cwd=repo)
     if code != 0:
         return StepResult(False, FailureKind.BLOCKED, f"gh pr diff failed: {out[:500]}")
@@ -83,9 +80,9 @@ async def _pr_gate_check(ctx: StepContext) -> StepResult:
     """Deterministic gate check: draft/merge-state/failing checks — the issue
     class the eval showed no diff-only reviewer catches. Non-blocking: the
     findings go into the review context and the report."""
-    if "gate_report" in ctx.state:  # injected (tests / offline)
-        return StepResult(True, summary="gate report from state",
-                          outputs={"state_updates": {"gate_report": ctx.state["gate_report"]}})
+    cached = from_state(ctx, "gate_report")
+    if cached is not None:
+        return cached
     spec = ctx.state.get("task_spec") or {}
     pr = spec.get("pr") if isinstance(spec, dict) else None
     if not pr:
@@ -289,13 +286,10 @@ async def _pr_analyze_diff(ctx: StepContext) -> StepResult:
     ctx.state["affected_modules"] = modules
     ctx.state["touched_modules"] = modules
     ctx.state["primary_files"] = [f"*{c}" for c in changed]
-    return StepResult(True, summary=f"{len(changed)} files across modules {modules}",
-                      outputs={"changed_files": changed, "modules": modules,
-                               "state_updates": {
-                                   "affected_modules": modules,
-                                   "touched_modules": modules,
-                                   "primary_files": ctx.state["primary_files"],
-                               }})
+    return published(f"{len(changed)} files across modules {modules}",
+                     changed_files=changed, modules=modules,
+                     state={"affected_modules": modules, "touched_modules": modules,
+                            "primary_files": ctx.state["primary_files"]})
 
 
 @step("agent.verify_module", "validation", "read",
@@ -306,12 +300,11 @@ async def _verify_module(ctx: StepContext) -> StepResult:
     fail-closed gate is review.patch_gate before push."""
     module = ctx.item or "all"
     if ctx.llm is None or not ctx.llm.available:
-        ctx.trace.record("capability_gap", capability="llm",
-                         step="agent.verify_module",
-                         effect="advisory verification skipped; patch gate "
-                                "before push remains fail-closed")
-        return StepResult(True, summary=f"{module}: verification skipped (no LLM); "
-                                        "patch gate before push remains fail-closed")
+        return no_llm_gap(ctx, "agent.verify_module",
+                          "advisory verification skipped; patch gate before push "
+                          "remains fail-closed",
+                          summary=f"{module}: verification skipped (no LLM); patch "
+                                  "gate before push remains fail-closed")
     repo = _repo_path(ctx)
     base_sha = ctx.state.get("rebase_base_sha", "HEAD~1")
     _, diff = _git(repo, "diff", f"{base_sha}..HEAD")
@@ -353,11 +346,9 @@ def extract_signature(log: str) -> str:
 @step("pr.fetch_ci_failures", "deterministic", "read",
       "Collect failing checks for a PR (gh; injectable).")
 async def _pr_fetch_ci_failures(ctx: StepContext) -> StepResult:
-    if "ci_failures" in ctx.state:  # injected (tests / offline)
-        n = len(ctx.state["ci_failures"])
-        return StepResult(True, summary=f"{n} failing checks (from state)",
-                          outputs={"state_updates":
-                                   {"ci_failures": ctx.state["ci_failures"]}})
+    cached = from_state(ctx, "ci_failures")
+    if cached is not None:
+        return cached
     repo = _repo_path(ctx)
     spec = _task_spec(ctx)
     pr = spec.get("pr")
@@ -435,9 +426,9 @@ async def _pr_group_failures(ctx: StepContext) -> StepResult:
                           f"safety cap of {max_groups} — this PR needs a human",
                           outputs={"signatures": [g["signature"] for g in group_list]})
     ctx.state["failure_groups"] = group_list
-    return StepResult(True, summary=f"{len(failures)} failures -> {len(group_list)} root-cause groups",
-                      outputs={"signatures": [g["signature"] for g in group_list],
-                               "state_updates": {"failure_groups": group_list}})
+    return published(f"{len(failures)} failures -> {len(group_list)} root-cause groups",
+                     signatures=[g["signature"] for g in group_list],
+                     state={"failure_groups": group_list})
 
 
 _DEBUG_GUIDANCE = """You are debugging one grouped CI failure in a repo checkout.
@@ -454,9 +445,9 @@ failure_kind=escalate and an honest root_cause of what you found."""
 async def _pr_debug_group(ctx: StepContext) -> StepResult:
     group = ctx.item or {}
     sig = group.get("signature", "unknown")
-    repo = _repo_path(ctx)
-    if repo is None:
-        return StepResult(False, FailureKind.BLOCKED, "no repo path")
+    repo = require_repo(ctx, must_exist=False)
+    if isinstance(repo, StepResult):
+        return repo
     from ..agent_runtime import run_agent_step
 
     result, output = await run_agent_step(

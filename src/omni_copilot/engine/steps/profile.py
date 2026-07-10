@@ -22,6 +22,7 @@ from ...profiles.establish import (HUMAN_DOC_NAMES, build_doc_corpus,
                                   scan_modules)
 from ...profiles.store import ProfileStore
 from ..step import FailureKind, StepContext, StepResult
+from ._common import no_llm_gap
 from ._common import repo_path as _repo_path
 from ._common import step
 
@@ -154,12 +155,11 @@ async def _profile_repo_agent(ctx: StepContext) -> StepResult:
     if isinstance(plugin, StepResult):
         return plugin
     if ctx.llm is None or not ctx.llm.available:
-        ctx.trace.record("capability_gap", capability="llm",
-                         step="agent.profile_repo",
-                         effect="only deterministic profile stages ran")
-        return StepResult(True, summary="agent profiling skipped (no LLM) — "
-                                        "deterministic stages already produced "
-                                        "the draft profile")
+        return no_llm_gap(ctx, "agent.profile_repo",
+                          "only deterministic profile stages ran",
+                          summary="agent profiling skipped (no LLM) — "
+                                  "deterministic stages already produced the "
+                                  "draft profile")
     from ..agent_runtime import run_agent_step
 
     repo = Path(plugin.repo_path or ctx.state.get("repo_path", ""))
@@ -297,11 +297,10 @@ async def _profile_consolidate(ctx: StepContext) -> StepResult:
     if isinstance(plugin, StepResult):
         return plugin
     if ctx.llm is None or not ctx.llm.available:
-        ctx.trace.record("capability_gap", capability="llm",
-                         step="agent.profile_consolidate",
-                         effect="only deterministic decay/drift ran")
-        return StepResult(True, summary="consolidation skipped (no LLM); "
-                                        "decay and drift detection already ran")
+        return no_llm_gap(ctx, "agent.profile_consolidate",
+                          "only deterministic decay/drift ran",
+                          summary="consolidation skipped (no LLM); decay and "
+                                  "drift detection already ran")
     from ..agent_runtime import run_agent_step
 
     store = ProfileStore(plugin.profile_dir)
@@ -352,9 +351,8 @@ async def _profile_judge(ctx: StepContext) -> StepResult:
     if isinstance(plugin, StepResult):
         return plugin
     if ctx.llm is None or not ctx.llm.available:
-        ctx.trace.record("capability_gap", capability="llm",
-                         step="profile.judge", effect="profile audit skipped")
-        return StepResult(True, summary="profile audit skipped (no LLM)")
+        return no_llm_gap(ctx, "profile.judge", "profile audit skipped",
+                          summary="profile audit skipped (no LLM)")
     from ..agent_runtime import run_agent_step
 
     store = ProfileStore(plugin.profile_dir)

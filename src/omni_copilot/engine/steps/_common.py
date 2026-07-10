@@ -57,9 +57,47 @@ def repo_path(ctx: StepContext) -> Path | None:
     return Path(p) if p else None
 
 
+def require_repo(ctx: StepContext, *, must_exist: bool = True):
+    """The repo path or a BLOCKED StepResult (concision K3 — replaces the
+    per-step `repo is None -> BLOCKED` guard). Returns a `Path` on success."""
+    repo = repo_path(ctx)
+    if repo is None or (must_exist and not repo.exists()):
+        return StepResult(False, FailureKind.BLOCKED,
+                          f"repo checkout not configured (repo_path={repo}) — set "
+                          "REPO_PATHS in .env or a plugin repo.path")
+    return repo
+
+
 def task_spec(ctx: StepContext) -> dict:
     spec = ctx.state.get("task_spec")
     return spec if isinstance(spec, dict) else {}
+
+
+def from_state(ctx: StepContext, key: str, *, summary: str = "") -> StepResult | None:
+    """The injected/offline early-return: if `key` is already in state, return an
+    ok StepResult that re-publishes it (concision K7). Else None — do the fetch."""
+    if key in ctx.state:
+        return StepResult(True, summary=summary or f"{key} from state",
+                          outputs={"state_updates": {key: ctx.state[key]}})
+    return None
+
+
+def published(summary: str, *, state: dict | None = None, failure=None,
+              **outputs) -> StepResult:
+    """Build a StepResult that publishes handoff state (concision K4). `state`
+    is merged into `outputs['state_updates']` so B2 is easy to honor."""
+    if state:
+        outputs.setdefault("state_updates", {}).update(state)
+    ok = failure is None
+    return StepResult(ok, failure, summary=summary, outputs=outputs)
+
+
+def no_llm_gap(ctx: StepContext, step: str, effect: str, *,
+               summary: str) -> StepResult:
+    """Record a `capability_gap` for a missing LLM and return an ok skip
+    (concision K3 — replaces the repeated no-LLM block). E2."""
+    ctx.trace.record("capability_gap", capability="llm", step=step, effect=effect)
+    return StepResult(True, summary=summary)
 
 
 def gh(args: list[str], cwd: Path | None = None) -> tuple[int, str]:

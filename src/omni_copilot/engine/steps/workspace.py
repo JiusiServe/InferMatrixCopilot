@@ -6,16 +6,15 @@ import subprocess
 
 from ...review.diff_summary import build_diff_summary
 from ..step import FailureKind, StepContext, StepResult
-from ._common import repo_path as _repo_path
-from ._common import step
+from ._common import require_repo, step
 
 
 @step("workspace.guard_clean", "deterministic", "read",
       "Refuse to start on a dirty working tree.")
 async def _guard_clean(ctx: StepContext) -> StepResult:
-    repo = _repo_path(ctx)
-    if repo is None or not repo.exists():
-        return StepResult(False, FailureKind.BLOCKED, f"repo path missing: {repo}")
+    repo = require_repo(ctx)
+    if isinstance(repo, StepResult):
+        return repo
     out = subprocess.run(["git", "status", "--porcelain"], cwd=str(repo),
                          capture_output=True, text=True, timeout=30)
     if out.returncode != 0:
@@ -31,9 +30,9 @@ async def _guard_clean(ctx: StepContext) -> StepResult:
 @step("analysis.diff_summary", "deterministic", "read",
       "Cheap diffstat + out-of-scope/full-write flags.")
 async def _diff_summary(ctx: StepContext) -> StepResult:
-    repo = _repo_path(ctx)
-    if repo is None:
-        return StepResult(False, FailureKind.BLOCKED, "no repo path")
+    repo = require_repo(ctx, must_exist=False)
+    if isinstance(repo, StepResult):
+        return repo
     summary = build_diff_summary(
         repo, base_ref=ctx.params.get("base_ref", "HEAD"),
         primary_files=tuple(ctx.state.get("primary_files", ())), trace=ctx.trace,

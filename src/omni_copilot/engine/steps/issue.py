@@ -6,28 +6,25 @@ import json
 
 from ...scopes import read_only_scope
 from ..step import FailureKind, StepContext, StepResult, StepSpec
+from ._common import from_state, register_step, require_repo, step
 from ._common import gh as _gh
 from ._common import gh_read_tools as _gh_read_tools
 from ._common import post_step as _post_step
-from ._common import register_step
 from ._common import repo_path as _repo_path
-from ._common import step
 
 
 @step("issue.fetch", "deterministic", "read",
       "Fetch an issue via gh (read-only).")
 async def _issue_fetch(ctx: StepContext) -> StepResult:
-    if "issue_text" in ctx.state:
-        return StepResult(True, summary="issue from state",
-                          outputs={"state_updates": {"issue_text": ctx.state["issue_text"]}})
+    cached = from_state(ctx, "issue_text")
+    if cached is not None:
+        return cached
     spec = ctx.state.get("task_spec") or {}
     issue = spec.get("issue") if isinstance(spec, dict) else None
     kind = spec.get("kind") if isinstance(spec, dict) else ""
-    repo = _repo_path(ctx)
-    if repo is None or not repo.exists():
-        return StepResult(False, FailureKind.BLOCKED,
-                          f"repo checkout not configured (repo_path={repo}) — set "
-                          "REPO_PATHS in .env or a plugin repo.path")
+    repo = require_repo(ctx)
+    if isinstance(repo, StepResult):
+        return repo
     if not issue:
         if kind != "issue_filter":
             return StepResult(False, FailureKind.BLOCKED, "no issue number in task spec")
