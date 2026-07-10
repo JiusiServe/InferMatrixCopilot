@@ -6,6 +6,17 @@ boilerplate into shared helpers. Every item names the exact sites (grep-backed),
 the estimated line saving, the abstraction to introduce, and the invariant that
 must survive. Per-file specs carry a matching **Concision** subsection.
 
+## Status — K1–K7 applied on `main` (2026-07-10)
+
+All seven items are **done** (211 tests green throughout; each shipped as its
+own commit). Outcome: −2 net files (3 shims + 4 dead dataclasses removed, 1
+shared `profiles/languages.py` added), and every duplication below collapsed to
+a single source of truth. Raw line count is roughly flat because K2 trades
+three divergent copies for one shared module (DRY, not fewer lines); the real
+win is maintainability — a new step now reuses `_common` guards, and language
+rules live in one place. Keep this doc as the record of *why* those helpers
+exist so they are not re-inlined.
+
 ## Two axes — do not confuse them
 
 - **Concision** (this doc): fewer lines, less duplication, less dead code.
