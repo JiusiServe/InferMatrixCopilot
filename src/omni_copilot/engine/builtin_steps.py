@@ -560,7 +560,7 @@ async def _review_diff(ctx: StepContext) -> StepResult:
                        or "python")
         review_md = plugin.profile_dir / "review.md"
         try:
-            if review_md.exists():
+            if review_md.exists() and ctx.settings.profile_briefing_enabled:
                 guidance += ("\n\n## Repo-specific review checklist "
                              "(from the repo profile)\n"
                              + review_md.read_text(encoding="utf-8")[:4_000])

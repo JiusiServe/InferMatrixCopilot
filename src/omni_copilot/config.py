@@ -49,6 +49,12 @@ class Settings(BaseSettings):
     rebase_agent_root: Path = Path("/rebase/vllm-omni-rebase-agent")
     rebase_poll_interval: int = 30
 
+    # Repo profiles (design v2 §V2.3)
+    profile_stale_days: int = 90        # dormancy window for unconfirmed facts
+    profile_briefing_enabled: bool = True  # =0: the {no-profile} ablation arm
+                                        # (§V2.3.5) — briefing + review.md
+                                        # injection off, machine channel stays
+
     # Agent-step runtime (engine/agent_runtime.py)
     review_max_iters: int = 12          # tool-loop budget for agent steps
     skills_dir: Path = _REPO_ROOT / "skills"

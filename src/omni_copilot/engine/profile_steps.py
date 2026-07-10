@@ -223,6 +223,146 @@ async def _profile_repo_agent(ctx: StepContext) -> StepResult:
     return result
 
 
+# -- Stage 4: scheduled consolidation & audit (design §V2.3.3) -----------------
+
+async def _detect_drift(ctx: StepContext) -> StepResult:
+    plugin = _plugin_from_state(ctx)
+    if isinstance(plugin, StepResult):
+        return plugin
+    from ..profiles.consolidate import detect_drift
+
+    findings = detect_drift(plugin, ProfileStore(plugin.profile_dir))
+    if findings:
+        ctx.trace.record("profile_drift", findings=findings[:20])
+    return StepResult(True,
+                      summary=(f"{len(findings)} drift finding(s)" if findings
+                               else "no drift detected"),
+                      outputs={"drift": findings,
+                               "state_updates": {"profile_drift": findings}})
+
+
+async def _decay_stale(ctx: StepContext) -> StepResult:
+    plugin = _plugin_from_state(ctx)
+    if isinstance(plugin, StepResult):
+        return plugin
+    from ..profiles.consolidate import decay_stale
+
+    stale = decay_stale(ProfileStore(plugin.profile_dir),
+                        days=ctx.settings.profile_stale_days)
+    if stale:
+        ctx.trace.record("profile_decay", stale=stale)
+    return StepResult(True,
+                      summary=f"{len(stale)} fact(s) decayed to stale "
+                              f"(window {ctx.settings.profile_stale_days}d)",
+                      outputs={"stale": stale})
+
+
+_CONSOLIDATE_GUIDANCE = """You are the scheduled consolidation pass over a repo \
+profile — the ONLY writer allowed to rewrite or merge. You see the whole \
+profile at once plus drift findings. Emit typed ops:
+- merge_facts {into, from} when two facts state the same thing (the most
+  precise text survives; evidence unions automatically);
+- rewrite_fact {id, text} to make a kept fact crisper and imperative — never
+  drop the substance; stable facts refuse rewrites that lose evidence;
+- mark_stale {id} for facts the drift findings contradict;
+- add_evidence / bump_confirmed for facts the drift findings support.
+Do NOT invent new facts here (that is the establishment pass's job). Fewer,
+sharper facts beat many vague ones — the briefing channel has a hard word
+budget. Emit an empty ops list when the profile is already clean."""
+
+
+async def _profile_consolidate(ctx: StepContext) -> StepResult:
+    plugin = _plugin_from_state(ctx)
+    if isinstance(plugin, StepResult):
+        return plugin
+    if ctx.llm is None or not ctx.llm.available:
+        ctx.trace.record("capability_gap", capability="llm",
+                         step="agent.profile_consolidate",
+                         effect="only deterministic decay/drift ran")
+        return StepResult(True, summary="consolidation skipped (no LLM); "
+                                        "decay and drift detection already ran")
+    from .agent_runtime import run_agent_step
+
+    store = ProfileStore(plugin.profile_dir)
+    if not store.facts:
+        return StepResult(True, summary="empty profile — nothing to consolidate")
+    profile_text = store.profile_file.read_text(encoding="utf-8") \
+        if store.profile_file.exists() else ""
+    result, output = await run_agent_step(
+        ctx, step_name="agent.profile_consolidate",
+        purpose=f"Consolidate the '{plugin.name}' repo profile: dedupe, merge, "
+                "sharpen; keep provenance intact.",
+        guidance=_CONSOLIDATE_GUIDANCE,
+        expected="ops list (may be empty)",
+        evidence={"profile_yaml": profile_text,
+                  "drift_findings": "\n".join(ctx.state.get("profile_drift")
+                                              or []) or "(none)"},
+        output_extension={"ops": 'list of {"op": "rewrite_fact|merge_facts|'
+                                 'mark_stale|add_evidence|bump_confirmed", '
+                                 '...op-specific fields}'},
+    )
+    if not result.ok:
+        return result
+    ops = [op for op in output.get("ops") or [] if isinstance(op, dict)]
+    results = store.apply_ops(ops, tier="consolidate")
+    applied = results.count("")
+    rejected = [r for r in results if r]
+    ctx.trace.record("profile_consolidated", applied=applied,
+                     rejected=rejected[:10])
+    result.summary = (f"{applied}/{len(ops)} consolidation op(s) applied"
+                      + (f", {len(rejected)} rejected by gates" if rejected
+                         else ""))
+    result.outputs.update(applied=applied, rejected=rejected)
+    return result
+
+
+_JUDGE_GUIDANCE = """You are a READ-ONLY auditor of a repo profile. Report — \
+never fix — facts that look wrong: internally contradictory facts, claims the \
+evidence does not support, commands that look malformed, briefing lines that \
+are vague or read like generated overview prose. For each finding cite the \
+fact id and WHY. An empty findings list is a fine answer."""
+
+
+async def _profile_judge(ctx: StepContext) -> StepResult:
+    plugin = _plugin_from_state(ctx)
+    if isinstance(plugin, StepResult):
+        return plugin
+    if ctx.llm is None or not ctx.llm.available:
+        ctx.trace.record("capability_gap", capability="llm",
+                         step="profile.judge", effect="profile audit skipped")
+        return StepResult(True, summary="profile audit skipped (no LLM)")
+    from .agent_runtime import run_agent_step
+
+    store = ProfileStore(plugin.profile_dir)
+    profile_text = store.profile_file.read_text(encoding="utf-8") \
+        if store.profile_file.exists() else "(empty)"
+    result, output = await run_agent_step(
+        ctx, step_name="profile.judge",
+        purpose=f"Audit the '{plugin.name}' repo profile for contradictions "
+                "and unsupported claims (report only).",
+        guidance=_JUDGE_GUIDANCE, expected="findings (may be empty)",
+        evidence={"profile_yaml": profile_text},
+        output_extension={"audit_findings":
+                          'list of {"fact_id", "issue", "why"}'},
+    )
+    if not result.ok:
+        return result
+    findings = [f for f in output.get("audit_findings") or []
+                if isinstance(f, dict)]
+    # findings are surfaced, never auto-applied (the human/next cycle acts) —
+    # this handler never calls apply_ops, so the profile cannot change here
+    plugin.profile_dir.mkdir(parents=True, exist_ok=True)
+    (plugin.profile_dir / "JUDGE_REPORT.md").write_text(
+        "# Profile audit (read-only; nothing auto-fixed)\n\n"
+        + ("\n".join(f"- **{f.get('fact_id', '?')}**: {f.get('issue', '')} — "
+                     f"{f.get('why', '')}" for f in findings)
+           or "No findings.") + "\n", encoding="utf-8")
+    ctx.trace.record("profile_judged", findings=len(findings))
+    result.summary = f"audit: {len(findings)} finding(s) — JUDGE_REPORT.md"
+    result.outputs.update(findings=findings)
+    return result
+
+
 def register_profile_steps(registry: StepRegistry) -> StepRegistry:
     add = registry.register
     add(StepSpec("profile.fingerprint", "deterministic", "knowledge", _fingerprint,
@@ -238,4 +378,17 @@ def register_profile_steps(registry: StepRegistry) -> StepRegistry:
     add(StepSpec("agent.profile_repo", "agent", "knowledge", _profile_repo_agent,
                  "Stage 1: governed agent derives non-obvious, evidence-cited "
                  "profile facts; redundancy-filtered, typed-op applied."))
+    add(StepSpec("profile.detect_drift", "deterministic", "read", _detect_drift,
+                 "Stage 4: deterministic drift report (moved module paths, "
+                 "orphaned fact joins) — refresh material, never auto-fixed."))
+    add(StepSpec("profile.decay_stale", "deterministic", "knowledge", _decay_stale,
+                 "Stage 4: dormancy decay — unconfirmed facts flip to stale "
+                 "(excluded, never deleted)."))
+    add(StepSpec("agent.profile_consolidate", "agent", "knowledge",
+                 _profile_consolidate,
+                 "Stage 4: the ONLY rewrite/merge tier — whole-profile "
+                 "consolidation via typed ops, stability gates enforced."))
+    add(StepSpec("profile.judge", "agent", "read", _profile_judge,
+                 "Stage 4: read-only profile audit -> JUDGE_REPORT.md; "
+                 "findings surfaced, never auto-applied."))
     return registry

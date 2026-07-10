@@ -1,0 +1,25 @@
+# Stage-4 profile maintenance (design v2 §V2.3.3): scheduled consolidation.
+# CANDIDATE by design: invisible to the planner — run explicitly/scheduled via
+#   omni-copilot --playbook profile-consolidate --yes
+# so consolidation stays a deliberate cadence (the personal-agent lesson:
+# rewrite belongs in a scheduled tier, never in the per-run loop). The run
+# report shows the profile diff; committing plugins/<repo>/ stays a human act.
+name: profile-consolidate
+version: 1
+status: candidate
+provenance:
+  created_by: human
+  source: design v2 Stage-4 (decay + drift + consolidate + judge)
+task_kinds: [repo_profile]
+repos: []
+requires: [repo.path]
+params: {}
+steps:
+  - {id: fingerprint, step: profile.fingerprint}
+  - {id: drift, step: profile.detect_drift}
+  - {id: decay, step: profile.decay_stale}
+  - {id: consolidate, step: agent.profile_consolidate, when: not report_only}
+  - {id: judge, step: profile.judge}
+  - {id: report, step: report.final_summary}
+success: profile deduped/sharpened via gated ops; drift + audit findings
+  reported; nothing auto-committed

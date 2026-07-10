@@ -361,7 +361,7 @@ async def run_agent_step(
     all_extra = {**knowledge, **_repo_map_tool(ctx, plugin),
                  **(extra_tools or {})}
     briefing = ""
-    if plugin is not None:
+    if plugin is not None and ctx.settings.profile_briefing_enabled:
         try:
             briefing = plugin.briefing()
         except Exception:

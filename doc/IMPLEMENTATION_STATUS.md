@@ -230,8 +230,30 @@ PlanningError; read-only kinds degrade to the generate path.
 - `capability_gap` events also on no-LLM skips (verify_module,
   profile_repo).
 
-P3 (cross-repo eval + profile ablation arm + consolidation/judge loops):
-not started — see doc/DESIGN.md §V2.4.
+**P3 machinery (2026-07-10, offline — `test_p3_machinery.py`):**
+- **Stage-4 maintenance**: `profiles/consolidate.py` (`decay_stale` —
+  dormancy window `profile_stale_days`, stale = excluded never deleted;
+  `detect_drift` — moved module paths + orphaned fact joins, report-only) +
+  steps `profile.detect_drift` / `profile.decay_stale` /
+  `agent.profile_consolidate` (the ONLY rewrite/merge tier; ops applied
+  through the store so stability gates hold against the LLM) /
+  `profile.judge` (read-only audit → JUDGE_REPORT.md, never mutates).
+  Playbook `profile-consolidate` is CANDIDATE by design — scheduled/explicit
+  via `--playbook profile-consolidate --yes`, invisible to the planner.
+- **Ablation switch** (§V2.3.5): `PROFILE_BRIEFING_ENABLED=0` runs the
+  {no-profile} arm — briefing + review.md injection off, machine channel
+  untouched. One env var per eval arm.
+- **Invariance scoring** (`eval/invariance.py`, pure functions):
+  `replicate_mean` (missing arm = not-measured, never zero),
+  `invariance_index` (min/mean, needs ≥2 repos), `score_invariance`
+  (per-kind pass/fail vs the 0.8 target), `ablation_verdict` (promote only
+  if quality non-negative AND cost ratio ≤ 1.5 — the §V2.3.5 gate).
+
+**P3 remaining (needs API budget + owner input — deliberately not run):**
+the actual cross-repo eval campaign: pick the second benchmark repo, run
+replicate arms ({profile} / {no-profile} × repos), feed scores into
+`eval/invariance.py`, act on the verdicts. Also future: gh feedback
+collectors + post-push CI snapshot (metrics roadmap).
 
 ## Deliberate v1 boundaries
 - Playbooks are ordered step lists with `foreach` fan-out and `when:` conditions —
