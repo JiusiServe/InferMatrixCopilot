@@ -1,16 +1,25 @@
-# engine/steps/review.py — spec
+# engine/steps/review/ — spec
 
-`LOC ~347 · step library (review) · refactor-status: split-candidate`
+`LOC ~350 across 4 files · step library (review) · refactor-status: split-applied (2026-07-10)`
 
 ## Responsibility
 The conditional patch gate + the PR-review agent step and its repo-neutral
-prompt system.
+prompt system. Formerly one 341-line module; now a package that separates the
+eval-tuned prompt data from the handlers and the deterministic helpers.
 
-## Steps
-`review.patch_gate` (validation/read), `agent.review_diff` (agent/read).
+## Package layout (one concern per file)
+- `__init__.py` — imports `steps` for `@step` registration side effects;
+  re-exports the public contract (below). No logic.
+- `prompts.py` — eval-derived prompt data: `_REVIEW_SYSTEM`, `_REVIEW_LENSES`,
+  `_REVIEW_MERGE`. ~120 lines of text kept out of the control flow.
+- `utils.py` — deterministic, LLM-free helpers: `_sweep_targets`,
+  `_render_review_md`, `_SEVERITY_ORDER`.
+- `steps.py` — the two `@step` handlers: `review.patch_gate` (validation/read),
+  `agent.review_diff` (agent/read).
 
 ## Public contract (importable from `engine.steps.review`)
-`_REVIEW_LENSES`, `_render_review_md`, `_sweep_targets`.
+`_REVIEW_LENSES`, `_render_review_md`, `_sweep_targets` — re-exported from the
+package `__init__` so the pre-split import paths are unchanged.
 
 ## Invariants
 - Patch gate: cheap summary always, LLM review only on a trigger; fail-closed
@@ -25,21 +34,14 @@ prompt system.
 No agent-runtime governance (that is `agent_runtime`); no plugin/profile writes.
 
 ## Dependencies (allowed)
-`review/*`, `scopes`, `engine/step`, `._common`, `..agent_runtime`.
+`review/*`, `engine/step`, `.._common`, `..agent_runtime`, `profiles/languages`.
 
 ## Tests
 `test_review_step.py`, `test_agent_ensemble.py`,
 `test_profile_steps.py::test_review_guidance_from_profile`.
 
-## Refactor notes
-Half the file is prompt constants (`_REVIEW_SYSTEM`, `_REVIEW_LENSES`,
-`_REVIEW_MERGE`). **Suggested split**: move the prompt data to
-`steps/review_prompts.py` (or a `.txt`/`.md` loaded at import), leaving the two
-handlers + `_sweep_targets`/`_render_review_md` here. The eval-derived comments
-on the lenses are rationale — keep them beside the lens data.
-
-## Concision — **K2** (shared language rules)
-`_sweep_targets`'s `line_rules` (per-language branch/index regexes) is one of
-three copies of "per-language rules" (also in `profiles/establish` and
-`profiles/repo_map`). Move the data to `profiles/languages.py` and consume it
-here. Preserve: unknown-language honest degradation (file-level sweep only).
+## Concision — **K2** (shared language rules, applied)
+`_sweep_targets` consumes `profiles/languages.py::sweep_re` — one of the three
+former copies of "per-language rules" (also `profiles/establish`, `repo_map`),
+now collapsed to that single source. Unknown-language honest degradation
+(file-level sweep only) is preserved.

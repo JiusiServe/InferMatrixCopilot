@@ -26,9 +26,22 @@ exist so they are not re-inlined.
   lines.
 
 Where they conflict, **prefer concision**. Example: `agent_runtime.py` (685 LOC)
-has a cohesion-split note, but the concision win there is smaller (dedupe the
-repair-round and evidence-cap code), not the split. Split only after the
-dedup, and only if the file is still hard to navigate.
+had a cohesion-split note, but the concision win there was smaller (dedupe the
+repair-round and evidence-cap code), not the split — so the dedup came first.
+The cohesion split followed once the file was still hard to navigate.
+
+## Cohesion splits applied (2026-07-10, after K1–K7)
+
+Two oversized files were split into packages once the concision passes above
+left them still dense (219 tests green throughout; public import surfaces
+preserved via re-exporting `__init__`s, so no importer changed):
+- `engine/agent_runtime.py` (685 LOC) → `engine/agent_runtime/` —
+  `dispatch`/`knowledge`/`utils` (substrate) + `runner`/`ensemble` (entries).
+- `engine/steps/review.py` (341 LOC) → `engine/steps/review/` —
+  `prompts` (eval-tuned text) + `utils` (deterministic helpers) + `steps`
+  (handlers).
+In both, the stateless helpers moved to a `utils.py` so the class/handler files
+carry control flow, not plumbing. Eval-citation comments moved with their code.
 
 ## Rules the concision refactor must not break
 

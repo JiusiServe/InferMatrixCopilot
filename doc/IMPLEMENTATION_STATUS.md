@@ -25,7 +25,7 @@ Task numbers from `copilot_design` §四 (milestones from `docs/copilot/implemen
 ## Agent Step 修正方案 (code review of 2026-07-03) — status
 
 Implemented per its own P0-P3 plan (`/rebase/vLLM-Omni Copilot Agent Step 修正方案.md`):
-- **P0** `engine/agent_runtime.py::run_agent_step` — the single entry for every
+- **P0** `engine/agent_runtime/runner.py::run_agent_step` — the single entry for every
   `kind == "agent"` step: AgentDispatchContext (task/step/repo/evidence/
   previous-steps/permissions/skills/memories/output-contract), evidence pack
   replacing 60k truncation (per-item cap + full text archived in the run dir),
@@ -51,7 +51,7 @@ Implemented per its own P0-P3 plan (`/rebase/vLLM-Omni Copilot Agent Step 修正
 - Locked repo-rebase playbook untouched (acceptance #10).
 
 ### Ensemble agent steps (robustness follow-up, 2026-07-05)
-`run_agent_step_ensemble` (agent_runtime.py): the eval showed single agent-step
+`run_agent_step_ensemble` (agent_runtime/ensemble.py): the eval showed single agent-step
 runs have high variance (RQS 0.11–0.38 on identical configs) while the UNION of
 runs covered 5/8 ground-truth issues — so the runtime now offers a
 perspective-diverse fan-out (each sample goes deep on one lens of the step's

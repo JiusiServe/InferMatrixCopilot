@@ -55,7 +55,7 @@ class Settings(BaseSettings):
                                         # (§V2.3.5) — briefing + review.md
                                         # injection off, machine channel stays
 
-    # Agent-step runtime (engine/agent_runtime.py)
+    # Agent-step runtime (engine/agent_runtime/)
     review_max_iters: int = 12          # tool-loop budget for agent steps
     skills_dir: Path = _REPO_ROOT / "skills"
     memory_db: Path = Path.home() / ".omni-copilot" / "debug_memory.db"
