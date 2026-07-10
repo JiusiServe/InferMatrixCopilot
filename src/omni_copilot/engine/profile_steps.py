@@ -142,6 +142,9 @@ async def _profile_repo_agent(ctx: StepContext) -> StepResult:
     if isinstance(plugin, StepResult):
         return plugin
     if ctx.llm is None or not ctx.llm.available:
+        ctx.trace.record("capability_gap", capability="llm",
+                         step="agent.profile_repo",
+                         effect="only deterministic profile stages ran")
         return StepResult(True, summary="agent profiling skipped (no LLM) — "
                                         "deterministic stages already produced "
                                         "the draft profile")

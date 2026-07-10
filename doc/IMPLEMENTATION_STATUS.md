@@ -209,11 +209,29 @@ playbooks). `PlaybookStore.find` matches kind → exact repo → neutral with
 requires ⊆ capabilities (`capabilities=None` keeps v1 behavior);
 `Copilot.resolve` feeds capabilities from the plugin + REPO_PATHS. Gap
 handling: write-capable kinds raise a "capability gap … run repo_profile"
-PlanningError; read-only kinds degrade to the generate path. Still to do in
-P2: CI/forge adapter interface (Buildkite log download), `repo_map`
-on-demand tool, `capability_gap` RunTrace events inside steps. P3
-(cross-repo eval + profile ablation + consolidation/judge loops): not
-started — see doc/DESIGN.md §V2.4.
+PlanningError; read-only kinds degrade to the generate path.
+
+**P2 complete (2026-07-10)** — `test_ci_and_repo_map.py`:
+- **CI log adapters** (`ci/providers.py`), selected by the profile's
+  `ci.provider`: `BuildkiteLogs` (REST, link→build→failed jobs→job logs,
+  per-check best-effort) and `GithubActionsLogs` (`gh run view
+  --log-failed`, cached per run id). `pr.fetch_ci_failures` enriches logs
+  live; missing provider/token → `capability_gap` trace event and pr-debug
+  degrades to name grouping (v1 behavior), never a crash. This closes the
+  "Buildkite REST log download stubbed" v1 boundary.
+- **Normalized signatures** (`ci/normalize.py`): timestamps/hashes/addrs/
+  temp-paths/line-numbers/durations → placeholders before grouping — the
+  same failure across runs is one group; small literal numbers stay signal.
+  (The parent monitor's exact-string-compare weakness, not inherited.)
+- **`repo_map` tool** (`profiles/repo_map.py`): regex symbol index per
+  language, disk-cached keyed by HEAD, query-ranked and budgeted render;
+  offered to every governed agent step (channel 3: structure is pulled on
+  demand, never injected). Unsupported language → `capability_gap` event.
+- `capability_gap` events also on no-LLM skips (verify_module,
+  profile_repo).
+
+P3 (cross-repo eval + profile ablation arm + consolidation/judge loops):
+not started — see doc/DESIGN.md §V2.4.
 
 ## Deliberate v1 boundaries
 - Playbooks are ordered step lists with `foreach` fan-out and `when:` conditions —

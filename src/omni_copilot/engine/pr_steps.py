@@ -203,6 +203,10 @@ async def _verify_module(ctx: StepContext) -> StepResult:
     fail-closed gate is review.patch_gate before push."""
     module = ctx.item or "all"
     if ctx.llm is None or not ctx.llm.available:
+        ctx.trace.record("capability_gap", capability="llm",
+                         step="agent.verify_module",
+                         effect="advisory verification skipped; patch gate "
+                                "before push remains fail-closed")
         return StepResult(True, summary=f"{module}: verification skipped (no LLM); "
                                         "patch gate before push remains fail-closed")
     repo = _repo_path(ctx)
@@ -269,7 +273,10 @@ async def _pr_fetch_ci_failures(ctx: StepContext) -> StepResult:
     ctx.state["ci_failures"] = [
         {"name": c.get("name", "?"), "log": "", "link": c.get("link", "")} for c in failing
     ]
-    return StepResult(True, summary=f"{len(failing)}/{len(checks)} checks failing",
+    enriched = _enrich_ci_logs(ctx, repo)
+    return StepResult(True, summary=f"{len(failing)}/{len(checks)} checks failing"
+                                    + (f", {enriched} log(s) fetched"
+                                       if enriched else ""),
                       outputs={"failing": [c.get("name") for c in failing],
                                "state_updates": {
                                    "ci_failures": ctx.state["ci_failures"],
@@ -277,11 +284,38 @@ async def _pr_fetch_ci_failures(ctx: StepContext) -> StepResult:
                                }})
 
 
+def _enrich_ci_logs(ctx: StepContext, repo: Path | None) -> int:
+    """Fetch real failure logs via the profile-selected CI provider.
+    Best-effort: a missing provider is a recorded capability gap (pr-debug
+    degrades to name grouping), never a failure."""
+    failures = ctx.state.get("ci_failures") or []
+    if not failures:
+        return 0
+    from ..ci.providers import provider_for
+    from .agent_runtime import _resolve_plugin
+
+    provider, gap = provider_for(_resolve_plugin(ctx), ctx.settings,
+                                 gh_runner=lambda args, cwd=None:
+                                 _gh(args, cwd=cwd or repo))
+    if provider is None:
+        ctx.trace.record("capability_gap", capability="ci.provider",
+                         step="pr.fetch_ci_failures", reason=gap,
+                         effect="no CI logs; failures grouped by check name")
+        return 0
+    enriched = provider.enrich(failures)
+    ctx.trace.record("ci_logs_enriched", provider=type(provider).__name__,
+                     enriched=enriched, total=len(failures))
+    return enriched
+
+
 async def _pr_group_failures(ctx: StepContext) -> StepResult:
+    from ..ci.normalize import normalize_signature
+
     failures = ctx.state.get("ci_failures", [])
     groups: dict[str, dict] = {}
     for f in failures:
         sig = extract_signature(f.get("log", "")) if f.get("log") else f.get("name", "unknown")
+        sig = normalize_signature(sig)  # same failure ≠ new failure per run
         g = groups.setdefault(sig, {"signature": sig, "jobs": [], "log_excerpt": ""})
         g["jobs"].append(f.get("name", "?"))
         if f.get("log") and not g["log_excerpt"]:

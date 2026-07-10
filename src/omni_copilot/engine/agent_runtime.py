@@ -247,6 +247,39 @@ def _knowledge_tools(store: "_ScopedKnowledge", ctx: StepContext) -> dict[str, T
     }
 
 
+def _repo_map_tool(ctx: StepContext, plugin) -> dict[str, ToolDef]:
+    """`repo_map` — goal-ranked, budgeted structure queries (design §V2.3.4
+    channel 3: structure is pulled on demand, never injected as an overview)."""
+    from ..profiles.repo_map import RepoMap
+
+    repo = ctx.state.get("repo_path") or (plugin.repo_path if plugin else "")
+    if not repo or not Path(repo).exists():
+        return {}
+    language = "python"
+    cache_dir = ctx.run_dir / "repo_map"
+    if plugin is not None:
+        language = str(plugin.manifest.get("repo", {}).get("language")
+                       or "python")
+        cache_dir = plugin.root / "repo_map"
+    rmap = RepoMap(repo, language, cache_dir=cache_dir)
+    if not rmap.supported:
+        ctx.trace.record("capability_gap", capability=f"repo_map.{language}",
+                         step="agent_runtime",
+                         effect="repo_map tool unavailable; agent uses grep")
+        return {}
+
+    def repo_map(query: str, **_: Any) -> str:
+        return rmap.render(str(query))
+
+    return {"repo_map": ToolDef(
+        "repo_map",
+        "Goal-ranked map of the repo's files and symbol signatures for a "
+        "query (budgeted). Use it to LOCATE where something lives before "
+        "reading files; it is not a substitute for reading them.",
+        {"type": "object", "properties": {"query": {"type": "string"}},
+         "required": ["query"]}, repo_map)}
+
+
 def _permissions_view(scope: ToolScope, extra_tools: dict) -> dict:
     return {
         "tools": sorted(scope.allowed_tools) + sorted(extra_tools),
@@ -323,9 +356,10 @@ async def run_agent_step(
     skills, store = _retrieve_skills(ctx, query)
     memories = _retrieve_memories(ctx, query)
     knowledge = _knowledge_tools(store, ctx)
-    all_extra = {**knowledge, **(extra_tools or {})}
 
     plugin = _resolve_plugin(ctx)
+    all_extra = {**knowledge, **_repo_map_tool(ctx, plugin),
+                 **(extra_tools or {})}
     briefing = ""
     if plugin is not None:
         try:
