@@ -38,3 +38,9 @@ Half the file is prompt constants (`_REVIEW_SYSTEM`, `_REVIEW_LENSES`,
 `steps/review_prompts.py` (or a `.txt`/`.md` loaded at import), leaving the two
 handlers + `_sweep_targets`/`_render_review_md` here. The eval-derived comments
 on the lenses are rationale — keep them beside the lens data.
+
+## Concision — **K2** (shared language rules)
+`_sweep_targets`'s `line_rules` (per-language branch/index regexes) is one of
+three copies of "per-language rules" (also in `profiles/establish` and
+`profiles/repo_map`). Move the data to `profiles/languages.py` and consume it
+here. Preserve: unknown-language honest degradation (file-level sweep only).

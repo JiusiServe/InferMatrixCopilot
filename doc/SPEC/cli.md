@@ -46,5 +46,9 @@ Two responsibilities are entangled: (1) `argparse`/REPL front-end and
 (2) the `Copilot` façade (resolve/execute/metrics). **Suggested split**:
 `cli.py` (arg parsing + `_handle_line` + `main`) and `copilot.py` (the
 `Copilot` class). Keep `_execute` as the single execution seam either way.
-The plan-review + confirm gating in `run_task`/`run_playbook` is duplicated —
-extract a `_gate_and_confirm(resolution, spec)` helper.
+## Concision — **K6** (dedupe gate+confirm)
+`run_task` and `run_playbook` repeat the plan-review + `[y/N]` confirm sequence.
+Extract `_gate_and_confirm(resolution, spec, assume_yes) -> bool` (~15 LOC).
+Preserve: plan-review before confirm; confirm fires for `confirm_required or
+requires_review`. (This is independent of the optional cli→copilot cohesion
+split above.)

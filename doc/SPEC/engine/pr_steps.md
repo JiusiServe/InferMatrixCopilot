@@ -16,5 +16,5 @@ Pure re-export; no logic.
 already retargeted to `engine.steps.pr` during the refactor.)
 
 ## Refactor notes
-**Retire path**: point `test_pr_steps` at `from omni_copilot.engine.steps.pr
-import extract_signature`, then delete file + spec.
+**Retire path (_CONCISION.md K5)**: point `test_pr_steps` at `from
+omni_copilot.engine.steps.pr import extract_signature`, then delete file + spec.

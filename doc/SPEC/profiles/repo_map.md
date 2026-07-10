@@ -32,3 +32,9 @@ Regex-based (no tree-sitter dependency) — a deliberate simplicity/portability
 trade. If precision becomes a problem, a tree-sitter backend can slot behind the
 same `RepoMap.render` contract. Keep the "pulled on demand" stance — do not add
 a code path that injects the map into a prompt.
+
+## Concision — **K2** (shared language rules)
+`_SYMBOL_RES` + `_SUFFIXES` are the third copy of the per-language rule set
+(also `review._sweep_targets`, `profiles/establish`). Consume the shared
+`profiles/languages.py` (K2). Preserve: `supported` false + honest "use grep"
+for an unknown language.

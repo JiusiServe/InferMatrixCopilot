@@ -26,3 +26,7 @@ No mutation of the workspace; no repo knowledge.
 ## Refactor notes
 Trivial and correct. If more read-only "analysis" steps appear, they can share
 this file.
+
+## Concision — **K3**
+`guard_clean`/`diff_summary` each repeat the `repo is None → BLOCKED` guard →
+`require_repo(ctx)` (one of the 8 K3 sites).

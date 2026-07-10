@@ -28,6 +28,10 @@ stdlib only.
 ## Refactor notes
 Security-critical and pure — keep it dependency-free and side-effect-free.
 Every push path in the codebase must route through `guard_push`; a new push
-site that reimplements the checks is a defect. The extra target dataclasses
-(`ModuleTask` etc.) are lightly used — if they stay unused, a later refactor may
-trim them, but they document the intended target-layer vocabulary.
+site that reimplements the checks is a defect.
+
+## Concision — **K1** (dead code, ~35 LOC, risk none)
+`ModuleTask`, `ModuleSchedule`, `ValidationPlan`, `RebaseRunSpec` have **zero**
+importers outside `targets/__init__.py`'s re-exports (verified). Delete the four
+dataclasses + those re-exports. Keep `PushPolicy`/`PushDecision`/`guard_push`.
+Preserve: C4 untouched.

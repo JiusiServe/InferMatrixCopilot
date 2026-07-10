@@ -28,3 +28,7 @@ Covered via issue playbooks + `test_agent_runtime` paths.
 ## Refactor notes
 Well-sized. The `_issue_agent_step` factory + `_render_answer`/`_render_triage`
 pattern is clean; if a third issue agent step appears, keep using the factory.
+
+## Concision — **K4/K7**
+`issue.fetch` uses the "from state" early-return (K7 `from_state`) and verbose
+`state_updates` literals (K4 `published(...)`). Small wins; preserve B2.

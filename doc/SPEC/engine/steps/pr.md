@@ -47,3 +47,12 @@ split** once it grows further: `steps/pr_rebase.py` (checkout / rebase_onto_base
 `pr.gate_check`/`pr.post_review` in `pr.py`. They only share `_common` helpers,
 so the split creates no cross-import. `_enrich_ci_logs` is the seam to
 `ci/providers` — keep it thin.
+
+## Concision — **K3/K4/K7** (do before any split)
+Several repo-guard sites (K3 `require_repo`), verbose `state_updates` literals
+(K4 `published(...)`), and the `pr.fetch_diff`/`pr.gate_check`/
+`pr.fetch_ci_failures` "injected in state" early-returns (K7 `from_state`) can
+collapse to single calls. `agent.verify_module`'s no-LLM block is a K3
+`no_llm_gap` site. Do these first — the file may shrink enough that the
+cohesion split above becomes optional. Preserve: B2 (PushPolicy still published
+serialized), C4, C5, E2.

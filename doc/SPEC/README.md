@@ -19,6 +19,11 @@ belong in it, which global constraints bind it, and where it is currently messy.
   (A structural, B contract, C safety, D knowledge, E observability) + the
   invariant catalog. Per-file specs cite these by id (e.g. `A2`, `C4`) instead
   of restating them.
+- **[_CONCISION.md](_CONCISION.md)** — the plan for making the codebase smaller:
+  a prioritized, grep-backed catalog of dead code, duplication, and boilerplate
+  to remove (K1–K7), each with the shared helper to introduce and the invariant
+  to preserve. This is what the "make it concise" refactor follows; per-file
+  specs carry a matching **Concision** note where an opportunity applies.
 
 ## Per-file spec template (the lenses)
 
@@ -38,7 +43,11 @@ Every `*.md` under the mirrored tree uses these headings, in this order:
 8. **Extension points** — the sanctioned way to add capability here.
 9. **Tests** — the guard tests that pin the invariants.
 10. **Refactor notes** — size/cohesion/coupling smells and concrete suggested
-    moves/splits. This is the lens the refactor consumes.
+    moves/splits (a *cohesion* lens — improves readability, adds files).
+11. **Concision** (only where an opportunity applies) — what in this file is
+    dead, duplicated, or boilerplate, and which `_CONCISION.md` item (K1–K7)
+    removes it. This is the lens the *make-it-concise* refactor consumes;
+    where it conflicts with a cohesion split, concision wins.
 
 ## How to use this during refactor
 

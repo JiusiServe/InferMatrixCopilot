@@ -22,7 +22,7 @@ Most tests import `register_builtin_steps` from here; `test_profile_steps` and
 `test_agent_ensemble` import the review helpers from here.
 
 ## Refactor notes
-**Retire path**: migrate importers to `from omni_copilot.engine.steps import
-register_builtin_steps` and `from omni_copilot.engine.steps.review import ...`,
-then delete this file + its spec. Low priority — it costs 13 lines and keeps the
-diff of the refactor small.
+**Retire path (_CONCISION.md K5)**: migrate importers to `from
+omni_copilot.engine.steps import register_builtin_steps` and `from
+omni_copilot.engine.steps.review import ...`, then delete this file + its spec.
+Part of the ~26-LOC / 3-file shim removal.

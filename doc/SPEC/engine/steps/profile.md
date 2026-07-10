@@ -39,3 +39,12 @@ Two lifecycles in one file. **Suggested split**: `steps/profile_establish.py`
 share only `_plugin_from_state` (→ `_common` or a tiny `profiles` helper) and
 the store — no cross-import. Guidance prompt constants could move beside the
 review prompts under a `steps/*_prompts.py` convention.
+
+## Concision — **K3** (biggest boilerplate collapse here)
+This file has the densest guard repetition: **7** `_plugin_from_state` +
+`isinstance(..., StepResult)` guards, **6** `ProfileStore(plugin.profile_dir)`
+constructions, **3** no-LLM `capability_gap` blocks. Replace with `_common`
+helpers `plugin_or_result`/`@needs_plugin`, `store_for(plugin)`,
+`no_llm_gap(...)`. Expect ~25–35 LOC saved in this file alone. Preserve: each
+step's name/behavior, the store's gates (D3/D4), and the `capability_gap`
+events (E2). Do NOT let the helper hide the read-only-ness of `profile.judge`.

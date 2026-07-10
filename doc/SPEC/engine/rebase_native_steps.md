@@ -18,7 +18,7 @@ name affects the one runtime).
 `from omni_copilot.engine import rebase_native_steps`.
 
 ## Refactor notes
-**Retire path**: point those fixtures at
+**Retire path (_CONCISION.md K5)**: point those fixtures at
 `from omni_copilot.engine.steps import rebase_native` and clear
 `rebase_native._RUNTIME`, then delete file + spec. Keep the "same object"
 guarantee until then — a `_RUNTIME = {}` reassignment anywhere would break the

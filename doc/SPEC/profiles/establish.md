@@ -26,7 +26,8 @@ stdlib only.
 
 ## Refactor notes
 Pure functions — easy to test and reuse. The redundancy filter is the
-load-bearing ETH-study defense; keep it deterministic. Language extractors
-(`LANGUAGE_SUFFIXES` + `scan_modules`) share the language-keying idea with
-`review._sweep_targets` and `repo_map` — a future refactor could centralize the
-"per-language rules" table, but only if it stays a plain data map.
+load-bearing ETH-study defense; keep it deterministic. ## Concision — **K2** (shared language rules)
+`LANGUAGE_SUFFIXES` (+ the language use in `scan_modules`) is one of three copies
+of the per-language rule set (also `review._sweep_targets`, `repo_map`). Move the
+data to a leaf `profiles/languages.py` and consume it here; keep it a plain data
+map + tiny accessors. Preserve: unknown language → empty module scan.
