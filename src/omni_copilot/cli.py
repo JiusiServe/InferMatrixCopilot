@@ -70,6 +70,21 @@ class Copilot:
             return False
         return True  # lgtm, or revise surfaced to the user before their confirm
 
+    def _gate_and_confirm(self, resolution: Resolution, spec: TaskSpec,
+                          assume_yes: bool, *, prompt: str = "Proceed?",
+                          force_confirm: bool = False) -> int | None:
+        """Plan-review gate + [y/N] confirm (concision K6). Returns an exit code
+        to return, or None to proceed. Confirm fires for confirm_required or a
+        review-requiring/explicit plan, unless assume_yes."""
+        if not self._plan_review_gate(resolution, spec, assume_yes):
+            return BLOCKED_EXIT
+        need = force_confirm or spec.confirm_required or resolution.requires_review
+        if need and not assume_yes:
+            if input(f"{prompt} [y/N] ").strip().lower() not in ("y", "yes"):
+                print("aborted.")
+                return 1
+        return None
+
     # -- execution -----------------------------------------------------------------
     def run_task(self, spec: TaskSpec, *, assume_yes: bool = False,
                  plan_only: bool = False) -> int:
@@ -88,13 +103,9 @@ class Copilot:
         if plan_only:
             return 0
 
-        if not self._plan_review_gate(resolution, spec, assume_yes):
-            return BLOCKED_EXIT
-        if (spec.confirm_required or resolution.requires_review) and not assume_yes:
-            answer = input("Proceed? [y/N] ").strip().lower()
-            if answer not in ("y", "yes"):
-                print("aborted.")
-                return 1
+        code = self._gate_and_confirm(resolution, spec, assume_yes)
+        if code is not None:
+            return code
 
         run_id = f"run-{time.strftime('%Y%m%d-%H%M%S')}"
         run_dir = self.settings.run_root / run_id
@@ -128,13 +139,11 @@ class Copilot:
 
         resolution = Resolution(mode="explicit", playbook=playbook,
                                 tier=spec.tier, requires_review=True)
-        if not self._plan_review_gate(resolution, spec, assume_yes):
-            return BLOCKED_EXIT
-        if not assume_yes:
-            answer = input(f"Run {playbook.status} playbook '{name}'? [y/N] ").strip().lower()
-            if answer not in ("y", "yes"):
-                print("aborted.")
-                return 1
+        code = self._gate_and_confirm(
+            resolution, spec, assume_yes, force_confirm=True,
+            prompt=f"Run {playbook.status} playbook '{name}'?")
+        if code is not None:
+            return code
         run_id = f"run-{time.strftime('%Y%m%d-%H%M%S')}"
         run_dir = self.settings.run_root / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
