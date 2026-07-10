@@ -8,7 +8,7 @@ import pytest
 from omni_copilot.cli import Copilot
 from omni_copilot.config import _REPO_ROOT
 from omni_copilot.engine import Executor, StepRegistry, StepResult, StepSpec
-from omni_copilot.engine.builtin_steps import register_builtin_steps
+from omni_copilot.engine.steps import register_builtin_steps
 from omni_copilot.intent import parse_intents
 from omni_copilot.llm import Block, Reply
 from omni_copilot.notify import Notifier

@@ -71,8 +71,8 @@ Every `*.md` under the mirrored tree uses these headings, in this order:
 | Interface / task | `task_spec` `intent` `cli` `chat` `ui` `config` |
 | Engine substrate | `engine/step` `engine/registry` `engine/executor` `engine/planner` `engine/agent_runtime` `agent_loop` `tools` `scopes` `llm` |
 | Step library | `engine/steps/__init__` `engine/steps/_common` `engine/steps/{workspace,rebase_ext,review,report,pr,issue,profile,rebase_native}` |
-| Compat shims | `engine/{builtin_steps,pr_steps,rebase_native_steps}` (shim-to-retire) |
 | Planning data | `playbooks/store` `playbooks/PLAYBOOKS` (the yaml) |
+| Edge — languages | `profiles/languages` (per-language rules, shared) |
 | Edge | `plugins/base` `targets/base` `ci/normalize` `ci/providers` `rebase/monitor` |
 | Profiles | `profiles/store` `profiles/establish` `profiles/repo_map` `profiles/consolidate` |
 | Cross-cutting | `review/{diff_summary,triggers,reviewer}` `memory/{debug_memory,skills}` `run_trace` `notify` `metrics` |

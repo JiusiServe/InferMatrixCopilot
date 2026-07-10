@@ -7,8 +7,8 @@ import pytest
 
 from omni_copilot.config import _REPO_ROOT
 from omni_copilot.engine import Executor, StepRegistry
-from omni_copilot.engine.builtin_steps import register_builtin_steps
-from omni_copilot.engine import rebase_native_steps as rns
+from omni_copilot.engine.steps import register_builtin_steps
+from omni_copilot.engine.steps import rebase_native as rns
 from omni_copilot.notify import Notifier
 from omni_copilot.playbooks.store import PlaybookStore
 

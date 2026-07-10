@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from omni_copilot.engine.builtin_steps import register_builtin_steps
-from omni_copilot.engine.pr_steps import extract_signature
+from omni_copilot.engine.steps import register_builtin_steps
+from omni_copilot.engine.steps.pr import extract_signature
 from omni_copilot.engine.registry import StepRegistry
 from omni_copilot.engine.step import FailureKind, StepContext
 from omni_copilot.targets.base import PushPolicy

@@ -8,7 +8,8 @@ from omni_copilot.engine.agent_runtime import (
     BASE_OUTPUT_SCHEMA,
     run_agent_step_ensemble,
 )
-from omni_copilot.engine.builtin_steps import _REVIEW_LENSES, register_builtin_steps
+from omni_copilot.engine.steps import register_builtin_steps
+from omni_copilot.engine.steps.review import _REVIEW_LENSES
 from omni_copilot.engine.registry import StepRegistry
 from omni_copilot.engine.step import FailureKind, StepContext
 from omni_copilot.llm import Block, Reply
@@ -302,7 +303,7 @@ def test_review_step_caps_comments_deterministically(settings, trace, tmp_path,
                 "comment": "big", "evidence": "hunk"}]
             + [{"file": "m.py", "line": 20 + i, "severity": "minor",
                 "comment": f"m{i}", "evidence": "hunk"} for i in range(3)])
-    from omni_copilot.engine.builtin_steps import register_builtin_steps
+    from omni_copilot.engine.steps import register_builtin_steps
     llm = ScriptedLLM(
         [contract(review_comments=many)]
         + [contract(review_comments=[])] * (len(_REVIEW_LENSES) - 1)
@@ -323,7 +324,7 @@ def test_review_step_caps_comments_deterministically(settings, trace, tmp_path,
 def test_render_verdict_minor_requests_changes():
     """Severities above nit mean 'belongs in this PR' — approving while asking
     for in-PR changes is incoherent, so minor+ flips the verdict."""
-    from omni_copilot.engine.builtin_steps import _render_review_md
+    from omni_copilot.engine.steps.review import _render_review_md
 
     minor = {"review_comments": [{"file": "a.py", "line": 1, "severity":
                                   "minor", "comment": "simplify", "evidence": "hunk"}]}

@@ -3,7 +3,7 @@
 import asyncio
 import json
 
-from omni_copilot.engine.builtin_steps import register_builtin_steps
+from omni_copilot.engine.steps import register_builtin_steps
 from omni_copilot.engine.registry import StepRegistry
 from omni_copilot.engine.step import FailureKind, StepContext
 from omni_copilot.llm import Block, Reply

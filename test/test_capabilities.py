@@ -4,7 +4,7 @@ capability gaps degrade loudly, never silently."""
 
 import pytest
 
-from omni_copilot.engine.builtin_steps import register_builtin_steps
+from omni_copilot.engine.steps import register_builtin_steps
 from omni_copilot.engine.planner import Planner, PlanningError
 from omni_copilot.engine.registry import StepRegistry
 from omni_copilot.playbooks.store import PlaybookStore

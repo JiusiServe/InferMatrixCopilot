@@ -7,7 +7,7 @@ import json
 from omni_copilot.ci.normalize import normalize_signature
 from omni_copilot.ci.providers import (BuildkiteLogs, GithubActionsLogs,
                                        provider_for)
-from omni_copilot.engine.builtin_steps import register_builtin_steps
+from omni_copilot.engine.steps import register_builtin_steps
 from omni_copilot.engine.registry import StepRegistry
 from omni_copilot.engine.step import StepContext
 from omni_copilot.profiles.repo_map import RepoMap, build_index

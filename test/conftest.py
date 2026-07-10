@@ -166,10 +166,10 @@ def fake_agent(monkeypatch, tmp_path: Path, git_repo):
     for name, mod in modules.items():
         monkeypatch.setitem(sys.modules, name, mod)
 
-    from omni_copilot.engine import rebase_native_steps
-    rebase_native_steps._RUNTIME.clear()
+    from omni_copilot.engine.steps import rebase_native
+    rebase_native._RUNTIME.clear()
     yield control
-    rebase_native_steps._RUNTIME.clear()
+    rebase_native._RUNTIME.clear()
 
 
 @pytest.fixture()

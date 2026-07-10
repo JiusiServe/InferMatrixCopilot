@@ -19,7 +19,7 @@ from pathlib import Path
 import yaml
 
 from .config import Settings
-from .engine.builtin_steps import register_builtin_steps
+from .engine.steps import register_builtin_steps
 from .engine.executor import Executor
 from .engine.planner import Planner, PlanningError, Resolution
 from .engine.registry import StepRegistry

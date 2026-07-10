@@ -5,7 +5,8 @@ redundancy filter, and the repo-profile playbook/task-kind plumbing."""
 import asyncio
 import json
 
-from omni_copilot.engine.builtin_steps import _sweep_targets, register_builtin_steps
+from omni_copilot.engine.steps import register_builtin_steps
+from omni_copilot.engine.steps.review import _sweep_targets
 from omni_copilot.engine.planner import Planner
 from omni_copilot.engine.registry import StepRegistry
 from omni_copilot.engine.step import StepContext
