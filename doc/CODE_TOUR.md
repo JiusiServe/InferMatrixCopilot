@@ -182,7 +182,7 @@ Read in this order:
    **redundancy filter** (the ETH-study rule: doc-redundant briefing lines
    are pure cost), directive extraction from AGENTS.md-style files,
    deterministic module scan.
-3. **`engine/profile_steps.py`** — the pipeline as steps:
+3. **`engine/steps/profile.py`** — the pipeline as steps:
    `profile.fingerprint` → `profile.structure_scan` → `profile.ingest_docs`
    → `agent.profile_repo` (facts must cite evidence or the store rejects
    them; overviews are forbidden outputs), plus the Stage-4 set:
