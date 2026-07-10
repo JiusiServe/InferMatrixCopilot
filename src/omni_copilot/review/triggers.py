@@ -27,6 +27,13 @@ def evaluate_triggers(
     knowledge_edit: bool = False,
     high_risk_modules: list[str] | None = None,
 ) -> list[str]:
+    """Evaluate the conditional Patch-Review rules against a DiffSummary and
+    return the names of the fired ones (a subset of ALL_RULES) — a non-empty
+    list means the LLM reviewer should run. Fires on out-of-scope edits, touched
+    high-risk modules, an oversized diff (lines or file count), changed files
+    with no tests run, full-file rewrites, an imminent/requested push, and
+    knowledge edits. `high_risk_modules` (from the repo plugin when available)
+    overrides `settings.high_risk_modules`, which is only the fallback."""
     # repo-specific risk knowledge comes from the repo's plugin when available
     # (settings.high_risk_modules is only the fallback — v2 P0 fix #5)
     risky = settings.high_risk_modules if high_risk_modules is None \

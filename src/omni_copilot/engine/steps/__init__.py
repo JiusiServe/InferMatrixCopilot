@@ -26,6 +26,9 @@ from . import (  # noqa: F401,E402
 
 
 def register_builtin_steps(registry: StepRegistry) -> StepRegistry:
+    """Flush every step collected by import side effects into `registry` and
+    return it. Called once at startup, after this package's module imports have
+    populated the collection; the registry then holds the full vetted library."""
     for spec in _common.collected():
         registry.register(spec)
     return registry

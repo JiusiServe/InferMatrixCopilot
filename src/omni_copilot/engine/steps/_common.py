@@ -38,6 +38,8 @@ def step(name: str, kind: str, risk: str, description: str = ""):
     """Decorator: bind a handler to its name + metadata in one place."""
 
     def deco(fn):
+        """Register `fn` as the handler under the captured name/metadata, then
+        return it unchanged so the decorated name still binds to the function."""
         register_step(StepSpec(name, kind, risk, fn, description))
         return fn
 
@@ -45,12 +47,16 @@ def step(name: str, kind: str, risk: str, description: str = ""):
 
 
 def collected() -> list[StepSpec]:
+    """The StepSpecs registered so far (via `@step` / `register_step`) — consumed
+    once by `register_builtin_steps` to populate a StepRegistry."""
     return list(_COLLECTED.values())
 
 
 # -- cross-module helpers ------------------------------------------------------
 
 def repo_path(ctx: StepContext) -> Path | None:
+    """The repo checkout path for this step: the step's `repo_path` param first,
+    else the run-state `repo_path`, as a Path — or None when neither is set."""
     p = ctx.params.get("repo_path") or ctx.state.get("repo_path")
     return Path(p) if p else None
 
@@ -67,6 +73,8 @@ def require_repo(ctx: StepContext, *, must_exist: bool = True):
 
 
 def task_spec(ctx: StepContext) -> dict:
+    """The run's TaskSpec dict from state, or `{}` when absent/malformed — a
+    total accessor so callers can `.get()` fields without guarding."""
     spec = ctx.state.get("task_spec")
     return spec if isinstance(spec, dict) else {}
 
@@ -99,6 +107,10 @@ def no_llm_gap(ctx: StepContext, step: str, effect: str, *,
 
 
 def gh(args: list[str], cwd: Path | None = None) -> tuple[int, str]:
+    """Run the `gh` CLI with `args` in `cwd`, returning `(returncode, output)`
+    where output is stdout or, if empty, stderr. A missing CLI yields
+    `(127, ...)` instead of raising, so callers branch on the code, not an
+    exception."""
     try:
         out = subprocess.run(["gh", *args], cwd=str(cwd) if cwd else None,
                              capture_output=True, text=True, timeout=120)
@@ -108,6 +120,9 @@ def gh(args: list[str], cwd: Path | None = None) -> tuple[int, str]:
 
 
 def git(repo: Path, *args: str, timeout: int = 120) -> tuple[int, str]:
+    """Run `git args` inside `repo`, returning `(returncode, combined_output)`
+    with stdout+stderr merged and stripped — one place for step handlers to shell
+    out to git."""
     out = subprocess.run(["git", *args], cwd=str(repo), capture_output=True,
                          text=True, timeout=timeout)
     return out.returncode, (out.stdout + out.stderr).strip()
@@ -118,17 +133,26 @@ def gh_read_tools(repo: Path | None) -> dict:
     from ...tools import ToolDef
 
     def _view(kind: str, number, fields: str) -> str:
+        """`gh <kind> view <number> --json <fields>`, coercing `number` to int
+        (injection-safe) and truncating output to ~15k chars; returns a `gh
+        failed: ...` string on nonzero exit instead of raising."""
         code, out = gh([kind, "view", str(int(number)), "--json", fields],
                        cwd=repo)
         return out[:15_000] if code == 0 else f"gh failed: {out[:400]}"
 
     def gh_pr_view(pr, **_: object) -> str:
+        """Tool handler: return PR `pr`'s title/body/state/draft/mergeable/files
+        as JSON text."""
         return _view("pr", pr, "title,body,state,isDraft,mergeable,files")
 
     def gh_issue_view(issue, **_: object) -> str:
+        """Tool handler: return issue `issue`'s title/body/labels/comments as
+        JSON text."""
         return _view("issue", issue, "title,body,labels,comments")
 
     def gh_ci_read(pr, **_: object) -> str:
+        """Tool handler: return PR `pr`'s CI checks (name/state/bucket) as JSON
+        text, truncated to ~10k chars, or a `gh failed: ...` string on error."""
         code, out = gh(["pr", "checks", str(int(pr)), "--json",
                         "name,state,bucket"], cwd=repo)
         return out[:10_000] if code == 0 else f"gh failed: {out[:400]}"
@@ -152,6 +176,10 @@ def post_step(state_key: str, gh_args, what: str):
     `post` intent AND ALLOW_POST=1, else dry-run."""
 
     async def handler(ctx: StepContext) -> StepResult:
+        """Post `state[state_key]` via `gh_args(spec, body)` only when both the
+        task's `post` intent and `ALLOW_POST` are set; otherwise a BLOCKED (no
+        body) or an ok dry-run skip. On success traces a `posted_artifact` with
+        the extracted URL; a nonzero gh exit escalates."""
         body = ctx.state.get(state_key, "")
         spec = task_spec(ctx)
         if not body:

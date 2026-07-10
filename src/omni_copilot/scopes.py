@@ -15,16 +15,25 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class Decision:
+    """One scope ruling: `allowed` gates execution, `out_of_scope` flags an
+    allowed-but-recorded write (inside writable, outside primary), and `reason`
+    is the human-readable explanation used in traces and error messages."""
+
     allowed: bool
     out_of_scope: bool = False
     reason: str = ""
 
 
 def _norm(path: str | Path) -> str:
+    """Canonicalize `path` (expand `~`, resolve, posix form) so pattern matching
+    is stable across cwd and symlinks."""
     return Path(path).expanduser().resolve().as_posix()
 
 
 def _match_any(path: str, patterns: tuple[str, ...]) -> bool:
+    """True if `path` matches any glob in `patterns`. A pattern starting with
+    `*` is matched as-is (relative/suffix glob); others are normalized to an
+    absolute path first."""
     return any(fnmatch(path, _norm(p) if not p.startswith("*") else p) for p in patterns)
 
 
@@ -38,6 +47,9 @@ class PathScope:
     primary: tuple[str, ...] = ()
 
     def check_write(self, path: str | Path) -> Decision:
+        """Rule on a write to `path`: refused outside `writable`; allowed-but-
+        out-of-scope when inside `writable` but outside `primary` (when primary
+        is set); allowed otherwise."""
         p = _norm(path)
         if not _match_any(p, self.writable):
             return Decision(False, reason=f"path outside writable scope: {p}")
@@ -48,12 +60,19 @@ class PathScope:
 
 @dataclass(frozen=True)
 class ToolScope:
+    """A named permission set: which `allowed_tools` may run, an optional
+    `path_scope` bounding where writes land, and `read_only` to forbid all
+    writes. The unit `tools.dispatch` enforces at the single choke point."""
+
     name: str
     allowed_tools: frozenset[str]
     path_scope: PathScope | None = None
     read_only: bool = False
 
     def check(self, tool: str, write_path: str | Path | None = None) -> Decision:
+        """Rule on a `tool` call: refused if the tool is not in `allowed_tools`;
+        for a write (`write_path` given) also refused when read-only, else
+        delegated to `path_scope`. Returns an allowed Decision otherwise."""
         if tool not in self.allowed_tools:
             return Decision(False, reason=f"tool '{tool}' not allowed in scope '{self.name}'")
         if write_path is not None:
@@ -70,6 +89,8 @@ EXEC_TOOLS = frozenset({"run_shell"})
 
 
 def read_only_scope(name: str = "read_only") -> ToolScope:
+    """A scope permitting only read tools and forbidding all writes — the
+    investigate/review default."""
     return ToolScope(name=name, allowed_tools=READ_TOOLS, read_only=True)
 
 

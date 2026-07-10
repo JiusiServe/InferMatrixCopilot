@@ -15,6 +15,11 @@ from ..run_trace import RunTrace
 
 @dataclass
 class DiffSummary:
+    """The deterministic, LLM-free summary of a working diff: which files
+    changed, insertion/deletion counts, and the risk signals the trigger rules
+    key on — files edited outside the task's primary scope, full-file rewrites,
+    tests actually run, and whether a push was requested."""
+
     changed_files: list[str] = field(default_factory=list)
     insertions: int = 0
     deletions: int = 0
@@ -25,6 +30,7 @@ class DiffSummary:
 
     @property
     def total_lines(self) -> int:
+        """Insertions plus deletions — the diff size the large-diff trigger uses."""
         return self.insertions + self.deletions
 
 
@@ -35,6 +41,12 @@ def build_diff_summary(
     primary_files: tuple[str, ...] = (),
     trace: RunTrace | None = None,
 ) -> DiffSummary:
+    """Build a DiffSummary from `git diff --numstat base_ref` in `repo_path`.
+    Counts insertions/deletions per changed file and flags any path not matching
+    `primary_files` (fnmatch globs) as out-of-scope. When a `trace` is given, it
+    also folds in run-trace signals — out-of-scope edits, full-file writes,
+    tests run, and whether a push was requested — that the raw diff can't show.
+    Returns the populated summary; the always-on first stage of Patch Review."""
     summary = DiffSummary()
     out = subprocess.run(
         ["git", "diff", "--numstat", base_ref],

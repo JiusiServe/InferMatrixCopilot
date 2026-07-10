@@ -23,6 +23,10 @@ BLOCKED_EXIT = 3
 
 @dataclass
 class Escalation:
+    """One "needs a human" event: `reason` and `phase` describe what stalled,
+    `severity` (info | blocked | failed) tiers it, and `state_summary` /
+    `artifacts` carry the context rendered into ESCALATION.md and emailed."""
+
     reason: str
     phase: str
     run_id: str
@@ -32,7 +36,13 @@ class Escalation:
 
 
 class Notifier:
+    """The escalation channel for one run: writes ESCALATION.md, records a trace
+    event, and emails when configured. Bound to a `run_dir`/`run_id` and keeps a
+    `sent` log of every Escalation raised."""
+
     def __init__(self, settings: Settings, run_dir: Path, trace: RunTrace, run_id: str = ""):
+        """Bind the notifier to `settings` (email/SMTP config), the run's
+        `run_dir` and `trace`, and a `run_id` (defaults to the dir name)."""
         self.settings = settings
         self.run_dir = Path(run_dir)
         self.trace = trace
@@ -41,6 +51,9 @@ class Notifier:
 
     def escalate(self, *, reason: str, phase: str, severity: str = "blocked",
                  state_summary: dict | None = None, artifacts: list[str] | None = None) -> Path:
+        """Raise an escalation: build the Escalation, append it to `sent`, write
+        the rendered ESCALATION.md into the run dir, record a trace event, and
+        fire the notification email. Returns the path to the written file."""
         esc = Escalation(
             reason=reason, phase=phase, run_id=self.run_id, severity=severity,
             state_summary=state_summary or {}, artifacts=artifacts or [],
@@ -55,6 +68,9 @@ class Notifier:
         return path
 
     def _render(self, esc: Escalation) -> str:
+        """Render an Escalation into the ESCALATION.md Markdown body: run/phase/
+        timestamp header, the reason, the state summary as a JSON block, and an
+        artifacts list when present."""
         lines = [
             f"# Escalation — {esc.severity}",
             "",
@@ -76,6 +92,10 @@ class Notifier:
 
     # -- email: Resend HTTP first, SMTP fallback; failures never crash a run --
     def _email(self, subject: str, body: str) -> bool:
+        """Best-effort send `subject`/`body` to the configured recipient: try
+        the Resend HTTP API first, then SMTP. Returns True on a successful send,
+        False when no recipient is set or every transport fails — exceptions are
+        swallowed so notification never crashes a run."""
         to = self.settings.notify_email
         if not to:
             return False

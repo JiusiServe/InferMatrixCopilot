@@ -16,6 +16,11 @@ from .tools import dispatch, tool_definitions_for
 
 @dataclass
 class AgentOutcome:
+    """The result of an agent loop: the final `text`, how many `iterations` and
+    `tool_calls` it took, whether it was `truncated` (budget exhausted), any
+    scope `refusals`, token usage, and the `tools_used` sequence — the audit
+    trail a step consumes."""
+
     text: str
     iterations: int
     tool_calls: int
@@ -37,6 +42,13 @@ def run_agent(
     max_iters: int = 40,
     extra_tools: dict | None = None,
 ) -> AgentOutcome:
+    """Run a tool-use loop until the model stops calling tools or `max_iters` is
+    hit. The model only ever sees tools its `scope` permits, and every call goes
+    through `tools.dispatch` (scope-checked, `trace`-audited); refusals are
+    collected, not fatal. On budget exhaustion it forces one final untooled
+    answer from work-so-far rather than discarding the investigation, and marks
+    the outcome `truncated`. Returns an AgentOutcome with the answer and audit
+    counters."""
     messages: list[dict] = [{"role": "user", "content": prompt}]
     tools = tool_definitions_for(scope, extra_tools)
     tool_calls = 0

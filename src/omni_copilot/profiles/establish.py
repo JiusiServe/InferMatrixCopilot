@@ -20,6 +20,8 @@ _SHINGLE = 6
 
 
 def _words(text: str) -> list[str]:
+    """Lowercased word tokens of `text` (identifier/path chars kept) — the shared
+    normalization for both the doc corpus and the redundancy shingling."""
     return _WORD.findall(text.lower())
 
 

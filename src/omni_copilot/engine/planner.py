@@ -16,11 +16,18 @@ from .registry import StepRegistry
 
 
 class PlanningError(Exception):
-    pass
+    """A task cannot be resolved to a runnable plan — a declared, fail-closed
+    refusal (capability gap, locked playbook, or a write-capable task with no
+    vetted playbook) rather than a silently degraded plan."""
 
 
 @dataclass
 class Resolution:
+    """The planner's decision for a task: which `playbook` to run, by which
+    `mode` (reuse / adapt / generate), at which capability `tier`, whether it
+    `requires_review` before execution, and human-readable `notes` on how it was
+    chosen."""
+
     mode: str  # "reuse" | "adapt" | "generate"
     playbook: Playbook
     tier: str
@@ -49,12 +56,26 @@ _GENERATE_TEMPLATES: dict[str, list[tuple[str, str]]] = {
 
 
 class Planner:
+    """Resolves a TaskSpec to a pipeline by the reuse > adapt > generate ladder,
+    drawing playbooks from `store` and steps from `registry`."""
+
     def __init__(self, store: PlaybookStore, registry: StepRegistry):
+        """Bind the planner to the playbook `store` it recalls from and the step
+        `registry` it composes generate-tier plans out of."""
         self.store = store
         self.registry = registry
 
     def resolve(self, spec: TaskSpec,
                 capabilities: set[str] | None = None) -> Resolution:
+        """Pick a plan for `spec`, given the repo's available `capabilities`.
+
+        Tries in order: **reuse** a recalled playbook when `spec.params` stay
+        within its declared surface; **adapt** it (L1, review required) when there
+        are extra params and it isn't locked; else **generate** an L2 plan from a
+        read-only template. Raises PlanningError instead of degrading silently —
+        when a vetted playbook exists but the repo can't feed it (capability gap),
+        when a locked playbook would need undeclared params, or when a
+        write-capable / template-less kind has no playbook. Returns a Resolution."""
         playbook = self.store.find(spec.kind, spec.repo, capabilities)
         if playbook is None and capabilities is not None:
             gaps = self.store.missing_capabilities(spec.kind, capabilities)

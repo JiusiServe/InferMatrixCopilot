@@ -10,6 +10,10 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
+    """Process-wide configuration, populated from the environment / `.env` and
+    grouped by concern (LLM, repos, engine, push safety, metrics, escalation).
+    Values are the defaults; secrets stay empty here and arrive from `.env`."""
+
     # the repo's own .env loads regardless of cwd; a cwd-local .env overrides it
     model_config = SettingsConfigDict(
         env_file=(str(_REPO_ROOT / ".env"), ".env"),
@@ -105,12 +109,15 @@ class Settings(BaseSettings):
 
     @property
     def reviewer(self) -> str:
+        """The reviewer model, falling back to `agent_model` when unset."""
         return self.reviewer_model or self.agent_model
 
     @property
     def intent(self) -> str:
+        """The intent-classification model, falling back to `agent_model`."""
         return self.intent_model or self.agent_model
 
     def repo_path(self, name: str) -> Path | None:
+        """The configured filesystem path for repo `name`, or None if unknown."""
         p = self.repo_paths.get(name)
         return Path(p) if p else None

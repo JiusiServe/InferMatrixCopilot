@@ -13,6 +13,10 @@ from dataclasses import dataclass
 
 @dataclass
 class PushPolicy:
+    """The requested push: whether it is `allowed`, the `remote`/`branch` target,
+    and whether force-with-lease is asked for. Defaults are deny-by-default
+    (`allowed=False`) and non-forced."""
+
     allowed: bool = False
     remote: str = "origin"
     branch: str = ""
@@ -21,6 +25,10 @@ class PushPolicy:
 
 @dataclass(frozen=True)
 class PushDecision:
+    """A push ruling: `allowed`, a `reason`, and the concrete git `command` to
+    run when allowed (empty on deny). The command is never executed here — the
+    caller runs it — so authorization and execution stay separate."""
+
     allowed: bool
     reason: str
     command: list[str] = ()

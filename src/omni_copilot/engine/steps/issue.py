@@ -15,6 +15,15 @@ from ._common import repo_path as _repo_path
 @step("issue.fetch", "deterministic", "read",
       "Fetch an issue via gh (read-only).")
 async def _issue_fetch(ctx: StepContext) -> StepResult:
+    """Fetch issue material via `gh` for the downstream answer/triage agents.
+    Reads `task_spec`: with an `issue` number, fetches that one issue
+    (`issue view` — title/body/labels/comments); with no number but
+    `kind == "issue_filter"`, fetches recent open issues (`issue list`, capped by
+    `params.limit`) for triage mode; any other no-number case is BLOCKED. Returns
+    injected `issue_text` from state verbatim when present (offline testing); a
+    failed `gh` call degrades to BLOCKED.
+
+    Publishes the raw JSON as `issue_text` to state (B2 `state_updates`)."""
     cached = from_state(ctx, "issue_text")
     if cached is not None:
         return cached
@@ -51,6 +60,11 @@ def _issue_agent_step(step_name: str, purpose: str, guidance: str,
     """Issue-facing agent steps on the unified runtime (修正方案 P1)."""
 
     async def handler(ctx: StepContext) -> StepResult:
+        """Run the configured issue agent step on the unified runtime, reading
+        `issue_text` from state as evidence (BLOCKED when absent) and granting the
+        read-only gh tools. On success, `render` turns the agent output into a
+        (state key, text) pair which is stored and published (B2 `state_updates`,
+        e.g. `draft_answer` / `triage_table`); the draft is never auto-posted."""
         from ..agent_runtime import run_agent_step
 
         material = ctx.state.get("issue_text", "")
@@ -74,11 +88,16 @@ def _issue_agent_step(step_name: str, purpose: str, guidance: str,
 
 
 def _render_answer(output: dict) -> tuple[str, str]:
+    """Render the draft-answer agent output into the `("draft_answer", text)`
+    pair, preferring the `answer_draft` field and falling back to `summary`."""
     return "draft_answer", str(output.get("answer_draft")
                                or output.get("summary", ""))
 
 
 def _render_triage(output: dict) -> tuple[str, str]:
+    """Render the triage agent's `triage_table` rows into the
+    `("triage_table", markdown)` pair — a markdown table (issue/type/module/
+    priority/labels). Falls back to the agent's `summary` when there are no rows."""
     rows = output.get("triage_table") or []
     if not rows:
         return "triage_table", str(output.get("summary", ""))

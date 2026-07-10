@@ -19,6 +19,10 @@ STATUSES = ("candidate", "active", "locked", "retired")
 
 @dataclass
 class PlaybookStep:
+    """One step in a playbook: a unique `id`, the registered `step` name to run,
+    its `params`, and optional control — `foreach` (a state key holding a list
+    to fan out over) and `when` (a TaskSpec condition gating execution)."""
+
     id: str
     step: str
     params: dict = field(default_factory=dict)
@@ -28,6 +32,11 @@ class PlaybookStep:
 
 @dataclass
 class Playbook:
+    """A versioned, reusable orchestration plan: its `steps` plus the matching
+    keys (`task_kinds`, `repos`), declared adaptation `params`, profile
+    `requires`, `provenance`, and `success` criterion. `status` drives reuse
+    (candidate/active/locked/retired)."""
+
     name: str
     version: int
     status: str
@@ -41,10 +50,13 @@ class Playbook:
 
     @property
     def locked(self) -> bool:
+        """True for locked playbooks — high-risk plans reused verbatim."""
         return self.status == "locked"
 
 
 def playbook_to_doc(pb: Playbook) -> dict:
+    """Serialize a Playbook back to its YAML-ready dict, the inverse of
+    `_parse`. Empty optional fields are omitted so the round-trip stays clean."""
     return {
         "name": pb.name, "version": pb.version, "status": pb.status,
         "task_kinds": pb.task_kinds, "repos": pb.repos, "params": pb.params,
@@ -61,10 +73,15 @@ def playbook_to_doc(pb: Playbook) -> dict:
 
 
 def parse_playbook(doc: dict, source: str = "<inline>") -> Playbook:
+    """Parse and validate a playbook `doc` into a Playbook; `source` labels it in
+    error messages. The public entry point over `_parse`."""
     return _parse(doc, source)
 
 
 def _parse(doc: dict, source: str) -> Playbook:
+    """Build a Playbook from a raw `doc`, validating required keys, the `status`
+    enum, and step-id uniqueness; raises ValueError (naming `source`) on any
+    violation. Returns the constructed Playbook."""
     for key in ("name", "status", "task_kinds", "steps"):
         if key not in doc:
             raise ValueError(f"playbook {source}: missing '{key}'")
@@ -90,13 +107,21 @@ def _parse(doc: dict, source: str) -> Playbook:
 
 
 class PlaybookStore:
+    """In-memory registry of the playbooks under `directory`, validated against a
+    `StepRegistry` so a plan can never name an unregistered step. Provides recall
+    (`find`), lookup (`get`/`all`), and candidate persistence."""
+
     def __init__(self, directory: Path, registry: StepRegistry):
+        """Bind the store to its `directory` and step `registry`, then load all
+        playbooks eagerly."""
         self.directory = Path(directory)
         self.registry = registry
         self._playbooks: dict[str, Playbook] = {}
         self.load()
 
     def load(self) -> None:
+        """(Re)load every `*.yaml` in the directory, parsing and validating each;
+        replaces the in-memory set. A missing directory leaves it empty."""
         self._playbooks.clear()
         if not self.directory.exists():
             return
@@ -107,6 +132,8 @@ class PlaybookStore:
             self._playbooks[pb.name] = pb
 
     def validate(self, pb: Playbook) -> None:
+        """Raise ValueError if any of `pb`'s steps names a step not in the
+        registry — the guard that keeps plans executable."""
         for s in pb.steps:
             if s.step not in self.registry:
                 raise ValueError(
@@ -114,9 +141,11 @@ class PlaybookStore:
                 )
 
     def get(self, name: str) -> Playbook | None:
+        """The playbook registered under `name`, or None."""
         return self._playbooks.get(name)
 
     def all(self) -> list[Playbook]:
+        """All loaded playbooks."""
         return list(self._playbooks.values())
 
     def find(self, task_kind: str, repo: str | None = None,

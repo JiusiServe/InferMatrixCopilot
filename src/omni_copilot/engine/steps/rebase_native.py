@@ -23,6 +23,8 @@ _RUNTIME: dict = {}
 
 
 def _task_params(ctx: StepContext) -> dict:
+    """Return the task-spec `params` dict from state, or `{}` when the spec or its
+    params are absent — the CLI-flag / mode inputs the native steps read."""
     spec = ctx.state.get("task_spec") or {}
     return (spec.get("params") if isinstance(spec, dict) else {}) or {}
 
@@ -38,6 +40,9 @@ def _import_parent():
 
 
 def _blocked_import() -> StepResult:
+    """The shared BLOCKED result returned when the parent rebase-agent's `agent`
+    package is not importable — every native step degrades to this (with the
+    install hint) rather than raising, since all parent imports are lazy."""
     return StepResult(False, FailureKind.BLOCKED,
                       "vllm-omni-rebase-agent is not importable — install it into "
                       "the same venv (pip install -e /rebase/vllm-omni-rebase-agent)")
@@ -132,6 +137,17 @@ def _ensure_runtime(ctx: StepContext) -> dict | StepResult:
 
 
 async def _prelude(ctx: StepContext) -> StepResult:
+    """First native step: build the parent runtime and compute the wave module
+    lists. Refuses to start fresh when the parent's `state.json` shows an
+    in-flight run (BLOCKED — resume or clean it up first) unless `resuming`.
+    Builds the memoized runtime via `_ensure_runtime` (BLOCKED if the parent isn't
+    importable), then derives `wave1_modules` / `wave2_modules` from parent
+    settings, minus modules already done/skipped in a resumed run.
+
+    Cross-checks the settings wave map against plugin zero's module→wave map,
+    recording `wave_map_drift` in the trace (best-effort, never fatal). Publishes
+    the wave lists, `rebase_run_id`, and `parent_log_dir` to state (B2
+    `state_updates`)."""
     orch, _ = _import_parent()
     if orch is None:
         return _blocked_import()
@@ -190,6 +206,12 @@ def _phase_step(phase_module: str, wrapper_name: str, marker_after: str | None,
     """Factory for thin wrappers over the parent's phaseN_init_wrapper."""
 
     async def handler(ctx: StepContext) -> StepResult:
+        """Run one parent phase by importing and awaiting its
+        `phaseN_init_wrapper(state)`, then merging the returned dict back into the
+        shared parent state. Skips (returns ok) when `skip_flag` is set in state.
+        After a successful phase, persists the parent's `marker_after` phase marker
+        so a fallback to `--resume` stays possible. A raised exception or a
+        non-empty `errors` list in the result returns ESCALATE."""
         rt = _ensure_runtime(ctx)
         if isinstance(rt, StepResult):
             return rt
@@ -221,6 +243,10 @@ def _phase_step(phase_module: str, wrapper_name: str, marker_after: str | None,
 
 
 async def _phase2_prepare(ctx: StepContext) -> StepResult:
+    """Prepare Phase 2 before the per-module rebase fan-out: run the parent's
+    pre-flight curator (best-effort), advance the phase marker to
+    `module_rebase`, and initialize the parent's phase-2 progress file. Clears the
+    wave lists and returns ok early under `skip_rebase_mode` (CI-only runs)."""
     rt = _ensure_runtime(ctx)
     if isinstance(rt, StepResult):
         return rt
@@ -240,6 +266,18 @@ async def _phase2_prepare(ctx: StepContext) -> StepResult:
 
 
 async def _module_rebase(ctx: StepContext) -> StepResult:
+    """Rebase one module (fanned out via `ctx.item`) by delegating to the parent's
+    `node_rebase_module` — its own governed SDK loop, plan-review gate, and debug
+    retries — then merge the result into the parent state and save phase-2
+    progress. Honors the parent's resume granularity: a module already
+    done/skipped in the resumed run is not re-rebased.
+
+    Maps the module result to a typed outcome: `done` → ok; a missing
+    ANTHROPIC_API_KEY → BLOCKED; an agent that errored before running
+    (exit_code -1, no attempts) → RETRYABLE; otherwise ESCALATE with the module's
+    exit code, debug-attempt count, and log artifact — unless
+    `params.continue_on_module_failure` (parity mode), which returns ok with a
+    warning so the run proceeds."""
     rt = _ensure_runtime(ctx)
     if isinstance(rt, StepResult):
         return rt
@@ -292,6 +330,9 @@ async def _module_rebase(ctx: StepContext) -> StepResult:
 
 
 async def _phase2_finalize(ctx: StepContext) -> StepResult:
+    """Close out Phase 2 after both waves: advance the parent's phase marker to
+    `local_testing`, and publish `touched_modules` (modules that finished done or
+    failed) to state (B2 `state_updates`) for the local-test steps that follow."""
     rt = _ensure_runtime(ctx)
     if isinstance(rt, StepResult):
         return rt
@@ -324,6 +365,10 @@ async def _phase4_guarded(ctx: StepContext) -> StepResult:
 
 
 async def _phase5(ctx: StepContext) -> StepResult:
+    """Run the parent's Phase 5 (final summary) via a `_phase_step` wrapper that
+    marks the run `done`. On success, run the parent's post-run curator
+    (best-effort) and clear the memoized runtime so the next native run rebuilds
+    fresh. Returns the wrapped phase result unchanged."""
     rt = _ensure_runtime(ctx)
     if isinstance(rt, StepResult):
         return rt

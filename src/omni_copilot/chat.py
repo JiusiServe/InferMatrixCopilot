@@ -135,8 +135,18 @@ TOOL_DEFS: list[dict] = [
 
 
 class ChatSession:
+    """One persistent conversational session over a Copilot: keeps the running
+    message history, exposes the maintenance tools to the model, and executes
+    tool calls through the same TaskSpec/planner/confirmation path as the flag
+    CLI (so chat can never widen permissions). Owns a per-session RunTrace and
+    the UI renderer used to stream replies and tool activity."""
+
     def __init__(self, copilot: "Copilot", *, assume_yes: bool = False,
                  out: Callable[[str], None] = None, ui=None):
+        """Bind the session to `copilot` and start a timestamped session trace
+        under the run root's sibling `sessions/` dir. `assume_yes` propagates to
+        write/push confirmations. `ui` (or a PlainUI built from an explicit `out`
+        writer, used for tests/pipes) receives the streamed output."""
         self.copilot = copilot
         self.assume_yes = assume_yes
         self.ui = ui or make_ui(out)  # explicit writer -> PlainUI (tests/pipes)
@@ -149,6 +159,8 @@ class ChatSession:
 
     # -- read jail ---------------------------------------------------------------
     def _allowed_roots(self) -> list[Path]:
+        """The resolved directories chat reads are jailed to: every configured
+        repo path plus the run root."""
         roots = [Path(p).resolve() for p in self.copilot.settings.repo_paths.values()]
         roots.append(self.copilot.settings.run_root.resolve())
         return roots
@@ -164,6 +176,9 @@ class ChatSession:
         return p
 
     def _check_read(self, path: str) -> str | None:
+        """Fail-closed read guard: returns a refusal string when `path` is a
+        secret file (.env*) or resolves outside `_allowed_roots`, else None to
+        allow the read."""
         p = Path(path).resolve()
         if p.name.startswith(".env"):
             return "refused: secret files are not readable from chat"
@@ -175,12 +190,21 @@ class ChatSession:
 
     # -- tool handlers ---------------------------------------------------------
     def _handle_tool(self, name: str, args: dict) -> str:
+        """Dispatch tool `name` with `args`, catching every exception so a tool
+        failure becomes an observation string for the model rather than crashing
+        the turn."""
         try:
             return self._dispatch_tool(name, args)
         except Exception as exc:  # errors are observations for the model
             return f"tool error: {type(exc).__name__}: {exc}"
 
     def _dispatch_tool(self, name: str, args: dict) -> str:
+        """Execute one tool call and return its result as a string for the model.
+        run_task/run_playbook/resume_run go through the copilot (write/push tasks
+        still hit the confirm prompt) and report via `_run_outcome`; the get_*/
+        list/read tools return run introspection; repo_read/repo_grep read the
+        jailed repos (path-checked, size-capped, secrets refused). Unknown names
+        return an error string."""
         c = self.copilot
         if name == "run_task":
             spec = TaskSpec(
@@ -246,6 +270,9 @@ class ChatSession:
         return f"unknown tool: {name}"
 
     def _run_outcome(self, code: int) -> str:
+        """Summarize a run's exit `code` for the model: the status label, the
+        run_dir, completed steps from progress.json, and (on non-zero) the head
+        of ESCALATION.md when present."""
         status = {0: "done", 1: "failed/aborted", 3: "blocked (see ESCALATION.md)"}
         summary = [f"exit={code} ({status.get(code, '?')})"]
         if self.copilot.last_run_dir:
@@ -261,6 +288,11 @@ class ChatSession:
 
     # -- one conversational turn -----------------------------------------------
     def turn(self, user_text: str) -> str:
+        """Run one conversational turn: append `user_text`, then loop up to
+        `_MAX_TOOL_ROUNDS` of model reply → execute any tool calls → feed results
+        back, streaming text and tool activity to the UI throughout. Stops when
+        the model returns no tool calls (or the round cap is hit). Returns the
+        model's final text and records the exchange to the session trace."""
         self.trace.record("user", text=user_text)
         self.messages.append({"role": "user", "content": user_text})
         self._trim_history()
@@ -309,6 +341,10 @@ class ChatSession:
         return final_text
 
     def _trim_history(self) -> None:
+        """Cap history at `_MAX_HISTORY_MESSAGES` by dropping the oldest turns,
+        resuming from the first plain-text user message inside the keep window so
+        an assistant/tool_result pair is never split (which would break the API
+        contract)."""
         if len(self.messages) <= _MAX_HISTORY_MESSAGES:
             return
         # drop oldest turns, but never split an assistant/tool_result pair:

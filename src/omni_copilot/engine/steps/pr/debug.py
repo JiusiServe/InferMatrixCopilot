@@ -23,6 +23,16 @@ from .utils import extract_signature
 @step("pr.fetch_ci_failures", "deterministic", "read",
       "Collect failing checks for a PR (gh; injectable).")
 async def _pr_fetch_ci_failures(ctx: StepContext) -> StepResult:
+    """Collect a PR's failing checks via `gh pr checks`, enriching each with its
+    real failure log. Returns injected `ci_failures` from state verbatim when
+    present (offline testing). Reads the PR number from `task_spec`; a missing PR
+    or a failed `gh` call degrades to BLOCKED rather than raising.
+
+    Publishes two things to state (B2 `state_updates`): the full pre-fix
+    `ci_check_snapshot` (every check, not just failures — the F2P/P2P metric needs
+    the before-state to diff a post-push snapshot against), and `ci_failures`
+    (the failing subset, each `{name, log, link}` with logs filled by
+    `_enrich_ci_logs`)."""
     cached = from_state(ctx, "ci_failures")
     if cached is not None:
         return cached
@@ -84,6 +94,15 @@ def _enrich_ci_logs(ctx: StepContext, repo: Path | None) -> int:
 @step("pr.group_failures", "deterministic", "read",
       "Bucket failures by root-cause signature; hard cap escalates.")
 async def _pr_group_failures(ctx: StepContext) -> StepResult:
+    """Bucket the `ci_failures` from state into root-cause groups keyed by a
+    normalized failure signature (extracted from each log, or the check name when
+    no log), so the same failure across many jobs becomes one group to fix and the
+    same failure across runs keys identically. Each group carries its member jobs
+    and a single log excerpt.
+
+    Publishes `failure_groups` to state (B2 `state_updates`). Fail-closed safety
+    cap: more distinct groups than `settings.pr_debug_max_groups` returns ESCALATE
+    (too tangled for the copilot — a human is needed) instead of proceeding."""
     from ....ci.normalize import normalize_signature
 
     failures = ctx.state.get("ci_failures", [])
@@ -120,6 +139,14 @@ failure_kind=escalate and an honest root_cause of what you found."""
 @step("agent.debug_group", "agent", "write_workspace",
       "Fix one failure group's root cause; commits the fix.")
 async def _pr_debug_group(ctx: StepContext) -> StepResult:
+    """Fix one failure group's root cause as a governed agent step. The group is
+    fanned out via `ctx.item` (signature + failing jobs + log excerpt); the agent
+    runs in a post-plan scope over the repo checkout and must commit the fix
+    (`_DEBUG_GUIDANCE`: root cause not symptom, verify, then `git commit`).
+
+    Returns the agent's StepResult, rewriting its summary to carry the fix summary
+    and verification on success, or the (typically ESCALATE) reason on failure.
+    A missing repo checkout returns the require_repo BLOCKED result."""
     group = ctx.item or {}
     sig = group.get("signature", "unknown")
     repo = require_repo(ctx, must_exist=False)

@@ -18,6 +18,10 @@ from .scopes import ToolScope
 
 @dataclass(frozen=True)
 class ToolDef:
+    """A single callable tool: its Anthropic `name`/`description`/`input_schema`
+    plus the `handler` that executes it. `write_path_arg` names the argument
+    holding the write target, so the dispatcher can scope-check writes."""
+
     name: str
     description: str
     input_schema: dict
@@ -26,11 +30,15 @@ class ToolDef:
 
 
 def _read_file(path: str, max_bytes: int = 200_000, **_: Any) -> str:
+    """Read `path` as UTF-8 (undecodable bytes replaced), truncated to
+    `max_bytes`. Returns the file text."""
     data = Path(path).read_text(encoding="utf-8", errors="replace")
     return data[:max_bytes]
 
 
 def _write_file(path: str, content: str, **_: Any) -> str:
+    """Write `content` to `path`, creating parent dirs; overwrites any existing
+    file. Returns a short confirmation string."""
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(content, encoding="utf-8")
@@ -38,6 +46,9 @@ def _write_file(path: str, content: str, **_: Any) -> str:
 
 
 def _edit_file(path: str, old: str, new: str, **_: Any) -> str:
+    """Replace `old` with `new` in `path`, requiring exactly one match — zero or
+    multiple matches raise (forcing the caller to re-read and disambiguate)
+    rather than editing the wrong span. Returns a confirmation string."""
     p = Path(path)
     text = p.read_text(encoding="utf-8")
     n = text.count(old)
@@ -50,10 +61,14 @@ def _edit_file(path: str, old: str, new: str, **_: Any) -> str:
 
 
 def _list_dir(path: str, **_: Any) -> str:
+    """List `path`'s entries, one per line and sorted, with a trailing `/` on
+    directories. Returns the newline-joined listing."""
     return "\n".join(sorted(x.name + ("/" if x.is_dir() else "") for x in Path(path).iterdir()))
 
 
 def _grep(pattern: str, path: str, **_: Any) -> str:
+    """Recursively search `path` for `pattern` (`grep -rn`), returning matching
+    `file:line:text` lines capped at 20k chars, or "(no matches)"."""
     out = subprocess.run(
         ["grep", "-rn", "--include=*", "-e", pattern, path],
         capture_output=True, text=True, timeout=60,
@@ -62,6 +77,9 @@ def _grep(pattern: str, path: str, **_: Any) -> str:
 
 
 def _run_shell(cmd: str, cwd: str | None = None, timeout: int = 600, **_: Any) -> str:
+    """Run `cmd` in a shell (optionally in `cwd`, bounded by `timeout`).
+    Returns the exit code with the tail of stdout (10k) and stderr (5k) — tails
+    because the signal is usually at the end of long build/test output."""
     out = subprocess.run(
         cmd, shell=True, cwd=cwd, capture_output=True, text=True, timeout=timeout
     )
@@ -69,6 +87,8 @@ def _run_shell(cmd: str, cwd: str | None = None, timeout: int = 600, **_: Any) -
 
 
 def _schema(props: dict, required: list[str]) -> dict:
+    """Build a minimal JSON-Schema object from `props` and `required` — the
+    boilerplate shared by every builtin tool's `input_schema`."""
     return {"type": "object", "properties": props, "required": required}
 
 

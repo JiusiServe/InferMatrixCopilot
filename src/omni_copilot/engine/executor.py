@@ -24,12 +24,20 @@ if TYPE_CHECKING:  # pragma: no cover
 
 @dataclass
 class RunOutcome:
+    """The result of running a whole playbook: a terminal `status` ("done" once
+    every step passed, else "failed" or "blocked"), the per-step `step_results`
+    keyed by playbook-step id, and a `blocked_reason` explaining an early halt."""
+
     status: str  # "done" | "failed" | "blocked"
     step_results: dict[str, StepResult] = field(default_factory=dict)
     blocked_reason: str = ""
 
 
 class Executor:
+    """Runs a Playbook's step graph with task-agnostic guarantees: per-step
+    checkpoint/resume (progress.json), bounded retries, typed failure routing,
+    RunTrace recording, and escalation on BLOCKED/ESCALATE/FORBIDDEN."""
+
     def __init__(
         self,
         registry: StepRegistry,
@@ -40,6 +48,10 @@ class Executor:
         llm: Optional["LLM"] = None,
         notifier: Optional["Notifier"] = None,
     ):
+        """Wire the executor to its `registry` (step lookups), `settings`
+        (retry bounds, post gates), the `run_dir` where progress.json is
+        checkpointed, the `trace` sink, and optional `llm`/`notifier` handed to
+        each step's context and used for escalation."""
         self.registry = registry
         self.settings = settings
         self.run_dir = Path(run_dir)
@@ -50,16 +62,27 @@ class Executor:
 
     # -- checkpoint / resume ------------------------------------------------
     def _load_progress(self) -> dict:
+        """Read the run's checkpoint (a `{"completed": {step_id: ...}}` map) from
+        progress.json, or the empty checkpoint when this is a fresh run."""
         if self.progress_file.exists():
             return json.loads(self.progress_file.read_text())
         return {"completed": {}}
 
     def _save_progress(self, progress: dict) -> None:
+        """Persist the checkpoint to progress.json (creating run_dir), so a later
+        resume skips completed steps. `default=str` tolerates non-JSON values."""
         self.run_dir.mkdir(parents=True, exist_ok=True)
         self.progress_file.write_text(json.dumps(progress, indent=2, default=str))
 
     # -- execution ------------------------------------------------------------
     async def run(self, playbook: "Playbook", state: dict) -> RunOutcome:
+        """Execute `playbook`'s steps in order against shared `state`, returning a
+        RunOutcome. Each step is: gated by its `when:` condition (an unknown key
+        blocks rather than silently skips), short-circuited if already in the
+        checkpoint (its published `state_updates` are replayed so resume is
+        faithful), otherwise fanned out over `foreach` items, merged, traced, and
+        checkpointed on success. A BLOCKED/ESCALATE/FORBIDDEN failure notifies and
+        halts as "blocked"; any other failure halts as "failed"."""
         progress = self._load_progress()
         outcome = RunOutcome(status="done")
         state.setdefault("playbook", playbook.name)
@@ -140,6 +163,11 @@ class Executor:
         return outcome
 
     async def _run_step(self, spec, params: dict, state: dict, item) -> StepResult:
+        """Invoke one step's handler inside a tracing span, retrying only on
+        RETRYABLE up to `settings.max_step_retries`. Builds the StepContext from
+        `params`, shared `state`, and the current foreach `item`; an unhandled
+        exception is caught and converted to a BLOCKED StepResult so a handler bug
+        never escapes as a raw exception. Returns the last StepResult produced."""
         from .. import tracing
 
         ctx = StepContext(

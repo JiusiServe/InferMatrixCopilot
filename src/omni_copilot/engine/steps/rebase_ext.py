@@ -16,6 +16,20 @@ from ._common import step
 @step("rebase.run_external", "script", "write_workspace",
       "Delegate to the existing 5-phase rebase orchestrator (locked pipeline).")
 async def _run_external_rebase(ctx: StepContext) -> StepResult:
+    """Delegate the whole rebase to the existing 5-phase orchestrator as a
+    subprocess (wrap, don't reimplement), monitoring it live. Builds the command
+    from `params.command`/settings and the task-spec params (with `--resume` when
+    `resuming` is set), then polls the parent's `state.json` every `poll_interval`
+    and streams per-phase progress deltas into the RunTrace, writing snapshots to
+    `rebase_status.json`. Enforces a `params.timeout` (default 6h) that
+    terminates then kills the process.
+
+    A missing orchestrator binary is BLOCKED. When the process exits non-zero but
+    `state.json` never changed during this invocation, the stale state is
+    discarded so a leftover `phase=done` can't mask a crash. `classify_failure`
+    decides the outcome: no failure returns ok with the final status; otherwise
+    the classified FailureKind is returned with `build_escalation` material plus
+    the log tail."""
     import asyncio as _asyncio
 
     from ...rebase.monitor import (build_command, build_escalation,

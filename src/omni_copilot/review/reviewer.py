@@ -26,12 +26,18 @@ Be strict when tests were not run or files outside scope changed."""
 
 @dataclass
 class ReviewVerdict:
+    """A reviewer's decision: `verdict` (one of VERDICTS — lgtm/revise/block, or
+    the fail-closed `unavailable`), the concrete `critiques`, and the raw model
+    reply for the trace. Shared by patch and plan review."""
+
     verdict: str
     critiques: list[str] = field(default_factory=list)
     raw: str = ""
 
     @property
     def passing(self) -> bool:
+        """True only for `lgtm` — every other verdict (including `unavailable`)
+        must not be treated as a pass by a push gate."""
         return self.verdict == "lgtm"
 
 
@@ -67,6 +73,11 @@ def run_patch_review(
     context: str = "",
     model: str | None = None,
 ) -> ReviewVerdict:
+    """Review the ACTUAL diff and return a ReviewVerdict. Feeds the reviewer LLM
+    the fired trigger rules, the DiffSummary's risk signals (out-of-scope files,
+    full-file rewrites, tests run), optional `context`, and the (capped) diff
+    text. Fail-closed: no available reviewer -> `unavailable`; an unparseable
+    reply degrades conservatively to `revise` rather than approving."""
     if llm is None or not llm.available:
         return ReviewVerdict("unavailable", ["no reviewer LLM configured"])
 

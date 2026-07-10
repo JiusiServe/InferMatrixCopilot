@@ -9,6 +9,9 @@ from ._common import step
 @step("report.final_summary", "report", "report",
       "Write RUN_REPORT.md from accumulated step outputs.")
 async def _final_report(ctx: StepContext) -> StepResult:
+    """Write RUN_REPORT.md into the run dir from the accumulated per-step
+    `outputs` in state (plus the `task_spec` header), one section per step with
+    its output values truncated. Returns the report path in `outputs["report"]`."""
     lines = ["# Run report", ""]
     spec = ctx.state.get("task_spec")
     if spec:

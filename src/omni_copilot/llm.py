@@ -16,6 +16,10 @@ from .config import Settings
 
 @dataclass
 class Block:
+    """One content block of a reply — either assistant `text` or a `tool_use`
+    request carrying the tool `id`, `name`, and parsed `input` args. The `type`
+    field selects which fields are meaningful."""
+
     type: str  # "text" | "tool_use"
     text: str = ""
     id: str = ""
@@ -25,16 +29,22 @@ class Block:
 
 @dataclass
 class Reply:
+    """A normalized model response: its content `blocks`, the `stop_reason`, and
+    optional token `usage`. The provider-agnostic shape agent/intent/reviewer
+    code sees instead of raw SDK types."""
+
     blocks: list[Block]
     stop_reason: str = "end_turn"
     usage: dict | None = None  # {"input_tokens": int, "output_tokens": int}
 
     @property
     def text(self) -> str:
+        """The concatenated text of all text blocks, whitespace-stripped."""
         return "\n".join(b.text for b in self.blocks if b.type == "text").strip()
 
     @property
     def tool_uses(self) -> list[Block]:
+        """The tool_use blocks (the tools the model asked to call this turn)."""
         return [b for b in self.blocks if b.type == "tool_use"]
 
 
@@ -43,6 +53,10 @@ class LLM:
     must degrade (deterministic fallback / escalate), never crash."""
 
     def __init__(self, settings: Settings):
+        """Build the client only when an API key is present; otherwise stay
+        unconfigured (`available` False) so callers can degrade rather than
+        crash. The SDK is imported lazily so an unconfigured process needs no
+        `anthropic` dependency."""
         self.settings = settings
         self._client = None
         if settings.anthropic_api_key:
@@ -55,6 +69,7 @@ class LLM:
 
     @property
     def available(self) -> bool:
+        """True when a client was configured (an API key was present)."""
         return self._client is not None
 
     def create(

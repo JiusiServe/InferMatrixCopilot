@@ -37,12 +37,18 @@ _SWEEP_RE: dict[str, tuple[re.Pattern, re.Pattern]] = {
 
 
 def suffixes(language: str) -> tuple[str, ...]:
+    """Source-file suffixes for `language` (empty tuple if unknown — module scan
+    and repo map then find no files, degrading honestly)."""
     return _SUFFIXES.get(language, ())
 
 
 def symbol_re(language: str) -> re.Pattern | None:
+    """Symbol-definition regex for `language`, or None if unsupported (the repo
+    map treats None as "unsupported → use grep")."""
     return _SYMBOL_RE.get(language)
 
 
 def sweep_re(language: str) -> tuple[re.Pattern, re.Pattern] | None:
+    """The (indexed-access, branch) line-regex pair for the review sweep of
+    `language`, or None if unsupported (sweep falls back to file-level only)."""
     return _SWEEP_RE.get(language)

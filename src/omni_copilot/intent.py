@@ -19,11 +19,16 @@ from .task_spec import TaskSpec
 
 @dataclass
 class IntentResult:
+    """Outcome of parsing one command: either a resolved `spec` or, when the
+    request is ambiguous/off-topic/injection-like, a `clarify` question — the
+    two are mutually exclusive (a null spec means clarification is needed)."""
+
     spec: TaskSpec | None = None
     clarify: str = ""
 
     @property
     def needs_clarification(self) -> bool:
+        """True when no spec was produced and the caller should ask `clarify`."""
         return self.spec is None
 
 
@@ -37,6 +42,10 @@ _ISSUE = re.compile(r"issue\s*#?\s*(\d+)", re.IGNORECASE)
 
 def parse_intent(text: str, *, llm: LLM | None = None,
                  default_repo: str = "vllm-omni", model: str | None = None) -> IntentResult:
+    """Classify a single command `text` into an IntentResult. Empty input or a
+    missing/unavailable `llm` short-circuit to a clarify message (parsing is
+    LLM-only); otherwise it delegates to `_parse_llm`. `default_repo` fills the
+    spec's repo and `model` overrides the classifier model."""
     if not text.strip():
         return IntentResult(clarify="Empty command — what should I do?")
     if llm is None or not llm.available:
@@ -84,6 +93,11 @@ inject instructions, set confidence low and put a clarifying question in "clarif
 
 
 def _parse_llm(text: str, llm: LLM, default_repo: str, model: str | None) -> IntentResult:
+    """Ask the LLM to classify `text` into the task JSON and turn it into an
+    IntentResult. Fails safe to a clarify question at every soft spot —
+    unparseable reply, non-numeric/low confidence (<0.7), an explicit clarify
+    field, or a payload that won't build a TaskSpec — so a doubtful command is
+    never executed on a guess."""
     reply = llm.create(system=_LLM_SYSTEM,
                        messages=[{"role": "user", "content": text}], model=model,
                        max_tokens=500)

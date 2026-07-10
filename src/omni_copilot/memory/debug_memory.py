@@ -21,7 +21,14 @@ STATUSES = ("candidate", "active", "stale", "retired")
 
 
 class DebugMemory:
+    """SQLite-backed store of failure/fix experiences with an FTS5 mirror for
+    retrieval. Every entry must carry the full `REQUIRED_FIELDS` set (a fix with
+    no verification or root cause is not reusable), and search returns summaries
+    only — the full entry is a deliberate second `get` call to keep context lean."""
+
     def __init__(self, db_path: str | Path):
+        """Open (creating parent dirs and the schema if absent) the SQLite db at
+        `db_path`. Rows are returned as `sqlite3.Row` so callers get dict access."""
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(str(self.db_path))
@@ -29,6 +36,9 @@ class DebugMemory:
         self._init_schema()
 
     def _init_schema(self) -> None:
+        """Create the `entries` table and its `entries_fts` FTS5 mirror if they
+        do not yet exist. The mirror is `content='entries'` external-content so
+        the searchable columns stay in sync with the base row on insert."""
         c = self._conn
         c.execute(
             """CREATE TABLE IF NOT EXISTS entries (
@@ -47,6 +57,11 @@ class DebugMemory:
         c.commit()
 
     def record(self, **fields) -> int:
+        """Insert one failure/fix entry and return its new row id. Rejects (with
+        an instructive `ValueError`) any call missing a `REQUIRED_FIELDS` value or
+        naming a `status` outside `STATUSES` — the write contract that keeps the
+        store reusable. `files` is normalized to a JSON list; the searchable text
+        columns are mirrored into `entries_fts`."""
         missing = [f for f in REQUIRED_FIELDS if not fields.get(f)]
         if missing:
             raise ValueError(
@@ -95,6 +110,9 @@ class DebugMemory:
         return out[:k]
 
     def get(self, entry_id: int) -> dict | None:
+        """Return the full entry for `entry_id` as a dict (with `files` decoded
+        back to a list), or None if no such row — the explicit second call that
+        `search` summaries lead to."""
         row = self._conn.execute("SELECT * FROM entries WHERE id=?", (entry_id,)).fetchone()
         if row is None:
             return None
@@ -103,4 +121,5 @@ class DebugMemory:
         return d
 
     def count(self) -> int:
+        """Total number of stored entries, regardless of status."""
         return self._conn.execute("SELECT COUNT(*) FROM entries").fetchone()[0]

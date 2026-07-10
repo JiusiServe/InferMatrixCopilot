@@ -20,32 +20,46 @@ REQUIRED_SECTIONS = ("name", "repo")
 
 
 class PluginError(Exception):
-    pass
+    """Raised for any plugin-layer violation: a missing/invalid manifest, an
+    unknown plugin name, or an agent-side write to a high-risk section."""
 
 
 @dataclass
 class RepoPlugin:
+    """A loaded repo plugin: its `name`, on-disk `root`, and parsed `manifest`
+    (plugin.yaml). Exposes the manifest as typed views and locates the repo's
+    store/skills/profile dirs — the single edge object steps consult for a
+    target repo's structure and policy."""
+
     name: str
     root: Path
     manifest: dict
 
     @property
     def status(self) -> str:
+        """Lifecycle status from the manifest (`draft` until a human activates)."""
         return self.manifest.get("status", "draft")
 
     @property
     def repo_path(self) -> str:
+        """Filesystem path of the target repo, or "" if the manifest omits it."""
         return self.manifest.get("repo", {}).get("path", "")
 
     @property
     def protected_branches(self) -> list[str]:
+        """Branches a push may never target (defaults to `["main"]`) — read by the
+        push authorization gate."""
         return list(self.manifest.get("push", {}).get("protected_branches", ["main"]))
 
     @property
     def modules(self) -> dict:
+        """The manifest's module map (name → spec), or {} when undeclared."""
         return self.manifest.get("modules", {}) or {}
 
     def module_for_path(self, path: str) -> str | None:
+        """Return the module owning `path` — the first module whose declared
+        `local_paths` prefix (trailing glob/slash stripped) matches — or None when
+        no module claims it."""
         for module, spec in self.modules.items():
             for pattern in (spec or {}).get("local_paths", []):
                 if path.startswith(pattern.rstrip("*").rstrip("/")):
@@ -60,14 +74,17 @@ class RepoPlugin:
 
     @property
     def skills_dir(self) -> Path:
+        """Directory holding this repo's promoted `SKILL.md` runbooks."""
         return self.root / "skills"
 
     @property
     def debug_memory_db(self) -> Path:
+        """Path to this repo's `DebugMemory` SQLite database."""
         return self.root / "store" / "debug_memory.db"
 
     @property
     def profile_dir(self) -> Path:
+        """Directory holding this repo's `ProfileStore` (profile.yaml + logs)."""
         return self.root / "profile"
 
     @property
@@ -99,6 +116,9 @@ class RepoPlugin:
 
 
 def load_plugin(plugin_dir: str | Path) -> RepoPlugin:
+    """Load and validate the plugin at `plugin_dir`, returning a `RepoPlugin`.
+    Raises `PluginError` if `plugin.yaml` is absent or any `REQUIRED_SECTIONS`
+    (name, repo) is missing — the fail-closed check before a plugin is trusted."""
     root = Path(plugin_dir)
     manifest_path = root / "plugin.yaml"
     if not manifest_path.exists():
@@ -123,10 +143,17 @@ def update_manifest(plugin: RepoPlugin, section: str, value: dict, *, actor: str
 
 
 class PluginRegistry:
+    """Directory of installed plugins. Enumerates and resolves them (by explicit
+    name or by target repo path) for a run's bootstrap."""
+
     def __init__(self, plugins_dir: str | Path):
+        """Bind to `plugins_dir`, the directory whose immediate subdirs each hold
+        a `plugin.yaml`. Not required to exist yet."""
         self.plugins_dir = Path(plugins_dir)
 
     def all(self) -> list[RepoPlugin]:
+        """Load every plugin under the dir (each subdir with a `plugin.yaml`),
+        sorted by path; empty list when the dir is absent."""
         out = []
         if self.plugins_dir.exists():
             for d in sorted(self.plugins_dir.iterdir()):
@@ -153,6 +180,8 @@ class PluginRegistry:
 # -- Phase 0 bootstrap (read-only wrt the target repo) ------------------------
 
 def _git(repo: Path, *args: str) -> str:
+    """Run `git <args>` in `repo` and return its stripped stdout — the read-only
+    git helper the deterministic fingerprint uses."""
     out = subprocess.run(["git", *args], cwd=str(repo), capture_output=True,
                          text=True, timeout=30)
     return out.stdout.strip()

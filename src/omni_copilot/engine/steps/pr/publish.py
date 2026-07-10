@@ -19,6 +19,15 @@ from .._common import repo_path as _repo_path
 @step("ci.push", "script", "push",
       "Guarded push (PushPolicy AND protected branches; dry-run default).")
 async def _push(ctx: StepContext) -> StepResult:
+    """The single C4 push choke point: authorize a git push through `guard_push`
+    (PushPolicy AND protected branches) before ever running it. Rehydrates the
+    `push_policy` from state (dict or PushPolicy) and the protected-branch list
+    from state or settings.
+
+    A denied decision returns FORBIDDEN. When authorized but `ALLOW_PUSH=0`
+    (the default), it stays a dry run — reports the command it *would* run, never
+    executes. Only with pushes enabled does it run the git command; a non-zero
+    exit returns ESCALATE with the stderr tail."""
     repo = _repo_path(ctx)
     raw = ctx.state.get("push_policy")
     policy = raw if isinstance(raw, PushPolicy) else PushPolicy(**(raw or {}))

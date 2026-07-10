@@ -46,6 +46,13 @@ class AgentDispatchContext:
     output_contract: dict = field(default_factory=dict)
 
     def render(self) -> str:
+        """Assemble the full agent-step prompt from the context fields, in a
+        fixed section order: task/step/repo framing, the optional repo briefing,
+        prior-step conclusions, retrieved skills/memories, permissions, then the
+        evidence pack and the output contract. Sections tied to empty fields are
+        omitted. Evidence is wrapped in `<untrusted_data>` tags (and points at
+        its archived full-text ref when the text was capped) so the model treats
+        it as data, not instructions. Returns the single prompt string."""
         parts = [
             "## TASK\n" + json.dumps(self.task, ensure_ascii=False, indent=1),
             "## THIS STEP\n" + json.dumps(self.step, ensure_ascii=False, indent=1),

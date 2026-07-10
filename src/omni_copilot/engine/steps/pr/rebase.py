@@ -100,6 +100,16 @@ status=blocked with the reason."""
       "git rebase onto latest base; conflicts -> governed agent step "
       "(unified runtime) or abort+escalate.")
 async def _pr_rebase_onto_base(ctx: StepContext) -> StepResult:
+    """Rebase the checked-out PR branch onto the freshly fetched base (from
+    `pr_base_branch` in state, remote from `params.base_remote`). Records the
+    fetched base SHA as `rebase_base_sha` (published via B2 `state_updates`) for
+    later diff steps.
+
+    A clean rebase returns ok. On conflicts: when an LLM is available, hand the
+    conflicted files to a governed agent step (`_CONFLICT_GUIDANCE`: merge both
+    sides, `rebase --continue`); success requires no rebase left in progress. If
+    the agent can't finish, or when there is no LLM, `rebase --abort` restores the
+    workspace and the step returns ESCALATE with the conflict file list."""
     repo = _repo_path(ctx)
     base = ctx.state.get("pr_base_branch", "main")
     base_remote = ctx.params.get("base_remote", "origin")
@@ -158,6 +168,15 @@ async def _pr_rebase_onto_base(ctx: StepContext) -> StepResult:
 @step("pr.analyze_diff", "deterministic", "read",
       "Changed files -> affected modules (plugin map).")
 async def _pr_analyze_diff(ctx: StepContext) -> StepResult:
+    """Map the rebased branch's changed files to affected modules for the
+    per-module verification fan-out. Diffs `rebase_base_sha..HEAD` (`--numstat`)
+    for the file list, then resolves each path to a module via the repo's plugin
+    (`module_for_path`), falling back to the top-level directory (or "root") when
+    there is no plugin or match.
+
+    Publishes to state (B2 `state_updates`): `affected_modules` / `touched_modules`
+    (the module list) and `primary_files` (the changed paths, as `*`-globs for
+    the diff-summary scope check)."""
     repo = _repo_path(ctx)
     base_sha = ctx.state.get("rebase_base_sha", "HEAD~1")
     rc, out = _git(repo, "diff", "--numstat", f"{base_sha}..HEAD")

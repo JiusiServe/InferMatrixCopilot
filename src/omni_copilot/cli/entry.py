@@ -14,6 +14,10 @@ from .utils import parse_task_params
 
 def _handle_line(copilot: Copilot, line: str, assume_yes: bool,
                  plan_only: bool) -> int | None:
+    """Route one input `line`: `/`-built-ins (status/logs/playbooks/resume/quit)
+    are handled inline; anything else is parsed into one-or-more TaskSpecs and
+    run as a queue. Returns None when nothing runs (built-in or blank/clarify),
+    -1 to signal quit, or the queue's exit code."""
     line = line.strip()
     if not line:
         return None
@@ -44,6 +48,11 @@ def _handle_line(copilot: Copilot, line: str, assume_yes: bool,
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI entry point. Parses argv and dispatches: --resume / --playbook /
+    --prompt run one-shot and return their exit code; otherwise start the
+    interactive interface — the conversational chat REPL when an LLM is
+    configured (and not --no-chat), else the plain command REPL. `argv` defaults
+    to sys.argv. Returns the process exit code."""
     parser = argparse.ArgumentParser(prog="omni-copilot",
                                      description="Conversational repo-maintenance copilot")
     parser.add_argument("-p", "--prompt", help="one-shot natural-language command")

@@ -18,6 +18,12 @@ from .._common import repo_path as _repo_path
 @step("pr.fetch_diff", "deterministic", "read",
       "Fetch a PR diff via gh (read-only).")
 async def _pr_fetch_diff(ctx: StepContext) -> StepResult:
+    """Fetch a PR's unified diff via `gh pr diff` for the downstream reviewers.
+    Reads the PR number from `task_spec`; returns injected `diff_text` from state
+    verbatim when present (offline testing). A missing PR number or a failed `gh`
+    call degrades to BLOCKED rather than raising.
+
+    Publishes `diff_text` to state (B2 `state_updates`)."""
     cached = from_state(ctx, "diff_text")
     if cached is not None:
         return cached

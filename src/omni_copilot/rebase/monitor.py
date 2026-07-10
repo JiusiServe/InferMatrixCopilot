@@ -37,6 +37,10 @@ def parse_parent_state(path: str | Path) -> dict | None:
 
 
 def summarize_progress(parent_state: dict | None) -> dict:
+    """Reduce the parent orchestrator's `state.json` to a compact copilot-facing
+    summary: current phase, per-status module counts, phase-3 test progress
+    (completed/failed/skipped/current), and CI results. Missing state yields
+    `{"phase": "unknown"}`."""
     if not parent_state:
         return {"phase": "unknown"}
     modules = (parent_state.get("phase2_progress") or {}).get("modules", {})

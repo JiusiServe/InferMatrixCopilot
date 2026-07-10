@@ -32,6 +32,11 @@ KIND_TIER: dict[str, str] = {
 
 
 class TaskSpec(BaseModel):
+    """The structured, validated task the whole pipeline runs on: a `kind`
+    plus its target (`repo`, optional `pr`/`issue`) and the write-intent flags
+    (`report_only`, `post`, `params`). The blast-radius tier is derived from
+    `kind` alone — user text can never widen permissions."""
+
     kind: TaskKind
     repo: str = "vllm-omni"
     pr: Optional[int] = None
@@ -42,10 +47,14 @@ class TaskSpec(BaseModel):
 
     @property
     def tier(self) -> str:
+        """The blast-radius tier (L0/L1/L2) fixed by this task's kind."""
         return KIND_TIER[self.kind]
 
     @property
     def read_only(self) -> bool:
+        """Whether this run makes no writes: inherently-read kinds are read-only
+        unless `post` publishes outward; other kinds are read-only only when
+        `report_only` is set."""
         if self.kind in READ_ONLY_KINDS:
             return not self.post
         return self.report_only
@@ -56,6 +65,8 @@ class TaskSpec(BaseModel):
         return not self.read_only
 
     def describe(self) -> str:
+        """One-line human summary: kind, target PR/issue, repo, tier, and any
+        report-only/post flags — used in plan printouts and traces."""
         target = ""
         if self.pr:
             target = f" PR #{self.pr}"

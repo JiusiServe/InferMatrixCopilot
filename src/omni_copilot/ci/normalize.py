@@ -25,6 +25,10 @@ _PATTERNS: list[tuple[re.Pattern, str]] = [
 
 
 def normalize_signature(signature: str) -> str:
+    """Canonicalize a failure `signature` by masking run-varying noise
+    (addresses, hashes, timestamps, paths, line numbers, durations, big ids) and
+    collapsing whitespace, so repeats of the same failure compare equal. Returns
+    the stable signature used for grouping and known-flaky matching."""
     out = signature
     for pattern, repl in _PATTERNS:
         out = pattern.sub(repl, out)

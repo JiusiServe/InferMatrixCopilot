@@ -28,6 +28,9 @@ from ._common import step
 
 
 def _plugin_from_state(ctx: StepContext) -> RepoPlugin | StepResult:
+    """Load the RepoPlugin from the `plugin_root` that `profile.fingerprint`
+    published to state. Returns a BLOCKED StepResult when no `plugin_root` is set
+    (fingerprint must run first) — every Stage-1/Stage-4 step guards on this."""
     root = ctx.state.get("plugin_root")
     if not root:
         return StepResult(False, FailureKind.BLOCKED,
@@ -39,6 +42,14 @@ def _plugin_from_state(ctx: StepContext) -> RepoPlugin | StepResult:
       "Stage 0: deterministic repo fingerprint; draft plugin for unknown "
       "repos (stops at status: draft).")
 async def _fingerprint(ctx: StepContext) -> StepResult:
+    """Stage 0: deterministically fingerprint the target repo and ensure a plugin
+    exists for it. Resolves the plugin from the registry by repo path; for an
+    unknown repo, drafts one (which stops at `status: draft` — a human gate before
+    it is trusted). A missing repo checkout is BLOCKED.
+
+    Publishes `plugin_root` and `repo_language` to state (B2 `state_updates`) so
+    the later profile stages can load the plugin; records `profile_fingerprint`
+    in the trace."""
     repo = _repo_path(ctx)
     if repo is None or not repo.exists():
         return StepResult(False, FailureKind.BLOCKED,
@@ -67,6 +78,11 @@ async def _fingerprint(ctx: StepContext) -> StepResult:
       "Stage 0: deterministic module draft into plugin.yaml (never overwrites "
       "declared modules).")
 async def _structure_scan(ctx: StepContext) -> StepResult:
+    """Stage 0: deterministically draft the repo's module list into plugin.yaml.
+    Non-destructive — if the plugin already declares modules, they are kept as-is;
+    otherwise `scan_modules` (by repo path + language) proposes candidates and
+    `update_manifest` writes them (actor="agent"). No candidates found is a
+    non-failure (left for the profiling agent or a human)."""
     plugin = _plugin_from_state(ctx)
     if isinstance(plugin, StepResult):
         return plugin
@@ -91,6 +107,12 @@ async def _structure_scan(ctx: StepContext) -> StepResult:
       "Ingest AGENTS.md/CLAUDE.md-style human directives as briefing facts "
       "(doc-redundant lines dropped).")
 async def _ingest_docs(ctx: StepContext) -> StepResult:
+    """Stage 1.5: ingest human-authored directives from AGENTS.md/CLAUDE.md-style
+    docs (`HUMAN_DOC_NAMES`) as `briefing`-channel, source=human profile facts.
+    Directives already implied by the doc corpus (`is_redundant`) are dropped, and
+    the set is capped at 20 to keep the briefing minimal (the budget trims the
+    rest anyway). Applies the facts via typed `add_fact` ops to the ProfileStore;
+    records counts in the trace."""
     plugin = _plugin_from_state(ctx)
     if isinstance(plugin, StepResult):
         return plugin
@@ -151,6 +173,17 @@ review concerns a generic checklist would miss (empty list is a fine answer)."""
       "Stage 1: governed agent derives non-obvious, evidence-cited profile "
       "facts; redundancy-filtered, typed-op applied.")
 async def _profile_repo_agent(ctx: StepContext) -> StepResult:
+    """Stage 1: a governed agent derives the NON-OBVIOUS maintenance facts of the
+    repo (tooling commands, hard constraints, traps, undocumented conventions —
+    `_PROFILE_GUIDANCE`), seeded with the fingerprint and key config files as
+    evidence. No LLM degrades to a recorded capability gap (`no_llm_gap`) — the
+    deterministic stages already produced the draft.
+
+    Each returned fact must cite evidence; briefing-channel facts redundant with
+    the doc corpus are dropped, and the rest are applied as typed `add_fact` ops
+    (capped at 15) — malformed/evidence-less facts are rejected by the store. Any
+    `review_checklist` lines are written to `review.md`. Writes land only under
+    plugins/<repo>/ (knowledge risk, curator/human-gated downstream)."""
     plugin = _plugin_from_state(ctx)
     if isinstance(plugin, StepResult):
         return plugin
@@ -241,6 +274,10 @@ async def _profile_repo_agent(ctx: StepContext) -> StepResult:
       "Stage 4: deterministic drift report (moved module paths, orphaned fact "
       "joins) — refresh material, never auto-fixed.")
 async def _detect_drift(ctx: StepContext) -> StepResult:
+    """Stage 4: deterministically report profile drift (moved module paths,
+    facts whose join keys no longer resolve) against the current repo. Findings
+    are refresh material for the consolidation pass — surfaced, never auto-fixed.
+    Publishes `profile_drift` to state (B2 `state_updates`)."""
     plugin = _plugin_from_state(ctx)
     if isinstance(plugin, StepResult):
         return plugin
@@ -260,6 +297,10 @@ async def _detect_drift(ctx: StepContext) -> StepResult:
       "Stage 4: dormancy decay — unconfirmed facts flip to stale (excluded, "
       "never deleted).")
 async def _decay_stale(ctx: StepContext) -> StepResult:
+    """Stage 4: dormancy decay — facts unconfirmed for longer than
+    `settings.profile_stale_days` flip to `stale` (excluded from retrieval, never
+    deleted, so they can be revived). Deterministic; records the decayed ids in
+    the trace."""
     plugin = _plugin_from_state(ctx)
     if isinstance(plugin, StepResult):
         return plugin
@@ -293,6 +334,15 @@ budget. Emit an empty ops list when the profile is already clean."""
       "Stage 4: the ONLY rewrite/merge tier — whole-profile consolidation via "
       "typed ops, stability gates enforced.")
 async def _profile_consolidate(ctx: StepContext) -> StepResult:
+    """Stage 4: the ONLY tier allowed to rewrite or merge facts. A governed agent
+    sees the whole profile plus the drift findings from state and emits typed ops
+    (`merge_facts`/`rewrite_fact`/`mark_stale`/`add_evidence`/`bump_confirmed` —
+    `_CONSOLIDATE_GUIDANCE`); it may not invent new facts. No LLM degrades to a
+    capability gap (`no_llm_gap`); an empty profile is a no-op.
+
+    Ops are applied with `tier="consolidate"` so the store's stability gates can
+    reject rewrites that would lose evidence or substance; rejected ops are
+    reported, not silently dropped."""
     plugin = _plugin_from_state(ctx)
     if isinstance(plugin, StepResult):
         return plugin
@@ -347,6 +397,12 @@ fact id and WHY. An empty findings list is a fine answer."""
       "Stage 4: read-only profile audit -> JUDGE_REPORT.md; findings surfaced, "
       "never auto-applied.")
 async def _profile_judge(ctx: StepContext) -> StepResult:
+    """Stage 4: a READ-ONLY agent audit of the profile — reports contradictory,
+    unsupported, malformed, or overview-prose facts (`_JUDGE_GUIDANCE`), each
+    citing the offending fact id. No LLM degrades to a capability gap
+    (`no_llm_gap`). Findings are written to JUDGE_REPORT.md and surfaced for the
+    human/next cycle; this handler never calls `apply_ops`, so the profile cannot
+    change here."""
     plugin = _plugin_from_state(ctx)
     if isinstance(plugin, StepResult):
         return plugin

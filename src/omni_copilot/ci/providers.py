@@ -15,6 +15,8 @@ from typing import Callable
 
 
 def _http_get_json(url: str, token: str) -> dict | list:
+    """GET `url` with a bearer `token` and parse the JSON body. The default HTTP
+    fetcher for the Buildkite provider (injectable for tests)."""
     req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
     with urllib.request.urlopen(req, timeout=30) as resp:
         return json.loads(resp.read().decode("utf-8", errors="replace"))
@@ -27,10 +29,17 @@ class BuildkiteLogs:
     _API = "https://api.buildkite.com/v2/organizations/{org}/pipelines/{pipe}/builds/{num}"
 
     def __init__(self, token: str, http_get: Callable | None = None):
+        """Hold the API `token` and the JSON fetcher; `http_get` overrides the
+        default token-authenticated getter (injected in tests)."""
         self.token = token
         self._get = http_get or (lambda url: _http_get_json(url, self.token))
 
     def enrich(self, failures: list[dict], log_cap: int = 100_000) -> int:
+        """Fill each failure's `log` (in place) with Buildkite job logs: parse
+        the build from the check `link`, fetch it once (builds cached across
+        failures), pick the failed jobs matching the check name (else all), and
+        attach up to 3 jobs' logs tail-capped at `log_cap`. Returns how many
+        failures were enriched; a fetch error leaves that check name-grouped."""
         enriched = 0
         builds: dict[str, dict] = {}
         for failure in failures:
@@ -73,10 +82,17 @@ class GithubActionsLogs:
     _RUN_URL = re.compile(r"github\.com/[^/]+/[^/]+/actions/runs/(\d+)")
 
     def __init__(self, runner: Callable[..., tuple[int, str]], repo=None):
+        """Hold the `gh` `runner` (args, cwd) -> (exit_code, output) and the
+        optional `repo` it runs against."""
         self._gh = runner   # (args, cwd) -> (exit_code, output)
         self.repo = repo
 
     def enrich(self, failures: list[dict], log_cap: int = 100_000) -> int:
+        """Fill each failure's `log` (in place) via `gh run view <id>
+        --log-failed`: parse the run id from the check `link`, fetch each run's
+        failed-step log once (cached), and attach it tail-capped at `log_cap`.
+        Returns how many failures were enriched; a runner error leaves that
+        check name-grouped."""
         enriched = 0
         run_logs: dict[str, str] = {}
         for failure in failures:

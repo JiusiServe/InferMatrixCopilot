@@ -32,7 +32,18 @@ from .utils import format_metrics_line
 
 
 class Copilot:
+    """Orchestration core: resolves a TaskSpec to a playbook (reuse > adapt >
+    generate), runs it through the plan-review gate + confirmation into the
+    Executor, and owns the compound-command queue, resume, and the /status
+    /logs /playbooks built-ins. Holds the long-lived collaborators (LLM,
+    step registry, playbook store, planner) and tracks `last_run_dir` for the
+    built-ins."""
+
     def __init__(self, settings: Settings | None = None):
+        """Wire up the collaborators from `settings` (default `Settings()`):
+        the LLM, the built-in step registry, the playbook store rooted at the
+        configured dir, and the planner over both. `last_run_dir` starts unset
+        and is filled by the first execution."""
         self.settings = settings or Settings()
         self.llm = LLM(self.settings)
         self.registry = register_builtin_steps(StepRegistry())
@@ -42,6 +53,10 @@ class Copilot:
 
     # -- planning ---------------------------------------------------------------
     def resolve(self, spec: TaskSpec) -> Resolution:
+        """Resolve `spec` to a Resolution via the planner, passing the repo's
+        capability set so the planner only reuses playbooks the target supports.
+        Capabilities come from the repo's plugin (if any), plus `repo.path` when
+        a path is resolvable even without a plugin (REPO_PATHS works plugin-less)."""
         plugin = self._plugin_for(spec.repo)
         capabilities = set(plugin.capabilities) if plugin is not None else set()
         if self._resolve_repo_path(spec.repo):  # REPO_PATHS works plugin-less
@@ -85,6 +100,11 @@ class Copilot:
     # -- execution -----------------------------------------------------------------
     def run_task(self, spec: TaskSpec, *, assume_yes: bool = False,
                  plan_only: bool = False) -> int:
+        """Full path for one task: resolve → print plan → gate/confirm →
+        persist task.json → execute. Returns a process exit code — 0 done,
+        1 failed/aborted, BLOCKED_EXIT when planning fails or a gate blocks.
+        `plan_only` prints the resolved plan and returns 0 without running;
+        `assume_yes` skips the interactive confirm."""
         try:
             resolution = self.resolve(spec)
         except PlanningError as exc:
@@ -151,6 +171,12 @@ class Copilot:
     def _execute(self, playbook, spec: TaskSpec, run_dir: Path, *,
                  resolution_mode: str = "resume", tier: str = "?",
                  resuming: bool = False) -> int:
+        """Run a resolved `playbook` to completion in `run_dir`: init tracing +
+        notifier, seed the shared state (repo path, push policy, protected
+        branches / high-risk modules from the plugin when present), drive the
+        Executor, then print per-step marks, optional run metrics, and the final
+        status. `resuming` seeds the state so steps can pick up where they left
+        off. Returns the exit code (0 done, BLOCKED_EXIT blocked, else 1)."""
         self.last_run_dir = run_dir
         from .. import tracing
         tracing.init(run_dir.name, run_dir / "trace.jsonl")
@@ -248,6 +274,10 @@ class Copilot:
 
     # -- built-ins ---------------------------------------------------------------
     def status(self) -> str:
+        """Human-readable status of the current (or most recent) run: completed
+        steps from progress.json, plus a rebase-phase line (module/test counts,
+        CI result) when rebase_status.json exists. Falls back to the newest
+        run-* dir when no run has executed this session."""
         if not self.last_run_dir:
             runs = sorted(self.settings.run_root.glob("run-*")) \
                 if self.settings.run_root.exists() else []
@@ -276,6 +306,8 @@ class Copilot:
         return "\n".join(lines)
 
     def logs(self, n: int = 20) -> str:
+        """Return the last `n` lines of the current run's run_trace.jsonl, or a
+        placeholder string when there is no run / no trace yet."""
         if not self.last_run_dir:
             return "no runs yet"
         tracefile = self.last_run_dir / "run_trace.jsonl"
@@ -284,6 +316,8 @@ class Copilot:
         return "".join(tracefile.read_text().splitlines(keepends=True)[-n:])
 
     def playbooks(self) -> str:
+        """One line per registered playbook (name@version, status, task kinds),
+        or "(none)" when the store is empty."""
         return "\n".join(
             f"{p.name}@{p.version} [{p.status}] kinds={p.task_kinds}"
             for p in self.store.all()

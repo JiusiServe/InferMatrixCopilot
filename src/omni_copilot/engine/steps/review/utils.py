@@ -74,6 +74,12 @@ def _sweep_targets(diff: str, language: str = "python") -> str:
 
 
 def _render_review_md(output: dict) -> str:
+    """Render the review output dict as Markdown: comments sorted by severity,
+    each as `file:line [severity] — comment` with optional evidence, followed
+    by a verdict line. The verdict enforces coherence — any comment at blocker,
+    major, or minor severity means changes belong in THIS PR, so the verdict is
+    REQUEST CHANGES; only an all-nit (or empty) review APPROVEs. Falls back to
+    the output summary when there are no comments."""
     comments = sorted(output.get("review_comments") or [],
                       key=lambda c: _SEVERITY_ORDER.get(
                           str(c.get("severity", "minor")).lower(), 2))

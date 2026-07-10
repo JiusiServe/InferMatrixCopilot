@@ -47,6 +47,10 @@ def _build_evidence(ctx: StepContext, evidence: dict[str, str],
 
 
 def _permissions_view(scope: ToolScope, extra_tools: dict) -> dict:
+    """Summarize the step's tool scope for the prompt's PERMISSIONS section:
+    the sorted allowed + extra tool names, the read-only flag, writable paths,
+    and whether shell is available. `push` is hard-coded False — pushing is
+    never an agent-step capability."""
     return {
         "tools": sorted(scope.allowed_tools) + sorted(extra_tools),
         "read_only": scope.read_only,
@@ -57,6 +61,11 @@ def _permissions_view(scope: ToolScope, extra_tools: dict) -> dict:
 
 
 def _coerce_output(text: str, ctx: StepContext, contract: dict) -> dict | None:
+    """Parse the agent's final message into the output dict. Empty text returns
+    None (no repair — a repair round on nothing would only hallucinate). A
+    well-formed JSON object with a `status` is accepted as-is; otherwise one
+    repair LLM call reshapes the draft to `contract`. Returns the dict, or None
+    if it still lacks a `status`."""
     text = str(text or "")
     if not text.strip():
         return None  # nothing to repair — a repair round would hallucinate
@@ -76,6 +85,11 @@ def _coerce_output(text: str, ctx: StepContext, contract: dict) -> dict | None:
 
 
 def _to_step_result(output: dict, summary_prefix: str) -> StepResult:
+    """Map the agent's output dict to a typed StepResult. `status=success`
+    yields ok; `blocked`/`needs_review` map to fixed BLOCKED/ESCALATE kinds;
+    any other status derives the FailureKind from the output's `failure_kind`
+    field, defaulting to ESCALATE. The summary is prefixed (e.g. an ensemble
+    tag) and capped, and `files_modified` is carried as the changed files."""
     status = str(output.get("status", "failed")).lower()
     summary = f"{summary_prefix}{output.get('summary', '')}"[:400]
     changed = [str(f) for f in output.get("files_modified", []) or []]

@@ -38,15 +38,25 @@ BRIEFING_WORD_BUDGET = 350
 
 
 class ProfileError(Exception):
-    pass
+    """Raised (and caught per-op by `apply_ops`) when a patch op violates a
+    provenance or stability rule — never propagated across the write boundary."""
 
 
 def _today() -> str:
+    """Today's date as an `YYYY-MM-DD` string, the stamp for first_seen /
+    last_confirmed and the ops log."""
     return time.strftime("%Y-%m-%d")
 
 
 @dataclass
 class Fact:
+    """One curated fact plus its full provenance: the `module` it concerns (the
+    join key; "repo-wide" for global facts), its `kind`/`channel`, the human
+    `text`, and the evidence/confirmation trail (`evidence`, `first_seen`,
+    `last_confirmed`, `confirmations`). `status` flips to stale/merged/retired
+    rather than the fact being deleted; superseded text and merges accumulate in
+    `history` for audit."""
+
     id: str
     module: str                      # join key ("repo-wide" for global facts)
     kind: str
@@ -63,9 +73,13 @@ class Fact:
 
     @property
     def stable(self) -> bool:
+        """True once confirmed `STABLE_CONFIRMATIONS`+ times — the stability gate
+        that forbids rewrites from dropping this fact's evidence."""
         return self.confirmations >= STABLE_CONFIRMATIONS
 
     def to_doc(self) -> dict:
+        """Serialize to the YAML-persisted dict, omitting `merged_into`/`history`
+        when empty to keep `profile.yaml` uncluttered."""
         doc = {
             "id": self.id, "module": self.module, "kind": self.kind,
             "channel": self.channel, "text": self.text, "source": self.source,
@@ -84,6 +98,9 @@ class ProfileStore:
     """`<plugin>/profile/profile.yaml` + ops log + rendered views."""
 
     def __init__(self, root: str | Path):
+        """Load the store rooted at `root`: reads `profile.yaml` if present into
+        `meta` (non-fact top-level keys) and the `facts` map keyed by id, else
+        starts empty at schema_version 1. The ops log lives beside it."""
         self.root = Path(root)
         self.profile_file = self.root / "profile.yaml"
         self.ops_log = self.root / "ops_log.jsonl"
@@ -122,6 +139,12 @@ class ProfileStore:
         return results
 
     def _op_add_fact(self, op: dict) -> None:
+        """`add_fact` op: create a new active Fact (both tiers). Rejects empty
+        text and — the provenance rule — any fact with no evidence, and validates
+        kind/channel/source against the allowed sets. Ids are derived when absent;
+        an add whose id already exists is treated as a confirmation instead (bumps
+        confirmations, restamps last_confirmed, unions in new evidence), never a
+        duplicate fact. New facts cap stored evidence at 12 items."""
         text = str(op.get("text", "")).strip()
         evidence = [str(e) for e in op.get("evidence") or [] if str(e).strip()]
         if not text:
@@ -151,12 +174,17 @@ class ProfileStore:
             last_confirmed=_today())
 
     def _fact(self, op: dict, key: str = "id") -> Fact:
+        """Resolve the Fact named by `op[key]` (default the `id` field), or raise
+        `ProfileError` for an unknown id — the shared lookup for ops that target
+        an existing fact."""
         fact = self.facts.get(str(op.get(key, "")))
         if fact is None:
             raise ProfileError(f"unknown fact id {op.get(key)!r}")
         return fact
 
     def _op_add_evidence(self, op: dict) -> None:
+        """`add_evidence` op: append new (non-duplicate) evidence strings to an
+        existing fact and count it as a fresh confirmation (bump + restamp)."""
         fact = self._fact(op)
         for e in op.get("evidence") or []:
             if str(e).strip() and e not in fact.evidence:
@@ -165,11 +193,19 @@ class ProfileStore:
         fact.last_confirmed = _today()
 
     def _op_bump_confirmed(self, op: dict) -> None:
+        """`bump_confirmed` op: re-confirm an existing fact (increment
+        confirmations, restamp last_confirmed) without adding new evidence —
+        the "seen again, unchanged" signal that drives a fact toward stable."""
         fact = self._fact(op)
         fact.confirmations += 1
         fact.last_confirmed = _today()
 
     def _op_rewrite_fact(self, op: dict) -> None:
+        """`rewrite_fact` op (consolidation tier only): replace a fact's text,
+        pushing the old text onto `history`. `evidence` omitted keeps the existing
+        set; `[]` is rejected (a fact may never be left without evidence); a new
+        list replaces it, but a stable fact may not lose any evidence in the swap.
+        Empty replacement text is rejected."""
         fact = self._fact(op)
         text = str(op.get("text", "")).strip()
         if not text:
@@ -192,6 +228,11 @@ class ProfileStore:
             fact.evidence = new_evidence
 
     def _op_merge_facts(self, op: dict) -> None:
+        """`merge_facts` op (consolidation tier only): fold the `from` fact into
+        the `into` fact — union evidence, sum confirmations, and log the merge in
+        `into.history`. The source is not deleted: it becomes a `status: merged`
+        stub pointing at `into` via `merged_into`. Rejects merging a fact into
+        itself."""
         into = self._fact(op, "into")
         src = self._fact(op, "from")
         if into.id == src.id:
@@ -205,11 +246,16 @@ class ProfileStore:
         src.merged_into = into.id
 
     def _op_mark_stale(self, op: dict) -> None:
+        """`mark_stale` op (consolidation tier only): flip a fact's status to
+        `stale` so it drops out of `active` views — excluded, never erased."""
         self._fact(op).status = "stale"
 
     # -- persistence -----------------------------------------------------------
 
     def save(self) -> None:
+        """Persist the full state: rewrite `profile.yaml` (meta + all facts) and
+        regenerate the human-readable `PROFILE_REPORT.md`. Called after any batch
+        of applied ops."""
         self.root.mkdir(parents=True, exist_ok=True)
         doc = {**self.meta,
                "facts": [f.to_doc() for f in self.facts.values()]}
@@ -218,6 +264,8 @@ class ProfileStore:
         (self.root / "PROFILE_REPORT.md").write_text(self.render_report())
 
     def _append_ops_log(self, ops: list[dict], *, tier: str, actor: str) -> None:
+        """Append one JSONL record of the applied `ops` (with date, tier, actor)
+        to `ops_log.jsonl` — the append-only audit trail of every mutation."""
         self.root.mkdir(parents=True, exist_ok=True)
         with self.ops_log.open("a", encoding="utf-8") as f:
             f.write(json.dumps({"date": _today(), "tier": tier, "actor": actor,
@@ -227,6 +275,10 @@ class ProfileStore:
 
     def active(self, *, channel: str | None = None,
                module: str | None = None) -> list[Fact]:
+        """Active (non-stale/merged/retired) facts, optionally filtered to a
+        `channel` and/or `module` (module filter also admits "repo-wide" globals),
+        sorted most-confirmed first — the consumption view the render/step layers
+        read."""
         out = [f for f in self.facts.values() if f.status == "active"]
         if channel:
             out = [f for f in out if f.channel == channel]
@@ -250,6 +302,9 @@ class ProfileStore:
         return "\n".join(lines)
 
     def render_report(self) -> str:
+        """Render `PROFILE_REPORT.md`: every fact (regardless of status, sorted by
+        id) with its module/kind/channel/source, text, confirmation trail, listed
+        evidence, and merge pointer — the human audit view of provenance."""
         lines = ["# Profile report", "",
                  "Per-fact provenance: how derived, evidence, confirmations.",
                  ""]

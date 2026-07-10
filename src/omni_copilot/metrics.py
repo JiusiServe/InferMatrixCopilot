@@ -95,6 +95,9 @@ _DEFAULT_PRICE = (3.0, 15.0)
 
 def model_price(model: str, settings: "Settings | None" = None,
                 ) -> tuple[float, float]:
+    """(input, output) USD-per-1M-token price for `model`. A configured
+    `settings` override wins; otherwise the first `MODEL_PRICES` substring match
+    on the model name, falling back to `_DEFAULT_PRICE`."""
     if settings is not None and (settings.token_price_in_per_mtok > 0
                                  or settings.token_price_out_per_mtok > 0):
         return (settings.token_price_in_per_mtok or _DEFAULT_PRICE[0],
@@ -164,11 +167,16 @@ def safety_multiplier(incidents: dict[str, int]) -> float:
 # -- composites -------------------------------------------------------------------
 
 def catq(q: float | None, s: float, c: float) -> float | None:
+    """The headline composite CATQ = q·s/c (quality × safety over cost index).
+    None when quality `q` is unknown."""
     return None if q is None else q * s / max(c, 1e-9)
 
 
 def tus(q: float | None, s: float, c: float,
         lambda_c: float = 0.3, lambda_r: float = 0.7) -> float | None:
+    """Task Utility Score: quality minus additive cost and risk penalties
+    (weighted by `lambda_c`/`lambda_r`) — a bounded alternative to CATQ's ratio.
+    None when quality `q` is unknown."""
     return None if q is None else q - lambda_c * (1.0 - 1.0 / max(c, 1e-9)) \
         - lambda_r * (1.0 - s)
 
@@ -176,6 +184,8 @@ def tus(q: float | None, s: float, c: float,
 # -- run collector -----------------------------------------------------------------
 
 def _read_json(path: Path) -> dict:
+    """Load a JSON object from `path`, returning `{}` on any read/parse error —
+    metrics collection tolerates missing or partial run files."""
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -183,6 +193,8 @@ def _read_json(path: Path) -> dict:
 
 
 def _trace_events(run_dir: Path) -> list[dict]:
+    """Read `run_dir/run_trace.jsonl` into a list of event dicts, skipping blank
+    and malformed lines. Empty when the file is absent."""
     path = run_dir / "run_trace.jsonl"
     events: list[dict] = []
     if not path.exists():
@@ -212,6 +224,8 @@ def usage_from_events(events: Iterable[dict]) -> tuple[int, int, int]:
 
 def estimate_usd(tokens_in: int, tokens_out: int, ci_minutes: float,
                  settings: "Settings") -> float:
+    """Estimated run cost in USD: token cost at the agent model's price plus CI
+    minutes at `settings.ci_rate_usd_per_min`."""
     price_in, price_out = model_price(settings.agent_model, settings)
     usd = tokens_in / 1e6 * price_in + tokens_out / 1e6 * price_out
     return usd + ci_minutes * settings.ci_rate_usd_per_min

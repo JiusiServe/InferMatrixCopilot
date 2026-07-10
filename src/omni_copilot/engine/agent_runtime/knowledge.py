@@ -40,9 +40,15 @@ class _ScopedKnowledge:
     exists, so knowledge never leaks across repos."""
 
     def __init__(self, stores: list[SkillStore]):
+        """Hold the ordered skill stores — repo store first, shared pool last —
+        so retrieval and proposals honor the per-repo scoping."""
         self.stores = stores  # ordered: repo store first, shared pool last
 
     def find(self, query: str = "", module: str = "", k: int = 3):
+        """Search the stores in priority order and return up to `k` skills,
+        deduped by name (first store wins on a tie, so the repo's own skill
+        outranks a same-named shared one). `query`/`module` are passed through
+        to each store's own ranking."""
         out, seen = [], set()
         for store in self.stores:
             for s in store.find(query=query, module=module, k=k):
@@ -52,10 +58,16 @@ class _ScopedKnowledge:
         return out[:k]
 
     def propose(self, **kwargs) -> None:
+        """Record a skill-update candidate in the highest-priority store (the
+        repo's namespace when one exists), so proposals never leak across repos
+        and never touch active skills."""
         self.stores[0].propose(**kwargs)
 
 
 def _knowledge_stores(ctx: StepContext) -> _ScopedKnowledge:
+    """Build the per-repo `_ScopedKnowledge`: the active plugin's own skill
+    store first (when it differs from the shared dir), then the shared pool —
+    the ordering that gives repo skills retrieval and proposal priority."""
     stores: list[SkillStore] = []
     plugin = _resolve_plugin(ctx)
     if plugin is not None and plugin.skills_dir != Path(ctx.settings.skills_dir):
@@ -65,6 +77,10 @@ def _knowledge_stores(ctx: StepContext) -> _ScopedKnowledge:
 
 
 def _retrieve_skills(ctx: StepContext, query: str) -> tuple[list[dict], "_ScopedKnowledge"]:
+    """Pre-retrieve the top-k skills for `query` to seed the dispatch context.
+    Returns light `{name, summary}` dicts (summary falls back to the skill body
+    head when it has no description) plus the live `_ScopedKnowledge` store, so
+    the caller can also hand the agent its on-demand `skill_search` tool."""
     store = _knowledge_stores(ctx)
     hits = store.find(query=query, k=ctx.settings.skills_top_k)
     summaries = [{"name": s.name, "summary": s.description or s.body[:200]}
@@ -73,6 +89,10 @@ def _retrieve_skills(ctx: StepContext, query: str) -> tuple[list[dict], "_Scoped
 
 
 def _retrieve_memories(ctx: StepContext, query: str) -> list[str]:
+    """Search the debug-memory stores for `query` and return up to 3 one-line
+    `[module] symptom -> fix` hits. The repo plugin's DB is searched before the
+    shared one so repo-scoped memories rank first; duplicate lines are dropped
+    and any DB error is swallowed (retrieval never fails a step)."""
     dbs: list[Path] = []
     plugin = _resolve_plugin(ctx)
     if plugin is not None:
@@ -98,6 +118,8 @@ def _knowledge_tools(store: "_ScopedKnowledge", ctx: StepContext) -> dict[str, T
     """Read-only knowledge tools + governed skill-candidate proposals."""
 
     def skill_search(query: str, **_: Any) -> str:
+        """Tool: return up to 5 matching skills rendered as name + description +
+        body head, or a `(no matching skills)` sentinel."""
         hits = store.find(query=query, k=5)
         if not hits:
             return "(no matching skills)"
@@ -105,11 +127,16 @@ def _knowledge_tools(store: "_ScopedKnowledge", ctx: StepContext) -> dict[str, T
                            for s in hits)
 
     def memory_search(query: str, **_: Any) -> str:
+        """Tool: return the debug-memory hits for `query` as newline-joined
+        lines, or a `(no matching debug memories)` sentinel."""
         hits = _retrieve_memories(ctx, query)
         return "\n".join(hits) or "(no matching debug memories)"
 
     def skill_update_candidate(name: str, description: str, body: str,
                                **_: Any) -> str:
+        """Tool: record a proposed skill as a curator-gated candidate (active
+        skills are never edited by an agent), trace it, and confirm to the
+        agent."""
         store.propose(name=name, description=description, body=body)
         ctx.trace.record("skill_candidate_proposed", name=name)
         return (f"candidate '{name}' recorded for curator review — active skills "
@@ -154,6 +181,7 @@ def _repo_map_tool(ctx: StepContext, plugin) -> dict[str, ToolDef]:
         return {}
 
     def repo_map(query: str, **_: Any) -> str:
+        """Tool: render the goal-ranked, budgeted repo map for `query`."""
         return rmap.render(str(query))
 
     return {"repo_map": ToolDef(

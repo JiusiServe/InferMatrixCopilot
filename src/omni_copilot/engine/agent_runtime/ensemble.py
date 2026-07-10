@@ -61,6 +61,9 @@ async def run_agent_step_ensemble(
     k = max(1, int(ctx.settings.ensemble_samples_per_lens))
 
     async def _one_lens(lens: dict, j: int) -> tuple[str, StepResult, dict]:
+        """Run `run_agent_step` once for a single lens (sample `j`), instructing
+        the agent to go DEEP on that lens as its depth priority while peers cover
+        the rest. Returns the lens name, the StepResult, and the output dict."""
         suffix = f"/{j}" if k > 1 else ""
         lens_guidance = (
             f"{guidance}\n\n## Your assigned lens: {lens['name']}\n"
@@ -110,6 +113,10 @@ async def run_agent_step_ensemble(
                 candidates.append(tagged)
 
     def _dedup_union(key: str) -> list:
+        """Union the list-valued `key` across all samples, dropping exact
+        duplicates (dict/list items compared by canonical JSON, scalars by str),
+        preserving first-seen order. Used to merge the deterministic base fields
+        that the reducer does not judge."""
         out, seen = [], set()
         for _, o in samples:
             for v in o.get(key) or []:

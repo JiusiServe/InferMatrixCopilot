@@ -24,6 +24,8 @@ _SKIP_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__", "build",
 
 
 def _head_commit(repo: Path) -> str:
+    """Current HEAD sha of `repo`, used as the cache key so a new commit
+    invalidates the index. Returns "no-git" if git fails or the repo is untracked."""
     try:
         out = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(repo),
                              capture_output=True, text=True, timeout=15)
@@ -35,6 +37,10 @@ def _head_commit(repo: Path) -> str:
 def build_index(repo: Path, language: str, *, max_files: int = 4_000,
                 max_file_bytes: int = 200_000,
                 max_symbols_per_file: int = 40) -> dict[str, list[str]]:
+    """Build the symbol index: map each source file (relative path) to its list
+    of regex-matched symbol definitions for `language`. Skips vcs/build/hidden
+    dirs and non-source suffixes, and bounds the scan by file count, per-file
+    bytes, and symbols-per-file. Returns {} when the language is unsupported."""
     pattern = _symbol_re(language)
     suffixes = _suffixes(language)
     if pattern is None:
@@ -67,6 +73,9 @@ class RepoMap:
 
     def __init__(self, repo: str | Path, language: str,
                  cache_dir: str | Path | None = None):
+        """Bind to `repo` (of `language`); `cache_dir`, when given, persists the
+        HEAD-keyed index on disk. The index is built lazily and memoized in
+        `_index`."""
         self.repo = Path(repo)
         self.language = language
         self.cache_dir = Path(cache_dir) if cache_dir else None
@@ -74,9 +83,15 @@ class RepoMap:
 
     @property
     def supported(self) -> bool:
+        """Whether a symbol regex exists for this language (else `render` yields
+        the "use grep" fallback)."""
         return _symbol_re(self.language) is not None
 
     def index(self) -> dict[str, list[str]]:
+        """Return the symbol index, memoized. When a `cache_dir` is set, load the
+        `index-<HEAD>.json` cache if present; otherwise build it, then purge stale
+        caches (one HEAD, one file) and write the new one. Cache read/write errors
+        degrade to an in-memory build rather than failing."""
         if self._index is not None:
             return self._index
         cache_file = None
@@ -100,6 +115,11 @@ class RepoMap:
         return self._index
 
     def render(self, query: str, *, budget_chars: int = 4_000) -> str:
+        """Render a goal-ranked slice of the index for `query`, under a
+        `budget_chars` cap — the queryable view the `repo_map` tool returns.
+        Files are ranked by query-word hits (path match weighted 3x symbol match);
+        once ranking begins the zero-score tail is cut as noise. Returns a "use
+        grep" message when the index is empty or nothing matched."""
         index = self.index()
         if not index:
             return (f"(no repo map: language '{self.language}' unsupported "
@@ -107,6 +127,8 @@ class RepoMap:
         words = [w for w in re.findall(r"[a-z0-9_]+", query.lower()) if len(w) > 2]
 
         def score(item: tuple[str, list[str]]) -> int:
+            """Relevance of one (path, symbols) entry: 3 per query word found in
+            the path plus 1 per word found in the symbol text."""
             path, symbols = item
             haystack_path = path.lower()
             haystack_syms = " ".join(symbols).lower()

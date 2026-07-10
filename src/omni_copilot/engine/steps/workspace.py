@@ -12,6 +12,10 @@ from ._common import require_repo, step
 @step("workspace.guard_clean", "deterministic", "read",
       "Refuse to start on a dirty working tree.")
 async def _guard_clean(ctx: StepContext) -> StepResult:
+    """Fail-closed pre-flight gate: refuse to start when the working tree is
+    dirty, so a run never mixes its edits with pre-existing uncommitted changes.
+    Runs `git status --porcelain`; a non-git or dirty tree returns BLOCKED (the
+    dirty case carries a sample of the offending entries in `outputs`)."""
     repo = require_repo(ctx)
     if isinstance(repo, StepResult):
         return repo
@@ -30,6 +34,10 @@ async def _guard_clean(ctx: StepContext) -> StepResult:
 @step("analysis.diff_summary", "deterministic", "read",
       "Cheap diffstat + out-of-scope/full-write flags.")
 async def _diff_summary(ctx: StepContext) -> StepResult:
+    """Cheap diffstat over the workspace against `params.base_ref` (default HEAD),
+    flagging out-of-scope and full-file rewrites relative to `primary_files` in
+    state. Delegates to `build_diff_summary`; returns the file/insertion/deletion
+    counts as summary and the full summary dict in `outputs["diff_summary"]`."""
     repo = require_repo(ctx, must_exist=False)
     if isinstance(repo, StepResult):
         return repo

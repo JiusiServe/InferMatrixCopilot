@@ -16,6 +16,11 @@ import yaml
 
 @dataclass
 class Skill:
+    """One parsed SKILL.md: its frontmatter metadata (`name`, `description`,
+    `trigger`, `modules`, `status`, `run_count`) plus the markdown `body`.
+    `modules` is the join key for module-scoped retrieval; `run_count` is the
+    usage prior that breaks ranking ties toward proven skills."""
+
     name: str
     description: str = ""
     trigger: str = ""
@@ -26,6 +31,10 @@ class Skill:
 
 
 def _parse_skill(path: Path) -> Skill | None:
+    """Parse a `SKILL.md` at `path` into a `Skill`, or None when the file lacks
+    the leading `---` frontmatter fence or the YAML is malformed. Missing scalar
+    fields fall back to defaults (name defaults to the containing dir name), so a
+    partial-but-valid file still loads rather than being dropped."""
     text = path.read_text(encoding="utf-8")
     if not text.startswith("---"):
         return None
@@ -46,11 +55,21 @@ def _parse_skill(path: Path) -> Skill | None:
 
 
 class SkillStore:
+    """Directory of promoted `<name>/SKILL.md` skills plus a `_candidates.json`
+    holding agent-proposed but not-yet-promoted skills. Enforces the governance
+    split: agents may only `propose`; `promote` (writing a real SKILL.md) is a
+    curator/human action."""
+
     def __init__(self, directory: str | Path):
+        """Bind to the skills `directory`; candidates live in `_candidates.json`
+        under it. Neither path is required to exist yet."""
         self.directory = Path(directory)
         self.candidates_file = self.directory / "_candidates.json"
 
     def load_all(self) -> list[Skill]:
+        """Parse and return every active promoted skill under the directory
+        (sorted by path). Non-active or unparseable `SKILL.md` files are skipped;
+        an absent directory yields an empty list."""
         skills = []
         if self.directory.exists():
             for p in sorted(self.directory.glob("*/SKILL.md")):
@@ -60,7 +79,15 @@ class SkillStore:
         return skills
 
     def find(self, query: str = "", module: str = "", k: int = 3) -> list[Skill]:
+        """Return up to `k` active skills ranked for the given `query`/`module`.
+        Ranking key (descending): module match first, then count of query words
+        found in description+trigger, then `run_count` as the usage tie-breaker.
+        With a query or module supplied, zero-relevance skills are dropped; with
+        neither, the top `k` by run_count are returned as a default surface."""
+
         def score(s: Skill) -> tuple:
+            """Rank tuple for `s`: (module_hit, query-word overlap, run_count),
+            compared lexicographically so a module match dominates text overlap."""
             module_hit = 1 if module and module in s.modules else 0
             text_hit = sum(
                 1 for w in query.lower().split()
@@ -74,6 +101,9 @@ class SkillStore:
     # -- write gate: propose -> candidate; promote is curator/human ----------
     def propose(self, *, name: str, description: str, body: str,
                 modules: list[str] | None = None) -> None:
+        """Record a proposed skill (keyed by `name`) into `_candidates.json` with
+        a `proposed_at` timestamp — the only write agents are permitted. Re-using
+        a name overwrites its candidate. No SKILL.md is created until `promote`."""
         candidates = self._load_candidates()
         candidates[name] = {
             "name": name, "description": description, "body": body,
@@ -83,6 +113,10 @@ class SkillStore:
         self.candidates_file.write_text(json.dumps(candidates, indent=2, ensure_ascii=False))
 
     def promote(self, name: str) -> Path:
+        """Curator action: turn the candidate `name` into a real `<name>/SKILL.md`
+        (frontmatter + body), remove it from the candidates file, and return the
+        written path. Raises `KeyError` if no such candidate exists. The new skill
+        starts `status: active`, `run_count: 0`, dated today."""
         candidates = self._load_candidates()
         if name not in candidates:
             raise KeyError(f"no skill candidate named {name!r}")
@@ -104,14 +138,21 @@ class SkillStore:
         return path
 
     def candidates(self) -> dict:
+        """The current proposed-but-unpromoted skills, keyed by name."""
         return self._load_candidates()
 
     def _load_candidates(self) -> dict:
+        """Read and return the candidates map from `_candidates.json`, or an empty
+        dict when the file does not exist yet."""
         if self.candidates_file.exists():
             return json.loads(self.candidates_file.read_text())
         return {}
 
     def render_for_prompt(self, skills: list[Skill]) -> str:
+        """Format the given `skills` into a markdown block for prompt injection —
+        a heading plus each skill's name, description, and body truncated to 1500
+        chars (bounds prompt cost). Returns "" for an empty list so the caller can
+        omit the section entirely."""
         if not skills:
             return ""
         parts = ["## Relevant skills (distilled past lessons)"]
