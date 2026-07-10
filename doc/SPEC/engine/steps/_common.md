@@ -23,7 +23,7 @@ The step self-registration surface + cross-module helpers shared by step files.
 No step handlers; no domain logic. Infrastructure + shared IO only.
 
 ## Dependencies (allowed)
-`engine/step`; `...tools` (inside `gh_read_tools`), `...scopes` (types); stdlib.
+`engine/step`; `...tools` (inside `gh_read_tools`); stdlib.
 
 ## Extension points
 A helper genuinely shared by ≥2 step files → add here. A helper used by one step

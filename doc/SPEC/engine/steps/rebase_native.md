@@ -10,7 +10,7 @@ package's own phase wrappers + `node_rebase_module`.
 `rebase.prelude`, `rebase.phase1..phase5`, `rebase.phase2_prepare`,
 `rebase.module_rebase`, `rebase.phase2_finalize`, `rebase.compare_with_locked`.
 
-## Public contract (re-exported by the `rebase_native_steps` shim)
+## Public contract (importable from `engine.steps.rebase_native`)
 `_RUNTIME` (per-process memoized parent runtime; test fixtures clear it).
 
 ## Invariants

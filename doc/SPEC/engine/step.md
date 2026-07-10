@@ -39,7 +39,7 @@ update the executor routing and `_CONSTRAINTS` together.
 Exercised everywhere; shape pinned implicitly.
 
 ## Refactor notes
-Foundational — keep the dependency set at exactly {run_trace, scopes}. Adding an
+Foundational — keep the dependency set at exactly {run_trace}. Adding an
 import here would couple the whole engine to it. If `StepContext` grows more
 optional fields, that's a signal a step is over-reaching, not that this file
 needs restructuring.

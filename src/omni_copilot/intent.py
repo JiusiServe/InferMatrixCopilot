@@ -90,7 +90,11 @@ def _parse_llm(text: str, llm: LLM, default_repo: str, model: str | None) -> Int
     obj = parse_json_reply(reply.text)
     if not obj:
         return IntentResult(clarify="I couldn't parse that — can you rephrase?")
-    if obj.get("clarify") or float(obj.get("confidence", 0)) < 0.7:
+    try:  # a non-numeric confidence must clarify, not crash the CLI
+        confidence = float(obj.get("confidence", 0))
+    except (TypeError, ValueError):
+        confidence = 0.0
+    if obj.get("clarify") or confidence < 0.7:
         return IntentResult(clarify=obj.get("clarify") or "Can you be more specific?")
     try:
         return IntentResult(spec=TaskSpec(

@@ -30,7 +30,7 @@ is pointed at.
                     engine/executor.py                      §3.X engine substrate
         per-step checkpoint/resume · retries · typed failures · escalation
                               ▼
-             engine/builtin_steps.py (Step library)         §3.X.1 Steps
+             engine/steps/*          (Step library)         §3.X.1 Steps
       tools.py + scopes.py (ToolScope/PathScope choke point) §3.3(2)
       review/ (diff summary → triggers → read-only reviewer) §3.3(3)
       memory/ (RunTrace, DebugMemory FTS5, gated skills)     §3.3(4)
@@ -77,7 +77,7 @@ is pointed at.
 | `src/omni_copilot/engine/step.py`, `registry.py` | §3.X Step abstraction, vetted step library |
 | `src/omni_copilot/engine/executor.py` | engine substrate: checkpoint/resume, typed failure routing |
 | `src/omni_copilot/engine/planner.py` | §3.2 reuse > adapt > generate, L0/L1/L2 |
-| `src/omni_copilot/engine/builtin_steps.py` | initial step palette (guard, rebase, review gate, push, gh reads, agent steps) |
+| `src/omni_copilot/engine/steps/` | vetted step library (guard, rebase, review gate, push, gh reads, agent steps) — self-registering |
 | `src/omni_copilot/engine/agent_runtime.py` | unified Agent-Step runtime (修正方案): AgentDispatchContext, evidence pack (cap+archive), skill/memory retrieval + gated candidates, enforced scopes, structured output contract, full RunTrace; `run_agent_step_ensemble` — perspective-diverse fan-out + verify-and-merge for run-to-run robustness (eval-informed; any list-output agent step) |
 | `src/omni_copilot/playbooks/store.py`, `playbooks/*.yaml` | Playbook registry: versioned, provenance, candidate/active/locked/retired |
 | `src/omni_copilot/scopes.py`, `tools.py`, `agent_loop.py` | 框架层改进 (2): ToolScope/PathScope at one choke point |
@@ -186,7 +186,7 @@ Sources: [ETH AGENTS.md study](https://arxiv.org/html/2602.11988v1) ·
 
 | # | Problem | Evidence | Fix |
 |---|---|---|---|
-| 1 | **Resume loses in-memory state.** Steps hand results to later steps by writing `ctx.state` directly (`pr.fetch_diff` → `diff_text`, `issue.fetch` → `issue_text`, `pr.gate_check` → `gate_report`, `pr.checkout_branch` → `push_policy`/branch refs, `agent.review_diff` → `review_text`), but the executor's resume path restores only `outputs.state_updates`. `--resume` past a completed fetch re-enters `agent.review_diff` with no `diff_text` → spurious BLOCKED; resuming pr-rebase at the push step sees the default (deny-all) `PushPolicy` → spurious FORBIDDEN. | `executor.py` resume branch vs. `builtin_steps.py`/`pr_steps.py` state writes | Contract: **every state key a later step consumes must be published via `outputs.state_updates`** (JSON-simple; `PushPolicy` serialized). Enforced by a resume-integrity test per playbook: run to step N, drop the process, resume, assert no BLOCKED-on-missing-state at any N. |
+| 1 | **Resume loses in-memory state.** Steps hand results to later steps by writing `ctx.state` directly (`pr.fetch_diff` → `diff_text`, `issue.fetch` → `issue_text`, `pr.gate_check` → `gate_report`, `pr.checkout_branch` → `push_policy`/branch refs, `agent.review_diff` → `review_text`), but the executor's resume path restores only `outputs.state_updates`. `--resume` past a completed fetch re-enters `agent.review_diff` with no `diff_text` → spurious BLOCKED; resuming pr-rebase at the push step sees the default (deny-all) `PushPolicy` → spurious FORBIDDEN. | `executor.py` resume branch vs. `steps/pr.py`/`steps/review.py` state writes | Contract: **every state key a later step consumes must be published via `outputs.state_updates`** (JSON-simple; `PushPolicy` serialized). Enforced by a resume-integrity test per playbook: run to step N, drop the process, resume, assert no BLOCKED-on-missing-state at any N. |
 | 2 | **`foreach` fan-out drops `state_updates`.** `_merge` re-keys item outputs by index, so `state_updates` published by fan-out items never reach `state.update(...)`. | `executor.py::_merge` | Merge `state_updates` across items explicitly (last-writer-wins per key is acceptable; conflicts traced). Covered by the same resume-integrity test. |
 | 3 | **`when:` silently evaluates against TaskSpec only.** A condition on a computed state key (e.g. `has_conflicts`) evaluates false with no error. | `executor.py::_eval_when` | Evaluate against `state` with TaskSpec fallback; unknown key → planning-time error, not a silent skip. |
 | 4 | **Per-repo knowledge is designed but not wired.** `RepoPlugin.skills_dir` and `RepoPlugin.debug_memory_db` exist, but `agent_runtime` reads the *global* `settings.skills_dir` / `settings.memory_db` — every repo shares one skill store and one debug memory. | `plugins/base.py` vs `engine/agent_runtime.py::_retrieve_skills/_retrieve_memories` | Resolve knowledge stores through the active plugin/profile first, global shared pool second (§V2.2.6). |
@@ -199,7 +199,7 @@ gets silently degraded behavior. All are resolved by **profile injection**
 (§V2.3) — the core keeps only repo-neutral scaffolding:
 
 - `_REVIEW_SYSTEM` and `_REVIEW_LENSES` hardcode "vLLM-Omni" and a
-  Python/ML-repo review checklist inside `engine/builtin_steps.py`. → Split
+  Python/ML-repo review checklist inside `engine/steps/review.py`. → Split
   into a repo-neutral core prompt + profile-supplied domain sections
   (`review.md`: domain checklist, lens extensions, severity norms).
 - `_sweep_targets` assumes Python surface syntax (`xs[0]`, `elif`,

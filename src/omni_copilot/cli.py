@@ -353,7 +353,7 @@ def main(argv: list[str] | None = None) -> int:
                         help="with --playbook: task param (repeatable), "
                              "e.g. --task-param local_ci_only=true")
     parser.add_argument("--no-chat", action="store_true",
-                        help="use the deterministic command REPL instead of the "
+                        help="use the plain command REPL instead of the "
                              "conversational interface")
     args = parser.parse_args(argv)
 
@@ -379,7 +379,7 @@ def main(argv: list[str] | None = None) -> int:
         return int(code) if code not in (None, -1) else 0
 
     # Interactive: conversational chat (Claude-Code-style) when an LLM is
-    # configured; deterministic command REPL otherwise / with --no-chat.
+    # configured; plain command REPL otherwise / with --no-chat.
     if copilot.llm.available and not args.no_chat:
         from .chat import chat_repl
 

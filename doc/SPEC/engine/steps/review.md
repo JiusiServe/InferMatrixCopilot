@@ -9,7 +9,7 @@ prompt system.
 ## Steps
 `review.patch_gate` (validation/read), `agent.review_diff` (agent/read).
 
-## Public contract (re-exported by the `builtin_steps` shim)
+## Public contract (importable from `engine.steps.review`)
 `_REVIEW_LENSES`, `_render_review_md`, `_sweep_targets`.
 
 ## Invariants

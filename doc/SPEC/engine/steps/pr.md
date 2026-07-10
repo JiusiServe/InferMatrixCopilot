@@ -13,7 +13,7 @@ posting.
 (agent/write_workspace); `agent.verify_module` (validation/read);
 `pr.post_review` (script/push).
 
-## Public contract (re-exported by the `pr_steps` shim)
+## Public contract (importable from `engine.steps.pr`)
 `extract_signature`.
 
 ## Invariants

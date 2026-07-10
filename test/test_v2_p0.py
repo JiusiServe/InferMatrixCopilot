@@ -13,15 +13,31 @@ import re
 from pathlib import Path
 
 from omni_copilot.engine.steps import register_builtin_steps
+from omni_copilot.engine.steps._common import require_repo
 from omni_copilot.engine.executor import Executor
 from omni_copilot.engine.registry import StepRegistry
-from omni_copilot.engine.step import StepContext, StepResult, StepSpec
+from omni_copilot.engine.step import FailureKind, StepContext, StepResult, StepSpec
 from omni_copilot.llm import Block, Reply
 from omni_copilot.playbooks.store import Playbook, PlaybookStep, PlaybookStore
 from omni_copilot.review.diff_summary import DiffSummary
 from omni_copilot.review.triggers import evaluate_triggers
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_require_repo_guard(settings, trace, tmp_path):
+    """The K3 guard helper (one choke point for 8 steps): missing repo -> BLOCKED,
+    present repo -> the Path."""
+    ctx = StepContext(settings=settings, state={}, params={},
+                      run_dir=tmp_path, trace=trace)
+    res = require_repo(ctx)
+    assert isinstance(res, StepResult) and not res.ok
+    assert res.failure is FailureKind.BLOCKED
+    ctx.state["repo_path"] = str(tmp_path)          # exists
+    assert require_repo(ctx) == tmp_path
+    ctx.state["repo_path"] = str(tmp_path / "gone")  # missing dir
+    assert isinstance(require_repo(ctx), StepResult)          # must_exist=True
+    assert require_repo(ctx, must_exist=False) == tmp_path / "gone"  # None-only check
 
 
 class ScriptedLLM:

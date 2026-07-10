@@ -71,6 +71,24 @@ def test_injection_is_defended_by_low_confidence():
     assert r.needs_clarification
 
 
+def test_system_prompt_instructs_injection_defense():
+    # The substantive (non-mocked) injection guard is our system prompt telling
+    # the model to clarify on injection-looking input. Assert it is present so a
+    # future prompt edit can't silently drop it.
+    from omni_copilot.intent import _LLM_SYSTEM
+
+    low = _LLM_SYSTEM.lower()
+    assert "inject" in low and "confidence" in low and "clarify" in low
+
+
+def test_non_numeric_confidence_clarifies_not_crashes():
+    # regression: LLM-only widened exposure of _parse_llm; a malformed confidence
+    # (e.g. "high") must clarify, never raise a ValueError up through the CLI.
+    r = parse_intent("do it", llm=FakeLLM(
+        {"kind": "pr_rebase", "pr": 1, "confidence": "high"}))
+    assert r.needs_clarification  # coerced to 0.0 -> below the gate
+
+
 def test_tier_derivation_is_fixed():
     assert TaskSpec(kind="repo_rebase").tier == "L0"
     assert TaskSpec(kind="pr_rebase", pr=1).tier == "L1"
