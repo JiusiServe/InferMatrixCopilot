@@ -84,6 +84,7 @@ async def run_agent_step(
               "expected_output": expected,
               "on_failure": "set status/failure_kind honestly; never fabricate"},
         repo={"path": ctx.state.get("repo_path", ""),
+              "checkout": ctx.state.get("checkout_note", "live checkout"),
               "protected_branches": ctx.state.get("protected_branches", ["main"])},
         evidence=capped, evidence_refs=refs,
         previous_steps=[{"step": k, "outputs_keys": sorted((v or {}).keys())[:8]}

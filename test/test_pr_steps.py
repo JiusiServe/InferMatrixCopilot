@@ -175,3 +175,54 @@ def test_post_review_gating(registry, settings, trace, tmp_path):
     result = asyncio.run(step.handler(_ctx(settings, trace, tmp_path, state)))
     assert result.ok and result.outputs.get("dry_run") is True
     assert "looks fine" in result.outputs["body"]
+
+
+def test_worktree_at_creates_and_reuses(git_repo, tmp_path):
+    """_worktree_at pins a detached worktree at a sha, reuses a matching one,
+    and swaps a stale one; failures return (False, why) instead of raising."""
+    import subprocess
+
+    from omni_copilot.engine.steps.pr.fetch import _worktree_at
+
+    sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=git_repo,
+                         capture_output=True, text=True).stdout.strip()
+    dest = tmp_path / "wt"
+    ok, detail = _worktree_at(git_repo, sha, dest)
+    assert ok and "created" in detail and (dest / "mod_a.py").exists()
+    ok, detail = _worktree_at(git_repo, sha, dest)
+    assert ok and "reused" in detail
+    ok, detail = _worktree_at(git_repo, "0" * 40, dest)
+    assert not ok and "failed" in detail
+
+
+def test_fetch_diff_pins_pr_time_checkout(settings, trace, tmp_path, git_repo,
+                                          monkeypatch):
+    """pr.fetch_diff publishes repo_path pinned to the PR head (injected sha in
+    tests) plus a checkout_note; the worktree lands under ~/.omni-copilot."""
+    import asyncio
+    import subprocess
+
+    from omni_copilot.engine.registry import StepRegistry
+    from omni_copilot.engine.step import StepContext
+    from omni_copilot.engine.steps import register_builtin_steps
+    from omni_copilot.engine.steps.pr import fetch as fetch_mod
+    from omni_copilot.run_trace import RunTrace
+
+    monkeypatch.setattr(fetch_mod, "_gh",
+                        lambda args, cwd=None: (0, "diff --git a/x b/x"))
+    monkeypatch.setattr(fetch_mod.Path, "home", staticmethod(lambda: tmp_path))
+    sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=git_repo,
+                         capture_output=True, text=True).stdout.strip()
+    registry = register_builtin_steps(StepRegistry())
+    settings.repo_paths = {"vllm-omni": str(git_repo)}
+    state = {"task_spec": {"kind": "pr_review", "pr": 7, "repo": "vllm-omni"},
+             "repo_path": str(git_repo), "pr_head_sha": sha}
+    ctx = StepContext(settings=settings, state=state, params={},
+                      run_dir=tmp_path / "run", trace=RunTrace(tmp_path / "t.jsonl"),
+                      llm=None)
+    result = asyncio.run(registry.get("pr.fetch_diff").handler(ctx))
+    assert result.ok, result.summary
+    upd = result.outputs["state_updates"]
+    assert "PR-TIME TREE" in upd["checkout_note"]
+    assert upd["repo_path"].endswith("-pr7")
+    assert (tmp_path / ".omni-copilot" / "worktrees").exists()

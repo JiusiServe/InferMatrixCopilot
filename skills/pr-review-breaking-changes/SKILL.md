@@ -15,10 +15,11 @@ run_count: 0
   memory; record command + hit count) incl. `vllm_omni/diffusion/`, vendored
   code, `gpu_*`/`npu_*` pairs. Every hit: updated here or intentionally
   untouched (say why). Unexplained survivor = finding (#4810 → issue #4891).
-- CHECKOUT-DRIFT: you grep current main, which may already carry post-PR fixes —
-  zero survivors does NOT clear PR-time state. `git log --oneline -- <file>`
-  for commits after the PR; a file named in the PR body but absent from the
-  diff is a candidate unswept caller, never "an earlier iteration".
+- CHECKOUT STATE (see REPO.checkout): on the PR-TIME TREE an unexplained
+  surviving caller is a REAL finding — report it. On CURRENT MAIN zero
+  survivors proves nothing (post-PR fixes may exist): `git log --oneline --
+  <file>`; a file named in the PR body but absent from the diff is a candidate
+  unswept caller, never "an earlier iteration".
 - Variant sweep: each confirmed defect is an exemplar — grep structural
   siblings (same API, copy-paste blocks, paired AR/DiT or GPU/NPU file).
 - New guard/assert/NotImplementedError: ask which existing tests/CI exercise

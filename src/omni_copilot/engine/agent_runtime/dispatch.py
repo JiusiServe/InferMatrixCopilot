@@ -62,7 +62,6 @@ class AgentDispatchContext:
             + json.dumps(self.output_contract, ensure_ascii=False, indent=1),
             "## PERMISSIONS\n" + json.dumps(self.permissions,
                                             ensure_ascii=False, indent=1),
-            "## REPO\n" + json.dumps(self.repo, ensure_ascii=False, indent=1),
         ]
         if self.briefing:
             parts.append("## REPO BRIEFING (curated repo-specific directives)\n"
@@ -74,7 +73,9 @@ class AgentDispatchContext:
         if self.memories:
             parts.append("## RELEVANT DEBUG MEMORIES\n"
                          + "\n".join(f"- {m}" for m in self.memories))
-        # ---- dynamic (per-run) content below; keep it after the static head ----
+        # ---- dynamic (per-run) content below; keep it after the static head
+        # (REPO is here too: worktree paths are per-PR) ----
+        parts.append("## REPO\n" + json.dumps(self.repo, ensure_ascii=False, indent=1))
         parts.append("## TASK\n" + json.dumps(self.task, ensure_ascii=False, indent=1))
         parts.append("## THIS STEP\n" + json.dumps(self.step, ensure_ascii=False, indent=1))
         if self.previous_steps:

@@ -13,15 +13,15 @@
 - Removed/renamed/re-signatured API: grep the WHOLE repo for remaining callers —
   incl. `vllm_omni/diffusion/`, vendored code, `gpu_*`/`npu_*` counterparts.
   Account for every hit (updated here / intentionally untouched — say why).
-  Unexplained survivor = finding (#4810 shipped "missed by" follow-up #4891).
-  Callers come from grep output, never memory; record command + hit count.
-- **Checkout-drift discipline**: you review on current main, which may already
-  contain post-PR fixes — a zero-survivor grep does NOT clear the PR-time state.
-  Check `git log --oneline -- <file>` for commits after the PR. If the PR body
-  names a file the diff doesn't touch, that is a candidate unswept caller —
-  never explain it away as "an earlier iteration".
-- Variant sweep: each confirmed defect is an exemplar — grep for structural
-  siblings (same API, copy-pasted blocks, the paired AR/DiT or GPU/NPU file).
+  Unexplained survivor = finding (#4810 shipped "missed by" #4891). Callers
+  come from grep output, never memory; record command + hit count.
+- **Checkout state** (REPO.checkout): PR-TIME TREE — greps reflect PR-time
+  state; an unexplained surviving caller is a REAL finding. CURRENT MAIN —
+  post-PR fixes may exist; zero survivors proves nothing (`git log -- <file>`).
+  A file named in the PR body but absent from the diff is a candidate unswept
+  caller — never "an earlier iteration".
+- Variant sweep: a confirmed defect is an exemplar — grep for structural
+  siblings (same API, copy-paste blocks, the paired AR/DiT or GPU/NPU file).
 
 ## Review like this repo's maintainers
 - Surface the best design suggestion found during investigation, even on an
