@@ -1,0 +1,110 @@
+# Profile report
+
+Per-fact provenance: how derived, evidence, confirmations.
+
+## audio-similarity-trap [active]
+- module: audio · kind: trap · channel: briefing · source: agent
+- text: Audio/TTS similarity below the 0.9 gate is often a whisper-small ASR mishearing a short/quiet clip, not a model regression — re-check with whisper-large-v3 before flagging (large-v3 scored 200/200 where small failed).
+- confirmations: 1 (first 2026-07-11, last 2026-07-11)
+  - evidence: verified rebase observation 2026-06 (Higgs-Audio-V3 'Shhh!' clip: whisper-large-v3 200/200 clean)
+
+## benchmarks-wave2 [active]
+- module: benchmarks · kind: note · channel: retrieved · source: agent
+- text: benchmarks/ is rebase wave 2 (lower priority than the wave-1 runtime modules); its scripts validate throughput/latency, not output correctness.
+- confirmations: 1 (first 2026-07-11, last 2026-07-11)
+  - evidence: adapters/vllm_omni/manifest.yaml modules.benchmarks.wave=2
+
+## build-and-lint [active]
+- module: repo-wide · kind: command · channel: machine · source: agent
+- text: Python 3.10–3.13; build via setuptools (dynamic version + platform deps); lint/format via ruff + pre-commit.
+- confirmations: 1 (first 2026-07-11, last 2026-07-11)
+  - evidence: vllm-omni/pyproject.toml requires-python='>=3.10,<3.14', build-backend=setuptools
+  - evidence: adapters/vllm_omni/manifest.yaml validation.precommit=true
+
+## ci-entry [active]
+- module: repo-wide · kind: command · channel: machine · source: agent
+- text: CI image: `docker build --file docker/Dockerfile.ci -t vllm-omni-ci .`; pipeline entry `.buildkite/scripts/upload_pipeline.py` uploads the test-ready / test-merge / test-nightly / test-weekly child pipelines.
+- confirmations: 1 (first 2026-07-11, last 2026-07-11)
+  - evidence: vllm-omni/.buildkite/pipeline.yml
+
+## ci-signature-normalize [active]
+- module: repo-wide · kind: trap · channel: retrieved · source: agent
+- text: When grouping CI failures, normalize signatures — the same underlying failure recurs across runs with slightly different text; exact-string comparison misclassifies a known/flaky failure as new.
+- confirmations: 1 (first 2026-07-11, last 2026-07-11)
+  - evidence: rebase-agent debug lesson: CI baseline exact-string signature bug in monitor.py
+
+## ci-skip-not-fail [active]
+- module: repo-wide · kind: note · channel: briefing · source: agent
+- text: CI is Buildkite (org vllm). A PR's tests can be legitimately skipped by the skip-ci resolver (docs-only or pytest skip-mark diffs) — a skipped run is NOT a failing run; image-build still runs for the nightly exception.
+- confirmations: 1 (first 2026-07-11, last 2026-07-11)
+  - evidence: vllm-omni/.buildkite/pipeline.yml (upload_pipeline.py skip-ci resolution)
+
+## collected-zero-is-path [active]
+- module: repo-wide · kind: trap · channel: briefing · source: agent
+- text: pytest 'collected 0 items' (rc=4) means a stale/renamed test path, not OOM — after a test-file rename, verify the CI test command still points at real files.
+- confirmations: 1 (first 2026-07-11, last 2026-07-11)
+  - evidence: rebase run: config.sh CI_TEST_CMD referenced pre-rename *_expansion.py/*_tts.py paths
+
+## delivery-pr [active]
+- module: repo-wide · kind: constraint · channel: briefing · source: agent
+- text: Deliver every change as a PR to a working branch (e.g. dev/vllm-align); `main` is protected and must never be direct-pushed.
+- confirmations: 1 (first 2026-07-11, last 2026-07-11)
+  - evidence: adapters/vllm_omni/manifest.yaml push.allowed=false / protected_branches=[main]
+  - evidence: owner policy: deliver via PR, not direct commit
+
+## diffusion-nonar [active]
+- module: diffusion · kind: note · channel: retrieved · source: agent
+- text: vLLM-Omni adds a non-autoregressive path (Diffusion Transformers / DiT) alongside vLLM's autoregressive path; image/video generation and parts of the audio stack run through vllm_omni/diffusion/.
+- confirmations: 1 (first 2026-07-11, last 2026-07-11)
+  - evidence: vllm-omni/README.md (non-autoregressive DiT architectures)
+  - evidence: vllm-omni/vllm_omni/diffusion/
+
+## dockerfile-ci-pins [active]
+- module: platform · kind: trap · channel: briefing · source: agent
+- text: docker/Dockerfile.ci env pins are fragile across rebases — recurring breakers: numpy must stay <2.5 (numba incompatibility), a missing libnvJitLink.so.13, and transformers AutoProcessor.register API drift.
+- confirmations: 1 (first 2026-07-11, last 2026-07-11)
+  - evidence: rebase CI build 2520 align-branch failures, 2026-07
+
+## image-ssim-sensitive [active]
+- module: image · kind: trap · channel: retrieved · source: agent
+- text: Image-generation tests compare outputs with SSIM thresholds sensitive to nondeterminism — HunyuanImage SSIM has flaked; confirm a real regression (reproduce, compare against baseline) before flagging a threshold miss.
+- confirmations: 1 (first 2026-07-11, last 2026-07-11)
+  - evidence: rebase CI build 2520 align-branch failures, 2026-07
+
+## multi-platform [active]
+- module: repo-wide · kind: constraint · channel: briefing · source: agent
+- text: Don't assume CUDA: the repo targets CUDA/ROCm/NPU/XPU. Platform code is per-backend and dependencies are platform-specific (requirements/), not installed via a [cuda] extra.
+- confirmations: 1 (first 2026-07-11, last 2026-07-11)
+  - evidence: vllm-omni/pyproject.toml (dynamic platform deps, no [cuda] extra)
+  - evidence: vllm-omni/docker/Dockerfile.{cuda,rocm,npu,xpu}
+
+## omni-fork [active]
+- module: repo-wide · kind: note · channel: briefing · source: agent
+- text: vLLM-Omni is a fork of upstream vLLM extending it to omni-modality (text/image/video/audio) serving; releases align to an upstream vLLM version and rebasing onto upstream is the core maintenance activity.
+- confirmations: 1 (first 2026-07-11, last 2026-07-11)
+  - evidence: vllm-omni/README.md 'About' + release notes (0.16 rebased onto vLLM 0.16, 0.22 aligned to vLLM 0.22)
+  - evidence: adapters/vllm_omni/manifest.yaml upstream.kind=fork_tracking
+
+## rebase-hotspots [active]
+- module: repo-wide · kind: trap · channel: briefing · source: agent
+- text: Highest rebase-damage risk is worker_runner, model_executor and scheduler (vllm_omni/core/) — they track upstream vLLM internals closely; after a rebase check for dropped/duplicated hunks and references to moved/renamed symbols.
+- confirmations: 1 (first 2026-07-11, last 2026-07-11)
+  - evidence: adapters/vllm_omni/manifest.yaml modules with risk: high
+
+## scheduler-is-core [active]
+- module: scheduler · kind: note · channel: retrieved · source: agent
+- text: The 'scheduler' module maps to vllm_omni/core/ (per the manifest module map) — not a top-level scheduler/ directory.
+- confirmations: 1 (first 2026-07-11, last 2026-07-11)
+  - evidence: adapters/vllm_omni/manifest.yaml modules.scheduler.local_paths=[vllm_omni/core/]
+
+## torch-accelerator [active]
+- module: repo-wide · kind: convention · channel: briefing · source: agent
+- text: Never call `torch.cuda.*` — ruff bans it; use the `torch.accelerator.*` equivalents (device_count, current_device_index, empty_cache, synchronize, max_memory_allocated, reset_peak_memory_stats).
+- confirmations: 1 (first 2026-07-11, last 2026-07-11)
+  - evidence: vllm-omni/pyproject.toml [tool.ruff] banned-api rules for torch.cuda.*
+
+## transformers-drift [active]
+- module: model_executor · kind: trap · channel: retrieved · source: agent
+- text: transformers version drift breaks model loading across rebases (e.g. AutoProcessor.register signature changes) — pin and verify transformers when a rebase bumps it.
+- confirmations: 1 (first 2026-07-11, last 2026-07-11)
+  - evidence: rebase CI build 2520 (transformers AutoProcessor.register regression), 2026-07
