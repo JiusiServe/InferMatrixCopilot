@@ -14,3 +14,5 @@ runs/
 *.db
 eval/raw/*.diff
 eval/raw/cc_workdir/
+eval/dataset/arms/*/runs/
+adapters/*/repo_map/

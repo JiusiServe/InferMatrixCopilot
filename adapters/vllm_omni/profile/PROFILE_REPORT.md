@@ -71,6 +71,21 @@ Per-fact provenance: how derived, evidence, confirmations.
 - confirmations: 1 (first 2026-07-11, last 2026-07-11)
   - evidence: rebase CI build 2520 align-branch failures, 2026-07
 
+## model_executor-convention-checkpoint-layout [active]
+- module: model_executor · kind: convention · channel: retrieved · source: agent
+- text: Before a model id is written into docs/recipes/examples/perf configs, verify the checkpoint layout the pipeline loader needs (model_index.json, transformer/vae/scheduler/tokenizer subfolder configs, single-file safetensors support) — official and community-Diffusers repos differ; docs may only list checkpoints the CURRENT loader loads directly.
+- confirmations: 1 (first 2026-07-12, last 2026-07-12)
+  - evidence: github:vllm-omni issue#4827 (Base vs Instruct checkpoint layout crash)
+  - evidence: community:zuiho-kai/claude-workflow-starter review/guides/model-adaptation-guardrails.md
+
+## model_executor-trap-omni-phase-metadata [active]
+- module: model_executor · kind: trap · channel: briefing · source: agent
+- text: Worker runner _preprocess emits per-request _omni_prompt_len/_omni_num_computed_tokens/_omni_is_prefill consumed by model talkers — review producer and consumers together.
+- confirmations: 1 (first 2026-07-12, last 2026-07-12)
+  - evidence: vllm_omni/worker/gpu_model_runner.py (producer)
+  - evidence: vllm_omni/model_executor/models/qwen3_tts/qwen3_tts_talker.py (consumer)
+  - evidence: community:zuiho-kai/claude-workflow-starter repos/vllm-omni/rules.md (verified in-repo 2026-07-12)
+
 ## multi-platform [active]
 - module: repo-wide · kind: constraint · channel: briefing · source: agent
 - text: Don't assume CUDA: the repo targets CUDA/ROCm/NPU/XPU. Platform code is per-backend and dependencies are platform-specific (requirements/), not installed via a [cuda] extra.
@@ -85,11 +100,38 @@ Per-fact provenance: how derived, evidence, confirmations.
   - evidence: vllm-omni/README.md 'About' + release notes (0.16 rebased onto vLLM 0.16, 0.22 aligned to vLLM 0.22)
   - evidence: adapters/vllm_omni/manifest.yaml upstream.kind=fork_tracking
 
+## online_serving-trap-run-level-dummy-weights [active]
+- module: online_serving · kind: trap · channel: briefing · source: agent
+- text: --run-level defaults to core_model = DUMMY weights even in online serving; garbage output on a manual server is run-level misconfig — use --run-level=full_model for behavior tests.
+- confirmations: 1 (first 2026-07-12, last 2026-07-12)
+  - evidence: github:vllm-omni issue#4842 (closed INVALID: core_model default -> dummy weights; PR#4354 extended run-level to online serving)
+
 ## rebase-hotspots [active]
 - module: repo-wide · kind: trap · channel: briefing · source: agent
 - text: Highest rebase-damage risk is worker_runner, model_executor and scheduler (vllm_omni/core/) — they track upstream vLLM internals closely; after a rebase check for dropped/duplicated hunks and references to moved/renamed symbols.
 - confirmations: 1 (first 2026-07-11, last 2026-07-11)
   - evidence: adapters/vllm_omni/manifest.yaml modules with risk: high
+
+## repo-wide-constraint-upstream-checkout [active]
+- module: repo-wide · kind: constraint · channel: briefing · source: agent
+- text: Aligned upstream vLLM checkout: /rebase/vllm — read it to verify any upstream claim (cite file:line); never cite an unread PR/version/line.
+- confirmations: 1 (first 2026-07-12, last 2026-07-12)
+  - evidence: eval judgments/val 2026-07: baseline wins on pr4810/pr4893 rest on /rebase/vllm reads; copilot fabricated PR #43167/vllm#46022 cites
+  - evidence: CLAUDE.md: /rebase/vllm is the upstream checkout used as rebase target
+
+## repo-wide-convention-design-suggestions [active]
+- module: repo-wide · kind: convention · channel: briefing · source: agent
+- text: Surface the best design suggestion found during review even on approvable PRs (single-source-of-truth asks) — never silently drop it; empty review of a nontrivial diff = missed value.
+- confirmations: 1 (first 2026-07-12, last 2026-07-12)
+  - evidence: github:vllm-omni#4825 inline (dsocek: derive LoRA components from _packed_modules_mapping)
+  - evidence: eval train GT 2026-07: #4810->issue#4891, #4870->#4910 follow-ups
+
+## repo-wide-convention-plumbing-vs-parity [active]
+- module: repo-wide · kind: convention · channel: briefing · source: agent
+- text: Weight-load 0-missing/0-unexpected, shape smoke, no-NaN and CPU/mock CI prove plumbing only — model claims need HF semantic parity with a real checkpoint; perf claims need a locked config + scope label.
+- confirmations: 1 (first 2026-07-12, last 2026-07-12)
+  - evidence: .buildkite/ leveled pipelines (L2 CPU/mock vs higher GPU tiers; cf issue#5014 'L3 CI failure')
+  - evidence: community:zuiho-kai/claude-workflow-starter repos/vllm-omni/rules.md (verified in-repo 2026-07-12)
 
 ## scheduler-is-core [active]
 - module: scheduler · kind: note · channel: retrieved · source: agent
@@ -108,3 +150,17 @@ Per-fact provenance: how derived, evidence, confirmations.
 - text: transformers version drift breaks model loading across rebases (e.g. AutoProcessor.register signature changes) — pin and verify transformers when a rebase bumps it.
 - confirmations: 1 (first 2026-07-11, last 2026-07-11)
   - evidence: rebase CI build 2520 (transformers AutoProcessor.register regression), 2026-07
+
+## worker-trap-removed-api-sweep [active]
+- module: worker_runner · kind: trap · channel: briefing · source: agent
+- text: A PR adapting callers of a removed/renamed upstream API needs a repo-wide grep proving no caller remains (diffusion/, vendored, gpu_/npu_ included).
+- confirmations: 1 (first 2026-07-12, last 2026-07-12)
+  - evidence: github:vllm-omni#4810 'missed by' -> issue#4891 (HunyuanImage3 diffusion loader)
+
+## worker-trap-stage-capacity [active]
+- module: worker_runner · kind: trap · channel: retrieved · source: agent
+- text: Stage topology bugs: validate per-stage parallel world size (TP*PP*DP) against the stage's resolved visible devices BEFORE worker creation; config merges CLI -> per-stage override -> deploy YAML -> platform overlay (vllm_omni/engine/stage_init_utils.py setup_stage_devices). deploy YAML devices:'0' with --tensor-parallel-size 4 crashes with 'DP adjusted local rank out of bounds'.
+- confirmations: 1 (first 2026-07-12, last 2026-07-12)
+  - evidence: vllm_omni/engine/stage_init_utils.py + stage_engine_startup.py (verified 2026-07-12)
+  - evidence: github:vllm-omni issue#5003
+  - evidence: community:zuiho-kai/claude-workflow-starter components/model-executor/rules.md (verified in-repo)

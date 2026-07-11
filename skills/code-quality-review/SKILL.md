@@ -1,8 +1,8 @@
 ---
 name: code-quality-review
 description: Reviewing/maintaining code quality — split oversized low-cohesion modules into concern-focused packages (pure helpers to utils.py, public surface preserved via re-exporting __init__), and find dead code with lint+vulture then vet the false positives from dynamic dispatch and portable files
-trigger: pr_review or refactor of a large/dense module (>~350 LOC or mixed concerns); a dead-code / cleanup pass
-modules: [pr_review]
+trigger: refactoring a large/dense module of THIS copilot codebase (>~350 LOC or mixed concerns); a dead-code / cleanup pass on omni_copilot sources
+modules: []
 status: active
 created_at: 2026-07-11
 run_count: 0

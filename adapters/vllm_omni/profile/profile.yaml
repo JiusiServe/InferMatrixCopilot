@@ -240,3 +240,153 @@ facts:
   last_confirmed: '2026-07-11'
   confirmations: 1
   status: active
+- id: repo-wide-convention-design-suggestions
+  module: repo-wide
+  kind: convention
+  channel: briefing
+  text: Surface the best design suggestion found during review even on approvable
+    PRs (single-source-of-truth asks) — never silently drop it; empty review of a
+    nontrivial diff = missed value.
+  source: agent
+  evidence:
+  - 'github:vllm-omni#4825 inline (dsocek: derive LoRA components from _packed_modules_mapping)'
+  - 'eval train GT 2026-07: #4810->issue#4891, #4870->#4910 follow-ups'
+  first_seen: '2026-07-12'
+  last_confirmed: '2026-07-12'
+  confirmations: 1
+  status: active
+  history:
+  - Maintainers add design suggestions even to approvable PRs — surface the best single-source-of-truth
+    suggestion found during review instead of dropping it; empty review of a nontrivial
+    clean diff = missed value.
+- id: worker-trap-removed-api-sweep
+  module: worker_runner
+  kind: trap
+  channel: briefing
+  text: A PR adapting callers of a removed/renamed upstream API needs a repo-wide
+    grep proving no caller remains (diffusion/, vendored, gpu_/npu_ included).
+  source: agent
+  evidence:
+  - github:vllm-omni#4810 'missed by' -> issue#4891 (HunyuanImage3 diffusion loader)
+  first_seen: '2026-07-12'
+  last_confirmed: '2026-07-12'
+  confirmations: 1
+  status: active
+  history:
+  - A PR adapting callers of a removed/renamed upstream API is incomplete until a
+    repo-wide grep proves no caller remains (diffusion/, vendored, gpu_/npu_ counterparts
+    included).
+- id: model_executor-trap-omni-phase-metadata
+  module: model_executor
+  kind: trap
+  channel: briefing
+  text: Worker runner _preprocess emits per-request _omni_prompt_len/_omni_num_computed_tokens/_omni_is_prefill
+    consumed by model talkers — review producer and consumers together.
+  source: agent
+  evidence:
+  - vllm_omni/worker/gpu_model_runner.py (producer)
+  - vllm_omni/model_executor/models/qwen3_tts/qwen3_tts_talker.py (consumer)
+  - community:zuiho-kai/claude-workflow-starter repos/vllm-omni/rules.md (verified
+    in-repo 2026-07-12)
+  first_seen: '2026-07-12'
+  last_confirmed: '2026-07-12'
+  confirmations: 1
+  status: active
+  history:
+  - Shared worker runner _preprocess produces per-request phase metadata (_omni_prompt_len,
+    _omni_num_computed_tokens, _omni_is_prefill) consumed by model talkers/preprocessors
+    — review producer AND consumers together when either side changes.
+- id: repo-wide-convention-plumbing-vs-parity
+  module: repo-wide
+  kind: convention
+  channel: briefing
+  text: Weight-load 0-missing/0-unexpected, shape smoke, no-NaN and CPU/mock CI prove
+    plumbing only — model claims need HF semantic parity with a real checkpoint; perf
+    claims need a locked config + scope label.
+  source: agent
+  evidence:
+  - .buildkite/ leveled pipelines (L2 CPU/mock vs higher GPU tiers; cf issue#5014
+    'L3 CI failure')
+  - community:zuiho-kai/claude-workflow-starter repos/vllm-omni/rules.md (verified
+    in-repo 2026-07-12)
+  first_seen: '2026-07-12'
+  last_confirmed: '2026-07-12'
+  confirmations: 1
+  status: active
+  history:
+  - 'Model-adaptation evidence tiers: weight-load 0-missing/0-unexpected, shape smoke,
+    no-NaN and CPU/mock CI tiers prove plumbing only; semantic parity vs the HF reference
+    and perf claims need real-checkpoint evidence with a locked config and scope label.'
+- id: repo-wide-constraint-upstream-checkout
+  module: repo-wide
+  kind: constraint
+  channel: briefing
+  text: 'Aligned upstream vLLM checkout: /rebase/vllm — read it to verify any upstream
+    claim (cite file:line); never cite an unread PR/version/line.'
+  source: agent
+  evidence:
+  - 'eval judgments/val 2026-07: baseline wins on pr4810/pr4893 rest on /rebase/vllm
+    reads; copilot fabricated PR #43167/vllm#46022 cites'
+  - 'CLAUDE.md: /rebase/vllm is the upstream checkout used as rebase target'
+  first_seen: '2026-07-12'
+  last_confirmed: '2026-07-12'
+  confirmations: 1
+  status: active
+  history:
+  - The aligned upstream vLLM checkout is at /rebase/vllm — verify every claim about
+    upstream behavior by reading it (cite file:line); never cite an upstream PR/version/line
+    you did not open.
+- id: online_serving-trap-run-level-dummy-weights
+  module: online_serving
+  kind: trap
+  channel: briefing
+  text: --run-level defaults to core_model = DUMMY weights even in online serving;
+    garbage output on a manual server is run-level misconfig — use --run-level=full_model
+    for behavior tests.
+  source: agent
+  evidence:
+  - 'github:vllm-omni issue#4842 (closed INVALID: core_model default -> dummy weights;
+    PR#4354 extended run-level to online serving)'
+  first_seen: '2026-07-12'
+  last_confirmed: '2026-07-12'
+  confirmations: 1
+  status: active
+  history:
+  - --run-level defaults to core_model, which loads DUMMY weights even in online serving
+    — garbage outputs on a manually launched server are a run-level misconfig, not
+    a model bug; full-model behavior needs --run-level=full_model.
+- id: worker-trap-stage-capacity
+  module: worker_runner
+  kind: trap
+  channel: retrieved
+  text: 'Stage topology bugs: validate per-stage parallel world size (TP*PP*DP) against
+    the stage''s resolved visible devices BEFORE worker creation; config merges CLI
+    -> per-stage override -> deploy YAML -> platform overlay (vllm_omni/engine/stage_init_utils.py
+    setup_stage_devices). deploy YAML devices:''0'' with --tensor-parallel-size 4
+    crashes with ''DP adjusted local rank out of bounds''.'
+  source: agent
+  evidence:
+  - vllm_omni/engine/stage_init_utils.py + stage_engine_startup.py (verified 2026-07-12)
+  - github:vllm-omni issue#5003
+  - community:zuiho-kai/claude-workflow-starter components/model-executor/rules.md
+    (verified in-repo)
+  first_seen: '2026-07-12'
+  last_confirmed: '2026-07-12'
+  confirmations: 1
+  status: active
+- id: model_executor-convention-checkpoint-layout
+  module: model_executor
+  kind: convention
+  channel: retrieved
+  text: Before a model id is written into docs/recipes/examples/perf configs, verify
+    the checkpoint layout the pipeline loader needs (model_index.json, transformer/vae/scheduler/tokenizer
+    subfolder configs, single-file safetensors support) — official and community-Diffusers
+    repos differ; docs may only list checkpoints the CURRENT loader loads directly.
+  source: agent
+  evidence:
+  - github:vllm-omni issue#4827 (Base vs Instruct checkpoint layout crash)
+  - community:zuiho-kai/claude-workflow-starter review/guides/model-adaptation-guardrails.md
+  first_seen: '2026-07-12'
+  last_confirmed: '2026-07-12'
+  confirmations: 1
+  status: active
