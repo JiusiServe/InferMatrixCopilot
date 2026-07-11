@@ -127,6 +127,18 @@ async def _review_diff(ctx: StepContext) -> StepResult:
         output["review_comments"] = comments[:5]
     else:
         result, output = await run_agent_step(ctx, **common)
+    if not result.ok and output.get("review_comments"):
+        # A review that FOUND defects is a successful review whose verdict is
+        # REQUEST CHANGES — not a failed step. Agents conflate the PR's
+        # mergeability with their own step status (observed live: four lenses
+        # unanimously caught a removed-API survivor on the PR-time tree, set
+        # needs_review, and the whole review was discarded). Same salvage
+        # pattern as the issue-draft fix.
+        result = StepResult(True,
+                            summary=f"review salvaged from escalation — "
+                                    f"{result.summary}",
+                            outputs=result.outputs,
+                            changed_files=result.changed_files)
     if result.ok:
         review_md = _render_review_md(output)
         ctx.state["review_text"] = review_md

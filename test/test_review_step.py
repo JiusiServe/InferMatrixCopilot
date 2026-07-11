@@ -127,3 +127,27 @@ def test_pr_review_playbook_shape():
     assert [s.step for s in pb.steps] == [
         "pr.fetch_diff", "pr.gate_check", "agent.review_diff",
         "pr.post_review", "report.final_summary"]
+
+
+def test_review_salvaged_when_agent_escalates_with_comments(settings, trace,
+                                                            tmp_path, git_repo):
+    """A review carrying comments ships as success even when the agent sets an
+    escalating status — finding a blocking defect IS a successful review."""
+    reply = json.dumps({
+        "status": "needs_review", "summary": "found a blocking survivor",
+        "findings": [], "files_read": [], "files_modified": [],
+        "tests_requested": [], "tests_run": [], "assumptions": [],
+        "blockers": [], "confidence": "high", "failure_kind": "escalate",
+        "next_action": "block merge",
+        "review_comments": [{"file": "a.py", "line": 1, "severity": "major",
+                             "comment": "removed-API survivor", "evidence": "grep"}],
+    })
+    llm = ScriptedLLM([Reply(blocks=[Block(type="text", text=reply)])])
+    state = {"task_spec": {"kind": "pr_review", "pr": 9, "repo": "r"},
+             "repo_path": str(git_repo), "diff_text": "+++ b/a.py\n@@ +1\n+x=1"}
+    result = asyncio.run(_registry().get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+    assert result.ok, result.summary
+    assert "salvaged" in result.summary
+    assert "removed-API survivor" in state["review_text"]
+    assert state["review_text"].rstrip().endswith("**Verdict:** REQUEST CHANGES")
