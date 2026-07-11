@@ -63,6 +63,14 @@ class _ScopedKnowledge:
         and never touch active skills."""
         self.stores[0].propose(**kwargs)
 
+    def touch(self, name: str) -> None:
+        """Record one use of skill `name` in whichever store owns it — the
+        usage prior (`run_count`) that breaks retrieval ties toward proven
+        skills was a dead field until steps actually stamped it."""
+        for store in self.stores:
+            if store.touch(name):
+                return
+
 
 def _knowledge_stores(ctx: StepContext) -> _ScopedKnowledge:
     """Build the per-repo `_ScopedKnowledge`: the active adapter's own skill

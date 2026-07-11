@@ -16,7 +16,7 @@ from pathlib import Path
 from ....push import PushPolicy
 from ....scopes import post_plan_scope
 from ...step import FailureKind, StepContext, StepResult
-from .._common import no_llm_gap, published, step
+from .._common import no_llm_gap, published, record_debug_memory, step
 from .._common import gh as _gh
 from .._common import git as _git
 from .._common import repo_path as _repo_path
@@ -150,6 +150,15 @@ async def _pr_rebase_onto_base(ctx: StepContext) -> StepResult:
         if result.ok and not in_progress:
             outputs = {**result.outputs}
             outputs.setdefault("state_updates", {})["rebase_base_sha"] = base_sha
+            if output.get("resolution_summary"):
+                record_debug_memory(
+                    ctx, module="rebase",
+                    symptom=f"rebase conflicts onto {base_remote}/{base}: "
+                            f"{', '.join(conflict_files[:6])}",
+                    root_cause="divergent edits vs base (rebase conflict)",
+                    fix_summary=str(output["resolution_summary"]),
+                    files=conflict_files,
+                    verification="rebase completed; no rebase-merge/apply left")
             return StepResult(True, summary=f"conflicts resolved by agent "
                                             f"({len(conflict_files)} files): "
                                             f"{output.get('resolution_summary', '')[:150]}",

@@ -1,9 +1,1 @@
-{
-  "hunyuan-image3-base-tokenizer-guard": {
-    "name": "hunyuan-image3-base-tokenizer-guard",
-    "description": "Guard HunyuanImage3 __init__ against Base model tokenizer missing extended ratio tokens (<img_ratio_33..36>) when MoE/Instruct config is mistakenly used.",
-    "body": "## Root cause\n`vllm_omni/model_executor/models/hunyuan_image3/hunyuan_image3.py` lines ~1560-1563 in `HunyuanImage3ForConditionalGeneration.__init__`:\n\n```python\nratio_33 = tokenizer.convert_tokens_to_ids(\"<img_ratio_33>\")\nratio_36 = tokenizer.convert_tokens_to_ids(\"<img_ratio_36>\")\nself._ratio_other_slices = [(ratio_33, ratio_36 + 1)]  # None + 1 → TypeError\n```\n\nThe Base checkpoint (`tencent/HunyuanImage-3.0`) tokenizer only has `<img_ratio_0>` through `<img_ratio_32>`. The extended tokens `<img_ratio_33>`–`<img_ratio_36>` are Instruct-only. Tencent's reference code guards this with a `model_version == \"HunyuanImage-3.0\"` check at `tokenization_hunyuan_image_3.py:613`.\n\n## Fix\n1. Add a `None` guard with a clear error message before computing `ratio_36 + 1`.\n2. Document that Base uses `hunyuan_image3_dit.yaml` (single-stage DiT) and Instruct uses `hunyuan_image_3_moe.yaml` (two-stage AR→DiT).\n\n## Workaround\nUse `vllm_omni/deploy/hunyuan_image3_dit.yaml` for the Base model (confirmed working).",
-    "modules": [],
-    "proposed_at": 1783788497.7282372
-  }
-}
+{}

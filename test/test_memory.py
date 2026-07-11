@@ -63,3 +63,42 @@ def test_skill_find_ranks_module_match(tmp_path):
     found = store.find(module="scheduler", k=1)
     assert found and found[0].name == "sched-skill"
     assert "sched-skill" in store.render_for_prompt(found)
+
+
+def test_skill_touch_increments_usage(tmp_path):
+    """SkillStore.touch bumps run_count + stamps last_used_at, preserving the
+    body; unknown names return False instead of raising."""
+    from omni_copilot.memory.skills import SkillStore
+
+    store = SkillStore(tmp_path)
+    d = tmp_path / "my-skill"
+    d.mkdir(parents=True)
+    (d / "SKILL.md").write_text(
+        "---\nname: my-skill\ndescription: d\ntrigger: t\nmodules: []\n"
+        "status: active\nrun_count: 2\n---\n\n## Fix\nbody text\n")
+    assert store.touch("my-skill")
+    s = store.load_all()[0]
+    assert s.run_count == 3 and "body text" in s.body
+    assert not store.touch("nope")
+
+
+def test_debug_memory_recorded_from_step_helper(tmp_path):
+    """record_debug_memory writes a contract-complete entry into the shared
+    pool and never raises on failure."""
+    from omni_copilot.config import Settings
+    from omni_copilot.engine.step import StepContext
+    from omni_copilot.engine.steps._common import record_debug_memory
+    from omni_copilot.memory.debug_memory import DebugMemory
+    from omni_copilot.run_trace import RunTrace
+
+    settings = Settings(_env_file=None, adapters_dir=tmp_path / "adapters",
+                        memory_db=tmp_path / "mem.db")
+    ctx = StepContext(settings=settings,
+                      state={"task_spec": {"repo": "r1"}}, params={},
+                      run_dir=tmp_path / "run-x", trace=RunTrace(tmp_path / "t.jsonl"),
+                      llm=None)
+    ok = record_debug_memory(ctx, module="ci", symptom="s", root_cause="rc",
+                             fix_summary="fs", files=["a.py"], verification="v")
+    assert ok
+    hits = DebugMemory(tmp_path / "mem.db").search("rc")
+    assert hits and hits[0]["module"] == "ci"

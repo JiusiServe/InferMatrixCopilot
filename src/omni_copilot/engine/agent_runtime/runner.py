@@ -136,5 +136,8 @@ async def run_agent_step(
         return (StepResult(False, FailureKind.RETRYABLE,
                            f"{step_name}: agent produced no contract-conformant "
                            "output"), {})
+    if str(output.get("status", "")).lower() == "success":
+        for s in skills:  # injected skills earned a use — feed the run_count prior
+            store.touch(s["name"])
     prefix = f"[{output.get('confidence', '?')}] "
     return _to_step_result(output, prefix), output

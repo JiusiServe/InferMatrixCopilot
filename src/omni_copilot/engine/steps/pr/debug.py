@@ -13,7 +13,7 @@ from pathlib import Path
 
 from ....scopes import post_plan_scope
 from ...step import FailureKind, StepContext, StepResult
-from .._common import from_state, published, require_repo, step
+from .._common import from_state, published, record_debug_memory, require_repo, step
 from .._common import gh as _gh
 from .._common import repo_path as _repo_path
 from .._common import task_spec as _task_spec
@@ -172,6 +172,13 @@ async def _pr_debug_group(ctx: StepContext) -> StepResult:
     if result.ok:
         result.summary = (f"'{sig}': {output.get('fix_summary', '')[:150]} "
                           f"(verified: {output.get('verification', '?')[:80]})")
+        if output.get("root_cause") and output.get("verification"):
+            record_debug_memory(
+                ctx, module=str(group.get("module") or "ci"), symptom=sig,
+                root_cause=str(output["root_cause"]),
+                fix_summary=str(output.get("fix_summary", "")),
+                files=list(output.get("files_modified") or []),
+                verification=str(output["verification"]))
     else:
         result.summary = f"'{sig}': {result.summary[:250]}"
     return result

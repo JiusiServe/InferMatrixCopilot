@@ -137,6 +137,26 @@ class SkillStore:
         self.candidates_file.write_text(json.dumps(candidates, indent=2, ensure_ascii=False))
         return path
 
+    def touch(self, name: str) -> bool:
+        """Record one use of the promoted skill `name`: bump `run_count` and
+        stamp `last_used_at` in its frontmatter (the body is preserved
+        byte-for-byte). Returns False when no such skill file exists or the
+        frontmatter cannot be parsed — usage tracking never raises."""
+        path = self.directory / name / "SKILL.md"
+        try:
+            text = path.read_text(encoding="utf-8")
+            _, fm, body = text.split("---", 2)
+            meta = yaml.safe_load(fm) or {}
+            meta["run_count"] = int(meta.get("run_count", 0) or 0) + 1
+            meta["last_used_at"] = time.strftime("%Y-%m-%d")
+            path.write_text(
+                "---\n" + yaml.safe_dump(meta, sort_keys=False,
+                                          allow_unicode=True) + "---" + body,
+                encoding="utf-8")
+            return True
+        except (OSError, ValueError, yaml.YAMLError):
+            return False
+
     def candidates(self) -> dict:
         """The current proposed-but-unpromoted skills, keyed by name."""
         return self._load_candidates()
