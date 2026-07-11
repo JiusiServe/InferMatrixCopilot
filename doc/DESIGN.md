@@ -302,6 +302,37 @@ everything below (§V2.0.1–2):
   is running in production and whose failure modes (fragmentation,
   evidence dumps, continuous-rewrite corruption) are already mapped.
 
+### V2.3.0 Two tiers of repo knowledge
+
+Repo knowledge splits into two tiers by **who may write it and how much trust it
+carries** — the axis that matters for safety, orthogonal to the machine /
+briefing / retrieved *consumption* split of §V2.3.4:
+
+- **Tier 1 — the manifest** (`plugin.yaml`): *human-authored, human-gated* config
+  the agent would be unsafe to guess — repo/upstream paths, push policy
+  (protected branches, `allowed`), CI provider, capabilities. Plain declarative
+  YAML; the high-risk sections (`repo`/`upstream`/`push`) are human-only
+  (`HIGH_RISK_SECTIONS`, enforced in `update_manifest`). **Required** (a repo
+  can't be operated safely without it), low-churn — the safety gate (**D2**).
+- **Tier 2 — the profile** (`profile/`, plus `skills/`, `store/`, `repo_map/`):
+  *agent-established, evidence-gated* knowledge the agent earns — per-fact
+  provenance, typed patch ops as the only write surface, stability + staleness
+  gates (§V2.3.2). **Optional** enrichment (retrieval falls back to the shared
+  pool when absent), high-churn, self-correcting, auditable — the quality lever
+  (**D1**).
+
+The manifest is the repo's *constitution*; the profile is the knowledge that
+accumulates under it. They are deliberately **not merged**: folding Tier 1 into
+the evidence-gated Tier-2 write path would make the push policy agent-writable (a
+safety regression), and the alternative — a human-only region inside the profile
+— just re-draws the same boundary inside one file. The two data models are also
+incompatible (a manifest fact like `repo.path` has no "evidence" or "staleness";
+a profile fact without evidence is *rejected*). The container `plugins/<repo>/`
+already unifies them on disk — **one repo edge, two trust tiers**. The agent
+*may draft* Tier-1 structure (`profile.structure_scan` seeds the module list),
+but Tier 1's risky sections always require human activation, so anything
+safety-bearing is *agent-proposes / human-confirms*.
+
 ### V2.3.1 Layout
 
 ```
@@ -339,6 +370,22 @@ plugins/<repo>/
 
 `plugin.yaml` keeps its v1 role and high-risk human-only sections
 (`repo`/`upstream`/`push`); `profile/` holds the establishable knowledge.
+
+> **Naming note (proposed, deferred).** "plugin" is a misnomer — this bundle is
+> declarative repo knowledge, not executable extension code, which is what
+> "plugin" implies everywhere else in software. The design's headline property is
+> *repo-invariance*: a generic engine specialized per repo — i.e. the **adapter
+> pattern**. Proposed rename so the three concepts become self-documenting:
+> - container `plugins/<repo>/` → `adapters/<repo>/`
+>   (`RepoPlugin` → `RepoAdapter`, `PluginRegistry` → `AdapterRegistry`)
+> - Tier-1 file `plugin.yaml` → `manifest.yaml` (it is already the `.manifest`
+>   attribute internally, and "manifest" names the config tier honestly)
+>
+> Read as: the **adapter** (container) holds a **manifest** (Tier-1 config) and a
+> **profile** (Tier-2 knowledge). Alternative if "adapter" reads too code-like:
+> "repo pack" (cf. *language pack* — a data bundle specializing a generic app).
+> Deferred as a breaking on-disk change (moves `plugins/` and renames the
+> manifest file) pending owner sign-off — see the "rename" follow-up.
 
 ### V2.3.2 Profile memory architecture (borrowed from the personal agent)
 

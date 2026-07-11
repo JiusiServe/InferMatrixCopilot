@@ -4,7 +4,12 @@
 
 ## Responsibility
 `RepoPlugin` (repo knowledge at the edge), the plugin registry, and
-deterministic Phase-0 bootstrap.
+deterministic Phase-0 bootstrap. `RepoPlugin` is the **container** for a repo's
+two trust tiers (DESIGN §V2.3.0): its `.manifest` is **Tier 1** (`plugin.yaml`,
+human-gated config) and `.profile_dir`/`.skills_dir`/`.debug_memory_db` are
+**Tier 2** (agent-established, evidence-gated knowledge). Proposed rename:
+`RepoPlugin` → `RepoAdapter`, `plugin.yaml` → `manifest.yaml` (see DESIGN naming
+note) — "plugin" wrongly implies executable extension code.
 
 ## Public contract
 `RepoPlugin` (props `status`, `repo_path`, `protected_branches`, `modules`,

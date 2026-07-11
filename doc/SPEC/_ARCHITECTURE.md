@@ -101,10 +101,14 @@ being a forge other than what a CI/forge adapter declares; storing secrets
   facts), `progress.json` (step checkpoints), `RUN_REPORT.md`, `metrics.json`,
   `ESCALATION.md` (only when blocked), plus step-specific artifacts
   (`rebase_status.json`, `COMPARISON.md`, evidence archives).
-- **Per repo (knowledge)** — `plugins/<repo>/`: `plugin.yaml` (identity, human-
-  gated sections), `profile/` (`profile.yaml`, `PROFILE_REPORT.md`,
-  `JUDGE_REPORT.md`, `ops_log.jsonl`, `format.yaml`/`review.md`/… as
-  established), `skills/`, `store/debug_memory.db`, `repo_map/` cache.
+- **Per repo (knowledge)** — `plugins/<repo>/`, **two trust tiers** (DESIGN
+  §V2.3.0): **Tier 1 — the manifest** `plugin.yaml` (human-authored, human-gated:
+  identity/paths/push/ci — the safety config the agent may not self-edit), and
+  **Tier 2 — the profile** `profile/` (agent-established, evidence-gated:
+  `profile.yaml`, `PROFILE_REPORT.md`, `JUDGE_REPORT.md`, `ops_log.jsonl`,
+  `format.yaml`/`review.md`/… as established) + `skills/`,
+  `store/debug_memory.db`, `repo_map/` cache. ("plugin" is a proposed-rename
+  misnomer — really a repo *adapter* holding a *manifest* + a *profile*.)
 - **Governance rule:** RunTrace/evidence are the immutable layer; the profile is
   the curated layer over it. Facts summarize evidence, never replace it.
 
