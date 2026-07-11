@@ -107,11 +107,11 @@ def test_briefing_reaches_agent_dispatch(settings, trace, tmp_path, git_repo):
     from omni_copilot.engine.agent_runtime import run_agent_step
     from omni_copilot.llm import Block, Reply
 
-    plugin_root = settings.plugins_dir / "myrepo"
-    plugin_root.mkdir(parents=True)
-    (plugin_root / "plugin.yaml").write_text(
+    adapter_root = settings.adapters_dir / "myrepo"
+    adapter_root.mkdir(parents=True)
+    (adapter_root / "manifest.yaml").write_text(
         f"name: myrepo\nstatus: active\nrepo:\n  path: {git_repo}\n")
-    ProfileStore(plugin_root / "profile").apply_ops(
+    ProfileStore(adapter_root / "profile").apply_ops(
         [_fact_op("uv", text="Use `uv pip install`, never bare pip.")])
 
     class OneShotLLM:

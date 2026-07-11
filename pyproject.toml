@@ -1,7 +1,7 @@
 [project]
 name = "omni-copilot"
 version = "0.1.0"
-description = "vLLM-Omni Copilot — playbook-driven repo-maintenance agent (engine substrate, targets, plugins, conversational CLI)"
+description = "vLLM-Omni Copilot — playbook-driven repo-maintenance agent (engine substrate, targets, adapters, conversational CLI)"
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.7",

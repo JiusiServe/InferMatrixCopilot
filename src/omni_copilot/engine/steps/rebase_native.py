@@ -144,7 +144,7 @@ async def _prelude(ctx: StepContext) -> StepResult:
     importable), then derives `wave1_modules` / `wave2_modules` from parent
     settings, minus modules already done/skipped in a resumed run.
 
-    Cross-checks the settings wave map against plugin zero's module→wave map,
+    Cross-checks the settings wave map against adapter zero's module→wave map,
     recording `wave_map_drift` in the trace (best-effort, never fatal). Publishes
     the wave lists, `rebase_run_id`, and `parent_log_dir` to state (B2
     `state_updates`)."""
@@ -179,12 +179,12 @@ async def _prelude(ctx: StepContext) -> StepResult:
     ctx.state["wave1_modules"] = wave1
     ctx.state["wave2_modules"] = wave2
 
-    # cross-check against plugin zero's module->wave map; drift is recorded
+    # cross-check against adapter zero's module->wave map; drift is recorded
     try:
-        from ...plugins.base import PluginRegistry
-        plugin = PluginRegistry(ctx.settings.plugins_dir).resolve(name="vllm_omni")
-        plugin_waves = {m: (s or {}).get("wave") for m, s in plugin.modules.items()}
-        drift = [m for m in settings.wave_1_modules if plugin_waves.get(m) not in (1, None)]
+        from ...adapters.base import AdapterRegistry
+        adapter = AdapterRegistry(ctx.settings.adapters_dir).resolve(name="vllm_omni")
+        adapter_waves = {m: (s or {}).get("wave") for m, s in adapter.modules.items()}
+        drift = [m for m in settings.wave_1_modules if adapter_waves.get(m) not in (1, None)]
         if drift:
             ctx.trace.record("wave_map_drift", modules=drift)
     except Exception:

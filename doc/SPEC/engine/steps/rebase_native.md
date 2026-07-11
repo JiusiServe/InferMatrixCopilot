@@ -24,7 +24,7 @@ package's own phase wrappers + `node_rebase_module`.
 No promotion logic; no rebase reimplementation. Wrapper only.
 
 ## Dependencies (allowed)
-`rebase/monitor`, `plugins/base` (wave cross-check), `engine/step`, `._common`;
+`rebase/monitor`, `adapters/base` (wave cross-check), `engine/step`, `._common`;
 the external `agent.*` package (lazy imports, ImportError → BLOCKED).
 
 ## Tests

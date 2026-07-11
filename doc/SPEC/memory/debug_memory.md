@@ -28,4 +28,4 @@ stdlib `sqlite3`.
 ## Refactor notes
 The write contract (required fields) is the D3 guarantee — enforce it at write
 time, never accept a partial memory. Per-repo DB path is chosen by the caller
-(`plugin.debug_memory_db`) — keep this class path-agnostic.
+(`adapter.debug_memory_db`) — keep this class path-agnostic.

@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     max_step_retries: int = 1
     max_agent_iters: int = 40
     playbooks_dir: Path = _REPO_ROOT / "playbooks"
-    plugins_dir: Path = _REPO_ROOT / "plugins"
+    adapters_dir: Path = _REPO_ROOT / "adapters"
 
     # Push safety — dry-run by default; protected branches never force-pushed.
     allow_push: bool = False

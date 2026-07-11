@@ -18,16 +18,16 @@ now a package that separates the argparse/REPL wiring from the orchestrator.
 
 ## Public contract (importable from `omni_copilot.cli`)
 `main(argv)`; `Copilot` (`resolve`, `run_task`, `run_playbook`, `run_queue`,
-`resume_last`, `status`, `logs`, `playbooks`, `_execute`, `_plugin_for`,
+`resume_last`, `status`, `logs`, `playbooks`, `_execute`, `_adapter_for`,
 `_resolve_repo_path`). The re-exporting `__init__` keeps `omni_copilot.cli:main`
 (entry point) and `from omni_copilot.cli import Copilot` unchanged.
 
 ## Invariants
-- `resolve` feeds capabilities (plugin + REPO_PATHS) to the planner.
+- `resolve` feeds capabilities (adapter + REPO_PATHS) to the planner.
 - Plan-review gate before confirm; confirm fires for
   `confirm_required or requires_review` unless `--yes` (`_gate_and_confirm`, K6).
 - `_execute` is the single execution path (task / explicit-playbook / resume).
-- Repo knowledge (protected branches, high-risk modules) comes from the plugin
+- Repo knowledge (protected branches, high-risk modules) comes from the adapter
   into run state (**A5**); blocked → exit 3 (`BLOCKED_EXIT`).
 - `--playbook` is the only way to run a candidate.
 
@@ -36,7 +36,7 @@ No step logic, no repo-knowledge literals, no LLM prompts. Orchestration wiring
 only.
 
 ## Dependencies (allowed)
-`engine/*`, `playbooks/*`, `intent`, `task_spec`, `plugins/base`,
+`engine/*`, `playbooks/*`, `intent`, `task_spec`, `adapters/base`,
 `push`, `review/reviewer`, `notify`, `run_trace`, `config`, `ui`,
 `chat`. MUST NOT be imported by any lower layer (**§ARCH.4.2**).
 

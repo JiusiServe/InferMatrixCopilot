@@ -1,8 +1,8 @@
-"""RepoPlugin — repo structure knowledge at the edge (DESIGN_REPO_PLUGINS).
+"""RepoAdapter — repo structure knowledge at the edge (DESIGN §V2.3.0 two-tier repo knowledge).
 
-Declarative plugin.yaml; high-risk sections (push, repo) are human-only —
+Declarative manifest.yaml; high-risk sections (push, repo) are human-only —
 agent-side updates to them are rejected at this layer. Unknown repos get a
-deterministic fingerprint + a DRAFT plugin that stops for human review.
+deterministic fingerprint + a DRAFT adapter that stops for human review.
 """
 
 from __future__ import annotations
@@ -19,15 +19,15 @@ HIGH_RISK_SECTIONS = ("push", "repo", "upstream")
 REQUIRED_SECTIONS = ("name", "repo")
 
 
-class PluginError(Exception):
-    """Raised for any plugin-layer violation: a missing/invalid manifest, an
-    unknown plugin name, or an agent-side write to a high-risk section."""
+class AdapterError(Exception):
+    """Raised for any adapter-layer violation: a missing/invalid manifest, an
+    unknown adapter name, or an agent-side write to a high-risk section."""
 
 
 @dataclass
-class RepoPlugin:
-    """A loaded repo plugin: its `name`, on-disk `root`, and parsed `manifest`
-    (plugin.yaml). Exposes the manifest as typed views and locates the repo's
+class RepoAdapter:
+    """A loaded repo adapter: its `name`, on-disk `root`, and parsed `manifest`
+    (manifest.yaml). Exposes the manifest as typed views and locates the repo's
     store/skills/profile dirs — the single edge object steps consult for a
     target repo's structure and policy."""
 
@@ -115,63 +115,63 @@ class RepoPlugin:
         return ProfileStore(self.profile_dir).render_briefing()
 
 
-def load_plugin(plugin_dir: str | Path) -> RepoPlugin:
-    """Load and validate the plugin at `plugin_dir`, returning a `RepoPlugin`.
-    Raises `PluginError` if `plugin.yaml` is absent or any `REQUIRED_SECTIONS`
-    (name, repo) is missing — the fail-closed check before a plugin is trusted."""
-    root = Path(plugin_dir)
-    manifest_path = root / "plugin.yaml"
+def load_adapter(adapter_dir: str | Path) -> RepoAdapter:
+    """Load and validate the adapter at `adapter_dir`, returning a `RepoAdapter`.
+    Raises `AdapterError` if `manifest.yaml` is absent or any `REQUIRED_SECTIONS`
+    (name, repo) is missing — the fail-closed check before a adapter is trusted."""
+    root = Path(adapter_dir)
+    manifest_path = root / "manifest.yaml"
     if not manifest_path.exists():
-        raise PluginError(f"no plugin.yaml in {root}")
+        raise AdapterError(f"no manifest.yaml in {root}")
     manifest = yaml.safe_load(manifest_path.read_text()) or {}
     for section in REQUIRED_SECTIONS:
         if section not in manifest:
-            raise PluginError(f"plugin {root.name}: missing required section '{section}'")
-    return RepoPlugin(name=manifest["name"], root=root, manifest=manifest)
+            raise AdapterError(f"adapter {root.name}: missing required section '{section}'")
+    return RepoAdapter(name=manifest["name"], root=root, manifest=manifest)
 
 
-def update_manifest(plugin: RepoPlugin, section: str, value: dict, *, actor: str = "agent") -> None:
-    """Agent-proposed plugin updates. High-risk sections are human-only."""
+def update_manifest(adapter: RepoAdapter, section: str, value: dict, *, actor: str = "agent") -> None:
+    """Agent-proposed adapter updates. High-risk sections are human-only."""
     if actor != "human" and section in HIGH_RISK_SECTIONS:
-        raise PluginError(
+        raise AdapterError(
             f"section '{section}' is high-risk (human-only); propose a candidate instead"
         )
-    plugin.manifest[section] = value
-    (plugin.root / "plugin.yaml").write_text(
-        yaml.safe_dump(plugin.manifest, sort_keys=False, allow_unicode=True)
+    adapter.manifest[section] = value
+    (adapter.root / "manifest.yaml").write_text(
+        yaml.safe_dump(adapter.manifest, sort_keys=False, allow_unicode=True)
     )
 
 
-class PluginRegistry:
-    """Directory of installed plugins. Enumerates and resolves them (by explicit
+class AdapterRegistry:
+    """Directory of installed adapters. Enumerates and resolves them (by explicit
     name or by target repo path) for a run's bootstrap."""
 
-    def __init__(self, plugins_dir: str | Path):
-        """Bind to `plugins_dir`, the directory whose immediate subdirs each hold
-        a `plugin.yaml`. Not required to exist yet."""
-        self.plugins_dir = Path(plugins_dir)
+    def __init__(self, adapters_dir: str | Path):
+        """Bind to `adapters_dir`, the directory whose immediate subdirs each hold
+        a `manifest.yaml`. Not required to exist yet."""
+        self.adapters_dir = Path(adapters_dir)
 
-    def all(self) -> list[RepoPlugin]:
-        """Load every plugin under the dir (each subdir with a `plugin.yaml`),
+    def all(self) -> list[RepoAdapter]:
+        """Load every adapter under the dir (each subdir with a `manifest.yaml`),
         sorted by path; empty list when the dir is absent."""
         out = []
-        if self.plugins_dir.exists():
-            for d in sorted(self.plugins_dir.iterdir()):
-                if (d / "plugin.yaml").exists():
-                    out.append(load_plugin(d))
+        if self.adapters_dir.exists():
+            for d in sorted(self.adapters_dir.iterdir()):
+                if (d / "manifest.yaml").exists():
+                    out.append(load_adapter(d))
         return out
 
-    def resolve(self, *, name: str | None = None, repo_path: str | None = None) -> RepoPlugin | None:
-        """--plugin name wins; then repo-path match; None -> caller bootstraps."""
-        plugins = self.all()
+    def resolve(self, *, name: str | None = None, repo_path: str | None = None) -> RepoAdapter | None:
+        """--adapter name wins; then repo-path match; None -> caller bootstraps."""
+        adapters = self.all()
         if name:
-            for p in plugins:
+            for p in adapters:
                 if p.name == name:
                     return p
-            raise PluginError(f"no plugin named {name!r}")
+            raise AdapterError(f"no adapter named {name!r}")
         if repo_path:
             resolved = str(Path(repo_path).resolve())
-            for p in plugins:
+            for p in adapters:
                 if p.repo_path and str(Path(p.repo_path).resolve()) == resolved:
                     return p
         return None
@@ -214,10 +214,10 @@ def fingerprint_repo(repo_path: str | Path) -> dict:
     }
 
 
-def draft_plugin(fingerprint: dict, plugins_dir: str | Path) -> Path:
-    """Persist a DRAFT plugin + bootstrap report, then STOP (human review gate)."""
+def draft_adapter(fingerprint: dict, adapters_dir: str | Path) -> Path:
+    """Persist a DRAFT adapter + bootstrap report, then STOP (human review gate)."""
     name = re.sub(r"[^a-z0-9_]+", "_", Path(fingerprint["path"]).name.lower())
-    root = Path(plugins_dir) / name
+    root = Path(adapters_dir) / name
     root.mkdir(parents=True, exist_ok=True)
     manifest = {
         "name": name,
@@ -238,12 +238,12 @@ def draft_plugin(fingerprint: dict, plugins_dir: str | Path) -> Path:
         "push": {"default_remote": "origin", "protected_branches": ["main"],
                  "allowed": False},
     }
-    (root / "plugin.yaml").write_text(
+    (root / "manifest.yaml").write_text(
         yaml.safe_dump(manifest, sort_keys=False, allow_unicode=True)
     )
     (root / "BOOTSTRAP_REPORT.md").write_text(
         f"# Bootstrap report — {name}\n\n"
-        "Draft plugin generated from a deterministic fingerprint. Review and set\n"
+        "Draft adapter generated from a deterministic fingerprint. Review and set\n"
         "`status: active` (and fill `modules:`) before code-modifying runs.\n\n"
         "```yaml\n" + yaml.safe_dump(fingerprint, sort_keys=False) + "```\n"
     )

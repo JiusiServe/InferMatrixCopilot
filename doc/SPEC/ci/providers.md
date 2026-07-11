@@ -6,7 +6,7 @@
 Profile-selected CI log adapters for pr-debug.
 
 ## Public contract
-`provider_for(plugin, settings, gh_runner?) -> (provider|None, gap_reason)`;
+`provider_for(adapter, settings, gh_runner?) -> (provider|None, gap_reason)`;
 `BuildkiteLogs.enrich`, `GithubActionsLogs.enrich`.
 
 ## Invariants

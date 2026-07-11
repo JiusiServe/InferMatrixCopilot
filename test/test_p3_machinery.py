@@ -12,7 +12,7 @@ from omni_copilot.engine.steps import register_builtin_steps
 from omni_copilot.engine.registry import StepRegistry
 from omni_copilot.engine.step import StepContext
 from omni_copilot.llm import Block, Reply
-from omni_copilot.plugins.base import load_plugin
+from omni_copilot.adapters.base import load_adapter
 from omni_copilot.profiles.consolidate import decay_stale, detect_drift
 from omni_copilot.profiles.store import ProfileStore
 
@@ -39,21 +39,21 @@ def _fact_op(fact_id, text, module="repo-wide", channel="briefing"):
             "source": "agent", "evidence": [f"evidence for {fact_id}"]}
 
 
-def _plugin_with_profile(settings, git_repo, facts):
-    root = settings.plugins_dir / "myrepo"
+def _adapter_with_profile(settings, git_repo, facts):
+    root = settings.adapters_dir / "myrepo"
     root.mkdir(parents=True)
-    (root / "plugin.yaml").write_text(
+    (root / "manifest.yaml").write_text(
         f"name: myrepo\nstatus: active\nrepo:\n  path: {git_repo}\n"
         "modules:\n  core:\n    local_paths: [core/]\n")
     store = ProfileStore(root / "profile")
     store.apply_ops(facts)
-    return load_plugin(root), store
+    return load_adapter(root), store
 
 
 # -- decay & drift ---------------------------------------------------------------
 
 def test_decay_flips_old_facts_to_stale(settings, git_repo, tmp_path):
-    plugin, store = _plugin_with_profile(settings, git_repo,
+    adapter, store = _adapter_with_profile(settings, git_repo,
                                          [_fact_op("old", "Old directive"),
                                           _fact_op("fresh", "Fresh directive")])
     old = store.facts["old"]
@@ -61,22 +61,22 @@ def test_decay_flips_old_facts_to_stale(settings, git_repo, tmp_path):
         "%Y-%m-%d", time.localtime(time.time() - 200 * 86_400))
     store.save()
 
-    stale = decay_stale(ProfileStore(plugin.profile_dir), days=90)
+    stale = decay_stale(ProfileStore(adapter.profile_dir), days=90)
     assert stale == ["old"]
-    reloaded = ProfileStore(plugin.profile_dir)
+    reloaded = ProfileStore(adapter.profile_dir)
     assert reloaded.facts["old"].status == "stale"     # excluded, not deleted
     assert reloaded.facts["fresh"].status == "active"
     assert "Old directive" not in reloaded.render_briefing()
 
 
 def test_detect_drift_reports_never_fixes(settings, git_repo):
-    plugin, store = _plugin_with_profile(
+    adapter, store = _adapter_with_profile(
         settings, git_repo,
         [_fact_op("orphan", "Joined to a gone module", module="ghost_module")])
-    findings = detect_drift(plugin, store)
+    findings = detect_drift(adapter, store)
     assert any("core/" in f for f in findings)          # declared path missing
     assert any("ghost_module" in f for f in findings)   # orphaned join
-    assert ProfileStore(plugin.profile_dir).facts["orphan"].status == "active"
+    assert ProfileStore(adapter.profile_dir).facts["orphan"].status == "active"
 
 
 # -- consolidation & judge steps ---------------------------------------------------
@@ -103,7 +103,7 @@ def _contract(extra):
 
 
 def test_consolidate_applies_gated_ops(settings, trace, tmp_path, git_repo):
-    plugin, store = _plugin_with_profile(settings, git_repo, [
+    adapter, store = _adapter_with_profile(settings, git_repo, [
         _fact_op("a", "Run `make check` before committing"),
         _fact_op("b", "Before committing run `make check`"),
         _fact_op("stable", "Protected branch main is never pushed"),
@@ -119,21 +119,21 @@ def test_consolidate_applies_gated_ops(settings, trace, tmp_path, git_repo):
         # add_fact IS allowed in consolidate tier but lacks evidence -> rejected
     ]})])
     state = {"task_spec": {"repo": "myrepo"}, "repo_path": str(git_repo),
-             "plugin_root": str(plugin.root)}
+             "adapter_root": str(adapter.root)}
     result = asyncio.run(_registry().get("agent.profile_consolidate").handler(
         _ctx(settings, trace, tmp_path, state, llm=llm)))
     assert result.ok
     assert result.outputs["applied"] == 1
     assert len(result.outputs["rejected"]) == 2
-    reloaded = ProfileStore(plugin.profile_dir)
+    reloaded = ProfileStore(adapter.profile_dir)
     assert reloaded.facts["b"].status == "merged"
     assert reloaded.facts["stable"].text.startswith("Protected branch")
 
 
 def test_consolidate_skips_without_llm(settings, trace, tmp_path, git_repo):
-    plugin, _ = _plugin_with_profile(settings, git_repo, [_fact_op("a", "T")])
+    adapter, _ = _adapter_with_profile(settings, git_repo, [_fact_op("a", "T")])
     state = {"task_spec": {"repo": "myrepo"}, "repo_path": str(git_repo),
-             "plugin_root": str(plugin.root)}
+             "adapter_root": str(adapter.root)}
     result = asyncio.run(_registry().get("agent.profile_consolidate").handler(
         _ctx(settings, trace, tmp_path, state)))
     assert result.ok and "skipped (no LLM)" in result.summary
@@ -142,19 +142,19 @@ def test_consolidate_skips_without_llm(settings, trace, tmp_path, git_repo):
 
 
 def test_judge_reports_but_never_mutates(settings, trace, tmp_path, git_repo):
-    plugin, store = _plugin_with_profile(settings, git_repo,
+    adapter, store = _adapter_with_profile(settings, git_repo,
                                          [_fact_op("a", "Suspicious claim")])
-    before = (plugin.profile_dir / "profile.yaml").read_text()
+    before = (adapter.profile_dir / "profile.yaml").read_text()
     llm = ScriptedLLM([_contract({"audit_findings": [
         {"fact_id": "a", "issue": "unsupported", "why": "evidence is vague"}]})])
     state = {"task_spec": {"repo": "myrepo"}, "repo_path": str(git_repo),
-             "plugin_root": str(plugin.root)}
+             "adapter_root": str(adapter.root)}
     result = asyncio.run(_registry().get("profile.judge").handler(
         _ctx(settings, trace, tmp_path, state, llm=llm)))
     assert result.ok and "1 finding" in result.summary
-    report = (plugin.profile_dir / "JUDGE_REPORT.md").read_text()
+    report = (adapter.profile_dir / "JUDGE_REPORT.md").read_text()
     assert "unsupported" in report and "nothing auto-fixed" in report
-    assert (plugin.profile_dir / "profile.yaml").read_text() == before
+    assert (adapter.profile_dir / "profile.yaml").read_text() == before
 
 
 def test_consolidate_playbook_is_candidate_only(settings):
@@ -173,7 +173,7 @@ def test_consolidate_playbook_is_candidate_only(settings):
 def test_briefing_ablation_switch(settings, trace, tmp_path, git_repo):
     from omni_copilot.engine.agent_runtime import run_agent_step
 
-    plugin, _ = _plugin_with_profile(
+    adapter, _ = _adapter_with_profile(
         settings, git_repo, [_fact_op("uv", "Use `uv pip install` only")])
     settings.profile_briefing_enabled = False
     llm = ScriptedLLM([_contract({})])

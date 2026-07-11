@@ -20,7 +20,7 @@ from .dispatch import BASE_OUTPUT_SCHEMA, AgentDispatchContext
 from .knowledge import (
     _knowledge_tools,
     _repo_map_tool,
-    _resolve_plugin,
+    _resolve_adapter,
     _retrieve_memories,
     _retrieve_skills,
 )
@@ -60,13 +60,13 @@ async def run_agent_step(
     memories = _retrieve_memories(ctx, query)
     knowledge = _knowledge_tools(store, ctx)
 
-    plugin = _resolve_plugin(ctx)
-    all_extra = {**knowledge, **_repo_map_tool(ctx, plugin),
+    adapter = _resolve_adapter(ctx)
+    all_extra = {**knowledge, **_repo_map_tool(ctx, adapter),
                  **(extra_tools or {})}
     briefing = ""
-    if plugin is not None and ctx.settings.profile_briefing_enabled:
+    if adapter is not None and ctx.settings.profile_briefing_enabled:
         try:
-            briefing = plugin.briefing()
+            briefing = adapter.briefing()
         except Exception:
             briefing = ""
 

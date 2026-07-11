@@ -8,7 +8,7 @@ from omni_copilot.engine.steps import register_builtin_steps
 from omni_copilot.engine.planner import Planner, PlanningError
 from omni_copilot.engine.registry import StepRegistry
 from omni_copilot.playbooks.store import PlaybookStore
-from omni_copilot.plugins.base import load_plugin
+from omni_copilot.adapters.base import load_adapter
 from omni_copilot.task_spec import TaskSpec
 
 from test_v2_p0 import REPO_ROOT
@@ -21,11 +21,11 @@ def stack():
     return store, Planner(store, registry)
 
 
-def test_plugin_zero_capabilities():
-    plugin = load_plugin(REPO_ROOT / "plugins" / "vllm_omni")
+def test_adapter_zero_capabilities():
+    adapter = load_adapter(REPO_ROOT / "adapters" / "vllm_omni")
     assert {"repo.path", "language.python", "ci.provider",
             "upstream.fork_tracking", "modules",
-            "orchestrator.external"} <= plugin.capabilities
+            "orchestrator.external"} <= adapter.capabilities
 
 
 def test_neutral_playbooks_match_second_repo(stack):
@@ -60,8 +60,8 @@ def test_missing_capability_degrades_read_only_to_generate(stack):
 
 def test_repo_scoped_playbook_still_wins_for_its_repo(stack):
     store, _ = stack
-    plugin = load_plugin(REPO_ROOT / "plugins" / "vllm_omni")
-    pb = store.find("repo_rebase", "vllm-omni", plugin.capabilities)
+    adapter = load_adapter(REPO_ROOT / "adapters" / "vllm_omni")
+    pb = store.find("repo_rebase", "vllm-omni", adapter.capabilities)
     assert pb is not None and pb.name == "repo-rebase" and pb.locked
     # ...and never leaks to other repos (requires orchestrator.external)
     assert store.find("repo_rebase", "other-repo", {"repo.path"}) is None

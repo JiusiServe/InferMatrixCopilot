@@ -3,16 +3,16 @@ import subprocess
 import pytest
 import yaml
 
-from omni_copilot.plugins import (
-    PluginError,
-    PluginRegistry,
-    draft_plugin,
+from omni_copilot.adapters import (
+    AdapterError,
+    AdapterRegistry,
+    draft_adapter,
     fingerprint_repo,
-    load_plugin,
+    load_adapter,
     update_manifest,
 )
 
-PLUGIN_YAML = """\
+MANIFEST_YAML = """\
 name: vllm_omni
 status: active
 repo:
@@ -28,41 +28,41 @@ push:
 
 
 @pytest.fixture()
-def plugin_dir(settings, git_repo):
-    d = settings.plugins_dir / "vllm_omni"
+def adapter_dir(settings, git_repo):
+    d = settings.adapters_dir / "vllm_omni"
     d.mkdir(parents=True)
-    (d / "plugin.yaml").write_text(PLUGIN_YAML.format(repo_path=git_repo))
+    (d / "manifest.yaml").write_text(MANIFEST_YAML.format(repo_path=git_repo))
     return d
 
 
-def test_load_and_accessors(plugin_dir, git_repo):
-    p = load_plugin(plugin_dir)
+def test_load_and_accessors(adapter_dir, git_repo):
+    p = load_adapter(adapter_dir)
     assert p.name == "vllm_omni" and p.status == "active"
     assert p.protected_branches == ["main"]
     assert p.module_for_path("vllm_omni/core/sched.py") == "scheduler"
     assert p.module_for_path("docs/readme.md") is None
 
 
-def test_registry_resolution(settings, plugin_dir, git_repo):
-    reg = PluginRegistry(settings.plugins_dir)
+def test_registry_resolution(settings, adapter_dir, git_repo):
+    reg = AdapterRegistry(settings.adapters_dir)
     assert reg.resolve(name="vllm_omni").name == "vllm_omni"
     assert reg.resolve(repo_path=str(git_repo)).name == "vllm_omni"
     assert reg.resolve(repo_path="/nonexistent") is None
-    with pytest.raises(PluginError):
+    with pytest.raises(AdapterError):
         reg.resolve(name="missing")
 
 
-def test_high_risk_sections_are_human_only(plugin_dir):
-    p = load_plugin(plugin_dir)
-    with pytest.raises(PluginError, match="high-risk"):
+def test_high_risk_sections_are_human_only(adapter_dir):
+    p = load_adapter(adapter_dir)
+    with pytest.raises(AdapterError, match="high-risk"):
         update_manifest(p, "push", {"protected_branches": []}, actor="agent")
     # human may
     update_manifest(p, "push", {"protected_branches": ["main", "release"]}, actor="human")
-    assert load_plugin(plugin_dir).protected_branches == ["main", "release"]
+    assert load_adapter(adapter_dir).protected_branches == ["main", "release"]
     # agent may update low-risk sections
     update_manifest(p, "modules", {"platform": {"local_paths": ["vllm_omni/platforms/"]}},
                     actor="agent")
-    assert "platform" in load_plugin(plugin_dir).modules
+    assert "platform" in load_adapter(adapter_dir).modules
 
 
 def test_bootstrap_draft_stops_and_never_touches_repo(settings, git_repo):
@@ -71,8 +71,8 @@ def test_bootstrap_draft_stops_and_never_touches_repo(settings, git_repo):
     fp = fingerprint_repo(git_repo)
     assert fp["language"] == "python" and fp["default_branch"] == "main"
 
-    root = draft_plugin(fp, settings.plugins_dir)
-    manifest = yaml.safe_load((root / "plugin.yaml").read_text())
+    root = draft_adapter(fp, settings.adapters_dir)
+    manifest = yaml.safe_load((root / "manifest.yaml").read_text())
     assert manifest["status"] == "draft"
     assert manifest["push"]["allowed"] is False
     assert (root / "BOOTSTRAP_REPORT.md").exists()
@@ -82,10 +82,10 @@ def test_bootstrap_draft_stops_and_never_touches_repo(settings, git_repo):
     assert before == after  # target repo untouched
 
 
-def test_shipped_plugin_zero_parses():
+def test_shipped_adapter_zero_parses():
     from omni_copilot.config import _REPO_ROOT
 
-    p = load_plugin(_REPO_ROOT / "plugins" / "vllm_omni")
+    p = load_adapter(_REPO_ROOT / "adapters" / "vllm_omni")
     assert p.name == "vllm_omni"
     assert p.manifest["push"]["allowed"] is False
     assert "main" in p.protected_branches

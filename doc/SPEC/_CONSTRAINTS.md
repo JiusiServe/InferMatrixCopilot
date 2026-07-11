@@ -21,7 +21,7 @@ wrong even if it "works".
   `@step(...)` or `register_step(StepSpec(...))`. No central `add()` block.
 - **A5 — Knowledge at the edge.** Repo-specific literals (repo names, module
   names, domain prompts, absolute paths, CI wiring) live only under
-  `plugins/<repo>/`. Pinned by `test_repo_neutral_core` (a per-file leak ceiling
+  `adapters/<repo>/`. Pinned by `test_repo_neutral_core` (a per-file leak ceiling
   that can only shrink; the shims and delegation files carry the sole known
   exceptions).
 
@@ -72,10 +72,10 @@ wrong even if it "works".
 ## D. Knowledge-governance constraints
 
 - **D1 — Facts recorded freely, knowledge promoted via gates.** RunTrace/debug
-  memory are cheap and append-only. Skills, playbooks, plugins, and profile
+  memory are cheap and append-only. Skills, playbooks, adapters, and profile
   facts are candidate→promote; promotion is a curator/human act.
 - **D2 — Agents propose, humans dispose (high-risk).** Agents may only write
-  candidates. `update_manifest` rejects agent writes to `plugin.yaml`
+  candidates. `update_manifest` rejects agent writes to `manifest.yaml`
   high-risk sections (`push`/`repo`/`upstream`). The profile judge is read-only.
 - **D3 — Provenance + stability on every profile fact.** Each carries
   `source`/`evidence`/`first_seen`/`last_confirmed`/`confirmations`; an
@@ -114,4 +114,4 @@ wrong even if it "works".
 | C4 | push choke point | `push.py` | `test_push_and_steps.py` |
 | A5 | repo-neutral core | whole `src/` | `test_v2_p0.py::test_repo_neutral_core` |
 | D3 | provenance + stability | `profiles/store.py` | `test_profile_store.py` |
-| D2 | judge/agent read-only-to-active | `profiles/*`,`plugins/base.py` | `test_p3_machinery.py` |
+| D2 | judge/agent read-only-to-active | `profiles/*`,`adapters/base.py` | `test_p3_machinery.py` |

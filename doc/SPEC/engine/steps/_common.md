@@ -42,8 +42,8 @@ so a future rename doesn't silently break patching.
 ## Concision — home for **K3/K4/K7** helpers
 This file is where the step-boilerplate collapse lands. Add:
 - `require_repo(ctx) -> Path | StepResult` (K3 — 8 repo-guard sites).
-- `plugin_or_result(ctx)` / `@needs_plugin` (K3 — 7 profile guards),
-  `no_llm_gap(ctx, step, effect)` (K3 — 4 blocks), `store_for(plugin)` (K3 — 6).
+- `adapter_or_result(ctx)` / `@needs_adapter` (K3 — 7 profile guards),
+  `no_llm_gap(ctx, step, effect)` (K3 — 4 blocks), `store_for(adapter)` (K3 — 6).
 - `published(summary, *, state=None, **outputs)` (K4 — 21 `state_updates`
   literals collapse to one call).
 - `from_state(ctx, key)` (K7 — 5 fetch early-returns).

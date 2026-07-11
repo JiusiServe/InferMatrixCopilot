@@ -68,7 +68,7 @@ def require_repo(ctx: StepContext, *, must_exist: bool = True):
     if repo is None or (must_exist and not repo.exists()):
         return StepResult(False, FailureKind.BLOCKED,
                           f"repo checkout not configured (repo_path={repo}) — set "
-                          "REPO_PATHS in .env or a plugin repo.path")
+                          "REPO_PATHS in .env or a adapter repo.path")
     return repo
 
 

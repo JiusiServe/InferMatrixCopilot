@@ -23,7 +23,7 @@ input can change (see `task_spec.py`):
 | `repo_profile` | L2 | no** | establish/refresh a repo's profile |
 
 \* read-only unless the explicit `post` intent is set. \*\* reads the target
-repo but writes knowledge under `plugins/<repo>/`.
+repo but writes knowledge under `adapters/<repo>/`.
 
 Tiers (`§3.2` of DESIGN): **L0** reuse a locked playbook verbatim; **L1** adapt
 a vetted playbook (plan-review gated); **L2** may fall back to generation, but
@@ -44,7 +44,7 @@ only for read-only kinds.
      │
  Steps       engine/steps/*                       the vetted step library
      │
- Edge        plugins/, ci/, profiles/             repo knowledge & capabilities
+ Edge        adapters/, ci/, profiles/             repo knowledge & capabilities
              review/, memory/, run_trace, notify, metrics   cross-cutting
              scopes.py, push.py                   pure safety primitives
 ```
@@ -60,7 +60,7 @@ is **not** a code layer: its task-definition role is carried by `TaskSpec` +
   scope enforcement, escalation, RunTrace), and a plan→execute loop. It does not
   hold repo knowledge and does not let the planner compose raw tools.
 - **Knowledge lives at the edge.** Repo-specific facts (modules, CI, prompts,
-  conventions, push policy) live under `plugins/<repo>/` (manifest + profile),
+  conventions, push policy) live under `adapters/<repo>/` (manifest + profile),
   never in the core. Adding a repo is an edge addition, not a core change.
 
 ## 4. Dependency rules (enforced layering)
@@ -68,7 +68,7 @@ is **not** a code layer: its task-definition role is carried by `TaskSpec` +
 Imports may only point **down and outward**. Verified constraints a change may
 not violate:
 
-1. Leaf edge packages (`profiles/`, `ci/`, `plugins/`, `review/`, `memory/`)
+1. Leaf edge packages (`profiles/`, `ci/`, `adapters/`, `review/`, `memory/`)
    and safety primitives (`scopes.py`, `push.py`) MUST NOT import `engine/`.
    The engine depends on them.
 2. Interface (`cli/`, `chat.py`) MUST NOT be imported by any lower layer.
@@ -101,14 +101,14 @@ being a forge other than what a CI/forge adapter declares; storing secrets
   facts), `progress.json` (step checkpoints), `RUN_REPORT.md`, `metrics.json`,
   `ESCALATION.md` (only when blocked), plus step-specific artifacts
   (`rebase_status.json`, `COMPARISON.md`, evidence archives).
-- **Per repo (knowledge)** — `plugins/<repo>/`, **two trust tiers** (DESIGN
-  §V2.3.0): **Tier 1 — the manifest** `plugin.yaml` (human-authored, human-gated:
+- **Per repo (knowledge)** — `adapters/<repo>/`, **two trust tiers** (DESIGN
+  §V2.3.0): **Tier 1 — the manifest** `manifest.yaml` (human-authored, human-gated:
   identity/paths/push/ci — the safety config the agent may not self-edit), and
   **Tier 2 — the profile** `profile/` (agent-established, evidence-gated:
   `profile.yaml`, `PROFILE_REPORT.md`, `JUDGE_REPORT.md`, `ops_log.jsonl`,
   `format.yaml`/`review.md`/… as established) + `skills/`,
-  `store/debug_memory.db`, `repo_map/` cache. ("plugin" is a proposed-rename
-  misnomer — really a repo *adapter* holding a *manifest* + a *profile*.)
+  `store/debug_memory.db`, `repo_map/` cache. (The container is a repo *adapter*
+  holding a *manifest* + a *profile* — renamed from "plugin" 2026-07-11.)
 - **Governance rule:** RunTrace/evidence are the immutable layer; the profile is
   the curated layer over it. Facts summarize evidence, never replace it.
 

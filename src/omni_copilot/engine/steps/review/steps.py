@@ -76,7 +76,7 @@ async def _review_diff(ctx: StepContext) -> StepResult:
     skill retrieval, enforced read-only tools, structured review_comments.
     By default runs as a 3-lens ensemble with verify-and-merge (robustness:
     single runs have high variance; see eval/ANALYSIS.md)."""
-    from ...agent_runtime import _resolve_plugin, run_agent_step, run_agent_step_ensemble
+    from ...agent_runtime import _resolve_adapter, run_agent_step, run_agent_step_ensemble
 
     diff = ctx.state.get("diff_text", "")
     if not diff:
@@ -85,13 +85,13 @@ async def _review_diff(ctx: StepContext) -> StepResult:
 
     # repo knowledge from the profile, not the core (design §V2.2.2): domain
     # checklist extension + the language key for the sweep extractors
-    plugin = _resolve_plugin(ctx)
+    adapter = _resolve_adapter(ctx)
     language = "python"
     guidance = _REVIEW_SYSTEM
-    if plugin is not None:
-        language = str(plugin.manifest.get("repo", {}).get("language")
+    if adapter is not None:
+        language = str(adapter.manifest.get("repo", {}).get("language")
                        or "python")
-        review_md = plugin.profile_dir / "review.md"
+        review_md = adapter.profile_dir / "review.md"
         try:
             if review_md.exists() and ctx.settings.profile_briefing_enabled:
                 guidance += ("\n\n## Repo-specific review checklist "

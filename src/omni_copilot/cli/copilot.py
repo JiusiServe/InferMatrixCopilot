@@ -55,11 +55,11 @@ class Copilot:
     def resolve(self, spec: TaskSpec) -> Resolution:
         """Resolve `spec` to a Resolution via the planner, passing the repo's
         capability set so the planner only reuses playbooks the target supports.
-        Capabilities come from the repo's plugin (if any), plus `repo.path` when
-        a path is resolvable even without a plugin (REPO_PATHS works plugin-less)."""
-        plugin = self._plugin_for(spec.repo)
-        capabilities = set(plugin.capabilities) if plugin is not None else set()
-        if self._resolve_repo_path(spec.repo):  # REPO_PATHS works plugin-less
+        Capabilities come from the repo's adapter (if any), plus `repo.path` when
+        a path is resolvable even without a adapter (REPO_PATHS works adapter-less)."""
+        adapter = self._adapter_for(spec.repo)
+        capabilities = set(adapter.capabilities) if adapter is not None else set()
+        if self._resolve_repo_path(spec.repo):  # REPO_PATHS works adapter-less
             capabilities.add("repo.path")
         return self.planner.resolve(spec, capabilities=capabilities)
 
@@ -173,7 +173,7 @@ class Copilot:
                  resuming: bool = False) -> int:
         """Run a resolved `playbook` to completion in `run_dir`: init tracing +
         notifier, seed the shared state (repo path, push policy, protected
-        branches / high-risk modules from the plugin when present), drive the
+        branches / high-risk modules from the adapter when present), drive the
         Executor, then print per-step marks, optional run metrics, and the final
         status. `resuming` seeds the state so steps can pick up where they left
         off. Returns the exit code (0 done, BLOCKED_EXIT blocked, else 1)."""
@@ -191,12 +191,12 @@ class Copilot:
             "protected_branches": self.settings.protected_branches,
             "resuming": resuming,
         }
-        plugin = self._plugin_for(spec.repo)
-        if plugin is not None:
-            # repo knowledge from the plugin, not core settings (v2 P0 fix #5)
-            state["protected_branches"] = plugin.protected_branches
-            if plugin.high_risk_modules:
-                state["high_risk_modules"] = plugin.high_risk_modules
+        adapter = self._adapter_for(spec.repo)
+        if adapter is not None:
+            # repo knowledge from the adapter, not core settings (v2 P0 fix #5)
+            state["protected_branches"] = adapter.protected_branches
+            if adapter.high_risk_modules:
+                state["high_risk_modules"] = adapter.high_risk_modules
         executor = Executor(self.registry, self.settings, run_dir=run_dir,
                             trace=trace, llm=self.llm, notifier=notifier)
         outcome = asyncio.run(executor.run(playbook, state))
@@ -251,25 +251,25 @@ class Copilot:
         print("no resumable run found")
         return 1
 
-    def _plugin_for(self, repo: str):
-        """The repo's registered plugin, or None (never raises)."""
+    def _adapter_for(self, repo: str):
+        """The repo's registered adapter, or None (never raises)."""
         try:
-            from ..plugins.base import PluginRegistry
+            from ..adapters.base import AdapterRegistry
 
-            return PluginRegistry(self.settings.plugins_dir).resolve(
+            return AdapterRegistry(self.settings.adapters_dir).resolve(
                 name=repo.replace("-", "_"))
         except Exception:
             return None
 
     def _resolve_repo_path(self, repo: str) -> str:
-        """REPO_PATHS first; fall back to the repo's plugin manifest (plugin zero
+        """REPO_PATHS first; fall back to the repo's adapter manifest (adapter zero
         declares repo.path), so runs work even without a .env in reach."""
         p = self.settings.repo_path(repo)
         if p:
             return str(p)
-        plugin = self._plugin_for(repo)
-        if plugin and plugin.repo_path:
-            return plugin.repo_path
+        adapter = self._adapter_for(repo)
+        if adapter and adapter.repo_path:
+            return adapter.repo_path
         return ""
 
     # -- built-ins ---------------------------------------------------------------

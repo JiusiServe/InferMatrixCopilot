@@ -4,7 +4,7 @@
 2. foreach fan-out lifts per-item state_updates into the merged result;
 3. `when:` reads state keys and fails loudly on unknown keys;
 4. per-repo skills/debug-memory namespaces are actually consulted;
-5. high-risk modules come from the repo plugin, not core settings.
+5. high-risk modules come from the repo adapter, not core settings.
 """
 
 import asyncio
@@ -231,11 +231,11 @@ def test_per_repo_skills_rank_first_and_receive_proposals(settings, trace,
     from omni_copilot.engine.agent_runtime import _retrieve_skills
 
     _write_skill(settings.skills_dir, "shared-skill", "how to fix ci failures")
-    plugin_root = settings.plugins_dir / "myrepo"
-    (plugin_root).mkdir(parents=True)
-    (plugin_root / "plugin.yaml").write_text(
+    adapter_root = settings.adapters_dir / "myrepo"
+    (adapter_root).mkdir(parents=True)
+    (adapter_root / "manifest.yaml").write_text(
         f"name: myrepo\nstatus: active\nrepo:\n  path: {git_repo}\n")
-    _write_skill(plugin_root / "skills", "repo-skill", "how to fix ci failures")
+    _write_skill(adapter_root / "skills", "repo-skill", "how to fix ci failures")
 
     ctx = StepContext(settings=settings, params={}, run_dir=tmp_path / "run",
                       trace=trace,
@@ -246,11 +246,11 @@ def test_per_repo_skills_rank_first_and_receive_proposals(settings, trace,
     assert names[0] == "repo-skill" and "shared-skill" in names
 
     store.propose(name="new-lesson", description="d", body="b")
-    assert (plugin_root / "skills" / "_candidates.json").exists()
+    assert (adapter_root / "skills" / "_candidates.json").exists()
     assert not (settings.skills_dir / "_candidates.json").exists()
 
 
-def test_no_plugin_falls_back_to_shared_pool(settings, trace, tmp_path, git_repo):
+def test_no_adapter_falls_back_to_shared_pool(settings, trace, tmp_path, git_repo):
     from omni_copilot.engine.agent_runtime import _retrieve_skills
 
     _write_skill(settings.skills_dir, "shared-skill", "how to fix ci failures")
@@ -264,9 +264,9 @@ def test_no_plugin_falls_back_to_shared_pool(settings, trace, tmp_path, git_repo
     assert (settings.skills_dir / "_candidates.json").exists()
 
 
-# -- fix 5: plugin-sourced high-risk modules ------------------------------------
+# -- fix 5: adapter-sourced high-risk modules ------------------------------------
 
-def test_high_risk_modules_from_plugin_override():
+def test_high_risk_modules_from_adapter_override():
     summary = DiffSummary(changed_files=["x.py"], insertions=1,
                           tests_run=["pytest"])
     from omni_copilot.config import Settings
@@ -276,14 +276,14 @@ def test_high_risk_modules_from_plugin_override():
                               high_risk_modules=["custom_mod"])
     assert "high_risk_modules" in fired
     fired = evaluate_triggers(summary, settings, touched_modules=("worker_runner",),
-                              high_risk_modules=[])  # plugin says: none risky
+                              high_risk_modules=[])  # adapter says: none risky
     assert "high_risk_modules" not in fired
 
 
-def test_plugin_zero_declares_risk_tiers():
-    from omni_copilot.plugins.base import load_plugin
-    plugin = load_plugin(REPO_ROOT / "plugins" / "vllm_omni")
-    assert set(plugin.high_risk_modules) == {"worker_runner", "model_executor",
+def test_adapter_zero_declares_risk_tiers():
+    from omni_copilot.adapters.base import load_adapter
+    adapter = load_adapter(REPO_ROOT / "adapters" / "vllm_omni")
+    assert set(adapter.high_risk_modules) == {"worker_runner", "model_executor",
                                              "scheduler"}
 
 
@@ -311,5 +311,5 @@ def test_repo_neutral_core():
         ceiling = _KNOWN_LEAKS.get(rel, 0)
         assert count <= ceiling, (
             f"{rel}: {count} repo-specific literal(s), ceiling {ceiling} — "
-            "repo knowledge belongs in plugins/<repo>/, not the core "
+            "repo knowledge belongs in adapters/<repo>/, not the core "
             "(doc/DESIGN.md §V2.2.1)")

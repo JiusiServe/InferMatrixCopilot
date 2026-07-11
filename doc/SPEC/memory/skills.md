@@ -29,4 +29,4 @@ UI.
 Clean propose→promote gate — do not add an agent-callable `promote`. The
 `trigger` field is the Devin-style recall cue; keep it first-class as more
 trigger-gated retrieval lands. Per-repo dir is caller-chosen
-(`plugin.skills_dir`) — keep path-agnostic.
+(`adapter.skills_dir`) — keep path-agnostic.

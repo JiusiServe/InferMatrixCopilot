@@ -12,7 +12,7 @@ from omni_copilot.engine.registry import StepRegistry
 from omni_copilot.engine.step import StepContext
 from omni_copilot.llm import Block, Reply
 from omni_copilot.playbooks.store import PlaybookStore
-from omni_copilot.plugins.base import load_plugin
+from omni_copilot.adapters.base import load_adapter
 from omni_copilot.profiles.establish import (build_doc_corpus, extract_directives,
                                              is_redundant, scan_modules)
 from omni_copilot.profiles.store import ProfileStore
@@ -77,10 +77,10 @@ def test_fingerprint_drafts_then_resolves(settings, trace, tmp_path, git_repo):
     state = {"task_spec": {"repo": "r"}, "repo_path": str(git_repo)}
     result = _run(settings, trace, tmp_path, "profile.fingerprint", state)
     assert result.ok and result.outputs["created"]
-    assert state["plugin_root"]
+    assert state["adapter_root"]
     assert result.outputs["state_updates"]["repo_language"] == "python"
-    plugin = load_plugin(state["plugin_root"])
-    assert plugin.status == "draft"                    # human gate (Stage 2)
+    adapter = load_adapter(state["adapter_root"])
+    assert adapter.status == "draft"                    # human gate (Stage 2)
 
     again = _run(settings, trace, tmp_path, "profile.fingerprint",
                  {"task_spec": {"repo": "r"}, "repo_path": str(git_repo)})
@@ -96,8 +96,8 @@ def test_structure_scan_drafts_modules_once(settings, trace, tmp_path, git_repo)
     _run(settings, trace, tmp_path, "profile.fingerprint", state)
     result = _run(settings, trace, tmp_path, "profile.structure_scan", state)
     assert result.ok
-    plugin = load_plugin(state["plugin_root"])
-    assert "engine" in plugin.modules
+    adapter = load_adapter(state["adapter_root"])
+    assert "engine" in adapter.modules
 
     # declared modules are never overwritten
     again = _run(settings, trace, tmp_path, "profile.structure_scan", state)
@@ -118,7 +118,7 @@ def test_ingest_docs_filters_redundant(settings, trace, tmp_path, git_repo):
     assert result.outputs == {"applied": 1, "dropped": 1,
                               **{k: v for k, v in result.outputs.items()
                                  if k not in ("applied", "dropped")}}
-    store = ProfileStore(load_plugin(state["plugin_root"]).profile_dir)
+    store = ProfileStore(load_adapter(state["adapter_root"]).profile_dir)
     facts = store.active(channel="briefing")
     assert len(facts) == 1
     assert facts[0].source == "human" and facts[0].evidence == ["AGENTS.md"]
@@ -172,13 +172,13 @@ def test_profile_agent_applies_gated_facts(settings, trace, tmp_path, git_repo):
     assert result.outputs["redundant_dropped"] == 1
     assert len(result.outputs["rejected"]) == 1
 
-    plugin = load_plugin(state["plugin_root"])
-    store = ProfileStore(plugin.profile_dir)
+    adapter = load_adapter(state["adapter_root"])
+    store = ProfileStore(adapter.profile_dir)
     briefing = store.render_briefing()
     assert "never bare pip" in briefing
     assert "pytest -q" not in briefing                  # machine channel
-    assert (plugin.profile_dir / "review.md").read_text().count("KV-cache") == 1
-    assert (plugin.profile_dir / "PROFILE_REPORT.md").exists()
+    assert (adapter.profile_dir / "review.md").read_text().count("KV-cache") == 1
+    assert (adapter.profile_dir / "PROFILE_REPORT.md").exists()
 
 
 def test_profile_agent_skips_without_llm(settings, trace, tmp_path, git_repo):
@@ -228,12 +228,12 @@ def test_sweep_targets_language_degrades_to_files():
 
 def test_review_guidance_from_profile(settings, trace, tmp_path, git_repo):
     """agent.review_diff appends the repo profile's review.md to its guidance."""
-    plugin_root = settings.plugins_dir / "myrepo"
-    (plugin_root / "profile").mkdir(parents=True)
-    (plugin_root / "plugin.yaml").write_text(
+    adapter_root = settings.adapters_dir / "myrepo"
+    (adapter_root / "profile").mkdir(parents=True)
+    (adapter_root / "manifest.yaml").write_text(
         f"name: myrepo\nstatus: active\nrepo:\n  path: {git_repo}\n"
         "  language: python\n")
-    (plugin_root / "profile" / "review.md").write_text(
+    (adapter_root / "profile" / "review.md").write_text(
         "- Check the wave-1 module import contract\n")
 
     llm = ScriptedLLM([_facts_reply([])])  # contract-shaped reply suffices

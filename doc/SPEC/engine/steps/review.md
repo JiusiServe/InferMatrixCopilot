@@ -23,7 +23,7 @@ package `__init__` so the pre-split import paths are unchanged.
 
 ## Invariants
 - Patch gate: cheap summary always, LLM review only on a trigger; fail-closed
-  (**C6**); high-risk modules from the plugin, settings fallback (**A5**).
+  (**C6**); high-risk modules from the adapter, settings fallback (**A5**).
 - Review: domain checklist extends from the profile's `review.md`;
   `_sweep_targets` keyed on `repo.language`, degrades honestly; verdict
   coherence (any ≥minor comment ⇒ REQUEST CHANGES); deterministic
@@ -31,7 +31,7 @@ package `__init__` so the pre-split import paths are unchanged.
 - Prompts are repo-neutral (**A5**).
 
 ## Scope — not here
-No agent-runtime governance (that is `agent_runtime`); no plugin/profile writes.
+No agent-runtime governance (that is `agent_runtime`); no adapter/profile writes.
 
 ## Dependencies (allowed)
 `review/*`, `engine/step`, `.._common`, `..agent_runtime`, `profiles/languages`.

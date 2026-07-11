@@ -91,21 +91,21 @@ def test_github_actions_provider_caches_per_run():
 
 
 def test_provider_selection_and_gaps(settings):
-    class FakePlugin:
+    class FakeAdapter:
         def __init__(self, provider):
             self.manifest = {"ci": {"provider": provider}}
 
     provider, gap = provider_for(None, settings)
     assert provider is None and "no ci.provider" in gap
-    provider, gap = provider_for(FakePlugin("buildkite"), settings)
+    provider, gap = provider_for(FakeAdapter("buildkite"), settings)
     assert provider is None and "BUILDKITE_API_TOKEN" in gap
     settings.buildkite_api_token = "tok"
-    provider, gap = provider_for(FakePlugin("buildkite"), settings)
+    provider, gap = provider_for(FakeAdapter("buildkite"), settings)
     assert isinstance(provider, BuildkiteLogs) and gap == ""
-    provider, gap = provider_for(FakePlugin("github_actions"), settings,
+    provider, gap = provider_for(FakeAdapter("github_actions"), settings,
                                  gh_runner=lambda a, cwd=None: (0, ""))
     assert isinstance(provider, GithubActionsLogs)
-    provider, gap = provider_for(FakePlugin("jenkins"), settings)
+    provider, gap = provider_for(FakeAdapter("jenkins"), settings)
     assert provider is None and "unknown ci.provider" in gap
 
 

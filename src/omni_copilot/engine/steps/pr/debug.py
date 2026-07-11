@@ -75,9 +75,9 @@ def _enrich_ci_logs(ctx: StepContext, repo: Path | None) -> int:
     if not failures:
         return 0
     from ....ci.providers import provider_for
-    from ...agent_runtime import _resolve_plugin
+    from ...agent_runtime import _resolve_adapter
 
-    provider, gap = provider_for(_resolve_plugin(ctx), ctx.settings,
+    provider, gap = provider_for(_resolve_adapter(ctx), ctx.settings,
                                  gh_runner=lambda args, cwd=None:
                                  _gh(args, cwd=cwd or repo))
     if provider is None:

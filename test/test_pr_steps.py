@@ -93,7 +93,7 @@ def test_clean_rebase_and_analyze(registry, settings, trace, tmp_path, pr_repos)
     # rebased on top of new main: both files reachable
     assert (work / "other.py").exists() and (work / "feature.py").exists()
     analyze = state["affected_modules"]
-    assert analyze == ["root"]  # feature.py at top level, no plugin in sandbox
+    assert analyze == ["root"]  # feature.py at top level, no adapter in sandbox
     assert state["primary_files"] == ["*feature.py"]
 
 

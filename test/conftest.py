@@ -13,7 +13,7 @@ def settings(tmp_path: Path) -> Settings:
         _env_file=None,
         run_root=tmp_path / "runs",
         playbooks_dir=tmp_path / "playbooks",
-        plugins_dir=tmp_path / "plugins",
+        adapters_dir=tmp_path / "adapters",
         repo_paths={},
         allow_push=False,
         rebase_agent_root=tmp_path / "agent_root",  # never the real one in tests

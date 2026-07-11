@@ -26,7 +26,7 @@ KIND_TIER: dict[str, str] = {
     "issue_answer": "L2",
     "issue_filter": "L2",
     # profile establishment reads the target repo but writes knowledge
-    # (plugins/<repo>/) — confirm-gated like other write-capable kinds
+    # (adapters/<repo>/) — confirm-gated like other write-capable kinds
     "repo_profile": "L2",
 }
 

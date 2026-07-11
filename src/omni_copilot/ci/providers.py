@@ -115,12 +115,12 @@ class GithubActionsLogs:
         return enriched
 
 
-def provider_for(plugin, settings, gh_runner: Callable | None = None):
+def provider_for(adapter, settings, gh_runner: Callable | None = None):
     """The repo's CI log provider, or (None, gap-reason). The gap reason is
     escalation material for a `capability_gap` trace event."""
     name = ""
-    if plugin is not None:
-        name = str((plugin.manifest.get("ci") or {}).get("provider") or "")
+    if adapter is not None:
+        name = str((adapter.manifest.get("ci") or {}).get("provider") or "")
     if not name:
         return None, "no ci.provider in the repo profile"
     if name == "buildkite":

@@ -10,7 +10,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from ..plugins.base import RepoPlugin
+from ..adapters.base import RepoAdapter
 from .store import ProfileStore
 
 
@@ -31,20 +31,20 @@ def decay_stale(store: ProfileStore, *, days: int) -> list[str]:
     return [op["id"] for op in ops]
 
 
-def detect_drift(plugin: RepoPlugin, store: ProfileStore) -> list[str]:
+def detect_drift(adapter: RepoAdapter, store: ProfileStore) -> list[str]:
     """Deterministic drift signals that should trigger a refresh proposal:
     declared module paths that no longer exist, and facts joined to modules
-    the plugin no longer declares. Findings are REPORTS — nothing is
+    the adapter no longer declares. Findings are REPORTS — nothing is
     auto-fixed here; the refresh re-runs the affected Stage-1 agent."""
     findings: list[str] = []
-    repo = Path(plugin.repo_path) if plugin.repo_path else None
+    repo = Path(adapter.repo_path) if adapter.repo_path else None
     if repo is not None and repo.exists():
-        for module, spec in plugin.modules.items():
+        for module, spec in adapter.modules.items():
             for pattern in (spec or {}).get("local_paths", []):
                 if not (repo / pattern.rstrip("*").rstrip("/")).exists():
                     findings.append(f"module '{module}': declared path "
                                     f"'{pattern}' no longer exists")
-    known = set(plugin.modules) | {"repo-wide"}
+    known = set(adapter.modules) | {"repo-wide"}
     for fact in store.active():
         if fact.module not in known:
             findings.append(f"fact '{fact.id}': joined to unknown module "

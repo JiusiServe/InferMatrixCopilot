@@ -34,7 +34,7 @@ is pointed at.
       tools.py + scopes.py (ToolScope/PathScope choke point) §3.3(2)
       review/ (diff summary → triggers → read-only reviewer) §3.3(3)
       memory/ (RunTrace, DebugMemory FTS5, gated skills)     §3.3(4)
-      plugins/ (repo knowledge, draft bootstrap)             plugin layer
+      adapters/ (repo knowledge, draft bootstrap)             adapter layer
       push.py  (PushPolicy + guard_push)                     push authorization
       notify.py (ESCALATION.md + email, exit 3)              goal #4
 ```
@@ -83,7 +83,7 @@ is pointed at.
 | `src/omni_copilot/scopes.py`, `tools.py`, `agent_loop.py` | 框架层改进 (2): ToolScope/PathScope at one choke point |
 | `src/omni_copilot/review/` | 框架层改进 (3): diff summary → trigger rules → read-only patch reviewer |
 | `src/omni_copilot/run_trace.py`, `memory/` | 框架层改进 (4): RunTrace / DebugMemory / gated skills |
-| `src/omni_copilot/plugins/` | RepoPlugin: plugin zero, registry, deterministic bootstrap → draft |
+| `src/omni_copilot/adapters/` | RepoAdapter: adapter zero, registry, deterministic bootstrap → draft |
 | `src/omni_copilot/push.py` | Push authorization: `PushPolicy` + unified `guard_push` (no separate Target layer) |
 | `src/omni_copilot/notify.py` | goal #4: escalation channel, blocked exit code 3 |
 
@@ -98,7 +98,7 @@ is pointed at.
 # Part II — Design v2: repo-invariant copilot (2026-07-10)
 
 v1 already states the multi-repo success criterion ("onboarding a second repo
-must not touch the core engine — only a new plugin"). v2 strengthens it from
+must not touch the core engine — only a new adapter"). v2 strengthens it from
 *runs at all* to **runs with stable, measured performance**, and closes the
 gaps that currently make that impossible. Three workstreams:
 
@@ -156,7 +156,7 @@ changed a v2 decision. Sources at the end of the section.
    across repositories for the same model, systematic language effects, and
    sizable drops on private/unseen codebases (e.g. Opus 4.1 22.7%→17.8% on
    SWE-bench Pro's private set). Repo properties — architectural complexity,
-   plugin/hook systems, API surface clarity — predict difficulty.
+   adapter/hook systems, API surface clarity — predict difficulty.
    → **v2 consequence**: invariance must be *measured* per repo (§V2.2.5);
    an agent that is only ever evaluated on vllm-omni has unknown performance
    everywhere else, and profile quality is a first-order lever on the gap.
@@ -189,7 +189,7 @@ Sources: [ETH AGENTS.md study](https://arxiv.org/html/2602.11988v1) ·
 | 1 | **Resume loses in-memory state.** Steps hand results to later steps by writing `ctx.state` directly (`pr.fetch_diff` → `diff_text`, `issue.fetch` → `issue_text`, `pr.gate_check` → `gate_report`, `pr.checkout_branch` → `push_policy`/branch refs, `agent.review_diff` → `review_text`), but the executor's resume path restores only `outputs.state_updates`. `--resume` past a completed fetch re-enters `agent.review_diff` with no `diff_text` → spurious BLOCKED; resuming pr-rebase at the push step sees the default (deny-all) `PushPolicy` → spurious FORBIDDEN. | `executor.py` resume branch vs. `steps/pr/`/`steps/review/` state writes | Contract: **every state key a later step consumes must be published via `outputs.state_updates`** (JSON-simple; `PushPolicy` serialized). Enforced by a resume-integrity test per playbook: run to step N, drop the process, resume, assert no BLOCKED-on-missing-state at any N. |
 | 2 | **`foreach` fan-out drops `state_updates`.** `_merge` re-keys item outputs by index, so `state_updates` published by fan-out items never reach `state.update(...)`. | `executor.py::_merge` | Merge `state_updates` across items explicitly (last-writer-wins per key is acceptable; conflicts traced). Covered by the same resume-integrity test. |
 | 3 | **`when:` silently evaluates against TaskSpec only.** A condition on a computed state key (e.g. `has_conflicts`) evaluates false with no error. | `executor.py::_eval_when` | Evaluate against `state` with TaskSpec fallback; unknown key → planning-time error, not a silent skip. |
-| 4 | **Per-repo knowledge is designed but not wired.** `RepoPlugin.skills_dir` and `RepoPlugin.debug_memory_db` exist, but `agent_runtime` reads the *global* `settings.skills_dir` / `settings.memory_db` — every repo shares one skill store and one debug memory. | `plugins/base.py` vs `engine/agent_runtime/knowledge.py::_retrieve_skills/_retrieve_memories` | Resolve knowledge stores through the active plugin/profile first, global shared pool second (§V2.2.6). |
+| 4 | **Per-repo knowledge is designed but not wired.** `RepoAdapter.skills_dir` and `RepoAdapter.debug_memory_db` exist, but `agent_runtime` reads the *global* `settings.skills_dir` / `settings.memory_db` — every repo shares one skill store and one debug memory. | `adapters/base.py` vs `engine/agent_runtime/knowledge.py::_retrieve_skills/_retrieve_memories` | Resolve knowledge stores through the active adapter/profile first, global shared pool second (§V2.2.6). |
 | 5 | **High-risk-module list is hardcoded vLLM-Omni names in core settings**, so the patch-review `high_risk_modules` trigger silently never fires on any other repo. | `config.py::high_risk_modules` | Move to the profile (`modules.yaml` risk tiers, §V2.3); the setting becomes a fallback only. |
 
 ### (b) Repo-knowledge leaks in the core (violate "knowledge at the edge"; block invariance)
@@ -246,7 +246,7 @@ the benchmark literature (§V2.0.4) shows same-model resolve rates swinging
 
 1. **Repo-neutral core, enforced.** No repo-specific literal (repo names,
    module names, domain prompts, absolute paths) anywhere in
-   `src/omni_copilot/` — such knowledge lives only under `plugins/<repo>/`.
+   `src/omni_copilot/` — such knowledge lives only under `adapters/<repo>/`.
    Pinned by a `test_repo_neutral_core` test that scans the source for the
    known-leak patterns and fails on new ones. Prompts in the core may state
    *how to review/debug/triage*; only the profile states *what this repo is*.
@@ -277,7 +277,7 @@ the benchmark literature (§V2.0.4) shows same-model resolve rates swinging
    (draft → active) only after its eval run lands within the band — the
    profile promotion gate *is* the invariance gate.
 6. **Knowledge namespacing.** Skills and debug memories resolve per-repo
-   first (`plugins/<repo>/skills/`, `plugins/<repo>/store/debug_memory.db` —
+   first (`adapters/<repo>/skills/`, `adapters/<repo>/store/debug_memory.db` —
    the already-designed fields from §(a)4), then a shared general pool.
    Writes always land in the active repo's namespace; promotion of a repo
    skill to the shared pool is a curator decision (it must be genuinely
@@ -286,7 +286,7 @@ the benchmark literature (§V2.0.4) shows same-model resolve rates swinging
 
 ## V2.3 Repo profile
 
-The profile generalizes plugin zero + Phase-0 bootstrap into the copilot's
+The profile generalizes adapter zero + Phase-0 bootstrap into the copilot's
 full picture of a repository. Two evidence-driven design rules govern
 everything below (§V2.0.1–2):
 
@@ -308,7 +308,7 @@ Repo knowledge splits into two tiers by **who may write it and how much trust it
 carries** — the axis that matters for safety, orthogonal to the machine /
 briefing / retrieved *consumption* split of §V2.3.4:
 
-- **Tier 1 — the manifest** (`plugin.yaml`): *human-authored, human-gated* config
+- **Tier 1 — the manifest** (`manifest.yaml`): *human-authored, human-gated* config
   the agent would be unsafe to guess — repo/upstream paths, push policy
   (protected branches, `allowed`), CI provider, capabilities. Plain declarative
   YAML; the high-risk sections (`repo`/`upstream`/`push`) are human-only
@@ -327,7 +327,7 @@ the evidence-gated Tier-2 write path would make the push policy agent-writable (
 safety regression), and the alternative — a human-only region inside the profile
 — just re-draws the same boundary inside one file. The two data models are also
 incompatible (a manifest fact like `repo.path` has no "evidence" or "staleness";
-a profile fact without evidence is *rejected*). The container `plugins/<repo>/`
+a profile fact without evidence is *rejected*). The container `adapters/<repo>/`
 already unifies them on disk — **one repo edge, two trust tiers**. The agent
 *may draft* Tier-1 structure (`profile.structure_scan` seeds the module list),
 but Tier 1's risky sections always require human activation, so anything
@@ -336,8 +336,8 @@ safety-bearing is *agent-proposes / human-confirms*.
 ### V2.3.1 Layout
 
 ```
-plugins/<repo>/
-  plugin.yaml            identity, repo/upstream paths, push policy   (human-gated)
+adapters/<repo>/
+  manifest.yaml            identity, repo/upstream paths, push policy   (human-gated)
   profile/
     profile.yaml         the curated core (small, human-readable): per-fact
                          provenance fields — see §V2.3.2
@@ -368,24 +368,24 @@ plugins/<repo>/
                          budgeted; rebuilt on drift)
 ```
 
-`plugin.yaml` keeps its v1 role and high-risk human-only sections
+`manifest.yaml` keeps its v1 role and high-risk human-only sections
 (`repo`/`upstream`/`push`); `profile/` holds the establishable knowledge.
 
-> **Naming note (proposed, deferred).** "plugin" is a misnomer — this bundle is
-> declarative repo knowledge, not executable extension code, which is what
-> "plugin" implies everywhere else in software. The design's headline property is
-> *repo-invariance*: a generic engine specialized per repo — i.e. the **adapter
-> pattern**. Proposed rename so the three concepts become self-documenting:
-> - container `plugins/<repo>/` → `adapters/<repo>/`
->   (`RepoPlugin` → `RepoAdapter`, `PluginRegistry` → `AdapterRegistry`)
-> - Tier-1 file `plugin.yaml` → `manifest.yaml` (it is already the `.manifest`
->   attribute internally, and "manifest" names the config tier honestly)
+> **Naming (renamed 2026-07-11, was "plugin").** The old name "plugin" was a
+> misnomer — this bundle is declarative repo knowledge, not executable extension
+> code, which is what "plugin" implies everywhere else in software. The design's
+> headline property is *repo-invariance*: a generic engine specialized per repo —
+> i.e. the **adapter pattern** — so the concepts are now self-documenting:
+> - container `adapters/<repo>/` (was `plugins/<repo>/`) —
+>   `RepoAdapter`/`AdapterRegistry` (were `RepoPlugin`/`PluginRegistry`)
+> - Tier-1 file `manifest.yaml` (was `plugin.yaml`) — already the `.manifest`
+>   attribute internally, and "manifest" names the config tier honestly
 >
 > Read as: the **adapter** (container) holds a **manifest** (Tier-1 config) and a
-> **profile** (Tier-2 knowledge). Alternative if "adapter" reads too code-like:
-> "repo pack" (cf. *language pack* — a data bundle specializing a generic app).
-> Deferred as a breaking on-disk change (moves `plugins/` and renames the
-> manifest file) pending owner sign-off — see the "rename" follow-up.
+> **profile** (Tier-2 knowledge). The `ADAPTERS_DIR` env var (was `PLUGINS_DIR`)
+> points at the adapters root. The rename was mechanical (git-mv + symbol sweep,
+> tests green throughout); on-disk `adapters/<repo>/manifest.yaml` replaces the
+> old `plugins/<repo>/plugin.yaml`.
 
 ### V2.3.2 Profile memory architecture (borrowed from the personal agent)
 
@@ -403,9 +403,9 @@ to repo terms:
 | Provenance per entry: `evidence[]`, `first_seen`, `last_seen`, `confirmations: n` | Same fields per fact, plus `source: deterministic|agent|human` and source commit |
 | **Stability gate**: entries with ≥3 confirmations can't be rewritten to cite less evidence | Same rule: a consolidation rewrite may not drop cited evidence from a stable fact; superseded text goes to `history[]`, never deleted |
 | **Dormancy decay, never delete** (30/60-day windows) | Facts unconfirmed past their window flip to `stale` (excluded from injection/consumption, kept for audit); refresh re-confirms or retires them |
-| Protected sections the LLM cannot touch (`identity`, `preferences`) | `plugin.yaml` high-risk sections (already enforced in `update_manifest`) + human-authored constraint lines marked `source: human` |
+| Protected sections the LLM cannot touch (`identity`, `preferences`) | `manifest.yaml` high-risk sections (already enforced in `update_manifest`) + human-authored constraint lines marked `source: human` |
 | **Read-only LLM judge** (weekly): reports contradictions/stale claims, never auto-fixes | Profile judge audits profile vs. last N RunTraces (commands that failed, modules that moved, checklist items that never fire) — findings become refresh proposals |
-| Git repo per profile: every save a commit, weekly diff emailed, `git revert` rollback | `plugins/<repo>/` is committed; every consolidation is one reviewed commit with the diff in the run report — rollback is `git revert` |
+| Git repo per profile: every save a commit, weekly diff emailed, `git revert` rollback | `adapters/<repo>/` is committed; every consolidation is one reviewed commit with the diff in the run report — rollback is `git revert` |
 
 ### V2.3.3 Establishment pipeline (extends Phase-0 bootstrap)
 

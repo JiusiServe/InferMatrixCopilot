@@ -1,7 +1,7 @@
-"""Repo-scoped knowledge for agent steps: plugin resolution, skill/debug-memory
+"""Repo-scoped knowledge for agent steps: adapter resolution, skill/debug-memory
 retrieval, and the read-only tools an agent uses to pull more on demand.
 
-Retrieval is scoped per repo — the active plugin's own store ranks before the
+Retrieval is scoped per repo — the active adapter's own store ranks before the
 shared pool, and skill-update *candidates* land in the repo's namespace (agents
 never edit active skills). `_repo_map_tool` exposes goal-ranked structure as a
 tool (design §V2.3.4 channel 3: structure is pulled, never injected wholesale).
@@ -18,24 +18,24 @@ from ...tools import ToolDef
 from ..step import StepContext
 
 
-def _resolve_plugin(ctx: StepContext):
-    """The active repo's plugin, when one is registered (never raises)."""
-    from ...plugins.base import PluginRegistry
+def _resolve_adapter(ctx: StepContext):
+    """The active repo's adapter, when one is registered (never raises)."""
+    from ...adapters.base import AdapterRegistry
 
-    registry = PluginRegistry(ctx.settings.plugins_dir)
+    registry = AdapterRegistry(ctx.settings.adapters_dir)
     spec = ctx.state.get("task_spec") or {}
     try:
-        plugin = registry.resolve(repo_path=ctx.state.get("repo_path") or None)
-        if plugin is None and spec.get("repo"):
-            plugin = registry.resolve(name=str(spec["repo"]).replace("-", "_"))
-        return plugin
+        adapter = registry.resolve(repo_path=ctx.state.get("repo_path") or None)
+        if adapter is None and spec.get("repo"):
+            adapter = registry.resolve(name=str(spec["repo"]).replace("-", "_"))
+        return adapter
     except Exception:
         return None
 
 
 class _ScopedKnowledge:
-    """Skill retrieval scoped per repo: the repo plugin's own store first, the
-    shared pool second (v2 P0 — the per-repo dirs existed on RepoPlugin but
+    """Skill retrieval scoped per repo: the repo adapter's own store first, the
+    shared pool second (v2 P0 — the per-repo dirs existed on RepoAdapter but
     were never wired in). Proposals land in the repo's namespace when one
     exists, so knowledge never leaks across repos."""
 
@@ -65,13 +65,13 @@ class _ScopedKnowledge:
 
 
 def _knowledge_stores(ctx: StepContext) -> _ScopedKnowledge:
-    """Build the per-repo `_ScopedKnowledge`: the active plugin's own skill
+    """Build the per-repo `_ScopedKnowledge`: the active adapter's own skill
     store first (when it differs from the shared dir), then the shared pool —
     the ordering that gives repo skills retrieval and proposal priority."""
     stores: list[SkillStore] = []
-    plugin = _resolve_plugin(ctx)
-    if plugin is not None and plugin.skills_dir != Path(ctx.settings.skills_dir):
-        stores.append(SkillStore(plugin.skills_dir))
+    adapter = _resolve_adapter(ctx)
+    if adapter is not None and adapter.skills_dir != Path(ctx.settings.skills_dir):
+        stores.append(SkillStore(adapter.skills_dir))
     stores.append(SkillStore(ctx.settings.skills_dir))
     return _ScopedKnowledge(stores)
 
@@ -90,13 +90,13 @@ def _retrieve_skills(ctx: StepContext, query: str) -> tuple[list[dict], "_Scoped
 
 def _retrieve_memories(ctx: StepContext, query: str) -> list[str]:
     """Search the debug-memory stores for `query` and return up to 3 one-line
-    `[module] symptom -> fix` hits. The repo plugin's DB is searched before the
+    `[module] symptom -> fix` hits. The repo adapter's DB is searched before the
     shared one so repo-scoped memories rank first; duplicate lines are dropped
     and any DB error is swallowed (retrieval never fails a step)."""
     dbs: list[Path] = []
-    plugin = _resolve_plugin(ctx)
-    if plugin is not None:
-        dbs.append(Path(plugin.debug_memory_db))
+    adapter = _resolve_adapter(ctx)
+    if adapter is not None:
+        dbs.append(Path(adapter.debug_memory_db))
     dbs.append(Path(ctx.settings.memory_db))
     hits: list[str] = []
     seen: set[str] = set()
@@ -159,20 +159,20 @@ def _knowledge_tools(store: "_ScopedKnowledge", ctx: StepContext) -> dict[str, T
     }
 
 
-def _repo_map_tool(ctx: StepContext, plugin) -> dict[str, ToolDef]:
+def _repo_map_tool(ctx: StepContext, adapter) -> dict[str, ToolDef]:
     """`repo_map` — goal-ranked, budgeted structure queries (design §V2.3.4
     channel 3: structure is pulled on demand, never injected as an overview)."""
     from ...profiles.repo_map import RepoMap
 
-    repo = ctx.state.get("repo_path") or (plugin.repo_path if plugin else "")
+    repo = ctx.state.get("repo_path") or (adapter.repo_path if adapter else "")
     if not repo or not Path(repo).exists():
         return {}
     language = "python"
     cache_dir = ctx.run_dir / "repo_map"
-    if plugin is not None:
-        language = str(plugin.manifest.get("repo", {}).get("language")
+    if adapter is not None:
+        language = str(adapter.manifest.get("repo", {}).get("language")
                        or "python")
-        cache_dir = plugin.root / "repo_map"
+        cache_dir = adapter.root / "repo_map"
     rmap = RepoMap(repo, language, cache_dir=cache_dir)
     if not rmap.supported:
         ctx.trace.record("capability_gap", capability=f"repo_map.{language}",

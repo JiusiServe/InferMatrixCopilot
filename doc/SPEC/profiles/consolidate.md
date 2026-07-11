@@ -6,7 +6,7 @@
 Deterministic Stage-4 helpers: staleness decay + drift detection.
 
 ## Public contract
-`decay_stale(store, days) -> stale ids`; `detect_drift(plugin, store) ->
+`decay_stale(store, days) -> stale ids`; `detect_drift(adapter, store) ->
 findings`.
 
 ## Invariants
@@ -20,7 +20,7 @@ Deterministic detection only — no LLM, no auto-fix (consolidation is the
 `agent.profile_consolidate` step).
 
 ## Dependencies (allowed)
-`plugins/base`, `profiles/store`; stdlib `time`.
+`adapters/base`, `profiles/store`; stdlib `time`.
 
 ## Tests
 `test_p3_machinery.py`.

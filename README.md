@@ -2,7 +2,7 @@
 
 Playbook-driven repo-maintenance copilot for [vLLM-Omni], implementing the
 architecture in `vllm-omni-rebase-agent/docs/copilot/copilot_design`
-(3-layer RepoPlugin / Target / Engine, Step abstraction, dynamic pipelines with
+(3-layer RepoAdapter / Target / Engine, Step abstraction, dynamic pipelines with
 reuse > adapt > generate, conversational CLI). See [doc/DESIGN.md](doc/DESIGN.md);
 new readers: start with the code walkthrough in [doc/CODE_TOUR.md](doc/CODE_TOUR.md).
 The normative per-layer specification (contracts, invariants, constraints) is
@@ -11,11 +11,11 @@ in [doc/SPEC/](doc/SPEC/README.md).
 ## Layout
 
 ```
-src/omni_copilot/   implementation (engine, playbooks, plugins, review, memory, CLI)
+src/omni_copilot/   implementation (engine, playbooks, adapters, review, memory, CLI)
 test/               pytest suite (no GPU, no network, no API key needed)
 doc/                design + implementation status
 playbooks/          registered playbooks (repo-rebase is LOCKED)
-plugins/            repo plugins (plugin zero: vllm_omni)
+adapters/            repo adapters (adapter zero: vllm_omni)
 ```
 
 ## Install & test
@@ -90,5 +90,5 @@ clarifying question, never a guessed execution. The planner then resolves
 - **Escalation**: blocked runs write `ESCALATION.md`, email if configured, and
   exit 3 — notify, never guess.
 - **Memory governance**: RunTrace records everything; debug memories require
-  root-cause + verification fields; skills/playbooks/plugins are
-  candidate-then-promote (high-risk plugin sections are human-only).
+  root-cause + verification fields; skills/playbooks/adapters are
+  candidate-then-promote (high-risk adapter sections are human-only).

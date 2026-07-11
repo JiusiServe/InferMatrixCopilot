@@ -12,7 +12,7 @@ utils) is separated from its two entry points (runner/ensemble).
 - `__init__.py` — public re-exports only (surface below); no logic.
 - `dispatch.py` — the agent **input contract**: `AgentDispatchContext` (+ its
   `render()`) and `BASE_OUTPUT_SCHEMA`. Prompt shape, isolated from control flow.
-- `knowledge.py` — repo-scoped knowledge: `_resolve_plugin`, `_ScopedKnowledge`,
+- `knowledge.py` — repo-scoped knowledge: `_resolve_adapter`, `_ScopedKnowledge`,
   `_knowledge_stores`, `_retrieve_skills`, `_retrieve_memories`,
   `_knowledge_tools`, `_repo_map_tool`.
 - `utils.py` — stateless helpers: `_build_evidence`, `_permissions_view`,
@@ -24,7 +24,7 @@ utils) is separated from its two entry points (runner/ensemble).
 
 ## Public contract (importable from `engine.agent_runtime`)
 `run_agent_step(...) -> (StepResult, output)`; `run_agent_step_ensemble(...)`;
-`AgentDispatchContext`; `BASE_OUTPUT_SCHEMA`; `_resolve_plugin`,
+`AgentDispatchContext`; `BASE_OUTPUT_SCHEMA`; `_resolve_adapter`,
 `_retrieve_skills` (used by steps/tests). The re-exporting `__init__` keeps the
 pre-split import paths (`from ..agent_runtime import X`) unchanged.
 
@@ -52,7 +52,7 @@ No task/planning logic; no repo literals (system prompt repo-neutral). Step-
 specific prompts/lenses live in the step file (e.g. `steps/review/prompts.py`).
 
 ## Dependencies (allowed)
-`agent_loop`, `llm`, `memory/*`, `plugins/base`, `profiles/repo_map`, `scopes`,
+`agent_loop`, `llm`, `memory/*`, `adapters/base`, `profiles/repo_map`, `scopes`,
 `tools`, `engine/step`.
 
 ## Extension points

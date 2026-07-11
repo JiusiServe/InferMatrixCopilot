@@ -95,7 +95,7 @@ class Fact:
 
 
 class ProfileStore:
-    """`<plugin>/profile/profile.yaml` + ops log + rendered views."""
+    """`<adapter>/profile/profile.yaml` + ops log + rendered views."""
 
     def __init__(self, root: str | Path):
         """Load the store rooted at `root`: reads `profile.yaml` if present into

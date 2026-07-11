@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from .dispatch import BASE_OUTPUT_SCHEMA, AgentDispatchContext
 from .ensemble import run_agent_step_ensemble
-from .knowledge import _resolve_plugin, _retrieve_skills
+from .knowledge import _resolve_adapter, _retrieve_skills
 from .runner import run_agent_step
 
 __all__ = [
@@ -24,6 +24,6 @@ __all__ = [
     "BASE_OUTPUT_SCHEMA",
     "run_agent_step",
     "run_agent_step_ensemble",
-    "_resolve_plugin",
+    "_resolve_adapter",
     "_retrieve_skills",
 ]

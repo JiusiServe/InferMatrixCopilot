@@ -28,4 +28,4 @@ No rebase logic of its own; no parsing beyond delegating to `rebase/monitor`.
 ## Refactor notes
 Acceptable. The one repo literal (`"vllm-omni-rebase-agent"`) is by-design
 delegation text — do not templatize it prematurely; if a second external
-orchestrator is ever wrapped, then extract the name to the plugin.
+orchestrator is ever wrapped, then extract the name to the adapter.

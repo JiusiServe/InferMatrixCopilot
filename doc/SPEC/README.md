@@ -73,7 +73,7 @@ Every `*.md` under the mirrored tree uses these headings, in this order:
 | Step library | `engine/steps/__init__` `engine/steps/_common` `engine/steps/{workspace,rebase_ext,review,report,pr,issue,profile,rebase_native}` |
 | Planning data | `playbooks/store` `playbooks/PLAYBOOKS` (the yaml) |
 | Edge — languages | `profiles/languages` (per-language rules, shared) |
-| Edge | `plugins/base` `ci/normalize` `ci/providers` `rebase/monitor` |
+| Edge | `adapters/base` `ci/normalize` `ci/providers` `rebase/monitor` |
 | Safety primitives | `scopes` `push` |
 | Profiles | `profiles/store` `profiles/establish` `profiles/repo_map` `profiles/consolidate` |
 | Cross-cutting | `review/{diff_summary,triggers,reviewer}` `memory/{debug_memory,skills}` `run_trace` `notify` `metrics` |

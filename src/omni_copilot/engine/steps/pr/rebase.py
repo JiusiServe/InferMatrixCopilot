@@ -166,13 +166,13 @@ async def _pr_rebase_onto_base(ctx: StepContext) -> StepResult:
 
 
 @step("pr.analyze_diff", "deterministic", "read",
-      "Changed files -> affected modules (plugin map).")
+      "Changed files -> affected modules (adapter map).")
 async def _pr_analyze_diff(ctx: StepContext) -> StepResult:
     """Map the rebased branch's changed files to affected modules for the
     per-module verification fan-out. Diffs `rebase_base_sha..HEAD` (`--numstat`)
-    for the file list, then resolves each path to a module via the repo's plugin
+    for the file list, then resolves each path to a module via the repo's adapter
     (`module_for_path`), falling back to the top-level directory (or "root") when
-    there is no plugin or match.
+    there is no adapter or match.
 
     Publishes to state (B2 `state_updates`): `affected_modules` / `touched_modules`
     (the module list) and `primary_files` (the changed paths, as `*`-globs for
@@ -186,17 +186,17 @@ async def _pr_analyze_diff(ctx: StepContext) -> StepResult:
         if len(parts) == 3:
             changed.append(parts[2])
 
-    # module mapping: plugin first, top-level dir fallback
-    plugin = None
+    # module mapping: adapter first, top-level dir fallback
+    adapter = None
     try:
-        from ....plugins.base import PluginRegistry
-        plugin = PluginRegistry(ctx.settings.plugins_dir).resolve(
+        from ....adapters.base import AdapterRegistry
+        adapter = AdapterRegistry(ctx.settings.adapters_dir).resolve(
             repo_path=str(repo)) if repo else None
     except Exception:
-        plugin = None
+        adapter = None
     modules: list[str] = []
     for path in changed:
-        mod = plugin.module_for_path(path) if plugin else None
+        mod = adapter.module_for_path(path) if adapter else None
         mod = mod or (path.split("/")[0] if "/" in path else "root")
         if mod not in modules:
             modules.append(mod)

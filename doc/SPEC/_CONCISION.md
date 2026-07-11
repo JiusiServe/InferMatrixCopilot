@@ -84,12 +84,12 @@ in each consumer (file-level sweep / empty module scan / "use grep").
 Add to `engine/steps/_common.py` and replace the repeated blocks:
 - `require_repo(ctx) -> Path | StepResult` — the **8** `repo is None → BLOCKED`
   guards across step files become one line each.
-- `plugin_or_result(ctx) -> RepoPlugin | StepResult` (or a `@needs_plugin`
-  decorator) — the **7** `_plugin_from_state` + `isinstance(..., StepResult)`
+- `adapter_or_result(ctx) -> RepoAdapter | StepResult` (or a `@needs_adapter`
+  decorator) — the **7** `_adapter_from_state` + `isinstance(..., StepResult)`
   guards in `profile.py`.
 - `no_llm_gap(ctx, step, effect) -> StepResult` — the **4** identical
   "no LLM → record `capability_gap` → return ok/skip" blocks.
-- `store_for(plugin) -> ProfileStore` — the **6** `ProfileStore(plugin.profile_dir)`
+- `store_for(adapter) -> ProfileStore` — the **6** `ProfileStore(adapter.profile_dir)`
   constructions in `profile.py`.
 *Invariant to preserve:* typed BLOCKED returns (B1), the `capability_gap` trace
 event (E2), and each step's public name/behavior.

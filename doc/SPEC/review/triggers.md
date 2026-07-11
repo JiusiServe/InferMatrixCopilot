@@ -12,7 +12,7 @@ knowledge_edit, high_risk_modules?) -> fired[]`; `ALL_RULES` (7).
 ## Invariants
 - Seven rules: `out_of_scope_edits, high_risk_modules, large_diff,
   tests_unavailable, full_file_fallback, before_push, knowledge_edit`.
-- High-risk modules come from the caller (plugin), settings only as fallback
+- High-risk modules come from the caller (adapter), settings only as fallback
   (**A5**).
 
 ## Scope — not here

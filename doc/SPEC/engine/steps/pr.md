@@ -44,7 +44,7 @@ mechanics (that is `ci/providers`); no agent governance (that is
 `agent_runtime`).
 
 ## Dependencies (allowed)
-`scopes`, `push`, `ci/*`, `plugins/base` (analyze), `engine/step`,
+`scopes`, `push`, `ci/*`, `adapters/base` (analyze), `engine/step`,
 `.._common`, `..agent_runtime`.
 
 ## Tests
