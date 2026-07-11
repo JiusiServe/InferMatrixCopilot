@@ -1,0 +1,20 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.55,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.85,
+    "actionability": 0.75
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "The one substantive ground-truth signal (yJader's inline comment) explains that the already_submitted guard removal is correct because both submit_initial and submit_update reject list prompts for diffusion — an approval-rationale, not a bug report, consistent with the two LGTM/APPROVED reviews. Y independently reproduces this exact reasoning almost verbatim (citing stage_pool.py:951 and 1022) and correctly recommends APPROVE, matching the actual outcome. X's surfaced review comments skip this reasoning entirely, instead flagging test-coverage as 'major'/blocking despite two clean approvals — grounded but miscalibrated and lower recall on the actual reviewer concern. Both are concrete and actionable, but Y is better grounded and much closer to what reviewers actually cared about.",
+  "_cost_usd": 0.14680200000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

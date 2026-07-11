@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.75,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.55,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X matches the ground-truth reviewer's core technical points (outer AutoWeightsLoader auto-applies the mapper, qwen2_old's getattr guard made removal a clean-up not a regression) and independently catches that hunyuan_image3_transformer.py (diffusion loader) was dropped from _STALE_API_FILES scope despite being listed in the PR's own failure output — this is exactly the missed caller that became issue #4891, hitting the latent gap. Y covers the same basic correctness ground but its 'major' finding fabricates/misattributes a PR-body quote about removing the test file not evidenced anywhere in the diff or ground truth, and its repo-wide grep conclusion ('All consumers covered') is confidently wrong, actively missing the gap the check is probing for. X's comments are also more concretely actionable (specific test-fix prescription) versus Y's verbose, trace-like output mixed with meta-fields.",
+  "_cost_usd": 0.2284804,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

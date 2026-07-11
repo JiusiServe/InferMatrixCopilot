@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.0,
+    "grounding": 0.0,
+    "completeness": 0.0
+  },
+  "y": {
+    "correctness": 0.95,
+    "grounding": 0.9,
+    "completeness": 0.9
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Candidate X's output is entirely unrelated to the issue (references a 'Mission Control'/cron-runs feature request), indicating a broken or mismatched run — it fails to engage with the HunyuanImage-3.0 bug at all. Candidate Y correctly diagnoses the root cause (base tokenizer missing extended ratio tokens, config forcing two-stage AR topology), cites specific file/line evidence, confirms the exact workaround FayeSpica validated, and proposes a concrete guard/fix plus docs clarification matching the maintainers' proposed fix and Gaohan123's request to track follow-up separately.",
+  "_cost_usd": 0.0357607,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

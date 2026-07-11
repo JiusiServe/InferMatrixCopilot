@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.6,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X independently verifies the mapper delegation logic against the real vLLM checkout (matching lishunyang12's LGTM reasoning), echoes the ground-truth's 'fake param doesn't prove real-checkpoint mapping' concern, and explicitly flags that the diffusion transformer loader (hunyuan_image3_transformer.py) was dropped from the PR's fix scope — directly hitting the latent gap about issue #4891. Y's two delivered comments (dead-code guard, keep-the-test-file) are individually grounded but narrower, miss the checkpoint-validation and diffusion-loader-sweep points entirely, and its REQUEST CHANGES verdict is miscalibrated against two real maintainer approvals; the review text is also oddly triplicated, suggesting an output artifact/reliability issue.",
+  "_cost_usd": 0.25237940000000003,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

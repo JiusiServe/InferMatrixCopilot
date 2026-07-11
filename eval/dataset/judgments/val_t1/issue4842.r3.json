@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.75,
+    "completeness": 0.7
+  },
+  "y": {
+    "correctness": 0.95,
+    "grounding": 0.9,
+    "completeness": 0.9
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly identify the ground truth root cause (default --run-level=core_model forcing dummy weights) and reach the same 'invalid' conclusion, citing akshatvishu/yenuo26. Y digs deeper with precise line-level citations across run_args.py, runtime.py, stage_config.py, and assertions.py, explains why the full_model pytest marker doesn't itself set run-level (a subtlety X misses), and addresses practical reporter concerns (video path, GPU memory split, hardware requirements) plus a constructive ergonomics suggestion. X's answer is correct and reasonably grounded but thinner on mechanism detail and wrapped in redundant report scaffolding rather than a clean maintainer reply.",
+  "_cost_usd": 0.0460924,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.5,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth shows no substantive reviewer concerns (just an 'lgtm' approval) for this purely mechanical attribute rename. X correctly approves, backing it with concrete, verified evidence (repo-wide grep, upstream vllm cross-check) rather than inventing issues. Y requests changes over a single 'missing test' nitpick on create_chat_completion's fallback path — grounded in the diff, but self-contradicted by its own assumptions log ('coverage exists in a separate test file'), and its review_text is duplicated verbatim three times, undermining confidence in the tool's reliability. Y's finding is more concretely actionable (named test function, exact lines) but lower precision given the internal contradiction and disproportionate REQUEST CHANGES verdict for a minor, scope-creeping ask on a trivial rename PR.",
+  "_cost_usd": 0.10516280000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

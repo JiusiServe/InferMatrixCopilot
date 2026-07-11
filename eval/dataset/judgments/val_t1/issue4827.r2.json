@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.92,
+    "grounding": 0.85,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.0,
+    "grounding": 0.0,
+    "completeness": 0.0
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X correctly diagnoses the base-tokenizer/Instruct-config mismatch, cites the exact crash site and matches the thread's confirmed workaround (hunyuan_image3_dit.yaml) plus the proposed guard/docs fix and correctly defers deeper hardening to a follow-up issue per Gaohan123's request. Y produced no answer at all — it aborted with an escalation about an entirely unrelated Mission Control cron-run dashboard feature, showing no engagement with issue #4827 whatsoever.",
+  "_cost_usd": 0.095554,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

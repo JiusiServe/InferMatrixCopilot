@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.5,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth is a clean 'lgtm' approval with no substantive concerns, and this PR is indeed a mechanical, upstream-aligned rename. X verifies the rename against the actual upstream vLLM source (the exact line that would have thrown AttributeError), confirms zero stray occurrences, and reaches an approve that matches reviewer sentiment with no fabricated claims. Y's single finding (missing test for the chat-completion 404 path) is grounded in the diff but is a pre-existing coverage gap, not something the PR broke, and escalating a self-labeled 'minor' issue to 'REQUEST CHANGES' is miscalibrated and contradicts the actual maintainer approval; the output is also oddly triplicated, suggesting a malfunction rather than a deliberate developer-facing review.",
+  "_cost_usd": 0.0817228,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.55,
+    "grounding": 0.6,
+    "completeness": 0.5
+  },
+  "y": {
+    "correctness": 0.55,
+    "grounding": 0.65,
+    "completeness": 0.6
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates correctly tie the failure to PR #4834's new wake_up() guard, matching yenuo26's thread comment that the error appeared after #4834 merged, and both cite real file/line locations in async_omni.py and the test file. However, the actual thread shows the issue is still unresolved and under investigation (Flink-ddd asking yenuo26 to trigger a full sleep-mode CI run), while both candidates confidently declare it a solved stale-test issue with the fix already on main — an overreach beyond what the thread established, and Y goes further by explicitly recommending closure. Y is marginally stronger on grounding/completeness (more code citations including the generate() partial-wake guard, plus runtime guidance for users), while X's answer is functionally a near-duplicate of itself and slightly thinner in scope.",
+  "_cost_usd": 0.0946274,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

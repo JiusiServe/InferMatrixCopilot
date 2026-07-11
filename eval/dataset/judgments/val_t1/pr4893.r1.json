@@ -1,0 +1,20 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.5,
+    "actionability": 0.6
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.75,
+    "actionability": 0.55
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Neither candidate surfaces the one substantive ground-truth concern (whether the new reduce_scatter hasattr assertions are sufficient verification), so recall is low for both. X finds some plausibly-real gaps (missing docstring, untested cfg_parallel_size=1 path, uncovered dp_metadata line) with concrete file/line asks, but the report is a messy, self-described failed/incomplete run (low confidence, 'retryable' failure, truncated text, evidence drawn from possibly stale htmlcov artifacts it admits are assumptions) that never reaches a verdict. Y is a coherent, well-grounded technical review that correctly verifies the DPMetadata construction, device_communicator plumbing, and cleanup logic, and lands on APPROVE — matching the actual outcome (Gaohan123 LGTM) — with one reasonably concrete nit. Y is more trustworthy and useful overall despite being slightly less exhaustive in raw comment count.",
+  "_cost_usd": 0.26509640000000007,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

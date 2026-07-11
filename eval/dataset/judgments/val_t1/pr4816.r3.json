@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.6,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth is a trivial merged rename PR with an 'lgtm' approval and no real concerns; X correctly matches this, verifying the rename against upstream and test updates without fabricating issues, and its one non-blocking note is accurate and well-grounded. Y did comparable diff verification but then issued a disproportionate 'REQUEST CHANGES' over a pre-existing test gap it itself admits isn't a regression from this PR, and mislabeled the finding's location (file=test_serving_speech.py but line=1164, which is actually the api_server.py getattr site, not a line in that test file), undermining both its precision and actionability. Neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.06474999999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

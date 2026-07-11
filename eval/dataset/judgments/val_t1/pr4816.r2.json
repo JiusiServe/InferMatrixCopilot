@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.4,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.6,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth is a trivial 'lgtm' approve on a pure mechanical rename with no substantive concerns, so recall is vacuous for both. X reaches the same correctly-grounded APPROVE verdict, verifying the rename against the upstream checkout and confirming test updates, though its citation of a specific upstream PR number (vllm#46022) is an unverified embellishment. Y does equally thorough grounding work but then issues 'REQUEST CHANGES' over a single minor test-coverage gap that its own assumptions list admits is 'pre-existing and not a regression from this PR' — a disproportionate, miscalibrated verdict versus the actual state of the PR, even though the underlying suggested test is concrete and actionable.",
+  "_cost_usd": 0.07066,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.7,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Neither candidate catches the substantive ground-truth concern (dsocek's suggestion to derive the naming/mapping from `_packed_modules_mapping`/`stacked_params_mapping`), though both independently converge on the adjacent 'derive default_components from `_dit_modules`' nit with solid grounding (pipeline_sdxl.py, registry.py, interface.py). X delivers a clean, well-calibrated review (COMMENT verdict matching the actual merged/approved outcome) plus a genuinely valid extra finding (silent no-op for text-encoder LoRA). Y's output is marred by verbatim triplication of the entire review_text and verdict, and lands on REQUEST CHANGES for what are objectively a minor/nit pair on an already twice-LGTM'd, merged PR — a miscalibrated severity call that hurts practical usefulness despite individually grounded claims.",
+  "_cost_usd": 0.19088480000000002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

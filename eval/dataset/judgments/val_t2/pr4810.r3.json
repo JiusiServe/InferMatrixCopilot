@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.45,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Y independently re-derives the ground-truth reviewer's own reasoning (AutoWeightsLoader applies the mapper upstream for delegated loaders, direct loaders must self-apply it) with concrete file:line citations, surfaces a sharper version of the GT's 'test doesn't validate on a real checkpoint' concern, and explicitly flags the dropped hunyuan_image3_transformer.py diffusion loader — exactly the latent gap later filed as #4891. X's two comments are thinner: the 'dead code guard' comment is undercut by its own internal diagnostics (which called the same guard 'intentional defense, not dead code'), and its diffusion-loader check concluded there was no issue, actively missing the gap Y caught. Both are reasonably actionable with file:line anchors, but X's low recall, weaker grounding, and false gap_hit put it clearly behind Y.",
+  "_cost_usd": 0.1067997,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

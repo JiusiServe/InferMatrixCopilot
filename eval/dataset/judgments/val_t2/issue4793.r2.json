@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.8,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.9,
+    "grounding": 0.8,
+    "completeness": 0.72
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly identify PR #4792 as the fix (already merged into the v0.24 rebase) for the #4527 regression that starved the downstream stage in non-async-chunk mode, matching the thread's resolution closely, including near-verbatim reproduction of the actual code/comment shown by the maintainer. X is organized as a clean, complete maintainer response — it addresses upgrade path, cherry-pick option, workaround, and proactively dismisses red herrings from the reporter's log (NVFP4 patch, timeout value differences), showing full engagement with the reporter's specific environment. Y's content is equally correct but the final output is cluttered with duplicated 'draft_answer' blocks and internal diagnostic scaffolding not scrubbed for presentation, and it omits addressing the reporter's other log details, making it feel less polished/complete as a direct answer despite a nice verification curl snippet.",
+  "_cost_usd": 0.1695763,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

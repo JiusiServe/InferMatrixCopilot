@@ -56,10 +56,13 @@ ISSUE_SCHEMA = ('{"x": {"correctness": 0.0, "grounding": 0.0, "completeness": 0.
 def _cc_judge(prompt: str) -> dict:
     env = {k: v for k, v in os.environ.items()
            if not k.startswith(("ANTHROPIC", "CLAUDE_CODE"))}
+    # tool-less judging: without the empty allowlist the model occasionally
+    # attempts a tool call and --max-turns 1 kills the run (error_max_turns,
+    # no result field); --max-turns 3 is headroom for a same-turn retry.
     out = subprocess.run(
-        ["claude", "-p", prompt, "--output-format", "json", "--max-turns", "1",
-         "--model", JUDGE_MODEL], capture_output=True, text=True, timeout=600,
-        env=env, cwd=str(OUT))
+        ["claude", "-p", prompt, "--output-format", "json", "--max-turns", "3",
+         "--allowedTools", "", "--model", JUDGE_MODEL],
+        capture_output=True, text=True, timeout=600, env=env, cwd=str(OUT))
     data = json.loads(out.stdout)
     text = str(data.get("result") or "")
     start, end = text.find("{"), text.rfind("}")

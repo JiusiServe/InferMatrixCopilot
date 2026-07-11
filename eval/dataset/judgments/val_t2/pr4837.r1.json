@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.8,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.6,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X's core reasoning (both submit_initial/submit_update reject list prompts, so gating on already_submitted was wrong) directly mirrors yJader's actual inline comment, and its APPROVE verdict matches the two real LGTM approvals — high grounding and precision. Y covers the same technical fact but mislabels it 'major' and requests changes despite the PR being approved by all reviewers, tacks on a speculative error-propagation concern that applies equally to the pre-existing code (not something the diff introduced), and repeats its entire review verbatim three times with a messy 'Run report' dump, hurting precision and actionability.",
+  "_cost_usd": 0.17890930000000002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

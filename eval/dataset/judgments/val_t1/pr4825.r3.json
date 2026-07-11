@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.25,
+    "precision": 0.8,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates converge on the same core design critique (derive default_components from existing declared metadata like _dit_modules rather than hardcoding), which is grounded but only tangentially related to the actual ground-truth concern (dsocek's suggestion to derive naming from _packed_modules_mapping/stacked_params_mapping for fused-projection renames), so recall is low and similar for both. X adds a second well-grounded, actionable finding (text-encoder LoRA silent no-op) with a concrete warning-log suggestion, and presents everything as a clean, human-readable review with clear verdict framing. Y's output is a raw harness/tool-log dump (fetch state, gate report, assumptions list, duplicated diff text) that buries its one actionable comment in noise, hurting actionability despite comparable technical grounding.",
+  "_cost_usd": 0.09680249999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

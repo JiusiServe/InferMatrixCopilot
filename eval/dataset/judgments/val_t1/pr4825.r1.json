@@ -1,0 +1,20 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.75,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.7
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently surface the one substantive reviewer concern visible in the diff — that default_components is a hardcoded, drift-prone list that should instead be derived from each pipeline's declared denoiser metadata (echoing dsocek's request to drive naming off existing mappings) — and both ground it with specific file:line citations. X goes further, adding a second concrete, well-reasoned finding (text-encoder LoRA is still a silent no-op, same failure class the PR itself describes) plus a suggested mitigation (warn on zero-replacement loads), giving more actionable value, though that finding is less rigorously cited than Y's evidence trail. Y's single finding is more exhaustively verified (multiple files read, explicit grep evidence) but the output is a messy raw tool-state dump that buries the actual comment, and it offers only one point versus X's two. Neither includes a LATENT GAP CHECK section, so gap_hit is false for both.",
+  "_cost_usd": 0.174954,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

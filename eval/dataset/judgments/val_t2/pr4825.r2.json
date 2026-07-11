@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.55,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates independently converge on the same substantive design point ground truth reviewer dsocek raised (hardcoded default_components duplicates per-pipeline metadata; derive from a single source of truth), giving comparable recall. X is better calibrated: it recommends COMMENT/approve-level, matching the actual outcome (two LGTM approvals), and adds a plausible, well-grounded extra finding (text-encoder LoRA silent no-op) with clean, non-redundant output. Y recommends REQUEST CHANGES — a mismatch with the real merge outcome — and its test-coverage ask (require a real StableDiffusionXLPipeline instantiation) is inconsistent with the codebase's established bare-nn.Module unit-test convention, weakening precision; Y's output is also verbatim tripled, a generation artifact that undercuts trust and clarity.",
+  "_cost_usd": 0.0782119,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.8,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.8,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The one substantive ground-truth point (removing the already_submitted gate is safe because both submit_initial and submit_update reject list prompts identically) is almost verbatim reproduced by X ('both raise ValueError... confirming the fix is exactly right'), while Y's version only reasons about the first-call case and misses the broader payload-contract argument. Both candidates are reasonably grounded (verified via actual file/line reads), but X delivers it as a clean, scannable review with precise file:line comments, whereas Y's output is a noisy raw pipeline dump (state_updates, files_read, assumptions) that buries the actionable review_comments and lands on an unwarranted REQUEST CHANGES verdict against a PR that was cleanly approved. X is the stronger, more actionable review.",
+  "_cost_usd": 0.14853200000000003,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

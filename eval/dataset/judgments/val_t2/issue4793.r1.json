@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.8,
+    "grounding": 0.6,
+    "completeness": 0.7
+  },
+  "y": {
+    "correctness": 0.85,
+    "grounding": 0.9,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly identify PR #4792 as the fix for the #4527 regression and match the ground-truth thread resolution. Y is far more grounded, citing precise file:line references across the coordinator, scheduler mixin, and connector code, quoting exact log strings, and explaining the mechanism specific to multi-stage full-payload-consumer stages (matching the issue title) rather than just the generic runner change. Y is also more complete: it gives concrete next steps (upgrade/cherry-pick/workaround), flags red herrings in the user's environment dump, and offers a clear reopen path, whereas X's citations are approximate and it omits the architectural 'why multi-stage hangs' detail.",
+  "_cost_usd": 0.09086039999999998,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

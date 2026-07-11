@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 1.0,
+    "grounding": 0.95,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 1.0,
+    "grounding": 0.85,
+    "completeness": 0.55
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both correctly identify the #4527 regression (non-async-chunk branch nulling the inter-stage payload) and that PR #4792 already fixes it in the 0.24 rebase, matching the thread resolution. X is grounded almost word-for-word in the exact code comment shown in the ground truth diff, and delivers a clean maintainer-style answer with concrete next steps (upgrade/cherry-pick/workaround) plus a note dismissing red herrings in the reporter's env. Y reaches the same correct diagnosis and even cites extra NPU-runner files, but the output is a raw, unpolished internal 'run report' full of duplicated JSON/state-dump scaffolding rather than a coherent answer to the reporter, and it never gives explicit actionable guidance — hurting completeness and usability despite comparable technical accuracy.",
+  "_cost_usd": 0.06030959999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

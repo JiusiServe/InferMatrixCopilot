@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.55,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates correctly identify and explain the sole ground-truth concern (already_submitted guard removal), with near-identical grounding in stage_pool.py's list-rejection behavior. X pads its review with three verbatim-duplicated blocks and two overlapping 'add tests' findings, and its verdict (REQUEST CHANGES) contradicts its own analysis that both fixes are correct, undermining precision and coherence. Y is concise, non-redundant, verifies the same claims with equally solid evidence, and its APPROVE verdict with non-blocking suggestions matches the actual review outcome (two LGTM approvals), making it more grounded and useful overall.",
+  "_cost_usd": 0.1730093,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

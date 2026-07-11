@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.85,
+    "completeness": 0.75
+  },
+  "y": {
+    "correctness": 0.85,
+    "grounding": 0.75,
+    "completeness": 0.85
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly diagnose the deploy-config mismatch (base checkpoint + hunyuan_image_3_moe.yaml → missing extended ratio tokens) and give the same confirmed workaround, matching the thread. X is better grounded because it explicitly ties the regression to PR #2713 and the old 'modes' filtering, which is the actual causal narrative the reporter and maintainer thread center on, while Y omits that PR reference and adds unverified extra code lines (_start_ratio_id/_end_ratio_id) and a differing class name, introducing some grounding risk. Y is more complete, offering an actual code diff for the guard and docs fix, but its 'graceful degradation' code suggestion drifts slightly from the thread's simpler 'fail fast' guard proposal. Net effect is a close call favoring X on correctness/grounding fidelity to the real resolution.",
+  "_cost_usd": 0.2166143,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

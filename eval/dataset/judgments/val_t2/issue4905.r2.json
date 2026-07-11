@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.55,
+    "grounding": 0.55,
+    "completeness": 0.7
+  },
+  "y": {
+    "correctness": 0.55,
+    "grounding": 0.6,
+    "completeness": 0.45
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "The ground-truth thread is inconclusive (maintainers still triaging, asking for a full CI trigger), so neither candidate's confident 'test mismatch from #4834, already fixed as level=1' diagnosis is thread-confirmed, though it is plausible and consistent with the traceback text itself. Both cite the same async_omni.py guard logic and test file lines with similar specificity, so grounding is close; Y edges slightly ahead by exposing an explicit files_read trace showing it actually inspected the repo rather than just asserting line numbers. However, Y's response is not a usable maintainer-style answer — it dumps raw harness metadata (task dict, 'Run report', duplicated draft_answer twice verbatim, blockers/confidence/failure_kind fields) that leaks internal agent state and buries the actual answer, hurting completeness/usability. X delivers the same technical conclusion in a single clean, actionable maintainer comment with a closing recommendation and broader user guidance.",
+  "_cost_usd": 0.1742063,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

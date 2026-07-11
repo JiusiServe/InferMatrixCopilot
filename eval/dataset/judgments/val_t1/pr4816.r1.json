@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.55,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both correctly verify the mechanical rename is complete and consistent with upstream, and ground truth (a bare 'lgtm' approval) has no substantive concerns to recall. X reaches an accurate APPROVE verdict grounded entirely in the diff, with honest non-blocking notes. Y also verifies the rename correctly but then issues a REQUEST CHANGES verdict over a missing chat-completion fallback test that Y's own assumptions admit is a pre-existing gap unrelated to this PR's scope, and mislabels the finding's location (cites test_serving_speech.py:1164, a line number that actually belongs to api_server.py's chat-completion handler), which hurts precision and actionability despite the underlying observation being real.",
+  "_cost_usd": 0.131072,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

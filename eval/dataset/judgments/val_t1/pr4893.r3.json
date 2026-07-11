@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.6,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Neither candidate caught the one substantive ground-truth ask (whether the test should verify the reduce_scatter param, not just device_communicator/hasattr), so recall is low for both, with Y getting a slight edge for raising related test-coverage gaps (missing cfg_parallel_size=1 case, missing docstring, uncovered dp_metadata line). X's findings are cleaner and more clearly grounded in verified vLLM API behavior with a coherent verdict, while Y's output is a noisy internal run-report that self-reports 'exhausted iteration limit,' 'low confidence,' and unverifiable htmlcov evidence, undercutting trust in its otherwise concrete file/line suggestions. Y is marginally more actionable per-comment, but X is more reliable and professionally usable overall.",
+  "_cost_usd": 0.11108390000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

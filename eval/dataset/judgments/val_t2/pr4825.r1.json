@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.55,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates independently converge on the same real reviewer concern (dsocek's 'derive the component list from existing per-pipeline metadata instead of hardcoding'), giving them comparable recall, and Y adds a plausible, well-evidenced test-coverage gap (no SDXL-pipeline-level test) that X misses. However, Y's verdict is 'REQUEST CHANGES' — printed three times, redundantly — despite its own findings being labeled minor/nit, directly contradicting the ground truth of two unconditional LGTM approvals and a merged PR; this is a real calibration failure that undercuts precision. X's 'COMMENT, approve-level, non-blocking' verdict matches the actual outcome, and it also correctly credits the PR body's before/after validation images, addressing xuechendi's validation-result ask that Y ignores entirely.",
+  "_cost_usd": 0.1850423,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.3,
+    "grounding": 0.6,
+    "completeness": 0.45
+  },
+  "y": {
+    "correctness": 0.75,
+    "grounding": 0.8,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly diagnose the root cause and correctly resolve to 'duplicate of #4808' matching the ground truth, but X confidently asserts #4808 is 'merged' and the fix is already live on main, then tells the reporter to just git-pull and run a test — without verifying PR merge state. Y actually checks and reports #4808 is CLOSED with mergedAt null, flags this as an open question rather than asserting resolution, and additionally finds a concrete grounded gap (the regression test's _STALE_API_FILES list omits the diffusion file, explaining how this slipped through). Y's hedged-but-verified stance is more useful and more accurate than X's confident but likely-wrong 'already fixed' claim, and Y's completeness (triage history, test-gap fix, merge-confirmation ask) better serves the reporter's actual situation.",
+  "_cost_usd": 0.05412349999999999,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

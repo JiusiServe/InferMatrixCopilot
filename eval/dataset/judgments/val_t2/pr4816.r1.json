@@ -1,0 +1,20 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.4,
+    "actionability": 0.5
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Ground truth is an uncontested 'lgtm' approve on a pure rename; X matches this outcome with grounded verification (confirmed no stale references, confirmed alignment with upstream's actual attribute name/call site) and clear, concrete evidence. Y instead issues a REQUEST CHANGES verdict over a self-tagged '[minor]' test-coverage nitpick (missing test for the chat-completion fallback path) that is not itself a bug introduced by this diff, contradicting its own severity label and the actual merged outcome; it also renders the identical comment three times, undermining reliability.",
+  "_cost_usd": 0.0665628,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

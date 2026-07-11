@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.35,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Y grounds every claim in specific upstream file/line evidence, correctly identifies that the diffusion loader (hunyuan_image3_transformer.py) was dropped from this PR's sweep despite being listed as affected — a direct hit on the latent gap later surfaced by #4891 — and its test-weakness critique echoes the ground truth's concern about unverified real-checkpoint behavior. X asserts a repo-wide grep found 'zero hits' outside the test file, which is factually wrong and contradicts the very gap the check probes for, and its 'major' finding hinges on a PR-body quote about removing the test file that appears nowhere in the provided diff/ground truth, suggesting fabrication. Both cover the baseline correctness of the mapper migration, but Y is far more precise, actionable, and the only one to surface the real gap.",
+  "_cost_usd": 0.2176454,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

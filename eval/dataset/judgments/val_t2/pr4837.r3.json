@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.95,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.75,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates correctly diagnose the two real bugs and X's analysis of orchestrator.py:1290 tracks the ground-truth reviewer's exact reasoning (both submit_initial/submit_update reject lists, so gating on already_submitted was wrong) concisely and lands on APPROVE, matching the actual outcome (two LGTMs). Y repeats the identical review verbatim three times (a generation artifact) and its REQUEST CHANGES verdict is miscalibrated against reality since all its findings are non-blocking; it also includes one weaker/misleading finding (implying the error-propagation isinstance check is a new regression when the same check existed pre-diff). Y's test-coverage suggestions are grounded but generic, slightly diluting precision and actionability relative to X's tighter, better-grounded review.",
+  "_cost_usd": 0.090578,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

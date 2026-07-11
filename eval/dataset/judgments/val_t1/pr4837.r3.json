@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.6,
+    "actionability": 0.45,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X's review directly reconstructs the ground-truth reviewer's core insight — that submit_initial and submit_update both reject list prompts for diffusion, so gating the unwrap on already_submitted was wrong — with precise file:line grounding, matching the single substantive human comment almost exactly. Y verifies similar facts but never articulates that both-paths-reject-list reasoning, instead pivoting to a REQUEST CHANGES verdict over missing tests (a reasonable but secondary concern, and contradicted by two clean LGTM approvals), and its output leaks raw agent-run artifacts (state_updates, dropped-candidate notes, 'budget exhausted' hedges) that bury the actionable findings and hurt clarity. X is also internally consistent and delivered as a clean, mergeable-review format, whereas Y reads like an unpolished log dump.",
+  "_cost_usd": 0.0665336,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

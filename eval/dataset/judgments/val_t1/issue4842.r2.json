@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.85,
+    "completeness": 0.75
+  },
+  "y": {
+    "correctness": 0.95,
+    "grounding": 0.9,
+    "completeness": 0.95
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly diagnose the run-level/dummy-weight root cause matching the thread's 'invalid' resolution and cite specific test-helper files/functions. Y goes further: it explains the crucial nuance that pytest.mark.full_model is a selection marker, not a run-level setter (clarifying why node-ID selection didn't prevent the bug), addresses both the text ('Joe') and audio (Welsh noise) symptoms, lists concrete prerequisites (real weights, GPU memory split, video path), and adds a reasonable forward-looking suggestion (warn/skip guard) without contradicting the closed-as-invalid outcome. X's answer is also correct and grounded but slightly less complete and appears truncated at the end.",
+  "_cost_usd": 0.216034,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.95,
+    "grounding": 0.8,
+    "completeness": 0.75
+  },
+  "y": {
+    "correctness": 0.95,
+    "grounding": 0.9,
+    "completeness": 0.9
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly diagnose this as a run-level misconfiguration (not a bug) matching the thread's 'invalid' resolution, and both cite real code paths (run_args.py default, stage_config.py's dummy-load-format patching). Y digs deeper and more precisely — it distinguishes the pytest.mark.full_model marker (categorization only) from --run-level (actual behavior), cites additional files (runtime.py fixture logic, assertions.py), flags the A100-vs-declared-H100/MI325 hardware mismatch, and proposes a concrete forward-looking guard against the 'silent downgrade' footgun. X's report is also solid but shallower in citations and marred by a verbatim-duplicated/truncated answer section, a minor polish issue.",
+  "_cost_usd": 0.070521,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

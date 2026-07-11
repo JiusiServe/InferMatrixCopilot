@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.55,
+    "grounding": 0.7,
+    "completeness": 0.5
+  },
+  "y": {
+    "correctness": 0.75,
+    "grounding": 0.7,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly land on 'duplicate of #4808,' matching the thread, but Y also surfaces the #4809 triage-issue reference that the maintainer explicitly pointed to, while X omits it entirely. X asserts 'already fixed on main' with high confidence yet its own findings note PR #4808 is CLOSED (not merged), an unresolved contradiction it never addresses; Y instead flags this exact gap (mergedAt null) as an open question needing confirmation, which is the more epistemically honest move on a genuinely unverified point. Y is also more complete, proposing a concrete regression-test coverage fix tied to why the bug slipped through, whereas X's answer stops at 'already fixed, no further action.'",
+  "_cost_usd": 0.15727699999999997,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}
