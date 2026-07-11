@@ -130,7 +130,7 @@ async def _review_diff(ctx: StepContext) -> StepResult:
     if result.ok:
         review_md = _render_review_md(output)
         ctx.state["review_text"] = review_md
-        result.outputs["review_text"] = review_md[:4_000]
+        result.outputs["review_text"] = review_md
         result.outputs.setdefault("state_updates", {})["review_text"] = review_md
         result.summary = (f"review produced ({len(output.get('review_comments') or [])} "
                           f"comments) — {result.summary}")

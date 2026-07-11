@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+import uuid
 from pathlib import Path
 
 import yaml
@@ -124,7 +125,8 @@ class Copilot:
         if code is not None:
             return code
 
-        run_id = f"run-{time.strftime('%Y%m%d-%H%M%S')}"
+        run_id = (f"run-{time.strftime('%Y%m%d-%H%M%S')}"
+                  f"-{uuid.uuid4().hex[:6]}")  # unique — same-second runs collided
         run_dir = self.settings.run_root / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
         (run_dir / "task.json").write_text(json.dumps({
@@ -159,7 +161,8 @@ class Copilot:
             prompt=f"Run {playbook.status} playbook '{name}'?")
         if code is not None:
             return code
-        run_id = f"run-{time.strftime('%Y%m%d-%H%M%S')}"
+        run_id = (f"run-{time.strftime('%Y%m%d-%H%M%S')}"
+                  f"-{uuid.uuid4().hex[:6]}")  # unique — same-second runs collided
         run_dir = self.settings.run_root / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
         (run_dir / "task.json").write_text(json.dumps({

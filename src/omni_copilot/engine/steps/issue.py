@@ -79,9 +79,24 @@ def _issue_agent_step(step_name: str, purpose: str, guidance: str,
         if result.ok:
             key, text = render(output)
             ctx.state[key] = text
-            result.outputs[key] = text[:4_000]
+            result.outputs[key] = text
             result.outputs.setdefault("state_updates", {})[key] = text
             result.summary = f"{key} produced — {result.summary}"
+        elif result.failure is FailureKind.ESCALATE:
+            # An incomplete-but-substantive draft ships with caveats instead of
+            # being discarded (eval: 3 escalated runs held correct diagnoses and
+            # delivered nothing). Empty/thin drafts still escalate.
+            key, text = render(output)
+            if len(text.strip()) > 300:
+                text = (f"> ⚠ draft shipped with caveats — agent self-assessed "
+                        f"confidence: {output.get('confidence', 'low')}; "
+                        f"verify before relying on it.\n\n{text}")
+                ctx.state[key] = text
+                result = StepResult(
+                    True, summary=f"{key} produced with caveats — {result.summary}",
+                    outputs={**result.outputs, key: text},
+                    changed_files=result.changed_files)
+                result.outputs.setdefault("state_updates", {})[key] = text
         return result
 
     return handler

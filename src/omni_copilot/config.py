@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     agent_model: str = "claude-sonnet-5"
     reviewer_model: str = ""  # empty -> agent_model
     intent_model: str = ""  # empty -> agent_model
-    llm_max_tokens: int = 8000
+    llm_max_tokens: int = 16000  # 8k truncated verbose lens replies mid-JSON
 
     # Repos
     default_repo: str = "vllm-omni"

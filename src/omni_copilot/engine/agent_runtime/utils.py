@@ -79,7 +79,7 @@ def _coerce_output(text: str, ctx: StepContext, contract: dict) -> dict | None:
                 "defaults, keep all substance):\n"
                 + json.dumps(contract, ensure_ascii=False)),
         messages=[{"role": "user", "content": str(text)[:20_000]}],
-        max_tokens=4000)
+        max_tokens=8000)  # repair reply must fit a full contract
     obj = parse_json_reply(reply.text)
     return obj if isinstance(obj, dict) and obj.get("status") else None
 
