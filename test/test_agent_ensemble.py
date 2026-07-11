@@ -75,9 +75,10 @@ def test_ensemble_fans_out_and_merges(settings, trace, tmp_path):
     assert "lenses" not in output["items"][0]  # tags stripped from the result
     assert result.summary.startswith("[ensemble x2]")
 
-    # each lens got its focus; the merger got the numbered candidates + evidence
-    assert "look at A" in llm.calls[0]["system"]
-    assert "look at B" in llm.calls[1]["system"]
+    # each lens got its focus (at the prompt tail — static-system invariant);
+    # the merger got the numbered candidates + evidence
+    assert "look at A" in llm.calls[0]["messages"][0]["content"]
+    assert "look at B" in llm.calls[1]["messages"][0]["content"]
     merge = llm.calls[2]
     assert "verify-and-merge" in merge["system"]
     body = merge["messages"][0]["content"]
@@ -216,10 +217,13 @@ class KeyedLLM:
                max_tokens=None, on_text=None):
         with self._lock:
             self.calls.append({"system": system, "messages": [*messages]})
+        # lens markers ride the user prompt now (static-system invariant);
+        # match on system + first-message content so either placement keys.
+        haystack = system + "\n" + str(messages[0].get("content", ""))
         for key, reply in self._by_key.items():
-            if key in system:
+            if key in haystack:
                 return reply
-        raise AssertionError(f"no scripted reply matches system: {system[:80]}")
+        raise AssertionError(f"no scripted reply matches: {haystack[:80]}")
 
 
 def test_ensemble_parallel_lenses_merge(settings, trace, tmp_path):

@@ -24,6 +24,7 @@ def settings(tmp_path: Path) -> Settings:
         ensemble_parallel=False,  # ordered ScriptedLLM fakes need determinism;
                                   # the parallel path has its own keyed-fake test
         ensemble_samples_per_lens=1,  # sampling tests opt in explicitly
+        ensemble_stagger_seconds=0,  # tests never sleep for cache warm-up
     )
 
 

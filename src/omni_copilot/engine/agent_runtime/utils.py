@@ -24,11 +24,16 @@ _FAILURE_KINDS = {k.value: k for k in FailureKind}
 def _build_evidence(ctx: StepContext, evidence: dict[str, str],
                     cap: int | None = None) -> tuple[dict, dict]:
     """Cap each item; archive the full text in the run dir for tool access."""
-    cap = cap or ctx.settings.evidence_item_chars
+    explicit = cap  # an explicit caller cap (e.g. the reducer) always wins
+    # per-name overrides: bulky shared evidence (the PR diff) belongs in the
+    # prompt ONCE — inside the cross-lens cached prefix — not re-read by every
+    # lens as private (uncached) tool results
+    caps = getattr(ctx.settings, "evidence_caps", {}) or {}
     capped: dict[str, str] = {}
     refs: dict[str, str] = {}
     ev_dir = ctx.run_dir / "evidence"
     for name, text in evidence.items():
+        cap = explicit or caps.get(name, ctx.settings.evidence_item_chars)
         text = str(text or "")
         if len(text) > cap:
             ev_dir.mkdir(parents=True, exist_ok=True)

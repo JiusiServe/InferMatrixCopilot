@@ -76,12 +76,14 @@ def test_review_runtime_flow(settings, trace, tmp_path, git_repo):
     assert review.endswith("**Verdict:** REQUEST CHANGES")
 
     # dispatch context reached the model: evidence fenced, gate report included,
-    # checklist guidance in system, contract demanded
+    # checklist guidance at the prompt TAIL (the system prompt stays static so
+    # sibling lenses share one cached prefix), contract demanded
     first = llm.calls[0]
     prompt = first["messages"][0]["content"]
     assert "MERGE STATE: DIRTY" in prompt and "OUTPUT CONTRACT" in prompt
     assert "PERMISSIONS" in prompt and "<untrusted_data>" in prompt
-    assert "Breaking behavior" in first["system"]
+    assert "Breaking behavior" in prompt
+    assert "Breaking behavior" not in first["system"]  # static-system invariant
     # knowledge tools offered alongside scoped read tools
     tool_names = {t["name"] for t in first["tools"]}
     assert {"read_file", "skill_search", "gh_pr_view"} <= tool_names

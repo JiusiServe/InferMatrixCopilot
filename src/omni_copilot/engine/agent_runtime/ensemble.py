@@ -60,10 +60,16 @@ async def run_agent_step_ensemble(
     budget = max_iters or ctx.settings.ensemble_lens_max_iters
     k = max(1, int(ctx.settings.ensemble_samples_per_lens))
 
-    async def _one_lens(lens: dict, j: int) -> tuple[str, StepResult, dict]:
+    async def _one_lens(lens: dict, j: int, idx: int = 0) -> tuple[str, StepResult, dict]:
         """Run `run_agent_step` once for a single lens (sample `j`), instructing
         the agent to go DEEP on that lens as its depth priority while peers cover
-        the rest. Returns the lens name, the StepResult, and the output dict."""
+        the rest. `idx` staggers concurrent starts: lenses share a byte-identical
+        prompt prefix (tools+system+dispatch render), so giving the first lens a
+        head start lets the provider cache the prefix before the siblings send
+        it — simultaneous identical prefixes all miss. Returns the lens name,
+        the StepResult, and the output dict."""
+        if idx and ctx.settings.ensemble_stagger_seconds > 0:
+            await asyncio.sleep(idx * ctx.settings.ensemble_stagger_seconds)
         suffix = f"/{j}" if k > 1 else ""
         lens_guidance = (
             f"{guidance}\n\n## Your assigned lens: {lens['name']}\n"
@@ -84,7 +90,8 @@ async def run_agent_step_ensemble(
     # sequential ensemble's wall-clock was its whole efficiency penalty
     jobs = [(lens, j) for lens in lenses for j in range(1, k + 1)]
     if ctx.settings.ensemble_parallel and len(jobs) > 1:
-        runs = await asyncio.gather(*(_one_lens(lens, j) for lens, j in jobs))
+        runs = await asyncio.gather(
+            *(_one_lens(lens, j, idx) for idx, (lens, j) in enumerate(jobs)))
     else:
         runs = [await _one_lens(lens, j) for lens, j in jobs]
     samples = [(name, output) for name, _, output in runs if output]

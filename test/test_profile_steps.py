@@ -241,4 +241,5 @@ def test_review_guidance_from_profile(settings, trace, tmp_path, git_repo):
              "repo_path": str(git_repo), "diff_text": "+++ b/a.py\n@@ +1\n+x=1"}
     result = _run(settings, trace, tmp_path, "agent.review_diff", state, llm=llm)
     assert result.ok
-    assert "wave-1 module import contract" in llm.calls[0]["system"]
+    assert ("wave-1 module import contract"
+            in llm.calls[0]["messages"][0]["content"])  # guidance rides the prompt

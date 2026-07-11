@@ -102,7 +102,10 @@ def run_agent(
                      "Your tool budget is exhausted. Produce your FINAL answer "
                      "now from what you have already gathered (follow the "
                      "output contract if one was given). Do not call tools."})
-    reply = llm.create(system=system, messages=messages, tools=[], model=model)
+    # same tools list on purpose: tools serialize BEFORE system in the
+    # request, so switching to [] here busts the prompt-cache prefix on
+    # the longest call of the loop (truncated runs paid a full re-read)
+    reply = llm.create(system=system, messages=messages, tools=tools, model=model)
     if reply.usage:
         usage_in += reply.usage.get("input_tokens", 0)
         usage_out += reply.usage.get("output_tokens", 0)

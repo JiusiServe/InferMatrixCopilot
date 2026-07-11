@@ -63,7 +63,12 @@ class Settings(BaseSettings):
     review_max_iters: int = 12          # tool-loop budget for agent steps
     skills_dir: Path = _REPO_ROOT / "skills"
     memory_db: Path = Path.home() / ".omni-copilot" / "debug_memory.db"
-    evidence_item_chars: int = 6000     # per-item cap; full text archived to run dir
+    evidence_item_chars: int = 24000  # was 6000: starving lenses pushed them
+                                      # to re-read full files as per-lens tool
+                                      # results — uncached tokens x n_lenses;
+                                      # evidence lives ONCE in the shared
+                                      # cached prefix instead
+    evidence_caps: dict[str, int] = {"pr_diff": 120_000, "issue_text": 30_000}     # per-item cap; full text archived to run dir
     skills_top_k: int = 3
 
     # Ensemble agent steps (run_agent_step_ensemble): perspective-diverse
@@ -72,7 +77,12 @@ class Settings(BaseSettings):
     ensemble_parallel: bool = True      # lenses are independent — run concurrently
     ensemble_samples_per_lens: int = 1  # >1 buys union recall at ~linear cost;
                                         # measured: 2x cost, no recall gain (eval iter-3)
-    ensemble_lens_max_iters: int = 6    # per-lens tool budget — replicate means
+    ensemble_stagger_seconds: float = 8.0  # head start for lens 0 so the
+                                        # shared prompt prefix is cached
+                                        # before sibling lenses send it
+    ensemble_lens_max_iters: int = 10  # rounds are ~3x cheaper with windowed
+                                       # reads; 6 starved lenses into paging
+                                       # death (and 38/40 truncated at T0)    # per-lens tool budget — replicate means
                                         # dropped when this was cut to 4 (recall
                                         # starvation); 6 is the measured setting
     ensemble_merge_evidence_chars: int = 35_000

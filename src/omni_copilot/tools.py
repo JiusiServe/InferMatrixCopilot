@@ -29,11 +29,20 @@ class ToolDef:
     write_path_arg: str | None = None  # arg holding the path a write lands on
 
 
-def _read_file(path: str, max_bytes: int = 200_000, **_: Any) -> str:
-    """Read `path` as UTF-8 (undecodable bytes replaced), truncated to
-    `max_bytes`. Returns the file text."""
+def _read_file(path: str, max_bytes: int = 48_000, offset: int = 0,
+               **_: Any) -> str:
+    """Read `path` as UTF-8 (undecodable bytes replaced), returning a bounded
+    window of `max_bytes` chars starting at char `offset`. Unbounded reads
+    ballooned agent histories (a 50k-token file ingested whole per lens both
+    multiplies uncached tokens and pushes conversations past the provider's
+    reliable prompt-cache range) — read in windows and page with `offset`."""
     data = Path(path).read_text(encoding="utf-8", errors="replace")
-    return data[:max_bytes]
+    window = data[offset:offset + max_bytes]
+    if offset + max_bytes < len(data):
+        window += (f"\n...[truncated at char {offset + max_bytes} of "
+                   f"{len(data)} — call read_file again with "
+                   f"offset={offset + max_bytes} for more]")
+    return window
 
 
 def _write_file(path: str, content: str, **_: Any) -> str:
@@ -96,7 +105,11 @@ _S = {"type": "string"}
 TOOLS: dict[str, ToolDef] = {
     t.name: t
     for t in [
-        ToolDef("read_file", "Read a text file.", _schema({"path": _S}, ["path"]), _read_file),
+        ToolDef("read_file",
+                "Read a text file (windowed: 48k chars per call; page with "
+                "offset).",
+                _schema({"path": _S, "offset": {"type": "integer"}}, ["path"]),
+                _read_file),
         ToolDef("write_file", "Write/overwrite a file.",
                 _schema({"path": _S, "content": _S}, ["path", "content"]), _write_file, "path"),
         ToolDef("edit_file", "Replace exactly-once-matching text in a file.",
