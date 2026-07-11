@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.8,
+    "grounding": 0.85,
+    "completeness": 0.75
+  },
+  "y": {
+    "correctness": 0.55,
+    "grounding": 0.65,
+    "completeness": 0.7
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly land on the actual resolution (duplicate of #4808, cross-ref #4809), but X backs this with direct evidence — a grep showing zero remaining get_cache_scale calls and a comment at the exact crash line confirming the fix is already in the code, which is exactly why closing as duplicate is right. Y reaches the same duplicate verdict but then destabilizes it with an unverified, likely wrong claim that #4808 'never merged' (contradicted by X's grep evidence the fix is present) and speculative test-coverage-gap claims it admits it couldn't verify against upstream main, adding noise rather than resolving the reporter's situation.",
+  "_cost_usd": 0.11477870000000001,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

@@ -1,0 +1,50 @@
+diff --git a/vllm_omni/diffusion/models/ming_flash_omni/pipeline_ming_imagegen.py b/vllm_omni/diffusion/models/ming_flash_omni/pipeline_ming_imagegen.py
+index a55a7998758..f3e0f33577a 100644
+--- a/vllm_omni/diffusion/models/ming_flash_omni/pipeline_ming_imagegen.py
++++ b/vllm_omni/diffusion/models/ming_flash_omni/pipeline_ming_imagegen.py
+@@ -446,7 +446,7 @@ def forward(self, req: DiffusionRequestBatch) -> DiffusionOutput:
+             None if ref_latent is None else tuple(ref_latent.shape),
+         )
+         try:
+-            outputs = super().forward(
++            outputs: DiffusionOutput = super().forward(
+                 z_req,
+                 prompt=None,
+                 height=height,
+@@ -462,13 +462,7 @@ def forward(self, req: DiffusionRequestBatch) -> DiffusionOutput:
+         finally:
+             set_forward_context_ref_latent(None)
+ 
+-        output = outputs[0]
+-        if hasattr(output, "output") and output.output is not None:
+-            raw = output.output
+-        elif hasattr(output, "images"):
+-            raw = output.images
+-        else:
+-            raw = output
++        raw = outputs.output
+         if not isinstance(raw, torch.Tensor):
+             raise RuntimeError(f"ZImagePipeline returned non-tensor output: {type(raw).__name__}")
+         if logger.isEnabledFor(logging.DEBUG):
+@@ -478,7 +472,7 @@ def forward(self, req: DiffusionRequestBatch) -> DiffusionOutput:
+                 raw.float().min().item(),
+                 raw.float().max().item(),
+             )
+-        return DiffusionOutput(output=raw)
++        return outputs
+ 
+ 
+ # ----------------------------------------------------------------------
+diff --git a/vllm_omni/engine/orchestrator.py b/vllm_omni/engine/orchestrator.py
+index df05cb66922..bdd678f2763 100644
+--- a/vllm_omni/engine/orchestrator.py
++++ b/vllm_omni/engine/orchestrator.py
+@@ -1287,7 +1287,7 @@ async def _forward_to_next_stage(
+                             [req_id, *self._cfg_tracker.cleanup_parent(req_id)],
+                         )
+                         return
+-                    if already_submitted and len(diffusion_prompt) == 1:
++                    if len(diffusion_prompt) == 1:
+                         diffusion_prompt = diffusion_prompt[0]
+             else:
+                 diffusion_prompt = req_state.prompt

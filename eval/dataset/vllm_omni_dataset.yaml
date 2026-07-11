@@ -1,0 +1,154 @@
+# vllm-omni agent-improvement dataset — 20 pr_review + 20 issue_answer,
+# each split 10 train / 5 val / 5 test.
+# Constructed 2026-07-11 from live github.com/vllm-project/vllm-omni state.
+#
+# Partition semantics (SIP-Bench-style; see README.md):
+#   train — adaptation stream: the agent may learn from these (skills, profile facts,
+#           prompt/checklist evolution). Weak-GT (open) items are concentrated here.
+#   val   — promotion gate: candidate improvements are accepted only if val does not regress.
+#   test  — FROZEN holdout: never read by any proposer, evaluated only at checkpoints
+#           (T0/T1/...). Strong ground truth only.
+# GOLD latent-gap review PRs (history proves what human review initially missed) are
+# distributed one per partition: 4870 (train), 4810 (val), 4834 (test).
+name: vllm_omni_dataset
+repo: vllm-omni
+github: vllm-project/vllm-omni
+constructed_at: "2026-07-11"
+splits:
+  pr_review: {train: 10, val: 5, test: 5}
+  issue_answer: {train: 10, val: 5, test: 5}
+
+pr_review:
+  # ---------- train (10) ----------
+  - {pr: 5009, split: train, title: "[BugFix] Restore vllm_c IR op priority and torch.nn.RMSNorm for Qwen-Image (#4964)",
+     author: NumberWan, merged: "2026-07-10", modules: [platform, diffusion],
+     size: {files: 3, add: 45, del: 16}, review_comments: 3, linked_issue: 4964,
+     class: rebase-perf-regression}
+  - {pr: 4923, split: train, title: "[Perf][Qwen3-TTS] Align talker MTP CUDA graph capture with Qwen3-Omni & Adapt to async output",
+     author: amy-why-3459, merged: "2026-07-10", modules: [model_executor, model_config],
+     size: {files: 3, add: 37, del: 11}, review_comments: 3, class: cuda-graph-perf}
+  - {pr: 4804, split: train, title: "[Feature] Support MOSS-TTS-Local-v1.5 Streaming",
+     author: gcanlin, merged: "2026-07-03", modules: [online_serving, benchmarks, model_executor],
+     size: {files: 15, add: 3222, del: 189}, review_comments: 5, class: large-feature}
+  - {pr: 4870, split: train, gold: latent-gap, title: "[Bugfix] Fix Qwen3-TTS no-async-chunk payload splitting",
+     author: Sy0307, merged: "2026-07-04", modules: [worker_runner, online_serving],
+     size: {files: 4, add: 99, del: 13}, review_comments: 2, linked_issue: 4851,
+     gap_followup: 4910, class: payload-splitting,
+     gap_note: "follow-up #4910 fixed the missed dual hidden/scheduled batch-axis case"}
+  - {pr: 4817, split: train, title: "[Bugfix][Quant] Gate quack FP8 to datacenter Blackwell (sm_100.x) only",
+     author: wangrzneu, merged: "2026-07-01", modules: [model_config],
+     size: {files: 3, add: 98, del: 7}, review_comments: 2, class: hw-capability-gate}
+  - {pr: 4977, split: train, title: "[Diffusion] Improve HuggingFace hub kernel loading in flash_attn_hub",
+     author: SamitHuang, merged: "2026-07-09", modules: [diffusion],
+     size: {files: 1, add: 30, del: 30}, review_comments: 2, class: dependency-loading}
+  - {pr: 4926, split: train, title: "Support HuggingFace kernels package for native diffusion attention backends",
+     author: SamitHuang, merged: "2026-07-08", modules: [diffusion, platform],
+     size: {files: 9, add: 601, del: 0}, review_comments: 1, class: feature-integration}
+  - {pr: 4859, split: train, title: "[BugFix][Ming-TTS] Improve Seed-TTS WER accuracy",
+     author: LHXuuu, merged: "2026-07-03", modules: [benchmarks, online_serving, model_executor],
+     size: {files: 6, add: 59, del: 45}, review_comments: 1, class: accuracy-fix}
+  - {pr: 4970, split: train, title: "[Perf][Qwen3-TTS] Drop default seed from qwen3_tts.yaml to restore batched MTP sampling",
+     author: linyueqian, merged: "2026-07-08", modules: [model_config],
+     size: {files: 1, add: 0, del: 2}, review_comments: 2, class: config-only,
+     note: "2-line deletion with a deep perf rationale (companion to the #4883/#4889 chain)"}
+  - {pr: 4950, split: train, title: "docs(recipe): fix MiniCPM-o 4.5 curl TTS example and clarify chat_template_kwargs usage",
+     author: amy-why-3459, merged: "2026-07-08", modules: [docs],
+     size: {files: 1, add: 19, del: 8}, review_comments: 1, class: docs}
+
+  # ---------- val (5) ----------
+  - {pr: 4893, split: val, title: "[Bugfix] Fix HunyuanImage3 MoE groups for vLLM 0.24",
+     author: TaffyOfficial, merged: "2026-07-05", modules: [diffusion],
+     size: {files: 4, add: 146, del: 14}, review_comments: 2, linked_issue: 4885,
+     class: upstream-api-drift}
+  - {pr: 4810, split: val, gold: latent-gap, title: "[BugFix] Use KV cache scale mapper in custom loaders",
+     author: akshatvishu, merged: "2026-07-03", modules: [model_executor],
+     size: {files: 5, add: 159, del: 33}, review_comments: 2, linked_issue: 4809,
+     gap_followup: 4891, class: removed-api-sweep,
+     gap_note: "issue #4891 ('missed by #4810') proves one caller of removed get_cache_scale escaped the sweep"}
+  - {pr: 4825, split: val, title: "[Feature] Improve diffusion LoRA compatibility for SDXL",
+     author: tthakkal, merged: "2026-07-01", modules: [diffusion],
+     size: {files: 2, add: 53, del: 1}, review_comments: 2, class: small-feature}
+  - {pr: 4837, split: val, title: "[Bugfix] Fix request batching regression on Ming-flash-omni ImageGen",
+     author: yuanheng-zhao, merged: "2026-07-03", modules: [diffusion, online_serving],
+     size: {files: 2, add: 4, del: 10}, review_comments: 2, class: batching-regression}
+  - {pr: 4816, split: val, title: "[Bugfix] Realign Serving Tokenization Name to Fix Error Handling Routes",
+     author: alex-jw-brooks, merged: "2026-07-02", modules: [online_serving],
+     size: {files: 2, add: 9, del: 9}, review_comments: 1, related_issue: 4811,
+     class: frontend-routing,
+     note: "related_issue is a semantic match (serving_tokenization app-state symptom), not a formally linked closure"}
+
+  # ---------- test (5) — FROZEN ----------
+  - {pr: 4762, split: test, title: "[Core / Bugfix] Add Mechanism for Endpoint Rejection",
+     author: alex-jw-brooks, merged: "2026-07-08", modules: [online_serving, model_config],
+     size: {files: 14, add: 509, del: 159}, review_comments: 2, class: core-mechanism}
+  - {pr: 4834, split: test, gold: latent-gap, title: "[Bugfix][sleep mode]: guard generation on partial wake and ensure wake idempotency",
+     author: Flink-ddd, merged: "2026-07-05", modules: [online_serving, diffusion],
+     size: {files: 3, add: 92, del: 6}, review_comments: 2, gap_followup: 4905,
+     class: concurrency-idempotency,
+     gap_note: "its own NotImplementedError safeguard broke merge CI (#4905 -> relaxed by #4912); flagging over-strictness = hit"}
+  - {pr: 4849, split: test, title: "[image][bugfix] Fix HunyuanImage3 bridge request batching",
+     author: Celeste-jq, merged: "2026-07-03", modules: [model_executor],
+     size: {files: 3, add: 163, del: 133}, review_comments: 2, class: stage-bridge-batching}
+  - {pr: 4954, split: test, title: "Fix Voxtral TTS feedback and short ASR checks",
+     author: napleon-liu, merged: "2026-07-08", modules: [model_executor, benchmarks],
+     size: {files: 4, add: 147, del: 14}, review_comments: 1, linked_issue: 4949,
+     class: test-helper-accuracy}
+  - {pr: 4777, split: test, title: "[Bugfix] Qwen-Image-Layered: allow layers=2 to match upstream demo",
+     author: ktrk115, merged: "2026-07-04", modules: [online_serving],
+     size: {files: 4, add: 9, del: 9}, review_comments: 2, class: api-validation}
+
+issue_answer:
+  # ---------- train (10) — weak-GT (open) items concentrated here ----------
+  - {issue: 4840, split: train, state: closed, title: "[Bug]: No module named 'vllm.entrypoints.serve.render.serving'",
+     author: sphinxkkkbc, n_comments: 2, modules: [online_serving], class: version-mismatch}
+  - {issue: 4806, split: train, state: closed, title: "[Bug]: Hunyuan-image fp8 cannot serve",
+     author: AbelSara, n_comments: 4, modules: [model_config], class: quantization-serving}
+  - {issue: 4814, split: train, state: closed, title: "[Bug]: Wan2.2 不支持同时开启ulysses并行和cache-dit [ASCEND NPU]",
+     author: brandneway, n_comments: 2, modules: [platform, diffusion], class: npu-feature-conflict,
+     note: "Chinese-language issue — language-diversity item"}
+  - {issue: 5003, split: train, state: open, title: "[Bug]: Qwen3-Omni-30B-A3B-Instruct — DP adjusted local rank 1 is out of bounds for 1 devices",
+     author: r4ining, n_comments: 9, modules: [worker_runner, scheduler], class: distributed-config}
+  - {issue: 5023, split: train, state: open, title: "[Performance Regression] v0.24.0: TTS TTFP degrades 27-41% at concurrency >=8 vs v0.22.0 (Qwen3-TTS, H200)",
+     author: cemigo114, n_comments: 1, modules: [worker_runner, online_serving, benchmarks],
+     class: perf-regression-analysis}
+  - {issue: 4966, split: train, state: open, title: "[Bug]: Large variance in leading silence before speech in Qwen3-TTS x-vector-only mode",
+     author: iancarrasco-b10, n_comments: 6, modules: [model_executor], class: output-quality}
+  - {issue: 4952, split: train, state: open, title: "[New Model]: nvidia/Nemotron-Labs-Audex 30B-A3B, 2B",
+     author: yuekaizhang, n_comments: 6, modules: [model_executor], class: new-model-request}
+  - {issue: 4992, split: train, state: open, title: "[Bug][NPU][CI] RMSNorm.forward_npu / RMSNormVAE.forward_npu crash on CPU tensors",
+     author: zhangj1an, n_comments: 3, modules: [platform], class: npu-device-placement}
+  - {issue: 4960, split: train, state: open, title: "[Bug]: The time statistics are incorrect when calling the metrics API",
+     author: amy-why-3459, n_comments: 2, modules: [online_serving], class: metrics-api}
+  - {issue: 4940, split: train, state: open, title: "[Bug]: DreamZero crashes at startup on current main: execute_model() got an unexpected keyword argument 'kv_prefetch_jobs'",
+     author: wjsuijlenh, n_comments: 0, modules: [worker_runner], class: upstream-api-drift,
+     note: "zero-comment fresh triage item"}
+
+  # ---------- val (5) ----------
+  - {issue: 4793, split: val, state: closed, title: "[Bug]: `async_chunk: false` multi-stage pipelines hang",
+     author: wjinxu, n_comments: 2, modules: [online_serving, scheduler], class: pipeline-hang}
+  - {issue: 4827, split: val, state: closed, title: "[Bug]: HunyuanImage-3.0 crash on init when tokenizer lacks extended ratio tokens (<img_ratio_33..36>)",
+     author: FayeSpica, n_comments: 3, modules: [model_executor], class: model-init-crash}
+  - {issue: 4905, split: val, state: closed, title: "[Bug]: Merge CI, test_omni_sleep_mode — NotImplementedError: wake_up() after sleep(level=2)",
+     author: yenuo26, n_comments: 3, modules: [online_serving], class: ci-failure-report,
+     resolution_pr: 4912}
+  - {issue: 4891, split: val, state: closed, title: "[Bug]: HunyuanImage3 diffusion loader still calls removed get_cache_scale (missed by #4810)",
+     author: wangrzneu, n_comments: 1, modules: [diffusion], class: removed-api-drift,
+     resolution_pr: 4892}
+  - {issue: 4842, split: val, state: closed, title: "[Bug]: A100, test_qwen3_omni — AssertionError: output does not contain any of the keywords",
+     author: zhumingjue138, n_comments: 3, modules: [model_executor], class: invalid-triage,
+     note: "closed as INVALID — correct answer is a triage verdict, not a fix"}
+
+  # ---------- test (5) — FROZEN, all closed with maintainer resolutions ----------
+  - {issue: 4957, split: test, state: closed, title: "[Bug]: Streaming thinker-to-talker coalesced decode chunks are dropped, truncating audio under load",
+     author: ZhengWG, n_comments: 4, modules: [worker_runner, online_serving], class: not-reproducible-triage,
+     note: "closed NOT REPRODUCIBLE — per-hop chunk accounting showed no drops; likely stale env state + talker length variance (YAML temp=0.9 vs request temp=0). Correct answer is that triage verdict, NOT a fix."}
+  - {issue: 4962, split: test, state: closed, title: "[Bug]: Qwen3-TTS: setting min_tokens in the talker stage crashes the engine with a CUDA device-side assert",
+     author: n0n4m39911, n_comments: 1, modules: [worker_runner], class: engine-crash,
+     resolution_pr: 4971}
+  - {issue: 4815, split: test, state: closed, title: "[Bug]: Qwen3-TTS Base voice-clone (ICL) generation runs to max_tokens without EOS on vLLM 0.24",
+     author: linyueqian, n_comments: 2, modules: [model_executor], class: generation-quality}
+  - {issue: 4826, split: test, state: closed, title: "[Bug]: H800, Local CI Fail, Qwen2.5-omni — returned text does not contain a video description",
+     author: yenuo26, n_comments: 4, modules: [model_executor], class: ci-failure-report}
+  - {issue: 4802, split: test, state: closed, title: "[RFC]: vLLM-Omni KV Cache Efficiency and Attribution Metrics",
+     author: Ronnie-Rui, n_comments: 8, modules: [scheduler, online_serving], class: rfc-design,
+     note: "RFC-class item — answer quality judged on design engagement, not a bugfix"}

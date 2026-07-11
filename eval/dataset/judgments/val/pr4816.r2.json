@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.6,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (just an lgtm), so both correctly approve with nothing to miss. X asserts unverifiable specifics as fact — a PR number (vllm#46022), an exact upstream line (instrumentator/basic.py:23), and a 'concrete repro' from the PR body — none of which are grounded in the given diff/ground-truth, reading as plausible fabrication. Y reaches the same correct verdict but explicitly labels its upstream-alignment claims as 'assumptions' rather than verified fact, and its per-hunk checklist stays tightly anchored to lines actually in the diff, making it more epistemically honest and grounded despite similar low actionability (nothing to action on an approve).",
+  "_cost_usd": 0.059931200000000004,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

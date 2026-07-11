@@ -1,0 +1,277 @@
+diff --git a/tests/diffusion/distributed/test_expert_parallel_layout.py b/tests/diffusion/distributed/test_expert_parallel_layout.py
+index 8fc1db60515..c4d3c6ae71d 100644
+--- a/tests/diffusion/distributed/test_expert_parallel_layout.py
++++ b/tests/diffusion/distributed/test_expert_parallel_layout.py
+@@ -19,6 +19,10 @@ def __init__(
+         self.group_ranks = group_ranks
+         self.parallel_mode = parallel_mode
+         self.device_group = object()
++        self.device_communicator = kwargs.get("device_communicator")
++        reduce_scatter = kwargs.get("reduce_scatter")
++        if reduce_scatter is not None:
++            self.reduce_scatter = reduce_scatter
+         self.ulysses_group = kwargs.get("ulysses_group")
+         self.ring_group = kwargs.get("ring_group")
+         self.local_group = next(group for group in group_ranks if local_rank in group)
+@@ -55,6 +59,23 @@ def fake_init_model_parallel_group(
+         created_groups.append(group)
+         return group
+ 
++    def fake_init_vllm_model_parallel_group(
++        group_ranks,
++        local_rank,
++        backend,
++        group_name,
++    ):
++        del backend
++        group = _FakeGroup(
++            [list(ranks) for ranks in group_ranks],
++            local_rank,
++            f"vllm_{group_name}",
++            device_communicator=object(),
++            reduce_scatter=lambda tensor, **kwargs: tensor,
++        )
++        created_groups.append(group)
++        return group
++
+     fake_world_group = SimpleNamespace(
+         rank_in_group=local_rank,
+         local_rank=local_rank,
+@@ -68,6 +89,7 @@ def fake_init_model_parallel_group(
+     monkeypatch.setattr(parallel_state, "get_world_group", lambda: fake_world_group)
+     monkeypatch.setattr(parallel_state, "get_forward_context", lambda: fake_forward_context)
+     monkeypatch.setattr(parallel_state, "init_model_parallel_group", fake_init_model_parallel_group)
++    monkeypatch.setattr(parallel_state, "init_vllm_model_parallel_group", fake_init_vllm_model_parallel_group)
+     monkeypatch.setattr(parallel_state, "init_dit_group", lambda *_args, **_kwargs: None)
+ 
+     for name in ("_DP", "_CFG", "_SP", "_PP", "_FS", "_EXPERT_PARALLEL_GROUP_RANKS"):
+@@ -87,7 +109,7 @@ def fake_init_model_parallel_group(
+         backend="gloo",
+     )
+ 
+-    assert parallel_state.vllm_parallel_state._PCP is parallel_state._SP
++    assert parallel_state.vllm_parallel_state._PCP is not parallel_state._SP
+     assert parallel_state.vllm_parallel_state._PCP.world_size == 2
+     assert parallel_state._DP.world_size == 2
+     assert parallel_state.vllm_parallel_state._DP is not parallel_state._DP
+@@ -96,6 +118,13 @@ def fake_init_model_parallel_group(
+     assert parallel_state.vllm_parallel_state._TP.world_size == 2
+     assert parallel_state._PP.world_size == 2
+ 
++    assert parallel_state.vllm_parallel_state._PCP.device_communicator is not None
++    assert parallel_state.vllm_parallel_state._DP.device_communicator is not None
++    assert parallel_state.vllm_parallel_state._EP.device_communicator is not None
++    assert hasattr(parallel_state.vllm_parallel_state._PCP, "reduce_scatter")
++    assert hasattr(parallel_state.vllm_parallel_state._DP, "reduce_scatter")
++    assert hasattr(parallel_state.vllm_parallel_state._EP, "reduce_scatter")
++
+     assert parallel_state.vllm_parallel_state._PCP.local_group == [0, 2]
+     assert parallel_state.vllm_parallel_state._DP.local_group == [0, 8, 16, 24]
+     assert parallel_state.vllm_parallel_state._EP.local_group == [
+@@ -155,7 +184,9 @@ def fake_init_model_parallel_group(
+         ],
+     ]
+ 
+-    ep_groups = [group.local_group for group in created_groups if group.parallel_mode == "expert"]
++    vllm_group_names = [group.parallel_mode for group in created_groups if group.parallel_mode.startswith("vllm_")]
++    assert vllm_group_names == ["vllm_pcp", "vllm_tp", "vllm_dp", "vllm_ep"]
++    ep_groups = [group.local_group for group in created_groups if group.parallel_mode == "vllm_ep"]
+     assert ep_groups == [parallel_state.vllm_parallel_state._EP.local_group]
+ 
+ 
+diff --git a/tests/diffusion/models/hunyuan_image3/test_hunyuan_fused_moe.py b/tests/diffusion/models/hunyuan_image3/test_hunyuan_fused_moe.py
+index 626f78eed9c..e8ade2e51e8 100644
+--- a/tests/diffusion/models/hunyuan_image3/test_hunyuan_fused_moe.py
++++ b/tests/diffusion/models/hunyuan_image3/test_hunyuan_fused_moe.py
+@@ -50,6 +50,48 @@ def test_noop_when_context_unavailable(self, mocker):
+         mock_get.assert_not_called()
+ 
+ 
++class TestSetForwardContextDPMetadata:
++    """Test diffusion MoE DP metadata setup for vLLM 0.24 all2all dispatch."""
++
++    def test_sets_dp_metadata_from_vllm_dp_group(self, mocker):
++        import vllm_omni.diffusion.models.hunyuan_image3.hunyuan_fused_moe as hunyuan_moe
++
++        mock_ctx = mocker.MagicMock()
++        mock_ctx.dp_metadata = None
++        fake_group = mocker.MagicMock()
++        fake_group.world_size = 2
++        fake_group.cpu_group = object()
++
++        def _all_gather_object(output, obj, group):
++            assert group is fake_group.cpu_group
++            output[:] = [obj, obj + 1]
++
++        mocker.patch.object(hunyuan_moe._vllm_fc, "is_forward_context_available", return_value=True)
++        mocker.patch.object(hunyuan_moe._vllm_fc, "get_forward_context", return_value=mock_ctx)
++        mocker.patch.object(hunyuan_moe._vllm_ps, "_DP", fake_group, create=True)
++        mocker.patch.object(hunyuan_moe.torch.distributed, "all_gather_object", side_effect=_all_gather_object)
++
++        hunyuan_moe._set_forward_context_dp_metadata(1024)
++
++        assert mock_ctx.dp_metadata is not None
++        assert mock_ctx.dp_metadata.num_tokens_across_dp_cpu.tolist() == [1024, 1025]
++
++    def test_keeps_existing_dp_metadata(self, mocker):
++        import vllm_omni.diffusion.models.hunyuan_image3.hunyuan_fused_moe as hunyuan_moe
++
++        existing_metadata = object()
++        mock_ctx = mocker.MagicMock()
++        mock_ctx.dp_metadata = existing_metadata
++        mocker.patch.object(hunyuan_moe._vllm_fc, "is_forward_context_available", return_value=True)
++        mocker.patch.object(hunyuan_moe._vllm_fc, "get_forward_context", return_value=mock_ctx)
++        mock_all_gather = mocker.patch.object(hunyuan_moe.torch.distributed, "all_gather_object")
++
++        hunyuan_moe._set_forward_context_dp_metadata(1024)
++
++        assert mock_ctx.dp_metadata is existing_metadata
++        mock_all_gather.assert_not_called()
++
++
+ class TestHunyuanFusedMoEPlatformDispatch:
+     """Test platform dispatch via platform qualname hooks."""
+ 
+diff --git a/vllm_omni/diffusion/distributed/parallel_state.py b/vllm_omni/diffusion/distributed/parallel_state.py
+index 5904ae94f1a..7b38d377563 100644
+--- a/vllm_omni/diffusion/distributed/parallel_state.py
++++ b/vllm_omni/diffusion/distributed/parallel_state.py
+@@ -512,6 +512,21 @@ def init_model_parallel_group(
+         )
+ 
+ 
++def init_vllm_model_parallel_group(
++    group_ranks: list[list[int]],
++    local_rank: int,
++    backend: str,
++    group_name: str,
++) -> vllm_parallel_state.GroupCoordinator:
++    return vllm_parallel_state.init_model_parallel_group(
++        group_ranks=group_ranks,
++        local_rank=local_rank,
++        backend=backend,
++        group_name=group_name,
++        use_device_communicator=True,
++    )
++
++
+ def init_dit_group(
+     dit_parallel_size: int,
+     backend: str,
+@@ -838,23 +853,40 @@ def initialize_model_parallel(
+     if use_moe_parallel_mapping:
+         # Diffusion normally uses its own SP group. Map it to vLLM PCP only for
+         # expert-parallel runtimes that rely on vLLM FusedMoE group semantics.
+-        vllm_parallel_state._PCP = _SP
++        # vLLM 0.24 MoE kernels require GroupCoordinator.device_communicator
++        # and reduce_scatter(), which the diffusion SP coordinator intentionally
++        # does not own. Keep the rank layout but build a vLLM coordinator.
++        vllm_parallel_state._PCP = init_vllm_model_parallel_group(
++            group_ranks=sp_group_ranks,
++            local_rank=get_world_group().local_rank,
++            backend=backend,
++            group_name="pcp",
++        )
+ 
+     assert vllm_parallel_state._TP is None, "Tensor parallel group is already initialized"
+-    vllm_parallel_state._TP = init_model_parallel_group(
+-        group_ranks=rank_generator.get_ranks("tp"),
+-        local_rank=get_world_group().local_rank,
+-        backend=backend,
+-        parallel_mode="tensor",
+-    )
+-    if use_moe_parallel_mapping and cfg_parallel_size > 1:
++    tp_group_ranks = rank_generator.get_ranks("tp")
++    if use_moe_parallel_mapping:
++        vllm_parallel_state._TP = init_vllm_model_parallel_group(
++            group_ranks=tp_group_ranks,
++            local_rank=get_world_group().local_rank,
++            backend=backend,
++            group_name="tp",
++        )
++    else:
++        vllm_parallel_state._TP = init_model_parallel_group(
++            group_ranks=tp_group_ranks,
++            local_rank=get_world_group().local_rank,
++            backend=backend,
++            parallel_mode="tensor",
++        )
++    if use_moe_parallel_mapping:
+         # CFG is a diffusion-specific replica dimension. Fold it into vLLM DP
+         # only when constructing the vLLM EP layout for expert-parallel paths.
+-        vllm_parallel_state._DP = init_model_parallel_group(
++        vllm_parallel_state._DP = init_vllm_model_parallel_group(
+             group_ranks=rank_generator.get_ranks("cfg-dp"),
+             local_rank=get_world_group().local_rank,
+             backend=backend,
+-            parallel_mode="data",
++            group_name="dp",
+         )
+ 
+     global _FS, _EXPERT_PARALLEL_GROUP_RANKS
+@@ -869,11 +901,11 @@ def initialize_model_parallel(
+     _EXPERT_PARALLEL_GROUP_RANKS = None
+     if use_moe_parallel_mapping:
+         ep_group_ranks = rank_generator.get_ranks("tp-sp-cfg-dp")
+-        vllm_parallel_state._EP = init_model_parallel_group(
++        vllm_parallel_state._EP = init_vllm_model_parallel_group(
+             group_ranks=ep_group_ranks,
+             local_rank=get_world_group().local_rank,
+             backend=backend,
+-            parallel_mode="expert",
++            group_name="ep",
+         )
+         _EXPERT_PARALLEL_GROUP_RANKS = ep_group_ranks
+ 
+diff --git a/vllm_omni/diffusion/models/hunyuan_image3/hunyuan_fused_moe.py b/vllm_omni/diffusion/models/hunyuan_image3/hunyuan_fused_moe.py
+index f9f114513b5..fc1317a48e6 100644
+--- a/vllm_omni/diffusion/models/hunyuan_image3/hunyuan_fused_moe.py
++++ b/vllm_omni/diffusion/models/hunyuan_image3/hunyuan_fused_moe.py
+@@ -3,6 +3,8 @@
+ 
+ from typing import Any
+ 
++import torch
++import vllm.distributed.parallel_state as _vllm_ps
+ import vllm.forward_context as _vllm_fc
+ from vllm.utils.import_utils import resolve_obj_by_qualname
+ 
+@@ -24,6 +26,30 @@ def _set_forward_context_num_tokens(num_tokens: int) -> None:
+         forward_context.in_profile_run = False
+ 
+ 
++def _set_forward_context_dp_metadata(num_tokens: int) -> None:
++    """Populate vLLM MoE DP token metadata for diffusion-only DP mappings."""
++    if not _vllm_fc.is_forward_context_available():
++        return
++    forward_context = _vllm_fc.get_forward_context()
++    if getattr(forward_context, "dp_metadata", None) is not None:
++        return
++
++    dp_group = getattr(_vllm_ps, "_DP", None)
++    if dp_group is None or getattr(dp_group, "world_size", 1) <= 1:
++        return
++
++    gathered_num_tokens: list[int | None] = [None] * dp_group.world_size
++    torch.distributed.all_gather_object(
++        gathered_num_tokens,
++        int(num_tokens),
++        group=dp_group.cpu_group,
++    )
++    if any(count is None for count in gathered_num_tokens):
++        raise RuntimeError(f"Failed to gather MoE DP token counts: {gathered_num_tokens}")
++
++    forward_context.dp_metadata = _vllm_fc.DPMetadata(torch.tensor(gathered_num_tokens, dtype=torch.int64))
++
++
+ class HunyuanFusedMoEDefault:
+     """Adapter that configures the upstream FusedMoE ``MoERunner`` for HunyuanImage3.
+ 
+@@ -62,6 +88,7 @@ def _num_tokens_pre_hook(module: Any, args: Any, kwargs: Any) -> None:
+                 hidden_states = args[0]
+             if hidden_states is not None:
+                 _set_forward_context_num_tokens(hidden_states.shape[0])
++                _set_forward_context_dp_metadata(hidden_states.shape[0])
+ 
+         moe_runner.register_forward_pre_hook(_num_tokens_pre_hook, with_kwargs=True)
+ 

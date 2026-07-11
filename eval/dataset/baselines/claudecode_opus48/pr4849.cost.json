@@ -1,0 +1,10 @@
+{
+  "calls": 17,
+  "input_tokens": 617978,
+  "output_tokens": 9664,
+  "cost_usd": 1.5860455000000002,
+  "wall_s": 169.3,
+  "split": "test",
+  "model": "claude-opus-4-8",
+  "recorded_at": "2026-07-11T19:59:50"
+}

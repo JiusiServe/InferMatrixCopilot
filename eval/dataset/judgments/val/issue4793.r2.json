@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.9,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.6,
+    "grounding": 0.55,
+    "completeness": 0.3
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Both correctly identify PR #4792 (folded into the 0.24 rebase commit a560ed18) as the fix for the #4527 regression that starved the downstream stage, matching the ground truth. X delivers a clean, complete maintainer answer with precise file/line citations that mirror the exact code snippet from the ground truth, plus a workaround and clear next steps. Y is delivered as a raw, truncated internal state dump (unfinished mid-sentence 'what to do' section) mixed with JSON scaffolding rather than a polished answer, and adds unverified claims about NPU/XPU files not supported by the ground truth evidence, hurting both grounding and completeness.",
+  "_cost_usd": 0.1270527,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

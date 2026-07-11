@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.8,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.65,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates correctly identify the two real bugfixes and largely echo the ground-truth reviewer's reasoning that already_submitted was a spurious gate since both submit paths reject lists. X presents this cleanly with specific file/line grounding and clearly labels its suggestions as non-blocking, matching the PR's actual LGTM/APPROVE outcome. Y reaches the same technical conclusions but wraps them in a noisy raw state-dump format, mislabels confirmed-correct fixes as 'major' severity (misleadingly implying unresolved problems), and contains self-contradictory assumption entries (claiming both 'could not inspect due to tool budget exhaustion' and 'confirmed' for the same fact), which hurts precision and actionability.",
+  "_cost_usd": 0.1268717,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

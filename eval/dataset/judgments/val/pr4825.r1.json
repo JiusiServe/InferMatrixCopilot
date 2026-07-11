@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.8,
+    "actionability": 0.2,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X's top comment (reuse pipeline._dit_modules instead of a fourth hardcoded component list) closely mirrors dsocek's actual ground-truth concern about deriving the mapping from existing per-model metadata rather than hardcoding, and is backed with specific file/line citations and a concrete fix. Y approves with no comments and its own 'simplifiability' analysis explicitly dismisses extracting the list into a shared constant — the opposite conclusion from the real reviewer's suggestion — so it misses the one substantive concern in the ground truth entirely. Both sets of claims appear grounded in the diff/repo, but X is far more actionable (specific line-level suggestions) versus Y's approve-only output with an empty review_comments list.",
+  "_cost_usd": 0.1255127,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

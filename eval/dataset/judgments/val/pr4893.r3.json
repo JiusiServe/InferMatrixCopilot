@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.55,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Neither candidate surfaces the one substantive ground-truth concern (verifying the reduce_scatter param in the test), so recall is low for both. X does deeper, verified technical reasoning (confirms DPMetadata construction, device_communicator semantics, group cleanup/destroy safety, and the _DP condition change are all correct against actual vLLM source) and gives one grounded, actionable nitpick with file/line. Y's output is a raw agent trace (fetch/gate/review steps, 'Maximum iterations reached' blocker, redundant 'Sweep:' bullets) rather than a synthesized review, and its three findings are all docstring-nit level, one of which (enable_expert_parallel) isn't verifiable from the shown diff — lower precision and much lower signal-to-noise despite structured file/line tags.",
+  "_cost_usd": 0.2008974,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

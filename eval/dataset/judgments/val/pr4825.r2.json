@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.6,
+    "actionability": 0.1,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X's point about deriving the component list from an existing per-pipeline source (like _dit_modules) instead of yet another hardcoded tuple closely mirrors dsocek's real concern about driving the mapper from _packed_modules_mapping instead of ad-hoc lists, and X adds a second grounded, actionable point about the text-encoder LoRA gap with concrete file:line references. Y's review is a thorough-looking checklist that ultimately produces zero actual review comments and just rubber-stamps APPROVE, missing the one substantive concern reviewers actually raised and offering nothing actionable.",
+  "_cost_usd": 0.0588437,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

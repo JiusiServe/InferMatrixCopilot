@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.55,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.75,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Neither candidate surfaces the one substantive ground-truth thread (reduce_scatter test verification, itself already addressed in this diff snapshot), so recall is low and roughly tied. X's three findings (missing docstrings, stale comment) are grounded but shallow nitpicks, and the report itself is messy/garbled with leftover agent scaffolding and a truncated verdict. Y instead verifies the actual correctness logic of the fix (DPMetadata construction, init_vllm_model_parallel_group semantics, group separation, cleanup safety) with concrete reasoning tied to the diff, is honest about sandbox limits, and lands on a verdict (APPROVE) consistent with the real reviewer outcome, making it more useful and better grounded overall despite similarly modest actionability.",
+  "_cost_usd": 0.0650808,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

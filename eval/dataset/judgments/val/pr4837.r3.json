@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.75,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates correctly identify the same two real fixes (DiffusionOutput indexing/attribute access and the already_submitted guard removal) and both ground the orchestrator.py:1290 reasoning in the same stage_pool.py submit_initial/submit_update list-rejection logic the ground-truth inline comment relies on. X presents this cleanly with precise file:line citations and a concise, actionable non-blocking test suggestion. Y covers similar ground but buries it in redundant raw tool-report JSON, duplicates the same findings twice, and contains an internally contradictory assumption ('could not inspect due to tool budget exhaustion' vs. claiming it verified submit_initial), which hurts trustworthiness and makes the actual actionable asks harder to extract.",
+  "_cost_usd": 0.0601324,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

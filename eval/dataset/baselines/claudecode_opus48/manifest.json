@@ -1,0 +1,9 @@
+{
+  "arm": "claudecode_opus48",
+  "model": "claude-opus-4-8",
+  "protocol": "eval/run_eval.py::arm_claudecode (claudecode_opus_skill arm), issue items use the same harness with an answer prompt",
+  "workdir": "/rebase/vllm-omni-copilot/eval/raw/cc_workdir",
+  "dataset": "vllm_omni_dataset.yaml",
+  "n_items": 40,
+  "caveat": "Runs against post-merge main (same as the original claudecode_opus_skill arm). For merged PRs / closed issues the fix exists in repo history and answers may cite it \u2014 score closed items as repo-knowledge tasks, or re-run pinned to pre-merge SHAs for blind scoring."
+}

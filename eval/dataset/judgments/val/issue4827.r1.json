@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.85,
+    "grounding": 0.75,
+    "completeness": 0.7
+  },
+  "y": {
+    "correctness": 0.9,
+    "grounding": 0.9,
+    "completeness": 0.9
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly diagnose the base/Instruct deploy-config mismatch and confirm the hunyuan_image3_dit.yaml workaround, matching the thread resolution. Y is more grounded, citing specific line ranges in both the model file and both YAML configs (including the misleading 'Instruct' header on the DiT file) and offers a concrete tolerant-init code patch rather than just describing the need for a guard. X's answer is thinner on citation specifics and its draft answer is truncated mid-sentence, leaving the fail-fast proposal incomplete, which hurts completeness.",
+  "_cost_usd": 0.1252747,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.6,
+    "actionability": 0.55
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently verify the same core facts as the ground-truth inline comment (submit_initial/submit_update reject lists for diffusion, so the already_submitted gate was spurious) and catch the DiffusionOutput indexing bug, giving comparable recall. Y is materially more precise and disciplined: it correctly flags the still-unhandled len>1 case as an intentional non-issue, cites exact stage_pool.py line numbers, and calibrates severity (non-blocking) matching the actual LGTM outcome, whereas X pads its findings with a shaky unverified claim ('already_submitted is still used later') and mislabels a test-coverage nit as 'major'. X's output is also a messy dump of raw tool state with truncated/duplicated text, badly hurting actionability versus Y's clean, well-organized, line-anchored review.",
+  "_cost_usd": 0.1301967,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

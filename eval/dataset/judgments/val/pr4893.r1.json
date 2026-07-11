@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.7,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.85,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth is thin (mostly a blurred-image aside and an LGTM approval, plus one inline nit about test coverage of reduce_scatter that neither candidate addresses), so recall is low for both. X gives three concrete, well-anchored docstring/comment nits that are actionable but low-value, and one claim (enable_expert_parallel param) isn't verifiable from the shown diff. Y does deeper correctness verification (DPMetadata construction, group separation, destroy/cleanup safety, the dropped cfg_parallel_size>1 guard) that is all grounded in the diff/vLLM API and reaches an APPROVE verdict consistent with the actual LGTM outcome, though it yields only one concrete actionable comment versus X's three.",
+  "_cost_usd": 0.2109374,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

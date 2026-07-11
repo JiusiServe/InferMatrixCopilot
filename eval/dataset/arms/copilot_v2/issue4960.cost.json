@@ -1,0 +1,56 @@
+{
+  "wall_s": 115.7,
+  "split": "train",
+  "rc": 3,
+  "run_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2/runs/issue4960/run-20260711-232010",
+  "recorded_at": "2026-07-11T23:22:01",
+  "llm_calls": 0,
+  "input_tokens": 0,
+  "output_tokens": 0,
+  "metrics": {
+    "schema": 1,
+    "run": "run-20260711-232010",
+    "task_kind": "issue_answer",
+    "status": "blocked",
+    "quality": {
+      "q": 0.3,
+      "weight_coverage": 1.0,
+      "partial": false,
+      "abstained": true,
+      "components": {
+        "correct": null,
+        "grounded": null,
+        "complete": null,
+        "helpful": null
+      }
+    },
+    "cost": {
+      "usd": 0.0321,
+      "minutes": 1.81,
+      "ci_minutes": 0,
+      "input_tokens": 99388,
+      "output_tokens": 4773,
+      "tool_calls": 19,
+      "usd_ref": 0.3,
+      "min_ref": 5.0,
+      "cost_index": 1.1842
+    },
+    "risk": {
+      "incidents": {
+        "catastrophic": 0,
+        "severe": 0,
+        "moderate": 0,
+        "minor": 0
+      },
+      "safety_multiplier": 1.0
+    },
+    "catq": 0.2533,
+    "tus": 0.2533,
+    "signals": {
+      "escalations": 1,
+      "pushes": 0,
+      "posted": 0,
+      "steps_completed": 1
+    }
+  }
+}

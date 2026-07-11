@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.6,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y verifies the design against actual upstream vLLM source with concrete file:line citations (utils.py:408-415, weight_utils.py:1361, fp8.py:227-233) and independently reconstructs nearly every point the human reviewer made (mapper placement for direct vs delegated loaders, qwen2_old's silent-degrade cleanup, test-coverage gap around real checkpoint resolution) plus catches the latent gap — the diffusion hunyuan_image3_transformer.py loader was a known-affected caller dropped from this PR's scope. X covers similar correctness ground but with weaker, PR-description-sourced grounding, a messier/truncated output, and explicitly dismisses the diffusion-transformer file as 'no broken code' — actively missing the latent gap rather than just failing to mention it.",
+  "_cost_usd": 0.1054795,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "arm": "copilot_v2",
+  "engine": "omni-copilot CLI (shipped pipeline, pr-review@4 ensemble; issue-answer dry-run)",
+  "llm": "per .env (DeepSeek-routed)",
+  "dataset": "vllm_omni_dataset.yaml",
+  "splits": [
+    "val",
+    "train"
+  ],
+  "n_items": 30
+}

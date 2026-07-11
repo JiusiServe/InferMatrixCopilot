@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.88,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.72,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly land on APPROVE matching the ground-truth 'lgtm', and neither had real findings to recall since the diff is a clean, consistent rename. X's verification is more grounded — it cross-checks against the actual upstream vllm/ checkout (which exists per project setup) and cites a specific matching line, whereas Y repeatedly asserts the new name 'aligns with existing state.serving_tokens attribute' as justification, a detail not visible anywhere in the diff and likely fabricated, slightly hurting its precision. Actionability is comparable and low for both since there's nothing to act on in a clean approve, though Y enumerates more individual checked hunks with line numbers.",
+  "_cost_usd": 0.0507812,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

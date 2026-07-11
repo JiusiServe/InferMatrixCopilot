@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.55,
+    "grounding": 0.55,
+    "completeness": 0.6
+  },
+  "y": {
+    "correctness": 0.9,
+    "grounding": 0.9,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly land on 'duplicate of #4808', matching the ground truth, but Y backs this with actual verification (grep confirms zero remaining get_cache_scale calls on main, direct read of the transformer file showing only a comment where the call used to be), giving a clean, directly actionable answer to the reporter (git pull, re-test). X asserts as fact that '#4808 is CLOSED and mergedAt is null — it never merged,' which is an unverified/likely fabricated GitHub-metadata claim that directly contradicts what Y actually confirmed in the code (the fix is present on main), undermining X's grounding and correctness despite its otherwise reasonable structural analysis and useful test-coverage-gap observation.",
+  "_cost_usd": 0.1048487,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.9,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.85,
+    "grounding": 0.8,
+    "completeness": 0.4
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both correctly diagnose the base/Instruct config mismatch and cite the same crashing line and the DiT-config workaround confirmed by FayeSpica, matching the thread resolution. X is more thorough and better grounded (specific line ranges, explanation of why each deploy config triggers/avoids the AR stage, a concrete guarded-fix snippet) and correctly mirrors the thread's actual resolution by noting the bug itself is closed via the workaround while hardening should go in a new tracked issue per Gaohan123. Y's answer draft is cut off mid-sentence and exposes raw internal state-dump scaffolding rather than a clean maintainer response, hurting completeness and usability even though its diagnosis is essentially correct.",
+  "_cost_usd": 0.0493151,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

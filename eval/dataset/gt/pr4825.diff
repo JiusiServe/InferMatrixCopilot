@@ -1,0 +1,73 @@
+diff --git a/tests/diffusion/lora/test_lora_manager.py b/tests/diffusion/lora/test_lora_manager.py
+index 785f5d84217..723e4b13a93 100644
+--- a/tests/diffusion/lora/test_lora_manager.py
++++ b/tests/diffusion/lora/test_lora_manager.py
+@@ -575,3 +575,45 @@ def _fake_from_layer_diffusion(*, layer: torch.nn.Module, **_kwargs):
+     assert "bagel.language_model.qkv_proj" in manager._lora_modules
+     # Verify the module was actually replaced in the tree (not just recorded)
+     assert isinstance(pipeline.bagel.language_model.qkv_proj, _DummyBaseLayerWithLoRA)
++
++
++def test_lora_manager_discovers_unet_component(monkeypatch):
++    """Verify that _replace_layers_with_lora finds layers under 'unet'."""
++    import vllm_omni.diffusion.lora.manager as manager_mod
++
++    monkeypatch.setattr(manager_mod, "BaseLayerWithLoRA", _DummyBaseLayerWithLoRA)
++
++    def _fake_from_layer_diffusion(*, layer: torch.nn.Module, **_kwargs):
++        if isinstance(layer, _FakeLinearBase):
++            return _DummyBaseLayerWithLoRA(layer)
++        return layer
++
++    replace_calls: list[str] = []
++
++    monkeypatch.setattr(manager_mod, "from_layer_diffusion", _fake_from_layer_diffusion)
++    monkeypatch.setattr(
++        manager_mod,
++        "replace_submodule",
++        lambda root, name, sub: fake_replace_submodule(root, name, sub, replace_calls),
++    )
++
++    # Pipeline with a 'unet' component (no 'transformer')
++    pipeline = torch.nn.Module()
++    pipeline.unet = torch.nn.Module()
++    pipeline.unet.down_block = torch.nn.Module()
++    pipeline.unet.down_block.proj = _FakeLinearBase()
++
++    manager = DiffusionLoRAManager(
++        pipeline=pipeline,
++        device=torch.device("cpu"),
++        dtype=torch.bfloat16,
++        max_cached_adapters=1,
++    )
++
++    peft_helper = type("_PH", (), {"r": 1})()
++    manager._replace_layers_with_lora(peft_helper)
++
++    assert "down_block.proj" in replace_calls
++    assert "unet.down_block.proj" in manager._lora_modules
++    # Verify the module was actually replaced in the tree (not just recorded)
++    assert isinstance(pipeline.unet.down_block.proj, _DummyBaseLayerWithLoRA)
+diff --git a/vllm_omni/diffusion/lora/manager.py b/vllm_omni/diffusion/lora/manager.py
+index 8ba30b79e1f..2fcf43b6e31 100644
+--- a/vllm_omni/diffusion/lora/manager.py
++++ b/vllm_omni/diffusion/lora/manager.py
+@@ -368,7 +368,17 @@ def _matches_target(module_name: str) -> bool:
+ 
+         # Default denoising components plus any a pipeline opts into via
+         # ``_lora_components`` (opt-in; other pipelines unchanged).
+-        default_components = ("transformer", "transformer_2", "dit", "bagel")
++        #
++        # NOTE: SDXL-style pipelines expose the denoiser as ``unet``.
++        # Without scanning this component, adapters can load/activate while
++        # effectively applying to zero layers, producing base-identical output.
++        default_components = (
++            "transformer",
++            "transformer_2",
++            "dit",
++            "bagel",
++            "unet",
++        )
+         extra_components = tuple(getattr(self.pipeline, "_lora_components", ()) or ())
+         for component_name in (*default_components, *extra_components):
+             if not hasattr(self.pipeline, component_name):

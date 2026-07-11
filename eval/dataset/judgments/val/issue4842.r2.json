@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.85,
+    "grounding": 0.6,
+    "completeness": 0.65
+  },
+  "y": {
+    "correctness": 0.9,
+    "grounding": 0.85,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly diagnose the root cause (default core_model run-level forces dummy weights via #4354's extension to online serving, so full_model tests need --run-level=full_model), matching the thread's 'invalid' resolution. Y is far more grounded, citing specific files and line numbers across the fixture/config/assertion chain and cross-referencing the gpu_memory_utilization split visible in the reporter's own debug log, whereas X's citations are vaguer (file/function names only) and its claim that the test itself carries an `@pytest.mark.full_model` marker is unverified filler. Y is also more complete, addressing hardware/video-path prerequisites and proposing a concrete footgun-prevention follow-up, which better serves the reporter's end-to-end situation.",
+  "_cost_usd": 0.1273307,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

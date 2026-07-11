@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly identify this as a mechanically consistent rename with all call sites updated and tests aligned, reaching the same APPROVE verdict as the ground truth's terse 'lgtm' — recall is trivially satisfied for both since ground truth surfaces no substantive concerns. X shows deeper root-cause understanding (explains the AttributeError → 500 mechanism via upstream's base() helper) and cites concrete file:line locations for its verification, giving it an edge in actionable insight. Y is thorough and honestly flags its 'serving_tokens naming' claim as an unverified assumption rather than asserting it as fact, but its findings read more as a mechanical checklist without explaining why the bug mattered, and its raw workflow-report format is less digestible/actionable than X's structured review.",
+  "_cost_usd": 0.0633662,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}
