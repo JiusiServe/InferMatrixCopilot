@@ -203,3 +203,28 @@ def post_step(state_key: str, gh_args, what: str):
                           outputs={"url": url} if url else {})
 
     return handler
+
+
+def record_debug_memory(ctx, *, module: str, symptom: str, root_cause: str,
+                        fix_summary: str, files: list, verification: str) -> bool:
+    """Persist a resolved failure/fix into the repo-scoped debug memory (the
+    shared pool when no adapter owns the repo). The write contract (root cause
+    + verification required) is enforced by the store; a failed write is traced
+    and swallowed — closing the learning loop must never fail the fix itself."""
+    try:
+        from ...memory.debug_memory import DebugMemory
+        from ..agent_runtime.knowledge import _resolve_adapter
+
+        adapter = _resolve_adapter(ctx)
+        db = adapter.debug_memory_db if adapter is not None else ctx.settings.memory_db
+        spec = ctx.state.get("task_spec") or {}
+        DebugMemory(db).record(
+            repo=str(spec.get("repo", "")), module=module,
+            run_id=ctx.run_dir.name, symptom=symptom, root_cause=root_cause,
+            fix_summary=fix_summary, files=files, verification=verification)
+        ctx.trace.record("debug_memory_recorded", module=module,
+                         symptom=symptom[:120])
+        return True
+    except Exception as exc:  # noqa: BLE001
+        ctx.trace.record("debug_memory_write_failed", error=str(exc)[:200])
+        return False
