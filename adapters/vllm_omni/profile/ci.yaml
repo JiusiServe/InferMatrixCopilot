@@ -1,0 +1,69 @@
+# CI configuration for vllm-omni (adapter Tier-2 knowledge).
+# Grounded in vllm-omni/.buildkite/ + docker/ + .github/workflows/.
+# Includes the normalized flaky-signature baseline so the CI monitor does not
+# misclassify known flakes as new regressions.
+schema_version: 1
+
+provider: buildkite
+org: vllm
+
+entry: .buildkite/pipeline.yml            # 2-doc file: skip-ci resolver, then upload_pipeline.py uploads children
+upload_script: .buildkite/scripts/upload_pipeline.py
+
+image:
+  dockerfile: docker/Dockerfile.ci
+  build: "docker build --file docker/Dockerfile.ci -t vllm-omni-ci ."
+  registry: public.ecr.aws/q9t5s3a7/vllm-ci-test-repo   # tagged by $BUILDKITE_COMMIT
+
+pipelines:
+  cuda:
+    ready: .buildkite/test-ready.yml
+    merge: .buildkite/test-merge.yml
+    nightly: .buildkite/test-nightly.yml
+    weekly: .buildkite/test-weekly.yml
+  amd_rocm:
+    ready: .buildkite/test-amd-ready.yaml
+    merge: .buildkite/test-amd-merge.yml
+    base: .buildkite/test-amd.yaml
+  npu:
+    ready: .buildkite/test-npu-ready.yaml
+    nightly: .buildkite/test-npu-nightly.yaml
+    a3: .buildkite/pipeline-npu-a3.yaml
+  intel_xpu: .buildkite/pipeline-intel.yaml
+  rebase: .buildkite/rebase-pipeline.yaml     # the align/rebase CI (pipeline "vllm-omni-rebase")
+  release: .buildkite/release-pipeline.yaml
+
+github_actions:                          # non-buildkite checks
+  - .github/workflows/pre-commit.yml
+  - .github/workflows/build_wheel.yml
+
+skip_ci:
+  resolver: upload_pipeline.py
+  rules: ["docs-only diff", "pytest skip-mark-only diff", "combined skip-ci"]
+  note: "A skipped run is NOT a failing run; image-build still runs for the nightly exception (nightly-test label, or main + NIGHTLY=1)."
+
+gating:
+  ready_label: "PR 'ready' label triggers the diff-aware L2 test group."
+  main_nightly: "main + NIGHTLY=1 runs the full E2E group (--e2e)."
+
+# Known-flaky signatures — NOT real regressions. The CI monitor should normalize
+# to these before opening an actionable failure.
+flaky_signature_baseline:
+  - signature: "audio/TTS similarity < 0.9"
+    cause: "whisper-small ASR mishears short/quiet clips"
+    action: "re-check with whisper-large-v3; not a model regression (large-v3 200/200 clean, 2026-06)"
+  - signature: "HunyuanImage SSIM threshold miss"
+    cause: "image-generation nondeterminism"
+    action: "reproduce + baseline-compare before flagging"
+
+# Dockerfile.ci environment regressions recurring across rebases (fix at the image, not the test).
+env_traps:
+  - "numpy must stay <2.5 (numba incompatibility)"
+  - "libnvJitLink.so.13 missing from the CI image"
+  - "transformers AutoProcessor.register API drift"
+
+evidence:
+  - "vllm-omni/.buildkite/ (pipeline.yml, test-*.yml, pipeline-*.yaml, scripts/upload_pipeline.py)"
+  - "vllm-omni/docker/Dockerfile.ci"
+  - "vllm-omni/.github/workflows/"
+  - "rebase CI build 2520 (2026-07) for the flaky baseline + env traps"

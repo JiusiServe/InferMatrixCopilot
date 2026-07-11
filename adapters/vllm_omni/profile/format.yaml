@@ -1,0 +1,50 @@
+# Formatting & lint conventions for vllm-omni (adapter Tier-2 knowledge).
+# Grounded in vllm-omni/pyproject.toml [tool.ruff] + .pre-commit-config.yaml.
+# Machine channel: the exact commands and rules the review/format steps can cite.
+schema_version: 1
+
+language: python
+python_versions: ["3.10", "3.11", "3.12", "3.13"]   # requires-python ">=3.10,<3.14"
+build_backend: setuptools                            # dynamic version + platform deps
+
+formatter:
+  tool: ruff-format
+  command: "ruff format ."
+
+linter:
+  tool: ruff
+  command: "ruff check ."
+  line_length: 120
+  select: [E, W, F, I, N, UP, TID251]                # pycodestyle, pyflakes, isort, pep8-naming, pyupgrade, tidy-imports
+  ignore: [E203, N801, N802, N806, N812]
+  per_file_ignores:
+    "examples/**": [E501]
+    "tests/**": [E501]
+
+# TID251 flake8-tidy-imports.banned-api — these FAIL lint/CI, not just warn.
+banned_api:
+  "librosa": "banned — use vllm.multimodal helpers instead"
+  "torch.cuda.max_memory_allocated": "use torch.accelerator.max_memory_allocated"
+  "torch.cuda.reset_peak_memory_stats": "use torch.accelerator.reset_peak_memory_stats"
+  "torch.cuda.device_count": "use torch.accelerator.device_count"
+  "torch.cuda.current_device": "use torch.accelerator.current_device_index"
+  "torch.cuda.empty_cache": "use torch.accelerator.empty_cache"
+  "torch.cuda.synchronize": "use torch.accelerator.synchronize"
+
+pre_commit:
+  config: .pre-commit-config.yaml
+  command: "pre-commit run --all-files"
+  hooks: [check-yaml, debug-statements, end-of-file-fixer, mixed-line-ending,
+          trailing-whitespace, ruff-check, ruff-format, typos, actionlint,
+          signoff-commit, check-pickle-imports]
+
+conventions:
+  - "snake_case functions, CapWords classes (pep8-naming N; N801/N802/N806/N812 relaxed)."
+  - "No `torch.cuda.*` — use the `torch.accelerator.*` equivalents (device-agnostic; CI-enforced)."
+  - "No direct `librosa` — use vllm.multimodal helpers."
+  - "pickle imports are restricted (check-pickle-imports hook) — avoid introducing new pickle usage."
+  - "Vendored upstream model code (e.g. vllm_omni/model_executor/models/minicpmo_4_5/) keeps UPSTREAM conventions (star imports, long lines, math-symbol arg names) so it stays diff-able — do NOT reformat it."
+
+evidence:
+  - "vllm-omni/pyproject.toml [tool.ruff] / [tool.ruff.lint] / [tool.ruff.lint.flake8-tidy-imports.banned-api]"
+  - "vllm-omni/.pre-commit-config.yaml"
