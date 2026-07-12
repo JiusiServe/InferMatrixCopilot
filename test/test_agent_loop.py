@@ -59,3 +59,37 @@ def test_agent_loop_max_iters_forces_final_answer(tmp_path, trace):
     assert outcome.text == "best effort answer"
     last_call = llm.sent_messages[-1]
     assert "budget is exhausted" in str(last_call)
+
+
+def test_final_round_nudge_follows_tool_results(trace):
+    """The budget-2 nudge must come AFTER tool_result blocks in the user
+    message — a leading text block violates the API contract (tool_use ids
+    must be immediately followed by tool_results; caused live 400s at T4)."""
+    from omni_copilot.agent_loop import run_agent
+    from omni_copilot.llm import Block, Reply
+    from omni_copilot.scopes import read_only_scope
+
+    class LLM:
+        available = True
+
+        def __init__(self):
+            self.calls = []
+
+        def create(self, *, system, messages, tools=None, model=None,
+                   max_tokens=None, on_text=None):
+            self.calls.append([*messages])
+            return Reply(blocks=[Block(type="tool_use", id=f"t{len(self.calls)}",
+                                       name="list_dir", input={"path": "/tmp"})])
+
+    llm = LLM()
+    run_agent(llm, system="s", prompt="p", scope=read_only_scope(),
+              trace=trace, max_iters=2)
+    # find the nudge-carrying user message: results FIRST, text LAST
+    nudged = [m["content"] for m in llm.calls[-1]
+              if isinstance(m.get("content"), list)
+              and any(isinstance(b, dict) and b.get("type") == "text"
+                      and "FINAL ROUND" in b.get("text", "")
+                      for b in m["content"])]
+    assert nudged, "nudge message missing"
+    kinds = [b["type"] for b in nudged[0] if isinstance(b, dict)]
+    assert kinds[0] == "tool_result" and kinds[-1] == "text"

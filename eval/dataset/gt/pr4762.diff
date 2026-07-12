@@ -1,0 +1,924 @@
+diff --git a/tests/config/test_endpoint_policy.py b/tests/config/test_endpoint_policy.py
+new file mode 100644
+index 00000000000..aeb1ffa5133
+--- /dev/null
++++ b/tests/config/test_endpoint_policy.py
+@@ -0,0 +1,87 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""Tests for endpoint restrictions logic."""
++
++import pytest
++from fastapi import FastAPI
++from fastapi.testclient import TestClient
++
++from vllm_omni.config.endpoint_policy import (
++    EndpointRestriction,
++    OmniServingCapability,
++    shutdown_unsupported_routes,
++)
++
++pytestmark = [pytest.mark.core_model, pytest.mark.cpu]
++
++SERVER_ROUTE = "/v1/completions"
++REJECTION_REASON = "This route is banned!"
++
++
++def _make_app_with_server_route():
++    """Create a FastAPI app with a route to reject."""
++    app = FastAPI()
++
++    @app.post(SERVER_ROUTE)
++    async def existing_handler():
++        """Returns a response; we want to disable this."""
++        return {"ok": True}
++
++    return app
++
++
++def test_restricted_completions_returns_400():
++    """Ensure that simple route rejection works."""
++    app = _make_app_with_server_route()
++    restrictions = (EndpointRestriction(OmniServingCapability.COMPLETIONS, REJECTION_REASON),)
++    shutdown_unsupported_routes(app, restrictions)
++
++    client = TestClient(app)
++    resp = client.post(SERVER_ROUTE, json={"prompt": "hello", "model": "m"})
++    assert resp.status_code == 400
++    body = resp.json()
++    assert body["error"]["message"] == REJECTION_REASON
++    assert body["error"]["type"] == "BadRequestError"
++
++
++def test_unrestricted_completions_not_blocked():
++    """Ensure that if we don't shutdown any routes, the route stays."""
++    app = _make_app_with_server_route()
++    shutdown_unsupported_routes(app, ())
++
++    client = TestClient(app)
++    resp = client.post(SERVER_ROUTE)
++    assert resp.status_code == 200
++    assert resp.json() == {"ok": True}
++
++
++def test_route_rejection_is_idempotent():
++    """Ensure that calling rejection twice doesn't break things."""
++    app = _make_app_with_server_route()
++    restrictions = (EndpointRestriction(OmniServingCapability.COMPLETIONS, REJECTION_REASON),)
++    shutdown_unsupported_routes(app, restrictions)
++    shutdown_unsupported_routes(app, restrictions)
++
++    client = TestClient(app)
++    resp = client.post(SERVER_ROUTE, json={"prompt": "hello", "model": "m"})
++    assert resp.status_code == 400
++    body = resp.json()
++    assert body["error"]["message"] == REJECTION_REASON
++    assert body["error"]["type"] == "BadRequestError"
++
++
++def test_invalid_route_rejection():
++    """Ensure that a restriction won't crash if a route doesn't exist."""
++    # NOTE: This test is for safety since the route organization is still messy.
++    # Since the restriction needs a valid OmniServingCapability, its implied the route
++    # is a valid vLLM route, but was already removed from the app by earlier processing.
++    app = FastAPI()
++    restrictions = (EndpointRestriction(OmniServingCapability.COMPLETIONS, REJECTION_REASON),)
++    shutdown_unsupported_routes(app, restrictions)
++
++    client = TestClient(app)
++    resp = client.post(SERVER_ROUTE, json={"prompt": "hello", "model": "m"})
++    assert resp.status_code == 400
++    body = resp.json()
++    assert body["error"]["message"] == REJECTION_REASON
++    assert body["error"]["type"] == "BadRequestError"
+diff --git a/tests/e2e/online_serving/test_qwen3_omni.py b/tests/e2e/online_serving/test_qwen3_omni.py
+index 0893ef1d2f3..ffddafbc066 100644
+--- a/tests/e2e/online_serving/test_qwen3_omni.py
++++ b/tests/e2e/online_serving/test_qwen3_omni.py
+@@ -226,3 +226,27 @@ def test_thinker_prefix_caching_audio_output(omni_server, openai_client) -> None
+     }
+ 
+     _run_prefix_cache_check(openai_client, request_config)
++
++
++@pytest.mark.advanced_model
++@pytest.mark.core_model
++@pytest.mark.omni
++@hardware_test(res={"cuda": "H100", "rocm": "MI325"}, num_cards=2)
++@pytest.mark.parametrize("omni_server", test_params, indirect=True)
++def test_completions_rejected_for_thinker_talker(omni_server, openai_client) -> None:
++    """Ensure Thinker-talker models reject /v1/completions; we do this because the
++    thinker-talker handoff implementations currently use ChatML <|im_start|> and
++    <|im_end|> markers to segment the input sequence; when we don't have them,
++    the talker does not get any embeddings, which breaks the server.
++    """
++    responses = openai_client.send_completions_http_request(
++        {
++            "json": {
++                "model": omni_server.model,
++                "prompt": "Hello, how are you?",
++                "max_tokens": 10,
++            },
++        },
++        err_code=400,
++    )
++    assert not responses[0].success
+diff --git a/tests/entrypoints/test_omni_entrypoints.py b/tests/entrypoints/test_omni_entrypoints.py
+index 8f647138b0c..4da82390be8 100644
+--- a/tests/entrypoints/test_omni_entrypoints.py
++++ b/tests/entrypoints/test_omni_entrypoints.py
+@@ -107,6 +107,7 @@ def __init__(
+         self.stage_vllm_configs = [None for _ in range(self.num_stages)]
+         self.output_processors = [SimpleNamespace(tokenizer=None) for _ in range(self.num_stages)]
+         self.input_processor = None
++        self.endpoint_restrictions = ()
+ 
+         self.output_q: queue.Queue[Any] = queue.Queue()
+         self.submitted: list[dict[str, Any]] = []
+diff --git a/tests/entrypoints/test_resolve_dreamzero_config.py b/tests/entrypoints/test_resolve_dreamzero_config.py
+index 374dcf7fa9c..e699edde4b6 100644
+--- a/tests/entrypoints/test_resolve_dreamzero_config.py
++++ b/tests/entrypoints/test_resolve_dreamzero_config.py
+@@ -24,8 +24,8 @@ def test_dreamzero_vla_resolves_to_dreamzero_config(monkeypatch):
+ 
+ def test_dreamzero_config_sets_model_class_and_policy_config(monkeypatch):
+     monkeypatch.setattr(
+-        "vllm_omni.config.config_factory.StageConfigFactory._auto_detect_model_type",
+-        classmethod(lambda _cls, _model, trust_remote_code=True: ("vla", None)),
++        "vllm_omni.config.config_factory.StageConfigFactory._try_infer_model_type",
++        classmethod(lambda _cls, model, trust_remote_code=True: "vla"),
+     )
+     monkeypatch.setattr(
+         "vllm_omni.diffusion.utils.hf_utils._looks_like_dreamzero",
+diff --git a/tests/helpers/runtime.py b/tests/helpers/runtime.py
+index 51ee981cb32..f33489578e0 100644
+--- a/tests/helpers/runtime.py
++++ b/tests/helpers/runtime.py
+@@ -1064,6 +1064,29 @@ def send_chat_completions_http_request(
+         )
+         return [resp]
+ 
++    def send_completions_http_request(
++        self,
++        request_config: dict[str, Any],
++        *,
++        err_code: int | tuple[int, ...] | list[int] | None = None,
++        err_message: str | tuple[str, ...] | list[str] | None = None,
++    ) -> list[HttpResponse]:
++        """POST ``/v1/completions`` with ``json`` or ``raw_body``."""
++        # TODO (Alex): A lot of these helpers should be consolidated as they differ only by endpoint
++        cfg = _merge_http_expectation_kwargs(
++            request_config,
++            err_code=err_code,
++            err_message=err_message,
++        )
++        r = self._post_json_endpoint("/v1/completions", cfg, default_timeout=120.0)
++        resp = self._http_response_from_requests(r)
++        assert_http_error(
++            resp,
++            err_code=cfg.get("err_code"),
++            err_message=cfg.get("err_message"),
++        )
++        return [resp]
++
+     def send_omni_sleep_http_request(
+         self,
+         request_config: dict[str, Any],
+diff --git a/tests/test_config_factory.py b/tests/test_config_factory.py
+index 63a67d652c3..b6ae0074d18 100644
+--- a/tests/test_config_factory.py
++++ b/tests/test_config_factory.py
+@@ -16,6 +16,7 @@
+ 
+ from tests.helpers.stage_config import get_deploy_config_path
+ from vllm_omni.config.config_factory import StageConfigFactory
++from vllm_omni.config.endpoint_policy import EndpointRestriction, OmniServingCapability
+ from vllm_omni.config.pipeline_registry import OMNI_PIPELINES, register_pipeline
+ from vllm_omni.config.stage_config import (
+     DeployConfig,
+@@ -39,6 +40,15 @@
+ pytestmark = [pytest.mark.core_model, pytest.mark.cpu]
+ 
+ 
++@pytest.fixture(autouse=True)
++def clear_config_factory_caches():
++    """Clear cached classmethods from the StageConfigFactory to prevent test pollution."""
++    yield
++    StageConfigFactory.get_hf_config.cache_clear()
++    StageConfigFactory.try_infer_model_type.cache_clear()
++    StageConfigFactory.get_pipeline_config.cache_clear()
++
++
+ Q3_OMNI_ALL_STAGES_HF_CONFIG = Qwen3OmniMoeConfig(enable_audio_output=True)
+ Q3_OMNI_THINKER_HF_CONFIG = Qwen3OmniMoeConfig(enable_audio_output=False)
+ 
+@@ -665,6 +675,43 @@ def test_resolve_when_autodetect_resolves_none(self):
+         assert resolved_config is not None
+         assert len(resolved_config) > 0
+ 
++    def test_deploy_override_uses_correct_endpoint_restrictions(self, clean_pipeline_registry, tmp_path):
++        """Ensure endpoint restrictions must come from the final pipeline
++        after deploy config overrides, not the auto-detected pipeline.
++        """
++        # Register two pipeline configs, where one has an endpoint restriction, and one doesn't
++        restriction = EndpointRestriction(
++            OmniServingCapability.COMPLETIONS,
++            "pipeline_a blocks completions",
++        )
++        pipe_a = PipelineConfig(model_type="detect_type", endpoint_restrictions=(restriction,))
++        pipe_b = PipelineConfig(model_type="override_type", endpoint_restrictions=())
++        register_pipeline(pipe_a)
++        register_pipeline(pipe_b)
++
++        # Create a config with the autodetected type, and write the
++        # deploy config specifying the override type to a temp path
++        class FakeConfig(PretrainedConfig):
++            model_type = "detect_type"
++
++        deploy_yaml = tmp_path / "override.yaml"
++        deploy_yaml.write_text("pipeline: override_type\n")
++
++        # Get the endpoint restrictions, passing the deploy config with the override
++        # type + patching the config for the detected type. Ensure that the endpoint
++        # restrictions correspond to the type in the deploy config.
++        with patch(
++            "vllm_omni.config.config_factory.get_config",
++            return_value=FakeConfig(),
++        ):
++            restrictions = StageConfigFactory.get_pipeline_endpoint_restrictions(
++                model="fake/model",
++                trust_remote_code=False,
++                deploy_config_path=str(deploy_yaml),
++            )
++
++        assert restrictions == ()
++
+ 
+ class TestResolveScheduler:
+     def test_all_execution_types_handled(self):
+diff --git a/vllm_omni/config/config_factory.py b/vllm_omni/config/config_factory.py
+index 20c32c5bc2c..4ab526a8b8c 100644
+--- a/vllm_omni/config/config_factory.py
++++ b/vllm_omni/config/config_factory.py
+@@ -5,6 +5,7 @@
+ from __future__ import annotations
+ 
+ import dataclasses
++import functools
+ from dataclasses import asdict
+ from pathlib import Path
+ from typing import Any
+@@ -14,6 +15,7 @@
+ from vllm.transformers_utils.config import get_config
+ from vllm.transformers_utils.repo_utils import get_hf_file_to_dict
+ 
++from vllm_omni.config.endpoint_policy import EndpointRestriction
+ from vllm_omni.config.pipeline_registry import OMNI_PIPELINES
+ from vllm_omni.config.stage_config import (
+     _DEPLOY_DIR,
+@@ -46,83 +48,174 @@ class StageConfigFactory:
+     """
+ 
+     @classmethod
+-    def create_from_model(
++    def get_pipeline_endpoint_restrictions(
+         cls,
+         model: str,
+-        cli_overrides: dict[str, Any] | None = None,
+-        deploy_config_path: str | None = None,
+-        **deprecated_kwargs: Any,
+-    ) -> list[StageConfig] | None:
+-        """Load pipeline + deploy config, merge with CLI overrides.
++        trust_remote_code: bool,
++        deploy_config_path: str | None,
++    ) -> tuple[EndpointRestriction, ...]:
++        """Given a model string, determine the corresponding endpoint restrictions.
+ 
+-        Checks OMNI_PIPELINES first, since supported models should be explicitly
+-        registered. If a model is not registered in OMNI_PIPELINES, tries to fall
+-        back to using the Transformers config & finding pipelines that have overlapping
+-        supported architectures.
++        Args:
++            model: Model name or path.
++            trust_remote_code: Whether to trust remote code for HF config loading.
++            deploy_config_path: Optional path to the deploy config for the pipeline.
++
++        Returns:
++            A tuple of model specific endpoint restrictions.
+         """
+-        if cli_overrides is None:
+-            cli_overrides = {}
++        pipeline_cfg = StageConfigFactory.get_pipeline_config(
++            model=model,
++            trust_remote_code=trust_remote_code,
++            deploy_config_path=deploy_config_path,
++        )
++        return pipeline_cfg.endpoint_restrictions if pipeline_cfg else ()
+ 
+-        trust_remote_code = cli_overrides.get("trust_remote_code", True)
+-        if trust_remote_code is None:
+-            trust_remote_code = False
++    @classmethod
++    @functools.cache
++    def get_hf_config(cls, model: str, trust_remote_code: bool) -> PretrainedConfig | None:
++        """Fetch the HF config (if it exists) from the model directory.
+ 
+-        model_type, hf_config = cls._auto_detect_model_type(model, trust_remote_code=trust_remote_code)
++        Args:
++            model: Model name or path.
++            trust_remote_code: Whether to trust remote code for HF config loading.
++
++        Returns:
++            the model's config or None.
++        """
++        hf_config = None
++        try:
++            return get_config(model, trust_remote_code=trust_remote_code)
++        except Exception as e:
++            logger.debug(f"`get_config` failed with exception {e}; inferred HF config is None")
++        return hf_config
++
++    @classmethod
++    @functools.cache
++    def try_infer_model_type(cls, model: str, trust_remote_code: bool) -> str | None:
++        """Auto-detect model_type from model directory and apply any model
++        specific patches to get the correct model_type str. If we are unable
++        to infer it from the model directory, we fall back to the PipelineConfig.
++
++        Args:
++            model: Model name or path.
++            trust_remote_code: Whether to trust remote code for HF config loading.
++
++        Returns:
++            model_type as a string; may be None on failure.
++        """
++        model_type = cls._try_infer_model_type(
++            model=model,
++            trust_remote_code=trust_remote_code,
++        )
+         if model_type == "vla":
+             if _looks_like_dreamzero(model):
+                 model_type = "dreamzero"
++        return model_type
+ 
+-        # --- 1. Explicit deploy-config pipeline override (highest precedence) ---
+-        # A deploy YAML may set ``pipeline: <model_type>`` to force routing for
+-        # models whose HF config has a generic/colliding ``model_type`` or no
+-        # matching architectures. Ming-omni-tts, for example, reports
+-        # model_type="dense" with arch BailingMMNative…, which matches no
+-        # pipeline — without this it falls through to the diffusion default and
+-        # dies with "Model class BailingMMNativeForConditionalGeneration not
+-        # found in diffusion model registry". Honor the key before auto-detection.
+-        explicit_pipeline = None
+-        if deploy_config_path:
+-            try:
+-                explicit_pipeline = load_deploy_config(deploy_config_path).pipeline
+-            except Exception:
+-                logger.exception("Failed to read 'pipeline' key from deploy config %s", deploy_config_path)
+-        if explicit_pipeline:
+-            pipeline_cfg = cls.resolve_pipeline_config(explicit_pipeline, hf_config)
+-            if pipeline_cfg is not None:
+-                return cls._create_from_registry(
+-                    explicit_pipeline,
+-                    pipeline_cfg,
+-                    cli_overrides,
+-                    deploy_config_path,
+-                )
+-            logger.warning(
+-                "Deploy config %s requested pipeline %r which is not in OMNI_PIPELINES; "
+-                "falling back to auto-detection.",
+-                deploy_config_path,
+-                explicit_pipeline,
+-            )
++    @classmethod
++    def _try_infer_model_type(cls, model: str, trust_remote_code: bool) -> str | None:
++        """Auto-detect model_type from model directory.
++
++        Args:
++            model: Model name or path.
++            trust_remote_code: Whether to trust remote code for HF config loading.
++
++        Returns:
++            model_type as a string; may be None on failure.
++        """
++        hf_config = cls.get_hf_config(
++            model=model,
++            trust_remote_code=trust_remote_code,
++        )
++        if hf_config is not None:
++            return hf_config.model_type
+ 
+-        # --- 2. Auto-detected model_type registered in OMNI_PIPELINES ---
++        # Fallback: read config.json directly for custom model types that
++        # are not registered with transformers (e.g. qwen3_tts).
++        try:
++            config_dict = get_hf_file_to_dict("config.json", model, revision=None)
++            if config_dict:
++                if "model_type" in config_dict:
++                    return config_dict["model_type"]
++                # VoxCPM2-style configs use singular ``architecture`` rather
++                # than HF's standard ``model_type`` / ``architectures``. Accept
++                # it as a fallback so the pipeline registry can still match.
++                if "architecture" in config_dict and isinstance(config_dict["architecture"], str):
++                    return config_dict["architecture"]
++        except Exception as e:
++            logger.debug(f"Failed to auto-detect model type for {model}: {e}")
++
++        # Fallback for diffusers-style models: check model_index.json.
++        # Some models (e.g. GLM-Image) have no root config.json but ship a
++        # model_index.json with _class_name that maps to a pipeline key via
++        # PipelineConfig.diffusers_class_name.
++        try:
++            model_index = get_hf_file_to_dict("model_index.json", model, revision=None)
++            if model_index and "_class_name" in model_index:
++                class_name = model_index["_class_name"]
++                for obj in OMNI_PIPELINES.values():
++                    # If we have a resolver, call it with the optional hf_config
++                    # to get the default pipeline config for this key
++                    pipeline_cfg = obj(hf_config) if callable(obj) else obj
++                    if pipeline_cfg is not None and pipeline_cfg.diffusers_class_name == class_name:
++                        logger.info(
++                            "Detected pipeline %r from model_index.json (_class_name=%r)",
++                            pipeline_cfg.model_type,
++                            class_name,
++                        )
++                        return pipeline_cfg.model_type
++        except Exception as e:
++            logger.debug(f"Failed to detect model type for diffusers-style models: {e}")
++
++        # Final fallback: some models (e.g. CosyVoice3) ship an empty
++        # config.json and rely on naming conventions. Match the model path
++        # basename against registered pipeline keys — longest match wins
++        # so "cosyvoice3" (length 10) beats "cosyvoice" (length 9).
++        model_lower = model.lower().replace("-", "").replace("_", "")
++        best: str | None = None
++        best_len = 0
++        for registered_key in OMNI_PIPELINES.keys():
++            candidate = registered_key.lower().replace("-", "").replace("_", "")
++            if candidate and candidate in model_lower and len(candidate) > best_len:
++                best = registered_key
++                best_len = len(candidate)
++        if best is not None:
++            return best
++
++        return None
++
++    @classmethod
++    @functools.cache
++    def get_pipeline_config(
++        cls,
++        model: str,
++        trust_remote_code: bool,
++        deploy_config_path: str | None = None,
++    ) -> PipelineConfig | None:
++        """Resolve the PipelineConfig for a model path/name."""
++        model_type = cls.try_infer_model_type(model=model, trust_remote_code=trust_remote_code)
++        hf_config = cls.get_hf_config(model=model, trust_remote_code=trust_remote_code)
++
++        # Resolve the deploy config & check if the user set the pipeline;
++        # If the pipeline is explicitly set, it takes highest priority
++        deploy_config_pipe = cls._get_deploy_override_pipe_config(hf_config, deploy_config_path)
++        if deploy_config_pipe is not None:
++            return deploy_config_pipe
++
++        # Pipeline isn't set in the yaml spec, so we need infer it ourselves.
+         if model_type and model_type in OMNI_PIPELINES:
+             pipeline_cfg = cls.resolve_pipeline_config(model_type, hf_config)
+             if pipeline_cfg is not None:
+-                return cls._create_from_registry(
+-                    model_type,
+-                    pipeline_cfg,
+-                    cli_overrides,
+-                    deploy_config_path,
+-                )
+-
+-        # --- HF architecture fallback: some models report a generic
+-        # model_type that collides with another model. Match by the
+-        # hf_architectures declared on each registered PipelineConfig.
++                return pipeline_cfg
++
+         if hf_config is not None:
+-            logger.warning("Inferred model type %s is not registered to an Omni pipeline", model_type)
++            if model_type is not None:
++                logger.warning("Inferred model type %s is not registered to an Omni pipeline", model_type)
+             hf_archs = set(getattr(hf_config, "architectures", []) or [])
+             if hf_archs:
+                 for registered in OMNI_PIPELINES.values():
+                     pipeline_cfg = registered if isinstance(registered, PipelineConfig) else registered(hf_config)
+-                    # Resolvers that get configs of the incorrect type should return None
+                     if pipeline_cfg is None:
+                         continue
+                     predicate = pipeline_cfg.hf_config_predicate
+@@ -143,36 +236,61 @@ def create_from_model(
+                                 pipeline_cfg.model_type,
+                             )
+                             continue
+-
+                     if isinstance(pipeline_cfg, PipelineConfig) and hf_archs.intersection(
+                         pipeline_cfg.hf_architectures
+                     ):
+-                        return cls._create_from_registry(
+-                            pipeline_cfg.model_type,
+-                            pipeline_cfg,
+-                            cli_overrides,
+-                            deploy_config_path,
+-                        )
++                        return pipeline_cfg
++        return None
+ 
+-        # --- Explicit deploy-config pipeline ---
+-        # When auto-detection above resolves nothing (generic/missing HF model_type
+-        # and no matching architecture), honor an explicit pipeline key in the deploy config
+-        if deploy_config_path is not None:
+-            deploy_path = Path(deploy_config_path)
+-            if deploy_path.exists():
+-                deploy_cfg = load_deploy_config(deploy_path)
+-                if deploy_cfg.pipeline:
+-                    pipeline_cfg = cls.resolve_pipeline_config(deploy_cfg.pipeline, hf_config)
+-                    if pipeline_cfg is not None:
+-                        return cls._create_from_registry(
+-                            pipeline_cfg.model_type,
+-                            pipeline_cfg,
+-                            cli_overrides,
+-                            deploy_config_path,
+-                        )
++    @classmethod
++    def _get_deploy_override_pipe_config(
++        cls,
++        hf_config: PretrainedConfig | None,
++        deploy_config_path: str | None,
++    ) -> PipelineConfig | None:
++        """Load the deploy config and extract + resolve its pipeline field."""
++        if deploy_config_path is None:
++            return None
+ 
+-        # Not in the pipeline registry — let the caller fall back to the
+-        # legacy ``stage_configs/*.yaml`` path (resolve_model_config_path).
++        deploy_path = Path(deploy_config_path)
++        if deploy_path.exists():
++            deploy_cfg = load_deploy_config(deploy_path)
++            if deploy_cfg.pipeline is not None:
++                return cls.resolve_pipeline_config(deploy_cfg.pipeline, hf_config)
++        return None
++
++    @classmethod
++    def create_from_model(
++        cls,
++        model: str,
++        *,
++        trust_remote_code: bool = False,
++        cli_overrides: dict[str, Any] | None = None,
++        deploy_config_path: str | None = None,
++        **deprecated_kwargs: Any,
++    ) -> list[StageConfig] | None:
++        """Load pipeline + deploy config, merge with CLI overrides.
++
++        Checks OMNI_PIPELINES first, since supported models should be explicitly
++        registered. If a model is not registered in OMNI_PIPELINES, tries to fall
++        back to using the Transformers config & finding pipelines that have overlapping
++        supported architectures.
++        """
++        if cli_overrides is None:
++            cli_overrides = {}
++
++        pipeline_cfg = cls.get_pipeline_config(
++            model=model,
++            trust_remote_code=trust_remote_code,
++            deploy_config_path=deploy_config_path,
++        )
++        if pipeline_cfg is not None:
++            return cls._create_from_registry(
++                pipeline_cfg.model_type,
++                pipeline_cfg,
++                cli_overrides,
++                deploy_config_path,
++            )
+         return None
+ 
+     @classmethod
+@@ -288,79 +406,6 @@ def create_default_diffusion(cls, kwargs: dict[str, Any]) -> list[dict[str, Any]
+ 
+         return [config_dict]
+ 
+-    @classmethod
+-    def _auto_detect_model_type(cls, model: str, trust_remote_code: bool = True) -> tuple[str | None, Any]:
+-        """Auto-detect model_type from model directory.
+-
+-        Args:
+-            model: Model name or path.
+-            trust_remote_code: Whether to trust remote code for HF config loading.
+-
+-        Returns:
+-            Tuple of (model_type, hf_config). Both may be None on failure.
+-        """
+-        hf_config = None
+-
+-        try:
+-            hf_config = get_config(model, trust_remote_code=trust_remote_code)
+-            return hf_config.model_type, hf_config
+-        except Exception as e:
+-            logger.debug(f"`get_config` failed for {e}; Falling back to raw config.json path")
+-
+-        # Fallback: read config.json directly for custom model types that
+-        # are not registered with transformers (e.g. qwen3_tts).
+-        try:
+-            config_dict = get_hf_file_to_dict("config.json", model, revision=None)
+-            if config_dict:
+-                if "model_type" in config_dict:
+-                    return config_dict["model_type"], None
+-                # VoxCPM2-style configs use singular ``architecture`` rather
+-                # than HF's standard ``model_type`` / ``architectures``. Accept
+-                # it as a fallback so the pipeline registry can still match.
+-                if "architecture" in config_dict and isinstance(config_dict["architecture"], str):
+-                    return config_dict["architecture"], None
+-        except Exception as e:
+-            logger.debug(f"Failed to auto-detect model type for {model}: {e}")
+-
+-        # Fallback for diffusers-style models: check model_index.json.
+-        # Some models (e.g. GLM-Image) have no root config.json but ship a
+-        # model_index.json with _class_name that maps to a pipeline key via
+-        # PipelineConfig.diffusers_class_name.
+-        try:
+-            model_index = get_hf_file_to_dict("model_index.json", model, revision=None)
+-            if model_index and "_class_name" in model_index:
+-                class_name = model_index["_class_name"]
+-                for obj in OMNI_PIPELINES.values():
+-                    # If we have a resolver, call it with the optional hf_config
+-                    # to get the default pipeline config for this key
+-                    pipeline_cfg = obj(hf_config) if callable(obj) else obj
+-                    if pipeline_cfg is not None and pipeline_cfg.diffusers_class_name == class_name:
+-                        logger.info(
+-                            "Detected pipeline %r from model_index.json (_class_name=%r)",
+-                            pipeline_cfg.model_type,
+-                            class_name,
+-                        )
+-                        return pipeline_cfg.model_type, None
+-        except Exception as e:
+-            logger.debug(f"Failed to detect model type for diffusers-style models: {e}")
+-
+-        # Final fallback: some models (e.g. CosyVoice3) ship an empty
+-        # config.json and rely on naming conventions. Match the model path
+-        # basename against registered pipeline keys — longest match wins
+-        # so "cosyvoice3" (length 10) beats "cosyvoice" (length 9).
+-        model_lower = model.lower().replace("-", "").replace("_", "")
+-        best: str | None = None
+-        best_len = 0
+-        for registered_key in OMNI_PIPELINES.keys():
+-            candidate = registered_key.lower().replace("-", "").replace("_", "")
+-            if candidate and candidate in model_lower and len(candidate) > best_len:
+-                best = registered_key
+-                best_len = len(candidate)
+-        if best is not None:
+-            return best, None
+-
+-        return None, None
+-
+     @classmethod
+     def _merge_cli_overrides(
+         cls,
+@@ -381,6 +426,7 @@ def resolve_pipeline_config(model_type: str, hf_config: PretrainedConfig | None
+         """Given a model type, resolve to the pipeline to be used. If the pipeline
+         maps to a callable we resolve based on the HF config."""
+         if model_type not in OMNI_PIPELINES:
++            logger.warning("Model type %s is not registered to OMNI_PIPELINES", model_type)
+             return None
+         obj = OMNI_PIPELINES[model_type]
+         return obj(hf_config) if callable(obj) else obj
+diff --git a/vllm_omni/config/endpoint_policy.py b/vllm_omni/config/endpoint_policy.py
+new file mode 100644
+index 00000000000..5a1449614d6
+--- /dev/null
++++ b/vllm_omni/config/endpoint_policy.py
+@@ -0,0 +1,91 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""Endpoint restriction policy for omni pipelines."""
++
++from dataclasses import dataclass
++from enum import Enum
++from typing import NamedTuple
++
++from fastapi import FastAPI, Request
++from fastapi.responses import JSONResponse
++from vllm.entrypoints.serve.utils.error_response import create_error_response
++
++
++class RouteTarget(NamedTuple):
++    """A server path & supported methods."""
++
++    path: str
++    methods: frozenset[str]
++
++
++class OmniServingCapability(Enum):
++    """Serving capabilities that pipelines can shut down."""
++
++    CHAT_COMPLETIONS_BATCH = RouteTarget("/v1/chat/completions/batch", frozenset({"POST"}))
++    COMPLETIONS = RouteTarget("/v1/completions", frozenset({"POST"}))
++
++    @property
++    def path(self) -> str:
++        return self.value.path
++
++    @property
++    def methods(self) -> frozenset[str]:
++        return self.value.methods
++
++
++@dataclass(frozen=True)
++class EndpointRestriction:
++    capability: OmniServingCapability
++    reason: str
++
++
++# Routes that are not supported for any model, but are supported in vLLM.
++# This is only temporary to avoid 500s for batched chat completions.
++UNSUPPORTED_ROUTES: tuple[EndpointRestriction, ...] = (
++    EndpointRestriction(
++        OmniServingCapability.CHAT_COMPLETIONS_BATCH,
++        "Batched chat completions are not yet supported by vLLM Omni.",
++    ),
++)
++
++
++def build_rejection_handler(reason: str):
++    """Build a rejection handler for a given endpoint for the provided reason."""
++
++    async def rejection_handler(raw_request: Request):
++        error = create_error_response(message=reason)
++        return JSONResponse(
++            content=error.model_dump(),
++            status_code=error.error.code,
++        )
++
++    return rejection_handler
++
++
++def shutdown_unsupported_routes(
++    app: FastAPI,
++    endpoint_restrictions: tuple[EndpointRestriction, ...],
++):
++    """Given an initialized FastAPI server instance and a set of model specific endpoint
++    restrictions, remove the restricted routes and patch a handler that returns 400.
++    """
++    from vllm_omni.entrypoints.openai.api_server import _remove_route_from_app
++
++    # Generally these should not overlap since there is no point. If they do,
++    # we use the reason message in UNSUPPORTED_ROUTES, for consistent error messages.
++    restricted_endpoints = (*endpoint_restrictions, *UNSUPPORTED_ROUTES)
++
++    for end_restrict in restricted_endpoints:
++        capability = end_restrict.capability
++        # Remove the route from the app
++        _remove_route_from_app(app, capability.path, capability.methods)
++
++        # Patch the bad request error with the model specific
++        # reason for shutting down this endpoint
++        rejection_handler = build_rejection_handler(end_restrict.reason)
++
++        app.add_api_route(
++            capability.path,
++            rejection_handler,
++            methods=list(capability.methods),
++        )
+diff --git a/vllm_omni/config/stage_config.py b/vllm_omni/config/stage_config.py
+index a269216da44..d6baf815c5c 100644
+--- a/vllm_omni/config/stage_config.py
++++ b/vllm_omni/config/stage_config.py
+@@ -18,6 +18,7 @@
+ from vllm.logger import init_logger
+ from vllm.v1.core.sched.scheduler import Scheduler as VLLMScheduler
+ 
++from vllm_omni.config.endpoint_policy import EndpointRestriction
+ from vllm_omni.config.yaml_util import create_config, load_yaml_config, to_dict
+ from vllm_omni.core.sched.omni_ar_scheduler import OmniARAsyncScheduler, OmniARScheduler
+ from vllm_omni.core.sched.omni_generation_scheduler import OmniGenerationScheduler
+@@ -262,6 +263,7 @@ class PipelineConfig:
+     # this value to auto-detect the pipeline.  Only needed for diffusers-style
+     # multi-component repos (e.g. GLM-Image).  ``None`` = not a diffusers model.
+     diffusers_class_name: str | None = None
++    endpoint_restrictions: tuple[EndpointRestriction, ...] = ()
+ 
+     def get_stage(self, stage_id: int) -> StagePipelineConfig | None:
+         """Look up a stage by its ID."""
+diff --git a/vllm_omni/engine/async_omni_engine.py b/vllm_omni/engine/async_omni_engine.py
+index 77e0a8405c4..3c898ee75ea 100644
+--- a/vllm_omni/engine/async_omni_engine.py
++++ b/vllm_omni/engine/async_omni_engine.py
+@@ -30,6 +30,7 @@
+ from vllm.v1.engine import EngineCoreRequest
+ from vllm.v1.engine.input_processor import InputProcessor
+ 
++from vllm_omni.config.config_factory import StageConfigFactory
+ from vllm_omni.config.stage_config import strip_parent_engine_args
+ from vllm_omni.diffusion.data import DiffusionParallelConfig, parse_attention_config
+ from vllm_omni.diffusion.diffusion_engine import supports_audio_output
+@@ -216,6 +217,7 @@ def __init__(
+         transfer_emitter: Any = None,
+         log_stats: bool = False,
+         tokenizer: str | None = None,
++        trust_remote_code: bool = False,
+         **kwargs: Any,
+     ) -> None:
+         self.model = model
+@@ -273,6 +275,17 @@ def __init__(
+                 self._omni_master_port,
+             )
+ 
++        # Stage resolution pops deploy_config, so get the pipeline endpoint
++        # restriction beforehand. TODO (Alex) make this cleaner and refactor
++        # stage config resolution to remove kwargs hacks.
++        deploy_config_path = kwargs.get("deploy_config")
++        self.endpoint_restrictions = StageConfigFactory.get_pipeline_endpoint_restrictions(
++            model=model,
++            trust_remote_code=trust_remote_code,
++            deploy_config_path=deploy_config_path,
++        )
++
++        kwargs["trust_remote_code"] = trust_remote_code
+         self.config_path, self.stage_configs = self._resolve_stage_configs(model, kwargs)
+ 
+         self.num_stages = len(self.stage_configs)
+diff --git a/vllm_omni/entrypoints/async_omni.py b/vllm_omni/entrypoints/async_omni.py
+index ab2d8836b3a..6975f20d8e2 100644
+--- a/vllm_omni/entrypoints/async_omni.py
++++ b/vllm_omni/entrypoints/async_omni.py
+@@ -147,6 +147,7 @@ def __init__(self, *args: Any, model: str = "", **kwargs: Any) -> None:
+         self.config_path = self.engine.config_path
+         self.tts_max_instructions_length = kwargs.get("tts_max_instructions_length", None)
+         self.input_processor = self.engine.input_processor
++        self.endpoint_restrictions = self.engine.endpoint_restrictions
+ 
+         stage_index = self._get_comprehension_stage_index()
+         if stage_index is None:
+diff --git a/vllm_omni/entrypoints/openai/api_server.py b/vllm_omni/entrypoints/openai/api_server.py
+index 991e702e39f..7e115361795 100755
+--- a/vllm_omni/entrypoints/openai/api_server.py
++++ b/vllm_omni/entrypoints/openai/api_server.py
+@@ -91,6 +91,7 @@
+ from vllm.utils.system_utils import decorate_logs
+ from vllm.v1.engine.exceptions import EngineDeadError, EngineGenerateError
+ 
++from vllm_omni.config.endpoint_policy import shutdown_unsupported_routes
+ from vllm_omni.diffusion.models.interface import ReferenceVideoDecodeSpec
+ from vllm_omni.entrypoints.async_omni import AsyncOmni
+ from vllm_omni.entrypoints.openai.errors import InvalidInputReferenceError
+@@ -259,7 +260,7 @@ async def _get_vllm_config(engine_client: EngineClient) -> Any:
+     return getattr(engine_client, "vllm_config", None)
+ 
+ 
+-def _remove_route_from_app(app, path: str, methods: set[str] | None = None):
++def _remove_route_from_app(app, path: str, methods: frozenset[str] | None = None):
+     """Remove a route from the app by path and optionally by methods.
+ 
+     OMNI: used to override upstream /v1/chat/completions with omni behavior.
+@@ -509,6 +510,12 @@ async def omni_run_server_worker(listen_address, sock, args, client_config=None,
+ 
+         await omni_init_app_state(engine_client, app.state, args)
+ 
++        # After initializing the app state, shut down any endpoints that are model specific
++        if hasattr(engine_client, "endpoint_restrictions"):
++            shutdown_unsupported_routes(app, engine_client.endpoint_restrictions)
++        else:
++            logger.warning("engine client has no endpoint restrictions attribute")
++
+         # Start background processes
+         await STORAGE_MANAGER.start()
+ 
+diff --git a/vllm_omni/entrypoints/utils.py b/vllm_omni/entrypoints/utils.py
+index 961638e14d9..5ecbaa9c959 100644
+--- a/vllm_omni/entrypoints/utils.py
++++ b/vllm_omni/entrypoints/utils.py
+@@ -345,6 +345,7 @@ def load_stage_configs_from_model(
+ 
+     stages = StageConfigFactory.create_from_model(
+         model,
++        trust_remote_code=cli_overrides.get("trust_remote_code", False),
+         cli_overrides=cli_overrides,
+         deploy_config_path=deploy_config_path,
+     )
+diff --git a/vllm_omni/model_executor/models/qwen3_omni/pipeline.py b/vllm_omni/model_executor/models/qwen3_omni/pipeline.py
+index 07debc72438..137e4e29d1d 100644
+--- a/vllm_omni/model_executor/models/qwen3_omni/pipeline.py
++++ b/vllm_omni/model_executor/models/qwen3_omni/pipeline.py
+@@ -9,6 +9,7 @@
+ 
+ from transformers import Qwen3OmniMoeConfig
+ 
++from vllm_omni.config.endpoint_policy import EndpointRestriction, OmniServingCapability
+ from vllm_omni.config.stage_config import (
+     PipelineConfig,
+     StageExecutionType,
+@@ -21,6 +22,12 @@
+ QWEN3_OMNI_PIPELINE = PipelineConfig(
+     model_type="qwen3_omni_moe",
+     model_arch="Qwen3OmniMoeForConditionalGeneration",
++    endpoint_restrictions=(
++        EndpointRestriction(
++            OmniServingCapability.COMPLETIONS,
++            "Qwen3-Omni requires chat template structure for thinker-talker handoff. Use /v1/chat/completions instead.",
++        ),
++    ),
+     stages=(
+         StagePipelineConfig(
+             stage_id=0,

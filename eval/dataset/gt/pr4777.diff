@@ -1,0 +1,88 @@
+diff --git a/tests/e2e/online_serving/test_qwen_image_layered_expansion.py b/tests/e2e/online_serving/test_qwen_image_layered_expansion.py
+index c26e2103915..315fba6ef3f 100644
+--- a/tests/e2e/online_serving/test_qwen_image_layered_expansion.py
++++ b/tests/e2e/online_serving/test_qwen_image_layered_expansion.py
+@@ -7,7 +7,7 @@
+ Kept cases (maximum feature coverage, no cpu-offload):
+   sp_001              : cache_dit + Ulysses-SP 2          (2×H100)
+   cfg_parallel_002    : cache_dit + CFG-Parallel 2        (2×H100)
+-  layers_guard_001    : layerwise offload + layers=3      (1×H100, issue #1969 guard)
++  layers_guard_001    : layerwise offload + layers=2      (1×H100, issue #1969 guard)
+ 
+ Total distinct features covered: cache_dit, Ulysses-SP, CFG-Parallel, layerwise-offload.
+ """
+@@ -116,8 +116,8 @@ def test_feature(omni_server: OmniServer, openai_client: OpenAIClientHandler):
+             model=MODEL,
+             server_args=["--enable-layerwise-offload"],
+         ),
+-        3,
+-        id="layers_guard_001_layers3",
++        2,
++        id="layers_guard_001_layers2",
+         marks=SINGLE_CARD_FEATURE_MARKS,
+     ),
+ ]
+diff --git a/tests/entrypoints/openai_api/test_image_server.py b/tests/entrypoints/openai_api/test_image_server.py
+index 31a82102a6b..5a7ef7bf032 100644
+--- a/tests/entrypoints/openai_api/test_image_server.py
++++ b/tests/entrypoints/openai_api/test_image_server.py
+@@ -1244,7 +1244,7 @@ def test_parameter_validation():
+ 
+     # Invalid layers for layered models (must stay within the backend-supported range)
+     with pytest.raises(ValueError):
+-        ImageGenerationRequest(prompt="test", layers=2)
++        ImageGenerationRequest(prompt="test", layers=1)
+ 
+     with pytest.raises(ValueError):
+         ImageGenerationRequest(prompt="test", layers=11)
+@@ -1663,13 +1663,13 @@ def test_image_edit_invalid_layers(async_omni_test_client):
+         files=[("image", img_bytes)],
+         data={
+             "prompt": "test",
+-            "layers": 2,
++            "layers": 1,
+         },
+     )
+     assert response.status_code == 400
+     detail = response.json()["detail"]
+     assert "Invalid layers" in detail
+-    assert "layers must be between 3 and 10 inclusive" in detail
++    assert "layers must be between 2 and 10 inclusive" in detail
+ 
+     # Test layers above the supported range
+     response = async_omni_test_client.post(
+@@ -1683,7 +1683,7 @@ def test_image_edit_invalid_layers(async_omni_test_client):
+     assert response.status_code == 400
+     detail = response.json()["detail"]
+     assert "Invalid layers" in detail
+-    assert "layers must be between 3 and 10 inclusive" in detail
++    assert "layers must be between 2 and 10 inclusive" in detail
+ 
+ 
+ def test_image_edit_resolution_and_size_conflict(async_omni_test_client):
+diff --git a/vllm_omni/entrypoints/openai/image_api_utils.py b/vllm_omni/entrypoints/openai/image_api_utils.py
+index b958d786a20..5bd79e9362f 100644
+--- a/vllm_omni/entrypoints/openai/image_api_utils.py
++++ b/vllm_omni/entrypoints/openai/image_api_utils.py
+@@ -14,7 +14,7 @@
+ import PIL.Image
+ 
+ SUPPORTED_LAYERED_RESOLUTIONS = (640, 1024)
+-SUPPORTED_LAYERED_LAYERS_RANGE = range(3, 11)
++SUPPORTED_LAYERED_LAYERS_RANGE = range(2, 11)
+ 
+ 
+ def parse_size(size_str: str) -> tuple[int, int]:
+diff --git a/vllm_omni/entrypoints/openai/protocol/images.py b/vllm_omni/entrypoints/openai/protocol/images.py
+index 78f63d38718..b7247962cb7 100644
+--- a/vllm_omni/entrypoints/openai/protocol/images.py
++++ b/vllm_omni/entrypoints/openai/protocol/images.py
+@@ -60,7 +60,7 @@ class ImageGenerationRequest(BaseModel):
+     user: str | None = Field(default=None, description="User identifier for tracking")
+     layers: int | None = Field(
+         default=None,
+-        description="Number of output layers for layered image models. Supported range: 3-10.",
++        description="Number of output layers for layered image models. Supported range: 2-10.",
+     )
+ 
+     @field_validator("size")

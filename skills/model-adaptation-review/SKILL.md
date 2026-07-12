@@ -1,11 +1,19 @@
 ---
 name: model-adaptation-review
-description: Reviewing new-model / pipeline / checkpoint / deploy-config PRs and stage-topology issues — plumbing vs parity evidence, checkpoint layout gate, stage parallelism x device capacity validation, runner preprocess contract
-trigger: pr_review or issue_answer touching a new model, pipeline, checkpoint, deploy YAML, stage config, parallelism, devices, or model_executor preprocess/MTP routing
-modules: [pr_review, issue_answer, model_executor, worker_runner]
+description: Reviewing new-model / pipeline / checkpoint / deploy-config PRs and stage-topology
+  issues — plumbing vs parity evidence, checkpoint layout gate, stage parallelism
+  x device capacity validation, runner preprocess contract
+trigger: pr_review or issue_answer touching a new model, pipeline, checkpoint, deploy
+  YAML, stage config, parallelism, devices, or model_executor preprocess/MTP routing
+modules:
+- pr_review
+- issue_answer
+- model_executor
+- worker_runner
 status: active
 created_at: 2026-07-12
-run_count: 0
+run_count: 5
+last_used_at: '2026-07-12'
 ---
 
 ## Fix (what to demand / check)

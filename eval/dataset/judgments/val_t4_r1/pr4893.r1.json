@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Candidate X produced no review at all (crashed with an API error before generating output), so it contributes nothing on any axis. Candidate Y delivered a grounded, technically verified review (checked DPMetadata construction, init_vllm_model_parallel_group semantics, cleanup paths) with a concrete file:line comment and an APPROVE verdict that matches the ground truth's LGTM sentiment, though it doesn't explicitly surface the reviewer's reduce_scatter test-coverage question (a minor, already-resolved concern in the diff).",
+  "_cost_usd": 0.1574564,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

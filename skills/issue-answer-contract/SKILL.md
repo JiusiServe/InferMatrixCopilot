@@ -1,11 +1,15 @@
 ---
 name: issue-answer-contract
-description: Issue answering — the answer contract (root cause file:line, mechanism, fix AND workaround, verification, linked issues/PRs), thread grounding, and status semantics; an incomplete-but-grounded draft ships with caveats instead of escalating
+description: Issue answering — the answer contract (root cause file:line, mechanism,
+  fix AND workaround, verification, linked issues/PRs), thread grounding, and status
+  semantics; an incomplete-but-grounded draft ships with caveats instead of escalating
 trigger: issue_answer / drafting an answer or triage for a GitHub issue
-modules: [issue_answer]
+modules:
+- issue_answer
 status: active
 created_at: 2026-07-12
-run_count: 0
+run_count: 5
+last_used_at: '2026-07-12'
 ---
 
 ## Fix (answer contract, every slot)

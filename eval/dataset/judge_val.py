@@ -34,14 +34,29 @@ JUDGE_MODEL = "claude-sonnet-5"
 REPLICATES = 3
 CAP = 24_000  # chars per candidate / per GT block
 
-PR_ITEMS = [4893, 4810, 4825, 4837, 4816]
-ISSUE_ITEMS = [4793, 4827, 4905, 4891, 4842]
+# SPLIT=val (default) or test — selects items; test items stay untouched
+# until the frozen final evaluation.
+_SPLITS = {
+    "val": {"prs": [4893, 4810, 4825, 4837, 4816],
+            "issues": [4793, 4827, 4905, 4891, 4842]},
+    "test": {"prs": [4762, 4834, 4849, 4954, 4777],
+             "issues": [4957, 4962, 4815, 4826, 4802]},
+}
+_SPLIT = os.environ.get("SPLIT", "val")
+PR_ITEMS = _SPLITS[_SPLIT]["prs"]
+ISSUE_ITEMS = _SPLITS[_SPLIT]["issues"]
 GAP_NOTES = {
     4810: ("LATENT GAP CHECK: history proves human review missed that one more "
            "caller of the removed get_cache_scale API existed (the HunyuanImage3 "
            "diffusion loader, later issue #4891). gap_hit = does the candidate "
            "flag other/unswept callers of the removed API or demand a "
            "repo-wide sweep?"),
+    4834: ("LATENT GAP CHECK: history proves this PR's own strict "
+           "NotImplementedError safeguard broke merge CI after landing "
+           "(issue #4905, relaxed by #4912) — human review missed the "
+           "over-strictness. gap_hit = does the candidate question whether "
+           "existing tests/CI exercise the newly guarded path, or flag the "
+           "guard as potentially too strict for existing callers?"),
 }
 
 PR_SCHEMA = ('{"x": {"recall": 0.0, "precision": 0.0, "actionability": 0.0, '
