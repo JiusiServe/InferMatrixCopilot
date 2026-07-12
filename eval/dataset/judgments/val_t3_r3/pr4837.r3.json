@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.75,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.5,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X directly verifies the orchestrator.py:1290 change against both submit_initial/submit_update code paths and reaches the same conclusion as the ground-truth reviewer (the already_submitted distinction was never load-bearing for diffusion), landing on APPROVE matching the actual two LGTM outcome. Y's output is bloated with three near-identical duplicated reviews, treats the same line as a risk requiring a speculative assert rather than explaining why the change is safe, and lands on REQUEST CHANGES despite the PR being a clean, approved bugfix — mismatching ground truth and diluting precision with redundant/low-value test-request comments.",
+  "_cost_usd": 0.071217,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

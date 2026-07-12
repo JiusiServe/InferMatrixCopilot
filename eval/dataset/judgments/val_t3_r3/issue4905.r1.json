@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.45,
+    "grounding": 0.6,
+    "completeness": 0.5
+  },
+  "y": {
+    "correctness": 0.5,
+    "grounding": 0.7,
+    "completeness": 0.65
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly tie the failure to PR #4834's new wake_up() guard matching yenuo26's bisection, and both cite the same real guard code in async_omni.py, but both overclaim resolution — asserting the test fix is 'already on main' and recommending closure — when the actual thread shows Flink-ddd still asking yenuo26 to trigger a full CI sleep-mode run, i.e. unresolved. Y is slightly better grounded (cites the generate() partial-wake guard at async_omni.py:319-324, specific test line numbers for the regression tests) and more complete (adds runtime guidance for users, cleanly organized) versus X's redundant/duplicated answer text and thinner sourcing beyond the core diff.",
+  "_cost_usd": 0.13991569999999998,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

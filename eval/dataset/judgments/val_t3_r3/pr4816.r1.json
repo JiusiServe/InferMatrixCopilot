@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.45,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "GT shows a trivial mechanical rename PR that was approved with 'lgtm' and no substantive concerns. X correctly approves, verifies the rename against upstream, and confirms no missed occurrences — fully grounded and accurate. Y requests changes over a single manufactured test-coverage gap (missing 404 test for create_chat_completion) that is real but disproportionate for a pure rename fix and contradicts the actual reviewer outcome; Y's output is also duplicated three times verbatim, suggesting a generation artifact. Y's finding is more concretely actionable (file/line, specific test to add), but X's higher fidelity to ground truth and absence of overreach make it the stronger review overall.",
+  "_cost_usd": 0.1479129,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

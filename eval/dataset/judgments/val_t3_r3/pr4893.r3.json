@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.75,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Neither candidate surfaces the one substantive ground-truth concern (whether the test's hasattr checks actually verify reduce_scatter behavior, not just presence), so recall is low for both. X's findings are all accurate, code-grounded, and end in a calibrated APPROVE that matches the actual human outcome (LGTM), with one clearly-flagged, honest caveat about sandbox limits. Y's five nits (docstring gaps, redundant guard, DPMetadata.make comment) are also grounded but purely cosmetic, yet Y inflates them into a REQUEST CHANGES verdict — a miscalibration versus the PR's actual approval — and the output is marred by triplicated duplicate review_text blocks and diagnostic noise (low confidence, 'retryable' failure) that undercut trust in the process.",
+  "_cost_usd": 0.3284357,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

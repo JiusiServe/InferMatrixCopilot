@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.55,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The one substantive ground-truth item (yJader's inline comment explaining that already_submitted shouldn't gate the unwrap because both submit_initial/submit_update reject list prompts identically) is exactly what X verifies and states explicitly, with correct file/line grounding. Y flags the same orchestrator line but only suggests adding tests/asserts without ever articulating why dropping already_submitted is safe, missing the actual reasoning; Y also proposes an assert(len<=1) that contradicts the deliberate multi-element batching behavior X correctly identifies as intentional. Y's output is also verbatim-duplicated three times, undermining confidence in its process even though individual comments are file/line-grounded and non-fabricated.",
+  "_cost_usd": 0.1550247,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

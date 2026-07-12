@@ -1,15 +1,15 @@
 {
-  "wall_s": 331.9,
+  "wall_s": 231.9,
   "split": "val",
   "rc": 0,
-  "run_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t3_r1/runs/pr4810/run-20260712-023231-c65cf8",
-  "recorded_at": "2026-07-12T02:37:50",
+  "run_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t3_r1/runs/pr4816/run-20260712-024146-3f5e42",
+  "recorded_at": "2026-07-12T02:45:34",
   "llm_calls": 0,
   "input_tokens": 0,
   "output_tokens": 0,
   "metrics": {
     "schema": 1,
-    "run": "run-20260712-023231-c65cf8",
+    "run": "run-20260712-024146-3f5e42",
     "task_kind": "pr_review",
     "status": "done",
     "quality": {
@@ -26,15 +26,15 @@
       }
     },
     "cost": {
-      "usd": 0.2499,
-      "minutes": 5.31,
+      "usd": 0.2027,
+      "minutes": 3.79,
       "ci_minutes": 0,
-      "input_tokens": 750307,
-      "output_tokens": 42996,
-      "tool_calls": 87,
+      "input_tokens": 619498,
+      "output_tokens": 32179,
+      "tool_calls": 81,
       "usd_ref": 1.0,
       "min_ref": 10.0,
-      "cost_index": 1.2996
+      "cost_index": 1.231
     },
     "risk": {
       "incidents": {

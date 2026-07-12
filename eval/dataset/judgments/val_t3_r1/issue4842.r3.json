@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.0,
+    "grounding": 0.0,
+    "completeness": 0.0
+  },
+  "y": {
+    "correctness": 0.92,
+    "grounding": 0.82,
+    "completeness": 0.9
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "X produced no actual answer at all — it hit max iterations and escalated with zero diagnosis, so it cannot match the thread resolution on any axis. Y correctly concludes 'invalid' due to running at the default core_model run-level (dummy weights), matching the actual maintainer resolution exactly, and even independently cites PR #4354 as the same causal mechanism akshatvishu pointed to in the thread. Y backs this with specific file/line citations and ties the dummy-weight explanation directly to the 'Joe Joe Joe' collapse pattern and the debug log in the thread, giving a complete, actionable fix (--run-level=full_model) plus a reasonable follow-up suggestion.",
+  "_cost_usd": 0.1289352,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

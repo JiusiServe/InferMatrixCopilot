@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.4,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.9,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "The one substantive ground-truth concern (yJader's inline comment) argues that dropping `already_submitted` is safe because diffusion's StagePool rejects list prompts identically in both submit_initial and submit_update. Y directly verifies this exact claim by reading stage_pool.py:951 and 1022, and also resolves X's speculative 'major' concern by confirming ZImagePipeline.forward returns a plain DiffusionOutput with no __getitem__ (proving the old outputs[0] indexing was itself the bug) — landing on APPROVE, matching both human LGTMs. X touches the same orchestrator.py:1290 line but reframes it as a missing-test issue rather than the safety-semantics question actually raised, and its two 'major' findings are explicitly unverified ('budget exhausted', 'cannot verify') yet still drive a REQUEST CHANGES verdict that misreads a legitimate bugfix as risky. X's minor suggestions (docstring update, comment additions) are reasonable and actionable but don't compensate for ungrounded blocking claims dragging down precision.",
+  "_cost_usd": 0.16803780000000001,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

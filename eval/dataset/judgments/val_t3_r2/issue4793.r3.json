@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.92,
+    "grounding": 0.9,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.88,
+    "grounding": 0.75,
+    "completeness": 0.72
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates correctly identify PR #4792 as the fix (None vs per_req_payloads starving the downstream stage) and both quote the exact code/comment that appears in the ground-truth thread, so core correctness is essentially tied and matches the resolution. X is more thoroughly grounded — it traces the full mechanism (_FULL_PAYLOAD_INPUT_STAGES registration, accumulate_full_payload_output gating, coordinator/scheduler timeout log lines, 300s→600s timeout change) across multiple files with distinct, plausible variable names per file, and closes out loose ends in the reporter's environment (NaN-clamp patch, empty-audio note) that Y ignores. Y's answer is substantively similar but is delivered as a messy, duplicated raw run-report (draft_answer repeated twice, followed by an internal diagnostics/JSON dump) rather than a clean maintainer-style post, hurting completeness and polish despite correct content.",
+  "_cost_usd": 0.1477897,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

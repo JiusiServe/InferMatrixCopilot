@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.85,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.78,
+    "grounding": 0.72,
+    "completeness": 0.85
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly diagnose the tokenizer/config mismatch and cite the confirmed workaround, but X faithfully reproduces the thread's actual root-cause framing (PR #2713 regression removing the `modes` filter) and its resolution path (docs fix + fail-fast guard, tracked in a new issue per @Gaohan123), matching the ground truth almost exactly. Y omits the PR #2713/`modes`-filter mechanism entirely and instead proposes a specific 'tolerant fallback' code diff that contradicts the thread's actual ask (fail fast, not silently degrade), plus an unverified/likely-fabricated claim about both YAML headers saying 'Instruct,' which is a grounding risk not supported by the thread.",
+  "_cost_usd": 0.24822909999999998,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

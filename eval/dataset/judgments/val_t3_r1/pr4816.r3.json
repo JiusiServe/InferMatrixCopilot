@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.35,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth is a trivial 'lgtm' approve with zero substantive concerns, which matches Candidate X's clean, well-verified APPROVE (grep + upstream cross-check, no fabricated issues). Candidate Y instead issues a REQUEST CHANGES verdict over a single speculative concern that its own cited evidence (grep showing 0 remaining old-name references) already refutes, making the finding self-contradictory and low-precision; it also renders the identical review three times, suggesting pipeline malfunction rather than a considered judgment.",
+  "_cost_usd": 0.05375039999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

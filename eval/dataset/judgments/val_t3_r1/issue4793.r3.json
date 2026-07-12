@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.95,
+    "grounding": 0.9,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.9,
+    "grounding": 0.85,
+    "completeness": 0.5
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both reach the same correct diagnosis matching the ground truth (regression from #4527, fix in #4792, already folded into the 0.24 rebase commit a560ed18) and cite the same real files/lines/snippet verbatim. X delivers a clean, complete maintainer-style close-out with a clear verdict, workaround, and preemption of red herrings. Y is delivered as raw agent scaffolding (duplicated draft_answer blocks, exposed internal diagnostics) and its final answer is literally cut off mid-sentence ('Set async_chu'), which is a real completeness defect for a response meant to be posted to the reporter.",
+  "_cost_usd": 0.0933556,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

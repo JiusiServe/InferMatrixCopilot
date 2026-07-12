@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.45,
+    "grounding": 0.6,
+    "completeness": 0.5
+  },
+  "y": {
+    "correctness": 0.8,
+    "grounding": 0.75,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly diagnose the missed diffusion-side get_cache_scale call and cite #4810/#4808/#4809, but X frames the issue as still-open troubleshooting ('what to do if you still hit this') rather than converging on the actual resolution — closure as a duplicate — and glosses over the contradiction that #4808 is closed-unmerged yet 'appears applied.' Y explicitly recommends closing as duplicate (matching the actual thread outcome), directly confronts the closed/unmerged status as an open question needing confirmation, and is honest about which branch it could verify. Y's grounding is also more specific (AutoWeightsLoader chain, exact remap call, test file line ranges) and its completeness better addresses the maintainer decision the reporter actually needed.",
+  "_cost_usd": 0.0576379,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.75,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X covers both real reviewer threads (the validation-results request, which it explicitly notes was already satisfied, and dsocek's hardcoded-list/naming-conflict concern, matched via a similar _dit_modules-derivation suggestion) and lands a calibrated COMMENT verdict consistent with the actual LGTM/merge outcome. Y also raises the hardcoded-list duplication point with solid grounding but entirely misses the validation-results thread, pads its output with three verbatim-duplicated review blocks, and issues a 'REQUEST CHANGES' verdict for two nit/minor findings that directly contradicts its own 'Approve and merge' next_action, undermining actionability and trust despite genuine repo exploration evidence.",
+  "_cost_usd": 0.1593068,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

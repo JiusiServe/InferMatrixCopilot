@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.6,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth is a trivial approve ('lgtm', no inline comments), so recall is vacuously satisfied by both. X's review is fully grounded — it verifies the rename against upstream and existing tests and correctly recommends approval with no fabricated claims. Y requests changes over a speculative, out-of-scope missing-test claim for a purely mechanical rename PR (contradicting the actual lgtm/approve outcome), and its output is degraded by identical triplicated review_text blocks, suggesting a process glitch rather than a clean single verdict.",
+  "_cost_usd": 0.1237773,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

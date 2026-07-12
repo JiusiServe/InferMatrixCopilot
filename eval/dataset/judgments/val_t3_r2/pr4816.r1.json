@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth is a trivial 'lgtm' approval on a mechanical rename PR with zero substantive concerns; X matches this exactly, with grounded verification (confirms no missed occurrences, matches upstream naming) and a clean approve. Y surfaces a real, well-grounded, highly actionable observation (no unit test for the create_chat_completion fallback path, unlike the three sibling endpoints) but overcalibrates it into a 'REQUEST CHANGES' verdict on what is otherwise a correct, low-risk rename — misrepresenting severity relative to the actual approved outcome, and the output is oddly duplicated three times verbatim.",
+  "_cost_usd": 0.1558808,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

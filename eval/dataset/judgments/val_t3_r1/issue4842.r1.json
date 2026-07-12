@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.92,
+    "grounding": 0.82,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.0,
+    "grounding": 0.0,
+    "completeness": 0.0
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X correctly diagnoses the issue as a run-level mismatch (core_model defaulting to dummy weights despite the full_model marker), matching the actual thread resolution (akshatvishu/yenuo26, closed invalid) almost exactly, and backs it with specific file/line citations and a concrete rerun command plus a reasonable follow-up suggestion. Y produced no answer at all — the agent hit max iterations and escalated, yielding zero diagnostic value to the reporter.",
+  "_cost_usd": 0.09218370000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

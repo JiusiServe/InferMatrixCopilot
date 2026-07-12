@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.95,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.45,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X's core claim — both submit_initial and submit_update reject list prompts regardless of already_submitted — directly matches the ground-truth reviewer's rationale for why the gate removal is correct, and X reaches the same APPROVE verdict the actual reviewers gave (two LGTMs). Y reaches REQUEST CHANGES, contradicting the real outcome, hedges its main finding as unverified ('tool budget exhausted'), mischaracterizes pre-existing len>1 fallthrough as a new gap, and its diagnostics contain unrelated fabricated content (db/init.sql, iteration-limit blockers) that has nothing to do with this diff, undermining credibility. X's comments are better grounded with concrete file/line verification and a useful actionable regression-test suggestion.",
+  "_cost_usd": 0.0826649,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

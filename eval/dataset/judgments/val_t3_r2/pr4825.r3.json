@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Neither candidate found the actual substantive ground-truth concern (dsocek's suggestion to derive PEFT naming from `_packed_modules_mapping`/`stacked_params_mapping` for fused-projection renames), though both independently converged on an adjacent, well-grounded idea (deriving `default_components` from each pipeline's `_dit_modules` instead of hardcoding), giving low-to-moderate recall for both. X's findings are cleaner, correctly calibrated (COMMENT verdict matching the actual approve-and-merge outcome), noted the validation evidence that satisfied xuechendi's request, and surfaced an additional valid gap (text-encoder LoRA silently no-op) not mentioned by Y. Y did comparably thorough grounded investigation (per its diagnostics) and raised a reasonable test-coverage nit, but its final output is oddly triplicated and lands on 'REQUEST CHANGES' for what are essentially two nits — a miscalibrated verdict given the PR was merged with only LGTMs. Both are actionable with concrete file/line references, but X edges out on precision, calibration, and coverage.",
+  "_cost_usd": 0.09824230000000002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

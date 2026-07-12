@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.65,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.85,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Neither candidate surfaces the one substantive ground-truth concern (yenuo26's question about whether the test should also verify reduce_scatter), so recall is near-zero for both. X's deliverable is a single minor nit about an error message, repeated three times verbatim (an artifact of an unfinished/degraded run, confirmed by its own diagnostics showing 'iteration limit reached' and 'confidence: low'). Y is more thorough and precise: it verifies DPMetadata's field requirements, confirms init_vllm_model_parallel_group's use_device_communicator semantics against the actual vLLM source, checks destroy_model_parallel cleanup, and validates the cfg_parallel_size condition change is safe — all grounded, correct, and organized into a clear blocker-scan table with an explicit verdict and caveats about sandbox limitations.",
+  "_cost_usd": 0.1901984,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

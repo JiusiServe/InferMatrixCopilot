@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.4,
+    "grounding": 0.55,
+    "completeness": 0.65
+  },
+  "y": {
+    "correctness": 0.4,
+    "grounding": 0.5,
+    "completeness": 0.4
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates converge on the same (plausible but unverified) theory — PR #4834 added an intentional guard and the stale test needs a level=1 fix already on HEAD — which overstates the actual thread, where maintainers are still bisecting to #4834 and asking Flink-ddd to trigger a full CI run, not confirming a closed/fixed state. Code line citations for the guard itself line up with the traceback, but the specific PR content, new test names, and 'already fixed on HEAD' claims are unverified fabrication in both. X reads as a coherent maintainer post; Y is delivered as a raw automated 'run report' with the draft answer duplicated verbatim and tool-metadata noise, making it noticeably less usable as a direct answer despite near-identical substance.",
+  "_cost_usd": 0.1763574,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.45,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Ground truth is an approved, correct bugfix (2 LGTMs) whose only substantive inline comment explains why removing 'already_submitted' is safe (both submit paths reject list prompts identically). Y independently verifies this exact fact by reading stage_pool.py's ValueError guards, correctly recommends APPROVE, and directly addresses the multi-element-list edge case X worries about. X instead recommends REQUEST CHANGES and flags returning the full DiffusionOutput (preserving stage_durations) as a 'major' risk — but this is actually the correct behavior, not a bug — and pads the review with three near-duplicate 'add a test' comments instead of engaging with why the already_submitted removal is sound.",
+  "_cost_usd": 0.17078970000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

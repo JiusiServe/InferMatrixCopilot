@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.0,
+    "grounding": 0.0,
+    "completeness": 0.0
+  },
+  "y": {
+    "correctness": 0.9,
+    "grounding": 0.65,
+    "completeness": 0.9
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Candidate X produced no substantive answer at all — the agent hit its iteration limit and escalated, so there is nothing to credit. Candidate Y correctly diagnoses the issue as user error (default core_model run-level silently patches stage configs to load_format: dummy, extended to online serving via PR #4354), matching the thread's actual 'invalid' resolution and akshatvishu/yenuo26's comments almost exactly, including the correct fix command (--run-level=full_model). Y loses some grounding credit for inventing an unverifiable detail (claiming the audio output was 'Welsh-flavored noise') that isn't actually shown in the truncated log in the issue body, and for citing specific file/line numbers that can't be verified from the given context, but the core causal chain and resolution are right and well-argued.",
+  "_cost_usd": 0.1004297,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

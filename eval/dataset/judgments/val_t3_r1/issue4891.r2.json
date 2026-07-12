@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.4,
+    "grounding": 0.45,
+    "completeness": 0.5
+  },
+  "y": {
+    "correctness": 0.85,
+    "grounding": 0.8,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth is narrowly 'duplicate of #4808, see #4809 comment for details' — Y matches this precisely, correctly separating #4810 (AR-side, 4/5 sites) from #4808 (the specific DiT site this issue reports), and surfaces the actual nuance implied by 'additional details': #4808 shows closed/unmerged and the #4810 regression test has a coverage hole for this exact file. X instead confidently declares both PRs 'merged' and the bug fully fixed, but its own diagnostics show it never ran the suggested test and never verified GitHub PR state — it conflates #4808/#4810 and asserts specifics (line numbers, test names) not backed by verification, which is risky given Y's finding that #4808 may not have merged at all. Y's hedged, well-cited escalation is closer to how a maintainer would actually respond to a duplicate report.",
+  "_cost_usd": 0.091167,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

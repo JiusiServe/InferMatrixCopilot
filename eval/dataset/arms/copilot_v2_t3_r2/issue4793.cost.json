@@ -1,16 +1,16 @@
 {
-  "wall_s": 331.9,
+  "wall_s": 295.0,
   "split": "val",
   "rc": 0,
-  "run_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t3_r1/runs/pr4810/run-20260712-023231-c65cf8",
-  "recorded_at": "2026-07-12T02:37:50",
+  "run_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t3_r2/runs/issue4793/run-20260712-030031-062b49",
+  "recorded_at": "2026-07-12T03:05:21",
   "llm_calls": 0,
   "input_tokens": 0,
   "output_tokens": 0,
   "metrics": {
     "schema": 1,
-    "run": "run-20260712-023231-c65cf8",
-    "task_kind": "pr_review",
+    "run": "run-20260712-030031-062b49",
+    "task_kind": "issue_answer",
     "status": "done",
     "quality": {
       "q": null,
@@ -18,23 +18,22 @@
       "partial": true,
       "abstained": false,
       "components": {
-        "recall_w": null,
-        "precision_v": null,
-        "useful": null,
-        "calib": null,
-        "decision": null
+        "correct": null,
+        "grounded": null,
+        "complete": null,
+        "helpful": null
       }
     },
     "cost": {
-      "usd": 0.2499,
-      "minutes": 5.31,
+      "usd": 0.0877,
+      "minutes": 4.83,
       "ci_minutes": 0,
-      "input_tokens": 750307,
-      "output_tokens": 42996,
-      "tool_calls": 87,
-      "usd_ref": 1.0,
-      "min_ref": 10.0,
-      "cost_index": 1.2996
+      "input_tokens": 255274,
+      "output_tokens": 17113,
+      "tool_calls": 36,
+      "usd_ref": 0.3,
+      "min_ref": 5.0,
+      "cost_index": 1.4377
     },
     "risk": {
       "incidents": {
@@ -51,7 +50,7 @@
       "escalations": 0,
       "pushes": 0,
       "posted": 0,
-      "steps_completed": 4
+      "steps_completed": 3
     }
   }
 }

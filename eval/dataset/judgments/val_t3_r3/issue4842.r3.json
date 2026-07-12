@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.0,
+    "grounding": 0.0,
+    "completeness": 0.0
+  },
+  "y": {
+    "correctness": 0.95,
+    "grounding": 0.9,
+    "completeness": 0.9
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Candidate X produced no answer at all (agent exceeded iterations, escalated), so it scores zero across all dimensions. Candidate Y correctly diagnoses the issue as invalid — the test was run at the default core_model run-level which patches all stages to load_format: dummy, producing the garbage 'Joe Joe Joe' output — matching almost exactly what akshatvishu and yenuo26 established in the thread, and grounds it with specific file/line citations and the correct fix (--run-level=full_model). Y also adds a reasonable, non-overreaching suggestion about improving the footgun without contradicting the 'invalid' resolution.",
+  "_cost_usd": 0.035818899999999994,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.95,
+    "grounding": 0.92,
+    "completeness": 0.92
+  },
+  "y": {
+    "correctness": 0.92,
+    "grounding": 0.85,
+    "completeness": 0.75
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both correctly diagnose the #4527 regression and cite PR #4792 as the fix already folded into the 0.24 rebase commit, matching the ground truth exactly. X goes further with grounding — it traces the full mechanism (_FULL_PAYLOAD_INPUT_STAGES parking, accumulate_full_payload_output gating, exact timeout log strings matching the reporter's log, and the 300s→600s timeout change) and explicitly rules out red herrings in the reporter's environment. Y's diagnosis is correct but the delivered answer is cluttered with leftover run-report scaffolding and a duplicated draft_answer block, which hurts polish and completeness as a maintainer-facing reply, even though it adds a plausible NPU-runner cross-reference X lacks.",
+  "_cost_usd": 0.14901770000000003,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

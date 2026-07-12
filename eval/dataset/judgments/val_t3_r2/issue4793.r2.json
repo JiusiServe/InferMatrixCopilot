@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.85,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.85,
+    "grounding": 0.8,
+    "completeness": 0.55
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both correctly identify PR #4792 as the fix for the async_chunk:false None-payload starvation bug, and both quote the exact fix snippet that matches akshatvishu's ground-truth comment almost verbatim. X is delivered as a clean, polished maintainer response — it cites the specific rebase commit a560ed18 (matching akshatvishu's comment precisely), preempts red herrings, and gives a clear close/reopen verdict with actionable next steps. Y's answer is marred by leaked internal tool-report formatting: the draft content is duplicated verbatim twice, and the final 'answer_draft' field is truncated mid-sentence, which hurts completeness and reads as unfinished/unprofessional despite reaching the same correct diagnosis.",
+  "_cost_usd": 0.2352975,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

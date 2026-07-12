@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth found nothing substantive (just an 'lgtm' approval), and X's thorough, upstream-verified approve with no blockers matches that outcome exactly while staying fully grounded. Y surfaces one plausible, well-evidenced test-coverage gap (missing 404-fallback test for create_chat_completion) that is genuinely actionable, but it inflates a 'minor' severity into a REQUEST CHANGES verdict that contradicts the actual approved PR, and the entire review_text block is bizarrely duplicated three times, undermining trust in the output's coherence.",
+  "_cost_usd": 0.08414820000000002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

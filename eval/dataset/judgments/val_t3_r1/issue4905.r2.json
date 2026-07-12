@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.45,
+    "grounding": 0.55,
+    "completeness": 0.6
+  },
+  "y": {
+    "correctness": 0.55,
+    "grounding": 0.6,
+    "completeness": 0.5
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates converge on the same technically plausible diagnosis (PR #4834's wake_up guard vs. a stale level=2 test), matching yenuo26's bisection to #4834, and cite the same code/line evidence. X overreaches by declaring the issue 'already fixed on main' and recommending it stay closed, which contradicts the visible thread state (Flink-ddd is still asking yenuo26 to trigger a full CI sleep-mode run — clearly unresolved, not confirmed-and-closed). Y frames its fix as a proposed change pending verification/merge, closer to the thread's actual open, investigative tenor, and its diagnostics transparently show it read the actual files rather than asserting from memory. Y loses points for sloppy duplicate draft_answer blocks and raw run-report scaffolding that a real maintainer comment wouldn't include, while X reads as a more polished, complete write-up with broader user guidance — but X's confident 'close as resolved' claim is the more consequential error given the ground truth shows the issue was still being actively chased down.",
+  "_cost_usd": 0.20490629999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

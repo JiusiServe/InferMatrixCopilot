@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently catch the latent gap (the surviving get_cache_scale caller in hunyuan_image3_transformer.py that later became issue #4891), so gap_hit is true for both, and both are concrete/file-line actionable. X additionally reconstructs and validates the actual technical reasoning the human reviewer gave (delegated vs. direct loaders, why removing the manual branches is safe) and adds a grounded critique of the new test's real coverage, giving it noticeably higher recall against the ground-truth review; it does contain one small factual wobble (an odd '(see #4810)' self-reference). Y is narrower and more repetitive (the same three findings duplicated verbatim across retries), and its blocker framing ignores the human reviewer's note that DiT coverage was deliberately deferred to #4808, slightly mischaracterizing scope even though the underlying gap it flags is real.",
+  "_cost_usd": 0.3016024,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

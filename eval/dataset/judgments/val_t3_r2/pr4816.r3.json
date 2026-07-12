@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth has no real concerns (just an lgtm approve), so both trivially satisfy recall. X correctly matches the actual outcome with rigorous, grounded verification (cross-checked upstream vLLM naming, confirmed no missed rename sites, validated existing test updates) and reaches APPROVE, mirroring the human reviewer. Y's single finding (missing chat-completion fallback test) is valid and highly concrete/actionable, but it escalates a self-labeled 'minor' gap to a blocking REQUEST_CHANGES verdict on a mechanical bugfix PR that was actually approved — a real miscalibration — and the output is defectively triplicated (identical review text repeated three times), undermining reliability.",
+  "_cost_usd": 0.09648990000000002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

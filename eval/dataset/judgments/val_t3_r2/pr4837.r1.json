@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.5,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X independently verifies the exact reasoning the ground-truth reviewer gave (both submit_initial and submit_update reject list prompts regardless of already_submitted, confirming the guard removal is correct), and reaches the same APPROVE outcome as the actual two LGTMs, with concrete grounded file/line evidence. Y contradicts the actual outcome by recommending REQUEST CHANGES, hinges its 'major' findings on unverified/hedged assumptions (explicitly marked 'blocked'/'budget exhausted'), misses the specific already_submitted/StagePool reasoning the real reviewer gave, and pads output with triplicated identical text, all of which drag down precision and usefulness despite superficially specific file/line references.",
+  "_cost_usd": 0.16281779999999998,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

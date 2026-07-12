@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.85,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.25,
+    "precision": 0.55,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth's only substantive concern (yenuo26's inline note on verifying reduce_scatter in the test) is largely already satisfied in the diff shown, so neither candidate scores much recall; Y's nit about the test mocking device_communicator/reduce_scatter is thematically closer, giving it a slight recall edge. X is a clean, well-grounded review that correctly verifies the DPMetadata/GroupCoordinator claims against actual vLLM source and reaches the same APPROVE verdict the human reviewers gave. Y's output is degraded by triple-duplicated review text, leaked agent-failure diagnostics ('hit maximum iterations', 'confidence: low') that are irrelevant to the PR, and a REQUEST CHANGES verdict that doesn't match its own 'minor'/'nit' severity labels — undermining precision and usefulness despite some valid test-coverage findings.",
+  "_cost_usd": 0.2363194,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

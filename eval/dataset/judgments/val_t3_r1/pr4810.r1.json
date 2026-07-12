@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.75,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.6,
+    "actionability": 0.7,
+    "gap_hit": true
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates independently catch the latent diffusion-transformer gap (hunyuan_image3_transformer.py:2238), so gap_hit is true for both. X additionally reproduces the ground truth's own critique almost verbatim — the regression test verifies the mapper is *called* but not that mapped names resolve on a real quantized checkpoint — and correctly verifies the outer-AutoWeightsLoader mechanism against actual upstream vLLM code. Y's competing 'major' finding that HunyuanModel has no outer AutoWeightsLoader wrapper is directly contradicted by the human reviewer's explicit confirmation that the outer AutoWeightsLoader handles the rename, making it a likely false positive that hurts precision; Y's output is also marred by verbatim triplicated review text and truncated sentences, reducing usability despite comparable per-finding concreteness.",
+  "_cost_usd": 0.30628740000000004,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

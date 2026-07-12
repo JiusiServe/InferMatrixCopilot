@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.8,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.7,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates converge on the same non-ground-truth-matching but plausible suggestion (derive scan targets from _dit_modules), missing the actual reviewer concern (dsocek's point about deriving from _packed_modules_mapping/stacked_params_mapping to handle fused-projection renames like to_q/k/v→to_qkv), so recall is low and similar for both. X is cleanly organized, calibrates its verdict appropriately (non-blocking COMMENT, correctly noting the PR is already merged and approved by both human reviewers), and grounds its claims with specific file:line citations. Y's output is duplicated verbatim three times, buries its two actual findings under a large raw diagnostic/telemetry dump not meant for human consumption, and issues a REQUEST CHANGES verdict for what are only minor/nit items — a miscalibration given the PR was merged with two LGTMs.",
+  "_cost_usd": 0.0801308,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

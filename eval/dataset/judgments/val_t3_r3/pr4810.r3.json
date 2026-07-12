@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y reproduces most of the actual human review's substance (verifies the AutoWeightsLoader design via upstream vLLM source, matches the APPROVE verdict, echoes lishunyang12's test-coverage-limitation concern) while independently surfacing the same latent gap — the surviving hunyuan_image3_transformer.py get_cache_scale caller — with stronger grounding (cites the PR's own pre-existing failing-file list and confirms the eventual on-main fix). X's sole substantive finding also hits the gap and is technically valid/actionable, but it ignores everything else the real reviewers actually raised (recall is near-zero) and the report shows signs of a malfunctioning run: the identical blocker text is triplicated and the diagnostics admit the agent hit max iterations with low confidence.",
+  "_cost_usd": 0.1819164,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

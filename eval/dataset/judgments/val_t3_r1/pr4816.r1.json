@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.35,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns (bot rate-limit message + a bare 'lgtm' approval), so both trivially achieve full recall. X thoroughly verifies the rename against upstream and confirms zero missed occurrences, correctly landing on APPROVE which matches the actual outcome. Y's sole finding — that an unread test at line 2306 might still mock the old attribute — is explicitly flagged by Y itself as an unverified assumption, and is directly undercut by Y's own cited evidence ('grep confirmed 0 remaining openai_serving_tokenization references'), yet Y still issues REQUEST CHANGES (duplicated identically three times), making the finding low-precision and the verdict unjustified.",
+  "_cost_usd": 0.16022430000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

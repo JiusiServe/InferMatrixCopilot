@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.7,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates converge on the same core structural point the ground truth hints at (dsocek's suggestion to derive component names from an existing mapping rather than hardcoding a list), though neither cites the exact `_packed_modules_mapping`/PEFT-naming-conflict angle dsocek raised, capping recall for both. X is better calibrated: it correctly lands on an approve-level COMMENT verdict (matching the actual outcome of two human LGTMs) and adds a second genuinely useful, well-grounded finding (text-encoder LoRA remaining a silent no-op) that mirrors the same failure mode the PR fixes. Y's output is marred by verbatim triplication of its own review text and issues a REQUEST CHANGES verdict for findings it itself labels minor/nit, an internal miscalibration that hurts precision despite solid grounding and evidence citations in the findings themselves.",
+  "_cost_usd": 0.0705523,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

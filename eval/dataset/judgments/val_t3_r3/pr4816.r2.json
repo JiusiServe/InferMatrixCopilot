@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.55,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth shows an approved, uncontroversial rename with zero substantive concerns raised. X reaches the same conclusion after genuinely verifying the rename against the upstream vllm checkout and confirming no missed occurrences, matching reality closely. Y's single finding (missing chat-endpoint fallback test) is grounded in real grep evidence and reasonably actionable, but blocking with 'REQUEST CHANGES' over a self-labeled 'minor' test-coverage nit on a straightforward bugfix rename is disproportionate and mismatched with the actual review outcome, and the entire review is bizarrely triplicated, hurting reliability.",
+  "_cost_usd": 0.06766319999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

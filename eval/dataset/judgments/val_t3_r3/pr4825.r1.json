@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.7,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.7,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates independently converge on the same substantive nit (derive scan targets from per-pipeline metadata like _dit_modules instead of hardcoding), echoing the spirit of dsocek's ground-truth suggestion, but X also correctly notes the PR's before/after validation (matching xuechendi's request/tthakkal's reply) and lands on an approve-level verdict consistent with the actual two LGTM approvals. Y omits the validation point entirely and outputs 'REQUEST CHANGES' despite labeling its own findings 'minor'/'nit', directly contradicting the actual approved/merged outcome, and its output is bloated with triplicated review text and raw diagnostic dumps that hurt readability without adding grounded content.",
+  "_cost_usd": 0.1649597,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

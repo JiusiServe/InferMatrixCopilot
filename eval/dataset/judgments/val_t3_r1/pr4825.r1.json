@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.55,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates independently converge on the ground-truth's core theme (dsocek's suggestion to derive default_components from existing declarative metadata rather than hardcoding), but X also credits the resolved validation-request thread (xuechendi's before/after ask), giving it stronger recall. X's second comment (text-encoder LoRA gap) is well-grounded and its verdict ('COMMENT', approve-level) matches the actual outcome (both reviewers LGTM'd/approved). Y's second finding (flux2_klein/ovis_image 'unet' scope creep) is self-admittedly inferred only from docstring text, not a verified attribute, undermining its precision, and Y's 'REQUEST CHANGES' verdict directly contradicts its own next_action of 'Approve and merge,' hurting actionability; the review_text is also triplicated verbatim, adding noise without new content.",
+  "_cost_usd": 0.22775849999999997,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

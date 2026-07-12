@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.6,
+    "actionability": 0.7,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both independently catch the latent gap (stale get_cache_scale call in the diffusion-side hunyuan_image3_transformer.py), so gap_hit is true for both, but Y frames it accurately as a non-blocking scope note (matching the eventual fix path via a later issue) while X escalates it to a blocking verdict. X's major finding disputing that HunyuanModel is delegated through an outer AutoWeightsLoader directly contradicts the ground-truth reviewer's explicit statement that this exact design is correct, and the PR's actual merge/approval outcome — a real precision miss for a 'major' severity claim. Y instead confirms that same design point with concrete upstream code citations (utils.py, fp8.py) matching the human reviewer almost exactly, and adds a sharper version of the ground truth's test-coverage critique (the mapped-name test bypasses AutoWeightsLoader entirely, so it doesn't validate the real integration). Both are concrete and file/line-grounded, but Y's higher recall (matches more of the actual reviewer's substantive points) and better-calibrated verdict give it the edge.",
+  "_cost_usd": 0.212631,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently surface the real latent gap (hunyuan_image3_transformer.py:2238 still calling the removed get_cache_scale, later fixed by #4891), so gap_hit is true for both. But the ground truth's one substantive human concern — that the new test only proves the mapper is *called*, not that mapped names actually resolve against a real quantized checkpoint — is captured well by Y's finding #1 (test bypasses AutoWeightsLoader and never exercises the real .output_scale→.k_scale mapping) while X's test-related finding is unrelated (missing file in a stale-API list). X's verdict of blocker/REQUEST CHANGES is more aggressive than the actual outcome (approved/merged with only non-blocking notes), whereas Y's approve-with-caveats verdict and severity calibration track the real review tenor more closely; Y does include one slightly dubious citation ('(see #4810)') that dings its precision a bit, but its broader recall advantage dominates.",
+  "_cost_usd": 0.2738618,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

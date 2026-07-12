@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.35,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth shows no real concerns (Codex quota-exhausted, human reviewer just said 'lgtm'/APPROVED), so the correct call is a clean approve. Candidate X verifies the rename exhaustively against both the repo and upstream vLLM, correctly concludes APPROVE, and its non-blocking note is well-grounded. Candidate Y flags a single speculative concern (an untouched test at line 2306) as 'minor' but escalates to REQUEST CHANGES, while its own assumptions admit the file was 'unread due to budget' and its own grep evidence (0 remaining old-name references) undercuts the concern — a hedged, unverified claim dressed as a blocking finding, and the same text is duplicated three times with no added value. X's grounded approve matches truth better; Y's actionable-looking but unverified request-changes lowers its precision substantially.",
+  "_cost_usd": 0.1440843,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.85,
+    "grounding": 0.75,
+    "completeness": 0.7
+  },
+  "y": {
+    "correctness": 0.9,
+    "grounding": 0.9,
+    "completeness": 0.9
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly diagnose the deploy-config mismatch (Base tokenizer lacks <img_ratio_33..36>) and reproduce the thread's workaround, matching akshatvishu/FayeSpica. Y is more grounded, quoting actual header lines from both deploy YAMLs to justify why one path touches AR init and the other doesn't, and proposes a concrete degrade-gracefully code fix rather than X's vaguer 'add a guard' suggestion. Y also explicitly addresses Gaohan123's closing request to track the improvement in a new issue and frames the bug report itself as resolved via workaround, which matches the actual thread resolution more precisely than X's ending, which omits this final maintainer action.",
+  "_cost_usd": 0.13171270000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

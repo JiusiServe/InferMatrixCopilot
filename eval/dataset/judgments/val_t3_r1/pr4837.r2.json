@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.5,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.9,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "The one substantive ground-truth concern (yJader's point that already_submitted is irrelevant since both submit paths reject list prompts regardless) is directly and correctly reproduced by Y, which verified it by reading stage_pool.py's submit_initial/submit_update and confirmed the fix is exactly right — matching the reviewer's reasoning almost verbatim. X instead flags the same line but misreads it as a residual len>1 gap/possible crash, which Y shows is deliberate intended behavior, not a bug, so X's framing misses the actual insight and adds a partially incorrect speculative concern. X's other finding (verify ZImagePipeline return type) is explicitly unverified/hedged ('tool budget exhausted'), while Y verified the same code path against pipeline_z_image.py and confirmed the change is a strict improvement, giving Y much higher grounding and precision. X also emitted three duplicated review_text blocks, a formatting defect that doesn't help its case.",
+  "_cost_usd": 0.1464363,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

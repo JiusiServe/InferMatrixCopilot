@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.8,
+    "grounding": 0.68,
+    "completeness": 0.65
+  },
+  "y": {
+    "correctness": 0.88,
+    "grounding": 0.85,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly diagnose the Base-vs-Instruct tokenizer/config mismatch and reach the same workaround, matching the thread. Y is more grounded, citing specific surrounding code (start/end ratio ids) and noticing both YAML headers say 'Instruct', while X's own diagnostics admit it couldn't actually locate the cited lines via grep and leaned on the issue's own trace instead of independent verification. Y also captures the actual thread resolution — Gaohan123 asking to track the fix in a new issue — whereas X's next_action proposes landing a PR directly, missing that nuance.",
+  "_cost_usd": 0.1509573,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}
