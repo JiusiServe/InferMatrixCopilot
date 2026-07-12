@@ -1,0 +1,21 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.8,
+    "actionability": 0.35
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Neither candidate surfaces the one substantive ground-truth concern (yenuo26's question about reduce_scatter test verification), though X's validated notes on FakeGroup's reduce_scatter branch come closest. X delivers concrete, file/line-anchored findings including a genuine grounded catch (int64 vs upstream's int32 in DPMetadata) and a real test-coverage gap (cfg_parallel_size=1 untested), giving it real actionability even though several items are cosmetic nits. Y's review is accurate but mostly a high-level PASS checklist with only one soft non-blocking comment, so despite solid technical grounding it offers far less concrete, actionable feedback than X.",
+  "_cost_usd": 0.2084604,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

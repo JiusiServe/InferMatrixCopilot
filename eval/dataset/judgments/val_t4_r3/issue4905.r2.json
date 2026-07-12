@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.5,
+    "grounding": 0.45,
+    "completeness": 0.5
+  },
+  "y": {
+    "correctness": 0.55,
+    "grounding": 0.55,
+    "completeness": 0.65
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "The actual thread never confirms a resolution — it only bisects blame to PR #4834 and ends with Flink-ddd asking yenuo26 to trigger a full cluster CI run, meaning the issue was still open/unverified. Both candidates overstate certainty by declaring 'close, already fixed on main,' and both pile on fabricated specifics (exact line numbers, invented companion tests, issue #4473 repro labels) that aren't grounded in the given evidence. Y is slightly better calibrated: it hedges with 'if your CI ran against an older commit... re-running should pass,' offers a falsifiable grep/pytest verification recipe, and directly engages the actual participants' ask to re-trigger CI, whereas X asserts the fix is fully landed and recommends closing without acknowledging the maintainers' explicit request for another test run.",
+  "_cost_usd": 0.15683239999999998,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

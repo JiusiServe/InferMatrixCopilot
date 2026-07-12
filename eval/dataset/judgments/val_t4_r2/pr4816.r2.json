@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has zero substantive concerns (bot notice + plain 'lgtm'), so both candidates trivially achieve full recall and both correctly conclude the PR is sound. X gives a clean, accurate, well-verified approve but offers little beyond confirmation. Y does the same hunk-by-hunk verification plus surfaces three grounded, file/line-specific nits (naming-convention divergence, missing chat-completion test coverage) that are genuinely useful and actionable, though one nit slightly mischaracterizes the fix's core purpose as 'incidental' rather than the PR's main intent, costing a bit of precision.",
+  "_cost_usd": 0.0949954,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

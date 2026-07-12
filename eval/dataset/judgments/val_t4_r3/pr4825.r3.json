@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly validate the unet-scan addition as safe and independently converge on the same legitimate design nit (hardcoded default_components duplicates per-pipeline _dit_modules), which echoes the spirit of dsocek's ground-truth 'single source of truth' comment, though neither hits its specific mechanism (packed_modules_mapping/naming-conflict renames), so recall is modest for both. X adds a genuinely valuable, diff-grounded catch Y misses: text-encoder LoRA components are still silently unmatched, the exact 'zero-layer no-op' failure mode the PR itself describes, plus a concrete warn-on-zero-match suggestion. Y compensates with more exhaustive grep-verified evidence and two lower-value nits (docstring, integration test), but doesn't surface anything as sharp as X's text-encoder gap. Neither has a labeled LATENT GAP CHECK section.",
+  "_cost_usd": 0.11981390000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

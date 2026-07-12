@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.45,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y directly verifies the exact rationale the ground-truth inline comment gives (both submit_initial and submit_update reject list prompts for diffusion, so already_submitted was never load-bearing) and lands on the correct APPROVE verdict matching both human reviewers. X touches the same lines but is internally contradictory — it 'validates' the same facts in its sweep notes, then re-flags them as unresolved 'major' concerns needing confirmation, inflating finding count with redundant asks on orchestrator.py:1290 and landing on REQUEST CHANGES despite finding no real blocker. X's actionable minor suggestions (assertion, comment) are reasonable but outweighed by the noisy/contradictory major flags that hurt precision and correctness of verdict.",
+  "_cost_usd": 0.1735238,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

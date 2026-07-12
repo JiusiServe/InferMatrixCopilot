@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.15,
+    "grounding": 0.2,
+    "completeness": 0.35
+  },
+  "y": {
+    "correctness": 0.85,
+    "grounding": 0.75,
+    "completeness": 0.8
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Ground truth closed #4891 as a duplicate of #4808, not as already-fixed-by-#4810. X confidently asserts the bug is 'already fixed on main' via #4810 and fabricates verified line-numbered code/comments as proof, directly contradicting the issue's own title ('missed by #4810') and the actual duplicate-of-#4808 resolution. Y correctly reasons that #4810 fixed only 4 of 5 call sites, explains why routing to #4808 (not #4810) is the right closure, and honestly flags that #4808 never merged and the regression test has a coverage gap — matching the thread's actual outcome while being transparent about what it could and couldn't verify.",
+  "_cost_usd": 0.0565546,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

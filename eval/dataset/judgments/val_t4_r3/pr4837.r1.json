@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.95,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.55,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The only substantive ground-truth concern (yJader's inline comment explaining why removing `already_submitted` is safe because both submit_initial/submit_update reject list prompts identically) is directly and correctly resolved by X, which cites the exact same stage_pool.py evidence and reaches the same conclusion, matching the actual APPROVED/LGTM outcome. Y touches the same line but frames it as an unresolved risk ('verify the processor handles a bare dict'), contradicting the ground truth's settled reasoning, and pads its review with speculative, partly redundant suggestions (docstrings, asserts, comments) that don't correspond to real reviewer concerns. X's comments are fewer but tightly grounded and correctly verified; Y's breadth comes at the cost of precision and confidence.",
+  "_cost_usd": 0.1591717,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

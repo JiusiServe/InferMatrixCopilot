@@ -1,0 +1,20 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth is thin (two LGTM approvals plus a validation-result request that was satisfied, and a naming/packed_modules_mapping suggestion likely in an unshown diff hunk); neither candidate recalls that specific mapper suggestion, but both independently converge on the analogous 'default_components duplicates other declarative sources of truth' observation, which is well grounded via repo greps. X additionally notes the PR's before/after validation images were provided, directly mirroring the real xuechendi/tthakkal exchange, and surfaces a genuinely valuable extra gap (text-encoder LoRA silently no-op) that Y misses. Y is slightly more systematic with explicit validated/sweep evidence trails and a couple of solid nits (missing SDXL integration test, undocumented _lora_components), but doesn't touch the validation topic and its findings largely overlap X's core point. Both are well grounded with no clear fabrications; neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.1674431,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

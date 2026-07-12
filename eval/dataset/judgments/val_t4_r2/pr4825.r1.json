@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.8,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates identify the one substantive ground-truth concern (dsocek's point that the hardcoded default_components list is fragile and should be derived from existing per-pipeline structure), and neither fabricates findings — both stay grounded in the diff and surrounding code. Y edges ahead on precision/actionability by backing each claim with explicit grep evidence, citing more duplicate-list sites (registry.py, module_collector.py), and adding a concretely verifiable follow-up (zero SDXL test coverage via grep), whereas X's second point (text-encoder LoRA no-op) is more speculative and less directly evidenced. Neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.1628616,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

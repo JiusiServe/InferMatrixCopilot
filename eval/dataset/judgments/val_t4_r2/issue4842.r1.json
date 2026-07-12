@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.95,
+    "grounding": 0.9,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.95,
+    "grounding": 0.82,
+    "completeness": 0.8
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly identify the ground truth's actual resolution (run-level misconfiguration causing dummy weights, closed invalid) and cite the same core evidence (stage_config.py's dummy load_format patching, run_args.py default, PR #4354, and akshatvishu's debug log). X grounds more broadly (adds runtime.py fixture logic, assertions.py thresholds, and explicitly explains why selecting the test by node ID doesn't override run-level despite the full_model marker — a subtlety Y leaves implicit). X is also more end-to-end, adding concrete pass requirements and a constructive footgun/ergonomics suggestion, whereas Y's answer is solid but narrower and includes stray tool-output boilerplate ('Run report' header) that reads as less polished.",
+  "_cost_usd": 0.1340654,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.8,
+    "grounding": 0.85,
+    "completeness": 0.85
+  },
+  "y": {
+    "correctness": 0.35,
+    "grounding": 0.35,
+    "completeness": 0.55
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both reach the correct top-level verdict (close as duplicate of #4808, tracked in #4809), but X is honest about what it could verify — it explicitly flags that #4808 shows closed/unmerged and asks for confirmation the fix actually landed, plus finds a real-looking regression-test coverage gap. Y instead confidently asserts 'already fixed on main' with fabricated-looking exact line numbers and code/comment text it couldn't have actually verified, and its claim that #4810 (not #4808) delivered the fix contradicts the specific duplicate target in the ground truth. X's grounding and calibrated uncertainty make it clearly more trustworthy and useful to a maintainer than Y's overconfident, unverifiable specifics.",
+  "_cost_usd": 0.09442840000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

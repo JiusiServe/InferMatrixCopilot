@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.5,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "The single ground-truth concern (yJader's inline comment) is actually a defense of the fix: both submit_initial and submit_update reject list prompts, so dropping the already_submitted gate is correct and desirable. X nails this precisely, citing stage_pool.py:951/1022, and reaches APPROVE matching the real outcome (two LGTMs). Y's own 'sweep' note reaches the same conclusion internally, but then repeatedly re-flags the identical orchestrator.py:1290 line as [major]/[minor] asking to 'confirm' something it already validated, inflating severity and contradicting itself, and lands on REQUEST CHANGES — directly at odds with the actual reviewer consensus. Y's redundant near-duplicate comments on one line also hurt precision and signal quality despite superficially concrete line citations.",
+  "_cost_usd": 0.1361248,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

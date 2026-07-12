@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.55,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently surface the latent gap (the hunyuan_image3 diffusion transformer still calling the removed get_cache_scale), so gap_hit is true for both, but Y grounds it more rigorously — citing the PR's own stated file list and confirming the eventual fix on main — while X presents it correctly but more speculatively as a hard blocker. X's precision is hurt by a verbatim-duplicated 'dead code guard' finding and two speculative claims that get_cache_scale_mapper never returns None, an unverified assumption given the author deliberately added the guard. Y better covers ground-truth concerns (test-quality caveat about not proving real behavior, correct APPROVE verdict matching actual merge/approval outcome) with cleaner, non-redundant, well-cited findings, though X's recommendations are slightly more prescriptive/actionable.",
+  "_cost_usd": 0.303543,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

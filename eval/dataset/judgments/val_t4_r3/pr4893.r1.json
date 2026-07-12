@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.7,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The single ground-truth inline concern (whether the test should verify the new reduce_scatter attribute) is already resolved in the visible diff, so recall potential is thin for both; X at least explicitly validates that exact test region ('reduce_scatter only when passed; both branches reachable') while Y never touches it. X also produces five concrete, line-anchored, grounded findings (dtype mismatch vs upstream forward_context.py, missing cfg_parallel_size=1 test case, stale comment, missing docstring) each with file:line and cited evidence, giving it much higher actionability. Y is well-organized and its correctness verification is sound, but it surfaces only one soft, non-line-anchored suggestion and defaults to a blanket APPROVE despite admitting it couldn't execute anything, making it comparatively less useful as an actionable review.",
+  "_cost_usd": 0.1953054,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

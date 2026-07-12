@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.9,
+    "actionability": 0.35,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Neither candidate surfaces the one substantive ground-truth concern (reduce_scatter verification gap in test_expert_parallel_layout.py), so recall is low for both, but Y at least raises an analogous test-coverage gap (missing branch coverage in the DP-metadata tests) while X explicitly asserts test coverage is adequate, moving further from the reviewer's spirit. Y's findings are more actionable — each has a precise file:line, cites cross-referenced vLLM source, and proposes a concrete fix (docstring, comment, assertion, test case) — whereas X mostly emits blanket PASS verdicts and offers only one soft nitpick before recommending APPROVE. Both are well-grounded with no fabrications, but Y's itemized, evidence-backed format is more useful to a reviewer.",
+  "_cost_usd": 0.24851479999999998,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

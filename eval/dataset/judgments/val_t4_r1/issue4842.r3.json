@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.8,
+    "grounding": 0.75,
+    "completeness": 0.75
+  },
+  "y": {
+    "correctness": 0.9,
+    "grounding": 0.9,
+    "completeness": 0.9
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly diagnose the failure as a run-level misconfiguration (core_model dummy weights) matching the thread's 'invalid' resolution and --run-level=full_model fix. Y is more accurate and thorough: it correctly explains that pytest.mark.full_model is only a selection filter independent of --run-level (X wrongly implies the marker 'gates' the run-level, which contradicts the observed failure when running by node ID), cites more file:line evidence (run_args.py, runtime.py, stage_config.py, assertions.py) tracing the full fixture/config-patch pipeline, and explicitly confirms A100 works per yenuo26's report — directly addressing the reporter's actual hardware, which the issue title highlights. X also overreaches by attributing test-passing verification to akshatvishu on MI300x when the ground truth only shows akshatvishu diagnosing the dummy-weight issue, not confirming a pass.",
+  "_cost_usd": 0.10518499999999999,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "y",
+  "margin": "slight",
+  "rationale": "Both candidates correctly validate the unet addition as safe and independently rediscover the same underlying theme as dsocek's ground-truth comment (hardcoded component lists should derive from a single source of truth), neither hitting his exact packed_modules_mapping suggestion. X adds a genuinely distinct second finding (text-encoder LoRA silently no-op'ing) that Y misses entirely, but Y backs its overlapping two comments with much heavier grounding — explicit consumer sweep, a concrete missed case (MagiHuman's 'sr_dit'), and repo-wide grep evidence — giving it a slight precision/rigor edge despite near-identical comment content. Actionability is comparable in both, with concrete file/line suggestions and proposed code changes.",
+  "_cost_usd": 0.0777291,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

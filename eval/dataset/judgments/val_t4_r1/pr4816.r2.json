@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth shows a trivial, cleanly-approved rename PR with zero substantive concerns, so recall is trivially satisfied by both. X's verification-heavy APPROVE (grep for leftovers, upstream cross-check) matches the actual reviewer signal exactly with no fabricated asks. Y is also well-grounded (real file/line, verified via grep) but manufactures two minor scope-creep nitpicks (untested pre-existing fallback path, a suggested comment) that push the verdict to COMMENT, diverging from the human's plain lgtm — technically valid but of marginal necessity, lowering precision even though the concrete file/line detail makes it more actionable.",
+  "_cost_usd": 0.0682541,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly identify this as a pure, low-risk rename and both independently ground it in the same upstream evidence (vllm/entrypoints/serve/instrumentator/basic.py:23 reading state.serving_tokenization), matching the ground truth's 'lgtm' with no real concerns to recall. X's APPROVE verdict and clean 'nothing to fix' conclusion align more precisely with the ground truth than Y's COMMENT verdict, which manufactures a non-issue (suggesting a redundant test/comment when the diff's own test updates already cover the exact fallback paths), slightly hurting precision. Y is more actionable by giving a concrete file:line suggestion, but the suggestion itself has low value since it's optional and duplicative of existing coverage.",
+  "_cost_usd": 0.060756700000000004,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

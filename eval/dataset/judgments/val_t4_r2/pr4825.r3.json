@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.25,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both reviews independently converge on a legitimate, well-grounded finding (default_components duplicates the pipeline's own _dit_modules declaration, citing matching pipeline_sdxl.py/registry.py locations) that is thematically adjacent to but not identical to dsocek's actual ground-truth ask (driving naming fixes from _packed_modules_mapping/stacked_params_mapping), which appears to concern code removed before the final diff. X edges ahead because it explicitly notes the before/after validation images were provided in the PR body — directly matching the one clearly-resolvable ground-truth thread (xuechendi's validation request) — and adds a distinct, plausible text-encoder LoRA gap; Y's two hardcoded-list comments (374/375) are largely redundant restatements of the same point, though Y does catch a genuine test-coverage gap (no SDXL integration test) that X marked PASS without scrutiny. Neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.2014044,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.6,
+    "grounding": 0.65,
+    "completeness": 0.55
+  },
+  "y": {
+    "correctness": 0.5,
+    "grounding": 0.65,
+    "completeness": 0.55
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly bisect the failure to PR #4834's new wake_up() guard and propose the same level=1 test fix, matching yenuo26's thread comment that #4834 introduced the error — reasonable diagnoses given no ground-truth resolution comment confirms a fix. However, the actual thread shows the issue still open, with Flink-ddd asking yenuo26 to trigger a full CI sleep-mode test — neither candidate acknowledges this pending verification step. Y overreaches by flatly asserting 'this is already in main' and showing the fix as already-applied code, a specific factual claim unsupported by the given thread; X more appropriately frames it as a proposed one-line diff and separately flags an unpatched skipped test (test_coordinated_cross_device) that would need the same fix, showing slightly better calibration and thread fidelity.",
+  "_cost_usd": 0.0707652,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

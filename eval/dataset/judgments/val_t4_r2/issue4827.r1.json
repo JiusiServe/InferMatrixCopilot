@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.8,
+    "grounding": 0.7,
+    "completeness": 0.75
+  },
+  "y": {
+    "correctness": 0.88,
+    "grounding": 0.85,
+    "completeness": 0.9
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly diagnose the None+1 crash from missing extended ratio tokens and the moe.yaml vs dit.yaml topology mismatch, matching the thread's resolution and workaround. Y goes further with a concrete guard/fallback code snippet and closing status assessment that mirrors Gaohan123's 'open a new issue' redirect, while staying within evidence actually present in the thread. X adds a 'Deploy Config Guide' table introducing an unverified third config (hunyuan_image3_ar.yaml) not mentioned anywhere in the issue, a minor fabrication risk that slightly weakens its grounding.",
+  "_cost_usd": 0.18320209999999998,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

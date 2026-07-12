@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.4,
+    "grounding": 0.35,
+    "completeness": 0.5
+  },
+  "y": {
+    "correctness": 0.7,
+    "grounding": 0.65,
+    "completeness": 0.75
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly land on 'duplicate of #4808/#4809,' matching the ground truth, but X asserts with unqualified confidence that the fix is 'already on main' and cites suspiciously specific artifacts (a code comment, '9 tests should pass') that read as fabricated rather than verified. Y reaches the same duplicate disposition but is honest about what it could and couldn't verify — it flags that #4808 closed without merging and that the regression test added by #4810 has a coverage gap at exactly this file, which is exactly the kind of well-grounded escalation the rubric rewards on a genuinely uncertain point. Y is more useful end-to-end because it doesn't just restate the fix but tells the maintainer what to double-check before closing for good.",
+  "_cost_usd": 0.0592114,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

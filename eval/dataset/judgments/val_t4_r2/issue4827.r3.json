@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.92,
+    "grounding": 0.9,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.78,
+    "grounding": 0.72,
+    "completeness": 0.75
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both correctly diagnose the config/tokenizer mismatch and cite the same crash site (hunyuan_image3.py:1561-1563), matching the thread's root cause and workaround. X goes further with grounded detail (yaml header citations, downstream _all_ratio_ids handling) and correctly infers the disposition — Gaohan123's request to move tracking to a new issue implies this bug report itself is resolved, which X states explicitly. Y adds an unverified third config row (hunyuan_image3_ar.yaml) not established anywhere in the thread and marks disposition 'keep-open', which contradicts the thread's clear resolution/workaround-plus-spinoff pattern.",
+  "_cost_usd": 0.10253009999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

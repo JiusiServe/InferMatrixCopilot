@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.6,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.8,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Neither candidate surfaces the one substantive ground-truth concern (verifying reduce_scatter in the test alongside device_communicator). X pads its review with five 'minor' findings that are largely stylistic nits (missing docstrings, add-a-comment suggestions, a redundant hasattr assert) presented as issues, inflating actionable-looking line items without much real signal, and its 'COMMENT' verdict sits oddly against content it itself calls all-minor. Y is more concise but demonstrates deeper correctness verification (DPMetadata's actual required fields, why removing the cfg_parallel_size>1 guard is safe via the world_size==1 early-return, destroy_model_parallel cleanup correctness) and reaches an APPROVE verdict consistent with the real reviewers' LGTM outcome.",
+  "_cost_usd": 0.2626574,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

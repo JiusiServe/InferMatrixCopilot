@@ -6,51 +6,60 @@
 
 ## Root cause
 
-`vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_transformer.py` — the `HunyuanImage3Model.load_weights` method (line 2125) had a manual branch that called:
+vLLM removed `QuantizationConfig.get_cache_scale()` in v0.23.0 (upstream PR vllm#43167). PR #4810 migrated the AR-side custom loaders to the new `get_cache_scale_mapper()` path, but the diffusion-side HunyuanImage3 DiT transformer loader in `vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_transformer.py` was missed and still called the old API at line ~2238.
+
+**Mechanism**: `HunyuanImage3Model.load_weights()` had a manual branch that called `self.quant_config.get_cache_scale(name)` to short-circuit KV-cache scale loading. Since the method no longer exists on `ModelOptMixedPrecisionConfig` (or any `QuantizationConfig` subclass), any quantized checkpoint triggers `AttributeError` during weight loading in the DiT stage.
+
+## Current status: fixed on main
+
+On the current main branch, the offending call has been removed. Instead, KV-cache scale names flow through the standard `maybe_remap_kv_scale_name` path (line 2343):
 
 ```python
-self.quant_config.get_cache_scale(name)
+# hunyuan_image3_transformer.py, lines 2238-2239
+# KV-cache scales are renamed via maybe_remap_kv_scale_name below;
+# quant_config.get_cache_scale was removed in vLLM v0.23.0 (see #4810).
 ```
 
-This API was removed from vLLM upstream in [vllm#43167](https://github.com/vllm-project/vllm/pull/43167) (first released in v0.23.0rc2 / v0.23.0). vLLM-Omni picked up the removal in the v0.23.0 rebase (PR #4286). PR #4810 fixed the 4 AR-side custom loaders that still called it, but the diffusion-side HunyuanImage3 DiT loader was the 5th call site and was missed.
-
-## Current state
-
-On current `main` this is **already fixed**. The `get_cache_scale` call has been removed and replaced with:
-
-- A comment at lines 2238-2239 explaining the removal
-- Reliance on `maybe_remap_kv_scale_name` (imported from `vllm.model_executor.model_loader.weight_utils`) at line 2343, which handles KV-cache scale name remapping without the removed API
-
-The DiT is loaded through an outer `AutoWeightsLoader` in `pipeline_hunyuan_image3.py:458`, which already remaps `.output_scale` → `.attn.{k,v,q}_scale` before delegating to this loader — so the manual branch was redundant anyway (this is the same rationale as the AR-side fix in #4810).
-
-## Fix / workaround
-
-**Update past commit 86bdcaf3d.** The fix is already on main. If you cannot update immediately, the one-line workaround is to delete the `get_cache_scale` branch from `load_weights` — the same change that #4808 proposed:
-
-```diff
--            scale_name = self.quant_config.get_cache_scale(name)
--            if scale_name is not None:
--                param = params_dict[scale_name]
--                weight_loader(param, loaded_weight)
--                return
+```python
+# hunyuan_image3_transformer.py, line 2343
+name = maybe_remap_kv_scale_name(name, params_dict)
 ```
 
-(The existing `maybe_remap_kv_scale_name` call later in the same method handles quantized checkpoints correctly on its own.)
+This is exactly the fix the reporter described and verified. A regression test (`tests/model_executor/models/test_kv_cache_scale_mapper.py`) now enforces that none of the 5 affected loaders contain `.get_cache_scale(`.
 
-## Verification
+## Related issues & PRs
+
+| Link | Status | What |
+|------|--------|------|
+| #4809 | Issue | Umbrella tracking all 5 `get_cache_scale` call sites |
+| #4810 | **MERGED** | Fixed AR-side loaders (hunyuan_image3.py, mammoth_moda2, mimo_audio, qwen2_old) |
+| #4808 | **CLOSED** | DiT transformer fix (superseded — fix is on main) |
+| #4806 | Issue | Original Hunyuan-image FP8 serving failure (same root cause) |
+| #4597 | Open | Additional scalar-expert-scale + `<img_ratio>` fixes (complementary) |
+
+## Workaround & verification
+
+**Workaround**: Update to the latest main branch — the fix is already present.
 
 ```bash
-# Confirm the call is gone:
-grep -rn 'get_cache_scale(' vllm_omni/
-# Should return zero matches.
-
-# Run the existing regression suite:
-pytest -q tests/model_executor/models/test_kv_cache_scale_mapper.py -v
+git checkout main && git pull
+pip install -e .
 ```
 
-## Related
+**Verification**: Run the regression test:
 
-- **PR #4810** (merged): AR-side fix — `hunyuan_image3.py`, `mammoth_moda2.py`, `mimo_audio_llm.py`, `qwen2_old.py`
-- **PR #4808** (closed): originally proposed this DiT-side fix
-- **Issue #4809**: broader tracking issue for all `get_cache_scale` call sites
-- **Issue #4806**: original Hunyuan-image FP8 serving failure report
+```bash
+pytest -q tests/model_executor/models/test_kv_cache_scale_mapper.py
+```
+
+All 9 tests should pass on main. You can also confirm the dead call is absent:
+
+```bash
+grep -r 'get_cache_scale(' vllm_omni/ diffusion/  # should return nothing
+```
+
+## Disposition
+
+This is a **duplicate of #4808 / #4809** — the fix is already on main. Closing. If you still see this crash on current main HEAD, please reopen with the exact commit hash.
+
+**Disposition:** duplicate-of-#4808

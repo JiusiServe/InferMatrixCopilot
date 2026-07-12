@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.75,
+    "actionability": 0.35,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth is thin (mostly non-technical: blurred-image question, LGTM approval, a success screenshot) plus one substantive inline comment asking whether test coverage adequately verifies both device_communicator and reduce_scatter fixes. X never engages with that nuance and delivers a shallow PASS/PASS/PASS blocker table plus one vague non-actionable nit. Y produces five concrete, file/line-anchored findings with specific suggested edits (dtype fix, missing test case, docstring, stale comment), cross-referencing upstream vLLM source to ground its claims, and its FakeGroup validation notes brush closer to the reviewer's actual test-coverage concern.",
+  "_cost_usd": 0.267925,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

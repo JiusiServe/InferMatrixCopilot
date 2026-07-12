@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.7,
+    "grounding": 0.72,
+    "completeness": 0.75
+  },
+  "y": {
+    "correctness": 0.6,
+    "grounding": 0.68,
+    "completeness": 0.6
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both independently converge on the same real diagnosis (PR #4834's _level2_sleeping guard vs. a stale test still calling sleep(level=2)→wake_up()), matching yenuo26's thread attribution to #4834, and both cite plausible file/line evidence. But the actual thread never confirms resolution — its last action is Flink-ddd asking yenuo26 to trigger a full CI run — so a confident 'close, already fixed' verdict outruns what's established. X hedges appropriately ('confirm CI was on the right commit and re-trigger if needed') and pings the same people the thread was waiting on, aligning with the real next step. Y asserts closure as settled fact, invents unverifiable specifics (a PR title, a merge date, three named regression tests) not evidenced anywhere, and never engages the outstanding CI-trigger request, making it less complete relative to the reporter's actual situation despite being more verbose.",
+  "_cost_usd": 0.15642309999999998,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

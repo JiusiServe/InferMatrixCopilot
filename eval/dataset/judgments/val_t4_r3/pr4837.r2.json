@@ -1,0 +1,20 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.5,
+    "actionability": 0.55
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.85,
+    "actionability": 0.75
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth's sole substantive concern (yJader) explains WHY dropping already_submitted is safe: both submit_initial and submit_update reject list prompts for diffusion, so the guard should be unconditional. Y independently verifies this exact reasoning with concrete evidence (stage_pool.py:951-955, 1022-1026) and lands on the correct APPROVE verdict matching the actual LGTM outcome. X flags the same line but frames it as an unresolved risk needing 'verification' without ever checking stage_pool.py, effectively missing the answer the ground-truth reviewer already gave, and pads the review with speculative low-value asks (docstring updates, asserts, stage_durations concerns) that inflate comment count without grounding, landing on an unwarranted COMMENT verdict.",
+  "_cost_usd": 0.1203261,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

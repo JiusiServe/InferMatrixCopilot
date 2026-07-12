@@ -6,21 +6,24 @@
 
 ## Root Cause
 
-The crash is a **deploy-config mismatch**: you passed `--deploy-config hunyuan_image_3_moe.yaml` with the **Base** checkpoint (`tencent/HunyuanImage-3.0`), but that config forces the two-stage AR→Diffusion **Instruct** topology.
-
-During the AR-stage model init, the code tries to resolve Instruct-only special tokens that don't exist in the Base tokenizer:
+`vllm_omni/model_executor/models/hunyuan_image3/hunyuan_image3.py:1560-1563` — `HunyuanImage3ForConditionalGeneration.__init__` unconditionally looks up Instruct-only ratio tokens in the tokenizer:
 
 ```python
-# hunyuan_image3.py:1562-1563 (HunyuanImage3ForConditionalGeneration.__init__)
-ratio_36 = tokenizer.convert_tokens_to_ids("<img_ratio_36>")  # → None (Base tokenizer lacks this)
-self._ratio_other_slices = [(ratio_33, ratio_36 + 1)]           # → TypeError: None + 1
+self._end_ratio_id = tokenizer.convert_tokens_to_ids("<img_ratio_32>")
+ratio_33 = tokenizer.convert_tokens_to_ids("<img_ratio_33>")
+ratio_36 = tokenizer.convert_tokens_to_ids("<img_ratio_36>")
+self._ratio_other_slices = [(ratio_33, ratio_36 + 1)]  # 💥 None + 1
 ```
 
-The Base tokenizer has ratio tokens `<img_ratio_0>` through `<img_ratio_32>` (33 buckets). The extended range `<img_ratio_33>`–`<img_ratio_36>` (4 extra buckets) exists **only** in the Instruct tokenizer. Tencent's reference `tokenization_hunyuan_image_3.py:613` guards this with an explicit `model_version == "HunyuanImage-3.0"` check.
+The **Base** model (`tencent/HunyuanImage-3.0`) tokenizer only has ratio tokens 0–32. The extended tokens `<img_ratio_33>` through `<img_ratio_36>` exist only in the **Instruct** tokenizer (`tencent/HunyuanImage-3.0-Instruct`). When `convert_tokens_to_ids` can't find `<img_ratio_36>`, it returns `None`, and `None + 1` raises `TypeError`.
 
-## Workaround (use now)
+## Why This Happens
 
-Use the single-stage DiT deploy config instead:
+PR [#2713](https://github.com/vllm-project/vllm-omni/pull/2713) replaced the old `hunyuan_image_3_moe.yaml` which had a `modes` field that could filter out the AR stage for the Base model. The new config **always** forces the two-stage Instruct topology (AR → Diffusion). Running `--deploy-config hunyuan_image_3_moe.yaml` with the Base model now unconditionally initializes the AR stage, which in turn instantiates `HunyuanImage3ForConditionalGeneration` and hits this crash.
+
+## Workaround (Confirmed)
+
+Use the single-stage DiT-only config for the Base model:
 
 ```bash
 vllm serve tencent/HunyuanImage-3.0 --omni --port 8091 \
@@ -28,22 +31,33 @@ vllm serve tencent/HunyuanImage-3.0 --omni --port 8091 \
   --trust-remote-code
 ```
 
-This runs the Base model as a diffusion-only pipeline (no AR stage), which is the correct topology for the non-Instruct checkpoint. Confirmed working by @FayeSpica.
+This was confirmed working by @FayeSpica (see [comment](https://github.com/vllm-project/vllm-omni/issues/4827#issuecomment-...)).
 
-## Config guidance
+## Deploy Config Map
 
 | Model | Deploy Config | Pipeline |
 |---|---|---|
-| `tencent/HunyuanImage-3.0` (Base) | `hunyuan_image3_dit.yaml` | `hunyuan_image3_dit` (DiT-only) |
-| `tencent/HunyuanImage-3.0-Instruct` | `hunyuan_image_3_moe.yaml` | `hunyuan_image_3_moe` (AR + DiT) |
+| `tencent/HunyuanImage-3.0` (Base) | `hunyuan_image3_dit.yaml` | Single-stage DiT |
+| `tencent/HunyuanImage-3.0-Instruct` (Instruct) | `hunyuan_image_3_moe.yaml` | Two-stage AR→DiT |
 
-## Improvement (tracked separately)
+## Proposed Code Fix
 
-@akshatvishu suggested adding a guard in `HunyuanImage3ForConditionalGeneration.__init__` that checks whether the extended ratio tokens resolve in the tokenizer, and fails fast with a clear error message directing users to the correct config. @Gaohan123 asked to open a new issue to track this — please do so (or I can open one).
+Add a guard in `HunyuanImage3ForConditionalGeneration.__init__` (around line 1563):
 
-## Verification
+```python
+if ratio_33 is None or ratio_36 is None:
+    raise ValueError(
+        "Extended ratio tokens (<img_ratio_33>..<img_ratio_36>) not found in tokenizer. "
+        "You are likely loading the Base model (tencent/HunyuanImage-3.0) with the "
+        "Instruct deploy config (hunyuan_image_3_moe.yaml). "
+        "Use hunyuan_image3_dit.yaml for the Base model instead."
+    )
+```
 
-1. Run the workaround command above — the server should start without the TypeError crash
-2. The model should serve and generate images via the DiT-only pipeline
+This mirrors the pattern in Tencent's reference code which guards on `model_version == "HunyuanImage-3.0"` ([ref](https://github.com/Tencent-Hunyuan/HunyuanImage-3.0/blob/main/hunyuan_image_3/tokenization_hunyuan_image_3.py#L613)).
+
+## Disposition
+
+Closing as resolved with a confirmed workaround. Per @Gaohan123's [request](https://github.com/vllm-project/vllm-omni/issues/4827#issuecomment-...), please open a separate issue to track the code-guard improvement if one hasn't been filed yet.
 
 **Disposition:** close

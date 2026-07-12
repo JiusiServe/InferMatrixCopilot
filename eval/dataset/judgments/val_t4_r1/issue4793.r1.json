@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.75,
+    "completeness": 0.8
+  },
+  "y": {
+    "correctness": 0.88,
+    "grounding": 0.62,
+    "completeness": 0.85
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly identify the exact ground-truth resolution (regression from #4527, fixed by PR #4792, already folded into the v0.24 rebase commit) and both reproduce the akshatvishu code snippet verbatim, so correctness is comparable and grounding on the core citation is solid for both. Y is more thorough on mechanism and closing structure but piles on many hyper-specific unverifiable claims (exact log format strings, a referenced issue #4962, precise 300s→600s timeout change, exact 'matches your log exactly' assertion against a log we never see) that read as fabricated precision rather than confirmed fact, which is a real grounding risk. X stays closer to what's actually confirmable, with only one dubious unit-test citation as a blemish, making it marginally more trustworthy despite being slightly less exhaustive.",
+  "_cost_usd": 0.1509944,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.55,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth is a clean 'lgtm' approve with zero substantive concerns, and X reaches the same conclusion with grounded verification (upstream match, no leftover references, existing tests updated) without inventing issues. Y's mechanical hunk-sweep is accurate but then manufactures two low-value nits (an out-of-scope test suggestion for an untouched code path, and a comment suggestion that contradicts the PR's explicit purpose of matching upstream naming), which are actionable but not genuinely valid concerns for this trivial rename fix. Neither has a LATENT GAP CHECK section.",
+  "_cost_usd": 0.05851409999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.85,
+    "grounding": 0.8,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.72,
+    "grounding": 0.82,
+    "completeness": 0.78
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly diagnose the None+1 crash from missing extended ratio tokens in the base tokenizer, cite the same file/lines, provide the identical FayeSpica-confirmed DiT workaround, and propose the same None-guard fix — matching the thread closely. Y is slightly better grounded by explicitly citing PR #2713 (the regression source per akshatvishu), which X omits, but Y invents an unverified third 'AR only' config (hunyuan_image3_ar.yaml) and asserts 'Disposition: keep-open,' which contradicts the natural reading of Gaohan123's closing request to track the fix in a new issue. X's more thorough treatment (docs-misleading-header note, explicit fail-fast suggestion, correct resolved/closed disposition) edges out Y despite some unverified header-text claims of its own.",
+  "_cost_usd": 0.1609634,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

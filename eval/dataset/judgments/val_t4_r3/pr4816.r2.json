@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.8,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth is essentially empty (a bot rate-limit notice and a bare 'lgtm' approval), so recall is trivially satisfied by both. Both candidates correctly verify this is a pure rename with no logic change and both cite the same upstream evidence (basic.py:23) confirming the new name matches what upstream reads. X's APPROVE verdict better matches the actual human outcome and its verification is more concrete (grep count of remaining occurrences, upstream cross-check), though its citation of an unverifiable upstream PR number (vllm#46022) is a minor ungrounded flourish. Y's one substantive comment—suggesting a comment or a 'targeted test' for paths that X shows are already covered by the updated existing tests—is vague and only weakly actionable.",
+  "_cost_usd": 0.0649617,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

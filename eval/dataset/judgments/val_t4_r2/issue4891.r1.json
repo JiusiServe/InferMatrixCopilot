@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.2,
+    "grounding": 0.3,
+    "completeness": 0.4
+  },
+  "y": {
+    "correctness": 0.8,
+    "grounding": 0.55,
+    "completeness": 0.75
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth closes #4891 as a duplicate of #4808 (not #4810), pointing to #4809 for the full call-site inventory. Y matches this exactly — it explains #4810 covered 4/5 AR-side sites while #4808 is the dedicated DiT fix, correctly endorses the duplicate closure, and honestly flags the unresolved question of whether #4808 actually merged plus a real test-coverage gap. X instead confidently asserts the file is 'already fixed on main' via #4810 and dismisses #4808 as 'closed, superseded' — a fabricated resolution that contradicts the actual maintainer action of closing as a duplicate of #4808, undermining its otherwise detailed-looking grounding.",
+  "_cost_usd": 0.09712340000000001,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates converge on the same latent theme the ground truth reviewer raised (manager.py hardcodes a component list that duplicates existing per-pipeline metadata like _dit_modules), though neither cites the exact GT reference to the Qwen WA or _packed_modules_mapping, capping recall for both. X is tighter and adds a genuinely sharp second finding (text-encoder LoRA is a silent no-op via the same failure mode the PR itself describes), while Y pads with two overlapping variants of the same hardcoded-list critique (374/375) before adding a solid but more generic missing-test-coverage note. Both are well-grounded and actionable with concrete file:line references, but X's non-redundant, more insightful second point edges out Y's repetition.",
+  "_cost_usd": 0.08987819999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

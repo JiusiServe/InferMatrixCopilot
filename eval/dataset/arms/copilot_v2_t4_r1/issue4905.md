@@ -4,80 +4,50 @@
 
 ## draft_answer
 
-## Diagnosis
+## Root Cause
 
-This is **not a bug** — it's the intended behavior of PR #4834 working correctly, combined with a stale test configuration that has since been fixed.
+This is **not a regression bug** — it's the intended behavior introduced by **PR #4834** ([Bugfix][sleep mode]: guard generation on partial wake and ensure wake idempotency).
 
-### Root cause
-
-PR #4834 (merged at the time of this CI failure) added a deliberate safety guard in `AsyncOmni.wake_up()` (`vllm_omni/entrypoints/async_omni.py:945`):
+The guard that raises `NotImplementedError` lives in:
+- **`vllm_omni/entrypoints/async_omni.py:953`** — the `wake_up()` method checks `_level2_sleeping` (set after `sleep(level=2)`) and deliberately raises:
 
 ```python
 if getattr(self, "_level2_sleeping", False):
     raise NotImplementedError(
         "wake_up() after sleep(level=2) is not yet implemented: weights were "
-        "discarded from GPU and reloading from disk is not yet supported. ..."
+        "discarded from GPU and reloading from disk is not yet supported. "
+        "Use sleep(level=1) instead, which offloads weights to CPU RAM "
+        "and supports fast DMA restore."
     )
 ```
 
-This is **correct and intentional**. Sleep level 2 discards weights entirely from GPU VRAM (they are not offloaded to CPU RAM), so wake_up cannot restore them without a disk-reload mechanism, which is not yet implemented. Before PR #4834, calling wake_up after level-2 sleep would silently produce corrupted/garbage output (issue #4473 Repro A).
+This was the fix for **issue #4473 Repro A**: before PR #4834, calling `sleep(level=2)` then `wake_up()` would *silently* produce corrupted output (e.g., `"!!!!!!!!!!!"`). Now it raises a clear `NotImplementedError` at the Python control-plane layer before any CUDA kernel can access freed memory.
 
-### Why the test failed
-
-The test `test_multistage_sleep_h100` was calling:
-
+The test `test_multistage_sleep_h100` (at `tests/entrypoints/test_omni_sleep_mode.py`, originally around line 540) was calling:
 ```python
-acks = await engine.sleep(stage_ids=[0, 1], level=2)   # ← should be level=1
-...
-await engine.wake_up(stage_ids=[0, 1])                  # ← raises NotImplementedError
+acks = await engine.sleep(stage_ids=[0, 1], level=2)   # ← wrong level
+await engine.wake_up(stage_ids=[0, 1])                   # ← hits NotImplementedError
 ```
 
-The test should use **level=1**, which offloads weights to CPU RAM and supports fast DMA restore via wake_up. The correct invocation is:
+The dedicated regression test `test_level2_sleep_wake_raises` (line 412) already correctly validates that `sleep(level=2)` + `wake_up()` raises `NotImplementedError`.
 
-```python
-acks = await engine.sleep(stage_ids=[0, 1], level=1)
-```
+## Fix
 
-### Current status: **Already fixed**
-
-The current HEAD of the repository already has this correction applied. In `tests/entrypoints/test_omni_sleep_mode.py` line 545, the test now reads:
+Change `level=2` → `level=1` in `test_multistage_sleep_h100`:
 
 ```python
 acks = await engine.sleep(stage_ids=[0, 1], level=1)
 ```
 
-Additionally, PR #4834 also added `test_level2_sleep_wake_raises` (line 413) which explicitly tests that `wake_up()` after `sleep(level=2)` raises `NotImplementedError` — this is the correct regression test for the level-2 guard.
+**Why:** Level-1 offloads weights to CPU RAM and supports `wake_up()` via fast DMA restore. Level-2 discards weights from GPU entirely; reloading from disk is not yet implemented (tracked as future work). The test intends to exercise a full sleep/wake cycle with inference verification, which level-1 supports.
 
-### Workaround (if you hit this manually)
+## Current Status
 
-If you're calling `sleep(level=2)` in your own code and need to wake up afterward, use `sleep(level=1)` instead:
+The live checkout (`/rebase/vllm-omni`) already shows `level=1` in the test, so the fix appears to have already landed on `main`. A CI re-run should pass.
 
-```python
-# Instead of:
-await engine.sleep(stage_ids=[0, 1], level=2)
-
-# Use:
-await engine.sleep(stage_ids=[0, 1], level=1)
-await engine.wake_up(stage_ids=[0, 1])  # works — DMA restore from CPU RAM
-```
-
-Level 2 wake-up support (disk reload) is tracked as future work.
-
-### Verification
-
-```bash
-# Confirm the fix is in place:
-grep -n 'level=1' tests/entrypoints/test_omni_sleep_mode.py | grep multistage
-# Should show:  acks = await engine.sleep(stage_ids=[0, 1], level=1)
-
-# Run the corrected test:
-pytest tests/entrypoints/test_omni_sleep_mode.py::test_multistage_sleep_h100 -k 'tp_size=1' --run-level=full_model
-```
-
-## Resolution
-
-This issue is already resolved in the current codebase. The test was corrected from `level=2` to `level=1`. No further changes are needed.
-
-See also: PR #4834 (the bugfix that introduced the guard), issue #4473 (the original corruption/crash reports).
+## Related
+- **PR #4834** — introduced the level-2 guard (merged)
+- **Issue #4473** — original bug: silent corruption / CUDA illegal memory access on partial wake
+- **Test `test_level2_sleep_wake_raises`** — validates expected `NotImplementedError` for level-2
 
 **Disposition:** close

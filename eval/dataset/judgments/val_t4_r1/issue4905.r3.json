@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.4,
+    "grounding": 0.55,
+    "completeness": 0.5
+  },
+  "y": {
+    "correctness": 0.45,
+    "grounding": 0.65,
+    "completeness": 0.6
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates converge on the same diagnosis (PR #4834 intentionally hard-stops wake_up() after level=2 sleep, test needs level=1) and both overreach by confidently declaring the issue already fixed and closeable, when the actual thread shows maintainers still triaging and explicitly requesting a full CI-cluster test run rather than confirming resolution — neither engages with that pending verification step. Y is more thoroughly grounded, citing the sleep()-side flag-setting code, the companion generate() admission guard, and three distinct regression tests (Repro A/B/C) versus X's single citation, giving it a modest edge in grounding and completeness. Correctness is capped for both since the confident 'close as resolved' framing isn't actually established by the ground-truth thread, which ends mid-investigation.",
+  "_cost_usd": 0.1793594,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.8,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates correctly validate the unet addition and independently converge on the same structural point (hardcoded default_components duplicates pipeline-declared _dit_modules) — a reasonable but not exact match to dsocek's ground-truth concern about naming-conflict coverage via _packed_modules_mapping. X adds a more thematically apt second finding (text-encoder LoRA still silently no-ops), which echoes the ground-truth theme of incomplete coverage better than Y's weaker documentation/integration-test nits. Y is well-evidenced with grep citations but has a minor sloppy citation (conflating sensenova_u1 with pipeline_sdxl.py:543), slightly denting precision.",
+  "_cost_usd": 0.1305028,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

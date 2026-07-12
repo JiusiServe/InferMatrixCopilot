@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.7,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Neither candidate surfaces the actual ground-truth concern (dsocek's PEFT-naming/packed_modules_mapping point, tied to a since-removed WA not visible in the truncated diff), so recall is low for both. Both converge on the same legitimate non-blocking suggestion (derive components from _dit_modules instead of a hardcoded tuple), but Y backs it with more transparent grep-based evidence (consumer sweep, other self.unet occurrences checked and ruled out, registry.py bagel/unet divergence) making its claims more verifiable and its unique registry.py drift catch more concretely useful. X adds a plausible but less-verified text-encoder no-op observation. Both are actionable with file:line specificity and appropriately non-blocking COMMENT verdicts.",
+  "_cost_usd": 0.07299409999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

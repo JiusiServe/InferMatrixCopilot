@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.8,
+    "grounding": 0.75,
+    "completeness": 0.85
+  },
+  "y": {
+    "correctness": 0.85,
+    "grounding": 0.85,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly identify PR #4527 regression and PR #4792 fix folded into the 0.24 rebase commit, with near-identical code citations matching the ground-truth snippet. Y hews closer to the actual thread nuance ('closed as conflicting, never merged directly, but cherry-picked') which better explains akshatvishu's 'for some reason' phrasing, while X flatly asserts PR #4792 'is merged' and adds unverifiable specifics (600s vs 300s timeout, a #4962 empty-audio reference) that read as fabricated embellishment. Y is more concise, includes a concrete curl-based verification step, and stays tightly grounded in what the thread actually shows.",
+  "_cost_usd": 0.087955,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

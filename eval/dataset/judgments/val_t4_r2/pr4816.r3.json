@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth shows no substantive concerns (bot rate-limited, human said 'lgtm'), so both candidates correctly find nothing blocking and both verify every hunk against upstream/tests with accurate, grounded reasoning. X reaches a clean APPROVE that matches the actual outcome and its one non-blocking note is appropriately scoped as 'not something to change here.' Y pads the review with three 'nit' findings (add a comment, fix a naming-convention 'violation' that is actually the PR's intended alignment with upstream, add a test for a pre-existing untouched code path) that are grounded in real greps but of marginal validity/relevance given this trivial, already-approved rename, slightly diluting precision despite being concrete and actionable.",
+  "_cost_usd": 0.06837320000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

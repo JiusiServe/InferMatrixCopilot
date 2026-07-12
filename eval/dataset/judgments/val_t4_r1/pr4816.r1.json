@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth has zero substantive findings (just an 'lgtm' approve), so both candidates score full recall since nothing was missed. X delivers a clean, fully-grounded approve that verifies the rename against upstream vLLM and confirms no leftover references, matching the PR's actual triviality with no manufactured issues. Y's hunk-by-hunk validation is equally grounded, but its two flagged findings are marginal: the missing chat-completion test predates this PR rather than being introduced by it, and the 'add an explanatory comment for naming convention' nit is low-value noise, slightly hurting precision even though both are technically accurate and concretely actionable.",
+  "_cost_usd": 0.1204294,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

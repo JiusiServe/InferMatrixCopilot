@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.9,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.5,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The sole substantive ground-truth concern (yJader's inline comment) explains that already_submitted is irrelevant because both submit_initial and submit_update reject list prompts identically — X reproduces this exact reasoning with matching line citations (stage_pool.py:951-955, 1022-1026), while Y's coverage of the same hunk is vaguer, self-contradictory ('not dead after this change' vs. later suggesting removing it as dead code), and includes unverifiable claims (issue #4839, orchestrator reading .finished/.request_id) not grounded in the shown diff. Y offers more numerous and superficially concrete suggestions (tests, docstring updates) giving it a slight actionability edge, but its lower grounding drags precision and recall well below X's.",
+  "_cost_usd": 0.13386140000000002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

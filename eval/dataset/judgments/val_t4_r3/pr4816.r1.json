@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth is essentially just an 'lgtm' approval with no substantive concerns, so both candidates exceed it via thorough independent verification (grepping for missed occurrences, cross-checking upstream's exact attribute name/consumer at basic.py:23). X gives a cleaner, more decisive APPROVE that matches the ground-truth sentiment and explains the concrete failure mode (AttributeError surfacing as 500s) with specific file:line evidence. Y's hunk-by-hunk sweep is equally grounded but lands on a COMMENT verdict with a hedged, two-pronged suggestion ('add a comment... or add a test...') that is less crisp/actionable than a single concrete ask.",
+  "_cost_usd": 0.1068541,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

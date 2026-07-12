@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.45,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.8,
+    "precision": 0.85,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y's review closely reconstructs the ground-truth reviewer's actual reasoning (already_submitted is safe to drop because both submit_initial/submit_update reject list prompts identically), backing it with concrete stage_pool.py:951/1022 line citations that match the human comment's logic almost exactly. X touches the same area but its follow-up comment ('remove already_submitted as dead code') actually contradicts its own earlier validated note that the variable is used elsewhere, and it introduces unverifiable specifics (DiffusionOutput having .finished/.request_id fields, a fabricated issue #4839 reference) that hurt precision. Both correctly avoid inventing a blocking bug, but Y reaches the same conservative APPROVE verdict as the real reviewers with tighter, better-grounded justification, while X pads with speculative test/docstring asks of uncertain validity.",
+  "_cost_usd": 0.1409814,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

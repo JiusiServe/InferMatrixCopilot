@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.78,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth is trivial (bot rate-limit notice + a bare 'lgtm' approval), so recall is moot for both; the real differentiator is precision and groundedness. X correctly identifies the core rationale (upstream rename alignment), verifies against the actual upstream checkout with concrete line references, confirms zero stragglers, and lands on APPROVE — matching the real reviewer's verdict exactly. Y does equally solid hunk-by-hunk validation and independently surfaces the same latent-AttributeError insight, but pads the review with two speculative 'nit' suggestions (documenting an intentional upstream-matching name, and testing a pre-existing gap unrelated to this diff) that read as manufactured scope creep on a PR that genuinely needed no changes, and its COMMENT verdict diverges from the actual clean approval. Y's suggestions are more concretely actionable (file/line plus explicit asks), giving it an edge on actionability, but X's tighter, verification-backed, correctly-calibrated review is the more valuable read overall.",
+  "_cost_usd": 0.1586924,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

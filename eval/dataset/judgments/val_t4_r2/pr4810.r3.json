@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.62,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.88,
+    "actionability": 0.8,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both catch the real latent gap (unswept get_cache_scale caller in the diffusion transformer), satisfying gap_hit for each. X pads its findings with two speculative 'dead code' nitpicks and a trivial missing-comment nit, and its evidence trail is internally contradictory (claims a repo-wide grep found both '1 survivor' and '0 hits' for the same pattern), undercutting precision; its REQUEST CHANGES verdict also overstates severity relative to what actually happened (PR was approved/merged). Y's review is more tightly grounded — it traces the actual AutoWeightsLoader call chain with real upstream line citations to justify why the delegated-loader removals are safe (closely matching the human reviewer's own reasoning), surfaces a sharper test-coverage gap (delegated-loader test bypasses the real mapping it claims to verify), and frames the diffusion-transformer gap with accurate historical context (later fixed) rather than treating it as an urgent blocker, better matching ground truth and reality.",
+  "_cost_usd": 0.1562648,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

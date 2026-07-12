@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.55,
+    "grounding": 0.65,
+    "completeness": 0.6
+  },
+  "y": {
+    "correctness": 0.55,
+    "grounding": 0.7,
+    "completeness": 0.75
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly bisect the failure to PR #4834's intentional level-2 wake guard (matching yenuo26's thread comment) and propose the same level=1 test fix, but both overreach by confidently declaring the issue already fixed and closeable, when the actual thread shows Flink-ddd still requesting a full CI verification run rather than confirming resolution. Y is slightly more thorough and better grounded, citing additional guard locations (sleep() flag-setting, the generate() partial-wake RuntimeError) and adding practical runtime guidance for users choosing between level=1/level=2, giving it an edge on completeness and grounding despite near-identical (and similarly overconfident) correctness to X.",
+  "_cost_usd": 0.1513124,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}
