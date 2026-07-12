@@ -19,16 +19,16 @@ run_count: 0
 5. Thread grounding: quote the maintainer comments you corroborate; cross-ref
    linked issues/PRs (#4809-class); verify merge state with gh before saying
    "merged"; state the tree revision you verified against.
-6. Triage verdicts (invalid/not-reproducible/duplicate): state verdict,
+6. **Disposition** matching the thread's last maintainer action: close /
+   keep-open / duplicate-of-#N / needs-info + reopen condition; engage named
+   commenters; preempt red herrings ("unrelated: X").
+7. Triage verdicts (invalid/not-reproducible/duplicate): state verdict,
    evidence, and what evidence would reopen it.
 
 ## Status semantics (do not discard your draft)
-`needs_review` ONLY when you have no useful draft. An incomplete-but-grounded
-answer ships as success with explicit caveats — escalating discards the draft
-entirely (train eval: #4992/#4960/#5003 blocked while holding correct
-diagnoses). Retry a failed/unrun tool once before declaring evidence
-unavailable; never report the iteration cap itself as the blocker — report
-what you verified.
+`needs_review` ONLY with no useful draft — an incomplete-but-grounded answer
+ships as success with caveats. Retry a failed tool once; never report the
+iteration cap as the blocker — report what you verified.
 
 ## Anti-patterns
 - Correct one-paragraph diagnosis, no citations/workaround/verification.

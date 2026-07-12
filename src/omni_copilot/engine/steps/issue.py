@@ -75,6 +75,9 @@ def _issue_agent_step(step_name: str, purpose: str, guidance: str,
             evidence={"issue_text": str(material)},
             output_extension=extension,
             extra_tools=_gh_read_tools(_repo_path(ctx)),
+            max_iters=ctx.settings.max_agent_iters,  # T3: the default review
+            # budget left ~zero headroom for grep-heavy triage (issue4842
+            # blocked 2/3 replicates at the cap)
         )
         if result.ok:
             key, text = render(output)
@@ -104,9 +107,23 @@ def _issue_agent_step(step_name: str, purpose: str, guidance: str,
 
 def _render_answer(output: dict) -> tuple[str, str]:
     """Render the draft-answer agent output into the `("draft_answer", text)`
-    pair, preferring the `answer_draft` field and falling back to `summary`."""
-    return "draft_answer", str(output.get("answer_draft")
-                               or output.get("summary", ""))
+    pair: `answer_draft`, else the salvaged raw final text, else `summary`.
+    Appends the `disposition` slot (close/keep-open/duplicate/reopen-when —
+    T3 forensics #8: completeness losses were missing closing moves) and an
+    epistemics caveat when merge-state claims lack a gh verification call
+    (forensics #7)."""
+    text = str(output.get("answer_draft") or output.get("_raw_text")
+               or output.get("summary", ""))
+    disp = str(output.get("disposition") or "").strip()
+    if disp and disp.lower() not in text.lower():
+        text += f"\n\n**Disposition:** {disp}"
+    tools_used = output.get("_tools_used") or []
+    lowered = text.lower()
+    if (("merged" in lowered or "on main" in lowered)
+            and "gh_pr_view" not in tools_used):
+        text += ("\n\n> ⚠ merge-state statements above were not verified via "
+                 "gh this run — treat as unconfirmed.")
+    return "draft_answer", text
 
 
 def _render_triage(output: dict) -> tuple[str, str]:
@@ -133,7 +150,10 @@ register_step(StepSpec(
         "Ground every claim in the issue text or code you actually "
         "read (use your repo tools). Never invent APIs; say plainly "
         "when unsure. The draft is never auto-posted.",
-        {"answer_draft": "the complete draft reply (markdown)"},
+        {"answer_draft": "the complete draft reply (markdown)",
+         "disposition": "close / keep-open / duplicate-of-#N / needs-info — "
+                        "match the thread's last maintainer action; include "
+                        "the reopen condition"},
         _render_answer),
     "Draft an issue answer (governed agent step; never auto-posted)."))
 

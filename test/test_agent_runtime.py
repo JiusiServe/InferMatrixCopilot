@@ -108,14 +108,19 @@ def test_status_and_failure_kind_mapping(settings, trace, tmp_path):
         assert not result.ok and result.failure is expected, (status, kind)
 
 
-def test_unparseable_after_repair_is_retryable(settings, trace, tmp_path):
+def test_unparseable_after_repair_is_salvaged_as_escalation(settings, trace,
+                                                            tmp_path):
+    """T4: a non-empty final answer that fails the contract twice is wrapped
+    (needs_review + _raw_text) instead of discarded — a 665-token correct
+    diagnosis was thrown away at T3 for a missing field."""
     llm = ScriptedLLM([
         Reply(blocks=[Block(type="text", text="prose")]),
         Reply(blocks=[Block(type="text", text="still prose")]),  # repair fails
     ])
     result, output = _run(_ctx(settings, trace, tmp_path, llm=llm))
-    assert not result.ok and result.failure is FailureKind.RETRYABLE
-    assert output == {}
+    assert not result.ok and result.failure is FailureKind.ESCALATE
+    assert output.get("_raw_text") == "prose"  # the ORIGINAL final answer, not the repair
+    assert output.get("status") == "needs_review"
 
 
 def test_files_modified_flow_into_changed_files(settings, trace, tmp_path):

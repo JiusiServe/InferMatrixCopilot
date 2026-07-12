@@ -78,6 +78,14 @@ def run_agent(
                                 tools_used=tools_used)
 
         results = []
+        if i == max_iters - 1:
+            # final-round nudge: without it, agents burn the last round on
+            # another tool call and the forced answer loses the contract
+            # (T3: a 665-token final answer was discarded for a missing field)
+            results.append({"type": "text",
+                            "text": "FINAL ROUND: after these tool results, "
+                                    "emit your complete final answer per the "
+                                    "OUTPUT CONTRACT. Do not call more tools."})
         for use in uses:
             tool_calls += 1
             tools_used.append(use.name)

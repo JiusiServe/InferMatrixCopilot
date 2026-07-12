@@ -77,9 +77,10 @@ def _render_review_md(output: dict) -> str:
     """Render the review output dict as Markdown: comments sorted by severity,
     each as `file:line [severity] — comment` with optional evidence, followed
     by a verdict line. The verdict enforces coherence — any comment at blocker,
-    major, or minor severity means changes belong in THIS PR, so the verdict is
-    REQUEST CHANGES; only an all-nit (or empty) review APPROVEs. Falls back to
-    the output summary when there are no comments."""
+    blocker/major (and only when not self-declared-uncertain) means the PR
+    must change -> REQUEST CHANGES; other comments -> COMMENT; none ->
+    APPROVE. Positive [validated]/[upstream-verify]/[sweep] findings render
+    as a 'Validated' section. Falls back to the summary without comments."""
     comments = sorted(output.get("review_comments") or [],
                       key=lambda c: _SEVERITY_ORDER.get(
                           str(c.get("severity", "minor")).lower(), 2))
@@ -89,12 +90,33 @@ def _render_review_md(output: dict) -> str:
         ev = f" (evidence: {c['evidence']})" if c.get("evidence") else ""
         lines.append(f"{loc} [{c.get('severity', 'minor')}] — "
                      f"{c.get('comment', '')}{ev}")
-    # verdict coherence: severities above nit mean "belongs in THIS PR", and
-    # asking for in-PR changes while approving is incoherent (the eval's
-    # decision metric caught exactly that: all-minor reviews said APPROVE on
-    # PRs whose human maintainers requested changes)
-    blocking = any(str(c.get("severity", "")).lower()
-                   in ("blocker", "major", "minor") for c in comments)
-    verdict = "REQUEST CHANGES" if blocking else "APPROVE"
-    body = "\n\n".join(lines) if lines else output.get("summary", "No findings.")
+    # "What I validated": lenses record positive verifications as findings
+    # ([validated]/[upstream-verify]/[sweep] prefixes). On approved PRs the
+    # human reviewers' "concerns" are mostly validation reasoning — a
+    # comments-only review structurally caps recall (T3 forensics #4).
+    validated = [str(f).strip() for f in (output.get("findings") or [])
+                 if str(f).lstrip().lower().startswith(
+                     ("[validated]", "[upstream-verify]", "[sweep]"))][:8]
+    # Verdict calibration (T3 forensics #2): only blocker/major block — a
+    # `minor` is an in-PR ask but not merge-blocking (14/15 human-approved
+    # PRs got REQUEST CHANGES under the old rule). A comment whose own text
+    # or evidence declares uncertainty can never block.
+    def _uncertain(c: dict) -> bool:
+        hay = (str(c.get("comment", "")) + " " + str(c.get("evidence", ""))).lower()
+        return any(m in hay for m in ("uncertain", "unverified", "could not verify",
+                                      "cannot verify", "budget exhaust",
+                                      "not able to confirm"))
+    blocking = any(str(c.get("severity", "")).lower() in ("blocker", "major")
+                   and not _uncertain(c) for c in comments)
+    if blocking:
+        verdict = "REQUEST CHANGES"
+    elif comments:
+        verdict = "COMMENT"  # non-blocking asks; mergeable as-is
+    else:
+        verdict = "APPROVE"
+    parts = []
+    if validated:
+        parts.append("**Validated:**\n" + "\n".join(f"- {v}" for v in validated))
+    parts.append("\n\n".join(lines) if lines else output.get("summary", "No findings."))
+    body = "\n\n".join(parts)
     return f"{body}\n\n**Verdict:** {verdict}"

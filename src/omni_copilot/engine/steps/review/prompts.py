@@ -20,7 +20,13 @@ entry relevant to your lens; they were extracted mechanically, so "I didn't noti
 is not possible. Record the sweep in the `findings` base field — one line per checklist \
 item: what you checked (file read, grep run, or diff hunk) and the result. Complete the \
 whole sweep BEFORE writing review_comments; an item with no line in `findings` is a \
-missed sweep, and a thin sweep is where reviews silently fail:
+missed sweep, and a thin sweep is where reviews silently fail. Two extra contracts: \
+(a) ENUMERATE before you prune — target 5-10 candidate comments on a nontrivial diff \
+without self-censoring for confidence, THEN keep the ones inducing a concrete change; a \
+lens ending with zero candidates must first re-check its two highest-risk hunks. \
+(b) Record every POSITIVE verification as a findings line prefixed `[validated]` (or \
+`[upstream-verify]`/`[sweep]`) with file:line — validated reasoning renders in the \
+review and is what maintainers credit on approvable PRs:
 1. Correctness of changed logic (None/empty handling, off-by-one, error paths, concurrency).
 2. Simplifiability: branches for cases that cannot co-occur, values re-derived by hand \
 where an existing helper already provides them (grep the repo for such helpers). The right \
@@ -124,7 +130,11 @@ _REVIEW_MERGE = (
     "THIS PR; nit = optional polish. Severities above nit request changes — "
     "demote to nit anything genuinely optional; a VERIFIED but optional "
     "comment is demoted, not dropped. Drop comments whose evidence is "
-    "UNVERIFIED unless a second lens corroborates them. When you rewrite a "
+    "UNVERIFIED unless a second lens corroborates them. A candidate whose "
+    "own text or evidence declares uncertainty (\'uncertain\', \'could not "
+    "verify\', \'budget exhausted\') must be demoted to nit or rewritten as "
+    "a question — NEVER kept at blocker/major (an uncertain claim cannot "
+    "block a merge). When you rewrite a "
     "comment, its "
     "FIRST sentence must state the concrete change the diff makes (quote or "
     "paraphrase the hunk) — for repo-impact comments too, where the "

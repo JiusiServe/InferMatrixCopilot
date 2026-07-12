@@ -86,7 +86,17 @@ def _coerce_output(text: str, ctx: StepContext, contract: dict) -> dict | None:
         messages=[{"role": "user", "content": str(text)[:20_000]}],
         max_tokens=8000)  # repair reply must fit a full contract
     obj = parse_json_reply(reply.text)
-    return obj if isinstance(obj, dict) and obj.get("status") else None
+    if isinstance(obj, dict) and obj.get("status"):
+        return obj
+    if str(text).strip():
+        # salvage: a non-empty final answer that failed the contract twice is
+        # still better than discarding the investigation (T3 forensics #3) —
+        # wrap it so steps with a text deliverable can ship it with caveats.
+        return {"status": "needs_review",
+                "summary": str(text).strip()[:400],
+                "confidence": "low", "failure_kind": "escalate",
+                "_raw_text": str(text).strip()}
+    return None
 
 
 def _to_step_result(output: dict, summary_prefix: str) -> StepResult:

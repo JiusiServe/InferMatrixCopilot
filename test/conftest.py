@@ -25,6 +25,7 @@ def settings(tmp_path: Path) -> Settings:
                                   # the parallel path has its own keyed-fake test
         ensemble_samples_per_lens=1,  # sampling tests opt in explicitly
         ensemble_stagger_seconds=0,  # tests never sleep for cache warm-up
+        ensemble_zero_yield_retry=False,  # scripted fakes opt in explicitly
     )
 
 

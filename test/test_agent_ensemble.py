@@ -192,14 +192,17 @@ def test_ensemble_survives_one_failed_lens(settings, trace, tmp_path):
     ])
     result, output = _run(_ctx(settings, trace, tmp_path, llm=llm))
     assert result.ok
-    assert next(trace.events("agent_ensemble"))["lenses"] == ["b"]
+    # T4 salvage: the failed lens still contributes a (candidate-less) sample,
+    # so it appears in the lens list; its salvaged text adds no items.
+    assert next(trace.events("agent_ensemble"))["lenses"] == ["a", "b"]
 
 
 def test_ensemble_all_lenses_failed(settings, trace, tmp_path):
+    """T4 salvage: unparseable lens finals wrap as needs_review, so an
+    all-failed ensemble ESCALATES (raw texts preserved) instead of RETRY."""
     llm = ScriptedLLM([Reply(blocks=[Block(type="text", text="prose")])] * 4)
     result, output = _run(_ctx(settings, trace, tmp_path, llm=llm))
-    assert not result.ok and result.failure is FailureKind.RETRYABLE
-    assert output == {}
+    assert not result.ok and result.failure is FailureKind.ESCALATE
 
 
 class KeyedLLM:
@@ -325,19 +328,29 @@ def test_review_step_caps_comments_deterministically(settings, trace, tmp_path,
     assert state["review_text"].endswith("**Verdict:** REQUEST CHANGES")
 
 
-def test_render_verdict_minor_requests_changes():
-    """Severities above nit mean 'belongs in this PR' — approving while asking
-    for in-PR changes is incoherent, so minor+ flips the verdict."""
+def test_render_verdict_calibration():
+    """T4 calibration: only verified blocker/major block; other comments are
+    COMMENT (mergeable with asks); none -> APPROVE. Self-declared-uncertain
+    majors never block (T3 forensics: 14/15 human-approved PRs got REQUEST
+    CHANGES under the old minor-blocks rule). [validated] findings render."""
     from omni_copilot.engine.steps.review import _render_review_md
 
+    major = {"review_comments": [{"file": "a.py", "line": 1, "severity":
+                                  "major", "comment": "breaks X", "evidence": "hunk"}]}
+    assert _render_review_md(major).endswith("**Verdict:** REQUEST CHANGES")
     minor = {"review_comments": [{"file": "a.py", "line": 1, "severity":
                                   "minor", "comment": "simplify", "evidence": "hunk"}]}
-    assert _render_review_md(minor).endswith("**Verdict:** REQUEST CHANGES")
-    nit_only = {"review_comments": [{"file": "a.py", "line": 1, "severity":
-                                     "nit", "comment": "polish", "evidence": "hunk"}]}
-    assert _render_review_md(nit_only).endswith("**Verdict:** APPROVE")
+    assert _render_review_md(minor).endswith("**Verdict:** COMMENT")
+    uncertain_major = {"review_comments": [
+        {"file": "a.py", "line": 1, "severity": "major",
+         "comment": "potential gap; comment is uncertain", "evidence": "hunk"}]}
+    assert _render_review_md(uncertain_major).endswith("**Verdict:** COMMENT")
     assert _render_review_md({"summary": "clean"}).endswith(
         "**Verdict:** APPROVE")
+    validated = {"summary": "clean",
+                 "findings": ["[upstream-verify] vllm/x.py:12 — API confirmed"]}
+    out = _render_review_md(validated)
+    assert "**Validated:**" in out and "x.py:12" in out
 
 
 def test_review_step_uses_ensemble_when_enabled(settings, trace, tmp_path,
@@ -362,3 +375,21 @@ def test_review_step_uses_ensemble_when_enabled(settings, trace, tmp_path,
     # every lens sample went through the unified runtime (agent_dispatch each)
     dispatches = list(trace.events("agent_dispatch"))
     assert len(dispatches) == len(_REVIEW_LENSES)
+
+
+def test_zero_yield_lens_gets_one_retry(settings, trace, tmp_path):
+    """A lens whose candidate list is empty is re-asked once (single lens, not
+    a full ensemble re-run); the retry's candidates flow into the merge."""
+    settings.ensemble_parallel = False
+    settings.ensemble_zero_yield_retry = True
+    llm = KeyedLLM({
+        "first pass yielded zero": contract(items=[{"name": "late-find"}]),
+        "Your assigned lens: a": contract(items=[]),
+        "Your assigned lens: b": contract(items=[{"name": "from-b"}]),
+        "verify-and-merge": verdicts_reply({"i": 0, "action": "keep"},
+                                           {"i": 1, "action": "keep"}),
+    })
+    result, output = _run(_ctx(settings, trace, tmp_path, llm=llm))
+    assert result.ok
+    assert any(True for _ in trace.events("lens_zero_yield_retry"))
+    assert {i["name"] for i in output["items"]} == {"late-find", "from-b"}

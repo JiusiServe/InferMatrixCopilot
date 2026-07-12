@@ -124,6 +124,8 @@ async def run_agent_step(
         trace=ctx.trace, extra_tools=all_extra, max_iters=budget,
     )
     output = _coerce_output(outcome.text, ctx, contract)
+    if output is not None:
+        output.setdefault("_tools_used", outcome.tools_used[:40])
     ctx.trace.record(
         "agent_output", step=step_name, ok=output is not None,
         tool_calls=outcome.tool_calls, tools_used=outcome.tools_used[:30],

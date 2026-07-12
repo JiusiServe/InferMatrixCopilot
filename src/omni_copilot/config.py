@@ -77,6 +77,8 @@ class Settings(BaseSettings):
     ensemble_parallel: bool = True      # lenses are independent — run concurrently
     ensemble_samples_per_lens: int = 1  # >1 buys union recall at ~linear cost;
                                         # measured: 2x cost, no recall gain (eval iter-3)
+    ensemble_zero_yield_retry: bool = True  # one single-lens re-ask on an
+                                        # empty candidate list (T3 #6)
     ensemble_stagger_seconds: float = 8.0  # head start for lens 0 so the
                                         # shared prompt prefix is cached
                                         # before sibling lenses send it
@@ -85,7 +87,9 @@ class Settings(BaseSettings):
                                        # death (and 38/40 truncated at T0)    # per-lens tool budget — replicate means
                                         # dropped when this was cut to 4 (recall
                                         # starvation); 6 is the measured setting
-    ensemble_merge_evidence_chars: int = 35_000
+    ensemble_merge_evidence_chars: int = 60_000  # must fit the pr_diff — a
+                                        # reducer that can't see the diff
+                                        # can't verify (T3 forensics #5)
 
     # Patch-review trigger thresholds
     large_diff_lines: int = 400

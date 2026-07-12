@@ -82,6 +82,19 @@ async def run_agent_step_ensemble(
             evidence=evidence, guidance=lens_guidance, expected=expected,
             output_extension=output_extension, scope=scope,
             extra_tools=extra_tools, max_iters=budget)
+        if (ctx.settings.ensemble_zero_yield_retry and output and not (output.get(merge_key) or [])):
+            # zero-yield lens: one cheap single-lens re-ask beats the full
+            # 8-lens ensemble retry it used to trigger (T3 forensics #6)
+            ctx.trace.record("lens_zero_yield_retry", lens=str(lens["name"]))
+            result, output = await run_agent_step(
+                ctx, step_name=f"{step_name}#{lens['name']}{suffix}/retry",
+                purpose=purpose, evidence=evidence,
+                guidance=lens_guidance + "\n\nYour first pass yielded zero "
+                "candidates. Re-check your two highest-risk hunks; emit every "
+                "plausible candidate (do not self-censor) or a [validated] "
+                "finding for each checklist item you cleared.",
+                expected=expected, output_extension=output_extension,
+                scope=scope, extra_tools=extra_tools, max_iters=budget)
         return str(lens["name"]), result, output
 
     # lenses (and repeat samples of each lens — a single sample's item list is

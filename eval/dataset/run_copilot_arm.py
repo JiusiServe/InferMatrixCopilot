@@ -96,7 +96,8 @@ def one(kind: str, n: int, split: str) -> str:
     private_root.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, RUN_ROOT=str(private_root))
     t0 = time.time()
-    for attempt in range(3):
+    blocked_retries = 0
+    for attempt in range(4):
         with _START_LOCK:
             gap = time.time() - _last_start[0]
             if gap < 0.5:
@@ -106,10 +107,17 @@ def one(kind: str, n: int, split: str) -> str:
                               text=True, timeout=3000, cwd=str(CWD), env=env)
         # the LLM-only intent parser occasionally returns a clarify instead of
         # a TaskSpec ("I couldn't parse that") — nondeterministic; retry.
-        if "couldn't parse" not in proc.stdout:
-            break
-        print(f"[copilot-arm] retry {stem} (intent clarify, attempt {attempt + 1})",
-              flush=True)
+        if "couldn't parse" in proc.stdout:
+            print(f"[copilot-arm] retry {stem} (intent clarify, "
+                  f"attempt {attempt + 1})", flush=True)
+            continue
+        # rc=3 (blocked/escalated) is usually a bad roll (T3: $0.017/attempt,
+        # the same item answered fine in a sibling replicate) — one retry.
+        if proc.returncode == 3 and blocked_retries < 1:
+            blocked_retries += 1
+            print(f"[copilot-arm] retry {stem} (blocked rc=3)", flush=True)
+            continue
+        break
     wall = round(time.time() - t0, 1)
     run_dir = _find_run_dir(private_root, kind, n)
     report = ""
