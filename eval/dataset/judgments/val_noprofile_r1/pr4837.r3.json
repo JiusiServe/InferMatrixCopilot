@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.95,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.35,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X directly verified the exact concern the human reviewer raised (whether already_submitted-gated unwrapping is safe to drop) by reading stage_pool.py and confirming both submit_initial and submit_update reject list prompts — matching yJader's ground-truth reasoning almost exactly, and correctly reaches the same approve-equivalent verdict as the human LGTMs. Y raises the same code location but frames it as an unverified 'major' risk ('verify submit_initial accepts a scalar prompt'), never checking stage_pool.py, and similarly speculates an AttributeError risk on outputs.output without checking pipeline_z_image.py's actual return contract (which X confirmed). Y's REQUEST CHANGES verdict with multiple ungrounded 'major' findings contradicts both the ground truth and what verification would show, hurting precision significantly.",
+  "_cost_usd": 0.0512119,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

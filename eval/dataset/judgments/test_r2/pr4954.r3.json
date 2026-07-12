@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.7,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly validate the core codes.audio fix and its test coverage, matching the reviewer's approval rationale. X's top finding (containment fallback silently applies to all callers, not just opt-in tests) captures the same substantive concern the human reviewer raised about the fallback's scope, just framed behaviorally rather than as a docs nit, and its short_text-threshold observation is precise and grounded. Y surfaces more findings (unpopped legacy key, uninitialized test attribute, duplicate magic-number claim, IndexError nit, undocumented constants), but several are low-value nitpicks and one (duplicate `_SHORT_TEXT_THRESHOLD` at ~line 499) references code outside the diff that can't be verified here, diluting precision. Both are concretely actionable with file/line anchors.",
+  "_cost_usd": 0.13793360000000002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

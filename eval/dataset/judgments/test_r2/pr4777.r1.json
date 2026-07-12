@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.92,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.72,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both independently caught the same real, grounded defect (stale reliability tests in tests/dfx/reliability/invalid_param_test/ still encoding the old 3-10 bound), which is well-reasoned since neither of those files appears in the diff. X additionally catches a nuance Y misses: the 'layers=11 above-max' reliability case is still broken even though 11 stays invalid, because the expected error substring '3' no longer appears in the new '2 and 10' message. Y, meanwhile, self-contradicts: its 'validated' section claims a repo grep confirmed 'only the two test files touched by this diff' contain stale '3 and 10' patterns, directly contradicted by its own two blocker findings in untouched files — a credibility flaw. Y also appends an unrelated 'skill candidates' section (HunyuanImage3, issue #4891) that has nothing to do with PR #4777, suggesting context bleed. Both are highly actionable with concrete file/line/diff suggestions; ground truth offered no substantive reviewer concerns to recall (LGTM approvals only), so recall is trivially satisfied by both.",
+  "_cost_usd": 0.1980024,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

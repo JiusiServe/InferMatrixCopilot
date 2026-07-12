@@ -1,0 +1,20 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.7,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.9,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y's flagged issue (the containment fallback now unconditionally loosens the gate for every caller, with a concrete failing example like expected 'hello' matching transcript 'hello world goodbye') directly matches the substance of the ground-truth reviewer's concern about the changed contract, and its min()-based short_text critique is a correct, well-verified logic observation. X's five comments are mostly tangential to the GT concerns (threshold documentation nuance, a speculative dead-code claim, an extra test suggestion, duplicate-logic nit) and only loosely brush the legacy-audio-order/producer question GT raised. Both correctly validate the core tts_preprocess fix, but Y's tighter set of findings is more grounded and precise.",
+  "_cost_usd": 0.2151544,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

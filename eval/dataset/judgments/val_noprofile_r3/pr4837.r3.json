@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.85,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.55,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X's core claim — that both submit_initial and submit_update reject list-shaped diffusion prompts, so gating the unwrap on already_submitted was unnecessary — is nearly verbatim the reasoning yJader gave in the sole inline comment, and X correctly lands on APPROVE matching the actual outcome (2x LGTM, merged). Y reaches the same line but justifies it via a different, weaker argument (_prewarm_async_chunk_stages scalar-passing) that misses yJader's specific 'both paths reject lists' insight, and Y inflates missing-test gaps to three 'major' REQUEST CHANGES items despite two human approvals with no test ask — a calibration miss that hurts precision even though the technical evidence is grounded. Y is more verbose/actionable on hypothetical test additions, but X is better matched to what the ground-truth reviewers actually flagged and concluded.",
+  "_cost_usd": 0.0740001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

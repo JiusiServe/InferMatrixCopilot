@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.7,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Neither candidate surfaces the one substantive ground-truth ask (verifying device_communicator/reduce_scatter for _TP too, not just PCP/DP/EP), so recall is low for both. X is tighter and more precise — its single inline comment and API-level claims (DPMetadata fields, use_device_communicator default) are well-grounded, but it offers little concrete actionable change beyond a pass/fail table. Y digs deeper with grep/read_file evidence and flags a real coverage gap (no test exercises the _num_tokens_pre_hook wiring) plus the same stale dp_metadata caching risk X noticed, giving it more file/line-anchored actionable items, though two of its five findings (docstring vs. collective-comment) are near-duplicates and the 'major' severity on a coverage nit is inflated. Net: Y's broader, more actionable coverage edges out X's cleaner but thinner review.",
+  "_cost_usd": 0.33729410000000004,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

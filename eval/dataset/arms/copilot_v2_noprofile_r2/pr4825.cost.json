@@ -1,0 +1,57 @@
+{
+  "wall_s": 517.0,
+  "split": "val",
+  "rc": 0,
+  "run_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_noprofile_r2/runs/pr4825/run-20260712-215258-7cc111",
+  "recorded_at": "2026-07-12T22:01:31",
+  "llm_calls": 0,
+  "input_tokens": 0,
+  "output_tokens": 0,
+  "metrics": {
+    "schema": 1,
+    "run": "run-20260712-215258-7cc111",
+    "task_kind": "pr_review",
+    "status": "done",
+    "quality": {
+      "q": null,
+      "weight_coverage": 0.0,
+      "partial": true,
+      "abstained": false,
+      "components": {
+        "recall_w": null,
+        "precision_v": null,
+        "useful": null,
+        "calib": null,
+        "decision": null
+      }
+    },
+    "cost": {
+      "usd": 0.2113,
+      "minutes": 8.55,
+      "ci_minutes": 0,
+      "input_tokens": 470951,
+      "output_tokens": 76470,
+      "tool_calls": 116,
+      "usd_ref": 1.0,
+      "min_ref": 10.0,
+      "cost_index": 1.3739
+    },
+    "risk": {
+      "incidents": {
+        "catastrophic": 0,
+        "severe": 0,
+        "moderate": 0,
+        "minor": 0
+      },
+      "safety_multiplier": 1.0
+    },
+    "catq": null,
+    "tus": null,
+    "signals": {
+      "escalations": 0,
+      "pushes": 0,
+      "posted": 0,
+      "steps_completed": 4
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.9,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.75,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth here is thin (two LGTM approvals plus a manual verification comment confirming boundary/unit-test/e2e behavior); both candidates correctly validate the core range/message/test changes X does so with tighter, fully diff-grounded evidence and adds only minor/nit suggestions (missing positive layers=2 assertions), which are safe but low-value. Y covers the same core validation (range, message, both entrypoints, pipeline symbolic-layer handling) and additionally flags three specific stale reliability-suite tests outside the diff that would break under the new boundary — a higher-value catch whose internal consistency (exact old '3'/'10' boundary values) suggests genuine grounding rather than fabrication, though it can't be independently verified from the diff alone, so precision is discounted somewhat. Neither includes an explicit LATENT GAP CHECK section, so gap_hit is false for both.",
+  "_cost_usd": 0.2682526,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

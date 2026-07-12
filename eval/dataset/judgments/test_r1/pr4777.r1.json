@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.82,
+    "actionability": 0.88,
+    "gap_hit": false
+  },
+  "winner": "tie",
+  "margin": "slight",
+  "rationale": "Both candidates independently converge on the same real, well-grounded defect — stale hardcoded '3'-boundary references in the two dfx reliability test files that the PR diff didn't touch — with concrete file/line and exact fix suggestions, which is strong corroborating evidence it's a genuine gap rather than a hallucination. Ground truth offers little to recall against (just LGTM/verification comments), so both score similarly there. X edges out on precision via a deeper semantic check (reading pipeline_qwen_image_layered.py to confirm layers=2 is genuinely supported, not just mechanically threaded through validators), while Y is slightly more actionable/systematic (evidence-tagged sweep, plus one extra minor but valid finding about a missing positive boundary assertion) but leaks irrelevant 'skill candidates' content into the output that hurts polish.",
+  "_cost_usd": 0.15370640000000002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

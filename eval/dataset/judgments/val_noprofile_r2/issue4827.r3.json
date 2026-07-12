@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.85,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.88,
+    "grounding": 0.85,
+    "completeness": 0.8
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates correctly diagnose the None+1 crash from missing extended ratio tokens in the base tokenizer, cite the same code path and Tencent reference guard, and give the exact workaround FayeSpica confirmed (dit.yaml config). X is slightly more complete, mapping its proposed fix onto both items from the thread's actual proposed-fix list (docs clarification + fail-fast guard) plus an extra graceful-degrade code change, and correctly frames the issue as resolved with follow-up tracked separately per Gaohan123. Y adds a nice touch (surfacing a third deploy config, hunyuan_image3_ar.yaml) but its fix proposal only covers the guard, omitting the docs half of the thread's ask. Neither mentions the PR #2713 regression context that the actual root-cause comment cites, and the two disagree on the exact class name (unverifiable), so grounding is roughly a wash.",
+  "_cost_usd": 0.11434269999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

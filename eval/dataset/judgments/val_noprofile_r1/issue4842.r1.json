@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.92,
+    "grounding": 0.85,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.85,
+    "grounding": 0.8,
+    "completeness": 0.68
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both correctly diagnose the dummy-weight/run-level mismatch and cite the same core evidence (run_args.py default, _add_dummy_load_format in stage_config.py, PR #4354), matching the thread's actual 'invalid' resolution. X is more complete: it explicitly states the 'invalid' disposition matching ground truth, reasons about the A100-vs-H100/MI325 hardware_test mismatch (directly relevant since the issue title and resolution both hinge on A100), checks the video-path prerequisite, and proposes a concrete follow-up fixture-warning improvement. Y is accurate but terser, omits the A100 hardware nuance, and only says 'close' without specifying the invalid disposition.",
+  "_cost_usd": 0.1147493,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

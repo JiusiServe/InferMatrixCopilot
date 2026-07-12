@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.8,
+    "grounding": 0.6,
+    "completeness": 0.7
+  },
+  "y": {
+    "correctness": 0.8,
+    "grounding": 0.65,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly diagnose the base-tokenizer/extended-ratio-token crash and the config mismatch (moe.yaml=Instruct two-stage vs dit.yaml=base single-stage), matching the thread's resolution and FayeSpica's confirmed workaround. Y is more complete, explicitly mirroring the thread's two-part ask (docs fix + fail-fast guard) plus a concrete tolerant-fix patch and correct closing disposition tied to Gaohan123's follow-up-issue request; X's config table adds an unverified third yaml (hunyuan_image3_ar.yaml) not evidenced anywhere in the thread. Y's specific line numbers and claim about both yaml headers saying 'Instruct' are unverifiable and slightly self-contradictory, so grounding is only modestly ahead of X's vaguer but safer citations; neither mentions the PR #2713/modes-filtering regression detail from the thread.",
+  "_cost_usd": 0.2299521,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "wall_s": 73.8,
+  "split": "val",
+  "rc": 0,
+  "run_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_noprofile_r2/runs/issue4842/run-20260712-220832-ce27a3",
+  "recorded_at": "2026-07-12T22:09:42",
+  "llm_calls": 0,
+  "input_tokens": 0,
+  "output_tokens": 0,
+  "metrics": {
+    "schema": 1,
+    "run": "run-20260712-220832-ce27a3",
+    "task_kind": "issue_answer",
+    "status": "done",
+    "quality": {
+      "q": null,
+      "weight_coverage": 0.0,
+      "partial": true,
+      "abstained": false,
+      "components": {
+        "correct": null,
+        "grounded": null,
+        "complete": null,
+        "helpful": null
+      }
+    },
+    "cost": {
+      "usd": 0.016,
+      "minutes": 1.17,
+      "ci_minutes": 0,
+      "input_tokens": 43925,
+      "output_tokens": 3736,
+      "tool_calls": 11,
+      "usd_ref": 0.3,
+      "min_ref": 5.0,
+      "cost_index": 1.116
+    },
+    "risk": {
+      "incidents": {
+        "catastrophic": 0,
+        "severe": 0,
+        "moderate": 0,
+        "minor": 0
+      },
+      "safety_multiplier": 1.0
+    },
+    "catq": null,
+    "tus": null,
+    "signals": {
+      "escalations": 0,
+      "pushes": 0,
+      "posted": 0,
+      "steps_completed": 3
+    }
+  }
+}

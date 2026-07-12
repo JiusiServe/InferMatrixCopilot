@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.8,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently found the key latent gap (the unswept get_cache_scale caller in hunyuan_image3_transformer.py), satisfying gap_hit, but Y ties it directly to the PR's own listed affected files and notes it was later fixed referencing this PR, giving stronger grounding. Y also independently surfaces the same substantive weakness the human reviewer raised (the delegated-loader test doesn't actually validate the outer AutoWeightsLoader's mapping behavior), whereas X explicitly cites that same test as having 'validated' correctness, missing the human's core non-blocking concern. X pads its output with three near-duplicate low-value 'add a comment' nits, diluting precision/actionability relative to Y's more surgical, higher-value findings.",
+  "_cost_usd": 0.1973903,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.85,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.8,
+    "grounding": 0.6,
+    "completeness": 0.55
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both correctly diagnose the #4527 regression fixed by #4792 and already folded into the 0.24 rebase (a560ed18), matching the thread's ground truth. X is delivered as a clean, self-contained maintainer answer with dense, plausible file:line grounding and clear actionable next steps (upgrade/cherry-pick/workaround). Y adds unverified specifics beyond the evidence — approximate NPU file/line numbers (\"~484\") and a fabricated-looking specific pytest test path — and, more damagingly, the answer is polluted with leaked internal artifacts (a \"Run report\" header, task JSON, and an unrelated \"skill candidates awaiting curation\" section referencing entirely different issues), which undermines its usability as a response to the reporter.",
+  "_cost_usd": 0.093003,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

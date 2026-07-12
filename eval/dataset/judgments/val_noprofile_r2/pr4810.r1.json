@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.75,
+    "actionability": 0.75,
+    "gap_hit": true
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly validate the delegated-vs-direct loader design and both independently find the uncovered hunyuan_image3_transformer.py caller of the removed get_cache_scale API, satisfying the latent gap check with concrete file/line evidence. X is more precise and higher-signal: its test-adequacy critique (fake param not proving real AutoWeightsLoader mapping) closely echoes the human reviewer's actual concern about unverified real-checkpoint resolution, and its findings are prioritized by severity. Y raises the same core gap but buries it under several low-value stylistic nits (add explanatory comments, add branch-coverage test) that aren't grounded in any reviewer concern, diluting precision and actionability despite Y's methodologically rigorous PR-time-tree framing.",
+  "_cost_usd": 0.24338740000000003,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

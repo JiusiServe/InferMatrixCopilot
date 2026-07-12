@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.82,
+    "grounding": 0.75,
+    "completeness": 0.78
+  },
+  "y": {
+    "correctness": 0.85,
+    "grounding": 0.82,
+    "completeness": 0.86
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly diagnose the base-tokenizer/None+int crash, cite the same hunyuan_image3.py:1561-1563 lines, and give the identical FayeSpica-confirmed DiT workaround plus a guard/docs fix matching akshatvishu's proposal. Y goes further with deeper code grounding (extra surrounding lines, yaml header text, a concrete tolerant-init diff) and lands closer to the thread's actual disposition (treat as resolved via workaround, track hardening in a new issue) versus X's vaguer 'keep-open' framing. X's edge is explicitly citing PR #2713, which Y omits entirely.",
+  "_cost_usd": 0.1372188,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.82,
+    "completeness": 0.82
+  },
+  "y": {
+    "correctness": 0.9,
+    "grounding": 0.9,
+    "completeness": 0.9
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly identify the #4527 regression (None sentinel skipping accumulate_full_payload_output) fixed by #4792, already folded into the 0.24 rebase — matching the ground truth exactly, including the same code snippet/comment. Y goes further in grounding by tracing the actual failure mechanism (scheduling coordinator's _FULL_PAYLOAD_INPUT_STAGES, WAITING_FOR_INPUT parking, specific timeout log strings) that plausibly matches the reporter's hang symptom, and shows more end-to-end completeness by addressing likely red herrings in the environment dump and offering upgrade/cherry-pick/workaround paths plus a reopen condition. X is also solid and gives a concrete regression-test pointer, but is comparatively thinner on the causal chain from code state to observed hang.",
+  "_cost_usd": 0.1167043,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

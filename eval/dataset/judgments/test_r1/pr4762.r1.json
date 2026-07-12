@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.78,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "X explicitly surfaces the two GT concerns most reviewers cared about (the trust_remote_code default flip, and the deploy-override-vs-auto-detected-pipeline precedence issue, noting the regression test that fixes it), giving it better recall against the ground truth. Y is more thorough and technically deep (functools.cache poisoning, missing try/except around load_deploy_config, lost warning message) with sharper file:line actionability, but entirely misses the single most-discussed GT issue (endpoint restrictions resolved from the wrong pipeline) and contains one factually wrong claim (the 'dead hf_config=None' assignment is actually read on the exception path). Both avoid a labeled LATENT GAP CHECK section.",
+  "_cost_usd": 0.3925094,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

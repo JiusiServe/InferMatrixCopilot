@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both hit the latent gap directly and concretely: X pinpoints 5 existing tests that call sleep(level=2)+wake_up() and will now raise (exact reproduction of the #4905 break), while Y independently diagnoses the root cause (default level=2 bricks the common sleep/wake path) and separately flags that the new guard logic isn't exercised in standard CI. X is slightly more surgical and evidence-heavy (specific test names/lines), giving it an edge in precision, but Y has broader recall — it touches all three ground-truth threads (regression-test adequacy, the CuMemTag enum, and an unrelated-CI-failure caveat mirroring Flink-ddd's actual comment) versus X's near-total silence on CI. Both are highly actionable with concrete file/line fixes; Y's structured findings table and conditioned verdict edge out X's flatter list.",
+  "_cost_usd": 0.26759940000000004,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

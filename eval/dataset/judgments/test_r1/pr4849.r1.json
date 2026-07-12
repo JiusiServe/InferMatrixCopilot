@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "The ground-truth thread's substantive concern is Gaohan123 questioning whether source_outputs[0] is reliably the parent output, resolved by Celeste-jq explaining the orchestrator builds [output, *companions]. X directly investigates and confirms this exact invariant with specific orchestrator.py line citations, mirroring the actual resolution. Y treats the ordering as already validated via the docstring and pivots to minor, more tangential docstring/test-coverage nits, one of which (a 'CfgCompanionTracker' class) is an unverified claim not evidenced anywhere in the diff, weakening its precision. Neither candidate recalls the precommit-fix or diffusion-benchmark-run requests. Y's findings are individually more atomic/actionable (exact line + suggested snippet), but X better recalls and grounds the one concern that mattered most to the human reviewers.",
+  "_cost_usd": 0.20228640000000003,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

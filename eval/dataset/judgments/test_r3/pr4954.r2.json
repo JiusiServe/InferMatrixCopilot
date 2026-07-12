@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly validate the core fix (codes.audio read now matches tts_postprocess's write, with backward-compat for legacy top-level audio) and both raise legitimate, grounded concerns about the new containment fallback's looseness — X with a concrete false-positive example, Y with reachability-style verification. Neither catches the ground truth's doc-staleness point (moot since the diff shown already updates those docstrings) fully, but Y's finding that the legacy 'audio' key is left unpopped when codes.audio is consumed, plus its call for a dual-key precedence test, meaningfully echoes the ground truth's minor note about confirming the legacy fallback path's ordering/liveness, which X never touches. Y's findings are also slightly more actionable (precise line citations plus explicit evidence quotes) though X is tighter and equally well-grounded with no fabrications on either side.",
+  "_cost_usd": 0.20503590000000002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

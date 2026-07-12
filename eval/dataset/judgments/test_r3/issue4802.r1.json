@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.6,
+    "grounding": 0.65,
+    "completeness": 0.7
+  },
+  "y": {
+    "correctness": 0.5,
+    "grounding": 0.55,
+    "completeness": 0.65
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly capture the two things the thread actually settled — stage/replica attribution already covered by the relabeling work, and tail_waste/fragmentation dropped as expected block-rounding overhead — plus the LLM-first scoping. X is better grounded with consistent cross-repo file/line citations and treats the make_stats throttle as the one real open item worth filing separately rather than dismissing it, though its 'closing the whole RFC' disposition overreaches since footprint/prefix-cache metrics were never explicitly resolved in the thread. Y's resolved/open breakdown is a reasonable structure, but its confident, thread-unsupported claim that the throttle is 'per-scheduler not global' and already non-issue post-#3576 risks waving away the reporter's own measured evidence without real grounding.",
+  "_cost_usd": 0.2613509,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

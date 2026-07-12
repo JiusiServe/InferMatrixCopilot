@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.92,
+    "grounding": 0.85,
+    "completeness": 0.92
+  },
+  "y": {
+    "correctness": 0.9,
+    "grounding": 0.78,
+    "completeness": 0.83
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly diagnose the missing-extended-ratio-token crash and the base-vs-Instruct config mismatch, matching the thread; both cite the confirmed DiT workaround and defer the hardening work to a follow-up issue per Gaohan123. X is more complete, explicitly covering both thread proposals (docs fix on misleading deploy-YAML headers, plus a guard) with specific line-level citations, whereas Y's fix section, while cleaner, only addresses the guard and skips the docs-clarity ask. X's fix logic is slightly muddled (proposing both a tolerant empty-list fallback and a hard fail, which are redundant/contradictory) while Y's single fail-fast ValueError more crisply matches the maintainer's stated intent, but this is offset by X's broader coverage and more granular grounding claims.",
+  "_cost_usd": 0.191068,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

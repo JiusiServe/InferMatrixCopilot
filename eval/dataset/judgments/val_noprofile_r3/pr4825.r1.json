@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The one substantive ground-truth concern (dsocek's point that hardcoding component names is fragile and a single source of truth like the packed-modules mapping should drive discovery instead) is closely echoed by X's finding #1, which independently identifies the same fragmented-hardcoded-list problem across manager.py/offloader/registry.py and proposes deriving from a per-pipeline declaration. Y explicitly considers the exact same dedup question (registry.py:427 vs manager.py) during its sweep but concludes it's 'not warranted,' effectively rejecting the reviewer's actual suggestion rather than surfacing it. Y's findings (missing activation round-trip test, parametrize duplication) are grounded and actionable but orthogonal to what the human reviewers actually raised, giving it much lower recall despite thorough, well-cited validation work.",
+  "_cost_usd": 0.1292608,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

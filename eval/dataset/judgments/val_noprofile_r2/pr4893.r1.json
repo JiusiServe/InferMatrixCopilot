@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.8,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.7,
+    "actionability": 0.4,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X's top finding (test_expert_parallel_layout.py:121 — TP missing device_communicator/reduce_scatter assertions despite now using init_vllm_model_parallel_group) is essentially the same concern the human reviewer raised inline at that exact line about verifying reduce_scatter coverage. X's other findings (stale comment, removed cfg_parallel_size>1 guard, missing docstring) are all grounded in the actual diff and mostly valid, if minor and somewhat redundant. Y produced a thorough, technically competent verification pass but concluded APPROVE and completely missed the one substantive gap the human reviewer flagged, offering only a vague non-actionable stylistic comment instead.",
+  "_cost_usd": 0.20917439999999995,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

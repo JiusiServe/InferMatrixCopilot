@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth is sparse (two LGTM approvals, one thread about a change later removed from the PR), so neither candidate has much to recall, but both independently converge on the same underlying theme dsocek raised — stop hardcoding component lists and derive from an existing single source (both cite registry.py:427 and _dit_modules/SupportsComponentDiscovery, a good sign of grounding since they agree). Y is more rigorous: every claim carries explicit grep/read evidence, it hits the 'derive from existing source' theme twice with concrete refactor proposals, and it surfaces additional verifiably-affected pipelines (ovis_image, flux2_klein) that X and the human reviewers missed. X is tighter and also well-grounded (correct scope analysis, text-encoder gap) but with fewer, less evidenced findings. Neither has a LATENT GAP CHECK section.",
+  "_cost_usd": 0.0753933,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.6,
+    "grounding": 0.5,
+    "completeness": 0.6
+  },
+  "y": {
+    "correctness": 0.45,
+    "grounding": 0.35,
+    "completeness": 0.55
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both correctly land on the ground-truth verdict (duplicate of #4808, per #4809), but X states it simply and directly, matching the terse actual resolution and giving the reporter concrete next steps (update main / cherry-pick). Y is more elaborate but manufactures unverifiable specifics — a claim that #4808 was 'closed without merging' and precise test-file line numbers (_STALE_API_FILES at lines 15-20) — that read as fabricated forensic detail not supported by anything in the issue or ground truth, and which the terse actual maintainer comment gives no hint of. That speculative overreach undercuts Y's grounding and completeness more than its careful hedging earns back.",
+  "_cost_usd": 0.1248953,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

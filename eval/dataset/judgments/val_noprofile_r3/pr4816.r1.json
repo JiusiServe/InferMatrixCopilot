@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (bot rate-limited, human said only 'lgtm'), so both correctly land on APPROVE with nothing to miss — recall ties at 1.0. Y is more rigorous and conservative: it states its checkout methodology explicitly, validates each diff hunk against precise, diff-consistent line offsets, and flags a real subtlety (ServingTokenization vs. ServingTokens) without reaching for unverifiable external facts. X is well-organized but cites a specific unverified upstream PR number (vllm#46022) and PR-body repro details not grounded in the given diff/ground truth, which is a fabrication risk that dings precision; it does add one genuinely useful actionable caveat about test-mock brittleness that Y lacks. Overall Y edges out X slightly on grounded precision while both are similarly actionable for a clean-approve review.",
+  "_cost_usd": 0.18918880000000002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.78,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.88,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both engage the ground-truth threads (regression tests, tag enum) and both flag the level-2 NotImplementedError guard as over-strict, hitting the latent gap. Y's version is far more concrete and verifiable: it names five specific pre-existing tests with exact line numbers that call sleep(level=2)+wake_up() and will now raise, backed by cited grep evidence — this is essentially the exact CI-breaking scenario from issue #4905 that both human reviewers missed. X's analogous finding (default level=2 'bricks' the engine) is a plausible but less-verified inference, and X carries a couple of speculative/self-admitted-no-impact points (allocator 'default' tag, pre-existing desync) that dilute precision. Y's other findings are all tightly grounded with per-item evidence trails, giving it the edge on precision and actionability despite a slightly narrower recall of the enum-suggestion thread.",
+  "_cost_usd": 0.2810654,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

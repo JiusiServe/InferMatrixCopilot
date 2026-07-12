@@ -1,0 +1,20 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.8,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.6,
+    "actionability": 0.3
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "The one substantive ground-truth concern (reviewer questioning why the test's device_communicator/reduce_scatter assertions don't cover _TP, which was also converted to init_vllm_model_parallel_group) is caught explicitly and precisely by X, with a concrete fix suggestion; Y misses it entirely and recommends APPROVE. X's other findings (stale comment after the cfg_parallel_size>1 guard was dropped, missing docstring, unguarded cpu_group access) are all grounded in the actual diff, though some are repetitive/low-value nitpicks. Y's review is well-reasoned on correctness but surfaces almost no actionable findings, offering only one vague non-blocking comment.",
+  "_cost_usd": 0.2614901,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

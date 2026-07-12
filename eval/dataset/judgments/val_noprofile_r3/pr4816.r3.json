@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.65,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly land on APPROVE matching the ground-truth 'lgtm', with no substantive concerns to recall since the PR is a clean, verified rename. Both perform grounded, diff-specific verification (upstream cross-check, exhaustive grep for missed occurrences), but Y appends an unrelated 'skill candidates awaiting curation' section referencing HunyuanImage3/issue #4891, which has nothing to do with PR #4816 and reads as contaminated/leaked content, hurting its overall precision and polish. X stays tightly scoped to the diff with a clean blocker-scan table and verification summary.",
+  "_cost_usd": 0.0563477,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

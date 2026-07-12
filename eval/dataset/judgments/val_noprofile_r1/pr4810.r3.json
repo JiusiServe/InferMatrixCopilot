@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.75,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.7,
+    "actionability": 0.8,
+    "gap_hit": true
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both independently rediscover the latent gap (the diffusion-transformer hunyuan_image3_transformer.py still calling the removed get_cache_scale), but X grounds it purely in verified PR-time-tree evidence while Y's parallel finding cites an unverifiable/likely-inaccurate '(see #4810)' resolution detail, denting its precision. X is more systematically actionable (per-hunk sweep, explicit blocker/major/minor tags with concrete remediation), though one of its minor findings about the AutoWeightsLoader comment self-contradicts its own earlier validation. Y better mirrors the ground-truth reviewer's substantive content (delegated-vs-direct design distinction verified against real vLLM source, correct APPROVE verdict matching the actual merged outcome) giving it a slight recall edge, but X's stronger grounding and actionability tip the overall balance narrowly in its favor.",
+  "_cost_usd": 0.17988780000000001,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

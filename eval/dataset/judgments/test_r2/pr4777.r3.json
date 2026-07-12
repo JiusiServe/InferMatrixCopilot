@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.92,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (just two LGTMs and a bot validation comment), so recall is vacuous for both. Both candidates independently converge on the same core, well-grounded finding — two hardware-gated reliability tests (test_invalid_image_generation.py, test_invalid_image_editing.py) still encode the old 3-10 bound — which is a strong signal of genuine grounding rather than fabrication. Y is slightly more precise and thorough: it catches an extra subtlety (the layers=11 above-max case in test_invalid_image_generation.py also breaks because the error message no longer contains '3'), grounds its pipeline-safety claim in concrete implementation details (symbolic latent slicing), and correctly notes the PR was already merged. X pads its report with speculative nits (invented issue numbers for an inline-comment suggestion) and an irrelevant trailing 'skill candidates' section unrelated to this PR, slightly hurting precision/cleanliness. Both are concretely actionable with file/line specificity, giving Y a slight overall edge.",
+  "_cost_usd": 0.17292570000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

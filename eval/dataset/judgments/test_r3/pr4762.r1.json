@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.8,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates catch the trust_remote_code True→False default flip (matches the acknowledged inline bug), but X also explicitly validates that endpoint-restriction resolution now follows the post-deploy-override pipeline — the single most substantive ground-truth concern (hsliuustc0106's confirmed bug) — and raises a plausible related caching/UNSUPPORTED_ROUTES gap. Y's extra findings (frozenset/set type mismatch, missing docstrings, 'temporary' wording) are grounded but mostly trivial nitpicks that don't overlap with any ground-truth concern (mutability of cached hf_config, positional-arg risk, debug-msg scope, create_error_response reuse, CI failures, cross-endpoint audit all go unmentioned by both). Neither has a LATENT GAP CHECK section.",
+  "_cost_usd": 0.2797734,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

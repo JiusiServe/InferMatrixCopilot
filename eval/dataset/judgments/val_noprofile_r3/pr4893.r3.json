@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.7,
+    "precision": 0.75,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "The single substantive ground-truth concern (yenuo26 questioning whether the reduce_scatter hasattr checks are sufficient verification) is essentially echoed by Candidate Y's finding that init_vllm_model_parallel_group is never exercised for real — only mocked — leaving reduce_scatter's actual contract untested; Candidate X instead affirmatively concludes the reduce_scatter/device_communicator wiring is correct and never surfaces it as a gap. Y's findings are all grounded with specific file/line citations and concrete fixes (add docstring, add real-call test, document collective assumption), giving it higher actionability, though some severity labels ('major' for missing docstrings) look inflated. X is well-reasoned and precise but functions mostly as an approval with one minor non-blocking nit, so it captures little of what the human reviewer actually flagged. Neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.2077424,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

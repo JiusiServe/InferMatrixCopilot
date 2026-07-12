@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X's comment about deriving default_components from the pipeline's own declarative source (_dit_modules) instead of a fourth hardcoded list closely mirrors the actual reviewer dsocek's concern about driving the mapping from _packed_modules_mapping/stacked_params_mapping rather than ad-hoc lists — the one substantive concern in the ground truth. Y never raises this and instead recommends REQUEST CHANGES over missing integration/round-trip tests that neither of the two actual approving reviewers flagged, misaligning with the real outcome (merged, LGTM x2). Both reviews are grounded and reasonably actionable with concrete file/line citations, but X's recall of the actual reviewer concern and better-calibrated verdict give it the edge, while Y's extra validation rigor and slightly sharper actionability aren't enough to offset the missed core concern.",
+  "_cost_usd": 0.1551896,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

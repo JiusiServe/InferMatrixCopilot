@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.85,
+    "completeness": 0.72
+  },
+  "y": {
+    "correctness": 0.95,
+    "grounding": 0.9,
+    "completeness": 0.92
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly identify the actual resolution (invalid, wrong --run-level defaulting to core_model which forces dummy weights), cite the same core mechanism (_add_dummy_load_format in stage_config.py) and PR #4354, and recommend --run-level=full_model, matching the thread. Y is more complete: it explains why the output looks the way it does (repeated single-token collapse, noise audio), clarifies the subtle and non-obvious distinction that the test's `full_model` pytest marker does not itself set the run-level (a plausible root-cause detail the thread didn't spell out), addresses the video-path and GPU memory prerequisites for a real run, and flags a reasonable separate ergonomics follow-up without muddying the main verdict. X is accurate and concise but thinner — fewer files touched, less coverage of the reporter's full situation (hardware declaration, video path, memory split) and less precise about the actual close reason ('invalid' vs generic 'close').",
+  "_cost_usd": 0.1599469,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

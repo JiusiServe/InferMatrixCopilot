@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth is empty (two LGTM approvals, no substantive concerns), so both candidates get full recall; the real differentiator is the latent gap they independently surfaced — two hardware-gated reliability test files (test_invalid_image_generation.py, test_invalid_image_editing.py) still encoding the old layers=3 boundary. Y catches this more completely (including the above-max case at line 91 whose error-string assertion also breaks) and backs it with exact code snippets plus deeper runtime validation (both API entrypoints route through the same validator, and the pipeline is confirmed layer-count-symbolic down to the tensor ops). X finds the same core two files but pads the review with three low-value nits, one of which cites specific issue numbers (#2334/#2349) not evidenced anywhere in the diff or PR context, a plausible fabrication that dings its precision. Both are concretely actionable with file/line targets, but Y's snippets make the fix trivial to apply.",
+  "_cost_usd": 0.17354570000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

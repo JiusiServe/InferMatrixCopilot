@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.0,
+    "grounding": 0.0,
+    "completeness": 0.0
+  },
+  "y": {
+    "correctness": 0.9,
+    "grounding": 0.85,
+    "completeness": 0.9
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Candidate X produced no answer at all (API error, rc=1), so it cannot be credited on any dimension. Candidate Y correctly reaches the same disposition as the ground truth (duplicate of #4808, tied to the #4809 triage issue) while grounding the claim in specific call sites, file paths, and line numbers, and goes further by flagging two legitimate open risks (whether #4808's fix actually landed on main, and a regression-test coverage gap) that make it more useful to a maintainer than a bare duplicate-closure comment.",
+  "_cost_usd": 0.1158247,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

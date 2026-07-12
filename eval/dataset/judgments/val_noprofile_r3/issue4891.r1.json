@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.0,
+    "grounding": 0.0,
+    "completeness": 0.0
+  },
+  "y": {
+    "correctness": 0.85,
+    "grounding": 0.8,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Candidate X crashed before producing any answer (API 402 error, no RUN_REPORT), so it scores zero across the board. Candidate Y correctly reaches the same resolution as the thread — closing as a duplicate of #4808, tracing it back to the #4809 five-call-site triage where #4810 fixed 4/5 and #4808 covers this exact DiT file — and backs it with specific file/line citations. Y goes further than the ground truth by flagging a real follow-up risk (whether #4808 actually merged, and a test-coverage gap), appropriately hedged as unverified rather than asserted, which shows good judgment on a genuinely open question rather than false confidence.",
+  "_cost_usd": 0.0870648,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

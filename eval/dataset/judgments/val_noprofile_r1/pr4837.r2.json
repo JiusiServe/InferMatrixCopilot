@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.3,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Ground truth is a unanimous APPROVE where the one inline comment explains that removing `already_submitted` is correct because both submit paths converge on the same DiffusionEngine code and StagePool rejects list prompts in either path. Candidate Y independently verifies this exact fact (citing stage_pool.py:951/1022 raising ValueError on lists) and the ZImagePipeline return contract (no `__getitem__`, confirming the old `outputs[0]` was itself a latent bug), landing on APPROVE with grounded, low-noise non-blocking notes — matching the human reviewers almost exactly. Candidate X reaches the opposite verdict (REQUEST CHANGES) built on several speculative 'major' findings it admits it can't verify (e.g., worrying `submit_initial` might need a list, which is backwards given StagePool actually rejects lists on both paths), fabricating risk where the ground truth and Y show none exists. Both give file/line-anchored, concrete comments, but X's ungrounded major/minor findings tank its precision and its miss of the actual StagePool reasoning tanks recall.",
+  "_cost_usd": 0.14384260000000001,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

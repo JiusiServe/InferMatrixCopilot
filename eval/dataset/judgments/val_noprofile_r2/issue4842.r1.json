@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 1.0,
+    "grounding": 0.8,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 1.0,
+    "grounding": 0.78,
+    "completeness": 0.82
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly diagnose the run-level mismatch (default core_model → dummy weights) matching the actual 'invalid' resolution, and both cite the same core files (run_args.py, stage_config.py's _add_dummy_load_format, the full_model marker). X goes further by tracing the fixture chain (runtime.py resolving tiny models/config swap) and the assertion helpers, and adds practical completeness (hardware/video-path caveats, a constructive footgun-guard suggestion) that better serves a maintainer closing the issue. Y is tighter and includes clickable GitHub links, but is a shade less thorough in tracing the full mechanism. Both share an unverifiable 'Welsh gibberish' audio detail not present in the issue body, capping grounding scores similarly for each.",
+  "_cost_usd": 0.1330523,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

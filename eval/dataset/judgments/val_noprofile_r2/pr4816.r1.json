@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.55,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X correctly identifies the root cause (upstream's shared `base()` helper hardcodes `state.serving_tokenization`), verifies against the actual upstream checkout including the exact traceback line, and confirms no missed occurrences — all claims are grounded and accurate. Y's sweep restates the diff without adding insight, and its two nits are weak: the naming-convention comment suggestion is minor, while the second nit (flagging `openai_serving_audio_generate` as an inconsistency needing the same rename) misunderstands why the rename happened — it's specific to matching upstream's hardcoded attribute name in the shared instrumentator, not a general prefix-removal effort, so the suggestion is misleading. Ground truth offers no substantive concerns to recall against, so both score full recall, but X's higher grounding and correctness give it the edge.",
+  "_cost_usd": 0.1237933,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

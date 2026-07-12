@@ -1,0 +1,21 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.75,
+    "actionability": 0.85
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X's top comment (reuse pipeline._dit_modules instead of growing a hardcoded default_components tuple) closely echoes the actual reviewer concern (dsocek: derive the mapping from existing per-model metadata like stacked_params_mapping instead of hardcoded lists), giving it real recall on the one substantive GT point; Y never raises this and instead invents test-coverage gaps (missing integration test, missing activation-path test) that no human reviewer flagged. Y's findings are well-grounded via greps and slightly more actionable line-by-line, but its REQUEST CHANGES verdict misreads the PR's actual reception (two clean LGTM approvals, merged), while X's COMMENT/approve-level verdict matches reality. Precision is decent for both since neither fabricates code that doesn't exist, but X better reflects what actually mattered to the real reviewers.",
+  "_cost_usd": 0.07307390000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

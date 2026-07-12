@@ -1,0 +1,20 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.9,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.3,
+    "actionability": 0.55
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "The sole substantive ground-truth concern (yJader's inline comment) explains that dropping the already_submitted gate is correct because diffusion StagePool rejects list prompts in both submit_initial and submit_update. Candidate X independently verifies this exact fact (stage_pool.py:951, 1022) and reaches the identical conclusion, also confirming the DiffusionOutput fix against the real ZImagePipeline return type — grounded and correctly APPROVEs. Candidate Y flags the same line as a 'major' risk in the opposite direction ('verify submit_initial accepts a scalar; if it expects a list this will error'), never actually checks stage_pool.py, and lands on REQUEST CHANGES — contradicting the true (and verifiable) behavior, which tanks its precision despite superficially concrete file/line citations.",
+  "_cost_usd": 0.1213126,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

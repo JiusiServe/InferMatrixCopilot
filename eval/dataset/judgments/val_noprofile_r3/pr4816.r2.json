@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.82,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.92,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly land on APPROVE, matching the trivial ground truth (no substantive human concerns exist), so recall is saturated for both. Y grounds every claim in a specific diff hunk with file:line citations and adds a useful concrete check (verifying no collision with the separate `ServingTokens`/`serving_tokens` symbol at line 1066), keeping precision high. X is equally well-organized but injects an unverifiable specific claim (a concrete upstream vllm PR number '#46022' and a quoted repro detail from the 'PR body') not evidenced in the given diff, which is a mild fabrication risk that dings precision slightly. Actionability is comparable since both are clean-approve reviews with few actionable asks, but Y's consistent per-hunk line citations edge out X's mix of grounded and speculative references.",
+  "_cost_usd": 0.0710177,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

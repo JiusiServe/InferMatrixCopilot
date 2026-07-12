@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.3,
+    "grounding": 0.5,
+    "completeness": 0.35
+  },
+  "y": {
+    "correctness": 0.75,
+    "grounding": 0.85,
+    "completeness": 0.8
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth says the issue is a duplicate of #4808 (fix PR) with details in #4809; X inverts this, labeling it 'duplicate-of-4809' and asserting the fix is 'already merged' and the reporter has a 'stale checkout' — directly contradicted by the reporter's own stated commit hash on main, making X's confident claim likely wrong. Y correctly frames it as duplicate-of-4808/tracked-in-4809, matches the actual thread structure, and instead of asserting merge status appropriately flags that #4808 shows closed-without-merge and hedges that it couldn't verify upstream main — a well-argued escalation on a genuinely uncertain point rather than a confident wrong claim. Y is also more thoroughly grounded (specific call sites, test file gap) and more complete (surfaces the regression-test blind spot driving the whole issue).",
+  "_cost_usd": 0.08206759999999999,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

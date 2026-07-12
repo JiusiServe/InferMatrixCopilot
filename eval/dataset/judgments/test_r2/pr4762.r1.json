@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.88,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates catch the central trust_remote_code default-flip bug (GT's top inline concern) with correct grounding, and both implicitly verify the deploy-override/endpoint-restriction precedence fix is now correct. Y edges ahead by catching a verified dead-code bug (hf_config=None always returned) that's directly visible in the diff, and by flagging that Qwen2.5-Omni's identical thinker-talker architecture likely needs the same completions restriction — a concrete, specific echo of the PR discussion's explicit ask to 'audit other models that can be crashed,' which X never mentions. X's review is well-organized (blocker-scan table, verdict) but its extra findings (error-response fallback pattern, else-branch skipping UNSUPPORTED_ROUTES) are more speculative and don't map to any GT concern, giving it a similar precision but slightly lower recall than Y.",
+  "_cost_usd": 0.3123054,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

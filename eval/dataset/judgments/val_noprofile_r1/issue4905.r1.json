@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.55,
+    "grounding": 0.6,
+    "completeness": 0.58
+  },
+  "y": {
+    "correctness": 0.55,
+    "grounding": 0.68,
+    "completeness": 0.68
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly identify PR #4834 as the cause and correctly explain the NotImplementedError guard's intent, matching yenuo26's bisection — but both overclaim resolution ('already fixed on main', recommend closing) when the actual thread shows the issue still under investigation (Flink-ddd asking yenuo26 to trigger a full CI sleep-mode test, no confirmation of a merged fix). Y is slightly better grounded, citing more distinct code locations (sleep/wake_up flag logic, the generate() admission guard, multiple named regression tests) and gives more complete end-to-end guidance for users hitting this at runtime. X's answer is comparable but includes an unrelated 'skill candidates' appendix (hunyuan-image3, issue #4891) that has nothing to do with this issue, slightly hurting polish/completeness.",
+  "_cost_usd": 0.1261523,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

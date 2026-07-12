@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.75,
+    "actionability": 0.75,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently discover the unswept get_cache_scale caller in the diffusion transformer, correctly hitting the latent gap the human reviewers missed. Y frames it as a severity-tagged blocker with concrete, evidence-cited fix guidance mirroring the mammoth_moda2 pattern, plus additional well-grounded test-coverage and comment-accuracy findings, giving it broader recall and stronger actionability. X compensates with impressive grounding against the actual upstream vLLM AutoWeightsLoader/fp8 mapper source to validate the core design, but its parallel gap finding is muddied by an unverified 'already fixed on main' claim, slightly hurting precision.",
+  "_cost_usd": 0.3576181,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

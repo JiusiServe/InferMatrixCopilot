@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates fully cover the two substantive ground-truth asks (regression tests, tag enum) and both surface the latent gap: X names five specific pre-existing tests that would now break under the new level-2 guard, while Y identifies that sleep() defaults to level=2 (bricking the engine on wake for any caller not specifying level=1) and that the guard logic is only exercised by hardware-gated tests, never standard CI. Y's framing better explains a 'merge CI broke after landing' incident since X's flagged tests are themselves hardware-gated and likely wouldn't run in standard CI either, whereas Y's default-parameter root cause plus CI-gating observation is a more systemic and plausible account. Both are well-grounded, concrete with file/line references, and actionable; Y edges out slightly on root-cause accuracy and breadth (CI status, breaking-change framing) while X's blocker is more surgically specific.",
+  "_cost_usd": 0.2890014,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

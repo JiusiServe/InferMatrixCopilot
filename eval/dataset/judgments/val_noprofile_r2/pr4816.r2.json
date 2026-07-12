@@ -1,0 +1,21 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.6,
+    "actionability": 0.7
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth shows zero substantive concerns (a plain 'lgtm' approval), so both candidates correctly find no blockers via accurate hunk-by-hunk verification. X stops there, cross-checks against the actual upstream vllm checkout, and delivers a clean, well-grounded APPROVE matching ground truth exactly. Y pads the review with two speculative 'nits'—one low-value (suggesting a comment about naming divergence) and one poorly grounded (urging a rename of the unrelated, untouched `openai_serving_audio_generate` attribute, misreading the PR's actual intent of matching a specific upstream rename)—plus leaked irrelevant 'skill candidate' text from unrelated tasks, hurting precision and cleanliness without adding real value.",
+  "gap_hit": false,
+  "_cost_usd": 0.0619316,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

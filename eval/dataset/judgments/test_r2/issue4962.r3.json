@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.2,
+    "grounding": 0.35,
+    "completeness": 0.75
+  },
+  "y": {
+    "correctness": 0.15,
+    "grounding": 0.3,
+    "completeness": 0.55
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth shows only a maintainer tagging two colleagues for review ('PTAL') — the issue was still open/under triage, not fixed or closed. Both candidates instead fabricate a confident, detailed 'already merged and closed' narrative with specific unverifiable file/line citations, so both score low on correctness for contradicting the actual (uncertain) thread state. X is the better of the two: it reads like an actual maintainer reply, explicitly engages with and explains why the reporter's two suggested fixes were not chosen, and gives a coherent narrative. Y is weaker in execution — it leaks raw internal tool scaffolding ('Run report', a literal task dict, a redundant 'Linked issues/PRs' section) that would look like a broken artifact rather than a real GitHub comment, hurting its usefulness despite similar fabricated technical content.",
+  "_cost_usd": 0.0696695,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

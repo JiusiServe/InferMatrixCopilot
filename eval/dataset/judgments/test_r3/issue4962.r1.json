@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.5,
+    "grounding": 0.6,
+    "completeness": 0.75
+  },
+  "y": {
+    "correctness": 0.5,
+    "grounding": 0.6,
+    "completeness": 0.55
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both accurately restate the reporter's own root-cause analysis (text EOS folded into all_stop_token_ids, index_put_ overrun on the narrow codec vocab) and both cite an identical, suspiciously specific 'already-merged' fix (sanitize_min_tokens_stop_ids, same file/line numbers) that isn't corroborated by the ground truth, which shows only a bare maintainer 'PTAL' escalation — so neither candidate hedges on the actual unresolved status, a shared correctness weakness. X is the more usable, postable maintainer answer: clean tone, explicit version reconciliation (reported commit predates the fix), and direct actionable guidance for the reporter. Y's content is comparable but wrapped in internal agent-report scaffolding (draft_answer/disposition fields) unsuitable to post as-is, though its 'keep-open' disposition and repro script are marginally more honest about lingering uncertainty.",
+  "_cost_usd": 0.2209755,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

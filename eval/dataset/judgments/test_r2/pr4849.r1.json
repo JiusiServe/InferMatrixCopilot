@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently verify the core reviewer concern (is source_outputs[0] really the parent?) by tracing the orchestrator, and both flag the same dead requires_multimodal_data parameter — recall is comparable and neither catches the ground-truth asks to rerun the diffusion benchmark or fix precommit. Y is more actionable: it gives exact file/line callouts with concrete suggested code (e.g. the missing `if not ar_output.outputs: return None` guard) and catches a real, previously-unflagged pre-existing robustness gap, whereas X's non-blocking notes ('worth a one-line confirmation', 'fine to leave') are vaguer and its CI-failure claim is less verifiable from the diff alone. X's synthesis and root-cause narrative are strong, but Y edges it on concreteness of remediation.",
+  "_cost_usd": 0.1934507,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.55,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates correctly validate the core range/message-consistency change and match the ground truth's implicit 'this works as intended' sentiment (GT is thin: two LGTMs plus a manual QA confirmation, no inline comments). X's headline 'blocking' findings cite three files entirely outside the diff (tests/dfx/reliability/...) with suspiciously precise line numbers and code snippets that can't be verified against the provided diff, and Y's own explicit repo-wide grep sweep for stale '3'/'range(3,11)' references found zero remaining matches, casting real doubt on X's central claim. Y's findings are all tightly grounded in the shown diff lines, backed by concrete evidence citations and sweeps, and though more minor (missing positive boundary tests, hardcoded message duplication), they are safely actionable and verifiably correct. X gets credit for depth and actionability but loses on precision risk; Y wins on grounded precision with comparable recall and actionability.",
+  "_cost_usd": 0.2236402,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

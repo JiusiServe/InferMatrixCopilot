@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.85,
+    "grounding": 0.9,
+    "completeness": 0.55
+  },
+  "y": {
+    "correctness": 0.95,
+    "grounding": 0.85,
+    "completeness": 0.95
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly land on the ground truth (not reproducible; no chunk drops; gap is talker temp=0.9 vs request temp=0), but Y is a complete, standalone triage doc with concrete YAML/serving_chat.py citations explaining the exact mechanism, plus an actionable fix, workaround, and verification command for the reporter. X's presented text is an addendum that meticulously and correctly audits the transport path (chunk_transfer_adapter.py/shm_connector.py) to rule out drops, which is strong grounding, but it explicitly defers the core temp-variance explanation to unseen 'sections 1-3' and leaves the reporter with no direct next step, making it feel partial by comparison.",
+  "_cost_usd": 0.08839559999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

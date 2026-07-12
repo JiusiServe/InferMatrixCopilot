@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.92,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.4,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth shows this is a trivial, fully-consistent rename that was simply approved ('lgtm'), and X correctly reaches that conclusion with grounded verification (exhaustive grep, cross-check against upstream vLLM). Y's hunk-by-hunk sweep is accurate but its one actionable finding (REQUEST CHANGES over `_create_speech_error_json_response` possibly hitting None) targets a function outside the diff and a pre-existing pattern (the None-state case already existed before this rename), making the blocking verdict speculative and misaligned with the actual PR scope and outcome. Y's finding is more concretely actionable in form (file/line, explicit ask), but its low grounding/validity drags precision down, so X wins on overall correctness.",
+  "_cost_usd": 0.2233775,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

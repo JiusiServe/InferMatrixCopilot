@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.78,
+    "completeness": 0.65
+  },
+  "y": {
+    "correctness": 0.92,
+    "grounding": 0.85,
+    "completeness": 0.88
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly reach the ground-truth verdict (run-level mismatch causing dummy weights, closed as invalid) and cite the same PR #4354 / dummy load_format mechanism that akshatvishu identified. Y is more grounded, tracing the fixture chain (run_args.py, runtime.py, stage_config.py, assertions.py) and correctly clarifying that the `full_model` pytest marker is independent from the `--run-level` CLI flag, which is the actual subtlety that tripped up the reporter. Y is also more complete: it explains the specific garbage outputs (repeated 'Joe', Welsh-noise audio) as signatures of dummy weights, addresses the A100-vs-H100/MI325 hardware mismatch implied by the issue title, checks the video-path prerequisite, and proposes a concrete guard-rail follow-up. X is correct and well-organized but thinner on grounding detail and doesn't address the A100-specific angle central to the issue title.",
+  "_cost_usd": 0.13359189999999999,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

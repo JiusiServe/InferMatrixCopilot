@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.35,
+    "grounding": 0.35,
+    "completeness": 0.5
+  },
+  "y": {
+    "correctness": 0.85,
+    "grounding": 0.8,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Both reach the correct top-level 'duplicate' verdict, but X asserts with false confidence that the diffusion-loader fix 'has since landed on main' and shows a fabricated-looking file comment, seemingly conflating a local/rebase-branch checkout with actual upstream main state — a risky, unverified claim presented as fact. Y reaches the same duplicate conclusion, explicitly cites the tracking issue #4809 (matching the actual ground-truth reference), and is careful to distinguish what it could verify (its own branch) from what it couldn't (upstream main's merge state), while also surfacing a concrete, useful regression-test coverage gap. Y is more honest, better grounded, and more complete relative to the actual thread resolution.",
+  "_cost_usd": 0.1060653,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

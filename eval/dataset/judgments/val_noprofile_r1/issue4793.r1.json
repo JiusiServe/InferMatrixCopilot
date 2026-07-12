@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.92,
+    "grounding": 0.85,
+    "completeness": 0.82
+  },
+  "y": {
+    "correctness": 0.92,
+    "grounding": 0.65,
+    "completeness": 0.88
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly diagnose the #4527 regression fixed by #4792, already folded into the 0.24 rebase, matching the thread exactly. X's fix snippet is a verbatim, character-for-character match to the ground-truth code/comment, strong evidence it actually read the real file, and it hedges with '~line' on approximate locations. Y is more thorough (explains _FULL_PAYLOAD_INPUT_STAGES, coordinator timeout mechanics) but states many precise file:line citations and extra claims (issue #4962, 300s→600s timeout change) with high confidence that aren't verifiable and read as likely confabulation, which hurts grounding trust despite the added completeness.",
+  "_cost_usd": 0.20730359999999998,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

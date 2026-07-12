@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.85,
+    "grounding": 0.9,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.6,
+    "grounding": 0.75,
+    "completeness": 0.6
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both correctly land on 'close' and correctly reconstruct the core resolution (attribution already covered by #3576's stage/replica relabeling; tail_waste/fragmentation conceded as expected block-rounding overhead). X is more thorough (covers the evidence rework, the LLM_AR/LLM_Generation scoping negotiation, diffusion Q3 ETA) and hedges its one speculative addition (the throttle being a 'short-window artifact' rather than a hard blind spot) appropriately, routing it to a follow-up issue rather than asserting it as settled fact. Y makes a similarly speculative but far more confidently-stated claim (a named regression test allegedly guarding against a 'global' throttle) that isn't corroborated anywhere in the thread and reads as a risky fabrication presented as established fact. Y also leaks irrelevant harness artifacts into the answer (a 'Run report' preamble and unrelated skill-candidate notes about a different issue, #4891), which hurts completeness and professionalism as a maintainer-style reply.",
+  "_cost_usd": 0.22991830000000002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.8,
+    "grounding": 0.85,
+    "completeness": 0.6
+  },
+  "y": {
+    "correctness": 0.85,
+    "grounding": 0.8,
+    "completeness": 0.9
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly converge on the actual resolution (not reproducible; audio-length gap from talker temp=0.9 vs request temp=0, not dropped chunks), with comparable code-level grounding via specific file/line citations. X reads as an internal audit note (\"I've now verified agent 2's flagged paths\") rather than a maintainer reply, omits any actionable guidance for the reporter, and never mentions the reporter's own environment despite thread hints. Y is properly formatted as a direct maintainer response, credits the actual investigators, quotes the concrete YAML config, offers a workaround and reopen guidance — making it more complete and usable end-to-end for the reporter.",
+  "_cost_usd": 0.09821259999999998,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

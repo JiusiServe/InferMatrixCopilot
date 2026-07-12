@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Y independently confirms the PR's central disputed point (is source_outputs[0] really the parent?) by tracing orchestrator.py's construction of [output, *companions], mirroring the actual thread's resolution more rigorously than X, which just cites the docstring's self-assertion. Both surface the same valid unused-parameter nitpick and neither catches the precommit-fix or benchmark-script asks from the human reviewers. X's suggested concrete code guard for ar_output.outputs[0] and its E2E-test callout are slightly more actionable, but Y's APPROVE verdict better matches the actual outcome (LGTM/approved) given the diff already reflects the post-discussion state.",
+  "_cost_usd": 0.23883590000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

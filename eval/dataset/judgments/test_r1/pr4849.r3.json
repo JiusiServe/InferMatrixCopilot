@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.75,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "The one substantive human concern (Gaohan123 questioning whether source_outputs[0] is reliably the parent) is directly and thoroughly answered by Y, which traces the exact orchestrator construction site (`orchestrator.py:1211`) and confirms the contract with line-level evidence — essentially reproducing Celeste-jq's actual justification. X only brushes this via redundant docstring-placement nits and never verifies the claim against the orchestrator. Neither candidate covers Bounty-hunter's benchmark-run request. X's findings are all grounded and concretely actionable but are minor documentation nitpicks (one is duplicated across two findings), giving it decent precision/actionability but low relevance/recall; Y's findings are fewer and less imperative but catch a real dead-parameter issue and a genuine test gap, and its architectural validation (CFG companion handling, glm_image parity) is exactly the kind of diligence the PR needed.",
+  "_cost_usd": 0.0957041,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

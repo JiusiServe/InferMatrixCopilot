@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.65,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.8,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth's only substantive concern (yenuo26: test coverage gap around the new reduce_scatter/device_communicator plumbing) is closest matched by X's finding that init_vllm_model_parallel_group is never exercised for real (only mocked), while Y never touches this area at all and instead confirms everything passes. X is more actionable (concrete file/line + specific fix text for each of 5 findings) but pads recall with a stale-docstring nitpick unrelated to the diff and an inflated 'REQUEST CHANGES' verdict for what reviewers treated as an approve-level PR, hurting precision; Y is well-grounded and honest about its sandbox limits but is too thin (one soft nit) to recall the real reviewer concern.",
+  "_cost_usd": 0.24001240000000004,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.6,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates correctly validate the two core fixes (DiffusionOutput access/return and the already_submitted removal) and independently arrive at the same reasoning as the sole ground-truth inline comment. X reaches a well-calibrated APPROVE that matches the actual outcome (two LGTM approvals), with non-blocking suggestions appropriately scoped. Y is thorough and well-grounded but inflates three separate 'major' no-test-coverage findings (essentially the same complaint restated across files) into a REQUEST CHANGES verdict that misrepresents what real reviewers flagged, hurting precision despite good actionability.",
+  "_cost_usd": 0.1538658,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

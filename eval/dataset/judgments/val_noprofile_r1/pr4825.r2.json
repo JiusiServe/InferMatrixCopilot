@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The one substantive ground-truth concern (dsocek: hardcoded default_components list should be derived from existing per-model mapping rather than manually appended) is directly hit by Candidate X's comment #1 (derive from _dit_modules instead of hardcoding), while Candidate Y never raises this point at all. Y's findings, though well-evidenced with file/line grep citations, focus entirely on test-coverage gaps (integration test, activation-path test) that neither reviewer raised, and its REQUEST CHANGES verdict conflicts with the actual twice-approved/merged outcome, signaling miscalibration. Both are grounded and actionable, but X better reflects what the real reviewers cared about.",
+  "_cost_usd": 0.0655939,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

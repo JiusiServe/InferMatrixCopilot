@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.7,
+    "grounding": 0.6,
+    "completeness": 0.85
+  },
+  "y": {
+    "correctness": 0.65,
+    "grounding": 0.45,
+    "completeness": 0.5
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both correctly land on the actual resolution (closed as not-reproducible after 55/55 clean trials), but X engages the reporter's stated dilemma (not wanting to ship enforce_eager broadly) with a concrete alternative diagnostic path (PIECEWISE cudagraph mode, EOS-logit instrumentation), while Y just restates the workaround with a caveat. X's specific line-citations and invented TODO ticket (#4923) push slightly past what's verifiable, and it states its numerical-perturbation theory with more confidence than the ground truth's own admitted uncertainty warrants, but the theory doesn't contradict the actual resolution. Y's answer is materially hurt by leaking irrelevant automation artifacts (raw task JSON, a 'draft_answer' header, and unrelated skill-candidate blurbs about a different issue/#4891), which undercuts its credibility and completeness as a maintainer response.",
+  "_cost_usd": 0.1904574,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

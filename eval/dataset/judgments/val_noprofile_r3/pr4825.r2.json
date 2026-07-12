@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The one substantive ground-truth concern (dsocek's point that the hardcoded default_components list duplicates logic and should instead be driven from a canonical per-model source, e.g. so naming variants like unet are handled generically) is captured in spirit by Candidate X's comment #1 (reuse pipeline._dit_modules instead of a fourth hardcoded list), which X grounds with specific file/line evidence. Candidate Y never raises this architectural concern at all, instead offering test-coverage (round-trip activation test) and DRY (parametrize) nits that don't appear in the ground truth. Both candidates' factual claims (e.g. pipeline_sdxl.py:110) are mutually consistent and plausible, so precision is comparable and reasonably high for both, but X's actionability edges out due to the higher-value architectural fix suggestion versus Y's lower-impact nits and verbose non-actionable 'validated' bullet list.",
+  "_cost_usd": 0.0750334,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

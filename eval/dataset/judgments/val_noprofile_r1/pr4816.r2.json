@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.45,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth shows this PR is a trivial, correctly-scoped rename with zero substantive reviewer concerns (just 'lgtm' approval), so there's nothing for either candidate to miss. X's approve verdict is well-grounded: it verified the grep count, cross-checked against the actual upstream vllm source for the exact attribute name and call site, and confirmed the constructor/tests were updated consistently. Y requests changes over a 'major' issue in `_create_speech_error_json_response`, a function not shown anywhere in the diff, speculating it could crash on None — plausible-sounding but unverified against the actual code path and seemingly not a real blocker given the PR was approved as-is, which drags down its precision despite otherwise-accurate hunk-by-hunk validation. Y's flagged comment is more concretely actionable (file/line, explicit remediation), but X is more right and useful overall.",
+  "_cost_usd": 0.1788034,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

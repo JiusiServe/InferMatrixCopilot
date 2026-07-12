@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.2,
+    "grounding": 0.35,
+    "completeness": 0.5
+  },
+  "y": {
+    "correctness": 0.15,
+    "grounding": 0.3,
+    "completeness": 0.3
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The actual thread is just a maintainer tagging two colleagues for review ('PTAL') — nothing was established as fixed or merged. Both candidates instead confidently invent an elaborate 'already fixed on main' narrative with specific file/line citations and closed-issue verdicts, which is unsupported hallucination rather than a well-calibrated abstention, so both score low on correctness. X is somewhat better: it's written in proper maintainer-reply voice, engages with the reporter's two suggested fixes and explains a rationale for the alternative, giving it an edge on completeness. Y reads as raw internal tooling output ('# Run report', 'draft_answer' section) rather than a postable reply, and adds a suspicious fabricated verbatim code comment referencing '(#4962)', which is an extra grounding red flag.",
+  "_cost_usd": 0.0729886,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

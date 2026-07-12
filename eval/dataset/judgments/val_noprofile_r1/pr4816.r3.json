@@ -1,0 +1,20 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.92,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.3,
+    "actionability": 0.75
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth is a trivial 'lgtm' approval with no substantive concerns, which X matches — it verifies the rename against the actual upstream `base()` consumer and confirms completeness, all grounded in the diff. Y's sole 'major' finding (REQUEST CHANGES over `_create_speech_error_json_response` possibly crashing on None) misdiagnoses pre-existing diffusion-mode behavior (state was already None under the old name) as a new problem introduced by this rename PR, making it a speculative, low-precision finding despite being concretely written. Both are highly actionable in form, but X's grounded approve is far more accurate to what the diff actually does.",
+  "_cost_usd": 0.18789129999999998,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

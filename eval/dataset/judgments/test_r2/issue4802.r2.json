@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.6,
+    "grounding": 0.5,
+    "completeness": 0.55
+  },
+  "y": {
+    "correctness": 0.8,
+    "grounding": 0.65,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly land on the thread's actual resolution (attribution covered by #3576's stage/replica relabeling; tail_waste/fragmentation withdrawn), but X then confidently 'resolves' the make_stats throttle with an oddly specific, unverifiable regression-test citation that the thread never discussed — a confident claim outside the ground truth. Y instead treats the throttle as a genuinely open, separate concern and escalates it rather than asserting a fix, which is the more defensible move on an unresolved point. Y is also more complete, capturing the LLM_AR/LLM_Generation-vs-diffusion scoping thread that X omits entirely, and grounds its claims with more (still unverifiable but more numerous and consistent) file/line citations.",
+  "_cost_usd": 0.16396929999999998,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

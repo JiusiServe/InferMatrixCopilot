@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.7,
+    "actionability": 0.3,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "The sole ground-truth inline concern (reviewer yenuo26 asking whether reduce_scatter/device_communicator assertions should also cover _TP) is exactly what Candidate Y flags as its top finding, with precise line references and a concrete fix — X never mentions it and instead rubber-stamps an APPROVE with only one soft, non-actionable stylistic comment. Y's other findings (stale comment, missing test coverage for cfg_parallel_size=1, missing getattr guard, missing docstring) are all grounded in real diff hunks with specific file:line evidence, though some are minor/nitpicky. X's verification claims are accurate but constitute assessment rather than actionable findings, leaving it with near-zero recall against the ground truth.",
+  "_cost_usd": 0.24694799999999997,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

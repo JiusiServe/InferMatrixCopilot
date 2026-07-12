@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.75,
+    "grounding": 0.8,
+    "completeness": 0.85
+  },
+  "y": {
+    "correctness": 0.7,
+    "grounding": 0.55,
+    "completeness": 0.5
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both correctly endorse the actual resolution (close, not reproducible, likely a runtime/environment fluke) rather than inventing a false root cause. X is cleanly formatted as a real maintainer comment, cites more specific file/line evidence (yaml sampling params, mask lines, cudagraph defaults) consistent with the issue's own claims, and gives concrete low-cost next steps if it recurs, though its confident causal narrative (numerical perturbation → repetition attractor) goes beyond what the thread actually confirmed. Y is reasonable but noticeably weaker in polish and evidence density, and critically leaks unrelated internal scaffolding ('Run report', 'draft_answer' headers, an unrelated HunyuanImage3 skill-candidate blurb) into what should be a clean issue response, undermining its completeness/professionalism as an actual maintainer answer.",
+  "_cost_usd": 0.15306190000000003,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

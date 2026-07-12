@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.2,
+    "grounding": 0.5,
+    "completeness": 0.65
+  },
+  "y": {
+    "correctness": 0.55,
+    "grounding": 0.5,
+    "completeness": 0.6
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "The thread never identifies a root cause — the reporter just says it stopped reproducing after an update and the maintainer closes with 'can reopen if needed,' leaving the diagnosis genuinely open. X fabricates a specific, confident root-cause story (chunked-prefill splitting video tokens, a stage_config.py max_num_batched_tokens fix) that appears nowhere in the ground truth and presents it as verified fact — exactly the 'confident wrong answer' pattern that should score low. Y instead preserves the thread's actual epistemic state, explicitly stating uncertainty about whether video features dropped or wording just missed keywords, mirrors the maintainer's real ask for printed text/audio output, and closes with the same reopen condition as the actual resolution, even though it also speculates loosely about an unconfirmed fix.",
+  "_cost_usd": 0.07102170000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

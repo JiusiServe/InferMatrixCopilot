@@ -1,0 +1,20 @@
+{
+  "x": {
+    "correctness": 0.5,
+    "grounding": 0.55,
+    "completeness": 0.55
+  },
+  "y": {
+    "correctness": 0.5,
+    "grounding": 0.55,
+    "completeness": 0.65
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly latch onto the thread's one hard fact (yenuo26's attribution to #4834) and give the same plausible technical story (level-2 sleep intentionally has no wake path, test should use level=1), but both then confidently declare the fix already merged and the issue closeable — unsupported by the actual thread, which ends with Flink-ddd asking yenuo26 to trigger a full CI run, i.e. still unresolved. That overreach caps correctness for both. Y is more complete, tying the diagnosis to practical runtime guidance (use level=1, note the partial-wake admission guard) and giving a fuller narrative, though it also invents more unverifiable specifics (exact merge date, 'Repro A/B/C' labels) that read as embellishment. X is tighter but thinner, and its 'already fixed' claim sits oddly next to its own 'workaround for the old commit' section.",
+  "_cost_usd": 0.10162270000000001,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  }
+}

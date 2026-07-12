@@ -1,0 +1,20 @@
+{
+  "x": {
+    "recall": 0.8,
+    "precision": 0.9,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.3,
+    "actionability": 0.6
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "The ground-truth inline comment explains why dropping `already_submitted` is safe: both submit_initial and submit_update reject list prompts identically for diffusion, so unconditional unwrapping is correct. Candidate X independently verified this exact reasoning by reading stage_pool.py's submit_initial/submit_update, reaching the same conclusion with concrete evidence, and correctly validated the DiffusionOutput fix as strictly better (preserves stage_durations). Candidate Y instead raises 'major' unverified concerns on both hunks, explicitly contradicting the ground-truth reasoning (claims submit_initial may not handle a scalar, admits 'unverified'), and recommends REQUEST CHANGES against an actual unanimous APPROVE — its findings are speculative rather than grounded despite superficial file/line specificity. Neither has a LATENT GAP CHECK section.",
+  "_cost_usd": 0.050757899999999995,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

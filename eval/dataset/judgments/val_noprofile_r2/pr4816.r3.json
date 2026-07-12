@@ -1,0 +1,20 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.45,
+    "actionability": 0.5
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth is a trivial clean rename PR (lgtm, no comments). X correctly approves with well-grounded verification (checked upstream matches, confirmed no missed occurrences, noted test coverage) and no fabricated issues. Y invents two low-value nits: one asks to justify a naming divergence that the PR title itself already explains as the entire point of the fix, and the other flags `openai_serving_audio_generate` as inconsistently unrenamed, conflating an unrelated attribute with the tokenization-specific upstream alignment this PR targets — a misunderstanding of PR scope that hurts precision.",
+  "_cost_usd": 0.0539166,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}

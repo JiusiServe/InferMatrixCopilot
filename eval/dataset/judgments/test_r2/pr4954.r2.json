@@ -1,0 +1,22 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.8,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "X's core-fix narrative (codes.audio vs legacy audio, #4527 gap, decode feedback silently dropped) almost exactly mirrors the ground-truth reviewer's approval rationale, giving it stronger recall on the substantive point; its two non-blocking comments are grounded and concretely actionable. Y produces more findings with precise file:line evidence and slightly better actionability, but they skew toward low-value/nitpicky defensive suggestions (unpopped legacy key, missing IndexError guard, duplicate magic-number comments) that don't engage with the ground truth's central concern, and two of its five comments are redundant restatements of the same magic-number issue.",
+  "_cost_usd": 0.2952183,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  }
+}
