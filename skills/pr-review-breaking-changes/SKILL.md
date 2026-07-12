@@ -1,11 +1,17 @@
 ---
 name: pr-review-breaking-changes
-description: PR review — when a default, protocol, or API changes (incl. removed/renamed upstream APIs), sweep ALL in-repo consumers and remaining callers repo-wide with checkout-drift discipline; unexplained survivors and undocumented ordering assumptions are findings
-trigger: pr_review of changes to defaults, API/protocol behavior, removed or renamed APIs, or bridge/ordering logic
-modules: [pr_review]
+description: PR review — when a default, protocol, or API changes (incl. removed/renamed
+  upstream APIs), sweep ALL in-repo consumers and remaining callers repo-wide with
+  checkout-drift discipline; unexplained survivors and undocumented ordering assumptions
+  are findings
+trigger: pr_review of changes to defaults, API/protocol behavior, removed or renamed
+  APIs, or bridge/ordering logic
+modules:
+- pr_review
 status: active
 created_at: 2026-07-03
-run_count: 0
+run_count: 162
+last_used_at: '2026-07-12'
 ---
 
 ## Fix
