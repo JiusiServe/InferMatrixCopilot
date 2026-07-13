@@ -16,3 +16,5 @@ eval/raw/*.diff
 eval/raw/cc_workdir/
 eval/dataset/arms/*/runs/
 adapters/*/repo_map/
+eval/dataset/arms/copilot_v2_test_*/
+eval/dataset/judgments/test_r*/
