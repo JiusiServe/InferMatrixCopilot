@@ -13,6 +13,7 @@ import json
 import time
 import uuid
 from pathlib import Path
+from typing import NamedTuple
 
 import yaml
 
@@ -30,6 +31,25 @@ from ..run_trace import RunTrace
 from ..task_spec import TaskSpec
 from ..ui import style
 from .utils import format_metrics_line
+
+
+class GateOutcome(NamedTuple):
+    """Result of the pre-execution gates. `proceed` says whether to run; when
+    False, `exit_code` is the process code the caller should return. Read at
+    the call site as: ``if not gate.proceed: return gate.exit_code``."""
+
+    proceed: bool
+    exit_code: int = 0
+
+    @classmethod
+    def go(cls) -> "GateOutcome":
+        """Gates passed — run the task."""
+        return cls(proceed=True)
+
+    @classmethod
+    def stop(cls, exit_code: int) -> "GateOutcome":
+        """A gate halted the run — return this exit code."""
+        return cls(proceed=False, exit_code=exit_code)
 
 
 class Copilot:
@@ -85,18 +105,20 @@ class Copilot:
 
     def _gate_and_confirm(self, resolution: Resolution, spec: TaskSpec,
                           assume_yes: bool, *, prompt: str = "Proceed?",
-                          force_confirm: bool = False) -> int | None:
-        """Plan-review gate + [y/N] confirm (concision K6). Returns an exit code
-        to return, or None to proceed. Confirm fires for confirm_required or a
-        review-requiring/explicit plan, unless assume_yes."""
+                          force_confirm: bool = False) -> GateOutcome:
+        """Plan-review gate + [y/N] confirm (concision K6). Returns
+        `GateOutcome.go()` to run, or `GateOutcome.stop(code)` to halt with a
+        process exit code (BLOCKED_EXIT on a reviewer block, 1 on a user
+        abort). Confirm fires for confirm_required or a review-requiring/
+        explicit plan, unless assume_yes."""
         if not self._plan_review_gate(resolution, spec, assume_yes):
-            return BLOCKED_EXIT
+            return GateOutcome.stop(BLOCKED_EXIT)  # reviewer blocked the plan
         need = force_confirm or spec.confirm_required or resolution.requires_review
         if need and not assume_yes:
             if input(f"{prompt} [y/N] ").strip().lower() not in ("y", "yes"):
                 print("aborted.")
-                return 1
-        return None
+                return GateOutcome.stop(1)  # user declined
+        return GateOutcome.go()
 
     # -- execution -----------------------------------------------------------------
     def run_task(self, spec: TaskSpec, *, assume_yes: bool = False,
@@ -121,9 +143,9 @@ class Copilot:
         if plan_only:
             return 0
 
-        code = self._gate_and_confirm(resolution, spec, assume_yes)
-        if code is not None:
-            return code
+        gate = self._gate_and_confirm(resolution, spec, assume_yes)
+        if not gate.proceed:
+            return gate.exit_code
 
         run_id = (f"run-{time.strftime('%Y%m%d-%H%M%S')}"
                   f"-{uuid.uuid4().hex[:6]}")  # unique — same-second runs collided
@@ -156,11 +178,11 @@ class Copilot:
             return 0
         resolution = Resolution(mode="explicit", playbook=playbook,
                                 tier=spec.tier, requires_review=True)
-        code = self._gate_and_confirm(
+        gate = self._gate_and_confirm(
             resolution, spec, assume_yes, force_confirm=True,
             prompt=f"Run {playbook.status} playbook '{name}'?")
-        if code is not None:
-            return code
+        if not gate.proceed:
+            return gate.exit_code
         run_id = (f"run-{time.strftime('%Y%m%d-%H%M%S')}"
                   f"-{uuid.uuid4().hex[:6]}")  # unique — same-second runs collided
         run_dir = self.settings.run_root / run_id
