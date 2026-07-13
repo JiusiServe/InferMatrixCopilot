@@ -356,3 +356,159 @@ omni-copilot --resume                           # 从上次运行的首个未完
 - **改交付/评审行为前先看 trace 取证**:评测战役的教训是裁判扣分约九成来自
   机械交付问题(截断、误标 verdict、丢弃草稿),而非分析能力;先读
   `eval/dataset/judgments/T3_FORENSICS.md` 的排名缺陷清单,再决定动哪里。
+
+## 附录 A:完整文件清单(`src/omni_copilot/` 逐个)
+
+导览正文是**阅读路径**;本附录是**完整索引**——每个 `.py` 文件一行,标注
+角色与它在正文中的位置(§)。行数为量级参考。
+
+### 顶层 `omni_copilot/`
+- `__init__.py`(3) — 包根,版本/公共导出。
+- `task_spec.py`(81) — `TaskSpec`:kind/pr/issue/flags;**tier 由 kind 推导**,
+  文字无法扩权。→ §1
+- `intent.py`(120) — 自然语言 → TaskSpec,**LLM-only**;歧义/离题/注入即澄清;
+  只有终端输入进入,GitHub 文本永不进入。→ §1
+- `config.py`(137) — `Settings`(pydantic,从 `.env`/环境加载):LLM 端点、
+  仓库路径、引擎预算(`ensemble_lens_max_iters`/`evidence_caps`/
+  `llm_max_tokens`…)、推送安全、profile 开关。改行为先改这里。
+- `llm.py`(142) — Anthropic SDK 薄封装(兼容 DeepSeek `/anthropic`);把回复
+  归一化成 `Reply`/`Block`,捕获 `cache_read_input_tokens` 供计费/缓存分析。→ §4
+- `agent_loop.py`(126) — 原始工具循环:每次调用过 `tools.dispatch`;预算耗尽
+  强制最终答复;FINAL-ROUND 提示排在 tool_result 之后(API 邻接契约)。→ §4
+- `tools.py`(195) — 原子能力 + **唯一** scope-enforcing choke point;越界写
+  执行但记录;`read_file` 窗口化(48k+offset)。→ §4
+- `scopes.py`(115) — `ToolScope`/`PathScope`:允许 / 拒绝 / 越界但记录。→ §4
+- `push.py`(55) — `guard_push`:唯一推送 choke point,PushPolicy × 受保护分支
+  双闸,force 仅 with-lease。→ §5
+- `run_trace.py`(51) — 仅追加 jsonl 事实记录;默认不进 prompt;供 diff summary/
+  触发器/升级/审计消费。→ §8
+- `tracing.py`(340) — 可移植的 OTel 形状 span 记录器(零外部依赖):
+  trace_id/span_id/parent + 计时,span 关闭即写一行 jsonl;跨 sync/asyncio,
+  用 `contextvars` 传递父子嵌套;`llm.py` 的 `create()` 包在 `span("llm")` 里
+  记 TTFT/token/并发。三个 agent 仓库共用的可移植 tracing。
+- `metrics.py`(356) — CATQ = Q·S/C:Q 只对已知分量加权(绝不编造判分),
+  S 由类型化 incident 几何衰减,C 是 USD+墙钟的对数成本指数;写
+  `metrics.json`,失败绝不搞垮 run。→ §8
+- `notify.py`(132) — 升级通道:ESCALATION.md + RunTrace 事件 + 邮件(Resend→
+  SMTP)+ `BLOCKED_EXIT`;"通知而非猜测"。→ §8
+- `chat.py`(411) — Claude-Code 式对话前端;执行走**同一** TaskSpec/planner/
+  确认路径,永不扩权;仓库读取被囚禁,`.env*` 被拒。→ §8
+- `ui.py`(194) — 终端 chrome:`FancyUI`(rich:banner/spinner/流式尾/markdown)
+  与 `PlainUI`(管道/测试/`--no-chat` 的降级),无一依赖 TTY。→ §8
+
+### `cli/` — 命令行(包)
+- `__init__.py`(27) / `__main__.py`(7) — 包导出;`python -m omni_copilot.cli` 入口。
+- `copilot.py`(327) — `Copilot` 编排核:resolve → plan → plan-review 门 →
+  executor,复合命令队列、resume、`/status /logs /playbooks` 内置;run 目录
+  `run-<ts>-<uuid6>`。→ §0/§5
+- `entry.py`(113) — argparse + 单次/REPL 分派 + 内置命令路由(把 argv/stdin
+  变成对 `Copilot` 的调用)。
+- `utils.py`(32) — 纯 CLI helper:参数强制、metrics 行格式化。
+
+### `adapters/` — 仓库结构知识(包)
+- `__init__.py`(16) — 再导出 `RepoAdapter`/`AdapterRegistry`/loaders/writers/
+  Phase-0 引导/`HIGH_RISK_SECTIONS`。
+- `base.py`(250) — `RepoAdapter`:manifest、`module_for_path`、
+  `high_risk_modules`、`capabilities`、按仓库隔离的 skills/memory/profile 目录;
+  `update_manifest` 拒写高风险段;`fingerprint_repo`/`draft_adapter`。→ §2
+
+### `engine/` — 引擎底座
+- `__init__.py`(8) — 包导出。
+- `step.py`(79) — `StepSpec`/`StepResult`/`StepContext`/`FailureKind`(仅类型)。→ §3
+- `registry.py`(39) — `StepRegistry`:名字→handler 的唯一解析点。→ §3
+- `executor.py`(233) — 任务无关保证:checkpoint/resume、foreach、when:、
+  类型化失败路由、**state_updates 契约**。→ §3
+- `planner.py`(137) — reuse > adapt > generate + 能力匹配;locked 拒改编,
+  generate 只读。→ §2
+
+### `engine/agent_runtime/` — 受治理 agent 运行时(核心,包)
+- `__init__.py`(29) — 原样 re-export,公开导入面不变。
+- `dispatch.py`(94) — `AgentDispatchContext` + 基础输出 schema;`render()`
+  **静态在前动态在后**(prompt-cache 前缀复用);证据 `<untrusted_data>` 围栏。→ §4
+- `knowledge.py`(201) — `_ScopedKnowledge`(仓库优先的 skill/memory 检索 +
+  `touch()` 用量先验 + candidate 提案)、`_repo_map_tool`、memory 检索。→ §4
+- `runner.py`(145) — `run_agent_step`:每个 `kind=="agent"` step 的唯一入口。→ §4
+- `ensemble.py`(306) — `run_agent_step_ensemble`:多 lens 扇出 → 去重 → 逐编号
+  裁决;零产出重问;reducer 不确定即降级。→ §4
+- `utils.py`(119) — 无状态 helper:`_build_evidence`(caps+归档)、
+  `_coerce_output`(合同修复 + **非空最终文本抢救**)、`_to_step_result`。→ §4
+
+### `engine/steps/` — vetted step 库(自注册,包)
+- `__init__.py`(34) — 导入即注册;`register_builtin_steps` 刷进 registry。→ §5
+- `_common.py`(230) — `@step`/`register_step` 装饰器 + helper(`gh`/`git`/
+  `repo_path`/`gh_read_tools`/`post_step`)+ `record_debug_memory`(闭环写入)。→ §5
+- `workspace.py`(50) — `workspace.guard_clean`(拒脏树)、`analysis.diff_summary`。
+- `report.py`(73) — `report.final_summary`:RUN_REPORT.md 每 deliverable 一次 +
+  candidate 队列;诊断入 DIAGNOSTICS.md。→ §5
+- `issue.py`(179) — `issue.fetch`、`agent.draft_issue_answer`(disposition 槽 +
+  epistemics caveat + 草稿抢救)、`agent.triage_issues`、门禁 `issue.post_answer`。→ §5
+- `profile.py`(441) — profile 建立 Stage 0–1.5 + Stage-4 维护 step。→ §6
+- `rebase_ext.py`(115) — `rebase.run_external`:锁定夜跑的受监控子进程委托。→ §5
+- `rebase_native.py`(442) — 夜跑原生分解候选(wrap 父包函数,不重写);
+  `repo-rebase-native` playbook(candidate)。晋升路径时读。
+
+### `engine/steps/pr/` — PR 领域 step(包)
+- `__init__.py`(17) — re-export + 注册。
+- `fetch.py`(169) — `pr.fetch_diff`(含 **PR-time checkout** `_pr_time_checkout`)、
+  `pr.gate_check`。→ §5
+- `rebase.py`(252) — PR head fork-aware checkout → PushPolicy → rebase → 冲突
+  agent 或 abort+升级;`agent.verify_module`(仅建议)。→ §5
+- `debug.py`(184) — 失败 check 收集(CI 日志富化)→ 签名分组 → `agent.debug_group`
+  (成功后 `record_debug_memory`)→ 增量 push。→ §5
+- `publish.py`(56) — 向外写(risk=push):`ci.push`(过 `guard_push`)、门禁
+  `pr.post_review`(explicit post + ALLOW_POST)。→ §5
+- `utils.py`(23) — 纯 `extract_signature`:从 CI 日志抽根因签名。
+
+### `engine/steps/review/` — 评审 step(包)
+- `__init__.py`(17) — re-export + 注册。
+- `prompts.py`(145) — `_REVIEW_SYSTEM`/`_REVIEW_LENSES`/`_REVIEW_MERGE`/清单
+  数据;枚举-再剪、`[validated]` 记录、reducer 不确定降级规则都在这里。→ §5
+- `steps.py`(149) — `review.patch_gate` + `agent.review_diff`;带 comments 的
+  escalate 抢救为 REQUEST CHANGES。→ §5
+- `utils.py`(122) — `_render_review_md`(**裁决校准** + Validated 段)、
+  `_SEVERITY_ORDER`、`_sweep_targets`。→ §5
+
+### `memory/` — 经验库(包)
+- `__init__.py`(6) — 再导出 `DebugMemory`/`SkillStore`。
+- `debug_memory.py`(125) — SQLite+FTS5 失败/修复库;写入契约(必须 root_cause +
+  verification);检索返回摘要,取全文是第二次调用。→ §8
+- `skills.py`(181) — SKILL.md 库:propose→candidate→人工 promote;`find` 用
+  module/词重叠/`run_count` 排序;`touch` 累计用量。→ §5/§8
+
+### `playbooks/` — playbook 注册表(包)
+- `__init__.py`(5) — 导出。
+- `store.py`(195) — `Playbook`(yaml 数据)+ `find`(kind→精确 repo→能力匹配的
+  仓库无关);candidate 永不召回。→ §2
+
+### `profiles/` — 仓库知识子系统(包)
+- `__init__.py`(6) — 导出。
+- `store.py`(323) — 精选层:带溯源 fact、类型化 op 唯一写入面、两 tier、稳定性
+  门禁、`render_briefing()`(词预算)。→ §6
+- `establish.py`(102) — Stage 0–1.5 helper:6 词 shingle 冗余过滤(ETH 规则)、
+  指令抽取、模块扫描。→ §6
+- `consolidate.py`(52) — Stage-4:调度化门控巩固(唯一可 rewrite/merge)+
+  确定性衰减 + 漂移检测。→ §6
+- `repo_map.py`(149) — 按语言正则符号索引,按 HEAD 缓存,查询排序 + 字符预算;
+  结构由 agent 主动拉取。→ §6
+- `languages.py`(54) — 按语言的叶子数据(源文件后缀/符号/索引访问);未知语言
+  返回空,消费者诚实降级。三处旧副本的共同归宿。
+
+### `ci/` — CI 日志适配器(包)
+- `__init__.py`(6) — 导出。
+- `normalize.py`(35) — 分组前抹去时间戳/哈希/行号(刻意不继承父 monitor 的
+  精确比较缺陷)。→ §7
+- `providers.py`(134) — `provider_for`:`BuildkiteLogs` / `GithubActionsLogs`;
+  缺 provider/token → `capability_gap` + 降级。→ §7
+
+### `rebase/` — 父流水线可观测性(包)
+- `__init__.py`(13) — 导出。
+- `monitor.py`(163) — 只读消费父 orchestrator 的 `state.json`(phase/module/test
+  进度)→ copilot 进度事件 + 失败分类 + 升级材料;绝不写父文件。→ §5
+
+### `review/` — 条件式 Patch Review(包)
+- `__init__.py`(9) — 导出。
+- `diff_summary.py`(74) — 廉价确定性 diff 摘要(Patch Review 常开首段)。→ §8
+- `triggers.py`(57) — 7 条触发规则(越界/高风险模块/大 diff/无测试/…):仅高风险
+  才跑 LLM 评审。→ §8
+- `reviewer.py`(100) — 只读 Patch Review agent;fail-closed(无 LLM →
+  `unavailable`,推送门须当作不通过)。→ §8
