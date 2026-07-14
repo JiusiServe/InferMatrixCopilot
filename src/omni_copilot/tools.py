@@ -7,6 +7,7 @@ recorded — never silent.
 
 from __future__ import annotations
 
+import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,6 +15,29 @@ from typing import Any, Callable
 
 from .run_trace import RunTrace
 from .scopes import ToolScope
+
+# which arg of each builtin tool names a filesystem path — used to resolve a
+# RELATIVE path against the scope's repo root (so an agent's repo-relative
+# path reaches a per-PR worktree, not the process cwd)
+_PATH_ARGS: dict[str, str] = {
+    "read_file": "path", "list_dir": "path", "grep": "path",
+    "write_file": "path", "edit_file": "path", "run_shell": "cwd",
+}
+
+
+def _resolve_against_root(name: str, args: dict, root: str) -> dict:
+    """Return `args` with its path arg made absolute under `root` when it is
+    relative (absolute paths are left untouched). For `run_shell`, an unset
+    `cwd` defaults to `root` so shell commands run in the repo tree."""
+    key = _PATH_ARGS.get(name)
+    if key is None:
+        return args
+    val = args.get(key)
+    if name == "run_shell" and not val:
+        return {**args, key: root}
+    if isinstance(val, str) and val and not os.path.isabs(val):
+        return {**args, key: os.path.join(root, val)}
+    return args
 
 
 @dataclass(frozen=True)
@@ -165,6 +189,11 @@ def dispatch(
             return {"ok": False, "error": f"{type(exc).__name__}: {exc}",
                     "out_of_scope": False}
 
+    # resolve a relative path arg against the repo root before scoping/exec, so
+    # the agent's repo-relative paths reach the actual tree (e.g. a PR worktree)
+    if scope is not None and scope.root:
+        args = _resolve_against_root(name, args, scope.root)
+
     write_path = args.get(tool.write_path_arg) if tool.write_path_arg else None
     out_of_scope = False
     if scope is not None:
@@ -184,9 +213,12 @@ def dispatch(
         payload = {"ok": False, "error": f"{type(exc).__name__}: {exc}", "out_of_scope": out_of_scope}
 
     if trace:
+        # record the operative path (write target, or the resolved read/exec
+        # path) so a failed read isn't a blind spot in the trace
+        traced_path = write_path or args.get(_PATH_ARGS.get(name, ""))
         trace.record(
             "tool_call", tool=name, ok=ok, out_of_scope=out_of_scope,
-            path=str(write_path) if write_path else None,
+            path=str(traced_path) if traced_path else None,
         )
         if out_of_scope:
             trace.record("out_of_scope_edit", tool=name, path=str(write_path))

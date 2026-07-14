@@ -74,3 +74,32 @@ def test_edit_file_requires_unique_match(tmp_path: Path):
     assert not out["ok"] and "matches 2 times" in out["error"]
     out = dispatch("edit_file", {"path": str(f), "old": "bbb", "new": "ccc"})
     assert out["ok"] and f.read_text() == "aaa ccc aaa"
+
+
+def test_relative_paths_resolve_against_scope_root(tmp_path):
+    """A scope.root makes the agent's repo-relative tool paths resolve against
+    the repo tree (a per-PR worktree), not the process cwd — the read_file/grep
+    failures on PR-added files. Absolute paths are left untouched."""
+    from dataclasses import replace
+
+    from omni_copilot.scopes import read_only_scope
+    from omni_copilot.tools import dispatch
+
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / "new_file.py").write_text("MARKER = 1\n")
+    scope = replace(read_only_scope(), root=str(tmp_path))
+
+    rel = dispatch("read_file", {"path": "pkg/new_file.py"}, scope=scope)
+    assert rel["ok"] and "MARKER = 1" in rel["result"]
+
+    g = dispatch("grep", {"pattern": "MARKER", "path": "pkg"}, scope=scope)
+    assert g["ok"] and "new_file.py" in g["result"]
+
+    ab = dispatch("read_file", {"path": str(tmp_path / "pkg" / "new_file.py")},
+                  scope=scope)
+    assert ab["ok"] and "MARKER = 1" in ab["result"]  # absolute untouched
+
+    # no root -> legacy behavior (resolves against cwd; relative miss is fine)
+    bare = replace(read_only_scope(), root="")
+    miss = dispatch("read_file", {"path": "pkg/new_file.py"}, scope=bare)
+    assert not miss["ok"]  # not found against cwd

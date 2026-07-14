@@ -68,6 +68,10 @@ class ToolScope:
     allowed_tools: frozenset[str]
     path_scope: PathScope | None = None
     read_only: bool = False
+    root: str = ""  # repo root: RELATIVE tool paths resolve against it (the
+                    # agent works in repo-relative paths — e.g. from the diff —
+                    # while the actual tree may be a per-PR worktree it can't
+                    # hardcode). Empty = resolve against process cwd (legacy).
 
     def check(self, tool: str, write_path: str | Path | None = None) -> Decision:
         """Rule on a `tool` call: refused if the tool is not in `allowed_tools`;

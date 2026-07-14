@@ -75,7 +75,9 @@ class AgentDispatchContext:
                          + "\n".join(f"- {m}" for m in self.memories))
         # ---- dynamic (per-run) content below; keep it after the static head
         # (REPO is here too: worktree paths are per-PR) ----
-        parts.append("## REPO\n" + json.dumps(self.repo, ensure_ascii=False, indent=1))
+        parts.append("## REPO\n" + json.dumps(self.repo, ensure_ascii=False, indent=1)
+                     + "\n(read_file/grep/list_dir accept repo-relative paths, "
+                       "e.g. `src/pkg/mod.py`; they resolve against REPO.path.)")
         parts.append("## TASK\n" + json.dumps(self.task, ensure_ascii=False, indent=1))
         parts.append("## THIS STEP\n" + json.dumps(self.step, ensure_ascii=False, indent=1))
         if self.previous_steps:

@@ -12,6 +12,7 @@ dispatch/output contracts in `dispatch`.
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 
 from ...scopes import ToolScope, read_only_scope
 from ...tools import ToolDef
@@ -48,6 +49,12 @@ async def run_agent_step(
     from ...agent_loop import run_agent
 
     scope = scope or read_only_scope()
+    # bind the scope to the repo root so the agent's repo-relative tool paths
+    # resolve against the actual tree (a per-PR worktree after PR-time checkout,
+    # not the process cwd) — the read_file/grep failures on PR-added files
+    repo_root = ctx.state.get("repo_path") or ""
+    if repo_root and not scope.root:
+        scope = replace(scope, root=str(repo_root))
     spec = ctx.state.get("task_spec") or {}
     contract = {**BASE_OUTPUT_SCHEMA, **(output_extension or {})}
     capped, refs = _build_evidence(ctx, evidence)
