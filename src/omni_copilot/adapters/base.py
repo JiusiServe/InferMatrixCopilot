@@ -24,6 +24,28 @@ REQUIRED_SECTIONS = ("name", "repo")
 _BRIEFING_CAP = 8000
 
 
+def render_briefing_docs(root: Path | str, docs: list[str], *, header: str = "",
+                         cap: int = _BRIEFING_CAP) -> str:
+    """Concatenate the `docs` (paths relative to `root`) into one capped briefing
+    slice, prefixed by `header`. Missing docs are skipped (never fatal). Returns
+    "" when none exist. Shared by the general (framework) and repo-specific
+    briefing layers so both render identically."""
+    root = Path(root)
+    parts: list[str] = []
+    for rel in docs:
+        p = root / rel
+        if p.exists():
+            parts.append(p.read_text(encoding="utf-8", errors="replace").strip())
+    if not parts:
+        return ""
+    body = ((header + "\n\n") if header else "") + "\n\n---\n\n".join(parts)
+    if len(body) > cap:
+        body = (body[:cap]
+                + f"\n\n...[briefing capped at {cap} chars — use doc_read for the "
+                  "full pages]")
+    return body
+
+
 class AdapterError(Exception):
     """Raised for any adapter-layer violation: a missing/invalid manifest, an
     unknown adapter name, or an agent-side write to a high-risk section."""
@@ -93,22 +115,6 @@ class RepoAdapter:
         return self.root / "profile"
 
     @property
-    def knowledge_dir(self) -> Path:
-        """Root of the referenced knowledge base (a git submodule) when the
-        manifest declares a `knowledge:` section, else the conventional
-        `knowledge/` dir. The curated community docs live under here."""
-        rel = (self.manifest.get("knowledge") or {}).get("dir", "knowledge")
-        return self.root / rel
-
-    @property
-    def knowledge_repo_dir(self) -> Path:
-        """The repo-specific subtree of the knowledge base (e.g.
-        `knowledge/repos/<repo>`), where this repo's docs + `_index.md` live.
-        Falls back to `knowledge_dir` when no `repo_subdir` is declared."""
-        sub = (self.manifest.get("knowledge") or {}).get("repo_subdir", "")
-        return (self.knowledge_dir / sub) if sub else self.knowledge_dir
-
-    @property
     def capabilities(self) -> set[str]:
         """What this repo's profile provides — matched against playbook
         `requires:` (design §V2.2.3). Derived facts plus the manifest's
@@ -127,31 +133,22 @@ class RepoAdapter:
             caps.add("modules")
         return caps
 
-    def briefing(self) -> str:
-        """The repo's always-on prompt slice. Prefers the curated knowledge base
-        — the `knowledge.briefing_docs` (hard-gate rules + navigation index) from
-        the referenced community submodule, concatenated and capped. Deeper
-        guides/incidents are NOT injected here; they are pulled on demand via the
-        doc tools (nothing is lost, just not dumped wholesale). Falls back to a
-        legacy AI `profile.yaml` when one exists, else empty."""
+    def briefing(self, knowledge_root: Path | None = None) -> str:
+        """The repo's always-on prompt slice — the REPO-SPECIFIC part only. Reads
+        this adapter's `knowledge.briefing_docs` (its `repos/<repo>/` hard-gate
+        rules + navigation index) from the SHARED `knowledge_root` (the community
+        submodule; general `framework/` knowledge is injected separately by the
+        caller). Deeper guides/incidents are pulled on demand via the doc tools,
+        not dumped here. Falls back to a legacy AI `profile.yaml` when one exists,
+        else empty."""
         kn = self.manifest.get("knowledge") or {}
         docs = kn.get("briefing_docs") or []
-        kdir = self.knowledge_dir
-        if docs and kdir.exists():
-            parts = []
-            for rel in docs:
-                p = kdir / rel
-                if p.exists():
-                    parts.append(p.read_text(encoding="utf-8", errors="replace").strip())
-            if parts:
-                header = (f"Curated repo knowledge (source: {kn.get('source', '')}; "
-                          "read the linked deeper docs with the doc_read / doc_search "
-                          "tools — paths are relative to the knowledge base):\n\n")
-                body = header + "\n\n---\n\n".join(parts)
-                if len(body) > _BRIEFING_CAP:
-                    body = (body[:_BRIEFING_CAP]
-                            + f"\n\n...[briefing capped at {_BRIEFING_CAP} chars — "
-                              "use doc_read for the full pages]")
+        if knowledge_root is not None and docs:
+            body = render_briefing_docs(
+                knowledge_root, docs,
+                header=(f"Repo-specific knowledge (source: {kn.get('source', '')}; "
+                        "open the linked deeper docs with doc_read / doc_search):"))
+            if body:
                 return body
         if (self.profile_dir / "profile.yaml").exists():  # legacy AI profile
             from ..profiles.store import ProfileStore

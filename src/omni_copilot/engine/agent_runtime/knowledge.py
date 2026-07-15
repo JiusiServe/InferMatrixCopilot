@@ -202,18 +202,17 @@ def _repo_map_tool(ctx: StepContext, adapter) -> dict[str, ToolDef]:
 
 
 def _repo_docs_tool(ctx: StepContext, adapter) -> dict[str, ToolDef]:
-    """`doc_search` / `doc_read` over the adapter's referenced knowledge base (the
-    curated community-docs submodule). The always-on briefing injects only the
-    hard-gate rules + navigation; the deep guides/incidents those pages link to
-    are pulled on demand here (design §V2.3.4 channel 3: pulled, not injected) —
-    so nothing in the knowledge base is lost, just not dumped wholesale.
-    Read-only and contained under the knowledge dir (traversal is refused)."""
+    """`doc_search` / `doc_read` over the SHARED curated knowledge base (the
+    community-docs submodule: framework/ general + repos/<repo>/ specific). The
+    always-on briefing injects only the hard-gate rules + navigation; the deep
+    guides/incidents those pages link to (general or repo-specific) are pulled on
+    demand here (design §V2.3.4 channel 3: pulled, not injected) — so nothing in
+    the knowledge base is lost, just not dumped wholesale. Read-only and contained
+    under the knowledge dir (traversal is refused)."""
     import subprocess
 
-    if adapter is None:
-        return {}
-    kdir = getattr(adapter, "knowledge_dir", None)
-    if kdir is None or not kdir.exists():
+    kdir = Path(ctx.settings.knowledge_dir)  # shared base (framework/ + repos/)
+    if not kdir.exists():
         return {}
     root = kdir.resolve()
 
