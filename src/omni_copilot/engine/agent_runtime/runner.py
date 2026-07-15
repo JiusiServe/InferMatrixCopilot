@@ -20,6 +20,7 @@ from ..step import FailureKind, StepContext, StepResult
 from .dispatch import BASE_OUTPUT_SCHEMA, AgentDispatchContext
 from .knowledge import (
     _knowledge_tools,
+    _repo_docs_tool,
     _repo_map_tool,
     _resolve_adapter,
     _retrieve_memories,
@@ -74,7 +75,7 @@ async def run_agent_step(
 
     adapter = _resolve_adapter(ctx)
     all_extra = {**knowledge, **_repo_map_tool(ctx, adapter),
-                 **(extra_tools or {})}
+                 **_repo_docs_tool(ctx, adapter), **(extra_tools or {})}
     briefing = ""
     if adapter is not None and ctx.settings.profile_briefing_enabled:
         try:

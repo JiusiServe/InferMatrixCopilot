@@ -1,0 +1,3 @@
+[submodule "adapters/vllm_omni/knowledge"]
+	path = adapters/vllm_omni/knowledge
+	url = https://github.com/zuiho-kai/claude-workflow-starter

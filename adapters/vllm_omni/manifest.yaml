@@ -17,6 +17,18 @@ upstream:
   repo_path: /rebase/vllm
   remote: origin
 
+# Curated repo knowledge, REFERENCED (not copied) as a git submodule — the
+# human-authored community knowledge base replaces the retired AI profile/.
+# Their tree stays UNTOUCHED (single source of truth); attribution in NOTICE.md.
+# Paths below are relative to `dir`.
+knowledge:
+  source: zuiho-kai/claude-workflow-starter
+  dir: knowledge                  # submodule path under this adapter root
+  repo_subdir: repos/vllm-omni    # the vllm-omni knowledge within their tree
+  briefing_docs:                  # always-on prompt slice: hard gates + navigation
+  - repos/vllm-omni/rules.md
+  - repos/vllm-omni/_index.md
+
 modules:
   worker_runner:
     local_paths: [vllm_omni/worker/]
