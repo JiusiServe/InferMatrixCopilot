@@ -1,17 +1,12 @@
 # Plan — (1) Copilot as an MCP plugin for Claude Code + Codex, and (2) community-repo adapter contribution
 
-Status: PROPOSED, revision 4 (planning only — nothing here is executed yet).
-Rev 4 folds in a third external review (GPT). Its two code-level claims were
-verified against the source and are **real**:
-- The report-only `pr-debug` playbook is **not** read-only: `pr.checkout_branch`
-  (`rebase.py:28`, mislabeled `"read"`) adds a fork remote, `git fetch`es, and
-  `git checkout -B`s, and the `pr-debug.yaml` `checkout` step has no
-  `when: not report_only` guard.
-- `start_issue_triage(limit)` would be **ignored**: `issue.fetch` reads
-  `ctx.params` (step params, `issue.py:40`), and `issue-triage.yaml` passes none,
-  so a `TaskSpec`-level `limit` never reaches it.
-
-Changes from rev 3 are listed at the end.
+Status: PROPOSED, revision 5 (planning only — nothing here is executed yet).
+Rev 5 folds in a fourth external review (GPT). Its two blockers were real design
+gaps — both consequences of rev 4 explicitly allowing **multiple server
+processes** (Claude Code and Codex each launch their own server): an untrusted
+`request.json`, and unsafe cross-server reconciliation. WS2 was declared ready
+and is unchanged. The Claude Code plugin/marketplace syntax (rev-4's open item)
+is now **verified** and written in. Changes from rev 4 are listed at the end.
 
 Two independent workstreams. Every WS2 mutation (fork, commit, push, PR) needs
 owner approval; WS1 is in-repo and proceeds on owner's go.
@@ -23,234 +18,207 @@ owner approval; WS1 is in-repo and proceeds on owner's go.
 ### Goal
 One MCP server exposing the copilot's **genuinely read-only** task kinds over
 **stdio**, usable from **both** Claude Code and Codex, while the `omni-copilot`
-CLI keeps working unchanged and **in-process**. The governed pipeline (scopes,
-plan-review, `guard_push`) stays inside each run; the host calls the server as a
-black-box and cannot widen its permissions.
+CLI keeps working unchanged and **in-process**. The safety guarantee — *the host
+cannot widen the server's permissions* — is enforced **structurally in the
+child**, not by tool schemas or file trust.
 
 ### V1 tool set — verified read-only only
-- `start_review(pr, repo)` — pr-review playbook (read-only).
-- `start_issue_answer(issue, repo)` — issue-assist (read-only; never auto-posts).
-- `start_issue_triage(repo)` — issue-triage (read-only). **No `limit` param in
-  V1**: it isn't plumbed (`issue.fetch` reads step params, not `TaskSpec.params`),
-  so exposing it would be a dead knob. Uses the playbook default (20). Exposing
-  `limit` later needs a one-line plumb (fall back to `spec.params["limit"]` in
-  `issue.fetch`, or pass it into the step's params).
-- **`start_debug` is NOT in V1.** The report-only `pr-debug` playbook mutates the
-  working tree (remote add + fetch + `checkout -B`) before it groups CI failures,
-  so it is not read-only, and in report-only mode the failure groups land in
-  DIAGNOSTICS rather than the (thin) RUN_REPORT. Re-adding debug is a **defined
-  follow-up**: a dedicated `pr-debug-report` playbook that skips `checkout`
-  entirely (its `fetch_ci_failures`/`group_failures` read CI by PR number, not the
-  worktree) and renders the groups **into** the report. Only then does
-  `start_debug` return as read-only.
-- `get_result(run_id, offset?)` · `get_status(run_id)` · `list_playbooks()`.
+- `start_review(pr, repo)` · `start_issue_answer(issue, repo)` (never
+  auto-posts) · `start_issue_triage(repo)` (no `limit` knob — unplumbed;
+  `issue.fetch` reads step params) · `get_result(run_id, offset?)` ·
+  `get_status(run_id)` · `list_playbooks()`.
+- **No `start_debug` in V1** — report-only `pr-debug` mutates (verified:
+  `pr.checkout_branch` add-remote/fetch/`checkout -B`, ungated). Follow-up: a
+  read-only `pr-debug-report` playbook (no `checkout`; CI groups rendered into
+  the report).
 
 ### Non-goals (MVP)
-- **No outward writes in v1** (no posting/pushing; no `report_only=False` surface
-  — a host toggling a flag is not human approval).
-- **stdio only** (no HTTP: auth/tenancy/persistence/cancellation out of scope).
-- Not a Claude Code subagent; **zero** change to existing CLI behavior.
+No outward writes (no posting/pushing; no `report_only=False` surface); **stdio
+only**; not a Claude Code subagent; **zero** change to existing CLI behavior.
+
+### Two independent safety enforcers (defense in depth)
+Rev 4 leaned on the MCP tool schema. That is not sufficient, because the run is
+launched later from an on-disk `request.json` a same-user host process could
+rewrite. So policy is enforced **twice**, and the child's check is authoritative:
+
+1. **Boundary (server, at `reserve_run`)**: validate the tool call and write a
+   restrictive-permission (`0600`) `request.json`.
+2. **Child (authoritative, at execution)**: an `enforce_mcp_policy(spec)` gate
+   runs after reading `request.json` and before anything else, **re-deriving**
+   the safe task regardless of file contents:
+   - kind ∈ {`pr_review`, `issue_assist`, `issue_filter`} only — any other kind
+     (esp. write-capable: rebase/debug/push) → **refuse**;
+   - force `post=False` (and `report_only` where the kind takes it);
+   - reject unknown/extra params; strip anything not in the kind's schema;
+   - revalidate `repo` against `mcp_repo_allowlist` and any target values.
+   The same function guards the boundary, so tampering between reserve and
+   execute cannot widen permissions — the guarantee is structural.
 
 ### Execution model — CLI in-process, MCP launches a subprocess
-- **CLI unchanged & in-process.** `run_task` composes `reserve_run` + an
-  **in-process** execute (today's behavior). The CLI never spawns a subprocess,
-  so "CLI unchanged" stays literally true and all 227 tests hold.
-- **MCP launches a subprocess per run.** Only the server path runs each execution
-  as a child process, which (a) keeps the copilot's stdout — plans/progress/
-  metrics/results — in `<run_dir>/console.log`, leaving the server's stdout
-  exclusively for JSON-RPC framing; (b) makes the module-global `tracing._default`
-  and `Copilot.last_run_dir` per-process, removing the cross-contamination
-  hazard by construction.
-- **Launch mechanism.** `sys.executable -m omni_copilot.<reserved-exec-entry>
-  --run-id <id>` — the current interpreter/module, never a PATH `omni-copilot`
-  that could be a different install.
-- **Worker.** One dedicated worker thread draining a `queue.Queue`; it `Popen`s
-  the child and `.wait()`s, so exactly one run executes at a time (serialized —
-  for cost/simplicity, not correctness). No cross-loop `asyncio.Lock`.
-- **Serialization scope caveat.** The queue serializes only *within one server
-  process*. Claude Code and Codex each launch their own server → two queues →
-  concurrent runs. That is correctness-safe (subprocess isolation), only a
-  cost/resource concern; machine-wide serialization would need a filesystem lock
-  (`run_root/.worker.lock`). Deferred unless cost demands it.
+- **CLI unchanged & in-process.** The CLI's `run_task` keeps its **existing
+  order**: resolve → print plan → gate/confirm → **then** `mkdir` → in-process
+  `_execute`. A rejected plan or aborted confirm leaves **no** run directory
+  (unchanged behavior — asserted by a test). `reserve_run` and the reserved-exec
+  child are **new and MCP-only**; the CLI never spawns a subprocess.
+- **MCP launches a subprocess per run** via `sys.executable -m
+  omni_copilot.<reserved-exec-entry> --run-id <id>` (current interpreter/module,
+  never a PATH `omni-copilot`). This keeps the copilot's stdout — plans/progress/
+  metrics — in `<run_dir>/console.log`, leaving the server's stdout for JSON-RPC
+  only; and makes the module-global `tracing._default` / `Copilot.last_run_dir`
+  per-process. For the MCP path the dir exists **before** planning by design; a
+  plan-review `blocked` or a failure is recorded as a **terminal** status (the
+  poll record), intentionally persisted — not litter.
+- **Worker**: one dedicated worker thread draining a `queue.Queue`; `Popen` +
+  `.wait()`, one run at a time. No cross-loop `asyncio.Lock`.
 
-### Run lifecycle — reserve fast, plan+execute in the child, reconcile on exit
-1. **`reserve_run(spec) -> run_id`** (server thread, no LLM): validate inputs,
-   allocate `run_id`, `mkdir` its dir under `run_root`, write `request.json` +
-   `run_status.json {state:"queued", pid:null}`; return the id in ms.
-2. **Child** (`--run-id <id>`): **validate the id and derive+contain** the run
-   dir under `run_root` *inside the child* (never accept a raw `--run-dir` — that
-   is a second path-traversal boundary). Read `request.json`, then transition
-   `queued → planning → running → {done|blocked|failed}`; resolution + plan-review
-   under `planning`, execution under `running`; the terminal write is atomic
+### Run lifecycle — ownership-stamped, reconciled by confirmed death
+Each server instance has a unique `server_id` (uuid, one per process start) and
+registers a liveness token `run_root/servers/<server_id>` carrying its pid.
+
+1. **`reserve_run(spec) -> run_id`** (server thread, no LLM): `enforce_mcp_policy`,
+   allocate `run_id`, `mkdir` under `run_root`, write `request.json` (0600) +
+   `run_status.json {state:"queued", owner_server_id, owner_server_pid,
+   child_pid:null}`; return id in ms.
+2. **Parent records `child_pid` immediately after `Popen`** (before the child's
+   first status write) — else a server death in that window makes a live child
+   look orphaned.
+3. **Child** (`--run-id`, id-validated, dir derived+contained under `run_root`
+   in-child — never a raw `--run-dir`): `enforce_mcp_policy`, then
+   `queued → planning → running → {done|blocked|failed}`; atomic terminal write
    (tmp + `os.replace`) in a `finally`.
-3. **Parent reconciles on exit.** After `.wait()`, the worker reads
-   `run_status.json`; if the child died before its `finally` left a terminal
-   state (SIGKILL/crash → still `planning`/`running`), the parent **atomically
-   marks it `interrupted`/`failed` immediately** — not only on the next restart.
-4. **Startup reconciliation** remains the backstop for runs orphaned by a
-   *server* death: scan `run_root`, mark non-terminal runs with a dead `pid` as
-   `interrupted`.
+4. **Parent reconciles on exit.** After `.wait()`, if the run it owns is still
+   non-terminal (child died before its `finally`), atomically mark it
+   `interrupted`/`failed` immediately.
+5. **Ownership-aware startup reconciliation** (multi-server safe). A starting
+   server reconciles a run **only when its owner is confirmed dead**:
+   `owner_server_id`'s liveness token is gone / its pid is not alive. A `queued`
+   run (`child_pid:null`) owned by a **live** other server is left untouched
+   (fixes the rev-4 bug where a second server would mark it `interrupted`). A
+   `running` run is reconciled only if owner-server **and** `child_pid` are both
+   dead. A live server never touches another live server's runs.
 
-Durability = observability + reconciliation, not resurrection. A `finally`
-covers controlled completion and Python exceptions; SIGKILL/host death is caught
-by parent-on-exit (child died, parent alive) or startup (both died).
+Durability = observability + ownership-aware reconciliation, not resurrection.
+`finally` covers controlled completion + Python exceptions; child SIGKILL →
+parent-on-exit; server death → another server reconciles only what the dead
+owner held.
 
-### MCP boundary validation (untrusted host input)
-- `run_id`: strict pattern; resolved real path must be contained under `run_root`
-  (reject traversal); unknown id → clean error.
-- `repo`: must be in a configured **allowlist** — a new explicit setting
-  `mcp_repo_allowlist` (defaults to the adapters present); off-list → refused.
+### MCP boundary validation
+- `run_id`: strict pattern; resolved real path contained under `run_root`.
+- `repo`: **`mcp_repo_allowlist` defaults to `[default_repo]`** (not every
+  installed adapter); extra repos require explicit config; off-list → refused.
 - `pr`/`issue`: positive integers.
-- **Report pagination contract (explicit):** `get_result` returns at most
-  `mcp_report_max_bytes` (default e.g. 64 KiB) of report text, plus
-  `next_offset` (int|null) and `report_path` (the archived full report) so the
-  host can page or fetch the artifact; never an unbounded dump.
-- `get_status` returns **`run_status.json`** (state/pid/timestamps) plus
-  `progress.json` **when present** — queued/planning runs have no progress file.
+- **`get_result` pagination contract**: returns ≤ `mcp_report_max_bytes`
+  (default 64 KiB) of report text + `next_offset` (int|null) + `report_path`
+  (archived full report); never an unbounded dump.
+- **`get_status`** returns `run_status.json` (state/owner/pids/timestamps) +
+  `progress.json` **when present** (queued/planning have none).
 
 ### Phases & deliverables
-1. **CLI surface** (`cli/copilot.py`): `reserve_run` + a reserved-exec module
-   entry (`--run-id`, id-validated, dir contained in-child) that plans-then-
-   executes with atomic `run_status.json` transitions; `run_task` composes
-   `reserve_run` + in-process execute. CLI path and all 227 tests unchanged.
+1. **CLI surface** (`cli/copilot.py`): `enforce_mcp_policy`, `reserve_run`, the
+   reserved-exec module entry (id-validated, dir contained in-child, ownership
+   stamps, planning-in-child). CLI `run_task` **unchanged**. All 227 tests hold.
 2. **MCP server** (`src/omni_copilot/mcp_server.py`, new): `mcp` SDK (FastMCP)
-   over stdio; single-worker `queue.Queue` + `sys.executable -m` subprocess
-   launcher + parent-on-exit reconciliation; the V1 tools above; the allowlist +
-   pagination settings. New `omni-copilot-mcp` console-script behind an optional
-   `[mcp]` extra so standalone installs stay dependency-free.
-3. **Claude Code plugin** (`plugin/`): `.claude-plugin/plugin.json`, `.mcp.json`,
-   thin skills. **Prerequisite explicit:** a plugin does not install the package —
-   document `uv tool install`/`pipx install`, or `uvx --from git+…
-   omni-copilot-mcp`; raw path is `claude mcp add`; marketplace/`/plugin` syntax
-   to verify against current docs.
-4. **Codex**: `docs/codex/config.toml` `[mcp_servers.omni_copilot]` + optional
-   `AGENTS.md`. No plugin.
-5. **Tests** (offline): `reserve_run` returns id + `queued` with **no LLM**;
-   `queued→planning→running→done`; injected child crash → parent-on-exit marks
-   `failed` (no hang); dead-pid stale run → startup marks `interrupted`; stdout
-   hygiene (copilot output in `console.log`, protocol-only on server stdout);
-   boundary (bad id / off-allowlist repo / negative pr rejected; report size
-   capped with `next_offset`); no post/push/debug tool in the V1 schema set. Plus
-   one **live smoke**: `start_review` on a small merged PR → poll to `done`.
+   over stdio; `server_id` + liveness token; single-worker `queue.Queue`;
+   `sys.executable -m` launcher; `child_pid`-on-Popen; parent-on-exit +
+   ownership-aware startup reconciliation; V1 tools; allowlist/pagination
+   settings. `omni-copilot-mcp` console-script behind an optional `[mcp]` extra.
+3. **Claude Code plugin** (`plugin/`) — **verified layout**:
+   - `.claude-plugin/plugin.json`: `{name, version, description, author?}`.
+   - Plugin-root `.mcp.json`:
+     `{"mcpServers":{"omni-copilot":{"type":"stdio","command":"…","args":[…],
+     "env":{…}}}}`; `${CLAUDE_PLUGIN_ROOT}` / `${VAR:-default}` substitution is
+     available.
+   - **Package prerequisite (verified boundary):** installing the plugin does
+     **not** pip/uv-install the Python package — the `.mcp.json` `command` must
+     already resolve. So **prefer a preinstalled, pinned package**: document
+     `uv tool install`/`pipx install 'omni-copilot==<pinned>'`, and set
+     `command` to the installed `omni-copilot-mcp` (or a plugin `bin/` shim that
+     execs it). A floating `uvx --from git+…@<ref>` is an explicit opt-in
+     fallback only — it adds network latency + supply-chain drift + MCP
+     startup-timeout risk. (One residual: whether any plugin hook can run an
+     install step — treat as no; verify at implementation.)
+   - Install: `claude plugin marketplace add github.com/tzhouam/<repo>` then
+     `claude plugin install <name>@<marketplace>`, or direct
+     `claude plugin install github.com/tzhouam/<repo>` (a root `marketplace.yaml`
+     lists the plugin: name/version/description + `source:{type:github, repo,
+     path?, ref?}`). The raw, host-agnostic path remains `claude mcp add`.
+4. **Codex**: `docs/codex/config.toml` `[mcp_servers.omni_copilot]`
+   (`command`/`args`/`env`, per Codex docs) + optional `AGENTS.md`. No plugin.
+5. **Tests** (offline): `reserve_run` → id + `queued`, no LLM; `enforce_mcp_policy`
+   refuses a tampered `request.json` (kind→rebase, `post=True`, off-list repo);
+   `queued→planning→running→done`; child crash → parent-on-exit `failed`;
+   **two servers**: server B's startup does **not** touch server A's live
+   `queued` run, but **does** reconcile a run whose owner token is gone; CLI abort
+   leaves **no** run dir; stdout hygiene; boundary (bad id/off-list repo/negative
+   pr; capped report + `next_offset`); no post/push/debug tool in V1 schema. Plus
+   a **live smoke**: `start_review` on a small merged PR → poll `done`.
 6. **Docs**: `CODE_TOUR.md` §11 MCP entry; new `doc/MCP.md`.
 
 ### Acceptance
-- `omni-copilot -p "review pr N"` unchanged, runs **in-process** (tests green).
-- Server stdout is protocol-only; copilot output is in `console.log`.
-- Every V1 tool is read-only; **no `start_debug` in V1**; triage exposes no dead
-  `limit` knob.
-- Every run reaches a terminal `run_status.json` on controlled completion,
-  Python exception, or child death (parent-on-exit); server-death orphans
-  reconciled to `interrupted` on startup.
-- `get_result` is size-capped with `next_offset` + `report_path`.
+- CLI unchanged and in-process; aborted plans leave no run dir.
+- The child enforces policy independently: a rewritten `request.json` cannot run
+  a non-V1 kind, post, push, or an off-list repo.
+- Multi-server safe: no server reconciles a run whose owner is alive.
+- Every run reaches a terminal `run_status.json` (completion / exception /
+  child-death via parent; server-death via owner-aware startup).
+- `get_result` size-capped with `next_offset` + `report_path`; server stdout is
+  protocol-only.
 
 ---
 
 ## Workstream 2 — contribute the copilot's net-new knowledge to `zuiho-kai/claude-workflow-starter` (fork → PR)
 
-### Goal (knowledge-only)
-Contribute the copilot's **net-new** vllm-omni knowledge as new pages placed by
-*their* `layout.md`, each with **public** provenance, linked from the nearest
-`_index.md` as their rules require. No broad reorganization; a reorg is at most a
-separate, later, optional PR.
+*Declared ready by the review; unchanged from rev 4. Summary:*
 
-### Index linking is mandatory (verified in their repo)
-- `page-rules.md`: "分类 `_index.md` 必须列出里面的每篇当前有效页面"; new subdir ⇒
-  "在上一层 `_index.md` 增加入口".
-- `CONTRIBUTING.md` checklist: "最近 `_index.md` 能找到新页面".
-- `validation.md`: "更新当前目录 `_index.md`".
-So the PR makes the **minimal mandatory** `_index.md` edits (additive link rows,
-+ a parent entry when a new subdir is created) — nothing more.
-
-### Content-preservation, reconciled with mandatory index edits
-- **Navigation allowlist**: the specific `_index.md` files that must gain a link.
-  Edits limited to **additive link rows**.
-- **Zero-edit hash gate on everything else**: a pre/post SHA-256 manifest of all
-  other pre-existing files; any change outside the allowlist blocks the PR.
-
-### Dedup + public provenance (hard gates)
-- Facts with provenance `community:zuiho-kai/…` were ingested *from this repo* —
-  never contributed back; only **net-new** copilot knowledge is eligible.
-- Provenance must be **public**: cite public vllm-omni **commit / PR / issue /
-  source links** (our internal "eval GT #n" maps to a real public PR/issue — cite
-  that), so a maintainer can independently verify.
-
-### Format: their book, not our machine tree
-Translate net-new curated facts into their markdown pages placed by `layout.md`;
-do **not** drop `profile.yaml`/`manifest.yaml` as a parallel machine tree
-(book-form only).
-
-### Phases & deliverables
-1. **Local prep (no mutations)**: clone into scratch; assemble net-new page
-   drafts, the dedup matrix, and the hash manifest as working files.
-2. **Audit / dedup**: classify each adapter fact; keep only `net-new`; resolve a
-   public provenance link for each.
-3. **Author pages** by `layout.md`, public provenance, linking to (never
-   duplicating) existing owner pages.
-4. **Mandatory minimal nav**: additive link rows in the nearest `_index.md`
-   (+ parent entry if a subdir is new); everything else hash-verified unchanged.
-5. **Hygiene**: run their linter/validation; **DCO sign-off mandatory**
-   (`git commit -s`, confirmed required by their `CONTRIBUTING.md`); PR body in
-   **Chinese**. **Do not commit `MERGE-MATRIX.md`** into their tree (a review
-   artifact would itself break their page/index rules). The PR body carries the
-   **verification command + result summary + a compact list of the allowlisted
-   `_index.md` link additions**; the full hash manifest + dedup matrix are kept as
-   local review artifacts (or an external gist), not pasted wholesale.
-   PR body line: "本 PR 仅新增 vllm-omni-copilot 提炼的净新增知识(附公开溯源链
-   接),仅对相关 `_index.md` 追加导航链接,未改动任何其他现有内容;已排除源自本
-   仓库的事实以避免回灌;不含目录重构。"
-6. **Open PR** → `zuiho-kai:master`.
-
-### Acceptance
-- Diff = new files + additive link rows in allowlisted `_index.md` only; the hash
-  check (command + summary in the PR body) shows zero change elsewhere.
-- New pages sit where `layout.md` prescribes, each reachable from the nearest
-  `_index.md`, with public provenance, no duplication, no `sourced-from-theirs`
-  re-contribution, no `MERGE-MATRIX.md` committed.
-- DCO-signed; Chinese PR body; passes their contribution checks.
+- **Knowledge-only PR** — net-new pages placed by *their* `layout.md`; no reorg.
+- **Index linking mandatory** (verified: `page-rules.md` / `CONTRIBUTING.md` /
+  `validation.md`): minimal additive link rows in the nearest `_index.md`
+  (+ parent entry for a new subdir).
+- **Content preserved**: a **navigation allowlist** exempts only those `_index.md`
+  files (additive rows); a pre/post SHA-256 manifest hash-gates everything else.
+- **Dedup + public provenance** (hard gates): never re-contribute
+  `community:zuiho-kai/…`-sourced facts; cite **public** vllm-omni commit/PR/
+  issue/source links (not internal `eval GT #n`).
+- **Book form only** — no parallel machine tree.
+- **Hygiene**: DCO `git commit -s` **mandatory** (verified); Chinese PR body; the
+  PR body carries the hash **verify command + summary + compact allowlisted-index
+  list** (full manifest + dedup matrix are local artifacts, **not** committed —
+  a `MERGE-MATRIX.md` file would break their page/index rules).
+- Phases: local prep (no mutations) → audit/dedup → author pages → minimal nav →
+  hygiene → open PR → `zuiho-kai:master`.
 
 ---
 
 ## Sequencing & ownership
 - WS1 and WS2 are independent.
-- **WS1** is in-repo → proceeds on owner's go; delivered as a PR to
-  `tzhouam/vllm-omni-copilot`. Land in order: reserve/in-process-execute split →
-  status file + parent-on-exit + startup reconciliation → MCP subprocess+queue →
-  boundary/pagination → packaging. (The read-only `pr-debug-report` playbook +
-  `start_debug` is a fast-follow after V1 ships read-only.)
-- **WS2** touches an external repo. **Every mutation needs explicit owner
-  approval before it happens** — fork (creates a repo under `tzhouam`), any commit
-  (owner rule: never commit a sub-repo without approval), branch push, and PR.
-  Only local-only prep (scratch clone, uncommitted drafts, matrix/manifest)
-  proceeds unattended.
+- **WS1** is in-repo → proceeds on owner's go; PR to `tzhouam/vllm-omni-copilot`.
+  Land in order: `enforce_mcp_policy` + `reserve_run` + reserved-exec child →
+  ownership stamps + parent-on-exit + owner-aware startup reconciliation → MCP
+  subprocess/queue → boundary/pagination → packaging. (Read-only
+  `pr-debug-report` + `start_debug` is a fast-follow.)
+- **WS2** external repo → **every mutation (fork/commit/push/PR) needs explicit
+  owner approval before it happens**. Only local uncommitted prep runs unattended.
 
-## What changed from rev 3 (per the review)
-1. **`start_debug` dropped from V1** — the report-only `pr-debug` playbook
-   mutates (verified: `checkout_branch` add-remote/fetch/`checkout -B`, ungated by
-   `report_only`). A read-only `pr-debug-report` playbook (no `checkout`, groups
-   rendered into the report) is the defined follow-up (B1).
-2. **Parent-on-exit reconciliation** — after `.wait()`, mark any still-non-
-   terminal run `interrupted`/`failed` immediately, not only on restart (B2).
-3. **Child takes a validated `--run-id`**, derives+contains its dir under
-   `run_root` internally — no raw `--run-dir` traversal boundary (B3).
-4. **CLI stays in-process**; only MCP launches the subprocess, so "CLI unchanged"
-   is literal (IC1).
-5. **`get_status` returns `run_status.json` + optional `progress.json`** (queued/
-   planning have no progress file) (IC2).
-6. **Triage `limit` removed from V1** — it isn't plumbed (verified: `issue.fetch`
-   reads step params); noted the one-line plumb to expose it later (IC3).
-7. **Child launched via `sys.executable -m`**, not a PATH executable (IC4).
-8. **Explicit `mcp_repo_allowlist` setting + pagination contract**
-   (`max_bytes`/`next_offset`/`report_path`) (IC5).
-9. **Serialization-scope caveat**: the queue serializes one server process only;
-   two hosts = two servers; filesystem lock for machine-wide (IC6).
-10. **WS2**: PR body carries the hash **verification command + summary + compact
-    allowlisted-index list**, not the full manifest; full manifest stays a local
-    artifact.
+## What changed from rev 4 (per the review)
+1. **Child-side policy enforcement** (`enforce_mcp_policy`) makes the "host cannot
+   widen permissions" guarantee structural, immune to a tampered `request.json`
+   (0600) — not reliant on tool schemas (blocker 1).
+2. **Ownership-aware reconciliation**: persist `owner_server_id` /
+   `owner_server_pid` / `child_pid`; reconcile only when the owner is confirmed
+   dead — a second server no longer stomps another's live `queued` run
+   (blocker 2).
+3. **CLI `run_task` left unchanged** (gate-before-`mkdir`); reserve/child are
+   MCP-only; a test asserts aborts leave no dir (IR1).
+4. **`child_pid` recorded immediately after `Popen`** (IR2).
+5. **`mcp_repo_allowlist` defaults to `[default_repo]`** (IR3).
+6. **Prefer a preinstalled pinned package**; `uvx --from git+…` only as an opt-in
+   fallback (IR4).
+7. **Claude plugin/marketplace syntax verified** and written in — real form is
+   `claude plugin install github.com/owner/repo`, `.claude-plugin/plugin.json`,
+   plugin-root `.mcp.json` with `${CLAUDE_PLUGIN_ROOT}`, root `marketplace.yaml`;
+   plugin install does not install the Python package (IR5).
 
 ## Open decisions
-None blocking. Rev-2/3 decisions are resolved (serialized single-worker-subprocess
-MVP; mandatory minimal `_index.md` updates). One product choice for later, not V1:
-whether the fast-follow re-adds `start_debug` via the read-only `pr-debug-report`
-playbook, or debug stays CLI-only. The only remaining gate is owner approval — go
-for WS1, per-mutation approval for WS2.
+None blocking. One residual to confirm at implementation: whether any plugin
+install hook can run a package install (assumed no). The remaining gate is owner
+approval — go for WS1, per-mutation approval for WS2.
