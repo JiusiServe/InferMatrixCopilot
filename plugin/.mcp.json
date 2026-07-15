@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "omni-copilot": {
+      "type": "stdio",
+      "command": "omni-copilot-mcp",
+      "args": [],
+      "env": {
+        "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}",
+        "ANTHROPIC_BASE_URL": "${ANTHROPIC_BASE_URL:-}",
+        "DEFAULT_REPO": "${OMNI_DEFAULT_REPO:-vllm-omni}"
+      }
+    }
+  }
+}

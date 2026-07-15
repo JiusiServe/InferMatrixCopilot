@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     default_repo: str = "vllm-omni"
     repo_paths: dict[str, str] = {}
 
+    # MCP server (mcp_server.py) — read-only surface for Claude Code / Codex.
+    # The allowlist defaults to just `default_repo` (least privilege); extra
+    # repos must be named explicitly. mcp_report_max_bytes caps a get_result
+    # page so a report is never dumped unbounded over the stdio protocol.
+    mcp_repo_allowlist: list[str] = []
+    mcp_report_max_bytes: int = 65536
+
     # Engine
     run_root: Path = Path.home() / ".omni-copilot" / "runs"
     max_step_retries: int = 1
@@ -130,6 +137,12 @@ class Settings(BaseSettings):
     def intent(self) -> str:
         """The intent-classification model, falling back to `agent_model`."""
         return self.intent_model or self.agent_model
+
+    @property
+    def mcp_allowed_repos(self) -> list[str]:
+        """Effective MCP repo allowlist: the configured list, or `[default_repo]`
+        when unset (least privilege — never every installed adapter)."""
+        return list(self.mcp_repo_allowlist) or [self.default_repo]
 
     def repo_path(self, name: str) -> Path | None:
         """The configured filesystem path for repo `name`, or None if unknown."""

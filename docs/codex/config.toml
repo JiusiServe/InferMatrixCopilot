@@ -1,0 +1,21 @@
+# Codex CLI integration — add this block to ~/.codex/config.toml
+#
+# Prerequisite: the omni-copilot package (with the MCP extra) must be installed
+# and on PATH — installing a Codex MCP entry does NOT install the package:
+#     uv tool install 'omni-copilot[mcp]'      # or: pipx install 'omni-copilot[mcp]'
+#
+# Forward secrets by NAME via `env_vars` (Codex reads them from your shell
+# environment) rather than pasting literal secret values into this file.
+
+[mcp_servers.omni_copilot]
+command = "omni-copilot-mcp"
+args = []
+env_vars = ["ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "DEFAULT_REPO"]
+
+# Tools exposed (all read-only, start/poll):
+#   start_review(pr, repo?)        -> {run_id}
+#   start_issue_answer(issue, repo?) -> {run_id}
+#   start_issue_triage(repo?)      -> {run_id}
+#   get_result(run_id, offset?)    -> {state, report?, next_offset?, report_path?}
+#   get_status(run_id)             -> {status, progress?}
+#   list_playbooks()               -> {read_only_kinds, playbooks}
