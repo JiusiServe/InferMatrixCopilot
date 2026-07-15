@@ -13,9 +13,13 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+# MCP server (Claude Code / Codex integration) — kept optional so a standalone
+# CLI install stays dependency-free.
+mcp = ["mcp>=1.2"]
 
 [project.scripts]
 omni-copilot = "omni_copilot.cli:main"
+omni-copilot-mcp = "omni_copilot.mcp_server:main"
 
 [build-system]
 requires = ["setuptools>=68"]

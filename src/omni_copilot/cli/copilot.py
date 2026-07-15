@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import re
 import time
 import uuid
 from pathlib import Path
@@ -275,6 +277,90 @@ class Copilot:
             return self._execute(playbook, spec, run_dir, resuming=True)
         print("no resumable run found")
         return 1
+
+    # -- MCP surface (reserve + child execute) --------------------------------
+    # These support the start/poll MCP server (mcp_server.py). The CLI path
+    # (run_task/run_playbook) is deliberately untouched: it still gates BEFORE
+    # creating a run dir, so an aborted plan leaves no directory. Reservation
+    # (dir before plan) is an MCP-only shape whose blocked/failed outcome is a
+    # terminal poll record, not litter.
+    _RUN_ID_RE = re.compile(r"^run-\d{8}-\d{6}-[0-9a-f]{6}$")
+
+    @staticmethod
+    def _new_run_id() -> str:
+        """A fresh unique run id (`run-<ts>-<uuid6>`; same format the CLI uses)."""
+        return f"run-{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
+
+    def _contained_run_dir(self, run_id: str) -> Path:
+        """Validate `run_id` and resolve it to a directory strictly contained
+        under `run_root` — rejecting path traversal from an untrusted MCP arg.
+        Raises ValueError on a bad pattern, escape, or missing run."""
+        if not self._RUN_ID_RE.match(run_id or ""):
+            raise ValueError(f"invalid run_id: {run_id!r}")
+        root = self.settings.run_root.resolve()
+        run_dir = (self.settings.run_root / run_id).resolve()
+        if run_dir.parent != root:
+            raise ValueError(f"run_id escapes run_root: {run_id!r}")
+        if not run_dir.exists():
+            raise ValueError(f"no such run: {run_id!r}")
+        return run_dir
+
+    def reserve_run(self, spec: TaskSpec, *, owner_server_id: str,
+                    owner_server_pid: int) -> str:
+        """MCP-only: reserve a run and return its id **without** planning or
+        executing (no LLM), so the tool call returns in ms and the caller polls.
+        Persists `request.json` (0600) + an initial `queued` `run_status.json`
+        stamped with the owning server; planning happens later in the child."""
+        from .. import run_status as rs
+
+        run_id = self._new_run_id()
+        run_dir = self.settings.run_root / run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+        req = run_dir / "request.json"
+        req.write_text(json.dumps(spec.model_dump(), indent=2))
+        try:  # least-privilege perms; advisory only against same-user tampering
+            os.chmod(req, 0o600)
+        except OSError:
+            pass
+        rs.init_queued(run_dir, run_id=run_id, owner_server_id=owner_server_id,
+                       owner_server_pid=owner_server_pid)
+        return run_id
+
+    def execute_reserved(self, run_id: str) -> int:
+        """MCP-only child entry (subprocess, stdout -> console.log). Writes its
+        own pid FIRST (single-writer invariant), **re-enforces** the read-only
+        MCP policy on the persisted request (request.json is untrusted — a host
+        could have rewritten it), plans, then executes, driving
+        `run_status.json` planning -> running -> terminal. Returns the exit code."""
+        from .. import run_status as rs
+        from ..mcp_policy import PolicyError, enforce_mcp_policy
+
+        run_dir = self._contained_run_dir(run_id)
+        rs.mark_child_started(run_dir, child_pid=os.getpid(), state=rs.PLANNING)
+        try:
+            raw = json.loads((run_dir / "request.json").read_text())
+            spec = enforce_mcp_policy(raw, allowed_repos=self.settings.mcp_allowed_repos)
+        except (PolicyError, OSError, json.JSONDecodeError, ValueError) as exc:
+            rs.mark(run_dir, rs.FAILED, note=f"policy/request rejected: {exc}")
+            return 1
+        try:
+            resolution = self.resolve(spec)
+        except PlanningError as exc:
+            rs.mark(run_dir, rs.BLOCKED, note=f"cannot plan: {exc}")
+            return BLOCKED_EXIT
+        (run_dir / "task.json").write_text(json.dumps({
+            "spec": spec.model_dump(),
+            "playbook": playbook_to_doc(resolution.playbook),
+        }, indent=2))
+        rs.mark(run_dir, rs.RUNNING)
+        try:
+            code = self._execute(resolution.playbook, spec, run_dir,
+                                 resolution_mode=resolution.mode, tier=resolution.tier)
+        except Exception as exc:  # a crash still leaves a terminal record
+            rs.mark(run_dir, rs.FAILED, note=f"{type(exc).__name__}: {exc}")
+            raise
+        rs.mark(run_dir, {0: rs.DONE, BLOCKED_EXIT: rs.BLOCKED}.get(code, rs.FAILED))
+        return code
 
     def _adapter_for(self, repo: str):
         """The repo's registered adapter, or None (never raises)."""

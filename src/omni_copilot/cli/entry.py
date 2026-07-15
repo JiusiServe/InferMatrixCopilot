@@ -74,10 +74,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-chat", action="store_true",
                         help="use the plain command REPL instead of the "
                              "conversational interface")
+    # MCP-only internal entry: execute a run previously reserved by the MCP
+    # server, in this fresh subprocess. Hidden from --help.
+    parser.add_argument("--execute-reserved", metavar="RUN_ID",
+                        help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
 
     copilot = Copilot()
 
+    if args.execute_reserved:
+        return copilot.execute_reserved(args.execute_reserved)
     if args.resume:
         return copilot.resume_last()
     if args.playbook:
