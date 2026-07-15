@@ -142,6 +142,8 @@ class Copilot:
               f"steps={[s.step for s in resolution.playbook.steps]}")
         for note in resolution.notes:
             print(f"  · {note}")
+        print(style("→ path: ", "bold", "cyan")
+              + f"{spec.mode} · agent-model={self.settings.model_for(spec.mode)}")
         if plan_only:
             return 0
 

@@ -56,6 +56,11 @@ async def run_agent_step(
     if repo_root and not scope.root:
         scope = replace(scope, root=str(repo_root))
     spec = ctx.state.get("task_spec") or {}
+    # dual-path (双路径): the run's execution tier (set from intent, eco by
+    # default) selects the agent-reasoning model here — the split point is after
+    # intent, and everything upstream (planning, evidence, knowledge) is shared.
+    tier = spec.get("mode", "eco")
+    tier_model = ctx.settings.model_for(tier)
     contract = {**BASE_OUTPUT_SCHEMA, **(output_extension or {})}
     capped, refs = _build_evidence(ctx, evidence)
 
@@ -102,7 +107,7 @@ async def run_agent_step(
     ctx.trace.record("agent_dispatch", step=step_name,
                      evidence={k: len(v) for k, v in capped.items()},
                      skills=[s["name"] for s in skills],
-                     memories=len(memories),
+                     memories=len(memories), mode=tier, model=tier_model,
                      permissions=dispatch_ctx.permissions)
 
     budget = max_iters or ctx.settings.review_max_iters
@@ -129,6 +134,7 @@ async def run_agent_step(
         run_agent,
         ctx.llm, system=system, prompt=prompt, scope=scope,
         trace=ctx.trace, extra_tools=all_extra, max_iters=budget,
+        model=tier_model,
     )
     output = _coerce_output(outcome.text, ctx, contract)
     if output is not None:
