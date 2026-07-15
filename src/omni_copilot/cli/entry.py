@@ -13,11 +13,13 @@ from .utils import parse_task_params
 
 
 def _handle_line(copilot: Copilot, line: str, assume_yes: bool,
-                 plan_only: bool) -> int | None:
+                 plan_only: bool, force_performance: bool = False) -> int | None:
     """Route one input `line`: `/`-built-ins (status/logs/playbooks/resume/quit)
     are handled inline; anything else is parsed into one-or-more TaskSpecs and
-    run as a queue. Returns None when nothing runs (built-in or blank/clarify),
-    -1 to signal quit, or the queue's exit code."""
+    run as a queue. `force_performance` (the --performance flag) pins every
+    resolved spec to the high-performance model tier, an explicit override on top
+    of intent's eco-by-default detection. Returns None when nothing runs
+    (built-in or blank/clarify), -1 to signal quit, or the queue's exit code."""
     line = line.strip()
     if not line:
         return None
@@ -43,8 +45,11 @@ def _handle_line(copilot: Copilot, line: str, assume_yes: bool,
     if unclear:
         print(f"? {unclear[0].clarify}")
         return None
-    return copilot.run_queue([r.spec for r in results],
-                             assume_yes=assume_yes, plan_only=plan_only)
+    specs = [r.spec for r in results]
+    if force_performance:  # explicit --performance overrides eco-by-default
+        for s in specs:
+            s.mode = "performance"
+    return copilot.run_queue(specs, assume_yes=assume_yes, plan_only=plan_only)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -74,6 +79,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-chat", action="store_true",
                         help="use the plain command REPL instead of the "
                              "conversational interface")
+    parser.add_argument("--performance", action="store_true",
+                        help="use the high-performance model tier for this run "
+                             "(default: eco / cost-effective)")
     args = parser.parse_args(argv)
 
     copilot = Copilot()
@@ -86,7 +94,8 @@ def main(argv: list[str] | None = None) -> int:
                                     report_only=args.report_only,
                                     assume_yes=args.yes, plan_only=args.plan_only)
     if args.prompt:
-        code = _handle_line(copilot, args.prompt, args.yes, args.plan_only)
+        code = _handle_line(copilot, args.prompt, args.yes, args.plan_only,
+                            force_performance=args.performance)
         return int(code) if code not in (None, -1) else 0
 
     # Interactive: conversational chat (Claude-Code-style) when an LLM is
@@ -97,7 +106,8 @@ def main(argv: list[str] | None = None) -> int:
         return chat_repl(
             copilot, assume_yes=args.yes,
             handle_builtin=lambda line: _handle_line(copilot, line, args.yes,
-                                                     args.plan_only),
+                                                     args.plan_only,
+                                                     force_performance=args.performance),
         )
 
     print("omni-copilot — natural-language repo maintenance. "
@@ -108,6 +118,7 @@ def main(argv: list[str] | None = None) -> int:
         except (EOFError, KeyboardInterrupt):
             print()
             return 0
-        code = _handle_line(copilot, line, args.yes, args.plan_only)
+        code = _handle_line(copilot, line, args.yes, args.plan_only,
+                            force_performance=args.performance)
         if code == -1:
             return 0

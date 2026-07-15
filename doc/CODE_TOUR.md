@@ -43,14 +43,18 @@
   扩权;仓库读取被囚禁,`.env*` 被拒。**`ui.py`**(194)是终端 chrome:
   `FancyUI`(rich:banner/spinner/流式尾/markdown)与 `PlainUI`(管道/测试/
   `--no-chat` 的降级),无一依赖 TTY。
-- **`intent.py`**(120,**LLM-only**)——把一条终端命令分类成 `TaskSpec`;
+- **`intent.py`**(141,**LLM-only**)——把一条终端命令分类成 `TaskSpec`;
   歧义/离题/注入 → 澄清提问,绝不猜测执行。**只有终端输入进入此函数**——
   拉取的 GitHub/CI 文本是数据不是指令(信任边界的第一道)。复合命令先切分,
-  PR/issue 引用接续("… then review it")。由 `test_intent_taskspec.py` /
-  `test_phase_b.py` 固定。
-- **`task_spec.py`**(81)——数据对象 `TaskSpec`:kind/pr/issue/flags。最硬的
+  PR/issue 引用接续("… then review it")。也在此设**双路径 `mode`**:默认
+  `eco`,仅当用户显式声明高性能模型才升 `performance`(确定性短语正则 +
+  LLM `performance` 标志,OR 取或;成本敏感决策绝不靠猜)。由
+  `test_intent_taskspec.py` / `test_dual_path.py` / `test_phase_b.py` 固定。
+- **`task_spec.py`**(90)——数据对象 `TaskSpec`:kind/pr/issue/flags。最硬的
   不变量:**`tier` 由 `kind` 推导**,不存在任何文字或 LLM 可设的扩权字段;
-  `read_only`/`confirm_required` 由 kind + flag 推导。
+  `read_only`/`confirm_required` 由 kind + flag 推导。另有**双路径 `mode`**
+  (`eco` 默认 / `performance`):由 intent 设定、整条 run 共享,选 agent 推理
+  模型(见 §4),与 `tier` 正交——便宜模型永不放大任务权限。
 
 ## 2. 解析 —— `TaskSpec` + 能力 → 计划(Resolution)
 
@@ -105,9 +109,11 @@ TaskSpec 遇上仓库能力,解析成一条可执行流水线。
 的一段变换。`engine/agent_runtime/` 是一个包(`__init__.py`(29)原样
 re-export,公开导入面不变)。
 
-- **`engine/agent_runtime/runner.py`**(145)——每个 `kind=="agent"` step 的
+- **`engine/agent_runtime/runner.py`**(150)——每个 `kind=="agent"` step 的
   唯一入口:组装 dispatch context、注入知识、跑工具循环、按契约收敛输出、
-  成功后 `touch` 命中的 skills(用量先验)。
+  成功后 `touch` 命中的 skills(用量先验)。**双路径分流点**:按 run 的 tier
+  (`spec.mode`→`settings.model_for`)选 agent 推理模型传给 `run_agent`——
+  intent 之后才分流,上游(规划/证据/知识)全共享。
 - **`engine/agent_runtime/dispatch.py`**(94)——`AgentDispatchContext` +
   基础输出 schema。`render()` **静态在前、动态在后**,为 prompt-cache 前缀
   复用(供应商按逐字节相同前缀缓存):输出契约 / permissions / briefing /

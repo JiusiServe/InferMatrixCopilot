@@ -35,9 +35,17 @@ class TaskSpec(BaseModel):
     """The structured, validated task the whole pipeline runs on: a `kind`
     plus its target (`repo`, optional `pr`/`issue`) and the write-intent flags
     (`report_only`, `post`, `params`). The blast-radius tier is derived from
-    `kind` alone — user text can never widen permissions."""
+    `kind` alone — user text can never widen permissions.
+
+    `mode` is the dual-path (双路径) execution tier, set from intent and shared
+    by the whole run: `eco` (cost-effective model, the default) or `performance`
+    (high-capability model, only when the user explicitly asks for it). It
+    selects the agent-reasoning model per run; it is orthogonal to `tier` (which
+    still governs blast radius / permissions — a cheaper model never widens
+    what a task may do)."""
 
     kind: TaskKind
+    mode: Literal["eco", "performance"] = "eco"
     repo: str = "vllm-omni"
     pr: Optional[int] = None
     issue: Optional[int] = None
@@ -73,6 +81,8 @@ class TaskSpec(BaseModel):
         if self.issue:
             target = f" issue #{self.issue}"
         flags = []
+        if self.mode == "performance":
+            flags.append("performance")  # eco is the default, kept implicit
         if self.report_only:
             flags.append("report-only")
         if self.post:

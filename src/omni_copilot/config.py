@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     agent_model: str = "claude-sonnet-5"
     reviewer_model: str = ""  # empty -> agent_model
     intent_model: str = ""  # empty -> agent_model
+    # Dual-path (双路径) model tiers for agent reasoning. The tier is chosen from
+    # intent — `eco` by default, `performance` only when the user explicitly asks
+    # for the high-performance model — and selects the model per run via
+    # `model_for`. Both empty -> `agent_model` (so the split is a no-op until
+    # `performance_model` is configured, and never changes existing behavior).
+    eco_model: str = ""          # empty -> agent_model (the cost-effective default)
+    performance_model: str = ""  # empty -> agent_model (high-capability path)
     llm_max_tokens: int = 16000  # 8k truncated verbose lens replies mid-JSON
 
     # Repos
@@ -130,6 +137,15 @@ class Settings(BaseSettings):
     def intent(self) -> str:
         """The intent-classification model, falling back to `agent_model`."""
         return self.intent_model or self.agent_model
+
+    def model_for(self, mode: str) -> str:
+        """The agent-reasoning model for an execution tier (双路径):
+        `performance` -> the high-capability model (`performance_model`, falling
+        back to `agent_model`); anything else (`eco`, the default) -> the
+        cost-effective model (`eco_model`, falling back to `agent_model`)."""
+        if mode == "performance":
+            return self.performance_model or self.agent_model
+        return self.eco_model or self.agent_model
 
     def repo_path(self, name: str) -> Path | None:
         """The configured filesystem path for repo `name`, or None if unknown."""
