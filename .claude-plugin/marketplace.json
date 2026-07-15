@@ -1,0 +1,14 @@
+{
+  "name": "omni-copilot-marketplace",
+  "owner": {
+    "name": "tzhouam",
+    "url": "https://github.com/tzhouam"
+  },
+  "plugins": [
+    {
+      "name": "omni-copilot",
+      "source": "./plugin",
+      "description": "vLLM-Omni Copilot — governed, read-only repo-maintenance tools (PR review, issue answer, issue triage) over MCP."
+    }
+  ]
+}

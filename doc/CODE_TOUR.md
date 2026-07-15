@@ -340,13 +340,48 @@ omni-copilot --resume                           # 从首个未完成 step 重入
 - **改交付/评审行为前先看 trace 取证**:评测教训是裁判扣分约九成来自机械
   交付问题而非分析能力;先读 `eval/dataset/judgments/T3_FORENSICS.md`。
 
+## 12. 第三条数据流 —— MCP 服务端(Claude Code / Codex → 只读工具)
+
+叠在核心之上、面向宿主的一条独立入口。宿主非交互(无 `[y/N]`),所以"宿主
+不能放大权限"必须是**结构性**保证,且不能依赖磁盘上 `request.json` 未被同用户
+进程篡改。
+
+- **`mcp_policy.py`**(enforce_mcp_policy)——安全闸,在**边界**(server)与
+  **子进程**(权威)各跑一次:kind 必须 ∈ `READ_ONLY_KINDS`
+  (pr_review/issue_answer/issue_filter),`post` 硬置 False,repo 必须在
+  allowlist,pr/issue 为正,未知 params 剥除。允许集直接引用 `task_spec.py` 的
+  `READ_ONLY_KINDS`,永不与代码漂移。
+- **`mcp_server.py`**(FastMCP,stdio)——start/poll 工具对(评审 5–12 分钟会
+  撑爆同步调用超时):`start_review`/`start_issue_answer`/`start_issue_triage`
+  预约即返回 `run_id`;`get_result`(分页 `next_offset`+`report_path`,封顶
+  `mcp_report_max_bytes`)/`get_status`(`run_status`+`progress`)轮询。单
+  worker 线程串行,每个 run 一个**隔离子进程**(`python -m omni_copilot
+  --execute-reserved <id>`):子进程 stdout 落 `console.log`,server stdout 只走
+  JSON-RPC;进程级全局 tracer / `last_run_dir` 因此天然按 run 隔离。
+- **`run_status.py`**——`run_status.json` 的耐久单写者记录。`reserve_run`(server,
+  子进程存在前)写 `queued`;子进程一启动先写自己的 pid(`mark_child_started`)
+  再 `planning→running→terminal`,是运行期唯一写者;父进程只在 `.wait()` 后
+  (子已死)对账;跨进程对账仅在确认写者已死后、持 `flock` 写并保留 owner 字段。
+  按属主对账(`owner_server_id`/`owner_server_pid`/`child_pid`):只有属主 server
+  被确认死亡才把非终态 run 标 `interrupted`——多 server(Claude+Codex 各起一个)
+  下不会互抢对方 live 的 `queued` run。lazy(每次 get_*)+ 父进程 wait 后 +
+  启动扫描,三处对账,无 run 永久非终态。
+- **`__main__.py`**(cli)——`python -m omni_copilot` 入口,供 server 以当前
+  解释器拉起 `--execute-reserved` 子进程。CLI 主路径(`run_task`)不变:仍在建
+  run 目录**前**过门,弃用计划不落目录;预约(先建目录后规划)是 MCP 专属形状。
+- 打包:`plugin/`(`.claude-plugin/plugin.json` + 根 `.mcp.json`)、根
+  `.claude-plugin/marketplace.json`、`docs/codex/config.toml`;安装说明见
+  `doc/MCP.md`。`mcp` 依赖在 `[mcp]` extra 后,独立 CLA 安装保持零依赖。由
+  `test_mcp.py` 固定(篡改防御、单写者对账、分页、只读工具集)。
+
 ## 附录:文件 → 段落(完整索引)
 
 顶层 `omni_copilot/`:`__init__.py`=包根 · `intent.py`§1 · `task_spec.py`§1 ·
 `chat.py`§1 · `ui.py`§1 · `config.py`§3 · `agent_loop.py`§4 · `tools.py`§4/§7 ·
 `scopes.py`§4/§7 · `llm.py`§4 · `tracing.py`§4 · `push.py`§7 · `run_trace.py`§8 ·
-`metrics.py`§8 · `notify.py`§8。
-`cli/`:`entry.py`·`__main__.py`·`__init__.py`·`utils.py`§1;`copilot.py`§2。
+`metrics.py`§8 · `notify.py`§8 · `mcp_policy.py`§12 · `mcp_server.py`§12 ·
+`run_status.py`§12 · `__main__.py`§12。
+`cli/`:`entry.py`(亦 §12)·`__main__.py`·`__init__.py`·`utils.py`§1;`copilot.py`§2(亦 §12)。
 `adapters/`:`base.py`·`__init__.py`§2。
 `playbooks/`:`store.py`·`__init__.py`§2。
 `engine/`:`__init__.py`·`executor.py`·`step.py`·`registry.py`§3;`planner.py`§2。

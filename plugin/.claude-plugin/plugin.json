@@ -1,0 +1,9 @@
+{
+  "name": "omni-copilot",
+  "version": "0.1.0",
+  "description": "vLLM-Omni Copilot — governed, read-only repo-maintenance tools (PR review, issue answer, issue triage) exposed over MCP. Requires the `omni-copilot[mcp]` Python package on PATH.",
+  "author": {
+    "name": "tzhouam",
+    "url": "https://github.com/tzhouam"
+  }
+}
