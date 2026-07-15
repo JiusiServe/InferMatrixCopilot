@@ -18,6 +18,33 @@ import yaml
 HIGH_RISK_SECTIONS = ("push", "repo", "upstream")
 REQUIRED_SECTIONS = ("name", "repo")
 
+# Always-on briefing byte cap. The curated hard-gate + navigation pages are
+# high-signal and injected into the static (cached) prompt prefix, so a generous
+# cap is fine; deeper guides/incidents are pulled on demand via the doc tools.
+_BRIEFING_CAP = 8000
+
+
+def render_briefing_docs(root: Path | str, docs: list[str], *, header: str = "",
+                         cap: int = _BRIEFING_CAP) -> str:
+    """Concatenate the `docs` (paths relative to `root`) into one capped briefing
+    slice, prefixed by `header`. Missing docs are skipped (never fatal). Returns
+    "" when none exist. Shared by the general (framework) and repo-specific
+    briefing layers so both render identically."""
+    root = Path(root)
+    parts: list[str] = []
+    for rel in docs:
+        p = root / rel
+        if p.exists():
+            parts.append(p.read_text(encoding="utf-8", errors="replace").strip())
+    if not parts:
+        return ""
+    body = ((header + "\n\n") if header else "") + "\n\n---\n\n".join(parts)
+    if len(body) > cap:
+        body = (body[:cap]
+                + f"\n\n...[briefing capped at {cap} chars — use doc_read for the "
+                  "full pages]")
+    return body
+
 
 class AdapterError(Exception):
     """Raised for any adapter-layer violation: a missing/invalid manifest, an
@@ -106,13 +133,28 @@ class RepoAdapter:
             caps.add("modules")
         return caps
 
-    def briefing(self) -> str:
-        """The repo's always-on prompt slice (empty when no profile exists)."""
-        if not (self.profile_dir / "profile.yaml").exists():
-            return ""
-        from ..profiles.store import ProfileStore
+    def briefing(self, knowledge_root: Path | None = None) -> str:
+        """The repo's always-on prompt slice — the REPO-SPECIFIC part only. Reads
+        this adapter's `knowledge.briefing_docs` (its `repos/<repo>/` hard-gate
+        rules + navigation index) from the SHARED `knowledge_root` (the community
+        submodule; general `framework/` knowledge is injected separately by the
+        caller). Deeper guides/incidents are pulled on demand via the doc tools,
+        not dumped here. Falls back to a legacy AI `profile.yaml` when one exists,
+        else empty."""
+        kn = self.manifest.get("knowledge") or {}
+        docs = kn.get("briefing_docs") or []
+        if knowledge_root is not None and docs:
+            body = render_briefing_docs(
+                knowledge_root, docs,
+                header=(f"Repo-specific knowledge (source: {kn.get('source', '')}; "
+                        "open the linked deeper docs with doc_read / doc_search):"))
+            if body:
+                return body
+        if (self.profile_dir / "profile.yaml").exists():  # legacy AI profile
+            from ..profiles.store import ProfileStore
 
-        return ProfileStore(self.profile_dir).render_briefing()
+            return ProfileStore(self.profile_dir).render_briefing()
+        return ""
 
 
 def load_adapter(adapter_dir: str | Path) -> RepoAdapter:

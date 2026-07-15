@@ -199,3 +199,71 @@ def _repo_map_tool(ctx: StepContext, adapter) -> dict[str, ToolDef]:
         "reading files; it is not a substitute for reading them.",
         {"type": "object", "properties": {"query": {"type": "string"}},
          "required": ["query"]}, repo_map)}
+
+
+def _repo_docs_tool(ctx: StepContext, adapter) -> dict[str, ToolDef]:
+    """`doc_search` / `doc_read` over the SHARED curated knowledge base (the
+    community-docs submodule: framework/ general + repos/<repo>/ specific). The
+    always-on briefing injects only the hard-gate rules + navigation; the deep
+    guides/incidents those pages link to (general or repo-specific) are pulled on
+    demand here (design §V2.3.4 channel 3: pulled, not injected) — so nothing in
+    the knowledge base is lost, just not dumped wholesale. Read-only and contained
+    under the knowledge dir (traversal is refused)."""
+    import subprocess
+
+    kdir = Path(ctx.settings.knowledge_dir)  # shared base (framework/ + repos/)
+    if not kdir.exists():
+        return {}
+    root = kdir.resolve()
+
+    def _contained(path: str) -> Path | None:
+        """Resolve `path` under the knowledge root, or None if it escapes."""
+        p = (kdir / path).resolve()
+        try:
+            p.relative_to(root)
+        except ValueError:
+            return None
+        return p
+
+    def doc_search(query: str, **_: Any) -> str:
+        """Tool: grep the knowledge base's markdown for `query`; return
+        knowledge-relative `path:line:text` matches (capped), or a sentinel."""
+        out = subprocess.run(
+            ["grep", "-rniI", "--include=*.md", "-e", query, str(kdir)],
+            capture_output=True, text=True, timeout=30)
+        rel = [ln.replace(str(kdir) + "/", "", 1) for ln in out.stdout.splitlines()]
+        return "\n".join(rel)[:8000] or "(no matching docs)"
+
+    def doc_read(path: str, offset: int = 0, **_: Any) -> str:
+        """Tool: read a knowledge-base doc by its knowledge-relative path
+        (windowed 24k chars; page with offset). Refuses paths escaping the base."""
+        p = _contained(path)
+        if p is None:
+            return f"refused: path escapes the knowledge base: {path!r}"
+        if not p.exists():
+            return f"(no such doc: {path})"
+        data = p.read_text(encoding="utf-8", errors="replace")
+        window = data[offset:offset + 24_000]
+        if offset + 24_000 < len(data):
+            window += (f"\n...[truncated at {offset + 24_000} of {len(data)} — "
+                       f"call doc_read again with offset={offset + 24_000}]")
+        return window
+
+    s = {"type": "string"}
+    return {
+        "doc_search": ToolDef(
+            "doc_search",
+            "Search the repo's curated knowledge base (community docs) for a "
+            "string; returns knowledge-relative path:line matches to open with "
+            "doc_read.",
+            {"type": "object", "properties": {"query": s}, "required": ["query"]},
+            doc_search),
+        "doc_read": ToolDef(
+            "doc_read",
+            "Read a doc from the curated knowledge base by its knowledge-relative "
+            "path (e.g. `repos/<repo>/rules.md`, or a `framework/...` guide it "
+            "links to). Windowed; page with offset.",
+            {"type": "object", "properties": {"path": s,
+                                              "offset": {"type": "integer"}},
+             "required": ["path"]}, doc_read),
+    }

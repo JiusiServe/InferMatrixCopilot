@@ -20,6 +20,7 @@ from ..step import FailureKind, StepContext, StepResult
 from .dispatch import BASE_OUTPUT_SCHEMA, AgentDispatchContext
 from .knowledge import (
     _knowledge_tools,
+    _repo_docs_tool,
     _repo_map_tool,
     _resolve_adapter,
     _retrieve_memories,
@@ -74,11 +75,25 @@ async def run_agent_step(
 
     adapter = _resolve_adapter(ctx)
     all_extra = {**knowledge, **_repo_map_tool(ctx, adapter),
-                 **(extra_tools or {})}
+                 **_repo_docs_tool(ctx, adapter), **(extra_tools or {})}
+    # Briefing = GENERAL framework knowledge (shared, cross-repo) + this repo's
+    # REPO-SPECIFIC slice — both from the shared knowledge base. Deeper docs are
+    # pulled on demand via the doc tools (all_extra above).
     briefing = ""
-    if adapter is not None and ctx.settings.profile_briefing_enabled:
+    if ctx.settings.profile_briefing_enabled:
         try:
-            briefing = adapter.briefing()
+            from ...adapters.base import render_briefing_docs
+
+            kroot = ctx.settings.knowledge_dir
+            parts = []
+            if ctx.settings.knowledge_general_docs and kroot.exists():
+                parts.append(render_briefing_docs(
+                    kroot, ctx.settings.knowledge_general_docs,
+                    header="General framework knowledge (cross-repo; open deeper "
+                           "docs with doc_read / doc_search):"))
+            if adapter is not None:
+                parts.append(adapter.briefing(kroot))
+            briefing = "\n\n".join(p for p in parts if p)
         except Exception:
             briefing = ""
 
