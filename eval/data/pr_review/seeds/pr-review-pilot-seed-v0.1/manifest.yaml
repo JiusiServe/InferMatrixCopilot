@@ -1,0 +1,23 @@
+benchmark_seed_version: pr-review-pilot-seed-v0.1.0
+status: PROVISIONAL_BENCHMARK_SEED
+repository: vllm-project/vllm-omni
+created_at: '2026-07-16'
+source: public_github_history
+candidate_counts:
+  buggy_prs: 5
+  auto_certified_clean_prs: 0
+  candidate_gt_findings: 9
+formal_benchmark_eligible: false
+items:
+  - items/pr-3094.yaml
+  - items/pr-2360.yaml
+  - items/pr-1720.yaml
+  - items/pr-3100.yaml
+  - items/pr-3053.yaml
+blocking_gaps:
+  - exact_base_sha_resolution
+  - repository_snapshot_and_full_diff
+  - multi_model_gt_jury
+  - accepted_location_freeze
+  - clean_pr_certification
+  - immutable_manifest_hashes

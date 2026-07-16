@@ -1,4 +1,4 @@
-from eval.pr_review.runner.tool_policy import ToolDecision, ToolPolicy
+from eval.tasks.pr_review.runner.tool_policy import ToolDecision, ToolPolicy
 
 
 def test_readonly_git_is_allowed_and_mutation_is_refused(tmp_path):

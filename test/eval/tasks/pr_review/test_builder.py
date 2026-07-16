@@ -1,6 +1,6 @@
-from eval.pr_review.benchmark.builder.deduplicator import cluster_candidates
-from eval.pr_review.benchmark.builder.review_candidate_extractor import ReviewCandidate
-from eval.pr_review.benchmark.builder.snapshot_selector import select_review_preceding_head
+from eval.tasks.pr_review.benchmark.builder.deduplicator import cluster_candidates
+from eval.tasks.pr_review.benchmark.builder.review_candidate_extractor import ReviewCandidate
+from eval.tasks.pr_review.benchmark.builder.snapshot_selector import select_review_preceding_head
 
 
 def test_snapshot_is_last_commit_before_first_substantive_review():
@@ -35,8 +35,8 @@ def test_candidate_dedup_requires_same_file_and_similar_root_cause():
     clusters = cluster_candidates([a, b, c])
     assert sorted(len(cluster.candidates) for cluster in clusters) == [1, 2]
 
-from eval.pr_review.benchmark.builder.clean_certifier import certify_clean_pr
-from eval.pr_review.runner.output_schema import AgentReview
+from eval.tasks.pr_review.benchmark.builder.clean_certifier import certify_clean_pr
+from eval.tasks.pr_review.runner.output_schema import AgentReview
 
 
 def test_clean_certification_rejects_request_changes_even_without_findings():

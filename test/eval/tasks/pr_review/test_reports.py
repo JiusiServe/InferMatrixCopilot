@@ -1,5 +1,5 @@
-from eval.pr_review.metrics.models import SummaryMetrics
-from eval.pr_review.reports import render_summary
+from eval.tasks.pr_review.metrics.models import SummaryMetrics
+from eval.tasks.pr_review.reports import render_summary
 
 
 def test_summary_contains_required_sections_and_no_composite():

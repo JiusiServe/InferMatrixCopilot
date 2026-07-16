@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from eval.pr_review.runner.output_schema import OutputContractError, parse_agent_output
+from eval.tasks.pr_review.runner.output_schema import OutputContractError, parse_agent_output
 
 
 def valid_output():

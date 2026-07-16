@@ -2,8 +2,8 @@ import subprocess
 
 import pytest
 
-from eval.pr_review.runner.tools import StaticToolExecutor, ToolRefused
-from eval.pr_review.runner.trace_collector import TraceCollector
+from eval.tasks.pr_review.runner.tools import StaticToolExecutor, ToolRefused
+from eval.tasks.pr_review.runner.trace_collector import TraceCollector
 
 
 def test_static_tools_are_bounded_and_trace_policy_violations(tmp_path):

@@ -1,0 +1,56 @@
+benchmark_id: pr-review-seed-3094
+status: READY_FOR_SNAPSHOT_AND_JURY
+repository: vllm-project/vllm-omni
+pr_number: 3094
+title: fix generations reponse body
+pr_url: https://github.com/vllm-project/vllm-omni/pull/3094
+base_sha: null
+head_sha: b9ad822ca71b3d8ed8945f8fea5cebafc7c72a24
+snapshot_rule: last PR commit before the first substantive human review on 2026-04-24
+post_review_fix_sha: 434d6b19da3c51575c4c290c8ac64a934b35fd20
+changed_files:
+  - vllm_omni/entrypoints/openai/api_server.py
+  - vllm_omni/entrypoints/openai/protocol/images.py
+expected_verdict_candidate: REQUEST_CHANGES
+clean_status: buggy
+candidate_gt_findings:
+  - id: CAND-3094-001
+    summary: Omitted output_format silently changes the documented default from PNG to JPEG
+    description: _choose_output_format(None, None) returns jpeg although the comment and request schema say omitted output_format defaults to png, changing response encoding for existing callers.
+    severity_candidate: Major
+    category_candidate: compatibility_api
+    merge_blocking_candidate: true
+    location_required: true
+    accepted_locations_candidate:
+      - file: vllm_omni/entrypoints/openai/api_server.py
+        start_line: 1545
+        end_line: 1555
+        symbol: generate_images
+    evidence:
+      review_date: '2026-04-24'
+      reviewer: david6666666
+      review_comment_url: https://github.com/vllm-project/vllm-omni/pull/3094
+      fix_evidence: The later fix passes an explicit png fallback.
+  - id: CAND-3094-002
+    summary: Default image generation can fail validation because size=None is passed to a str field
+    description: When request.size is omitted, the response explicitly passes None while ImageGenerationResponse.size is typed as str; Pydantic v2 rejects the value after image generation succeeds.
+    severity_candidate: Major
+    category_candidate: correctness
+    merge_blocking_candidate: true
+    location_required: true
+    accepted_locations_candidate:
+      - file: vllm_omni/entrypoints/openai/api_server.py
+        start_line: 1550
+        end_line: 1565
+        symbol: generate_images
+      - file: vllm_omni/entrypoints/openai/protocol/images.py
+        symbol: ImageGenerationResponse
+    evidence:
+      review_date: '2026-04-24'
+      reviewer: david6666666
+      review_comment_url: https://github.com/vllm-project/vllm-omni/pull/3094
+      fix_evidence: The later fix conditionally omits size from response kwargs.
+remaining_work:
+  - resolve exact base_sha
+  - build full base/head evidence package
+  - run GT jury and freeze severity/category/locations

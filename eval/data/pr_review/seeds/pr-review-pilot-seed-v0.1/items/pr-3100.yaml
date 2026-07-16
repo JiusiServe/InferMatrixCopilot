@@ -1,0 +1,51 @@
+benchmark_id: pr-review-seed-3100
+status: NEEDS_FULL_SHA_RESOLUTION_AND_JURY
+repository: vllm-project/vllm-omni
+pr_number: 3100
+title: Add Static EPLB for HunyuanImage3.0
+pr_url: https://github.com/vllm-project/vllm-omni/pull/3100
+base_sha: null
+head_sha_short: eb7b8e2
+review_date: '2026-04-24'
+post_review_fix_sha_short: b01da7e
+expected_verdict_candidate: REQUEST_CHANGES
+clean_status: buggy
+candidate_gt_findings:
+  - id: CAND-3100-001
+    summary: Missing comma makes the offline text-to-image script fail to parse
+    description: The new parser.add_argument call omits a comma after the option string, producing a SyntaxError before the example can start.
+    severity_candidate: Blocker
+    category_candidate: correctness
+    merge_blocking_candidate: true
+    location_required: true
+    accepted_locations_candidate:
+      - file: examples/offline_inference/text_to_image/text_to_image.py
+        start_line: 193
+        end_line: 196
+        symbol: parse_args
+  - id: CAND-3100-002
+    summary: Static EPLB layout is saved under a model identifier that may not be writable
+    description: pipeline.model.model_path may be a Hugging Face model ID or read-only location. torch.save then fails at the end of generation whenever static EPLB is enabled.
+    severity_candidate: Major
+    category_candidate: correctness
+    merge_blocking_candidate: true
+    location_required: true
+    accepted_locations_candidate:
+      - file: vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_transformer.py
+        start_line: 2902
+        end_line: 2905
+  - id: CAND-3100-003
+    summary: Loading a persisted EPLB layout without weights_only permits unsafe pickle deserialization
+    description: torch.load is called without weights_only=True on a layout file that could be tampered with.
+    severity_candidate: Major
+    category_candidate: security_safety
+    merge_blocking_candidate: true
+    location_required: true
+    accepted_locations_candidate:
+      - file: vllm_omni/distributed/eplb/static_policy.py
+        start_line: 15
+        end_line: 25
+remaining_work:
+  - resolve full pre-review head SHA and exact base SHA
+  - confirm all three issues coexist in the selected snapshot
+  - verify subsequent fixes and run GT jury

@@ -1,8 +1,8 @@
 import pytest
 
-from eval.pr_review.metrics.models import SummaryMetrics
-from eval.pr_review.reports.replicates import summarize_replicates
-from eval.pr_review.spec import load_evaluation_spec
+from eval.tasks.pr_review.metrics.models import SummaryMetrics
+from eval.tasks.pr_review.reports.replicates import summarize_replicates
+from eval.tasks.pr_review.spec import load_evaluation_spec
 
 
 def summary(value):

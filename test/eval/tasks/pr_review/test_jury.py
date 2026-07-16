@@ -1,5 +1,5 @@
-from eval.pr_review.adjudication.jury import run_position_swapped_jury
-from eval.pr_review.adjudication.models import JudgeVote
+from eval.tasks.pr_review.adjudication.jury import run_position_swapped_jury
+from eval.tasks.pr_review.adjudication.models import JudgeVote
 
 
 class Judge:

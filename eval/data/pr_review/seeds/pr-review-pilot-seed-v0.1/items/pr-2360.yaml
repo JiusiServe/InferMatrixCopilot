@@ -1,0 +1,37 @@
+benchmark_id: pr-review-seed-2360
+status: READY_FOR_SNAPSHOT_AND_JURY
+repository: vllm-project/vllm-omni
+pr_number: 2360
+title: Optimize cos sin shape handling in rope.py to adapt Wan2.2
+pr_url: https://github.com/vllm-project/vllm-omni/pull/2360
+base_sha: null
+head_sha: 492294a95d684242907773f192479c6841f9ff1a
+snapshot_rule: merge commit immediately before the requested-changes review submitted on 2026-04-02
+post_review_fix_sha_short: 73e8325
+changed_files:
+  - vllm_omni/diffusion/layers/rope.py
+expected_verdict_candidate: REQUEST_CHANGES
+clean_status: buggy
+candidate_gt_findings:
+  - id: CAND-2360-001
+    summary: Last-dimension-only check can pass a 2-D cosine tensor to rotary_position_embedding
+    description: After squeezing a B,S,D input, cos may be 2-D. The code disables reshaping solely because the last dimension matches, so the downstream operator receives a 2-D tensor instead of the expected expanded 4-D shape.
+    severity_candidate: Major
+    category_candidate: correctness
+    merge_blocking_candidate: true
+    location_required: true
+    accepted_locations_candidate:
+      - file: vllm_omni/diffusion/layers/rope.py
+        start_line: 49
+        end_line: 60
+        symbol: apply_rotary_emb_mindiesd
+    evidence:
+      review_date: '2026-04-02'
+      reviewer: lishunyang12
+      review_comment_url: https://github.com/vllm-project/vllm-omni/pull/2360/commits/58d78f76700561c216c0b418ba382b46715138af
+      requested_change: Guard with cos.dim() == 4 before skipping reshape.
+remaining_work:
+  - resolve exact base_sha
+  - verify whether later merge commits changed the affected hunk before review
+  - resolve full post-review fix SHA
+  - run GT jury

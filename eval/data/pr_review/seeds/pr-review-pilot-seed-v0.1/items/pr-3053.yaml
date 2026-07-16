@@ -1,0 +1,38 @@
+benchmark_id: pr-review-seed-3053
+status: NEEDS_FULL_SHA_RESOLUTION_AND_JURY
+repository: vllm-project/vllm-omni
+pr_number: 3053
+title: Add MXFP4 online quantization for Wan2.2 diffusion models
+pr_url: https://github.com/vllm-project/vllm-omni/pull/3053
+base_sha: null
+reviewed_head_sha_short: dcbfab70a6
+review_date: '2026-04-23'
+post_review_fix_sha_short: a7a2f90
+expected_verdict_candidate: REQUEST_CHANGES
+clean_status: buggy
+candidate_gt_findings:
+  - id: CAND-3053-001
+    summary: A duplicate method overrides the quantization-aware transformer factory
+    description: The second one-argument _create_transformer definition replaces the new two-argument implementation. Construction then calls it with config and quant_config and raises TypeError before inference.
+    severity_candidate: Blocker
+    category_candidate: correctness
+    merge_blocking_candidate: true
+    location_required: true
+    accepted_locations_candidate:
+      - file: vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2.py
+        symbol: _create_transformer
+  - id: CAND-3053-002
+    summary: MXFP4 kernel call may use a keyword unsupported by the pinned vLLM helper
+    description: The review states that the installed apply_fp4_marlin_linear signature expects weight_scale_2 rather than weight_global_scale, which would raise TypeError on the first quantized linear invocation.
+    severity_candidate: Blocker
+    category_candidate: compatibility_api
+    merge_blocking_candidate: true
+    location_required: true
+    accepted_locations_candidate:
+      - file: vllm_omni/quantization/mxfp4_config.py
+        symbol: apply
+    validity_risk: The author later disputed the helper signature, so this candidate requires dependency-version evidence in Jury round 2.
+remaining_work:
+  - resolve full reviewed head SHA and exact base SHA
+  - confirm pinned vLLM version and function signature
+  - run enhanced GT jury; exclude CAND-3053-002 if not stable for the frozen dependency version

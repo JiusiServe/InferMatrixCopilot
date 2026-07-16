@@ -1,4 +1,4 @@
-from eval.pr_review.adjudication.bipartite_matcher import MatchEdge, maximum_weight_matching
+from eval.tasks.pr_review.adjudication.bipartite_matcher import MatchEdge, maximum_weight_matching
 
 
 def test_global_matching_beats_greedy_choice():

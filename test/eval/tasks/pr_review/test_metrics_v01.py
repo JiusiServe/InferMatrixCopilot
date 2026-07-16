@@ -1,10 +1,10 @@
 import pytest
 
-from eval.pr_review.adjudication.models import AdjudicationRow, FinalStatus
-from eval.pr_review.benchmark.schema import BenchmarkItem
-from eval.pr_review.metrics import PRResultInput, aggregate_results, evaluate_pr
-from eval.pr_review.runner.output_schema import AgentReview
-from eval.pr_review.runner.trace_collector import RunMetadata
+from eval.tasks.pr_review.adjudication.models import AdjudicationRow, FinalStatus
+from eval.tasks.pr_review.benchmark.schema import BenchmarkItem
+from eval.tasks.pr_review.metrics import PRResultInput, aggregate_results, evaluate_pr
+from eval.tasks.pr_review.runner.output_schema import AgentReview
+from eval.tasks.pr_review.runner.trace_collector import RunMetadata
 
 
 def gt(gt_id, severity, blocking, category="correctness", line=1):

@@ -1,7 +1,7 @@
-from eval.pr_review.adjudication.engine import adjudicate_review
-from eval.pr_review.adjudication.models import JudgeVote
-from eval.pr_review.benchmark.schema import BenchmarkItem
-from eval.pr_review.runner.output_schema import AgentReview
+from eval.tasks.pr_review.adjudication.engine import adjudicate_review
+from eval.tasks.pr_review.adjudication.models import JudgeVote
+from eval.tasks.pr_review.benchmark.schema import BenchmarkItem
+from eval.tasks.pr_review.runner.output_schema import AgentReview
 
 
 class Judge:

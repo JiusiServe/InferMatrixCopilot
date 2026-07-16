@@ -1,0 +1,22 @@
+required_before_formal_use:
+  data_collection:
+    - fetch PR metadata, reviews, review comments, commits and changed files through GitHub REST API
+    - resolve exact base_sha and selected pre-review head_sha
+    - clone/fetch only objects reachable from base/head
+    - persist full diff and immutable evidence packages
+  gt_generation:
+    - run 3 independent judge configurations with two presentation orders
+    - require at least 5 of 6 first-round votes
+    - run enhanced second round for disagreements and require at least 8 of 10 votes
+    - deduplicate findings by root cause
+    - freeze severity, category, merge_blocking and accepted_locations
+  clean_set:
+    - collect historically approved candidates
+    - run three independent reviewer agents
+    - adjudicate every output finding
+    - certify only PRs with no merge-blocking findings and high clean-jury agreement
+  release:
+    - generate schema-valid benchmark items
+    - calculate item sha256 hashes
+    - create immutable manifest and benchmark version
+    - separate Dev and Test GT visibility

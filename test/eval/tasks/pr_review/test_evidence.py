@@ -1,8 +1,8 @@
 import subprocess
 
-from eval.pr_review.adjudication.evidence import RepositoryEvidenceProvider
-from eval.pr_review.benchmark.schema import BenchmarkItem
-from eval.pr_review.runner.output_schema import AgentFinding
+from eval.tasks.pr_review.adjudication.evidence import RepositoryEvidenceProvider
+from eval.tasks.pr_review.benchmark.schema import BenchmarkItem
+from eval.tasks.pr_review.runner.output_schema import AgentFinding
 
 
 def _git(repo, *args):

@@ -1,6 +1,6 @@
 import subprocess
 
-from eval.pr_review.repository.readonly_workspace import ReadOnlyWorkspace
+from eval.tasks.pr_review.repository.readonly_workspace import ReadOnlyWorkspace
 
 
 def test_snapshot_does_not_contain_review_after_commit(tmp_path):

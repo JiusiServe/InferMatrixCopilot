@@ -1,0 +1,51 @@
+benchmark_id: pr-review-seed-1720
+status: READY_FOR_SNAPSHOT_AND_JURY
+repository: vllm-project/vllm-omni
+pr_number: 1720
+title: Adding some metrics on audio/speech
+pr_url: https://github.com/vllm-project/vllm-omni/pull/1720
+base_sha: null
+head_sha: 54b1f67a7b2feaf24dcf1ab5e6685f00f8fb3f5c
+snapshot_rule: initial metrics commit reviewed by Codex before follow-up fix commits
+post_review_fix_sha: 47d9aba9bf13eba883a22cdc38d22e7338de5398
+changed_files:
+  - vllm_omni/entrypoints/openai/serving_speech.py
+expected_verdict_candidate: REQUEST_CHANGES
+clean_status: buggy
+candidate_gt_findings:
+  - id: CAND-1720-001
+    summary: Non-TTS non-streaming speech requests reference an uninitialized ph_len
+    description: ph_len is assigned only inside the TTS branch, while the new prompt-token metric observes it unconditionally. A non-TTS model with stream=false raises UnboundLocalError and returns an error instead of audio.
+    severity_candidate: Blocker
+    category_candidate: correctness
+    merge_blocking_candidate: true
+    location_required: true
+    accepted_locations_candidate:
+      - file: vllm_omni/entrypoints/openai/serving_speech.py
+        start_line: 640
+        end_line: 665
+        symbol: create_speech
+    evidence:
+      review_date: '2026-03-06'
+      reviewer: chatgpt-codex-connector
+      review_comment_url: https://github.com/vllm-project/vllm-omni/pull/1720/commits/54b1f67a7b2feaf24dcf1ab5e6685f00f8fb3f5c
+      fix_evidence: A later fix changes where token metrics are observed.
+  - id: CAND-1720-002
+    summary: New metric registration depends on a private prometheus_client registry attribute
+    description: The implementation traverses REGISTRY._names_to_collectors, a private attribute that may change across prometheus_client versions and can break metrics initialization after dependency upgrades.
+    severity_candidate: Minor
+    category_candidate: maintainability
+    merge_blocking_candidate: false
+    location_required: true
+    accepted_locations_candidate:
+      - file: vllm_omni/entrypoints/openai/serving_speech.py
+        start_line: 28
+        end_line: 75
+    evidence:
+      review_date: '2026-03-09'
+      reviewer: lishunyang12
+      review_comment_url: https://github.com/vllm-project/vllm-omni/pull/1720/files
+remaining_work:
+  - resolve exact base_sha
+  - determine whether the private-API finding meets GT validity threshold
+  - run GT jury and deduplicate review evidence

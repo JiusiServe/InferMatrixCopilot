@@ -32,7 +32,7 @@ sys.path.insert(0, str(EVAL_DIR.parent / "src"))
 from omni_copilot.config import Settings  # noqa: E402
 from omni_copilot.llm import LLM, parse_json_reply  # noqa: E402
 
-from run_eval import ARMS, GROUND_TRUTH, PRS  # noqa: E402  (v1 harness)
+from eval.legacy.run_eval import ARMS, GROUND_TRUTH, PRS  # noqa: E402  (v1 harness)
 
 # severity/resolution weights per METRIC_V2.md (blocking x2, nit x0.75, resolved x1.5)
 GT_WEIGHTS: dict[int, dict[str, float]] = {}

@@ -27,8 +27,8 @@ sys.path.insert(0, str(EVAL_DIR.parent / "src"))
 from omni_copilot.config import Settings  # noqa: E402
 from omni_copilot.llm import LLM, parse_json_reply  # noqa: E402
 
-from run_eval import ARMS, GROUND_TRUTH, PRS  # noqa: E402
-from run_eval_v2 import (  # noqa: E402
+from eval.legacy.run_eval import ARMS, GROUND_TRUTH, PRS  # noqa: E402
+from eval.legacy.run_eval_v2 import (  # noqa: E402
     GT_WEIGHTS,
     JUDGE_MODELS,
     _cached,

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ...adjudication.models import AdjudicationRow, FinalStatus
-from ...benchmark.schema import Severity, Verdict
+from ..schema import Severity, Verdict
 from ...runner.output_schema import AgentReview
 
 

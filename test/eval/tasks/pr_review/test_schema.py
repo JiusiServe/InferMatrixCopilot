@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from eval.pr_review.benchmark.schema import BenchmarkItem, GroundTruthFinding
+from eval.tasks.pr_review.benchmark.schema import BenchmarkItem, GroundTruthFinding
 
 
 def finding(**updates):

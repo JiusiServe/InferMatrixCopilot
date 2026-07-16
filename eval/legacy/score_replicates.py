@@ -17,7 +17,7 @@ EVAL_DIR = Path(__file__).resolve().parent
 SAMPLES = EVAL_DIR / "raw" / "copilot_v2_samples"
 
 sys.path.insert(0, str(EVAL_DIR))
-from run_eval_v3 import rqs3e  # noqa: E402
+from eval.legacy.run_eval_v3 import rqs3e  # noqa: E402
 
 
 def parse_snapshot(path: Path) -> dict | None:

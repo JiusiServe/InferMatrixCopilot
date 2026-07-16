@@ -6,7 +6,7 @@ from collections import Counter
 from typing import Any
 
 from ...adjudication.jury import JudgeBackend, run_position_swapped_jury
-from ...benchmark.schema import Category, GroundTruthFinding, Severity
+from ..schema import Category, GroundTruthFinding, Severity
 from .deduplicator import CandidateCluster
 
 
