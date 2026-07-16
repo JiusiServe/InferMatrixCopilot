@@ -108,13 +108,17 @@ def review(batch: str, pages: list[str], iteration: int,
                      f"as BEFORE content that AFTER pages must preserve) ===\n{text}"
                      f"\n=== END DATA ===\n")
     for rel in pages:
+        after = (REPO / "knowledge" / rel).resolve()
+        if not after.exists() or not after.is_relative_to((REPO / "knowledge").resolve()):
+            print(f"REVISE (AFTER page missing or escapes knowledge/: {rel} — "
+                  "authoring/path error, nothing to review)")
+            return 1
         before = subprocess.run(
             ["git", "-C", str(REPO), "show", f"HEAD:knowledge/{rel}"],
             capture_output=True, text=True)
-        after = (REPO / "knowledge" / rel)
         parts.append(f"\n=== DATA: BEFORE {rel} ===\n{before.stdout}"
                      f"\n=== DATA: AFTER {rel} ===\n"
-                     f"{after.read_text(encoding='utf-8') if after.exists() else '(missing!)'}"
+                     f"{after.read_text(encoding='utf-8')}"
                      f"\n=== END DATA ===\n")
     prompt = "".join(parts)
     if len(prompt) > CAP:

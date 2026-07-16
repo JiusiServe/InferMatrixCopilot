@@ -1,0 +1,7 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 2075a0eb3057dba797c6f2806db1bea60d833947c3dc0eaef4c38053cdbd61f9
+prompt_chars: 4209
+---- reviewer output ----
+AFTER preserves everything; only new tags were added.
+
+VERDICT: APPROVE

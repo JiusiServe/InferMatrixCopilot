@@ -35,9 +35,9 @@ contradictions: [相对路径]         # 可选：与本页冲突的页面
 
 - 归属：`general`、`vllm-omni`
 - 工作主题：`review`、`ci`、`docs`、`git`、`debug`、`benchmark`、`environment`、
-  `remote`、`agents`、`planning`、`dev`
+  `remote`、`agents`、`planning`、`dev`、`rebase`
 - 代码/模型轴：`components`、`models`、`diffusion`、`model-executor`、`serving`、
-  `hunyuan-image3`
+  `scheduler`、`distributed`、`config`、`hunyuan-image3`、`ltx2`、`qwen-omni`
 
 ## 溯源标记
 
