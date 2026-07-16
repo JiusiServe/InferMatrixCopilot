@@ -88,9 +88,13 @@ def _issue_agent_step(step_name: str, purpose: str, guidance: str,
         elif result.failure is FailureKind.ESCALATE:
             # An incomplete-but-substantive draft ships with caveats instead of
             # being discarded (eval: 3 escalated runs held correct diagnoses and
-            # delivered nothing). Empty/thin drafts still escalate.
+            # delivered nothing). Empty/thin drafts still escalate. The prose
+            # floor alone is wrong for triage: a complete one-row triage table
+            # renders under 200 chars, so structured rows count as substantive
+            # on their own (a high-confidence needs_review triage of issue5123
+            # was discarded and blocked the run).
             key, text = render(output)
-            if len(text.strip()) > 300:
+            if output.get("triage_table") or len(text.strip()) > 300:
                 text = (f"> ⚠ draft shipped with caveats — agent self-assessed "
                         f"confidence: {output.get('confidence', 'low')}; "
                         f"verify before relying on it.\n\n{text}")

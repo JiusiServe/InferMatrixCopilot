@@ -151,3 +151,48 @@ def test_every_agent_step_goes_through_the_runtime(settings, trace, tmp_path,
     assert result.ok, f"{step_name}: {result.summary}"
     ev = next(trace.events("agent_dispatch"))
     assert ev["permissions"]["tools"], step_name
+
+
+def _run_issue_step(settings, trace, tmp_path, step_name, state, reply):
+    registry = register_builtin_steps(StepRegistry())
+    ctx = StepContext(settings=settings, state=state, params={},
+                      run_dir=tmp_path / "run", trace=trace,
+                      llm=ScriptedLLM([reply]))
+    return asyncio.run(registry.get(step_name).handler(ctx)), ctx
+
+
+def test_needs_review_triage_with_rows_is_salvaged(settings, trace, tmp_path):
+    """A complete triage table self-assessed `needs_review` ships with caveats
+    instead of blocking the run — a one-row table renders under the 300-char
+    prose floor, so the floor alone discarded a correct high-confidence triage
+    (issue5123, run-20260716-175425)."""
+    reply = contract(status="needs_review", confidence="high",
+                     triage_table=[{"number": 5123, "title": "gradio removed",
+                                    "type": "bug", "module": "examples",
+                                    "priority": "high", "labels": ["bug"]}])
+    result, ctx = _run_issue_step(
+        settings, trace, tmp_path, "agent.triage_issues",
+        {"task_spec": {"kind": "issue_filter"}, "issue_text": "[]"}, reply)
+    assert result.ok, result.summary
+    assert "with caveats" in result.summary
+    assert "#5123" in ctx.state["triage_table"]
+    assert ctx.state["triage_table"].startswith("> ⚠")  # caveat kept visible
+
+
+def test_needs_review_triage_without_rows_still_escalates(settings, trace,
+                                                          tmp_path):
+    reply = contract(status="needs_review", triage_table=[])
+    result, _ = _run_issue_step(
+        settings, trace, tmp_path, "agent.triage_issues",
+        {"task_spec": {"kind": "issue_filter"}, "issue_text": "[]"}, reply)
+    assert not result.ok and result.failure is FailureKind.ESCALATE
+
+
+def test_needs_review_thin_draft_still_escalates(settings, trace, tmp_path):
+    """The prose floor stays authoritative for drafts: a thin needs_review
+    answer is not salvaged."""
+    reply = contract(status="needs_review", answer_draft="too thin")
+    result, _ = _run_issue_step(
+        settings, trace, tmp_path, "agent.draft_issue_answer",
+        {"task_spec": {"issue": 2}, "issue_text": "help"}, reply)
+    assert not result.ok and result.failure is FailureKind.ESCALATE
