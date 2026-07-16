@@ -1,0 +1,10 @@
+model: gpt-5.6-sol-high
+prompt_sha256: f8a5f0c62c3df1a72c40b3b44600e7441af2f1f8acac56954b4356b74fda3ed2
+prompt_chars: 27906
+---- reviewer output ----
+[live-environment.md §all] — AFTER is identical; no information loss.
+[remote-long-run.md §all] — AFTER is identical; no information loss.
+[serving-failfast-cleanup.md §all] — AFTER is identical; no information loss.
+[srun-lifecycle.md §all] — AFTER is identical; no information loss.
+[remote-debug-strategy.md §all] — AFTER is identical; no information loss.
+VERDICT: APPROVE

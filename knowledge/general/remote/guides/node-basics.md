@@ -1,11 +1,13 @@
 ---
-title: "1. 进陌生远端节点的正确流程"
+title: "进陌生远端节点的正确流程"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: guide
 tags: [general, remote]
 sources: []
 ---
+
+# 进陌生远端节点的正确流程
 
 ## 1. 进陌生远端节点的正确流程
 
