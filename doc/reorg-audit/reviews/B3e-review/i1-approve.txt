@@ -1,0 +1,6 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 172d48f1e1e93f0aeeefc6fc0ee82b0d59174e6cb2772791e977f2a1102432c1
+prompt_chars: 24834
+---- reviewer output ----
+AFTER preserves everything from BEFORE; no information loss found.
+VERDICT: APPROVE

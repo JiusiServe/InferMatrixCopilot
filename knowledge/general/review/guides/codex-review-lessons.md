@@ -1,11 +1,13 @@
 ---
-title: "1. Source enums from the producing module, not a hardcoded set at the consumer"
+title: "Codex review lessons"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: guide
 tags: [general, review]
 sources: []
 ---
+
+# Codex review lessons
 
 When Codex did the same `task/bot_task` API split on PR #3444 (`codex/pr3444-online-prompt-align`), it shipped two API-design habits I missed on the first pass:
 
