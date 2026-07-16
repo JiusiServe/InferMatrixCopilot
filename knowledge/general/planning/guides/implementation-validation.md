@@ -1,10 +1,10 @@
 ---
 title: "实现与功能验证"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: guide
 tags: [general, planning]
-sources: []
+sources: ["#3734", vllm_omni/core/prefix_cache.py, repos/vllm-omni/models/hunyuan-image3/incidents/painterly/_index.md]
 ---
 
 # 实现与功能验证

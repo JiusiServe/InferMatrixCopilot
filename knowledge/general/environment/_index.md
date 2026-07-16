@@ -20,3 +20,7 @@ sources: []
 ## 目录内容
 
 当前正文尚未迁移。新增通用环境经验时直接在本目录登记；具体失败放未来的 `incidents/`。
+
+已有的 Windows/PowerShell 相关经验目前分布在远端主题下：PowerShell 引号与远端脚本
+投递门禁见 [远端 guides](../remote/guides/_index.md)（debug-basics、ssh-workflow）；
+Windows ControlMaster/fail2ban 等历史失败见 [远端 incidents](../remote/incidents/_index.md)。
