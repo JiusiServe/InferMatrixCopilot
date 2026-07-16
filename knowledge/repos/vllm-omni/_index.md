@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: index
 tags: [vllm-omni]
 sources: []
@@ -10,7 +10,9 @@ sources: []
 # vLLM-Omni
 
 - 上游仓库：`vllm-project/vllm-omni`
+- 常用分支：默认分支 `main`；对齐 upstream vLLM 的重构分支 `dev/vllm-align`
 - 适用范围：vLLM-Omni 的开发、测试、文档、模型、性能和远端验证
+- 组件源码映射（下表 components 入口）已按 `dev/vllm-align @ 4f2b32c` 校验
 
 ## 什么时候查这里
 

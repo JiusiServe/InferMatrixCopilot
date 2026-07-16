@@ -1,0 +1,7 @@
+model: gpt-5.6-sol-high
+prompt_sha256: b6b368b4acf8d33c81d280af7f32893201a7e817484a03b957ef9a76425d730d
+prompt_chars: 1052
+---- reviewer output ----
+[smoke.md §规则] — 丢失“PR #4242 证明”这一具体来源，以及“不 warmup 会导致首批请求超时”的具体后果 — critical
+[smoke.md §规则] — 丢失“只在 BF16 下复现”的适用范围，导致规则被过度泛化 — critical
+VERDICT: REVISE

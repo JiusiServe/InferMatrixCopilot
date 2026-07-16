@@ -1,7 +1,7 @@
 ---
 title: "通用经验入口"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: index
 tags: [general]
 sources: []
@@ -33,3 +33,6 @@ sources: []
 | SSH、容器和远端长跑任务 | [remote](remote/_index.md) | 通用远端操作方法 |
 | 判断何时使用多个 agent | [agents](agents/_index.md) | agent 分工和交接 |
 | 拆需求、产品闭环和执行计划 | [planning](planning/_index.md) | 通用规划方法 |
+
+页面元数据（frontmatter、标签分类法、`_archive/` 归档）规范见 [SCHEMA](../SCHEMA.md)；
+目录归属与页面写法见 [贡献规范](../contributing/_index.md)。
