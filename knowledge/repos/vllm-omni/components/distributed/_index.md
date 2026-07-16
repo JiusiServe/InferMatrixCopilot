@@ -39,3 +39,4 @@ sources: [vllm_omni/distributed/omni_connectors/, vllm_omni/distributed/omni_coo
 |---|---|
 | 理解 connector 合同、6 后端、KV 迁移管理与负载均衡 | [architecture](architecture.md) |
 | 已修过的 connector/端口产品坑 | [connector pitfalls](connector-pitfalls.md) |
+| 后端选择与 async_chunk 特性语义 | [特性指南](guides/_index.md) |
