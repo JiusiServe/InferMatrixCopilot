@@ -1,11 +1,13 @@
 ---
-title: "1. .gitignore 排 *.json，新增 JSON test config 必须 git add -f"
+title: "vLLM-Omni CI 配置坑（gotchas）"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: guide
 tags: [vllm-omni, ci]
-sources: []
+sources: ["#2495"]
 ---
+
+# vLLM-Omni CI 配置坑（gotchas）
 
 vllm-omni CI 上反复踩到的三个具体配置坑——合一篇。
 
@@ -39,3 +41,8 @@ PR #2495 把 HunyuanImage3 perf test 从 mandatory "Diffusion X2I(&A&T) · Perf 
 - 模型从 `tencent/HunyuanImage-3.0` 改为 `tencent/HunyuanImage-3.0-Instruct`（CI 节点 HF cache 里有 Instruct，没有 base，避免 30 分钟下载 + startup timeout）
 - 原来一个 JSON（3 个 test case）拆成 3 个独立 JSON（tp4_fp8, tp2_fp8_sp2, tp2_fp8_cfgp2），每个 pytest 调用只起一个 server，防止显存残留
 - profiling 脚本从 `scripts/profiling/` 移到 `tools/`，shell 脚本改为通用（model 作为 CLI 参数）
+
+## 相关
+
+- 历史 CI 失败的完整证据链见 [CI incidents](../incidents/_index.md)。
+- 新增测试/CI 前先按 [先检查现有测试](../../../../general/ci/guides/inspect-existing-tests-first.md) 确认已有覆盖。

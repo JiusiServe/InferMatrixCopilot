@@ -1,10 +1,10 @@
 ---
 title: "规则：先看现有代码，再谈方案"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: guide
 tags: [general, ci]
-sources: []
+sources: ["#3297", "tests/e2e/accuracy/test_gebench_h100_smoke.py", "tests/e2e/accuracy/test_hunyuan_image3.py"]
 ---
 
 # 规则：先看现有代码，再谈方案
@@ -183,3 +183,7 @@ CONFIG_CHECK generated_yaml.stage1.devices=2,3
 | PSNR (dB) | 14.02 | 14.10 |
 
 pytest summary: `1 passed, 19 warnings in 449.44s (0:07:29)`. 临时 patch 已恢复，`post_restore.diff` 为 0 字节。
+
+## 相关
+
+- 精度/性能结论开跑前先固定证据合同：[benchmark contract](../../benchmark/guides/benchmark-contract.md)。

@@ -1,0 +1,6 @@
+model: gpt-5.6-sol-high
+prompt_sha256: ffff1be44cbdae2684d49abfc3fd0a9747b35bf9394c7da8118582e18164dbef
+prompt_chars: 21507
+---- reviewer output ----
+AFTER preserves all content from all six BEFORE pages; additions are metadata and cross-links only.
+VERDICT: APPROVE
