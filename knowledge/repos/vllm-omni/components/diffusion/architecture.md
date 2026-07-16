@@ -19,7 +19,7 @@ sources: [vllm_omni/diffusion/]
 - 请求字段怎样从 HTTP/CLI 进入系统由 serving 模块负责。
 - AR/LLM stage 怎样产生跨阶段输入由 model-executor 负责。
 
-## 当前子模块布局（dev/vllm-align @ 4f2b32c 复核）
+## 当前子模块布局（main @ 238fc0a6 复核；此前亦在 dev/vllm-align @ 4f2b32c 验证，结果一致）
 
 执行链相关：`executor/`（执行循环）、`worker/`（diffusion worker）、`sched/`（stage 内调度）、
 `models/`（共享模型实现）、`model_loader/`；显存与性能相关：`cache/`、`offloader/`、

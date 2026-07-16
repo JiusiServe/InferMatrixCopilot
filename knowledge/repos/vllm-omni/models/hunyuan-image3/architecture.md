@@ -53,7 +53,7 @@ sources: [vllm_omni/model_executor/models/hunyuan_image3/hunyuan_image3.py, vllm
 - I2T（图像→文字）：`vllm_omni/model_executor/stage_configs/hunyuan_image3_i2t.yaml`
 - IT2I（图像+文字→图像）：`vllm_omni/model_executor/stage_configs/hunyuan_image3_it2i.yaml`
 - T2I（纯 DiT）：`vllm_omni/model_executor/stage_configs/hunyuan_image3_t2i.yaml`
-- **2026-07-16 在 `dev/vllm-align @ 4f2b32c` 复核：上面三个 stage_configs YAML 已不存在**
+- **2026-07-16 在 `main @ 238fc0a6`（此前亦在 `dev/vllm-align @ 4f2b32c` 验证，结果一致） 复核：上面三个 stage_configs YAML 已不存在**
   （`stage_configs/` 现只含 video/audio 模型）；当前 Hunyuan 配置位于
   `vllm_omni/deploy/hunyuan_image3_ar.yaml` 和 `vllm_omni/deploy/hunyuan_image3_dit.yaml`。
 
@@ -63,7 +63,7 @@ sources: [vllm_omni/model_executor/models/hunyuan_image3/hunyuan_image3.py, vllm
 ### 示例
 - `examples/offline_inference/hunyuan_image3/image_to_text.py`
 - `examples/offline_inference/hunyuan_image3/image_to_image.py`
-- **2026-07-16 在 `dev/vllm-align @ 4f2b32c` 复核：上面两个示例已移除**，该目录现只有
+- **2026-07-16 在 `main @ 238fc0a6`（此前亦在 `dev/vllm-align @ 4f2b32c` 验证，结果一致） 复核：上面两个示例已移除**，该目录现只有
   `end2end.py`（+ README）。AR/DiT/衔接/tokenizer 等其余代码地图路径在同一提交全部验证存在。
 
 ## 命名约定

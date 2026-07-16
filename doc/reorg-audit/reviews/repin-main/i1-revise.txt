@@ -1,0 +1,14 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 3bd5a55124e4298d0f2d07f47070118d88dc92473e8565f7fb642c8b3a4426ea
+prompt_chars: 28314
+---- reviewer output ----
+[repos/vllm-omni/_index.md § vLLM-Omni] — validation provenance `dev/vllm-align @ 4f2b32c` was replaced rather than retained alongside the main validation — nuance
+[repos/vllm-omni/components/_index.md § vLLM-Omni 代码模块] — path-validation provenance for `dev/vllm-align @ 4f2b32c` was removed — nuance
+[repos/vllm-omni/components/model-executor/_index.md § Model Executor] — path and obsolete-layout validation provenance for `dev/vllm-align @ 4f2b32c` was removed — nuance
+[repos/vllm-omni/components/model-executor/architecture.md § 当前源码职责锚点] — the six anchors and symbols’ verification on `dev/vllm-align @ 4f2b32c` was removed — nuance
+[repos/vllm-omni/components/serving/_index.md § Serving] — source-path validation provenance for `dev/vllm-align @ 4f2b32c` was removed — nuance
+[repos/vllm-omni/components/serving/architecture.md § 当前源码入口] — the complete entrypoint and engine-layout verification context for `dev/vllm-align @ 4f2b32c` was removed — nuance
+[repos/vllm-omni/components/diffusion/_index.md § Diffusion] — verification that all 16 submodules existed on `dev/vllm-align @ 4f2b32c` was removed — nuance
+[repos/vllm-omni/components/diffusion/architecture.md § 当前子模块布局] — the documented submodule-layout verification on `dev/vllm-align @ 4f2b32c` was removed — nuance
+[repos/vllm-omni/models/hunyuan-image3/architecture.md § Stage 配置 / 示例] — the branch-specific evidence that three stage-config files and two examples were absent, while the remaining code-map paths existed, on `dev/vllm-align @ 4f2b32c` was removed — nuance
+VERDICT: REVISE

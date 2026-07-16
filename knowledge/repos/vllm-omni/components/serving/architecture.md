@@ -13,7 +13,7 @@ sources: [vllm_omni/entrypoints/, vllm_omni/engine/orchestrator.py]
 
 Serving 层把用户输入转换成内部请求，选择 online/offline 执行入口，并把参数交给实际 engine 或 pipeline。它也是 CLI、HTTP 和兼容 API 之间保持行为一致的责任边界。
 
-## 当前源码入口（dev/vllm-align @ 4f2b32c 复核）
+## 当前源码入口（main @ 238fc0a6 复核；此前亦在 dev/vllm-align @ 4f2b32c 验证，结果一致）
 
 - 用户入口：`vllm_omni/entrypoints/` — `omni.py` / `async_omni.py` / `omni_base.py`（offline 与
   async 入口）、`cli/`、`openai/`（OpenAI-compatible API）、`openpi/`、`pd_utils.py`、
