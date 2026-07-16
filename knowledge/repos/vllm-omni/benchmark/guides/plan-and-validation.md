@@ -4,12 +4,12 @@
 
 | 任务 | 读这个 |
 |------|--------|
-| 写 plan、判断 feature 是否可用、选择 e2e vs fake/unit | [实现与功能验证](../../../../framework/planning/guides/implementation-validation.md) |
-| 产品对标、最低 parity、产品书、roadmap、版本目标拆分 | [product_loop_planning.md](../../../../framework/planning/guides/product-loop-planning.md) |
+| 写 plan、判断 feature 是否可用、选择 e2e vs fake/unit | [实现与功能验证](../../../../general/planning/guides/implementation-validation.md) |
+| 产品对标、最低 parity、产品书、roadmap、版本目标拆分 | [product_loop_planning.md](../../../../general/planning/guides/product-loop-planning.md) |
 | benchmark 口径、探索/smoke/sweep 区分、scope lock、结果命名 | [benchmark scope](benchmark-scope.md) |
-| 远端长测配置验证、复用既有脚本、profiler 不污染 steady-state | [remote_long_run.md](../../../../framework/remote/guides/remote-long-run.md) |
+| 远端长测配置验证、复用既有脚本、profiler 不污染 steady-state | [remote_long_run.md](../../../../general/remote/guides/remote-long-run.md) |
 | AR graph / profiling 诊断机制、d-step 分析、PR 远端验证闸门 | [benchmark guides](./_index.md) |
-| 新模型 / execution path / public 字段 / multimodal payload / perf PR 开发前 mini spec | [mini_spec.md](../../../../framework/planning/guides/mini-spec.md)，review/merge 前再读 [reviewer_lens_audit.md](../../../../framework/review/guides/reviewer-lens-audit.md)；mini-spec appendix 和 design gates 在 [reviewer_lens_gates.md](../../../../framework/review/guides/reviewer-lens-gates.md) |
+| 新模型 / execution path / public 字段 / multimodal payload / perf PR 开发前 mini spec | [mini_spec.md](../../../../general/planning/guides/mini-spec.md)，review/merge 前再读 [reviewer_lens_audit.md](../../../../general/review/guides/reviewer-lens-audit.md)；mini-spec appendix 和 design gates 在 [reviewer_lens_gates.md](../../../../general/review/guides/reviewer-lens-gates.md) |
 
 硬规则摘要：
 

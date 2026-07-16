@@ -6,7 +6,7 @@
 
 1. 更新当前目录 `_index.md`。
 2. 创建或删除子目录时，更新上一层 `_index.md`。
-3. 新增、删除或重命名 `framework/` 一级主题时，同步 `framework/_index.md`、`CLAUDE.md` 和 `README.md` 任务地图。
+3. 新增、删除或重命名 `general/` 一级主题时，同步 `general/_index.md`、`CLAUDE.md` 和 `README.md` 任务地图。
 4. 修复所有相对链接和 anchor。
 5. 移动错题时保持“编号”不变，只更新归属、路径和索引。
 6. 删除被新页面替代的重复正文，不留兼容副本。
@@ -45,7 +45,7 @@ python tools/check_knowledge_tree.py
 
 ## 当前写入规则
 
-- 新的跨仓库经验只写 `framework/`。
+- 新的跨仓库经验只写 `general/`。
 - 新的仓库、代码模块和模型知识只写 `repos/`。
 - 稳定教训先写最近 owner 的规则，复杂事故证据才可选写错题。
 - 当前机器事实只写 ignored `local/`。

@@ -9,7 +9,7 @@ Promote skill-level learnings to global scope when they appear in multiple repos
 
 ## Repo Policy Override
 
-Do not use this command to promote learnings from `workflow-starter`. This repository forbids writing project facts, workflow rules, incidents, or personal preferences to system/global/personal memory by default. If a learning is useful here, land it in repo-local `CLAUDE.md`, `CONTRIBUTING.md`, `framework/`, or `repos/`; machine facts belong only in ignored `local/`. Otherwise do not persist it.
+Do not use this command to promote learnings from `workflow-starter`. This repository forbids writing project facts, workflow rules, incidents, or personal preferences to system/global/personal memory by default. If a learning is useful here, land it in repo-local `CLAUDE.md`, `CONTRIBUTING.md`, `general/`, or `repos/`; machine facts belong only in ignored `local/`. Otherwise do not persist it.
 
 ## What This Does
 

@@ -9,7 +9,7 @@
 
 ## 1.1 Windows 文本文件一律显式 UTF-8
 
-在 Windows/PowerShell 里读写本仓中文文档时，默认编码可能把 UTF-8 内容显示成乱码。打开 `CLAUDE.md`、`AGENTS.md`、`CONTRIBUTING.md`、`framework/`、`repos/` 下的文本文件时一律显式使用 UTF-8。
+在 Windows/PowerShell 里读写本仓中文文档时，默认编码可能把 UTF-8 内容显示成乱码。打开 `CLAUDE.md`、`AGENTS.md`、`CONTRIBUTING.md`、`general/`、`repos/` 下的文本文件时一律显式使用 UTF-8。
 
 **How to apply:**
 - 读文件：`Get-Content -Path <file> -Encoding utf8`
@@ -35,7 +35,7 @@
 - 本仓长期记录只写：
   - `CLAUDE.md`（只放所有仓库都适用的开工硬门禁）
   - `CONTRIBUTING.md`（只放目录维护规则）
-  - `framework/`
+  - `general/`
   - `repos/`
 - 禁止默认写：
   - `<USER_HOME>\.codex\...`

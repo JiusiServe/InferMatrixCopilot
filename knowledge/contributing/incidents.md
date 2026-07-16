@@ -17,7 +17,7 @@
 
 | 已验证的根因 | 放置位置 |
 |---|---|
-| 通用 SSH、WSL、PowerShell、文档或 Git 错误 | `framework/<对应主题>/incidents/` |
+| 通用 SSH、WSL、PowerShell、文档或 Git 错误 | `general/<对应主题>/incidents/` |
 | 某仓库的 CI、benchmark、review 或 remote 流程错误 | `repos/<仓库>/<对应主题>/incidents/` |
 | 多模型共用的 diffusion、serving、frontend 或 backend 错误 | `repos/<仓库>/components/<模块>/incidents/` |
 | 某模型专有实现、配置或 checkpoint 错误 | `repos/<仓库>/models/<模型>/incidents/` |
@@ -40,7 +40,7 @@ YYYY-MM-DD-short-name.md
 # 容器重启后 SSH 连接超时
 
 - 编号：`inc-YYYY-MM-DD-short-name`
-- 归属：`framework/remote`
+- 归属：`general/remote`
 - 状态：处理中
 - 搜索词：SSH、timeout、container restart
 - 影响范围：远端验证

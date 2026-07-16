@@ -1,7 +1,7 @@
 # Error Book: HunyuanImage3 接入完整踩坑归档（2026-04-08 ~ 2026-04-30）
 
 > 这是 HunyuanImage-3.0-Instruct 接入工作（PR #2713 / #2986 / #3107 / #3243 + GEBench CI 系列）期间累积的所有踩坑，按主题压缩归档。
-> 通用教训已分别提炼到 `framework/`、仓库指南和各层 `incidents/`，本文件只保留完整历史记录。
+> 通用教训已分别提炼到 `general/`、仓库指南和各层 `incidents/`，本文件只保留完整历史记录。
 
 ## A. Git & 环境搭建（04-08）
 

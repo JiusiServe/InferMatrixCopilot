@@ -6,7 +6,7 @@
 
 ## 不放什么
 
-- 跨仓库通用审查方法；先看 `framework/review/`。
+- 跨仓库通用审查方法；先看 `general/review/`。
 
 ## 目录内容
 

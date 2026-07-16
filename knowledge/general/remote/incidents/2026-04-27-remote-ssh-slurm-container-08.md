@@ -1,10 +1,10 @@
 # 2026-04-27 — 不能用 CPU 空闲数推算可用 GPU
 
 - 编号：`inc-2026-04-27-remote-ssh-slurm-container-08`
-- 归属：`framework/remote`
+- 归属：`general/remote`
 - 状态：已验证
 - 搜索词：sinfo、GPU allocation、CPU 空闲数、Slurm
-- 影响范围：framework/remote
+- 影响范围：general/remote
 
 **症状**：曾尝试根据 `sinfo` 的 CPU 空闲数和某台机器的 CPU/GPU 比例推算“可用 GPU”。
 

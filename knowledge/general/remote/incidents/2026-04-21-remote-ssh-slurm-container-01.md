@@ -1,10 +1,10 @@
 # 2026-04-21 — 假设路径 + HF 缓存丢失
 
 - 编号：`inc-2026-04-21-remote-ssh-slurm-container-01`
-- 归属：`framework/remote`
+- 归属：`general/remote`
 - 状态：已验证
 - 搜索词：假设路径 + HF 缓存丢失
-- 影响范围：framework/remote
+- 影响范围：general/remote
 
 ## 原文件说明
 

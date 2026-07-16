@@ -8,7 +8,7 @@
 
 复盘不是先写事故记录。默认修改离根因最近、下次任务一定会读取的 `rules.md`：
 
-- 跨仓库都成立 → 对应 `framework/<主题>/` 的规则入口；
+- 跨仓库都成立 → 对应 `general/<主题>/` 的规则入口；
 - 某仓库都成立 → `repos/<仓库>/rules.md` 或仓库主题规则；
 - 共享源码模块专有 → `repos/<仓库>/components/<模块>/rules.md`；
 - 某模型专有 → `repos/<仓库>/models/<模型>/rules.md`。

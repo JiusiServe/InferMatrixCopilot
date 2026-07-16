@@ -162,6 +162,6 @@ torch.compile / dynamo / 类型推断报错经常有两层：
 ## 链接
 
 - 上位原则：P1（证据先行）、P4（单变量隔离）
-- 相邻：[execution principles](../../../../framework/debug/guides/execution-principles.md)（用户给方案直接执行）、[conclusion discipline](../../../../framework/debug/guides/conclusion-discipline.md)（推理 vs 实测前缀）、[style bias debug](style-bias-debug.md)（静态 diff > dump）
+- 相邻：[execution principles](../../../../general/debug/guides/execution-principles.md)（用户给方案直接执行）、[conclusion discipline](../../../../general/debug/guides/conclusion-discipline.md)（推理 vs 实测前缀）、[style bias debug](style-bias-debug.md)（静态 diff > dump）
 - 反向：[B29] user 给具体 fix 指令禁 detour（这条管的是给 fix 指令的场景，本规则管诊断不给 fix 的场景）
 - 派生硬规则：CLAUDE.md B32

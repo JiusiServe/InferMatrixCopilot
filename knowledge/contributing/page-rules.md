@@ -21,7 +21,7 @@
 ## 不放什么
 
 - HunyuanImage3 独有实现放 `models/hunyuan-image3/`。
-- 通用 benchmark 方法放 `framework/benchmark/`。
+- 通用 benchmark 方法放 `general/benchmark/`。
 
 ## 目录内容
 
@@ -87,7 +87,7 @@
 
 规则是默认执行面，不是故事摘要。按最近 owner 放置：
 
-- 多个仓库都成立 → `framework/<主题>/`；
+- 多个仓库都成立 → `general/<主题>/`；
 - 整个仓库都成立 → `repos/<仓库>/rules.md`；
 - 只属于稳定的共享源码模块 → `components/<模块>/rules.md`；
 - 只属于某个模型 → `models/<模型>/rules.md`。

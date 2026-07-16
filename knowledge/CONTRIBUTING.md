@@ -8,7 +8,7 @@
 
 | 任务 | 只需继续读 |
 |---|---|
-| 判断内容放 `framework/`、`repos/`、component、model 还是 `local/` | [目录与归属](contributing/layout.md) |
+| 判断内容放 `general/`、`repos/`、component、model 还是 `local/` | [目录与归属](contributing/layout.md) |
 | 新增 `_index.md`、`rules.md`、`architecture.md` 或普通页面 | [页面与索引](contributing/page-rules.md) |
 | 复盘、提炼规则或确实需要保留错题 | [复盘与错题](contributing/incidents.md) |
 | 文件太长、目录太挤、dev 要拆前后端或模块/模型长大 | [何时拆分](contributing/scaling.md) |
@@ -33,7 +33,7 @@ python tools/check_knowledge_tree.py
 - 只保留一套正式知识树，不建 `_private/`、兼容副本或第二套私人索引。
 - 机器地址、账号、cache、venv、token、密钥和用户绝对路径只属于 Git 忽略的 `local/`；密码、token 和私钥正文不写入文件。
 - 一条知识只有一份正文，其他入口只链接；不复制类似规则。
-- 长期知识只写本仓库的 `framework/`、`repos/` 和贡献规范，不推进系统、全局或个人 memory。
+- 长期知识只写本仓库的 `general/`、`repos/` 和贡献规范，不推进系统、全局或个人 memory。
 - 仓库、模块、模型和机器规则不互相继承；当前任务只加载真正命中的 owner。
 - 新增、移动、重命名、拆分或删除 Markdown 时，必须在同一修改中更新索引和所有链接。
 

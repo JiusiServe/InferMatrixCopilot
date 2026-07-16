@@ -1,6 +1,6 @@
 # Benchmark Notes
 
-本页只做 benchmark 入口。通用口径在 `framework/benchmark/`，仓库指南和结果由本目录 `_index.md` 分流，避免单个文档继续膨胀。
+本页只做 benchmark 入口。通用口径在 `general/benchmark/`，仓库指南和结果由本目录 `_index.md` 分流，避免单个文档继续膨胀。
 
 | 文档 | 内容 |
 |------|------|

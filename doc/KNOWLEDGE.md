@@ -30,9 +30,9 @@ curation — see `doc/PLAN-knowledge-reorg.md`); upstream is not modified.
 The knowledge base separates the two, and so do we — the whole tree is **shared**,
 never nested under one adapter:
 
-- `knowledge/framework/` — **general, cross-repo** agent experience (review, ci,
-  debug, git, planning, remote, …). Shared across every repo.
-  (Being renamed to `knowledge/general/` — see the reorg plan.)
+- `knowledge/general/` — **general, cross-repo** agent experience (review, ci,
+  debug, git, planning, remote, …). Shared across every repo. (Renamed from
+  upstream's `framework/` — see the reorg plan.)
 - `knowledge/repos/<repo>/` — **repo-specific** knowledge. Each adapter references
   only its own slice via `manifest.yaml → knowledge.repo_subdir`
   (e.g. `repos/vllm-omni`).

@@ -1,7 +1,7 @@
 ---
 name: claudeception
 description: |
-  把会话中的可复用经验和具体错题写回当前仓库的 framework/ 或 repos/。
+  把会话中的可复用经验和具体错题写回当前仓库的 general/ 或 repos/。
   触发：/claudeception、用户要求“落盘/记住/写错题”，或一次复杂排障结束后。
   写入前先查重复，展示修改内容并得到用户确认；不生成新 skill。
 allowed-tools:
@@ -17,7 +17,7 @@ allowed-tools:
 
 ## 先判断放在哪里
 
-1. 换到无关仓库仍然成立 → `framework/<主题>/`。
+1. 换到无关仓库仍然成立 → `general/<主题>/`。
 2. 依赖某个仓库的代码、命令或流程 → `repos/<仓库>/<主题>/`。
 3. 根因属于多个模型共用的代码 → `repos/<仓库>/components/<模块>/`。
 4. 根因只属于某个模型 → `repos/<仓库>/models/<模型>/`。
@@ -27,7 +27,7 @@ allowed-tools:
 
 ## 写之前
 
-1. 从 `framework/_index.md` 和 `repos/_index.md` 找最近入口。
+1. 从 `general/_index.md` 和 `repos/_index.md` 找最近入口。
 2. 用标题、错误签名和关键词全文搜索，确认没有重复正文。
 3. 明确页面最终路径和需要更新的 `_index.md`。
 4. 去掉私人 host、token、账号、私钥和用户绝对路径。

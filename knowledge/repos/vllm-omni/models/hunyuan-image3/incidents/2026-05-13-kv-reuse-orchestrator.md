@@ -109,7 +109,7 @@ S = 11621, N = 11620, S - N = 1  ✓
 - 无 AttributeError ✓
 - 图像跟其他 SHM-reuse 跑的同 mode PSNR 在 22-24 dB 范围（合理 same-mode floor）✓
 
-## 我踩的坑（meta，跟 [下结论的纪律](../../../../../framework/debug/guides/conclusion-discipline.md) 对应）
+## 我踩的坑（meta，跟 [下结论的纪律](../../../../../general/debug/guides/conclusion-discipline.md) 对应）
 
 ### 错 1：把 "S-N=1" 当 design intent
 
@@ -180,9 +180,9 @@ S = 11621, N = 11620, S - N = 1  ✓
 
 ### 新触发的硬规则
 
-- **B30** [P1 派生 + B7 精神扩展] algorithm 决策前先 grep upstream。我没 grep `modeling_hunyuan_image_3.py:3289-3303` → [先读上游实现](../../../../../framework/review/guides/upstream-first-for-algorithm.md)
-- **B31** [P3 派生] framework hack vs algorithm fix 优先级——同现象两套方案选 algorithm。我串了三件 framework hack 互相依赖 → [algorithm vs framework](../../../../../framework/review/guides/algorithm-vs-framework-fix.md)
-- **F8** [P7 派生 + F3 加强] 调试中的"顺手优化"必须分类。我在 multi-image 主线里夹带了 `cot_token_ids_list` BPE drift 防漂移优化，reviewer "isn't necessary, suggest removing" 当场删 → [收窄优化范围](../../../../../framework/review/guides/narrow-optimization-scope.md)
+- **B30** [P1 派生 + B7 精神扩展] algorithm 决策前先 grep upstream。我没 grep `modeling_hunyuan_image_3.py:3289-3303` → [先读上游实现](../../../../../general/review/guides/upstream-first-for-algorithm.md)
+- **B31** [P3 派生] framework hack vs algorithm fix 优先级——同现象两套方案选 algorithm。我串了三件 framework hack 互相依赖 → [algorithm vs framework](../../../../../general/review/guides/algorithm-vs-framework-fix.md)
+- **F8** [P7 派生 + F3 加强] 调试中的"顺手优化"必须分类。我在 multi-image 主线里夹带了 `cot_token_ids_list` BPE drift 防漂移优化，reviewer "isn't necessary, suggest removing" 当场删 → [收窄优化范围](../../../../../general/review/guides/narrow-optimization-scope.md)
 
 ### 时间分布
 
@@ -195,6 +195,6 @@ S = 11621, N = 11620, S - N = 1  ✓
 
 ## 链接
 
-- 行为纪律抽象：[下结论的纪律](../../../../../framework/debug/guides/conclusion-discipline.md)
+- 行为纪律抽象：[下结论的纪律](../../../../../general/debug/guides/conclusion-discipline.md)
 - 派生宪法：`P1 证据先行` / `P3 完整链路` / `P7 范围自律`
-- review iteration 抽象规则：[先读上游实现](../../../../../framework/review/guides/upstream-first-for-algorithm.md) / [algorithm vs framework](../../../../../framework/review/guides/algorithm-vs-framework-fix.md) / [收窄优化范围](../../../../../framework/review/guides/narrow-optimization-scope.md)
+- review iteration 抽象规则：[先读上游实现](../../../../../general/review/guides/upstream-first-for-algorithm.md) / [algorithm vs framework](../../../../../general/review/guides/algorithm-vs-framework-fix.md) / [收窄优化范围](../../../../../general/review/guides/narrow-optimization-scope.md)

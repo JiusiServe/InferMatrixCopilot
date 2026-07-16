@@ -1,10 +1,10 @@
 # 2026-05-14 — cp -r 复制别人的 venv 想"独立"反而踩坑
 
 - 编号：`inc-2026-05-14-remote-venv-and-cleanup-01`
-- 归属：`framework/remote`
+- 归属：`general/remote`
 - 状态：已验证
 - 搜索词：cp -r 复制别人的 venv 想"独立"反而踩坑
-- 影响范围：framework/remote
+- 影响范围：general/remote
 
 ## 原文件说明
 

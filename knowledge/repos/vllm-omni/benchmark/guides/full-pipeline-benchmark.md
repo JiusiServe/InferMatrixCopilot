@@ -79,7 +79,7 @@ Metric availability:
 
 PowerShell 到 SSH 的补充坑：
 
-- `@'...'@ | ssh ... 'bash -s'` 可能把 UTF-8 BOM 送到远端，bash 第一行会变成 `$'\357\273\277set'`。复杂远端 Bash 脚本落盘后必须完整执行 [canonical fail-closed 投递门禁](../../../../framework/remote/guides/debug-basics.md#远端-bash-脚本投递必须失败关闭)；临时 stdin 脚本优先用无 BOM 文件流或直接用远端已有脚本。
+- `@'...'@ | ssh ... 'bash -s'` 可能把 UTF-8 BOM 送到远端，bash 第一行会变成 `$'\357\273\277set'`。复杂远端 Bash 脚本落盘后必须完整执行 [canonical fail-closed 投递门禁](../../../../general/remote/guides/debug-basics.md#远端-bash-脚本投递必须失败关闭)；临时 stdin 脚本优先用无 BOM 文件流或直接用远端已有脚本。
 - 远端 `python -c` 的引号在 PowerShell/SSH 双层下容易被吃掉；能用绝对解释器 + stdin 文件流时，不要继续纠缠一行 `-c`。
 - 新终端接手远端任务时，先从当前会话/issue/PR 摘 5 行 runbook（head sha、worktree、venv、tmux、out_dir），不要把已知远端重新 `find` 一遍。
 - 已知有 `<REMOTE_WORK_ROOT>/wt-...` worktree 时，先 `git -C <dir> status` / `rev-parse HEAD` 验证事实；只有不一致才扩大搜索。

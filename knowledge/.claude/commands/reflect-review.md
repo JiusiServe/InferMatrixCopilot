@@ -6,7 +6,7 @@ description: Review and approve pending reflection learnings collected by the St
 
 ## Repo Policy Override
 
-In this repository, do not apply pending reflect-system learnings to user-level or global Claude locations. If a pending learning matters for this repo, summarize it and convert it into a repo-local rule under `CLAUDE.md`, `CONTRIBUTING.md`, `framework/`, or `repos/`; machine facts belong only in ignored `local/`. Otherwise discard it. This applies to project facts and personal preferences alike.
+In this repository, do not apply pending reflect-system learnings to user-level or global Claude locations. If a pending learning matters for this repo, summarize it and convert it into a repo-local rule under `CLAUDE.md`, `CONTRIBUTING.md`, `general/`, or `repos/`; machine facts belong only in ignored `local/`. Otherwise discard it. This applies to project facts and personal preferences alike.
 
 The reflect-system Stop hook runs in the background after each turn. Background processes have no TTY, so it cannot prompt the user directly — instead it writes detected signals to `~/.claude/skills/reflect-system/.state/pending-review.json` and waits for this command to handle the human-in-the-loop step.
 

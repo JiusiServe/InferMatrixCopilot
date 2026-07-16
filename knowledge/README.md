@@ -17,7 +17,7 @@ cd claude-workflow-starter
 
 最短接入流程：
 
-1. 把 `AGENTS.md`、`CLAUDE.md`、`README.md`、`CONTRIBUTING.md`、`contributing/`、`framework/` 和 `tools/check_knowledge_tree.py` 复制或合并到目标仓库根目录。已有同名规则时先合并，不要直接覆盖。
+1. 把 `AGENTS.md`、`CLAUDE.md`、`README.md`、`CONTRIBUTING.md`、`contributing/`、`general/` 和 `tools/check_knowledge_tree.py` 复制或合并到目标仓库根目录。已有同名规则时先合并，不要直接覆盖。
 2. 在目标仓库的 `.gitignore` 中加入 `local/`；机器地址、账号、cache 和 venv 只写 `local/`。
 3. 新建 `repos/_index.md` 和 `repos/<你的仓库>/_index.md`。如果 fork 了本仓，删除与你无关的 `repos/vllm-omni/`、`repos/jianghan-roleplay-data-pipeline/`，并同步 `repos/_index.md`。
 4. 只有该仓库确实有每次开工都必须执行的专属门禁时，才新建 `repos/<你的仓库>/rules.md`，并从仓库 `_index.md` 链接它。
@@ -28,7 +28,7 @@ cd claude-workflow-starter
 
 ## 从哪里查
 
-- [通用经验](framework/_index.md)：review、CI、docs、Git、debug、benchmark、环境、远端、agent 和规划。
+- [通用经验](general/_index.md)：review、CI、docs、Git、debug、benchmark、环境、远端、agent 和规划。
 - [仓库经验](repos/_index.md)：从仓库列表进入当前实际保留的仓库、代码模块和模型；第三方接入后以自己的列表为准。
 - [贡献与目录维护](CONTRIBUTING.md)：短入口会按任务带你进入归属、页面、复盘、拆分或校验规范，不要求整套通读。
 
@@ -36,16 +36,16 @@ cd claude-workflow-starter
 
 | 你正在做什么 | 先看通用入口 | 识别仓库后必须检查 |
 |---|---|---|
-| code review 和 reviewer follow-up | [review](framework/review/_index.md) | `repos/<仓库>/review/` |
-| 测试和 CI | [ci](framework/ci/_index.md) | `repos/<仓库>/ci/` |
-| 文档、RFC 和公开说明 | [docs](framework/docs/_index.md) | `repos/<仓库>/docs/` |
-| Git、commit、rebase 和 PR | [git](framework/git/_index.md) | `repos/<仓库>/git/` |
-| 调试和根因收敛 | [debug](framework/debug/_index.md) | `repos/<仓库>/debug/` |
-| benchmark 和性能证据 | [benchmark](framework/benchmark/_index.md) | `repos/<仓库>/benchmark/` |
-| Windows、WSL 和本地环境 | [environment](framework/environment/_index.md) | 通常不需要仓库补充 |
-| SSH、容器、GPU 和远端任务 | [remote](framework/remote/_index.md) | `repos/<仓库>/remote/` |
-| 多 agent 分工 | [agents](framework/agents/_index.md) | 通常不需要仓库补充 |
-| 需求拆分和执行计划 | [planning](framework/planning/_index.md) | 仓库入口中的业务主题 |
+| code review 和 reviewer follow-up | [review](general/review/_index.md) | `repos/<仓库>/review/` |
+| 测试和 CI | [ci](general/ci/_index.md) | `repos/<仓库>/ci/` |
+| 文档、RFC 和公开说明 | [docs](general/docs/_index.md) | `repos/<仓库>/docs/` |
+| Git、commit、rebase 和 PR | [git](general/git/_index.md) | `repos/<仓库>/git/` |
+| 调试和根因收敛 | [debug](general/debug/_index.md) | `repos/<仓库>/debug/` |
+| benchmark 和性能证据 | [benchmark](general/benchmark/_index.md) | `repos/<仓库>/benchmark/` |
+| Windows、WSL 和本地环境 | [environment](general/environment/_index.md) | 通常不需要仓库补充 |
+| SSH、容器、GPU 和远端任务 | [remote](general/remote/_index.md) | `repos/<仓库>/remote/` |
+| 多 agent 分工 | [agents](general/agents/_index.md) | 通常不需要仓库补充 |
+| 需求拆分和执行计划 | [planning](general/planning/_index.md) | 仓库入口中的业务主题 |
 
 实际顺序以 `CLAUDE.md` 的场景触发器为准：直接命中具体 guide 时跳过通用主题索引。只有 canonical `repos/<slug>/` 未经验证时才用 [仓库列表](repos/_index.md) 把 upstream、URL、显示名或本地目录映射到 slug；不凭名字猜目录。随后先读当前仓库 `rules.md`，规则精确命中 owner 就停止导航；未命中才读仓库 `_index.md`、一个由任务目的选中的仓库主题，再从 `components/_index.md` 或 `models/_index.md` 选择主要 owner。读完 owner 已有规则后停止横向展开，只有 live 调用链证明跨模块时才打开第二个目录。
 
@@ -56,13 +56,13 @@ cd claude-workflow-starter
 不知道归属时，可以先全文搜索：
 
 ```powershell
-rg "SSH timeout|shape mismatch" framework repos -g "*.md"
+rg "SSH timeout|shape mismatch" general repos -g "*.md"
 ```
 
 ## 目录怎样理解
 
 ```text
-framework/<主题>/                         # 换仓库仍然成立
+general/<主题>/                         # 换仓库仍然成立
 repos/<仓库>/<主题>/                      # 某仓库专有流程
 repos/<仓库>/components/<代码模块>/       # 前端、后端、diffusion 等共享代码
 repos/<仓库>/models/<模型>/               # 模型专有实现和配置
@@ -91,7 +91,7 @@ local/                                    # 当前机器信息，Git 忽略
 
 确实需要错题时，按根因放在最近的 `incidents/`：
 
-- 通用 SSH、WSL、PowerShell 或 Git 错误 → `framework/<主题>/incidents/`
+- 通用 SSH、WSL、PowerShell 或 Git 错误 → `general/<主题>/incidents/`
 - 仓库 CI、benchmark、review 或 remote 错误 → `repos/<仓库>/<主题>/incidents/`
 - 多模型共享代码错误 → `repos/<仓库>/components/<模块>/incidents/`
 - 模型专有错误 → `repos/<仓库>/models/<模型>/incidents/`
@@ -113,7 +113,7 @@ local/                                    # 当前机器信息，Git 忽略
 
 真实服务器地址、账号、token、私钥、cache 和 venv 路径只放 Git 忽略的 `local/`。需要时直接创建 `local/remote.md`，按机器或完整 `user@host:port` 分段记录；该文件不能被 Git 跟踪。
 
-正式知识页面不得包含私人 host、凭据或用户绝对路径。去除敏感信息后仍有复用价值的教训，再写入 `framework/` 或 `repos/`。
+正式知识页面不得包含私人 host、凭据或用户绝对路径。去除敏感信息后仍有复用价值的教训，再写入 `general/` 或 `repos/`。
 
 ## 自动检查
 
@@ -137,7 +137,7 @@ python tools/check_knowledge_tree.py
 | 内容 | 路径 |
 |---|---|
 | 开工硬规则 | `CLAUDE.md` |
-| 通用经验 | `framework/` |
+| 通用经验 | `general/` |
 | 仓库、代码模块、模型和错题 | `repos/` |
 | 当前机器信息 | `local/`（Git ignored） |
 | 贡献与目录维护 | `CONTRIBUTING.md` |

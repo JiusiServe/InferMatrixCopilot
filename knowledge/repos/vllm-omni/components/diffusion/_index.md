@@ -11,7 +11,7 @@
 ## 不放什么
 
 - HunyuanImage3 独有 pipeline、配置和 checkpoint 问题；这些放模型目录。
-- 通用 benchmark 方法；这些放 `framework/benchmark/`。
+- 通用 benchmark 方法；这些放 `general/benchmark/`。
 
 ## 目录内容
 

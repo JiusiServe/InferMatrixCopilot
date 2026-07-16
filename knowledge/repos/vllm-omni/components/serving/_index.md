@@ -11,7 +11,7 @@
 ## 不放什么
 
 - 模型内部 attention、checkpoint 或 diffusion 算法问题。
-- 通用 API 设计方法；这些放 `framework/review/`。
+- 通用 API 设计方法；这些放 `general/review/`。
 
 ## 目录内容
 

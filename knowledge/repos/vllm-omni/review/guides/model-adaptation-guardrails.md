@@ -2,11 +2,11 @@
 
 **触发**：新模型、新 pipeline、新 backend、已有模型新增 T2V/I2V/S2V/V2V 等 public path、PR 需要写性能提升、docs/recipe/supported model/perf config 任何一个公开入口发生变化。
 
-**硬规则**：开发前先按 [canonical mini spec](../../../../framework/planning/guides/mini-spec.md) 写最小模板；本页只补模型 / checkpoint / pipeline 适配 appendix。sub-agent review 只能兜底，不能替代开发前 gate。能跑通 unit test 不等于 public entrypoint 可用，不等于 PR body 可以写性能结论。声明 PR clean 前必须跑 full diff review；关闭已知 finding 不等于全量 review 干净。
+**硬规则**：开发前先按 [canonical mini spec](../../../../general/planning/guides/mini-spec.md) 写最小模板；本页只补模型 / checkpoint / pipeline 适配 appendix。sub-agent review 只能兜底，不能替代开发前 gate。能跑通 unit test 不等于 public entrypoint 可用，不等于 PR body 可以写性能结论。声明 PR clean 前必须跑 full diff review；关闭已知 finding 不等于全量 review 干净。
 
 ## 1. Model adaptation mini-spec appendix
 
-先完成 [mini_spec.md](../../../../framework/planning/guides/mini-spec.md) 的 canonical template；涉及新模型 / checkpoint / pipeline 时，再追加这张短矩阵，允许很短，但不能空：
+先完成 [mini_spec.md](../../../../general/planning/guides/mini-spec.md) 的 canonical template；涉及新模型 / checkpoint / pipeline 时，再追加这张短矩阵，允许很短，但不能空：
 
 ```text
 Mini spec

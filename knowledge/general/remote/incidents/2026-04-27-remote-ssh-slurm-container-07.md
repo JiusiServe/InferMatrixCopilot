@@ -1,10 +1,10 @@
 # 2026-04-27 — srun --pty 在非交互 SSH 下报 ioctl 错误但仍能执行
 
 - 编号：`inc-2026-04-27-remote-ssh-slurm-container-07`
-- 归属：`framework/remote`
+- 归属：`general/remote`
 - 状态：已验证
 - 搜索词：srun --pty 在非交互 SSH 下报 ioctl 错误但仍能执行
-- 影响范围：framework/remote
+- 影响范围：general/remote
 
 **症状**：`srun: error: ioctl(TIOCGWINSZ): Inappropriate ioctl for device` + `Not using a pseudo-terminal, disregarding --pty option`
 **根因**：通过 `ssh host 'cmd'` 非交互方式调用 srun，没有 TTY，--pty 无效

@@ -1,10 +1,10 @@
 # 2026-04-27 — 新登录节点 srun 不在 PATH，需 module load
 
 - 编号：`inc-2026-04-27-remote-ssh-slurm-container-06`
-- 归属：`framework/remote`
+- 归属：`general/remote`
 - 状态：已验证
 - 搜索词：新登录节点 srun 不在 PATH，需 module load
-- 影响范围：framework/remote
+- 影响范围：general/remote
 
 **症状**：`bash: line 1: srun: command not found`
 **根因**：部分登录节点用 Environment Modules 管理 Slurm

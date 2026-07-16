@@ -28,8 +28,8 @@ def render_briefing_docs(root: Path | str, docs: list[str], *, header: str = "",
                          cap: int = _BRIEFING_CAP) -> str:
     """Concatenate the `docs` (paths relative to `root`) into one capped briefing
     slice, prefixed by `header`. Missing docs are skipped (never fatal). Returns
-    "" when none exist. Shared by the general (framework) and repo-specific
-    briefing layers so both render identically."""
+    "" when none exist. Shared by the general and repo-specific briefing layers
+    so both render identically."""
     root = Path(root)
     parts: list[str] = []
     for rel in docs:
@@ -136,8 +136,8 @@ class RepoAdapter:
     def briefing(self, knowledge_root: Path | None = None) -> str:
         """The repo's always-on prompt slice — the REPO-SPECIFIC part only. Reads
         this adapter's `knowledge.briefing_docs` (its `repos/<repo>/` hard-gate
-        rules + navigation index) from the SHARED `knowledge_root` (the community
-        submodule; general `framework/` knowledge is injected separately by the
+        rules + navigation index) from the SHARED `knowledge_root` (the vendored
+        community docs; `general/` knowledge is injected separately by the
         caller). Deeper guides/incidents are pulled on demand via the doc tools,
         not dumped here. Falls back to a legacy AI `profile.yaml` when one exists,
         else empty."""

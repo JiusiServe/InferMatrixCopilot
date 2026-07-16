@@ -12,7 +12,7 @@
 
 ## 先判断放哪里
 
-1. 换到完全无关的仓库后仍然正确吗？是就放 `framework/<主题>/`。
+1. 换到完全无关的仓库后仍然正确吗？是就放 `general/<主题>/`。
 2. 依赖某个仓库的代码、命令或流程吗？放 `repos/<仓库>/<主题>/` 或仓库 `rules.md`。
 3. 结论属于一块被多个模型/功能共用的源码吗？放 `repos/<仓库>/components/<模块>/`。
 4. 只属于某个模型的实现、配置、checkpoint 或运行流程吗？放 `repos/<仓库>/models/<模型>/`。
@@ -49,7 +49,7 @@ CONTRIBUTING.md                    # 短入口
 contributing/                      # 本仓库的知识树维护规范
   _index.md
 
-framework/                         # 换仓库仍然成立
+general/                         # 换仓库仍然成立
   <主题>/
     _index.md
     guides/                        # 有内容才创建
@@ -83,13 +83,13 @@ skills/
 
 ## 每一层默认放什么
 
-### `framework/<主题>/`
+### `general/<主题>/`
 
 只放跨仓库通用方法。不出现某个仓库专有命令、模型结论或私人机器地址。
 
 ### `repos/<仓库>/<主题>/`
 
-只写该仓库相对通用方法的差异，并链接通用页面。不复制整篇 `framework/` 正文。
+只写该仓库相对通用方法的差异，并链接通用页面。不复制整篇 `general/` 正文。
 
 ### `components/<模块>/`
 
@@ -133,5 +133,5 @@ skills/
 不知道最终归属时可以搜索，但不递归加载：
 
 ```powershell
-rg "SSH timeout|shape mismatch" framework repos -g "*.md"
+rg "SSH timeout|shape mismatch" general repos -g "*.md"
 ```

@@ -17,10 +17,10 @@ upstream:
   repo_path: /rebase/vllm
   remote: origin
 
-# Repo-specific slice of the SHARED, human-curated knowledge base (the community
-# docs submodule at the repo-root `knowledge/` = settings.knowledge_dir; general
-# framework/ knowledge is shared, NOT nested here). Replaces the retired AI
-# profile/. Their tree stays UNTOUCHED (single source of truth); attribution in
+# Repo-specific slice of the SHARED, human-curated knowledge base (the vendored
+# community docs at the repo-root `knowledge/` = settings.knowledge_dir;
+# cross-repo general/ knowledge is shared, NOT nested here). Replaces the
+# retired AI profile/. Provenance + the author's copy authorization are in
 # doc/KNOWLEDGE.md. Paths below are relative to settings.knowledge_dir.
 knowledge:
   source: zuiho-kai/claude-workflow-starter

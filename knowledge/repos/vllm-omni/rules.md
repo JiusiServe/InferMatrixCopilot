@@ -5,8 +5,8 @@
 ## 1. 开工
 
 1. 确认真实 vLLM-Omni checkout、分支和目标 worktree。主基准 checkout 默认只读，业务修改使用专用 worktree。
-2. 写代码前读 [code taste](../../framework/review/guides/code-taste.md)。
-3. 新模型、新 pipeline、新 public entrypoint 或性能 claim 先读 [mini spec](../../framework/planning/guides/mini-spec.md)；涉及模型或 checkpoint 再读 [model adaptation guardrails](review/guides/model-adaptation-guardrails.md)。
+2. 写代码前读 [code taste](../../general/review/guides/code-taste.md)。
+3. 新模型、新 pipeline、新 public entrypoint 或性能 claim 先读 [mini spec](../../general/planning/guides/mini-spec.md)；涉及模型或 checkpoint 再读 [model adaptation guardrails](review/guides/model-adaptation-guardrails.md)。
 4. bug、crash 或行为异常先检查下面的场景触发器；直接匹配时按链接进入 owner。没有直接匹配时才进入 [vLLM-Omni 调试入口](debug/_index.md)，再通过仓库主题、`components/_index.md` 或 `models/_index.md` 确认 owner；不能停在通用规则，也不能先猜 incident 路径。
 5. benchmark、profiling、GPU、serving 或远端验证先读 [benchmark 入口](benchmark/_index.md) 和 [远端入口](remote/_index.md)。只有规则明确提示、出现高度相似错误或用户要求历史复盘时才查错题。
 6. 当前机器地址、worktree、venv、cache、容器和账号只从 ignored `local/` 获取，并用本轮 live 命令验证。
@@ -32,7 +32,7 @@
 - 新模型的 `0 missing / 0 unexpected`、shape smoke、无 NaN/Inf 和 mock 权重只证明 plumbing；必须补 semantic parity matrix。
 - L2 只覆盖 CPU/mock 功能且不能触发真实 stage、device 或 GPU 初始化；真实权重、精度、性能和 profiling 属于 L4。
 - 新参数必须有单一 owner、公开 contract 和对应测试；禁止用 `dict.get(...) or fallback`、`hasattr`、随手 `getattr(default)` 或 `generator=None` 掩盖新旧路径不一致。
-- 用户可见的 API、CLI、日志、文档或输出变更，必须按 [用户可见验收](../../framework/docs/guides/user-visible-acceptance.md) 跑真实路径。
+- 用户可见的 API、CLI、日志、文档或输出变更，必须按 [用户可见验收](../../general/docs/guides/user-visible-acceptance.md) 跑真实路径。
 
 ## 4. CI、测试和性能证据
 
@@ -55,7 +55,7 @@
 - 安装、下载、编译、serve、generate、pytest 和 sweep 必须在远端自身带 timeout/watchdog、状态文件和日志，不能只依赖本地工具超时。
 - 启动服务先验证 CLI，随后同时监控 health、PID 和错误日志；单请求 smoke 通过前不进入 sweep。
 - 清理只针对本轮 PGID、run directory 和能够证明归属的进程；禁止宽泛 `pkill -f python`。大目录优先同盘移动到本轮 trash，再异步删除。
-- 详细规则见 [live environment](../../framework/remote/guides/live-environment.md)、[HF offline](../../framework/remote/guides/hf-offline-mandatory.md) 和 [remote validation gates](benchmark/guides/remote-validation-gates.md)。
+- 详细规则见 [live environment](../../general/remote/guides/live-environment.md)、[HF offline](../../general/remote/guides/hf-offline-mandatory.md) 和 [remote validation gates](benchmark/guides/remote-validation-gates.md)。
 
 ## 6. Git、PR 和公开证据
 

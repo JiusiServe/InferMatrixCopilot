@@ -8,7 +8,7 @@
 
 规则入口：仓库上下文落盘规则见根目录 `CLAUDE.md`；远端 benchmark / accuracy 证据规则见 [benchmark scope](../../../benchmark/guides/benchmark-scope.md)。本节只保留反例和本轮有效结果，不作为主规则入口。
 
-**症状**：用户要求“跑一下精度用例看看，要求 image size=512, batch=2,4,8”。执行过程中先把旧 PR body / 旧 artifact 当线索继续追，发现多份结果都不能直接作为本次证据：旧 512 accuracy 只有 batch=1/2；旧 performance sweep 有 b2/b4/b8 但不是当前 PR head / 当前 step-execution 口径；远端已有若干 `pr4041_023_groupbatch_512_*` 目录实际只是 config JSON 或跑的是默认 `max_num_seqs=1` deploy。最终重新跑通显式 `step_execution=true`、`max_num_seqs=8`、`DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA`、512x512、batch/concurrency 2/4/8 后，用户要求“落盘”。我却先准备写到用户个人 Codex 目录，这违反本仓规则：长期知识只写本仓 `framework/` 或 `repos/`，机器事实写 ignored `local/`，禁止写个人 memory。
+**症状**：用户要求“跑一下精度用例看看，要求 image size=512, batch=2,4,8”。执行过程中先把旧 PR body / 旧 artifact 当线索继续追，发现多份结果都不能直接作为本次证据：旧 512 accuracy 只有 batch=1/2；旧 performance sweep 有 b2/b4/b8 但不是当前 PR head / 当前 step-execution 口径；远端已有若干 `pr4041_023_groupbatch_512_*` 目录实际只是 config JSON 或跑的是默认 `max_num_seqs=1` deploy。最终重新跑通显式 `step_execution=true`、`max_num_seqs=8`、`DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA`、512x512、batch/concurrency 2/4/8 后，用户要求“落盘”。我却先准备写到用户个人 Codex 目录，这违反本仓规则：长期知识只写本仓 `general/` 或 `repos/`，机器事实写 ignored `local/`，禁止写个人 memory。
 
 **根因**：
 
@@ -44,7 +44,7 @@ batch=8: completed=8 failed=0 duration=31.86s stage_0_gen_ms_mean=30853.85 amort
 
 **正确做法**：
 
-1. 用户在仓库上下文里说“落盘 / 记录 / 复盘”时，先按 `CLAUDE.md` 写本仓 `framework/` 或 `repos/`；机器事实写 ignored `local/`，禁止默认写用户个人 Codex 目录。
+1. 用户在仓库上下文里说“落盘 / 记录 / 复盘”时，先按 `CLAUDE.md` 写本仓 `general/` 或 `repos/`；机器事实写 ignored `local/`，禁止默认写用户个人 Codex 目录。
 2. 远端验证先写 scope lock，再跑：
    ```text
    PR / head SHA:

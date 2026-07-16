@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""检查 contributing/、framework/ 和 repos/ 的目录、索引与 Markdown 链接。"""
+"""检查 contributing/、general/ 和 repos/ 的目录、索引与 Markdown 链接。"""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from urllib.parse import unquote
 
 
 ROOT = Path(__file__).resolve().parent.parent
-KNOWLEDGE_ROOTS = (ROOT / "contributing", ROOT / "framework", ROOT / "repos")
+KNOWLEDGE_ROOTS = (ROOT / "contributing", ROOT / "general", ROOT / "repos")
 INDEX_NAME = "_index.md"
 SPECIAL_PAGES = {INDEX_NAME, "rules.md", "architecture.md"}
 GROUP_DIRS = {"guides", "history", "incidents", "references", "results", "rfcs"}
@@ -325,7 +325,7 @@ def main() -> int:
         ".git",
         "artifacts",
         "contributing",
-        "framework",
+        "general",
         "local",
         "outputs",
         "repos",

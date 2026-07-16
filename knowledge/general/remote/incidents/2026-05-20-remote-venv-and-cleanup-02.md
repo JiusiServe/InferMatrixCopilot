@@ -1,10 +1,10 @@
 # 2026-05-20 — 用户明确说新建 venv 时，不要继续环境考古
 
 - 编号：`inc-2026-05-20-remote-venv-and-cleanup-02`
-- 归属：`framework/remote`
+- 归属：`general/remote`
 - 状态：已验证
 - 搜索词：用户明确说新建 venv 时，不要继续环境考古
-- 影响范围：framework/remote
+- 影响范围：general/remote
 
 **症状**：用户要求到 `ssh root@<REMOTE_HOST> -p 31449` 复现 vLLM-Omni issue #3743。发现没有合适现成环境后，用户明确说“没有就新建一个”，我仍继续扫已有 venv / worktree / 模型路径，还尝试复用旧环境；随后用户进一步明确“直接新建venv，然后uv pip install vllm==0.21.0，然后venv名字改一下叫vllm0.21.0”。中间浪费多轮 SSH 往返，还踩了 PowerShell 引号、tmux 不存在、PID 写成字面量 `$!` 等噪音。
 

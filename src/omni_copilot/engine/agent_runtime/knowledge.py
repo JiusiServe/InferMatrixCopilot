@@ -203,7 +203,7 @@ def _repo_map_tool(ctx: StepContext, adapter) -> dict[str, ToolDef]:
 
 def _repo_docs_tool(ctx: StepContext, adapter) -> dict[str, ToolDef]:
     """`doc_search` / `doc_read` over the SHARED curated knowledge base (the
-    community-docs submodule: framework/ general + repos/<repo>/ specific). The
+    vendored community docs: general/ cross-repo + repos/<repo>/ specific). The
     always-on briefing injects only the hard-gate rules + navigation; the deep
     guides/incidents those pages link to (general or repo-specific) are pulled on
     demand here (design §V2.3.4 channel 3: pulled, not injected) — so nothing in
@@ -211,7 +211,7 @@ def _repo_docs_tool(ctx: StepContext, adapter) -> dict[str, ToolDef]:
     under the knowledge dir (traversal is refused)."""
     import subprocess
 
-    kdir = Path(ctx.settings.knowledge_dir)  # shared base (framework/ + repos/)
+    kdir = Path(ctx.settings.knowledge_dir)  # shared base (general/ + repos/)
     if not kdir.exists():
         return {}
     root = kdir.resolve()
@@ -261,7 +261,7 @@ def _repo_docs_tool(ctx: StepContext, adapter) -> dict[str, ToolDef]:
         "doc_read": ToolDef(
             "doc_read",
             "Read a doc from the curated knowledge base by its knowledge-relative "
-            "path (e.g. `repos/<repo>/rules.md`, or a `framework/...` guide it "
+            "path (e.g. `repos/<repo>/rules.md`, or a `general/...` guide it "
             "links to). Windowed; page with offset.",
             {"type": "object", "properties": {"path": s,
                                               "offset": {"type": "integer"}},
