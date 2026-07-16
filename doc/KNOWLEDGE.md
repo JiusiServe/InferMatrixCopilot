@@ -26,8 +26,8 @@ curation — see `doc/PLAN-knowledge-reorg.md`); upstream is not modified.
   (per-file upstream created/updated dates, captured before the submodule's git
   history was removed — used for page frontmatter).
 - **Code-mirror pin:** the `knowledge/repos/vllm-omni/components/` source maps
-  are verified against vllm-omni `dev/vllm-align @
-  4f2b32cd36e23325b53e20f6ddd5f5954edccb47` (every stated path exists there).
+  are verified against vllm-omni `main @
+  238fc0a609311235a671940cf209a7eb72c1dc29` (every stated path exists there).
 
 ## Layout: general vs repo-specific
 The knowledge base separates the two, and so do we — the whole tree is **shared**,

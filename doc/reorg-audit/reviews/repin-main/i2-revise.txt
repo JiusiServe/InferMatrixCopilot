@@ -1,0 +1,7 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 00b02fc208733be6eb78fbd5605b5708b3405dfffaf901a7f3b53c5d5f43ddbf
+prompt_chars: 28642
+---- reviewer output ----
+[repos/vllm-omni/components/serving/architecture.md §当前源码入口] — 丢失 `dev/vllm-align @ 4f2b32c` 的复核 provenance — nuance
+[repos/vllm-omni/components/diffusion/architecture.md §当前子模块布局] — 丢失 `dev/vllm-align @ 4f2b32c` 的复核 provenance — nuance
+VERDICT: REVISE

@@ -1,0 +1,7 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 294cc6b024da37a4373ed02629a40c1a9379d74b57b332c2088fd9ad4b0f0f8a
+prompt_chars: 28718
+---- reviewer output ----
+AFTER preserves all concrete material from every BEFORE page; only validation provenance was added.
+
+VERDICT: APPROVE

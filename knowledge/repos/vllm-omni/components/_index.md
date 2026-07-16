@@ -10,7 +10,7 @@ sources: []
 # vLLM-Omni 代码模块
 
 本目录是知识树对 `vllm_omni/` 源码空间的镜像（code-owner 轴）。每个模块页的
-"源码入口"列出它拥有的真实源码路径；所有路径已在 `dev/vllm-align @ 4f2b32c`
+"源码入口"列出它拥有的真实源码路径；所有路径已在 `main @ 238fc0a6`（此前亦在 `dev/vllm-align @ 4f2b32c` 验证，结果一致）
 验证存在。只有确有知识沉淀的模块才建目录（scheduler、config 等在第一条稳定
 结论落盘时再建），不预建空目录。
 
