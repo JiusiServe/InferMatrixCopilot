@@ -1,3 +1,12 @@
+---
+title: "Model Adaptation PR Guardrails"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, review]
+sources: []
+---
+
 # Model Adaptation PR Guardrails
 
 **触发**：新模型、新 pipeline、新 backend、已有模型新增 T2V/I2V/S2V/V2V 等 public path、PR 需要写性能提升、docs/recipe/supported model/perf config 任何一个公开入口发生变化。

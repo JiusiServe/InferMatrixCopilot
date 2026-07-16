@@ -1,3 +1,12 @@
+---
+title: "PR Workflow 入口"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, git]
+sources: []
+---
+
 # PR Workflow 入口
 
 本文件只保留路由。提交、push、PR body 或 reviewer follow-up 前，按场景打开对应专题页。

@@ -1,3 +1,12 @@
+---
+title: "下结论的纪律（流程化清单）"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, debug]
+sources: []
+---
+
 # 下结论的纪律（流程化清单）
 
 PR #3444 复盘抽出。每条以 **触发器 → 强制动作 → 禁止动作** 三段式 hard-coded。违反任一段立刻停。

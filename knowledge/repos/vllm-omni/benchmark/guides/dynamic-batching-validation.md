@@ -1,3 +1,12 @@
+---
+title: "Dynamic / Continuous Batching 验证"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, benchmark]
+sources: []
+---
+
 # Dynamic / Continuous Batching 验证
 
 ## Dynamic / continuous batching 验证：shape 能合不等于语义能合

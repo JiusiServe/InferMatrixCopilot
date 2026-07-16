@@ -1,3 +1,12 @@
+---
+title: "1. 第一步：grep 显式随机源，不是直奔 MoE/attention"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, debug]
+sources: []
+---
+
 调"vllm-omni 输出与 HF baseline 对齐"或"greedy 每次跑结果不一致"两类 bug 时反复踩的坑合集。`style_bias_debug_methodology.md` 是更深一层的"风格 bias 类"专题，先看完这里再过去。
 
 ## 1. 第一步：grep 显式随机源，不是直奔 MoE/attention

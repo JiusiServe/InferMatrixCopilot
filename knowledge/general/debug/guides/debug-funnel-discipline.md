@@ -1,3 +1,12 @@
+---
+title: "调试漏斗"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, debug]
+sources: []
+---
+
 # 调试漏斗
 
 ## 什么时候用

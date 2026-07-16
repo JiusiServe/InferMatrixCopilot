@@ -1,3 +1,12 @@
+---
+title: "远端性能与精度验证时间门禁"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, benchmark]
+sources: []
+---
+
 # 远端性能与精度验证时间门禁
 
 ## 远端 PR 性能 / 精度验证：先过 5/10/15 分钟闸门，别把准备工作当交付

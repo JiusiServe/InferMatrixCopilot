@@ -1,3 +1,12 @@
+---
+title: "Framework hack vs algorithm fix"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, review]
+sources: []
+---
+
 # Framework hack vs algorithm fix
 
 PR #3444 KV reuse S-N=6 复盘抽出。两套描述 fit 同一现象时（"AR 跑过头 KV 包括 5 个 tail token" 既能从 algorithm 层解释也能从 framework 层"补 cap 机制"打补丁），**我两次选了 framework hack 路线**，每次都被 reviewer 拉回 algorithm 路线。

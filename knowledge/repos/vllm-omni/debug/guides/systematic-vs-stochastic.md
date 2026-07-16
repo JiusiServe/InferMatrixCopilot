@@ -1,3 +1,12 @@
+---
+title: "Rule 1: Systematic ≠ stochastic. Classify first."
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, debug]
+sources: []
+---
+
 When user reports "path A consistently produces X, path B consistently produces Y" on the same model with the same seed:
 
 ## Rule 1: Systematic ≠ stochastic. Classify first.

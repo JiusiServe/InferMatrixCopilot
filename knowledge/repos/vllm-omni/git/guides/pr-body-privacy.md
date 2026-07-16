@@ -1,3 +1,12 @@
+---
+title: "PR Body Privacy"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, git]
+sources: []
+---
+
 # PR Body Privacy
 
 Public PR body / comment text must contain reviewer-facing reproducible evidence, not local or remote work logs.

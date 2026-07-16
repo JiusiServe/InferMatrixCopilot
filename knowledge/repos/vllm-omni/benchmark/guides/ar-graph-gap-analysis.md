@@ -1,3 +1,12 @@
+---
+title: "HunyuanImage3 AR Graph Gap 分析"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, benchmark]
+sources: []
+---
+
 # HunyuanImage3 AR Graph Gap 分析
 
 ## HunyuanImage3 AR graph online profiling：d-step 空洞不能先入为主归因

@@ -1,3 +1,12 @@
+---
+title: "Algorithm-level 决策前先 grep upstream"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, review]
+sources: []
+---
+
 # Algorithm-level 决策前先 grep upstream
 
 PR #3444 review iteration 复盘抽出。`hunyuan3.0_ins/modeling_hunyuan_image_3.py` 就在 `D:\vllm-omni\hunyuan3.0_ins\` 下，**距离一次 grep 的距离**，我没读，靠 trace 现场反推方案，结果跟 upstream 设计哲学背道而驰。reviewer 一句 "ref upstream line 3290" 把方案打回原形。

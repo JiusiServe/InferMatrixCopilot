@@ -1,3 +1,12 @@
+---
+title: "vLLM-Omni Git 与 PR"
+created: 2026-07-10
+updated: 2026-07-10
+type: index
+tags: [vllm-omni, git]
+sources: []
+---
+
 # vLLM-Omni Git 与 PR
 
 ## 什么时候查这里

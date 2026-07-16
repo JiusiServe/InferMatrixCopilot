@@ -1,3 +1,12 @@
+---
+title: "开发环境"
+created: 2026-07-10
+updated: 2026-07-10
+type: index
+tags: [general, environment]
+sources: []
+---
+
 # 开发环境
 
 ## 什么时候查这里

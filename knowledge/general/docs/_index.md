@@ -1,3 +1,12 @@
+---
+title: "文档"
+created: 2026-07-10
+updated: 2026-07-10
+type: index
+tags: [general, docs]
+sources: []
+---
+
 # 文档
 
 ## 什么时候查这里

@@ -1,3 +1,12 @@
+---
+title: "调试漏斗纪律"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, debug]
+sources: []
+---
+
 # 调试漏斗纪律
 
 PR #3444 HunyuanImage-3.0 IT2I online 方图 bug 复盘。Codex 与我并行调同一个 bug：

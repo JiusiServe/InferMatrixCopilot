@@ -1,3 +1,12 @@
+---
+title: "Agent 协作指南"
+created: 2026-07-10
+updated: 2026-07-10
+type: index
+tags: [general, agents]
+sources: []
+---
+
 # Agent 协作指南
 
 | 遇到什么 | 查看哪里 |

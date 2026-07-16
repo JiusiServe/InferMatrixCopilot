@@ -1,3 +1,12 @@
+---
+title: "测试与 CI"
+created: 2026-07-10
+updated: 2026-07-10
+type: index
+tags: [general, ci]
+sources: []
+---
+
 # 测试与 CI
 
 ## 什么时候查这里

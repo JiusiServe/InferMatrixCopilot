@@ -1,3 +1,12 @@
+---
+title: "PR Workflow · Scope 收窄与 diff gate"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, git]
+sources: []
+---
+
 # PR Workflow · Scope 收窄与 diff gate
 
 ## 7. Reviewer 要求收窄 PR scope 时，先做 diff gate，废弃路线全删

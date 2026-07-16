@@ -1,3 +1,12 @@
+---
+title: "vLLM-Omni Benchmark 证据门禁"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, benchmark]
+sources: []
+---
+
 # vLLM-Omni Benchmark 证据门禁
 
 ## 0. 远端 benchmark / accuracy 证据 gate：先判定 artifact 是否有效

@@ -1,3 +1,12 @@
+---
+title: "把任务写成审计枚举"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, debug]
+sources: []
+---
+
 # 把任务写成审计枚举
 
 任务清单应该描述“必须检查哪些面”，而不只是重复“已经知道要修什么”。如果 task 只来自第一轮 review 的 action list，它会完整继承那次 review 的盲区。

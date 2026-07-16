@@ -1,3 +1,12 @@
+---
+title: "vLLM-Omni"
+created: 2026-07-10
+updated: 2026-07-10
+type: index
+tags: [vllm-omni]
+sources: []
+---
+
 # vLLM-Omni
 
 - 上游仓库：`vllm-project/vllm-omni`

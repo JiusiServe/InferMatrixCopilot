@@ -1,3 +1,12 @@
+---
+title: "Code Taste"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, review]
+sources: []
+---
+
 # Code Taste
 
 **硬规则:** 凡是要写业务代码、测试代码、示例代码、API 字段、CLI 参数、helper 函数，动手前先读本页。

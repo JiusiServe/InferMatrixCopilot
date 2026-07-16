@@ -1,3 +1,12 @@
+---
+title: "标准流程"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, debug]
+sources: []
+---
+
 调试模型输出 bias 类问题（painterly drift / blur / over-saturation / artistic style shift / quality regression）必须区分两类 bug，工具栈完全不同：
 
 | 类型 | 表现 | 正确工具 |

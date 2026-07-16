@@ -1,3 +1,12 @@
+---
+title: "PR Body Model Evidence"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, git]
+sources: []
+---
+
 # PR Body Model Evidence
 
 Use this for new model, pipeline, backend, or checkpoint adapter PRs.

@@ -1,3 +1,12 @@
+---
+title: "Plan & Validation · 远端长测与 profiler gate"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, remote]
+sources: []
+---
+
 # Plan & Validation · 远端长测与 profiler gate
 
 ### 远端长测配置验证：先证明字段进真实消费点，再跑完整 pytest

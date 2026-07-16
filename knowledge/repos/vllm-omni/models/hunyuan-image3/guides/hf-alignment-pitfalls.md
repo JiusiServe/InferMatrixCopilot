@@ -1,3 +1,12 @@
+---
+title: "1. 测任何模型对齐前必先 grep 官方 demo / README"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, models, hunyuan-image3]
+sources: []
+---
+
 接 HF 模型做 baseline / 对齐对比时反复犯的两类错合集——选错 API 入口和瞎试版本。
 
 ## 1. 测任何模型对齐前必先 grep 官方 demo / README

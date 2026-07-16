@@ -1,3 +1,12 @@
+---
+title: "Diffusion"
+created: 2026-07-10
+updated: 2026-07-10
+type: index
+tags: [vllm-omni, components, diffusion]
+sources: []
+---
+
 # Diffusion
 
 - 源码入口：`vllm_omni/diffusion/` 全树，含 16 个子模块：attention、cache、distributed、executor、hooks、layers、lora、model_loader、models、offloader、postprocess、profiler、quantization、sched、utils、worker

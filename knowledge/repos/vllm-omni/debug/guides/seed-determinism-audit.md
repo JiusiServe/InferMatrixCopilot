@@ -1,3 +1,12 @@
+---
+title: "1. Confirm sampling mode"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, debug]
+sources: []
+---
+
 When a user reports "same `seed=N` produces different images / cot text across runs", do NOT immediately suspect the seed plumbing code. Walk this checklist first:
 
 ## 1. Confirm sampling mode

@@ -1,3 +1,12 @@
+---
+title: "1. 进陌生远端节点的正确流程"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, remote]
+sources: []
+---
+
 ## 1. 进陌生远端节点的正确流程
 
 **错误示范（我犯过的）**：假设新节点路径结构和之前节点一样，直接 `cd /app/vllm-omni` 或 `source <YOUR_REMOTE_WORKDIR>/.venv/bin/activate`，全部踩空。

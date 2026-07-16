@@ -1,3 +1,12 @@
+---
+title: "vLLM-Omni 代码模块"
+created: 2026-07-10
+updated: 2026-07-10
+type: index
+tags: [vllm-omni, components]
+sources: []
+---
+
 # vLLM-Omni 代码模块
 
 本目录是知识树对 `vllm_omni/` 源码空间的镜像（code-owner 轴）。每个模块页的

@@ -64,6 +64,17 @@ def test_adapter_briefing_is_repo_specific_only(tmp_path):
     assert "GENERAL NAV" not in b  # general is injected separately, not here
 
 
+def test_render_briefing_strips_page_frontmatter(tmp_path):
+    k = tmp_path / "k"; k.mkdir()
+    (k / "page.md").write_text(
+        "---\ntitle: \"T\"\ncreated: 2026-01-01\nupdated: 2026-01-01\n"
+        "type: index\ntags: [general]\nsources: []\n---\n\n# BODY HEADING\ncontent",
+        encoding="utf-8")
+    b = render_briefing_docs(k, ["page.md"])
+    assert "BODY HEADING" in b and "content" in b
+    assert "created: 2026-01-01" not in b and not b.startswith("---")
+
+
 def test_adapter_briefing_empty_without_root_or_docs(tmp_path):
     k = _knowledge(tmp_path)
     # no knowledge_root -> no repo briefing (and no legacy profile) -> ""

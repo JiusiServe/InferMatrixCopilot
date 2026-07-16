@@ -1,3 +1,12 @@
+---
+title: "1. 优先最简单直接方案，禁止绕远路"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, debug]
+sources: []
+---
+
 ## 1. 优先最简单直接方案，禁止绕远路
 
 遇到环境问题时，先检查现有环境（venv、conda）是否已经有需要的东西，有就直接用。**不要**在简单方案存在时选复杂方案（PYTHONPATH hack、pip 升级系统包、加别名 patch 等）。

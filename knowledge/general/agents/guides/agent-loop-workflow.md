@@ -1,3 +1,12 @@
+---
+title: "Agent loop / sub-agent workflow"
+created: 2026-07-10
+updated: 2026-07-13
+type: guide
+tags: [general, agents]
+sources: []
+---
+
 # Agent loop / sub-agent workflow
 
 **何时来翻**：用户明确要求 sub-agent / 并行 agent，或任务能拆成互不依赖的调查面。目标是降低等待和盲区，不是增加流程。

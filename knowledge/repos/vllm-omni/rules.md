@@ -1,3 +1,12 @@
+---
+title: "vLLM-Omni 硬门禁"
+created: 2026-07-10
+updated: 2026-07-10
+type: rule
+tags: [vllm-omni]
+sources: []
+---
+
 # vLLM-Omni 硬门禁
 
 只在当前任务明确属于 `vllm-project/vllm-omni` 时应用本页。先遵守根目录 `CLAUDE.md` 的通用 P0，再执行这里的仓库专属门禁。其他仓库不得继承本页的模型、远端、测试、PR 或身份假设。

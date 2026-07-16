@@ -1,3 +1,12 @@
+---
+title: "HunyuanImage3"
+created: 2026-07-10
+updated: 2026-07-13
+type: index
+tags: [vllm-omni, models, hunyuan-image3]
+sources: []
+---
+
 # HunyuanImage3
 
 - 常见别名：`HunyuanImage3`、`hunyuan_image3`

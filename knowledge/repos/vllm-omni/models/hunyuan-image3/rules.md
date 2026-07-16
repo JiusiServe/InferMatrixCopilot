@@ -1,3 +1,12 @@
+---
+title: "HunyuanImage3 开发规则"
+created: 2026-07-13
+updated: 2026-07-13
+type: rule
+tags: [vllm-omni, models, hunyuan-image3]
+sources: []
+---
+
 # HunyuanImage3 开发规则
 
 这些规则适用于 HunyuanImage3 的生成、编辑、prompt、AR 采样、AR→DiT 交接、条件图处理和公开入口。只有加粗项目或表格第一列中的 `HY3-数字字母` 是可审计规则 ID；章节标题只是分组，不计入 ID，解释性文字和链接也不计。

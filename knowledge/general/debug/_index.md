@@ -1,3 +1,12 @@
+---
+title: "调试"
+created: 2026-07-10
+updated: 2026-07-10
+type: index
+tags: [general, debug]
+sources: []
+---
+
 # 调试
 
 ## 什么时候查这里

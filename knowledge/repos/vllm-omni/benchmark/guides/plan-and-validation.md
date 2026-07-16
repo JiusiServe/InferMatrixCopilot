@@ -1,3 +1,12 @@
+---
+title: "Plan / Validation 入口"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, benchmark]
+sources: []
+---
+
 # Plan / Validation 入口
 
 本文件只保留路由。日常先按任务类型打开对应专题页；不要整篇读历史 runbook。

@@ -1,3 +1,12 @@
+---
+title: "适用范围"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, models, hunyuan-image3]
+sources: []
+---
+
 ## 适用范围
 跑 https://github.com/Tencent-Hunyuan/HunyuanImage-3.0 的 `run_image_gen.py`（不是 vllm-omni、不是 HF 离线推理对齐脚本）。
 

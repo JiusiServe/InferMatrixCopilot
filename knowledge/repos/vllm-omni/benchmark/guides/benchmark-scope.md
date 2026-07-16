@@ -1,3 +1,12 @@
+---
+title: "vLLM-Omni Benchmark 口径"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, benchmark]
+sources: []
+---
+
 # vLLM-Omni Benchmark 口径
 
 ## 5. Benchmark 必须先定口径：探索 / smoke / sweep 三段不能混跑

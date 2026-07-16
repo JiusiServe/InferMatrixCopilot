@@ -1,3 +1,12 @@
+---
+title: "Serving 共享架构"
+created: 2026-07-10
+updated: 2026-07-10
+type: architecture
+tags: [vllm-omni, components, serving]
+sources: []
+---
+
 # Serving 共享架构
 
 ## 负责什么

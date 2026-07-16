@@ -1,3 +1,12 @@
+---
+title: "通用经验入口"
+created: 2026-07-10
+updated: 2026-07-10
+type: index
+tags: [general]
+sources: []
+---
+
 # 通用经验入口
 
 ## 什么时候查这里

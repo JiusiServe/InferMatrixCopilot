@@ -1,3 +1,12 @@
+---
+title: "Integration PR / Merge Vehicle Gate"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, git]
+sources: []
+---
+
 # Integration PR / Merge Vehicle Gate
 
 来源：Greyfield Next V1 收尾中，先开 #35-#40 窄 PR，再开 #41 integration PR，过程中出现 draft/ready 状态漂移、PR body/docs stale、CodeRabbit success 被误读、过量状态机修复、sub-agent review 后置等问题。最终 #41 合入可接受，但过程违反框架规则：经验先写进了个人 Codex memory，而不是本仓框架。

@@ -1,3 +1,12 @@
+---
+title: "SSH 工作方式"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, remote]
+sources: []
+---
+
 # SSH 工作方式
 
 ## 1. 先验证目标和 host key

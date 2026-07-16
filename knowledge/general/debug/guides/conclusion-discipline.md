@@ -1,3 +1,12 @@
+---
+title: "下结论的纪律"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, debug]
+sources: []
+---
+
 # 下结论的纪律
 
 ## 什么时候用

@@ -1,3 +1,12 @@
+---
+title: "Remote Debug Strategy 入口"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, remote]
+sources: []
+---
+
 # Remote Debug Strategy 入口
 
 本文件只保留路由。远端任务先按场景打开专题页，避免一次性载入全部 graph/profiling 复盘。

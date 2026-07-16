@@ -1,3 +1,12 @@
+---
+title: "Benchmark Notes"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, benchmark]
+sources: []
+---
+
 # Benchmark Notes
 
 本页只做 benchmark 入口。通用口径在 `general/benchmark/`，仓库指南和结果由本目录 `_index.md` 分流，避免单个文档继续膨胀。

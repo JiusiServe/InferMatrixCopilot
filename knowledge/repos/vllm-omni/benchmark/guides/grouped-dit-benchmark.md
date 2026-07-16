@@ -1,3 +1,12 @@
+---
+title: "Hunyuan Step-Batching Benchmark"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, benchmark]
+sources: []
+---
+
 # Hunyuan Step-Batching Benchmark
 
 ## Hunyuan step-batching benchmark：batch 口径必须证明命中 grouped DiT

@@ -1,3 +1,12 @@
+---
+title: "HunyuanImage3 指南"
+created: 2026-07-10
+updated: 2026-07-10
+type: index
+tags: [vllm-omni, models, hunyuan-image3]
+sources: []
+---
+
 # HunyuanImage3 指南
 
 | 遇到什么 | 查看哪里 |

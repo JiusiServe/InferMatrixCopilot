@@ -323,6 +323,7 @@ def main() -> int:
 
     excluded_parts = {
         ".git",
+        "_archive",
         "artifacts",
         "contributing",
         "general",

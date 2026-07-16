@@ -1,3 +1,12 @@
+---
+title: "Reviewer Lens Prompt"
+created: 2026-07-10
+updated: 2026-07-13
+type: guide
+tags: [general, review]
+sources: []
+---
+
 # Reviewer Lens Prompt
 
 Use this when spawning a read-only review sub-agent. Do not add a suspected root cause unless the task is explicitly finding-closure for an already accepted finding.

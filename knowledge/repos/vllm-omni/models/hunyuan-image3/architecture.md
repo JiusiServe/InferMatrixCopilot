@@ -1,3 +1,12 @@
+---
+title: "vLLM-Omni 核心架构"
+created: 2026-07-10
+updated: 2026-07-10
+type: architecture
+tags: [vllm-omni, models, hunyuan-image3]
+sources: []
+---
+
 # vLLM-Omni 核心架构
 
 ## 架构速览

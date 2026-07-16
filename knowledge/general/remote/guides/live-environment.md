@@ -1,3 +1,12 @@
+---
+title: "远端事实以 live env 为准"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, remote]
+sources: []
+---
+
 # 远端事实以 live env 为准
 
 ## 规则

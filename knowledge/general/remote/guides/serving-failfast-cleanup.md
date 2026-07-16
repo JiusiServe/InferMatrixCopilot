@@ -1,3 +1,12 @@
+---
+title: "Remote Debug · Serving / Benchmark fail-fast 与清理"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, remote]
+sources: []
+---
+
 # Remote Debug · Serving / Benchmark fail-fast 与清理
 
 ## 远端 serving / benchmark 脚本必须 fail-fast

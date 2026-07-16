@@ -1,3 +1,12 @@
+---
+title: "远端指南"
+created: 2026-07-10
+updated: 2026-07-10
+type: index
+tags: [general, remote]
+sources: []
+---
+
 # 远端指南
 
 | 遇到什么 | 查看哪里 |

@@ -1,3 +1,12 @@
+---
+title: "User-visible Acceptance Gate"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, docs]
+sources: []
+---
+
 # User-visible Acceptance Gate
 
 这条是框架规则，不绑定某个项目。只要改动会被用户、reviewer、CI reader 或最终产品用户直接看到，就不能把“代码路径通过”当成验收完成。

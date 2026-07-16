@@ -1,3 +1,12 @@
+---
+title: "执行原则"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, debug]
+sources: []
+---
+
 # 执行原则
 
 ## 1. 使用最简单的有效路径

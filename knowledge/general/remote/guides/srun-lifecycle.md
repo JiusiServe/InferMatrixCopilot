@@ -1,3 +1,12 @@
+---
+title: "Slurm 资源生命周期"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, remote]
+sources: []
+---
+
 # Slurm 资源生命周期
 
 ## 原则

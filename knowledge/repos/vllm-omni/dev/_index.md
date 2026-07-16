@@ -1,3 +1,12 @@
+---
+title: "vLLM-Omni 开发与配置"
+created: 2026-07-10
+updated: 2026-07-10
+type: index
+tags: [vllm-omni, dev]
+sources: []
+---
+
 # vLLM-Omni 开发与配置
 
 ## 什么时候查这里

@@ -1,3 +1,12 @@
+---
+title: "实现与功能验证"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, planning]
+sources: []
+---
+
 # 实现与功能验证
 
 ## 1. Plan 阶段必须 trace 完整 lifecycle，不要拿快照建模

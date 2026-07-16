@@ -1,3 +1,12 @@
+---
+title: "调试中'顺手优化'的 scope 纪律"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, review]
+sources: []
+---
+
 # 调试中"顺手优化"的 scope 纪律
 
 PR #3444 multi-image 主线开发期间，我顺手做了 `cot_token_ids_list` 优化（既绕 BPE drift 又快 0.01s 的 segment-token 透传路径）。reviewer 一眼看穿："this isn't necessary for the current PR"。**问题不在优化本身对错，在它跟 PR 主线无关**。

@@ -1,3 +1,12 @@
+---
+title: "review-delegation-framing"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, agents]
+sources: []
+---
+
 Spawn review sub-agent 时**禁止把自己的 hypothesis / suspected root cause 塞进 prompt**。这不等于不要 scope：目标 PR / commit / 文件范围 / reviewer note / read-only 约束 / evidence contract 必须写清；禁止的是把“我怀疑 X”变成子 agent 的唯一视角。
 
 **Why:** sub-agent 没有我的上下文 ≠ 没有偏见——偏见**通过我给它的 prompt 传染过去**。子 agent 严格在 prompt 框定的范围内审查，框外的问题它压根不看。

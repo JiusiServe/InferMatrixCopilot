@@ -1,3 +1,12 @@
+---
+title: "新模型接入验证"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, review]
+sources: []
+---
+
 # 新模型接入验证
 
 ## 新模型接入验证：shape / clean load 不等于语义等价

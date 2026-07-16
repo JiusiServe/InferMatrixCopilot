@@ -24,18 +24,29 @@ REQUIRED_SECTIONS = ("name", "repo")
 _BRIEFING_CAP = 8000
 
 
+def _without_frontmatter(text: str) -> str:
+    """Drop a leading YAML frontmatter block — page metadata (SCHEMA.md), not
+    briefing content the agent should spend prompt budget on."""
+    if text.startswith("---"):
+        parts = text.split("---", 2)
+        if len(parts) == 3:
+            return parts[2]
+    return text
+
+
 def render_briefing_docs(root: Path | str, docs: list[str], *, header: str = "",
                          cap: int = _BRIEFING_CAP) -> str:
     """Concatenate the `docs` (paths relative to `root`) into one capped briefing
-    slice, prefixed by `header`. Missing docs are skipped (never fatal). Returns
-    "" when none exist. Shared by the general and repo-specific briefing layers
-    so both render identically."""
+    slice, prefixed by `header`. Missing docs are skipped (never fatal); page
+    frontmatter is stripped. Returns "" when none exist. Shared by the general
+    and repo-specific briefing layers so both render identically."""
     root = Path(root)
     parts: list[str] = []
     for rel in docs:
         p = root / rel
         if p.exists():
-            parts.append(p.read_text(encoding="utf-8", errors="replace").strip())
+            text = p.read_text(encoding="utf-8", errors="replace")
+            parts.append(_without_frontmatter(text).strip())
     if not parts:
         return ""
     body = ((header + "\n\n") if header else "") + "\n\n---\n\n".join(parts)

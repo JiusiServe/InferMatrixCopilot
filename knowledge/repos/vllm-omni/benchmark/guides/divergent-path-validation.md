@@ -1,3 +1,12 @@
+---
+title: "分叉执行路径验证"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, benchmark]
+sources: []
+---
+
 # 分叉执行路径验证
 
 ## 分叉执行路径验证：normal path parity 是硬门槛

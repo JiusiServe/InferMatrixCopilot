@@ -1,3 +1,12 @@
+---
+title: "1. .gitignore 排 *.json，新增 JSON test config 必须 git add -f"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, ci]
+sources: []
+---
+
 vllm-omni CI 上反复踩到的三个具体配置坑——合一篇。
 
 ## 1. .gitignore 排 *.json，新增 JSON test config 必须 git add -f

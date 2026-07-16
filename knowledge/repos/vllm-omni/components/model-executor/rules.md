@@ -1,3 +1,12 @@
+---
+title: "Model Executor 规则"
+created: 2026-07-10
+updated: 2026-07-10
+type: rule
+tags: [vllm-omni, components, model-executor]
+sources: []
+---
+
 # Model Executor 规则
 
 ## Runner 到模型的预处理合同

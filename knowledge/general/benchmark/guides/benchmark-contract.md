@@ -1,3 +1,12 @@
+---
+title: "性能测试基本合同"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, benchmark]
+sources: []
+---
+
 # 性能测试基本合同
 
 ## 开跑前先写清楚

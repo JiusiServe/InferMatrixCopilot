@@ -1,3 +1,12 @@
+---
+title: "Reviewer Lens Cases"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, review]
+sources: []
+---
+
 # Reviewer Lens Cases
 
 Keep this file short. It explains why the reviewer-lens rules exist without making the main checklist unreadable.

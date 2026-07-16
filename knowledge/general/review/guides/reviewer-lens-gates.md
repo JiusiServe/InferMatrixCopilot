@@ -1,3 +1,12 @@
+---
+title: "Reviewer Lens Gates"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, review]
+sources: []
+---
+
 # Reviewer Lens Gates
 
 This file holds workflow gates that are easy to forget when `reviewer_lens_audit.md` gets treated as a generic review checklist.

@@ -1,3 +1,12 @@
+---
+title: "Model Executor"
+created: 2026-07-10
+updated: 2026-07-10
+type: index
+tags: [vllm-omni, components, model-executor]
+sources: []
+---
+
 # Model Executor
 
 - 源码入口：`vllm_omni/model_executor/`（layers、model_loader、models、stage_configs、stage_input_processors）、`vllm_omni/worker/`（gpu_*_worker、gpu_*_model_runner、mixins）、`vllm_omni/inputs/`（runner 输入预处理：data.py、preprocess.py）和设备平台层 `vllm_omni/platforms/<cuda|musa|npu|rocm|xpu>/platform.py`

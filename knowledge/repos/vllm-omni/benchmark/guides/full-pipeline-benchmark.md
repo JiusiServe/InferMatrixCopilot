@@ -1,3 +1,12 @@
+---
+title: "Remote Debug · Full pipeline benchmark gate"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, benchmark]
+sources: []
+---
+
 # Remote Debug · Full pipeline benchmark gate
 
 ## Full pipeline benchmark 的 connector 和指标必须先做可用性 gate

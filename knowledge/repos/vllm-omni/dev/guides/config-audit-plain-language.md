@@ -1,3 +1,12 @@
+---
+title: "vLLM-Omni config audit 说人话规则"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, dev]
+sources: []
+---
+
 # vLLM-Omni config audit 说人话规则
 
 ## 什么时候用

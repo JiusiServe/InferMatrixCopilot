@@ -1,3 +1,12 @@
+---
+title: "vLLM-Omni CI"
+created: 2026-07-10
+updated: 2026-07-10
+type: index
+tags: [vllm-omni, ci]
+sources: []
+---
+
 # vLLM-Omni CI
 
 ## 什么时候查这里

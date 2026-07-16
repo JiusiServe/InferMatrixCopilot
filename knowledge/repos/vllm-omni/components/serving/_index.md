@@ -1,3 +1,12 @@
+---
+title: "Serving"
+created: 2026-07-10
+updated: 2026-07-10
+type: index
+tags: [vllm-omni, components, serving]
+sources: []
+---
+
 # Serving
 
 - 主要源码入口：`vllm_omni/entrypoints/`（cli、openai、openpi 及 omni/async_omni 入口）和 `vllm_omni/engine/`（orchestrator、stage engine core、stage pool/runtime、output processor）

@@ -1,3 +1,12 @@
+---
+title: "Product Loop Planning"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, planning]
+sources: []
+---
+
 # Product Loop Planning
 
 **何时来翻**：用户说“对标某项目 / 做到某体验 / 最低 parity / 产品书 / roadmap / 版本目标”，或者已经抱怨“拆得太散、PR 很多但功能没感觉”。

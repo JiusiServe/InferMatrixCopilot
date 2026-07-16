@@ -1,3 +1,12 @@
+---
+title: "PR Body Provenance"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, git]
+sources: []
+---
+
 # PR Body Provenance
 
 Use this before putting performance, accuracy, metric tables, or output images into a PR body or PR comment.

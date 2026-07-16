@@ -1,3 +1,12 @@
+---
+title: "RFC Status"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, docs]
+sources: []
+---
+
 # RFC Status
 
 ## Deterministic rollout

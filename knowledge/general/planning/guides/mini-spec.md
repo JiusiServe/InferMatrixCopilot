@@ -1,3 +1,12 @@
+---
+title: "Canonical Mini Spec"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, planning]
+sources: []
+---
+
 # Canonical Mini Spec
 
 **何时来翻**：新模型、新 pipeline、新 backend、已有模型新增 public path、execution path 变更、public 字段 / multimodal payload 变更、性能 claim PR、docs / recipe / supported model / perf config 公开入口变化。

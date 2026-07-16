@@ -1,3 +1,12 @@
+---
+title: "Remote Debug · AR graph serve / profiling 状态机"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, benchmark]
+sources: []
+---
+
 # Remote Debug · AR graph serve / profiling 状态机
 
 ## 通用 profiling 规则：先读经验，再锁 artifact 契约

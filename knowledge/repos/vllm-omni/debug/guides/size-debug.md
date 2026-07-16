@@ -1,3 +1,12 @@
+---
+title: "背景生图尺寸异常，不要先盯单个函数"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, debug]
+sources: []
+---
+
 ## 背景生图尺寸异常，不要先盯单个函数
 
 这类 bug 很容易看起来像 `pre_process_func`、首图兜底、或者某个 resize 分支的问题，但真正根因通常分布在多层链路里。

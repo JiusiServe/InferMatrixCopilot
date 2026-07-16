@@ -1,3 +1,12 @@
+---
+title: "Remote Debug · 基础策略"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, remote]
+sources: []
+---
+
 # Remote Debug · 基础策略
 
 ## 默认执行顺序

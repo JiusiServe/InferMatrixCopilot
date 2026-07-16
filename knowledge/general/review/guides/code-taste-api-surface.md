@@ -1,3 +1,12 @@
+---
+title: "Code Taste · API Surface"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, review]
+sources: []
+---
+
 # Code Taste · API Surface
 
 Use this before adding any public or semi-public knob, request field, internal optional fast path, or shared schema field.

@@ -1,3 +1,12 @@
+---
+title: "性能与精度证据"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, benchmark]
+sources: []
+---
+
 # 性能与精度证据
 
 ## 4. 性能 / 精度验证必须先定义口径：official e2e 结论不能用 smoke 数据代替

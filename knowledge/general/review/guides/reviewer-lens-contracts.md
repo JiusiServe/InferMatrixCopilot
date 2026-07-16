@@ -1,3 +1,12 @@
+---
+title: "Reviewer Lens Contracts"
+created: 2026-07-10
+updated: 2026-07-13
+type: guide
+tags: [general, review]
+sources: []
+---
+
 # Reviewer Lens Contracts
 
 Use this when the change exposes, forwards, or normalizes behavior across module boundaries.

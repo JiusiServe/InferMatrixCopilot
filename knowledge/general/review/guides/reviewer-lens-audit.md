@@ -1,3 +1,12 @@
+---
+title: "Reviewer-lens audit"
+created: 2026-07-10
+updated: 2026-07-13
+type: guide
+tags: [general, review]
+sources: []
+---
+
 # Reviewer-lens audit
 
 **Why:** PR #3626 证明普通 "code check" 护不住 review：sub-agent 说 OK，但 reviewer 仍抓到重复算法、错层、非连续 token id 和冗余 surface。Reviewer-lens 的目的不是让 sub-agent 拍板，而是把 reviewer 会看的维度显式化。

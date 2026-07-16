@@ -1,3 +1,12 @@
+---
+title: "HunyuanImage3 AR D-Step 调查"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, benchmark]
+sources: []
+---
+
 # HunyuanImage3 AR D-Step 调查
 
 ## HunyuanImage3 AR graph d-step 性能分析：10 小时 goal 的下次执行模板

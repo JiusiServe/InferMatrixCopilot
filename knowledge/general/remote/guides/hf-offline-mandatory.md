@@ -1,3 +1,12 @@
+---
+title: "远端 HF 加载必须 OFFLINE"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, remote]
+sources: []
+---
+
 # 远端 HF 加载必须 OFFLINE
 
 ## 规则

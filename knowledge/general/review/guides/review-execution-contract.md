@@ -1,3 +1,12 @@
+---
+title: "独立审查执行合同"
+created: 2026-07-13
+updated: 2026-07-13
+type: guide
+tags: [general, review]
+sources: []
+---
+
 # 独立审查执行合同
 
 **何时使用：** 开发完成后的独立 review、完整 diff review、准备交给项目 owner 前的最后审查。这里是可直接执行的短入口；风险解释和专项 lens 只在本页要求时继续读取。

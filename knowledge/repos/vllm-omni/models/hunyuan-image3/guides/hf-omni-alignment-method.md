@@ -1,3 +1,12 @@
+---
+title: "触发条件"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, models, hunyuan-image3]
+sources: []
+---
+
 ## 触发条件
 
 - 用户反馈"vllm-omni 离线推理输出和官方 HF 不一样"

@@ -1,3 +1,12 @@
+---
+title: "环境要求"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, models, hunyuan-image3]
+sources: []
+---
+
 ## 环境要求
 
 - transformers==4.57.1（官方 requirements.txt 指定版本）

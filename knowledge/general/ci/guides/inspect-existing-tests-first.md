@@ -1,3 +1,12 @@
+---
+title: "规则：先看现有代码，再谈方案"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [general, ci]
+sources: []
+---
+
 # 规则：先看现有代码，再谈方案
 
 ## 反面教训（2026-04-21）

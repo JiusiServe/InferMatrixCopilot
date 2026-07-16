@@ -1,3 +1,12 @@
+---
+title: "TL;DR"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, models, hunyuan-image3]
+sources: []
+---
+
 ﻿# HunyuanImage-3.0-Instruct IT2I Gap 风险报告
 
 **版本**：2026-04-20

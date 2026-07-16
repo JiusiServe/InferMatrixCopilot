@@ -1,3 +1,12 @@
+---
+title: "PR Workflow · PR body entry"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, git]
+sources: []
+---
+
 # PR Workflow · PR body entry
 
 This page is the short entry for PR body writing. Deeper evidence rules live in:

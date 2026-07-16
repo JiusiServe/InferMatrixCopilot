@@ -1,3 +1,12 @@
+---
+title: "通用格式（2026-04-29 全任务确认）"
+created: 2026-07-10
+updated: 2026-07-10
+type: guide
+tags: [vllm-omni, models, hunyuan-image3]
+sources: []
+---
+
 ## 通用格式（2026-04-29 全任务确认）
 
 `generation_config.json` 默认 `sequence_template="instruct"`，所有 chat 任务的 AR prefill 必须用 instruct 模板：
