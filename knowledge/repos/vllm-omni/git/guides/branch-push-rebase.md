@@ -1,10 +1,10 @@
 ---
 title: "PR Workflow · Branch / Push / Rebase"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: guide
 tags: [vllm-omni, git]
-sources: []
+sources: ["#3626", "#3766", "#4041"]
 ---
 
 # PR Workflow · Branch / Push / Rebase

@@ -1,10 +1,10 @@
 ---
 title: "PR Workflow · Review/debugging 与测试路径"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: guide
 tags: [vllm-omni, git]
-sources: []
+sources: ["#2713", "#2986", "#3107", "#3207"]
 ---
 
 # PR Workflow · Review/debugging 与测试路径

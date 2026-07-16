@@ -1,10 +1,10 @@
 ---
 title: "PR Workflow · Scope 收窄与 diff gate"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: guide
 tags: [vllm-omni, git]
-sources: []
+sources: ["#3483", "#3819"]
 ---
 
 # PR Workflow · Scope 收窄与 diff gate

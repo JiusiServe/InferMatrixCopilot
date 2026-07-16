@@ -1,10 +1,10 @@
 ---
 title: "RFC Status"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: guide
 tags: [vllm-omni, docs]
-sources: []
+sources: ["#203", "#4864"]
 ---
 
 # RFC Status

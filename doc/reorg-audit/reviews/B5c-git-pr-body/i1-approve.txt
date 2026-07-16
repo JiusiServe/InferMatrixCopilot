@@ -1,0 +1,7 @@
+model: gpt-5.6-sol-high
+prompt_sha256: a0cf5b3581524de437d66391d02cabca2b95d20da7df16adb4422e1df5db0a57
+prompt_chars: 28376
+---- reviewer output ----
+All seven BEFORE pages are fully preserved in AFTER; only provenance metadata was added.
+
+VERDICT: APPROVE

@@ -1,11 +1,13 @@
 ---
-title: "omni-init-args"
+title: "Omni() 初始化参数语义"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: guide
 tags: [vllm-omni, dev]
 sources: []
 ---
+
+# Omni() 初始化参数语义
 
 vllm-omni 是多 stage 架构，每个 stage 在 yaml 的 `engine_args` 字段单独配 `tensor_parallel_size` / `pipeline_parallel_size` / `enable_prefix_caching` 等。但 vllm 的 `EngineArgs` **顶层**也有这些字段的默认值（tp=1 等）。
 

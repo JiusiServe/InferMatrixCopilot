@@ -1,10 +1,10 @@
 ---
 title: "新模型接入验证"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: guide
 tags: [vllm-omni, review]
-sources: []
+sources: ["#3474"]
 ---
 
 # 新模型接入验证
