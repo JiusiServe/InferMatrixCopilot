@@ -1,10 +1,10 @@
 ---
 title: "Diffusion 共享架构"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: architecture
 tags: [vllm-omni, components, diffusion]
-sources: []
+sources: [vllm_omni/diffusion/]
 ---
 
 # Diffusion 共享架构
@@ -18,6 +18,13 @@ sources: []
 - 模型专有 transformer、tokenizer、VAE wrapper 和 checkpoint 兼容细节由对应模型目录说明。
 - 请求字段怎样从 HTTP/CLI 进入系统由 serving 模块负责。
 - AR/LLM stage 怎样产生跨阶段输入由 model-executor 负责。
+
+## 当前子模块布局（dev/vllm-align @ 4f2b32c 复核）
+
+执行链相关：`executor/`（执行循环）、`worker/`（diffusion worker）、`sched/`（stage 内调度）、
+`models/`（共享模型实现）、`model_loader/`；显存与性能相关：`cache/`、`offloader/`、
+`quantization/`、`profiler/`；能力扩展：`attention/`、`layers/`、`lora/`、`hooks/`、
+`distributed/`、`postprocess/`、`utils/`。
 
 ## 调查顺序
 

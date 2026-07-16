@@ -1,10 +1,10 @@
 ---
 title: "Serving 共享架构"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: architecture
 tags: [vllm-omni, components, serving]
-sources: []
+sources: [vllm_omni/entrypoints/, vllm_omni/engine/orchestrator.py]
 ---
 
 # Serving 共享架构
@@ -12,6 +12,16 @@ sources: []
 ## 负责什么
 
 Serving 层把用户输入转换成内部请求，选择 online/offline 执行入口，并把参数交给实际 engine 或 pipeline。它也是 CLI、HTTP 和兼容 API 之间保持行为一致的责任边界。
+
+## 当前源码入口（dev/vllm-align @ 4f2b32c 复核）
+
+- 用户入口：`vllm_omni/entrypoints/` — `omni.py` / `async_omni.py` / `omni_base.py`（offline 与
+  async 入口）、`cli/`、`openai/`（OpenAI-compatible API）、`openpi/`、`pd_utils.py`、
+  `stage_utils.py`、`client_request_state.py`。
+- engine 边界：`vllm_omni/engine/` — `orchestrator.py` + `orchestrator_monitor.py`（阶段编排）、
+  `async_omni_engine.py`、`stage_engine_core_client.py` / `stage_engine_core_proc.py`（stage
+  engine core）、`stage_pool.py` / `stage_runtime.py`（stage 生命周期）、`output_processor.py`、
+  `membership_controller.py`。
 
 ## 调查顺序
 

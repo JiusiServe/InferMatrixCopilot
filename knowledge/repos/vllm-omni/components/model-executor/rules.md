@@ -1,10 +1,10 @@
 ---
 title: "Model Executor 规则"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: []
+sources: [vllm_omni/worker/gpu_model_runner.py, tests/worker/test_omni_gpu_model_runner.py, vllm_omni/config/stage_config.py]
 ---
 
 # Model Executor 规则

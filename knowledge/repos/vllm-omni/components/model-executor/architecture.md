@@ -1,10 +1,10 @@
 ---
 title: "Model Executor 共享架构"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: architecture
 tags: [vllm-omni, components, model-executor]
-sources: []
+sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/config/stage_config.py, vllm_omni/engine/stage_runtime.py, tests/worker/test_omni_gpu_model_runner.py]
 ---
 
 # Model Executor 共享架构
@@ -23,6 +23,8 @@ sources: []
 ## 当前源码职责锚点
 
 调查前用 current main 验证这些符号仍存在；路径变化时沿调用方更新本页，不保留失效副本。
+（2026-07-16 在 `dev/vllm-align @ 4f2b32c` 复核：下列 6 个锚点文件与
+`build_stage_runtime_overrides`、`_preprocess` 符号全部存在。）
 
 - 全局 CLI、deploy YAML 和 per-stage override 合并：`vllm_omni/config/stage_config.py` 的 `build_stage_runtime_overrides` 及其 config factory 调用方。
 - stage devices、replica 布局和启动前容量：`vllm_omni/engine/stage_runtime.py`、`vllm_omni/engine/stage_init_utils.py`。
