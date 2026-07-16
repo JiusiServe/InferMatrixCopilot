@@ -1,0 +1,7 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 580c71264880f4131bc66c14bd4d46f7d3dc88f1de6a953bcedac92cd7e653b3
+prompt_chars: 31351
+---- reviewer output ----
+[repos/vllm-omni/rebase/upstream-api-drift.md §1] — The full `vllm.entrypoints.openai.parser.harmony_utils` import path and `serving_chat.py` fix location were shortened/omitted — nuance
+[repos/vllm-omni/rebase/upstream-api-drift.md §10] — The exact diagnostic import `from vllm.benchmarks.datasets import SampleRequest, get_samples` was omitted — nuance
+VERDICT: REVISE

@@ -1,0 +1,17 @@
+model: gpt-5.6-sol-high
+prompt_sha256: cd9bb43ec4bf57e8a1b6dd6b68e2bfe746ecb966f8e8603e51100d412e034d13
+prompt_chars: 29513
+---- reviewer output ----
+[upstream-api-drift.md §1] — 遗漏恢复方法“当前匹配 pre-`9affc17a05` upstream 签名”的兼容性边界，以及“所有测试通过”的明确验收标准 — nuance
+[upstream-api-drift.md §3] — `ChatTemplateConfig` 修法弱化为概述，遗漏三个字段的具体取值，并完全遗漏 `ServingScores` 还须补 `supported_tasks` — critical
+[upstream-api-drift.md §4] — 遗漏未来 `check_ep_fault` 若需要真实故障检测则必须重新实现、当前默认 False 仅暂时安全的警告 — nuance
+[upstream-api-drift.md §5] — 遗漏 upstream 同时引入的 `is_empty()` 判断和 scheduler-only stats fallback；旧逻辑会静默丢弃仅调度侧统计 — critical
+[upstream-api-drift.md §6] — 遗漏故障发生于 Qwen3-TTS `CustomVoice` 启动，以及读取 `max_cudagraph_capture_size` 时用于兼容 mock config 的 `isinstance(int, ...)` 防护 — critical
+[upstream-api-drift.md §7] — 遗漏 metadata 使用 REPLACE 语义，以及未知标量 tensor 仍会触发 RuntimeError fallback warning、未来需扩展 key 集合的限制 — nuance
+[upstream-api-drift.md §8] — `parser_cls` 验证命令从精确的 `python -m pytest ...` 弱化为 `pytest ...` — nuance
+[upstream-api-drift.md §8] — VoxCPM2 修法遗漏将 `expected_meta['new_lm_hidden']` 改为 `expected_meta.new_lm_hidden`，并遗漏新增初始化属性、NamedTuple/签名漂移的后续检查警告 — nuance
+[upstream-api-drift.md §9] — 采集错误特征遗漏 `ERROR: not found:`，会缩窄该模式的识别范围 — critical
+[upstream-api-drift.md §9] — 诊断命令丢失 `/rebase/vllm-omni` 仓库限定与“vllm-omni 自身 `origin/main`”语义，并遗漏护栏函数名 `_append_silent_log_footer` — nuance
+[upstream-api-drift.md §9] — 元数据仅保留一个无标签日期，未明确 `created_at` 与 `last_used_at` 均为 2026-07-11 — nuance
+[upstream-api-drift.md §10] — 遗漏精确诊断语句 `from vllm.benchmarks.datasets import SampleRequest, get_samples` 及完整检查路径 `/rebase/vllm/vllm/benchmarks/datasets/__init__.py` — nuance
+VERDICT: REVISE

@@ -1,0 +1,6 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 8694c8ff0cc64ad6c90d00dd9bdb51fbed0aed75c6c06d37214cdb07e38b38c6
+prompt_chars: 35665
+---- reviewer output ----
+AFTER preserves all concrete material from every BEFORE source; no information loss detected.
+VERDICT: APPROVE

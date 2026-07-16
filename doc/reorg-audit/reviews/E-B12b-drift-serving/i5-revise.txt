@@ -1,0 +1,7 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 6137a9fa1af63a96821bbfec3235a9a559a5cc4139e93b1eff80507638b3b612
+prompt_chars: 31531
+---- reviewer output ----
+[repos/vllm-omni/rebase/upstream-api-drift.md §3] — Omitted that pooling was consolidated into factories and that `PoolingBaseServing.__init__` specifically requires `chat_template_config` — nuance
+[repos/vllm-omni/rebase/upstream-api-drift.md §8] — Omitted `_finish_decode_batch` as an affected test helper — nuance
+VERDICT: REVISE

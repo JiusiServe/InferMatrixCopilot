@@ -1,0 +1,6 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 45327bcd35af6851c7dc8053396d46df8643f84a17adc13270738a8da189df08
+prompt_chars: 31335
+---- reviewer output ----
+[upstream-api-drift.md §9. 上游测试布局重命名] — “full_model/nightly job 已覆盖幸存测试”的条件被缩为仅 nightly，丢失 full_model 也可保留覆盖这一情况 — nuance
+VERDICT: REVISE

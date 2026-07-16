@@ -1,0 +1,13 @@
+model: gpt-5.6-sol-high
+prompt_sha256: a74e9972e34a53be89094dc7a5a8ecce41fa5704aa8af26eb0f8dbe74cba1489
+prompt_chars: 32063
+---- reviewer output ----
+[upstream-api-drift-loading.md §1] — Exact adapter mechanics were reduced: `_FusedMoE(prefix=prefix, **kwargs)`, kwargs/positional `hidden_states` fallback, `None` guards, and safe `init_handle`/`quant_method` handling are omitted — critical
+[upstream-api-drift-loading.md §1] — Verification command lost `2>&1`, so stderr is no longer included in `tail -20` — nuance
+[upstream-api-drift-loading.md §2] — The concrete device-move implementation was generalized, omitting exact parameter filtering, `original_devices`, `.data` restoration, and the non-online `module_device`/`needs_move` sequence — critical
+[upstream-api-drift-loading.md §3] — The callback patch omits `pointer_to_data.pop(ptr)`, clearing `cpu_backup_tensor`, the exact callback signature, monkey-patch assignment, and explicit patch invocation — critical
+[upstream-api-drift-loading.md §3] — Canonical verification no longer preserves the complete executable snippet or expected `OK: Patched correctly` output — nuance
+[upstream-api-drift-loading.md §3] — Retired-history verification lost the required absence of CUDA stderr errors and completion without watchdog termination — nuance
+[upstream-api-drift-loading.md §3] — Debug-memory #437’s watch-outs were omitted: search for other repeated `allocator.sleep()` paths and note that upstream `sleep()` ideally should be idempotent but cannot be modified locally — nuance
+[upstream-api-drift-loading.md §4] — The exact `load_weights(self, weights: Iterable[tuple[str, torch.Tensor]]) -> set[str]` signature was omitted — nuance
+VERDICT: REVISE

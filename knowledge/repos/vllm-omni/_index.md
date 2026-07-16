@@ -36,5 +36,6 @@ sources: []
 | 处理分支、PR 和公开证据 | [git](git/_index.md) | 仓库专有 Git/PR 规则 |
 | 跑 benchmark、profiling 或查历史结果 | [benchmark](benchmark/_index.md) | 性能入口 |
 | 在远端验证仓库改动 | [remote](remote/_index.md) | 仓库专有远端策略 |
+| 对齐 upstream vLLM（rebase、API 漂移、波次） | [rebase](rebase/_index.md) | 上游对齐工作流与漂移登记 |
 | 查看共享代码模块 | [components](components/_index.md) | diffusion、model-executor、serving |
 | 查看支持模型 | [models](models/_index.md) | 模型架构与经验 |
