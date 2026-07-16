@@ -1,10 +1,10 @@
 ---
 title: "HunyuanImage3 开发规则"
 created: 2026-07-13
-updated: 2026-07-13
+updated: 2026-07-16
 type: rule
 tags: [vllm-omni, models, hunyuan-image3]
-sources: []
+sources: [incidents/painterly/_index.md, guides/hf-alignment-pitfalls.md, vllm_omni/diffusion/models/hunyuan_image3/prompt_utils.py]
 ---
 
 # HunyuanImage3 开发规则

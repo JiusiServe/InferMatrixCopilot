@@ -1,11 +1,13 @@
 ---
-title: "通用格式（2026-04-29 全任务确认）"
+title: "HunyuanImage3 官方 prompt 格式"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: guide
 tags: [vllm-omni, models, hunyuan-image3]
 sources: []
 ---
+
+# HunyuanImage3 官方 prompt 格式
 
 ## 通用格式（2026-04-29 全任务确认）
 

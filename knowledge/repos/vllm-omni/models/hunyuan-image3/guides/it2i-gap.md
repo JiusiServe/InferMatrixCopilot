@@ -1,11 +1,13 @@
 ---
-title: "TL;DR"
+title: "HunyuanImage3 IT2I gap 调查"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: guide
 tags: [vllm-omni, models, hunyuan-image3]
 sources: []
 ---
+
+# HunyuanImage3 IT2I gap 调查
 
 ﻿# HunyuanImage-3.0-Instruct IT2I Gap 风险报告
 

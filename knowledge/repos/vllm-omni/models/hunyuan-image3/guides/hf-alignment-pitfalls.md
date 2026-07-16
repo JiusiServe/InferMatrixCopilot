@@ -1,11 +1,13 @@
 ---
-title: "1. 测任何模型对齐前必先 grep 官方 demo / README"
+title: "HunyuanImage3 HF 对齐常见陷阱"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: guide
 tags: [vllm-omni, models, hunyuan-image3]
 sources: []
 ---
+
+# HunyuanImage3 HF 对齐常见陷阱
 
 接 HF 模型做 baseline / 对齐对比时反复犯的两类错合集——选错 API 入口和瞎试版本。
 

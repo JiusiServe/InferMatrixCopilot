@@ -1,11 +1,13 @@
 ---
-title: "环境要求"
+title: "HunyuanImage3 HF baseline runbook"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: guide
 tags: [vllm-omni, models, hunyuan-image3]
 sources: []
 ---
+
+# HunyuanImage3 HF baseline runbook
 
 ## 环境要求
 

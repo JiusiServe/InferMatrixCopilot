@@ -1,11 +1,13 @@
 ---
-title: "触发条件"
+title: "HunyuanImage3 HF/Omni 系统化对齐方法"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: guide
 tags: [vllm-omni, models, hunyuan-image3]
 sources: []
 ---
+
+# HunyuanImage3 HF/Omni 系统化对齐方法
 
 ## 触发条件
 
