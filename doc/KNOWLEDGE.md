@@ -25,6 +25,9 @@ curation — see `doc/PLAN-knowledge-reorg.md`); upstream is not modified.
   manifest, a full `git archive` tarball (+sha256) of `f2dc824`, and `dates.tsv`
   (per-file upstream created/updated dates, captured before the submodule's git
   history was removed — used for page frontmatter).
+- **Code-mirror pin:** the `knowledge/repos/vllm-omni/components/` source maps
+  are verified against vllm-omni `dev/vllm-align @
+  4f2b32cd36e23325b53e20f6ddd5f5954edccb47` (every stated path exists there).
 
 ## Layout: general vs repo-specific
 The knowledge base separates the two, and so do we — the whole tree is **shared**,

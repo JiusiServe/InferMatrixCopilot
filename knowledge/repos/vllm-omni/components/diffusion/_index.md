@@ -1,6 +1,7 @@
 # Diffusion
 
-- 源码入口：`vllm_omni/diffusion/`
+- 源码入口：`vllm_omni/diffusion/` 全树，含 16 个子模块：attention、cache、distributed、executor、hooks、layers、lora、model_loader、models、offloader、postprocess、profiler、quantization、sched、utils、worker
+- 源码校验：以上子模块均已在 `dev/vllm-align @ 4f2b32c` 验证存在
 - 主要职责：多个 diffusion 模型共用的 pipeline、执行循环、scheduler 接入和运行机制
 
 ## 什么时候查这里
