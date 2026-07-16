@@ -121,3 +121,39 @@ def test_runner_uses_performance_model_for_performance_tier(settings, trace, tmp
 def test_runner_uses_eco_model_by_default(settings, trace, tmp_path):
     models = _run_step(settings, trace, tmp_path, mode=None)  # no mode -> eco
     assert models and all(m == "eco-base" for m in models)
+
+
+# ── the ensemble reducer rides the tier too (live perf-run regression: lenses
+# ran on the performance model while the merge/repair calls silently fell back
+# to agent_model) ──────────────────────────────────────────────────────────────
+def test_ensemble_reducer_uses_tier_model(settings, trace, tmp_path):
+    from omni_copilot.engine.agent_runtime.ensemble import run_agent_step_ensemble
+
+    class EnsembleLLM(CaptureLLM):
+        def create(self, *, system, messages, tools=None, model=None,
+                   max_tokens=None, on_text=None):
+            self.models.append(model)
+            base = {k: ([] if "list" in v else "x")
+                    for k, v in BASE_OUTPUT_SCHEMA.items()}
+            base.update(status="success", summary="s", confidence="high",
+                        next_action="none", failure_kind=None,
+                        review_comments=[{"file": "a.py", "line": 1,
+                                          "severity": "minor", "comment": "c",
+                                          "evidence": "e"}])
+            return Reply(blocks=[Block(type="text", text=json.dumps(base))])
+
+    settings.agent_model = "eco-base"
+    settings.performance_model = "strong-model"
+    settings.ensemble_stagger_seconds = 0.0
+    llm = EnsembleLLM()
+    ctx = StepContext(settings=settings,
+                      state={"task_spec": {"kind": "pr_review", "pr": 1,
+                                           "mode": "performance"}},
+                      params={}, run_dir=tmp_path / "run", trace=trace, llm=llm)
+    asyncio.run(run_agent_step_ensemble(
+        ctx, step_name="t.step", purpose="p", evidence={"e": "x"},
+        lenses=[{"name": "l1", "focus": "f1"}, {"name": "l2", "focus": "f2"}],
+        merge_key="review_comments",
+        output_extension={"review_comments": "list"}))
+    # every LLM call in the ensemble — lenses, merge, repair — uses the tier
+    assert llm.models and all(m == "strong-model" for m in llm.models)

@@ -229,9 +229,15 @@ async def run_agent_step_ensemble(
         f"## CANDIDATE ITEMS ({merge_key}, from {len(samples)} samples)\n"
         + json.dumps(numbered, ensure_ascii=False, indent=1)
         + f"\n\n## EVIDENCE\n{ev_text}")
+    # the reducer is agent reasoning too — it rides the run's dual-path tier
+    # (lens agents already do via run_agent_step; without this the merge
+    # silently fell back to agent_model on performance runs)
+    tier_model = ctx.settings.model_for(
+        (ctx.state.get("task_spec") or {}).get("mode", "eco"))
     reply = await asyncio.to_thread(
         ctx.llm.create, system=merge_system,
         messages=[{"role": "user", "content": merge_prompt}],
+        model=tier_model,
         max_tokens=max(6000, ctx.settings.llm_max_tokens))
     reply_text = reply.text
     reduce_in = (reply.usage or {}).get("input_tokens", 0)
@@ -252,6 +258,7 @@ async def run_agent_step_ensemble(
                         "this contract exactly (keep all substance):\n"
                         + json.dumps(reduce_contract, ensure_ascii=False)),
                 messages=[{"role": "user", "content": str(reply_text)[:20_000]}],
+                model=tier_model,
                 max_tokens=max(6000, ctx.settings.llm_max_tokens))
             reduce_in += (fix.usage or {}).get("input_tokens", 0)
             reduce_out += (fix.usage or {}).get("output_tokens", 0)
