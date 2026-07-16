@@ -1,0 +1,7 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 4e4e47293085dc296b209709339fa8d06d5f2d7f9d720485efb74224e183a98a
+prompt_chars: 25440
+---- reviewer output ----
+All four AFTER pages preserve all BEFORE content; only metadata was added or updated.
+
+VERDICT: APPROVE

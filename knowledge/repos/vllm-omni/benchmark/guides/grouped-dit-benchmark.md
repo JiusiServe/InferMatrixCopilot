@@ -1,10 +1,10 @@
 ---
 title: "Hunyuan Step-Batching Benchmark"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: guide
 tags: [vllm-omni, benchmark]
-sources: []
+sources: ["#4041"]
 ---
 
 # Hunyuan Step-Batching Benchmark

@@ -1,10 +1,10 @@
 ---
 title: "Remote Debug · Full pipeline benchmark gate"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: guide
 tags: [vllm-omni, benchmark]
-sources: []
+sources: ["#3938"]
 ---
 
 # Remote Debug · Full pipeline benchmark gate

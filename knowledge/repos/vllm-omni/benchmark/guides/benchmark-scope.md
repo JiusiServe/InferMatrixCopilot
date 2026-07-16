@@ -1,10 +1,10 @@
 ---
 title: "vLLM-Omni Benchmark 口径"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: guide
 tags: [vllm-omni, benchmark]
-sources: []
+sources: ["#3767", "#3938"]
 ---
 
 # vLLM-Omni Benchmark 口径

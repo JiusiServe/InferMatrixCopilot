@@ -1,10 +1,10 @@
 ---
 title: "Dynamic / Continuous Batching 验证"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: guide
 tags: [vllm-omni, benchmark]
-sources: []
+sources: ["#3766", "#3857"]
 ---
 
 # Dynamic / Continuous Batching 验证
