@@ -1,0 +1,8 @@
+## rebase-agent config.py buildkite facts (@122a9468)
+    last_rebase_vllm_commit: str = "1acd67a795ebccdf9b9db7697ae9082058301657"
+    rebase_branch: str = "dev/vllm-align"
+    vllm_wheel_variant: str = "cu130"
+    buildkite_org: str = "vllm"
+    buildkite_ci_pipeline: str = "vllm-omni-release"
+    nightly_pipeline: str = "vllm-omni-rebase"
+    main_ci_pipeline: str = "vllm-omni-rebase"

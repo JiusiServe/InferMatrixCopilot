@@ -1,0 +1,8 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 63b13cb6422c11498419f33f62601f8372bd0cfcbaac859de1867142fa725b49
+prompt_chars: 30437
+---- reviewer output ----
+[ci-environment-gotchas.md §2] — `created_at` 与 `last_used_at` 被合并成单一日期，字段语义丢失 — nuance
+[ci-environment-gotchas.md §3] — `created_at` 与 `last_used_at` 被合并成单一日期，字段语义丢失 — nuance
+[ci-environment-gotchas.md §6] — debug-memory 记录的 `run_count=1` 被删除 — nuance
+VERDICT: REVISE

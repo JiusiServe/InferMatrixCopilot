@@ -1,0 +1,6 @@
+model: gpt-5.6-sol-high
+prompt_sha256: f93aed9df008ee09c16b81e8315212612a80ef3a906381e01f9374af5f4d951b
+prompt_chars: 30529
+---- reviewer output ----
+AFTER preserves all concrete material from every source; no information loss, weakening, over-generalization, or mistranslation found.
+VERDICT: APPROVE

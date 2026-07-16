@@ -1,0 +1,6 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 7406653f455af46d1a07b0511691110079b53aac80e19ff2aba8d2cb914adc6f
+prompt_chars: 6845
+---- reviewer output ----
+All three AFTER pages preserve all BEFORE and pinned-source content; no loss, weakening, over-generalization, or mistranslation found.
+VERDICT: APPROVE

@@ -1,0 +1,8 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 8c975e0e8e8863e7d0c0e7162ec635c23a1db2d90c3d3225be6915ab365b90d5
+prompt_chars: 30485
+---- reviewer output ----
+[ci-environment-gotchas.md §4] — The instruction to inspect the log tail for watchdog messages was omitted — nuance
+[ci-environment-gotchas.md §5] — Engine initialization was explicitly the third 7200s timeout layer, but AFTER reclassifies it as a separate 900s tweak and omits the full file paths — critical
+[ci-environment-gotchas.md §6] — “The test model loads to GPU” was mistranslated as “无处安放” (cannot be loaded), changing the observed sequence — nuance
+VERDICT: REVISE

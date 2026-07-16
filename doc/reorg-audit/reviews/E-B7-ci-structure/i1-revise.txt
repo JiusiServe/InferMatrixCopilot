@@ -1,0 +1,12 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 88eaf65255bb496de440f770e92501523658c15feda888eb204e5edea5533ea4
+prompt_chars: 7496
+---- reviewer output ----
+[buildkite-structure.md §运营事实] — 完整 rebase commit pin 被截短为 `1acd67a795eb` — critical
+[buildkite-structure.md §运营事实] — 丢失模块启动 waves：Wave 2 为 `benchmarks`，ALL_MODULES 按 Wave 1、Wave 2 合并 — critical
+[buildkite-structure.md §运营事实] — 丢失 `pipeline_module_debug_timeout_sec = 7200` — critical
+[buildkite-structure.md §运营事实] — 丢失八个模块到 vLLM 路径的完整 `module_vllm_paths` 映射 — critical
+[buildkite-structure.md §运营事实] — `gpu_1_queue`/`gpu_4_queue` 的硬件约束由 `any` 误写成 L4，且丢失“最少卡数”语义 — critical
+[test-tiers.md] — BEFORE 为空，无信息损失
+[_index.md] — 原有内容全部保留
+VERDICT: REVISE

@@ -1,0 +1,10 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 2aeaa410de2026c8fcf321101c0546d4044b2ae9dc44c571cba85057c05cdee2
+prompt_chars: 30985
+---- reviewer output ----
+[ci-environment-gotchas.md §2] — 修复命令丢失 `/rebase/.venv/bin/` 的精确解释器路径；“upstream 不发布 jit-cache”误译了“不随该 stack ship/pin” — nuance
+[ci-environment-gotchas.md §3] — 管线侧修复丢失具体过滤器示例 `!dev/vllm-align`，以及等待逻辑所在 `phase4.py` 与 “webhook build to settle” 标识 — nuance
+[ci-environment-gotchas.md §4] — 验证步骤弱化：丢失精确工作目录、完整 `_is_simulated_test_error` 命令及 `echo "IGNORED - CORRECT"` — nuance
+[ci-environment-gotchas.md §5] — 丢失关键诊断细节：`TIMEOUT: test ... exceeded NNNs` 且 NNN<7200 指向 stale env；也未保留 `test.sh` 的 `timeout "$job_timeout"` 与变量回退链 — nuance
+[ci-environment-gotchas.md §6 后] — debug-memory #457 整条缺失：async_chunk cosine 0.693<0.8、正确文本与 Whisper 漏词对照、阈值仅 async_chunk 降至 0.65、sync 保持 0.8，以及 CUDA assert 独立瞬态风险均未收录 — critical
+VERDICT: REVISE
