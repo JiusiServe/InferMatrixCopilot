@@ -46,4 +46,5 @@ rebase-agent 配置快照（@122a9468），**属运营观测、可能漂移**，
 ## 相关
 
 - 分级定义见 [test-tiers](test-tiers.md)；Buildkite skipped-build/rebuild 互杀等
-  环境坑见 [ci-environment-gotchas](ci-environment-gotchas.md)。
+  环境坑见 [ci-environment-gotchas](ci-environment-gotchas.md)；rebase 管线的
+  工作流见 [rebase 主题](../../rebase/_index.md)。

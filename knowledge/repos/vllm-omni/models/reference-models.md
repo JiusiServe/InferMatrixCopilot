@@ -42,5 +42,6 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/config/pipeline
 
 ## 相关
 
+- 加模型的注册点清单见 [dev/adding-a-model](../dev/guides/adding-a-model.md)。
 - 语义验收（plumbing≠语义）见
   [model-adaptation-guardrails](../review/guides/model-adaptation-guardrails.md)。
