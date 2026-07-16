@@ -1,11 +1,13 @@
 ---
-title: "1. Confirm sampling mode"
+title: "Seed 确定性审计流程"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-16
 type: guide
 tags: [vllm-omni, debug]
 sources: []
 ---
+
+# Seed 确定性审计流程
 
 When a user reports "same `seed=N` produces different images / cot text across runs", do NOT immediately suspect the seed plumbing code. Walk this checklist first:
 
