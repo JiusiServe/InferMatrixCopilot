@@ -1,0 +1,27 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 8a8ac309f82a883b40be8ba08e885fb41295fedbec7373f6c0b77a3475b2555b
+prompt_chars: 18248
+---- reviewer output ----
+[repos/vllm-omni/components/scheduler/_index.md §entire page] — No information loss; BEFORE was empty.
+[repos/vllm-omni/components/scheduler/architecture.md §entire page] — No information loss; BEFORE was empty.
+[skills/fix-talker-truncated-prefill-prefix-cache-key-cap.md §frontmatter] — Operational metadata (`modules`, status, dates, and `run_count: 54`) was omitted — nuance
+[skills/fix-talker-truncated-prefill-prefix-cache-key-cap.md §Symptom] — Exact failing test, process name, source expression, cascading `EngineDeadError`, session-scoped fixture consequence, and watchdog rc=143 were omitted — critical
+[skills/fix-talker-truncated-prefill-prefix-cache-key-cap.md §Symptom] — Shape decoding (`9` codec rows versus `0+4+1+1=6` text rows) and the empty thinker slice diagnosis were omitted — critical
+[skills/fix-talker-truncated-prefill-prefix-cache-key-cap.md §Diagnose] — Exact warning search and the significance of `hidden_states.layer_0`/`layer_24` were generalized to `layer_N` — nuance
+[skills/fix-talker-truncated-prefill-prefix-cache-key-cap.md §Diagnose] — Telemetry lost the decisive sequence: first miss near 21 MB, subsequent hits near 1.4 MB, versus healthy requests consistently 21–22 MB — critical
+[skills/fix-talker-truncated-prefill-prefix-cache-key-cap.md §Diagnose] — Last-passing-run comparison, engine-version SHA attribution, log path, and `git log -S<warning text> --all` procedure were omitted — critical
+[skills/fix-talker-truncated-prefill-prefix-cache-key-cap.md §Root cause chain] — Forced stage-0/1 prefix caching through `--stage-overrides` was omitted — nuance
+[skills/fix-talker-truncated-prefill-prefix-cache-key-cap.md §Root cause chain] — Exact captured keys (`layer_0` and configured accept layer), suffix-only execution, and reconstruction requirement were weakened to generic per-token caching — critical
+[skills/fix-talker-truncated-prefill-prefix-cache-key-cap.md §Root cause chain] — Capacity example of 682,896 tokens producing 2667.6 MiB per 2048-dimensional bf16 key was omitted — nuance
+[skills/fix-talker-truncated-prefill-prefix-cache-key-cap.md §Fix] — The four concrete edits and `required_mm_cache_keys`/`required_prefix_cache_mm_keys` set-based exemption were omitted and replaced by the distinct boolean `requires_full_prefix_cached_hidden_states` contract — critical
+[skills/fix-talker-truncated-prefill-prefix-cache-key-cap.md §Fix] — `flatten_payload` naming conversion and the requirement to declare flattened `hidden_states.layer_N` names were omitted — critical
+[skills/fix-talker-truncated-prefill-prefix-cache-key-cap.md §Fix] — Unit-test method—cap monkeypatched to one byte, required keys retained, optional oversized keys skipped—was omitted — critical
+[skills/fix-talker-truncated-prefill-prefix-cache-key-cap.md §Verification] — Exact unit/E2E commands, expected four passes, required-allocation warning, and all-request send-size expectation were omitted — critical
+[skills/fix-talker-truncated-prefill-prefix-cache-key-cap.md §Watch Out] — Qwen2.5-omni’s current lack of layer capture and instruction to reassess if it changes were omitted — nuance
+[skills/fix-talker-truncated-prefill-prefix-cache-key-cap.md §Watch Out] — Host-RAM cost of approximately 2.6 GiB per bypassed key and small-host warning were omitted — critical
+[skills/fix-talker-truncated-prefill-prefix-cache-key-cap.md §Watch Out] — Ownership conclusion that this belongs upstream in vllm-omni, with an upstream PR to file/track, was omitted — nuance
+[skills/gpu-hang-low-max-num-batched-tokens.md §frontmatter] — Operational metadata (`modules`, status, dates, and `run_count: 38`) was omitted — nuance
+[skills/gpu-hang-low-max-num-batched-tokens.md §Fix/Files to modify] — Exact target `test_qwen3_omni_expansion.py`, `get_batch_token_config`, and both-stage configuration snippet were omitted — critical
+[skills/gpu-hang-low-max-num-batched-tokens.md §Verification] — Limitation requiring two H100 GPUs, import-only verification, and confirmation that this changes test configuration rather than product code were omitted — nuance
+[repos/vllm-omni/components/_index.md §entire page] — No information loss; all prior content is retained and the new rows are additions.
+VERDICT: REVISE

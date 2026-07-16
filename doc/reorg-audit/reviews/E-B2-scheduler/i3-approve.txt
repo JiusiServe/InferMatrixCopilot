@@ -1,0 +1,6 @@
+model: gpt-5.6-sol-high
+prompt_sha256: cd1a58f7a8878b4eeb8633dc513aaee89a0a1820b8bd8a6d8eb8a430fa9c37e0
+prompt_chars: 22099
+---- reviewer output ----
+AFTER preserves all concrete material from every BEFORE page and both pinned sources; gains do not introduce information loss.
+VERDICT: APPROVE

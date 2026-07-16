@@ -1,0 +1,7 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 8324d8e52ff469992baee511a6d6eb6e862b1ee8904c8fe5191170705722b000
+prompt_chars: 19338
+---- reviewer output ----
+AFTER preserves all BEFORE content across all three pages; no information loss, weakening, over-generalization, or mistranslation found.
+
+VERDICT: APPROVE
