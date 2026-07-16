@@ -1,6 +1,6 @@
 """Adapter knowledge sourced from the SHARED community-docs submodule. General
-(`framework/`) and repo-specific (`repos/<repo>/`) knowledge are kept separate:
-the framework tree is shared across all repos (never nested under one adapter),
+(`general/`) and repo-specific (`repos/<repo>/`) knowledge are kept separate:
+the general tree is shared across all repos (never nested under one adapter),
 and each adapter's briefing is only its own slice. Deeper docs are reachable on
 demand via the doc tools, contained under the shared base."""
 
@@ -27,10 +27,10 @@ def _adapter(tmp_path: Path, manifest: dict) -> RepoAdapter:
 
 
 def _knowledge(tmp_path: Path) -> Path:
-    """A shared knowledge base: framework/ (general) + repos/r/ (repo-specific)."""
+    """A shared knowledge base: general/ (general) + repos/r/ (repo-specific)."""
     k = tmp_path / "knowledge"
-    (k / "framework").mkdir(parents=True)
-    (k / "framework" / "_index.md").write_text("# FRAMEWORK NAV\ngeneral topics",
+    (k / "general").mkdir(parents=True)
+    (k / "general" / "_index.md").write_text("# GENERAL NAV\ngeneral topics",
                                                encoding="utf-8")
     (k / "repos" / "r").mkdir(parents=True)
     (k / "repos" / "r" / "rules.md").write_text("# HARD GATES\nrule one", encoding="utf-8")
@@ -45,15 +45,15 @@ def _ctx(kdir: Path):
 # ── the shared renderer ───────────────────────────────────────────────────────
 def test_render_briefing_docs_concatenate_cap_and_missing(tmp_path):
     k = _knowledge(tmp_path)
-    b = render_briefing_docs(k, ["framework/_index.md", "repos/r/rules.md"], header="H")
-    assert "H" in b and "FRAMEWORK NAV" in b and "HARD GATES" in b
+    b = render_briefing_docs(k, ["general/_index.md", "repos/r/rules.md"], header="H")
+    assert "H" in b and "GENERAL NAV" in b and "HARD GATES" in b
     assert render_briefing_docs(k, ["nope.md"]) == ""          # missing -> empty
     big = tmp_path / "kk"; big.mkdir()
     (big / "big.md").write_text("x" * 20_000, encoding="utf-8")
     assert len(render_briefing_docs(big, ["big.md"])) <= _BRIEFING_CAP + 200
 
 
-# ── repo-specific briefing (reads the SHARED root, excludes framework) ─────────
+# ── repo-specific briefing (reads the SHARED root, excludes general) ─────────
 def test_adapter_briefing_is_repo_specific_only(tmp_path):
     k = _knowledge(tmp_path)
     a = _adapter(tmp_path, {"knowledge": {
@@ -61,7 +61,18 @@ def test_adapter_briefing_is_repo_specific_only(tmp_path):
         "briefing_docs": ["repos/r/rules.md", "repos/r/_index.md"]}})
     b = a.briefing(k)
     assert "HARD GATES" in b and "REPO NAV" in b and "acme/kb" in b
-    assert "FRAMEWORK NAV" not in b  # general is injected separately, not here
+    assert "GENERAL NAV" not in b  # general is injected separately, not here
+
+
+def test_render_briefing_strips_page_frontmatter(tmp_path):
+    k = tmp_path / "k"; k.mkdir()
+    (k / "page.md").write_text(
+        "---\ntitle: \"T\"\ncreated: 2026-01-01\nupdated: 2026-01-01\n"
+        "type: index\ntags: [general]\nsources: []\n---\n\n# BODY HEADING\ncontent",
+        encoding="utf-8")
+    b = render_briefing_docs(k, ["page.md"])
+    assert "BODY HEADING" in b and "content" in b
+    assert "created: 2026-01-01" not in b and not b.startswith("---")
 
 
 def test_adapter_briefing_empty_without_root_or_docs(tmp_path):
@@ -73,15 +84,15 @@ def test_adapter_briefing_empty_without_root_or_docs(tmp_path):
     assert _adapter(tmp_path, {}).briefing(k) == ""
 
 
-# ── doc tools over the SHARED base (framework + repos), contained ─────────────
+# ── doc tools over the SHARED base (general + repos), contained ─────────────
 def test_doc_tools_reach_general_and_repo_specific(tmp_path):
     k = _knowledge(tmp_path)
-    (k / "framework" / "g.md").write_text("SEMANTIC PARITY in framework", encoding="utf-8")
+    (k / "general" / "g.md").write_text("SEMANTIC PARITY in general", encoding="utf-8")
     tools = _repo_docs_tool(_ctx(k), None)  # adapter unused; base is settings.knowledge_dir
     assert set(tools) == {"doc_search", "doc_read"}
-    assert "SEMANTIC PARITY" in tools["doc_read"].handler(path="framework/g.md")
+    assert "SEMANTIC PARITY" in tools["doc_read"].handler(path="general/g.md")
     assert "HARD GATES" in tools["doc_read"].handler(path="repos/r/rules.md")
-    assert "framework/g.md" in tools["doc_search"].handler(query="SEMANTIC PARITY")
+    assert "general/g.md" in tools["doc_search"].handler(query="SEMANTIC PARITY")
     assert "refused" in tools["doc_read"].handler(path="../../../../etc/passwd")
     assert "no such doc" in tools["doc_read"].handler(path="repos/r/nope.md")
 
@@ -98,8 +109,8 @@ def test_real_setup_separates_general_and_repo_specific():
     s = Settings()
     if not (s.knowledge_dir / "repos").exists():
         pytest.skip("knowledge submodule not checked out")
-    # framework/ (general) lives at the shared base, NOT under the adapter
-    assert (s.knowledge_dir / "framework").exists()
+    # general/ (general) lives at the shared base, NOT under the adapter
+    assert (s.knowledge_dir / "general").exists()
     assert not (Path(s.adapters_dir) / "vllm_omni" / "knowledge").exists()
     # general briefing renders from the shared base
     assert render_briefing_docs(s.knowledge_dir, s.knowledge_general_docs)

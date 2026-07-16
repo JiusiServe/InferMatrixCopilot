@@ -1,0 +1,7 @@
+model: gpt-5.6-sol-high
+prompt_sha256: cfcab4106dd9875e40d42093aa3cb42f3e89930c99b5cace5a7fefba8e4f82ce
+prompt_chars: 14046
+---- reviewer output ----
+AFTER preserves all concrete material; only metadata/title framing changed, with the original wording retained as §1.
+
+VERDICT: APPROVE

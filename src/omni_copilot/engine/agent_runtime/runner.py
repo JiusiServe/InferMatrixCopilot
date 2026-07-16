@@ -76,7 +76,7 @@ async def run_agent_step(
     adapter = _resolve_adapter(ctx)
     all_extra = {**knowledge, **_repo_map_tool(ctx, adapter),
                  **_repo_docs_tool(ctx, adapter), **(extra_tools or {})}
-    # Briefing = GENERAL framework knowledge (shared, cross-repo) + this repo's
+    # Briefing = GENERAL knowledge (shared, cross-repo) + this repo's
     # REPO-SPECIFIC slice — both from the shared knowledge base. Deeper docs are
     # pulled on demand via the doc tools (all_extra above).
     briefing = ""
@@ -89,7 +89,7 @@ async def run_agent_step(
             if ctx.settings.knowledge_general_docs and kroot.exists():
                 parts.append(render_briefing_docs(
                     kroot, ctx.settings.knowledge_general_docs,
-                    header="General framework knowledge (cross-repo; open deeper "
+                    header="General knowledge (cross-repo; open deeper "
                            "docs with doc_read / doc_search):"))
             if adapter is not None:
                 parts.append(adapter.briefing(kroot))

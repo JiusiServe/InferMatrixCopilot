@@ -1,0 +1,7 @@
+model: gpt-5.6-sol-high
+prompt_sha256: b7737f4faa775aa37459dc36bf0a3689f40818dbc5e64feab1037a09a7b3f19d
+prompt_chars: 33119
+---- reviewer output ----
+All three BEFORE pages are fully preserved in AFTER; only titles/metadata were added or updated.
+
+VERDICT: APPROVE

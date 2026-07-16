@@ -46,14 +46,14 @@ class Settings(BaseSettings):
     mcp_repo_allowlist: list[str] = []
     mcp_report_max_bytes: int = 65536
 
-    # Shared, human-curated knowledge base — a git submodule of the community
-    # docs, organized as framework/ (general, cross-repo experience) +
+    # Shared, human-curated knowledge base — vendored from the community docs
+    # (see doc/KNOWLEDGE.md), organized as general/ (cross-repo experience) +
     # repos/<repo>/ (repo-specific). Adapters reference only their repos/<repo>/
-    # slice (manifest `knowledge.repo_subdir`); framework/ is general and shared
-    # across all repos. knowledge_general_docs is the always-on general slice;
-    # every deeper doc is reachable on demand via doc_search/doc_read.
+    # slice (manifest `knowledge.repo_subdir`); general/ is shared across all
+    # repos. knowledge_general_docs is the always-on general slice; every deeper
+    # doc is reachable on demand via doc_search/doc_read.
     knowledge_dir: Path = _REPO_ROOT / "knowledge"
-    knowledge_general_docs: list[str] = ["framework/_index.md"]
+    knowledge_general_docs: list[str] = ["general/_index.md"]
 
     # Engine
     run_root: Path = Path.home() / ".omni-copilot" / "runs"

@@ -1,0 +1,7 @@
+model: gpt-5.6-sol-high
+prompt_sha256: fbbfec30e562a6c783258a8e5a0cda58bf2b3b1bd9aa4e57eb81d20af6705d19
+prompt_chars: 25060
+---- reviewer output ----
+All six AFTER pages preserve all BEFORE content; title/H1 and frontmatter changes introduce no information loss.
+
+VERDICT: APPROVE

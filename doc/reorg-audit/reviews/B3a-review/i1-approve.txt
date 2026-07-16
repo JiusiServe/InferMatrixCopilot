@@ -1,0 +1,7 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 651a1ae0a469d24b1111be383081e91d93a3cdee2d14a53b802dac7aab2e74ab
+prompt_chars: 30029
+---- reviewer output ----
+All six BEFORE pages are fully preserved in AFTER; no information loss, weakening, over-generalization, or mistranslation found.
+
+VERDICT: APPROVE

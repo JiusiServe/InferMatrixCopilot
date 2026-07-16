@@ -1,0 +1,274 @@
+path	batch	op
+general/_index.md	B9-roots	add-detail
+general/agents/_index.md	B10-agents-planning-env	add-detail
+general/agents/guides/_index.md	B10-agents-planning-env	add-detail
+general/agents/guides/agent-loop-workflow.md	B10-agents-planning-env	add-detail
+general/agents/guides/review-delegation-framing.md	B10-agents-planning-env	add-detail
+general/benchmark/_index.md	B2-benchmark	add-detail
+general/benchmark/guides/_index.md	B2-benchmark	add-detail
+general/benchmark/guides/benchmark-contract.md	B2-benchmark	add-detail
+general/ci/_index.md	B6-ci	add-detail
+general/ci/guides/_index.md	B6-ci	add-detail
+general/ci/guides/inspect-existing-tests-first.md	B6-ci	add-detail
+general/debug/_index.md	B1-debug	add-detail
+general/debug/guides/_index.md	B1-debug	add-detail
+general/debug/guides/conclusion-discipline.md	B1-debug	add-detail
+general/debug/guides/debug-funnel-discipline.md	B1-debug	add-detail
+general/debug/guides/execution-principles.md	B1-debug	add-detail
+general/debug/guides/retrospective-to-rules.md	B1-debug	add-detail
+general/debug/guides/task-as-audit-enumeration.md	B1-debug	add-detail
+general/docs/_index.md	B5-review-dev-docs-git	add-detail
+general/docs/guides/_index.md	B5-review-dev-docs-git	add-detail
+general/docs/guides/user-visible-acceptance.md	B5-review-dev-docs-git	add-detail
+general/environment/_index.md	B10-agents-planning-env	add-detail
+general/git/_index.md	B5-review-dev-docs-git	add-detail
+general/planning/_index.md	B10-agents-planning-env	add-detail
+general/planning/guides/_index.md	B10-agents-planning-env	add-detail
+general/planning/guides/implementation-validation.md	B10-agents-planning-env	add-detail
+general/planning/guides/mini-spec.md	B10-agents-planning-env	add-detail
+general/planning/guides/product-loop-planning.md	B10-agents-planning-env	add-detail
+general/remote/_index.md	B4-remote	add-detail
+general/remote/guides/_index.md	B4-remote	add-detail
+general/remote/guides/container-setup.md	B4-remote	add-detail
+general/remote/guides/debug-basics.md	B4-remote	add-detail
+general/remote/guides/hf-offline-mandatory.md	B4-remote	add-detail
+general/remote/guides/live-environment.md	B4-remote	add-detail
+general/remote/guides/node-basics.md	B4-remote	add-detail
+general/remote/guides/remote-long-run.md	B4-remote	add-detail
+general/remote/guides/serving-failfast-cleanup.md	B4-remote	add-detail
+general/remote/guides/srun-lifecycle.md	B4-remote	add-detail
+general/remote/guides/ssh-workflow.md	B4-remote	add-detail
+general/remote/incidents/2026-04-21-remote-ssh-slurm-container-01.md	-	keep (raw evidence layer — never edited)
+general/remote/incidents/2026-04-22-remote-ssh-slurm-container-02.md	-	keep (raw evidence layer — never edited)
+general/remote/incidents/2026-04-23-remote-ssh-slurm-container-03.md	-	keep (raw evidence layer — never edited)
+general/remote/incidents/2026-04-23-remote-ssh-slurm-container-04.md	-	keep (raw evidence layer — never edited)
+general/remote/incidents/2026-04-27-remote-ssh-slurm-container-05.md	-	keep (raw evidence layer — never edited)
+general/remote/incidents/2026-04-27-remote-ssh-slurm-container-06.md	-	keep (raw evidence layer — never edited)
+general/remote/incidents/2026-04-27-remote-ssh-slurm-container-07.md	-	keep (raw evidence layer — never edited)
+general/remote/incidents/2026-04-27-remote-ssh-slurm-container-08.md	-	keep (raw evidence layer — never edited)
+general/remote/incidents/2026-05-14-remote-venv-and-cleanup-01.md	-	keep (raw evidence layer — never edited)
+general/remote/incidents/2026-05-20-remote-venv-and-cleanup-02.md	-	keep (raw evidence layer — never edited)
+general/remote/incidents/_index.md	-	keep (raw evidence layer — never edited)
+general/review/_index.md	B3-general-review	add-detail
+general/review/guides/_index.md	B3-general-review	add-detail
+general/review/guides/algorithm-vs-framework-fix.md	B3-general-review	add-detail
+general/review/guides/code-taste-api-surface.md	B3-general-review	add-detail
+general/review/guides/code-taste-review-flow.md	B3-general-review	add-detail
+general/review/guides/code-taste.md	B3-general-review	add-detail
+general/review/guides/codex-review-lessons.md	B3-general-review	add-detail
+general/review/guides/narrow-optimization-scope.md	B3-general-review	add-detail
+general/review/guides/review-execution-contract.md	B3-general-review	add-detail
+general/review/guides/reviewer-lens-audit.md	B3-general-review	add-detail
+general/review/guides/reviewer-lens-cases.md	B3-general-review	add-detail
+general/review/guides/reviewer-lens-contracts.md	B3-general-review	add-detail
+general/review/guides/reviewer-lens-gates.md	B3-general-review	add-detail
+general/review/guides/reviewer-lens-prompt.md	B3-general-review	add-detail
+general/review/guides/upstream-first-for-algorithm.md	B3-general-review	add-detail
+repos/vllm-omni/_index.md	B9-roots	add-detail
+repos/vllm-omni/benchmark/_index.md	B2-benchmark	add-detail
+repos/vllm-omni/benchmark/guides/_index.md	B2-benchmark	add-detail
+repos/vllm-omni/benchmark/guides/ar-dstep-investigation.md	B2-benchmark	add-detail
+repos/vllm-omni/benchmark/guides/ar-graph-gap-analysis.md	B2-benchmark	add-detail
+repos/vllm-omni/benchmark/guides/ar-graph-profiling.md	B2-benchmark	add-detail
+repos/vllm-omni/benchmark/guides/benchmark-scope.md	B2-benchmark	add-detail
+repos/vllm-omni/benchmark/guides/divergent-path-validation.md	B2-benchmark	add-detail
+repos/vllm-omni/benchmark/guides/dynamic-batching-validation.md	B2-benchmark	add-detail
+repos/vllm-omni/benchmark/guides/evidence-gate.md	B2-benchmark	add-detail
+repos/vllm-omni/benchmark/guides/full-pipeline-benchmark.md	B2-benchmark	add-detail
+repos/vllm-omni/benchmark/guides/grouped-dit-benchmark.md	B2-benchmark	add-detail
+repos/vllm-omni/benchmark/guides/performance-evidence.md	B2-benchmark	add-detail
+repos/vllm-omni/benchmark/guides/plan-and-validation.md	B2-benchmark	add-detail
+repos/vllm-omni/benchmark/guides/remote-validation-gates.md	B2-benchmark	add-detail
+repos/vllm-omni/benchmark/incidents/2026-04-23-profiling-and-model-loading-01.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/incidents/2026-04-23-profiling-and-model-loading-02.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/incidents/2026-04-27-profiling-and-model-loading-03.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/incidents/2026-04-27-profiling-and-model-loading-04.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/incidents/2026-04-27-profiling-and-model-loading-05.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/incidents/2026-04-27-profiling-and-model-loading-06.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/incidents/2026-04-28-profiling-and-model-loading-07.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/incidents/2026-04-28-profiling-and-model-loading-08.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/incidents/2026-04-28-profiling-and-model-loading-09.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/incidents/2026-04-28-profiling-and-model-loading-10.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/incidents/2026-04-28-profiling-and-model-loading-11.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/incidents/2026-04-28-profiling-and-model-loading-12.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/incidents/2026-04-28-profiling-and-model-loading-13.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/incidents/2026-04-28-profiling-and-model-loading-14.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/incidents/2026-04-28-profiling-and-model-loading-15.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/incidents/2026-04-28-profiling-and-model-loading-16.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/incidents/2026-04-28-profiling-and-model-loading-17.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/incidents/2026-04-28-profiling-and-model-loading-18.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/incidents/2026-06-17-profiling-and-model-loading-19.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/incidents/2026-06-17-profiling-and-model-loading-20.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/incidents/_index.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/overview.md	B2-benchmark	add-detail
+repos/vllm-omni/benchmark/results/_index.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/results/ar-2025-04-17.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/results/ar-graph-online-2026-06-09-no-profiler.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/results/ar-graph-online-2026-06-09-overview.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/results/ar-graph-online-2026-06-09-timestep-patch.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/results/ar-graph-online-2026-06-09-trace.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/results/ar-graph-online-2026-06-10-tail-gap.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/benchmark/results/ar-graph-online-2026-06-12-evidence.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/ci/_index.md	B6-ci	add-detail
+repos/vllm-omni/ci/guides/_index.md	B6-ci	add-detail
+repos/vllm-omni/ci/guides/ci-gotchas.md	B6-ci	add-detail
+repos/vllm-omni/ci/incidents/2026-04-22-ci-and-testing-09.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/ci/incidents/2026-04-25-ci-and-testing-10.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/ci/incidents/2026-05-04-ci-and-testing-11.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/ci/incidents/2026-05-04-ci-and-testing-12.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/ci/incidents/2026-05-04-ci-and-testing-13.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/ci/incidents/2026-05-04-ci-and-testing-14.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/ci/incidents/2026-05-08-ci-and-testing-15.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/ci/incidents/2026-05-08-ci-and-testing-16.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/ci/incidents/2026-05-08-ci-and-testing-17.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/ci/incidents/2026-05-08-ci-and-testing-18.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/ci/incidents/2026-05-19-ci-and-testing-06.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/ci/incidents/2026-05-19-ci-and-testing-07.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/ci/incidents/2026-05-19-ci-and-testing-08.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/ci/incidents/2026-05-21-ci-and-testing-04.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/ci/incidents/2026-05-21-ci-and-testing-05.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/ci/incidents/2026-05-26-ci-and-testing-03.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/ci/incidents/2026-05-26-ci-and-testing-19.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/ci/incidents/2026-05-29-ci-and-testing-01.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/ci/incidents/2026-05-29-ci-and-testing-02.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/ci/incidents/_index.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/components/_index.md	B7-components	add-detail
+repos/vllm-omni/components/diffusion/_index.md	B7-components	add-detail
+repos/vllm-omni/components/diffusion/architecture.md	B7-components	add-detail
+repos/vllm-omni/components/model-executor/_index.md	B7-components	add-detail
+repos/vllm-omni/components/model-executor/architecture.md	B7-components	add-detail
+repos/vllm-omni/components/model-executor/rules.md	B7-components	add-detail
+repos/vllm-omni/components/serving/_index.md	B7-components	add-detail
+repos/vllm-omni/components/serving/architecture.md	B7-components	add-detail
+repos/vllm-omni/debug/_index.md	B1-debug	add-detail
+repos/vllm-omni/debug/guides/_index.md	B1-debug	add-detail
+repos/vllm-omni/debug/guides/alignment-debug.md	B1-debug	add-detail
+repos/vllm-omni/debug/guides/conclusion-discipline-cases.md	B1-debug	add-detail
+repos/vllm-omni/debug/guides/debug-funnel-cases.md	B1-debug	add-detail
+repos/vllm-omni/debug/guides/execution-principles-cases.md	B1-debug	add-detail
+repos/vllm-omni/debug/guides/seed-determinism-audit.md	B1-debug	add-detail
+repos/vllm-omni/debug/guides/size-debug.md	B1-debug	add-detail
+repos/vllm-omni/debug/guides/style-bias-debug.md	B1-debug	add-detail
+repos/vllm-omni/debug/guides/systematic-vs-stochastic.md	B1-debug	add-detail
+repos/vllm-omni/dev/_index.md	B5-review-dev-docs-git	add-detail
+repos/vllm-omni/dev/guides/_index.md	B5-review-dev-docs-git	add-detail
+repos/vllm-omni/dev/guides/config-audit-plain-language.md	B5-review-dev-docs-git	add-detail
+repos/vllm-omni/dev/guides/omni-init-args.md	B5-review-dev-docs-git	add-detail
+repos/vllm-omni/docs/_index.md	B5-review-dev-docs-git	add-detail
+repos/vllm-omni/docs/rfcs/_index.md	B5-review-dev-docs-git	add-detail
+repos/vllm-omni/docs/rfcs/status.md	B5-review-dev-docs-git	add-detail
+repos/vllm-omni/git/_index.md	B5-review-dev-docs-git	add-detail
+repos/vllm-omni/git/guides/_index.md	B5-review-dev-docs-git	add-detail
+repos/vllm-omni/git/guides/branch-push-rebase.md	B5-review-dev-docs-git	add-detail
+repos/vllm-omni/git/guides/debugging-and-tests.md	B5-review-dev-docs-git	add-detail
+repos/vllm-omni/git/guides/integration-pr-merge-vehicle.md	B5-review-dev-docs-git	add-detail
+repos/vllm-omni/git/guides/pr-body-evidence.md	B5-review-dev-docs-git	add-detail
+repos/vllm-omni/git/guides/pr-body-model-evidence.md	B5-review-dev-docs-git	add-detail
+repos/vllm-omni/git/guides/pr-body-privacy.md	B5-review-dev-docs-git	add-detail
+repos/vllm-omni/git/guides/pr-body-provenance.md	B5-review-dev-docs-git	add-detail
+repos/vllm-omni/git/guides/pr-workflow.md	B5-review-dev-docs-git	add-detail
+repos/vllm-omni/git/guides/scope-narrowing.md	B5-review-dev-docs-git	add-detail
+repos/vllm-omni/git/incidents/2026-04-30-git-and-pr-branch-pollution-01.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/git/incidents/2026-05-19-git-and-pr-branch-pollution-03.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/git/incidents/2026-05-19-git-and-pr-branch-pollution-05.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/git/incidents/2026-05-19-git-and-pr-branch-pollution-06.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/git/incidents/2026-05-19-git-and-pr-branch-pollution-07.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/git/incidents/2026-05-20-git-and-pr-branch-pollution-02.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/git/incidents/2026-05-20-git-and-pr-branch-pollution-04.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/git/incidents/2026-05-27-git-and-pr-branch-pollution-08.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/git/incidents/2026-05-27-git-and-pr-branch-pollution-09.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/git/incidents/2026-05-29-git-and-pr-branch-pollution-10.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/git/incidents/_index.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/_index.md	B8-hunyuan	add-detail
+repos/vllm-omni/models/hunyuan-image3/_index.md	B8-hunyuan	add-detail
+repos/vllm-omni/models/hunyuan-image3/architecture.md	B8-hunyuan	add-detail
+repos/vllm-omni/models/hunyuan-image3/guides/_index.md	B8-hunyuan	add-detail
+repos/vllm-omni/models/hunyuan-image3/guides/hf-alignment-pitfalls.md	B8-hunyuan	add-detail
+repos/vllm-omni/models/hunyuan-image3/guides/hf-baseline-runbook.md	B8-hunyuan	add-detail
+repos/vllm-omni/models/hunyuan-image3/guides/hf-omni-alignment-method.md	B8-hunyuan	add-detail
+repos/vllm-omni/models/hunyuan-image3/guides/it2i-gap.md	B8-hunyuan	add-detail
+repos/vllm-omni/models/hunyuan-image3/guides/official-prompt-format.md	B8-hunyuan	add-detail
+repos/vllm-omni/models/hunyuan-image3/guides/run-image-gen-demo.md	B8-hunyuan	add-detail
+repos/vllm-omni/models/hunyuan-image3/history/_index.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/history/alignment-inventory.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/history/ar-dit-bridge.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/history/ar-graph-online-profiling-2026-06-08.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/history/ar-only-tp2-benchmark-runbook.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/history/bidirectional-attention.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/history/ci-progress.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/history/legacy-error-summary.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/history/moe-fp32-router.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/history/multi-image-input-plumbing.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/history/painterly-drift-investigation.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/history/profiling-tp4-fp8-baseline.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/history/stage-device-mapping-race.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/incidents/2026-05-13-kv-reuse-orchestrator.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/incidents/_index.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/incidents/painterly/2026-05-05-painterly-conditioning-ablation-01.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/incidents/painterly/2026-05-05-painterly-conditioning-ablation-02.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/incidents/painterly/2026-05-05-painterly-conditioning-ablation-03.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/incidents/painterly/2026-05-05-painterly-debug-methodology-misses-01.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/incidents/painterly/2026-05-05-painterly-debug-methodology-misses-02.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/incidents/painterly/2026-05-05-painterly-debug-methodology-misses-03.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/incidents/painterly/2026-05-05-painterly-debug-methodology-misses-04.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/incidents/painterly/2026-05-05-painterly-debug-methodology-misses-05.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/incidents/painterly/2026-05-06-painterly-psnr-pitfalls-01.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/incidents/painterly/2026-05-06-painterly-psnr-pitfalls-02.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/incidents/painterly/2026-05-06-painterly-psnr-pitfalls-03.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/incidents/painterly/2026-05-06-painterly-root-cause-01.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/incidents/painterly/2026-05-06-painterly-root-cause-02.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/incidents/painterly/2026-05-06-painterly-root-cause-03.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/incidents/painterly/2026-05-06-painterly-silent-bugs-01.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/incidents/painterly/2026-05-07-painterly-silent-bugs-02.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/incidents/painterly/2026-05-08-painterly-plan-size-misjudge-01.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/incidents/painterly/2026-05-08-painterly-plan-size-misjudge-02.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/incidents/painterly/_index.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/models/hunyuan-image3/rules.md	B8-hunyuan	add-detail
+repos/vllm-omni/remote/_index.md	B4-remote	add-detail
+repos/vllm-omni/remote/guides/_index.md	B4-remote	add-detail
+repos/vllm-omni/remote/guides/remote-debug-strategy.md	B4-remote	add-detail
+repos/vllm-omni/remote/incidents/2026-04-27-remote-runtime-gpu-01.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/2026-05-18-remote-runtime-gpu-02.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/2026-05-18-remote-runtime-gpu-03.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/2026-05-18-remote-runtime-gpu-04.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/2026-05-18-remote-runtime-gpu-05.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/_index.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/performance-validation/2026-05-19-remote-validation-013.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/performance-validation/2026-06-01-remote-validation-019.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/performance-validation/2026-06-01-remote-validation-020.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/performance-validation/2026-06-02-remote-validation-021.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/performance-validation/2026-06-02-remote-validation-022.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/performance-validation/2026-06-02-remote-validation-023.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/performance-validation/2026-06-02-remote-validation-024.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/performance-validation/2026-06-05-remote-validation-025.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/performance-validation/2026-06-05-remote-validation-026.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/performance-validation/2026-06-08-remote-validation-003.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/performance-validation/2026-06-08-remote-validation-004.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/performance-validation/2026-06-08-remote-validation-005.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/performance-validation/2026-06-08-remote-validation-027.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/performance-validation/2026-06-12-remote-validation-028.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/performance-validation/2026-06-12-remote-validation-029.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/performance-validation/2026-06-15-remote-validation-002.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/performance-validation/2026-06-16-remote-validation-030.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/performance-validation/2026-06-17-remote-validation-001.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/performance-validation/2026-06-17-remote-validation-031.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/performance-validation/2026-06-22-remote-validation-032.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/performance-validation/_index.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/workflow-validation/2026-04-27-remote-validation-007.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/workflow-validation/2026-05-18-remote-validation-008.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/workflow-validation/2026-05-18-remote-validation-009.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/workflow-validation/2026-05-19-remote-validation-006.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/workflow-validation/2026-05-19-remote-validation-010.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/workflow-validation/2026-05-19-remote-validation-011.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/workflow-validation/2026-05-19-remote-validation-012.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/workflow-validation/2026-05-19-remote-validation-014.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/workflow-validation/2026-05-20-remote-validation-015.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/workflow-validation/2026-05-20-remote-validation-016.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/workflow-validation/2026-05-20-remote-validation-017.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/workflow-validation/2026-05-20-remote-validation-018.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/remote/incidents/workflow-validation/_index.md	-	keep (raw evidence layer — never edited)
+repos/vllm-omni/review/_index.md	B5-review-dev-docs-git	add-detail
+repos/vllm-omni/review/guides/_index.md	B5-review-dev-docs-git	add-detail
+repos/vllm-omni/review/guides/model-adaptation-guardrails.md	B5-review-dev-docs-git	add-detail
+repos/vllm-omni/review/guides/model-validation.md	B5-review-dev-docs-git	add-detail
+repos/vllm-omni/rules.md	B9-roots	add-detail

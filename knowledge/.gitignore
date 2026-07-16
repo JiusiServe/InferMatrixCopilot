@@ -1,0 +1,21 @@
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+*.pyc
+__pycache__/
+.venv/
+venv/
+node_modules/
+
+# 防止真实密码/凭证误 commit
+.env
+.env.local
+secrets.*
+*.pem
+*.key
+askpass*.sh
+*.local.md
+
+# 当前机器信息；可复用知识必须脱敏后写入 general/ 或 repos/
+local/

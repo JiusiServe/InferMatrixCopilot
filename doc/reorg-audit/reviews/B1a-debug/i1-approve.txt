@@ -1,0 +1,7 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 8d292d09111f24339045ed2b591e764ec6d6386a2a0694be242c302a6602b74d
+prompt_chars: 15555
+---- reviewer output ----
+All seven AFTER pages are identical to BEFORE; no information loss, weakening, over-generalization, or mistranslation found.
+
+VERDICT: APPROVE

@@ -1,0 +1,7 @@
+model: gpt-5.6-sol-high
+prompt_sha256: b28ba869b946aabd52db330dd1eac849db1ec61fad9efb6f565ed07bb7de4420
+prompt_chars: 26833
+---- reviewer output ----
+AFTER preserves all concrete material from every BEFORE page; additions only provide metadata and current-state provenance.
+
+VERDICT: APPROVE

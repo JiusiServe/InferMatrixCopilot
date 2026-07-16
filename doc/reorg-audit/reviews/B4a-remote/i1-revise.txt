@@ -1,0 +1,11 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 163e28d544682cc9394bb2977476b05bdbb8c404538af4f307008881f226eb63
+prompt_chars: 25022
+---- reviewer output ----
+[general/remote/_index.md] — No information loss.
+[general/remote/guides/_index.md] — No information loss.
+[general/remote/guides/container-setup.md §title] — Specific thesis-style title was replaced by the broader “容器环境使用”; wording remains as §1, but page-level framing is over-generalized — nuance
+[general/remote/guides/node-basics.md §title] — Specific title was replaced by the broader “远端节点基础”; wording remains as §1, but page-level framing is over-generalized — nuance
+[repos/vllm-omni/remote/_index.md] — No information loss.
+[repos/vllm-omni/remote/guides/_index.md] — No information loss.
+VERDICT: REVISE

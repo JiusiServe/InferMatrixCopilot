@@ -1,0 +1,7 @@
+model: gpt-5.6-sol-high
+prompt_sha256: af5729b38022bfacb1872dcebe13022f1089363705562d2d6f7b049e2e2b6bdc
+prompt_chars: 26786
+---- reviewer output ----
+All four AFTER pages preserve all BEFORE content; only permitted frontmatter metadata was added.
+
+VERDICT: APPROVE

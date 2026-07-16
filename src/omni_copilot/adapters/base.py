@@ -24,18 +24,29 @@ REQUIRED_SECTIONS = ("name", "repo")
 _BRIEFING_CAP = 8000
 
 
+def _without_frontmatter(text: str) -> str:
+    """Drop a leading YAML frontmatter block — page metadata (SCHEMA.md), not
+    briefing content the agent should spend prompt budget on."""
+    if text.startswith("---"):
+        parts = text.split("---", 2)
+        if len(parts) == 3:
+            return parts[2]
+    return text
+
+
 def render_briefing_docs(root: Path | str, docs: list[str], *, header: str = "",
                          cap: int = _BRIEFING_CAP) -> str:
     """Concatenate the `docs` (paths relative to `root`) into one capped briefing
-    slice, prefixed by `header`. Missing docs are skipped (never fatal). Returns
-    "" when none exist. Shared by the general (framework) and repo-specific
-    briefing layers so both render identically."""
+    slice, prefixed by `header`. Missing docs are skipped (never fatal); page
+    frontmatter is stripped. Returns "" when none exist. Shared by the general
+    and repo-specific briefing layers so both render identically."""
     root = Path(root)
     parts: list[str] = []
     for rel in docs:
         p = root / rel
         if p.exists():
-            parts.append(p.read_text(encoding="utf-8", errors="replace").strip())
+            text = p.read_text(encoding="utf-8", errors="replace")
+            parts.append(_without_frontmatter(text).strip())
     if not parts:
         return ""
     body = ((header + "\n\n") if header else "") + "\n\n---\n\n".join(parts)
@@ -136,8 +147,8 @@ class RepoAdapter:
     def briefing(self, knowledge_root: Path | None = None) -> str:
         """The repo's always-on prompt slice — the REPO-SPECIFIC part only. Reads
         this adapter's `knowledge.briefing_docs` (its `repos/<repo>/` hard-gate
-        rules + navigation index) from the SHARED `knowledge_root` (the community
-        submodule; general `framework/` knowledge is injected separately by the
+        rules + navigation index) from the SHARED `knowledge_root` (the vendored
+        community docs; `general/` knowledge is injected separately by the
         caller). Deeper guides/incidents are pulled on demand via the doc tools,
         not dumped here. Falls back to a legacy AI `profile.yaml` when one exists,
         else empty."""

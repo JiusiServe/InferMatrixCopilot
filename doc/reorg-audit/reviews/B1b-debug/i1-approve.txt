@@ -1,0 +1,6 @@
+model: gpt-5.6-sol-high
+prompt_sha256: a12f19f06fd10153166996329522b21cfaadb18f0e6e7efc9e9ad75175c69126
+prompt_chars: 15190
+---- reviewer output ----
+All four pages preserve all original content; no information loss, weakening, over-generalization, or mistranslation found.
+VERDICT: APPROVE
