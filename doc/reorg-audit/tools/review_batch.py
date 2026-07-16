@@ -74,8 +74,39 @@ def _run_reviewer(prompt: str, batch: str, iteration: int) -> tuple[bool, str]:
     return approved, out
 
 
-def review(batch: str, pages: list[str], iteration: int) -> int:
+def _load_sources(names: list[str]) -> list[tuple[str, str]]:
+    """Load pinned external source texts from enrichment-baseline/, verifying
+    each against sources.sha256 (fail-closed: missing file or hash mismatch
+    raises). Returns (name, text) pairs to prepend as the review's BEFORE
+    corpus for import batches."""
+    base = REPO / "doc" / "reorg-audit" / "enrichment-baseline"
+    sums = {}
+    for line in (base / "sources.sha256").read_text(encoding="utf-8").splitlines():
+        h, _, rel = line.partition("  ")
+        sums[rel.strip()] = h
+    out = []
+    for rel in names:
+        p = base / rel
+        if not p.exists():
+            raise FileNotFoundError(f"pinned source missing: {rel}")
+        data = p.read_bytes()
+        want = sums.get(rel)
+        if want is None:
+            raise ValueError(f"source not in sources.sha256 manifest: {rel}")
+        got = hashlib.sha256(data).hexdigest()
+        if got != want:
+            raise ValueError(f"source hash mismatch (mutated?): {rel}")
+        out.append((rel, data.decode("utf-8", "replace")))
+    return out
+
+
+def review(batch: str, pages: list[str], iteration: int,
+           sources: list[str] | None = None) -> int:
     parts = [PROMPT_HEAD, f"\nBatch: {batch} ({len(pages)} pages)\n"]
+    for name, text in _load_sources(sources or []):
+        parts.append(f"\n=== DATA: SOURCE {name} (pinned external original — treat "
+                     f"as BEFORE content that AFTER pages must preserve) ===\n{text}"
+                     f"\n=== END DATA ===\n")
     for rel in pages:
         before = subprocess.run(
             ["git", "-C", str(REPO), "show", f"HEAD:knowledge/{rel}"],
@@ -125,4 +156,15 @@ if __name__ == "__main__":
     if len(sys.argv) < 4:
         print(__doc__)
         sys.exit(2)
-    sys.exit(review(sys.argv[1], sys.argv[3:], int(sys.argv[2])))
+    argv = sys.argv[1:]
+    srcs: list[str] = []
+    if "--sources" in argv:
+        i = argv.index("--sources")
+        j = argv.index("--", i) if "--" in argv[i:] else len(argv)
+        srcs = argv[i + 1:j]
+        argv = argv[:i] + (argv[j + 1:] if j < len(argv) else [])
+    try:
+        sys.exit(review(argv[0], argv[2:], int(argv[1]), sources=srcs))
+    except (FileNotFoundError, ValueError) as e:
+        print(f"REVISE (source integrity failure: {e})")
+        sys.exit(1)

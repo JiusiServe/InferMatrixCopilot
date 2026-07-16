@@ -1,0 +1,24 @@
+date: 2026-07-16
+vllm-omni origin/main: 5c3900960bc0d500c05619f02ee99211ecb81d73
+rebase-agent HEAD: 122a946873ec1681e4fbd600958986e8be52443c
+rebase-agent skills dirty vs HEAD: YES - working-tree snapshot is the source
+dirty files:
+M agent/skills/benchmark-datasets-module-restructured/SKILL.md
+ M agent/skills/buildkite-skipped-build-rebuild-fratricide/SKILL.md
+ M agent/skills/fix-bitsandbytes-libnvjitlink-ld-library-path/SKILL.md
+ M agent/skills/fix-cumem-cuda-double-free-gc-atexit/SKILL.md
+ M agent/skills/fix-diffusion-fp8-meta-tensor-weight-loading/SKILL.md
+ M agent/skills/fix-hunyuanimage3-moe-weight-loading-keyerror/SKILL.md
+ M agent/skills/fix-missing-gpu-memory-utilization-diffusion-stage/SKILL.md
+ M agent/skills/fix-mooncake-put-concurrency/SKILL.md
+ M agent/skills/fix-mooncake-tcp-deserialize-leading-byte/SKILL.md
+ M agent/skills/fix-omni-serving-chat-upstream-harmony-refactor/SKILL.md
+ M agent/skills/fix-stale-test-path-collection-error-after-rename/SKILL.md
+ M agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md
+ M agent/skills/fix-test-parser_cls-missing/SKILL.md
+ M agent/skills/fix-tts-realtime-asr-accuracy-flake-whisper-small/SKILL.md
+ M agent/skills/fix-tts-speed-adjustment-phase-vocoder-quality/SKILL.md
+ M agent/skills/fix-voxcpm2-l4-oom-after-rebase/SKILL.md
+ M agent/skills/fix-watchdog-non-fatal-false-positive/SKILL.md
+ M agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md
+ M agent/skills/resolve-moss-tts-nano-load-weights-conflict/SKILL.md
