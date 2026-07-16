@@ -1,0 +1,7 @@
+model: gpt-5.6-sol-high
+prompt_sha256: c42f708bd332d10c653fccbbfaced381c6e8644d3e509a576fc313c10254cf52
+prompt_chars: 20903
+---- reviewer output ----
+All BEFORE pages and both pinned source skills are fully preserved; AFTER only adds metadata, detail, provenance, and cross-links.
+
+VERDICT: APPROVE
