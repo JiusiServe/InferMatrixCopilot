@@ -1,0 +1,52 @@
+schema_version: pr-review-evaluation-spec-v0.1
+benchmark_item_schema: pr-review-item-v0.1
+agent_input_schema: pr-review-input-v0.1
+agent_output_schema: pr-review-output-v0.1
+rubric_version: pr-review-rubric-v0.1
+judge_version: pr-review-jury-v0.1
+tool_policy_version: pr-review-tool-policy-v0.1
+max_findings: 20
+severity:
+  Critical: {weight: 4.0, value: 4, merge_blocking: required}
+  Blocker: {weight: 3.0, value: 3, merge_blocking: required}
+  Major: {weight: 2.0, value: 2, merge_blocking: judge}
+  Minor: {weight: 1.0, value: 1, merge_blocking: forbidden}
+  Nit: {weight: 0.5, value: 0, merge_blocking: forbidden}
+categories:
+  - correctness
+  - compatibility_api
+  - concurrency
+  - performance_resource
+  - security_safety
+  - test
+  - documentation
+  - maintainability
+verdicts: [APPROVE, REQUEST_CHANGES]
+adjudication_statuses:
+  - MATCHED_GT
+  - VALID_PARTIAL
+  - VALID_NEW
+  - FALSE_POSITIVE
+  - DUPLICATE
+  - UNVERIFIABLE
+jury:
+  standard_judges: 3
+  positions_per_judge: 2
+  first_round_required_votes: 5
+  duplicate_required_votes: 4
+  cumulative_round2_required_votes: 8
+  standard_total_votes: 6
+  cumulative_total_votes: 10
+candidate_matcher:
+  threshold: 0.20
+  max_candidates_per_prediction: 5
+formal_match_threshold: 0.50
+adjudication_coverage_threshold: 0.98
+aggregation:
+  raw_recall: pr_macro
+  weighted_recall: pr_macro
+  valid_precision: finding_micro
+  verdict_accuracy: pr_micro
+  merge_blocking_miss_rate: finding_micro
+  category_recall: category_and_category_macro
+allowed_git_subcommands: [diff, show, log, blame, grep, ls-tree, cat-file, rev-parse]
