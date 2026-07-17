@@ -40,7 +40,7 @@ async def _push(ctx: StepContext) -> StepResult:
         return StepResult(True, summary=f"dry-run (ALLOW_PUSH=0): {' '.join(decision.command)}",
                           outputs={"dry_run": True, "command": list(decision.command)})
     out = subprocess.run(list(decision.command), cwd=str(repo), capture_output=True,
-                         text=True, timeout=300)
+                         text=True, encoding="utf-8", errors="replace", timeout=300)
     if out.returncode != 0:
         return StepResult(False, FailureKind.ESCALATE,
                           f"push failed: {out.stderr[-1_000:]}")

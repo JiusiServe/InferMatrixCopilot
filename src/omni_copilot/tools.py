@@ -104,7 +104,7 @@ def _grep(pattern: str, path: str, **_: Any) -> str:
     `file:line:text` lines capped at 20k chars, or "(no matches)"."""
     out = subprocess.run(
         ["grep", "-rn", "--include=*", "-e", pattern, path],
-        capture_output=True, text=True, timeout=60,
+        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60,
     )
     return out.stdout[:20_000] or "(no matches)"
 
@@ -114,7 +114,8 @@ def _run_shell(cmd: str, cwd: str | None = None, timeout: int = 600, **_: Any) -
     Returns the exit code with the tail of stdout (10k) and stderr (5k) — tails
     because the signal is usually at the end of long build/test output."""
     out = subprocess.run(
-        cmd, shell=True, cwd=cwd, capture_output=True, text=True, timeout=timeout
+        cmd, shell=True, cwd=cwd, capture_output=True, text=True,
+        encoding="utf-8", errors="replace", timeout=timeout
     )
     return f"exit={out.returncode}\n{out.stdout[-10_000:]}\n{out.stderr[-5_000:]}"
 

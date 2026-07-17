@@ -113,7 +113,8 @@ def gh(args: list[str], cwd: Path | None = None) -> tuple[int, str]:
     exception."""
     try:
         out = subprocess.run(["gh", *args], cwd=str(cwd) if cwd else None,
-                             capture_output=True, text=True, timeout=120)
+                             capture_output=True, text=True, encoding="utf-8",
+                             errors="replace", timeout=120)
         return out.returncode, out.stdout or out.stderr
     except FileNotFoundError:
         return 127, "gh CLI not installed"
@@ -124,7 +125,8 @@ def git(repo: Path, *args: str, timeout: int = 120) -> tuple[int, str]:
     with stdout+stderr merged and stripped — one place for step handlers to shell
     out to git."""
     out = subprocess.run(["git", *args], cwd=str(repo), capture_output=True,
-                         text=True, timeout=timeout)
+                         text=True, encoding="utf-8", errors="replace",
+                         timeout=timeout)
     return out.returncode, (out.stdout + out.stderr).strip()
 
 

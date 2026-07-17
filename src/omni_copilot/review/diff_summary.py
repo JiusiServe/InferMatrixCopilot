@@ -50,7 +50,8 @@ def build_diff_summary(
     summary = DiffSummary()
     out = subprocess.run(
         ["git", "diff", "--numstat", base_ref],
-        cwd=str(repo_path), capture_output=True, text=True, timeout=60,
+        cwd=str(repo_path), capture_output=True, text=True, encoding="utf-8",
+        errors="replace", timeout=60,
     )
     for line in out.stdout.splitlines():
         parts = line.split("\t")

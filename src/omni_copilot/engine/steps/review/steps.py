@@ -51,7 +51,8 @@ async def _patch_gate(ctx: StepContext) -> StepResult:
         return StepResult(True, summary="no review triggers fired",
                           outputs={"fired": [], "verdict": "not_required"})
     diff = subprocess.run(["git", "diff", ctx.params.get("base_ref", "HEAD")],
-                          cwd=str(repo), capture_output=True, text=True, timeout=60).stdout
+                          cwd=str(repo), capture_output=True, text=True,
+                          encoding="utf-8", errors="replace", timeout=60).stdout
     verdict = run_patch_review(ctx.llm, diff_text=diff, summary=summary,
                                fired_rules=fired, model=ctx.settings.reviewer)
     ctx.trace.record("patch_review", fired=fired, verdict=verdict.verdict,

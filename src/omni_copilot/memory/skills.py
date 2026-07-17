@@ -165,7 +165,7 @@ class SkillStore:
         """Read and return the candidates map from `_candidates.json`, or an empty
         dict when the file does not exist yet."""
         if self.candidates_file.exists():
-            return json.loads(self.candidates_file.read_text())
+            return json.loads(self.candidates_file.read_text(encoding="utf-8"))
         return {}
 
     def render_for_prompt(self, skills: list[Skill]) -> str:

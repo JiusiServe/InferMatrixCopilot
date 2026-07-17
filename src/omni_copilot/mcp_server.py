@@ -1,9 +1,10 @@
 """MCP stdio server — the copilot's read-only V1 surface for Claude Code / Codex.
 
-Both hosts speak MCP, so this is the one portable boundary. A review takes
-5–12 min, which would blow a synchronous host-call timeout, so every task is a
+Both hosts speak MCP, so this is the one portable boundary. Knowledge lookup is
+synchronous through repo-scoped `doc_search` / `doc_read`. A review takes 5–12
+min, which would blow a synchronous host-call timeout, so workflow tasks use a
 **start + poll** pair: `start_*` reserves a run and returns a `run_id`
-immediately; `get_result`/`get_status` poll it. The heavy work runs in an
+immediately; `get_result`/`get_status` poll it. The heavy workflow runs in an
 **isolated subprocess** (`python -m omni_copilot --execute-reserved <id>`), which
 (a) keeps the copilot's stdout out of this process's JSON-RPC stdio channel —
 child stdout goes to `<run_dir>/console.log` — and (b) makes the process-global
@@ -25,6 +26,7 @@ from __future__ import annotations
 import json
 import os
 import queue
+import signal
 import subprocess
 import sys
 import threading
@@ -34,6 +36,7 @@ from typing import Any, Callable, Optional
 
 from . import run_status as rs
 from .config import Settings
+from .knowledge_docs import KnowledgeDocs, KnowledgeDocsError
 from .mcp_policy import PolicyError, enforce_mcp_policy
 from .task_spec import READ_ONLY_KINDS
 
@@ -87,17 +90,38 @@ class CopilotMCP:
         env = dict(os.environ)
         env["ALLOW_POST"] = "0"  # defense in depth; policy already forces post off
         env["ALLOW_PUSH"] = "0"
+        # The Windows Store Python runtime otherwise inherits the machine's
+        # legacy console code page (commonly GBK). Reports legitimately contain
+        # Unicode markers such as ✓; force the isolated child's stdio to UTF-8
+        # so rendering a completed report cannot fail after all work is done.
+        env["PYTHONUTF8"] = "1"
+        env["PYTHONIOENCODING"] = "utf-8"
         # The child builds its own Settings() from env/.env, so make THIS server's
         # effective config authoritative for it: the same run_root (to locate the
         # reserved dir) and the same read-only allowlist (its policy re-check).
         env["RUN_ROOT"] = str(self.run_root)
         env["MCP_REPO_ALLOWLIST"] = json.dumps(self.settings.mcp_allowed_repos)
         env["DEFAULT_REPO"] = self.settings.default_repo
+        popen_kwargs: dict[str, Any] = {}
+        if os.name == "nt":
+            # Codex/Claude launch the MCP server over stdio.  Without a new
+            # Windows process group, host or transport shutdown can propagate a
+            # console control event into the long-running review child and turn
+            # it into KeyboardInterrupt.  CREATE_NO_WINDOW also prevents a
+            # console flash for every MCP run.
+            popen_kwargs["creationflags"] = (
+                subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
+            )
+        else:
+            # Keep the durable child alive and independently reconcilable when
+            # its stdio MCP parent is restarted.
+            popen_kwargs["start_new_session"] = True
         with open(run_dir / "console.log", "ab") as log:
             proc = subprocess.Popen(
                 [sys.executable, "-m", "omni_copilot", "--execute-reserved", run_id],
                 stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
                 cwd=str(self.run_root), env=env,
+                **popen_kwargs,
             )
             proc.wait()
         rs.reconcile_after_wait(run_dir)
@@ -162,6 +186,37 @@ class CopilotMCP:
                if any(k in line for k in READ_ONLY_KINDS)]
         return {"read_only_kinds": sorted(READ_ONLY_KINDS), "playbooks": pbs}
 
+    def _docs(self, repo: str) -> KnowledgeDocs:
+        """Build the same repo-scoped knowledge view used by workflow agents."""
+        from .adapters.base import AdapterRegistry
+
+        repo = repo or self.settings.default_repo
+        if repo not in self.settings.mcp_allowed_repos:
+            raise PolicyError(f"repo {repo!r} is not permitted")
+        try:
+            adapter = AdapterRegistry(self.settings.adapters_dir).resolve(
+                name=repo.replace("-", "_"))
+        except Exception as exc:
+            raise PolicyError(f"no knowledge adapter for repo {repo!r}") from exc
+        kn = adapter.manifest.get("knowledge") or {}
+        return KnowledgeDocs(self.settings.knowledge_dir, kn.get("repo_subdir"))
+
+    def doc_search(self, query: str, repo: str = "", limit: int = 40) -> dict:
+        """Search general + the selected repo's curated Markdown knowledge."""
+        selected = repo or self.settings.default_repo
+        hits = self._docs(selected).search(query, limit=limit)
+        return {"query": query, "repo": selected, "matches": hits,
+                "truncated": len(hits) >= max(1, min(int(limit), 100))}
+
+    def doc_read(self, path: str, repo: str = "", offset: int = 0) -> dict:
+        """Read one document from general + the selected repo's slice."""
+        selected = repo or self.settings.default_repo
+        try:
+            page = self._docs(selected).read(path, offset=offset)
+        except FileNotFoundError as exc:
+            raise KnowledgeDocsError(f"no such document: {path}") from exc
+        return {"repo": selected, **page}
+
     def close(self) -> None:
         """Deregister this server's liveness token (best-effort, on shutdown)."""
         rs.unregister_server(self.run_root, self.server_id)
@@ -222,11 +277,27 @@ def build_mcp(settings: Optional[Settings] = None):
         """List the read-only task kinds and the playbooks backing them."""
         return _guard(core.list_playbooks)
 
+    @mcp.tool()
+    def doc_search(query: str, repo: str = "", limit: int = 40) -> dict:
+        """Search curated general and repo-specific knowledge without a workflow."""
+        return _guard(lambda: core.doc_search(query, repo, limit))
+
+    @mcp.tool()
+    def doc_read(path: str, repo: str = "", offset: int = 0) -> dict:
+        """Read a Markdown document returned by doc_search; results are paged."""
+        return _guard(lambda: core.doc_read(path, repo, offset))
+
     return mcp
 
 
 def main() -> int:
     """Console-script entry (`omni-copilot-mcp`): serve over stdio."""
+    if os.name == "nt":
+        # Codex/terminal hosts can emit a console Ctrl+C event while keeping the
+        # stdio transport open.  anyio turns that inherited event into
+        # KeyboardInterrupt and tears down the MCP server mid-run.  Stdio EOF
+        # remains the authoritative, portable shutdown signal.
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
     try:
         mcp = build_mcp()
     except ImportError:

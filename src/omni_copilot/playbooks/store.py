@@ -126,7 +126,7 @@ class PlaybookStore:
         if not self.directory.exists():
             return
         for path in sorted(self.directory.glob("*.yaml")):
-            doc = yaml.safe_load(path.read_text())
+            doc = yaml.safe_load(path.read_text(encoding="utf-8"))
             pb = _parse(doc, str(path))
             self.validate(pb)
             self._playbooks[pb.name] = pb
@@ -190,6 +190,6 @@ class PlaybookStore:
         self.directory.mkdir(parents=True, exist_ok=True)
         path = self.directory / f"{pb.name}.yaml"
         path.write_text(yaml.safe_dump(playbook_to_doc(pb), sort_keys=False,
-                                       allow_unicode=True))
+                                       allow_unicode=True), encoding="utf-8")
         self._playbooks[pb.name] = pb
         return path

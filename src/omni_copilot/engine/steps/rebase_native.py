@@ -398,7 +398,7 @@ async def _compare_with_locked(ctx: StepContext) -> StepResult:
         lines.append(f"- {m}: {(info or {}).get('status', '?')}")
     verdict = "unknown"
     if baseline_file and Path(baseline_file).exists():
-        baseline = json.loads(Path(baseline_file).read_text())
+        baseline = json.loads(Path(baseline_file).read_text(encoding="utf-8"))
         lines += ["", "## Locked baseline", f"- {baseline}"]
         native_failed = sum(1 for i in modules.values()
                             if (i or {}).get("status") == "failed")

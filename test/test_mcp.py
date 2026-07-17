@@ -68,6 +68,14 @@ def test_status_lifecycle_preserves_ownership(tmp_path):
 
 
 # ── reconciliation ────────────────────────────────────────────────────────────
+def test_pid_alive_treats_windows_invalid_pid_as_dead(monkeypatch):
+    def invalid_pid(_pid, _signal):
+        raise OSError(87, "The parameter is incorrect")
+
+    monkeypatch.setattr(rs.os, "kill", invalid_pid)
+    assert rs.pid_alive(4242) is False
+
+
 def test_reconcile_after_wait_terminalizes_only_non_terminal(tmp_path):
     live = tmp_path / "run-20260715-101010-aaa111"
     rs.init_queued(live, run_id=live.name, owner_server_id="S", owner_server_pid=os.getpid())
@@ -200,13 +208,40 @@ def test_get_status_returns_status_and_optional_progress(settings):
     core.close()
 
 
+def test_mcp_docs_are_repo_scoped(settings, tmp_path):
+    k = tmp_path / "knowledge"
+    (k / "general").mkdir(parents=True)
+    (k / "general" / "guide.md").write_text(
+        "GENERAL SEARCH NEEDLE", encoding="utf-8")
+    (k / "repos" / "vllm-omni").mkdir(parents=True)
+    (k / "repos" / "vllm-omni" / "rules.md").write_text(
+        "REPO SEARCH NEEDLE", encoding="utf-8")
+    (k / "repos" / "other").mkdir(parents=True)
+    (k / "repos" / "other" / "secret.md").write_text(
+        "OTHER SECRET", encoding="utf-8")
+    adapter = settings.adapters_dir / "vllm_omni"
+    adapter.mkdir(parents=True)
+    (adapter / "manifest.yaml").write_text(json.dumps({
+        "name": "vllm_omni", "repo": {"path": str(tmp_path / "repo")},
+        "knowledge": {"repo_subdir": "repos/vllm-omni"},
+    }), encoding="utf-8")
+    settings.knowledge_dir = k
+    core = _core(settings)
+    assert core.doc_search("SEARCH NEEDLE")["matches"]
+    assert "REPO SEARCH" in core.doc_read("repos/vllm-omni/rules.md")["content"]
+    with pytest.raises(ValueError, match="outside the selected"):
+        core.doc_read("repos/other/secret.md")
+    core.close()
+
+
 def test_exposed_tools_are_read_only_only(settings):
     pytest.importorskip("mcp")
     from omni_copilot.mcp_server import build_mcp
 
     mcp = build_mcp(settings)
     names = sorted(t.name for t in asyncio.run(mcp.list_tools()))
-    assert names == ["get_result", "get_status", "list_playbooks",
+    assert names == ["doc_read", "doc_search", "get_result", "get_status",
+                     "list_playbooks",
                      "start_issue_answer", "start_issue_triage", "start_review"]
     assert not any(bad in n for n in names
                    for bad in ("post", "push", "debug", "rebase"))

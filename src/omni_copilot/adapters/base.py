@@ -35,18 +35,28 @@ def _without_frontmatter(text: str) -> str:
 
 
 def render_briefing_docs(root: Path | str, docs: list[str], *, header: str = "",
-                         cap: int = _BRIEFING_CAP) -> str:
+                         cap: int = _BRIEFING_CAP,
+                         warnings: list[str] | None = None) -> str:
     """Concatenate the `docs` (paths relative to `root`) into one capped briefing
     slice, prefixed by `header`. Missing docs are skipped (never fatal); page
     frontmatter is stripped. Returns "" when none exist. Shared by the general
     and repo-specific briefing layers so both render identically."""
-    root = Path(root)
+    root = Path(root).resolve()
     parts: list[str] = []
     for rel in docs:
-        p = root / rel
-        if p.exists():
-            text = p.read_text(encoding="utf-8", errors="replace")
-            parts.append(_without_frontmatter(text).strip())
+        p = (root / rel).resolve()
+        try:
+            p.relative_to(root)
+        except ValueError:
+            if warnings is not None:
+                warnings.append(f"briefing path escapes knowledge root: {rel}")
+            continue
+        if not p.is_file() or p.suffix.casefold() != ".md":
+            if warnings is not None:
+                warnings.append(f"briefing document missing or not Markdown: {rel}")
+            continue
+        text = p.read_text(encoding="utf-8", errors="replace")
+        parts.append(_without_frontmatter(text).strip())
     if not parts:
         return ""
     body = ((header + "\n\n") if header else "") + "\n\n---\n\n".join(parts)
@@ -144,7 +154,8 @@ class RepoAdapter:
             caps.add("modules")
         return caps
 
-    def briefing(self, knowledge_root: Path | None = None) -> str:
+    def briefing(self, knowledge_root: Path | None = None,
+                 warnings: list[str] | None = None) -> str:
         """The repo's always-on prompt slice — the REPO-SPECIFIC part only. Reads
         this adapter's `knowledge.briefing_docs` (its `repos/<repo>/` hard-gate
         rules + navigation index) from the SHARED `knowledge_root` (the vendored
@@ -154,11 +165,22 @@ class RepoAdapter:
         else empty."""
         kn = self.manifest.get("knowledge") or {}
         docs = kn.get("briefing_docs") or []
+        repo_subdir = str(kn.get("repo_subdir") or "").rstrip("/")
+        if repo_subdir:
+            scoped_docs = []
+            for rel in docs:
+                rel_posix = Path(rel).as_posix()
+                if rel_posix == repo_subdir or rel_posix.startswith(repo_subdir + "/"):
+                    scoped_docs.append(rel)
+                elif warnings is not None:
+                    warnings.append(f"repo briefing path outside {repo_subdir}: {rel}")
+            docs = scoped_docs
         if knowledge_root is not None and docs:
             body = render_briefing_docs(
                 knowledge_root, docs,
                 header=(f"Repo-specific knowledge (source: {kn.get('source', '')}; "
-                        "open the linked deeper docs with doc_read / doc_search):"))
+                        "open the linked deeper docs with doc_read / doc_search):"),
+                warnings=warnings)
             if body:
                 return body
         if (self.profile_dir / "profile.yaml").exists():  # legacy AI profile
@@ -176,7 +198,7 @@ def load_adapter(adapter_dir: str | Path) -> RepoAdapter:
     manifest_path = root / "manifest.yaml"
     if not manifest_path.exists():
         raise AdapterError(f"no manifest.yaml in {root}")
-    manifest = yaml.safe_load(manifest_path.read_text()) or {}
+    manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
     for section in REQUIRED_SECTIONS:
         if section not in manifest:
             raise AdapterError(f"adapter {root.name}: missing required section '{section}'")
@@ -236,7 +258,7 @@ def _git(repo: Path, *args: str) -> str:
     """Run `git <args>` in `repo` and return its stripped stdout — the read-only
     git helper the deterministic fingerprint uses."""
     out = subprocess.run(["git", *args], cwd=str(repo), capture_output=True,
-                         text=True, timeout=30)
+                         text=True, encoding="utf-8", errors="replace", timeout=30)
     return out.stdout.strip()
 
 
