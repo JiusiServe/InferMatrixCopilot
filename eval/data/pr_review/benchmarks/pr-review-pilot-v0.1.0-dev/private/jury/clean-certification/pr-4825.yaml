@@ -1,0 +1,40 @@
+schema_version: pr-review-clean-certification-v0.1
+benchmark_id: pr-review-vllm-omni-4825
+certification_version: clean-certification-migrated-v0.1
+generated_at: '2026-07-17T17:17:22+09:00'
+rule_checks:
+  three_independent_reviewer_agents: true
+  no_reviewer_found_merge_blocking_finding: true
+  all_candidate_findings_invalid_or_pure_non_problem: true
+  high_consistency: true
+reviewers:
+- id: claudecode-opus48
+  verdict: COMMENT
+  merge_blocking_findings: 0
+  candidate_findings: 2
+- id: copilot-v2
+  verdict: APPROVE
+  merge_blocking_findings: 0
+  candidate_findings: 0
+- id: copilot-v2-noprofile-r3
+  verdict: COMMENT
+  merge_blocking_findings: 0
+  candidate_findings: 2
+candidate_finding_adjudications:
+- candidate: derive components from _dit_modules
+  status: PURE_NON_PROBLEM
+  reason: Architectural simplification suggestion; the scoped SDXL unet behavior is correct and safe.
+- candidate: text-encoder LoRA still unsupported
+  status: INVALID_FOR_PR
+  reason: Pre-existing, explicitly out of scope, and not introduced or worsened by this change.
+- candidate: add unet activation round-trip test
+  status: PURE_NON_PROBLEM
+  reason: Optional additional coverage; no concrete activation defect was demonstrated and the PR supplied unit
+    plus before/after validation.
+- candidate: parameterize duplicated discovery tests
+  status: PURE_NON_PROBLEM
+  reason: Style/maintainability preference with no behavioral impact.
+historical_review_check: Early architecture feedback targeted code removed before the frozen final diff; final tree
+  received approvals.
+decision: AUTO_CERTIFIED_CLEAN
+confidence: high

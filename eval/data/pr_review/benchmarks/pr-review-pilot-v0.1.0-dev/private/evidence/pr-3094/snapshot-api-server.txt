@@ -1,0 +1,20 @@
+ref: b9ad822ca71b3d8ed8945f8fea5cebafc7c72a24
+blob_sha: 899aef0a68bc3f296db41489e4c04e2c7d441959
+source_lines: 1535-1595
+
+        logger.info(f"Successfully generated {len(images)} image(s)")
+
+        # Determine output format (default to png)
+        output_format = _choose_output_format(request.output_format, None)
+
+        image_data = [
+            ImageData(b64_json=_encode_image_base64_with_compression(img, format=output_format), revised_prompt=None)
+            for img in images
+        ]
+
+        return ImageGenerationResponse(
+            created=int(time.time()),
+            data=image_data,
+            output_format=output_format,
+            size=size_str if request.size else None,
+        )

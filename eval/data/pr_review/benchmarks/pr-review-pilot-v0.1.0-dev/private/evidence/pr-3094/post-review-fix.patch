@@ -1,0 +1,18 @@
+@@ generate_images response construction @@
+-        output_format = _choose_output_format(request.output_format, None)
++        output_format = _choose_output_format(request.output_format or "png", None)
+@@
+-        return ImageGenerationResponse(
+-            created=int(time.time()),
+-            data=image_data,
+-            output_format=output_format,
+-            size=size_str if request.size else None,
+-        )
++        response_kwargs = {
++            "created": int(time.time()),
++            "data": image_data,
++            "output_format": output_format,
++        }
++        if request.size:
++            response_kwargs["size"] = size_str
++        return ImageGenerationResponse(**response_kwargs)

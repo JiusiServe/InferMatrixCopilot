@@ -1,0 +1,14 @@
+ref: 434d6b19da3c51575c4c290c8ac64a934b35fd20
+blob_sha: 81c2b90e48bb3b4282f1b2533e55b0a0e12a4a8e
+source_lines: 1535-1595
+
+        output_format = _choose_output_format(request.output_format or "png", None)
+
+        response_kwargs = {
+            "created": int(time.time()),
+            "data": image_data,
+            "output_format": output_format,
+        }
+        if request.size:
+            response_kwargs["size"] = size_str
+        return ImageGenerationResponse(**response_kwargs)

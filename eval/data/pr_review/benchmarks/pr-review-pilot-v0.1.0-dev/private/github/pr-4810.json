@@ -1,0 +1,14 @@
+{
+  "base_sha": "b443504d619b4a66bfcb5e6f5900e91458dbe11d",
+  "head_sha": "f9665cc223c8628275ca86a9e5a3d02b3627911c",
+  "merge_commit_sha": "d9cf85d5e2ee8052672a671dc1ab19ec927dd920",
+  "number": 4810,
+  "snapshot_kind": "merged final head; latent findings remain in this tree",
+  "source": "GitHub connector",
+  "title": "[BugFix] Use KV cache scale mapper in custom loaders",
+  "url": "https://github.com/vllm-project/vllm-omni/pull/4810",
+  "verified_blobs": {
+    "regression_test_blob_sha": "98f016bb406c072d39d01ca444d2d43f7bfff8d7",
+    "stale_diffusion_loader_blob_sha": "1212497e6639767839e8fb914f7e743cdf4b9b94"
+  }
+}

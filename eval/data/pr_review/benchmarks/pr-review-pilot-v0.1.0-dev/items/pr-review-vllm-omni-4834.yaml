@@ -1,0 +1,71 @@
+schema_version: pr-review-item-v0.1
+benchmark_id: pr-review-vllm-omni-4834
+repository: vllm-project/vllm-omni
+pr_number: 4834
+base_branch: main
+base_sha: d7b365df64075f8784109f5b7ee9596a274075e5
+head_sha: 5793cd6f4bba8cc7f19c79c9758d817ffeacf3e3
+title: '[Bugfix][sleep mode]: guard generation on partial wake and ensure wake idempotency'
+body: Track sleeping CuMem tags, reject generation while partially asleep, make duplicate wake-up idempotent, and
+  reject unsupported level-2 wake-up before it reaches CUDA.
+commits:
+- sha: 5793cd6f4bba8cc7f19c79c9758d817ffeacf3e3
+  message: guard partial wake generation and make wake idempotent
+changed_files:
+- tests/entrypoints/test_omni_sleep_mode.py
+- vllm_omni/diffusion/data.py
+- vllm_omni/entrypoints/async_omni.py
+expected_verdict: REQUEST_CHANGES
+clean_status: buggy
+split: dev
+gt_findings:
+- id: GT-4834-001
+  summary: The default sleep level enters a state that wake_up can never recover from
+  description: AsyncOmni.sleep() still defaults to level=2, but this PR makes every wake_up() after level-2 sleep
+    raise NotImplementedError and blocks generation while tags remain asleep. A caller using the default sleep()
+    then wake_up() sequence permanently bricks the engine until restart; the safe default should be level 1 or the
+    level should be explicit.
+  severity: Major
+  category: correctness
+  merge_blocking: true
+  location_required: true
+  accepted_locations:
+  - file: vllm_omni/entrypoints/async_omni.py
+    start_line: 904
+    end_line: 940
+    symbol: sleep
+  - file: vllm_omni/entrypoints/async_omni.py
+    start_line: 941
+    end_line: 960
+    symbol: wake_up
+  evidence:
+  - file: vllm_omni/entrypoints/async_omni.py
+    start_line: 904
+    end_line: 940
+    symbol: sleep
+    reason: The public orchestrator method defaults to level 2 and records an unrecoverable level-2 state.
+  - file: vllm_omni/entrypoints/async_omni.py
+    start_line: 941
+    end_line: 960
+    symbol: wake_up
+    reason: wake_up rejects the state unconditionally, leaving sleeping tags set and generation blocked.
+- id: GT-4834-002
+  summary: Pure control-plane regression checks are hidden behind two-GPU hardware markers
+  description: All three new sleep/wake regression tests require two H100 or MI325 GPUs even though the admission
+    guard, level-2 rejection, and duplicate-wake filtering are Python control-plane logic. Standard CI therefore
+    does not exercise the behavior most likely to regress.
+  severity: Minor
+  category: test
+  merge_blocking: false
+  location_required: true
+  accepted_locations:
+  - file: tests/entrypoints/test_omni_sleep_mode.py
+    start_line: 410
+    end_line: 455
+    symbol: TestOmniSleepMode
+  evidence:
+  - file: tests/entrypoints/test_omni_sleep_mode.py
+    start_line: 410
+    end_line: 455
+    reason: Each regression test is guarded by the same two-card hardware_test marker.
+invalidated: false

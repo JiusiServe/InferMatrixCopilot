@@ -1,0 +1,10 @@
+pr_number: 3094
+review_date: '2026-04-24'
+reviewer: david6666666
+review_url: https://github.com/vllm-project/vllm-omni/pull/3094
+frozen_head_sha: b9ad822ca71b3d8ed8945f8fea5cebafc7c72a24
+post_review_fix_sha: 434d6b19da3c51575c4c290c8ac64a934b35fd20
+facts:
+- The frozen path selected JPEG when output_format was omitted despite the PNG contract.
+- The frozen response passed size=None into a string field.
+- The later commit supplied an explicit PNG fallback and conditionally omitted null response fields.

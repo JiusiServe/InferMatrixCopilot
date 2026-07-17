@@ -1,0 +1,18 @@
+schema_version: pr-review-build-metadata-v0.1
+benchmark_version: pr-review-pilot-v0.1.0-dev
+created_at: '2026-07-17T17:17:22+09:00'
+builder: GPT-5.6 Thinking with GitHub connector
+construction_mode: GitHub snapshot verification plus legacy evidence migration
+human_annotation_added: false
+notes:
+- PR 3094 uses the planning-document pre-review snapshot rather than the merged final head.
+- PRs 4810 and 4834 use final merged heads because the accepted latent findings remain present in those trees.
+- PRs 4816 and 4825 use final merged heads for clean certification.
+- PR 4893 was evaluated but excluded because the final diff already contained the requested reduce_scatter assertions.
+- Seed PRs 1720, 2360, 3053 and 3100 remain seeds because exact problem-containing snapshots and jury evidence were
+  not strong enough for freezing.
+limitations:
+- The 3 judge configurations × 2 position swaps required for the future formal ranking set were not replayed in
+  this migration.
+- Buggy GT uses existing GitHub/legacy reviewer evidence plus a versioned migration certification pass.
+- This package is intentionally a Dev pilot; build a physically isolated hidden Test Set before formal agent ranking.

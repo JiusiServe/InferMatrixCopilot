@@ -1,0 +1,10 @@
+{
+  "base_sha": "e7b281799ec80cabc1493f3c8a623589a95cf1de",
+  "head_sha": "e1dac23ac02cda81909af4633e85d7ff846f1032",
+  "merge_commit_sha": "5c51782c6bec3c7976c528e5899e89452278c448",
+  "number": 4816,
+  "snapshot_kind": "merged final head used for clean certification",
+  "source": "GitHub connector",
+  "title": "[Bugfix] Realign Serving Tokenization Name to Fix Error Handling Routes",
+  "url": "https://github.com/vllm-project/vllm-omni/pull/4816"
+}

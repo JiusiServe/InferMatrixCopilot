@@ -1,0 +1,12 @@
+ref: f9665cc223c8628275ca86a9e5a3d02b3627911c
+blob_sha: 1212497e6639767839e8fb914f7e743cdf4b9b94
+source_lines: 2215-2260
+
+            if self.config.tie_word_embeddings and "lm_head.weight" in name:
+                continue
+            if self.quant_config is not None and (scale_name := self.quant_config.get_cache_scale(name)):
+                param = params_dict[scale_name]
+                weight_loader = getattr(param, "weight_loader", default_weight_loader)
+                loaded_weight = loaded_weight[0]
+                weight_loader(param, loaded_weight)
+                continue

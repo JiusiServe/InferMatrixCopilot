@@ -1,0 +1,26 @@
+schema_version: pr-review-clean-certification-v0.1
+benchmark_id: pr-review-vllm-omni-4816
+certification_version: clean-certification-migrated-v0.1
+generated_at: '2026-07-17T17:17:22+09:00'
+rule_checks:
+  three_independent_reviewer_agents: true
+  no_reviewer_found_merge_blocking_finding: true
+  all_candidate_findings_invalid_or_pure_non_problem: true
+  high_consistency: true
+reviewers:
+- id: claudecode-opus48
+  verdict: APPROVE
+  merge_blocking_findings: 0
+  candidate_findings: 0
+- id: copilot-v2
+  verdict: APPROVE
+  merge_blocking_findings: 0
+  candidate_findings: 0
+- id: copilot-v2-noprofile-r3
+  verdict: APPROVE
+  merge_blocking_findings: 0
+  candidate_findings: 0
+candidate_finding_adjudications: []
+historical_review_check: No Request Changes; mechanical rename completed consistently and approved.
+decision: AUTO_CERTIFIED_CLEAN
+confidence: high

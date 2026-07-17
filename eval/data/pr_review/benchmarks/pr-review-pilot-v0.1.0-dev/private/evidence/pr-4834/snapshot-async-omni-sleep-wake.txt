@@ -1,0 +1,16 @@
+ref: 5793cd6f4bba8cc7f19c79c9758d817ffeacf3e3
+blob_sha: ce7ea8817d00deef782dcb7da19ed39919feebf4
+source_lines: 900-975
+
+    async def sleep(
+        self, stage_ids: list[int] | None = None, level: int = 2, mode: PauseMode = "abort"
+    ) -> list[OmniACK]:
+        ...
+        if level == 2:
+            self._level2_sleeping = True
+
+    async def wake_up(...):
+        if getattr(self, "_level2_sleeping", False):
+            raise NotImplementedError(
+                "wake_up() after sleep(level=2) is not yet implemented..."
+            )

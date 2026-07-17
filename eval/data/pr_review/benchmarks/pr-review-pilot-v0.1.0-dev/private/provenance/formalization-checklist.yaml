@@ -1,0 +1,20 @@
+benchmark_version: pr-review-pilot-v0.1.0-dev
+checks:
+  all_items_have_full_base_and_head_sha: true
+  all_item_ids_unique: true
+  all_changed_file_lists_frozen: true
+  all_buggy_items_have_gt_jury_records: true
+  all_clean_items_have_three_reviewer_certification: true
+  all_gt_severity_category_blocking_and_locations_frozen: true
+  agent_visible_and_private_data_separated: true
+  manifest_hashes_frozen: true
+  pilot_size_between_5_and_8: true
+  at_least_two_clean_items: true
+  at_least_one_merge_blocking_item: true
+  at_least_three_categories: true
+qualification:
+  usable_for_dev_pipeline: true
+  immutable_item_hashes_verified: true
+  formal_3x2_gt_jury_replayed: false
+  hidden_test_set: false
+  eligible_for_formal_ranking: false

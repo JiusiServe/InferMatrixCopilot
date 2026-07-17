@@ -1,0 +1,10 @@
+{
+  "base_sha": "d526dc93e89aa4d806a9111aab496b0bc04c8937",
+  "head_sha": "ac3a2ce5a9b9f89cd74e2e456bb9eac1f48dac20",
+  "merge_commit_sha": "1788d76eb32ff68b8069a07185253245367090f4",
+  "number": 4825,
+  "snapshot_kind": "merged final head used for clean certification",
+  "source": "GitHub connector",
+  "title": "[Feature] Improve diffusion LoRA compatibility for SDXL",
+  "url": "https://github.com/vllm-project/vllm-omni/pull/4825"
+}

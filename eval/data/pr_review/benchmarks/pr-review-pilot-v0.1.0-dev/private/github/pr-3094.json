@@ -1,0 +1,17 @@
+{
+  "frozen_base_sha": "3f5e1a92807c63f968d7436eb43da8b857923ac1",
+  "frozen_head_sha": "b9ad822ca71b3d8ed8945f8fea5cebafc7c72a24",
+  "merge_commit_sha": "9a1270e6ccd643df550f7fcc92771d2e78804689",
+  "merged_at": "2026-04-25T02:17:44Z",
+  "number": 3094,
+  "post_review_fix_sha": "434d6b19da3c51575c4c290c8ac64a934b35fd20",
+  "snapshot_rule": "last problem-containing PR commit before first substantive review on 2026-04-24",
+  "source": "GitHub connector plus frozen planning evidence",
+  "title": "fix generations reponse body",
+  "url": "https://github.com/vllm-project/vllm-omni/pull/3094",
+  "verified_blobs": {
+    "frozen_api_server_blob_sha": "899aef0a68bc3f296db41489e4c04e2c7d441959",
+    "frozen_protocol_blob_sha": "0fb22a548cfb56d90dfaa355b8a42a37dfc1325e",
+    "post_review_api_server_blob_sha": "81c2b90e48bb3b4282f1b2533e55b0a0e12a4a8e"
+  }
+}

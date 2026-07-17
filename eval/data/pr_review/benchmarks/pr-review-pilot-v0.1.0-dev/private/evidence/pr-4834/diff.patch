@@ -1,0 +1,183 @@
+diff --git a/tests/entrypoints/test_omni_sleep_mode.py b/tests/entrypoints/test_omni_sleep_mode.py
+index c2a5ff0a103..4be847cb99d 100644
+--- a/tests/entrypoints/test_omni_sleep_mode.py
++++ b/tests/entrypoints/test_omni_sleep_mode.py
+@@ -407,6 +407,47 @@ async def test_diffusion_vram_lifecycle_audit(self, diffusion_engine: AsyncOmni)
+             diffusion_engine.shutdown()
+             await asyncio.sleep(1)
+ 
++    @pytest.mark.asyncio
++    @hardware_test(res={"cuda": "H100", "rocm": "MI325"}, num_cards=2)
++    async def test_level2_sleep_wake_raises(self, llm_engine: AsyncOmni):
++        """Regression for #4473 Repro A: wake_up() after sleep(level=2) must raise
++        NotImplementedError instead of silently producing corrupted output."""
++        try:
++            await llm_engine.sleep(stage_ids=[0], level=2)
++            with pytest.raises(NotImplementedError, match="sleep\\(level=2\\)"):
++                await llm_engine.wake_up(stage_ids=[0])
++        finally:
++            llm_engine.shutdown()
++
++    @pytest.mark.asyncio
++    @hardware_test(res={"cuda": "H100", "rocm": "MI325"}, num_cards=2)
++    async def test_partial_wake_blocks_generate(self, llm_engine: AsyncOmni):
++        """Regression for #4473 Repro B: generate() must be rejected if kv_cache
++        is still asleep after wake_up(tags=["weights"]), instead of crashing with
++        CUDA illegal memory access."""
++        try:
++            await llm_engine.sleep(stage_ids=[0], level=1)
++            await llm_engine.wake_up(stage_ids=[0], tags=["weights"])
++            with pytest.raises(RuntimeError, match="partially or fully asleep"):
++                async for _ in llm_engine.generate("test", sampling_params=SamplingParams(max_tokens=4)):
++                    pass
++        finally:
++            llm_engine.shutdown()
++
++    @pytest.mark.asyncio
++    @hardware_test(res={"cuda": "H100", "rocm": "MI325"}, num_cards=2)
++    async def test_duplicate_wake_is_idempotent(self, llm_engine: AsyncOmni):
++        """Regression for #4473 Repro C: duplicate wake_up(tags=None) must be a
++        safe no-op instead of raising a cumem CUDA invalid argument error."""
++        try:
++            await llm_engine.sleep(stage_ids=[0], level=1)
++            first_acks = await llm_engine.wake_up(stage_ids=[0])
++            assert len(first_acks) > 0, "First wake_up() should return ACKs"
++            second_acks = await llm_engine.wake_up(stage_ids=[0])
++            assert second_acks == [], f"Duplicate wake_up() should return [] but got {second_acks}"
++        finally:
++            llm_engine.shutdown()
++
+ 
+ # ---------------------------------------------------------------------------
+ # H100 (or MI325) e2e: BAGEL / pure diffusion, multi-TP
+diff --git a/vllm_omni/diffusion/data.py b/vllm_omni/diffusion/data.py
+index 7362e5cf766..3d7e1bcfc92 100644
+--- a/vllm_omni/diffusion/data.py
++++ b/vllm_omni/diffusion/data.py
+@@ -6,6 +6,7 @@
+ import random
+ from collections.abc import Callable, Mapping
+ from dataclasses import dataclass, field, fields
++from enum import Enum
+ from typing import TYPE_CHECKING, Any
+ 
+ import diffusers
+@@ -1488,5 +1489,12 @@ class OmniWakeTask:
+     tags: list[str] | None = None
+ 
+ 
++class CuMemTag(str, Enum):
++    """Tags representing specific CuMem allocations for sleep/wake state tracking."""
++
++    WEIGHTS = "weights"
++    KV_CACHE = "kv_cache"
++
++
+ # Special message broadcast via scheduler queues to signal worker shutdown.
+ SHUTDOWN_MESSAGE = {"type": "shutdown"}
+diff --git a/vllm_omni/entrypoints/async_omni.py b/vllm_omni/entrypoints/async_omni.py
+index ab2d8836b3a..ce7ea8817d0 100644
+--- a/vllm_omni/entrypoints/async_omni.py
++++ b/vllm_omni/entrypoints/async_omni.py
+@@ -26,7 +26,7 @@
+ from vllm.utils import random_uuid
+ from vllm.v1.engine.exceptions import EngineDeadError
+ 
+-from vllm_omni.diffusion.data import OmniACK, OmniSleepTask, OmniWakeTask
++from vllm_omni.diffusion.data import CuMemTag, OmniACK, OmniSleepTask, OmniWakeTask
+ from vllm_omni.engine.messages import ErrorMessage, OutputMessage
+ from vllm_omni.entrypoints.client_request_state import ClientRequestState
+ from vllm_omni.entrypoints.omni_base import (
+@@ -141,7 +141,8 @@ def __init__(self, *args: Any, model: str = "", **kwargs: Any) -> None:
+         OmniBase.__init__(self, model=model, **kwargs)
+         self._pause_cond: asyncio.Condition = asyncio.Condition()
+         self._paused: bool = False
+-        self._is_sleeping: bool = False
++        self._sleeping_tags: set[str] = set()
++        self._level2_sleeping: bool = False
+         self.final_output_task: asyncio.Task | None = None
+         self.event_resolver = AsyncEventResolver(orchestrator=self)
+         self.config_path = self.engine.config_path
+@@ -306,6 +307,14 @@ async def generate(
+ 
+         logger.debug(f"[AsyncOmni] generate() called for request {external_request_id}")
+ 
++        _sleeping_tags = getattr(self, "_sleeping_tags", None)
++        if _sleeping_tags:
++            raise RuntimeError(
++                f"Generation rejected: Engine is partially or fully asleep. "
++                f"Currently sleeping tags: {list(_sleeping_tags)}. "
++                f"Please perform a full wake_up before generating."
++            )
++
+         # Reject diffusion list-prompt early with a clear API error.
+         if isinstance(prompt, list) and any(
+             getattr(client, "stage_type", "") == "diffusion" for client in getattr(self.engine, "stage_clients", [])
+@@ -922,11 +931,32 @@ async def sleep(
+                 if ack is not None:
+                     await self.event_resolver.resolve(ack)
+                     final_acks.append(ack)
+-        self._is_sleeping = True
++        if not hasattr(self, "_sleeping_tags"):
++            self._sleeping_tags = set()
++        self._sleeping_tags.update([CuMemTag.WEIGHTS.value, CuMemTag.KV_CACHE.value])
++        if level == 2:
++            self._level2_sleeping = True
+         return final_acks
+ 
+     async def wake_up(self, stage_ids: list[int] | None = None, tags: list[str] | None = None) -> list[OmniACK]:
+         self._final_output_handler()
++
++        if getattr(self, "_level2_sleeping", False):
++            raise NotImplementedError(
++                "wake_up() after sleep(level=2) is not yet implemented: weights were "
++                "discarded from GPU and reloading from disk is not yet supported. "
++                "Use sleep(level=1) instead, which offloads weights to CPU RAM "
++                "and supports fast DMA restore."
++            )
++        _current_tags = getattr(self, "_sleeping_tags", set())
++        if tags is None:
++            requested_tags = list(_current_tags)
++        else:
++            requested_tags = [t for t in tags if t in _current_tags]
++        if not requested_tags:
++            logger.info(f"[{self._name}] Requested tags {tags} are already warm. Skipping wake_up.")
++            return []
++
+         if stage_ids is None:
+             stage_ids = list(range(len(self.engine.stage_clients)))
+         total_workers = 0
+@@ -940,7 +970,7 @@ async def wake_up(self, stage_ids: list[int] | None = None, tags: list[str] | No
+         task_id = str(uuid.uuid4())
+         self.event_resolver.watch_task(task_id, expected_count=total_workers)
+         logger.info(f"[{self._name}] Wake-up initiated (Task: {task_id}). Awaiting {total_workers} ACKs...")
+-        task = OmniWakeTask(tags=tags, task_id=task_id)
++        task = OmniWakeTask(tags=requested_tags, task_id=task_id)
+         rpc_results = await self.collective_rpc(method="handle_wake_task", args=(task,), stage_ids=stage_ids)
+         final_acks = []
+         for stage_res in rpc_results:
+@@ -951,7 +981,14 @@ async def wake_up(self, stage_ids: list[int] | None = None, tags: list[str] | No
+                     final_acks.append(ack)
+         current_omni_platform.synchronize()
+         await asyncio.sleep(0.1)
+-        self._is_sleeping = False
++
++        for t in requested_tags:
++            if hasattr(self, "_sleeping_tags"):
++                self._sleeping_tags.discard(t)
++        # Only clear the level-2 flag once all tags are warm, in case partial
++        # wake support (e.g. tags=["kv_cache"] only) is added in the future.
++        if not getattr(self, "_sleeping_tags", None):
++            self._level2_sleeping = False
+         logger.info(f"[{self._name}] All {len(final_acks)}/{total_workers} workers reported WARM for task {task_id}.")
+         return final_acks
+ 
+@@ -961,7 +998,7 @@ async def is_sleeping(self) -> bool:
+         TODO(AsyncOmni): query the orchestrator once all stage backends expose
+         a real sleeping-state RPC. For now we track the requested state locally.
+         """
+-        return self._is_sleeping
++        return bool(getattr(self, "_sleeping_tags", None))
+ 
+     async def add_lora(self, lora_request: LoRARequest) -> bool:
+         """Load a new LoRA adapter into all stages.

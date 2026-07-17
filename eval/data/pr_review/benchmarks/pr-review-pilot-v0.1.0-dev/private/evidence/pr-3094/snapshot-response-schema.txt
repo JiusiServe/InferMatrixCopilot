@@ -1,0 +1,14 @@
+ref: b9ad822ca71b3d8ed8945f8fea5cebafc7c72a24
+blob_sha: 0fb22a548cfb56d90dfaa355b8a42a37dfc1325e
+source_lines: 145-167
+
+    output_format: str | None = Field(
+        default=None,
+        description="Output image format: 'png', 'jpeg', or 'webp'. Defaults to 'png'.",
+    )
+
+class ImageGenerationResponse(BaseModel):
+    created: int = Field(...)
+    data: list[ImageData] = Field(...)
+    output_format: str = Field(None, description="The output format of the image generation")
+    size: str = Field(None, description="The size of the image generated")

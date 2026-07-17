@@ -1,0 +1,68 @@
+schema_version: pr-review-item-v0.1
+benchmark_id: pr-review-vllm-omni-4810
+repository: vllm-project/vllm-omni
+pr_number: 4810
+base_branch: main
+base_sha: b443504d619b4a66bfcb5e6f5900e91458dbe11d
+head_sha: f9665cc223c8628275ca86a9e5a3d02b3627911c
+title: '[BugFix] Use KV cache scale mapper in custom loaders'
+body: Fix custom model loaders that still call the removed vLLM get_cache_scale API after the vLLM 0.23 migration.
+  Delegated loaders rely on AutoWeightsLoader; direct loaders apply get_cache_scale_mapper().
+commits:
+- sha: f9665cc223c8628275ca86a9e5a3d02b3627911c
+  message: Use KV cache scale mapper in custom loaders
+changed_files:
+- tests/model_executor/models/test_kv_cache_scale_mapper.py
+- vllm_omni/model_executor/models/hunyuan_image3/hunyuan_image3.py
+- vllm_omni/model_executor/models/mammoth_moda2/mammoth_moda2.py
+- vllm_omni/model_executor/models/mimo_audio/mimo_audio_llm.py
+- vllm_omni/model_executor/models/qwen2_5_omni/qwen2_old.py
+expected_verdict: REQUEST_CHANGES
+clean_status: buggy
+split: dev
+gt_findings:
+- id: GT-4810-001
+  summary: The migration leaves the HunyuanImage3 diffusion loader on the removed get_cache_scale API
+  description: The PR migrates four model-executor loaders but leaves the HunyuanImage3 diffusion transformer loader
+    calling quant_config.get_cache_scale(). That API was removed upstream, so checkpoints that exercise this loader
+    can still fail with AttributeError even after the advertised compatibility fix.
+  severity: Major
+  category: compatibility_api
+  merge_blocking: true
+  location_required: true
+  accepted_locations:
+  - file: vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_transformer.py
+    start_line: 2228
+    end_line: 2245
+    symbol: load_weights
+  evidence:
+  - file: tests/model_executor/models/test_kv_cache_scale_mapper.py
+    start_line: 15
+    end_line: 27
+    reason: The regression file enumerates stale API users but omits the diffusion transformer that the PR test
+      result itself identified.
+  - file: vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_transformer.py
+    start_line: 2228
+    end_line: 2245
+    symbol: load_weights
+    reason: The frozen snapshot still calls the removed API; a later main-branch follow-up migrated this loader.
+- id: GT-4810-002
+  summary: The delegated-loader regression test bypasses AutoWeightsLoader and cannot catch mapper regressions
+  description: The test named for AutoWeightsLoader feeds an already-mapped .attn.k_scale name directly into the
+    inner loader. It never sends the raw .k_proj.output_scale name through AutoWeightsLoader, so it would remain
+    green if the outer mapper stopped running—the exact behavior the production change relies on.
+  severity: Major
+  category: test
+  merge_blocking: false
+  location_required: true
+  accepted_locations:
+  - file: tests/model_executor/models/test_kv_cache_scale_mapper.py
+    start_line: 99
+    end_line: 121
+    symbol: test_auto_weights_loader_delegated_loaders_accept_mapped_cache_scale
+  evidence:
+  - file: tests/model_executor/models/test_kv_cache_scale_mapper.py
+    start_line: 105
+    end_line: 121
+    reason: The test invokes the child load_weights function directly with _MAPPED_SCALE_NAME.
+invalidated: false

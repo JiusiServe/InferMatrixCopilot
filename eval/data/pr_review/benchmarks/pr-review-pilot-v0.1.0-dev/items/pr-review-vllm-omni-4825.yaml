@@ -1,0 +1,21 @@
+schema_version: pr-review-item-v0.1
+benchmark_id: pr-review-vllm-omni-4825
+repository: vllm-project/vllm-omni
+pr_number: 4825
+base_branch: main
+base_sha: d526dc93e89aa4d806a9111aab496b0bc04c8937
+head_sha: ac3a2ce5a9b9f89cd74e2e456bb9eac1f48dac20
+title: '[Feature] Improve diffusion LoRA compatibility for SDXL'
+body: Include the SDXL top-level unet in default diffusion LoRA component scanning and add a unit test showing that
+  LoRA replacement reaches unet modules.
+commits:
+- sha: ac3a2ce5a9b9f89cd74e2e456bb9eac1f48dac20
+  message: Improve diffusion LoRA compatibility for SDXL
+changed_files:
+- tests/diffusion/lora/test_lora_manager.py
+- vllm_omni/diffusion/lora/manager.py
+expected_verdict: APPROVE
+clean_status: auto_certified_clean
+split: dev
+gt_findings: []
+invalidated: false

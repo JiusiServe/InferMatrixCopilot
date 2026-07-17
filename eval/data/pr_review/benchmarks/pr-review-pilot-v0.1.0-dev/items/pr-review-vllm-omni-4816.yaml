@@ -1,0 +1,21 @@
+schema_version: pr-review-item-v0.1
+benchmark_id: pr-review-vllm-omni-4816
+repository: vllm-project/vllm-omni
+pr_number: 4816
+base_branch: main
+base_sha: e7b281799ec80cabc1493f3c8a623589a95cf1de
+head_sha: e1dac23ac02cda81909af4633e85d7ff846f1032
+title: '[Bugfix] Realign Serving Tokenization Name to Fix Error Handling Routes'
+body: Rename the Omni app-state tokenization attribute from openai_serving_tokenization to serving_tokenization
+  so upstream vLLM error-handling helpers resolve the expected state.
+commits:
+- sha: e1dac23ac02cda81909af4633e85d7ff846f1032
+  message: Realign serving tokenization app-state name
+changed_files:
+- tests/entrypoints/openai_api/test_serving_speech.py
+- vllm_omni/entrypoints/openai/api_server.py
+expected_verdict: APPROVE
+clean_status: auto_certified_clean
+split: dev
+gt_findings: []
+invalidated: false

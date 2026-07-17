@@ -1,0 +1,14 @@
+{
+  "base_sha": "d7b365df64075f8784109f5b7ee9596a274075e5",
+  "head_sha": "5793cd6f4bba8cc7f19c79c9758d817ffeacf3e3",
+  "merge_commit_sha": "ddba6de2ab658a0fdb6f3f72cac9d2c3e2c19aea",
+  "merged_at": "2026-07-05T14:50:09Z",
+  "number": 4834,
+  "snapshot_kind": "merged final head; latent findings remain in this tree",
+  "source": "GitHub connector",
+  "title": "[Bugfix][sleep mode]: guard generation on partial wake and ensure wake idempotency",
+  "url": "https://github.com/vllm-project/vllm-omni/pull/4834",
+  "verified_blobs": {
+    "async_omni_blob_sha": "ce7ea8817d00deef782dcb7da19ed39919feebf4"
+  }
+}

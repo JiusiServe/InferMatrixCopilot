@@ -1,0 +1,11 @@
+repository: https://github.com/vllm-project/vllm-omni
+pull_requests:
+  '3094': https://github.com/vllm-project/vllm-omni/pull/3094
+  '4810': https://github.com/vllm-project/vllm-omni/pull/4810
+  '4816': https://github.com/vllm-project/vllm-omni/pull/4816
+  '4825': https://github.com/vllm-project/vllm-omni/pull/4825
+  '4834': https://github.com/vllm-project/vllm-omni/pull/4834
+legacy_root: eval/legacy/dataset
+planning_documents:
+- eval/docs/PR_REVIEW_METRICS_DESIGN.md
+- eval/docs/目录结构规划.md

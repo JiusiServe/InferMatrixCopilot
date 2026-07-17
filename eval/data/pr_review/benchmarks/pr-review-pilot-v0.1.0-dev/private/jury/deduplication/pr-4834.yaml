@@ -1,0 +1,8 @@
+schema_version: pr-review-deduplication-record-v0.1
+benchmark_id: pr-review-vllm-omni-4834
+input_findings: &id001
+- GT-4834-001
+- GT-4834-002
+output_findings: *id001
+merged_groups: []
+decision: KEEP_SEPARATE

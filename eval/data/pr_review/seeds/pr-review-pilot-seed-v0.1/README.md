@@ -2,6 +2,12 @@
 
 状态：`PROVISIONAL_BENCHMARK_SEED`
 
+
+> **Promotion update (2026-07-17):** A loadable frozen Dev pilot now exists at
+> `eval/data/pr_review/benchmarks/pr-review-pilot-v0.1.0-dev/`. PR #3094 was promoted from this seed;
+> the remaining original seed PRs stay provisional. The frozen pilot also migrates PRs #4810, #4834,
+> #4816 and #4825 from `eval/legacy/dataset/`.
+
 这不是可直接用于正式排名的冻结 Benchmark，而是依据公开 GitHub PR、Review comment、Review 前后 commit 证据构建的 Pilot 候选数据包。
 
 当前已完成：

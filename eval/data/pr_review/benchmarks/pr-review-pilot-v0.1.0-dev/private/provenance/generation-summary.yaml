@@ -1,0 +1,22 @@
+benchmark_version: pr-review-pilot-v0.1.0-dev
+items: 5
+buggy_items: 3
+auto_certified_clean_items: 2
+gt_findings: 6
+merge_blocking_findings: 4
+non_blocking_findings: 2
+categories:
+- compatibility_api
+- correctness
+- test
+source_breakdown:
+  formal_seed_promoted:
+  - 3094
+  legacy_buggy_migrations:
+  - 4810
+  - 4834
+  legacy_clean_certifications:
+  - 4816
+  - 4825
+  excluded_after_final_diff_verification:
+  - 4893

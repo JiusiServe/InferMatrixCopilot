@@ -1,0 +1,21 @@
+schema_version: pr-review-manifest-v0.1
+benchmark_version: pr-review-pilot-v0.1.0-dev
+rubric_version: pr-review-rubric-v0.1
+judge_version: pr-review-migration-jury-v0.1
+created_at: '2026-07-17T17:17:22+09:00'
+entries:
+- benchmark_id: pr-review-vllm-omni-3094
+  item: items/pr-review-vllm-omni-3094.yaml
+  sha256: 9e5176e923045d0417e16804e6c733a6cd539b7ea7f6cdb166281b42a9956b55
+- benchmark_id: pr-review-vllm-omni-4810
+  item: items/pr-review-vllm-omni-4810.yaml
+  sha256: 6872c9fbc4909055de0b9e0fd7c9acf238da19a4fe2c5e8f6e1be1a1a28e2b3c
+- benchmark_id: pr-review-vllm-omni-4834
+  item: items/pr-review-vllm-omni-4834.yaml
+  sha256: 311083213c337d3197c66c27c2047d906ed309a0e597255188a2e8addc966e0d
+- benchmark_id: pr-review-vllm-omni-4816
+  item: items/pr-review-vllm-omni-4816.yaml
+  sha256: 51d262019739f1852f41cb17f846c39cb2542bb26afaaba7d5759f389c259113
+- benchmark_id: pr-review-vllm-omni-4825
+  item: items/pr-review-vllm-omni-4825.yaml
+  sha256: e7dacb70f9f790fb1d5508a95ccc2aa4afcc382821b0ad864ba5eded4eecdc75

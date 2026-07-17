@@ -1,0 +1,67 @@
+schema_version: pr-review-item-v0.1
+benchmark_id: pr-review-vllm-omni-3094
+repository: vllm-project/vllm-omni
+pr_number: 3094
+base_branch: main
+base_sha: 3f5e1a92807c63f968d7436eb43da8b857923ac1
+head_sha: b9ad822ca71b3d8ed8945f8fea5cebafc7c72a24
+title: fix generations reponse body
+body: Add the missing parameters to the image generations endpoint response. The frozen snapshot is the last problem-containing
+  commit before the first substantive review.
+commits:
+- sha: b9ad822ca71b3d8ed8945f8fea5cebafc7c72a24
+  message: fix undefined name
+changed_files:
+- vllm_omni/entrypoints/openai/api_server.py
+- vllm_omni/entrypoints/openai/protocol/images.py
+expected_verdict: REQUEST_CHANGES
+clean_status: buggy
+split: dev
+gt_findings:
+- id: GT-3094-001
+  summary: Omitting output_format changes the documented default encoding from PNG to JPEG
+  description: When the request omits output_format, the response path calls the format selector without an explicit
+    PNG fallback. The selector therefore chooses JPEG even though the request schema and API contract define PNG
+    as the default, silently changing response bytes for existing callers.
+  severity: Major
+  category: compatibility_api
+  merge_blocking: true
+  location_required: true
+  accepted_locations:
+  - file: vllm_omni/entrypoints/openai/api_server.py
+    start_line: 1548
+    end_line: 1549
+    symbol: generate_images
+  evidence:
+  - file: vllm_omni/entrypoints/openai/api_server.py
+    start_line: 1545
+    end_line: 1562
+    symbol: generate_images
+    reason: The frozen response path does not supply the documented PNG fallback; the later fix passes it explicitly.
+- id: GT-3094-002
+  summary: The response model rejects size=None after successful image generation
+  description: When size is omitted, the response builder explicitly passes null to ImageGenerationResponse.size,
+    which is declared as a string. Pydantic v2 rejects the response after generation succeeds, so a default request
+    can fail during response-model construction.
+  severity: Blocker
+  category: correctness
+  merge_blocking: true
+  location_required: true
+  accepted_locations:
+  - file: vllm_omni/entrypoints/openai/api_server.py
+    start_line: 1557
+    end_line: 1562
+    symbol: generate_images
+  evidence:
+  - file: vllm_omni/entrypoints/openai/api_server.py
+    start_line: 1557
+    end_line: 1562
+    symbol: generate_images
+    reason: The response includes size even when the request value is null; the later fix conditionally omits the
+      field.
+  - file: vllm_omni/entrypoints/openai/protocol/images.py
+    start_line: 157
+    end_line: 167
+    symbol: ImageGenerationResponse
+    reason: The frozen response schema requires a string value for size.
+invalidated: false

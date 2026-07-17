@@ -1,0 +1,28 @@
+schema_version: pr-review-gt-jury-record-v0.1
+benchmark_id: pr-review-vllm-omni-4834
+jury_version: pr-review-migration-jury-v0.1
+generated_at: '2026-07-17T17:17:22+09:00'
+snapshot: merged final head with latent defects
+candidate_sources:
+- legacy baseline reviewer agent
+- PR diff
+- PR body
+- GitHub reviews
+decision: ACCEPT
+findings:
+- id: GT-4834-001
+  valid: true
+  independent_root_cause: true
+  severity: Major
+  category: correctness
+  merge_blocking: true
+  confidence: high
+- id: GT-4834-002
+  valid: true
+  independent_root_cause: true
+  severity: Minor
+  category: test
+  merge_blocking: false
+  confidence: high
+deduplication: The unsafe default behavior and CI coverage gap are separate findings.
+jury_mode: legacy evidence migration plus one independent certification pass

@@ -1,0 +1,10 @@
+schema_version: eval-catalog-v0.1
+benchmarks:
+- task: pr_review
+  benchmark_version: pr-review-pilot-v0.1.0-dev
+  split: dev
+  status: frozen_dev
+  manifest: pr_review/benchmarks/pr-review-pilot-v0.1.0-dev/manifest.yaml
+  item_count: 5
+  description: Hash-frozen PR Review pilot built from verified GitHub snapshots and migrated legacy evidence.
+  formal_ranking_eligible: false
