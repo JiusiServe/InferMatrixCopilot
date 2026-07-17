@@ -38,7 +38,10 @@ _DIFF_GIT = re.compile(
     r'^diff --git (?:"a/((?:[^"\\]|\\.)*)"|a/(\S+)) (?:"b/((?:[^"\\]|\\.)*)"|b/(\S+))\s*$')
 _OLD_NEW = re.compile(r'^(?:---|\+\+\+) (?:"?([ab])/((?:[^"\\]|\\.)*?)"?|/dev/null)\s*$')
 _RENAME = re.compile(r'^rename (?:from|to) "?(.+?)"?\s*$')
-# signature/default-constant changes on ± lines — the breaking-behavior class
+# signature/default-constant surface on ± lines. Only a `-` line means an
+# EXISTING surface changed or went away (the breaking-behavior class — someone
+# may depend on the old form); a pure `+def` addition has no old consumers and
+# must not disqualify a tiny PR from the light tier.
 _API_LINE = re.compile(
     r"^[+-]\s*(?:async\s+def\s+\w+|def\s+\w+\s*\(|class\s+\w+|[A-Z][A-Z0-9_]{2,}\s*=)")
 
@@ -72,7 +75,8 @@ class DiffSignals:
     config_files: tuple[str, ...] = ()
     code_files: tuple[str, ...] = ()
     high_risk_files: tuple[str, ...] = ()
-    api_change_hints: tuple[str, ...] = ()
+    api_change_hints: tuple[str, ...] = ()   # `-` lines: changed/removed surface
+    api_added: int = 0                        # `+` def/class/const: new surface
 
     @property
     def lines_changed(self) -> int:
@@ -89,7 +93,8 @@ class DiffSignals:
                 "doc_files": len(self.doc_files),
                 "config_files": len(self.config_files),
                 "high_risk_files": list(self.high_risk_files),
-                "api_change_hints": len(self.api_change_hints)}
+                "api_change_hints": len(self.api_change_hints),
+                "api_added": self.api_added}
 
 
 @dataclass(frozen=True)
@@ -125,6 +130,7 @@ def diff_signals(diff_text: str,
     files: dict[str, str] = {}
     insertions = deletions = 0
     api_hints: list[str] = []
+    api_added = 0
     current_path = ""
     current_kind = "code"
 
@@ -161,7 +167,10 @@ def diff_signals(diff_text: str,
         else:
             deletions += 1
         if current_kind == "code" and _API_LINE.match(raw):
-            api_hints.append(f"{current_path}: `{raw[:120].strip()}`")
+            if raw[0] == "-":
+                api_hints.append(f"{current_path}: `{raw[:120].strip()}`")
+            else:
+                api_added += 1
 
     by_kind: dict[str, list[str]] = {"doc": [], "test": [], "config": [],
                                      "code": []}
@@ -173,7 +182,8 @@ def diff_signals(diff_text: str,
         files=tuple(files), insertions=insertions, deletions=deletions,
         doc_files=tuple(by_kind["doc"]), test_files=tuple(by_kind["test"]),
         config_files=tuple(by_kind["config"]), code_files=tuple(by_kind["code"]),
-        high_risk_files=risky, api_change_hints=tuple(api_hints))
+        high_risk_files=risky, api_change_hints=tuple(api_hints),
+        api_added=api_added)
 
 
 def classify(sig: DiffSignals, settings: Any) -> tuple[str, str] | None:

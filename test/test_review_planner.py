@@ -68,7 +68,7 @@ def test_signals_counts_and_classes():
     assert not sig.docs_only
 
 
-def test_signals_api_hints_only_in_code_files():
+def test_signals_api_hints_split_changed_vs_added():
     diff = ("diff --git a/src/mod.py b/src/mod.py\n"
             "--- a/src/mod.py\n+++ b/src/mod.py\n"
             "-def handler(x):\n+def handler(x, y):\n"
@@ -77,8 +77,20 @@ def test_signals_api_hints_only_in_code_files():
             "--- a/tests/test_mod.py\n+++ b/tests/test_mod.py\n"
             "+def test_handler():\n")
     sig = diff_signals(diff)
-    assert len(sig.api_change_hints) == 3  # -def, +def, +CONST — code file only
-    assert all(h.startswith("src/mod.py") for h in sig.api_change_hints)
+    # only the `-` line is a changed-surface hint (it had old consumers);
+    # +def/+CONST count as additions and never disqualify light; test files
+    # are excluded entirely
+    assert len(sig.api_change_hints) == 1
+    assert sig.api_change_hints[0].startswith("src/mod.py")
+    assert sig.api_added == 2
+
+
+def test_rules_pure_addition_of_a_function_stays_light(settings):
+    diff = ("diff --git a/src/mod.py b/src/mod.py\n"
+            "--- a/src/mod.py\n+++ b/src/mod.py\n"
+            "+def warn_on_overflow(req):\n"
+            "+    return len(req) > CAP\n")
+    assert classify(diff_signals(diff), settings)[0] == "light"
 
 
 def test_signals_pure_deletion_counts_the_old_side():
