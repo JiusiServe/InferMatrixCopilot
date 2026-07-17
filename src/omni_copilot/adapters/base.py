@@ -236,7 +236,7 @@ def _git(repo: Path, *args: str) -> str:
     """Run `git <args>` in `repo` and return its stripped stdout — the read-only
     git helper the deterministic fingerprint uses."""
     out = subprocess.run(["git", *args], cwd=str(repo), capture_output=True,
-                         text=True, timeout=30)
+                         text=True, encoding="utf-8", errors="replace", timeout=30)
     return out.stdout.strip()
 
 

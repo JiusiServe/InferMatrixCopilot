@@ -20,7 +20,8 @@ async def _guard_clean(ctx: StepContext) -> StepResult:
     if isinstance(repo, StepResult):
         return repo
     out = subprocess.run(["git", "status", "--porcelain"], cwd=str(repo),
-                         capture_output=True, text=True, timeout=30)
+                         capture_output=True, text=True, encoding="utf-8",
+                         errors="replace", timeout=30)
     if out.returncode != 0:
         return StepResult(False, FailureKind.BLOCKED, f"not a git repo: {repo}")
     if out.stdout.strip():

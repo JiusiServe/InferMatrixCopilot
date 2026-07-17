@@ -28,7 +28,8 @@ def _head_commit(repo: Path) -> str:
     invalidates the index. Returns "no-git" if git fails or the repo is untracked."""
     try:
         out = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(repo),
-                             capture_output=True, text=True, timeout=15)
+                             capture_output=True, text=True, encoding="utf-8",
+                             errors="replace", timeout=15)
         return out.stdout.strip() or "no-git"
     except Exception:
         return "no-git"

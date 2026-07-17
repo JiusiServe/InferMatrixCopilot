@@ -265,7 +265,8 @@ class ChatSession:
                 return err
             import subprocess
             out = subprocess.run(["grep", "-rn", "-e", args["pattern"], root],
-                                 capture_output=True, text=True, timeout=60)
+                                 capture_output=True, text=True, encoding="utf-8",
+                                 errors="replace", timeout=60)
             return out.stdout[:15_000] or "(no matches)"
         return f"unknown tool: {name}"
 

@@ -230,7 +230,8 @@ def _repo_docs_tool(ctx: StepContext, adapter) -> dict[str, ToolDef]:
         knowledge-relative `path:line:text` matches (capped), or a sentinel."""
         out = subprocess.run(
             ["grep", "-rniI", "--include=*.md", "-e", query, str(kdir)],
-            capture_output=True, text=True, timeout=30)
+            capture_output=True, text=True, encoding="utf-8",
+            errors="replace", timeout=30)
         rel = [ln.replace(str(kdir) + "/", "", 1) for ln in out.stdout.splitlines()]
         return "\n".join(rel)[:8000] or "(no matching docs)"
 
