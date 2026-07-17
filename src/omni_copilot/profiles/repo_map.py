@@ -99,7 +99,7 @@ class RepoMap:
             cache_file = self.cache_dir / f"index-{_head_commit(self.repo)}.json"
             if cache_file.exists():
                 try:
-                    self._index = json.loads(cache_file.read_text())
+                    self._index = json.loads(cache_file.read_text(encoding="utf-8"))
                     return self._index
                 except (OSError, json.JSONDecodeError):
                     pass
@@ -109,7 +109,7 @@ class RepoMap:
                 self.cache_dir.mkdir(parents=True, exist_ok=True)
                 for stale in self.cache_dir.glob("index-*.json"):
                     stale.unlink()   # one HEAD, one cache
-                cache_file.write_text(json.dumps(self._index))
+                cache_file.write_text(json.dumps(self._index), encoding="utf-8")
             except OSError:
                 pass
         return self._index

@@ -93,11 +93,26 @@ class CopilotMCP:
         env["RUN_ROOT"] = str(self.run_root)
         env["MCP_REPO_ALLOWLIST"] = json.dumps(self.settings.mcp_allowed_repos)
         env["DEFAULT_REPO"] = self.settings.default_repo
+        popen_kwargs: dict[str, Any] = {}
+        if os.name == "nt":
+            # Codex/Claude launch the MCP server over stdio.  Without a new
+            # Windows process group, host or transport shutdown can propagate a
+            # console control event into the long-running review child and turn
+            # it into KeyboardInterrupt.  CREATE_NO_WINDOW also prevents a
+            # console flash for every MCP run.
+            popen_kwargs["creationflags"] = (
+                subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
+            )
+        else:
+            # Keep the durable child alive and independently reconcilable when
+            # its stdio MCP parent is restarted.
+            popen_kwargs["start_new_session"] = True
         with open(run_dir / "console.log", "ab") as log:
             proc = subprocess.Popen(
                 [sys.executable, "-m", "omni_copilot", "--execute-reserved", run_id],
                 stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
                 cwd=str(self.run_root), env=env,
+                **popen_kwargs,
             )
             proc.wait()
         rs.reconcile_after_wait(run_dir)

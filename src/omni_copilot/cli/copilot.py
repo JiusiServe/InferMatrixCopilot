@@ -272,7 +272,7 @@ class Copilot:
             task_file = run_dir / "task.json"
             if not task_file.exists():
                 continue
-            saved = json.loads(task_file.read_text())
+            saved = json.loads(task_file.read_text(encoding="utf-8"))
             spec = TaskSpec(**saved["spec"])
             playbook = parse_playbook(saved["playbook"], str(task_file))
             print(f"↻ resuming {run_dir.name}: {spec.describe()}")
@@ -319,7 +319,7 @@ class Copilot:
         run_dir = self.settings.run_root / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
         req = run_dir / "request.json"
-        req.write_text(json.dumps(spec.model_dump(), indent=2))
+        req.write_text(json.dumps(spec.model_dump(), indent=2), encoding="utf-8")
         try:  # least-privilege perms; advisory only against same-user tampering
             os.chmod(req, 0o600)
         except OSError:
@@ -340,7 +340,7 @@ class Copilot:
         run_dir = self._contained_run_dir(run_id)
         rs.mark_child_started(run_dir, child_pid=os.getpid(), state=rs.PLANNING)
         try:
-            raw = json.loads((run_dir / "request.json").read_text())
+            raw = json.loads((run_dir / "request.json").read_text(encoding="utf-8"))
             spec = enforce_mcp_policy(raw, allowed_repos=self.settings.mcp_allowed_repos)
         except (PolicyError, OSError, json.JSONDecodeError, ValueError) as exc:
             rs.mark(run_dir, rs.FAILED, note=f"policy/request rejected: {exc}")
@@ -400,13 +400,13 @@ class Copilot:
         progress = self.last_run_dir / "progress.json"
         lines = []
         if progress.exists():
-            done = list(json.loads(progress.read_text()).get("completed", {}))
+            done = list(json.loads(progress.read_text(encoding="utf-8")).get("completed", {}))
             lines.append(f"{self.last_run_dir.name}: completed steps: {done}")
         else:
             lines.append(f"{self.last_run_dir.name}: no progress recorded")
         rebase_status = self.last_run_dir / "rebase_status.json"
         if rebase_status.exists():
-            s = json.loads(rebase_status.read_text())
+            s = json.loads(rebase_status.read_text(encoding="utf-8"))
             mods = s.get("modules", {})
             tests = s.get("tests", {})
             lines.append(
@@ -426,7 +426,7 @@ class Copilot:
         tracefile = self.last_run_dir / "run_trace.jsonl"
         if not tracefile.exists():
             return "no trace"
-        return "".join(tracefile.read_text().splitlines(keepends=True)[-n:])
+        return "".join(tracefile.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)[-n:])
 
     def playbooks(self) -> str:
         """One line per registered playbook (name@version, status, task kinds),

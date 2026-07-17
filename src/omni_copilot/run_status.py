@@ -147,6 +147,11 @@ def pid_alive(pid: Optional[int]) -> bool:
         return True
     except (OverflowError, ValueError):
         return False
+    except OSError:
+        # Windows raises a plain OSError (for example WinError 87) when the
+        # probed PID no longer identifies a process.  Treat that as dead so an
+        # orphaned MCP run can be reconciled instead of crashing server startup.
+        return False
     return True
 
 
@@ -231,7 +236,12 @@ def startup_reconcile(run_root: str | Path) -> int:
     for run_dir in root.glob("run-*"):
         if not run_dir.is_dir():
             continue
-        res = reconcile_if_dead(run_dir, run_root)
+        try:
+            res = reconcile_if_dead(run_dir, run_root)
+        except (OSError, ValueError):
+            # Recovery is best-effort.  One stale/corrupt run must not prevent
+            # the whole stdio MCP server from initializing in its host.
+            continue
         if res and res.get("state") == INTERRUPTED:
             n += 1
     return n

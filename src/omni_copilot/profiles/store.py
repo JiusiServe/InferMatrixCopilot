@@ -107,7 +107,7 @@ class ProfileStore:
         self.facts: dict[str, Fact] = {}
         self.meta: dict = {"schema_version": 1}
         if self.profile_file.exists():
-            doc = yaml.safe_load(self.profile_file.read_text()) or {}
+            doc = yaml.safe_load(self.profile_file.read_text(encoding="utf-8")) or {}
             self.meta = {k: v for k, v in doc.items() if k != "facts"}
             for f in doc.get("facts") or []:
                 fact = Fact(**f)
@@ -261,7 +261,8 @@ class ProfileStore:
                "facts": [f.to_doc() for f in self.facts.values()]}
         self.profile_file.write_text(
             yaml.safe_dump(doc, sort_keys=False, allow_unicode=True))
-        (self.root / "PROFILE_REPORT.md").write_text(self.render_report())
+        (self.root / "PROFILE_REPORT.md").write_text(
+            self.render_report(), encoding="utf-8")
 
     def _append_ops_log(self, ops: list[dict], *, tier: str, actor: str) -> None:
         """Append one JSONL record of the applied `ops` (with date, tier, actor)

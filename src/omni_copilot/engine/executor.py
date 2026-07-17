@@ -65,7 +65,7 @@ class Executor:
         """Read the run's checkpoint (a `{"completed": {step_id: ...}}` map) from
         progress.json, or the empty checkpoint when this is a fresh run."""
         if self.progress_file.exists():
-            return json.loads(self.progress_file.read_text())
+            return json.loads(self.progress_file.read_text(encoding="utf-8"))
         return {"completed": {}}
 
     def _save_progress(self, progress: dict) -> None:

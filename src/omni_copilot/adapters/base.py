@@ -176,7 +176,7 @@ def load_adapter(adapter_dir: str | Path) -> RepoAdapter:
     manifest_path = root / "manifest.yaml"
     if not manifest_path.exists():
         raise AdapterError(f"no manifest.yaml in {root}")
-    manifest = yaml.safe_load(manifest_path.read_text()) or {}
+    manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
     for section in REQUIRED_SECTIONS:
         if section not in manifest:
             raise AdapterError(f"adapter {root.name}: missing required section '{section}'")

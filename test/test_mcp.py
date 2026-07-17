@@ -68,6 +68,14 @@ def test_status_lifecycle_preserves_ownership(tmp_path):
 
 
 # ── reconciliation ────────────────────────────────────────────────────────────
+def test_pid_alive_treats_windows_invalid_pid_as_dead(monkeypatch):
+    def invalid_pid(_pid, _signal):
+        raise OSError(87, "The parameter is incorrect")
+
+    monkeypatch.setattr(rs.os, "kill", invalid_pid)
+    assert rs.pid_alive(4242) is False
+
+
 def test_reconcile_after_wait_terminalizes_only_non_terminal(tmp_path):
     live = tmp_path / "run-20260715-101010-aaa111"
     rs.init_queued(live, run_id=live.name, owner_server_id="S", owner_server_pid=os.getpid())

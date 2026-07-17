@@ -239,7 +239,7 @@ class ChatSession:
             for f in ("RUN_REPORT.md", "ESCALATION.md", "COMPARISON.md"):
                 p = Path(run_dir) / f
                 if p.exists():
-                    parts.append(f"## {f}\n{p.read_text()[:8_000]}")
+                    parts.append(f"## {f}\n{p.read_text(encoding='utf-8', errors='replace')[:8_000]}")
             return "\n\n".join(parts) or "no reports in this run"
         if name == "repo_read":
             path = self._resolve_path(args["path"])
@@ -279,11 +279,11 @@ class ChatSession:
             summary.append(f"run_dir={self.copilot.last_run_dir}")
             progress = Path(self.copilot.last_run_dir) / "progress.json"
             if progress.exists():
-                done = list(json.loads(progress.read_text()).get("completed", {}))
+                done = list(json.loads(progress.read_text(encoding="utf-8")).get("completed", {}))
                 summary.append(f"completed_steps={done}")
             esc = Path(self.copilot.last_run_dir) / "ESCALATION.md"
             if esc.exists() and code != 0:
-                summary.append("escalation:\n" + esc.read_text()[:1_500])
+                summary.append("escalation:\n" + esc.read_text(encoding="utf-8", errors="replace")[:1_500])
         return "; ".join(summary[:3]) + ("\n" + summary[3] if len(summary) > 3 else "")
 
     # -- one conversational turn -----------------------------------------------
