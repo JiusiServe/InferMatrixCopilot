@@ -123,10 +123,11 @@ def test_pr_review_playbook_shape():
 
     store = PlaybookStore(_REPO_ROOT / "playbooks", _registry())
     pb = store.get("pr-review")
-    assert pb.version == 5  # v5 = repo-neutral (repos: [] + requires)
+    assert pb.version == 6  # v6 = declared review_depth param (adaptive depth)
     assert [s.step for s in pb.steps] == [
         "pr.fetch_diff", "pr.gate_check", "agent.review_diff",
         "pr.post_review", "report.final_summary"]
+    assert "review_depth" in pb.params  # reuse (L0) with the depth override
 
 
 def test_review_salvaged_when_agent_escalates_with_comments(settings, trace,

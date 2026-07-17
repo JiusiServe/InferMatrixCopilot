@@ -25,8 +25,11 @@ from .task_spec import READ_ONLY_KINDS, TaskSpec
 
 # params a V1 tool may legitimately carry through to the playbook. Anything else
 # in an incoming `params` map is dropped (not an error — stripped) so a tampered
-# request can't smuggle a knob (e.g. force_push) into a step.
-_ALLOWED_PARAMS: frozenset[str] = frozenset()
+# request can't smuggle a knob (e.g. force_push) into a step. Allowed params are
+# strictly value-validated below — a knob may modulate cost/depth, never widen
+# permissions.
+_ALLOWED_PARAMS: frozenset[str] = frozenset({"review_depth"})
+_REVIEW_DEPTHS = ("auto", "light", "standard", "full")
 
 
 class PolicyError(ValueError):
@@ -68,6 +71,12 @@ def enforce_mcp_policy(raw: dict[str, Any], *, allowed_repos: list[str]) -> Task
     if not isinstance(raw_params, dict):
         raise PolicyError("params must be an object")
     params = {k: v for k, v in raw_params.items() if k in _ALLOWED_PARAMS}
+    if "review_depth" in params:  # strict: a typo must not silently pass
+        if str(params["review_depth"]).lower() not in _REVIEW_DEPTHS:
+            raise PolicyError(
+                f"review_depth {params['review_depth']!r} is not one of "
+                f"{list(_REVIEW_DEPTHS)}")
+        params["review_depth"] = str(params["review_depth"]).lower()
 
     # Build through the validated model. post is hard-forced False; report_only
     # is irrelevant for READ_ONLY_KINDS (they are read-only unless post), but we

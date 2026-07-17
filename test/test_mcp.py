@@ -53,6 +53,22 @@ def test_policy_strips_unknown_params_and_post_flag():
     assert spec.params == {}  # a tampered step knob cannot ride through
 
 
+def test_policy_allows_validated_review_depth():
+    spec = enforce_mcp_policy(
+        {"kind": "pr_review", "repo": "vllm-omni", "pr": 7,
+         "params": {"review_depth": "FULL", "force_push": True}},
+        allowed_repos=ALLOW)
+    assert spec.params == {"review_depth": "full"}  # normalized; rest stripped
+
+
+def test_policy_rejects_invalid_review_depth():
+    with pytest.raises(PolicyError, match="review_depth"):
+        enforce_mcp_policy(
+            {"kind": "pr_review", "repo": "vllm-omni", "pr": 7,
+             "params": {"review_depth": "ful"}},  # typo must not pass silently
+            allowed_repos=ALLOW)
+
+
 # ── run_status: single writer + preserved ownership ───────────────────────────
 def test_status_lifecycle_preserves_ownership(tmp_path):
     run_dir = tmp_path / "run-20260715-101010-abc123"

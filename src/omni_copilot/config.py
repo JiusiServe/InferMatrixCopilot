@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -113,6 +114,21 @@ class Settings(BaseSettings):
     ensemble_merge_evidence_chars: int = 60_000  # must fit the pr_diff — a
                                         # reducer that can't see the diff
                                         # can't verify (T3 forensics #5)
+
+    # Adaptive review depth (hybrid planner, review/planner.py): deterministic
+    # rules decide the clear cases in pure code; only the gray middle zone
+    # spends one small LLM call, and that call can pick standard/full but
+    # never light. review_ensemble=False stays the hard kill-switch (single
+    # pass, no planner — beats even a forced "full"). Per-run override:
+    # --task-param review_depth=... / MCP start_review(review_depth=...).
+    review_depth: Literal["auto", "light", "standard", "full"] = "auto"
+    review_light_max_files: int = 3   # light ceiling (with lines below):
+    review_light_max_lines: int = 80  #   at/under, with no API/default or
+                                      #   risk signals -> one-pass review
+    review_light_max_iters: int = 8   # light-pass tool budget — the token
+                                      #   bound that keeps small PRs <=200k
+    review_planner_model: str = ""    # gray-zone planner; empty -> the run's
+                                      #   tier model (model_for(mode))
 
     # Patch-review trigger thresholds
     large_diff_lines: int = 400

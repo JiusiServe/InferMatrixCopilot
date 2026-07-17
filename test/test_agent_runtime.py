@@ -78,6 +78,32 @@ def test_skills_retrieved_and_injected(settings, trace, tmp_path):
     assert "test-skill" in ev["skills"]
 
 
+def test_read_only_run_never_touches_skill_files(settings, trace, tmp_path):
+    """A read-only run (READ_ONLY_KINDS without post — the MCP review case)
+    must not rewrite git-tracked SKILL.md frontmatter: run_count bumps were
+    dirtying the tree on every MCP review. Write-capable specs still feed the
+    usage prior."""
+    store = SkillStore(settings.skills_dir)
+    store.propose(name="test-skill", description="guidance for t.step testing",
+                  body="## Fix\ndo the thing")
+    skill_file = store.promote("test-skill")
+    before = skill_file.read_text(encoding="utf-8")
+
+    ro_state = {"task_spec": {"kind": "pr_review", "pr": 1, "post": False}}
+    result, _ = _run(_ctx(settings, trace, tmp_path, state=ro_state,
+                          llm=ScriptedLLM([contract()])),
+                     step_name="t.step testing")
+    assert result.ok
+    assert skill_file.read_text(encoding="utf-8") == before  # byte-identical
+
+    rw_state = {"task_spec": {"kind": "pr_rebase", "pr": 1}}
+    result, _ = _run(_ctx(settings, trace, tmp_path, state=rw_state,
+                          llm=ScriptedLLM([contract()])),
+                     step_name="t.step testing")
+    assert result.ok
+    assert "run_count: 1" in skill_file.read_text(encoding="utf-8")
+
+
 def test_skill_candidate_tool_is_gated(settings, trace, tmp_path):
     llm = ScriptedLLM([
         Reply(blocks=[Block(type="tool_use", id="t1", name="skill_update_candidate",
