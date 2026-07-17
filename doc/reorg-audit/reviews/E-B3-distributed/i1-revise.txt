@@ -1,0 +1,21 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 2549102c13be94aafc0d8be7371559b92158a6db5e220be6200b96de36711550
+prompt_chars: 16755
+---- reviewer output ----
+[distributed/_index.md §entire page] — BEFORE was empty; no information loss — nuance
+[distributed/architecture.md §entire page] — BEFORE was empty; no information loss — nuance
+[connector-pitfalls.md §source metadata] — All three skills’ `status`, creation/last-use dates, run counts, and exact module lists were omitted — nuance
+[connector-pitfalls.md §1 Fix] — `_put_impl()` must retain the original signature except `from_stage`/`to_stage`; this constraint was omitted — critical
+[connector-pitfalls.md §1 Verification] — The direct `MooncakeTransferEngineConnector` import check was omitted — nuance
+[connector-pitfalls.md §2 Fix] — Exact allocation mechanics (`alloc_size`, allocator call, and `ManagedBuffer` construction) were generalized away — critical
+[connector-pitfalls.md §2 Fix] — Exact slices and exception scope were lost: first deserialize `raw_bytes[:data_size]`, catch only `msgspec.DecodeError`, then retry `raw_bytes[1:data_size + 1]` — critical
+[connector-pitfalls.md §2 Verification] — Full pytest command and expected result `24 passed, 0 failed` were replaced by a weaker qualitative claim — critical
+[connector-pitfalls.md §2 Watch outs] — Guidance that padding/retry may be removed if Mooncake fixes the upstream protocol byte was omitted — nuance
+[connector-pitfalls.md §3 Symptoms] — The concrete `"Stage N replica M exited with code 1 before API server became ready"` symptom was omitted — nuance
+[connector-pitfalls.md §3 Fix] — `_allocated_ports` must be seeded with `master_port` and the parsed coordinator ROUTER TCP port; both requirements were omitted — critical
+[connector-pitfalls.md §3 Fix] — `_port_from_zmq_address()` behavior for TCP, IPC, inproc, and unparsable addresses was omitted — critical
+[connector-pitfalls.md §3 Fix] — `_alloc_unique_ports(count)` redraw behavior, registration of winners, bounded retry budget, and `RuntimeError` on exhaustion were omitted — critical
+[connector-pitfalls.md §3 Fix] — The exact replacement of `get_open_ports_list(count=3)` and the residual unrelated-process port-steal limitation were omitted — nuance
+[connector-pitfalls.md §3 Verification] — CPU-only command, test filter, expected two regression tests, nine-port assertions, and whole-file `26 passed` result were replaced by an unsupported qualitative claim — critical
+[connector-pitfalls.md §3 Anti-patterns] — All explicit prohibitions were omitted: patching model/generation code, blind bind retry, assuming cross-call uniqueness, and unbounded redraw loops — critical
+VERDICT: REVISE

@@ -1,0 +1,10 @@
+## rebase-agent module->upstream paths (@122a9468)
+    module_vllm_paths: dict[str, str] = {
+        "model_config":   "vllm/config/ vllm/engine/arg_utils.py",
+        "input_output":   "vllm/inputs/ vllm/v1/engine/input_processor.py vllm/v1/engine/output_processor.py vllm/v1/request.py",
+        "scheduler":      "vllm/v1/core/sched/",
+        "worker_runner":  "vllm/v1/worker/",
+        "model_executor": "vllm/model_executor/",
+        "online_serving": "vllm/entrypoints/",
+        "benchmarks":     "vllm/benchmarks/ vllm/entrypoints/cli/benchmark/",
+        "platform":       "vllm/platforms/",

@@ -1,0 +1,6 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 2a38a932a1e1670363a5045184ab0883a7aa8011878dca3fd352929471e81b5a
+prompt_chars: 20618
+---- reviewer output ----
+[components/config/rules.md §CONF-1a] — 丢失两段 Python/YAML 精确示例及其中 `max_num_seqs: 1` 的具体配置上下文 — nuance
+VERDICT: REVISE

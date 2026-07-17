@@ -1,0 +1,7 @@
+model: gpt-5.6-sol-high
+prompt_sha256: e481dfb4b4baa067da08d33360db9aaae44d9fd9cc6d39450dce2e276963ff02
+prompt_chars: 7873
+---- reviewer output ----
+AFTER preserves everything across all 4 pages; all changes are additions.
+
+VERDICT: APPROVE

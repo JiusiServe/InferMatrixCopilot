@@ -1,0 +1,7 @@
+model: gpt-5.6-sol-high
+prompt_sha256: fe675d076b7dbc0307ebd73b268b077f69b0a2192e694cf6211662ecfe27d8be
+prompt_chars: 8895
+---- reviewer output ----
+AFTER preserves all BEFORE content across all five pages; changes only add new pages, metadata, detail, and index links.
+
+VERDICT: APPROVE

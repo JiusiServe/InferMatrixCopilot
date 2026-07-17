@@ -1,0 +1,58 @@
+source_id	source_path	destination	note
+SK-benchmark-datasets-module-restructured	skills/benchmark-datasets-module-restructured.md	knowledge/repos/vllm-omni/rebase/upstream-api-drift.md §datasets-restructure	
+SK-buildkite-skipped-build-rebuild-fratricide	skills/buildkite-skipped-build-rebuild-fratricide.md	knowledge/repos/vllm-omni/ci/guides/ci-environment-gotchas.md §buildkite-fratricide	
+SK-entrypoint-h100-timeout-1800s-runner-mismatch	skills/entrypoint-h100-timeout-1800s-runner-mismatch.md	knowledge/repos/vllm-omni/ci/guides/ci-environment-gotchas.md §entrypoint-budget-timeout	
+SK-fix-accuracy-golden-hardware-mismatch	skills/fix-accuracy-golden-hardware-mismatch.md	knowledge/repos/vllm-omni/ci/guides/accuracy-attribution.md §golden-hardware	
+SK-fix-bitsandbytes-libnvjitlink-ld-library-path	skills/fix-bitsandbytes-libnvjitlink-ld-library-path.md	knowledge/repos/vllm-omni/ci/guides/ci-environment-gotchas.md §libnvjitlink	
+SK-fix-cumem-allocator-sleep-double-free	skills/fix-cumem-allocator-sleep-double-free.md	knowledge/repos/vllm-omni/rebase/upstream-api-drift-loading.md §cumem-double-free (retired-history)	
+SK-fix-cumem-cuda-double-free-gc-atexit	skills/fix-cumem-cuda-double-free-gc-atexit.md	knowledge/repos/vllm-omni/rebase/upstream-api-drift-loading.md §cumem-double-free	
+SK-fix-diffusion-fp8-meta-tensor-weight-loading	skills/fix-diffusion-fp8-meta-tensor-weight-loading.md	knowledge/repos/vllm-omni/rebase/upstream-api-drift-loading.md §fp8-meta-tensor	
+SK-fix-flashinfer-jit-cache-version-mismatch	skills/fix-flashinfer-jit-cache-version-mismatch.md	knowledge/repos/vllm-omni/ci/guides/ci-environment-gotchas.md §flashinfer-jit-cache	
+SK-fix-hunyuanimage3-moe-weight-loading-keyerror	skills/fix-hunyuanimage3-moe-weight-loading-keyerror.md	knowledge/repos/vllm-omni/rebase/upstream-api-drift-loading.md §fusedmoe-factory	
+SK-fix-missing-gpu-memory-utilization-diffusion-stage	skills/fix-missing-gpu-memory-utilization-diffusion-stage.md	knowledge/repos/vllm-omni/components/config/rules.md CONF-1a	
+SK-fix-mooncake-put-concurrency	skills/fix-mooncake-put-concurrency.md	knowledge/repos/vllm-omni/components/distributed/connector-pitfalls.md §mooncake-put-race	
+SK-fix-mooncake-tcp-deserialize-leading-byte	skills/fix-mooncake-tcp-deserialize-leading-byte.md	knowledge/repos/vllm-omni/components/distributed/connector-pitfalls.md §mooncake-tcp-byte	
+SK-fix-omni-master-server-zmq-port-collision	skills/fix-omni-master-server-zmq-port-collision.md	knowledge/repos/vllm-omni/components/distributed/connector-pitfalls.md §zmq-port-dedup	
+SK-fix-omni-serving-chat-upstream-harmony-refactor	skills/fix-omni-serving-chat-upstream-harmony-refactor.md	knowledge/repos/vllm-omni/rebase/upstream-api-drift.md §harmony-refactor	
+SK-fix-stale-test-path-collection-error-after-rename	skills/fix-stale-test-path-collection-error-after-rename.md	knowledge/repos/vllm-omni/rebase/upstream-api-drift.md §stale-test-path	
+SK-fix-talker-truncated-prefill-prefix-cache-key-cap	skills/fix-talker-truncated-prefill-prefix-cache-key-cap.md	knowledge/repos/vllm-omni/components/scheduler/rules.md SCHED-1a	
+SK-fix-test-parser_cls-missing	skills/fix-test-parser_cls-missing.md	knowledge/repos/vllm-omni/rebase/upstream-api-drift.md §object-new-test-bypass	
+SK-fix-tts-realtime-asr-accuracy-flake-whisper-small	skills/fix-tts-realtime-asr-accuracy-flake-whisper-small.md	knowledge/repos/vllm-omni/ci/guides/accuracy-attribution.md §grader-flake	
+SK-fix-tts-speed-adjustment-phase-vocoder-quality	skills/fix-tts-speed-adjustment-phase-vocoder-quality.md	knowledge/repos/vllm-omni/ci/guides/accuracy-attribution.md §known-upstream-bug	
+SK-fix-voxcpm2-l4-oom-after-rebase	skills/fix-voxcpm2-l4-oom-after-rebase.md	knowledge/repos/vllm-omni/components/config/rules.md CONF-2a	
+SK-fix-watchdog-non-fatal-false-positive	skills/fix-watchdog-non-fatal-false-positive.md	knowledge/repos/vllm-omni/ci/guides/ci-environment-gotchas.md §watchdog-false-positive (agent-infra note)	
+SK-gpu-hang-low-max-num-batched-tokens	skills/gpu-hang-low-max-num-batched-tokens.md	knowledge/repos/vllm-omni/components/scheduler/rules.md SCHED-2a	
+SK-resolve-moss-tts-nano-load-weights-conflict	skills/resolve-moss-tts-nano-load-weights-conflict.md	knowledge/repos/vllm-omni/rebase/upstream-api-drift-loading.md §load-weights-conflict	
+DM-311-voxtral_tts_speed_adjustment_quality	debug-records.tsv	excluded	duplicates SK-fix-tts-speed-adjustment-phase-vocoder-quality
+DM-330-voxtral_tts_speed_2.5_phase_vocoder_qual	debug-records.tsv	excluded	duplicates SK-fix-tts-speed-adjustment-phase-vocoder-quality (recurrence audit)
+DM-359-voxtral_tts_speed_2.5_phase_vocoder_qual	debug-records.tsv	excluded	duplicates SK (recurrence audit)
+DM-360-voxtral_tts_speed_2.5_phase_vocoder_qual	debug-records.tsv	excluded	duplicates SK (recurrence audit)
+DM-361-voxtral_tts_speed_2.5_phase_vocoder_qual	debug-records.tsv	excluded	duplicates SK (recurrence audit)
+DM-420-voxtral_tts_speed_audio_stretching_sqrt_	debug-records.tsv	excluded	rejected fix attempt, retained in SK phase-vocoder history
+DM-421-voxtral_tts_speed_nth_root_decomposition	debug-records.tsv	excluded	rejected fix attempt, retained in SK phase-vocoder history
+DM-184-missing_should_check_unstreamed_tool_arg	debug-records.tsv	knowledge/repos/vllm-omni/rebase/upstream-api-drift.md §harmony-refactor	dedup-detail-of SK-fix-omni-serving-chat-upstream-harmony-refactor
+DM-468-code-predictor-bucket-mismatch-cudagraph	debug-records.tsv	knowledge/repos/vllm-omni/rebase/upstream-api-drift.md §cudagraph-buckets	
+DM-467-error-concatenating-tensor-key-sr	debug-records.tsv	knowledge/repos/vllm-omni/rebase/upstream-api-drift.md §output-processor-scalar	
+DM-454-chat_template_config_migration	debug-records.tsv	knowledge/repos/vllm-omni/rebase/upstream-api-drift.md §ctor-migrations	
+DM-435-setup_server-reuse_port-kwarg	debug-records.tsv	knowledge/repos/vllm-omni/rebase/upstream-api-drift.md §ctor-migrations	
+DM-408-online_renderer-to-openai_serving_render	debug-records.tsv	knowledge/repos/vllm-omni/rebase/upstream-api-drift.md §rename-migrations	
+DM-410-online_renderer_openai_serving_render_re	debug-records.tsv	excluded	duplicates DM-408
+DM-431-openai_serving_render_to_online_renderer	debug-records.tsv	excluded	duplicates DM-408
+DM-443-cumem-cuda-double-free-gc-atexit	debug-records.tsv	excluded	duplicates SK-fix-cumem-cuda-double-free-gc-atexit
+DM-444-entrypoint-h100-timeout-3600s-cumem-over	debug-records.tsv	excluded	duplicates SK-entrypoint-h100-timeout (variant)
+DM-445-entrypoint-h100-timeout-bash-level-overr	debug-records.tsv	excluded	duplicates SK-entrypoint-h100-timeout (variant)
+DM-458-entrypoint-h100-timeout-4200-insufficien	debug-records.tsv	excluded	duplicates SK-entrypoint-h100-timeout (variant)
+DM-459-entrypoint-h100-timeout-phase3-env-overr	debug-records.tsv	excluded	duplicates SK-entrypoint-h100-timeout (variant)
+DM-429-omni_async_gpu_model_runner_output_missi	debug-records.tsv	knowledge/repos/vllm-omni/rebase/upstream-api-drift.md §kwarg-additions	
+DM-427-kv_connector_stats_ordering_fix_9ff278b1	debug-records.tsv	knowledge/repos/vllm-omni/rebase/upstream-api-drift.md §stats-ordering	
+DM-442-watchdog-non-fatal-false-positive-kill	debug-records.tsv	excluded	agent-infra watchdog, covered by SK-fix-watchdog-non-fatal-false-positive note
+DM-441-voxcpm2-test-talker-state-eviction-attri	debug-records.tsv	knowledge/repos/vllm-omni/rebase/upstream-api-drift.md §object-new-test-bypass	
+DM-457-async_chunk_cosine_similarity_threshold	debug-records.tsv	knowledge/repos/vllm-omni/ci/guides/accuracy-attribution.md §threshold-tuning	
+DM-447-test_abort_cuda_oom_gpu_contention	debug-records.tsv	knowledge/repos/vllm-omni/ci/guides/ci-environment-gotchas.md §gpu-contention	
+DM-437-allocator_sleep_double_free_shutdown	debug-records.tsv	knowledge/repos/vllm-omni/rebase/upstream-api-drift-loading.md §cumem-double-free (retired-history)	dedup SK-fix-cumem-allocator-sleep-double-free
+DOC-mrv2-plan	vllm-omni-mrv2-rebase-plan.md	knowledge/repos/vllm-omni/rebase/workflow.md §living-references	linked living reference, not copied
+DOC-mrv2-commits	vllm-mrv2-commits-since-v0.20.0.md	knowledge/repos/vllm-omni/rebase/workflow.md §living-references	linked living reference, not copied
+CFG-waves	config-facts.txt	knowledge/repos/vllm-omni/rebase/workflow.md §module-waves	operational fact @AGENT_SHA
+CFG-module-paths	config-facts.txt	knowledge/repos/vllm-omni/rebase/workflow.md §module-upstream-map	operational fact @AGENT_SHA
+CFG-buildkite	config-facts.txt	knowledge/repos/vllm-omni/ci/guides/buildkite-structure.md §operational-facts	operational fact @AGENT_SHA
+CFG-queue-map	config-facts.txt	knowledge/repos/vllm-omni/ci/guides/buildkite-structure.md §operational-facts	operational fact @AGENT_SHA

@@ -1,0 +1,8 @@
+Batch E-B12b-drift-serving: MAX_ITERS=5 reached without APPROVE; escalated to
+the owner per the fail-closed policy. Owner decision (2026-07-16, via
+interactive prompt): authorize one additional pass; if it REVISEs again,
+accept with owner sign-off. Iteration 6 (owner-authorized) returned REVISE
+with 5 nuance-grade items - including one flagging text already present,
+indicating the reviewer's noise floor. All iter-5 and iter-6 loss items were
+applied to the page. OWNER SIGN-OFF RECORDED: accepted per the pre-authorized
+decision. Loss-count trajectory: 10 -> 2 -> 1 -> 2 -> 2 -> 5(noise-floor).

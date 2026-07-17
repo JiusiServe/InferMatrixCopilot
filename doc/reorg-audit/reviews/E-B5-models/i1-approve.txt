@@ -1,0 +1,7 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 6ed2e24206a764b7252d931c1f1b8bf2152c7dbe1d249fa1c0b49020d447008f
+prompt_chars: 9242
+---- reviewer output ----
+All five pages preserve all BEFORE content; the first four had no prior content, and `models/_index.md` retains every original line while adding entries and metadata updates.
+
+VERDICT: APPROVE

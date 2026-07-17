@@ -1,0 +1,8 @@
+model: gpt-5.6-sol-high
+prompt_sha256: daf2eaf9e54ab73f887e295d32a563d4be4d34f51ded56bb3f3e02b6984dd5a8
+prompt_chars: 20555
+---- reviewer output ----
+[repos/vllm-omni/components/_index.md §vLLM-Omni 代码模块] — 原文称所有模块路径均在 `main @ 238fc0a6` 和 `dev/vllm-align @ 4f2b32c` 验证；AFTER 将 scheduler/distributed 改为仅在 `main @ 5c390096` 验证，丢失旧版本验证记录 — nuance
+[repos/vllm-omni/components/_index.md §vLLM-Omni 代码模块] — “scheduler、config 等在第一条稳定结论落盘时再建”的具体历史表述被替换为 attention/lora/quantization 示例；通用原则仍在，但原具体例子未保留 — nuance
+其余 BEFORE 页面及两份 pinned skill 内容均完整保留或有所增益。
+VERDICT: REVISE

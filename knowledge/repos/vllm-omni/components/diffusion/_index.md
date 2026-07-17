@@ -28,3 +28,4 @@ sources: []
 | 遇到什么 | 查看哪里 |
 |---|---|
 | 理解共享职责和数据流 | [architecture](architecture.md) |
+| step 执行/batching/缓存加速/并行等特性语义 | [特性指南](guides/_index.md) |

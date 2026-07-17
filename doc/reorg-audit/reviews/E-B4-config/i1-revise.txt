@@ -1,0 +1,8 @@
+model: gpt-5.6-sol-high
+prompt_sha256: e0a3bd1ba75dc6a46f0b623b80f68b0e276b0ea364a7ed7c30228c0cd546207c
+prompt_chars: 20458
+---- reviewer output ----
+[components/config/rules.md §CONF-2a] — “right-sized”误译为“右侧余量”，削弱了 6 GiB 与 2×4096 容量匹配的含义 — nuance
+[components/config/rules.md §CONF-2a] — 递减历史中的“and back”被泛化为“反复”，丢失比例曾回调的具体信息 — nuance
+[components/_index.md §vLLM-Omni 代码模块] — 路径验证范围由全部原有模块弱化为“原有三组件”，未再覆盖 BEFORE 中的五个模块 — nuance
+VERDICT: REVISE

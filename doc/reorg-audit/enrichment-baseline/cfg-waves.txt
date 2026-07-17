@@ -1,0 +1,9 @@
+## rebase-agent module waves (@122a9468)
+    # ── Module launch waves ───────────────────────────────────────────────────
+    wave_1_modules: list[str] = [
+    wave_2_modules: list[str] = ["benchmarks"]
+        return self.wave_1_modules + self.wave_2_modules
+## config.sh (waves + queue map lines)
+WAVE_1_MODULES=(
+WAVE_2_MODULES=(
+ALL_MODULES=("${WAVE_1_MODULES[@]}" "${WAVE_2_MODULES[@]}")

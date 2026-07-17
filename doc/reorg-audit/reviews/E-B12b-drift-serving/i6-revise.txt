@@ -1,0 +1,10 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 6137a9fa1af63a96821bbfec3235a9a559a5cc4139e93b1eff80507638b3b612
+prompt_chars: 31531
+---- reviewer output ----
+[upstream-api-drift.md §2] — 精确报错信息被弱化：遗漏 unexpected kwarg 是 `online_renderer`，以及 AttributeError 指向 `self.online_renderer` — nuance
+[upstream-api-drift.md §3] — 遗漏 `PoolingBaseServing.__init__` 明确要求 `chat_template_config`，以及未更新的是 import alias `setup_openai_server` — nuance
+[upstream-api-drift.md §7] — 遗漏 0 维 `sr` 具体在 `torch.cat()` 中失败的诊断细节 — nuance
+[upstream-api-drift.md §9] — `tests/e2e/online_serving/test_hunyuan_video_15.py` 被缩成 basename，丢失完整路径 — nuance
+[upstream-api-drift.md §9] — 遗漏把 rc=4/5 当 OOM 重试“结果永远不会改变”的明确结论 — nuance
+VERDICT: REVISE

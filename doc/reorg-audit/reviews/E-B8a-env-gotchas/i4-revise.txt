@@ -1,0 +1,6 @@
+model: gpt-5.6-sol-high
+prompt_sha256: f93aed9df008ee09c16b81e8315212612a80ef3a906381e01f9374af5f4d951b
+prompt_chars: 30529
+---- reviewer output ----
+[ci-environment-gotchas.md §5] — 原文明确将 Engine init 列为本地三层 timeout 之一并称须 7200s；AFTER 改称 fixture `init_timeout=900`，未保留该原始陈述 — critical
+VERDICT: REVISE

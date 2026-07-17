@@ -1,0 +1,13 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 4a2db82d4e5966de5f90f7269b8e035207598eed700c226fe9fef2577066099b
+prompt_chars: 21969
+---- reviewer output ----
+[repos/vllm-omni/components/scheduler/_index.md] — BEFORE 为空，无信息损失
+[repos/vllm-omni/components/scheduler/architecture.md] — BEFORE 为空，无信息损失
+[repos/vllm-omni/components/scheduler/rules.md §SCHED-1a] — skill 元数据 `status: active` 丢失 — nuance
+[repos/vllm-omni/components/scheduler/rules.md §SCHED-1a] — `getattr(talker_config, "accept_hidden_layer", None)` 与 `is not None` 被弱化为直接取属性并判断“非空”，改变了缺失属性和零值时的语义 — critical
+[repos/vllm-omni/components/scheduler/rules.md §SCHED-1a] — “TB 级内存的 CI 主机可承受该缓存”这一容量判断丢失 — nuance
+[repos/vllm-omni/components/scheduler/rules.md §SCHED-2a] — skill 元数据 `status: active` 丢失 — nuance
+[repos/vllm-omni/components/scheduler/rules.md §SCHED-2a] — “import check 已确认无语法错误”的实际验证结果被弱化成“无卡时只能 import 检查” — nuance
+[repos/vllm-omni/components/_index.md] — BEFORE 内容全部保留，仅新增模块条目，无信息损失
+VERDICT: REVISE

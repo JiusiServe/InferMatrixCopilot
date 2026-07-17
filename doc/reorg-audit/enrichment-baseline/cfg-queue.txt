@@ -1,0 +1,6 @@
+## rebase-agent config.sh queue map (@122a9468)
+## config.sh (waves + queue map lines)
+# Buildkite queue → (min_gpus, hw):
+#   gpu_1_queue       → (1, any)    # L4, 1×
+#   gpu_4_queue       → (4, any)    # L4, 4×
+#   mithril-h100-pool → (N, h100)   # H100/H800 (can_run_ci_test treats H800 as H100)

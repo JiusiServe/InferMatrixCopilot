@@ -1,0 +1,7 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 9c9d5bae42a06f97d1e9c63ea8609a16df7a4e2dfbe974c08a3f330475673d9a
+prompt_chars: 986
+---- reviewer output ----
+../SCHEMA.md preserves all concrete material; BEFORE is empty.
+
+VERDICT: APPROVE

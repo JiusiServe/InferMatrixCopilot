@@ -1,0 +1,31 @@
+## agent/config.py (domain-fact lines; secrets/hosts excluded)
+    last_rebase_vllm_commit: str = "1acd67a795ebccdf9b9db7697ae9082058301657"
+    rebase_branch: str = "dev/vllm-align"
+    vllm_wheel_variant: str = "cu130"
+    pipeline_module_debug_timeout_sec: int = 7200
+    # ── Module launch waves ───────────────────────────────────────────────────
+    wave_1_modules: list[str] = [
+    wave_2_modules: list[str] = ["benchmarks"]
+        return self.wave_1_modules + self.wave_2_modules
+    buildkite_org: str = "vllm"
+    buildkite_ci_pipeline: str = "vllm-omni-release"
+    nightly_pipeline: str = "vllm-omni-rebase"
+    main_ci_pipeline: str = "vllm-omni-rebase"
+    module_vllm_paths: dict[str, str] = {
+        "model_config":   "vllm/config/ vllm/engine/arg_utils.py",
+        "input_output":   "vllm/inputs/ vllm/v1/engine/input_processor.py vllm/v1/engine/output_processor.py vllm/v1/request.py",
+        "scheduler":      "vllm/v1/core/sched/",
+        "worker_runner":  "vllm/v1/worker/",
+        "model_executor": "vllm/model_executor/",
+        "online_serving": "vllm/entrypoints/",
+        "benchmarks":     "vllm/benchmarks/ vllm/entrypoints/cli/benchmark/",
+        "platform":       "vllm/platforms/",
+
+## config.sh (waves + queue map lines)
+WAVE_1_MODULES=(
+WAVE_2_MODULES=(
+ALL_MODULES=("${WAVE_1_MODULES[@]}" "${WAVE_2_MODULES[@]}")
+# Buildkite queue → (min_gpus, hw):
+#   gpu_1_queue       → (1, any)    # L4, 1×
+#   gpu_4_queue       → (4, any)    # L4, 4×
+#   mithril-h100-pool → (N, h100)   # H100/H800 (can_run_ci_test treats H800 as H100)

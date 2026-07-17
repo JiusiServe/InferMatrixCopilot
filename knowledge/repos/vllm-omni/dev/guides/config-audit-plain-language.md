@@ -65,3 +65,5 @@ sources: []
 
 > Stage 1 先不急着改代码。先搞清楚配置从哪里来、最后在哪里生效、哪些 legacy 还不能删。否则 cleanup 很容易删错字段，或者把模型运行行为改掉。
 
+
+配置语义（schema、合并链、默认值）的 owner 见 [Config 组件](../../components/config/_index.md)；本页只管审计工作法。

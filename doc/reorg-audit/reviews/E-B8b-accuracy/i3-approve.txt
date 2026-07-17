@@ -1,0 +1,6 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 989c91dfc514edafeb12a6504f8984a4d5de2f69c45692a6ac6b98db463837e4
+prompt_chars: 21605
+---- reviewer output ----
+[accuracy-attribution.md §all sections] — No information loss, weakening, over-generalization, or mistranslation detected.
+VERDICT: APPROVE

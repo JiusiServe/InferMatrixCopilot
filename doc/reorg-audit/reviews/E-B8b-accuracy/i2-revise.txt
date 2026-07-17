@@ -1,0 +1,12 @@
+model: gpt-5.6-sol-high
+prompt_sha256: 6918f0c05f7e134f19722c2d3ec85cc5f12857c41b828688578fae899ef0bdec
+prompt_chars: 21244
+---- reviewer output ----
+[accuracy-attribution.md §1] — 遗漏确认 golden 是否曾在非 CI 硬件重生成这一诊断分支 — nuance
+[accuracy-attribution.md §1] — CI 上传示例省略 pytest 的 `-s -v -m full_model --run-level full_model` 及 `EXIT=$$?` — nuance
+[accuracy-attribution.md §2] — 遗漏断言通过 `cosine_similarity_text(...)` 比较文本的具体实现信息 — nuance
+[accuracy-attribution.md §2 相邻案例] — 遗漏 debug-memory 的 key/module，以及 Whisper 非确定性漏 1–2 个词的限定 — nuance
+[accuracy-attribution.md §3] — 标题“不要在 omni 侧修”过度泛化；原文只禁止 rebase 分支本地修补，并要求在 omni main PR 正修 — critical
+[accuracy-attribution.md §3] — 遗漏典型相似度范围 0.5–0.75，以及 2026-06-12 是第 4 次复发 — nuance
+[accuracy-attribution.md §3] — 遗漏 PyAV 已是 vLLM 依赖这一选型依据 — nuance
+VERDICT: REVISE
