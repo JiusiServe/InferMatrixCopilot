@@ -125,8 +125,12 @@ class Settings(BaseSettings):
     review_light_max_files: int = 3   # light ceiling (with lines below):
     review_light_max_lines: int = 80  #   at/under, with no API/default or
                                       #   risk signals -> one-pass review
-    review_light_max_iters: int = 8   # light-pass tool budget — the token
-                                      #   bound that keeps small PRs <=200k
+    review_light_max_iters: int = 12  # light-pass tool budget — the token
+                                      #   bound for small PRs. The solo pass
+                                      #   sweeps the WHOLE checklist that four
+                                      #   10-iter lenses split: 8 starved it
+                                      #   into a forced block on a real 60-line
+                                      #   PR (5156: cut at 11 tool calls)
     review_planner_model: str = ""    # gray-zone planner; empty -> the run's
                                       #   tier model (model_for(mode))
 
