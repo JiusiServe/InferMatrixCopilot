@@ -102,3 +102,19 @@ def test_candidate_save_roundtrip(stack, settings):
     assert saved is not None and saved.status == "candidate"
     # candidates are never recalled by find()
     assert store.find("pr_review") is None
+
+
+def test_real_pr_review_playbook_reuses_with_review_depth():
+    """The shipped pr-review.yaml declares review_depth, so a spec carrying it
+    resolves as reuse (L0) — an undeclared param would demote to adapt (L1,
+    review-gated), which the MCP --execute-reserved child cannot gate."""
+    from omni_copilot.config import _REPO_ROOT
+
+    registry = register_builtin_steps(StepRegistry())
+    store = PlaybookStore(_REPO_ROOT / "playbooks", registry)
+    planner = Planner(store, registry)
+    res = planner.resolve(
+        TaskSpec(kind="pr_review", pr=7, params={"review_depth": "full"}),
+        capabilities={"repo.path"})
+    assert res.mode == "reuse" and not res.requires_review
+    assert res.playbook.name == "pr-review"

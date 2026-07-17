@@ -304,6 +304,7 @@ def test_review_step_caps_comments_deterministically(settings, trace, tmp_path,
     """The comment budget is enforced in code (severity-ordered, cap 5) — the
     low-signal nit tail goes first. Reducers ignored a prompted cap."""
     settings.review_ensemble = True
+    settings.review_depth = "full"  # pin: this test exercises ensemble mechanics
     many = ([{"file": "m.py", "line": i, "severity": "nit",
               "comment": f"n{i}", "evidence": "hunk"} for i in range(4)]
             + [{"file": "m.py", "line": 9, "severity": "major",
@@ -356,6 +357,7 @@ def test_render_verdict_calibration():
 def test_review_step_uses_ensemble_when_enabled(settings, trace, tmp_path,
                                                 git_repo):
     settings.review_ensemble = True
+    settings.review_depth = "full"  # pin: tiny diff would auto-plan light
     comments = [{"file": "mod_a.py", "line": 1, "severity": "major",
                  "comment": "the diff sets A=1 which breaks B — guard it",
                  "evidence": "hunk"}]
@@ -375,6 +377,102 @@ def test_review_step_uses_ensemble_when_enabled(settings, trace, tmp_path,
     # every lens sample went through the unified runtime (agent_dispatch each)
     dispatches = list(trace.events("agent_dispatch"))
     assert len(dispatches) == len(_REVIEW_LENSES)
+    plan_ev = next(trace.events("review_plan"))
+    assert plan_ev["depth"] == "full" and plan_ev["planner"] == "override"
+
+
+def test_review_step_auto_plans_light_for_tiny_diff(settings, trace, tmp_path,
+                                                    git_repo):
+    """A tiny low-risk diff under review_depth=auto runs ONE full-checklist
+    pass — no ensemble, no reducer (the Codex-measured 1.1M-token 4-lens run
+    on a 2-file/+60-line PR is the regime this removes)."""
+    settings.review_ensemble = True
+    comments = [{"file": "mod_a.py", "line": 1, "severity": "minor",
+                 "comment": "tighten the guard", "evidence": "hunk"}]
+    llm = ScriptedLLM([contract(review_comments=comments)])  # exactly one pass
+    state = {"diff_text": "diff --git a/mod_a.py b/mod_a.py\n"
+                          "--- a/mod_a.py\n+++ b/mod_a.py\n+x = 1",
+             "task_spec": {"pr": 9}, "repo_path": str(git_repo)}
+    registry = register_builtin_steps(StepRegistry())
+    result = asyncio.run(registry.get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+    assert result.ok, result.summary
+    plan_ev = next(trace.events("review_plan"))
+    assert plan_ev["depth"] == "light" and plan_ev["planner"] == "rules"
+    assert len(list(trace.events("agent_dispatch"))) == 1
+    assert not list(trace.events("agent_ensemble"))
+    assert result.outputs["review_plan"]["depth"] == "light"
+    assert "depth=light via rules" in result.summary
+
+
+def test_review_step_invalid_override_blocks_before_any_llm(settings, trace,
+                                                            tmp_path, git_repo):
+    """A typo like review_depth=ful must fail fast, never silently downgrade
+    an explicitly requested full review."""
+    settings.review_ensemble = True
+    llm = ScriptedLLM([])   # any LLM call would pop from an empty script
+    state = {"diff_text": "diff --git a/m.py b/m.py\n+x = 1",
+             "task_spec": {"pr": 9, "params": {"review_depth": "ful"}},
+             "repo_path": str(git_repo)}
+    registry = register_builtin_steps(StepRegistry())
+    result = asyncio.run(registry.get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+    assert not result.ok and result.failure is FailureKind.BLOCKED
+    assert "invalid review_depth" in result.summary
+    assert not llm.calls
+
+
+def test_review_step_gray_zone_falls_back_to_standard(settings, trace,
+                                                      tmp_path, git_repo):
+    """Mid-size diff + unparseable planner reply → deterministic standard
+    (logic+behavior): 1 garbage planner call, 2 lens passes, 1 reducer."""
+    settings.review_ensemble = True
+    body = "\n".join(f"+line {i}" for i in range(60))
+    state = {"diff_text": "\n".join(
+        f"diff --git a/src/f{i}.py b/src/f{i}.py\n"
+        f"--- a/src/f{i}.py\n+++ b/src/f{i}.py\n{body}" for i in range(4)),
+        "task_spec": {"pr": 9}, "repo_path": str(git_repo)}
+    c1 = [{"file": "src/f0.py", "line": 1, "severity": "major",
+           "comment": "breaks the consumer contract", "evidence": "hunk"}]
+    c2 = [{"file": "src/f1.py", "line": 2, "severity": "minor",
+           "comment": "stale docstring", "evidence": "hunk"}]
+    llm = ScriptedLLM([
+        Reply(blocks=[Block(type="text", text="prose, not json")]),  # planner
+        contract(review_comments=c1),                                # lens 1
+        contract(review_comments=c2),                                # lens 2
+        verdicts_reply({"i": 0, "action": "keep"},                   # reducer
+                       {"i": 1, "action": "keep"}),
+    ])
+    registry = register_builtin_steps(StepRegistry())
+    result = asyncio.run(registry.get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+    assert result.ok, result.summary
+    plan_ev = next(trace.events("review_plan"))
+    assert plan_ev["planner"] == "llm-fallback"
+    assert plan_ev["lenses"] == ["logic", "behavior"]
+    assert len(list(trace.events("agent_dispatch"))) == 2
+    assert not llm._replies  # the whole script was consumed
+
+
+def test_review_step_cap_applies_to_light_path(settings, trace, tmp_path,
+                                               git_repo):
+    """The 5-comment severity-ordered budget is a product cap, not ensemble
+    mechanics — it applies to the light single pass too."""
+    settings.review_ensemble = True
+    many = ([{"file": "m.py", "line": i, "severity": "nit", "comment": f"n{i}",
+              "evidence": "hunk"} for i in range(6)]
+            + [{"file": "m.py", "line": 9, "severity": "major",
+                "comment": "big", "evidence": "hunk"}])
+    llm = ScriptedLLM([contract(review_comments=many)])
+    state = {"diff_text": "diff --git a/mod_a.py b/mod_a.py\n"
+                          "--- a/mod_a.py\n+++ b/mod_a.py\n+x = 1",
+             "task_spec": {"pr": 9}, "repo_path": str(git_repo)}
+    registry = register_builtin_steps(StepRegistry())
+    result = asyncio.run(registry.get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+    assert result.ok, result.summary
+    kept = result.outputs["review_comments"]
+    assert len(kept) == 5 and kept[0]["severity"] == "major"
 
 
 def test_zero_yield_lens_gets_one_retry(settings, trace, tmp_path):

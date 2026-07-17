@@ -241,10 +241,15 @@ def build_mcp(settings: Optional[Settings] = None):
     mcp = FastMCP("omni-copilot")
 
     @mcp.tool()
-    def start_review(pr: int, repo: str = "") -> dict:
-        """Start a read-only review of PR `pr`. Returns {run_id}; poll get_result."""
-        return _guard(lambda: {"run_id": core.start(
-            {"kind": "pr_review", "repo": repo or core.settings.default_repo, "pr": pr})})
+    def start_review(pr: int, repo: str = "", review_depth: str = "") -> dict:
+        """Start a read-only review of PR `pr`. Returns {run_id}; poll
+        get_result. `review_depth` optionally pins the adaptive depth
+        (light|standard|full|auto; policy-validated)."""
+        req: dict = {"kind": "pr_review",
+                     "repo": repo or core.settings.default_repo, "pr": pr}
+        if review_depth:
+            req["params"] = {"review_depth": review_depth}
+        return _guard(lambda: {"run_id": core.start(req)})
 
     @mcp.tool()
     def start_issue_answer(issue: int, repo: str = "") -> dict:

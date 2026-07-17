@@ -15,6 +15,7 @@ import asyncio
 from dataclasses import replace
 
 from ...scopes import ToolScope, read_only_scope
+from ...task_spec import READ_ONLY_KINDS
 from ...tools import ToolDef
 from ..step import FailureKind, StepContext, StepResult
 from .dispatch import BASE_OUTPUT_SCHEMA, AgentDispatchContext
@@ -174,7 +175,14 @@ async def run_agent_step(
         return (StepResult(False, FailureKind.RETRYABLE,
                            f"{step_name}: agent produced no contract-conformant "
                            "output"), {})
-    if str(output.get("status", "")).lower() == "success":
+    # mirror TaskSpec.read_only (a property, absent from the state dict): a
+    # read-only run must not rewrite git-tracked SKILL.md frontmatter — MCP
+    # reviews were dirtying the tree with run_count bumps. Tradeoff: read-only
+    # kinds stop feeding the usage prior, which is only the third-tier
+    # retrieval tie-breaker (skills.py score()); last_used_at is never read.
+    spec_read_only = (spec.get("kind") in READ_ONLY_KINDS
+                      and not spec.get("post")) or bool(spec.get("report_only"))
+    if str(output.get("status", "")).lower() == "success" and not spec_read_only:
         for s in skills:  # injected skills earned a use — feed the run_count prior
             store.touch(s["name"])
     prefix = f"[{output.get('confidence', '?')}] "

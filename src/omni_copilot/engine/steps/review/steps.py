@@ -12,9 +12,11 @@ keeping the core prompt repo-neutral.
 
 from __future__ import annotations
 
+import asyncio
 import subprocess
 
 from ....review.diff_summary import build_diff_summary
+from ....review.planner import DEPTHS, plan_review
 from ....review.reviewer import run_patch_review
 from ....review.triggers import evaluate_triggers
 from ...step import FailureKind, StepContext, StepResult
@@ -69,14 +71,28 @@ async def _patch_gate(ctx: StepContext) -> StepResult:
                       outputs={"verdict": verdict.verdict, "critiques": verdict.critiques})
 
 
+def _risk_paths(adapter, settings) -> tuple[str, ...]:
+    """High-risk path prefixes for the depth planner: the adapter's `risk:
+    high` modules' local_paths when available, else the settings module-name
+    fallback (matched as path segments, best effort)."""
+    if adapter is not None and adapter.high_risk_modules:
+        return tuple(p for m in adapter.high_risk_modules
+                     for p in ((adapter.modules.get(m) or {})
+                               .get("local_paths") or []))
+    return tuple(settings.high_risk_modules)
+
+
 @step("agent.review_diff", "agent", "read",
       "Evidence-grounded two-stage review: tool-loop investigation draft, "
       "then verify-and-rewrite editor pass.")
 async def _review_diff(ctx: StepContext) -> StepResult:
     """PR review as a governed agent step (unified runtime): evidence pack,
     skill retrieval, enforced read-only tools, structured review_comments.
-    By default runs as a 3-lens ensemble with verify-and-merge (robustness:
-    single runs have high variance; see eval/ANALYSIS.md)."""
+    Depth is adaptive (review/planner.py): deterministic rules route tiny
+    low-risk diffs to one full-checklist pass and large/high-risk diffs to
+    the full lens ensemble; only the gray middle spends one small planner
+    call (robustness rationale for the ensemble: single runs have high
+    variance; see eval/ANALYSIS.md)."""
     from ...agent_runtime import _resolve_adapter, run_agent_step, run_agent_step_ensemble
 
     diff = ctx.state.get("diff_text", "")
@@ -116,18 +132,50 @@ async def _review_diff(ctx: StepContext) -> StepResult:
                           "comment, evidence}"},
         extra_tools=_gh_read_tools(_repo_path(ctx)),
     )
-    if ctx.settings.review_ensemble:
-        result, output = await run_agent_step_ensemble(
-            ctx, lenses=_REVIEW_LENSES, merge_key="review_comments",
-            merge_guidance=_REVIEW_MERGE, **common)
-        # deterministic comment budget: severity-ordered, capped at 5 — the
-        # low-signal tail goes first (reducers ignored a prompted cap)
-        comments = sorted(output.get("review_comments") or [],
-                          key=lambda c: _SEVERITY_ORDER.get(
-                              str(c.get("severity", "minor")).lower(), 2))
-        output["review_comments"] = comments[:5]
-    else:
+    plan = None
+    if not ctx.settings.review_ensemble:   # legacy kill-switch: single pass
         result, output = await run_agent_step(ctx, **common)
+    else:
+        override = str((spec.get("params") or {}).get("review_depth") or "") \
+            .lower().strip()
+        if override and override not in DEPTHS + ("auto",):
+            # fail fast: a typo like "ful" must never silently downgrade an
+            # explicitly requested full review
+            return StepResult(False, FailureKind.BLOCKED,
+                              f"invalid review_depth {override!r} — use "
+                              "light|standard|full|auto")
+        if not override or override == "auto":
+            override = "" if ctx.settings.review_depth == "auto" \
+                else ctx.settings.review_depth
+        plan = await asyncio.to_thread(
+            plan_review, str(diff), settings=ctx.settings,
+            lens_names=tuple(l["name"] for l in _REVIEW_LENSES),
+            lens_focus={l["name"]: l["focus"] for l in _REVIEW_LENSES},
+            high_risk_paths=_risk_paths(adapter, ctx.settings),
+            override=override, llm=ctx.llm,
+            model=ctx.settings.review_planner_model
+            or ctx.settings.model_for(spec.get("mode", "eco")))
+        ctx.trace.record(
+            "review_plan", depth=plan.depth, planner=plan.planner,
+            reason=plan.reason, lenses=list(plan.lens_names),
+            signals=plan.signals.as_dict() if plan.signals else None,
+            input_tokens=plan.input_tokens, output_tokens=plan.output_tokens)
+        if plan.depth == "light":
+            result, output = await run_agent_step(
+                ctx, max_iters=ctx.settings.review_light_max_iters, **common)
+        else:
+            lenses = [l for l in _REVIEW_LENSES
+                      if l["name"] in plan.lens_names] or list(_REVIEW_LENSES)
+            result, output = await run_agent_step_ensemble(
+                ctx, lenses=lenses, merge_key="review_comments",
+                merge_guidance=_REVIEW_MERGE, **common)
+    # deterministic comment budget: severity-ordered, capped at 5 — the
+    # low-signal tail goes first (reducers ignored a prompted cap; the cap is
+    # a product budget, so it applies to every depth)
+    comments = sorted(output.get("review_comments") or [],
+                      key=lambda c: _SEVERITY_ORDER.get(
+                          str(c.get("severity", "minor")).lower(), 2))
+    output["review_comments"] = comments[:5]
     if not result.ok and output.get("review_comments"):
         # A review that FOUND defects is a successful review whose verdict is
         # REQUEST CHANGES — not a failed step. Agents conflate the PR's
@@ -140,11 +188,16 @@ async def _review_diff(ctx: StepContext) -> StepResult:
                                     f"{result.summary}",
                             outputs=result.outputs,
                             changed_files=result.changed_files)
+    if plan is not None:
+        result.outputs["review_plan"] = {"depth": plan.depth,
+                                         "planner": plan.planner,
+                                         "reason": plan.reason}
     if result.ok:
         review_md = _render_review_md(output)
         ctx.state["review_text"] = review_md
         result.outputs["review_text"] = review_md
         result.outputs.setdefault("state_updates", {})["review_text"] = review_md
+        depth_note = f"; depth={plan.depth} via {plan.planner}" if plan else ""
         result.summary = (f"review produced ({len(output.get('review_comments') or [])} "
-                          f"comments) — {result.summary}")
+                          f"comments{depth_note}) — {result.summary}")
     return result
