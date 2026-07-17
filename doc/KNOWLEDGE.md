@@ -49,10 +49,18 @@ capabilities, push policy) is human-authored and stays — the code depends on i
 - **Briefing (always-on):** the general slice `settings.knowledge_general_docs`
   + the adapter's repo-specific `briefing_docs`
   (`repos/<repo>/rules.md` + `_index.md`), each capped.
-- **On demand:** the `doc_search` / `doc_read` agent tools reach **every** deeper
-  guide, incident, component, and model page across the shared base (general or
-  repo-specific), contained under `knowledge/`. Nothing is lost — the full tree is
-  on disk and versioned; only the always-on slice is bounded.
+- **On demand:** the cross-platform `doc_search` / `doc_read` tools reach every
+  deeper guide, incident, component, and model page in the shared `general/`
+  slice plus the active adapter's `knowledge.repo_subdir`. Other repos' slices
+  are refused. Search is implemented in Python (no host `grep` dependency), and
+  title/frontmatter/heading hits rank first.
+- **MCP direct access:** the same repo-scoped `doc_search` / `doc_read` tools are
+  exposed read-only over MCP, so a capable host model can use the knowledge base
+  directly without starting a workflow. Workflow agents and MCP share the same
+  access implementation and containment rules.
+- **Observability:** missing, escaped, or unreadable briefing documents emit
+  `knowledge_warning` / `capability_gap` RunTrace events instead of silently
+  removing the knowledge briefing.
 
 ## Maintaining the vendored tree
 Edit `knowledge/` in place like any other tracked content; every change goes

@@ -81,6 +81,7 @@ async def run_agent_step(
     # pulled on demand via the doc tools (all_extra above).
     briefing = ""
     if ctx.settings.profile_briefing_enabled:
+        briefing_warnings: list[str] = []
         try:
             from ...adapters.base import render_briefing_docs
 
@@ -90,11 +91,18 @@ async def run_agent_step(
                 parts.append(render_briefing_docs(
                     kroot, ctx.settings.knowledge_general_docs,
                     header="General knowledge (cross-repo; open deeper "
-                           "docs with doc_read / doc_search):"))
+                           "docs with doc_read / doc_search):",
+                    warnings=briefing_warnings))
             if adapter is not None:
-                parts.append(adapter.briefing(kroot))
+                parts.append(adapter.briefing(kroot, warnings=briefing_warnings))
             briefing = "\n\n".join(p for p in parts if p)
-        except Exception:
+            for warning in briefing_warnings:
+                ctx.trace.record("knowledge_warning", step=step_name,
+                                 warning=warning)
+        except Exception as exc:
+            ctx.trace.record("capability_gap", capability="knowledge.briefing",
+                             step=step_name,
+                             effect=f"briefing unavailable: {type(exc).__name__}: {exc}")
             briefing = ""
 
     # step name is lens-free in the PROMPT (ensemble lenses share one cached

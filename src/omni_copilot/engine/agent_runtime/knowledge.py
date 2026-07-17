@@ -14,6 +14,7 @@ from typing import Any
 
 from ...memory.debug_memory import DebugMemory
 from ...memory.skills import SkillStore
+from ...knowledge_docs import KnowledgeDocs, KnowledgeDocsError
 from ...tools import ToolDef
 from ..step import StepContext
 
@@ -209,45 +210,38 @@ def _repo_docs_tool(ctx: StepContext, adapter) -> dict[str, ToolDef]:
     demand here (design §V2.3.4 channel 3: pulled, not injected) — so nothing in
     the knowledge base is lost, just not dumped wholesale. Read-only and contained
     under the knowledge dir (traversal is refused)."""
-    import subprocess
-
     kdir = Path(ctx.settings.knowledge_dir)  # shared base (general/ + repos/)
     if not kdir.exists():
         return {}
-    root = kdir.resolve()
-
-    def _contained(path: str) -> Path | None:
-        """Resolve `path` under the knowledge root, or None if it escapes."""
-        p = (kdir / path).resolve()
-        try:
-            p.relative_to(root)
-        except ValueError:
-            return None
-        return p
+    repo_subdir = None
+    if adapter is not None:
+        repo_subdir = (adapter.manifest.get("knowledge") or {}).get("repo_subdir")
+    docs = KnowledgeDocs(kdir, repo_subdir)
 
     def doc_search(query: str, **_: Any) -> str:
         """Tool: grep the knowledge base's markdown for `query`; return
         knowledge-relative `path:line:text` matches (capped), or a sentinel."""
-        out = subprocess.run(
-            ["grep", "-rniI", "--include=*.md", "-e", query, str(kdir)],
-            capture_output=True, text=True, encoding="utf-8",
-            errors="replace", timeout=30)
-        rel = [ln.replace(str(kdir) + "/", "", 1) for ln in out.stdout.splitlines()]
-        return "\n".join(rel)[:8000] or "(no matching docs)"
+        try:
+            hits = docs.search(query)
+        except KnowledgeDocsError as exc:
+            return f"refused: {exc}"
+        return "\n".join(
+            f"{h['path']}:{h['line']}:{h['text']}" for h in hits
+        ) or "(no matching docs)"
 
     def doc_read(path: str, offset: int = 0, **_: Any) -> str:
         """Tool: read a knowledge-base doc by its knowledge-relative path
         (windowed 24k chars; page with offset). Refuses paths escaping the base."""
-        p = _contained(path)
-        if p is None:
-            return f"refused: path escapes the knowledge base: {path!r}"
-        if not p.exists():
+        try:
+            page = docs.read(path, offset=offset)
+        except FileNotFoundError:
             return f"(no such doc: {path})"
-        data = p.read_text(encoding="utf-8", errors="replace")
-        window = data[offset:offset + 24_000]
-        if offset + 24_000 < len(data):
-            window += (f"\n...[truncated at {offset + 24_000} of {len(data)} — "
-                       f"call doc_read again with offset={offset + 24_000}]")
+        except KnowledgeDocsError as exc:
+            return f"refused: {exc}"
+        window = page["content"]
+        if page["next_offset"] is not None:
+            window += (f"\n...[truncated — call doc_read again with "
+                       f"offset={page['next_offset']}]")
         return window
 
     s = {"type": "string"}

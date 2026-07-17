@@ -53,6 +53,15 @@ def test_render_briefing_docs_concatenate_cap_and_missing(tmp_path):
     assert len(render_briefing_docs(big, ["big.md"])) <= _BRIEFING_CAP + 200
 
 
+def test_render_briefing_reports_missing_and_escape(tmp_path):
+    k = _knowledge(tmp_path)
+    warnings = []
+    assert render_briefing_docs(
+        k, ["missing.md", "../../outside.md"], warnings=warnings) == ""
+    assert any("missing" in warning for warning in warnings)
+    assert any("escapes" in warning for warning in warnings)
+
+
 # ── repo-specific briefing (reads the SHARED root, excludes general) ─────────
 def test_adapter_briefing_is_repo_specific_only(tmp_path):
     k = _knowledge(tmp_path)
@@ -62,6 +71,17 @@ def test_adapter_briefing_is_repo_specific_only(tmp_path):
     b = a.briefing(k)
     assert "HARD GATES" in b and "REPO NAV" in b and "acme/kb" in b
     assert "GENERAL NAV" not in b  # general is injected separately, not here
+
+
+def test_adapter_briefing_refuses_other_repo_doc(tmp_path):
+    k = _knowledge(tmp_path)
+    warnings = []
+    a = _adapter(tmp_path, {"knowledge": {
+        "repo_subdir": "repos/r",
+        "briefing_docs": ["repos/r/rules.md", "general/_index.md"]}})
+    b = a.briefing(k, warnings=warnings)
+    assert "HARD GATES" in b and "GENERAL NAV" not in b
+    assert any("outside repos/r" in warning for warning in warnings)
 
 
 def test_render_briefing_strips_page_frontmatter(tmp_path):
@@ -88,13 +108,34 @@ def test_adapter_briefing_empty_without_root_or_docs(tmp_path):
 def test_doc_tools_reach_general_and_repo_specific(tmp_path):
     k = _knowledge(tmp_path)
     (k / "general" / "g.md").write_text("SEMANTIC PARITY in general", encoding="utf-8")
-    tools = _repo_docs_tool(_ctx(k), None)  # adapter unused; base is settings.knowledge_dir
+    adapter = _adapter(tmp_path, {"knowledge": {"repo_subdir": "repos/r"}})
+    tools = _repo_docs_tool(_ctx(k), adapter)
     assert set(tools) == {"doc_search", "doc_read"}
     assert "SEMANTIC PARITY" in tools["doc_read"].handler(path="general/g.md")
     assert "HARD GATES" in tools["doc_read"].handler(path="repos/r/rules.md")
     assert "general/g.md" in tools["doc_search"].handler(query="SEMANTIC PARITY")
     assert "refused" in tools["doc_read"].handler(path="../../../../etc/passwd")
     assert "no such doc" in tools["doc_read"].handler(path="repos/r/nope.md")
+
+
+def test_doc_tools_are_cross_platform_literal_and_repo_scoped(tmp_path):
+    k = _knowledge(tmp_path)
+    (k / "repos" / "other").mkdir()
+    (k / "repos" / "other" / "secret.md").write_text(
+        "OTHER REPO SECRET", encoding="utf-8")
+    (k / "repos" / "r" / "literal.md").write_text(
+        "Literal bracket [abc and metadata", encoding="utf-8")
+    adapter = _adapter(tmp_path, {"knowledge": {"repo_subdir": "repos/r"}})
+    tools = _repo_docs_tool(_ctx(k), adapter)
+
+    # No external grep and no regex interpretation: this works on Windows too.
+    assert "literal.md" in tools["doc_search"].handler(query="[abc")
+    # The active adapter can read general + its own slice, never another repo.
+    assert "outside the selected" in tools["doc_read"].handler(
+        path="repos/other/secret.md")
+    assert "non-negative" in tools["doc_read"].handler(
+        path="repos/r/rules.md", offset=-1)
+    assert "regular file" in tools["doc_read"].handler(path="repos/r")
 
 
 def test_doc_tools_absent_when_no_knowledge_base(tmp_path):
