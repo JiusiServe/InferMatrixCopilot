@@ -7,11 +7,13 @@
 
 ## 分层
 
-- **原始证据层（不可改写）**：`incidents/`、`history/`、`results/` —— 只读、被引用、
-  永不删除或压缩；正文实质（发现、证据、数字、经过）不再编辑。这些文件**不加**
-  frontmatter，元数据在正文字段（编号/归属/状态/搜索词/影响范围）。
+- **既有历史层（关闭新增）**：现存 `incidents/`、`history/`、`results/` 只为兼容旧树
+  保留，不是 PR/review 学习的落盘目标。新的 raw diff、评论、thread、回放和 case 只在
+  整理临时目录存在，规则验收后必须删除。
 - **沉淀层**：`rules.md`、`guides/`、`architecture.md`、`overview.md`、`_index.md`
-  等 —— 携带 frontmatter，结论引用证据层。
+  等 —— 携带 frontmatter，结论通过 `sources:` 引用外部 PR/代码或既有历史页。
+- **PR/review 学习产物**：只允许写最近 owner 的 `rules.md` 与必要 `_index.md`；用
+  `sources:` 和段尾 PR 引用提供溯源，不保存原始证据副本。
 
 ## Frontmatter（沉淀层必填）
 
