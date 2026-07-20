@@ -1,1 +1,0 @@
-{"case_id":"pr-9001@2222222","findings":[{"id":"g1","severity":"major","root_cause":"The new indexed access has no empty-input guard.","impact_path":"empty request batch -> items[0] -> IndexError","evidence":"synthetic hidden review thread T1"}]}

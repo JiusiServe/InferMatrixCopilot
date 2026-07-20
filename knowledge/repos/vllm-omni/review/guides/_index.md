@@ -11,6 +11,5 @@ sources: []
 
 | 遇到什么 | 查看哪里 |
 |---|---|
-| 审查近期常见的兼容性、benchmark、可选依赖和 checkpoint 变更 | [recent maintainer patterns](recent-maintainer-patterns.md) |
 | 审查模型适配 PR 的完整性 | [model adaptation guardrails](model-adaptation-guardrails.md) |
 | 判断新模型验证是否证明语义正确 | [model validation](model-validation.md) |

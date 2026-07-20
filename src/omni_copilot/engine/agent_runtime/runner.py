@@ -101,8 +101,7 @@ async def run_agent_step(
                            "docs with doc_read / doc_search):",
                     warnings=briefing_warnings))
             if adapter is not None:
-                parts.append(adapter.briefing(
-                    kroot, warnings=briefing_warnings, mode=tier))
+                parts.append(adapter.briefing(kroot, warnings=briefing_warnings))
             briefing = "\n\n".join(p for p in parts if p)
             for warning in briefing_warnings:
                 ctx.trace.record("knowledge_warning", step=step_name,

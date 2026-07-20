@@ -66,7 +66,18 @@ capabilities, push policy) is human-authored and stays — the code depends on i
 Edit `knowledge/` in place like any other tracked content; every change goes
 through normal PR review plus the tree's own gates:
 
+1. Read `knowledge/CONTRIBUTING.md` and exactly one linked contribution topic.
+   The `zuiho-kai/claude-workflow-starter` contribution model is authoritative
+   for ownership, placement, page shape, indexes, and incident handling.
+2. Treat `knowledge/SCHEMA.md` only as this vendored copy's additive metadata
+   overlay. It must not be used to invent review-history dumps, result archives,
+   or a second knowledge layout.
+3. Put reusable knowledge in the nearest owner's rules first. Evaluation cases,
+   hidden labels, predictions, judgments, and generated reports stay outside the
+   product knowledge tree and outside always-on briefing documents.
+
     python knowledge/tools/check_knowledge_tree.py
+    python knowledge/tools/check_wiki_lint.py
 
 To cherry-pick a future upstream improvement, diff against
 https://github.com/zuiho-kai/claude-workflow-starter and import the specific
