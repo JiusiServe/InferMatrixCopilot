@@ -2,9 +2,10 @@
 
 本页只是手工维护知识树的短入口，不再承载全部细则。先按任务选一篇专题，不要每次落盘都读完整套规范。
 
-本目录以 `zuiho-kai/claude-workflow-starter` 的贡献流程为内容和目录规范来源。
-本仓库额外增加的 [SCHEMA.md](SCHEMA.md) 只补 frontmatter、标签和溯源元数据，
-不能据此新建第二套知识结构、PR 答案档案或评测结果目录。
+本目录以 `zuiho-kai/claude-workflow-starter` 的贡献流程为内容和目录规范来源；
+vendored 后的批量整理还必须遵守 [知识重组计划](../doc/PLAN-knowledge-reorg.md) 的
+owner-scoped inventory、union-first 和证据保留约束。[SCHEMA.md](SCHEMA.md) 只补
+frontmatter、标签和溯源元数据，不能据此发明第二套知识结构。
 
 向 `zuiho-kai/claude-workflow-starter` 这个公开上游提交 commit 时使用 DCO sign-off（`git commit -s`）。第三方接入后按自己的贡献政策保留、修改或删除这条要求。
 
@@ -40,9 +41,11 @@ python tools/check_knowledge_tree.py
 - 长期知识只写本仓库的 `general/`、`repos/` 和贡献规范，不推进系统、全局或个人 memory。
 - 仓库、模块、模型和机器规则不互相继承；当前任务只加载真正命中的 owner。
 - 新增、移动、重命名、拆分或删除 Markdown 时，必须在同一修改中更新索引和所有链接。
-- 可复用结论默认写进最近 owner 的 `rules.md`；只有满足错题规范时才新增
-  `incidents/`。禁止把 PR review 答案、labels、predictions、judgments 或生成报告
-  写成 `history/`、`results/` 或默认加载的知识页。
+- 按内容角色落盘：可执行不变量进入最近 owner 的 `rules.md`，操作方法进入 guide，
+  稳定边界进入 architecture，复杂证据按既有 raw-layer 角色保存。不得把不同模型、
+  组件、benchmark 和 review 内容压成一篇 catch-all 页面。
+- 评测 cases、hidden labels、predictions、judgments 和 run reports 属于 `eval/`，
+  不得混入产品知识树或 adapter 默认 briefing。
 
 ## 交付前五项
 

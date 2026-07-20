@@ -1,10 +1,10 @@
 ---
 title: "Model Executor 规则"
 created: 2026-07-10
-updated: 2026-07-16
+updated: 2026-07-20
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: [vllm_omni/worker/gpu_model_runner.py, tests/worker/test_omni_gpu_model_runner.py, vllm_omni/config/stage_config.py]
+sources: [vllm_omni/worker/gpu_model_runner.py, tests/worker/test_omni_gpu_model_runner.py, vllm_omni/config/stage_config.py, "PR #3642", "PR #4730"]
 ---
 
 # Model Executor 规则
@@ -35,3 +35,34 @@ sources: [vllm_omni/worker/gpu_model_runner.py, tests/worker/test_omni_gpu_model
 当 issue 已提供最终配置和失败堆栈、current source 可读时，先按 [架构职责锚点](architecture.md#当前源码职责锚点) 完成一轮窄调查，目标是在 owner 确定后两分钟内给出首次根因。超时仍未闭环时必须指出缺失证据，不能静默扩大到历史 commit、其他模型或环境猜测。
 
 Stage 拓扑错误的最小充分源码证据只有三段：一处最终配置日志加全局/per-stage 合并函数；一处启动前容量校验及其完整异常控制流；一处与日志一致的 worker 失败点。三段一致即可决定“配置触发 + fail-fast 缺陷”的主要修复位置，不再为首次结论读取 config factory、模型 pipeline、完整 deploy、spawn 实现或 tag diff；只有三段之间发生冲突时才补这些文件。
+
+## 跨 stage bridge 与 batch 合同
+
+### EXEC-1a — 从 producer 字段追到下一 stage consumer 和最终输出包装
+
+- 触发：新模型、多阶段 pipeline、stage wrapper、runtime info 或 multimodal payload。
+- 强制：逐段记录 runner 写入字段、传输后的字段名/shape、下一 stage 读取位置，以及最终
+  `OmniOutput`/multimodal payload 的包装。loader 或模型 class 单独可调用不能代替真实
+  stage handoff。
+- 禁止：让 tuple waveform/hidden state 依赖 runner 的隐式猜测；bridge key 不一致时用
+  fallback 掩盖。
+- 验收：测试从真实 stage wrapper 输入开始，断言下一 stage 收到逐请求字段并得到公开
+  输出类型。MiniCPM-o 的具体合同见
+  [MiniCPM-o 4.5 规则](../../models/minicpm-o-4-5/rules.md)。 ^[PR #3642]
+
+### EXEC-1b — stage 声明 batch 能力就必须逐请求消费 runtime info
+
+- 触发：`max_num_seqs > 1`、batch handoff 或 wrapper 接收 `runtime_info` 列表。
+- 强制：输出按请求索引与输入一一对应；无法安全逐请求处理时把并发上限显式收紧为 1。
+- 禁止：只消费 `runtime_info[0]`，或把单元素 waveform/metadata 广播给整个 batch。
+- 验收：至少两个不同输入的同批测试，分别断言 bridge、输出和错误归属；不能重复相同
+  prompt 让串线不可见。 ^[PR #3642]
+
+### EXEC-2a — loader 的 dtype 与 config 获取必须显式、最小化
+
+- 触发：模型 loader 构造 text encoder、VAE、transformer 或只读取 checkpoint config。
+- 强制：所有子模块显式接收目标 dtype；读取单个 config 使用精确文件/metadata 获取路径。
+- 禁止：为读取 `config.json` 同步下载整套权重；依赖默认 fp32 后再靠下游 cast 修补。
+- 验收：mock 下载层证明只请求目标 config，loader 测试断言各子模块 dtype；真实 smoke
+  记录峰值显存和 dtype。Krea 2 的具体约束见
+  [Krea 2 规则](../../models/krea2/rules.md)。 ^[PR #4730]

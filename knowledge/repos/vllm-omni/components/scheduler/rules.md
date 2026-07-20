@@ -1,10 +1,10 @@
 ---
 title: "Scheduler 规则"
 created: 2026-07-16
-updated: 2026-07-16
+updated: 2026-07-20
 type: rule
 tags: [vllm-omni, components, scheduler]
-sources: ["vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py]
+sources: ["vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, "PR #4106"]
 ---
 
 # Scheduler 规则
@@ -111,6 +111,25 @@ modules=[online_serving, worker_runner]，status=active，run_count=38，2026-06
   需要移到 `_update_from_kv_xfer_finished` 之后的案例（omni_ar_scheduler.py 与
   omni_generation_scheduler.py 都要改）。
 - 禁止：只跑单测绿灯就认定调度语义未变（单测常用 `object.__new__` 绕过真实构造）。
+
+## SCHED-4a — side-stream 复制必须拥有源 buffer 的完成期
+
+- 触发：prefix-cache 异步写、side-stream D2H、persistent GPU buffer 或下一 step 会重写
+  的 `slot_mapping`/hidden/mm tensor。
+- 强制：源 tensor 在 copy event 完成前保持有效且不可被重写；使用显式 stream ordering、
+  retain/`record_stream` 或消费屏障。drain/early-return 也必须完成或转移生命周期责任。
+- 禁止：仅同步目标 CPU tensor，却允许下一 step 复用源 GPU buffer；这会得到合法 shape
+  但错误行内容。
+- 验收：连续两 step 写入不同 sentinel，在人为延迟 side stream 下证明第一轮 CPU 结果
+  不被第二轮覆盖。 ^[PR #4106]
+
+## SCHED-4b — pinned CPU 分配必须先判断 CUDA 能力
+
+- 触发：CPU-only 测试、CUDA 不可用环境或异步 copy 可降级路径。
+- 强制：根据 CUDA availability 选择 pinned/non-pinned allocation，再决定是否启用异步。
+- 禁止：先无条件构造 pinned tensor，失败后才关闭 async path。
+- 验收：CPU-only 环境能构造并走同步 fallback；CUDA 环境仍使用 pinned + async，两个
+  分支产生相同内容。 ^[PR #4106]
 
 ## 相关
 

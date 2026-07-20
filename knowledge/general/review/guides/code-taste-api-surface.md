@@ -1,10 +1,10 @@
 ---
 title: "Code Taste · API Surface"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-20
 type: guide
 tags: [general, review]
-sources: []
+sources: ["PR #4980", "PR #5037", "PR #5084"]
 ---
 
 # Code Taste · API Surface
@@ -79,6 +79,43 @@ Common consumers:
 | `image` | HunyuanImage3 / GLM / many image understanding or DiT bridge paths | Use only in the owner path |
 | `img2img` | Bagel / Flux Kontext and img2img parsers | Preserve in shared chat path unless every consumer has compatibility |
 | `images` | Diffusion pipeline batch / multi-image inputs | Convert only by explicit pipeline consumer contract |
+
+## Moving a public symbol is an API migration
+
+When a refactor moves a class or helper between modules, search repository docs,
+examples, tests, and import sites before deleting the old path. A compatibility
+shim must re-export the canonical definition; emitting a warning without the
+symbol still breaks imports. Never leave separate old/new class definitions:
+different class identities break `isinstance`, registries, serialization, and
+dispatch even when their source text is identical. ^[PR #4980]
+
+Preserve behavior as well as the import path. For an accumulator, formatter, or
+output container, inventory metadata relocation, empty-input behavior, mutation
+semantics, and return-value ownership. An API that sometimes mutates `self` and
+sometimes returns `incoming` is not safely "in-place"; give it an explicit
+merge-style name and require callers to store the return value. ^[PR #4980]
+
+Minimum migration evidence:
+
+1. old and new imports resolve to the same object identity;
+2. existing metadata and empty/non-empty cases retain their behavior;
+3. every caller follows the same return-value contract;
+4. the deprecated path has a focused regression test.
+
+## Claims, registries, schemas, and generated files move together
+
+A documented alias is public API only if the live registry/parser accepts it.
+A hardware support row must match the runtime platform gate and minimum
+capability; `unsupported` must not be softened into `untested`. Schema names in
+docs and fixtures must match the parser exactly (`mark` and `marks` are different
+contracts). ^[PR #5037] ^[PR #5084]
+
+When many JSON/YAML cases repeat the same hardware or marker metadata, keep the
+canonical value in one generator, fixture, or patch function and regenerate the
+cases. Review both the source-of-truth code and rendered examples so a docs-only
+rename cannot drift from execution. Related repository-specific routing lives in
+[vLLM-Omni Config rules](../../../repos/vllm-omni/components/config/rules.md) and
+[CI guidance](../../../repos/vllm-omni/ci/guides/ci-environment-gotchas.md).
 
 ## PR #3626 example
 

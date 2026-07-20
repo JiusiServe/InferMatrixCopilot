@@ -37,9 +37,8 @@ python tools/check_wiki_lint.py
 `tools/check_wiki_lint.py` 额外负责：
 
 - 沉淀层 frontmatter、类型和标签符合 `SCHEMA.md`；
-- 原始证据层没有 frontmatter；
-- 不允许新增 `review/history` 答案档案；
-- adapter briefing 只使用允许的字段，且不能加载 `incidents/history/results`。
+- adapter briefing 只使用允许的字段，且不能把 `incidents/history/results` 原始证据层
+  变成默认加载内容。
 
 ## 检查脚本不会替人决定什么
 
