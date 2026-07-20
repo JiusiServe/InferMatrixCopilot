@@ -2,6 +2,10 @@
 
 本页只是手工维护知识树的短入口，不再承载全部细则。先按任务选一篇专题，不要每次落盘都读完整套规范。
 
+本目录以 `zuiho-kai/claude-workflow-starter` 的贡献流程为内容和目录规范来源。
+本仓库额外增加的 [SCHEMA.md](SCHEMA.md) 只补 frontmatter、标签和溯源元数据，
+不能据此新建第二套知识结构、PR 答案档案或评测结果目录。
+
 向 `zuiho-kai/claude-workflow-starter` 这个公开上游提交 commit 时使用 DCO sign-off（`git commit -s`）。第三方接入后按自己的贡献政策保留、修改或删除这条要求。
 
 ## 正在做什么
@@ -36,6 +40,9 @@ python tools/check_knowledge_tree.py
 - 长期知识只写本仓库的 `general/`、`repos/` 和贡献规范，不推进系统、全局或个人 memory。
 - 仓库、模块、模型和机器规则不互相继承；当前任务只加载真正命中的 owner。
 - 新增、移动、重命名、拆分或删除 Markdown 时，必须在同一修改中更新索引和所有链接。
+- 可复用结论默认写进最近 owner 的 `rules.md`；只有满足错题规范时才新增
+  `incidents/`。禁止把 PR review 答案、labels、predictions、judgments 或生成报告
+  写成 `history/`、`results/` 或默认加载的知识页。
 
 ## 交付前五项
 
@@ -43,4 +50,5 @@ python tools/check_knowledge_tree.py
 - [ ] 最近 `_index.md` 能找到新页面，旧路径没有残留有效链接。
 - [ ] 可执行结论已进 `rules.md`，错题没有变成默认必读入口。
 - [ ] 没有公开机器信息、凭据、私人路径或本地临时产物。
-- [ ] `python tools/check_knowledge_tree.py` 通过，并已检查当前完整 diff。
+- [ ] `python tools/check_knowledge_tree.py` 和 `python tools/check_wiki_lint.py`
+  都通过，并已检查当前完整 diff。

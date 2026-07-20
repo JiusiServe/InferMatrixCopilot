@@ -1,8 +1,9 @@
 # SCHEMA — 页面元数据与生命周期
 
 规定 `general/` 与 `repos/` 下**沉淀层**页面的 YAML frontmatter、标签分类法和归档
-规则（LLMWiki 机制）。目录归属与页面写法仍以 [贡献规范](contributing/_index.md)
-为准；本文件只补充元数据机制，不重复目录规范。`repos/jianghan-roleplay-data-pipeline/`
+规则（LLMWiki 机制）。目录归属与页面写法仍以 [贡献规范](CONTRIBUTING.md)
+及其链接的单篇专题为准；本文件只补充元数据机制，不能授权新的目录角色或页面
+类型。`repos/jianghan-roleplay-data-pipeline/`
 整棵子树暂不适用（保持原样）。
 
 ## 分层
@@ -12,6 +13,12 @@
   frontmatter，元数据在正文字段（编号/归属/状态/搜索词/影响范围）。
 - **沉淀层**：`rules.md`、`guides/`、`architecture.md`、`overview.md`、`_index.md`
   等 —— 携带 frontmatter，结论引用证据层。
+
+`history/`、`results/` 只描述 vendored tree 中已经存在的历史原始层，不是新知识的
+写入入口。新增经验先更新最近 owner 的 `rules.md`；确需保留复杂证据时，只能按
+[复盘与错题](contributing/incidents.md) 新增 `incidents/` 页面。PR review 答案、
+评测 labels/predictions/judgments 和生成报告不属于产品知识库，也不能进入 adapter
+briefing。
 
 ## Frontmatter（沉淀层必填）
 

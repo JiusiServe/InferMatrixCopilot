@@ -16,6 +16,7 @@
 
 ```powershell
 python tools/check_knowledge_tree.py
+python tools/check_wiki_lint.py
 ```
 
 如果修改准备提交，还要查当前完整 diff 和未跟踪文件，不只看 `HEAD`。以真实 target base 为准，不硬编码 remote 或默认分支。
@@ -32,6 +33,13 @@ python tools/check_knowledge_tree.py
 - 错题文件名、字段、状态、编号和索引完整；
 - `local/` 没有被 Git 跟踪；
 - 正式页面没有明显凭据、私人地址、用户路径或已禁止的危险命令。
+
+`tools/check_wiki_lint.py` 额外负责：
+
+- 沉淀层 frontmatter、类型和标签符合 `SCHEMA.md`；
+- 原始证据层没有 frontmatter；
+- 不允许新增 `review/history` 答案档案；
+- adapter briefing 只使用允许的字段，且不能加载 `incidents/history/results`。
 
 ## 检查脚本不会替人决定什么
 

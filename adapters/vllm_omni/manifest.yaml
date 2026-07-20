@@ -28,10 +28,6 @@ knowledge:
   briefing_docs:                  # always-on repo-specific slice: rules + nav
   - repos/vllm-omni/rules.md
   - repos/vllm-omni/_index.md
-  # Strong models get compact, evidence-derived review patterns directly.
-  # Eco keeps the smaller workflow-led briefing and can pull these on demand.
-  performance_briefing_docs:
-  - repos/vllm-omni/review/guides/recent-maintainer-patterns.md
 
 modules:
   worker_runner:

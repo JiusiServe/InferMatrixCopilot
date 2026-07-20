@@ -22,5 +22,3 @@ sources: []
 | 遇到什么 | 查看哪里 |
 |---|---|
 | 审查新模型或 pipeline 接入 | [review guides](guides/_index.md) |
-| 复用近期 maintainer 已确认的审核模式 | [recent maintainer patterns](guides/recent-maintainer-patterns.md) |
-| 核对模式的 PR、review SHA 与最终修法 | [review history](history/_index.md) |
