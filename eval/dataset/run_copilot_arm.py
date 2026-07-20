@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import uuid
 import sys
 import threading
 import time
@@ -67,18 +68,40 @@ def _find_run_dir(private_root: Path, kind: str, n: int) -> Path | None:
 
 
 def _trace_tokens(run_dir: Path) -> dict:
-    tin = tout = calls = 0
-    try:
-        for line in (run_dir / "run_trace.jsonl").read_text().splitlines():
-            ev = json.loads(line)
-            u = ev.get("usage") or ev.get("llm_usage") or {}
-            if u:
-                calls += 1
-                tin += u.get("input_tokens", 0)
-                tout += u.get("output_tokens", 0)
-    except Exception:
-        pass
-    return {"llm_calls": calls, "input_tokens": tin, "output_tokens": tout}
+    """Canonical span-based cost for one run dir (W7 — replaces the old
+    event-key readout whose keys never existed, so it always reported 0)."""
+    import sys
+
+    sys.path.insert(0, str(CWD / "src"))
+    from omni_copilot.metrics import cost_from_spans
+
+    span = cost_from_spans(run_dir / "trace.jsonl")
+    if span is None:
+        return {"llm_calls": 0, "input_tokens": 0, "output_tokens": 0,
+                "usd": 0.0, "source": "no-trace"}
+    return {"llm_calls": span["llm_calls"], "input_tokens": span["input_tokens"],
+            "output_tokens": span["output_tokens"], "usd": span["usd"],
+            "source": "spans"}
+
+
+def _attempt_records(private_root: Path, inv_ids: list[str]) -> list[dict]:
+    """EVERY attempted cost artifact for this item (design W7): each attempt's
+    invocation record (pre-run spend — clarify/blocked attempts included) plus
+    the span cost of every run dir it produced. Pareto/cost gates must sum
+    these, not just the newest run."""
+    out: list[dict] = []
+    inv_dir = Path.home() / ".omni-copilot" / "invocations"
+    for iid in inv_ids:
+        rec_path = inv_dir / f"{iid}.json"
+        rec = {}
+        try:
+            rec = json.loads(rec_path.read_text())
+        except Exception:
+            rec = {"invocation_id": iid, "outcome": "missing-record"}
+        out.append(rec)
+    for d in sorted(private_root.glob("run-*")):
+        out.append({"run_dir": d.name, **_trace_tokens(d)})
+    return out
 
 
 def one(kind: str, n: int, split: str) -> str:
@@ -94,10 +117,19 @@ def one(kind: str, n: int, split: str) -> str:
 
     private_root = OUT / "runs" / stem
     private_root.mkdir(parents=True, exist_ok=True)
-    env = dict(os.environ, RUN_ROOT=str(private_root))
+    # eval-leakage policy (design W1): the frozen PR ground truth IS the human
+    # review discussion — arm runs must never see it
+    env = dict(os.environ, RUN_ROOT=str(private_root),
+               PR_CONTEXT_MODE="no_discussion")
     t0 = time.time()
     blocked_retries = 0
+    inv_ids: list[str] = []
     for attempt in range(4):
+        # unique invocation id per attempt: correlates each paid attempt
+        # (incl. clarify retries that create NO run dir) under concurrency
+        inv_id = f"inv-{uuid.uuid4().hex[:8]}"
+        inv_ids.append(inv_id)
+        env["OMNI_INVOCATION_ID"] = inv_id
         with _START_LOCK:
             gap = time.time() - _last_start[0]
             if gap < 0.5:
@@ -127,9 +159,14 @@ def one(kind: str, n: int, split: str) -> str:
         # fall back to CLI stdout so failures stay diagnosable
         report = (f"(no RUN_REPORT.md — rc={proc.returncode})\n\n"
                   f"## stdout\n{proc.stdout[-8000:]}\n\n## stderr\n{proc.stderr[-4000:]}")
+    attempts = _attempt_records(private_root, inv_ids)
     cost = {"wall_s": wall, "split": split, "rc": proc.returncode,
             "run_dir": str(run_dir) if run_dir else None,
-            "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
+            "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "attempts": attempts,
+            "attempt_usd_total": round(sum(
+                (a.get("usd") or (a.get("pre_run") or {}).get("usd") or 0.0)
+                for a in attempts), 6)}
     if run_dir:
         cost.update(_trace_tokens(run_dir))
         mfile = run_dir / "metrics.json"

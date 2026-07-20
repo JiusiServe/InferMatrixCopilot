@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.95,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.55,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X's core analysis directly reproduces the sole ground-truth concern — that both submit_initial and submit_update reject list prompts identically, so gating the unwrap on already_submitted was unnecessary — verified with exact file:line evidence. Y touches the same already_submitted change but misreads it as a possible dead-code issue, contradicts itself (claims it's 'used elsewhere' then asks whether it's unused), and fabricates an unverifiable issue reference (#4839) along with unverified claims about orchestrator internals (.finished/.request_id), hurting precision. Both reviews are reasonably actionable with file:line pointers, but X's findings are more consistently grounded and correct.",
+  "_cost_usd": 0.1463366,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r2",
+    "arm_a_sha256": "780b9c8c59337c162ac05ff15019a073faeec40fa079149313a71ab9abfe8f63",
+    "judge_rep": 1
+  }
+}

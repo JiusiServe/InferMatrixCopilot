@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.65,
+    "actionability": 0.8,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently surface the real latent gap (hunyuan_image3_transformer.py still calling the removed get_cache_scale), which neither ground-truth reviewer caught. X frames it as an unresolved 'major/FOLLOW-UP REQUIRED' blocker with a concrete fix, which is more urgently actionable but conflicts with the PR's actual approved/merged outcome and inflates severity elsewhere (tagging a 'keep this test' suggestion as 'major'). Y verifies against actual upstream vLLM source (AutoWeightsLoader, weight_utils, fp8.py line citations), correctly lands on APPROVE matching the real outcome, better calibrates severity (blocker table all PASS, findings as non-blocking/minor), and its test-completeness critique is more technically precise than X's. Neither candidate explicitly recovers the ground truth's specific 'verify on a real FP8 checkpoint' / '#4808 coordination' points, capping recall for both around 0.4-0.45.",
+  "_cost_usd": 0.2941998,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r1",
+    "arm_a_sha256": "61424d72f2966712b33af0158f92b2981aba329686c1cd3b858236132e6ec167",
+    "judge_rep": 2
+  }
+}

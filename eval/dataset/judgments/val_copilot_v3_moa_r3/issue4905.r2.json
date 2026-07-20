@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.55,
+    "grounding": 0.6,
+    "completeness": 0.75
+  },
+  "y": {
+    "correctness": 0.5,
+    "grounding": 0.5,
+    "completeness": 0.55
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates converge on the same plausible diagnosis (PR #4834 added an intentional wake-after-level-2-sleep guard; the pre-existing test wasn't updated) but both overclaim a confident 'already fixed, close it' resolution that the actual thread doesn't support — the ground-truth comments show ongoing triage, with Flink-ddd explicitly asking to trigger a full CI run to verify, not a confirmed fix. X is cleaner, better organized, and adds genuinely useful practical guidance for users hitting this at runtime, though its very specific line ranges/PR merge date read as risky invented precision. Y has the same core content but its output leaks raw pipeline/task-state scaffolding ('Run report', task dict, duplicated draft_answer plus a second write-up) that is unprofessional and not maintainer-style, hurting completeness.",
+  "_cost_usd": 0.1566173,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r3",
+    "arm_a_sha256": "ac63c4af8b928674f174fc8385f593d2d3976c87c60277a74c6a2ee9f1f73612",
+    "judge_rep": 2
+  }
+}

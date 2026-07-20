@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.55,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.7,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y's verification that both submit_initial and submit_update reject list prompts (making already_submitted an irrelevant distinction) closely mirrors yJader's actual inline comment, the one substantive ground-truth concern; X never articulates that specific reasoning. X pads its review with unverifiable external claims (issue #4839, a named contributor's quote) not evidenced in the given diff, and its 'major'/'FOLLOW-UP REQUIRED' verdict overstates severity for a PR two human reviewers approved with plain LGTMs, hurting precision. Both candidates give concrete file/line suggestions and propose a regression test, so actionability is comparably high.",
+  "_cost_usd": 0.15239930000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r1",
+    "arm_a_sha256": "606cfaabedab4f51f21725be9aee0eb40c33a2193e68c4edf9feda46ca508af2",
+    "judge_rep": 2
+  }
+}

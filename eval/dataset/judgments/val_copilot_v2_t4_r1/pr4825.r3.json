@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Neither candidate surfaces the ground truth's core concern (dsocek's point about deriving the PEFT-to-vllm-omni naming mapper from `_packed_modules_mapping` to cover fused-projection renames like to_q/k/v→to_qkv), which likely referenced code removed before merge per tthakkal's reply. Both instead independently raise a related but distinct 'single source of truth' critique (deriving default_components from _dit_modules), which is grounded and actionable in the diff. Y is slightly stronger: it backs claims with explicit repo-wide grep evidence, adds a genuinely new finding (registry.py's transformer_attrs list has diverged from manager.py's, missing 'bagel'/'sr_dit'), and does a broader consumer sweep, while X's text-encoder-gap note is more speculative and less verified.",
+  "_cost_usd": 0.1314222,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r1",
+    "arm_a_sha256": "374be7cefd01ee4ea6bb5a0160c306986947739b551638e374dd8c686db58111",
+    "judge_rep": 3
+  }
+}

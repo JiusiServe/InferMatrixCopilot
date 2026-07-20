@@ -1,0 +1,115 @@
+{
+  "wall_s": 656.2,
+  "split": "val",
+  "rc": 0,
+  "run_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r3/runs/pr4893/run-20260718-153903-6dbc9a",
+  "recorded_at": "2026-07-18T15:49:57",
+  "attempts": [
+    {
+      "invocation_id": "inv-f6e84e31",
+      "outcome": "run:run-20260718-153903-6dbc9a",
+      "rc": 0,
+      "pre_run": null
+    },
+    {
+      "run_dir": "run-20260718-153903-6dbc9a",
+      "llm_calls": 31,
+      "input_tokens": 455516,
+      "output_tokens": 57464,
+      "usd": 0.259905,
+      "source": "spans"
+    }
+  ],
+  "attempt_usd_total": 0.259905,
+  "llm_calls": 31,
+  "input_tokens": 455516,
+  "output_tokens": 57464,
+  "usd": 0.259905,
+  "source": "spans",
+  "metrics": {
+    "schema": 1,
+    "run": "run-20260718-153903-6dbc9a",
+    "task_kind": "pr_review",
+    "status": "done",
+    "quality": {
+      "q": null,
+      "weight_coverage": 0.0,
+      "partial": true,
+      "abstained": false,
+      "components": {
+        "recall_w": null,
+        "precision_v": null,
+        "useful": null,
+        "calib": null,
+        "decision": null
+      }
+    },
+    "cost": {
+      "usd": 0.2599,
+      "minutes": 10.91,
+      "ci_minutes": 0,
+      "input_tokens": 455516,
+      "output_tokens": 57464,
+      "tool_calls": 56,
+      "usd_ref": 1.0,
+      "min_ref": 10.0,
+      "cost_index": 1.4528,
+      "source": "spans",
+      "llm_calls": 31,
+      "by_role": {
+        "planner": {
+          "usd": 0.000524,
+          "input_tokens": 106,
+          "output_tokens": 400,
+          "calls": 1
+        },
+        "moa_member": {
+          "usd": 0.178767,
+          "input_tokens": 363916,
+          "output_tokens": 17537,
+          "calls": 18
+        },
+        "agent": {
+          "usd": 0.073883,
+          "input_tokens": 84579,
+          "output_tokens": 35121,
+          "calls": 11
+        },
+        "reducer": {
+          "usd": 0.006731,
+          "input_tokens": 6915,
+          "output_tokens": 4406,
+          "calls": 1
+        }
+      },
+      "cache_read_tokens": 812672,
+      "cache_creation_tokens": 0
+    },
+    "timings": {
+      "steps": {
+        "fetch": 3.47,
+        "gate": 0.49,
+        "review": 650.39,
+        "report": 0.03
+      },
+      "time_to_first_result_s": 654.38
+    },
+    "risk": {
+      "incidents": {
+        "catastrophic": 0,
+        "severe": 0,
+        "moderate": 0,
+        "minor": 0
+      },
+      "safety_multiplier": 1.0
+    },
+    "catq": null,
+    "tus": null,
+    "signals": {
+      "escalations": 0,
+      "pushes": 0,
+      "posted": 0,
+      "steps_completed": 4
+    }
+  }
+}

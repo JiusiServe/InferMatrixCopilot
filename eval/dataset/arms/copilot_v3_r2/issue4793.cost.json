@@ -1,0 +1,95 @@
+{
+  "wall_s": 96.1,
+  "split": "val",
+  "rc": 0,
+  "run_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r2/runs/issue4793/run-20260718-134703-9d664b",
+  "recorded_at": "2026-07-18T13:48:37",
+  "attempts": [
+    {
+      "invocation_id": "inv-a4d16290",
+      "outcome": "run:run-20260718-134703-9d664b",
+      "rc": 0,
+      "pre_run": null
+    },
+    {
+      "run_dir": "run-20260718-134703-9d664b",
+      "llm_calls": 13,
+      "input_tokens": 94024,
+      "output_tokens": 6396,
+      "usd": 0.053248,
+      "source": "spans"
+    }
+  ],
+  "attempt_usd_total": 0.053248,
+  "llm_calls": 13,
+  "input_tokens": 94024,
+  "output_tokens": 6396,
+  "usd": 0.053248,
+  "source": "spans",
+  "metrics": {
+    "schema": 1,
+    "run": "run-20260718-134703-9d664b",
+    "task_kind": "issue_answer",
+    "status": "done",
+    "quality": {
+      "q": null,
+      "weight_coverage": 0.0,
+      "partial": true,
+      "abstained": false,
+      "components": {
+        "correct": null,
+        "grounded": null,
+        "complete": null,
+        "helpful": null
+      }
+    },
+    "cost": {
+      "usd": 0.0532,
+      "minutes": 1.57,
+      "ci_minutes": 0,
+      "input_tokens": 94024,
+      "output_tokens": 6396,
+      "tool_calls": 20,
+      "usd_ref": 0.3,
+      "min_ref": 5.0,
+      "cost_index": 1.1982,
+      "source": "spans",
+      "llm_calls": 13,
+      "by_role": {
+        "agent": {
+          "usd": 0.053248,
+          "input_tokens": 94024,
+          "output_tokens": 6396,
+          "calls": 13
+        }
+      },
+      "cache_read_tokens": 771328,
+      "cache_creation_tokens": 0
+    },
+    "timings": {
+      "steps": {
+        "fetch": 0.98,
+        "draft": 93.37,
+        "report": 0.03
+      },
+      "time_to_first_result_s": 94.38
+    },
+    "risk": {
+      "incidents": {
+        "catastrophic": 0,
+        "severe": 0,
+        "moderate": 0,
+        "minor": 0
+      },
+      "safety_multiplier": 1.0
+    },
+    "catq": null,
+    "tus": null,
+    "signals": {
+      "escalations": 0,
+      "pushes": 0,
+      "posted": 0,
+      "steps_completed": 3
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.5,
+    "grounding": 0.55,
+    "completeness": 0.5
+  },
+  "y": {
+    "correctness": 0.5,
+    "grounding": 0.65,
+    "completeness": 0.6
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates converge on the same diagnosis (PR #4834's level-2 wake guard is intentional, test used the wrong sleep level) and both overreach by confidently declaring the issue already fixed on main and recommending closure — the actual thread shows no confirmed resolution, only an attribution to #4834 and a request to trigger a full CI run, so neither answer's closure verdict is thread-verified. Y is somewhat stronger on grounding and completeness: it cites more specific code locations (sleep() setting the flag, the generate() admission guard, three distinct regression tests) and adds practical level-1-vs-level-2 usage guidance, giving a more end-to-end picture, while X is comparatively terser and less detailed. Neither is clearly correct about the resolution status, so correctness is capped similarly for both.",
+  "_cost_usd": 0.10731979999999999,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r1",
+    "arm_a_sha256": "e8b80565b5bac4ede9a8ff71aa0b1be98a93b9a8bc0c49b564485a32badf8b9d",
+    "judge_rep": 3
+  }
+}

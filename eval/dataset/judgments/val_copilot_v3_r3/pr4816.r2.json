@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.93,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (just LGTM), so both candidates correctly approve and 'recall' is vacuously satisfied. Both did diff-grounded grep verification, but Y's specific line-number citations (api_server.py:754,1017,1157,1248,1286,1329; test_serving_speech.py:2533,2546,2615) check out exactly against the diff hunks, while X's citation of test line numbers (2638,2651,2720) is off by roughly 100 lines and appears fabricated. Y is therefore more precisely grounded despite similar structure and depth.",
+  "_cost_usd": 0.1838852,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r3",
+    "arm_a_sha256": "bce9fa077c0d5895dbaf32573acaf97d7fadd504b4e5ed6ec8b282b76d0fee69",
+    "judge_rep": 2
+  }
+}

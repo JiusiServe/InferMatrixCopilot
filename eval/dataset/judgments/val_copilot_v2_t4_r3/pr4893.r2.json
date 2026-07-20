@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.75,
+    "actionability": 0.45,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The one substantive ground-truth concern (whether the test verifies the new reduce_scatter parameter) is touched by X, which explicitly inspects the FakeGroup's reduce_scatter conditional and the corresponding hasattr assertions, while Y never mentions reduce_scatter, the FakeGroup mock, or the test file changes at all. X also produces five concrete, line-anchored, evidence-backed suggestions (dtype mismatch vs upstream int32, missing cfg=1 test case, docstring/comment updates) that are all grounded in the diff, whereas Y's single non-blocking comment is vaguer and its 'APPROVE' justification includes a shakier claim (device_communicator defaulting to True upstream) that sits oddly with the PR's whole premise. X is clearly more actionable and grounded even though both avoid fabrication overall.",
+  "_cost_usd": 0.3079557,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r3",
+    "arm_a_sha256": "fa353a4d7ed5aae9620d604f0945fc199f9d98c15d967a8484c6ac37949df7e2",
+    "judge_rep": 2
+  }
+}

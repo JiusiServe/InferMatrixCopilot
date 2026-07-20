@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (just an approval), so both correctly reach APPROVE with no missed issues. Y is more rigorously grounded: its file:line citations for all 9 renamed occurrences match the diff hunk headers exactly, and it goes further by checking an adjacent untouched test to confirm it's unaffected and sweeping comments/docstrings for staleness. X's analysis is also solid and correctly traces the upstream call chain, but includes some specific claims (PR repro details, an exact upstream line number, later test line numbers that don't match the diff's hunk offsets) that are less precisely verifiable from the given evidence.",
+  "_cost_usd": 0.1969655,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r3",
+    "arm_a_sha256": "bce9fa077c0d5895dbaf32573acaf97d7fadd504b4e5ed6ec8b282b76d0fee69",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth is a trivial 'lgtm' approval with no substantive concerns, so both candidates correctly identify this as a clean, upstream-aligned rename with no missed occurrences — both verified against the actual vllm checkout, so recall and grounding are strong for each. X's APPROVE verdict matches the real outcome and its findings (table scan, missed-occurrence grep, constructor-untouched check, mock-limitation note) are all accurate and grounded with no fabrication. Y's sweep is equally accurate but its verdict of COMMENT plus a speculative suggestion to add a comment/test at the getattr sites is a lower-value, non-essential ask that diverges from what actually happened (plain approval), slightly hurting precision despite being more 'actionable' in form.",
+  "_cost_usd": 0.061710499999999995,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r3",
+    "arm_a_sha256": "a3532ed191743c43789f30918b8ef98af99785ec3a5e24a1c412d1995c5467b7",
+    "judge_rep": 2
+  }
+}

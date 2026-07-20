@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.75,
+    "grounding": 0.6,
+    "completeness": 0.6
+  },
+  "y": {
+    "correctness": 0.9,
+    "grounding": 0.75,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both land on the correct disposition (duplicate of #4808) and diagnose the same root cause, but Y's narrative about #4809 tracking 5 call sites with #4810 fixing 4 and #4808 covering the 5th is a much closer match to what the ground-truth comment actually points to ('refer to #4809 comment for additional details'), whereas X only lists #4809 as a bare related link. X also asserts unverified facts confidently ('current main state... both fixes are present') without caveat, while Y explicitly flags that #4808's merge status is unconfirmed and that the regression test has a coverage gap for this exact file — a more diligent, maintainer-appropriate follow-up that addresses whether the reporter's problem is actually resolved end-to-end. Y is more complete and better grounded in what the thread resolution implies, at the cost of some unverifiable specificity shared by both.",
+  "_cost_usd": 0.105653,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r1",
+    "arm_a_sha256": "7209d4f95838fbc6a50c46d2839c5d2ec2b7e312cddeae50d4ee6eba928d4dda",
+    "judge_rep": 2
+  }
+}

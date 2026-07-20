@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.7,
+    "actionability": 0.7,
+    "gap_hit": true
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates independently surface the latent gap (the untouched hunyuan_image3_transformer.py diffusion loader still calling the removed get_cache_scale API), but X classifies it correctly as a major/blocking correctness bug with a concrete fix (add to _STALE_API_FILES, use the mapper), while Y buries the same finding as a 'non-blocking' comment under an 'APPROVE, no blockers' verdict — inconsistent given the gap later became a real issue (#4891) — and adds an unverifiable claim that it was 'already addressed on main.' X also more directly echoes ground-truth reviewer points (explicitly recommends keeping the regression test permanently, flags that fakes don't exercise a real quant config/checkpoint), whereas Y's test critique focuses only on the delegated-loader path and misses the direct-loader real-checkpoint concern the human reviewer raised. Both are well-grounded in the diff/test code, but X's severity calibration and closer coverage of ground-truth concerns make it the stronger review.",
+  "_cost_usd": 0.2527631,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r1",
+    "arm_a_sha256": "de3fe028c142e9e280cd9d7ebe2bf8ac45e4fd50f02c7936ea52fbb7dd528202",
+    "judge_rep": 2
+  }
+}

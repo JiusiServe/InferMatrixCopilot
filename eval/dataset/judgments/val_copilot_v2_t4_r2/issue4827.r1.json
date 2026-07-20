@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.85,
+    "grounding": 0.8,
+    "completeness": 0.78
+  },
+  "y": {
+    "correctness": 0.88,
+    "grounding": 0.85,
+    "completeness": 0.9
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly diagnose the crash as `<img_ratio_33..36>` lookups returning None on the base tokenizer, correctly attribute it to the two-stage MoE config forcing AR init, and cite the same working DiT-config workaround from the thread. Y goes further by supplying concrete guarded-init code and an explicit fail-fast error message (matching the thread's two-part 'Fix Docs / Add a Guard' proposal more completely), and by correctly treating the original bug as resolved/closeable while the hardening work moves to a new issue — matching Gaohan123's actual disposition — whereas X marks the issue 'keep-open', a weaker match to the thread's resolution. Both are comparably grounded in the same file/line citations, but Y cites additional config-header evidence, giving it a slight edge in grounding and completeness.",
+  "_cost_usd": 0.1321279,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r2",
+    "arm_a_sha256": "7d4cf1ec35569f1ab44324fc7009991bfb39eeacd4b6d7cc8cf75f60c87b1cb9",
+    "judge_rep": 1
+  }
+}

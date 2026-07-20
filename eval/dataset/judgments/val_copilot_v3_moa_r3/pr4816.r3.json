@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.7,
+    "actionability": 0.65
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns (bot notice + plain 'lgtm'), so both APPROVE verdicts trivially match and recall is vacuously full for each. Precision favors Y: every line number Y cites (754, 1017, 1157, 1248, 1286, 1329 in api_server.py; 2533/2546/2615 in tests) matches the diff exactly when hand-verified against the provided hunks, and Y is explicit about checking the PR-time tree. X's specific line citations (1024, 2638/2651/2720) don't match the diff's line numbers at all — a consistent ~105-line offset suggests X grepped a later, evolved 'post-merge' checkout rather than the PR-time diff, making its claims harder to trust as grounded in this PR. Y's checklist-style validated/sweep items are also more concretely anchored (exact site-by-site line refs) than X's categorical PASS table, giving Y the actionability edge despite no changes being requested.",
+  "_cost_usd": 0.1543189,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r3",
+    "arm_a_sha256": "7721a59243e5d86fb6192d70996f5b43668feee6fab0df07e851598b4527a482",
+    "judge_rep": 3
+  }
+}

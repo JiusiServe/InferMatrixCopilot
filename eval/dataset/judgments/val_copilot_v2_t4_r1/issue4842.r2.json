@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.72,
+    "grounding": 0.6,
+    "completeness": 0.7
+  },
+  "y": {
+    "correctness": 0.85,
+    "grounding": 0.78,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly diagnose the issue as a run-level misconfiguration (default core_model loads dummy weights) rather than a real bug, and both give the same correct fix (--run-level=full_model) and disposition (closed as invalid), matching the thread. X claims the full_model pytest marker itself 'gates' execution behind the run-level, which is inconsistent with the observed log (the test actually ran and produced output rather than being skipped/errored), and X pads its citations with placeholder ellipsis comment URLs rather than real evidence. Y correctly notes the marker is only a categorization filter independent of the --run-level flag, which better explains why the test executed instead of being skipped, and backs its explanation with a more granular chain of file/line citations plus practical completeness (video path, GPU memory split, forward-looking fixture-guard suggestion).",
+  "_cost_usd": 0.1288509,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r1",
+    "arm_a_sha256": "0dc9eed2a43fef746756b349901fd7b9107680f101485661b1fb6536e80c9604",
+    "judge_rep": 2
+  }
+}

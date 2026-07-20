@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.85,
+    "grounding": 0.75,
+    "completeness": 0.75
+  },
+  "y": {
+    "correctness": 0.75,
+    "grounding": 0.55,
+    "completeness": 0.85
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly land on the actual resolution: default --run-level=core_model forces dummy weights via #4354, fix is --run-level=full_model, correctly closed as invalid, matching akshatvishu/yenuo26's thread outcome. Y is more thorough (marker-vs-run-level distinction, hardcoded video-path caveat, footgun suggestion) but fabricates a specific audio transcript ('Yn ymwneud yw'r llwyddiad…') that never appears in the issue log, presenting invented evidence as fact, which undercuts its otherwise more granular file:line citations. X stays within the bounds of the given evidence and reaches the same correct diagnosis, though it has a minor internal inconsistency (Disposition: keep-open vs. its own text stating closed-as-invalid).",
+  "_cost_usd": 0.1591298,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r2",
+    "arm_a_sha256": "d435b76165336d0f7c315479ec4cd936cc9ebd9391c90fe47f368ae3491d0158",
+    "judge_rep": 2
+  }
+}

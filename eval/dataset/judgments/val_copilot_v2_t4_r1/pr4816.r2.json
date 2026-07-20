@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.65,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth is a trivial, correct rename with a plain 'lgtm' approval and no requested changes. X verifies the rename exhaustively (grep for stragglers, cross-check against upstream vllm) and correctly lands on a clean approve with no noise, matching the human reviewer's verdict. Y's hunk-by-hunk validation is equally solid, but it then tacks on two speculative, low-value nitpicks (add a new test for an untested chat-completion 404 path, add a comment about naming convention) that aren't grounded issues with this diff and push its verdict to COMMENT rather than APPROVE, diverging from ground truth and reading as manufactured scope for a clean fix. Y's suggestions are more concretely actionable in isolation, but X's precision and verdict alignment make it the stronger review overall.",
+  "_cost_usd": 0.11767349999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r1",
+    "arm_a_sha256": "bb0846caf4bb2bf41986efc83a183ba19810e49cb9731b18d3caad2698107070",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.7,
+    "precision": 0.6,
+    "actionability": 0.8,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly surface the missed diffusion-transformer caller of get_cache_scale, hitting the latent gap. Y grounds its analysis in actual upstream vLLM source (exact file:line citations in utils.py/weight_utils.py/fp8.py) to validate the design and lands on the correct approve/merge verdict, and it also catches a genuine, novel test-quality bug the humans missed (the delegated-loader test bypasses AutoWeightsLoader so never exercises the mapping it claims to verify). X pads its report with two low-value comment nitpicks and overstates severity by calling the unswept diffusion loader a 'blocker', when ground truth indicates that file was coordinated via a separate PR (#4808), hurting precision relative to Y.",
+  "_cost_usd": 0.1881968,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r3",
+    "arm_a_sha256": "b96a878c3671815ed5ecc9af6dbd70bc637e46fa1e930538d569335027cb6be7",
+    "judge_rep": 3
+  }
+}

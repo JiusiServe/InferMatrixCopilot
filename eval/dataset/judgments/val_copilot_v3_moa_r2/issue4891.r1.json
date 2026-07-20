@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.45,
+    "grounding": 0.4,
+    "completeness": 0.35
+  },
+  "y": {
+    "correctness": 0.7,
+    "grounding": 0.65,
+    "completeness": 0.75
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "The actual resolution cites two things: duplicate of #4808 AND refer to #4809 for details; X addresses only the former and never mentions #4809, while Y explicitly reconstructs the #4809 triage (5 call sites, 4 fixed in #4810, this one scoped to #4808), directly engaging the evidence trail the maintainer pointed to. X also confidently states #4808 'is already merged on main' in its answer body while appending a disclaimer that merge-state was unverified — an internal contradiction — whereas Y flags the same uncertainty transparently ('#4808 is CLOSED and mergedAt is null') and reasons from the reporter's own repro on main @ 86bdcaf3d to argue the fix may not have landed, which is a more defensible, better-calibrated read given the available evidence. Both cite plausible file/line locations, but Y's grounding is reinforced by tying back to the #4809 reference actually present in the ground truth.",
+  "_cost_usd": 0.11409849999999999,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r2",
+    "arm_a_sha256": "badde11aab30f74e723226c4fa54d1636ca37f490cc84c74bff79b2689ec391c",
+    "judge_rep": 1
+  }
+}

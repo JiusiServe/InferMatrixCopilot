@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.93,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both reviews correctly approve, thoroughly verify the rename is complete via grep, and trace the call chain through _create_speech_error_json_response/base() to the upstream attribute name; ground truth has no substantive concerns to miss, so recall is full for both. Y's cited line numbers (api_server.py:754,1017,1157,1248,1286,1329) match the diff hunks almost exactly, while X's test-file line citations (2638/2651/2720) are off by ~105 lines from what the diff actually shows, undermining precision on a checkable claim. Both are concrete and non-fabricated in substance, but Y's grounding is measurably tighter.",
+  "_cost_usd": 0.1896752,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r3",
+    "arm_a_sha256": "bce9fa077c0d5895dbaf32573acaf97d7fadd504b4e5ed6ec8b282b76d0fee69",
+    "judge_rep": 3
+  }
+}

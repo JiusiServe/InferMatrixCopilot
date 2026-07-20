@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.7,
+    "grounding": 0.45,
+    "completeness": 0.75
+  },
+  "y": {
+    "correctness": 0.8,
+    "grounding": 0.6,
+    "completeness": 0.8
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly diagnose the core_model→dummy-weight run-level issue and correctly land on 'invalid' matching the actual thread resolution, with matching fix commands. X fabricates specific evidence not present anywhere in the issue log — an invented Welsh-language audio transcript quote — which is a serious grounding problem since no audio content was ever shown in the reporter's log, casting doubt on its other hyper-specific line-number citations too. Y avoids that fabrication and more accurately attributes the resolution to akshatvishu's debug log and yenuo26's A100 verification, though it has a minor internal inconsistency (structured 'disposition: keep-open' contradicts its own prose stating the issue was closed as invalid).",
+  "_cost_usd": 0.2085088,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r2",
+    "arm_a_sha256": "d435b76165336d0f7c315479ec4cd936cc9ebd9391c90fe47f368ae3491d0158",
+    "judge_rep": 1
+  }
+}

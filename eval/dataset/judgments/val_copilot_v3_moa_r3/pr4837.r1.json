@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.55,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates correctly identify and verify the core fix (already_submitted removal is safe because both submit_initial and submit_update reject list prompts), matching the sole ground-truth inline concern. X's extra findings (regression-test gap, len>1 fallthrough) are all traceable to the diff and cited line numbers. Y pads its review with unverifiable external claims (a specific GitHub issue #4839, a named commenter @akshatvishu, and details about a HunyuanImage-3.0 bridge never mentioned in the diff or ground truth) that read as fabricated/ungrounded, hurting precision despite similar recall and actionability.",
+  "_cost_usd": 0.1262423,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r3",
+    "arm_a_sha256": "c9d4d9a37cf3d6676d93a50f52c3da4ed89ce3bd4ef6a67cadf90593ac25d222",
+    "judge_rep": 1
+  }
+}

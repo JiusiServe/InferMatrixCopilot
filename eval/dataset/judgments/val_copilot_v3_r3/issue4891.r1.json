@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.5,
+    "grounding": 0.45,
+    "completeness": 0.6
+  },
+  "y": {
+    "correctness": 0.75,
+    "grounding": 0.7,
+    "completeness": 0.75
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly identify the missed diffusion-side call site and that #4810 only covered the AR loaders, matching the thread's 'duplicate of #4808' resolution. But X confidently asserts the fix 'is already present on current main' and fabricates a specific code snippet/comment as proof, plus mislabels the disposition as 'duplicate-of-#4809' rather than #4808 — both are ungrounded or inaccurate claims not supported by the ground truth. Y reaches the same duplicate conclusion but explicitly flags that #4808 was closed without a recorded merge and that it could not verify main's actual state, which is the honest, appropriately-hedged read given genuine uncertainty, and it also grounds claims in specific line numbers from its own checkout rather than inventing evidence.",
+  "_cost_usd": 0.11417189999999999,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r3",
+    "arm_a_sha256": "3f7fb34a026087fee338f4465dde2db3fcdc3c50944cf569353e52c7dff9f18d",
+    "judge_rep": 1
+  }
+}

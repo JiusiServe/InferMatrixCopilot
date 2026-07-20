@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.85,
+    "actionability": 0.35,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth here is thin (mostly an LGTM/approval plus one inline nit asking whether reduce_scatter test coverage needs strengthening); neither candidate directly hits that specific ask, so recall is low for both. X reaches a well-argued APPROVE verdict backed by genuine deep verification (checking actual vLLM DPMetadata/GroupCoordinator semantics) matching the real outcome, but produces only one concrete actionable comment. Y stays tightly diff-grounded and surfaces five specific file/line findings (test-order fragility, untested cfg=1 and world_size<=1 branches, undocumented DPMetadata interface, unguarded cpu_group access) that are individually minor but concrete, evidence-cited, and actionable, giving it an edge on precision and actionability despite similarly weak recall.",
+  "_cost_usd": 0.211762,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r3",
+    "arm_a_sha256": "1189573fefdcc2468963e6440e4316b6079816bb8e589a3860e60bdeddad1573",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.8,
+    "precision": 0.82,
+    "actionability": 0.78,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates correctly zero in on the only substantive ground-truth point (the already_submitted gate removal is safe because both submit paths reject list prompts identically) and both flag the missing regression test as a non-blocking gap, matching the LGTM/no-blocker sentiment of the real reviewers. X presents this more cleanly with a standard blocker-scan table, an explicit APPROVE verdict matching the actual merged/approved outcome, and a sharper articulation of why the old gating specifically broke submit_initial. Y's findings are equally grounded and its suggested regression test is slightly more concrete (exact test location/assertions), but the report is cluttered with low-value 'sweep'/re-read bullets and lands on a COMMENT verdict that reads more cautious than the ground truth warrants, giving it a marginally lower actionability/precision edge.",
+  "_cost_usd": 0.07988150000000002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r2",
+    "arm_a_sha256": "36c576f951dc8c38e1bddd758a468307a53f7cb05808f795a6e29ba480e7d76d",
+    "judge_rep": 3
+  }
+}

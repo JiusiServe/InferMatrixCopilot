@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.72,
+    "completeness": 0.68
+  },
+  "y": {
+    "correctness": 0.9,
+    "grounding": 0.88,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly land on the ground-truth resolution (PR #4792 fixing the non-async-chunk None-payload starvation, already folded into the v0.24 rebase) and quote the same code snippet from akshatvishu's comment near-verbatim. Y grounds the mechanism more deeply across multiple files (coordinator gating, timeout log strings, mm_outputs partition helper) and engages more concretely with the reporter's specific environment/log details, whereas X's grounding is thinner and includes a suspicious, likely-fabricated unit-test name as 'verification' that isn't tied to the actual fix. Y's answer is also more complete, giving a clear verdict, an explicit workaround retaining the user's config, and next steps if the issue persists.",
+  "_cost_usd": 0.1211629,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r1",
+    "arm_a_sha256": "b08b02e74c7655bab1de0bff020b1d641ffa30ce699203b94fe5fae6a2f23a9a",
+    "judge_rep": 1
+  }
+}

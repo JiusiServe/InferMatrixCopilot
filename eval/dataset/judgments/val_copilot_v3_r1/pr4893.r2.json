@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.7,
+    "actionability": 0.45,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Neither candidate surfaces the one substantive ground-truth concern (yenuo26's question about whether reduce_scatter test verification at test_expert_parallel_layout.py:121 is sufficient), so recall is low for both; X touches the same file/mechanism tangentially (line 24) giving it a marginal edge. X delivers five concrete, file/line-anchored nits (missing branch-coverage tests, stale comment, terse docstring) that are all grounded and directly actionable ('add this test', 'add this sentence'). Y provides a thorough but largely unfalsifiable checklist of PASS verdicts plus a single softer, prose-style comment about dp_metadata caching — solid analysis of the fix's correctness but less concrete and less actionable, and it recommends APPROVE with no comments that map to reviewer concerns. Overall X edges out on precision and actionability while both are weak on recall.",
+  "_cost_usd": 0.2876624,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r1",
+    "arm_a_sha256": "c19056bb2bcdada25b43722cf00088cbd85246a3ee2fd0a9b4d86322b13c2686",
+    "judge_rep": 2
+  }
+}

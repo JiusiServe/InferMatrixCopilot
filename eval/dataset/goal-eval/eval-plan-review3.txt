@@ -1,0 +1,9 @@
+1. MUST-FIX — The tree digest excludes untracked files, including new W1–W7 code. Include tracked and untracked evaluated source files in the snapshot.
+
+2. MUST-FIX — Baseline aggregation must require a split and validate the exact 10 expected items; the baseline directory contains val, test, and train artifacts.
+
+3. MUST-FIX — `validate_replicate.py` must validate expected filenames and the complete dimension-specific schema, value ranges, blinding map, and judge replicates—not merely parseable JSON.
+
+4. MUST-FIX — Specify fresh directories or explicit cleanup for invalid generation replicates. `run_copilot_arm.py` skips any existing nonempty output, including failed canary outputs.
+
+VERDICT: REVISE

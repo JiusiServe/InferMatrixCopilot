@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.88,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.8,
+    "grounding": 0.6,
+    "completeness": 0.72
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both correctly diagnose the None+1 TypeError from missing extended ratio tokens in the base tokenizer and give the same working workaround (hunyuan_image3_dit.yaml), matching the thread's actual resolution. X is more thorough and better grounded: it faithfully mirrors Gaohan123's actual request (open a separate tracking issue for the improvement) and gives a concrete, mergeable guard implementation. Y introduces unverified specifics not present anywhere in the thread or issue body — a '4 devices for tensor parallelism' precondition and a third 'hunyuan_image3_ar.yaml' config option — which look fabricated and hurt its grounding despite reaching the same correct core conclusion.",
+  "_cost_usd": 0.051024599999999996,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r2",
+    "arm_a_sha256": "9570165f2d4a8e18b77e6be4179811f1e488025d9d12335d4dcd06a7918ec9c1",
+    "judge_rep": 3
+  }
+}

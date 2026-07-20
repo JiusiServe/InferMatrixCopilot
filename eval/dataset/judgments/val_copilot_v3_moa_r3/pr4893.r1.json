@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.75,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.55,
+    "actionability": 0.3
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X surfaces several concrete, line-cited findings grounded in the diff (untested early-return branch in the new DP-metadata helper, a plausible unnecessary all_gather on non-MoE paths, and the intent behind the dropped cfg_parallel_size guard), which lands closer to the ground truth's test-coverage theme (yenuo26's reduce_scatter verification comment) than anything in Y. Y reads as a self-verification narrative ending in APPROVE with only one vague, non-actionable 'worth a comment' remark and no findings that engage the reviewer's actual concerns. Neither includes a LATENT GAP CHECK section, so gap_hit is false for both.",
+  "_cost_usd": 0.2543919,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r3",
+    "arm_a_sha256": "6fca8e65e87c32835b564e34dc1df1f26b5f5223efd70139ffd8a966aeb1e2df",
+    "judge_rep": 1
+  }
+}

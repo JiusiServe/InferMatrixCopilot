@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.7,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (just an approve), so both reviews' verification-heavy approach is appropriate and both correctly conclude the rename is complete and consistent. X's approve is fully grounded (upstream cross-check, full grep sweep) and doesn't manufacture issues. Y did equally thorough hunk-by-hnk validation but then adds three 'nit' findings whose value is shaky: nit 1 mischaracterizes the PR's entire stated purpose (fixing the AttributeError) as an 'incidental' side effect worth extra documentation, and nit 2 flags a naming-convention break that Y's own cited evidence (upstream also uses serving_tokenization) undercuts — reducing precision even though the underlying facts are real. Y's nit 3 (missing chat-path test) is a fair, actionable point, and Y's comments are more concrete/file-line-specific, giving it an actionability edge, but the weaker nits drag down overall precision enough to favor X's cleaner, correctly-scoped review.",
+  "_cost_usd": 0.0773427,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r2",
+    "arm_a_sha256": "d0684d4c02ae503792059f60a250121278a33029834134ceb5b628cd30d9b06e",
+    "judge_rep": 3
+  }
+}

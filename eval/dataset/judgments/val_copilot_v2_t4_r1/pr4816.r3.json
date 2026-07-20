@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (approve/lgtm), so both correctly find no real defects and neither fabricates anything grounded outside the diff. X's verification (upstream grep, no leftover references, matches ground-truth's clean approve) is tightly grounded and reaches the correct verdict; its non-blocking note is honest but not framed as an actionable ask. Y pads with low-value 'sweep' restatements of the diff and raises two comments (missing chat-completion test, add explanatory comment for naming) that are grounded but marginal/out-of-scope for a pure rename fix, landing on a COMMENT verdict that overstates the PR's issues relative to the actual lgtm outcome; its explicit file:line 'add X' asks do make it slightly more actionable in form.",
+  "_cost_usd": 0.0763926,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r1",
+    "arm_a_sha256": "bb0846caf4bb2bf41986efc83a183ba19810e49cb9731b18d3caad2698107070",
+    "judge_rep": 3
+  }
+}

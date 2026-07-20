@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.3,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns (just an 'lgtm' approval), so both candidates trivially achieve full recall. X's review is solid but purely confirmatory (grep + claimed upstream cross-check) with no actionable items, and opens with a stray leaked fragment ('I have everything I need') that reads as unpolished internal reasoning. Y performs comparably rigorous diff-grounded verification (exact grep counts, specific line numbers) and additionally surfaces a genuine, well-reasoned gap: the modified tests only cover the handler-None 404 fallback, not the actual error-response crash path the PR's repro describes, with a concrete file/line, suggested test, and runnable command. That extra finding is plausible, relevant, and actionable, giving Y a clear edge.",
+  "_cost_usd": 0.057298100000000005,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r2",
+    "arm_a_sha256": "0118623b849b7a094ad3c3764ef53c830d7c217310b6feec77c5d9b5119cfbca",
+    "judge_rep": 2
+  }
+}

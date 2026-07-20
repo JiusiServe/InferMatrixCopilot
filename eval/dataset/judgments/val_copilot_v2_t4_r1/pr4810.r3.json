@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.62,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.72,
+    "actionability": 0.8,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly validate the 4 loader changes and both independently surface the exact latent gap (the unswept hunyuan_image3_transformer.py caller of get_cache_scale), so gap_hit=true for both. X pads its report with a duplicated finding and a speculative 'dead code' claim resting on suspiciously precise unverifiable upstream line citations, hurting precision; Y grounds its analysis in the actual upstream vLLM checkout and catches a genuine, diff-verifiable test-coverage flaw (the delegated-loader test bypasses AutoWeightsLoader entirely), though it also asserts a specific post-merge fix detail ('see #4810') that conflicts with the ground truth's stated #4891 reference, a minor fabrication risk. Both are highly actionable with concrete file:line fixes, giving X a slight edge there, but Y's broader, better-grounded coverage of reviewer-relevant concerns nets it the win.",
+  "_cost_usd": 0.14367210000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r1",
+    "arm_a_sha256": "9780545d206447135fbd2eb6ff172f313f609ab18c5fabc9ded9305cb5798fb0",
+    "judge_rep": 3
+  }
+}

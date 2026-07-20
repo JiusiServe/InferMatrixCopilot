@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.65,
+    "grounding": 0.65,
+    "completeness": 0.6
+  },
+  "y": {
+    "correctness": 0.85,
+    "grounding": 0.8,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly diagnose the None+1 TypeError from missing extended ratio tokens and correctly prescribe the hunyuan_image3_dit.yaml workaround confirmed in-thread. Y is better grounded (cites specific line ranges, quotes deploy YAML pipeline/header fields, gives a concrete tolerant-guard code fix) and gets the disposition right (issue resolved/closeable, improvement tracked in a new issue) matching Gaohan123's actual request, whereas X's 'keep-open' disposition misreads that request. X offers only a prose guard suggestion with no code, and slightly thinner evidence.",
+  "_cost_usd": 0.178141,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r3",
+    "arm_a_sha256": "5fbc32ec1e39f335b9fc5fd62ecefc62d388c22721b2566aaa64acf6038cfcb6",
+    "judge_rep": 1
+  }
+}

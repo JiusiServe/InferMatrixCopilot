@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.55,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The one substantive ground-truth concern (why dropping the `already_submitted` gate on line 1290 is safe) is directly and correctly explained by X, mirroring yJader's actual reasoning that both submit paths reject list prompts regardless of that flag. Y instead re-raises the same line as an open, unresolved question ('if the processor expects a list, the guard must be restored'), missing the resolving insight and even contradicting its own earlier 'validated' sweep findings elsewhere (e.g. flagging outputs.output as unconfirmed after already confirming ZImagePipeline always returns a single DiffusionOutput). Y's extra suggestions (docstring updates, asserts, inline comments) are speculative padding rather than grounded findings, and its COMMENT verdict misaligns with the actual LGTM/APPROVE outcome, whereas X's APPROVE verdict and concrete, well-evidenced line-level analysis is both more accurate and more actionable.",
+  "_cost_usd": 0.1349149,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r3",
+    "arm_a_sha256": "74a18e94cfbe04b625d2d92ffed491c4731bc1c43462aa11daea6fc40b9b9a1c",
+    "judge_rep": 1
+  }
+}

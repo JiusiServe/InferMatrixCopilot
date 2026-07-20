@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.45,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The one substantive ground-truth concern (dsocek's point that hardcoding component names is fragile and the manager should instead derive from a single source of truth to handle naming/fusion conflicts) is closely echoed by X's comment 1 (derive from pipeline._dit_modules instead of a fourth hardcoded list, cross-referencing offloader and registry.py), while Y's parallel finding (registry.py's transformer_attrs list has 'diverged' and deserves a clarifying comment) is a shallower, more cosmetic version of the same observation. X's two comments are also concretely actionable (specific file:line, specific code-level fix), whereas Y's output is mostly a validation checklist with one soft 'add a comment for future maintainers' suggestion. Both are well-grounded and accurate (they independently converge on the same registry.py:427 evidence), so precision is comparable, but X covers more of the real reviewer concern and is more actionable.",
+  "_cost_usd": 0.078424,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r3",
+    "arm_a_sha256": "7999f73ce57f9a15cd524e6fbe4fb3197361a6791c5653363966ab1cc346efda",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.5,
+    "grounding": 0.7,
+    "completeness": 0.7
+  },
+  "y": {
+    "correctness": 0.4,
+    "grounding": 0.7,
+    "completeness": 0.6
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "The actual thread shows only a bisection to #4834 and a request from Flink-ddd for a full sleep-mode CI run — it is not resolved, so confident 'close' dispositions from both candidates outrun what the thread establishes. Y goes further and falsely asserts the level=1 fix is 'already in main,' a specific fabricated claim unsupported by any thread evidence, whereas X frames the level=1 change as a proposed fix rather than a fait accompli. X also catches an additional related risk (test_coordinated_cross_device, also level=2, currently skipped) that Y misses, giving it a slight edge in completeness despite both being similarly grounded in the same code citations.",
+  "_cost_usd": 0.0660847,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r2",
+    "arm_a_sha256": "83e8b31c9e89929af63ce34b2a3a2c49b098f0f28504805c0b07ab5dfa267df9",
+    "judge_rep": 3
+  }
+}

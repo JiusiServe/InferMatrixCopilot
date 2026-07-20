@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.5,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X's key claim ('both submit_initial and submit_update raise ValueError on a list for diffusion stages') is essentially the exact reasoning yJader gave for why gating the unwrap on already_submitted was wrong — a near-perfect recall hit with concrete file/line grounding, and X's APPROVE verdict matches the real two-LGTM outcome. Y touches the same mechanism but less precisely, contradicts the actual approved outcome with a 'FOLLOW-UP REQUIRED' verdict and a 'major' severity tag, hedges on a possibly-wrong namedtuple claim (vs X's more concrete dataclass/no-__getitem__ check), and cites an unverifiable PR comment from 'akshatvishu' not present anywhere in the given materials, hurting precision. Y does produce more concrete, actionable suggestions (specific test locations, guard code, log messages), giving it the actionability edge, but X is the more grounded and correct review overall.",
+  "_cost_usd": 0.1447881,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r1",
+    "arm_a_sha256": "1d50a68e2e2911b563006c7ab6eeabbfd097887e6a475b1acff0b6966d0bf6e4",
+    "judge_rep": 1
+  }
+}

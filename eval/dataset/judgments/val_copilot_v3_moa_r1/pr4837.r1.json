@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.75,
+    "precision": 0.85,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.4,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates correctly explain the core fix (unconditional singleton-list unwrap is safe because both submit_initial/submit_update reject list prompts identically), matching yJader's inline reasoning reasonably well. However, Y fabricates external evidence — a specific issue #4839 error trace and a contributor quote from '@akshatvishu' — despite its own task metadata stating 'issue: None', which is a serious grounding violation that undermines trust in its other claims and its 'FOLLOW-UP REQUIRED' verdict (contradicted by two actual LGTM approvals). X's claims are all diff/codebase-grounded with no fabrication, and its APPROVE verdict matches the actual outcome. Y is slightly more mechanically actionable (concrete test-mock suggestion) but this doesn't offset the precision problem.",
+  "_cost_usd": 0.13053929999999997,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r1",
+    "arm_a_sha256": "606cfaabedab4f51f21725be9aee0eb40c33a2193e68c4edf9feda46ca508af2",
+    "judge_rep": 1
+  }
+}

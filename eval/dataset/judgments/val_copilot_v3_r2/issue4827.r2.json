@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.85,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.8,
+    "grounding": 0.65,
+    "completeness": 0.75
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both correctly diagnose the base-tokenizer/extended-ratio-token crash, cite the same file/lines, and confirm the same DiT-config workaround FayeSpica validated. X is cleaner: it gives a concrete guard-code fix, correctly reads Gaohan123's request as closing this bug with a follow-up tracking issue, and stays grounded in thread facts. Y pads its answer with fabricated 'Preconditions' (specific GPU/NPU memory claims not in the thread or issue), sets disposition to 'keep-open' which sits awkwardly against the maintainer's redirect-to-new-issue signal, includes a placeholder/broken comment link, and duplicates the root-cause explanation across raw pipeline-artifact sections rather than presenting one coherent maintainer response.",
+  "_cost_usd": 0.1372128,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r2",
+    "arm_a_sha256": "4c31a6dc26962dcdbf4a6ac2f49b42c05b376a83611807f08027771a9f9bc139",
+    "judge_rep": 2
+  }
+}

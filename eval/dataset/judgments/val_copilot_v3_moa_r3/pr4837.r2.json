@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.62,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.88,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "The sole ground-truth substantive concern (yJader's point that already_submitted shouldn't gate the unwrap because both submit_initial and submit_update reject list prompts) is nailed precisely by Y, which cites exact stage_pool.py line numbers (951-955, 1022-1026) proving both paths raise ValueError on lists — an almost verbatim match to the reviewer's reasoning. X captures the same conclusion more loosely ('confirmed correct across all four state combinations') without the same grounded evidence tying the two submission paths together. X also pads its review with speculative, diff-external claims (an issue #4839/HunyuanImage-3.0 tie-in citing a specific commenter) that can't be verified against the given diff, hurting precision, and lands on a COMMENT verdict where both actual reviewers approved, while Y correctly recommends APPROVE. Both are reasonably actionable with file/line citations and concrete test suggestions, but Y's findings are tighter, better grounded, and more aligned with what actually mattered in this PR.",
+  "_cost_usd": 0.17554109999999998,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r3",
+    "arm_a_sha256": "c9d4d9a37cf3d6676d93a50f52c3da4ed89ce3bd4ef6a67cadf90593ac25d222",
+    "judge_rep": 2
+  }
+}

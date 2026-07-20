@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.65,
+    "actionability": 0.75,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly validate the direct-vs-delegated loader distinction and both independently surface the real latent gap (hunyuan_image3_transformer.py:2238 still calling removed get_cache_scale) with file/line precision, so gap_hit is true for both. X duplicates its one big finding across two entries (test-file and production-file framed as separate 'major' items), pads with low-value stylistic nits (asking for a comment matching another file's), and never engages with the ground truth's actual non-blocking concern about the test's weak checkpoint validation. Y verifies the design against real upstream vLLM source (AutoWeightsLoader, fp8.py) rather than just the diff, lands on the same APPROVE verdict the humans reached, and its own non-blocking finding (the delegated-loader test bypasses AutoWeightsLoader and doesn't prove the real mapping behavior) is a sharper, better-grounded cousin of akshatvishu's 'test doesn't fully close the loop' concern. Y is more precise, less redundant, and slightly more actionable overall.",
+  "_cost_usd": 0.2203808,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r2",
+    "arm_a_sha256": "a8ccec6d0fd86c4b1805454e3bb5678712d76b6aac86516888634247fe7f4a99",
+    "judge_rep": 2
+  }
+}

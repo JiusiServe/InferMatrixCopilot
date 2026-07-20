@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.55,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "The only substantive ground-truth signal is yJader's inline comment confirming that removing `already_submitted` is correct because both submit_initial and submit_update reject list prompts for diffusion. Y independently verifies exactly this (citing stage_pool.py:951 and :1022) and reaches the same conclusion, landing on APPROVE like the real reviewers. X touches the same line but frames it as an open risk ('if the processor expects a list, the guard must be restored'), which runs counter to what the ground truth actually resolved, and duplicates this same line as two separate 'minor' findings. X lands on COMMENT with several hedged, unresolved 'verify X, if not do Y' items rather than committing to conclusions, weakening both recall accuracy and precision relative to Y's tighter, better-grounded review.",
+  "_cost_usd": 0.16641490000000003,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r3",
+    "arm_a_sha256": "74a18e94cfbe04b625d2d92ffed491c4731bc1c43462aa11daea6fc40b9b9a1c",
+    "judge_rep": 2
+  }
+}

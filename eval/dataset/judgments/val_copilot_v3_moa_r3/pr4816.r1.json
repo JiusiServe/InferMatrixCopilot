@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.82,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.93,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly conclude this is a clean, complete mechanical rename with no blockers, matching the ground truth's trivial 'lgtm' approval — recall is tied since there's nothing substantive to miss. Y's precision and actionability are stronger because every line number it cites (754, 1017, 1157, 1248, 1286, 1329 in api_server.py; 2533, 2546, 2615 in the test file) exactly matches positions computable from the diff hunks, while X's test-file line citations (2638, 2651, 2720) don't match the diff's line numbers, weakening its grounding even though it explains this via a post-merge checkout. X adds a plausible but unverifiable upstream PR citation (vllm#46022) that Y doesn't attempt.",
+  "_cost_usd": 0.24942020000000004,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r3",
+    "arm_a_sha256": "7721a59243e5d86fb6192d70996f5b43668feee6fab0df07e851598b4527a482",
+    "judge_rep": 1
+  }
+}

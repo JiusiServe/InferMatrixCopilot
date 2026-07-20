@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.95,
+    "grounding": 0.92,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.88,
+    "grounding": 0.68,
+    "completeness": 0.82
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly identify PR #4792 as the fix for the non-async-chunk branch shipping (None, payload) instead of the full payload, matching the ground truth's diff and confirming it's already folded into the 0.24 rebase (a560ed18) — core diagnosis is equally correct. X is more thoroughly grounded, tracing the full failure path through the scheduler coordinator's WAITING_FOR_INPUT/_FULL_PAYLOAD_INPUT_STAGES logic and timeout messages that plausibly match the reporter's log, and even proactively dismisses red herrings from the issue body. Y pads its report with a 'dedicated regression test' (test_sample_tokens_tail_only_prefix_cache_uses_staged_cpu_hidden_states) whose name has nothing to do with inter-stage payload routing, which looks like a fabricated/misapplied verification claim and slightly undercuts its grounding and completeness despite an otherwise solid, well-structured answer.",
+  "_cost_usd": 0.0727988,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r3",
+    "arm_a_sha256": "1fc137097ee75afa3f3022d9f3a802fee58d6884bd970056735c9de457a55ed5",
+    "judge_rep": 3
+  }
+}

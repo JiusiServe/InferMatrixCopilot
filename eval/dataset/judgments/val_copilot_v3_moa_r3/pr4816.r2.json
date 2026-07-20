@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.7,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.92,
+    "actionability": 0.82,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (plain 'lgtm' approve), so both candidates correctly reach APPROVE and recall is trivially satisfied for each. Both give the same accurate high-level narrative (rename tracks upstream vLLM PR #46022, complete/consistent across all call sites, tests updated), but Y's specific file/line citations (api_server.py:754/1017/1157/1248/1286/1329; test hunks at 2533/2546/2615) align almost exactly with the diff's hunk headers, whereas X's test-file line numbers (2638/2651/2720) are uniformly ~105 lines off from what the diff shows, undermining confidence in X's verification claims. Both are actionable in tone (concrete pass/fail scan tables, specific locations) but Y's grounding edge gives it a slight precision/actionability advantage.",
+  "_cost_usd": 0.1789643,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r3",
+    "arm_a_sha256": "7721a59243e5d86fb6192d70996f5b43668feee6fab0df07e851598b4527a482",
+    "judge_rep": 2
+  }
+}

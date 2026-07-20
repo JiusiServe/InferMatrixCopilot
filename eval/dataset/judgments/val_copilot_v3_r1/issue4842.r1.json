@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.85,
+    "grounding": 0.5,
+    "completeness": 0.85
+  },
+  "y": {
+    "correctness": 0.8,
+    "grounding": 0.8,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly diagnose the root cause (default --run-level=core_model injects load_format:dummy via #4354, producing garbage output on a full_model-only assertion) and give the correct fix (--run-level=full_model), matching the thread's 'invalid' resolution. X invents a specific fabricated audio transcript ('Yn ymwneud yw'r llwyddiad… — Welsh-flavored noise') that appears nowhere in the issue body, presenting invented evidence as observed fact, which undercuts its grounding. Y stays within the evidence given but oddly sets disposition to 'keep-open' despite its own text concluding 'not a bug,' a minor internal inconsistency versus the actual invalid/closed outcome. Y's fabrication-free grounding outweighs X's disposition-accuracy edge.",
+  "_cost_usd": 0.22192320000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r1",
+    "arm_a_sha256": "e0a49e6fd41f0c5ce35ed0f728e7b972a871b4758bd58dad00931519a02a72e2",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.7,
+    "precision": 0.7,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates converge on the same core conclusion the ground-truth inline comment makes (removing already_submitted is correct because both submit paths reject list prompts), but Y grounds it more precisely by citing the actual StagePool rejection sites (stage_pool.py:951-955, 1022-1026) matching the ground truth's own framing, while X approximates locations ('line ~1301/~1296') that appear to misattribute where the rejection logic actually lives. Y also correctly recommends APPROVE, mirroring the real reviewers' LGTM outcome, whereas X's 'major/FOLLOW-UP REQUIRED' framing for a missing unit test somewhat overstates severity relative to actual reviewer consensus. X compensates with more prescriptive, code-level actionable suggestions (exact test to add), giving it a slight edge in actionability, but Y's overall grounding and accuracy give it the edge.",
+  "_cost_usd": 0.15533490000000003,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r3",
+    "arm_a_sha256": "fd0d95152d3fc54f13bc52aab6dfea20fdf250d9ed9be61a55a7755fe2de45b7",
+    "judge_rep": 2
+  }
+}

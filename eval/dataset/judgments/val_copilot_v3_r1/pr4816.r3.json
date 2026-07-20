@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.92,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (just an 'lgtm' approval), so both candidates trivially achieve full recall and correctly reach APPROVE. Both correctly diagnose the rename's purpose (matching upstream vLLM's ServingTokenization attribute name to avoid AttributeError in error-handling fallback paths) and confirm no missed occurrences via grep. Y is more grounded and verifiable, explicitly validating every diff hunk individually with precise file:line citations and stating its checkout state (PR-time tree) up front, whereas X makes several specific unverifiable claims about exact upstream line numbers (basic.py:23, api_server.py:387,489) that add fabrication risk without clear sourcing. X's non-blocking note about test mock brittleness is a nice touch but doesn't offset the extra unverifiable specificity, so Y edges out on precision and actionability.",
+  "_cost_usd": 0.068916,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r1",
+    "arm_a_sha256": "ac1e6538a8deb1f5ab7243042390405a08e728d146c5b072f9b431a49dd54428",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.85,
+    "actionability": 0.3,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Neither candidate surfaces the ground-truth reviewer's actual concern (hasattr checks not verifying reduce_scatter behaves correctly), so recall is near-zero for both. X mostly confirms the PR is correct and ends in APPROVE with a single vague, low-actionability nit; its claims are accurate but thin. Y digs deeper with five concrete, file/line-anchored findings (untested early-return branch, unconditional collective call on non-MoE paths, missing guard/docstrings), each backed by cited evidence, making it far more actionable even though a couple are minor nits.",
+  "_cost_usd": 0.21285639999999997,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r3",
+    "arm_a_sha256": "6fca8e65e87c32835b564e34dc1df1f26b5f5223efd70139ffd8a966aeb1e2df",
+    "judge_rep": 3
+  }
+}

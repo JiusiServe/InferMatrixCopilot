@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.72,
+    "actionability": 0.8,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both independently surface the exact latent gap — the unswept hunyuan_image3_transformer.py:2238 caller of the removed get_cache_scale API — with concrete file/line evidence and fix suggestions, which neither ground-truth reviewer flagged as a blocker. However X then claims this was 'since been addressed on main... see #4810,' which contradicts the given history that this gap wasn't caught until a later issue (#4891); that looks like a fabricated resolution and undercuts an otherwise strong finding, plus it lets X land on a clean APPROVE verdict inconsistent with an unresolved caller. Y instead treats it as an active blocker and issues a 'FOLLOW-UP REQUIRED' verdict, matching reality more faithfully, and its other sweep/nit findings are all grounded in the actual diff/repo state without unsupported claims. Neither candidate reproduces the ground truth's narrow non-blocking ask for a real-checkpoint smoke test, keeping recall modest for both.",
+  "_cost_usd": 0.23960240000000002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r2",
+    "arm_a_sha256": "71b45d1d13d469f733213e6be36c836829926d6573f76b56a728f84c5fd37bc2",
+    "judge_rep": 1
+  }
+}

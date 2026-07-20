@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "tie",
+  "margin": "slight",
+  "rationale": "Neither candidate surfaces the ground truth's actual substantive concern (dsocek's suggestion to derive LoRA naming from `_packed_modules_mapping`/`stacked_params_mapping` for fused-projection renames), so recall is low for both. Both instead converge on the same well-grounded, cross-validated point (deriving `default_components` from `_dit_modules` instead of a fourth hardcoded list), with concrete file/line evidence and actionable suggestions. X adds a distinct, valuable catch (text-encoder LoRA silently no-oping, same bug class as the PR's stated problem) while Y adds a distinct but more generic point (missing SDXL integration test) plus more rigorous grep-evidenced verification, though at the cost of restating the same duplication finding twice.",
+  "_cost_usd": 0.2066515,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r2",
+    "arm_a_sha256": "273009d35581dc84d7ad6fc3ecd739a3166f69f504c4a7cc5f62360b5babec34",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.85,
+    "grounding": 0.75,
+    "completeness": 0.72
+  },
+  "y": {
+    "correctness": 0.88,
+    "grounding": 0.8,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates correctly identify the actual thread resolution: the test was run at the default core_model run-level, which forces dummy weights, and the correct fix is --run-level=full_model with the issue closed as invalid — matching akshatvishu/yenuo26's actual resolution. Y is more thorough and technically precise, correctly noting the subtle point that the full_model pytest marker doesn't set the CLI run-level (so selecting by node ID silently falls back to core_model/dummy weights), and grounds the explanation across more specific files/lines (run_args.py, runtime.py, stage_config.py, assertions.py) plus addresses the reporter's A100 hardware question and practical prerequisites (weights, video path, GPU memory) more completely. X is also correct and concise but leans on a speculative, thread-unsupported aside about per-stage OOM tuning for A100. Y's invented specific Welsh audio transcript is an unverifiable embellishment, slightly denting its grounding, but its overall diagnosis and code-path explanation is marginally deeper and more complete than X's.",
+  "_cost_usd": 0.14720719999999998,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r2",
+    "arm_a_sha256": "a52d9afe503abbea9efea43862a1c274f8d891fa81ceef235cbc8d392b1eedba",
+    "judge_rep": 3
+  }
+}

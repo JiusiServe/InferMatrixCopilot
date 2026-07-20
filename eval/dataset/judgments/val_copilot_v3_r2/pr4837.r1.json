@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.92,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.78,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently verify the same core fact the ground-truth reviewer (yJader) explains inline — that both submit_initial and submit_update reject list-shaped diffusion prompts, so gating the singleton-unwrap on already_submitted was the bug — and both correctly validate the pipeline_ming_imagegen.py change. X is tighter: it lands on APPROVE (matching the actual LGTM/LGTM outcome), flags only two clearly non-blocking, well-grounded observations, and doesn't overreach. Y is equally accurate but pads the review with three 'minor' suggestions (inline comment, defensive assert, unit test) that are grounded but not warranted given how clean this PR actually was per the real reviewers — verbose without adding real findings, which slightly dents precision/usefulness even though actionability (concrete suggested code) is strong. Neither has a LATENT GAP CHECK section.",
+  "_cost_usd": 0.1593178,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r2",
+    "arm_a_sha256": "e2ea9807d5be760b2003f2b6eb6702f84c1b19ba3311372a8fb6962a51fdace9",
+    "judge_rep": 1
+  }
+}

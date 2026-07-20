@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.9,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth is thin (mostly LGTM/approve plus one narrow inline ask about verifying reduce_scatter behavior in test_expert_parallel_layout.py, unrelated to hunyuan_fused_moe.py); neither candidate hits that specific concern, so recall is low for both. X mostly confirms correctness with PASS checks and offers a single soft documentation nit — grounded but thin. Y produces five grounded, file/line-anchored findings including concrete missing-test-coverage gaps for early-return branches in the new DP-metadata function, which is thematically closer to the reviewer's actual concern (verification completeness) and more actionable with exact suggested test additions, though most findings are minor nits rather than blockers.",
+  "_cost_usd": 0.3113787,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r1",
+    "arm_a_sha256": "c19056bb2bcdada25b43722cf00088cbd85246a3ee2fd0a9b4d86322b13c2686",
+    "judge_rep": 3
+  }
+}

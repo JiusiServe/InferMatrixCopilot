@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.9,
+    "actionability": 0.45,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth here is thin (mostly social comments plus one inline concern about reduce_scatter test coverage that the diff already resolves), so recall is low for both, but X explicitly engages with that exact assertion block while Y never mentions it. X delivers five concrete, grounded, file/line-anchored findings (untested early-return branch, dropped cfg_parallel_size guard, a plausible unconditional-collective-call issue, missing docstrings) that are all actionable. Y is well-grounded and technically sound (verifies DPMetadata, cleanup, group separation against real vLLM source) but yields only one vague 'worth a comment' suggestion, so despite slightly higher precision it trails badly on actionability and recall.",
+  "_cost_usd": 0.2287943,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r3",
+    "arm_a_sha256": "6fca8e65e87c32835b564e34dc1df1f26b5f5223efd70139ffd8a966aeb1e2df",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.93,
+    "actionability": 0.8,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.78,
+    "actionability": 0.88,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently rediscover the latent gap (the unswept hunyuan_image3_transformer.py DiT caller), but Y treats it as a live blocker with concrete remediation options while X frames it as already-fixed/non-blocking — Y's severity call matches what actually happened (issue #4891). Y also explicitly nails the ground truth's qwen2_old getattr-dead-code point and echoes the reviewer's regression-test-value concern via the 'don't remove the test' finding, giving it slightly better recall. X's review is tighter and higher-precision (three clean, non-redundant, well-grounded findings) while Y pads with two redundant restatements of the same gap and two low-value comment nitpicks that dilute precision. Actionability favors Y slightly since its blocker gives two concrete fix paths with exact evidence.",
+  "_cost_usd": 0.2636364,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r3",
+    "arm_a_sha256": "b96a878c3671815ed5ecc9af6dbd70bc637e46fa1e930538d569335027cb6be7",
+    "judge_rep": 1
+  }
+}

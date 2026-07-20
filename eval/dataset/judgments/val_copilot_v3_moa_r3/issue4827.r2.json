@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.85,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.8,
+    "grounding": 0.7,
+    "completeness": 0.8
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly diagnose the config/tokenizer mismatch and give the same verified workaround, matching the thread's core resolution. X is more grounded, citing specific line ranges and pulling explicit evidence from both YAML headers to explain the two-stage vs single-stage topology, and its disposition (close this bug, track hardening in a follow-up issue) matches Gaohan123's actual request more precisely than Y's 'keep-open' framing. Y is solid and well-structured but slightly thinner on cited evidence and less precise about the issue's actual disposition.",
+  "_cost_usd": 0.1272673,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r3",
+    "arm_a_sha256": "5fbc32ec1e39f335b9fc5fd62ecefc62d388c22721b2566aaa64acf6038cfcb6",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (just an 'lgtm' approval), so both candidates correctly find no blockers and their verification claims (grep for stale references, cross-check against upstream vllm) are accurate and grounded in the diff. X's clean APPROVE more faithfully matches the ground-truth signal, while Y's single 'finding' (suggesting a comment to explain the missing prefix) is a manufactured, low-value nitpick that isn't really warranted given the rename intentionally mirrors upstream naming. Y's finding is at least concrete (file:line, suggested edit), giving it a slight actionability edge, but overall precision suffers for inventing a non-issue where the reviewer said lgtm.",
+  "_cost_usd": 0.059425200000000004,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r1",
+    "arm_a_sha256": "a402744ab4d6d588e3d986419919f23d8b2fa2e121bc18b81b7ae3548a87f434",
+    "judge_rep": 3
+  }
+}

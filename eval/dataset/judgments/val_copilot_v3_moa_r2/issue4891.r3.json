@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.85,
+    "grounding": 0.8,
+    "completeness": 0.75
+  },
+  "y": {
+    "correctness": 0.5,
+    "grounding": 0.4,
+    "completeness": 0.6
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both correctly land on the 'duplicate of #4808' disposition, but the ground truth explicitly points to issue #4809's comment for context, and only X engages with #4809 (framing it as the tracking issue enumerating five call sites, four fixed by #4810, one left for #4808) — Y never mentions #4809 at all. Y also confidently asserts throughout that '#4808... is already merged on main' and fabricates specific verified-looking code-comment text/line numbers, only appending a disclaimer at the very end that merge-state wasn't actually checked, which is a more serious grounding problem than X's approach of flagging its one unverified claim as an explicit open question. X's regression-test-gap observation is also a concrete, verifiable, useful addition; Y's workaround/verification steps are practical but don't offset the fabrication and missing #4809 linkage.",
+  "_cost_usd": 0.11149350000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r2",
+    "arm_a_sha256": "badde11aab30f74e723226c4fa54d1636ca37f490cc84c74bff79b2689ec391c",
+    "judge_rep": 3
+  }
+}

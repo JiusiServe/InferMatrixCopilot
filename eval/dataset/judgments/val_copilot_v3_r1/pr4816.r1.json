@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (just an 'lgtm' approval), so both candidates correctly approve with no blockers and both achieve full recall vacuously. Both are well-grounded, citing accurate diff hunks and correctly explaining the upstream vllm#46022 rename rationale and the AttributeError failure mode it fixes. X is slightly more thorough, adding a useful non-blocking note about the mocked tests' limitation for catching future upstream renames, while Y's line-by-line 'Validated' hunk list omits one of the three test-file hunks (the create_audio_generate test) despite its prose correctly noting all three were updated.",
+  "_cost_usd": 0.17877509999999996,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r1",
+    "arm_a_sha256": "ac1e6538a8deb1f5ab7243042390405a08e728d146c5b072f9b431a49dd54428",
+    "judge_rep": 1
+  }
+}

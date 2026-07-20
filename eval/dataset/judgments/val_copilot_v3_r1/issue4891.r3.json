@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.75,
+    "grounding": 0.7,
+    "completeness": 0.65
+  },
+  "y": {
+    "correctness": 0.85,
+    "grounding": 0.75,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly land on the actual disposition (duplicate of #4808) and cite the same plausible code anchors (line 2238 crash, maybe_remap_kv_scale_name at 2343). X adds an unverified, unhedged-enough speculation that #4808 'was closed without merging,' a complication the thread never raised and which reads as invented rather than established. Y stays aligned with the terse ground-truth closure, states a concrete verification (grep returns zero matches) and delivers a clean, directly actionable maintainer-style report (root cause/fix/workaround/verification/disposition) rather than X's more meta, self-referential framing ('my read-only checkout is the rebase branch...') that breaks the maintainer persona.",
+  "_cost_usd": 0.12795910000000002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r1",
+    "arm_a_sha256": "7209d4f95838fbc6a50c46d2839c5d2ec2b7e312cddeae50d4ee6eba928d4dda",
+    "judge_rep": 3
+  }
+}

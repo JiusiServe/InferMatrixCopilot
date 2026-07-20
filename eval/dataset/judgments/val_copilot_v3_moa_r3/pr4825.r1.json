@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both correctly validate that adding 'unet' is safe and scoped, matching the ground truth's LGTM consensus, but neither candidate surfaces dsocek's specific inline suggestion about driving naming/component mapping from _packed_modules_mapping/stacked_params_mapping. X comes closer in spirit with its 'derive from pipeline._dit_modules instead of a fourth hardcoded list' point and also implicitly acknowledges the validation-evidence request that xuechendi raised. X's findings are concrete, cite specific file:line locations, and propose actual code changes, whereas Y's output is dominated by validation/sweep bullets and yields only one minor, weakly-actionable suggestion (add a clarifying comment).",
+  "_cost_usd": 0.1435513,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r3",
+    "arm_a_sha256": "7999f73ce57f9a15cd524e6fbe4fb3197361a6791c5653363966ab1cc346efda",
+    "judge_rep": 1
+  }
+}

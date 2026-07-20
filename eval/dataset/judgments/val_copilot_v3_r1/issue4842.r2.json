@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.75,
+    "grounding": 0.78,
+    "completeness": 0.75
+  },
+  "y": {
+    "correctness": 0.85,
+    "grounding": 0.68,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly identify the root cause (default --run-level=core_model injecting load_format: dummy per #4354, fixed by --run-level=full_model) matching the thread's resolution. Y aligns more precisely with the actual outcome by explicitly recommending 'closed as invalid' (matching yenuo26) and better explains that the full_model pytest marker doesn't itself set the run-level, whereas X's 'Disposition: keep-open' field contradicts the thread's actual closure. However, Y fabricates a specific Welsh-language audio transcript ('Yn ymwneud yw'r llwyddiad...') that never appears anywhere in the issue's log output, a grounding flaw X avoids by sticking to evidence actually present in the report.",
+  "_cost_usd": 0.14824410000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r1",
+    "arm_a_sha256": "e0a49e6fd41f0c5ce35ed0f728e7b972a871b4758bd58dad00931519a02a72e2",
+    "judge_rep": 2
+  }
+}

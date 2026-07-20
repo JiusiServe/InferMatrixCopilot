@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.5,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X directly reproduces the substance of the sole ground-truth inline comment by verifying that both submit_initial and submit_update reject list prompts, correctly explaining why the already_submitted gate was safe to drop — matching the human reviewer's actual reasoning. Y instead frames already_submitted as possible dead code to remove (self-contradicting its own earlier note that it's used elsewhere), missing the real insight, and pads its review with non-findings ('not performed due to budget') plus a fabricated issue reference (#4839) not present in any provided context, hurting precision. Both are reasonably actionable with file/line pointers, but X's claims are all grounded and verified while Y mixes valid observations with speculative/unverified ones.",
+  "_cost_usd": 0.056530699999999996,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r2",
+    "arm_a_sha256": "780b9c8c59337c162ac05ff15019a073faeec40fa079149313a71ab9abfe8f63",
+    "judge_rep": 3
+  }
+}

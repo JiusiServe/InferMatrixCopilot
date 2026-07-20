@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.95,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.55,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates independently reach the same core insight as the ground-truth comment (submit_initial and submit_update both reject list prompts for diffusion, so dropping already_submitted is safe/correct), and X states it once, cleanly, with concrete verifying line refs and a calibrated non-blocking tone matching the actual outcome (two LGTM approvals). Y buries the same correct conclusion inside four redundant, partially self-contradictory entries on the same line (one sweep item says the unwrap is 'verified... necessary,' while two 'major/minor' items simultaneously demand the reviewer 'confirm' the very thing already verified), which hurts precision and actionability and yields a miscalibrated REQUEST CHANGES verdict for a clean, human-approved bugfix. Neither review contains a LATENT GAP CHECK section.",
+  "_cost_usd": 0.0629479,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r1",
+    "arm_a_sha256": "8730179614b2a3a9abf3e08b1f447d6782a3dc73e37882a7c1f5ec708163261a",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.9,
+    "actionability": 0.35,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.25,
+    "precision": 0.78,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Neither candidate directly surfaces the ground-truth ask (whether the reduce_scatter hasattr checks need deeper verification), but Y's broader test-coverage focus (untested world_size==1/None branches, untested RuntimeError path, reduce_scatter fakegroup mechanics) is thematically closer to that concern than X's largely confirmatory APPROVE writeup. Y's findings are also far more actionable, each anchored to specific file:line evidence with concrete test/code additions to make, versus X's mostly high-level validation and one vague 'worth a comment' nit. X is slightly more conservative/precise since it makes fewer claims, but Y's small extra risk (unverifiable test names like test_moe_ep_maps) doesn't offset its clear actionability advantage.",
+  "_cost_usd": 0.1714229,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r2",
+    "arm_a_sha256": "13d49282f854a843410c532cabff1548fa68d00684391d8622b305f3a84cb79a",
+    "judge_rep": 3
+  }
+}

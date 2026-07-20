@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.3,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (bot rate-limit notice + bare 'lgtm'), so both candidates trivially achieve full recall on a genuinely trivial rename PR. Both did solid diligence (grep verification, upstream cross-check) with plausible but partly unverifiable claims about upstream line numbers, so precision is comparably high. Y edges ahead on actionability by surfacing one concrete, diff-grounded observation (inconsistent naming convention vs. other openai_serving_* attributes) with a specific file:line and suggested fix, whereas X's only non-blocking note argues nothing should change, offering no actionable output.",
+  "_cost_usd": 0.056260199999999996,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r1",
+    "arm_a_sha256": "a402744ab4d6d588e3d986419919f23d8b2fa2e121bc18b81b7ae3548a87f434",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.8,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (just an 'lgtm' approval), so recall is trivially satisfied by both. Both candidates correctly validate the core rename across all hunks with accurate file/line grounding; X's review is a clean but generic approve-checklist with one unverifiable PR-number citation ('vllm#46022') and only a soft non-actionable note. Y adds two additional grounded, file/line-specific observations directly visible in the diff (the openai_serving_* naming-convention break and the missing chat-completion test coverage), giving it stronger precision and actionability without fabricating anything.",
+  "_cost_usd": 0.0614327,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r2",
+    "arm_a_sha256": "d0684d4c02ae503792059f60a250121278a33029834134ceb5b628cd30d9b06e",
+    "judge_rep": 2
+  }
+}

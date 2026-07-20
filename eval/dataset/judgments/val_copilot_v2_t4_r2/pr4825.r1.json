@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.8,
+    "actionability": 0.78,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates converge on the same well-grounded core finding (default_components duplicates the pipeline's own _dit_modules metadata, citing matching file:line evidence in pipeline_sdxl.py/registry.py/module_collector.py) that echoes the spirit, if not the exact letter, of dsocek's GT concern about a fragile hardcoded naming/mapping list — neither hits dsocek's specific packed_modules_mapping suggestion, capping recall for both. X is more concise and non-redundant, pairing that finding with a distinct, specific second issue (text-encoder LoRA silently no-op) and a calibrated approve-level verdict matching the actual LGTM/merged outcome. Y pads its output with trivial 'validated' sanity checks and splits essentially one idea into two overlapping findings (#1 and #2), diluting precision/actionability slightly, though its integration-test-coverage point is a useful distinct addition.",
+  "_cost_usd": 0.1832049,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r2",
+    "arm_a_sha256": "273009d35581dc84d7ad6fc3ecd739a3166f69f504c4a7cc5f62360b5babec34",
+    "judge_rep": 1
+  }
+}

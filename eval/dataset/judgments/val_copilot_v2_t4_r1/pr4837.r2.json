@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.45,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.7,
+    "precision": 0.85,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y independently verifies the exact reasoning behind the ground-truth inline comment (both submit_initial and submit_update reject list prompts, stage_pool.py:951/1022), matching its conclusion and the PR's actual approved outcome. X repeatedly flags orchestrator.py:1290 as a major/minor concern asking to 'confirm' the same thing four times, self-contradicting its own sweep note that already found the change 'necessary,' and lands on REQUEST CHANGES for a PR two reviewers LGTM'd, which hurts precision despite decent grounding on the pipeline_ming_imagegen.py findings.",
+  "_cost_usd": 0.1343799,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r1",
+    "arm_a_sha256": "8730179614b2a3a9abf3e08b1f447d6782a3dc73e37882a7c1f5ec708163261a",
+    "judge_rep": 2
+  }
+}

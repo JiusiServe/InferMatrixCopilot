@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.8,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.88,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (just an approving 'lgtm' and a bot notice), so both candidates correctly recall everything by recommending APPROVE with grounded, diff-matching analysis of this trivial rename fix. Y is slightly more precise and disciplined: it explicitly states its checkout reflects PR-time state, cites more granular file/line evidence per hunk, and adds a useful sweep confirming other serving accessors are unaffected, whereas X's 'grepped post-merge' phrasing is confusing/inaccurate for a pre-merge review and its specific upstream line-number claims (api_server.py:387,489) are unverifiable assertions that add fabrication risk without real added value.",
+  "_cost_usd": 0.060461600000000004,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r2",
+    "arm_a_sha256": "e46feafe1dc9157e74667a96dbdcff6183e0c7c639e908ae8230dbafacbf6702",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.95,
+    "grounding": 0.9,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.9,
+    "grounding": 0.85,
+    "completeness": 0.65
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both correctly diagnose the ground-truth root cause (default --run-level=core_model forces dummy weights via _add_dummy_load_format, unrelated to the full_model pytest marker) and prescribe the same fix, matching akshatvishu/yenuo26's resolution. X is cleaner and more thorough: it explains why the marker doesn't set run-level, cites a broader/more coherent set of file:line references, and adds concrete preconditions (GPU mem split, video path) plus a well-scoped follow-up suggestion. Y's substance is equally correct but its packaging hurts completeness — it leaks raw internal pipeline metadata ('# Run report', a literal task dict) atop the answer, and its 'Additional context' Fix section is malformed (a 'Run with the correct run-level:' line with no accompanying code block before jumping to the marker-based alternative), making it read less like a polished maintainer reply.",
+  "_cost_usd": 0.1637095,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r3",
+    "arm_a_sha256": "8e2c0a0971808c656265cb9567ab7c3da527b6b38cf915d98b2ae688f62f3ce5",
+    "judge_rep": 1
+  }
+}

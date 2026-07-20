@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.85,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Neither candidate surfaces the one substantive ground-truth concern (yenuo26's question about verifying reduce_scatter behavior beyond hasattr) — X even explicitly marks that exact test code as 'validated...correct' without flagging it, so recall is low for both. X offers five concrete, diff-grounded, file/line-anchored findings (test-order fragility, untested cfg=1 path, untested None/world_size<=1 branches, etc.) that are valid if minor, giving it stronger actionability; Y's deeper but narrower investigation yields only one vague 'worth a comment' nit and otherwise reads as a pure approval, matching real-world outcome but contributing little concrete, actionable content.",
+  "_cost_usd": 0.29669320000000005,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r3",
+    "arm_a_sha256": "1189573fefdcc2468963e6440e4316b6079816bb8e589a3860e60bdeddad1573",
+    "judge_rep": 1
+  }
+}

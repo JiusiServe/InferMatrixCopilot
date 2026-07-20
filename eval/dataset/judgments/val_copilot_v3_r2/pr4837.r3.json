@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.85,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 0.88,
+    "precision": 0.85,
+    "actionability": 0.88
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently arrive at the same core grounding as the human reviewer (submit_initial and submit_update both reject list prompts for diffusion, so dropping the already_submitted gate is correct) and both correctly explain the DiffusionOutput unwrap fix — solid recall/precision on the single substantive ground-truth concern. Y edges ahead on actionability by proposing the exact inline comment text that documents the human reviewer's rationale (the closest match to the actual inline concern) and by doing extra grounded sweeps (dead-code check on already_submitted, pattern-repeat grep); X is more concise and its APPROVE verdict better matches the actual LGTM/LGTM outcome, but its comments are slightly more generic. Neither has a LATENT GAP CHECK section, so gap_hit is false for both.",
+  "_cost_usd": 0.16803780000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r2",
+    "arm_a_sha256": "e2ea9807d5be760b2003f2b6eb6702f84c1b19ba3311372a8fb6962a51fdace9",
+    "judge_rep": 3
+  }
+}

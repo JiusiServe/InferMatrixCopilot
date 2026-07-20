@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.9,
+    "actionability": 0.45,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The one substantive ground-truth concern (yenuo26 asking whether reduce_scatter verification in the test is adequate given two issues were fixed together) is only loosely echoed by X, which flags that _TP is missing the same device_communicator/reduce_scatter assertions added for _PCP/_DP/_EP — a related but not identical test-coverage gap. Y never engages this topic at all, instead delivering a validation-heavy APPROVE with a single vague, low-actionability suggestion. Both reviews are grounded and free of fabrication, but X's findings are concrete (specific lines, exact assertions/comments to add) while Y's is soft ('worth a one-line comment').",
+  "_cost_usd": 0.288183,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r2",
+    "arm_a_sha256": "975af0981db332c2f920488c31e142ed59d17fa1d7685a95a1962ee9a785597d",
+    "judge_rep": 1
+  }
+}

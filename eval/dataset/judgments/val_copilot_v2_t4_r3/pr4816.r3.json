@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth has zero substantive concerns (plain 'lgtm'), so both candidates trivially achieve full recall; the differentiator is precision/actionability of their own findings. Both independently verified the same upstream evidence (instrumentator/basic.py:23) confirming the rename fixes a real AttributeError bug, which is grounded and correct. X reaches the correct APPROVE verdict matching the actual review outcome, and explicitly recognizes the mock-test limitation as non-actionable rather than manufacturing a request. Y reaches COMMENT and asks for 'a targeted test that exercises create_speech, create_speech_batch, and create_audio_generate error paths end-to-end,' but the diff shows exactly these three paths already have updated regression tests, making that suggestion partly redundant/ungrounded and its actionability weaker (a vague either/or ask).",
+  "_cost_usd": 0.08444099999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r3",
+    "arm_a_sha256": "a3532ed191743c43789f30918b8ef98af99785ec3a5e24a1c412d1995c5467b7",
+    "judge_rep": 3
+  }
+}

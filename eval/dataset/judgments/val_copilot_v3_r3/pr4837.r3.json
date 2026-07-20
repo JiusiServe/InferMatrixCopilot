@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.92,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.7,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates independently reconstruct the one substantive ground-truth concern (already_submitted removal is safe because both submit_initial/submit_update reject list prompts for diffusion), so recall is comparable. X's findings are tighter and all grounded — the multi-element-list note is correctly framed as intentional/non-blocking and the regression-test ask is concise. Y pads with a redundant 'please confirm' on something it already claims to have verified (ZImagePipeline's DiffusionOutput return type) and raises a scope-creep 'major' finding about pre-existing, untouched code (orchestrator.py:1264 multi-element handling), which weakens precision. Y's overly cautious 'FOLLOW-UP REQUIRED' verdict also diverges from the actual outcome (clean LGTM/LGTM approval).",
+  "_cost_usd": 0.0672566,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r3",
+    "arm_a_sha256": "fd0d95152d3fc54f13bc52aab6dfea20fdf250d9ed9be61a55a7755fe2de45b7",
+    "judge_rep": 3
+  }
+}

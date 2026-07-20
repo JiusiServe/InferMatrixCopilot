@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.25,
+    "precision": 0.8,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Neither candidate surfaces dsocek's core ground-truth concern (unify naming-conflict handling with _packed_modules_mapping/stacked_params_mapping), but X's suggestion to derive default_components from each pipeline's declared _dit_modules is thematically closer to that critique (eliminate hardcoded/duplicated lists) than Y's shallower 'add a comment noting the registry.py duplication' fix. X also surfaces a genuinely valuable, PR-relevant finding (text-encoder LoRA is still a silent no-op, the same failure class this PR fixes) that outweighs Y's less critical missing-round-trip-test suggestion. Both are well-grounded (they independently cite the same pipeline_sdxl.py:110/46 and registry.py:427 facts, cross-validating accuracy) and both give concrete file/line actionable comments, but X's findings carry more design/severity weight.",
+  "_cost_usd": 0.1714987,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r1",
+    "arm_a_sha256": "11ca8a5e736c9d42c98843ca94b1c16658716f59a3dd59c234a4d3c1e147edfc",
+    "judge_rep": 1
+  }
+}

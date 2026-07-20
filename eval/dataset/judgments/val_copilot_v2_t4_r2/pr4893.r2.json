@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.75,
+    "actionability": 0.4,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The only substantive ground-truth concern is yenuo26's inline question about whether reduce_scatter also needs test verification alongside device_communicator; X independently flags that the same test omits equivalent device_communicator/reduce_scatter assertions for _TP, landing squarely in the same theme, while Y's review never touches test-coverage gaps for these new assertions at all. X also delivers four other grounded, file:line-anchored findings (stale comments, missing docstring, unguarded cpu_group precondition) that are all verifiable against the diff, giving it much higher actionability than Y's single vague 'worth a one-line comment' note. Y's review is accurate but shallow — mostly a validation/blocker-scan with almost no concrete, actionable line-level findings, so it scores lower on recall and actionability despite reasonable precision.",
+  "_cost_usd": 0.2167154,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r2",
+    "arm_a_sha256": "975af0981db332c2f920488c31e142ed59d17fa1d7685a95a1962ee9a785597d",
+    "judge_rep": 2
+  }
+}

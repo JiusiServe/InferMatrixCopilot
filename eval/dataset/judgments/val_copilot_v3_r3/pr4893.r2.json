@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.85,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Neither candidate hits the one substantive ground-truth concern (whether hasattr-only checks for reduce_scatter are sufficient verification), so recall is low for both. X engages more with test-coverage gaps in the same area (missing cfg=1 case, untested None/world_size<=1 branches, fragile order assertion) and delivers five concrete, grounded, actionable file/line suggestions, whereas Y offers deeper API verification (confirming DPMetadata's fields and init_model_parallel_group's signature) but converges to a single actionable comment plus an APPROVE verdict, making it less actionable despite comparable groundedness.",
+  "_cost_usd": 0.3296615,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r3",
+    "arm_a_sha256": "1189573fefdcc2468963e6440e4316b6079816bb8e589a3860e60bdeddad1573",
+    "judge_rep": 2
+  }
+}

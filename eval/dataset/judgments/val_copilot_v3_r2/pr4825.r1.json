@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.9,
+    "actionability": 0.15,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The one substantive ground-truth concern (dsocek's push to generalize the fix, e.g. drive it from _packed_modules_mapping, instead of hardcoding another component name) is echoed by X's comment #1 urging derivation from pipeline._dit_modules rather than a fourth hardcoded list, plus a grounded follow-on about text-encoder LoRA being a silent no-op — both concrete, file/line-anchored, and actionable. Y is a meticulous validation pass (many corroborated file:line facts, high precision) but raises zero design or follow-up concerns and lands on a bare APPROVE, missing the actual reviewer pushback and offering nothing actionable.",
+  "_cost_usd": 0.1871005,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r2",
+    "arm_a_sha256": "daf475716abfe39f5233aba7d59fe621602d3b4c7633a0b58101a27d349aaa6c",
+    "judge_rep": 1
+  }
+}

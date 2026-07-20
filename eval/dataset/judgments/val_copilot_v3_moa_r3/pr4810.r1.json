@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.7,
+    "actionability": 0.75,
+    "gap_hit": true
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates correctly validate the direct/delegated loader split and both independently flag the exact latent gap (hunyuan_image3_transformer.py diffusion loader still calling the removed API), matching the ground-truth gap check. X goes further with a substantive, well-grounded catch that the delegated-loader test only feeds an already-mapped name into the inner loader and never actually exercises the outer AutoWeightsLoader's mapping — a theme that echoes the human reviewer's own caveat about tests using fake params instead of validating against real resolved names. Y's extra findings (collapsing nested None-guards, renaming a test for consistency) are valid but low-value nitpicks that dilute precision without adding coverage of ground-truth concerns. Neither candidate mentions the #4808 cross-PR coordination note, capping recall for both.",
+  "_cost_usd": 0.22055339999999998,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r3",
+    "arm_a_sha256": "72850582867a29eb91c1d9578d9c35baebc4cfd589a97d4ca26cee01a25dd071",
+    "judge_rep": 1
+  }
+}

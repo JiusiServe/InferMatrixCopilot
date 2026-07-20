@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.9,
+    "actionability": 0.25,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X's suggestion to derive default_components from the pipeline's existing _dit_modules metadata closely mirrors dsocek's ground-truth concern about driving the mapping from _packed_modules_mapping instead of hardcoding a component list, giving it real recall of the one substantive reviewer concern, plus concrete file:line actionable suggestions. Y is a well-grounded validation report (accurate citations, no fabrication) but raises zero reviewer-level concerns and offers no change requests, so it scores high on precision but low on recall and actionability.",
+  "_cost_usd": 0.1545626,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r3",
+    "arm_a_sha256": "4935ce263775dd8c4b10f292e0aa35fad1cb5614b28d14b33739d40377d732a8",
+    "judge_rep": 1
+  }
+}

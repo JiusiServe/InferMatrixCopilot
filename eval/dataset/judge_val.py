@@ -141,6 +141,13 @@ def judge_one(kind: str, n: int, rep: int) -> str:
     v = _cc_judge(prompt)
     v["_blinding"] = {"X": "copilot_v2" if x_is_a else "opus_baseline",
                       "Y": "opus_baseline" if x_is_a else "copilot_v2"}
+    # metadata-only (goal-eval plan round-4 fix): record WHICH arm dir + its
+    # content hash so validation can detect a wrong ARM_A_DIR; scoring
+    # logic untouched — the generic copilot_v2 label above stays as-is.
+    import hashlib as _hl
+    v["_arm_meta"] = {"arm_a_dir": str(ARM_A),
+                      "arm_a_sha256": _hl.sha256(a_text.encode()).hexdigest(),
+                      "judge_rep": rep}
     outf.write_text(json.dumps(v, indent=2, ensure_ascii=False))
     w = v.get("winner", "?")
     real = v["_blinding"].get(w, "tie")

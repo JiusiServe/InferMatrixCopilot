@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.7,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates catch the key latent gap (the diffusion transformer's leftover get_cache_scale call), satisfying gap_hit for each. X frames it correctly as a blocker with a concrete grep-verified fix path, and independently hits the ground truth's '+1 keep the regression test' point by arguing forcefully against removing it. Y's technical analysis is impressively deep (actual upstream vLLM source citations) and sharply nails the GT's test-adequacy concern (mapped-name test bypasses the real AutoWeightsLoader mapping it's meant to verify), but it buries its own diffusion-transformer catch as 'non-blocking' under a clean APPROVE verdict and tacks on an unverifiable, likely-fabricated claim that the file already carries a '(see #4810)' comment — which contradicts the gap note's implication that a separate later issue (#4891) was needed, hurting precision.",
+  "_cost_usd": 0.26361290000000004,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r3",
+    "arm_a_sha256": "b96a878c3671815ed5ecc9af6dbd70bc637e46fa1e930538d569335027cb6be7",
+    "judge_rep": 2
+  }
+}

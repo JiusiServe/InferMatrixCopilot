@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.5,
+    "grounding": 0.4,
+    "completeness": 0.6
+  },
+  "y": {
+    "correctness": 0.8,
+    "grounding": 0.75,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly land on 'duplicate of #4808', matching the ground truth. X asserts confidently and repeatedly that #4808 is 'merged' and fabricates unverifiable specifics (exact comment text, an existing regression-test file covering all five loaders) presented as fact, which reads as hallucinated grounding rather than checked evidence. Y reaches the same duplicate verdict but is more epistemically honest: it flags that #4808's PR metadata shows closed/unmerged, identifies a real coverage gap in the regression test, and explicitly states what it could vs. could not verify (rebase branch vs. upstream main) rather than asserting unverified claims as settled fact. That hedged, verification-aware stance on a point where confident wrongness would be costly is exactly what should be rewarded over a confidently-stated but likely fabricated 'verified merged' narrative.",
+  "_cost_usd": 0.0507635,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r3",
+    "arm_a_sha256": "549fb9422452b0eacc521a642bd2b10cad8e63de29dfa86f92a947999733ae89",
+    "judge_rep": 2
+  }
+}

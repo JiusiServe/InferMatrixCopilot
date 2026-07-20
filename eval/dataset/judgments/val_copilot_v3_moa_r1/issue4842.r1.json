@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.85,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.85,
+    "grounding": 0.72,
+    "completeness": 0.85
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly land on the ground-truth resolution (wrong --run-level, dummy weights, close as invalid) with matching file/line citations for stage_config.py and run_args.py. X grounds more tightly to the actual thread by explicitly citing PR #4354 (which akshatvishu named) and adds concrete, verifiable detail (gpu_memory_utilization splits, assertion helper locations) without introducing unsupported claims. Y adds a speculative, unverified claim that the reporter's --video-path arg 'does not exist in the upstream test,' which isn't backed by anything in the thread and risks misleading the reporter. Both fabricate an unsupported 'Welsh audio' detail not present in the given log, roughly canceling out on that front.",
+  "_cost_usd": 0.14868430000000002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r1",
+    "arm_a_sha256": "b6f5f518b8f567f603b1cf56a5c48b64a5eb6505d6626fd6abc8896b0848c56d",
+    "judge_rep": 1
+  }
+}

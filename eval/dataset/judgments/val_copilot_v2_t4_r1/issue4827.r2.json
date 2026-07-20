@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.95,
+    "grounding": 0.9,
+    "completeness": 0.95
+  },
+  "y": {
+    "correctness": 0.9,
+    "grounding": 0.7,
+    "completeness": 0.85
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates correctly reproduce the thread's diagnosis (base tokenizer lacks extended ratio tokens, moe.yaml wrongly forces the AR stage post-#2713, DiT config workaround confirmed by FayeSpica) and correctly note Gaohan123's request to track the fix in a new issue. X grounds slightly deeper — citing the downstream `_all_ratio_ids` builder, both yaml headers, and offering both a graceful-degrade fix (mirroring Tencent's actual guard behavior) and a fail-fast guard — while being explicit about its own hardware limitation. Y is comparably complete but cites a placeholder/fabricated comment URL ('#issuecomment-...') which undercuts its grounding, and its single raise-only fix is less aligned with Tencent's reference behavior than X's dual approach.",
+  "_cost_usd": 0.19568349999999998,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r1",
+    "arm_a_sha256": "92d7ac04cf168ff2353ce1650fdf0efd022573787fca125a6118053441925833",
+    "judge_rep": 2
+  }
+}

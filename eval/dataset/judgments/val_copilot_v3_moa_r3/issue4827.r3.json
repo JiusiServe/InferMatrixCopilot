@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.85,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.85,
+    "grounding": 0.7,
+    "completeness": 0.78
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly diagnose the tokenizer-missing-extended-ratio-token crash and give the same fix (serve Base with hunyuan_image3_dit.yaml), matching the thread resolution. X is more grounded, citing specific line ranges in both the model file and both YAML configs, quoting the YAML header text, and echoing the reporter's exact Tencent reference-code citation, plus offering a concrete degrade-gracefully code diff. Y's citations are vaguer (an approximate line number, no YAML header evidence) and its 'keep-open' disposition sits awkwardly against the maintainer's request to move tracking to a new issue, whereas X correctly frames this issue as resolved/closed with the hardening tracked separately.",
+  "_cost_usd": 0.0656543,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r3",
+    "arm_a_sha256": "5fbc32ec1e39f335b9fc5fd62ecefc62d388c22721b2566aaa64acf6038cfcb6",
+    "judge_rep": 3
+  }
+}

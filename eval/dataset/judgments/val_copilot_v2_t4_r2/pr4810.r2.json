@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.8,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both are well-grounded, code-verified reviews that independently surface the latent gap (the unswept HunyuanImage3 diffusion loader). But Y also captures several ground-truth-specific nuances X misses: the test's real-limitation (fake param not exercising the outer AutoWeightsLoader mapping path, closely mirroring the human reviewer's exact critique), the explicit #4808/5-call-site coordination point, and it converges on the same APPROVE verdict the actual reviewers reached. X's findings are equally grounded and its blocker framing is defensible given hindsight, but it misses the test-quality nuance and coordination point, and its REQUEST CHANGES verdict diverges from what ground-truth reviewers actually did without acknowledging their reasoning.",
+  "_cost_usd": 0.3450972,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r2",
+    "arm_a_sha256": "4d1c9686d181233a39c05268ffd2c2896ea84c06e9f21d1634aeac61f9289daf",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.35,
+    "grounding": 0.4,
+    "completeness": 0.55
+  },
+  "y": {
+    "correctness": 0.25,
+    "grounding": 0.3,
+    "completeness": 0.6
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly trace the guard to PR #4834 (matches yenuo26's comment) but then both confidently fabricate a specific closing fix (PR #4912, level=1 change) and declare the issue resolved/closed — while the actual thread shows Flink-ddd still asking to trigger a full sleep-mode CI run, implying the issue was still under active investigation, not resolved. That's a confident-wrong pattern for both. X is slightly better because it appends an explicit caveat that merge-state claims were 'not verified via gh this run — treat as unconfirmed,' whereas Y asserts unverified specifics (an exact merge date, extra test names/line numbers, 'already in main') with no hedging at all, compounding the hallucination risk. Y is somewhat more complete, adding practical runtime guidance for users choosing between sleep levels, which slightly helps the reporter's broader situation.",
+  "_cost_usd": 0.12135719999999998,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r2",
+    "arm_a_sha256": "ea0efe1861bee9ee2fa7f94264bd8a54096f8f84e3b498b9defc2862d5f2b2b7",
+    "judge_rep": 3
+  }
+}

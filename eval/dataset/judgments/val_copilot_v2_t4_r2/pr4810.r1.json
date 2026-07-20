@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.7,
+    "actionability": 0.65,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both flag the diffusion loader (hunyuan_image3_transformer.py) still calling the removed get_cache_scale API, hitting the latent gap, but Y treats it as a grep-verified blocker with concrete file:line fix instructions and a matching test-file update, while X buries it as a 'non-blocking' note and asserts it was 'already addressed on main' with a specific '(see #4810)' comment citation that contradicts the gap check's premise that this required a later issue (#4891) — an unverifiable, likely fabricated detail that undercuts precision and defangs the finding's urgency. Y also better mirrors ground-truth substance (qwen2_old's guard removal as cleanup, not regression) and adds a well-grounded extra catch (mimo_audio_llm mapper-ordering fix) with consistently precise line-level evidence, giving it stronger recall and actionability overall.",
+  "_cost_usd": 0.33405670000000004,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r2",
+    "arm_a_sha256": "4d1c9686d181233a39c05268ffd2c2896ea84c06e9f21d1634aeac61f9289daf",
+    "judge_rep": 1
+  }
+}

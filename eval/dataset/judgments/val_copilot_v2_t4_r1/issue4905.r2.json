@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.5,
+    "grounding": 0.7,
+    "completeness": 0.75
+  },
+  "y": {
+    "correctness": 0.5,
+    "grounding": 0.72,
+    "completeness": 0.65
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly trace the failure to PR #4834's level-2 wake guard (matching yenuo26's bisection), but both overreach by confidently declaring the issue resolved/closeable, when the actual thread shows maintainers still triaging and explicitly requesting a full CI cluster run to confirm — a live, unresolved escalation rather than a closed matter. Grounding is comparable (same file/line citations); Y is marginally more transparent by noting it verified the current checkout state, while X provides slightly more complete, actionable guidance (runtime advice for users, admission-guard detail) that better serves the reporter. Neither addresses Flink-ddd's specific ask to trigger the CI test, so both share that completeness gap equally.",
+  "_cost_usd": 0.1511453,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r1",
+    "arm_a_sha256": "e8b80565b5bac4ede9a8ff71aa0b1be98a93b9a8bc0c49b564485a32badf8b9d",
+    "judge_rep": 2
+  }
+}

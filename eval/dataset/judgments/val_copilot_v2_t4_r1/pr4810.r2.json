@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.55,
+    "actionability": 0.75,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently surface the latent gap (the unswept hunyuan_image3_transformer.py caller of get_cache_scale), so gap_hit is true for both. But X's precision is hurt by two/three near-duplicate 'dead code' claims asserting get_cache_scale_mapper() never returns None — contradicting vLLM's actual default (returns None; only Fp8/CompressedTensors-style configs override it), so the guard is not dead code, and X states this with fabricated confidence and citations. Y's findings (outer-AutoWeightsLoader mechanics, the delegated-loader test bypassing the mapper it claims to test, qwen2_old's getattr guard being cleanup not regression) are all accurate, closely track the human reviewer's actual concerns (recall), and are verified against a real upstream checkout rather than asserted. Both are reasonably actionable with file/line pointers, giving Y a clear win on precision and recall despite comparable actionability and identical gap_hit.",
+  "_cost_usd": 0.35209860000000004,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r1",
+    "arm_a_sha256": "9780545d206447135fbd2eb6ff172f313f609ab18c5fabc9ded9305cb5798fb0",
+    "judge_rep": 2
+  }
+}

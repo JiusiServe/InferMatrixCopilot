@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.7,
+    "grounding": 0.55,
+    "completeness": 0.6
+  },
+  "y": {
+    "correctness": 0.85,
+    "grounding": 0.8,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly land on 'duplicate of #4808,' matching the thread resolution, but Y also cites #4809 as the tracking issue exactly as the ground-truth comment does, while X never mentions #4809 at all. X asserts confidently throughout that #4808 is 'merged' and the fix is 'already fixed on main,' only walking it back with a bolted-on disclaimer at the end — an internally inconsistent, less trustworthy pattern. Y instead flags the merge status and a plausible test-coverage gap as open questions to confirm rather than facts, which is more appropriate given neither candidate actually verified state via tools, and this framing makes Y more complete (it addresses whether the closure is actually safe, not just whether the diagnosis is right).",
+  "_cost_usd": 0.124251,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r1",
+    "arm_a_sha256": "c2e9dcc330398ad4241dfd621773eb940d2c252a14b6cf35d255df807676aa97",
+    "judge_rep": 2
+  }
+}

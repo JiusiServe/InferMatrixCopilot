@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (just an 'lgtm' approval), and both candidates correctly reach APPROVE with grounded, diff-consistent verification of the rename's completeness (repo-wide grep counts match the diff's 9 sites exactly). Neither fabricates issues. X edges ahead slightly by adding a genuine non-blocking insight (tests mock the attribute directly and won't catch future upstream drift) and presenting findings more concisely, whereas Y's repetitive per-hunk '[validated]' formatting adds length without added value.",
+  "_cost_usd": 0.0830366,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r2",
+    "arm_a_sha256": "e46feafe1dc9157e74667a96dbdcff6183e0c7c639e908ae8230dbafacbf6702",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.8,
+    "actionability": 0.15,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X's comment about deriving denoiser/component discovery from existing per-pipeline data (_dit_modules) instead of a fourth hardcoded list echoes the spirit of dsocek's actual ground-truth concern about generalizing the naming-conflict fix via _packed_modules_mapping, and X also raises a concrete, file/line-grounded gap (text-encoder LoRA still silently no-ops) with an actionable suggestion (warn on zero-match adapters). Y is a thorough but purely confirmatory validation pass — accurate and well-grounded, but it raises zero design concerns or suggested changes, missing the one substantive point a real reviewer made and offering nothing actionable.",
+  "_cost_usd": 0.1118976,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r1",
+    "arm_a_sha256": "dc95d28261d8af65323f29b93ddcec38d124c4a0b0ca13fdfc97388d86540d5c",
+    "judge_rep": 3
+  }
+}

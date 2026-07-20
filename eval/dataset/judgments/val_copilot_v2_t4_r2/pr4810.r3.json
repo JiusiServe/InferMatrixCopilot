@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": true
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently found the same latent gap (the unswept HunyuanImage3 diffusion-transformer caller of get_cache_scale), which the ground-truth human reviewers missed — a strong catch for both. X grounds its finding in a PR-time-tree grep and frames it as an actionable blocker with concrete line-level fixes (add to _STALE_API_FILES, apply mapper pattern), plus an additional well-grounded catch (the mimo_audio mapper-ordering fix pre-empting a double-prefix bug). Y does deeper upstream design verification and its test-coverage critique (Note 1) echoes the human's fake-param-vs-real-checkpoint concern, but it downgrades the diffusion-transformer gap to a resolved historical note (an unverifiable claim about current main) rather than a blocking action, softening its practical value. Neither fully covers the human review's #4808/5-call-site coordination point or explicitly praises the regression test as the reviewer did.",
+  "_cost_usd": 0.23916740000000003,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r2",
+    "arm_a_sha256": "4d1c9686d181233a39c05268ffd2c2896ea84c06e9f21d1634aeac61f9289daf",
+    "judge_rep": 3
+  }
+}

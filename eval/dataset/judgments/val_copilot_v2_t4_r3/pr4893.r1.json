@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.7,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Neither candidate directly surfaces the ground-truth reviewer's narrow question about verifying reduce_scatter coverage in the test, though X's validated notes at least engage with that exact test detail and X independently catches a real, grounded gap (missing cfg_parallel_size=1 test coverage) that echoes the same 'did the two fixes get jointly verified' concern. X gives more concrete, line-specific, copy-pasteable suggestions (docstring text, comment wording, test case to add), which raises actionability despite some findings being low-value nitpicks. Y is more rigorously verified (checked DPMetadata dataclass fields, destroy_model_parallel cleanup, use_device_communicator default) and stays cleaner/higher-precision, but ends in a bare APPROVE with only one soft, non-actionable comment, contributing less reviewable substance.",
+  "_cost_usd": 0.2114739,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r3",
+    "arm_a_sha256": "fa353a4d7ed5aae9620d604f0945fc199f9d98c15d967a8484c6ac37949df7e2",
+    "judge_rep": 1
+  }
+}

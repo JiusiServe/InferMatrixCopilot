@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Neither candidate recovers the ground truth's actual substantive suggestion (dsocek's packed_modules_mapping-driven naming-conflict idea, likely tied to a hunk removed before merge per tthakkal's reply), so recall is low and roughly equal for both, matched mainly by the implicit LGTM/COMMENT-level verdict. Both converge on a similar valid but GT-unmatched theme (derive component list from _dit_modules instead of hardcoding), but Y grounds its claims more thoroughly with explicit repo-wide greps (consumer sweep, registry.py divergence, MagiHuman's missed sr_dit, other self.unet references), giving it an edge in precision. X contributes one genuinely distinct and useful insight (text-encoder LoRA still silently no-ops, plus a systemic 'warn on zero-match adapter' suggestion) that Y lacks, keeping actionability close between the two.",
+  "_cost_usd": 0.1651389,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r1",
+    "arm_a_sha256": "374be7cefd01ee4ea6bb5a0160c306986947739b551638e374dd8c686db58111",
+    "judge_rep": 1
+  }
+}

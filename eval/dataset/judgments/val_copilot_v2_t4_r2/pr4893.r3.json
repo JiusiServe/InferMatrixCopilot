@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.85,
+    "actionability": 0.4
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "The sole substantive ground-truth concern (yenuo26's question about whether reduce_scatter verification should be added given two issues fixed at once) is completely missed by X, which instead validates everything as correct and recommends outright APPROVE with only a soft documentation nit. Y independently surfaces essentially the same gap with more precision — it notices the test asserts device_communicator/reduce_scatter for _PCP, _DP, _EP but not for _TP, which is exactly the kind of coverage gap the human reviewer was flagging, and gives a concrete fix. Y's other findings (stale comments, missing docstring, precondition documentation) are all grounded in real diff lines with accurate quotes and specific actionable fixes, while X's review is mostly a validation checklist with only one weak actionable item.",
+  "_cost_usd": 0.264263,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r2",
+    "arm_a_sha256": "975af0981db332c2f920488c31e142ed59d17fa1d7685a95a1962ee9a785597d",
+    "judge_rep": 3
+  }
+}

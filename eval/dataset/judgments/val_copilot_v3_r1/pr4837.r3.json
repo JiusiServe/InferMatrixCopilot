@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.7,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.55,
+    "actionability": 0.8
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X's core claim — that both submit_initial and submit_update reject list prompts identically, so gating the unwrap on already_submitted was never semantically justified — is essentially the exact reasoning in yJader's ground-truth inline comment, grounded with specific line refs. Y covers the same mechanism but reframes it as an undertested risk needing a follow-up regression test, missing the reviewer's actual point, and its verdict 'FOLLOW-UP REQUIRED' contradicts the two clean LGTM approvals. Y also cites a PR comment from '@akshatvishu' about HunyuanImage-3.0 that appears nowhere in the provided ground-truth thread, a likely fabrication that undercuts its 'verified/sweep' claims; X has its own smaller flaw (an internally contradictory claim that old outputs[0] would raise TypeError, while also saying it 'preserved stage_durations' from the old return). Y's suggestions are more code-concrete/actionable, but X is more accurate and better aligned with what reviewers actually flagged.",
+  "_cost_usd": 0.1598509,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r1",
+    "arm_a_sha256": "1d50a68e2e2911b563006c7ab6eeabbfd097887e6a475b1acff0b6966d0bf6e4",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.45,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (just an 'lgtm' approve), so both candidates trivially achieve full recall and neither fabricates findings — both did real verification (greps, upstream comparison) that appear grounded. X is a clean, well-organized approve with only a non-actionable observation about test-mock limitations. Y reaches the same approve-quality conclusion but adds one concrete, file/line-anchored suggestion (flagging the openai_serving_ prefix inconsistency and proposing a comment) plus a specific semantic check confirming audio_generate's untouched attribute is correct — giving it a slight edge on actionability and depth of diff-level reasoning.",
+  "_cost_usd": 0.1389913,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r1",
+    "arm_a_sha256": "a402744ab4d6d588e3d986419919f23d8b2fa2e121bc18b81b7ae3548a87f434",
+    "judge_rep": 1
+  }
+}

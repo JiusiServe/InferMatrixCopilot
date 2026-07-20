@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.55,
+    "completeness": 0.85
+  },
+  "y": {
+    "correctness": 0.95,
+    "grounding": 0.75,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly diagnose the issue as a run-level misconfiguration (default core_model → dummy weights) rather than a real bug, matching the thread's 'invalid' resolution and citing PR #4354/full_model fix. X fabricates a specific Welsh-language audio transcript quote that appears nowhere in the issue body, and cites a suspiciously large line range (runtime.py:2829-2832) that reads as invented precision. Y stays closer to verifiable ground truth, quotes an actual code snippet for the dummy-load-format patch, and correctly incorporates akshatvishu's specific single-device memory-utilization workaround, making it slightly more trustworthy despite similar overall depth.",
+  "_cost_usd": 0.13584990000000002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r2",
+    "arm_a_sha256": "a52d9afe503abbea9efea43862a1c274f8d891fa81ceef235cbc8d392b1eedba",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.45,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth is trivial (an 'lgtm' approval, no substantive comments), so recall ties. X is more precise and disciplined: it explicitly cross-checks the rename against the upstream vllm checkout, pinpoints the exact upstream line causing the original AttributeError, and correctly concludes APPROVE with no action items, matching the human 'lgtm' well. Y is nearly as grounded (accurate hunk-by-hunk validation, real grep evidence) but its three 'nit' comments are lower-value — one duplicates X's root-cause finding as a documentation suggestion, one flags the naming-convention divergence without recognizing it's the intentional point of the PR (upstream realignment), slightly undercutting its usefulness/precision. However Y's comments are far more concrete (specific file:line plus what to add/change), giving it a clear actionability edge, and it surfaces one genuinely novel, valid gap (no test for the chat-completion fallback path) that X never mentions.",
+  "_cost_usd": 0.2583966,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r2",
+    "arm_a_sha256": "d0684d4c02ae503792059f60a250121278a33029834134ceb5b628cd30d9b06e",
+    "judge_rep": 1
+  }
+}

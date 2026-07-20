@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.6,
+    "actionability": 0.4,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth has no real concerns (Codex hit its limit, human just said 'lgtm'), so both reviews correctly land on approve/no-blocker verdicts and neither misses anything. But Y's cited line numbers (754, 1017, 1157, 1248, 1286, 1329, 2533, 2546, 2615) all check out exactly against the diff hunks, and Y surfaces one genuinely actionable, well-evidenced finding (the error-response path via `_create_speech_error_json_response` isn't directly test-covered) with a concrete suggested test and command. X's narrative is solid but its test-file line references (2638, 2651, 2720) are wrong by ~100 lines (actual lines are ~2533/2546/2615), and it cites an unverifiable upstream PR number (vllm#46022) and specific upstream line numbers that can't be checked from the diff, adding fabrication risk to an otherwise reasonable review.",
+  "_cost_usd": 0.1907962,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r2",
+    "arm_a_sha256": "0118623b849b7a094ad3c3764ef53c830d7c217310b6feec77c5d9b5119cfbca",
+    "judge_rep": 3
+  }
+}

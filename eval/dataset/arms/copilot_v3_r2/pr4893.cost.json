@@ -1,0 +1,109 @@
+{
+  "wall_s": 324.9,
+  "split": "val",
+  "rc": 0,
+  "run_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r2/runs/pr4893/run-20260718-133943-5c6b24",
+  "recorded_at": "2026-07-18T13:45:06",
+  "attempts": [
+    {
+      "invocation_id": "inv-62cfff6c",
+      "outcome": "run:run-20260718-133943-5c6b24",
+      "rc": 0,
+      "pre_run": null
+    },
+    {
+      "run_dir": "run-20260718-133943-5c6b24",
+      "llm_calls": 22,
+      "input_tokens": 195802,
+      "output_tokens": 47347,
+      "usd": 0.124827,
+      "source": "spans"
+    }
+  ],
+  "attempt_usd_total": 0.124827,
+  "llm_calls": 22,
+  "input_tokens": 195802,
+  "output_tokens": 47347,
+  "usd": 0.124827,
+  "source": "spans",
+  "metrics": {
+    "schema": 1,
+    "run": "run-20260718-133943-5c6b24",
+    "task_kind": "pr_review",
+    "status": "done",
+    "quality": {
+      "q": null,
+      "weight_coverage": 0.0,
+      "partial": true,
+      "abstained": false,
+      "components": {
+        "recall_w": null,
+        "precision_v": null,
+        "useful": null,
+        "calib": null,
+        "decision": null
+      }
+    },
+    "cost": {
+      "usd": 0.1248,
+      "minutes": 5.38,
+      "ci_minutes": 0,
+      "input_tokens": 195802,
+      "output_tokens": 47347,
+      "tool_calls": 39,
+      "usd_ref": 1.0,
+      "min_ref": 10.0,
+      "cost_index": 1.2477,
+      "source": "spans",
+      "llm_calls": 22,
+      "by_role": {
+        "planner": {
+          "usd": 0.000524,
+          "input_tokens": 106,
+          "output_tokens": 400,
+          "calls": 1
+        },
+        "agent": {
+          "usd": 0.117231,
+          "input_tokens": 188319,
+          "output_tokens": 42341,
+          "calls": 20
+        },
+        "reducer": {
+          "usd": 0.007072,
+          "input_tokens": 7377,
+          "output_tokens": 4606,
+          "calls": 1
+        }
+      },
+      "cache_read_tokens": 736256,
+      "cache_creation_tokens": 0
+    },
+    "timings": {
+      "steps": {
+        "fetch": 3.11,
+        "gate": 0.92,
+        "review": 318.86,
+        "report": 0.04
+      },
+      "time_to_first_result_s": 322.92
+    },
+    "risk": {
+      "incidents": {
+        "catastrophic": 0,
+        "severe": 0,
+        "moderate": 0,
+        "minor": 0
+      },
+      "safety_multiplier": 1.0
+    },
+    "catq": null,
+    "tus": null,
+    "signals": {
+      "escalations": 0,
+      "pushes": 0,
+      "posted": 0,
+      "steps_completed": 4
+    }
+  }
+}

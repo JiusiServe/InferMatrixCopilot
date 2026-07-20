@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.75,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.85,
+    "grounding": 0.7,
+    "completeness": 0.8
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates correctly identify PR #4792 as the fix and the #4527 regression as root cause (non-async-chunk shipping (None, payload) instead of full payload), matching the ground-truth thread exactly, including the same code snippet and line locations. X goes further, citing additional scheduler/coordinator/mixin files to explain the full failure chain (parking, timeout, FINISHED_ERROR) and gives more actionable, structured guidance (upgrade/cherry-pick/workaround) plus addresses potential red herrings in the reporter's env; some of its extra specifics (e.g. exact 300s→600s timeout change) are unverifiable embellishments that slightly dent grounding confidence. Y is more conservative and equally correct on the core fix but thinner on completeness and the surrounding failure-path evidence.",
+  "_cost_usd": 0.1541659,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r2",
+    "arm_a_sha256": "49f960a72b97e9c24fdde0d1da562229043699108d0a8625c208ee5b6ffa63ce",
+    "judge_rep": 2
+  }
+}

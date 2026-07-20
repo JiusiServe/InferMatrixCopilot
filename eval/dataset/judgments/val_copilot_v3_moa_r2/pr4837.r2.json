@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.6,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.85,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates correctly validate the orchestrator.py:1290 already_submitted removal as safe, but Y's justification (submit_initial and submit_update both raise ValueError on list prompts, cited with exact stage_pool.py line numbers) almost exactly reproduces yJader's ground-truth reasoning about StagePool rejecting lists in both paths, while X's supporting evidence ('req.prompts[0] expects a dict') is vaguer and not clearly grounded in the same mechanism. Y also verifies the second diff hunk (DiffusionOutput/stage_durations preservation) with a concrete source citation, whereas X's parallel claims are asserted without comparable evidence. X edges out on actionability with a concrete test-file suggestion, but Y's stronger grounding on the one substantive reviewer concern outweighs that.",
+  "_cost_usd": 0.11388350000000001,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r2",
+    "arm_a_sha256": "36c576f951dc8c38e1bddd758a468307a53f7cb05808f795a6e29ba480e7d76d",
+    "judge_rep": 2
+  }
+}

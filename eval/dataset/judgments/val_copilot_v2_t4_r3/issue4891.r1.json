@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.45,
+    "grounding": 0.35,
+    "completeness": 0.5
+  },
+  "y": {
+    "correctness": 0.7,
+    "grounding": 0.65,
+    "completeness": 0.75
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly land on the ground-truth verdict (duplicate of #4808), but X states as settled fact that #4808 is merged and shows the exact post-fix line/comment, plus invents suspiciously specific artifacts (a test_kv_cache_scale_mapper.py file, unrelated 'qwen2_old.py'/'mammoth_moda2.py' loaders) with no hedge — risky given the reporter hit this crash on a recent main commit, suggesting the fix may not actually be live. Y reaches the same duplicate conclusion but explicitly flags that #4808 shows closed/unmerged and that the regression test has a coverage gap at this exact file, honestly noting what it could vs couldn't verify — better calibrated grounding and more useful to a maintainer even though it's more hedged.",
+  "_cost_usd": 0.10742389999999999,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r3",
+    "arm_a_sha256": "549fb9422452b0eacc521a642bd2b10cad8e63de29dfa86f92a947999733ae89",
+    "judge_rep": 1
+  }
+}

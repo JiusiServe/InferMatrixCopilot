@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.92,
+    "grounding": 0.85,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.85,
+    "grounding": 0.65,
+    "completeness": 0.85
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both correctly diagnose the config/tokenizer mismatch, cite the same crash line, and match the thread's workaround and 'open a new issue' disposition. X stays tighter to the evidence and adds a concrete, clearly-labeled remediation code snippet plus a hedged observation about doc headers. Y asserts unsupported specifics as fact — 'confirmed this works on NPU hardware' (the collect_env output shows a CUDA-less aarch64 CPU box, no NPU mentioned anywhere) and attributes the `_ratio_other_slices` code to PR #2713 when the thread only credits that PR with the config-topology change — plus an unverified config table (i2t/t2t rows) not grounded in the given thread.",
+  "_cost_usd": 0.1320569,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r3",
+    "arm_a_sha256": "e5404a287488cadaab2b960b2653c7988135a8fa9b1dd0a64c5ed6276aa408bf",
+    "judge_rep": 3
+  }
+}

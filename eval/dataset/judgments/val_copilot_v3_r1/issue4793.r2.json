@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.95,
+    "grounding": 0.85,
+    "completeness": 0.9
+  },
+  "y": {
+    "correctness": 0.9,
+    "grounding": 0.7,
+    "completeness": 0.8
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly diagnose the #4527 regression (None inter-stage payload starving the full-payload consumer) and correctly identify PR #4792 as the merged fix already folded into the 0.24 rebase commit, matching the thread exactly, and both correctly recommend closing. X goes further by explaining the actual hang mechanism (_FULL_PAYLOAD_INPUT_STAGES gating, accumulate_full_payload_output gating, coordinator/scheduler timeout log lines) and ties it precisely to the reporter's log output and version, while quoting the ground-truth code comment verbatim. Y reaches the same conclusion but pads with less-grounded extras (claimed NPU runner impact, a specific regression test path) not evidenced in the thread, and leaves in raw internal 'run report' scaffolding that undercuts it as a polished maintainer answer.",
+  "_cost_usd": 0.15886010000000003,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r1",
+    "arm_a_sha256": "0cb718111e9f6d42ec1a20dd1298a2ffedd8ebb65f8179197f7a59cdd0d26019",
+    "judge_rep": 2
+  }
+}

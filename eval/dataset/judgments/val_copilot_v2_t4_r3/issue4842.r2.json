@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.85,
+    "completeness": 0.75
+  },
+  "y": {
+    "correctness": 0.85,
+    "grounding": 0.55,
+    "completeness": 0.9
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both correctly diagnose the run-level/dummy-weights issue matching the thread's 'invalid' resolution and cite plausible stage_config.py/run_args.py lines pointing to PR #4354. Y is more thorough (marker-vs-runlevel distinction, hardware/video-path checklist, a genuine footgun-fix suggestion) but fabricates a specific audio transcript ('Yn ymwneud yw'r llwyddiad… Welsh-flavored noise') that never appears anywhere in the issue log, which is invented evidence presented as fact and undercuts its grounding. X's citations stay tightly tied to what's actually verifiable from the issue and maintainer comments, making it the safer, better-grounded answer despite being less comprehensive.",
+  "_cost_usd": 0.1319779,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r3",
+    "arm_a_sha256": "01aab673cc385790dbf3bea4e55e4b90fa6a49561898dc0d55c08675e156fe28",
+    "judge_rep": 2
+  }
+}

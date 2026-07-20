@@ -1,0 +1,19 @@
+1. MUST-FIX leakage: issue runs receive `title,body,labels,comments` and are explicitly told to read every comment and timeline, while those maintainer comments are the ground truth (`issue.py:49-50, 294-312`; `judge_val.py:101-104`). PR and issue arms also use post-resolution code/history despite the dataset requiring pre-merge/pre-resolution snapshots. Either rebuild both arms under frozen historical evidence or describe this only as retrospective synthesis—not blind maintenance evaluation.
+
+2. MUST-FIX holdout claim: the test split has already been evaluated, and its scores directly define the new targets. It is no longer an untouched one-shot holdout. Use a new sealed holdout, or label the final test as repeated confirmation rather than an unbiased headline estimate.
+
+3. MUST-FIX gate validity: val results cannot establish non-regression against A0’s test numbers. Judge the existing A0 val outputs under the identical protocol and use paired val comparisons. Include grounding—the seventh metric currently has no gate—and gate on unrounded values.
+
+4. MUST-FIX statistical design: A2’s “expand only after any per-dimension gain” is optional stopping across multiple dimensions, and “wins on ≥1 dimension” accepts noise. Precommit all three replicates or a powered sequential rule, define a minimum meaningful effect, report paired item-level uncertainty, and avoid superiority claims based only on three-run mean±SD.
+
+5. MUST-FIX missing-result handling: `judge_val.py` silently aggregates incomplete verdict sets; prior reports already contain 89/90. Require exactly 30 judgments per arm replicate and all expected items before any gate is evaluated.
+
+6. MUST-FIX cost accounting: `aggregate_costs.py` makes only USD attempt-inclusive; tokens and `cost.by_role` come from the final run, excluding retries. It also does not recognize baseline `cost_usd`. Normalize all arms to the same accounting basis and aggregate retries by tokens, roles, latency, and USD.
+
+7. MUST-FIX cost bounds: 3000 seconds is per attempt, with up to four attempts—not a per-item bound. The $1.50 MoA cap excludes non-MoA calls, and recorded Sonnet judgments are about $0.20 each, making 90 judgments roughly $18 rather than $5. Add enforceable per-item/campaign dollar and elapsed-time ceilings and include A2 expansion judging.
+
+8. MUST-FIX cost/Pareto gate: `$3.2` is a cited single baseline run, not the matched baseline mean; existing reporting gives roughly `$1.26/item`. Lower cost with worse quality is a trade-off, not Pareto dominance. Use matched split-level distributions and define the dominance/non-dominance rule precisely.
+
+9. MUST-FIX final clean-room execution: `run_test_cleanroom.sh` does not pin `MOA_WHEN=off` or the complete A1 configuration, suppresses failures with `|| true`, accepts failure markdown as completed items, does not assert 30 judgments after retries, and writes `TEST_CLEANROOM.md`, not `TEST_CLEANROOM_V3.md`. Snapshot the tree, models, resolved mixture, prices, and environment, then fail closed on any mismatch or missing result.
+
+VERDICT: REVISE

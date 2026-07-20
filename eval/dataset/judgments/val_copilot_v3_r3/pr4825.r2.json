@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.85,
+    "actionability": 0.15,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The only substantive ground-truth concern (dsocek's point that the hardcoded default_components list is fragile and should instead be driven from existing per-model mapping data) is echoed by X's comment 1, which independently proposes deriving from pipeline._dit_modules rather than hardcoding — a strong conceptual match even though the specific mechanism differs from _packed_modules_mapping. Y's review is a thorough but purely confirmatory validation pass (grounded, low fabrication risk) that raises zero concerns and offers no concrete change suggestions, missing the key reviewer concern entirely and scoring near-zero on actionability. X's comments also carry precise file:line citations and concrete suggested edits, giving it a clear edge in both recall and actionability while precision is comparable.",
+  "_cost_usd": 0.10850539999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r3",
+    "arm_a_sha256": "4935ce263775dd8c4b10f292e0aa35fad1cb5614b28d14b33739d40377d732a8",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.6,
+    "grounding": 0.45,
+    "completeness": 0.55
+  },
+  "y": {
+    "correctness": 0.8,
+    "grounding": 0.8,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly identify the duplicate-of-#4808 disposition, but X asserts unverified specifics as fact (PR 'merged', fabricated grep/comment output, fabricated 'Verified end-to-end' claim in the reproduction) and only tacks on a disclaimer that contradicts its confident tone. Y reaches the same core verdict but is explicit about what it could and couldn't verify (flagging #4808 as closed-without-merging and a test-coverage gap in _STALE_API_FILES as open questions rather than settled facts), which better matches the rubric's preference for well-argued hedging over confident overreach. Y also grounds its answer in more specific, plausible file/line references and more fully serves the reporter's actual need (confirming whether the fix is truly on main).",
+  "_cost_usd": 0.1210923,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r1",
+    "arm_a_sha256": "c2e9dcc330398ad4241dfd621773eb940d2c252a14b6cf35d255df807676aa97",
+    "judge_rep": 1
+  }
+}

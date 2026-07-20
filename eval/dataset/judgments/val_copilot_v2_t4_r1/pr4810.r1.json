@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.45,
+    "actionability": 0.8,
+    "gap_hit": true
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates independently surface the same latent gap (unswept get_cache_scale caller in hunyuan_image3_transformer.py:2238), so gap_hit is true for both, and both correctly validate the core mapper-migration logic for direct vs. delegated loaders. X's other findings are unusually well-grounded: its critique that the delegated-loader test feeds an already-mapped name and bypasses AutoWeightsLoader is directly verifiable from the diff's test code and is a genuinely sharp catch. Y pads its otherwise strong, well-evidenced blocker with a 'dead code' claim (get_cache_scale_mapper never returns None) that is very likely factually wrong given vLLM's typical default-None hook pattern, and repeats that same questionable finding almost verbatim twice, which hurts precision. Y is slightly more rigidly formatted with file:line + concrete remediation on every point, giving it a marginal actionability profile, but X edges recall too via its test-quality observation that echoes the ground truth's 'fake param doesn't prove real-checkpoint resolution' concern.",
+  "_cost_usd": 0.4239805,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r1",
+    "arm_a_sha256": "9780545d206447135fbd2eb6ff172f313f609ab18c5fabc9ded9305cb5798fb0",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.45,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "The sole ground-truth concern (yJader) is that both submit_initial and submit_update already reject list prompts, so gating the unwrap on already_submitted was inconsistent — X independently verifies this exact fact by citing both raise sites (stage_pool.py:951, 1022) and concludes the fix is correct, matching the reviewer's actual reasoning; it also correctly validates the DiffusionOutput change and lands on APPROVE, matching the real outcome (two LGTMs). Y touches the same line but hedges into an unverified, more speculative worry ('if the processor expects a list, the guard must be restored') without doing the confirming investigation, pads the review with duplicate comments on the same line, and cites a specific issue number/repro command (#4839) not grounded in the provided diff or ground truth, undermining precision; its COMMENT verdict also diverges from the actual approved outcome.",
+  "_cost_usd": 0.07998940000000002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r3",
+    "arm_a_sha256": "74a18e94cfbe04b625d2d92ffed491c4731bc1c43462aa11daea6fc40b9b9a1c",
+    "judge_rep": 3
+  }
+}

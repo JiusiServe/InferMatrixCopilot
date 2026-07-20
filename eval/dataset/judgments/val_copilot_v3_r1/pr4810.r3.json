@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.65,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly validate the core loader changes (direct loaders apply the mapper, delegated loaders correctly rely on the outer AutoWeightsLoader) and both independently catch the latent gap — hunyuan_image3_transformer.py still calling the removed get_cache_scale API — with concrete file/line evidence. Y grounds its validation in actual upstream vLLM source (AutoWeightsLoader, weight_utils.py, fp8.py), echoing the human reviewer's own rationale almost verbatim, and its three findings are tighter and less redundant than X's five overlapping test-coverage nitpicks (fake mapper only handling k_proj, no real quant config, test-file-removal ambiguity) that dilute precision. Y's APPROVE-with-non-blocking-notes verdict also matches the actual outcome (LGTM/APPROVED) whereas X's 'FOLLOW-UP REQUIRED' overstates severity relative to ground truth.",
+  "_cost_usd": 0.13835470000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r1",
+    "arm_a_sha256": "de3fe028c142e9e280cd9d7ebe2bf8ac45e4fd50f02c7936ea52fbb7dd528202",
+    "judge_rep": 3
+  }
+}

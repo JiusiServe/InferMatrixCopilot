@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.7,
+    "actionability": 0.3,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns (bot noise + 'lgtm'), so both candidates land on the right overall verdict and neither misses anything real. X's evidence includes a suspiciously specific unverifiable external citation (a vllm PR number and upstream line numbers) that reads as embellishment, and it ends with zero concrete action items ('no comments require the author's action'). Y's evidence is consistently grounded in file/line reads with plausible post-diff line offsets suggesting genuine repo inspection, and it surfaces one concrete, well-specified actionable finding (missing regression test for the actual error-response crash path, with file:line and a runnable command) that goes beyond simple rename-verification.",
+  "_cost_usd": 0.0730331,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r2",
+    "arm_a_sha256": "0118623b849b7a094ad3c3764ef53c830d7c217310b6feec77c5d9b5119cfbca",
+    "judge_rep": 1
+  }
+}

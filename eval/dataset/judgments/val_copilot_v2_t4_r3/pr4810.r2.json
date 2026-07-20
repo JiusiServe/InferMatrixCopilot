@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently surfaced the exact latent gap (surviving get_cache_scale call in hunyuan_image3_transformer.py), so gap_hit is true for both, and both ground their findings in concrete file/line evidence. Y has notably higher recall: it explicitly reproduces the ground-truth reviewer's nuance about qwen2_old's getattr guard being a safe cleanup rather than a regression, and frames the DiT-transformer omission with the same 'coordinates with #4808/incomplete sweep' angle the human reviewer raised, whereas X only implicitly touches correctness validation and misses the getattr/regression-test nuances entirely. X compensates with a couple of legitimate extra findings (dead `is not None` mapper checks) but oversells the missed call-site as a hard 'blocker'/REQUEST CHANGES when the actual PR merged and reviewers approved it, slightly misjudging severity relative to ground truth. Both are highly actionable with precise file/line pointers and concrete fixes.",
+  "_cost_usd": 0.2529004,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r3",
+    "arm_a_sha256": "c3fc39610ae0780984ee167d8610aa83aef855312c3ea17a868357a295e5e664",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.15,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X surfaces two grounded, actionable design notes (derive the component list from each pipeline's already-declared `_dit_modules` instead of a fourth hardcoded list, and flags that text-encoder LoRA is still a silent no-op) — the first echoes the ground truth's core theme (dsocek's push to drive component/key discovery from existing per-model metadata rather than ad-hoc lists), and X also explicitly credits that the requested before/after validation images were provided. Y's review is a thorough validation pass but yields zero findings or suggested changes, defaulting straight to APPROVE, so it misses the one substantive human concern entirely and offers nothing actionable for a reader to act on. Neither has a labeled LATENT GAP CHECK section.",
+  "_cost_usd": 0.1072627,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r2",
+    "arm_a_sha256": "daf475716abfe39f5233aba7d59fe621602d3b4c7633a0b58101a27d349aaa6c",
+    "judge_rep": 2
+  }
+}

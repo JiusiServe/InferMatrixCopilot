@@ -1,0 +1,15 @@
+1. Provenance commands are not actually NUL-safe after `sha256sum`; use zero-terminated checksum output and `sort -z`. Step 7’s broad `eval` scan also includes generated campaign artifacts—apply the same explicit source-only exclusions and exclude provenance/manifest outputs themselves.
+
+2. Do not persist raw “full arm env”: `LLM_MIXTURE` may contain `api_key`. Record normalized non-secret settings and member `model@host` labels, with secret values redacted.
+
+3. `validate_replicate.py` must enforce—not merely record—the verdict’s ARM path/content hash against the arm provenance. Freeze an independent expected PR-head SHA map and validate against it.
+
+4. A2 validation misses issue items: issue MoA explicitly has no `agent_ensemble` event. Under `MOA_WHEN=always`, validate all issue items plus non-light PRs. Also compare span `attr.model` to raw model names, not `model@host` dispatch labels.
+
+5. `2× largest observed cost` and `$0.30/verdict` are estimates, not hard maxima; therefore `settled ≤ reserved` is not guaranteed. Enforce request-level spend ceilings or derive true token/call-count bounds. Earmark the conditional confirmation budget before discretionary campaign spending.
+
+6. Excluding `.invalid` directories from all aggregation undercounts attempt-inclusive A1/A2 cost. Exclude them from quality/final-attempt statistics, but include their attributable spend and tokens in attempt-inclusive totals.
+
+7. Final confirmation always pins A1. If A2 passes and becomes default-on, confirmation must run the promoted A2 configuration; otherwise it does not confirm the selected treatment.
+
+VERDICT: REVISE

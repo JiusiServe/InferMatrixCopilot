@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.45,
+    "grounding": 0.5,
+    "completeness": 0.55
+  },
+  "y": {
+    "correctness": 0.85,
+    "grounding": 0.85,
+    "completeness": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth is a simple duplicate-closure pointing to #4808/#4809. Y explicitly reaches that same disposition, backs it with concrete PR metadata (enumerates the 5 call sites from #4809, confirms #4810 fixed 4/5, and — critically — checks that #4808 is CLOSED with mergedAt null), and honestly flags that it couldn't verify upstream main directly. X reaches a similar 'close' disposition but asserts as fact that main 'already' has the fix and quotes a specific replacement comment at an exact line number without any caveat — a claim that directly contradicts Y's finding that the fix PR never merged, suggesting fabrication rather than grounding. That unverified claim could mislead the reporter into thinking the bug is already resolved upstream when it may not be, making X materially less trustworthy despite a superficially thorough report.",
+  "_cost_usd": 0.11131680000000001,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r2",
+    "arm_a_sha256": "0e6cb10732386d341c510b53198c56b8add1e358fa8602a0437aba4a3127efe7",
+    "judge_rep": 1
+  }
+}

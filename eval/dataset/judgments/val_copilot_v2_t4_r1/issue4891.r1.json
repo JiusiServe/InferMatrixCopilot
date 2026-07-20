@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.5,
+    "grounding": 0.3,
+    "completeness": 0.45
+  },
+  "y": {
+    "correctness": 0.75,
+    "grounding": 0.65,
+    "completeness": 0.75
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both land on the correct disposition (duplicate of #4808), matching the thread's actual resolution. But X confidently asserts the fix is 'already on main,' fabricates a specific code snippet and a named regression test with an exact pass count ('All 9 tests should pass') without any way to have verified that against real upstream main — this is unearned certainty and likely hallucination. Y reaches the same duplicate verdict but explicitly flags that #4808 shows closed-without-merging, hedges what it could and couldn't verify from its read-only checkout, and surfaces a concrete, useful follow-up (test coverage gap) rather than asserting fabricated verification artifacts. Y is more calibrated and better grounded despite covering less fabricated ground.",
+  "_cost_usd": 0.1042589,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r1",
+    "arm_a_sha256": "65ba4bb3fac8938cbdbea71339593c99e29dbef9e3b4280d6fff15e6b3f84c82",
+    "judge_rep": 1
+  }
+}

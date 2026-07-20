@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.7
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.7,
+    "actionability": 0.6
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns (just an LGTM approval), so both candidates correctly find no real bugs and both verify the rename consistently across all 9 sites, matching upstream — recall is trivially full for both. X's APPROVE verdict aligns cleanly with ground truth's 'lgtm' and its verification is well-grounded (checked upstream basic.py:23, confirmed no missed occurrences, confirmed constructor untouched). Y's single 'minor' suggestion loses precision because it recommends adding tests for create_speech/create_speech_batch/create_audio_generate error paths that the diff already shows were added/updated (hunks 7-9, which Y itself validated as 'test mock assignments updated consistently') — a self-contradictory, redundant ask. Neither has a LATENT GAP CHECK section.",
+  "_cost_usd": 0.1542624,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r3",
+    "arm_a_sha256": "a3532ed191743c43789f30918b8ef98af99785ec3a5e24a1c412d1995c5467b7",
+    "judge_rep": 1
+  }
+}

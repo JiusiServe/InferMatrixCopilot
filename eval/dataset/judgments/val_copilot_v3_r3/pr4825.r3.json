@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.2,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X's comment on reusing pipeline._dit_modules instead of a fourth hardcoded component list echoes the spirit of dsocek's ground-truth concern about driving matching from existing per-pipeline metadata rather than ad-hoc lists, and adds a grounded, actionable follow-up about text-encoder LoRA silently no-op'ing. Y is purely a validation scan ('no finding reported' across all categories) that confirms the diff is correct but surfaces zero reviewer-style concerns or concrete suggestions, so it misses the substantive ground-truth thread entirely and offers minimal actionability despite being well-grounded in what little it does state.",
+  "_cost_usd": 0.06343969999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r3",
+    "arm_a_sha256": "4935ce263775dd8c4b10f292e0aa35fad1cb5614b28d14b33739d40377d732a8",
+    "judge_rep": 3
+  }
+}

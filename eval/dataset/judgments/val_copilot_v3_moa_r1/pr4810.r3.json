@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both independently verified the delegated-vs-direct loader distinction (matching lishunyang12's core review) and both surfaced the exact latent gap — the still-broken get_cache_scale call in hunyuan_image3_transformer.py — with specific file/line and fix suggestions. Y is better calibrated: its APPROVE verdict matches the actual merged/LGTM outcome and it correctly frames the diffusion-loader gap as later-resolved rather than an urgent unresolved blocker, plus it contributes a genuinely novel, correct finding (the delegated-loader test bypasses AutoWeightsLoader and never proves the outer mapping fires) that echoes the ground truth's 'test doesn't prove real resolution' concern more closely than anything in X. X's review is also solid and grounded but pads with generic sweep-confirmation bullets and inflates severity/scope (FOLLOW-UP REQUIRED) for an issue outside this PR's diff without acknowledging the companion-PR coordination context the human reviewer flagged.",
+  "_cost_usd": 0.15198250000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r1",
+    "arm_a_sha256": "61424d72f2966712b33af0158f92b2981aba329686c1cd3b858236132e6ec167",
+    "judge_rep": 3
+  }
+}

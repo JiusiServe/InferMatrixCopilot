@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.3,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth for this trivial rename PR is essentially empty (bot noise + a plain 'lgtm' approve), so both candidates trivially achieve full recall with nothing to miss. X thoroughly re-verifies the mechanical rename is consistent and matches upstream but ends in a pure approve with only one non-actionable observational note. Y performs the same verification sweep plus surfaces a concrete, diff-grounded gap (missing 404-fallback test for create_chat_completion, mirroring the three sibling tests that were updated) with a specific proposed test name and file:line, which is genuinely more actionable; its second nit (adding an explanatory comment) is low-value but still grounded, not fabricated.",
+  "_cost_usd": 0.1251429,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r1",
+    "arm_a_sha256": "bb0846caf4bb2bf41986efc83a183ba19810e49cb9731b18d3caad2698107070",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.8,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X's top comment (reuse pipeline._dit_modules instead of a fourth hardcoded component list) echoes the spirit of dsocek's real concern about the hardcoded default_components list drifting and wanting a single source of truth, and X also explicitly notes the PR body's before/after images, addressing xuechendi's validation ask — giving it noticeably better recall. Y's output is mostly a validation checklist restating already-obvious facts, with only one weak finding (registry.py list divergence, fix suggested is just 'add a comment') that doesn't map to any ground-truth concern. Both sets of specific claims appear plausible and grounded, but X's two findings are more concrete and actionable (specific code-level fixes: read _dit_modules, add a warning log) versus Y's single low-value documentation nit.",
+  "_cost_usd": 0.071904,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r3",
+    "arm_a_sha256": "7999f73ce57f9a15cd524e6fbe4fb3197361a6791c5653363966ab1cc346efda",
+    "judge_rep": 2
+  }
+}

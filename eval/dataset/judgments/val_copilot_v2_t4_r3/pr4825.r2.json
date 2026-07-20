@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently converge on the one substantive ground-truth concern (dsocek's point that the hardcoded component list duplicates naming/topology metadata elsewhere), grounding it with specific file:line evidence, so recall and actionability are close. X edges ahead by finding a third duplicated list (registry.py:427) beyond the two Y cites, and by surfacing a genuinely novel, well-grounded risk (text-encoder LoRA remaining a silent no-op) that extends the PR's own stated failure mode. Y's review is thorough and methodically evidenced but contains an internal inconsistency (mixing 'sensenova_u1' with 'pipeline_sdxl.py:543' filename) and a broad unverified '30+ pipelines' claim that slightly dent precision.",
+  "_cost_usd": 0.1027277,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r3",
+    "arm_a_sha256": "d00e4fdde9885470b4ca5504687bbd07fd3e595462322488dfeeaf54916a8cd3",
+    "judge_rep": 2
+  }
+}

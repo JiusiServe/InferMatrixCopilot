@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.75,
+    "actionability": 0.45,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.88,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "The one substantive ground-truth concern (yenuo26's question about verifying reduce_scatter in the test) is directly addressed by Y, which validates that exact test line with a specific citation; X never mentions reduce_scatter at all. Y's findings are also more tightly grounded with explicit file:line evidence and concrete 'change X' instructions (stale comment, missing branch-coverage tests, missing docstring), whereas X's report is broader but relies on some claims (destroy_model_parallel behavior, a named 'tp2_sp2' test scenario) not directly evidenced in the diff shown, and its single actionable item is a soft documentation nit. Both correctly land on an approve/no-blocker verdict consistent with the human LGTM.",
+  "_cost_usd": 0.1618565,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r2",
+    "arm_a_sha256": "ec5051aa14779fd4938de3346db2966fb80115a97808c3befe7835079be2d6a8",
+    "judge_rep": 3
+  }
+}

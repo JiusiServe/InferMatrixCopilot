@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.9,
+    "actionability": 0.2,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X's core suggestion (drive component discovery from already-computed manager state like `_dit_modules` instead of a fourth hardcoded list) is thematically close to dsocek's real ask (drive naming from `_packed_modules_mapping` instead of ad-hoc fixes), and X explicitly notes the before/after validation images that closed xuechendi's request — giving it real, if partial, recall plus concrete actionable follow-ups. Y is meticulously grounded (every claim tied to a verified file:line, correct APPROVE verdict matching the two LGTMs) but surfaces zero findings and completely misses the one substantive reviewer comment, so it scores highest on precision but lowest on recall and actionability.",
+  "_cost_usd": 0.1368684,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r2",
+    "arm_a_sha256": "daf475716abfe39f5233aba7d59fe621602d3b4c7633a0b58101a27d349aaa6c",
+    "judge_rep": 3
+  }
+}

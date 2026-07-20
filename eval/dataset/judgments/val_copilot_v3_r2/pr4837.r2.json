@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "The sole ground-truth concern (yJader's comment) explains that removing the `already_submitted` gate is safe because both `submit_initial` and `submit_update` reject list prompts identically for diffusion stages. Y reproduces this exact reasoning with precise citations (stage_pool.py:951, stage_pool.py:1022), while X only vaguely gestures at 'both submit paths' without locating the actual rejection logic. Y also surfaces an extra grounded correctness detail X misses entirely — that `return outputs` now preserves `stage_durations` instead of silently dropping it. Y's APPROVE verdict also matches the real outcome (two LGTM approvals), whereas X's COMMENT verdict overstates concern. Both are reasonably actionable with file/line references, but Y is more tightly grounded in verified code paths.",
+  "_cost_usd": 0.13862280000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r2",
+    "arm_a_sha256": "e2ea9807d5be760b2003f2b6eb6702f84c1b19ba3311372a8fb6962a51fdace9",
+    "judge_rep": 2
+  }
+}

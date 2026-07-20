@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.72,
+    "completeness": 0.78
+  },
+  "y": {
+    "correctness": 0.92,
+    "grounding": 0.9,
+    "completeness": 0.9
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly diagnose the same root cause (default --run-level=core_model forces dummy weights) and land on the same 'closed as invalid, rerun with --run-level=full_model' disposition matching the thread. Y is more thoroughly grounded, citing a wider set of specific files/lines (run_args.py, stage_config.py twice, runtime.py, assertions.py, the test's marker line) and explicitly explains the subtle point that pytest.mark.full_model is a selection marker independent of --run-level, which X doesn't address. Y also engages more completely with the reporter's actual situation (A100 vs the H100/MI325 hardware_test declaration, video path existing), while X's answer has redundant near-duplicate content between its draft_answer and additional_context sections.",
+  "_cost_usd": 0.04909229999999999,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r3",
+    "arm_a_sha256": "7202174292672950a98d2d54a1c452331f564e556fd65cf81a2b924e9ac1e58b",
+    "judge_rep": 3
+  }
+}

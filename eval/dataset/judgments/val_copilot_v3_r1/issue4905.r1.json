@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.45,
+    "grounding": 0.55,
+    "completeness": 0.55
+  },
+  "y": {
+    "correctness": 0.3,
+    "grounding": 0.5,
+    "completeness": 0.6
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "The actual thread shows the issue still in triage (yenuo26 pointing at #4834, Flink-ddd asking for a full CI sleep-mode run) — no confirmed fix or closure. Both candidates overreach by confidently declaring the root cause, asserting the fix is 'already in main', and recommending closure, which isn't supported by the thread; Y does this more forcefully and adds unverifiable specifics (invented test names like test_level2_sleep_wake_raises, exact line ranges, a hard 'keep closed' recommendation) that read as fabricated precision. X reaches a similar diagnosis but hedges more ('if CI is still failing... cherry-pick'), making it marginally less overconfident. Y's extra 'runtime guidance' section adds completeness but doesn't offset the correctness risk from unsupported certainty.",
+  "_cost_usd": 0.1296951,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r1",
+    "arm_a_sha256": "faf672f50a7b135facdb38f21e68f38d5c29e66c49141e8405d748e74a169cbe",
+    "judge_rep": 1
+  }
+}

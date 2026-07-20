@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.92,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.72,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently verify the same core fact ground truth cares about (submit_initial and submit_update both reject list prompts, so dropping the already_submitted gate is correct) and both flag the missing regression test as non-blocking. X's non-blocking framing and APPROVE verdict match the actual outcome (two LGTM approvals, no changes requested). Y labels the missing-test observation as 'major' and returns a 'FOLLOW-UP REQUIRED' verdict despite its own analysis confirming the fix is correct, which overstates severity relative to what actually happened on the PR, and it pads with a marginal pre-existing-behavior finding (orchestrator.py:1264) not really implicated by this diff, slightly hurting precision.",
+  "_cost_usd": 0.1404155,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r3",
+    "arm_a_sha256": "fd0d95152d3fc54f13bc52aab6dfea20fdf250d9ed9be61a55a7755fe2de45b7",
+    "judge_rep": 1
+  }
+}

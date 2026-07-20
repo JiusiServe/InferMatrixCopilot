@@ -1,0 +1,11 @@
+1. MUST-FIX — Provenance currently self-invalidates. New ledger/provenance/arm/judgment files under `eval/` alter the untracked digest, and patching `run_test_cleanroom.sh` after validation changes `git diff`. Exclude generated artifacts and patch the script before the initial snapshot. Use a canonical NUL-safe manifest and record all effective arm-specific settings.
+
+2. MUST-FIX — A2 validation is not executable as written. Auto-depth light PRs bypass `run_agent_step_ensemble`, so `MOA_WHEN=always` produces no `moa_dispatch` (`review/steps.py:165-168`). Also, dispatch does not prove members succeeded: all can fall back/drop. Require successful member-span evidence, support MoA on light PRs or align both arms’ depth, and hard-fail if the permitted rerun remains degenerate.
+
+3. MUST-FIX — Assert the claimed PR-time checkout for every PR item. `_pr_fetch_diff` permits a live-checkout fallback while returning success (`pr/fetch.py:216-224`), so `rc==0` is insufficient. Validate the pinned commit against the expected PR head SHA.
+
+4. MUST-FIX — Estimated reservations cannot enforce a hard $150 ceiling. Reserve a conservative hard maximum covering retries before each call/batch, atomically reconcile actual spend, and ledger failed paid invocations even when no valid artifact is produced.
+
+5. MUST-FIX — Remove the remaining latency contradiction: pre-campaign item 1 says attempt-inclusive “LATENCY” is summed from spans. Only outer `wall_s` may be called latency; span-duration sums must be named service time throughout code, fixtures, and reports.
+
+VERDICT: REVISE

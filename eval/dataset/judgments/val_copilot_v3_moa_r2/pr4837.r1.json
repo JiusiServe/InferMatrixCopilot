@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates correctly zero in on the same line (orchestrator.py:1290) that the human reviewer flagged, and both give a grounded, code-cited explanation of why removing the `already_submitted` gate is correct. X's explanation more precisely mirrors the ground-truth reasoning (both submit paths reject list-shaped payloads, so gating on already_submitted was inconsistent) and reaches the same verdict as the actual reviewers (approve, no blockers), while also cleanly verifying the second hunk (DiffusionOutput unwrap) with concrete evidence. Y's review is similarly grounded but pads its findings list with several non-findings (annotation-only, docstring-still-accurate) that add no signal, and lands on a COMMENT verdict that doesn't match the actual approve-with-no-changes outcome. Both offer concrete, actionable regression-test suggestions of similar quality.",
+  "_cost_usd": 0.15064850000000002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r2",
+    "arm_a_sha256": "36c576f951dc8c38e1bddd758a468307a53f7cb05808f795a6e29ba480e7d76d",
+    "judge_rep": 1
+  }
+}

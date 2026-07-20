@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth is thin (one inline comment about verifying reduce_scatter, already satisfied by the diff, plus non-technical PR chatter), so neither candidate scores well on recall and both are largely grounded in the actual diff with no fabrication. X gives a cohesive, correct narrative verification (DPMetadata construction, device_communicator/reduce_scatter ownership, cleanup safety) but surfaces only one concrete actionable comment. Y covers the same technical ground via a 'Validated' list plus five separate minor findings, each with file:line and a specific 'add X' action, giving it a clear actionability edge even though some findings (docstring nits, speculative hasattr assert) are low-value filler. Overall a slight win for Y on thoroughness/actionability, offset by X's marginally tighter precision and slightly better tie-in to the reduce_scatter/device_communicator theme from ground truth.",
+  "_cost_usd": 0.2823328,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r1",
+    "arm_a_sha256": "8b4f0993ef3f4ff897f4341d461ce8942bb9f664796f2b7902a37e7eb380047d",
+    "judge_rep": 3
+  }
+}

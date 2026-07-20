@@ -1,0 +1,11 @@
+1. Resolve the cost-gate contradiction: Step 3 promises matched final-attempt bases, but Step 5 compares A1 attempt-inclusive cost against A0 final-only cost. Use final-vs-final for the comparative gate and report retry-inclusive cost separately, or explicitly define the asymmetric gate as conservative.
+
+2. Require A2 run evidence to contain `moa_dispatch` with the expected resolved members, and report member drops/fallbacks. `MOA_WHEN=always` can silently behave like A1 when fewer than two members resolve or requests fail.
+
+3. Make the $150 ceiling preventive and attempt-inclusive. “Check between stages, stop after breach” can overshoot and omits failed/invalid judge calls, canaries, and invalid generation directories. Use an append-only campaign spend ledger and reserve/check budget before each paid batch.
+
+4. Fix provenance capture. The proposed `git diff`/`git ls-files -mo` digest misses staged-only changes and can fail on deletions; capturing it only for final test does not identify the source used for A1/A2 val runs. Snapshot before val using `git diff --binary HEAD`, HEAD identity, and null-safe untracked hashes; assert it remains unchanged and bind generation/judgment manifests to candidate-content hashes. `judge_val.py` currently records every candidate merely as `copilot_v2`, so validation cannot detect a wrong `ARM_A_DIR`.
+
+5. Do not calculate latency by summing nested or parallel spans; that double-counts concurrent MoA/lens time. Use end-to-end `wall_s` for attempt-inclusive latency and label summed per-role durations as service time rather than wall latency.
+
+VERDICT: REVISE

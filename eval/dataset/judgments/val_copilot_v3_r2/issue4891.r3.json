@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.8,
+    "completeness": 0.85
+  },
+  "y": {
+    "correctness": 0.7,
+    "grounding": 0.65,
+    "completeness": 0.7
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both correctly diagnose the removed get_cache_scale call and correctly identify the fix (drop the branch, rely on maybe_remap_kv_scale_name), matching the ground truth's disposition of closing as a duplicate pointing to #4808. X more precisely mirrors the actual resolution ('duplicate of #4808'), catches a real inconsistency (that #4808 shows closed/unmerged) and hedges appropriately rather than asserting it's already fixed on main, which is exactly the kind of epistemic care that should be rewarded on an issue this terse. Y instead flatly claims 'the current main tip' already has the fix and tells the user to git pull, while elsewhere calling #4808 'closed', an unhedged and internally inconsistent claim that could mislead the reporter. X's added flag about the regression-test coverage gap and the merge-status risk also makes it more useful end-to-end for the reporter's actual situation.",
+  "_cost_usd": 0.1359218,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_r2",
+    "arm_a_sha256": "0e6cb10732386d341c510b53198c56b8add1e358fa8602a0437aba4a3127efe7",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.85,
+    "actionability": 0.15,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The one substantive ground-truth concern (dsocek's point that hardcoded/scattered naming lists should instead be derived from a single per-model source of truth) is echoed almost exactly by X's comment #1, which finds that manager.py, module_collector.py, and registry.py each maintain their own divergent component lists and proposes deriving from pipeline._dit_modules — concrete, file/line-grounded, and actionable, plus a second plausible follow-up about silent text-encoder no-ops. Y's review is a well-grounded validation pass (correctly confirms the unet scan is safe and scoped) but surfaces zero findings or suggestions, so it recalls none of the reviewer's design concern and offers nothing actionable beyond an APPROVE verdict.",
+  "_cost_usd": 0.15626030000000002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r1",
+    "arm_a_sha256": "dc95d28261d8af65323f29b93ddcec38d124c4a0b0ca13fdfc97388d86540d5c",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.75,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.25,
+    "precision": 0.78,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth's substantive concern (dsocek's note about PEFT naming-conflict workarounds and driving the mapper from _packed_modules_mapping) appears to reference code removed before the final diff (per tthakkal's reply), so neither candidate could realistically recall it; both instead independently converge on the adjacent, thematically-related critique that default_components duplicates _dit_modules/registry.py knowledge. Both are well-grounded with specific file:line citations that partially cross-validate (pipeline_sdxl.py:46, registry.py:427). Y edges out slightly with one extra grounded, actionable finding (missing SDXL integration-test coverage, verified via a zero-hit grep) and a second concrete alternative design (pipeline-declared _lora_components), while X's review is cleaner and its text-encoder no-op catch is sharp but doesn't offset Y's marginally broader coverage.",
+  "_cost_usd": 0.11555270000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r2",
+    "arm_a_sha256": "273009d35581dc84d7ad6fc3ecd739a3166f69f504c4a7cc5f62360b5babec34",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.95,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.7,
+    "precision": 0.4,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X's core analysis of orchestrator.py:1290 mirrors yJader's actual reasoning almost exactly (both submit paths reject lists, so gating the unwrap on already_submitted was the bug) and correctly reaches APPROVE, matching the two LGTM reviews. Y raises the same line but hedges with repetitive, contradictory 'confirm this works' comments (major/minor duplicates) that never resolve to the actual insight, then unjustifiably lands on REQUEST CHANGES despite the fix being verifiably correct and human-approved, hurting precision and trustworthiness. Both are grounded in the diff and reasonably locate the right lines, but X is more correct, concise, and better calibrated to the ground truth verdict.",
+  "_cost_usd": 0.1229149,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r1",
+    "arm_a_sha256": "8730179614b2a3a9abf3e08b1f447d6782a3dc73e37882a7c1f5ec708163261a",
+    "judge_rep": 1
+  }
+}

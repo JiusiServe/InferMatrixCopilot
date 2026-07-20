@@ -1,0 +1,107 @@
+{
+  "wall_s": 247.4,
+  "split": "val",
+  "rc": 0,
+  "run_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r1/runs/issue4905/run-20260718-145749-0cddba",
+  "recorded_at": "2026-07-18T15:01:54",
+  "attempts": [
+    {
+      "invocation_id": "inv-eab2620a",
+      "outcome": "run:run-20260718-145749-0cddba",
+      "rc": 0,
+      "pre_run": null
+    },
+    {
+      "run_dir": "run-20260718-145749-0cddba",
+      "llm_calls": 13,
+      "input_tokens": 154467,
+      "output_tokens": 17384,
+      "usd": 0.08312,
+      "source": "spans"
+    }
+  ],
+  "attempt_usd_total": 0.08312,
+  "llm_calls": 13,
+  "input_tokens": 154467,
+  "output_tokens": 17384,
+  "usd": 0.08312,
+  "source": "spans",
+  "metrics": {
+    "schema": 1,
+    "run": "run-20260718-145749-0cddba",
+    "task_kind": "issue_answer",
+    "status": "done",
+    "quality": {
+      "q": null,
+      "weight_coverage": 0.0,
+      "partial": true,
+      "abstained": false,
+      "components": {
+        "correct": null,
+        "grounded": null,
+        "complete": null,
+        "helpful": null
+      }
+    },
+    "cost": {
+      "usd": 0.0831,
+      "minutes": 4.09,
+      "ci_minutes": 0,
+      "input_tokens": 154467,
+      "output_tokens": 17384,
+      "tool_calls": 18,
+      "usd_ref": 0.3,
+      "min_ref": 5.0,
+      "cost_index": 1.3933,
+      "source": "spans",
+      "llm_calls": 13,
+      "by_role": {
+        "moa_member": {
+          "usd": 0.076532,
+          "input_tokens": 145788,
+          "output_tokens": 13529,
+          "calls": 11
+        },
+        "agent": {
+          "usd": 0.003451,
+          "input_tokens": 5630,
+          "output_tokens": 1752,
+          "calls": 1
+        },
+        "moa_aggregator": {
+          "usd": 0.003137,
+          "input_tokens": 3049,
+          "output_tokens": 2103,
+          "calls": 1
+        }
+      },
+      "cache_read_tokens": 89920,
+      "cache_creation_tokens": 0
+    },
+    "timings": {
+      "steps": {
+        "fetch": 1.45,
+        "draft": 243.77,
+        "report": 0.02
+      },
+      "time_to_first_result_s": 245.24
+    },
+    "risk": {
+      "incidents": {
+        "catastrophic": 0,
+        "severe": 0,
+        "moderate": 0,
+        "minor": 0
+      },
+      "safety_multiplier": 1.0
+    },
+    "catq": null,
+    "tus": null,
+    "signals": {
+      "escalations": 0,
+      "pushes": 0,
+      "posted": 0,
+      "steps_completed": 3
+    }
+  }
+}

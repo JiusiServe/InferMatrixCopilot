@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.9,
+    "actionability": 0.15,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The GT's substantive concern (dsocek) is that hardcoding component names is fragile and should instead be driven by structured per-model data (packed_modules_mapping/stacked_params_mapping) to handle naming/fusion cases generically. X raises the same class of concern (hardcoded default_components list duplicated across manager.py/registry.py/offloader, propose deriving from pipeline._dit_modules) plus a grounded follow-on gap (text-encoder LoRA silent no-op), both with concrete file:line pointers and actionable fixes. Y performs thorough but purely confirmatory validation of the existing diff and surfaces no design-level concern resembling the GT's, ending in a bare approval with nothing actionable for the author to act on.",
+  "_cost_usd": 0.1449145,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r2",
+    "arm_a_sha256": "c4a77faa38b84f5fdabcd6d2a72e3afae8a1ef3247bf1601620cbd75649bfd9b",
+    "judge_rep": 1
+  }
+}

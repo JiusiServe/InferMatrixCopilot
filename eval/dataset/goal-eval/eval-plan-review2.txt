@@ -1,0 +1,17 @@
+1. MUST-FIX — Round-1 #1: remove the “arm-symmetric” claim. A1 uses PR-time checkout and suppresses discussion, while the recorded Opus baseline used post-merge checkout and allowed `gh pr view` (`run_baseline.py:76-81`). Report an arm-by-arm evidence matrix and actual checkout status.
+
+2. MUST-FIX — Round-1 #2/#3: remove contradictory language. A0 must always be re-judged on val; never substitute frozen test numbers for missing val dimensions. “Test judged once at the end” must say “repeated confirmation.”
+
+3. MUST-FIX — Round-1 #4: A2 still says one replicate with optional expansion in Arms, Procedure 3, and the cost estimate. Precommit all three replicates everywhere.
+
+4. MUST-FIX — Round-1 #3/#5: assign a unique `JUDGE_OUT` to every A0/A1/A2 generation replicate and define the exact pairing calculation. Otherwise `judge_val.py` defaults to one directory and skips existing verdicts (`judge_val.py:32,109-111`). Add machine-enforced validation of the expected 30 unique, parseable verdict files and 10 successful—not merely present—arm outputs.
+
+5. MUST-FIX — Round-1 #6 is not implemented. `aggregate_costs.py` ignores baseline `cost_usd`, takes tokens/phases only from the final attempt, and emits no `by_role` aggregation (`aggregate_costs.py:42-57`). Fix and test accounting before running the campaign. Also acknowledge or reconstruct A0 retries; its existing artifacts do not provide attempt-inclusive totals.
+
+6. MUST-FIX — Round-1 #7: reconcile the budget. A0 rejudge, A1, A2, and final test total 360 verdicts; at $0.20 each, judging alone is about $72, already above the $60 campaign ceiling. Replace the obsolete $5 estimate and define whether the ceiling includes conditional final evaluation.
+
+7. MUST-FIX — Round-1 #8: distinguish the two cost comparators explicitly: incumbent A0 and recorded CC+Opus. Define separate promotion and Pareto rules; the current text alternates between A0×1.5 and the Opus cost distribution.
+
+8. MUST-FIX — Round-1 #9 remains unimplemented in `run_test_cleanroom.sh`: it still uses `|| true`, does not pin the A1 environment, does not snapshot configuration, does not fail after incomplete judging, and writes the old filename (`run_test_cleanroom.sh:5-27,65`). A “git status hash” is insufficient for an uncommitted tree; record a content/diff digest. Preserve numeric test cost/latency aggregates before purging artifacts.
+
+VERDICT: REVISE

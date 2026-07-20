@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.92,
+    "actionability": 0.88,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (codex hit a rate limit, human just said 'lgtm'), so both correctly land on APPROVE with no missed issues—recall is trivially satisfied for both. Y's hunk-by-hunk validation cites test file line numbers (2533, 2546, 2615) that exactly match the diff's line arithmetic, making its grounding independently verifiable from the given diff; X cites test line numbers (2638/2651/2720) that don't reconcile with the shown hunks, and its PR-body repro detail ('/v1/audio/voices') and upstream PR number are unverifiable extras. Both give clear, line-referenced reasoning and correctly explain the AttributeError mechanism via the base()/instrumentator path, but Y's precise, self-consistent citations edge out X's slightly looser sourcing.",
+  "_cost_usd": 0.1468665,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r2",
+    "arm_a_sha256": "e46feafe1dc9157e74667a96dbdcff6183e0c7c639e908ae8230dbafacbf6702",
+    "judge_rep": 1
+  }
+}

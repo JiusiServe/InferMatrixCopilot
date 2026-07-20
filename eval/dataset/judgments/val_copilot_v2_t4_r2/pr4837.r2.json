@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.4,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.8,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "The only substantive ground-truth concern (yJader's inline comment explaining that submit_initial and submit_update both reject list prompts, so gating the unwrap on already_submitted was wrong) is reconstructed almost verbatim by Y, citing the exact ValueError raises in stage_pool.py for both submit paths. X only gestures at this ('fixing the regression... on the non-already_submitted path') without articulating the parity reasoning. X also undermines its own precision: it explicitly validates that already_submitted 'remains used in other conditions... not dead' in its sweep notes, then contradicts itself by posting a comment asking to check if the variable is dead code, and it asserts unverified DiffusionOutput fields (.finished, .request_id) not evidenced anywhere in its own cited code. Y's comments are more consistent and tightly grounded in the diff and surrounding code it read. Both add reasonable but non-critical test-coverage suggestions; neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.1546559,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r2",
+    "arm_a_sha256": "780b9c8c59337c162ac05ff15019a073faeec40fa079149313a71ab9abfe8f63",
+    "judge_rep": 2
+  }
+}

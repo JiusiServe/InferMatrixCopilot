@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.45,
+    "grounding": 0.55,
+    "completeness": 0.55
+  },
+  "y": {
+    "correctness": 0.75,
+    "grounding": 0.7,
+    "completeness": 0.75
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "The thread closed #4891 as a duplicate of PR #4808 with pointer to #4809 for detail — Y mirrors that structure exactly (cites #4808 as the fix PR, #4809 as the tracking issue with more context) while X mislabels the duplicate target as #4809 and only mentions #4808 as a secondary fix source. X also asserts confidently and without hedge that the fix is 'already applied on main' and both PRs are merged, whereas Y specifically flags that #4808 shows as CLOSED/unmerged and asks for confirmation — appropriate epistemic humility given neither candidate has live access to upstream main. Y also surfaces a concrete, actionable gap (test coverage list missing this file) that ties the loose end together, making it more complete for a maintainer's actual next steps.",
+  "_cost_usd": 0.0662793,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v3_moa_r3",
+    "arm_a_sha256": "5d7ca184a72f1bd8e183a02bb37d4043531bc8a683eae16460827e6b2bbe8d04",
+    "judge_rep": 2
+  }
+}

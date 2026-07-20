@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.9,
+    "grounding": 0.75,
+    "completeness": 0.7
+  },
+  "y": {
+    "correctness": 0.95,
+    "grounding": 0.85,
+    "completeness": 0.88
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly land on the actual resolution (invalid — core_model run-level silently injects dummy weights; fix is --run-level=full_model), matching the thread's close. X cites the same _add_dummy_load_format mechanism but leaves an unresolved paradox (it says the test is marked full_model yet doesn't explain why that marker didn't prevent running under core_model) and adds a tangential A100/GPU-memory-tuning aside not supported by the thread, which could mislead the reporter. Y explicitly resolves that marker paradox (selection marker vs. run-level flag are independent), grounds the mechanism across more of the actual test harness (run_args.py, runtime.py, stage_config.py, assertions.py), and adds concrete practical requirements (video path existence, real weights, memory split) plus a reasonable non-blocking follow-up suggestion — making it more complete and slightly better grounded without contradicting the ground truth.",
+  "_cost_usd": 0.1260849,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r2",
+    "arm_a_sha256": "a52d9afe503abbea9efea43862a1c274f8d891fa81ceef235cbc8d392b1eedba",
+    "judge_rep": 2
+  }
+}

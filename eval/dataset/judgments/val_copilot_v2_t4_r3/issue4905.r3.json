@@ -1,0 +1,25 @@
+{
+  "x": {
+    "correctness": 0.45,
+    "grounding": 0.55,
+    "completeness": 0.5
+  },
+  "y": {
+    "correctness": 0.3,
+    "grounding": 0.45,
+    "completeness": 0.5
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "The actual thread shows maintainers still investigating (yenuo26 asks Flink-ddd to check it, Flink-ddd asks for a full CI trigger to verify) rather than a settled 'already fixed on main, close' resolution — both candidates overstate confidence by recommending closure, but X hedges more appropriately ('please confirm CI was on right commit, re-trigger if needed') while Y asserts a definitive fix with unverifiable specifics (exact PR title, merge date '2026-07-05', three named regression tests, specific admission-guard line numbers) that read as fabricated embellishment beyond what the issue or thread supports. Both correctly ground the core diagnosis in the same async_omni.py guard code tied to PR #4834, matching the thread's attribution, but Y's excess invented detail hurts its grounding credibility more than it helps completeness.",
+  "_cost_usd": 0.06985209999999999,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/vllm-omni-copilot/eval/dataset/arms/copilot_v2_t4_r3",
+    "arm_a_sha256": "040e26aa3be2c60b92d9ce0138fa9a7d5cd61dbeafc6389de6e5eed2cdba551f",
+    "judge_rep": 3
+  }
+}
