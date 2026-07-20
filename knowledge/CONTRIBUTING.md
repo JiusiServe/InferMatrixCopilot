@@ -15,7 +15,7 @@ frontmatter、标签和溯源元数据，不能据此发明第二套知识结构
 |---|---|
 | 判断内容放 `general/`、`repos/`、component、model 还是 `local/` | [目录与归属](contributing/layout.md) |
 | 新增 `_index.md`、`rules.md`、`architecture.md` 或普通页面 | [页面与索引](contributing/page-rules.md) |
-| 复盘、提炼规则或确实需要保留错题 | [复盘与错题](contributing/incidents.md) |
+| 从 PR/review 复盘并提炼规则 | [复盘与规则摄取](contributing/incidents.md) |
 | 文件太长、目录太挤、dev 要拆前后端或模块/模型长大 | [何时拆分](contributing/scaling.md) |
 | 新增、移动、重命名、删除 Markdown，或准备提交 | [同步与校验](contributing/validation.md) |
 
@@ -41,9 +41,11 @@ python tools/check_knowledge_tree.py
 - 长期知识只写本仓库的 `general/`、`repos/` 和贡献规范，不推进系统、全局或个人 memory。
 - 仓库、模块、模型和机器规则不互相继承；当前任务只加载真正命中的 owner。
 - 新增、移动、重命名、拆分或删除 Markdown 时，必须在同一修改中更新索引和所有链接。
-- 按内容角色落盘：可执行不变量进入最近 owner 的 `rules.md`，操作方法进入 guide，
-  稳定边界进入 architecture，复杂证据按既有 raw-layer 角色保存。不得把不同模型、
-  组件、benchmark 和 review 内容压成一篇 catch-all 页面。
+- PR/review 学习只能落可执行规则：完整 diff、评论、thread、commit 和回放输出只在
+  整理时进入 Git 忽略的临时目录；批次结束必须删除。正式树只更新最近 component 或
+  model owner 的 `rules.md` 及必要索引，不新增 PR case/history/result/incident 页面。
+- 非 PR 学习的既有 guide/architecture 继续按原 owner 维护；不得把不同模型、组件、
+  benchmark 和 review 内容压成一篇 catch-all 页面。
 - 评测 cases、hidden labels、predictions、judgments 和 run reports 属于 `eval/`，
   不得混入产品知识树或 adapter 默认 briefing。
 
@@ -51,7 +53,7 @@ python tools/check_knowledge_tree.py
 
 - [ ] 位置符合内容 owner，没有把工作主题和代码模块套娃。
 - [ ] 最近 `_index.md` 能找到新页面，旧路径没有残留有效链接。
-- [ ] 可执行结论已进 `rules.md`，错题没有变成默认必读入口。
+- [ ] 可执行结论已进 `rules.md`，没有 raw、回放、PR 案例或临时索引残留。
 - [ ] 没有公开机器信息、凭据、私人路径或本地临时产物。
 - [ ] `python tools/check_knowledge_tree.py` 和 `python tools/check_wiki_lint.py`
   都通过，并已检查当前完整 diff。

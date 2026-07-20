@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-07-20
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088"]
+sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136"]
 confidence: high
 ---
 
@@ -54,6 +54,30 @@ confidence: high
 - 禁止：只断言传给 mock 的 kwargs 后声称分布式语义已覆盖。
 - 验收：普通 float parameter 变为 DTensor；packed uint8/scalar parameter 保持本地
   identity，并覆盖 loader 的真实调用边界。 ^[PR #5088]
+
+### DIFF-2c — component quantization 独立解析且保留完整 owner 前缀
+
+- 触发：diffusion pipeline 为 text encoder、transformer、VAE 等组件增加独立量化配置。
+- 强制：每个组件独立解析量化配置，并把包含 component owner 的完整模块名前缀传到
+  真正持有权重的 layer；只量化明确支持的 attention/MLP linear，embedding、LM head
+  等排除项必须显式保持未量化。
+- 禁止：先裁掉 `text_encoder` 等 owner 前缀再匹配 component 规则；用一个组件的配置
+  隐式覆盖其他组件；因为同属一个模型就量化全部 linear。
+- 验收：至少覆盖“只量化一个组件、其他组件保持 BF16”的真实构造与加载，逐层断言
+  命中/排除集合，并验证 meta-device parameter 不会被提前 move。FLUX.2 的具体边界见
+  [FLUX.2 规则](../../models/flux2/rules.md)。 ^[PR #5136]
+
+## 质量阈值与资源辅助
+
+### DIFF-3a — 质量阈值必须由完全相同的测试 case 产生
+
+- 触发：新增 LPIPS/PSNR/相似度阈值，或用 CPU offload 等资源选项支撑量化质量测试。
+- 强制：阈值证据与测试中的 step、seed、size、guidance、checkpoint 和量化组件完全一致；
+  仅为避免 OOM 的 offload 必须在 baseline/candidate 对称启用并说明它不属于待比较变量。
+- 禁止：用 50-step A/B 数字为 10-step 测试阈值背书；只写“需要 offload”而不说明
+  是资源前提还是功能行为。
+- 验收：运行测试文件中的 exact case，并在规则/配置旁保留最短资源原因；对称 baseline
+  证明质量差异来自目标量化变量。 ^[PR #5136]
 
 相关执行流见 [Diffusion architecture](architecture.md)；benchmark 证据合同见
 [performance evidence](../../benchmark/guides/performance-evidence.md)。

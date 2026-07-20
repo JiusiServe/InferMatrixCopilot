@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-07-20
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #3576", "PR #4718"]
+sources: ["PR #3576", "PR #4718", "PR #5157"]
 confidence: high
 ---
 
@@ -48,6 +48,29 @@ confidence: high
 - 禁止：把 upstream unregister 整体置空，导致重复 timeseries 注册。
 - 验收：同进程连续创建/销毁两次 engine，无 duplicate-timeseries 错误且 Omni family
   仍可采集。 ^[PR #3576]
+
+## 缓存 readiness 与失败隔离
+
+### SERV-3a — readiness 必须表达 artifact 能力而非仅表达 identity
+
+- 触发：serving 层按 URI/key 缓存预处理 artifact，并在后续请求剥离原始输入。
+- 强制：readiness key 或 capability predicate 必须包含 consumer 真正需要的 mode/字段；
+  只有 artifact 已具备全部必需字段时，才能进入 artifact-only 路径。
+- 禁止：因为 `artifact_key` 相同就跨模式复用；原始输入已剥离后再让 worker 尝试补算
+  缺失字段。
+- 验收：覆盖“能力不足 artifact → 更强请求”与“能力超集 artifact → 较弱请求”，前者
+  保留原始输入并重新计算，后者是否复用必须作为明确性能取舍。Qwen3-TTS 的方向性
+  合同见 [Qwen3-TTS 规则](../../models/qwen3-tts/rules.md)。 ^[PR #5157]
+
+### SERV-3b — readiness 状态迁移与错误存活性一起验证
+
+- 触发：修改 artifact ready/track/mark/discard、失败清理或 eviction。
+- 强制：所有状态入口使用同一 key/capability 合同；请求级 prompt/build 错误不得杀死
+  engine，后续健康请求仍应成功。
+- 禁止：只改 ready 查询而遗漏 mark/discard；只测同模式 cache hit，不测跨模式顺序和
+  counterfactual failure。
+- 验收：单测枚举状态迁移；E2E 复现原始坏顺序、证明修复后存活，并在回退修复代码时
+  重新出现目标错误，避免测试空跑。 ^[PR #5157]
 
 请求到 engine 的边界见 [Serving architecture](architecture.md)；公开协议通用检查见
 [review contracts](../../../../general/review/guides/reviewer-lens-contracts.md)。

@@ -13,6 +13,14 @@ Out of scope / untouched: `repos/jianghan-roleplay-data-pipeline/` (byte-identic
 Plan history: 10 gpt-5.6-sol-high review rounds (9 on the earlier upstream-PR design, 1 on this vendored v2 whose substantive findings — non-destructive Step 0, recorded SHA pin, skills-archival clarification, inventory gate, injection delimiters — are folded in). Kept from those rounds: fail-closed review harness, mechanical anchor checks, bounded batches, audit archive outside the knowledge root, validator green per commit. Dropped (obsolete with vendoring + detail-max curation): owner-map.yaml, delivery trains, pin-bump choreography, signed-tag authorization, reduction ledgers. The LLMWiki pattern (Karpathy, via the Hermes `llm-wiki` skill spec in `reference-agents/`) was adopted at the owner's request — see the page-format section.
 
 ## Detail-preservation policy (the governing rule for step 3)
+- **Current incremental PR-learning override (2026-07-20):** the historical
+  reorganization rules below describe how the vendored tree was migrated; they
+  do not authorize new raw evidence. New PR/review learning fetches complete
+  evidence only into a Git-ignored temporary directory, performs deterministic
+  owner routing, and commits only executable owner/model rules plus necessary
+  indexes. Raw/replay/case/history/result/incident artifacts and coverage
+  ledgers are deleted at batch end. Existing legacy files remain in place but
+  are closed to new PR-learning entries.
 - **Union-first merges:** when two pages overlap, the merged page keeps *all* concrete material from both — cases, PR refs (`#3055`…), incident IDs, file:line refs, benchmark numbers, Chinese wording/voice. Compression is not a goal.
 - **Archive, never delete (LLMWiki rule):** nothing is ever removed from the tree. A superseded or duplicate page moves to `knowledge/_archive/<original-path>` (deregistered from its `_index.md`; inbound links annotated "(archived)"), with the surviving page linking to it. This replaces the old deletion-approval flow entirely — the no-loss guarantee becomes structural. Archives are listed per batch for user visibility.
 - Adding detail, cross-links, and structure is always preferred over shortening.
@@ -53,6 +61,8 @@ The wiki pattern's *mechanics* layer onto zuiho's *owner taxonomy* (general vs `
 - Gate per commit: validator green; moved files' bodies fingerprint-identical.
 
 ## Step 3 — Information curation (union-first, gpt-gated batches)
+> Historical migration procedure. Incremental PR/review learning now follows
+> the 2026-07-20 override above and `knowledge/contributing/incidents.md`.
 - **Inventory gate first:** before any batch edits, author the complete batch inventory (every in-scope file → its batch + intended ops: merge-union / add-detail / keep / archive-superseded) and present it to the user for sign-off — Step 3 has a finite, agreed scope before it starts.
 - **Batching:** owner-scoped batches (~8–15 files, prompt ≤ ~40K chars — split batches that exceed; never truncate). Order: small isolated topics first, the hunyuan `painterly/`/`history/` sagas last. Each batch = one commit.
 - **Per-batch work:** union-first merges + detail additions, **plus LLMWiki enrichment**: fill `sources:` frontmatter and `^[…]` provenance markers on the pages touched, set `confidence`/`contested` where conclusions are disputed, ensure the ≥2-cross-links rule, and move any superseded/duplicate page to `_archive/` (never delete).

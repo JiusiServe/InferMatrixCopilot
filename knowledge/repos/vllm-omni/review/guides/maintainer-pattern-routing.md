@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-07-20
 type: guide
 tags: [vllm-omni, review]
-sources: ["PR #3576", "PR #3642", "PR #4106", "PR #4281", "PR #4341", "PR #4718", "PR #4730", "PR #4980", "PR #5001", "PR #5031", "PR #5037", "PR #5052", "PR #5084", "PR #5087", "PR #5088"]
+sources: ["PR #3576", "PR #3642", "PR #4106", "PR #4281", "PR #4341", "PR #4718", "PR #4730", "PR #4980", "PR #5001", "PR #5031", "PR #5037", "PR #5052", "PR #5084", "PR #5087", "PR #5088", "PR #5136", "PR #5157"]
 confidence: high
 ---
 
@@ -32,15 +32,17 @@ confidence: high
 | `tests/diffusion/quantization`、可选包 import、硬件支持文档 | [CI environment](../../ci/guides/ci-environment-gotchas.md) | 未安装环境、真实 kernel、claim 一致性 |
 | benchmark 脚本、percentile、warmup、replica isolation | [performance evidence](../../benchmark/guides/performance-evidence.md) | 计时、统计、失败退出、完整 key set |
 | 模块移动、compat shim、重复 class/schema | [API surface](../../../../general/review/guides/code-taste-api-surface.md) | identity、旧行为、返回合同 |
-| checkpoint adapter、graph/eager、HSDP/FSDP | [Diffusion rules](../../components/diffusion/rules.md) | consumer、数值 parity、真实 fully_shard |
+| checkpoint adapter、component quantization、graph/eager、HSDP/FSDP | [Diffusion rules](../../components/diffusion/rules.md) | namespace/consumer、数值 parity、真实 fully_shard |
 | composable strategy、stage YAML、headless override | [Config rules](../../components/config/rules.md) | wired axis、拓扑单源、显存预算 |
 | runtime bridge、`runtime_info`、`OmniOutput` | [Model Executor rules](../../components/model-executor/rules.md) | producer→consumer、逐请求 batch |
 | prefix-cache side stream、pinned host tensor | [Scheduler rules](../../components/scheduler/rules.md) | buffer 生命周期、CPU fallback |
-| SSE/audio format、Prometheus replica stats | [Serving rules](../../components/serving/rules.md) | 首 chunk 前校验、owner 生命周期 |
+| SSE/audio format、artifact readiness、Prometheus replica stats | [Serving rules](../../components/serving/rules.md) | 首 chunk 前校验、cache capability、owner 生命周期 |
 | Cosmos3 Edge/Distilled | [Cosmos3 rules](../../models/cosmos3/rules.md) | scheduler、RNG、zero、offload |
+| FLUX.2、Mistral text encoder FP8 | [FLUX.2 rules](../../models/flux2/rules.md) | component prefix、量化排除项、meta/offload |
 | Krea 2 | [Krea 2 rules](../../models/krea2/rules.md) | dtype、config fetch、online/capability |
 | MiniCPM-o 4.5 | [MiniCPM-o rules](../../models/minicpm-o-4-5/rules.md) | registry、remote code、TTS bridge/batch |
 | Ming dense/MoE、CFM CUDA Graph | [Ming-TTS rules](../../models/ming-omni-tts/rules.md) | solver dtype、CFG、last step、lazy import |
+| Qwen3-TTS、`ref_audio`、x-vector/ICL | [Qwen3-TTS rules](../../models/qwen3-tts/rules.md) | readiness 方向、一次重算、engine 存活 |
 
 ## 完成标准
 

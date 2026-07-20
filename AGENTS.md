@@ -10,17 +10,19 @@ knowledge page:
    the one linked contribution topic that matches the change. The plan's
    owner-scoped inventory and detail-retention rules remain authoritative for
    this vendored tree.
-2. Route each conclusion by both purpose and code owner. A must-do invariant
-   belongs in the nearest owner's `rules.md`; a procedure belongs in a guide;
-   stable boundaries belong in architecture; complex evidence belongs in the
-   existing raw layer. Never collapse heterogeneous model, component,
-   benchmark, and review knowledge into one catch-all page.
-3. Treat `knowledge/SCHEMA.md` as an additive metadata overlay only. Preserve
-   the planned `incidents/`, `history/`, and `results/` evidence roles. Generated
-   evaluation cases, hidden labels, predictions, judgments, and run reports
-   belong under `eval/`, not in the product knowledge tree.
-4. Never add raw evidence pages to an adapter's always-on briefing. Update the
-   nearest `_index.md` for every current synthesized page.
+2. Route each conclusion by both purpose and code owner. PR-learning and review-
+   experience intake may produce only executable rules in the nearest owner's
+   `rules.md`; model-specific rules stay with that model owner. Raw PR material
+   is temporary input outside the repository and must be deleted after the
+   owner-scoped rule batch passes validation. Never add PR case/history/result/
+   incident pages or collapse heterogeneous owners into one catch-all page.
+3. Treat `knowledge/SCHEMA.md` as an additive metadata overlay only. Existing
+   `incidents/`, `history/`, and `results/` files are legacy material, not an
+   allowed destination for new PR learning. Generated evaluation cases, hidden
+   labels, predictions, judgments, and run reports belong under `eval/`, not in
+   the product knowledge tree.
+4. Never persist raw evidence pages or replay outputs. Update the nearest
+   `_index.md` for every current rules page.
 5. Run both validators after the complete owner-scoped batch:
 
    ```powershell
