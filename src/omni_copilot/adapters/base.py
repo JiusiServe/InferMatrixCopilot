@@ -155,7 +155,8 @@ class RepoAdapter:
         return caps
 
     def briefing(self, knowledge_root: Path | None = None,
-                 warnings: list[str] | None = None) -> str:
+                 warnings: list[str] | None = None,
+                 mode: str = "eco") -> str:
         """The repo's always-on prompt slice — the REPO-SPECIFIC part only. Reads
         this adapter's `knowledge.briefing_docs` (its `repos/<repo>/` hard-gate
         rules + navigation index) from the SHARED `knowledge_root` (the vendored
@@ -164,23 +165,39 @@ class RepoAdapter:
         not dumped here. Falls back to a legacy AI `profile.yaml` when one exists,
         else empty."""
         kn = self.manifest.get("knowledge") or {}
-        docs = kn.get("briefing_docs") or []
+        docs = list(kn.get("briefing_docs") or [])
+        performance_docs = (list(kn.get("performance_briefing_docs") or [])
+                            if mode == "performance" else [])
         repo_subdir = str(kn.get("repo_subdir") or "").rstrip("/")
         if repo_subdir:
-            scoped_docs = []
-            for rel in docs:
-                rel_posix = Path(rel).as_posix()
-                if rel_posix == repo_subdir or rel_posix.startswith(repo_subdir + "/"):
-                    scoped_docs.append(rel)
-                elif warnings is not None:
-                    warnings.append(f"repo briefing path outside {repo_subdir}: {rel}")
-            docs = scoped_docs
-        if knowledge_root is not None and docs:
-            body = render_briefing_docs(
-                knowledge_root, docs,
-                header=(f"Repo-specific knowledge (source: {kn.get('source', '')}; "
-                        "open the linked deeper docs with doc_read / doc_search):"),
-                warnings=warnings)
+            def scoped(items: list[str]) -> list[str]:
+                out = []
+                for rel in items:
+                    rel_posix = Path(rel).as_posix()
+                    if (rel_posix == repo_subdir
+                            or rel_posix.startswith(repo_subdir + "/")):
+                        out.append(rel)
+                    elif warnings is not None:
+                        warnings.append(
+                            f"repo briefing path outside {repo_subdir}: {rel}")
+                return out
+
+            docs = scoped(docs)
+            performance_docs = scoped(performance_docs)
+        if knowledge_root is not None and (docs or performance_docs):
+            parts = []
+            if docs:
+                parts.append(render_briefing_docs(
+                    knowledge_root, docs,
+                    header=(f"Repo-specific knowledge (source: {kn.get('source', '')}; "
+                            "open the linked deeper docs with doc_read / doc_search):"),
+                    warnings=warnings))
+            if performance_docs:
+                parts.append(render_briefing_docs(
+                    knowledge_root, performance_docs,
+                    header="Performance-only review knowledge router:",
+                    warnings=warnings))
+            body = "\n\n".join(part for part in parts if part)
             if body:
                 return body
         if (self.profile_dir / "profile.yaml").exists():  # legacy AI profile

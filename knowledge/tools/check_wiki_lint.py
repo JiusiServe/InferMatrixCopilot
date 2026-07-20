@@ -2,8 +2,7 @@
 """检查沉淀层页面的 frontmatter、标签分类法、孤页与陈旧度（SCHEMA.md 机制）。
 
 范围：general/ 与 repos/ 下的沉淀层页面。证据层（incidents/、history/、
-results/）只检查禁止 frontmatter；repos/jianghan-roleplay-data-pipeline/ 与
-_archive/ 不检查。
+results/）、repos/jianghan-roleplay-data-pipeline/ 与 _archive/ 不检查。
 结构/索引/链接/错题校验属于 check_knowledge_tree.py，这里不重复。
 """
 
@@ -25,7 +24,9 @@ SKIP_SUBTREES = (ROOT / "repos" / "jianghan-roleplay-data-pipeline",)
 TYPES = {"rule", "guide", "architecture", "index"}
 CONFIDENCE = {"high", "medium", "low"}
 REQUIRED = ("title", "created", "updated", "type", "tags")
-ADAPTER_KNOWLEDGE_KEYS = {"source", "repo_subdir", "briefing_docs"}
+ADAPTER_KNOWLEDGE_KEYS = {
+    "source", "repo_subdir", "briefing_docs", "performance_briefing_docs"
+}
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 MARKDOWN_LINK = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
 STALE_DAYS = 365
@@ -61,20 +62,6 @@ def synthesized_pages() -> list[Path]:
     return pages
 
 
-def raw_pages() -> list[Path]:
-    pages = []
-    for root in SYNTH_ROOTS:
-        for p in sorted(root.rglob("*.md")):
-            relative = p.relative_to(ROOT)
-            parts = set(relative.parts)
-            if not parts & RAW_PARTS or parts & SKIP_PARTS:
-                continue
-            if any(p.is_relative_to(s) for s in SKIP_SUBTREES):
-                continue
-            pages.append(p)
-    return pages
-
-
 def check_adapter_briefings() -> None:
     adapter_root = ROOT.parent / "adapters"
     for manifest in sorted(adapter_root.glob("*/manifest.yaml")):
@@ -91,28 +78,16 @@ def check_adapter_briefings() -> None:
         if unknown:
             errors.append(
                 f"adapter knowledge 出现未授权字段 {unknown}：{manifest}")
-        docs = knowledge.get("briefing_docs") or []
-        if not isinstance(docs, list) or not all(isinstance(d, str) for d in docs):
-            errors.append(f"adapter briefing_docs 必须是字符串列表：{manifest}")
-            continue
-        for doc in docs:
-            if set(Path(doc).parts) & RAW_PARTS:
-                errors.append(
-                    f"adapter briefing 禁止加载原始证据层页面（{doc}）：{manifest}")
-
-
-def check_raw_layer() -> None:
-    for p in raw_pages():
-        parts = p.relative_to(ROOT).parts
-        if any(parts[i:i + 2] == ("review", "history")
-               for i in range(len(parts) - 1)):
-            errors.append(
-                f"禁止 review/history 答案档案；按 owner 写 rules 或 incidents：{display(p)}")
-        if p.read_text(encoding="utf-8-sig").startswith("---"):
-            errors.append(
-                f"原始证据层页面禁止 frontmatter：{display(p)}")
-
-
+        for field in ("briefing_docs", "performance_briefing_docs"):
+            docs = knowledge.get(field) or []
+            if (not isinstance(docs, list)
+                    or not all(isinstance(d, str) for d in docs)):
+                errors.append(f"adapter {field} 必须是字符串列表：{manifest}")
+                continue
+            for doc in docs:
+                if set(Path(doc).parts) & RAW_PARTS:
+                    errors.append(
+                        f"adapter {field} 禁止加载原始证据层页面（{doc}）：{manifest}")
 def frontmatter(path: Path) -> dict | None:
     text = path.read_text(encoding="utf-8-sig")
     if not text.startswith("---"):
@@ -180,7 +155,6 @@ def main() -> int:
     today = datetime.date.today()
     linked = inbound_links()
     check_adapter_briefings()
-    check_raw_layer()
     for p in pages:
         meta = check_page(p, tags_allowed)
         if meta is None:

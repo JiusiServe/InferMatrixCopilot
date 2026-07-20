@@ -6,19 +6,22 @@
 `zuiho-kai/claude-workflow-starter`. Before adding, moving, or deleting any
 knowledge page:
 
-1. Read `knowledge/CONTRIBUTING.md`, then read exactly the one linked
-   contribution topic that matches the change.
-2. Treat that contribution workflow as the source of truth for ownership,
-   directory placement, page shape, indexes, and incident handling.
-   `knowledge/SCHEMA.md` is an additive metadata overlay only; it does not
-   authorize a second knowledge layout or new page category.
-3. Put reusable conclusions in the nearest owner's existing `rules.md` first.
-   Add an `incidents/` page only when the upstream incident criteria and format
-   are satisfied. Do not create review-answer dumps under `history/` or
-   `results/`, and do not put evaluation cases, labels, predictions, judgments,
-   or generated reports in the knowledge tree.
-4. Never add raw evidence pages to an adapter's always-on briefing.
-5. Update the nearest `_index.md`, then run both:
+1. Read `doc/PLAN-knowledge-reorg.md`, `knowledge/CONTRIBUTING.md`, then exactly
+   the one linked contribution topic that matches the change. The plan's
+   owner-scoped inventory and detail-retention rules remain authoritative for
+   this vendored tree.
+2. Route each conclusion by both purpose and code owner. A must-do invariant
+   belongs in the nearest owner's `rules.md`; a procedure belongs in a guide;
+   stable boundaries belong in architecture; complex evidence belongs in the
+   existing raw layer. Never collapse heterogeneous model, component,
+   benchmark, and review knowledge into one catch-all page.
+3. Treat `knowledge/SCHEMA.md` as an additive metadata overlay only. Preserve
+   the planned `incidents/`, `history/`, and `results/` evidence roles. Generated
+   evaluation cases, hidden labels, predictions, judgments, and run reports
+   belong under `eval/`, not in the product knowledge tree.
+4. Never add raw evidence pages to an adapter's always-on briefing. Update the
+   nearest `_index.md` for every current synthesized page.
+5. Run both validators after the complete owner-scoped batch:
 
    ```powershell
    python knowledge/tools/check_knowledge_tree.py

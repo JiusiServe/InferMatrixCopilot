@@ -1,7 +1,7 @@
 ---
 title: "CI 环境与基础设施坑（runbook 汇编）"
 created: 2026-07-16
-updated: 2026-07-16
+updated: 2026-07-20
 type: guide
 tags: [vllm-omni, ci]
 sources: ["vllm-omni-rebase-agent@122a9468:agent/skills/fix-bitsandbytes-libnvjitlink-ld-library-path/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/fix-flashinfer-jit-cache-version-mismatch/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/buildkite-skipped-build-rebuild-fratricide/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/fix-watchdog-non-fatal-false-positive/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/entrypoint-h100-timeout-1800s-runner-mismatch/SKILL.md"]

@@ -1,10 +1,10 @@
 ---
 title: "性能与精度证据"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-20
 type: guide
 tags: [vllm-omni, benchmark]
-sources: []
+sources: ["PR #5052"]
 ---
 
 # 性能与精度证据
@@ -102,3 +102,25 @@ Only changed knobs: <baseline knobs> vs <grouped knobs>.
 - request 数和 batch knobs 是否与结论一致？
 - 这是 DiT-only 还是 full AR-to-DiT？
 - 表格标题有没有把 smoke 写成 e2e？
+
+## Benchmark 程序本身也必须验收
+
+性能脚本能打印数字，不等于数字和 PASS/FAIL 判定可信。新增或修改 benchmark 时，
+先用小型确定性输入验收测量器，再投入昂贵环境。^[PR #5052]
+
+- **计时边界**：warmup、compile、首次连接和模型初始化必须位于正式 wall-clock 起点
+  之前；若目标就是 cold-start，必须单独命名指标，不能混进 steady-state throughput。
+- **分位数**：小样本使用 nearest-rank 或成熟统计实现。`int(q*n)-1` 会把两样本 p90
+  错算成最小值；测试至少覆盖 1、2 和奇偶样本数。
+- **失败语义**：零成功、请求异常或隔离校验失败必须非零退出。打印错误后返回 0 会让
+  CI 和外层脚本把坏数据归档成成功结果。
+- **隔离证据**：replica/data-parallel 请求使用不同输入和 seed，各自与单副本 baseline
+  对齐，并要求完整 key-set equality。相同 prompt/seed/hash 只能证明结果相同，不能
+  证明请求没有串线；结果是 baseline 真子集也不能通过。
+- **结果完整性**：报告请求总数、成功数、失败数、结果 key 集和统计样本数；任何一项
+  与计划矩阵不一致都先失败，不计算漂亮的 percentile。
+
+最小验收应故意注入一次请求失败、一个缺失结果 key、两样本 p90 和一次 timed warmup，
+证明脚本分别拒绝前三者并把 warmup 排除在正式窗口外。完整 grouped/replica 语义还要
+结合 [dynamic batching validation](dynamic-batching-validation.md) 和
+[evidence gate](evidence-gate.md)。

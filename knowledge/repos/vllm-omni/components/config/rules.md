@@ -1,10 +1,10 @@
 ---
 title: "Config 规则"
 created: 2026-07-16
-updated: 2026-07-16
+updated: 2026-07-20
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["vllm-omni-rebase-agent@122a9468:agent/skills/fix-missing-gpu-memory-utilization-diffusion-stage/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/fix-voxcpm2-l4-oom-after-rebase/SKILL.md", docs/configuration/stage_configs.md]
+sources: ["vllm-omni-rebase-agent@122a9468:agent/skills/fix-missing-gpu-memory-utilization-diffusion-stage/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/fix-voxcpm2-l4-oom-after-rebase/SKILL.md", docs/configuration/stage_configs.md, "PR #4281", "PR #5031"]
 ---
 
 # Config 规则
@@ -91,6 +91,36 @@ modules=[worker_runner]，status=active，run_count=30，2026-06-07 创建 / 07-
   合并语义见 [architecture](architecture.md)。
 - 禁止：拿某一层 YAML 原文当生效值；用默认值脑补缺失字段（`gpu_memory_utilization`
   缺省=0.9、`async_chunk` 缺省=true 这类默认正是事故来源）。
+
+## CONF-4a — composable strategy 只暴露已经接通的 axis
+
+- 触发：新增 composable parallel strategy、axis、routing/LB policy 或 stage override。
+- 强制：schema 明确区分 wired 与 reserved；translator 对 unsupported/reserved 值显式
+  失败。routing 与 load-balancing policy 只能有一个 owner，不能同时由 strategy 和 CLI
+  冲突配置。
+- 禁止：接受但静默忽略 axis；关键 strategy/deploy 文件缺失时 conditional skip；以
+  可漂移的 stage index 作为长期 identity。
+- 验收：每个公开 axis 都有 spec → translator → final stage config 的正向测试和不支持
+  值的 fail-fast 测试；stage 使用必填、可读的稳定名称。 ^[PR #4281]
+
+## CONF-4b — 标准与 headless 启动必须解析出同一拓扑
+
+- 触发：CLI、headless serve、offline entrypoint 或 engine factory 新增/转发配置字段。
+- 强制：同一命令语义在所有入口转发相同 override，并比较展开后的逐 stage 配置。
+- 禁止：只测 parser 输出，未证明值到达 engine/config consumer。
+- 验收：标准与 headless 路径对同一 stage override 生成等价 topology；缺字段时测试直接
+  失败，不允许用 skip 隐藏路径漂移。 ^[PR #4281]
+
+## CONF-5a — 冻结 topology 只保留一份，部署开关决定 wiring
+
+- 触发：同一模型的 sync/async processor、普通/async chunk 或部署加速出现多份近似
+  pipeline/stage YAML。
+- 强制：相同冻结拓扑共用一份 pipeline config，同时声明可选 processor；由 deploy flag
+  决定 wiring。模型 package `__init__` 保持轻量，FP8 等部署加速留在 deploy 层。
+- 禁止：为一个 runtime flag 复制整套 topology；把无关 payload bug 或平台 cleanup
+  混入 config migration。
+- 验收：两种 wiring 都从同一 topology 展开，配置 diff 只包含预期 deploy 字段；同卡
+  多 stage 的 `gpu_memory_utilization` 总预算在最终配置中不超过可用容量。 ^[PR #5031]
 
 ## 相关
 

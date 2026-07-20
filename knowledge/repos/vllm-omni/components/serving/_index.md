@@ -1,7 +1,7 @@
 ---
 title: "Serving"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-20
 type: index
 tags: [vllm-omni, components, serving]
 sources: []
@@ -28,3 +28,4 @@ sources: []
 | 遇到什么 | 查看哪里 |
 |---|---|
 | 理解入口到 engine 的边界 | [architecture](architecture.md) |
+| 审查 streaming preflight、格式 owner 或多 replica 指标 | [rules](rules.md) |
