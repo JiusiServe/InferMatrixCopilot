@@ -78,10 +78,15 @@ def enforce_mcp_policy(raw: dict[str, Any], *, allowed_repos: list[str]) -> Task
                 f"{list(_REVIEW_DEPTHS)}")
         params["review_depth"] = str(params["review_depth"]).lower()
 
+    mode = raw.get("mode", "eco")
+    if mode not in {"eco", "performance"}:
+        raise PolicyError(
+            f"mode {mode!r} is invalid; allowed: ['eco', 'performance']")
+
     # Build through the validated model. post is hard-forced False; report_only
     # is irrelevant for READ_ONLY_KINDS (they are read-only unless post), but we
     # normalize it off too for a clean record.
-    return TaskSpec(kind=kind, repo=repo, pr=pr, issue=issue,
+    return TaskSpec(kind=kind, mode=mode, repo=repo, pr=pr, issue=issue,
                     report_only=False, post=False, params=params)
 
 
