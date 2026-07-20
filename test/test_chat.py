@@ -19,7 +19,7 @@ class ScriptedChatLLM:
         self.available = True
 
     def create(self, *, system, messages, tools=None, model=None,
-               max_tokens=None, on_text=None):
+               max_tokens=None, on_text=None, role=""):
         self.calls.append({"messages": [*messages], "tools": tools})
         reply = self._replies.pop(0)
         if on_text is not None:

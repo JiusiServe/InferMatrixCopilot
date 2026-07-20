@@ -42,8 +42,13 @@ async def run_agent_step(
     scope: ToolScope | None = None,
     extra_tools: dict[str, ToolDef] | None = None,
     max_iters: int | None = None,
+    llm_override=None,
+    model_override: str = "",
 ) -> tuple[StepResult, dict]:
-    """The single entry point for every agent step (修正方案 §4.1)."""
+    """The single entry point for every agent step (修正方案 §4.1).
+    `llm_override`/`model_override` are the MoA runtime seam (design W6): an
+    explicit per-call client+model (e.g. a mixture member) with NO mutation of
+    the shared ctx — omitted, the run's tier model applies as always."""
     if ctx.llm is None or not ctx.llm.available:
         return (StepResult(False, FailureKind.BLOCKED,
                            "LLM not configured — cannot run agent step"), {})
@@ -62,7 +67,8 @@ async def run_agent_step(
     # default) selects the agent-reasoning model here — the split point is after
     # intent, and everything upstream (planning, evidence, knowledge) is shared.
     tier = spec.get("mode", "eco")
-    tier_model = ctx.settings.model_for(tier)
+    tier_model = model_override or ctx.settings.model_for(tier)
+    step_llm = llm_override or ctx.llm
     contract = {**BASE_OUTPUT_SCHEMA, **(output_extension or {})}
     capped, refs = _build_evidence(ctx, evidence)
 
@@ -157,7 +163,7 @@ async def run_agent_step(
         prompt += f"\n\n## STEP GUIDANCE\n{guidance}"
     outcome = await asyncio.to_thread(
         run_agent,
-        ctx.llm, system=system, prompt=prompt, scope=scope,
+        step_llm, system=system, prompt=prompt, scope=scope,
         trace=ctx.trace, extra_tools=all_extra, max_iters=budget,
         model=tier_model,
     )

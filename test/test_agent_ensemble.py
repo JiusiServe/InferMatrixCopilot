@@ -22,7 +22,7 @@ class ScriptedLLM:
         self.available = True
 
     def create(self, *, system, messages, tools=None, model=None,
-               max_tokens=None, on_text=None):
+               max_tokens=None, on_text=None, role=""):
         self.calls.append({"system": system, "messages": [*messages],
                            "tools": tools})
         return self._replies.pop(0)
@@ -217,7 +217,7 @@ class KeyedLLM:
         self.available = True
 
     def create(self, *, system, messages, tools=None, model=None,
-               max_tokens=None, on_text=None):
+               max_tokens=None, on_text=None, role=""):
         with self._lock:
             self.calls.append({"system": system, "messages": [*messages]})
         # lens markers ride the user prompt now (static-system invariant);

@@ -159,6 +159,29 @@ def gh_read_tools(repo: Path | None) -> dict:
                         "name,state,bucket"], cwd=repo)
         return out[:10_000] if code == 0 else f"gh failed: {out[:400]}"
 
+    def gh_issue_timeline(issue, **_: object) -> str:
+        """Tool handler: referenced PRs/commits from the issue's timeline (W3b
+        related-artifact mining — 'is a fix already in flight?'). Owner/repo
+        comes from the checkout's own `gh repo view`, never from issue text
+        (endpoint-injection guard); int-coerced issue number."""
+        code, out = gh(["repo", "view", "--json", "nameWithOwner"], cwd=repo)
+        if code != 0:
+            return f"gh failed: {out[:400]}"
+        try:
+            full = str(__import__("json").loads(out or "{}")
+                       .get("nameWithOwner") or "")
+        except ValueError:
+            full = ""
+        if not full:
+            return "gh failed: could not resolve repo nameWithOwner"
+        code, out = gh(["api", f"repos/{full}/issues/{int(issue)}/timeline",
+                        "-q", '.[] | select(.event=="cross-referenced" or '
+                        '.event=="referenced") | {event, commit_id, '
+                        'source_type: .source.issue.pull_request != null, '
+                        'source_number: .source.issue.number, '
+                        'source_title: .source.issue.title}'], cwd=repo)
+        return out[:10_000] if code == 0 else f"gh failed: {out[:400]}"
+
     n = {"type": "integer"}
     return {
         "gh_pr_view": ToolDef("gh_pr_view", "Read PR metadata (read-only).",
@@ -170,6 +193,11 @@ def gh_read_tools(repo: Path | None) -> dict:
         "gh_ci_read": ToolDef("gh_ci_read", "Read a PR's CI checks (read-only).",
                               {"type": "object", "properties": {"pr": n},
                                "required": ["pr"]}, gh_ci_read),
+        "gh_issue_timeline": ToolDef(
+            "gh_issue_timeline",
+            "PRs/commits referencing this issue (read-only timeline).",
+            {"type": "object", "properties": {"issue": n},
+             "required": ["issue"]}, gh_issue_timeline),
     }
 
 

@@ -157,6 +157,7 @@ class Copilot:
         run_dir.mkdir(parents=True, exist_ok=True)
         (run_dir / "task.json").write_text(json.dumps({
             "spec": spec.model_dump(), "playbook": playbook_to_doc(resolution.playbook),
+            "invocation_id": os.environ.get("OMNI_INVOCATION_ID", ""),
         }, indent=2))
         return self._execute(resolution.playbook, spec, run_dir,
                              resolution_mode=resolution.mode, tier=resolution.tier)
@@ -172,8 +173,29 @@ class Copilot:
             print(f"✋ no playbook named {name!r} (see /playbooks)")
             return BLOCKED_EXIT
         kind = playbook.task_kinds[0]
-        spec = TaskSpec(kind=kind, repo=self.settings.default_repo,
-                        report_only=report_only, params=params or {})
+        # lift target params into first-class spec fields so the explicit
+        # playbook path can address a PR/issue/repo like every other surface
+        params = dict(params or {})
+        pr = params.pop("pr", None)
+        issue = params.pop("issue", None)
+        repo = str(params.pop("repo", "") or self.settings.default_repo)
+        try:
+            pr = int(pr) if pr is not None else None
+            issue = int(issue) if issue is not None else None
+        except (TypeError, ValueError):
+            print("✋ pr/issue task params must be integers")
+            return BLOCKED_EXIT
+        if repo not in (self.settings.repo_paths or {repo: ""}):
+            print(f"✋ unknown repo alias {repo!r} "
+                  f"(known: {', '.join(sorted(self.settings.repo_paths or {}))})")
+            return BLOCKED_EXIT
+        spec = TaskSpec(kind=kind, repo=repo, pr=pr, issue=issue,
+                        report_only=report_only, params=params)
+        from ..intent import validate_spec
+        err = validate_spec(spec)
+        if err:
+            print(f"✋ {err} (pass e.g. --task-param pr=5134)")
+            return BLOCKED_EXIT
         print(style("→ task: ", "bold", "cyan") + spec.describe()
               + style("  [explicit playbook override]", "yellow"))
         print(style("→ plan: ", "bold", "magenta") + f"explicit {playbook.name}@{playbook.version} "
@@ -193,6 +215,7 @@ class Copilot:
         run_dir.mkdir(parents=True, exist_ok=True)
         (run_dir / "task.json").write_text(json.dumps({
             "spec": spec.model_dump(), "playbook": playbook_to_doc(playbook),
+            "invocation_id": os.environ.get("OMNI_INVOCATION_ID", ""),
         }, indent=2))
         return self._execute(playbook, spec, run_dir,
                              resolution_mode="explicit", tier=spec.tier)
@@ -341,7 +364,7 @@ class Copilot:
         rs.mark_child_started(run_dir, child_pid=os.getpid(), state=rs.PLANNING)
         try:
             raw = json.loads((run_dir / "request.json").read_text(encoding="utf-8"))
-            spec = enforce_mcp_policy(raw, allowed_repos=self.settings.mcp_allowed_repos)
+            spec = enforce_mcp_policy(raw, allowed_repos=self.settings.mcp_allowed_repos, settings=self.settings)
         except (PolicyError, OSError, json.JSONDecodeError, ValueError) as exc:
             rs.mark(run_dir, rs.FAILED, note=f"policy/request rejected: {exc}")
             return 1

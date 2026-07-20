@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
@@ -120,6 +121,7 @@ class Executor:
             if pstep.foreach and not isinstance(items, list):
                 items = [items]
 
+            _t0 = time.monotonic()
             results = await asyncio.gather(
                 *(self._run_step(spec, pstep.params, state, item) for item in items)
             )
@@ -129,6 +131,7 @@ class Executor:
                 "step_result", step=pstep.id, spec=spec.name, ok=result.ok,
                 failure=result.failure.value if result.failure else None,
                 summary=result.summary,
+                dur_s=round(time.monotonic() - _t0, 2),  # labeled phase timing
             )
 
             if result.ok:

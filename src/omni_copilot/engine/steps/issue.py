@@ -55,6 +55,100 @@ async def _issue_fetch(ctx: StepContext) -> StepResult:
                       outputs={"state_updates": {"issue_text": out}})
 
 
+async def _maybe_moa_draft(ctx, *, step_name: str, purpose: str, guidance: str,
+                           extension: dict, material: str):
+    """MoA for issue answering (design W6 — issues have no lens ensemble):
+    when eligible with >=2 members, N member proposers draft concurrently over
+    the same evidence (STRICT budget: a refused reservation SKIPS the member —
+    no per-member legacy drafts) and one tier-model aggregator synthesizes the
+    slot-structured answer, its call reserved from the same cap. Fallbacks:
+    zero successful proposals => None (caller runs exactly ONE legacy tier
+    draft); aggregator unreservable/failed/invalid => the first proposal.
+    Returns (StepResult, output) or None for the legacy path."""
+    import asyncio
+    import json as _json
+
+    from ..agent_runtime import run_agent_step
+    from ..agent_runtime.moa import (
+        BudgetedLLM,
+        Member,
+        MoaBudget,
+        MoaBudgetExceeded,
+        moa_eligible,
+        resolve_members,
+    )
+    from ..agent_runtime.utils import _to_step_result
+
+    spec = ctx.state.get("task_spec") or {}
+    if not moa_eligible(ctx.settings, kind=str(spec.get("kind", "")),
+                        mode=str(spec.get("mode", "eco"))):
+        return None
+    members = resolve_members(ctx.settings)
+    if len(members) < 2:
+        return None
+    budget = MoaBudget.start(ctx.settings)
+    ctx.trace.record("moa_dispatch", step=step_name,
+                     members=[m.label() for m in members],
+                     max_usd=ctx.settings.moa_max_usd)
+
+    async def _propose(m):
+        try:
+            return await run_agent_step(
+                ctx, step_name=f"{step_name}#moa/{m.model}", purpose=purpose,
+                guidance=guidance, evidence={"issue_text": material},
+                output_extension=extension,
+                extra_tools=_gh_read_tools(_repo_path(ctx)),
+                max_iters=ctx.settings.max_agent_iters,
+                llm_override=BudgetedLLM(m, ctx.llm.for_member(m), budget,
+                                         role="moa_member"),
+                model_override=m.model)
+        except (MoaBudgetExceeded, Exception) as exc:
+            ctx.trace.record("moa_member_dropped", member=m.label(),
+                             error=f"{type(exc).__name__}: {exc}"[:200])
+            return None
+
+    runs = await asyncio.gather(*(_propose(m) for m in members))
+    proposals = [(r, o) for r_o in runs if r_o is not None
+                 for r, o in [r_o] if o and o.get("status") == "success"]
+    if not proposals:
+        return None  # exactly ONE legacy tier draft (the pre-MoA baseline)
+    tier_model = ctx.settings.model_for(spec.get("mode", "eco"))
+    agg = BudgetedLLM(Member(model=tier_model), ctx.llm, budget,
+                      role="moa_aggregator")
+    contract_desc = _json.dumps({k: v for k, v in extension.items()},
+                                ensure_ascii=False)
+    prompt = ("Synthesize ONE best answer from these independent proposals "
+              "(prefer agreement; keep the strongest evidence; fill every "
+              "slot you can). Proposals:\n\n"
+              + "\n\n---\n\n".join(_json.dumps(
+                  {k: o.get(k) for k in ("answer_draft", *extension)},
+                  ensure_ascii=False)[:8000] for _, o in proposals)
+              + "\n\n## ISSUE\n<untrusted_data>\n" + material[:20_000]
+              + "\n</untrusted_data>\n\nYour FINAL message must be one JSON "
+              "object with fields: " + contract_desc
+              + ' plus {"status": "success", "summary": "...", '
+              '"confidence": "high|medium|low"}')
+    try:
+        from ...llm import parse_json_reply
+
+        reply = agg.create(system="You are the synthesis aggregator for a "
+                                  "mixture of independent issue-answer drafts.",
+                           messages=[{"role": "user", "content": prompt}],
+                           max_tokens=ctx.settings.llm_max_tokens)
+        merged = parse_json_reply(reply.text or "")
+    except (MoaBudgetExceeded, Exception):
+        merged = None
+    if not isinstance(merged, dict) or not any(
+            merged.get(k) for k in ("answer_draft", "root_cause")):
+        result, output = proposals[0]  # aggregator failed — first proposal
+        ctx.trace.record("moa_aggregator_fallback", step=step_name)
+        return result, output
+    merged.setdefault("status", "success")
+    merged.setdefault("summary", "MoA-synthesized answer "
+                                 f"({len(proposals)} proposals)")
+    return _to_step_result(merged, f"[moa x{len(proposals)}] "), merged
+
+
 def _issue_agent_step(step_name: str, purpose: str, guidance: str,
                       extension: dict, render):
     """Issue-facing agent steps on the unified runtime (修正方案 P1)."""
@@ -70,15 +164,23 @@ def _issue_agent_step(step_name: str, purpose: str, guidance: str,
         material = ctx.state.get("issue_text", "")
         if not material:
             return StepResult(False, FailureKind.BLOCKED, "no issue_text in state")
-        result, output = await run_agent_step(
-            ctx, step_name=step_name, purpose=purpose, guidance=guidance,
-            evidence={"issue_text": str(material)},
-            output_extension=extension,
-            extra_tools=_gh_read_tools(_repo_path(ctx)),
-            max_iters=ctx.settings.max_agent_iters,  # T3: the default review
-            # budget left ~zero headroom for grep-heavy triage (issue4842
-            # blocked 2/3 replicates at the cap)
-        )
+        moa_result = None
+        if step_name == "agent.draft_issue_answer":
+            moa_result = await _maybe_moa_draft(
+                ctx, step_name=step_name, purpose=purpose, guidance=guidance,
+                extension=extension, material=str(material))
+        if moa_result is not None:
+            result, output = moa_result
+        else:
+            result, output = await run_agent_step(
+                ctx, step_name=step_name, purpose=purpose, guidance=guidance,
+                evidence={"issue_text": str(material)},
+                output_extension=extension,
+                extra_tools=_gh_read_tools(_repo_path(ctx)),
+                max_iters=ctx.settings.max_agent_iters,  # T3: the default review
+                # budget left ~zero headroom for grep-heavy triage (issue4842
+                # blocked 2/3 replicates at the cap)
+            )
         if result.ok:
             key, text = render(output)
             ctx.state[key] = text
@@ -109,18 +211,54 @@ def _issue_agent_step(step_name: str, purpose: str, guidance: str,
     return handler
 
 
+_SLOT_ORDER = (("root_cause", "Root cause"), ("fix", "Fix"),
+               ("workaround", "Workaround"), ("preconditions", "Preconditions"),
+               ("verification", "Verification"), ("prevention", "Prevention"),
+               ("disposition", "Disposition"))
+
+
 def _render_answer(output: dict) -> tuple[str, str]:
     """Render the draft-answer agent output into the `("draft_answer", text)`
-    pair: `answer_draft`, else the salvaged raw final text, else `summary`.
-    Appends the `disposition` slot (close/keep-open/duplicate/reopen-when —
-    T3 forensics #8: completeness losses were missing closing moves) and an
-    epistemics caveat when merge-state claims lack a gh verification call
-    (forensics #7)."""
-    text = str(output.get("answer_draft") or output.get("_raw_text")
-               or output.get("summary", ""))
-    disp = str(output.get("disposition") or "").strip()
-    if disp and disp.lower() not in text.lower():
-        text += f"\n\n**Disposition:** {disp}"
+    pair. Structured slots (W3: root_cause/fix/workaround/preconditions/
+    verification/prevention/disposition) are the canonical source when the
+    CORE is present (root_cause AND (fix OR disposition)) — the draft is
+    NEVER discarded: draft paragraphs not already contained in a slot append
+    under "Additional context". With only peripheral slots, the draft stays
+    the body and present slots append as labeled sections (same containment
+    dedup). No slots ⇒ the old contract: `answer_draft`, else salvaged raw
+    text, else `summary`. Appends an epistemics caveat when merge-state
+    claims lack a gh verification call (forensics #7)."""
+    slots = {k: str(output.get(k) or "").strip() for k, _ in _SLOT_ORDER}
+    draft = str(output.get("answer_draft") or output.get("_raw_text")
+                or output.get("summary", ""))
+    filled = {k: v for k, v in slots.items() if v}
+    core = bool(slots["root_cause"]) and bool(slots["fix"] or slots["disposition"])
+
+    def _sections(keys) -> str:
+        return "\n\n".join(f"### {title}\n{slots[k]}"
+                           for k, title in _SLOT_ORDER if k in keys)
+
+    def _leftover_paras(body: str) -> list[str]:
+        """Draft paragraphs not contained verbatim in any slot (non-lossy)."""
+        slot_text = "\n".join(filled.values()).lower()
+        return [p for p in body.split("\n\n")
+                if p.strip() and p.strip().lower() not in slot_text]
+
+    if core:
+        text = _sections(filled)
+        extra = _leftover_paras(draft)
+        if extra:
+            text += "\n\n### Additional context\n" + "\n\n".join(extra)
+    elif filled:
+        text = draft
+        for k, title in _SLOT_ORDER:
+            if k in filled and slots[k].lower() not in draft.lower():
+                text += f"\n\n**{title}:** {slots[k]}"
+    else:
+        text = draft
+        disp = str(output.get("disposition") or "").strip()
+        if disp and disp.lower() not in text.lower():
+            text += f"\n\n**Disposition:** {disp}"
     tools_used = output.get("_tools_used") or []
     lowered = text.lower()
     if (("merged" in lowered or "on main" in lowered)
@@ -153,8 +291,22 @@ register_step(StepSpec(
         "Draft a helpful, factual answer to the repository issue.",
         "Ground every claim in the issue text or code you actually "
         "read (use your repo tools). Never invent APIs; say plainly "
-        "when unsure. The draft is never auto-posted.",
+        "when unsure. Check gh_issue_timeline for PRs/commits that "
+        "already reference this issue before diagnosing from scratch. "
+        "FINAL CHECKLIST before answering: re-read the title, body and "
+        "every comment; confirm each question the reporter asked is "
+        "addressed; state the preconditions your fix needs to work; if "
+        "this failure is a footgun others will hit, add a prevention "
+        "suggestion. The draft is never auto-posted.",
         {"answer_draft": "the complete draft reply (markdown)",
+         "root_cause": "the diagnosed root cause, with file:line evidence",
+         "fix": "the concrete fix or correct invocation",
+         "workaround": "interim workaround if the fix is not immediate, else empty",
+         "preconditions": "what must hold for the fix to work (weights, "
+                          "hardware, versions), else empty",
+         "verification": "exact command/check proving the fix worked",
+         "prevention": "guard/warning/docs change preventing recurrence, "
+                       "else empty",
          "disposition": "close / keep-open / duplicate-of-#N / needs-info — "
                         "match the thread's last maintainer action; include "
                         "the reopen condition"},

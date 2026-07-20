@@ -60,7 +60,42 @@ async def run_agent_step_ensemble(
     budget = max_iters or ctx.settings.ensemble_lens_max_iters
     k = max(1, int(ctx.settings.ensemble_samples_per_lens))
 
-    async def _one_lens(lens: dict, j: int, idx: int = 0) -> tuple[str, StepResult, dict]:
+    # MoA (design W6): heterogeneous member proposers on qualified runs — the
+    # verify-and-merge reducer stays on the tier model. Member failures fall
+    # back per-lens to the tier model; a whole-mixture failure IS the existing
+    # tier-model ensemble (nothing below can make the run worse than today).
+    from .moa import BudgetedLLM, MoaBudget, moa_eligible, resolve_members
+
+    spec0 = ctx.state.get("task_spec") or {}
+    moa_members: list = []
+    moa_budget = None
+    if moa_eligible(ctx.settings, kind=str(spec0.get("kind", "")),
+                    mode=str(spec0.get("mode", "eco")),
+                    depth=str(ctx.state.get("_review_depth", ""))):
+        moa_members = resolve_members(ctx.settings)
+        if len(moa_members) < 2:
+            moa_members = []
+        else:
+            moa_budget = MoaBudget.start(ctx.settings)
+            fallback_model = ctx.settings.model_for(spec0.get("mode", "eco"))
+            ctx.trace.record(
+                "moa_dispatch", step=step_name,
+                members=[m.label() for m in moa_members],
+                assignment={str(lens["name"]): moa_members[i % len(moa_members)].label()
+                            for i, lens in enumerate(lenses)},
+                max_usd=ctx.settings.moa_max_usd)  # NO token counts here (W7)
+
+    def _lens_overrides(lens_i: int) -> dict:
+        if not moa_members:
+            return {}
+        m = moa_members[lens_i % len(moa_members)]
+        return {"llm_override": BudgetedLLM(
+                    m, ctx.llm.for_member(m), moa_budget,
+                    fallback=(ctx.llm, fallback_model)),
+                "model_override": m.model}
+
+    async def _one_lens(lens: dict, j: int, idx: int = 0,
+                        lens_i: int = 0) -> tuple[str, StepResult, dict]:
         """Run `run_agent_step` once for a single lens (sample `j`), instructing
         the agent to go DEEP on that lens as its depth priority while peers cover
         the rest. `idx` staggers concurrent starts: lenses share a byte-identical
@@ -76,12 +111,27 @@ async def run_agent_step_ensemble(
             f"{lens['focus']}\nGo DEEP on this lens — it is your depth "
             "priority; report other issues only if they surface on the way. "
             "Peer agents cover the other lenses.")
-        result, output = await run_agent_step(
-            ctx, step_name=f"{step_name}#{lens['name']}{suffix}",
-            purpose=purpose,
-            evidence=evidence, guidance=lens_guidance, expected=expected,
-            output_extension=output_extension, scope=scope,
-            extra_tools=extra_tools, max_iters=budget)
+        overrides = _lens_overrides(lens_i)
+        try:
+            result, output = await run_agent_step(
+                ctx, step_name=f"{step_name}#{lens['name']}{suffix}",
+                purpose=purpose,
+                evidence=evidence, guidance=lens_guidance, expected=expected,
+                output_extension=output_extension, scope=scope,
+                extra_tools=extra_tools, max_iters=budget, **overrides)
+        except Exception as exc:
+            if not overrides:
+                raise
+            # member failure (W6): this lens re-runs ONCE on the tier model —
+            # baseline-path cost, recorded, never sinks the ensemble
+            ctx.trace.record("moa_member_fallback", lens=str(lens["name"]),
+                             error=f"{type(exc).__name__}: {exc}"[:200])
+            result, output = await run_agent_step(
+                ctx, step_name=f"{step_name}#{lens['name']}{suffix}/tier",
+                purpose=purpose,
+                evidence=evidence, guidance=lens_guidance, expected=expected,
+                output_extension=output_extension, scope=scope,
+                extra_tools=extra_tools, max_iters=budget)
         if (ctx.settings.ensemble_zero_yield_retry and output and not (output.get(merge_key) or [])):
             # zero-yield lens: one cheap single-lens re-ask beats the full
             # 8-lens ensemble retry it used to trigger (T3 forensics #6)
@@ -101,12 +151,14 @@ async def run_agent_step_ensemble(
     # the highest-variance link, so the union over samples is the recall
     # floor) are independent by construction — run them concurrently; the
     # sequential ensemble's wall-clock was its whole efficiency penalty
-    jobs = [(lens, j) for lens in lenses for j in range(1, k + 1)]
+    jobs = [(li, lens, j) for li, lens in enumerate(lenses)
+            for j in range(1, k + 1)]
     if ctx.settings.ensemble_parallel and len(jobs) > 1:
         runs = await asyncio.gather(
-            *(_one_lens(lens, j, idx) for idx, (lens, j) in enumerate(jobs)))
+            *(_one_lens(lens, j, idx, li)
+              for idx, (li, lens, j) in enumerate(jobs)))
     else:
-        runs = [await _one_lens(lens, j) for lens, j in jobs]
+        runs = [await _one_lens(lens, j, lens_i=li) for li, lens, j in jobs]
     samples = [(name, output) for name, _, output in runs if output]
     last_result = runs[-1][1] if runs else None
     if not samples:
@@ -237,7 +289,7 @@ async def run_agent_step_ensemble(
     reply = await asyncio.to_thread(
         ctx.llm.create, system=merge_system,
         messages=[{"role": "user", "content": merge_prompt}],
-        model=tier_model,
+        model=tier_model, role="reducer",
         max_tokens=max(6000, ctx.settings.llm_max_tokens))
     reply_text = reply.text
     reduce_in = (reply.usage or {}).get("input_tokens", 0)
@@ -297,9 +349,25 @@ async def run_agent_step_ensemble(
     else:
         merged["summary"] = (f"ensemble of {len(samples)} samples "
                              "(merge reduction failed; unverified union)")
+    # near-dup guard (W2): the reducer occasionally re-emits the same finding
+    # (observed live: an identical dead-guard comment twice on PR 4810) — drop
+    # candidates identical on (file, line, normalized first-120-chars comment)
+    seen_sigs: set = set()
+    deduped: list[int] = []
+    for i in sorted(kept):
+        c = kept[i]
+        if not any(k in c for k in ("file", "line", "comment")):
+            deduped.append(i)   # not review-comment-shaped — never dedup
+            continue
+        sig = (str(c.get("file", "")), str(c.get("line", "")),
+               " ".join(str(c.get("comment", "")).lower().split())[:120])
+        if sig in seen_sigs:
+            continue
+        seen_sigs.add(sig)
+        deduped.append(i)
     merged[merge_key] = [
         {k: v for k, v in kept[i].items() if k not in ("lenses", "consensus")}
-        for i in sorted(kept)]
+        for i in deduped]
     ctx.trace.record(
         "agent_ensemble", step=step_name,
         lenses=[name for name, _ in samples],

@@ -73,14 +73,39 @@ def _sweep_targets(diff: str, language: str = "python") -> str:
     return "\n".join(out)
 
 
-def _render_review_md(output: dict) -> str:
-    """Render the review output dict as Markdown: comments sorted by severity,
-    each as `file:line [severity] — comment` with optional evidence, followed
-    by a verdict line. The verdict enforces coherence — any comment at blocker,
-    blocker/major (and only when not self-declared-uncertain) means the PR
-    must change -> REQUEST CHANGES; other comments -> COMMENT; none ->
-    APPROVE. Positive [validated]/[upstream-verify]/[sweep] findings render
-    as a 'Validated' section. Falls back to the summary without comments."""
+_CATEGORY_RULES = (
+    # deterministic finding→category keyword map (W2: no PASS inference — a
+    # row without findings renders "no finding reported", an honest coverage
+    # display, never a claimed verification)
+    ("Tests / verification", ("test", "coverage", "assert", "regression",
+                              "benchmark", "fixture")),
+    ("Security", ("security", "inject", "secret", "credential", "unsafe",
+                  "traversal", "sanitiz")),
+    ("Docs / comments", ("docstring", "comment", "doc", "readme", "stale")),
+    ("Behavior / compatibility", ("break", "consumer", "default", "api",
+                                  "compat", "regress", "behavior", "caller")),
+    ("Correctness", ()),  # catch-all
+)
+
+
+def _category_of(c: dict) -> str:
+    hay = (str(c.get("comment", "")) + " " + str(c.get("evidence", ""))).lower()
+    for name, keys in _CATEGORY_RULES:
+        if any(k in hay for k in keys):
+            return name
+    return "Correctness"
+
+
+def _render_review_md(output: dict, pr_state: str = "") -> str:
+    """Render the review output dict as Markdown: a category scan table
+    (finding counts per category; empty rows say `no finding reported`),
+    comments sorted by severity as `file:line [severity] — comment`, then a
+    verdict line. The verdict enforces coherence — blocker/major (not
+    self-declared-uncertain) -> REQUEST CHANGES, softened to
+    `FOLLOW-UP REQUIRED (post-merge)` when `pr_state` is MERGED (a merged PR
+    cannot coherently be blocked; the finding ships as a follow-up); other
+    comments -> COMMENT; none -> APPROVE. Positive [validated]/[sweep]
+    findings render as a 'Validated' section."""
     comments = sorted(output.get("review_comments") or [],
                       key=lambda c: _SEVERITY_ORDER.get(
                           str(c.get("severity", "minor")).lower(), 2))
@@ -109,12 +134,22 @@ def _render_review_md(output: dict) -> str:
     blocking = any(str(c.get("severity", "")).lower() in ("blocker", "major")
                    and not _uncertain(c) for c in comments)
     if blocking:
-        verdict = "REQUEST CHANGES"
+        verdict = "FOLLOW-UP REQUIRED (post-merge)" \
+            if str(pr_state).upper() == "MERGED" else "REQUEST CHANGES"
     elif comments:
         verdict = "COMMENT"  # non-blocking asks; mergeable as-is
     else:
         verdict = "APPROVE"
     parts = []
+    # category scan: judge-visible coverage without claiming verification
+    counts: dict[str, int] = {}
+    for c in comments:
+        counts[_category_of(c)] = counts.get(_category_of(c), 0) + 1
+    scan = ["| Category | Result |", "|---|---|"]
+    for name, _ in _CATEGORY_RULES:
+        n = counts.get(name, 0)
+        scan.append(f"| {name} | {f'{n} finding(s) below' if n else 'no finding reported'} |")
+    parts.append("**Scan:**\n" + "\n".join(scan))
     if validated:
         parts.append("**Validated:**\n" + "\n".join(f"- {v}" for v in validated))
     parts.append("\n\n".join(lines) if lines else output.get("summary", "No findings."))

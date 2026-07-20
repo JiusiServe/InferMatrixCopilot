@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -39,6 +40,13 @@ class Settings(BaseSettings):
     # Repos
     default_repo: str = "vllm-omni"
     repo_paths: dict[str, str] = {}
+    # alias -> "owner/repo" full GitHub identity (REPO_FULL_NAMES env JSON).
+    # Used by intent URL routing to validate that a pasted URL really refers to
+    # a configured repo — a same-named repo under a different owner must be
+    # rejected, not silently run against the local checkout. When an alias is
+    # absent here, the checkout's `git remote get-url origin` is the fallback
+    # authority (resolved lazily, cached per process).
+    repo_full_names: dict[str, str] = {}
 
     # MCP server (mcp_server.py) — read-only surface for Claude Code / Codex.
     # The allowlist defaults to just `default_repo` (least privilege); extra
@@ -92,7 +100,13 @@ class Settings(BaseSettings):
                                       # results — uncached tokens x n_lenses;
                                       # evidence lives ONCE in the shared
                                       # cached prefix instead
-    evidence_caps: dict[str, int] = {"pr_diff": 120_000, "issue_text": 30_000}     # per-item cap; full text archived to run dir
+    evidence_caps: dict[str, int] = {"pr_diff": 120_000, "issue_text": 30_000,
+                                     "pr_context": 15_000}     # per-item cap; full text archived to run dir
+    # PR context bundle (W1): description/discussion/linked issues fed to the
+    # reviewer. "no_discussion" excludes comments/review threads — REQUIRED for
+    # eval arms (the frozen dataset's ground truth IS the review discussion;
+    # PR_CONTEXT_MODE=no_discussion keeps candidate inputs baseline-equivalent).
+    pr_context_mode: Literal["full", "no_discussion"] = "full"
     skills_top_k: int = 3
 
     # Ensemble agent steps (run_agent_step_ensemble): perspective-diverse
@@ -134,6 +148,40 @@ class Settings(BaseSettings):
     review_planner_model: str = ""    # gray-zone planner; empty -> the run's
                                       #   tier model (model_for(mode))
 
+    # Mixture-of-Agents (design W6; JSON in LLM_MIXTURE, single-quoted in .env).
+    # Schema: {"members": [{"model": str, "base_url"?: str, "api_key_env"?: str
+    # (NAMES an env var — the secret-reference mechanism; raw "api_key" accepted
+    # but discouraged)], "aggregator"?: <member>, "layers"?: 1}. Malformed JSON
+    # degrades to {} (MoA off) — this optional feature must never take down the
+    # copilot. Members whose model has no MODEL_PRICES entry are rejected at
+    # parse (the budget cap must stay enforceable). Member identity in traces
+    # is model@host only; keys are never logged.
+    llm_mixture: Annotated[dict, NoDecode] = {}
+    moa_when: Literal["off", "full", "performance", "always"] = "full"
+    moa_member_timeout_s: float = 240.0  # per-request HTTP timeout ceiling
+    moa_deadline_s: float = 480.0        # overall fan-out deadline; each request
+                                         #   timeout = min(member, remaining)
+    moa_max_usd: float = 1.50            # per-run MoA spend cap (reservations)
+    moa_max_members: int = 4
+
+    @field_validator("llm_mixture", mode="before")
+    @classmethod
+    def _parse_mixture(cls, v):
+        """Tolerantly parse LLM_MIXTURE env JSON: malformed ⇒ {} (MoA off)."""
+        import json as _json
+
+        if isinstance(v, dict):
+            return v
+        try:
+            obj = _json.loads(v) if isinstance(v, str) and v.strip() else {}
+            return obj if isinstance(obj, dict) else {}
+        except (ValueError, TypeError):
+            import logging
+
+            logging.getLogger("omni_copilot").warning(
+                "ignoring malformed LLM_MIXTURE JSON — MoA stays off")
+            return {}
+
     # Patch-review trigger thresholds
     large_diff_lines: int = 400
     large_diff_files: int = 8
@@ -145,6 +193,7 @@ class Settings(BaseSettings):
     # resource is nearly free in your deployment.
     metrics_enabled: bool = True
     token_price_in_per_mtok: float = 0.0   # 0 -> metrics.MODEL_PRICES table
+    cache_read_price_factor: float = 0.0   # 0 -> provider default (0.1x input)
     token_price_out_per_mtok: float = 0.0
     ci_rate_usd_per_min: float = 0.0       # billed CI $/min, folded into usd
     cost_ref_usd: dict[str, float] = {

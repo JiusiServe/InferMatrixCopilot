@@ -18,3 +18,9 @@ eval/dataset/arms/*/runs/
 adapters/*/repo_map/
 eval/dataset/arms/copilot_v2_test_*/
 eval/dataset/judgments/test_r*/
+
+# local one-click-install artifacts (machine-specific paths)
+.install-manifest
+/omni-copilot
+# local campaign spend log (audit records that reference local state)
+eval/dataset/goal-eval/campaign_ledger.jsonl

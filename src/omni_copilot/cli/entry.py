@@ -13,7 +13,8 @@ from .utils import parse_task_params
 
 
 def _handle_line(copilot: Copilot, line: str, assume_yes: bool,
-                 plan_only: bool, force_performance: bool = False) -> int | None:
+                 plan_only: bool, force_performance: bool = False,
+                 oneshot: bool = False) -> int | None:
     """Route one input `line`: `/`-built-ins (status/logs/playbooks/resume/quit)
     are handled inline; anything else is parsed into one-or-more TaskSpecs and
     run as a queue. `force_performance` (the --performance flag) pins every
@@ -40,16 +41,45 @@ def _handle_line(copilot: Copilot, line: str, assume_yes: bool,
 
     results = parse_intents(line, llm=copilot.llm,
                             default_repo=copilot.settings.default_repo,
-                            model=copilot.settings.intent)
+                            model=copilot.settings.intent,
+                            settings=copilot.settings)
     unclear = [r for r in results if r.needs_clarification]
     if unclear:
         print(f"? {unclear[0].clarify}")
-        return None
+        # headless one-shot (-p): a clarify is a FAILURE the caller must see —
+        # exit 0 hid misroutes from scripts/eval harnesses
+        from ..notify import BLOCKED_EXIT
+        return BLOCKED_EXIT if oneshot else None
     specs = [r.spec for r in results]
     if force_performance:  # explicit --performance overrides eco-by-default
         for s in specs:
             s.mode = "performance"
     return copilot.run_queue(specs, assume_yes=assume_yes, plan_only=plan_only)
+
+
+def _write_invocation_record(inv_dir, inv_id: str, copilot, rc: int) -> None:
+    """Persist `<inv_id>.json` (W7): the pre-run llm spend (priced from this
+    invocation's own trace via the canonical calculator) + the outcome, joined
+    to any run by invocation_id — every paid attempt leaves an artifact even
+    when no run dir was created (the clarify-retry case)."""
+    import json as _json
+
+    from ..metrics import cost_from_spans
+    from ..notify import BLOCKED_EXIT
+
+    pre = cost_from_spans(inv_dir / f"{inv_id}.trace.jsonl", copilot.settings)
+    if copilot.last_run_dir:
+        outcome = "run:" + copilot.last_run_dir.name
+    elif rc == BLOCKED_EXIT:
+        outcome = "blocked"  # incl. upfront clarify in one-shot mode
+    else:
+        outcome = "error" if rc else "no_run"
+    try:
+        (inv_dir / f"{inv_id}.json").write_text(_json.dumps({
+            "invocation_id": inv_id, "outcome": outcome, "rc": rc,
+            "pre_run": pre}, indent=1), encoding="utf-8")
+    except OSError:
+        pass
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -60,6 +90,10 @@ def main(argv: list[str] | None = None) -> int:
     to sys.argv. Returns the process exit code."""
     parser = argparse.ArgumentParser(prog="omni-copilot",
                                      description="Conversational repo-maintenance copilot")
+    parser.add_argument("command", nargs="?", choices=["doctor"],
+                        help="doctor: preflight diagnostics with exact fixes")
+    parser.add_argument("--json", action="store_true",
+                        help="with doctor: machine-readable output")
     parser.add_argument("-p", "--prompt", help="one-shot natural-language command")
     parser.add_argument("--yes", action="store_true",
                         help="skip confirmation prompts (headless)")
@@ -88,6 +122,28 @@ def main(argv: list[str] | None = None) -> int:
                         help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
 
+    if args.command == "doctor":  # diagnostics only — no Copilot/LLM spin-up
+        from .doctor import run_doctor
+
+        return run_doctor(as_json=args.json)
+
+    # per-invocation accounting (W7): intent parsing runs BEFORE any run dir
+    # exists, so pre-run spend (clarify retries!) needs its own artifact. The
+    # id is honored from env so eval harnesses can stamp each attempt and
+    # correlate exactly; the run later re-points tracing at its own dir, so
+    # this trace holds exactly the pre-run llm spans.
+    import os
+    import uuid as _uuid
+    from pathlib import Path as _Path
+
+    from .. import tracing as _tracing
+
+    inv_id = os.environ.get("OMNI_INVOCATION_ID") or f"inv-{_uuid.uuid4().hex[:8]}"
+    inv_dir = _Path.home() / ".omni-copilot" / "invocations"
+    inv_dir.mkdir(parents=True, exist_ok=True)
+    _tracing.init(inv_id, inv_dir / f"{inv_id}.trace.jsonl")
+    os.environ["OMNI_INVOCATION_ID"] = inv_id  # visible to the run subprocess/task
+
     copilot = Copilot()
 
     if args.execute_reserved:
@@ -101,8 +157,10 @@ def main(argv: list[str] | None = None) -> int:
                                     assume_yes=args.yes, plan_only=args.plan_only)
     if args.prompt:
         code = _handle_line(copilot, args.prompt, args.yes, args.plan_only,
-                            force_performance=args.performance)
-        return int(code) if code not in (None, -1) else 0
+                            force_performance=args.performance, oneshot=True)
+        rc = int(code) if code not in (None, -1) else 0
+        _write_invocation_record(inv_dir, inv_id, copilot, rc)
+        return rc
 
     # Interactive: conversational chat (Claude-Code-style) when an LLM is
     # configured; plain command REPL otherwise / with --no-chat.

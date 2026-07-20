@@ -60,6 +60,11 @@ TOOL_DEFS: list[dict] = [
                                   "repo_profile"]},
                 "pr": {"type": "integer"},
                 "issue": {"type": "integer"},
+                "repo": {"type": "string",
+                         "description": "configured repo alias (omit for the default)"},
+                "url": {"type": "string",
+                        "description": "GitHub PR/issue URL the user gave — "
+                                       "resolved and identity-validated"},
                 "report_only": {"type": "boolean"},
                 "post": {"type": "boolean"},
                 "params": {"type": "object"},
@@ -207,13 +212,36 @@ class ChatSession:
         return an error string."""
         c = self.copilot
         if name == "run_task":
+            from .intent import _GH_URL, resolve_repo_alias, validate_spec
+
+            repo = str(args.get("repo") or "") or c.settings.default_repo
+            pr, issue = args.get("pr"), args.get("issue")
+            if args.get("url"):  # a pasted URL is identity-validated, same as CLI
+                m = _GH_URL.search(str(args["url"]))
+                if not m:
+                    return "error: not a recognizable GitHub PR/issue URL"
+                alias = resolve_repo_alias(m.group(1), m.group(2), c.settings)
+                if alias is None:
+                    known = ", ".join(sorted(c.settings.repo_paths or {}))
+                    return (f"error: {m.group(1)}/{m.group(2)} is not a "
+                            f"configured repo (known: {known})")
+                repo = alias
+                if m.group(3).lower() == "pull":
+                    pr = pr or int(m.group(4))
+                else:
+                    issue = issue or int(m.group(4))
+            if repo not in (c.settings.repo_paths or {repo: ""}):
+                known = ", ".join(sorted(c.settings.repo_paths or {}))
+                return f"error: unknown repo alias {repo!r} (known: {known})"
             spec = TaskSpec(
-                kind=args["kind"], repo=c.settings.default_repo,
-                pr=args.get("pr"), issue=args.get("issue"),
+                kind=args["kind"], repo=repo, pr=pr, issue=issue,
                 report_only=bool(args.get("report_only", False)),
                 post=bool(args.get("post", False)),
                 params=args.get("params") or {},
             )
+            err = validate_spec(spec)
+            if err:  # upfront, so the model asks the user instead of running
+                return f"error: {err}"
             code = c.run_task(spec, assume_yes=self.assume_yes)
             return self._run_outcome(code)
         if name == "run_playbook":

@@ -260,7 +260,7 @@ def _plan_llm(sig: DiffSignals, diff_text: str, lens_names: Sequence[str],
     try:
         reply = llm.create(system=system,
                            messages=[{"role": "user", "content": prompt}],
-                           model=model, max_tokens=400)
+                           model=model, max_tokens=400, role="planner")
     except Exception:
         return None
     obj = parse_json_reply(reply.text or "")

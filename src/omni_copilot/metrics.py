@@ -89,6 +89,10 @@ MODEL_PRICES: tuple[tuple[str, tuple[float, float]], ...] = (
     ("claude-haiku", (1.0, 5.0)),
     ("deepseek-reasoner", (0.55, 2.19)),
     ("deepseek", (0.27, 1.10)),
+    # estimated public rates for MoA members (cap enforcement needs SOME
+    # price; conservative-side estimates, override via settings if needed)
+    ("mimo", (0.35, 1.40)),
+    ("qwen", (0.40, 1.20)),
 )
 _DEFAULT_PRICE = (3.0, 15.0)
 
@@ -210,6 +214,94 @@ def _trace_events(run_dir: Path) -> list[dict]:
     return events
 
 
+# cache-token billing factors relative to the input price (W7): Anthropic
+# documents cache reads at 0.1x and cache writes at 1.25x the input rate;
+# configurable for other providers via settings.cache_read_price_factor
+CACHE_READ_FACTOR = 0.1
+CACHE_CREATE_FACTOR = 1.25
+
+
+def cost_from_spans(trace_path: "Path", settings: "Settings | None" = None,
+                    ) -> dict | None:
+    """THE canonical cost calculator (design W7): one `llm` span per actual
+    provider request -> tokens (incl. cache fields) -> USD priced by EACH
+    span's own model (heterogeneous MoA runs price correctly; a member->tier
+    fallback mid-loop is priced per request). Returns None when the trace file
+    is absent/unreadable — callers then fall back to event sums, tagged
+    `source: events`, and never combine the two. `by_role` breaks the spend
+    down by the span's `role` attr (lens/reducer/planner/moa_member/…) for
+    the overhead sub-block."""
+    try:
+        lines = Path(trace_path).read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    read_f = float(getattr(settings, "cache_read_price_factor", 0) or 0) \
+        or CACHE_READ_FACTOR
+    totals = {"input_tokens": 0, "output_tokens": 0, "cache_read_tokens": 0,
+              "cache_creation_tokens": 0, "usd": 0.0, "llm_calls": 0}
+    by_role: dict[str, dict] = {}
+    for line in lines:
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if rec.get("name") != "llm":
+            continue
+        a = rec.get("attr") or {}
+        model = str(a.get("model") or "")
+        p_in, p_out = model_price(model, settings)
+        tin = int(a.get("prompt_tokens") or 0)
+        tout = int(a.get("completion_tokens") or 0)
+        cread = int(a.get("cache_read_tokens") or 0)
+        ccreate = int(a.get("cache_creation_tokens") or 0)
+        usd = (tin / 1e6 * p_in + tout / 1e6 * p_out
+               + cread / 1e6 * p_in * read_f
+               + ccreate / 1e6 * p_in * CACHE_CREATE_FACTOR)
+        totals["input_tokens"] += tin
+        totals["output_tokens"] += tout
+        totals["cache_read_tokens"] += cread
+        totals["cache_creation_tokens"] += ccreate
+        totals["usd"] += usd
+        totals["llm_calls"] += 1
+        role = str(a.get("role") or "agent")
+        r = by_role.setdefault(role, {"usd": 0.0, "input_tokens": 0,
+                                      "output_tokens": 0, "calls": 0})
+        r["usd"] += usd
+        r["input_tokens"] += tin
+        r["output_tokens"] += tout
+        r["calls"] += 1
+    if not totals["llm_calls"]:
+        return None
+    totals["usd"] = round(totals["usd"], 6)
+    totals["by_role"] = {k: {**v, "usd": round(v["usd"], 6)}
+                         for k, v in by_role.items()}
+    totals["source"] = "spans"
+    return totals
+
+
+def _phase_timings(events: Iterable[dict]) -> dict:
+    """Labeled phase timings (W7): per-step durations from `step_result`
+    events' `dur_s` (fetch/gate/review/report ARE the run's phases) plus
+    `time_to_first_result_s` — the first agent-step completion relative to
+    run start, the closest thing a batch run has to time-to-first-useful-
+    result."""
+    events = list(events)
+    ts = [float(ev["ts"]) for ev in events
+          if isinstance(ev.get("ts"), (int, float))]
+    start = min(ts) if ts else 0.0
+    steps: dict[str, float] = {}
+    ttfr = None
+    for ev in events:
+        if ev.get("kind") != "step_result":
+            continue
+        if isinstance(ev.get("dur_s"), (int, float)):
+            steps[str(ev.get("step"))] = round(float(ev["dur_s"]), 2)
+        if ttfr is None and str(ev.get("spec", "")).startswith("agent.") \
+                and isinstance(ev.get("ts"), (int, float)):
+            ttfr = round(float(ev["ts"]) - start, 2)
+    return {"steps": steps, "time_to_first_result_s": ttfr}
+
+
 def usage_from_events(events: Iterable[dict]) -> tuple[int, int, int]:
     """(input_tokens, output_tokens, tool_calls) summed over usage-bearing
     events — agent_output, agent_ensemble (reducer), llm_usage."""
@@ -291,10 +383,22 @@ def collect_run_metrics(run_dir: Path, settings: "Settings",
 
     ts = [float(ev["ts"]) for ev in events if isinstance(ev.get("ts"), (int, float))]
     minutes = (max(ts) - min(ts)) / 60.0 if len(ts) >= 2 else 0.0
-    tokens_in, tokens_out, tool_calls = usage_from_events(events)
     ci_minutes = sum(float(ev.get("minutes") or 0.0) for ev in events
                      if ev.get("kind") == "ci_build")
-    usd = estimate_usd(tokens_in, tokens_out, ci_minutes, settings)
+    # ONE canonical cost source (W7): per-request llm spans when the trace
+    # exists (each span priced by its own model + cache fields); the event
+    # sum is the tagged fallback ONLY when no trace — never both
+    span_cost = cost_from_spans(run_dir / "trace.jsonl", settings)
+    _, _, tool_calls = usage_from_events(events)
+    if span_cost is not None:
+        tokens_in = span_cost["input_tokens"]
+        tokens_out = span_cost["output_tokens"]
+        usd = span_cost["usd"] + ci_minutes * settings.ci_rate_usd_per_min
+        cost_source = "spans"
+    else:
+        tokens_in, tokens_out, _ = usage_from_events(events)
+        usd = estimate_usd(tokens_in, tokens_out, ci_minutes, settings)
+        cost_source = "events"
 
     incidents = derive_incidents(events)
     s = safety_multiplier(incidents)
@@ -333,7 +437,13 @@ def collect_run_metrics(run_dir: Path, settings: "Settings",
             "usd_ref": usd_ref,
             "min_ref": min_ref,
             "cost_index": round(c, 4),
+            "source": cost_source,
+            "llm_calls": (span_cost or {}).get("llm_calls"),
+            "by_role": (span_cost or {}).get("by_role"),
+            "cache_read_tokens": (span_cost or {}).get("cache_read_tokens"),
+            "cache_creation_tokens": (span_cost or {}).get("cache_creation_tokens"),
         },
+        "timings": _phase_timings(events),
         "risk": {
             "incidents": incidents,
             "safety_multiplier": round(s, 4),

@@ -36,7 +36,8 @@ class PolicyError(ValueError):
     """Raised when a request cannot be reduced to a safe read-only V1 task."""
 
 
-def enforce_mcp_policy(raw: dict[str, Any], *, allowed_repos: list[str]) -> TaskSpec:
+def enforce_mcp_policy(raw: dict[str, Any], *, allowed_repos: list[str],
+                       settings: Any = None) -> TaskSpec:
     """Reduce `raw` (an untrusted tool-call / `request.json` dict) to a safe,
     read-only `TaskSpec`, or raise `PolicyError`.
 
@@ -60,6 +61,16 @@ def enforce_mcp_policy(raw: dict[str, Any], *, allowed_repos: list[str]) -> Task
             f"{sorted(READ_ONLY_KINDS)}")
 
     repo = raw.get("repo")
+    if isinstance(repo, str) and "/" in repo and settings is not None:
+        # full `owner/repo` form: resolve through the same identity validator
+        # the CLI uses, so aliases mean the same thing on every surface
+        from .intent import resolve_repo_alias
+
+        owner, _, name = repo.partition("/")
+        alias = resolve_repo_alias(owner, name, settings)
+        if alias is None:
+            raise PolicyError(f"repo {repo!r} does not match any configured repo")
+        repo = alias
     if repo not in allowed_repos:
         raise PolicyError(
             f"repo {repo!r} not in the MCP allowlist {sorted(allowed_repos)}")

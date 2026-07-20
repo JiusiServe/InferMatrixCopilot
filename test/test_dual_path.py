@@ -92,7 +92,7 @@ class CaptureLLM:
         self.models: list[str | None] = []
 
     def create(self, *, system, messages, tools=None, model=None,
-               max_tokens=None, on_text=None):
+               max_tokens=None, on_text=None, role=""):
         self.models.append(model)
         base = {k: ([] if "list" in v else "x") for k, v in BASE_OUTPUT_SCHEMA.items()}
         base.update(status="success", summary="s", confidence="high",

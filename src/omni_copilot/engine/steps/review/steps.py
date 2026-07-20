@@ -125,6 +125,7 @@ async def _review_diff(ctx: StepContext) -> StepResult:
         expected="review_comments with file/line/severity/comment/evidence; "
                  "APPROVE-equivalent = empty review_comments with a summary.",
         evidence={"pr_diff": str(diff),
+                  "pr_context": ctx.state.get("pr_context", ""),
                   "gate_report": ctx.state.get("gate_report", ""),
                   "sweep_targets": _sweep_targets(str(diff), language)},
         output_extension={"review_comments":
@@ -160,6 +161,7 @@ async def _review_diff(ctx: StepContext) -> StepResult:
             reason=plan.reason, lenses=list(plan.lens_names),
             signals=plan.signals.as_dict() if plan.signals else None,
             input_tokens=plan.input_tokens, output_tokens=plan.output_tokens)
+        ctx.state["_review_depth"] = plan.depth  # MoA eligibility signal (W6)
         if plan.depth == "light":
             result, output = await run_agent_step(
                 ctx, max_iters=ctx.settings.review_light_max_iters, **common)
@@ -193,7 +195,8 @@ async def _review_diff(ctx: StepContext) -> StepResult:
                                          "planner": plan.planner,
                                          "reason": plan.reason}
     if result.ok:
-        review_md = _render_review_md(output)
+        review_md = _render_review_md(output,
+                                      pr_state=str(ctx.state.get("pr_state", "")))
         ctx.state["review_text"] = review_md
         result.outputs["review_text"] = review_md
         result.outputs.setdefault("state_updates", {})["review_text"] = review_md

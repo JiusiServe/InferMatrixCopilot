@@ -26,7 +26,7 @@ class OneShotLLM:
         self.available = True
 
     def create(self, *, system, messages, tools=None, model=None,
-               max_tokens=None, on_text=None):
+               max_tokens=None, on_text=None, role=""):
         self.calls.append({"system": system, "messages": [*messages],
                            "model": model, "max_tokens": max_tokens})
         if isinstance(self._reply, Exception):

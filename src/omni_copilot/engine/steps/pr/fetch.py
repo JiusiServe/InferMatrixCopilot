@@ -8,6 +8,7 @@ network are offline-testable, and both degrade to BLOCKED (never crash) when
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from ...step import FailureKind, StepContext, StepResult
@@ -86,6 +87,137 @@ def _pr_time_checkout(ctx: StepContext, repo: Path, pr: int) -> tuple[str, str]:
                        "PR-time state")
 
 
+def _local_diff_fallback(repo: Path, pr: int) -> tuple[str, str]:
+    """Reconstruct the PR diff locally when the gh/API diff endpoint refuses it
+    (HTTP 406 on >20k-line diffs): resolve base+head from `gh pr view`, fetch
+    both refs, and diff `merge-base(origin/<base>, head)..head` — the same
+    three-dot semantics the API endpoint uses. Returns `(diff_text, detail)`;
+    empty `diff_text` means the fallback also failed and `detail` says why."""
+    code, out = _gh(["pr", "view", str(pr), "--json", "baseRefName,commits"],
+                    cwd=repo)
+    if code != 0:
+        return "", f"pr view failed: {out[:200]}"
+    try:
+        data = json.loads(out or "{}")
+    except json.JSONDecodeError:
+        return "", "pr view returned non-JSON"
+    base_ref = str(data.get("baseRefName") or "")
+    commits = data.get("commits") or []
+    head_sha = str(commits[-1].get("oid") or "") if commits else ""
+    if not (base_ref and head_sha):
+        return "", "base/head unresolvable from pr view"
+    code, out = _git(repo, "fetch", "origin", base_ref, f"pull/{pr}/head",
+                     timeout=300)
+    if code != 0:
+        return "", f"git fetch failed: {out[:200]}"
+    code, out = _git(repo, "merge-base", f"origin/{base_ref}", head_sha)
+    if code != 0:
+        return "", f"merge-base failed: {out[:200]}"
+    base_sha = out.strip()
+    code, out = _git(repo, "diff", f"{base_sha}..{head_sha}", timeout=300)
+    if code != 0:
+        return "", f"git diff failed: {out[:200]}"
+    return out, f"local git diff {base_sha[:12]}..{head_sha[:12]}"
+
+
+_LINKED_ISSUE = re.compile(r"(?:fix(?:es|ed)?|close[sd]?|resolve[sd]?)\s*:?\s*#(\d+)",
+                           re.IGNORECASE)
+
+
+def _repo_full_name(ctx: StepContext, repo: str) -> str:
+    """`owner/repo` of the checkout, resolved once via gh and cached in state —
+    never taken from user/issue text (endpoint-injection guard)."""
+    cached = ctx.state.get("_repo_full_name")
+    if cached:
+        return str(cached)
+    code, out = _gh(["repo", "view", "--json", "nameWithOwner"], cwd=repo)
+    full = ""
+    if code == 0:
+        try:
+            full = str(json.loads(out or "{}").get("nameWithOwner") or "")
+        except json.JSONDecodeError:
+            full = ""
+    ctx.state["_repo_full_name"] = full
+    return full
+
+
+def _last_n(items: list, n: int = 10) -> list:
+    """Chronological last-n cap per source (B1's recall-vs-cost tradeoff)."""
+    return list(items)[-n:]
+
+
+def _clip(text: str, n: int = 700) -> str:
+    text = str(text or "").strip()
+    return text if len(text) <= n else text[:n] + " …[clipped]"
+
+
+def _pr_context_bundle(ctx: StepContext, repo: str, pr: int) -> str:
+    """Assemble the PR-side evidence bundle (design W1): title/body/labels
+    always; discussion comments, review summaries, and inline review comments
+    only in `pr_context_mode=full` (the eval-leakage policy: the frozen
+    dataset's ground truth IS the human review discussion, so arm runs export
+    PR_CONTEXT_MODE=no_discussion); linked issues (fixes/closes #N in body or
+    branch name, capped 2) in both modes. Every sub-fetch failure degrades to
+    a note — this bundle must never block the review."""
+    mode = str(getattr(ctx.settings, "pr_context_mode", "full") or "full")
+    parts: list[str] = []
+    code, out = _gh(["pr", "view", str(pr), "--json",
+                     "title,body,labels,headRefName,comments,reviews"], cwd=repo)
+    data: dict = {}
+    if code == 0:
+        try:
+            data = json.loads(out or "{}")
+        except json.JSONDecodeError:
+            data = {}
+    else:
+        parts.append("(pr view unavailable — partial context)")
+    if data:
+        labels = ", ".join(lb.get("name", "") for lb in data.get("labels") or [])
+        parts.append(f"## PR description\n### {data.get('title', '')}"
+                     + (f"  [labels: {labels}]" if labels else "")
+                     + f"\n{_clip(data.get('body'), 4000)}")
+    if mode == "full" and data:
+        comments = [f"@{c.get('author', {}).get('login', '?')}: {_clip(c.get('body'))}"
+                    for c in _last_n(data.get("comments") or [])]
+        if comments:
+            parts.append("## PR discussion (do not repeat these concerns — "
+                         "build on or extend them)\n" + "\n".join(comments))
+        reviews = [f"@{r.get('author', {}).get('login', '?')} "
+                   f"[{r.get('state', '?')}]: {_clip(r.get('body'))}"
+                   for r in _last_n(data.get("reviews") or []) if r.get("body")]
+        if reviews:
+            parts.append("## Review summaries\n" + "\n".join(reviews))
+        full_name = _repo_full_name(ctx, repo)
+        if full_name:  # inline review comments live on a separate endpoint
+            code, out = _gh(["api", f"repos/{full_name}/pulls/{pr}/comments",
+                             "--paginate", "-q",
+                             ".[] | {user: .user.login, path, line, body}"],
+                            cwd=repo)
+            if code == 0 and out.strip():
+                inline = []
+                for line in _last_n(out.strip().splitlines()):
+                    try:
+                        c = json.loads(line)
+                        inline.append(f"@{c.get('user', '?')} {c.get('path')}:"
+                                      f"{c.get('line')}: {_clip(c.get('body'))}")
+                    except json.JSONDecodeError:
+                        continue
+                if inline:
+                    parts.append("## Inline review comments\n" + "\n".join(inline))
+    # linked issues: acceptance criteria the diff must satisfy (both modes)
+    hay = f"{(data.get('body') or '')} {(data.get('headRefName') or '')}"
+    for num in list(dict.fromkeys(_LINKED_ISSUE.findall(hay)))[:2]:
+        code, out = _gh(["issue", "view", num, "--json", "title,body"], cwd=repo)
+        if code == 0:
+            try:
+                idata = json.loads(out or "{}")
+                parts.append(f"## Linked issue #{num}: {idata.get('title', '')}\n"
+                             + _clip(idata.get("body"), 2000))
+            except json.JSONDecodeError:
+                continue
+    return "\n\n".join(p for p in parts if p)
+
+
 @step("pr.fetch_diff", "deterministic", "read",
       "Fetch a PR diff via gh (read-only).")
 async def _pr_fetch_diff(ctx: StepContext) -> StepResult:
@@ -106,9 +238,25 @@ async def _pr_fetch_diff(ctx: StepContext) -> StepResult:
     if isinstance(repo, StepResult):
         return repo
     code, out = _gh(["pr", "diff", str(pr)], cwd=repo)
+    diff_note = ""
     if code != 0:
-        return StepResult(False, FailureKind.BLOCKED, f"gh pr diff failed: {out[:500]}")
+        # the API diff endpoint hard-fails on >20k-line diffs (HTTP 406
+        # too_large) — reconstruct the diff from local git before giving up
+        gh_err = out[:500]
+        out, detail = _local_diff_fallback(Path(repo), int(pr))
+        if not out:
+            return StepResult(False, FailureKind.BLOCKED,
+                              f"gh pr diff failed: {gh_err}; "
+                              f"local fallback failed: {detail}")
+        ctx.trace.record("diff_fallback", pr=int(pr), detail=detail,
+                         gh_error=gh_err[:200])
+        diff_note = f" via {detail}"
     ctx.state["diff_text"] = out
+    # PR context bundle (design W1): description + discussion + linked issues —
+    # the recall evidence a diff-only review structurally lacks. Degrades to a
+    # partial bundle on any sub-fetch failure; never blocks the run.
+    pr_context = _pr_context_bundle(ctx, repo, int(pr))
+    ctx.state["pr_context"] = pr_context
     # pin the review tree to PR-time state (latent-gap mechanism); fall back
     # to the live checkout with a loud note when pinning is impossible
     wt_path, note = _pr_time_checkout(ctx, Path(repo), int(pr))
@@ -116,8 +264,10 @@ async def _pr_fetch_diff(ctx: StepContext) -> StepResult:
     ctx.state["checkout_note"] = note
     return StepResult(
         True,
-        summary=f"fetched PR #{pr} diff ({len(out)} chars); {note.split(' — ')[0]}",
-        outputs={"state_updates": {"diff_text": out, "repo_path": wt_path,
+        summary=f"fetched PR #{pr} diff ({len(out)} chars{diff_note}, context "
+                f"{len(pr_context)} chars); {note.split(' — ')[0]}",
+        outputs={"state_updates": {"diff_text": out, "pr_context": pr_context,
+                                   "repo_path": wt_path,
                                    "checkout_note": note}})
 
 
@@ -145,6 +295,10 @@ async def _pr_gate_check(ctx: StepContext) -> StepResult:
                           outputs={"state_updates":
                                    {"gate_report": ctx.state["gate_report"]}})
     data = json.loads(out or "{}")
+    # publish the PR state (OPEN|MERGED|CLOSED) — the renderer calibrates the
+    # verdict wording on merged PRs (W2); previously MERGED was discarded
+    # whenever no other gate fired
+    ctx.state["pr_state"] = str(data.get("state") or "")
     if data.get("isDraft"):
         lines.append("PR is a DRAFT — review findings are provisional.")
     if data.get("mergeable") == "CONFLICTING" or \
@@ -166,4 +320,6 @@ async def _pr_gate_check(ctx: StepContext) -> StepResult:
     ctx.state["gate_report"] = report
     return StepResult(True, summary=report.splitlines()[0][:120],
                       outputs={"gate_report": report,
-                               "state_updates": {"gate_report": report}})
+                               "state_updates": {
+                                   "gate_report": report,
+                                   "pr_state": ctx.state.get("pr_state", "")}})

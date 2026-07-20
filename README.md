@@ -18,25 +18,40 @@ playbooks/          registered playbooks (repo-rebase is LOCKED)
 adapters/            repo adapters (adapter zero: vllm_omni)
 ```
 
-## Install & test
+## Install — one command
 
 ```bash
-pip install -e .
-pytest                      # 49 tests, all offline
-cp .env.template .env       # fill in keys; .env is git-ignored, NEVER commit it
+bash install.sh             # venv + package + .env seed + ./omni-copilot wrapper + doctor
 ```
 
-## Use
+Then edit `.env` (set `ANTHROPIC_API_KEY`; adjust `REPO_PATHS` if your checkouts
+live elsewhere — `.env` is git-ignored, NEVER commit it) and re-check:
 
 ```bash
-omni-copilot                              # conversational chat (Claude-Code-style)
-omni-copilot --no-chat                    # deterministic command REPL instead
-omni-copilot -p "rebase the repo" --plan-only
-omni-copilot -p "debug the CI of pr 2744, report only"
-omni-copilot -p "review pr 4830" --yes
-omni-copilot -p "rebase pr 4830, then review it"   # compound -> ordered queue
-omni-copilot --resume                     # re-enter the last run's first incomplete step
+./omni-copilot doctor       # every ✗ prints the exact fix (needs gh auth login once)
 ```
+
+`bash install.sh --uninstall` removes only what the installer created. Manual
+install (`pip install -e .` + `cp .env.template .env`) still works.
+
+## Use — one natural-language interface
+
+```bash
+./omni-copilot                            # conversational chat (Claude-Code-style)
+./omni-copilot -p "review pr 4830" --yes
+./omni-copilot -p "review https://github.com/vllm-project/vllm-omni/pull/4830"
+./omni-copilot -p "do a full depth review of pr 4830"   # depth from plain English
+./omni-copilot -p "answer issue 4842, do not post"
+./omni-copilot -p "rebase pr 4830, then review it"      # compound -> ordered queue
+./omni-copilot --resume                   # re-enter the last run's first incomplete step
+```
+
+You never need to know the internal task kinds or memorize trigger phrases:
+URLs route to the right repo/workflow (a URL for an unconfigured repo is
+rejected, never silently run against the default), unambiguous commands skip
+the LLM parser entirely, and an incomplete request ("review this") gets one
+concrete clarifying question upfront — in `-p --yes` mode it exits nonzero
+with the fix instead of failing later.
 
 Built-ins inside the REPL: `/status`, `/logs [n]`, `/playbooks`, `/resume`, `/quit`.
 

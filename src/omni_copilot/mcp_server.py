@@ -129,7 +129,7 @@ class CopilotMCP:
     # -- start (reserve + enqueue) -------------------------------------------
     def start(self, spec_dict: dict) -> str:
         """Boundary policy enforcement + reserve + enqueue; returns the run id."""
-        spec = enforce_mcp_policy(spec_dict, allowed_repos=self.settings.mcp_allowed_repos)
+        spec = enforce_mcp_policy(spec_dict, allowed_repos=self.settings.mcp_allowed_repos, settings=self.settings)
         run_id = self.copilot.reserve_run(
             spec, owner_server_id=self.server_id, owner_server_pid=self.pid)
         self._q.put(run_id)

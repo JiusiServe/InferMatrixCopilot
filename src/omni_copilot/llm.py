@@ -72,6 +72,25 @@ class LLM:
         """True when a client was configured (an API key was present)."""
         return self._client is not None
 
+    def for_member(self, member: Any) -> "LLM":
+        """A lightweight per-member client for MoA (design W6): same Settings,
+        the member's model/base_url/api_key. The member's key/base_url never
+        leave the client object — logs and traces render `member.label()`
+        (model@host) only."""
+        clone = object.__new__(LLM)
+        clone.settings = self.settings
+        clone._client = None
+        api_key = getattr(member, "api_key", "") or self.settings.anthropic_api_key
+        if api_key:
+            import anthropic
+
+            kwargs: dict[str, Any] = {"api_key": api_key}
+            base = getattr(member, "base_url", "") or self.settings.anthropic_base_url
+            if base:
+                kwargs["base_url"] = base
+            clone._client = anthropic.Anthropic(**kwargs)
+        return clone
+
     def create(
         self,
         *,
@@ -81,6 +100,7 @@ class LLM:
         model: str | None = None,
         max_tokens: int | None = None,
         on_text=None,
+        role: str = "",
     ) -> Reply:
         """`on_text(delta)` streams text as it is generated (terminal chat UX);
         the returned Reply is identical either way."""
@@ -96,7 +116,8 @@ class LLM:
         from . import tracing
 
         with tracing.span("llm", model=kwargs["model"],
-                          n_tools=len(kwargs["tools"])) as _sp:
+                          n_tools=len(kwargs["tools"]),
+                          **({"role": role} if role else {})) as _sp:
             if on_text is not None:
                 with self._client.messages.stream(**kwargs) as stream:
                     for delta in stream.text_stream:
@@ -120,7 +141,9 @@ class LLM:
                      # the endpoint reports cache reads separately (and
                      # excludes them from input_tokens) — capture for billing
                      "cache_read_input_tokens":
-                         getattr(resp.usage, "cache_read_input_tokens", 0) or 0}
+                         getattr(resp.usage, "cache_read_input_tokens", 0) or 0,
+                     "cache_creation_input_tokens":
+                         getattr(resp.usage, "cache_creation_input_tokens", 0) or 0}
         return Reply(blocks=blocks, stop_reason=resp.stop_reason or "end_turn",
                      usage=usage)
 
