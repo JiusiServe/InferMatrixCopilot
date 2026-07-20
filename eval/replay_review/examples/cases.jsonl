@@ -1,0 +1,1 @@
+{"case_id":"pr-9001@2222222","repo":"vllm-project/vllm-omni","pr":9001,"base_sha":"1111111","review_sha":"2222222","mode":"performance","knowledge_snapshot":"synthetic-v1","prompt":"Review this PR at the supplied SHA. Do not use PR comments or later history."}

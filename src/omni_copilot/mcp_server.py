@@ -32,7 +32,7 @@ import sys
 import threading
 import uuid
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Literal, Optional
 
 from . import run_status as rs
 from .config import Settings
@@ -241,12 +241,14 @@ def build_mcp(settings: Optional[Settings] = None):
     mcp = FastMCP("omni-copilot")
 
     @mcp.tool()
-    def start_review(pr: int, repo: str = "", review_depth: str = "") -> dict:
-        """Start a read-only review of PR `pr`. Returns {run_id}; poll
-        get_result. `review_depth` optionally pins the adaptive depth
-        (light|standard|full|auto; policy-validated)."""
+    def start_review(pr: int, repo: str = "", review_depth: str = "",
+                     mode: Literal["eco", "performance"] = "eco") -> dict:
+        """Start a read-only review of PR `pr` in eco or performance mode.
+        Returns {run_id}; poll get_result. `review_depth` optionally pins the
+        adaptive depth (light|standard|full|auto; policy-validated)."""
         req: dict = {"kind": "pr_review",
-                     "repo": repo or core.settings.default_repo, "pr": pr}
+                     "repo": repo or core.settings.default_repo,
+                     "pr": pr, "mode": mode}
         if review_depth:
             req["params"] = {"review_depth": review_depth}
         return _guard(lambda: {"run_id": core.start(req)})

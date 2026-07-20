@@ -30,6 +30,20 @@ def test_policy_accepts_read_only_kinds_and_forces_post_off():
         assert spec.post is False and spec.report_only is False
 
 
+def test_policy_preserves_valid_execution_mode():
+    spec = enforce_mcp_policy(
+        {"kind": "pr_review", "repo": "vllm-omni", "pr": 5,
+         "mode": "performance"}, allowed_repos=ALLOW)
+    assert spec.mode == "performance"
+
+
+def test_policy_refuses_invalid_execution_mode():
+    with pytest.raises(PolicyError, match="mode"):
+        enforce_mcp_policy(
+            {"kind": "pr_review", "repo": "vllm-omni", "pr": 5,
+             "mode": "turbo"}, allowed_repos=ALLOW)
+
+
 @pytest.mark.parametrize("bad", [
     {"kind": "pr_rebase", "repo": "vllm-omni"},      # write-capable
     {"kind": "pr_debug", "repo": "vllm-omni"},       # mutates (checkout_branch)
