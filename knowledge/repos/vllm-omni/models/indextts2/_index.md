@@ -13,8 +13,8 @@ sources: [vllm_omni/model_executor/models/indextts2/, vllm_omni/deploy/indextts2
 
 ## 名称与范围
 
-- 命名区分：家族/类名 IndexTTS2;pipeline key `indextts2`;checkpoint 拼写
-  `IndexTeam/IndexTTS-2`（YAML 头注/示例记载）。
+- 正式名称 IndexTTS-2（checkpoint `IndexTeam/IndexTTS-2`,YAML 头注/示例
+  记载）;代码/家族别名 IndexTTS2;pipeline key `indextts2`。
 - 模型 registry 两入口（**无 diffusion registry 入口**——S2Mel 的 DiT/流
   匹配是家族内代码;注意第二个入口是 LLM_GENERATION stage,不是 AR）：
   `IndexTTS2TalkerForConditionalGeneration`

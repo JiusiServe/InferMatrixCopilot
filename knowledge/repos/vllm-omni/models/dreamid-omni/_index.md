@@ -13,13 +13,14 @@ sources: [vllm_omni/diffusion/models/dreamid_omni/, vllm_omni/diffusion/registry
 
 ## 名称与范围
 
-- diffusion registry：`DreamIDOmniPipeline` →
-  （`dreamid_omni`, `pipeline_dreamid_omni`）,post
+- 无别名、无变体有据,树内未 pin checkpoint。diffusion registry:
+  `DreamIDOmniPipeline` →
+  （`dreamid_omni`, `pipeline_dreamid_omni`, `DreamIDOmniPipeline`）,post
   `get_dreamid_omni_post_process_func`。单 stage diffusion,引擎默认 stage
   配置（[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
-- 联合音频+视频身份保持生成,基座是 Wan2.2（家族内
+- 联合音频+视频身份保持生成,以 Wan2.2 为骨架的**独立实现**（家族内自带
   `wan2_2.py`：TP 优化 `WanSelfAttention` + 跨 TP rank 求全局 RMS 的
-  `DistributedRMSNorm`）;与 [wan2-2](../wan2-2/_index.md) 家族同源但独立目录。
+  `DistributedRMSNorm`）;Wan 家族本体见 [wan2-2](../wan2-2/_index.md)。
 - 依赖共享模块：[Diffusion 组件](../../components/diffusion/_index.md)。
 
 ## 结构与要点
@@ -36,5 +37,4 @@ sources: [vllm_omni/diffusion/models/dreamid_omni/, vllm_omni/diffusion/registry
 
 ## 什么时候查这里
 
-- 审查 dreamid_omni 的双 VAE、fused offload 或外部包依赖变化;Wan 侧共享改动
-  同时核对 wan2_2 家族。
+- 审查 dreamid_omni 的双 VAE、fused offload 或外部包依赖变化。

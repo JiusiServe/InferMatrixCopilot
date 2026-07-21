@@ -24,9 +24,11 @@ sources: [vllm_omni/model_executor/models/dynin_omni/dynin_omni_common.py, vllm_
 - 远程侧（checkpoint 内,树外）：LLaDA 系 LM、`t2i_generate`/`mmu_generate*`
   等采样函数、MAGVITv2、EMOVA speech tokenizer——**vLLM 采样器不参与
   stage 0 采样**（`compute_logits` 返回 None,生成在远程函数内完成）。
-- 共享：worker-connector 全载荷面;零嵌入 stage
+- 共享：worker-connector 全载荷面。
+- 家族局部（非共享模块）：零嵌入 stage 行为在
+  `dynin_omni_common.py`/`DyninOmniStageBase` 内实现
   （`build_zero_input_embeddings`,token id 有意义、embedding 无意义,
-  `requires_raw_input_tokens=True`）。
+  `requires_raw_input_tokens=True`）——不是仓库级共享设施。
 
 ## 配置、checkpoint 和兼容范围
 
@@ -38,15 +40,18 @@ sources: [vllm_omni/model_executor/models/dynin_omni/dynin_omni_common.py, vllm_
 - 任务路由是**按请求**的（t2t/i2t/s2t/v2t/t2i/i2i/t2s/s2s…）：stage 0 按任务
   选 prompting + 远程 generate 函数;stage 1/2 按 `DetokTarget`（`detok_id`）
   决定解码或原样透传——t2t 请求也会流过三个 stage,只是后两级透传。
-- 词表偏移在 detok 时做算术：图像 id 减 `text_vocab_size+num_new_special_tokens`
-  后 clamp 到 codebook（默认 8192）;音频 id 减 `audio_vocab_offset` 过滤到
-  4096——偏移来自 runtime info,不是硬编码。
+- 词表偏移在 detok 时做算术:图像 id 减 `image_vocab_offset`（回退
+  `text_vocab_size+num_new_special_tokens`）后 clamp 到可配 `codebook_size`
+  （默认 8192）;音频 id 减 `audio_vocab_offset` 或 `t2s_vocab_start`,过滤到
+  可配 `audio_codebook_size`（默认 4096）——偏移与 codebook 大小都来自
+  runtime info,不是硬编码。
 
 ## 从输入到输出的主要流程
 
-1. stage 0 远程 generate 完成后产出**完整 token 载荷**（非分块流式;三份
-   deploy 都置 `async_chunk: false`,YAML 注释注明全载荷交接依赖
-   worker-connector 数据面）。`_build_full_payload` 从 `pooling_output` 里
+1. stage 0 远程 generate 完成后产出**完整 token 载荷**（非分块流式;默认与
+   CI deploy 都置 `async_chunk: false`,YAML 注释注明全载荷交接依赖
+   worker-connector 数据面;multiconnector YAML 的取值本调查未确认）。
+   `_build_full_payload` 从 `pooling_output` 里
    抽取 `token_ids`/`runtime_info_json`——**这些字段在 stage 0 forward 内的
    精确产出位未逐行追**（消费侧合同已验证,生产侧代码位保持未决）。
 2. 跨 stage 交接（`stage_input_processors/dynin_omni.py`）双数据面：

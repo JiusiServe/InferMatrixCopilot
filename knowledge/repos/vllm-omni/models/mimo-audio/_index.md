@@ -30,6 +30,10 @@ sources: [vllm_omni/model_executor/models/mimo_audio/, vllm_omni/deploy/mimo_aud
   **文本也是 final output**）→ stage 1 `code2wav`（LLM_GENERATION,音频）。
   **`MiMoAudioConfig` 继承 Qwen2Config,HF model_type 报 `qwen2`**——
   model_type 自动探测无法区分,靠 `hf_architectures` 匹配。
+- 入口路径：registry `vllm_omni/model_executor/models/registry.py` 与
+  `vllm_omni/config/pipeline_registry.py`;拓扑
+  `vllm_omni/model_executor/models/mimo_audio/pipeline.py`;桥
+  `vllm_omni/model_executor/stage_input_processors/mimo_audio.py`。
 - 依赖共享模块：vLLM qwen2_audio 处理栈、SharedMemoryConnector、
   [Config 组件](../../components/config/architecture.md)。
 

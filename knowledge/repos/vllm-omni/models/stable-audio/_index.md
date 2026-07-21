@@ -13,8 +13,9 @@ sources: [vllm_omni/diffusion/models/stable_audio/, vllm_omni/diffusion/registry
 
 ## 名称与范围
 
-- diffusion registry：`StableAudioPipeline` →
-  （`stable_audio`, `pipeline_stable_audio`）,post
+- 正式名称 Stable Audio Open(Stability AI),无别名、无变体有据。
+  diffusion registry：`StableAudioPipeline` →
+  （`stable_audio`, `pipeline_stable_audio`, `StableAudioPipeline`）,post
   `get_stable_audio_post_process_func`。单 stage diffusion,引擎默认 stage
   配置（[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
 - 源码：`pipeline_stable_audio.py`（24 KB）+ `stable_audio_transformer.py`

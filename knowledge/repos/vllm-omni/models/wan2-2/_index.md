@@ -27,9 +27,15 @@ sources: [vllm_omni/diffusion/models/wan2_2/, vllm_omni/deploy/wan2_2_ti2v.yaml,
 - 入口路径：registry `vllm_omni/diffusion/registry.py` 与
   `vllm_omni/config/pipeline_registry.py`;拓扑
   `vllm_omni/model_executor/models/wan2_2/pipeline.py`。pipeline key 只有
-  `wan2_2_ti2v`（T2V 类）;其余五架构走单 stage diffusion 兜底,无显式 key;
-  YAML 也不自动加载（无 `default_deploy_config_name`,显式传裸文件名时按
-  `_DEPLOY_DIR` 解析）。
+  `wan2_2_ti2v`——单 `stage_id=0` 的 DIFFUSION/`dit` stage,
+  `final_output_type="video"`;其余五架构走默认单 stage diffusion 兜底,无
+  显式 key;YAML 也不自动加载（无 `default_deploy_config_name`,显式传裸
+  文件名时按 `_DEPLOY_DIR` 解析）。
+- 变体速览：I2V = 首帧 latent 通道拼接 + 可选 CLIP 图像编码器
+  （Wan2.1 式 checkpoint）;VACE = 参考图/源视频/掩码条件,单或双专家形态都
+  接受;S2V = 单 transformer,支持 diffusers 与原始格式 checkpoint
+  （T5→UMT5 转换）;两个 DMD2 = 分别继承 T2V/I2V 行为,换 DMD2 调度并禁
+  CFG。
 - import 期副作用：`__init__.py` 调 `patch_wan_rms_norm()` 把所有已加载
   diffusers 模块里的 `WanRMS_norm` 换成本仓 `RMSNormVAE`——**进程内任何
   diffusers Wan VAE 用户都被影响**（例如

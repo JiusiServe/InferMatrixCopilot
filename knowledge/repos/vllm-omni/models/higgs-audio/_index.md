@@ -37,7 +37,9 @@ sources: [vllm_omni/model_executor/models/higgs_audio_v2/, vllm_omni/model_execu
 - pipeline key：`higgs_audio_v2` 与 `higgs_multimodal_qwen3`,拓扑同为两 stage:
   Talker（LLM_AR,文本→8-codebook codec,latent 出）→ Code2Wav
   （LLM_GENERATION,codec→24 kHz PCM）,SharedMemoryConnector 相连。
-- 依赖共享模块：[Config 组件](../../components/config/architecture.md);
+- 依赖共享模块：de-delay 与流式行为的所有者是两个 stage 处理器
+  `model_executor/stage_input_processors/higgs_audio_v2.py` 与
+  `higgs_audio_v3.py`;[Config 组件](../../components/config/architecture.md);
   serving 侧集成在 `entrypoints/openai/serving_speech.py`
   （v3 参考音频 code LRU cache 256 条/64 MiB + in-flight 去重）。
 
@@ -54,6 +56,8 @@ sources: [vllm_omni/model_executor/models/higgs_audio_v2/, vllm_omni/model_execu
 - stop token：v2 `[128009, 128012]`;v3 `[151643, 151671]`。
 - codec 权重：v2 独立 audio-tokenizer 仓;v3 捆绑在 checkpoint
   `tied.embedding.modality_embeddings.0.model.*` 下（复用 v2 的 RVQ+DAC 类）。
+- v3 deploy 并发档：默认档 stage-0 `max_num_seqs: 16`,
+  `high_throughput` 仅把它抬到 `64`（其余相同）。
 - v3 deploy 有**互斥的两种 CUDA graph 侧写**：`enforce_eager: true` 时启用
   Higgs 本地 MLP graph（high_throughput 同款,勿再开 vLLM FULL_DECODE）;
   low_latency 侧写用 `enforce_eager: false` + `FULL_DECODE_ONLY`（本地 graph

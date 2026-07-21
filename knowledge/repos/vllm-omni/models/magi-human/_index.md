@@ -15,8 +15,10 @@ sources: [vllm_omni/diffusion/models/magi_human/, vllm_omni/diffusion/registry.p
 
 - SandAI daVinci-MagiHuman 移植：音频驱动人像视频,输出同步视频 + 44.1 kHz
   音频（post 返回 `{video, audio, audio_sample_rate: 44100, fps: 25}`）。
-- diffusion registry：`MagiHumanPipeline` →
-  （`magi_human`, `pipeline_magi_human`）,pre 为 pass-through,post
+- 无别名、无变体有据,树内未 pin checkpoint。diffusion registry:
+  `MagiHumanPipeline` →
+  （`magi_human`, `pipeline_magi_human`, `MagiHumanPipeline`）,pre 为
+  pass-through,post
   `get_magi_human_post_process_func`。单 stage diffusion,引擎默认 stage 配置
   （[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
 - 源码仅 3 文件但全尾部最大：`pipeline_magi_human.py` **96 KB** +
@@ -31,8 +33,8 @@ sources: [vllm_omni/diffusion/models/magi_human/, vllm_omni/diffusion/registry.p
 - 音频条件直接用 OpenAI `whisper`（`SAAudioFeatureExtractor`,
   `whisper.load_audio`/`pad_or_trim`）;`_T5GemmaEncoder` 文本编码器;文件内
   移植版 `FlowUniPCMultistepScheduler`（line 72）;内置超长音质负向 prompt。
-- 单文件 monolith + 自带 `MagiDataProxy` 数据代理——改共享接口时这个家族最容易
-  被漏改,评审跨家族 refactor 时点名检查。
+- 单文件 monolith + 自带 `MagiDataProxy` 数据代理——跨家族 refactor 评审时
+  把这份 96 KB 单文件移植列入检查清单。
 
 ## 什么时候查这里
 

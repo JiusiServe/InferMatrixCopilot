@@ -13,8 +13,8 @@ sources: [vllm_omni/diffusion/models/dreamzero/, vllm_omni/deploy/dreamzero.yaml
 
 ## 名称与范围
 
-- 正式名称 DreamZero（DROID 场景 VLA 世界模型,别名/标识:
-  `DreamZero-DROID`;pipeline key `dreamzero`,registry 架构键
+- 名称:分析所据的模型形态是 DreamZero-DROID VLA 世界模型（树内多以简称
+  DreamZero 指代;代码标识:pipeline key `dreamzero`,registry 架构键
   `DreamZeroPipeline`）：一个 DiT 每步联合预测 `(video_pred, action_pred)`,
   视频逐块自回归、动作按 horizon 输出。diffusion registry:
   `DreamZeroPipeline` →（`dreamzero`, `pipeline_dreamzero`,

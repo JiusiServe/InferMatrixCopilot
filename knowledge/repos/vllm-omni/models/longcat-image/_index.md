@@ -13,7 +13,9 @@ sources: [vllm_omni/diffusion/models/longcat_image/, vllm_omni/diffusion/registr
 
 ## 名称与范围
 
-- diffusion registry：`LongCatImagePipeline`（`pipeline_longcat_image`）与
+- 正式名称 LongCat-Image;base/Edit 是**变体不是别名**,无 deploy
+  YAML/checkpoint 映射记录。diffusion registry:
+  `LongCatImagePipeline`（`pipeline_longcat_image`）与
   `LongCatImageEditPipeline`（`pipeline_longcat_image_edit`,
   `SupportImageInput`）→ 家族目录 `vllm_omni/diffusion/models/longcat_image/`;
   post 共用 `get_longcat_image_post_process_func`,pre 仅 Edit 绑定
@@ -27,8 +29,8 @@ sources: [vllm_omni/diffusion/models/longcat_image/, vllm_omni/diffusion/registr
 - prompt 编码：`Qwen2_5_VLForConditionalGeneration` + `Qwen2VLProcessor`,
   **中/英双语系统提示直接 import 自
   `diffusers.pipelines.longcat_image.system_messages`**
-  （`SYSTEM_PROMPT_EN/ZH`）——prompt 模板烙进编码路径,diffusers 升级可能
-  静默改变生成行为,升级评审时点名检查。
+  （`SYSTEM_PROMPT_EN/ZH`）——prompt 模板烙进编码路径;diffusers 升级评审
+  时点名核对这两个 import 常量。
 - `FlowMatchEulerDiscreteScheduler` + `AutoencoderKL`;CFG-parallel;hub
   子目录预取。
 

@@ -24,10 +24,16 @@ sources: [vllm_omni/model_executor/models/dynin_omni/, vllm_omni/deploy/dynin_om
   `dynin_omni_common.py`;桥
   `model_executor/stage_input_processors/dynin_omni.py`;deploy
   `vllm_omni/deploy/dynin_omni{,_ci,_multiconnector}.yaml`。
-- pipeline key `dynin_omni`：三 stage 链 token2text → token2image →
-  token2audio,**全部 LLM_GENERATION、全部 `engine_output_type="latent"`、
-  全部 `final_output=True`**（各 stage 可按模态终止输出）。**唯一冻结拓扑,
-  无 think/单 stage 变体**——变化只来自按请求任务路由与三份 deploy。
+- pipeline key `dynin_omni`：三 stage 链,**全部 LLM_GENERATION、全部
+  `engine_output_type="latent"`、全部 `final_output=True`**——stage 0
+  token2text（`owns_tokenizer=True`,`final_output_type="text"`,
+  `custom_process_next_stage_input_func=token2text_to_token2image_full_payload`）
+  → stage 1 token2image（`input_sources=(0,)`,`final_output_type="image"`,
+  入 `token2text_to_token2image`、出
+  `token2image_to_token2audio_full_payload`）→ stage 2 token2audio
+  （`input_sources=(1,)`,`final_output_type="audio"`,入
+  `token2image_to_token2audio`）。**唯一冻结拓扑,无 think/单 stage 变体**
+  ——变化只来自按请求任务路由与三份 deploy。
 - 依赖共享模块：worker-connector 全载荷数据面
   （`OmniConnectorModelRunnerMixin`）、
   [Config 组件](../../components/config/architecture.md)。
@@ -49,7 +55,7 @@ sources: [vllm_omni/model_executor/models/dynin_omni/, vllm_omni/deploy/dynin_om
   `dynin_omni_ci.yaml`（**显式 pin `pipeline: dynin_omni`,防 model_type
   自动探测失配**;L4 级显存）;`dynin_omni_multiconnector.yaml`
   （定义 Mooncake/Yuanrong/SHM 三种连接器,但 stage 间 output/input 链接
-  显式指到 `mooncake_connector`——另两种只是备选定义;此文件
+  **显式只接 `mooncake_connector`**——Yuanrong/SHM 定义了但未接线;此文件
   `trust_remote_code: false` 与家族要求矛盾,pin 上无解释——评审改这份
   YAML 时先澄清）。
 

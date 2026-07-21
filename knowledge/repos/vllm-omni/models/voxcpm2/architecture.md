@@ -33,9 +33,11 @@ sources: [vllm_omni/model_executor/models/voxcpm2/voxcpm2_talker.py, vllm_omni/m
   （talker 内 CUDA graph/torch.compile 可用性检查、
   `decode_graph_capture_policy`）;deploy 默认开批式 CFM/VAE、统一 decode
   graph（max batch 8）、`vae_decode_every: 3`。
-- 声音克隆零样本:无预置 preset（对照 ming/step 的 preset 制）;自定义声音
-  经 `precompute_custom_voice.py` 预算张量 profile,speaker cache 校验加载;
-  纯 embedding 上传被拒（那是 Qwen3-TTS 专属格式）。
+- 声音克隆零样本:无预置 preset;自定义声音经 `precompute_custom_voice.py`
+  预计算张量 profile,speaker cache 校验加载;纯 embedding 上传被拒
+  （那是 Qwen3-TTS 专属格式）。
+- checkpoint 范围：deploy YAML 不 pin;示例/测试用 `openbmb/VoxCPM2`;无
+  checkpoint/拓扑变体有据。
 - `stop_token_ids: [1]`（config bos=1/eos=2）——停在 id 1 的语义 pin 上无
   注释,未决。
 

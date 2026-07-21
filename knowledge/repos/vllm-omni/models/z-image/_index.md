@@ -19,7 +19,7 @@ sources: [vllm_omni/diffusion/models/z_image/, vllm_omni/diffusion/registry.py]
 - 单 stage diffusion,引擎默认 stage 配置
   （[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
 - 源码：`pipeline_z_image.py`（31 KB）+ `z_image_transformer.py`
-  （39 KB,`ZImageTransformer2DModel`）。
+  （39 KB,`ZImageTransformer2DModel`）。无变体有据,树内未 pin checkpoint。
 
 ## 结构与要点
 

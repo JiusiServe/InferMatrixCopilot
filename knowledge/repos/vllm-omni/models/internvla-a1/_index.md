@@ -15,16 +15,18 @@ sources: [vllm_omni/diffusion/models/internvla_a1/, vllm_omni/diffusion/registry
 
 - **不是媒体生成模型**：vision-language-action 机器人策略（Qwen3-VL backbone +
   action-expert transformer + Cosmos flow-matching 动作头）,以"动作 pipeline"
-  形态跑在 diffusion 引擎下。相关但独立的家族：[gr00t](../gr00t/_index.md)。
-- diffusion registry：`InternVLAA1Pipeline` →
-  （`internvla_a1`, `pipeline_internvla_a1`）,post
+  形态跑在 diffusion 引擎下。树内另一 VLA 家族：[gr00t](../gr00t/_index.md)。
+- 无别名、无变体有据,树内未 pin checkpoint。diffusion registry:
+  `InternVLAA1Pipeline` →
+  （`internvla_a1`, `pipeline_internvla_a1`, `InternVLAA1Pipeline`）,post
   `get_internvla_a1_post_process_func`（薄封装）。单 stage,引擎默认 stage
   配置（[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
 - 源码（7 文件,尾部家族里最异构）：`model_internvla_a1.py`（41 KB,
   `Qwen3VLWithExpertModel`/`InternVLAA1Policy`/
   `resolve_cosmos_checkpoint_paths`）、`adapter_qwen3_vl.py`（重写的
   Qwen3-VL attention/caching 层）、`cosmos_ci_torch.py` + `model_cosmos.py`
-  （Cosmos 动作扩散组件,家族内 vendor,勿与 cosmos3 视频家族混淆）、
+  （家族目录内的 Cosmos 动作扩散组件;与 [cosmos3](../cosmos3/_index.md)
+  是不同目录）、
   `config.py`（`OBS_IMAGES`/`OBS_STATE`/`OBS_TASK` 观测键 +
   `DEFAULT_QWEN3_VL_MODEL`/`DEFAULT_COSMOS_REPO`）。
 
@@ -37,4 +39,5 @@ sources: [vllm_omni/diffusion/models/internvla_a1/, vllm_omni/diffusion/registry
 ## 什么时候查这里
 
 - 审查 VLA 观测输入、动作头或 Qwen3-VL adapter 改动;评审时先确认改动属于
-  internvla_a1 还是 gr00t,两者不共享代码。
+  internvla_a1 还是 gr00t（两个独立家族目录）。主类 `InternVLAA1` 与
+  pipeline 包装 `pipeline_internvla_a1.py` 都在本家族目录内。

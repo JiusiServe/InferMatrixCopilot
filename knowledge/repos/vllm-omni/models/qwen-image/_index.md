@@ -10,14 +10,18 @@ sources: [vllm_omni/diffusion/models/qwen_image/, vllm_omni/diffusion/registry.p
 # Qwen-Image
 
 以下事实在 `main @ 5d44868e` 复核（源码派生页,尚无本模型的运行经验沉淀）。
-与 AR 侧 [qwen-omni](../qwen-omni/_index.md) 家族无代码关系,仅同厂牌。
+同厂牌 AR 侧家族另见 [qwen-omni](../qwen-omni/_index.md)。
 
 ## 名称与范围
 
-- 尾部最宽家族,5 个 pipeline 共享一套 transformer/VAE：
-  `QwenImagePipeline`、`QwenImageEditPipeline`、`QwenImageEditPlusPipeline`、
-  `QwenImageLayeredPipeline`、`QwenImageDMD2Pipeline`（与 base 同模块）→
-  家族目录 `vllm_omni/diffusion/models/qwen_image/`（9 文件）。
+- 尾部最宽家族,5 个 pipeline（变体）共享一套 transformer/VAE,模块映射:
+  `QwenImagePipeline`→`pipeline_qwen_image`;
+  `QwenImageEditPipeline`→`pipeline_qwen_image_edit`;
+  `QwenImageEditPlusPipeline`→`pipeline_qwen_image_edit_plus`;
+  `QwenImageLayeredPipeline`→`pipeline_qwen_image_layered`;
+  `QwenImageDMD2Pipeline`→`pipeline_qwen_image`（与 base 同模块）→ 家族
+  目录 `vllm_omni/diffusion/models/qwen_image/`（9 文件）;pin 上无
+  checkpoint↔变体映射记录。
 - pre/post 绑定不对称：pre 有 edit/edit-plus/layered;post 有
   base/edit/edit-plus（DMD2 复用 base）——**Layered 有 pre 无 post 绑定**,
   layered 输出后处理是否在 pipeline 内完成未在 pin 上追清,评审 layered 输出

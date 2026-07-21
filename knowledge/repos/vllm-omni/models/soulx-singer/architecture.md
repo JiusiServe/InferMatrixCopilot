@@ -22,7 +22,8 @@ sources: [vllm_omni/diffusion/models/soulx_singer/pipeline_soulx_singer_base.py,
   编码器;条件经 `mel2note` gather 扩到 mel 帧（溢出 warn+clamp）。
 - SVC 专有:冻结 **Whisper 编码器**特征（prompt+target）+ 粗 F0 嵌入
   （361 bin,`f0_to_coarse`）。
-- 预处理栈（`preprocess/`）：funasr、NeMo Parakeet（带 CUDA-graph 禁用
+- 神经预处理栈（`modules/preprocess/`,注意与同级的非神经 `preprocess/`
+  helper 目录区分）：funasr、NeMo Parakeet（带 CUDA-graph 禁用
   workaround）、BS-RoFormer pip 包这些外部依赖**只被预处理使用**;
   `VocalSegmenter` 是规则式(非 NN)。
 - 共享框架面：[Diffusion 组件](../../components/diffusion/_index.md)
@@ -41,9 +42,9 @@ sources: [vllm_omni/diffusion/models/soulx_singer/pipeline_soulx_singer_base.py,
 ## 从输入到输出的主要流程
 
 1. **三层输入分级**（`pre_process_func`）：原始音频（首见时懒建预处理栈,
-   内联跑分离/ASR/F0/MIDI）/ 预计算载荷（`has_precomputed`）/ warmup 哑
-   载荷;产物统一挂在
-   `prompt.additional_information["soulx_preprocessed"]`。
+   按变体内联跑——分离是 `vocal_sep` 可选;SVS 加 ASR+MIDI,SVC 加
+   F0+Whisper 特征）/ 预计算载荷（`has_precomputed`）/ warmup 哑载荷;
+   产物统一挂在 `prompt.additional_information["soulx_preprocessed"]`。
 2. 条件构建:SVS 走乐谱/音素路径（SVC 强制关 `midi_transcribe`）。
 3. **prompt 拼接 inpainting**：prompt（参考）与 target 沿时间轴在条件空间
    拼接,CFM 解码器在给定 prompt mel 的条件下生成 target 区段——**无说话人
@@ -54,7 +55,7 @@ sources: [vllm_omni/diffusion/models/soulx_singer/pipeline_soulx_singer_base.py,
 ## 怎样验证功能、精度和性能
 
 自动化测试仅覆盖离线 e2e,另有一个可复跑基准;本次调查未发现在线链路的
-CI 覆盖、精度基线或性能 gate——相关结论需另行实测。
+CI 覆盖——精度/性能结论需另行实测。
 
 - e2e：`tests/e2e/offline_inference/test_soulxsinger.py`（快照双仓、建
   SVS/SVC view 目录、校验 phone_set.json;资产

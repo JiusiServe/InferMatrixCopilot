@@ -35,9 +35,10 @@ sources: [vllm_omni/model_executor/models/omnivoice/, vllm_omni/diffusion/models
   stage_input_processor（单 stage 无交接）。
 - deploy `omnivoice.yaml` 未 pin checkpoint;`enforce_eager`、
   `dtype: float32`、`distributed_executor_backend: mp`。
-- **未决**：AR-registry 入口 `OmniVoiceModel` 在 pin 上疑似 vestigial——服务
-  路径是单 DIFFUSION stage,docstring 暗示的两 stage LLM_AR 形态何时被走到
-  无法仅从源码判定;断言"AR 路径已死"前需 live 验证。
+- **未决**：AR-registry 入口 `OmniVoiceModel` 何时被走到无法仅从源码判定
+  （服务路径是单 DIFFUSION stage,docstring 暗示两 stage LLM_AR 形态）——
+  断言其是否使用前需 live 验证。另注:`OmniVoice` 只是架构别名,不是独立
+  变体。
 
 ## 什么时候查这里
 

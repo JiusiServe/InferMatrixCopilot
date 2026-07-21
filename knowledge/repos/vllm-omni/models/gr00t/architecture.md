@@ -13,6 +13,9 @@ sources: [vllm_omni/diffusion/models/gr00t/pipeline_gr00t.py, vllm_omni/diffusio
 
 ## 模型专有部分与共享模块的边界
 
+- 目录分工：`model_executor/models/gr00t/` 只有拓扑（pipeline.py）;实现
+  全在 `diffusion/models/gr00t/`;观测由 OpenPI serving 层经共享 diffusion
+  管线送入,**无 stage 桥、无 pre/post-process 函数**。
 - 服务包装 `Gr00tN1d7Pipeline`：读 `robot_obs`（video/images、state、
   language/prompt 两种键都接受;`_normalize_observation`）,
   `extra_args["reset"]` 触发 `policy.reset()`;返回
@@ -37,9 +40,10 @@ sources: [vllm_omni/diffusion/models/gr00t/pipeline_gr00t.py, vllm_omni/diffusio
 - 默认:horizon 40、state/action 维上限 132、**4 步**流匹配去噪、DiT 16 层
   32 头。processor 随 checkpoint（`processor/` 子目录,AutoProcessor 兜底）;
   eval 图像 256×256 letterbox,对客户端宣告 `image_resolution [180,320]`。
-- `policy_server_config` 三项（horizon/action_keys/embodiment_tag）启动时对
-  checkpoint 校验;`supported_embodiments`（11 tag）**不校验**——改 YAML 时
-  自查。
+- 启动时对 checkpoint 快速失败校验的是 `model_config.embodiment_tag`
+  （`policy_server_config` 的兄弟字段）加
+  `policy_server_config.action_horizon/action_keys`;
+  `supported_embodiments`（11 tag）**不校验**——改 YAML 时自查。
 - 确定性:`GR00T_NOISE_SEED` 种子化采样噪声——位级可复现是 e2e 的断言基础。
 
 ## 从输入到输出的主要流程

@@ -13,9 +13,10 @@ sources: [vllm_omni/diffusion/models/gr00t/, vllm_omni/deploy/Gr00tN1d7.yaml, vl
 
 ## 名称与范围
 
-- 正式名称 NVIDIA GR00T-N1.7-3B(测试用 `nvidia/GR00T-N1.7-3B`,YAML 不
-  pin）;代码标识区分:model_type/pipeline key `Gr00tN1d7`,pipeline 类
-  `Gr00tN1d7Pipeline`,家族目录 `gr00t`。Qwen3-VL
+- 正式名称 NVIDIA GR00T-N1.7-3B,GR00T N1.7 是其简称,无其他别名有据
+  （测试用 `nvidia/GR00T-N1.7-3B`,YAML 不 pin）;代码标识区分:
+  model_type/pipeline key `Gr00tN1d7`,pipeline 类 `Gr00tN1d7Pipeline`,
+  家族目录 `gr00t`。Qwen3-VL
   （`nvidia/Cosmos-Reason2-2B`）backbone + 流匹配动作头,以单 "diffusion"
   stage 服务,输出**机器人动作块而非媒体**（`final_output_type="actions"`,
   本次 registry 调查中唯一）。
@@ -24,15 +25,19 @@ sources: [vllm_omni/diffusion/models/gr00t/, vllm_omni/deploy/Gr00tN1d7.yaml, vl
   `vllm_omni/diffusion/registry.py`（`Gr00tN1d7Pipeline` →
   （`gr00t`, `pipeline_gr00t`））、`vllm_omni/config/pipeline_registry.py`
   （`OMNI_PIPELINES["Gr00tN1d7"]`）、拓扑
-  `model_executor/models/gr00t/pipeline.py`（单 stage DIFFUSION,
+  `vllm_omni/model_executor/models/gr00t/pipeline.py`（单 stage DIFFUSION,
   `model_arch="Gr00tN1d7Pipeline"`,`hf_architectures=("Gr00tN1d7",)`,
-  `final_output=True`,无 connectors）;无 pre/post-process、无 AR 入口、无
-  stage input processor。
-- serving 面**不是 OpenAI chat**：OpenPI websocket
-  `/v1/realtime/robot/openpi`（`entrypoints/openpi/serving.py`,
-  msgpack-numpy 传输）;观测经
-  `sampling_params.extra_args["robot_obs"]` 进入。相关家族:
-  [internvla-a1](../internvla-a1/_index.md)（独立目录/独立实现）。
+  `final_output=True`,`default_deploy_config_name="Gr00tN1d7.yaml"` 自动
+  加载,无 connectors）;加载兜底 `vllm_omni/diffusion/data.py`
+  （model_type/architectures 含 `Gr00tN1d7` 即强制该 pipeline 类）;HF
+  config `Gr00tN1d7Config` 经家族内 `register_model_config` 注册;无
+  pre/post-process、无 AR 入口、无 stage input processor。
+- serving 面**不是 OpenAI chat**：websocket 路由
+  `/v1/realtime/robot/openpi` 声明在
+  `vllm_omni/entrypoints/openai/api_server.py`,serving 实现在
+  `vllm_omni/entrypoints/openpi/serving.py`（msgpack-numpy 传输）;观测经
+  `sampling_params.extra_args["robot_obs"]` 进入。树内另一 VLA 家族:
+  [internvla-a1](../internvla-a1/_index.md)。
 - 依赖共享模块：diffusion worker 管线
   （[Diffusion 组件](../../components/diffusion/_index.md)）、
   [Config 组件](../../components/config/architecture.md)。
@@ -56,7 +61,8 @@ sources: [vllm_omni/diffusion/models/gr00t/, vllm_omni/deploy/Gr00tN1d7.yaml, vl
   单 stage pipeline 的默认 true（新增单 stage 家族的常见 rebase 坑,YAML 头
   注明示）;`policy_server_config` 是**客户端 handshake 合同**,启动时
   horizon/action_keys/embodiment_tag 对 checkpoint 快速失败校验,但
-  `supported_embodiments` 列表原样下发**不校验**（陈旧列表会虚假宣传）。
+  `supported_embodiments` 列表原样下发**不校验**（陈旧列表可能向客户端
+  宣传 checkpoint 并不支持的 embodiment）。
 - transformers 下限陷阱：`qwen3_vl` 需要 ≥4.57.1（仓库下限 4.56.0,显式
   ImportError 提示）。
 

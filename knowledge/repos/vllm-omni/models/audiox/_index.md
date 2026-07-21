@@ -13,7 +13,8 @@ sources: [vllm_omni/diffusion/models/audiox/, vllm_omni/diffusion/registry.py]
 
 ## 名称与范围
 
-- diffusion registry：`AudioXPipeline` →（`audiox`, `pipeline_audiox`）,post
+- 正式名称 AudioX,无别名、无变体有据。diffusion registry:
+  `AudioXPipeline` →（`audiox`, `pipeline_audiox`, `AudioXPipeline`）,post
   `get_audiox_post_process_func`;在 `_NO_CACHE_ACCELERATION` 名单
   （不吃 cache_dit/tea_cache 加速）。
 - 单 stage diffusion,不在 `OMNI_PIPELINES`（引擎默认 diffusion stage 配置,

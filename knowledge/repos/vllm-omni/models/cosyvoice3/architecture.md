@@ -4,7 +4,7 @@ created: 2026-07-21
 updated: 2026-07-21
 type: architecture
 tags: [vllm-omni, models]
-sources: [vllm_omni/model_executor/models/cosyvoice3/cosyvoice3.py, vllm_omni/model_executor/models/cosyvoice3/cosyvoice3_code2wav.py, vllm_omni/model_executor/stage_input_processors/cosyvoice3.py, vllm_omni/transformers_utils/configs/cosyvoice3.py]
+sources: [vllm_omni/model_executor/models/cosyvoice3/cosyvoice3.py, vllm_omni/model_executor/models/cosyvoice3/cosyvoice3_code2wav.py, vllm_omni/model_executor/models/cosyvoice3/pipeline.py, vllm_omni/model_executor/stage_input_processors/cosyvoice3.py, vllm_omni/transformers_utils/configs/cosyvoice3.py, vllm_omni/deploy/cosyvoice3.yaml]
 ---
 
 # CosyVoice3 架构
@@ -28,6 +28,8 @@ sources: [vllm_omni/model_executor/models/cosyvoice3/cosyvoice3.py, vllm_omni/mo
 
 ## 配置、checkpoint 和兼容范围
 
+- checkpoint：YAML 不 pin;离线示例仅以注释给出默认
+  `FunAudioLLM/Fun-CosyVoice3-0.5B-2512`。
 - config（`transformers_utils/configs/cosyvoice3.py`）：`eos_token_id` 默认
   6562;注释明确官方把 **所有 ≥ speech_token_size 的 token（6561–6760）都视
   为停止信号**;`sample_rate 24000`、hidden 896、heads 14 硬编码。
@@ -51,8 +53,8 @@ sources: [vllm_omni/model_executor/models/cosyvoice3/cosyvoice3.py, vllm_omni/mo
      `unpad_prompt_conditioning` 剥掉。
    - 同步 `text2flow_full_payload`（生产侧全载荷）+ `text2flow_token_only`
      （消费侧占位）。
-4. code2wav：CFM（TRT 或 PyTorch DiT,由同一门选）→ 声学特征 → HiFT →
-   24 kHz 波形。
+4. code2wav：CFM 去噪 → 声学特征 → HiFT → 24 kHz 波形（TRT 估计器与
+   PyTorch DiT 之间的具体选路代码未逐行读,见文末未决项）。
 
 ## 怎样验证功能、精度和性能
 

@@ -13,7 +13,9 @@ sources: [vllm_omni/diffusion/models/omnigen2/, vllm_omni/diffusion/registry.py]
 
 ## 名称与范围
 
-- diffusion registry：`OmniGen2Pipeline` →（`omnigen2`, `pipeline_omnigen2`）,
+- 正式名称 OmniGen2,无别名、无变体有据,无 deploy YAML/checkpoint 映射
+  记录。diffusion registry:
+  `OmniGen2Pipeline` →（`omnigen2`, `pipeline_omnigen2`）,
   pre `get_omnigen2_pre_process_func` + post `get_omnigen2_post_process_func`。
   单 stage diffusion,引擎默认 stage 配置
   （[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
@@ -25,8 +27,8 @@ sources: [vllm_omni/diffusion/models/omnigen2/, vllm_omni/diffusion/registry.py]
 
 - **文件内 vendored `FlowMatchEulerDiscreteScheduler` 重实现**
   （`pipeline_omnigen2.py:66`,自带 `step()` 的 SchedulerMixin+ConfigMixin）
-  ——不是 diffusers import;修 diffusers scheduler 兼容问题时这里不受影响,
-  反之这里的 bug 也不会被 diffusers 升级修掉。
+  ——不是 diffusers import;涉及 scheduler 的修改需单独评审这份 vendored
+  实现。
 - prompt 编码 `Qwen2_5_VLForConditionalGeneration` + `Qwen2_5_VLProcessor`;
   自定义 `OmniGen2ImageProcessor(VaeImageProcessor)`（line 326）;参考图输入
   经 `is_valid_image_imagelist` 校验;CFG-parallel。

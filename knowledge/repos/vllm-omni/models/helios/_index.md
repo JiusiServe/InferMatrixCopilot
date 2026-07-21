@@ -17,7 +17,8 @@ sources: [vllm_omni/diffusion/models/helios/, vllm_omni/diffusion/registry.py]
   （`helios`, `pipeline_helios`, `HeliosPipeline`）;pre+post
   `get_helios_{pre,post}_process_func` 对两个架构名都绑定。
 - 单 stage diffusion,引擎默认 stage 配置
-  （[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
+  （[Config 组件](../../components/config/architecture.md)）。无 deploy
+  YAML,树内未 pin checkpoint。
 - 源码：`pipeline_helios.py`（78 KB）、`helios_transformer.py`
   （`HeliosTransformer3DModel`）、`scheduling_helios.py`（自定义
   `HeliosScheduler`,不用 diffusers scheduler）。

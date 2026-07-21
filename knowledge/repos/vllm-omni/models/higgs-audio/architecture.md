@@ -28,6 +28,9 @@ sources: [vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_talker.p
 
 ## 配置、checkpoint 和兼容范围
 
+- checkpoint（文档/示例记载,deploy YAML 均不 pin）：v2
+  `bosonai/higgs-audio-v2-generation-3B-base`,v3
+  `bosonai/higgs-audio-v3-tts-4b`。
 - prompt 形态不同：v2 走上游 HF processor（字节级一致的 system prompt;
   多说话人/`profile:`/长文分块被显式拒绝 4xx）;v3 用
   `<|tts|>/<|ref_text|>/<|ref_audio|>/<|text|>/<|audio|>` 模板,参考音频用

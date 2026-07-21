@@ -48,8 +48,10 @@ sources: [vllm_omni/model_executor/models/mimo_audio/mimo_audio_llm.py, vllm_omn
 
 1. prefill 前处理 `interleave_5_and_5_in_span`：prompt id 按 5 文本+5 音频
    交错重组;音频占位 `<|sosp|><|empty|><|eosp|>`。
-2. stage 0 逐步出 `(B,1,8,4)` 码块;文本经正常 detokenize 同时交付
-   （双 final output）。
+2. stage 0 逐步出 `(B,1,8,4)` 码块;文本经正常 detokenize 同时交付——
+   **stage 0 文本与 stage 1 音频是两个独立 final output**;stage-0 停止
+   条件是 `NO_INTERLEAVE_NEXT_TOKEN_ID=151671` 与 `151645`（`<|im_end|>`）
+   两个 stop id。
 3. 交接双路径（`stage_input_processors/mimo_audio.py`）：async_chunk 逐步
    累积、按 `codec_chunk_frames` 冲刷（**完成时 `_flush_remaining_codes` 冲
    最后不满块——漏掉会截尾音频**）;sync 路径 `llm2code2wav_token_only` 只发
@@ -59,6 +61,9 @@ sources: [vllm_omni/model_executor/models/mimo_audio/mimo_audio_llm.py, vllm_omn
    上下文必须盖住 vocoder 注意力窗口（默认 `[40,10]`）,低于下限会被强制改写
    并告警;违反表现为 chunk 边界处声学状态重置/音色漂移。
    `MAX_CODE2WAV_TOKENS=18192` 硬顶,超限在 full_payload 中静默截断。
+5. stage 1 Code2Wav：扁平 codebook-major 码流 → RVQ 反量化 → AudioDecoder →
+   Vocos 声码器 → 波形（`CUDAGraphMiMoDecoderWrapper` 把整条路径按
+   (深度, bucket) 捕获成 CUDA graph）。
 
 ## 怎样验证功能、精度和性能
 

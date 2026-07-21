@@ -13,7 +13,8 @@ sources: [vllm_omni/model_executor/models/voxtral_tts/, vllm_omni/deploy/voxtral
 
 ## 名称与范围
 
-- Mistral Voxtral TTS。AR registry：`VoxtralTTSForConditionalGeneration`、
+- 正式名称 Voxtral TTS（Mistral;无别名、**无变体**——注册的三个类是 stage
+  组件而非模型变体）。AR registry：`VoxtralTTSForConditionalGeneration`、
   `VoxtralTTSAudioGeneration`、`VoxtralTTSAudioTokenizer` → 家族目录
   `vllm_omni/model_executor/models/voxtral_tts/`（6 个文件）。
 - pipeline key `voxtral_tts`：stage 0 `audio_generation`（LLM_AR,tokenizer

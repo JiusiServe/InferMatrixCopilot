@@ -13,20 +13,28 @@ sources: [vllm_omni/model_executor/models/step_audio2/, vllm_omni/deploy/step_au
 
 ## 名称与范围
 
-- 正式名称 Step-Audio 2（StepFun;文档/示例 checkpoint
+- 家族/checkpoint 名 Step-Audio 2（文档/示例 checkpoint
   `stepfun-ai/Step-Audio-2-mini`,YAML 不 pin;token 配置声明跨 mini/7B 不变）。
   **三个变体共用这一个 checkpoint 与同一份 thinker 代码——变体由 pipeline
   对象 + deploy YAML 决定,不是模型代码分支。**
-- AR registry 五入口 → 三个类：包装
-  `StepAudio2ForConditionalGeneration`（`StepAudio2ForCausalLM` 只是
-  registry 架构别名,不是另一个 Python 类）、thinker、token2wav;
-  **无 diffusion 入口**。
-- pipeline key 两个：`step_audio_2`（thinker→token2wav,双 final:文本+音频）
-  与 `step_audio_2_asr`（仅 thinker,text 出;**无 `hf_architectures`,不能被
-  自动探测,只能靠 deploy YAML `pipeline:` 键显式选择**）。
-- 入口路径：拓扑 `model_executor/models/step_audio2/pipeline.py`（注册于
-  `config/pipeline_registry.py`）;桥
-  `model_executor/stage_input_processors/step_audio2.py`。
+- AR registry 五入口 → 三个类:包装
+  `StepAudio2ForConditionalGeneration`（`StepAudio2ForCausalLM` 是它的
+  registry 架构别名,不是另一个 Python 类）、thinker
+  `StepAudio2ThinkerForConditionalGeneration`、token2wav
+  `StepAudio2Token2WavForConditionalGeneration`;**无 diffusion 入口**。
+- pipeline key 两个:`step_audio_2`——stage 0 thinker（LLM_AR,latent 引擎
+  输出,final 文本,架构键 `StepAudio2ThinkerForConditionalGeneration`）→
+  stage 1 token2wav（LLM_GENERATION,消费 stage 0,final 音频,架构键
+  `StepAudio2Token2WavModel`）;`step_audio_2_asr`——仅 thinker,`text` 引擎
+  输出,**无 `hf_architectures`,不能被自动探测,只能靠 deploy YAML
+  `pipeline:` 键显式选择**。
+- 入口路径:拓扑 `vllm_omni/model_executor/models/step_audio2/pipeline.py`
+  （注册于 `vllm_omni/config/pipeline_registry.py`）;实现
+  `vllm_omni/model_executor/models/step_audio2/`
+  （`step_audio2.py` 包装、`step_audio2_thinker.py`、
+  `step_audio2_token2wav.py`、`step_audio2_constants.py`）;桥
+  `vllm_omni/model_executor/stage_input_processors/step_audio2.py`;deploy
+  `vllm_omni/deploy/step_audio_2{,_async_chunk,_asr}.yaml`。
 - 依赖共享模块：[Config 组件](../../components/config/architecture.md);
   家族专属 reasoning parser（`vllm_omni/reasoning/step_audio_reasoning_parser.py`）;
   serving 双入口——chat completions **和** `/v1/audio/speech`

@@ -28,7 +28,8 @@ sources: [vllm_omni/diffusion/models/ernie_image/, vllm_omni/diffusion/registry.
   `download_weights_from_hf_specific(model, revision, ["pe/*", "pe_tokenizer/*"])`
   选择性拉取——审查下载/缓存路径改动时注意这个子目录选择性拉取模式。
 - `AutoencoderKLFlux2` VAE;`FlowMatchEulerDiscreteScheduler`;
-  `CFGParallelMixin`,CFG 受 `is_distilled` 门控（蒸馏 checkpoint 关 CFG）。
+  `CFGParallelMixin`,CFG 由 `is_distilled` 旗标门控。另:无变体有据,树内未
+  pin checkpoint。
 
 ## 什么时候查这里
 

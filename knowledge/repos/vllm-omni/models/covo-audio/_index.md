@@ -13,7 +13,8 @@ sources: [vllm_omni/model_executor/models/covo_audio/, vllm_omni/deploy/covo_aud
 
 ## 名称与范围
 
-- 正式名称 Covo-Audio-Chat（腾讯）。AR registry 三个别名
+- 正式名称 Covo-Audio-Chat（腾讯;deploy 不 pin checkpoint,**三个架构
+  别名映射同一个类、同一变体——无真实变体**）。AR registry 三个别名
   `CovoAudioForCausalLM`/`CovoAudioForConditionalGeneration`/`CovoAudioModel`
   映射同一类,另有 `CovoAudioLLMModel`、`CovoAudioCode2WavModel`;家族目录
   `vllm_omni/model_executor/models/covo_audio/`。

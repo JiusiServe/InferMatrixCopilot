@@ -13,7 +13,9 @@ sources: [vllm_omni/model_executor/models/glm_tts/, vllm_omni/deploy/glm_tts.yam
 
 ## 名称与范围
 
-- AR registry：`GLMTTSForConditionalGeneration` →（`glm_tts`, `glm_tts`）;
+- 正式名称 GLM-TTS,无别名、无变体有据。AR registry:
+  `GLMTTSForConditionalGeneration`
+  →（`glm_tts`, `glm_tts`, `GLMTTSForConditionalGeneration`）;
   家族目录 `vllm_omni/model_executor/models/glm_tts/`（8 个文件）。
 - pipeline key `glm_tts`：stage 0 AR（Llama 基座,LLM_AR,latent;stop token
   为 "👂" id 59253,代码注释称按 tokenizer 动态解析校验）→ stage 1

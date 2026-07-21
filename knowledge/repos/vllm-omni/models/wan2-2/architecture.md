@@ -48,13 +48,17 @@ diffusion 设施见 [Diffusion 组件](../../components/diffusion/_index.md)。
 ## 从输入到输出的主要流程
 
 1. pre-process 按变体:T2V/TI2V 可选图像（720×1280 面积,16 对齐）;I2V 必须
-   图像（首帧 latent 通道拼接 + 可选 Wan2.1 式 CLIP image embeds）;VACE 把
-   reference_images/video/mask 映进 additional_information;S2V 需图像+音频。
+   图像（首帧 latent 通道拼接 + 可选 Wan2.1 式 CLIP image embeds）;VACE 接
+   `image`/`reference_images`、`video`、`mask` 映进
+   additional_information;S2V 需图像+音频,另接可选 `pose_video` 与
+   `init_first_frame`。
 2. 去噪:适用变体在 `transformer_2` 存在时按 boundary 切换专家（**S2V 单
    transformer,无 boundary**;VACE 两种形态都接受）;CFG 双分支跨 rank;RNG
    per-request generator。
-3. `empty_cache()` → VAE decode（源注释:Wan2.2 易 OOM）→ post-process,可选
-   **帧插值**（`interpolate_video_tensor`,报告 `video_fps_multiplier`）。
+3. `empty_cache()` → VAE decode（源注释:Wan2.2 易 OOM）→ post-process;
+   可选**帧插值**（`interpolate_video_tensor`,报告
+   `video_fps_multiplier`）只在 T2V/TI2V 的
+   `get_wan22_post_process_func` 上有据,其他变体的 post 函数未见此路径。
 
 ## 怎样验证功能、精度和性能
 

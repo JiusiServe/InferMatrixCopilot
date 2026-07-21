@@ -54,9 +54,14 @@ sources: [vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py, 
 
 ## 怎样验证功能、精度和性能
 
+以下都是**功能/e2e 入口**;pin 上无精度或性能验收 oracle,YAML 头注的
+延迟（TTFB/TTFA）声明是标称值不是验证结果——相关结论需另行实测。
+
 - e2e：`tests/e2e/offline_inference/test_moss_tts_expansion.py`（delay）、
-  `test_moss_tts_v1_5_expansion.py`（Local）、`test_moss_tts_realtime*.py`、
-  `test_moss_tts_nano_expansion.py` + online 两份;示例
+  `test_moss_tts_v1_5_expansion.py`（Local）、`test_moss_tts_realtime{,_expansion}.py`、
+  `test_moss_tts_nano_expansion.py`;online
+  `tests/e2e/online_serving/test_moss_tts_expansion.py` 与
+  `test_moss_tts_nano_expansion.py`;示例
   `examples/offline_inference/text_to_speech/moss_tts{,_nano}/end2end.py`
   （前者手工构建 delay 网格,并内含六个两 stage 仓的 checkpoint→deploy
   权威映射）;recipe `recipes/OpenMOSS/MOSS-TTS.md`。

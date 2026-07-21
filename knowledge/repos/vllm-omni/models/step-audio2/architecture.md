@@ -61,10 +61,12 @@ sources: [vllm_omni/model_executor/models/step_audio2/step_audio2_thinker.py, vl
    "是否末块"布尔（0/1）,**不是重叠帧数**——读 connector 元数据的共享代码
    勿按 higgs/mimo 语义解释。
 4. token2wav 流式:`_StreamState`（mel cache 160 ms、source cache 3840 样本、
-   estimator cache 窗 100）,块缝用 Hamming `fade_in_out` 平滑;文本-only 完成
-   发空 EOF 载荷。
+   estimator cache 窗 100）,块缝用 Hamming `fade_in_out` 平滑。
 
 ## 怎样验证功能、精度和性能
+
+pin 上只有**功能面**验证入口;无精度基线或性能 gate 证据,下列测试不覆盖
+精度/性能维度,相关结论需另行实测。
 
 - 单元：`tests/model_executor/models/step_audio2/`（thinker、token2wav
   async chunk）、`tests/model_executor/stage_input_processors/test_step_audio2_async_chunk.py`;

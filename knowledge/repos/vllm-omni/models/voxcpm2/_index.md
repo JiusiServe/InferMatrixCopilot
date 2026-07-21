@@ -13,16 +13,18 @@ sources: [vllm_omni/model_executor/models/voxcpm2/, vllm_omni/deploy/voxcpm2.yam
 
 ## 名称与范围
 
-- 正式名称 VoxCPM2（OpenBMB;示例/测试用 `openbmb/VoxCPM2`,YAML 不 pin）。
-  已知标识：pipeline key/model_type `voxcpm2`、模块名 `voxcpm2_talker`、
-  架构类 `VoxCPM2TalkerForConditionalGeneration`、stage 键
-  `latent_generator`。MiniCPM4 基座单 stage AR TTS,文本一趟直出
-  **48 kHz**（全清单多数 TTS 是 24 kHz,metrics 定义单列）。
+- 正式名称 VoxCPM2（OpenBMB;示例/测试用 `openbmb/VoxCPM2`,YAML 不 pin);
+  无其他官方别名有据。代码标识（非别名）：pipeline key/model_type
+  `voxcpm2`;模块名 `voxcpm2_talker`;架构类
+  `VoxCPM2TalkerForConditionalGeneration`;stage 键 `latent_generator`。
+  MiniCPM4 基座单 stage AR TTS,文本一趟直出 **48 kHz**（全清单多数 TTS 是
+  24 kHz,metrics 定义单列）。
 - AR registry 单入口 `VoxCPM2TalkerForConditionalGeneration`
   →（`voxcpm2`, `voxcpm2_talker`）;**无 diffusion registry 入口**——
   LocDiT/AudioVAE 扩散计算在 talker 步循环内部（"扩散侧路"）。
-- pipeline key `voxcpm2`：单 stage `latent_generator`（LLM_AR,audio 出,
-  stop_token_ids `[1]`）;**声明自定义调度器**
+- pipeline key `voxcpm2`：单 stage `latent_generator`（LLM_AR,
+  `owns_tokenizer`,`final_output=True`,`engine_output_type="audio"`,
+  采样约束 `detokenize=False` + stop_token_ids `[1]`）;**声明自定义调度器**
   `scheduler_cls=…voxcpm2.scheduler.VoxCPM2OmniARAsyncScheduler`
   （少数换 scheduler 类的家族）。无 stage input processor（单 stage 无桥）。
 - config 管线特判：`arg_utils.py` 把 arch 映射到 model_type `voxcpm2` 并注册

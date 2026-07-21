@@ -14,18 +14,23 @@ sources: [vllm_omni/diffusion/models/soulx_singer/, vllm_omni/model_executor/mod
 ## 名称与范围
 
 - 正式名称 SoulX-Singer（Soul-AILab）歌声家族,两条单 stage diffusion
-  pipeline：**SVS**（乐谱/歌词驱动合成;registry 别名
-  `SoulXSingerPipeline`,pipeline key `soulxsinger_svs`）与 **SVC**
-  （歌声转换;`SoulXSingerSVCPipeline`,key `soulxsinger_svc`）。
+  pipeline（各自单 stage 0 `dit`,`execution_type=DIFFUSION`,final 音频
+  输出,**无 connectors**）：**SVS**（乐谱/歌词驱动合成;registry 架构键
+  `SoulXSingerPipeline`,pipeline key `soulxsinger_svs`,pre-process
+  `get_soulxsinger_pre_process_func`）与 **SVC**（歌声转换;架构键
+  `SoulXSingerSVCPipeline`,key `soulxsinger_svc`,pre-process
+  `get_soulxsinger_svc_pre_process_func`）——这些是架构/注册标识,不是模型
+  别名。
   **命名陷阱**：registry key `SoulXSingerPipeline`（checkpoint config.json
   的 architectures 值）加载的类是 `PipelineSoulXSingerSVS`;
   `SoulXSingerSVCPipeline` → `PipelineSoulXSingerSVC`——grep 时勿被
   key/类名错位误导。
-- 虽是单 stage diffusion,**两个 key 都在 `OMNI_PIPELINES`**
-  （`soulxsinger_svs`/`soulxsinger_svc`）;少数注册了 diffusion
-  **pre**-process 的音频家族——完整神经预处理栈（BS-RoFormer 人声分离、
-  Paraformer/Parakeet 歌词 ASR、RMVPE F0、ROSVOT MIDI）在
-  `pre_process_func` 内**懒加载内联运行**。
+- 虽是单 stage diffusion,**两个 key 都在 `OMNI_PIPELINES`**;少数注册了
+  diffusion **pre**-process 的音频家族——神经预处理栈在 `pre_process_func`
+  内**懒加载内联运行**,且按变体取用：SVS 走歌词 ASR
+  （Paraformer/Parakeet）+ ROSVOT MIDI/note 条件;SVC 走 RMVPE F0 +
+  冻结 Whisper 特征,**MIDI 强制关闭**;人声分离（BS-RoFormer）对两者都是
+  可选项（`vocal_sep`）。
 - 入口路径：registry `vllm_omni/diffusion/registry.py` 与
   `vllm_omni/config/pipeline_registry.py`;拓扑
   `model_executor/models/soulx_singer/pipeline.py`;实现

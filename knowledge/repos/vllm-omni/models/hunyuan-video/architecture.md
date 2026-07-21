@@ -44,11 +44,13 @@ sources: [vllm_omni/diffusion/models/hunyuan_video/pipeline_hunyuan_video_1_5.py
    检测 T2V 模式）;I2V pre-process 从 `max_area=480×832`、16 整除推 H/W,
    SigLIP 编码输入图 → `image_embeds`,首帧 VAE argmax latent×scale 进
    `cond_latents`,mask 帧 0 置 1、后续帧零。
-2. 文本双路编码;线性 sigma `linspace(1,0)` 交给 scheduler 内部做 shift。
+2. 文本双路编码;线性 sigma `np.linspace(1.0, 0.0, steps+1)[:-1]`（去掉
+   末端零）交给 scheduler 内部做 shift。
 3. 去噪循环:CFG 经 `predict_noise_maybe_with_cfg`;meanflow 时每步传
    `timestep_r`（末步 0.0）;RNG 走 per-request generator +
    `randn_tensor`（generator 列表长度必须等于 batch）。
-4. `empty_cache()` 后 VAE decode（OOM 缓解,与 wan2_2 同款）→
+4. `empty_cache()` 后先 `latents / vae.config.scaling_factor` 再
+   `vae.decode`（OOM 缓解与 wan2_2 同款）→
    `VideoProcessor(vae_scale_factor=16)` → 展平成 PIL 帧列表。
 
 ## 怎样验证功能、精度和性能

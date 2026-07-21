@@ -27,9 +27,10 @@ sources: [vllm_omni/diffusion/models/nextstep_1_1/, vllm_omni/diffusion/registry
 
 - AR 解码循环用 transformers `StaticCache`;2D sincos 位置嵌入在 pipeline 内
   计算（`get_2d_sincos_pos_embed`,line 73）。
-- CFG **不走 `CFGParallelMixin`**：直接用
-  `get_cfg_group`/`get_classifier_free_guidance_rank/world_size` 跨 rank 实现
-  ——审查 CFG-parallel 共享改动时,这家族和 z_image 一样要单独确认。
+- CFG **不走 `CFGParallelMixin`**：直接用共享 CFG 群组工具
+  `get_cfg_group`/`get_classifier_free_guidance_rank/world_size` 跨 rank
+  实现——审查 CFG-parallel 共享改动时,这家族和 z_image 一样要单独确认。
+  另:无变体有据,树内未 pin checkpoint。
 
 ## 什么时候查这里
 

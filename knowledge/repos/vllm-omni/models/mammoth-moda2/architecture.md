@@ -58,12 +58,15 @@ sources: [vllm_omni/model_executor/models/mammoth_moda2/mammoth_moda2.py, vllm_o
    −inf。逐步由 `runtime_additional_information` 驱动。
 2. `ar2dit`（`stage_input_processors/mammoth_moda2.py`）：
    `full_token_ids = prompt + generated[:-1]`（末 token 无 hidden state,丢弃,
-   有长度断言守护）;**全量 hidden states 以 float32 连续张量跨进程**
-   （numpy 序列化器无 bf16,DiT 侧再转）;文本/图像条件拆分推迟到 DiT 的
-   `_split_ar_conditions`（从 config token id 重建掩码）。
+   有长度断言守护）;**要求 `completion_output.multimodal_output["latent"]`
+   为全量 hidden states,缺失即 raise**——这份 latent 由 **AR runner**（不是
+   AR 模型)在 stage 0 `engine_output_type="latent"` 下挂上;**以 float32
+   连续张量跨进程**（numpy 序列化器无 bf16,DiT 侧再转）;文本/图像条件拆分
+   推迟到 DiT 的 `_split_ar_conditions`（从 config token id 重建掩码）。
 3. DiT（LLM_GENERATION runner 内）：caption embedder 重初始化为
-   `RMSNorm+Linear(llm→dit)`;CFG 用 `text_guidance_scale`+`cfg_range` 窗口;
-   VAE 解码出图。
+   `RMSNorm+Linear(llm→dit)`;CFG 用 `text_guidance_scale`+`cfg_range` 窗口。
+   pipeline 构造了 VAE、stage 1 声明 final 图像输出;去噪/VAE 解码/图像打包
+   的逐步实现未逐行核对（见文末未决）。
 
 ## 怎样验证功能、精度和性能
 

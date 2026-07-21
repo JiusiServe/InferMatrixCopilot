@@ -15,13 +15,14 @@ diffusion 视频,AR registry 无入口;image3 的结构见该页）。
 
 ## 名称与范围
 
-- 正式名称 HunyuanVideo-1.5;标识区分:model_type/pipeline key
-  `hunyuan_video_15`,registry 架构键 `HunyuanVideo15Pipeline`（T2V）与
+- 正式名称 HunyuanVideo-1.5,无独立官方别名;代码标识:model_type/pipeline
+  key `hunyuan_video_15`,registry 架构键 `HunyuanVideo15Pipeline`（T2V）与
   `HunyuanVideo15ImageToVideoPipeline`（I2V,类名
   `HunyuanVideo15I2VPipeline`）。
-- diffusion registry 两架构共享一个 transformer（模块
-  `pipeline_hunyuan_video_1_5{,_i2v}`）;pre-process 仅 I2V 注册;I2V 的
-  post-process 是 T2V 函数的纯别名。
+- diffusion registry 两条目分别指向模块
+  `pipeline_hunyuan_video_1_5{,_i2v}`;两条 pipeline 共用
+  `hunyuan_video_15_transformer.HunyuanVideo15Transformer3DModel`;
+  pre-process 仅 I2V 注册;I2V 的 post-process 是 T2V 函数的纯别名。
 - 拓扑：T2V 在 `model_executor/models/hunyuan_video/pipeline.py`——单
   stage 0 `dit`（DIFFUSION,无 input_sources,`final_output_type="video"`）;
   **I2V 不在 OMNI_PIPELINES**（走单 stage diffusion 兜底）。pipeline
@@ -34,7 +35,8 @@ diffusion 视频,AR registry 无入口;image3 的结构见该页）。
 - 源码：`diffusion/models/hunyuan_video/`（transformer 54 双流块、T2V/I2V
   两 pipeline）;无 stage input processor。
 - 依赖共享模块：[Diffusion 组件](../../components/diffusion/_index.md)
-  （CFGParallelMixin、SP `_sp_plan`、分布式/瓦片 VAE、cache-dit adapter）。
+  （CFGParallelMixin、SP `_sp_plan`、分布式/瓦片 VAE、cache-dit adapter）、
+  `diffusion/models/t5_encoder.py`（glyph 路的共享 `T5EncoderModel`）。
 
 ## 目录内容
 

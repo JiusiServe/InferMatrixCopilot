@@ -19,6 +19,8 @@ sources: [vllm_omni/diffusion/models/diffusers_adapter/, vllm_omni/diffusion/reg
   （[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
 - 用途：以接近零 per-model 代码服务任意 HF Diffusers pipeline——执行直接委托
   diffusers `DiffusionPipeline.__call__`。
+- 无变体有据,无 deploy YAML,树内未 pin checkpoint（黑盒桥按被服务的
+  diffusers pipeline 决定行为）。
 - 源码：`pipeline_diffusers_adapter.py`（25 KB）、`pipeline_utils.py`
   （`get_pipeline_utils`,按 pipeline 类型做 IO 胶水）、
   `quantization_utils.py`（把 vLLM 风格量化配置转换/应用到 diffusers 组件）。

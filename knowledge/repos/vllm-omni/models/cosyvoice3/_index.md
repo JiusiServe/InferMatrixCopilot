@@ -46,7 +46,7 @@ sources: [vllm_omni/model_executor/models/cosyvoice3/, vllm_omni/deploy/cosyvoic
 
 - 单 pipeline key + 单 deploy;变体轴是**运行模式**：async_chunk 流式
   （默认）/ `--no-async-chunk` 同步全载荷 / `COSYVOICE3_TRT` 开关
-  （**默认开**,关掉 export 0）。
+  （**默认开**,`export COSYVOICE3_TRT=0` 关闭）。
 - `cosyvoice3.yaml`：全局 `dtype: float32`（本清单唯一全局 fp32 家族）;
   code2wav `enforce_eager`（动态卷积形状不吃 CUDA graph）;头注给出
   **GPU 级调参警告**——默认（seqs 8/chunk 15）按 H100 调（c=4 约 100%

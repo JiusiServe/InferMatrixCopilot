@@ -13,8 +13,10 @@ sources: [vllm_omni/model_executor/models/aura_omni/, vllm_omni/deploy/aura_omni
 
 ## 名称与范围
 
-- 正式 owner：aura_omni 家族；pipeline key `aura_omni`。AR registry 架构
-  `AuraQwen3VLForConditionalGeneration` →（`aura_omni`, `qwen3_vl`）。
+- 正式名称 Aura-Omni（AURA 语音助手管线;无其他别名有据,**无变体**）;
+  pipeline key `aura_omni`。AR registry 架构
+  `AuraQwen3VLForConditionalGeneration`
+  →（`aura_omni`, `qwen3_vl`, `AuraQwen3VLForConditionalGeneration`）。
 - 源码：`vllm_omni/model_executor/models/aura_omni/`（仅 3 个文件——本家族
   以**组合**为主,只有 stage 1 有家族自有模型代码）。
 - 依赖共享模块：qwen3_tts 家族的 talker/code2wav 与其 stage 处理器

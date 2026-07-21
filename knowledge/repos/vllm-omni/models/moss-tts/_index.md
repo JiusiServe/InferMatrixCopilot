@@ -4,7 +4,7 @@ created: 2026-07-21
 updated: 2026-07-21
 type: index
 tags: [vllm-omni, models]
-sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/config/pipeline_registry.py, vllm_omni/model_executor/models/moss_tts/, vllm_omni/model_executor/models/moss_tts_nano/, vllm_omni/model_executor/stage_input_processors/moss_tts.py, vllm_omni/deploy/moss_tts.yaml]
+sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/config/pipeline_registry.py, vllm_omni/model_executor/models/moss_tts/, vllm_omni/model_executor/models/moss_tts_nano/, vllm_omni/model_executor/stage_input_processors/moss_tts.py, vllm_omni/deploy/]
 ---
 
 # MOSS-TTS 家族
@@ -28,12 +28,17 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/config/pipeline
     （`OpenMOSS-Team/MOSS-TTS-Nano`,0.1B,独立目录）。
   - stage-1 共用架构 `MossTTSCodecDecoder`（同名类）。
 - pipeline key 四个（`moss_tts/pipeline.py` 与 `moss_tts_nano/pipeline.py`,
-  注册于 `config/pipeline_registry.py`）：`moss_tts_delay` /
-  `moss_tts_realtime`（model_stage 对 `moss_tts`→`moss_tts_codec`）/
-  `moss_tts_local`（**独立 stage 名对** `moss_tts_local`→
-  `moss_tts_local_codec`,serving 适配按此路由）/ `moss_tts_nano`
-  （**单 stage**,AR LM+codec 全在 `forward()` 内以 VoxCPM 式
-  `inference_stream()` 生成器跑,EOS id 2 由 compute_logits 强制）。
+  注册于 `config/pipeline_registry.py`）。两 stage 变体拓扑均为
+  **LLM_AR talker → delay/raw stage 处理器 → SharedMemoryConnector →
+  `MossTTSCodecDecoder`(LLM_GENERATION)**,区别在 talker 与处理器:
+  - `moss_tts_delay`:delay-pattern talker → `talker2codec_delay_async_chunk`,
+    stage 名对 `moss_tts`→`moss_tts_codec`。
+  - `moss_tts_realtime`:realtime talker → `talker2codec_raw_async_chunk`,
+    同 stage 名对。
+  - `moss_tts_local`:local talker → raw 处理器,**独立 stage 名对**
+    `moss_tts_local`→`moss_tts_local_codec`（serving 适配按此路由）。
+  - `moss_tts_nano`:**单 stage**,AR LM+codec 全在 `forward()` 内以 VoxCPM
+    式 `inference_stream()` 生成器跑,EOS id 2 由 compute_logits 强制。
 - 依赖共享模块：[Config 组件](../../components/config/architecture.md)、
   `utils/speaker_cache`、serving 适配
   `entrypoints/openai/tts_adapters/moss_tts.py`。
@@ -56,7 +61,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/config/pipeline
   不 CUDA-graph 安全,FULL-decode 捕获会崩 worker**）。
 - `moss_tts_realtime.yaml`（TTFB ~180 ms,`codec_chunk_frames 15`）;
   `moss_tts_local.yaml`（**48 kHz 立体声**,v2 tokenizer,首块 80 ms;顶层缺
-  `trust_remote_code`,与其余变体不一致——pin 上未验证是否有意）;
+  `trust_remote_code`,与其余双 stage 变体不一致——pin 上未验证是否有意）;
   `moss_tts_nano.yaml`（L4 验证,无 connectors,`skip_mm_profiling`）。
 - 权威 checkpoint→deploy 映射在
   `examples/offline_inference/text_to_speech/moss_tts/end2end.py`。

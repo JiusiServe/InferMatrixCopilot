@@ -17,12 +17,12 @@ sources: [vllm_omni/diffusion/models/sdxl/, vllm_omni/diffusion/registry.py]
   post `get_sdxl_image_post_process_func`。单 stage diffusion,引擎默认 stage
   配置（[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
 - 源码：`pipeline_sdxl.py`（16 KB）+ `sdxl_unet.py`
-  （`SDXLUNet2DConditionModel`,33 KB）。
+  （`SDXLUNet2DConditionModel`,33 KB）。无变体有据,树内未 pin checkpoint。
 - 依赖共享模块：[Diffusion 组件](../../components/diffusion/_index.md)。
 
 ## 结构与要点
 
-- **模型清单里唯一 UNet 基、非 flow-matching 的家族**：
+- **长尾清单调查范围内唯一 UNet 基、非 flow-matching 的家族**：
   `EulerDiscreteScheduler`（经典 epsilon-prediction）——涉及"所有模型都是
   FlowMatch"的全局假设时,sdxl 是反例。
 - `_dit_modules = ["unet"]`（`pipeline_sdxl.py:43`）——组件发现把 UNet 当

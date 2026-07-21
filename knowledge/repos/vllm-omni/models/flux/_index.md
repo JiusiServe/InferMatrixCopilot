@@ -9,8 +9,8 @@ sources: [vllm_omni/diffusion/models/flux/, vllm_omni/diffusion/registry.py]
 
 # FLUX.1
 
-以下事实在 `main @ 5d44868e` 复核（源码派生页）。FLUX.2 在独立家族——见
-[flux2](../flux2/_index.md)（含 Klein 的注记）。
+以下事实在 `main @ 5d44868e` 复核（源码派生页）。FLUX.2 是**两个独立家族**
+——[flux2](../flux2/_index.md) 与 [flux2-klein](../flux2-klein/_index.md)。
 
 ## 名称与范围
 
@@ -20,13 +20,14 @@ sources: [vllm_omni/diffusion/models/flux/, vllm_omni/diffusion/registry.py]
   `get_flux_post_process_func`（base+DMD2）与
   `get_flux_kontext_post_process_func`。
 - 单 stage diffusion,引擎默认 stage 配置
-  （[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
+  （[Config 组件](../../components/config/architecture.md)）。无 deploy
+  YAML,pin 上无 checkpoint↔变体映射记录。
 - 依赖共享模块：[Diffusion 组件](../../components/diffusion/_index.md)、
   `diffusion/models/t5_encoder`。
 
 ## 结构与变体
 
-- 三变体共享 transformer 栈（`flux_transformer.py`,含
+- 三个类是**变体不是别名**,共享 transformer 栈（`flux_transformer.py`,含
   `FluxKontextTransformer2DModel`）与 `FluxPipelineMixin.calculate_shift`
   （分辨率相关 timestep-shift mu）：
   - **base**：CLIP + T5 双文本编码器,`FlowMatchEulerDiscreteScheduler`,

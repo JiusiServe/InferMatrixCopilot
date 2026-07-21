@@ -13,7 +13,8 @@ sources: [vllm_omni/diffusion/models/hidream_image/, vllm_omni/diffusion/registr
 
 ## 名称与范围
 
-- diffusion registry：`HiDreamImagePipeline` →
+- 正式名称 HiDream-I1,无别名、无变体有据,无 deploy YAML/checkpoint 映射
+  记录。diffusion registry：`HiDreamImagePipeline` →
   （`hidream_image`, `pipeline_hidream_image`）,post
   `get_hidream_image_post_process_func`。单 stage diffusion,引擎默认 stage
   配置（[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
@@ -23,9 +24,9 @@ sources: [vllm_omni/diffusion/models/hidream_image/, vllm_omni/diffusion/registr
 
 ## 结构与要点
 
-- 文本编码栈：`CLIPTextModelWithProjection` + `T5EncoderModel` + 整个
-  `LlamaForCausalLM` 作为附加编码器——全仓少见的重编码器配置,显存预算评审
-  时别漏 Llama 编码器。
+- 四编码器文本栈,**含**（digest 点名的类）`CLIPTextModelWithProjection`、
+  `T5EncoderModel` 与整个 `LlamaForCausalLM` 附加编码器——重编码器配置,
+  显存预算评审时别漏 Llama 编码器。
 - transformer 是 routed-MoE feed-forward：`MoEGate`
   `num_routed_experts=4`/`num_activated_experts=2`
   （`hidream_image_transformer.py:347`）;TP 用 `DistributedRMSNorm`。
