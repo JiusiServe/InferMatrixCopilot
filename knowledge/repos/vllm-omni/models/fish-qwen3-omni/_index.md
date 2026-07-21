@@ -20,8 +20,9 @@ sources: [vllm_omni/model_executor/models/fish_speech/, vllm_omni/attention/fish
 - 模型 registry：`FishSpeechSlowARForConditionalGeneration` +
   `FishSpeechDACDecoder`;**Fast AR 不注册**——嵌在 Slow AR 内
   （`talker_mtp`,私有非分页 KV）。
-- pipeline key `fish_qwen3_omni`：Slow AR（LLM_AR,文本→RVQ 码）→ DAC
-  decoder（LLM_GENERATION,音频）。**stage 分界是 AR vs DAC 声码器,不是
+- pipeline key `fish_qwen3_omni`：stage 0 `fish_speech_slow_ar`（LLM_AR,
+  文本→RVQ latent 码）→ stage 1 `dac_decoder`（LLM_GENERATION,latent 码经
+  async-chunk 流到最终音频）。**stage 分界是 AR vs DAC 声码器,不是
   slow-vs-fast AR**;只有 async-chunk 路径,无 sync 处理器。
 - 入口路径：模型 registry `vllm_omni/model_executor/models/registry.py`;
   拓扑 `vllm_omni/model_executor/models/fish_speech/pipeline.py`（注册于
@@ -44,9 +45,11 @@ sources: [vllm_omni/model_executor/models/fish_speech/, vllm_omni/attention/fish
 - 共同硬约束：`enable_chunked_prefill: false`（SlowAR 解码环不
   chunked-prefill 安全）→ 被迫 `max_num_batched_tokens == max_model_len ==
   16384`。
-- `fish_qwen3_omni.yaml`（1×H20 验证,4/1 并发,轮询 **10 ms**;唯一带 XPU
-  override）;其余三份都用 **1 ms** 轮询:`_2gpu.yaml`（H100×2,DAC 上卡 1）;
-  `high_concurrency_single_gpu.yaml`（64/64 并发,**DAC 仍在卡 0**）与
+- 四份 YAML 跑**同一模型/同一 pipeline**,只是部署参数不同。
+  `fish_qwen3_omni.yaml`（1×H20 验证,4/1 并发,轮询 **10 ms**;唯一带 XPU
+  override）;其余三份都用 **1 ms** 轮询:`_2gpu.yaml`（H100×2,DAC 上卡 1,
+  **64/64 并发**）;`high_concurrency_single_gpu.yaml`（64/64 并发,
+  **DAC 仍在卡 0**）与
   `high_concurrency_dual_gpu.yaml`（同 knob 组,**DAC 移到卡 1** 消除
   AR/DAC 干扰）——两份 high-concurrency 共享专属 knob 组:
   `fish_speech_tensor_codes`、`fish_speech_single_initial_chunk`、backlog

@@ -1,5 +1,5 @@
 ---
-title: "Aura-Omni（4-stage 语音助手组合管线)"
+title: "Aura-Omni（4-stage 语音助手组合管线）"
 created: 2026-07-21
 updated: 2026-07-21
 type: index

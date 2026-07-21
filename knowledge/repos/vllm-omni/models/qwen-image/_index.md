@@ -1,5 +1,5 @@
 ---
-title: "Qwen-Image（base/Edit/EditPlus/Layered/DMD2 五变体）"
+title: "Qwen-Image（base/Edit/Edit-Plus/Layered/DMD2 五变体）"
 created: 2026-07-21
 updated: 2026-07-21
 type: index

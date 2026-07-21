@@ -1,5 +1,5 @@
 ---
-title: "SDXL（全仓唯一 UNet/epsilon 家族）"
+title: "SDXL（长尾清单中唯一 UNet/epsilon 家族）"
 created: 2026-07-21
 updated: 2026-07-21
 type: index

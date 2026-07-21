@@ -27,8 +27,8 @@ sources: [vllm_omni/diffusion/models/gr00t/, vllm_omni/deploy/Gr00tN1d7.yaml, vl
   （`OMNI_PIPELINES["Gr00tN1d7"]`）、拓扑
   `vllm_omni/model_executor/models/gr00t/pipeline.py`（单 stage DIFFUSION,
   `model_arch="Gr00tN1d7Pipeline"`,`hf_architectures=("Gr00tN1d7",)`,
-  `final_output=True`,`default_deploy_config_name="Gr00tN1d7.yaml"` 自动
-  加载,无 connectors）;加载兜底 `vllm_omni/diffusion/data.py`
+  `final_output=True`,以 `default_deploy_config_name="Gr00tN1d7.yaml"`
+  声明默认 deploy 配置,无 connectors）;加载兜底 `vllm_omni/diffusion/data.py`
   （model_type/architectures 含 `Gr00tN1d7` 即强制该 pipeline 类）;HF
   config `Gr00tN1d7Config` 经家族内 `register_model_config` 注册;无
   pre/post-process、无 AR 入口、无 stage input processor。

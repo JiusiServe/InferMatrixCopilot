@@ -27,10 +27,11 @@ sources: [vllm_omni/diffusion/models/soulx_singer/, vllm_omni/model_executor/mod
   key/类名错位误导。
 - 虽是单 stage diffusion,**两个 key 都在 `OMNI_PIPELINES`**;少数注册了
   diffusion **pre**-process 的音频家族——神经预处理栈在 `pre_process_func`
-  内**懒加载内联运行**,且按变体取用：SVS 走歌词 ASR
-  （Paraformer/Parakeet）+ ROSVOT MIDI/note 条件;SVC 走 RMVPE F0 +
-  冻结 Whisper 特征,**MIDI 强制关闭**;人声分离（BS-RoFormer）对两者都是
-  可选项（`vocal_sep`）。
+  内**懒加载内联运行**,产出音频/F0 载荷,且按变体取用：SVS 走歌词 ASR
+  （Paraformer/Parakeet）+ ROSVOT MIDI/note 条件;SVC 走 RMVPE F0,
+  **MIDI 强制关闭**;人声分离（BS-RoFormer）对两者都是可选项
+  （`vocal_sep`）。**冻结 Whisper 特征不在预处理里,而由
+  `PipelineSoulXSingerSVC` 在条件构建阶段计算**。
 - 入口路径：registry `vllm_omni/diffusion/registry.py` 与
   `vllm_omni/config/pipeline_registry.py`;拓扑
   `model_executor/models/soulx_singer/pipeline.py`;实现
@@ -53,7 +54,8 @@ sources: [vllm_omni/diffusion/models/soulx_singer/, vllm_omni/model_executor/mod
 ## 配置与 checkpoint 差异
 
 - 两份 deploy **只差 `pipeline:` 键**（fp16、32 步、guidance 3.0、单卡
-  gpu 0.5、seed 42）。
+  `gpu_memory_utilization: 0.5`、seed 42）,**都不 pin checkpoint ID**;
+  离线 README 要求分别建 SVS/SVC 的 "view" 目录并手拷 `phone_set.json`。
 - extra-body 面在 pipeline 类的 ClassVar（无 model_extras 文件）：SVS 收
   metadata/语言/control/max_merge_duration…出 `f0_shift`;SVC 收 wav/F0 路径
   出 `pitch_shift`（`auto_shift` 支持,SVC 移调 = `pitch_shift×5` 粗 F0 bin）。

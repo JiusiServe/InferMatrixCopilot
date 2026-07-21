@@ -33,8 +33,8 @@ sources: [vllm_omni/model_executor/models/cosyvoice3/cosyvoice3.py, vllm_omni/mo
 - config（`transformers_utils/configs/cosyvoice3.py`）：`eos_token_id` 默认
   6562;注释明确官方把 **所有 ≥ speech_token_size 的 token（6561–6760）都视
   为停止信号**;`sample_rate 24000`、hidden 896、heads 14 硬编码。
-- **RAS 停止机制（停止失效 bug 类别）**：停止 token 6562 是 200 个停止
-  logit 做 logsumexp 合并出的**虚拟 token**;YAML 的
+- **RAS 停止机制（停止失效 bug 类别）**：停止 token id **6562 接收 200 个
+  停止 logit 的 logsumexp 合并分数**;YAML 的
   `repetition_penalty: 1.0001` 唯一存在理由是逼 vLLM 维护
   `output_token_ids` 让 RAS 生效——把它"归一化"成 1.0 会静默破坏停止。
 - stage-1 的 `engine_output_type="latent"`（而非其他 TTS 家族的
@@ -53,7 +53,8 @@ sources: [vllm_omni/model_executor/models/cosyvoice3/cosyvoice3.py, vllm_omni/mo
      `unpad_prompt_conditioning` 剥掉。
    - 同步 `text2flow_full_payload`（生产侧全载荷）+ `text2flow_token_only`
      （消费侧占位）。
-4. code2wav：CFM 去噪 → 声学特征 → HiFT → 24 kHz 波形（TRT 估计器与
+4. code2wav：flow-matching 解码器产出声学特征 → HiFT → 24 kHz 波形（TRT
+   估计器与
    PyTorch DiT 之间的具体选路代码未逐行读,见文末未决项）。
 
 ## 怎样验证功能、精度和性能

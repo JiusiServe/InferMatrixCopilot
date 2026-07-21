@@ -13,16 +13,15 @@ sources: [vllm_omni/model_executor/models/dynin_omni/, vllm_omni/deploy/dynin_om
 
 ## 名称与范围
 
-- 正式名称 Dynin-Omni,代码/pipeline 标识 `dynin_omni`,无其他别名
-  （checkpoint 组织为 snu-aidas,`snu-aidas/Dynin-Omni` 来自 examples
-  README,YAML 不 pin）。AR registry:
+- 代码/pipeline 标识 `dynin_omni`;checkpoint 组织为 snu-aidas
+  （`snu-aidas/Dynin-Omni` 来自 examples README,YAML 不 pin）。AR registry:
   `DyninOmniForConditionalGeneration` →（`dynin_omni`, `dynin_omni`,同名类）;
   **无 diffusion registry 入口**。
-- 入口路径：拓扑 `model_executor/models/dynin_omni/pipeline.py`（注册于
-  `config/pipeline_registry.py`）;stage 分发壳 `dynin_omni.py`;三个 stage
-  实现 `dynin_omni_token2{text,image,audio}.py` + 共享设施
-  `dynin_omni_common.py`;桥
-  `model_executor/stage_input_processors/dynin_omni.py`;deploy
+- 入口路径：拓扑 `vllm_omni/model_executor/models/dynin_omni/pipeline.py`
+  （注册于 `vllm_omni/config/pipeline_registry.py`）;stage 分发壳
+  `dynin_omni.py`;三个 stage 实现 `dynin_omni_token2{text,image,audio}.py`
+  + 共享设施 `dynin_omni_common.py`;桥
+  `vllm_omni/model_executor/stage_input_processors/dynin_omni.py`;deploy
   `vllm_omni/deploy/dynin_omni{,_ci,_multiconnector}.yaml`。
 - pipeline key `dynin_omni`：三 stage 链,**全部 LLM_GENERATION、全部
   `engine_output_type="latent"`、全部 `final_output=True`**——stage 0

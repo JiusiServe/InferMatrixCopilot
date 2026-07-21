@@ -57,8 +57,8 @@ diffusion 设施见 [Diffusion 组件](../../components/diffusion/_index.md)。
    per-request generator。
 3. `empty_cache()` → VAE decode（源注释:Wan2.2 易 OOM）→ post-process;
    可选**帧插值**（`interpolate_video_tensor`,报告
-   `video_fps_multiplier`）只在 T2V/TI2V 的
-   `get_wan22_post_process_func` 上有据,其他变体的 post 函数未见此路径。
+   `video_fps_multiplier`）在 `get_wan22_post_process_func` 上有据——它绑定
+   T2V/TI2V 与 DMD2 T2V;其余变体的 post 函数未逐一追,不断言其有无。
 
 ## 怎样验证功能、精度和性能
 
@@ -66,7 +66,8 @@ diffusion 设施见 [Diffusion 组件](../../components/diffusion/_index.md)。
 （`tests/diffusion/models/wan2_2/`,含 diffuse/quant/各变体 pipeline）、
 e2e（t2v 离线/在线、W4A16）、**accuracy**
 （`tests/e2e/accuracy/wan22_i2v/` 视频相似度对 diffusers CP 基线）、dfx
-（perf/reliability/stability）。DMD2 变体无专属测试（pin 上未见）。
+（perf/reliability/stability）。上列家族测试中未见 DMD2 专属测试（未做穷举
+核对）。
 
 - 量化脚本 `examples/quantization/quantize_wan2_2_modelopt_fp8.py`;副本
   数据并行示例 `examples/online_serving/replica_data_parallel/wan2_2_ti2v_dp.yaml`。

@@ -26,9 +26,9 @@ sources: [vllm_omni/diffusion/models/flux2_klein/, vllm_omni/diffusion/registry.
 - 文本编码用 `Qwen3ForCausalLM` + `Qwen2TokenizerFast`（不是 CLIP/T5）;
   `AutoencoderKLFlux2` VAE,自定义
   `Flux2ImageProcessor(VaeImageProcessor)`（`pipeline_flux2_klein.py:55`）。
-- 类混入 `CFGParallelMixin, SupportImageInput`;**单架构无变体**——蒸馏
-  行为是构造期 `is_distilled` 旗标;无 deploy YAML/checkpoint 映射记录;
-  img2img latents 走 diffusers `retrieve_latents`。
+- 类混入 `CFGParallelMixin, SupportImageInput`;**单架构、无别名有据**——
+  蒸馏行为是构造期 `is_distilled` 旗标（不是另一个架构）;无 deploy
+  YAML/checkpoint 映射记录;img2img latents 走 diffusers `retrieve_latents`。
 
 ## 什么时候查这里
 

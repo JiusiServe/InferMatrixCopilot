@@ -56,9 +56,9 @@ sources: [vllm_omni/diffusion/models/wan2_2/, vllm_omni/deploy/wan2_2_ti2v.yaml,
   `vae_use_tiling: true` 常开;不 pin checkpoint。TI2V 与纯 T2V 的区分**只
   在运行期**由 `model_index.json` 的 `expand_timesteps` 决定,不是不同类。
 - 双专家（A14B）自动检测:本地有 `transformer_2/` 或 model_index 有其条目;
-  `boundary_ratio` **一值两用**——既按时间步切换专家（I2V 记载缺省 0.875 并
-  告警）,又控制部分加载（1.0 只装 transformer_2,0.0 只装 transformer)——
-  省显存开关,评审时别当普通超参改。
+  `boundary_ratio` **一值两用**——既按时间步切换专家（T2V/TI2V 与 I2V 缺省
+  都是 0.875,回退时告警）,又控制部分加载（1.0 只装 transformer_2,0.0 只装
+  transformer)——省显存开关,评审时别当普通超参改。
 - S2V 无捆绑 deploy YAML（flow_shift 3.0 只在代码里）——部署设置 pin 上无
   文档。
 

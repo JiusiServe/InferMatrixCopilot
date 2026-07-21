@@ -35,17 +35,19 @@ sources: [vllm_omni/diffusion/models/soulx_singer/pipeline_soulx_singer_base.py,
   `["SoulXSingerPipeline"]`（SVS）或 `["SoulXSingerSVCPipeline"]`（SVC）
   （`utils.py::resolve_soulx_kind`）;extra_args 按 kind 白名单校验。
 - 权重根:`resolve_preprocess_weights_root`（双仓布局）;
-  `phoneme/phone_set.json` 必须手工从 GitHub 拷入。
+  `phoneme/phone_set.json` 必须手工从 GitHub 拷入。deploy YAML **不含
+  checkpoint ID**,离线 README 要求分别建 SVS/SVC 的 "view" 目录。
 - 两个模块各定义同名 `get_soulxsinger_post_process_func`——registry 按各自
   模块解析,但重名对 `_DIFFUSION_MODELS` 映射改动脆弱（评审注意）。
 
 ## 从输入到输出的主要流程
 
 1. **三层输入分级**（`pre_process_func`）：原始音频（首见时懒建预处理栈,
-   按变体内联跑——分离是 `vocal_sep` 可选;SVS 加 ASR+MIDI,SVC 加
-   F0+Whisper 特征）/ 预计算载荷（`has_precomputed`）/ warmup 哑载荷;
+   按变体内联跑——分离是 `vocal_sep` 可选;SVS 加 ASR+MIDI,SVC 加 RMVPE
+   F0）产出音频/F0 载荷 / 预计算载荷（`has_precomputed`）/ warmup 哑载荷;
    产物统一挂在 `prompt.additional_information["soulx_preprocessed"]`。
-2. 条件构建:SVS 走乐谱/音素路径（SVC 强制关 `midi_transcribe`）。
+2. 条件构建:SVS 走乐谱/音素路径;**SVC 在此阶段用冻结 Whisper 提特征**
+   （强制关 `midi_transcribe`）。
 3. **prompt 拼接 inpainting**：prompt（参考）与 target 沿时间轴在条件空间
    拼接,CFM 解码器在给定 prompt mel 的条件下生成 target 区段——**无说话人
    嵌入的音色迁移**。

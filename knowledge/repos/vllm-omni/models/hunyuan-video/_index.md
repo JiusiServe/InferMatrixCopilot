@@ -15,8 +15,9 @@ diffusion 视频,AR registry 无入口;image3 的结构见该页）。
 
 ## 名称与范围
 
-- 正式名称 HunyuanVideo-1.5,无独立官方别名;代码标识:model_type/pipeline
-  key `hunyuan_video_15`,registry 架构键 `HunyuanVideo15Pipeline`（T2V）与
+- 正式名称 HunyuanVideo-1.5（源码未记录其他官方别名）;代码标识:
+  model_type/pipeline key `hunyuan_video_15`,registry 架构键
+  `HunyuanVideo15Pipeline`（T2V）与
   `HunyuanVideo15ImageToVideoPipeline`（I2V,类名
   `HunyuanVideo15I2VPipeline`）。
 - diffusion registry 两条目分别指向模块

@@ -4,7 +4,7 @@ created: 2026-07-21
 updated: 2026-07-21
 type: architecture
 tags: [vllm-omni, models]
-sources: [vllm_omni/model_executor/models/mimo_audio/mimo_audio_llm.py, vllm_omni/model_executor/models/mimo_audio/mimo_audio_code2wav.py, vllm_omni/model_executor/models/mimo_audio/cuda_graph_decoder_wrapper.py, vllm_omni/model_executor/models/mimo_audio/modeling_audio_tokenizer.py, vllm_omni/model_executor/models/mimo_audio/quantization.py, vllm_omni/model_executor/stage_input_processors/mimo_audio.py, vllm_omni/model_executor/models/mimo_audio/config_mimo_audio.py]
+sources: [vllm_omni/model_executor/models/mimo_audio/mimo_audio.py, vllm_omni/model_executor/models/mimo_audio/mimo_audio_llm.py, vllm_omni/model_executor/models/mimo_audio/mimo_audio_code2wav.py, vllm_omni/model_executor/models/mimo_audio/cuda_graph_decoder_wrapper.py, vllm_omni/model_executor/models/mimo_audio/modeling_audio_tokenizer.py, vllm_omni/model_executor/models/mimo_audio/quantization.py, vllm_omni/model_executor/models/mimo_audio/pipeline.py, vllm_omni/model_executor/stage_input_processors/mimo_audio.py, vllm_omni/model_executor/models/mimo_audio/config_mimo_audio.py]
 ---
 
 # MiMo-Audio 架构
@@ -22,8 +22,8 @@ sources: [vllm_omni/model_executor/models/mimo_audio/mimo_audio_llm.py, vllm_omn
   `modeling_audio_tokenizer.py`/`quantization.py`）：VQ 反量化 → AudioDecoder
   → Vocos 声码器;`CUDAGraphMiMoDecoderWrapper` 把**整条解码路径**按
   (RVQ 深度, bucket) 捕获成 CUDA graph,非因果滑窗注意力掩码是静态张量、
-  重放前原地更新;tokenizer worker 按 realpath 键进程级缓存（防多引擎重复
-  加载多 GB tokenizer）。
+  重放前原地更新;tokenizer worker 按归一化 realpath 键进程级缓存（同一进程
+  内同键不重复加载多 GB tokenizer）。
 - 共享：vLLM qwen2_audio 处理栈;worker-connector 全载荷面。
 
 ## 配置、checkpoint 和兼容范围
@@ -35,7 +35,7 @@ sources: [vllm_omni/model_executor/models/mimo_audio/mimo_audio_llm.py, vllm_omn
 - 码组几何：每 AR 步出 `(8 通道 × 4 group)` 码块;wire 格式 = 加 pad 行后
   列主序展平;各 codebook 词表异构
   （`"1025-1025-129-129-129-129-129-129"`,各自有 zero-emb 下标）;delay
-  pattern `0-7`。
+  pattern `0-1-2-3-4-5-6-7`。
 - 关键常量（`config_mimo_audio.py`）：span 标记 151670/151672;
   `NO_INTERLEAVE_NEXT_TOKEN_ID=151671` 兼任 stage-0 stop token 与音频边界;
   `TEXT_GROUP_SIZE=5`。
@@ -61,7 +61,8 @@ sources: [vllm_omni/model_executor/models/mimo_audio/mimo_audio_llm.py, vllm_omn
    上下文必须盖住 vocoder 注意力窗口（默认 `[40,10]`）,低于下限会被强制改写
    并告警;违反表现为 chunk 边界处声学状态重置/音色漂移。
    `MAX_CODE2WAV_TOKENS=18192` 硬顶,超限在 full_payload 中静默截断。
-5. stage 1 Code2Wav：扁平 codebook-major 码流 → RVQ 反量化 → AudioDecoder →
+5. stage 1 Code2Wav：加 pad 行后按列主序展平的码流 → RVQ 反量化 →
+   AudioDecoder →
    Vocos 声码器 → 波形（`CUDAGraphMiMoDecoderWrapper` 把整条路径按
    (深度, bucket) 捕获成 CUDA graph）。
 

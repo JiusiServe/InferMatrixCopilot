@@ -37,11 +37,16 @@ sources: [vllm_omni/model_executor/models/higgs_audio_v2/, vllm_omni/model_execu
 - pipeline key：`higgs_audio_v2` 与 `higgs_multimodal_qwen3`,拓扑同为两 stage:
   Talker（LLM_AR,文本→8-codebook codec,latent 出）→ Code2Wav
   （LLM_GENERATION,codec→24 kHz PCM）,SharedMemoryConnector 相连。
-- 依赖共享模块：de-delay 与流式行为的所有者是两个 stage 处理器
+- 职责边界：de-delay 与窗口构建的所有者是两个 stage 处理器
   `model_executor/stage_input_processors/higgs_audio_v2.py` 与
-  `higgs_audio_v3.py`;[Config 组件](../../components/config/architecture.md);
-  serving 侧集成在 `entrypoints/openai/serving_speech.py`
-  （v3 参考音频 code LRU cache 256 条/64 MiB + in-flight 去重）。
+  `higgs_audio_v3.py`;PCM 重叠修剪归 Code2Wav 的 `forward_chunk`;连接器只供
+  传输与配置。
+- 入口路径：registry `vllm_omni/model_executor/models/registry.py` 与
+  `vllm_omni/config/pipeline_registry.py`;serving 集成
+  `vllm_omni/entrypoints/openai/serving_speech.py`（v3 参考音频 code LRU
+  cache 256 条/64 MiB + in-flight 去重）与
+  `vllm_omni/entrypoints/openai/protocol/audio.py`（v3 references 映射、v2
+  富输入别名拒绝）;[Config 组件](../../components/config/architecture.md)。
 
 ## 目录内容
 
@@ -68,5 +73,6 @@ sources: [vllm_omni/model_executor/models/higgs_audio_v2/, vllm_omni/model_execu
 ## 什么时候查这里
 
 - 审查任一 Higgs 谱系的 delay pattern、流式分块或 graph 侧写改动;两谱系共享
-  codec 常量（8×1026,BOC 1024/EOC 1025,25 fps × hop 960）。
+  codec 常量（8×1026,25 fps × hop 960;v2 称 BOS/EOS 1024/1025,v3 称
+  BOC/EOC 1024/1025）。
 - 语义验收见 [model-validation](../../review/guides/model-validation.md)。

@@ -18,9 +18,10 @@ sources: [vllm_omni/diffusion/models/dreamid_omni/, vllm_omni/diffusion/registry
   （`dreamid_omni`, `pipeline_dreamid_omni`, `DreamIDOmniPipeline`）,post
   `get_dreamid_omni_post_process_func`。单 stage diffusion,引擎默认 stage
   配置（[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
-- 联合音频+视频身份保持生成,以 Wan2.2 为骨架的**独立实现**（家族内自带
-  `wan2_2.py`：TP 优化 `WanSelfAttention` + 跨 TP rank 求全局 RMS 的
-  `DistributedRMSNorm`）;Wan 家族本体见 [wan2-2](../wan2-2/_index.md)。
+- 联合音频+视频身份保持生成:家族目录内含 TP 优化的 Wan2.2 相关实现
+  （`wan2_2.py`：`WanSelfAttention` + 跨 TP rank 求全局 RMS 的
+  `DistributedRMSNorm`）,但整体**硬依赖树外 `dreamid_omni` 包**（见下）;
+  Wan 家族本体见 [wan2-2](../wan2-2/_index.md)。
 - 依赖共享模块：[Diffusion 组件](../../components/diffusion/_index.md)。
 
 ## 结构与要点

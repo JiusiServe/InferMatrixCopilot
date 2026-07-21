@@ -31,8 +31,10 @@ sources: [vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_talker.p
 - checkpoint（文档/示例记载,deploy YAML 均不 pin）：v2
   `bosonai/higgs-audio-v2-generation-3B-base`,v3
   `bosonai/higgs-audio-v3-tts-4b`。
-- prompt 形态不同：v2 走上游 HF processor（字节级一致的 system prompt;
-  多说话人/`profile:`/长文分块被显式拒绝 4xx）;v3 用
+- prompt 形态不同：v2 走上游 HF processor——支持零样本 + 浅层声音克隆
+  （`build_voice_clone_prompt`,字节级一致的 system prompt）,但
+  `ref_audio_in_system_message`/多说话人/`profile:`/长文分块被显式拒绝
+  4xx;v3 用
   `<|tts|>/<|ref_text|>/<|ref_audio|>/<|text|>/<|audio|>` 模板,参考音频用
   `-100` 占位符在 prefill 换成 delay 编码后的融合嵌入。
 - v3 config 从 checkpoint tokenizer 解析特殊 token 与 eos（缺失即 raise）。

@@ -27,7 +27,7 @@ sources: [vllm_omni/diffusion/models/dreamzero/, vllm_omni/deploy/dreamzero.yaml
   `"dit"`）。**单一 registry 架构,无 T2V/I2V/DMD2 分支**——变体只有 deploy
   两份与数据侧 embodiment 变换（droid/roboarena,都映射 OXE_DROID,按请求
   `robot_obs["embodiment"]` 回退 `default_robot_embodiment` 选择）。
-- **换引擎（本次清单调查中唯一确认）**：`dreamzero.yaml` 声明
+- **换引擎**：`dreamzero.yaml` 显式选择
   `engine_backend: …experimental.ar_diffusion.engine.ARDiffusionEngine`
   （引擎级分页 KV;pipeline 自述 "engine-only"——所有自注意力 KV 由
   AR-Diffusion runner 注入）。
@@ -58,13 +58,14 @@ sources: [vllm_omni/diffusion/models/dreamzero/, vllm_omni/deploy/dreamzero.yaml
   `vae/` 指向 Wan2.1 diffusers VAE。
 - 两份 deploy：`dreamzero.yaml`（单卡,step_cache 开,
   `velocity_sim_thresholds [0.95, 0.93]`）与 `dreamzero_tp1_cfg2.yaml`
-  （双卡 CFG-parallel;**此文件缺 `engine_backend:` 行**,与默认 YAML 不一致
-  ——引擎是否经其他路径仍被选中 pin 上未追清,评审改这两份 YAML 时先澄清）。
+  （双卡,`tensor_parallel_size: 1` + `cfg_parallel_size: 2`,两卡分跑
+  正/负 CFG 分支;**此文件缺 `engine_backend:` 行**,与默认 YAML 不一致——
+  引擎是否经其他路径仍被选中 pin 上未追清,评审改这两份 YAML 时先澄清）。
 - 关键默认（`utils.py`）：16 步、CFG 5.0、sigma_shift 5.0、seed 1140、
   内置长负向 prompt、embodiment 名→id 表。
 
 ## 什么时候查这里
 
-- 审查 dreamzero 的引擎交互、会话/KV 语义或 step-cache 阈值;本次调查中
-  AR-Diffusion 引擎的已确认使用方只有本家族,引擎改动至少拿它做回归。
+- 审查 dreamzero 的引擎交互、会话/KV 语义或 step-cache 阈值;它显式选用
+  AR-Diffusion 引擎,引擎改动拿它做回归。
 - 语义验收见 [model-validation](../../review/guides/model-validation.md)。

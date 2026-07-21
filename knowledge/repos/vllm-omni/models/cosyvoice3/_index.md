@@ -13,9 +13,9 @@ sources: [vllm_omni/model_executor/models/cosyvoice3/, vllm_omni/deploy/cosyvoic
 
 ## 名称与范围
 
-- 正式名称 CosyVoice3（FunAudioLLM;示例注释默认
+- CosyVoice3（FunAudioLLM;示例注释默认
   `FunAudioLLM/Fun-CosyVoice3-0.5B-2512`,YAML 不 pin）,代码/pipeline 标识
-  `cosyvoice3`,无其他别名。
+  `cosyvoice3`。
 - **单 registry 入口服务两个 stage**：`CosyVoice3Model`
   →（`cosyvoice3`, `cosyvoice3`）,`__init__` 按 `model_stage` 分发
   （`cosyvoice3_talker` → Qwen2 系 LM;`cosyvoice3_code2wav` → CFM+DiT+HiFT;
@@ -28,9 +28,12 @@ sources: [vllm_omni/model_executor/models/cosyvoice3/, vllm_omni/deploy/cosyvoic
 - DiT 估计器住在 `diffusion/models/cosyvoice3_audio/cosyvoice3_dit.py` 但
   **不在 diffusion registry**——被 code2wav 直接 import（借 diffusion
   Attention 优化后端,绕开 registry;pin 上唯一 importer）。
-- 入口路径：拓扑 `model_executor/models/cosyvoice3/pipeline.py`;桥
+- 入口路径：registry `vllm_omni/model_executor/models/registry.py` 与
+  `vllm_omni/config/pipeline_registry.py`;拓扑
+  `model_executor/models/cosyvoice3/pipeline.py`;桥
   `model_executor/stage_input_processors/cosyvoice3.py`;serving 适配
-  `entrypoints/openai/tts_adapters/cosyvoice3.py`;TRT
+  `entrypoints/openai/tts_adapters/cosyvoice3.py`
+  （`CosyVoice3Adapter`,`stage_keys={"cosyvoice3_talker"}`）;TRT
   `flow_estimator_trt.py`/`speaker_embedding_trt.py`。
 - 依赖共享模块：[Diffusion 组件](../../components/diffusion/_index.md)的
   Attention 层、SharedMemoryConnector（stage 间码流）、

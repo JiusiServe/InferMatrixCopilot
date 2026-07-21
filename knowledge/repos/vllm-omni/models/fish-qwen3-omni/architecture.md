@@ -53,10 +53,10 @@ sources: [vllm_omni/model_executor/models/fish_speech/fish_speech_slow_ar.py, vl
 
 - 单测：`tests/attention/test_fish_kvcache_attn.py`、
   `tests/model_executor/stage_input_processors/test_fish_speech_async_chunk.py`;
-  **无 e2e expansion 测试**（pin 上）——行为验证走
-  `examples/offline_inference/text_to_speech/fish_speech/end2end.py` 与
-  serving 示例;speaker cache 基准
-  `benchmarks/fish-speech/bench_speaker_cache.py`;recipe
+  **无 e2e expansion 测试**（pin 上）——示例提供功能/手工验证
+  （`examples/offline_inference/text_to_speech/fish_speech/end2end.py` 与
+  serving 示例）,基准 `benchmarks/fish-speech/bench_speaker_cache.py` **只
+  覆盖 speaker cache**;pin 上无专门的精度或全链路性能测试。recipe
   `recipes/fishaudio/Fish-Speech-S2-Pro.md`。
 - 已知未决：`fish_speech_dac_max_batch: 0` 的语义（无限 vs 关闭）未追;
   `fish_speech_single_initial_chunk` 与 `initial_codec_chunk_frames: 4` 的
