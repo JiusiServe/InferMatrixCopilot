@@ -1,0 +1,68 @@
+---
+title: "GR00T N1.7（机器人 VLA,actions 输出,OpenPI websocket）"
+created: 2026-07-21
+updated: 2026-07-21
+type: index
+tags: [vllm-omni, models, diffusion]
+sources: [vllm_omni/diffusion/models/gr00t/, vllm_omni/deploy/Gr00tN1d7.yaml, vllm_omni/entrypoints/openpi/serving.py]
+---
+
+# GR00T N1.7
+
+以下事实在 `main @ 5d44868e` 复核。
+
+## 名称与范围
+
+- 正式名称 NVIDIA GR00T-N1.7-3B(测试用 `nvidia/GR00T-N1.7-3B`,YAML 不
+  pin）;代码标识区分:model_type/pipeline key `Gr00tN1d7`,pipeline 类
+  `Gr00tN1d7Pipeline`,家族目录 `gr00t`。Qwen3-VL
+  （`nvidia/Cosmos-Reason2-2B`）backbone + 流匹配动作头,以单 "diffusion"
+  stage 服务,输出**机器人动作块而非媒体**（`final_output_type="actions"`,
+  本次 registry 调查中唯一）。
+- **pipeline key 是 CamelCase `Gr00tN1d7`**（随 model_type,其他家族都是
+  snake_case——grep/key 清单注意）;入口路径:diffusion registry
+  `vllm_omni/diffusion/registry.py`（`Gr00tN1d7Pipeline` →
+  （`gr00t`, `pipeline_gr00t`））、`vllm_omni/config/pipeline_registry.py`
+  （`OMNI_PIPELINES["Gr00tN1d7"]`）、拓扑
+  `model_executor/models/gr00t/pipeline.py`（单 stage DIFFUSION,
+  `model_arch="Gr00tN1d7Pipeline"`,`hf_architectures=("Gr00tN1d7",)`,
+  `final_output=True`,无 connectors）;无 pre/post-process、无 AR 入口、无
+  stage input processor。
+- serving 面**不是 OpenAI chat**：OpenPI websocket
+  `/v1/realtime/robot/openpi`（`entrypoints/openpi/serving.py`,
+  msgpack-numpy 传输）;观测经
+  `sampling_params.extra_args["robot_obs"]` 进入。相关家族:
+  [internvla-a1](../internvla-a1/_index.md)（独立目录/独立实现）。
+- 依赖共享模块：diffusion worker 管线
+  （[Diffusion 组件](../../components/diffusion/_index.md)）、
+  [Config 组件](../../components/config/architecture.md)。
+
+## 目录内容
+
+| 遇到什么 | 查看哪里 | 说明 |
+|---|---|---|
+| 自加载权重、handshake 合同、多 embodiment 权重库 | [architecture](architecture.md) | 数据流与 reviewer 陷阱 |
+
+## 配置与 checkpoint 差异
+
+- 单 key/单类/单 deploy;运行期变体轴：`embodiment_tag`（按机器人动作
+  空间,对 checkpoint `modality_configs` 校验,posttrain/finetune-only tag 在
+  基座模型上带提示拒绝）、`use_alternate_vl_dit`、
+  `backbone_model_type`/`model_name`（backbone 选择,pin 上只有 Qwen3-VL
+  路有具体类）、`Gr00tPolicy` 的 `strict` 校验开关。另有确定性控制
+  `GR00T_NOISE_SEED`（种子化采样噪声,e2e 以 max_diff=0.0 对齐 Isaac-GR00T
+  ZMQ 参考值）。
+- `Gr00tN1d7.yaml`：**`async_chunk: false` 是必须的**——deploy 校验器拒绝
+  单 stage pipeline 的默认 true（新增单 stage 家族的常见 rebase 坑,YAML 头
+  注明示）;`policy_server_config` 是**客户端 handshake 合同**,启动时
+  horizon/action_keys/embodiment_tag 对 checkpoint 快速失败校验,但
+  `supported_embodiments` 列表原样下发**不校验**（陈旧列表会虚假宣传）。
+- transformers 下限陷阱：`qwen3_vl` 需要 ≥4.57.1（仓库下限 4.56.0,显式
+  ImportError 提示）。
+
+## 什么时候查这里
+
+- 审查 gr00t 的观测协议、embodiment 校验或 handshake 合同;transformers
+  升级/降级 PR 把本家族列入回归点。
+- **pin 上无 examples**——行为参考只有 deploy 注释与 e2e 测试。语义验收见
+  [model-validation](../../review/guides/model-validation.md)。

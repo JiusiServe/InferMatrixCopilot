@@ -1,0 +1,55 @@
+---
+title: "Fish Speech S2 Pro（fish_qwen3_omni,双 AR 单 stage）"
+created: 2026-07-21
+updated: 2026-07-21
+type: index
+tags: [vllm-omni, models]
+sources: [vllm_omni/model_executor/models/fish_speech/, vllm_omni/attention/fish_kvcache_attn.py, vllm_omni/deploy/fish_qwen3_omni.yaml]
+---
+
+# Fish Speech S2 Pro（fish_qwen3_omni）
+
+以下事实在 `main @ 5d44868e` 复核。
+
+## 名称与范围
+
+- 命名三层：HF `model_type` = `fish_qwen3_omni`（registry key/deploy 文件名
+  随它）;源码目录 `fish_speech`;checkpoint `fishaudio/s2-pro`。AutoConfig
+  注册 shim（`transformers_utils/configs/fish_speech.py`）绑三个 model_type
+  串——**漂移会在 vLLM 启动前就断加载**。
+- AR registry：`FishSpeechSlowARForConditionalGeneration` +
+  `FishSpeechDACDecoder`;**Fast AR 不注册**——嵌在 Slow AR 内
+  （`talker_mtp`,私有非分页 KV）。
+- pipeline key `fish_qwen3_omni`：Slow AR（LLM_AR,文本→RVQ 码）→ DAC
+  decoder（LLM_GENERATION,音频）。**stage 分界是 AR vs DAC 声码器,不是
+  slow-vs-fast AR**;只有 async-chunk 路径,无 sync 处理器。
+- 依赖共享模块：`utils/speaker_cache`（克隆参考音频 DAC 编码进程内完成）、
+  [Config 组件](../../components/config/architecture.md);**全家族唯一自带
+  attention 内核的**:`vllm_omni/attention/fish_kvcache_*`（Triton,
+  `VLLM_OMNI_FISH_KVCACHE_ATTN` 默认开,1024 token 长短路径分割）。
+
+## 目录内容
+
+| 遇到什么 | 查看哪里 | 说明 |
+|---|---|---|
+| 双 AR 结构、背压自适应流式、部署矩阵 | [architecture](architecture.md) | 数据流与 reviewer 陷阱 |
+
+## 配置与 checkpoint 差异（4 份 deploy）
+
+- 共同硬约束：`enable_chunked_prefill: false`（SlowAR 解码环不
+  chunked-prefill 安全）→ 被迫 `max_num_batched_tokens == max_model_len ==
+  16384`。
+- `fish_qwen3_omni.yaml`（1×H20 验证,4/1 并发;唯一带 XPU override）;
+  `_2gpu.yaml`（H100×2,DAC 上卡 1,轮询 10 ms→1 ms）;
+  `high_concurrency_single_gpu.yaml`（64/64 并发,**DAC 仍在卡 0**）与
+  `high_concurrency_dual_gpu.yaml`（同 knob 组,**DAC 移到卡 1** 消除
+  AR/DAC 干扰）——两份共享专属 knob 组:`fish_speech_tensor_codes`、
+  backlog 自适应 50 帧@0.75 负载、fp16 DAC。
+- **pin 上没有 fish 的 e2e 测试**（只有 SIP 与 attention 单测）——改动本家族
+  的行为验证要靠示例/手工,评审时把"绿测"当弱信号。
+
+## 什么时候查这里
+
+- 审查 fish 的 KV 注意力、背压流式或 chunked-prefill 约束改动;上调并发前
+  先读 high_concurrency YAML 的 knob 语义。
+- 语义验收见 [model-validation](../../review/guides/model-validation.md)。

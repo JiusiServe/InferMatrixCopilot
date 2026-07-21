@@ -1,0 +1,68 @@
+---
+title: "GR00T N1.7 架构"
+created: 2026-07-21
+updated: 2026-07-21
+type: architecture
+tags: [vllm-omni, models, diffusion]
+sources: [vllm_omni/diffusion/models/gr00t/pipeline_gr00t.py, vllm_omni/diffusion/models/gr00t/policy.py, vllm_omni/diffusion/models/gr00t/modeling/gr00t_n1d7.py, vllm_omni/deploy/Gr00tN1d7.yaml]
+---
+
+# GR00T N1.7 架构
+
+事实在 `main @ 5d44868e` 复核;入口/坑位速览见 [index](_index.md)。
+
+## 模型专有部分与共享模块的边界
+
+- 服务包装 `Gr00tN1d7Pipeline`：读 `robot_obs`（video/images、state、
+  language/prompt 两种键都接受;`_normalize_observation`）,
+  `extra_args["reset"]` 触发 `policy.reset()`;返回
+  `DiffusionOutput(output={"actions": dict[str, np.float32 ndarray]})`
+  （把动作放进 `output` 以通过引擎空输出守卫——与 DreamZero OpenPI 策略
+  同形）。
+- **自加载权重（比 SoulX 更严格）**：`weights_sources=()` 且 `load_weights`
+  喂张量直接 raise——`Gr00tPolicy` 自己 `AutoModel.from_pretrained`（bf16）;
+  框架 loader 必须置身事外。
+- backbone `_Qwen3VLBackbone`：`Qwen3VLForConditionalGeneration` 截到
+  `select_layer=12` 层并**丢 `lm_head`**（纯特征提取,省 ~0.58 GiB）。
+- 动作头 `Gr00tN1d7ActionHead`：流匹配 DiT（默认 `AlternateVLDiT`,每 2 块
+  attend 一次文本）;**多 embodiment 权重库**——`CategorySpecificMLP`/
+  `MultiEmbodimentActionEncoder` 按 embodiment 索引参数（上限 32）,
+  `EMBODIMENT_TAG_TO_PROJECTOR_INDEX` 定投影槽。
+- dataio 层：`StateActionProcessor`（minmax/meanstd 归一化,按 embodiment
+  keyed norm params）、`ActionChunk` 家族（相对/绝对关节/EEF 表示）、
+  `EmbodimentTag` enum（POSTTRAIN/FINETUNE_ONLY 分级）。
+
+## 配置、checkpoint 和兼容范围
+
+- 默认:horizon 40、state/action 维上限 132、**4 步**流匹配去噪、DiT 16 层
+  32 头。processor 随 checkpoint（`processor/` 子目录,AutoProcessor 兜底）;
+  eval 图像 256×256 letterbox,对客户端宣告 `image_resolution [180,320]`。
+- `policy_server_config` 三项（horizon/action_keys/embodiment_tag）启动时对
+  checkpoint 校验;`supported_embodiments`（11 tag）**不校验**——改 YAML 时
+  自查。
+- 确定性:`GR00T_NOISE_SEED` 种子化采样噪声——位级可复现是 e2e 的断言基础。
+
+## 从输入到输出的主要流程
+
+1. OpenPI 客户端经 websocket 发观测（msgpack-numpy;`needs_session_id`）;
+   serving 层转成引擎请求,观测进 `extra_args["robot_obs"]`。
+2. processor 校验/变换观测（只用第一个 language key）→ backbone 提特征 →
+   动作头 4 步流匹配去噪。
+3. `StateActionProcessor` 反归一化到真实单位,`ActionChunk` 转表示;DROID
+   embodiment 输出 `eef_9d`/`gripper_position`/`joint_position`,形状
+   `[batch, 40, dim]`;warmup/dummy 请求按 norm params 出零动作块。
+
+## 怎样验证功能、精度和性能
+
+pin 上有**位级回归**（对 Isaac-GR00T ZMQ 参考值 max_diff=0.0)——这是行为
+正确性 gate;无性能 gate;examples 缺失。
+
+- e2e：`tests/e2e/online_serving/test_gr00t_openpi.py`
+  （`GR00T_NOISE_SEED=42`,init 1200 s/stage 900 s,缺 `websockets`+
+  `openpi_client` 即跳过）;测试客户端 `tests/gr00t/openpi_client_helper.py`;
+  单测 `tests/diffusion/models/gr00t/test_pipeline.py`（stub policy,观测
+  归一化/错误路径）;语义验收方法见
+  [model-validation](../../review/guides/model-validation.md)。
+- 已知未决：`Gr00tPolicy.get_action` 可能返回 tuple 的第二元素语义;
+  backbone config 是否需网络拉取 `nvidia/Cosmos-Reason2-2B`;
+  `embodiment_configs.py` 只有类型转出、无表格的意图。
