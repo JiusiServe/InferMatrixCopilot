@@ -87,6 +87,11 @@ class Executor:
         progress = self._load_progress()
         outcome = RunOutcome(status="done")
         state.setdefault("playbook", playbook.name)
+        # Run-scoped params (CLI `--task-param`, or intent-derived) reach every
+        # step. Without this a step's `ctx.params.get(...)` only ever saw the
+        # playbook's own step params, so `--task-param limit=5` was silently
+        # dropped and issue.fetch kept its default of 20.
+        task_params = (state.get("task_spec") or {}).get("params") or {}
 
         for pstep in playbook.steps:
             if pstep.when:
@@ -122,8 +127,12 @@ class Executor:
                 items = [items]
 
             _t0 = time.monotonic()
+            # A playbook's own step params are authored invariants — several are
+            # safety-bearing (`force_push`, `pre_push`) — so they override the
+            # run-scoped ones rather than the other way round.
+            step_params = {**task_params, **pstep.params}
             results = await asyncio.gather(
-                *(self._run_step(spec, pstep.params, state, item) for item in items)
+                *(self._run_step(spec, step_params, state, item) for item in items)
             )
             result = _merge(results)
             outcome.step_results[pstep.id] = result

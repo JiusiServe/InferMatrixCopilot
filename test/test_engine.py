@@ -42,6 +42,45 @@ def test_sequential_execution_and_outputs(env):
     assert outcome.step_results["b"].summary == "got 1"
 
 
+def test_task_params_reach_steps(env):
+    """`--task-param K=V` lands on the TaskSpec; it must also reach a step's
+    `ctx.params`, which previously only ever saw the playbook's step params."""
+    registry, executor, _ = env
+    seen = {}
+    registry.register(make_step("s.one", lambda ctx: (seen.update(ctx.params),
+                       StepResult(True, summary="ok"))[1]))
+    pb = playbook([PlaybookStep("a", "s.one")])
+    outcome = asyncio.run(executor.run(
+        pb, {"task_spec": {"params": {"limit": 5}}}))
+    assert outcome.status == "done"
+    assert seen["limit"] == 5
+
+
+def test_playbook_step_params_override_task_params(env):
+    """Step params are authored invariants — several are safety-bearing
+    (`force_push`, `pre_push`) — so a global task param must not flip them."""
+    registry, executor, _ = env
+    seen = {}
+    registry.register(make_step("s.one", lambda ctx: (seen.update(ctx.params),
+                       StepResult(True, summary="ok"))[1]))
+    pb = playbook([PlaybookStep("a", "s.one", params={"force_push": False})])
+    outcome = asyncio.run(executor.run(
+        pb, {"task_spec": {"params": {"force_push": True, "limit": 5}}}))
+    assert outcome.status == "done"
+    assert seen["force_push"] is False   # step wins
+    assert seen["limit"] == 5            # non-conflicting task param still flows
+
+
+def test_missing_task_spec_params_is_not_fatal(env):
+    registry, executor, _ = env
+    seen = {}
+    registry.register(make_step("s.one", lambda ctx: (seen.update({"n": len(ctx.params)}),
+                       StepResult(True, summary="ok"))[1]))
+    pb = playbook([PlaybookStep("a", "s.one")])
+    assert asyncio.run(executor.run(pb, {})).status == "done"
+    assert seen["n"] == 0
+
+
 def test_checkpoint_resume_skips_completed(env):
     registry, executor, _ = env
     counter = {"n": 0}

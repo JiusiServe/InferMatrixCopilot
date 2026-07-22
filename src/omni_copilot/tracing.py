@@ -295,7 +295,13 @@ def report(trace_path: os.PathLike | str) -> str:
         prompts = [s["attr"].get("prompt_tokens", 0) for s in llm]
         comps = [s["attr"].get("completion_tokens", 0) for s in llm]
         cache_read = sum(s["attr"].get("cache_read_tokens", 0) for s in llm)
-        total_in = sum(prompts) or 1
+        cache_write = sum(s["attr"].get("cache_creation_tokens", 0) for s in llm)
+        # `prompt_tokens` is the *uncached* prefill: Anthropic (and the
+        # Anthropic-compatible DeepSeek endpoint) report input_tokens EXCLUDING
+        # cache_read_input_tokens / cache_creation_input_tokens. The cache-hit
+        # denominator is therefore the whole prefill, not just that remainder —
+        # dividing by sum(prompts) alone yields ratios well over 100%.
+        total_in = (sum(prompts) + cache_read + cache_write) or 1
         inflight = [s["attr"].get("inflight", 1) for s in llm]
         lines.append("\nLLM (inference-engine view)")
         lines.append(f"  calls              {len(llm)}")
@@ -313,7 +319,12 @@ def report(trace_path: os.PathLike | str) -> str:
     sinks = sorted(spans, key=lambda s: s.get("dur_ms", 0), reverse=True)
     lines.append("\nTop time sinks")
     for s in sinks[:8]:
-        label = s["attr"].get("label") or s["attr"].get("tool") or s["attr"].get("model") or ""
+        a = s["attr"]
+        # every span kind names itself under a different key — `step` spans
+        # carry `step`, `phase` spans `phase`, so a tool/model-only lookup
+        # rendered the biggest sinks (whole steps) as blank rows.
+        label = (a.get("label") or a.get("step") or a.get("tool")
+                 or a.get("phase") or a.get("model") or "")
         lines.append(f"  {s['name']:<8} {s['dur_ms']/1000:>7.1f}s  {label}")
     return "\n".join(lines)
 
