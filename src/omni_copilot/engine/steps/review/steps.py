@@ -117,6 +117,22 @@ async def _review_diff(ctx: StepContext) -> StepResult:
         except OSError:
             pass
 
+    # Evaluation and embedding callers may append task-specific guidance while
+    # keeping the production prompt unchanged by default. This is deliberately
+    # state-driven so the public step signature and playbooks stay stable.
+    extra_guidance = str(ctx.state.get("review_extra_guidance") or "").strip()
+    if extra_guidance:
+        guidance += "\n\n" + extra_guidance
+
+    # Production uses live GitHub read tools. Offline evaluation injects a
+    # benchmark-owned read-only tool set over the frozen worktree instead.
+    injected_tools = ctx.state.get("review_extra_tools")
+    review_tools = (
+        injected_tools
+        if isinstance(injected_tools, dict)
+        else _gh_read_tools(_repo_path(ctx))
+    )
+
     common = dict(
         step_name="agent.review_diff",
         purpose=f"Review PR #{spec.get('pr')} like an engaged maintainer: "
@@ -128,10 +144,15 @@ async def _review_diff(ctx: StepContext) -> StepResult:
                   "gate_report": ctx.state.get("gate_report", ""),
                   "sweep_targets": _sweep_targets(str(diff), language)},
         output_extension={"review_comments":
-                          "list of {file, line, severity: blocker|major|minor|nit, "
-                          "comment, evidence}"},
-        extra_tools=_gh_read_tools(_repo_path(ctx)),
+                          "list of {file, line, severity: critical|blocker|major|minor|nit, "
+                          "category: correctness|compatibility_api|concurrency|"
+                          "performance_resource|security_safety|test|documentation|"
+                          "maintainability, comment, evidence}"},
+        extra_tools=review_tools,
     )
+    injected_scope = ctx.state.get("review_tool_scope")
+    if injected_scope is not None:
+        common["scope"] = injected_scope
     plan = None
     if not ctx.settings.review_ensemble:   # legacy kill-switch: single pass
         result, output = await run_agent_step(ctx, **common)

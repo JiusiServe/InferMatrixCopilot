@@ -25,6 +25,12 @@ from .reports import (
 )
 from .repository.cache import RepositoryCache
 from .runner.evaluation_runner import run_benchmark
+from .subjects.factory import load_and_build_agent_adapter
+from .subjects.matrix import (
+    adjudicate_experiment_matrix,
+    run_experiment_matrix,
+    score_experiment_matrix,
+)
 from .storage import RunBundle
 
 
@@ -68,16 +74,71 @@ def command_benchmark_validate(args: argparse.Namespace) -> int:
 
 
 def command_run(args: argparse.Namespace) -> int:
-    adapter = _load_object(args.adapter)
+    if args.agent_config:
+        config, adapter = load_and_build_agent_adapter(args.agent_config)
+        model = args.model or getattr(adapter, "model", config.model)
+        prompt_version = (
+            args.prompt_version
+            if args.prompt_version != "unknown"
+            else config.prompt_version
+        )
+        model_parameters = config.model_parameters
+    else:
+        adapter = _load_object(args.adapter)
+        model = args.model
+        prompt_version = args.prompt_version
+        model_parameters = {}
     output = run_benchmark(
         manifest_path=args.manifest,
         repository_cache=args.repository_cache,
         output_dir=args.output,
         adapter=adapter,
-        model=args.model,
-        prompt_version=args.prompt_version,
+        model=model,
+        model_parameters=model_parameters,
+        prompt_version=prompt_version,
         benchmark_filter=set(args.benchmark_id) if args.benchmark_id else None,
     )
+    print(output)
+    return 0
+
+
+def command_run_matrix(args: argparse.Namespace) -> int:
+    output = run_experiment_matrix(
+        matrix_path=args.matrix,
+        manifest_path=args.manifest,
+        repository_cache=args.repository_cache,
+        output_root=args.output,
+        benchmark_filter=set(args.benchmark_id) if args.benchmark_id else None,
+    )
+    print(output)
+    return 0
+
+
+def command_adjudicate_matrix(args: argparse.Namespace) -> int:
+    output = adjudicate_experiment_matrix(
+        matrix_run_root=args.matrix_run_root,
+        manifest_path=args.manifest,
+        repository_cache=args.repository_cache,
+        judge_specs=args.judge,
+        round2_judge_specs=args.round2_judge,
+    )
+    print(output)
+    return 0
+
+
+def command_score_matrix(args: argparse.Namespace) -> int:
+    output = score_experiment_matrix(
+        matrix_run_root=args.matrix_run_root,
+        manifest_path=args.manifest,
+        output_dir=args.output,
+    )
+    print(output)
+    return 0
+
+
+def command_repository_import(args: argparse.Namespace) -> int:
+    cache = RepositoryCache(args.repository_cache)
+    output = cache.import_local(args.repo, args.source)
     print(output)
     return 0
 
@@ -196,7 +257,7 @@ def command_replicates(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="python -m eval.pr_review")
+    parser = argparse.ArgumentParser(prog="python -m eval.tasks.pr_review")
     commands = parser.add_subparsers(dest="command", required=True)
 
     benchmark = commands.add_parser("benchmark")
@@ -217,15 +278,53 @@ def build_parser() -> argparse.ArgumentParser:
     validate.add_argument("--skip-hashes", action="store_true")
     validate.set_defaults(func=command_benchmark_validate)
 
+    repository = commands.add_parser("repository")
+    repository_commands = repository.add_subparsers(
+        dest="repository_command", required=True
+    )
+    repository_import = repository_commands.add_parser("import-local")
+    repository_import.add_argument("--repo", required=True)
+    repository_import.add_argument("--source", required=True)
+    repository_import.add_argument("--repository-cache", required=True)
+    repository_import.set_defaults(func=command_repository_import)
+
     run = commands.add_parser("run")
     run.add_argument("--manifest", required=True)
     run.add_argument("--repository-cache", required=True)
-    run.add_argument("--adapter", required=True, help="module:object implementing AgentAdapter")
+    adapter_group = run.add_mutually_exclusive_group(required=True)
+    adapter_group.add_argument(
+        "--adapter", help="module:object implementing AgentAdapter"
+    )
+    adapter_group.add_argument(
+        "--agent-config", help="versioned evaluated-agent YAML configuration"
+    )
     run.add_argument("--output", required=True)
     run.add_argument("--model", default="")
     run.add_argument("--prompt-version", default="unknown")
     run.add_argument("--benchmark-id", action="append")
     run.set_defaults(func=command_run)
+
+    matrix = commands.add_parser("run-matrix")
+    matrix.add_argument("--matrix", required=True)
+    matrix.add_argument("--manifest", required=True)
+    matrix.add_argument("--repository-cache", required=True)
+    matrix.add_argument("--output", required=True)
+    matrix.add_argument("--benchmark-id", action="append")
+    matrix.set_defaults(func=command_run_matrix)
+
+    adjudicate_matrix = commands.add_parser("adjudicate-matrix")
+    adjudicate_matrix.add_argument("--matrix-run-root", required=True)
+    adjudicate_matrix.add_argument("--manifest", required=True)
+    adjudicate_matrix.add_argument("--repository-cache", required=True)
+    adjudicate_matrix.add_argument("--judge", action="append", required=True)
+    adjudicate_matrix.add_argument("--round2-judge", action="append")
+    adjudicate_matrix.set_defaults(func=command_adjudicate_matrix)
+
+    score_matrix = commands.add_parser("score-matrix")
+    score_matrix.add_argument("--matrix-run-root", required=True)
+    score_matrix.add_argument("--manifest", required=True)
+    score_matrix.add_argument("--output")
+    score_matrix.set_defaults(func=command_score_matrix)
 
     adjudicate = commands.add_parser("adjudicate")
     adjudicate.add_argument("--manifest", required=True)

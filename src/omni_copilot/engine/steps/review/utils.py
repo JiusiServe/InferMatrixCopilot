@@ -9,7 +9,7 @@ files) so lens coverage never depends on a model re-enumerating the diff.
 
 from __future__ import annotations
 
-_SEVERITY_ORDER = {"blocker": 0, "major": 1, "minor": 2, "nit": 3}
+_SEVERITY_ORDER = {"critical": 0, "blocker": 1, "major": 2, "minor": 3, "nit": 4}
 
 
 def _sweep_targets(diff: str, language: str = "python") -> str:
@@ -106,7 +106,7 @@ def _render_review_md(output: dict) -> str:
         return any(m in hay for m in ("uncertain", "unverified", "could not verify",
                                       "cannot verify", "budget exhaust",
                                       "not able to confirm"))
-    blocking = any(str(c.get("severity", "")).lower() in ("blocker", "major")
+    blocking = any(str(c.get("severity", "")).lower() in ("critical", "blocker", "major")
                    and not _uncertain(c) for c in comments)
     if blocking:
         verdict = "REQUEST CHANGES"

@@ -1,0 +1,24 @@
+schema_version: pr-review-agent-config-v0.1
+name: copilot-with-vllm-omni-review
+kind: copilot_with_skill
+version: omni-copilot-pr-review-v6-plus-vllm-omni-review-eval-v0.1
+model: ''
+model_family: anthropic-compatible
+prompt_version: pr-review-output-v0.1
+model_parameters: {}
+max_iters: 20
+copilot:
+  review_depth: auto
+  review_ensemble: true
+  profile_briefing_enabled: true
+  builtin_skills_enabled: true
+  review_max_iters: 12
+  ensemble_lens_max_iters: 10
+  ensemble_parallel: true
+  ensemble_stagger_seconds: 0.0
+skill:
+  path: ../../../resources/skills/vllm-omni-review/SKILL.md
+  sha256: f985a1383bbff2e6ce46c77c28017e05887dd2acc2dfce5e94df1af3e4b19469
+  source_repository: hsliuustc0106/vllm-omni-skills
+  source_ref: a66fe5bd7fb753ee566fc9133d02cbb6b40521ad
+  source_blob_sha: c7820bb3afdc54dd2bef8b972022fbd72c19ae42

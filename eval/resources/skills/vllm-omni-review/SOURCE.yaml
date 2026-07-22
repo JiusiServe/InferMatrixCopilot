@@ -1,0 +1,10 @@
+schema_version: external-skill-source-v0.1
+repository: hsliuustc0106/vllm-omni-skills
+ref: a66fe5bd7fb753ee566fc9133d02cbb6b40521ad
+path: skills/vllm-omni-review/SKILL.md
+git_blob_sha: c7820bb3afdc54dd2bef8b972022fbd72c19ae42
+sha256: f985a1383bbff2e6ce46c77c28017e05887dd2acc2dfce5e94df1af3e4b19469
+frozen_at: '2026-07-17'
+notes: >-
+  The experiment intentionally evaluates the root SKILL.md only. Referenced
+  companion files are not injected into the skill-only arm.

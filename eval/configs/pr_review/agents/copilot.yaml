@@ -1,0 +1,18 @@
+schema_version: pr-review-agent-config-v0.1
+name: copilot
+kind: copilot
+version: omni-copilot-pr-review-v6-eval-v0.1
+model: ''
+model_family: anthropic-compatible
+prompt_version: pr-review-output-v0.1
+model_parameters: {}
+max_iters: 20
+copilot:
+  review_depth: auto
+  review_ensemble: true
+  profile_briefing_enabled: true
+  builtin_skills_enabled: true
+  review_max_iters: 12
+  ensemble_lens_max_iters: 10
+  ensemble_parallel: true
+  ensemble_stagger_seconds: 0.0

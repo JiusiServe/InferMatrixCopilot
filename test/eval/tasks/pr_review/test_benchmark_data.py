@@ -36,7 +36,9 @@ def test_frozen_pilot_uses_full_shas_and_hashes_every_item():
     assert all(len(item.base_sha) == 40 and len(item.head_sha) == 40 for item in items)
     assert all(entry.sha256 for entry in manifest.entries)
     for entry in manifest.entries:
-        assert sha256_file(MANIFEST.parent / entry.item) == entry.sha256
+        item_path = MANIFEST.parent / entry.item
+        assert sha256_file(item_path) == entry.sha256
+        assert b"\r\n" not in item_path.read_bytes(), "frozen items must remain LF-only"
 
 
 def test_clean_items_have_private_certification_and_no_gt():

@@ -1,0 +1,5 @@
+# Frozen benchmark hashes are byte-level contracts. Keep text snapshots stable
+# across Windows and Unix checkouts.
+eval/data/pr_review/benchmarks/**/*.yaml text eol=lf
+eval/data/pr_review/benchmarks/**/*.json text eol=lf
+eval/data/pr_review/benchmarks/**/*.md text eol=lf

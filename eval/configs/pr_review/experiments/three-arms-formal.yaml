@@ -1,0 +1,7 @@
+schema_version: pr-review-experiment-matrix-v0.1
+name: pr-review-three-arms-formal
+agents:
+  - ../agents/copilot.yaml
+  - ../agents/copilot-with-vllm-omni-review.yaml
+  - ../agents/vllm-omni-review-only.yaml
+repetitions: 3
