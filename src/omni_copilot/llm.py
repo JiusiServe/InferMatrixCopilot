@@ -118,6 +118,10 @@ class LLM:
         with tracing.span("llm", model=kwargs["model"],
                           n_tools=len(kwargs["tools"]),
                           **({"role": role} if role else {})) as _sp:
+            tracing.event("llm.request", span=_sp, model=kwargs["model"],
+                          n_tools=len(kwargs["tools"]), role=role or "",
+                          system=kwargs.get("system", ""),
+                          payload=tracing.summarize_messages(kwargs["messages"]))
             if on_text is not None:
                 with self._client.messages.stream(**kwargs) as stream:
                     for delta in stream.text_stream:
@@ -134,6 +138,11 @@ class LLM:
                 blocks.append(Block(type="text", text=b.text))
             elif b.type == "tool_use":
                 blocks.append(Block(type="tool_use", id=b.id, name=b.name, input=dict(b.input)))
+        tracing.event("llm.response", span=_sp,
+                      stop_reason=resp.stop_reason or "end_turn",
+                      text="".join(b.text for b in blocks if b.type == "text"),
+                      tool_calls=[{"name": b.name, "id": b.id, "input": b.input}
+                                  for b in blocks if b.type == "tool_use"])
         usage = None
         if getattr(resp, "usage", None) is not None:
             usage = {"input_tokens": getattr(resp.usage, "input_tokens", 0),

@@ -5,6 +5,7 @@
 **知识平面**。每个文件在它所处的数据流位置就地讲解;`src/omni_copilot/`
 下全部 71 个 `.py` 文件都被覆盖,文末**附录**是 `文件 → 段落` 的查阅索引。
 包根 `__init__.py` 只声明版本(`__version__`)。配套:`DESIGN.md`(为什么)、
+
 `IMPLEMENTATION_STATUS.md`(做了什么)、`SPEC/`(规范契约)、
 `eval/dataset/judgments/CAMPAIGN_FINAL.md`(评测结论)。
 

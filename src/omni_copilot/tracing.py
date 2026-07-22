@@ -39,6 +39,15 @@ from typing import Any, Iterator, Optional
 _ENABLED = os.environ.get("AGENT_TRACE", "1").strip().lower() not in ("0", "false", "no", "off", "")
 _current: "contextvars.ContextVar[Optional[Span]]" = contextvars.ContextVar("trace_span", default=None)
 
+# Fine-grained I/O capture: the actual request messages, model output, and tool
+# arguments/results. OFF by default — payloads are large and may echo secrets.
+# ``AGENT_TRACE_IO=1`` writes them to a sibling ``events.jsonl`` (never the span
+# trace). Each string field is clipped to ``AGENT_TRACE_IO_MAX`` bytes unless
+# ``AGENT_TRACE_IO_FULL=1`` keeps it whole.
+_IO = os.environ.get("AGENT_TRACE_IO", "0").strip().lower() in ("1", "true", "yes", "on")
+_IO_MAX = 0 if os.environ.get("AGENT_TRACE_IO_FULL", "0").strip().lower() in ("1", "true", "yes", "on") \
+    else int(os.environ.get("AGENT_TRACE_IO_MAX", "8192") or 8192)
+
 
 class Span:
     """One timed node. ``set()`` adds attributes; ``mark_ttft()`` stamps the
@@ -115,6 +124,9 @@ class Tracer:
         self.run_id = run_id
         self.path = Path(out_path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        # Heavy request/response/tool payloads land here, beside the span trace,
+        # so trace.jsonl stays a lean metrics stream. Correlated by span_id.
+        self.events_path = self.path.with_name("events.jsonl")
         self._lock = threading.Lock()
         self._inflight = 0  # concurrent llm spans — the effective batch size
 
@@ -134,6 +146,15 @@ class Tracer:
         line = json.dumps(rec, ensure_ascii=False, default=str)
         with self._lock, self.path.open("a", encoding="utf-8") as f:
             f.write(line + "\n")
+
+    def _write_event(self, rec: dict) -> None:
+        """Append one I/O event to the sibling events.jsonl (locked, best-effort)."""
+        try:
+            line = json.dumps(rec, ensure_ascii=False, default=str)
+            with self._lock, self.events_path.open("a", encoding="utf-8") as f:
+                f.write(line + "\n")
+        except Exception:
+            pass  # tracing must never break the agent
 
     @contextlib.contextmanager
     def span(self, name: str, **attr: Any) -> Iterator[Any]:
@@ -215,6 +236,85 @@ def set_usage(sp: Any, usage: Any, stop_reason: str = "") -> None:
     gen = getattr(sp, "gen_s", 0.0)
     if out and gen > 0:
         sp.set(tokens_per_sec=round(out / gen, 1))
+
+
+# ── fine-grained I/O events (request / response / tool call payloads) ─────────
+def io_enabled() -> bool:
+    """True when payload capture is on and a tracer is installed."""
+    return _IO and enabled()
+
+
+def _clip(obj: Any) -> Any:
+    """Recursively clip long strings to _IO_MAX bytes, marking how much was cut.
+    Structure (dict/list nesting) is preserved so payloads stay inspectable."""
+    if isinstance(obj, str):
+        if _IO_MAX and len(obj) > _IO_MAX:
+            return obj[:_IO_MAX] + f"…⟨+{len(obj) - _IO_MAX} chars⟩"
+        return obj
+    if isinstance(obj, dict):
+        return {k: _clip(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_clip(v) for v in obj]
+    return obj
+
+
+def _attr(b: Any, k: str, default: Any = None) -> Any:
+    """Read `k` from an Anthropic block whether it's a dict or an SDK object."""
+    return b.get(k, default) if isinstance(b, dict) else getattr(b, k, default)
+
+
+def _block_summary(b: Any) -> dict:
+    """Reduce one content block (text / tool_use / tool_result) to plain JSON."""
+    bt = _attr(b, "type", "")
+    if bt == "text":
+        return {"type": "text", "text": _attr(b, "text", "")}
+    if bt == "tool_use":
+        return {"type": "tool_use", "id": _attr(b, "id"),
+                "name": _attr(b, "name"), "input": _attr(b, "input", {})}
+    if bt == "tool_result":
+        return {"type": "tool_result", "tool_use_id": _attr(b, "tool_use_id"),
+                "is_error": _attr(b, "is_error", False),
+                "content": _attr(b, "content", "")}
+    return {"type": bt} if bt else {"raw": b}
+
+
+def summarize_content(content: Any) -> Any:
+    """Flatten an Anthropic message ``content`` (str, or a list of blocks that
+    may be SDK objects or dicts) into plain JSON-able summaries."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, (list, tuple)):
+        return [_block_summary(b) for b in content]
+    return _block_summary(content)
+
+
+def summarize_messages(messages: Any) -> list:
+    """Flatten a full Anthropic ``messages`` list for request-side capture."""
+    return [{"role": _attr(m, "role", "?"),
+             "content": summarize_content(_attr(m, "content", ""))}
+            for m in (messages or [])]
+
+
+def event(kind: str, *, span: Any = None, payload: Any = None, **fields: Any) -> None:
+    """Record a fine-grained I/O event — an LLM request/response or a tool call —
+    to the sibling ``events.jsonl``, correlated to the span tree by ``span_id``.
+    No-op unless ``AGENT_TRACE_IO`` is on, so it is free in normal runs. String
+    fields (and everything under ``payload``) are clipped to ``AGENT_TRACE_IO_MAX``
+    bytes (``AGENT_TRACE_IO_FULL=1`` keeps them whole)."""
+    if _default is None or not _IO or not _ENABLED:
+        return
+    sp = span if isinstance(span, Span) else _current.get()
+    rec = {
+        "t": "event",
+        "kind": kind,
+        "trace_id": _default.run_id,
+        "span_id": getattr(sp, "span_id", None),
+        "ts": round(time.time(), 6),
+    }
+    rec.update(_clip(fields))
+    if payload is not None:
+        rec["payload"] = _clip(payload)
+    _default._write_event(rec)
 
 
 # ── reporting ─────────────────────────────────────────────────────────────────
@@ -329,21 +429,95 @@ def report(trace_path: os.PathLike | str) -> str:
     return "\n".join(lines)
 
 
+def load_events(trace_path: os.PathLike | str) -> list[dict]:
+    """Read fine-grained I/O events. Accepts a run dir, a trace.jsonl path, or the
+    events.jsonl itself — the payloads always live in ``events.jsonl``."""
+    p = Path(trace_path)
+    if p.is_dir():
+        p = p / "events.jsonl"
+    elif p.name != "events.jsonl":
+        p = p.with_name("events.jsonl")
+    events = []
+    if not p.exists():
+        return events
+    for line in p.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if rec.get("t") == "event":
+            events.append(rec)
+    return events
+
+
+def _oneline(v: Any, n: int = 400) -> str:
+    """Render a value on one line, escaped and length-capped, for the timeline."""
+    s = v if isinstance(v, str) else json.dumps(v, ensure_ascii=False, default=str)
+    s = s.replace("\n", "\\n").replace("\r", "")
+    return s if len(s) <= n else s[:n] + f"…(+{len(s) - n})"
+
+
+def render_events(trace_path: os.PathLike | str, width: int = 400) -> str:
+    """A chronological transcript of the run: every request sent to the model,
+    every response (text + tool calls), and every tool's arguments and result —
+    the fine-grained view the span metrics omit."""
+    events = load_events(trace_path)
+    if not events:
+        return (f"no events for {trace_path}\n"
+                "(re-run with AGENT_TRACE_IO=1 to capture request/response/tool payloads)")
+    events.sort(key=lambda e: e.get("ts", 0))
+    t0 = events[0].get("ts", 0)
+    lines = [f"EVENTS  {events[0].get('trace_id', '')}   n={len(events)}"]
+    for e in events:
+        rel = e.get("ts", 0) - t0
+        kind = e.get("kind", "")
+        tag = f"[{rel:8.1f}s]"
+        if kind == "llm.request":
+            msgs = e.get("payload") or []
+            lines.append(f"{tag} → REQ   turn={e.get('turn', '-')} model={e.get('model', '')} "
+                         f"msgs={len(msgs)} tools={e.get('n_tools', '-')}")
+            for m in msgs[-3:]:  # last few turns of context; earlier is cache-stable
+                lines.append(f"           {str(m.get('role', '?')):9} {_oneline(m.get('content'), width)}")
+        elif kind == "llm.response":
+            lines.append(f"{tag} ← RESP  turn={e.get('turn', '-')} stop={e.get('stop_reason', '')}")
+            if e.get("text"):
+                lines.append(f"           text     {_oneline(e['text'], width)}")
+            for c in (e.get("tool_calls") or []):
+                lines.append(f"           call     {c.get('name', '')}({_oneline(c.get('input'), width)})")
+        elif kind == "tool.call":
+            lines.append(f"{tag} ⚙ CALL  {e.get('tool', '')}  {_oneline(e.get('input'), width)}")
+        elif kind == "tool.result":
+            status = "ok" if e.get("ok") else f"ERR {e.get('error', '')}"
+            body = e.get("payload") if e.get("payload") is not None else ""
+            lines.append(f"{tag} ⚙ RESULT {e.get('tool', '')} [{status}] {e.get('dur_ms', '')}ms "
+                         f"{_oneline(body, width)}")
+        else:
+            lines.append(f"{tag} {kind} {_oneline({k: v for k, v in e.items() if k not in ('t', 'kind', 'trace_id', 'ts')}, width)}")
+    return "\n".join(lines)
+
+
 def _main() -> int:
-    """CLI entry: print the report for a trace path or run id argument."""
+    """CLI entry: print the report (or --io transcript) for a trace path/run id."""
     import sys
 
-    if len(sys.argv) < 2:
-        print("usage: python -m omni_copilot.tracing <trace.jsonl | run_id>")
+    pos = [a for a in sys.argv[1:] if not a.startswith("-")]
+    if not pos:
+        print("usage: python -m omni_copilot.tracing <trace.jsonl | run_id> [--io]")
         return 1
-    arg = sys.argv[1]
+    arg = pos[0]
     path = Path(arg)
     if not path.exists():
         # allow passing a run_id — look under .copilot/runs/<id>/trace.jsonl
         cand = Path("runs") / arg / "trace.jsonl"
         if cand.exists():
             path = cand
-    print(report(path))
+    if "--io" in sys.argv or "-i" in sys.argv:
+        print(render_events(path))
+    else:
+        print(report(path))
     return 0
 
 
