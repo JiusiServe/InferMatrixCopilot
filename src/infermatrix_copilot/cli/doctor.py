@@ -27,10 +27,17 @@ def _check_deps() -> tuple[bool, str]:
 
 
 def _check_env(settings) -> tuple[bool, str]:
-    env_file = Path(".env")
-    if not env_file.exists() and not os.environ.get("ANTHROPIC_API_KEY"):
+    # Mirror Settings.model_config's env_file tuple: the repo's own .env loads
+    # regardless of cwd, and a cwd-local .env overrides it. Checking only the cwd
+    # reported a false ✗ (and exit 1) whenever doctor ran from outside the repo,
+    # even though the settings it was handed had loaded that .env correctly.
+    from ..config import _REPO_ROOT
+
+    if (not any(p.exists() for p in (_REPO_ROOT / ".env", Path(".env")))
+            and not os.environ.get("ANTHROPIC_API_KEY")):
         return False, (".env missing and ANTHROPIC_API_KEY unset — fix: "
-                       "cp .env.template .env && edit ANTHROPIC_API_KEY")
+                       f"cp {_REPO_ROOT}/.env.template {_REPO_ROOT}/.env "
+                       "&& edit ANTHROPIC_API_KEY")
     if not (settings.anthropic_api_key or os.environ.get("ANTHROPIC_API_KEY")):
         return False, ("ANTHROPIC_API_KEY is empty — fix: set it in .env "
                        "(key NAME checked only; value never printed)")
