@@ -142,7 +142,10 @@ class LLM:
                       stop_reason=resp.stop_reason or "end_turn",
                       text="".join(b.text for b in blocks if b.type == "text"),
                       tool_calls=[{"name": b.name, "id": b.id, "input": b.input}
-                                  for b in blocks if b.type == "tool_use"])
+                                  for b in blocks if b.type == "tool_use"],
+                      # the endpoint exposes no token ids, so the replayable
+                      # record is this text plus the counts for the same call
+                      **tracing.usage_counts(getattr(resp, "usage", None)))
         usage = None
         if getattr(resp, "usage", None) is not None:
             usage = {"input_tokens": getattr(resp.usage, "input_tokens", 0),

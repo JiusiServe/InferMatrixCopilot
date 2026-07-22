@@ -2,8 +2,12 @@
 import importlib
 
 
-def _fresh(monkeypatch, enabled="1"):
+def _fresh(monkeypatch, enabled="1", io=None):
     monkeypatch.setenv("AGENT_TRACE", enabled)
+    if io is None:
+        monkeypatch.delenv("AGENT_TRACE_IO", raising=False)
+    else:
+        monkeypatch.setenv("AGENT_TRACE_IO", io)
     import infermatrix_copilot.tracing as tracing
     importlib.reload(tracing)
     return tracing
@@ -100,3 +104,62 @@ def test_llm_create_records_span(monkeypatch, tmp_path):
     assert span["attr"]["prompt_tokens"] == 800
     assert span["attr"]["cache_read_tokens"] == 300
     assert span["attr"]["stop_reason"] == "tool_use"
+
+
+def test_usage_counts_extracts_tokens_from_object_and_dict(monkeypatch):
+    tr = _fresh(monkeypatch)
+    expected = {"input_tokens": 800, "output_tokens": 12,
+                "cache_read_tokens": 300, "cache_creation_tokens": 5}
+    assert tr.usage_counts({"input_tokens": 800, "output_tokens": 12,
+                            "cache_read_input_tokens": 300,
+                            "cache_creation_input_tokens": 5}) == expected
+
+    class U:
+        input_tokens = 800
+        output_tokens = 12
+        cache_read_input_tokens = 300
+        cache_creation_input_tokens = 5
+    assert tr.usage_counts(U()) == expected
+    # a provider omitting cache fields (or no usage at all) must not raise
+    assert tr.usage_counts(None)["input_tokens"] == 0
+    assert tr.usage_counts({"input_tokens": 7})["cache_read_tokens"] == 0
+
+
+def test_llm_create_records_io_text_and_tokens(monkeypatch, tmp_path):
+    """End-to-end through llm.create: with AGENT_TRACE_IO=1 the request text,
+    the response text and that call's token counts all land on events.jsonl.
+    The endpoint exposes no token ids, so text is the replayable stand-in."""
+    tr = _fresh(monkeypatch, io="1")
+    tr.init("run-io", tmp_path / "trace.jsonl")
+    from infermatrix_copilot.config import Settings
+    from infermatrix_copilot.llm import LLM
+
+    class Usage:
+        input_tokens = 1000
+        output_tokens = 3
+        cache_read_input_tokens = 9000
+        cache_creation_input_tokens = 0
+
+    class TextBlock:
+        type = "text"
+        text = "hello there"
+
+    class Resp:
+        stop_reason = "end_turn"
+        usage = Usage()
+        content = [TextBlock()]
+
+    llm = LLM(Settings(anthropic_api_key="x"))
+    monkeypatch.setattr(llm._client.messages, "create", lambda **kw: Resp())
+    llm.create(system="s", messages=[{"role": "user", "content": "hi"}])
+
+    events = tr.load_events(tmp_path / "trace.jsonl")
+    req = [e for e in events if e["kind"] == "llm.request"][0]
+    resp = [e for e in events if e["kind"] == "llm.response"][0]
+    assert req["payload"][0]["content"] == "hi"        # input text recorded
+    assert resp["text"] == "hello there"               # output text recorded
+    assert resp["input_tokens"] == 1000                # + counts, same record
+    assert resp["output_tokens"] == 3
+    assert resp["cache_read_tokens"] == 9000
+    assert resp["span_id"] == req["span_id"]           # joinable to the span
+    assert "in=1000 out=3 cached=9000" in tr.render_events(tmp_path / "trace.jsonl")

@@ -212,10 +212,13 @@ def enabled() -> bool:
     return _ENABLED and _default is not None
 
 
-def set_usage(sp: Any, usage: Any, stop_reason: str = "") -> None:
-    """Convenience: copy Anthropic ``response.usage`` onto an ``llm`` span and
-    derive tokens/sec. Accepts the SDK usage object or a plain dict; tolerant of
-    missing fields (cache token names differ across providers)."""
+def usage_counts(usage: Any) -> dict:
+    """Extract the token counts from an Anthropic-shaped ``usage`` (SDK object or
+    plain dict) as plain ints, tolerant of missing fields.
+
+    These endpoints report token *counts* but never token *ids*, so a replayable
+    record of a call is the request/response text (captured in ``events.jsonl``)
+    paired with these counts — hence ``llm.response`` events carry both."""
     def _g(name: str) -> int:
         """Read int field `name` from the usage object or dict; 0 if absent."""
         if usage is None:
@@ -224,12 +227,25 @@ def set_usage(sp: Any, usage: Any, stop_reason: str = "") -> None:
             return int(usage.get(name, 0) or 0)
         return int(getattr(usage, name, 0) or 0)
 
-    out = _g("output_tokens")
+    return {
+        "input_tokens": _g("input_tokens"),
+        "output_tokens": _g("output_tokens"),
+        "cache_read_tokens": _g("cache_read_input_tokens"),
+        "cache_creation_tokens": _g("cache_creation_input_tokens"),
+    }
+
+
+def set_usage(sp: Any, usage: Any, stop_reason: str = "") -> None:
+    """Convenience: copy Anthropic ``response.usage`` onto an ``llm`` span and
+    derive tokens/sec. Accepts the SDK usage object or a plain dict; tolerant of
+    missing fields (cache token names differ across providers)."""
+    c = usage_counts(usage)
+    out = c["output_tokens"]
     sp.set(
-        prompt_tokens=_g("input_tokens"),
+        prompt_tokens=c["input_tokens"],
         completion_tokens=out,
-        cache_read_tokens=_g("cache_read_input_tokens"),
-        cache_creation_tokens=_g("cache_creation_input_tokens"),
+        cache_read_tokens=c["cache_read_tokens"],
+        cache_creation_tokens=c["cache_creation_tokens"],
     )
     if stop_reason:
         sp.set(stop_reason=stop_reason)
@@ -482,7 +498,14 @@ def render_events(trace_path: os.PathLike | str, width: int = 400) -> str:
             for m in msgs[-3:]:  # last few turns of context; earlier is cache-stable
                 lines.append(f"           {str(m.get('role', '?')):9} {_oneline(m.get('content'), width)}")
         elif kind == "llm.response":
-            lines.append(f"{tag} ← RESP  turn={e.get('turn', '-')} stop={e.get('stop_reason', '')}")
+            # counts ride on the response event so events.jsonl is self-contained
+            # (no join back to trace.jsonl needed to size a call)
+            tok = ""
+            if e.get("input_tokens") is not None:
+                tok = (f" in={e.get('input_tokens', 0)} out={e.get('output_tokens', 0)}"
+                       f" cached={e.get('cache_read_tokens', 0)}")
+            lines.append(f"{tag} ← RESP  turn={e.get('turn', '-')} "
+                         f"stop={e.get('stop_reason', '')}{tok}")
             if e.get("text"):
                 lines.append(f"           text     {_oneline(e['text'], width)}")
             for c in (e.get("tool_calls") or []):
