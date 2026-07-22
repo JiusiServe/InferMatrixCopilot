@@ -30,7 +30,7 @@ from pathlib import Path
 HERE = Path(__file__).parent
 DS = HERE.parent                      # eval/dataset
 ROOT = DS.parent.parent
-PY = "/rebase/.venv/bin/python"
+PY = sys.executable            # the interpreter running this script
 
 sys.path.insert(0, str(HERE))
 import campaign_ledger as ledger      # noqa: E402

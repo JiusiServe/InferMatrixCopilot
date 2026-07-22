@@ -61,7 +61,7 @@ def _attempt_service_totals(arm_dir: Path) -> dict:
     import sys as _sys
 
     _sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
-    from omni_copilot.metrics import cost_from_spans
+    from infermatrix_copilot.metrics import cost_from_spans
 
     tot = {"usd": 0.0, "input_tokens": 0, "output_tokens": 0, "by_role": {}}
     roots = [arm_dir / "runs"]

@@ -1,9 +1,9 @@
 import subprocess
 
-from omni_copilot.llm import Block, Reply
-from omni_copilot.review.diff_summary import DiffSummary, build_diff_summary
-from omni_copilot.review.reviewer import run_patch_review
-from omni_copilot.review.triggers import evaluate_triggers
+from infermatrix_copilot.llm import Block, Reply
+from infermatrix_copilot.review.diff_summary import DiffSummary, build_diff_summary
+from infermatrix_copilot.review.reviewer import run_patch_review
+from infermatrix_copilot.review.triggers import evaluate_triggers
 
 
 class FakeLLM:

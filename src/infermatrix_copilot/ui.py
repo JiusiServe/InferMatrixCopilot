@@ -42,7 +42,7 @@ class PlainUI:
 
     def banner(self, info: dict) -> None:
         """Print the plain session header (model/repo/playbooks + command hint)."""
-        self.write("omni-copilot chat — talk to me about the repo, or ask me to "
+        self.write("infermatrix-copilot chat — talk to me about the repo, or ask me to "
                    "run tasks.\n")
         self.write(f"model={info.get('model')} repo={info.get('repo')} "
                    f"playbooks={info.get('playbooks')}\n")
@@ -110,7 +110,7 @@ class FancyUI:
         table.add_row("playbooks", str(info.get("playbooks", "-")))
         table.add_row("runs", str(info.get("run_root", "-")))
         self.console.print(Panel(
-            table, title="[bold cyan]omni-copilot[/] · conversational repo maintenance",
+            table, title="[bold cyan]infermatrix-copilot[/] · conversational repo maintenance",
             subtitle="[dim]/status /logs /playbooks /resume /quit · Ctrl+C stops a turn[/]",
             border_style="cyan", expand=False,
         ))

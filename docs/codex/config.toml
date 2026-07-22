@@ -1,14 +1,14 @@
 # Codex CLI integration — add this block to ~/.codex/config.toml
 #
-# Prerequisite: the omni-copilot package (with the MCP extra) must be installed
+# Prerequisite: the infermatrix-copilot package (with the MCP extra) must be installed
 # and on PATH — installing a Codex MCP entry does NOT install the package:
-#     uv tool install 'omni-copilot[mcp]'      # or: pipx install 'omni-copilot[mcp]'
+#     uv tool install 'infermatrix-copilot[mcp]'      # or: pipx install 'infermatrix-copilot[mcp]'
 #
 # Forward secrets by NAME via `env_vars` (Codex reads them from your shell
 # environment) rather than pasting literal secret values into this file.
 
-[mcp_servers.omni_copilot]
-command = "omni-copilot-mcp"
+[mcp_servers.infermatrix_copilot]
+command = "infermatrix-copilot-mcp"
 args = []
 env_vars = ["ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "DEFAULT_REPO"]
 

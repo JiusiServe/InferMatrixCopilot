@@ -13,9 +13,9 @@ from __future__ import annotations
 import types
 from pathlib import Path
 
-from omni_copilot.config import Settings
-from omni_copilot.engine.agent_runtime.knowledge import _knowledge_stores
-from omni_copilot.memory.skills import SkillStore
+from infermatrix_copilot.config import Settings
+from infermatrix_copilot.engine.agent_runtime.knowledge import _knowledge_stores
+from infermatrix_copilot.memory.skills import SkillStore
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _QUERY = "model adaptation review new checkpoint pipeline stage"

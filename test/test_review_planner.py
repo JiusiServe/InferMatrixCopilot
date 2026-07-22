@@ -5,9 +5,9 @@ import json
 
 import pytest
 
-from omni_copilot.engine.steps.review.prompts import _REVIEW_LENSES
-from omni_copilot.llm import Block, Reply
-from omni_copilot.review.planner import (
+from infermatrix_copilot.engine.steps.review.prompts import _REVIEW_LENSES
+from infermatrix_copilot.llm import Block, Reply
+from infermatrix_copilot.review.planner import (
     DEFAULT_STANDARD_LENSES,
     DEPTHS,
     diff_signals,

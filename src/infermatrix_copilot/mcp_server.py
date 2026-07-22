@@ -5,7 +5,7 @@ synchronous through repo-scoped `doc_search` / `doc_read`. A review takes 5–12
 min, which would blow a synchronous host-call timeout, so workflow tasks use a
 **start + poll** pair: `start_*` reserves a run and returns a `run_id`
 immediately; `get_result`/`get_status` poll it. The heavy workflow runs in an
-**isolated subprocess** (`python -m omni_copilot --execute-reserved <id>`), which
+**isolated subprocess** (`python -m infermatrix_copilot --execute-reserved <id>`), which
 (a) keeps the copilot's stdout out of this process's JSON-RPC stdio channel —
 child stdout goes to `<run_dir>/console.log` — and (b) makes the process-global
 tracer / `last_run_dir` per-run.
@@ -83,7 +83,7 @@ class CopilotMCP:
                 self._q.task_done()
 
     def _launch(self, run_id: str) -> None:
-        """Run one reserved run as `python -m omni_copilot --execute-reserved
+        """Run one reserved run as `python -m infermatrix_copilot --execute-reserved
         <id>`, child stdout+stderr -> console.log, outward-write env forced off.
         After `.wait()` the child is reaped, so we reconcile as sole writer."""
         run_dir = self.run_root / run_id
@@ -118,7 +118,7 @@ class CopilotMCP:
             popen_kwargs["start_new_session"] = True
         with open(run_dir / "console.log", "ab") as log:
             proc = subprocess.Popen(
-                [sys.executable, "-m", "omni_copilot", "--execute-reserved", run_id],
+                [sys.executable, "-m", "infermatrix_copilot", "--execute-reserved", run_id],
                 stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
                 cwd=str(self.run_root), env=env,
                 **popen_kwargs,
@@ -238,7 +238,7 @@ def build_mcp(settings: Optional[Settings] = None):
     from mcp.server.fastmcp import FastMCP
 
     core = CopilotMCP(settings)
-    mcp = FastMCP("omni-copilot")
+    mcp = FastMCP("infermatrix-copilot")
 
     @mcp.tool()
     def start_review(pr: int, repo: str = "", review_depth: str = "",
@@ -298,7 +298,7 @@ def build_mcp(settings: Optional[Settings] = None):
 
 
 def main() -> int:
-    """Console-script entry (`omni-copilot-mcp`): serve over stdio."""
+    """Console-script entry (`infermatrix-copilot-mcp`): serve over stdio."""
     if os.name == "nt":
         # Codex/terminal hosts can emit a console Ctrl+C event while keeping the
         # stdio transport open.  anyio turns that inherited event into
@@ -309,8 +309,8 @@ def main() -> int:
         mcp = build_mcp()
     except ImportError:
         sys.stderr.write(
-            "omni-copilot-mcp needs the MCP SDK. Install it with:\n"
-            "    pip install 'omni-copilot[mcp]'\n")
+            "infermatrix-copilot-mcp needs the MCP SDK. Install it with:\n"
+            "    pip install 'infermatrix-copilot[mcp]'\n")
         return 1
     mcp.run()  # stdio transport by default
     return 0

@@ -7,6 +7,7 @@ deterministic fingerprint + a DRAFT adapter that stops for human review.
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import time
@@ -16,6 +17,17 @@ from pathlib import Path
 import yaml
 
 HIGH_RISK_SECTIONS = ("push", "repo", "upstream")
+
+
+def expand_path(value: str) -> str:
+    """Expand `~` and `${VAR}` in a manifest path so committed adapters stay
+    machine-independent. An unset variable yields "" (treated as "not declared",
+    which degrades through the normal capability-gap path) rather than a bogus
+    literal path containing `${...}`."""
+    if not value:
+        return ""
+    expanded = os.path.expanduser(os.path.expandvars(value))
+    return "" if "$" in expanded else expanded
 REQUIRED_SECTIONS = ("name", "repo")
 
 # Always-on briefing byte cap. The curated hard-gate + navigation pages are
@@ -90,8 +102,11 @@ class RepoAdapter:
 
     @property
     def repo_path(self) -> str:
-        """Filesystem path of the target repo, or "" if the manifest omits it."""
-        return self.manifest.get("repo", {}).get("path", "")
+        """Filesystem path of the target repo, or "" if the manifest omits it.
+
+        Expanded through `expand_path`, so a committed manifest can stay portable
+        (`${VAR}` / `~`) instead of hardcoding one machine's absolute layout."""
+        return expand_path(self.manifest.get("repo", {}).get("path", ""))
 
     @property
     def protected_branches(self) -> list[str]:

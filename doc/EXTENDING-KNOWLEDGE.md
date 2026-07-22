@@ -77,8 +77,8 @@ enough that the rule alone can't carry it.
 
 ## 2. How the copilot consumes it (so you know what to optimize)
 
-Wiring lives in `src/omni_copilot/engine/agent_runtime/knowledge.py` +
-`src/omni_copilot/config.py` + each `adapters/<repo>/manifest.yaml`.
+Wiring lives in `src/infermatrix_copilot/engine/agent_runtime/knowledge.py` +
+`src/infermatrix_copilot/config.py` + each `adapters/<repo>/manifest.yaml`.
 
 - **Always-on briefing** — injected into *every* run, each capped:
   - the general slice `settings.knowledge_general_docs` (`general/_index.md`);

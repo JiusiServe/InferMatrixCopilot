@@ -673,7 +673,7 @@ the RQS3e ensemble question).
 ## Recommended Dashboard
 
 One row per task, one column per field; sparklines for trends. Sourced from a
-per-run `metrics.json` (emitted by a new `omni_copilot/metrics.py` collector
+per-run `metrics.json` (emitted by a new `infermatrix_copilot/metrics.py` collector
 over RunTrace) plus the feedback-collector store.
 
 - **Per-task score**: CATQ (headline) and TUS, 30-day rolling mean ± dispersion.

@@ -45,7 +45,8 @@ def _blocked_import() -> StepResult:
     install hint) rather than raising, since all parent imports are lazy."""
     return StepResult(False, FailureKind.BLOCKED,
                       "vllm-omni-rebase-agent is not importable — install it into "
-                      "the same venv (pip install -e /rebase/vllm-omni-rebase-agent)")
+                      "the same venv (pip install -e <path-to-rebase-agent>; see "
+                      "REBASE_AGENT_ROOT)")
 
 
 def _ensure_runtime(ctx: StepContext) -> dict | StepResult:

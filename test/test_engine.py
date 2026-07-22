@@ -2,9 +2,9 @@ import asyncio
 
 import pytest
 
-from omni_copilot.engine import Executor, FailureKind, StepRegistry, StepResult, StepSpec
-from omni_copilot.notify import Notifier
-from omni_copilot.playbooks.store import Playbook, PlaybookStep
+from infermatrix_copilot.engine import Executor, FailureKind, StepRegistry, StepResult, StepSpec
+from infermatrix_copilot.notify import Notifier
+from infermatrix_copilot.playbooks.store import Playbook, PlaybookStep
 
 
 def make_step(name, fn, risk="read"):

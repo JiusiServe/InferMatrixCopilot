@@ -11,10 +11,10 @@ import stat
 
 import pytest
 
-from omni_copilot import run_status as rs
-from omni_copilot.cli.copilot import Copilot
-from omni_copilot.mcp_policy import PolicyError, enforce_mcp_policy
-from omni_copilot.task_spec import READ_ONLY_KINDS, TaskSpec
+from infermatrix_copilot import run_status as rs
+from infermatrix_copilot.cli.copilot import Copilot
+from infermatrix_copilot.mcp_policy import PolicyError, enforce_mcp_policy
+from infermatrix_copilot.task_spec import READ_ONLY_KINDS, TaskSpec
 
 ALLOW = ["vllm-omni"]
 
@@ -192,7 +192,7 @@ def test_cli_declined_confirm_leaves_no_run_dir(settings, monkeypatch):
 
 # ── server core: pagination + status shape + read-only tool set ───────────────
 def _core(settings):
-    from omni_copilot.mcp_server import CopilotMCP
+    from infermatrix_copilot.mcp_server import CopilotMCP
     return CopilotMCP(settings)
 
 
@@ -266,7 +266,7 @@ def test_mcp_docs_are_repo_scoped(settings, tmp_path):
 
 def test_exposed_tools_are_read_only_only(settings):
     pytest.importorskip("mcp")
-    from omni_copilot.mcp_server import build_mcp
+    from infermatrix_copilot.mcp_server import build_mcp
 
     mcp = build_mcp(settings)
     names = sorted(t.name for t in asyncio.run(mcp.list_tools()))
@@ -278,7 +278,7 @@ def test_exposed_tools_are_read_only_only(settings):
 
 
 def test_subprocess_tamper_defense(settings):
-    """Full child-subprocess path: `python -m omni_copilot --execute-reserved`
+    """Full child-subprocess path: `python -m infermatrix_copilot --execute-reserved`
     re-enforces policy on a rewritten request.json and terminalizes to failed,
     with its stdout isolated to console.log."""
     core = _core(settings)

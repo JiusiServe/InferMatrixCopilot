@@ -1,6 +1,6 @@
 # Native decomposition of the nightly rebase — CANDIDATE: invisible to the
 # planner (find() only recalls active/locked), runnable only via
-# `omni-copilot --playbook repo-rebase-native`. The nightly keeps using the
+# `infermatrix-copilot --playbook repo-rebase-native`. The nightly keeps using the
 # locked `repo-rebase` until this is validated side-by-side and promoted
 # (candidate -> active -> locked; old playbook -> retired; rollback = revert).
 name: repo-rebase-native

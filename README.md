@@ -1,4 +1,7 @@
-# vllm-omni-copilot
+# InferMatrixCopilot
+
+> Formerly `vllm-infermatrix-copilot`. The Python package and CLI are still named
+> `infermatrix_copilot` / `infermatrix-copilot`; only the project/repo name changed.
 
 Playbook-driven repo-maintenance copilot for [vLLM-Omni], implementing the
 architecture in `vllm-omni-rebase-agent/docs/copilot/copilot_design`
@@ -11,7 +14,7 @@ in [doc/SPEC/](doc/SPEC/README.md).
 ## Layout
 
 ```
-src/omni_copilot/   implementation (engine, playbooks, adapters, review, memory, CLI)
+src/infermatrix_copilot/   implementation (engine, playbooks, adapters, review, memory, CLI)
 test/               pytest suite (no GPU, no network, no API key needed)
 doc/                design + implementation status
 playbooks/          registered playbooks (repo-rebase is LOCKED)
@@ -21,14 +24,14 @@ adapters/            repo adapters (adapter zero: vllm_omni)
 ## Install — one command
 
 ```bash
-bash install.sh             # venv + package + .env seed + ./omni-copilot wrapper + doctor
+bash install.sh             # venv + package + .env seed + ./infermatrix-copilot wrapper + doctor
 ```
 
 Then edit `.env` (set `ANTHROPIC_API_KEY`; adjust `REPO_PATHS` if your checkouts
 live elsewhere — `.env` is git-ignored, NEVER commit it) and re-check:
 
 ```bash
-./omni-copilot doctor       # every ✗ prints the exact fix (needs gh auth login once)
+./infermatrix-copilot doctor       # every ✗ prints the exact fix (needs gh auth login once)
 ```
 
 `bash install.sh --uninstall` removes only what the installer created. Manual
@@ -37,13 +40,13 @@ install (`pip install -e .` + `cp .env.template .env`) still works.
 ## Use — one natural-language interface
 
 ```bash
-./omni-copilot                            # conversational chat (Claude-Code-style)
-./omni-copilot -p "review pr 4830" --yes
-./omni-copilot -p "review https://github.com/vllm-project/vllm-omni/pull/4830"
-./omni-copilot -p "do a full depth review of pr 4830"   # depth from plain English
-./omni-copilot -p "answer issue 4842, do not post"
-./omni-copilot -p "rebase pr 4830, then review it"      # compound -> ordered queue
-./omni-copilot --resume                   # re-enter the last run's first incomplete step
+./infermatrix-copilot                            # conversational chat (Claude-Code-style)
+./infermatrix-copilot -p "review pr 4830" --yes
+./infermatrix-copilot -p "review https://github.com/vllm-project/vllm-omni/pull/4830"
+./infermatrix-copilot -p "do a full depth review of pr 4830"   # depth from plain English
+./infermatrix-copilot -p "answer issue 4842, do not post"
+./infermatrix-copilot -p "rebase pr 4830, then review it"      # compound -> ordered queue
+./infermatrix-copilot --resume                   # re-enter the last run's first incomplete step
 ```
 
 You never need to know the internal task kinds or memorize trigger phrases:
@@ -59,13 +62,13 @@ Built-ins inside the REPL: `/status`, `/logs [n]`, `/playbooks`, `/resume`, `/qu
 streaming replies and full terminal chrome — session banner, spinner while
 thinking, live streaming tail that resolves into markdown-rendered replies
 (tables, headers, bold), color-coded tool calls and step results, and
-arrow-key input history (`~/.omni-copilot/history`). Everything degrades to
+arrow-key input history (`~/.infermatrix-copilot/history`). Everything degrades to
 plain text on pipes/non-TTY, so scripting output stays stable. The model answers questions about the repo and past runs,
 and executes work through tools — `run_task`/`run_playbook` (same TaskSpec,
 planner, and [y/N] confirmation path as the flag CLI; chat can never widen
 permissions), `get_status`/`get_logs`/`read_run_report`, and `repo_read`/
 `repo_grep` jailed to the configured repos (secret files refused). Sessions are
-traced to `~/.omni-copilot/sessions/`. One-shot `-p` keeps the deterministic
+traced to `~/.infermatrix-copilot/sessions/`. One-shot `-p` keeps the deterministic
 parser (cheap, scriptable).
 
 Natural language is parsed into a **TaskSpec** (kind, PR/issue, flags) and echoed

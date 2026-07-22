@@ -9,18 +9,18 @@ now a package that separates the argparse/REPL wiring from the orchestrator.
 
 ## Package layout (one concern per file)
 - `__init__.py` — re-exports `Copilot`, `main` (surface below); no logic.
-- `__main__.py` — `python -m omni_copilot.cli` parity.
+- `__main__.py` — `python -m infermatrix_copilot.cli` parity.
 - `copilot.py` — the `Copilot` orchestrator (resolve/run_task/run_playbook/
   run_queue/resume_last/_execute + built-ins).
 - `entry.py` — `argparse`, `_handle_line`, `main` (turns argv/stdin into calls
   on `Copilot`).
 - `utils.py` — pure formatters: `parse_task_params`, `format_metrics_line`.
 
-## Public contract (importable from `omni_copilot.cli`)
+## Public contract (importable from `infermatrix_copilot.cli`)
 `main(argv)`; `Copilot` (`resolve`, `run_task`, `run_playbook`, `run_queue`,
 `resume_last`, `status`, `logs`, `playbooks`, `_execute`, `_adapter_for`,
-`_resolve_repo_path`). The re-exporting `__init__` keeps `omni_copilot.cli:main`
-(entry point) and `from omni_copilot.cli import Copilot` unchanged.
+`_resolve_repo_path`). The re-exporting `__init__` keeps `infermatrix_copilot.cli:main`
+(entry point) and `from infermatrix_copilot.cli import Copilot` unchanged.
 
 ## Invariants
 - `resolve` feeds capabilities (adapter + REPO_PATHS) to the planner.

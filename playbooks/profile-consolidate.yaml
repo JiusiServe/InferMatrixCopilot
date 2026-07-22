@@ -1,6 +1,6 @@
 # Stage-4 profile maintenance (design v2 §V2.3.3): scheduled consolidation.
 # CANDIDATE by design: invisible to the planner — run explicitly/scheduled via
-#   omni-copilot --playbook profile-consolidate --yes
+#   infermatrix-copilot --playbook profile-consolidate --yes
 # so consolidation stays a deliberate cadence (the personal-agent lesson:
 # rewrite belongs in a scheduled tier, never in the per-run loop). The run
 # report shows the profile diff; committing adapters/<repo>/ stays a human act.

@@ -1,15 +1,17 @@
 #!/bin/bash
 # Clean-room frozen-test run: outputs/traces of BOTH arms are never shown to
 # the operator and are deleted after aggregation. Only numeric aggregates
-# survive, in judgments/TEST_CLEANROOM.md. All paths absolute.
+# survive, in judgments/TEST_CLEANROOM.md.
+# Paths are derived from this script's own location — never hardcoded.
 set -u
-DS=/rebase/vllm-omni-copilot/eval/dataset
+DS=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+PY=${PYTHON:-python3}          # honour an active venv; override with PYTHON=
 cd "$DS"
 TMP=$(mktemp -d /tmp/cleanroom.XXXXXX)
 trap 'rm -rf "$TMP"' EXIT
 for r in 1 2 3; do
   echo "[cleanroom] sweep replicate $r"
-  ARM_OUT="$TMP/arm_r$r" /rebase/.venv/bin/python "$DS/run_copilot_arm.py" test \
+  ARM_OUT="$TMP/arm_r$r" "$PY" "$DS/run_copilot_arm.py" test \
     > /dev/null 2>&1 || true
   n=$(ls "$TMP/arm_r$r"/*.md 2>/dev/null | wc -l)
   echo "[cleanroom] replicate $r items: $n"
@@ -19,13 +21,13 @@ for r in 1 2 3; do
   echo "[cleanroom] judging replicate $r"
   for attempt in 1 2 3; do
     SPLIT=test ARM_A_DIR="$TMP/arm_r$r" JUDGE_OUT="$TMP/judge_r$r" \
-      /rebase/.venv/bin/python "$DS/judge_val.py" > /dev/null 2>&1 || true
+      "$PY" "$DS/judge_val.py" > /dev/null 2>&1 || true
     n=$(ls "$TMP/judge_r$r"/*.r*.json 2>/dev/null | wc -l)
     echo "[cleanroom] judge r$r verdicts: $n/30 (attempt $attempt)"
     [ "$n" -ge 30 ] && break
   done
 done
-/rebase/.venv/bin/python - "$TMP" <<'PYEOF'
+"$PY" - "$TMP" "$DS" <<'PYEOF'
 import json, glob, sys
 import statistics as st
 from collections import defaultdict
@@ -62,7 +64,7 @@ for d in dims_all:
 L += ["", "Wins (copilot/baseline/tie): "
       + ", ".join(f"r{i+1} {w['copilot_v2']}/{w['opus_baseline']}/{w.get('tie', 0)}"
                   for i, (_, w, _) in enumerate(reps))]
-open("/rebase/vllm-omni-copilot/eval/dataset/judgments/TEST_CLEANROOM.md",
+open(sys.argv[2] + "/judgments/TEST_CLEANROOM.md",
      "w").write("\n".join(L) + "\n")
 print("[cleanroom] aggregate written")
 PYEOF

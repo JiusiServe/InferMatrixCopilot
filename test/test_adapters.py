@@ -3,7 +3,7 @@ import subprocess
 import pytest
 import yaml
 
-from omni_copilot.adapters import (
+from infermatrix_copilot.adapters import (
     AdapterError,
     AdapterRegistry,
     draft_adapter,
@@ -83,7 +83,7 @@ def test_bootstrap_draft_stops_and_never_touches_repo(settings, git_repo):
 
 
 def test_shipped_adapter_zero_parses():
-    from omni_copilot.config import _REPO_ROOT
+    from infermatrix_copilot.config import _REPO_ROOT
 
     p = load_adapter(_REPO_ROOT / "adapters" / "vllm_omni")
     assert p.name == "vllm_omni"

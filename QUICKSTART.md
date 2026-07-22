@@ -1,4 +1,4 @@
-# Quickstart — vllm-omni-copilot
+# Quickstart — InferMatrixCopilot
 
 A playbook-driven repo-maintenance copilot for vLLM-Omni. One natural-language
 interface reviews PRs, debugs CI, rebases branches, answers/triages issues, and
@@ -18,12 +18,12 @@ bash install.sh
 ```
 
 Creates/reuses a venv, installs the package editable, seeds `.env` from the
-template (never overwrites), writes the repo-local `./omni-copilot` wrapper (no
+template (never overwrites), writes the repo-local `./infermatrix-copilot` wrapper (no
 PATH mutation), and runs `doctor`. `bash install.sh --uninstall` removes only
 what it created (never touches `.env`).
 
-> On this box it's already installed in `/rebase/.venv` — `./omni-copilot` works
-> as-is. Skip to step 3 unless you changed `.env`.
+> If it's already installed in your workspace venv, `./infermatrix-copilot` works as-is —
+> skip to step 3 unless you changed `.env`.
 
 ## 2. Configure `.env` (git-ignored — NEVER commit it)
 
@@ -33,7 +33,7 @@ Minimum to be operational:
 ANTHROPIC_API_KEY=sk-...            # or a DeepSeek /anthropic key
 ANTHROPIC_BASE_URL=                 # set if using a compatible endpoint
 AGENT_MODEL=claude-sonnet-5         # default reasoning model
-REPO_PATHS={"vllm-omni": "/rebase/vllm-omni"}   # JSON map: repo name -> path
+REPO_PATHS={"vllm-omni": "/path/to/vllm-omni"}  # JSON map: repo name -> path
 DEFAULT_REPO=vllm-omni
 ```
 
@@ -51,7 +51,7 @@ See `.env.template` for all knobs.
 ## 3. Preflight
 
 ```bash
-./omni-copilot doctor          # every ✗ prints the exact fix
+./infermatrix-copilot doctor          # every ✗ prints the exact fix
 ```
 
 Checks: package installed, `ANTHROPIC_API_KEY` set (name only, value never
@@ -67,22 +67,22 @@ itself; a full GitHub URL routes to the right repo/workflow.
 
 ```bash
 # Review a PR (read-only; produces a review, does not post)
-./omni-copilot -p "review pr 5134"
-./omni-copilot -p "do a full-depth review of pr 5134"
-./omni-copilot -p "review https://github.com/vllm-project/vllm-omni/pull/5134"
+./infermatrix-copilot -p "review pr 5134"
+./infermatrix-copilot -p "do a full-depth review of pr 5134"
+./infermatrix-copilot -p "review https://github.com/vllm-project/vllm-omni/pull/5134"
 
 # Debug failing CI on a PR (report-only = read-only triage)
-./omni-copilot -p "debug pr 5134, report only"
+./infermatrix-copilot -p "debug pr 5134, report only"
 
 # Answer / triage issues
-./omni-copilot -p "answer issue 4842, do not post"
-./omni-copilot -p "triage recent open issues"
+./infermatrix-copilot -p "answer issue 4842, do not post"
+./infermatrix-copilot -p "triage recent open issues"
 
 # Rebase a PR onto its base
-./omni-copilot -p "rebase pr 5134"
+./infermatrix-copilot -p "rebase pr 5134"
 
 # Compound request -> ordered queue, target carries over
-./omni-copilot -p "rebase pr 5134, then review it"
+./infermatrix-copilot -p "rebase pr 5134, then review it"
 ```
 
 Useful flags:
@@ -104,7 +104,7 @@ question instead of guessing — safe for eval harnesses and CI.
 ## 5. Chat mode (default, no `-p`)
 
 ```bash
-./omni-copilot
+./infermatrix-copilot
 ```
 
 A Claude-Code-style conversation: ask about the repo or past runs, and run work
@@ -131,22 +131,22 @@ Adapter zero (`adapters/vllm_omni/manifest.yaml`) declares `push.allowed: false`
 ## 7. Where output goes
 
 ```
-~/.omni-copilot/runs/run-<ts>-<uuid6>/
+~/.infermatrix-copilot/runs/run-<ts>-<uuid6>/
   RUN_REPORT.md      the deliverable (review / answer / debug summary)
   DIAGNOSTICS.md     per-step diagnostics
   run_trace.jsonl    append-only fact log
   progress.json      step checkpoints (what --resume reads)
   metrics.json       CATQ run metrics
   ESCALATION.md      only when blocked
-~/.omni-copilot/worktrees/<repo>-pr<n>/   PR-time checkout for reviews
-~/.omni-copilot/sessions/                  chat transcripts
+~/.infermatrix-copilot/worktrees/<repo>-pr<n>/   PR-time checkout for reviews
+~/.infermatrix-copilot/sessions/                  chat transcripts
 ```
 
 ## 8. Playbooks
 
 ```bash
-./omni-copilot -p "…"                          # planner picks the vetted playbook
-./omni-copilot --playbook pr-review --plan-only # run one by name
+./infermatrix-copilot -p "…"                          # planner picks the vetted playbook
+./infermatrix-copilot --playbook pr-review --plan-only # run one by name
 ```
 
 Registered: `pr-review`, `pr-debug`, `pr-rebase`, `issue-assist`,
@@ -158,8 +158,8 @@ to the planner — run them explicitly with `--playbook`.
 ## 9. Onboard a new repo (profile)
 
 ```bash
-./omni-copilot -p "profile the repo" --yes     # fingerprint -> draft profile
-./omni-copilot --playbook profile-consolidate --yes   # Stage-4 dedupe/refresh
+./infermatrix-copilot -p "profile the repo" --yes     # fingerprint -> draft profile
+./infermatrix-copilot --playbook profile-consolidate --yes   # Stage-4 dedupe/refresh
 ```
 
 Repo knowledge lives at the edge in `adapters/<repo>/` (human-gated

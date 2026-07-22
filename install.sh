@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# One-command setup for omni-copilot.
+# One-command setup for infermatrix-copilot.
 #
 #   bash install.sh              install (idempotent)
 #   bash install.sh --uninstall  remove ONLY what this installer created
 #
 # Creates/reuses a venv, installs the package, seeds .env from the template if
 # absent (never overwrites, never prints secret values), writes a repo-local
-# ./omni-copilot wrapper (no PATH mutation), and finishes with the doctor.
+# ./infermatrix-copilot wrapper (no PATH mutation), and finishes with the doctor.
 set -euo pipefail
 cd "$(dirname "$0")"
 
 MANIFEST=".install-manifest"
-WRAPPER="./omni-copilot"
+WRAPPER="./infermatrix-copilot"
 
 if [[ "${1:-}" == "--uninstall" ]]; then
     # remove only installer-created artifacts, recorded in the manifest
@@ -63,7 +63,7 @@ fi
     echo "✗ pip install failed — see output above; fix and re-run bash install.sh"
     exit 1
 }
-echo "installed omni-copilot into the venv"
+echo "installed infermatrix-copilot into the venv"
 
 # 3. seed .env (never overwrite)
 if [[ ! -f .env ]]; then
@@ -77,7 +77,7 @@ fi
 # 4. repo-local wrapper (invokable immediately; PATH is never modified)
 cat > "$WRAPPER" <<EOF
 #!/usr/bin/env bash
-exec "$VENV/bin/omni-copilot" "\$@"
+exec "$VENV/bin/infermatrix-copilot" "\$@"
 EOF
 chmod +x "$WRAPPER"
 created+=("$WRAPPER")
@@ -87,12 +87,12 @@ echo "wrote wrapper $WRAPPER"
 printf '%s\n' "${created[@]}" > "$MANIFEST"
 
 echo
-"$VENV/bin/omni-copilot" doctor || true
+"$VENV/bin/infermatrix-copilot" doctor || true
 
 cat <<'EOF'
 
 next steps:
-  ./omni-copilot                          # conversational chat
-  ./omni-copilot -p "review pr 5134"      # one-shot
-  optional: ln -s "$PWD/omni-copilot" ~/.local/bin/omni-copilot
+  ./infermatrix-copilot                          # conversational chat
+  ./infermatrix-copilot -p "review pr 5134"      # one-shot
+  optional: ln -s "$PWD/infermatrix-copilot" ~/.local/bin/infermatrix-copilot
 EOF

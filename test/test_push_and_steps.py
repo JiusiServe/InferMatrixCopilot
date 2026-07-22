@@ -1,11 +1,11 @@
 import asyncio
 
-from omni_copilot.engine.steps import register_builtin_steps
-from omni_copilot.engine.executor import Executor
-from omni_copilot.engine.registry import StepRegistry
-from omni_copilot.engine.step import FailureKind, StepContext
-from omni_copilot.notify import Notifier
-from omni_copilot.push import PushPolicy, guard_push
+from infermatrix_copilot.engine.steps import register_builtin_steps
+from infermatrix_copilot.engine.executor import Executor
+from infermatrix_copilot.engine.registry import StepRegistry
+from infermatrix_copilot.engine.step import FailureKind, StepContext
+from infermatrix_copilot.notify import Notifier
+from infermatrix_copilot.push import PushPolicy, guard_push
 
 
 def test_guard_push_matrix():

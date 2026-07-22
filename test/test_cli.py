@@ -2,9 +2,9 @@ import shutil
 
 import pytest
 
-from omni_copilot.cli import Copilot
-from omni_copilot.config import _REPO_ROOT
-from omni_copilot.task_spec import TaskSpec
+from infermatrix_copilot.cli import Copilot
+from infermatrix_copilot.config import _REPO_ROOT
+from infermatrix_copilot.task_spec import TaskSpec
 
 
 @pytest.fixture()

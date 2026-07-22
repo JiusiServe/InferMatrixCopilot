@@ -1,10 +1,10 @@
 import pytest
 
-from omni_copilot.engine.steps import register_builtin_steps
-from omni_copilot.engine.planner import Planner, PlanningError
-from omni_copilot.engine.registry import StepRegistry
-from omni_copilot.playbooks.store import PlaybookStore
-from omni_copilot.task_spec import TaskSpec
+from infermatrix_copilot.engine.steps import register_builtin_steps
+from infermatrix_copilot.engine.planner import Planner, PlanningError
+from infermatrix_copilot.engine.registry import StepRegistry
+from infermatrix_copilot.playbooks.store import PlaybookStore
+from infermatrix_copilot.task_spec import TaskSpec
 
 LOCKED_PB = """\
 name: repo-rebase
@@ -108,7 +108,7 @@ def test_real_pr_review_playbook_reuses_with_review_depth():
     """The shipped pr-review.yaml declares review_depth, so a spec carrying it
     resolves as reuse (L0) — an undeclared param would demote to adapt (L1,
     review-gated), which the MCP --execute-reserved child cannot gate."""
-    from omni_copilot.config import _REPO_ROOT
+    from infermatrix_copilot.config import _REPO_ROOT
 
     registry = register_builtin_steps(StepRegistry())
     store = PlaybookStore(_REPO_ROOT / "playbooks", registry)

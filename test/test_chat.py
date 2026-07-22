@@ -4,10 +4,10 @@ import shutil
 
 import pytest
 
-from omni_copilot.chat import ChatSession, _MAX_HISTORY_MESSAGES
-from omni_copilot.cli import Copilot
-from omni_copilot.config import _REPO_ROOT
-from omni_copilot.llm import Block, Reply
+from infermatrix_copilot.chat import ChatSession, _MAX_HISTORY_MESSAGES
+from infermatrix_copilot.cli import Copilot
+from infermatrix_copilot.config import _REPO_ROOT
+from infermatrix_copilot.llm import Block, Reply
 
 
 class ScriptedChatLLM:

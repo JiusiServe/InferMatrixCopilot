@@ -1,4 +1,4 @@
-"""`omni-copilot doctor` — preflight diagnostics with exact fixes.
+"""`infermatrix-copilot doctor` — preflight diagnostics with exact fixes.
 
 Every check prints ✓/✗ plus, on failure, the ONE command or edit that fixes it
 (the hermes/cline capture-and-print pattern; Claude Code's `claude doctor` is
@@ -129,6 +129,6 @@ def run_doctor(as_json: bool = False) -> int:
     else:
         for name, (ok, detail) in checks:
             print(f"{'✓' if ok else '✗'} {name:9s} — {detail}")
-        print("\nall good — start with: ./omni-copilot" if ok_all
-              else "\nfix the ✗ items above, then re-run: omni-copilot doctor")
+        print("\nall good — start with: ./infermatrix-copilot" if ok_all
+              else "\nfix the ✗ items above, then re-run: infermatrix-copilot doctor")
     return 0 if ok_all else 1

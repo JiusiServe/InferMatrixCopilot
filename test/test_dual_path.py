@@ -7,12 +7,12 @@ from __future__ import annotations
 import asyncio
 import json
 
-from omni_copilot.config import Settings
-from omni_copilot.engine.agent_runtime import BASE_OUTPUT_SCHEMA, run_agent_step
-from omni_copilot.engine.step import StepContext
-from omni_copilot.intent import _wants_performance, parse_intent, parse_intents
-from omni_copilot.llm import Block, Reply
-from omni_copilot.task_spec import TaskSpec
+from infermatrix_copilot.config import Settings
+from infermatrix_copilot.engine.agent_runtime import BASE_OUTPUT_SCHEMA, run_agent_step
+from infermatrix_copilot.engine.step import StepContext
+from infermatrix_copilot.intent import _wants_performance, parse_intent, parse_intents
+from infermatrix_copilot.llm import Block, Reply
+from infermatrix_copilot.task_spec import TaskSpec
 
 _PR = {"kind": "pr_review", "pr": 1, "confidence": 0.9}
 
@@ -127,7 +127,7 @@ def test_runner_uses_eco_model_by_default(settings, trace, tmp_path):
 # ran on the performance model while the merge/repair calls silently fell back
 # to agent_model) ──────────────────────────────────────────────────────────────
 def test_ensemble_reducer_uses_tier_model(settings, trace, tmp_path):
-    from omni_copilot.engine.agent_runtime.ensemble import run_agent_step_ensemble
+    from infermatrix_copilot.engine.agent_runtime.ensemble import run_agent_step_ensemble
 
     class EnsembleLLM(CaptureLLM):
         def create(self, *, system, messages, tools=None, model=None,

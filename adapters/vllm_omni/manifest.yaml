@@ -7,14 +7,17 @@ schema_version: 1
 capabilities: [orchestrator.external]
 
 repo:
-  path: /rebase/vllm-omni
+  # Portable: expanded via ${VAR}/~ at read time. REPO_PATHS in .env (gitignored)
+  # takes precedence; this is only the fallback when no .env is in reach. Never
+  # hardcode a machine-specific absolute path in this committed file.
+  path: ${VLLM_OMNI_REPO}
   default_branch: main
   rebase_branch: dev/vllm-align
   language: python
 
 upstream:
   kind: fork_tracking
-  repo_path: /rebase/vllm
+  repo_path: ${VLLM_UPSTREAM_REPO}
   remote: origin
 
 # Repo-specific slice of the SHARED, human-curated knowledge base (the vendored

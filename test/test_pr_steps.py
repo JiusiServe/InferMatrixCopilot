@@ -4,11 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from omni_copilot.engine.steps import register_builtin_steps
-from omni_copilot.engine.steps.pr import extract_signature
-from omni_copilot.engine.registry import StepRegistry
-from omni_copilot.engine.step import FailureKind, StepContext
-from omni_copilot.push import PushPolicy
+from infermatrix_copilot.engine.steps import register_builtin_steps
+from infermatrix_copilot.engine.steps.pr import extract_signature
+from infermatrix_copilot.engine.registry import StepRegistry
+from infermatrix_copilot.engine.step import FailureKind, StepContext
+from infermatrix_copilot.push import PushPolicy
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -182,7 +182,7 @@ def test_worktree_at_creates_and_reuses(git_repo, tmp_path):
     and swaps a stale one; failures return (False, why) instead of raising."""
     import subprocess
 
-    from omni_copilot.engine.steps.pr.fetch import _worktree_at
+    from infermatrix_copilot.engine.steps.pr.fetch import _worktree_at
 
     sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=git_repo,
                          capture_output=True, text=True).stdout.strip()
@@ -198,15 +198,15 @@ def test_worktree_at_creates_and_reuses(git_repo, tmp_path):
 def test_fetch_diff_pins_pr_time_checkout(settings, trace, tmp_path, git_repo,
                                           monkeypatch):
     """pr.fetch_diff publishes repo_path pinned to the PR head (injected sha in
-    tests) plus a checkout_note; the worktree lands under ~/.omni-copilot."""
+    tests) plus a checkout_note; the worktree lands under ~/.infermatrix-copilot."""
     import asyncio
     import subprocess
 
-    from omni_copilot.engine.registry import StepRegistry
-    from omni_copilot.engine.step import StepContext
-    from omni_copilot.engine.steps import register_builtin_steps
-    from omni_copilot.engine.steps.pr import fetch as fetch_mod
-    from omni_copilot.run_trace import RunTrace
+    from infermatrix_copilot.engine.registry import StepRegistry
+    from infermatrix_copilot.engine.step import StepContext
+    from infermatrix_copilot.engine.steps import register_builtin_steps
+    from infermatrix_copilot.engine.steps.pr import fetch as fetch_mod
+    from infermatrix_copilot.run_trace import RunTrace
 
     monkeypatch.setattr(fetch_mod, "_gh",
                         lambda args, cwd=None: (0, "diff --git a/x b/x"))
@@ -225,4 +225,4 @@ def test_fetch_diff_pins_pr_time_checkout(settings, trace, tmp_path, git_repo,
     upd = result.outputs["state_updates"]
     assert "PR-TIME TREE" in upd["checkout_note"]
     assert upd["repo_path"].endswith("-pr7")
-    assert (tmp_path / ".omni-copilot" / "worktrees").exists()
+    assert (tmp_path / ".infermatrix-copilot" / "worktrees").exists()

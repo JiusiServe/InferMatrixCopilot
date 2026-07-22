@@ -21,6 +21,6 @@ eval/dataset/judgments/test_r*/
 
 # local one-click-install artifacts (machine-specific paths)
 .install-manifest
-/omni-copilot
+/infermatrix-copilot
 # local campaign spend log (audit records that reference local state)
 eval/dataset/goal-eval/campaign_ledger.jsonl

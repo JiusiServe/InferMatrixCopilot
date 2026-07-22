@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from omni_copilot.engine.agent_runtime.moa import (
+from infermatrix_copilot.engine.agent_runtime.moa import (
     BudgetedLLM,
     Member,
     MoaBudget,
@@ -26,7 +26,7 @@ MIX = {"members": [
 # ---- config parsing / member resolution ------------------------------------
 
 def test_malformed_llm_mixture_degrades_to_off(monkeypatch):
-    from omni_copilot.config import Settings
+    from infermatrix_copilot.config import Settings
 
     monkeypatch.setenv("LLM_MIXTURE", "{not json")
     assert Settings().llm_mixture == {}

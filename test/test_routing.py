@@ -6,15 +6,15 @@ import json
 
 import pytest
 
-from omni_copilot.intent import (
+from infermatrix_copilot.intent import (
     parse_intent,
     parse_intents,
     pre_parse,
     resolve_repo_alias,
     validate_spec,
 )
-from omni_copilot.llm import Block, Reply
-from omni_copilot.task_spec import TaskSpec
+from infermatrix_copilot.llm import Block, Reply
+from infermatrix_copilot.task_spec import TaskSpec
 
 
 class NeverLLM:

@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     knowledge_general_docs: list[str] = ["general/_index.md"]
 
     # Engine
-    run_root: Path = Path.home() / ".omni-copilot" / "runs"
+    run_root: Path = Path.home() / ".infermatrix-copilot" / "runs"
     max_step_retries: int = 1
     max_agent_iters: int = 40
     playbooks_dir: Path = _REPO_ROOT / "playbooks"
@@ -82,7 +82,9 @@ class Settings(BaseSettings):
 
     # External locked rebase pipeline (the existing 5-phase orchestrator)
     rebase_orchestrator_cmd: str = "omni-rebase-orchestrator --dry-run"
-    rebase_agent_root: Path = Path("/rebase/vllm-omni-rebase-agent")
+    # Sibling checkout by default, derived from this file's location — never a
+    # hardcoded machine path. Override with REBASE_AGENT_ROOT if it lives elsewhere.
+    rebase_agent_root: Path = _REPO_ROOT.parent / "vllm-omni-rebase-agent"
     rebase_poll_interval: int = 30
 
     # Repo profiles (design v2 §V2.3)
@@ -94,7 +96,7 @@ class Settings(BaseSettings):
     # Agent-step runtime (engine/agent_runtime/)
     review_max_iters: int = 12          # tool-loop budget for agent steps
     skills_dir: Path = _REPO_ROOT / "skills"
-    memory_db: Path = Path.home() / ".omni-copilot" / "debug_memory.db"
+    memory_db: Path = Path.home() / ".infermatrix-copilot" / "debug_memory.db"
     evidence_item_chars: int = 24000  # was 6000: starving lenses pushed them
                                       # to re-read full files as per-lens tool
                                       # results — uncached tokens x n_lenses;
@@ -178,7 +180,7 @@ class Settings(BaseSettings):
         except (ValueError, TypeError):
             import logging
 
-            logging.getLogger("omni_copilot").warning(
+            logging.getLogger("infermatrix_copilot").warning(
                 "ignoring malformed LLM_MIXTURE JSON — MoA stays off")
             return {}
 

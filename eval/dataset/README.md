@@ -22,8 +22,8 @@ Anti-Goodhart rules (from the self-improvement measurement literature):
 ## Run commands
 
 ```bash
-omni-copilot -p "review pr <N>"                # pr_review items
-omni-copilot -p "answer issue <N>"             # issue_answer items (dry-run; ALLOW_POST stays off)
+infermatrix-copilot -p "review pr <N>"                # pr_review items
+infermatrix-copilot -p "answer issue <N>"             # issue_answer items (dry-run; ALLOW_POST stays off)
 ```
 
 ## Ground truth per kind

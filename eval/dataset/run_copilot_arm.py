@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the copilot arm (the real omni-copilot product CLI) over dataset items.
+"""Run the copilot arm (the real infermatrix-copilot product CLI) over dataset items.
 
 Unlike the in-process copilot_v2 arm of eval/run_eval.py, this drives the full
 shipped pipeline end-to-end: LLM intent parse -> planner (vetted playbook) ->
@@ -26,7 +26,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-# omni-copilot names run dirs run-<YYYYmmdd-HHMMSS>: two runs whose STARTUP
+# infermatrix-copilot names run dirs run-<YYYYmmdd-HHMMSS>: two runs whose STARTUP
 # reaches run-dir naming in the same second COLLIDE and overwrite each other's
 # artifacts (observed live twice: pr4810+pr4893, then issue4827+issue4793 even
 # with staggered Popen — import latency varies). Bulletproof fix: every
@@ -43,10 +43,11 @@ DATASET = HERE / "vllm_omni_dataset.yaml"
 # ARM_OUT selects the arm directory (default T0). For the post-learning T1 pass:
 #   ARM_OUT=copilot_v2_t1 run_copilot_arm.py val
 import os as _os
+import shutil as _shutil
 
 OUT = HERE / "arms" / _os.environ.get("ARM_OUT", "copilot_v2")
-RUN_ROOT = Path.home() / ".omni-copilot" / "runs"
-CLI = "/rebase/.venv/bin/omni-copilot"
+RUN_ROOT = Path.home() / ".infermatrix-copilot" / "runs"
+CLI = _os.environ.get("OMNI_CLI") or _shutil.which("infermatrix-copilot") or "infermatrix-copilot"
 CWD = HERE.parent.parent  # repo root, where .env lives
 SPLIT_ORDER = {"val": 0, "train": 1, "test": 2}
 
@@ -73,7 +74,7 @@ def _trace_tokens(run_dir: Path) -> dict:
     import sys
 
     sys.path.insert(0, str(CWD / "src"))
-    from omni_copilot.metrics import cost_from_spans
+    from infermatrix_copilot.metrics import cost_from_spans
 
     span = cost_from_spans(run_dir / "trace.jsonl")
     if span is None:
@@ -90,7 +91,7 @@ def _attempt_records(private_root: Path, inv_ids: list[str]) -> list[dict]:
     the span cost of every run dir it produced. Pareto/cost gates must sum
     these, not just the newest run."""
     out: list[dict] = []
-    inv_dir = Path.home() / ".omni-copilot" / "invocations"
+    inv_dir = Path.home() / ".infermatrix-copilot" / "invocations"
     for iid in inv_ids:
         rec_path = inv_dir / f"{iid}.json"
         rec = {}
@@ -195,7 +196,7 @@ def main() -> None:
                  if ("pr" if t[0] == "pr_review" else "issue") + str(t[1]) == only]
     items.sort(key=lambda t: SPLIT_ORDER[t[2]])
     (OUT / "manifest.json").write_text(json.dumps({
-        "arm": "copilot_v2", "engine": "omni-copilot CLI (shipped pipeline, "
+        "arm": "copilot_v2", "engine": "infermatrix-copilot CLI (shipped pipeline, "
         "pr-review@4 ensemble; issue-answer dry-run)",
         "llm": "per .env (DeepSeek-routed)", "dataset": DATASET.name,
         "splits": want, "n_items": len(items)}, indent=2))

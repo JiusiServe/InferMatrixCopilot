@@ -3,23 +3,24 @@
 # the operator and are deleted after aggregation. Only numeric aggregates
 # survive, in judgments/TEST_CLEANROOM.md.
 set -u
+PY=${PYTHON:-python3}          # honour an active venv; override with PYTHON=
 TMP=$(mktemp -d /tmp/cleanroom.XXXXXX)
 trap 'rm -rf "$TMP"' EXIT
 for r in 1 2 3; do
   echo "[cleanroom] sweep replicate $r"
-  ARM_OUT="$TMP/arm_r$r" /rebase/.venv/bin/python run_copilot_arm.py test \
+  ARM_OUT="$TMP/arm_r$r" "$PY" run_copilot_arm.py test \
     2>&1 | grep -cE "done|DONE" || true
 done
 for r in 1 2 3; do
   echo "[cleanroom] judging replicate $r"
   for attempt in 1 2 3; do
     SPLIT=test ARM_A_DIR="$TMP/arm_r$r" JUDGE_OUT="$TMP/judge_r$r" \
-      /rebase/.venv/bin/python judge_val.py 2>&1 | grep -cE "done|skip" || true
+      "$PY" judge_val.py 2>&1 | grep -cE "done|skip" || true
     n=$(ls "$TMP/judge_r$r"/*.r*.json 2>/dev/null | wc -l)
     [ "$n" -ge 30 ] && break
   done
 done
-/rebase/.venv/bin/python - "$TMP" <<'PYEOF'
+"$PY" - "$TMP" <<'PYEOF'
 import json, glob, sys
 import statistics as st
 from collections import defaultdict

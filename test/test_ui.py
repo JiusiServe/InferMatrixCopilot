@@ -2,11 +2,11 @@
 
 import shutil
 
-from omni_copilot.chat import ChatSession
-from omni_copilot.cli import Copilot
-from omni_copilot.config import _REPO_ROOT
-from omni_copilot.llm import Block, Reply
-from omni_copilot.ui import FancyUI, PlainUI, make_ui, style
+from infermatrix_copilot.chat import ChatSession
+from infermatrix_copilot.cli import Copilot
+from infermatrix_copilot.config import _REPO_ROOT
+from infermatrix_copilot.llm import Block, Reply
+from infermatrix_copilot.ui import FancyUI, PlainUI, make_ui, style
 
 
 def test_style_is_passthrough_without_tty():
@@ -23,7 +23,7 @@ def test_make_ui_with_writer_is_plain():
     ui.tool_call("run_task", "{}")
     ui.stream_end("hi")
     joined = "".join(buf)
-    assert "omni-copilot chat" in joined and "⚙ run_task({})" in joined
+    assert "infermatrix-copilot chat" in joined and "⚙ run_task({})" in joined
     assert "\033[" not in joined  # plain means plain
 
 

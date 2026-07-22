@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from omni_copilot.scopes import PathScope, ToolScope, post_plan_scope, pre_plan_scope, read_only_scope
-from omni_copilot.tools import dispatch
+from infermatrix_copilot.scopes import PathScope, ToolScope, post_plan_scope, pre_plan_scope, read_only_scope
+from infermatrix_copilot.tools import dispatch
 
 
 def test_pre_plan_scope_blocks_source_writes(tmp_path: Path):
@@ -82,8 +82,8 @@ def test_relative_paths_resolve_against_scope_root(tmp_path):
     failures on PR-added files. Absolute paths are left untouched."""
     from dataclasses import replace
 
-    from omni_copilot.scopes import read_only_scope
-    from omni_copilot.tools import dispatch
+    from infermatrix_copilot.scopes import read_only_scope
+    from infermatrix_copilot.tools import dispatch
 
     (tmp_path / "pkg").mkdir()
     (tmp_path / "pkg" / "new_file.py").write_text("MARKER = 1\n")

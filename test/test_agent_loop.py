@@ -1,6 +1,6 @@
-from omni_copilot.agent_loop import run_agent
-from omni_copilot.llm import Block, Reply
-from omni_copilot.scopes import pre_plan_scope
+from infermatrix_copilot.agent_loop import run_agent
+from infermatrix_copilot.llm import Block, Reply
+from infermatrix_copilot.scopes import pre_plan_scope
 
 
 class ScriptedLLM:
@@ -65,9 +65,9 @@ def test_final_round_nudge_follows_tool_results(trace):
     """The budget-2 nudge must come AFTER tool_result blocks in the user
     message — a leading text block violates the API contract (tool_use ids
     must be immediately followed by tool_results; caused live 400s at T4)."""
-    from omni_copilot.agent_loop import run_agent
-    from omni_copilot.llm import Block, Reply
-    from omni_copilot.scopes import read_only_scope
+    from infermatrix_copilot.agent_loop import run_agent
+    from infermatrix_copilot.llm import Block, Reply
+    from infermatrix_copilot.scopes import read_only_scope
 
     class LLM:
         available = True

@@ -4,13 +4,13 @@
 import asyncio
 import json
 
-from omni_copilot.ci.normalize import normalize_signature
-from omni_copilot.ci.providers import (BuildkiteLogs, GithubActionsLogs,
+from infermatrix_copilot.ci.normalize import normalize_signature
+from infermatrix_copilot.ci.providers import (BuildkiteLogs, GithubActionsLogs,
                                        provider_for)
-from omni_copilot.engine.steps import register_builtin_steps
-from omni_copilot.engine.registry import StepRegistry
-from omni_copilot.engine.step import StepContext
-from omni_copilot.profiles.repo_map import RepoMap, build_index
+from infermatrix_copilot.engine.steps import register_builtin_steps
+from infermatrix_copilot.engine.registry import StepRegistry
+from infermatrix_copilot.engine.step import StepContext
+from infermatrix_copilot.profiles.repo_map import RepoMap, build_index
 
 
 # -- signature normalization ------------------------------------------------------
@@ -114,7 +114,7 @@ def test_fetch_ci_records_capability_gap(settings, trace, tmp_path, git_repo,
     """Live fetch path with no provider: gap recorded, run continues."""
     # pr.fetch_ci_failures lives in the pr.debug submodule (its `_gh` binding is
     # what the step calls) after the pr package split — patch it there.
-    from omni_copilot.engine.steps.pr import debug as steps_pr
+    from infermatrix_copilot.engine.steps.pr import debug as steps_pr
 
     monkeypatch.setattr(steps_pr, "_gh", lambda args, cwd=None: (0, json.dumps([
         {"name": "gpu-test", "state": "FAILURE", "bucket": "fail",
@@ -163,8 +163,8 @@ def test_repo_map_unsupported_language(tmp_path):
 
 def test_repo_map_tool_reaches_agent(settings, trace, tmp_path, git_repo):
     """The repo_map tool is offered to governed agent steps and works."""
-    from omni_copilot.engine.agent_runtime import run_agent_step
-    from omni_copilot.llm import Block, Reply
+    from infermatrix_copilot.engine.agent_runtime import run_agent_step
+    from infermatrix_copilot.llm import Block, Reply
 
     class ToolThenDone:
         available = True

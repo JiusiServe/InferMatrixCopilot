@@ -45,7 +45,7 @@ preserved via re-exporting `__init__`s, so no importer changed):
   + `utils` (`extract_signature`).
 - `cli.py` (406 LOC) → `cli/` — `copilot` (the orchestrator class, kept whole)
   + `entry` (argparse/REPL) + `utils` (pure formatters); `__init__`/`__main__`
-  preserve the `omni_copilot.cli:main` entry point and `python -m` parity.
+  preserve the `infermatrix_copilot.cli:main` entry point and `python -m` parity.
 In every case the stateless/pure helpers moved to a `utils.py` so the class/
 handler files carry control flow, not plumbing. Eval-citation comments moved
 with their code, and public import surfaces were preserved via re-exporting

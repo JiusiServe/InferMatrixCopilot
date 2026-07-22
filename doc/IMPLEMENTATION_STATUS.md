@@ -20,11 +20,12 @@ Task numbers from `copilot_design` §四 (milestones from `docs/copilot/implemen
 | 12 | Issue answering & filtering | ✅ here | `issue-answer.yaml` (gated post) + `issue-triage.yaml` (no number → recent open issues); live-verified triage of 20 real issues |
 | 13 | Adapter zero | ✅ here | `adapters/vllm_omni/manifest.yaml` (modules, waves, push: allowed=false, protected main); consumed by `pr.analyze_diff` module mapping |
 | 14 | Adapter registry + Phase-0 bootstrap | ✅ | `adapters/base.py`: resolve by name/path; deterministic fingerprint → draft adapter + BOOTSTRAP_REPORT.md, stops for human review; high-risk sections human-only |
-| 15 | Conversational CLI | ✅ phases A+B+C | `cli/` + `intent.py`: one-shot `-p`, `--plan-only`, `--resume`; compound commands → ordered queue with target carry-over; inline plan review; TaskSpec confirm. Intent classification is **LLM-only** (the deterministic keyword parser was removed; intent now requires a configured LLM — no offline fast-path; `parse_intents` still splits compound commands + carries PR/issue references deterministically). **Phase C** (`chat.py`): Claude-Code-style interactive chat is the default REPL — persistent history (trim never splits tool pairs), streaming replies, tool round-trips (run_task/run_playbook via the same confirm gates, status/logs/reports, repo_read/repo_grep jailed to configured repos with `.env*` refused), session transcripts under `~/.omni-copilot/sessions/`; `--no-chat` keeps the plain command REPL |
+| 15 | Conversational CLI | ✅ phases A+B+C | `cli/` + `intent.py`: one-shot `-p`, `--plan-only`, `--resume`; compound commands → ordered queue with target carry-over; inline plan review; TaskSpec confirm. Intent classification is **LLM-only** (the deterministic keyword parser was removed; intent now requires a configured LLM — no offline fast-path; `parse_intents` still splits compound commands + carries PR/issue references deterministically). **Phase C** (`chat.py`): Claude-Code-style interactive chat is the default REPL — persistent history (trim never splits tool pairs), streaming replies, tool round-trips (run_task/run_playbook via the same confirm gates, status/logs/reports, repo_read/repo_grep jailed to configured repos with `.env*` refused), session transcripts under `~/.infermatrix-copilot/sessions/`; `--no-chat` keeps the plain command REPL |
 
 ## Agent Step 修正方案 (code review of 2026-07-03) — status
 
-Implemented per its own P0-P3 plan (`/rebase/vLLM-Omni Copilot Agent Step 修正方案.md`):
+Implemented per its own P0-P3 plan (`vLLM-Omni Copilot Agent Step 修正方案.md`, in
+the workspace root):
 - **P0** `engine/agent_runtime/runner.py::run_agent_step` — the single entry for every
   `kind == "agent"` step: AgentDispatchContext (task/step/repo/evidence/
   previous-steps/permissions/skills/memories/output-contract), evidence pack
@@ -132,7 +133,7 @@ per-hunk conflict records, dashboards.
 
 1. Nightly keeps resolving the locked `repo-rebase` (candidates are invisible
    to `PlaybookStore.find()` — pinned by test).
-2. Validate native off-nights: `omni-copilot --playbook repo-rebase-native --yes
+2. Validate native off-nights: `infermatrix-copilot --playbook repo-rebase-native --yes
    --task-param local_ci_only=true` first, then full runs;
    `rebase.compare_with_locked` writes COMPARISON.md (verdict equal/better/worse)
    against a locked run's `rebase_status.json`.

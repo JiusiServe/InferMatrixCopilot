@@ -18,6 +18,7 @@ Usage: snapshot_provenance.py [--assert]
 
 from __future__ import annotations
 
+import os
 import hashlib
 import json
 import subprocess
@@ -66,9 +67,9 @@ def _digest() -> dict:
 
 def _settings_view() -> dict:
     sys.path.insert(0, str(ROOT / "src"))
-    from omni_copilot.config import Settings
-    from omni_copilot.engine.agent_runtime.moa import resolve_members
-    from omni_copilot.metrics import MODEL_PRICES
+    from infermatrix_copilot.config import Settings
+    from infermatrix_copilot.engine.agent_runtime.moa import resolve_members
+    from infermatrix_copilot.metrics import MODEL_PRICES
 
     s = Settings()
     import os
@@ -91,7 +92,7 @@ def snapshot() -> dict:
         heads = {}
         for pr in VAL_PRS:
             out = _run(["gh", "pr", "view", str(pr), "--json", "commits"],
-                       cwd=Path("/rebase/vllm-omni"))
+                       cwd=Path(os.environ.get("OMNI_REPO") or Path.cwd()))
             try:
                 commits = json.loads(out or b"{}").get("commits") or []
                 heads[str(pr)] = str(commits[-1].get("oid", "")) if commits else ""

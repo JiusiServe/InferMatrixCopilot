@@ -72,7 +72,7 @@ def _pr_time_checkout(ctx: StepContext, repo: Path, pr: int) -> tuple[str, str]:
             return str(repo), ("checkout: CURRENT MAIN (head fetch failed) — "
                                "post-PR fixes may be present; a clean grep "
                                "does NOT clear PR-time state")
-    dest = Path.home() / ".omni-copilot" / "worktrees" / f"{repo.name}-pr{pr}"
+    dest = Path.home() / ".infermatrix-copilot" / "worktrees" / f"{repo.name}-pr{pr}"
     ok, detail = _worktree_at(repo, sha, dest)
     if not ok:
         ctx.trace.record("capability_gap", capability="pr.worktree",

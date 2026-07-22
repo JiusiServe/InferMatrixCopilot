@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from omni_copilot.metrics import (
+from infermatrix_copilot.metrics import (
     ABSTAIN_SCORES,
     TASK_WEIGHTS,
     catq,

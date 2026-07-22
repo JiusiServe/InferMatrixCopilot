@@ -2,8 +2,8 @@
 review render (category scan + merged-verdict calibration), reducer dup guard,
 and the non-lossy issue slot rendering."""
 
-from omni_copilot.engine.steps.issue import _render_answer
-from omni_copilot.engine.steps.review.utils import _render_review_md
+from infermatrix_copilot.engine.steps.issue import _render_answer
+from infermatrix_copilot.engine.steps.review.utils import _render_review_md
 
 
 # ---- W2: render ------------------------------------------------------------
@@ -65,7 +65,7 @@ def test_no_slots_falls_back_to_old_contract():
 
 def test_pr_context_mode_controls_discussion_exposure(settings, trace, tmp_path,
                                                       git_repo, monkeypatch):
-    import omni_copilot.engine.steps.pr.fetch as fetch_mod
+    import infermatrix_copilot.engine.steps.pr.fetch as fetch_mod
 
     view_json = ('{"title": "T", "body": "fixes #7", "labels": [], '
                  '"headRefName": "fix-7", '
@@ -102,7 +102,7 @@ def test_pr_context_mode_controls_discussion_exposure(settings, trace, tmp_path,
 
 def test_pr_context_degrades_partial_on_gh_failure(settings, git_repo,
                                                    monkeypatch):
-    import omni_copilot.engine.steps.pr.fetch as fetch_mod
+    import infermatrix_copilot.engine.steps.pr.fetch as fetch_mod
 
     monkeypatch.setattr(fetch_mod, "_gh",
                         lambda args, cwd=None, timeout=120: (1, "boom"))

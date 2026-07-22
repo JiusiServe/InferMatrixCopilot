@@ -6,16 +6,16 @@ import shutil
 
 import pytest
 
-from omni_copilot.cli import Copilot
-from omni_copilot.config import _REPO_ROOT
-from omni_copilot.engine import Executor, StepRegistry, StepResult, StepSpec
-from omni_copilot.engine.steps import register_builtin_steps
-from omni_copilot.intent import parse_intents
-from omni_copilot.llm import Block, Reply
-from omni_copilot.notify import Notifier
-from omni_copilot.playbooks.store import Playbook, PlaybookStep
-from omni_copilot.run_trace import RunTrace
-from omni_copilot.task_spec import TaskSpec
+from infermatrix_copilot.cli import Copilot
+from infermatrix_copilot.config import _REPO_ROOT
+from infermatrix_copilot.engine import Executor, StepRegistry, StepResult, StepSpec
+from infermatrix_copilot.engine.steps import register_builtin_steps
+from infermatrix_copilot.intent import parse_intents
+from infermatrix_copilot.llm import Block, Reply
+from infermatrix_copilot.notify import Notifier
+from infermatrix_copilot.playbooks.store import Playbook, PlaybookStep
+from infermatrix_copilot.run_trace import RunTrace
+from infermatrix_copilot.task_spec import TaskSpec
 
 
 def test_when_gating_skips_steps(settings, trace, tmp_path):
@@ -161,7 +161,7 @@ def test_pr_review_now_resolves_via_reuse(copilot):
 
 def test_all_shipped_playbooks_validate():
     registry = register_builtin_steps(StepRegistry())
-    from omni_copilot.playbooks.store import PlaybookStore
+    from infermatrix_copilot.playbooks.store import PlaybookStore
 
     store = PlaybookStore(_REPO_ROOT / "playbooks", registry)
     names = {p.name for p in store.all()}

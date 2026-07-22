@@ -4,15 +4,15 @@
 import asyncio
 import json
 
-from omni_copilot.engine.agent_runtime import (
+from infermatrix_copilot.engine.agent_runtime import (
     BASE_OUTPUT_SCHEMA,
     run_agent_step_ensemble,
 )
-from omni_copilot.engine.steps import register_builtin_steps
-from omni_copilot.engine.steps.review import _REVIEW_LENSES
-from omni_copilot.engine.registry import StepRegistry
-from omni_copilot.engine.step import FailureKind, StepContext
-from omni_copilot.llm import Block, Reply
+from infermatrix_copilot.engine.steps import register_builtin_steps
+from infermatrix_copilot.engine.steps.review import _REVIEW_LENSES
+from infermatrix_copilot.engine.registry import StepRegistry
+from infermatrix_copilot.engine.step import FailureKind, StepContext
+from infermatrix_copilot.llm import Block, Reply
 
 
 class ScriptedLLM:
@@ -311,7 +311,7 @@ def test_review_step_caps_comments_deterministically(settings, trace, tmp_path,
                 "comment": "big", "evidence": "hunk"}]
             + [{"file": "m.py", "line": 20 + i, "severity": "minor",
                 "comment": f"m{i}", "evidence": "hunk"} for i in range(3)])
-    from omni_copilot.engine.steps import register_builtin_steps
+    from infermatrix_copilot.engine.steps import register_builtin_steps
     llm = ScriptedLLM(
         [contract(review_comments=many)]
         + [contract(review_comments=[])] * (len(_REVIEW_LENSES) - 1)
@@ -334,7 +334,7 @@ def test_render_verdict_calibration():
     COMMENT (mergeable with asks); none -> APPROVE. Self-declared-uncertain
     majors never block (T3 forensics: 14/15 human-approved PRs got REQUEST
     CHANGES under the old minor-blocks rule). [validated] findings render."""
-    from omni_copilot.engine.steps.review import _render_review_md
+    from infermatrix_copilot.engine.steps.review import _render_review_md
 
     major = {"review_comments": [{"file": "a.py", "line": 1, "severity":
                                   "major", "comment": "breaks X", "evidence": "hunk"}]}

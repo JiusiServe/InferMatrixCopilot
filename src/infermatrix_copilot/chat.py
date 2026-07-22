@@ -28,7 +28,7 @@ if TYPE_CHECKING:  # pragma: no cover
 _MAX_HISTORY_MESSAGES = 60
 _MAX_TOOL_ROUNDS = 8
 
-SYSTEM_PROMPT = """You are omni-copilot, a conversational repo-maintenance assistant for the \
+SYSTEM_PROMPT = """You are infermatrix-copilot, a conversational repo-maintenance assistant for the \
 {repo} project, running in a terminal session (similar to Claude Code).
 
 You can: chat and answer questions; inspect past runs, logs and reports; read/search \

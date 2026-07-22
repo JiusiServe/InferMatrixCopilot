@@ -3,10 +3,10 @@
 import asyncio
 import json
 
-from omni_copilot.engine.steps import register_builtin_steps
-from omni_copilot.engine.registry import StepRegistry
-from omni_copilot.engine.step import FailureKind, StepContext
-from omni_copilot.llm import Block, Reply
+from infermatrix_copilot.engine.steps import register_builtin_steps
+from infermatrix_copilot.engine.registry import StepRegistry
+from infermatrix_copilot.engine.step import FailureKind, StepContext
+from infermatrix_copilot.llm import Block, Reply
 
 
 class ScriptedLLM:
@@ -118,8 +118,8 @@ def test_review_blocked_without_diff(settings, trace, tmp_path):
 
 
 def test_pr_review_playbook_shape():
-    from omni_copilot.config import _REPO_ROOT
-    from omni_copilot.playbooks.store import PlaybookStore
+    from infermatrix_copilot.config import _REPO_ROOT
+    from infermatrix_copilot.playbooks.store import PlaybookStore
 
     store = PlaybookStore(_REPO_ROOT / "playbooks", _registry())
     pb = store.get("pr-review")

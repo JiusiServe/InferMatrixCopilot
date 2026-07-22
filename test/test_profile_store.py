@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from omni_copilot.profiles.store import ProfileStore, STABLE_CONFIRMATIONS
+from infermatrix_copilot.profiles.store import ProfileStore, STABLE_CONFIRMATIONS
 
 
 def _fact_op(fact_id="fmt", channel="briefing", **over):
@@ -104,8 +104,8 @@ def test_briefing_budget_channel_and_staleness(tmp_path):
 
 
 def test_briefing_reaches_agent_dispatch(settings, trace, tmp_path, git_repo):
-    from omni_copilot.engine.agent_runtime import run_agent_step
-    from omni_copilot.llm import Block, Reply
+    from infermatrix_copilot.engine.agent_runtime import run_agent_step
+    from infermatrix_copilot.llm import Block, Reply
 
     adapter_root = settings.adapters_dir / "myrepo"
     adapter_root.mkdir(parents=True)
@@ -129,7 +129,7 @@ def test_briefing_reaches_agent_dispatch(settings, trace, tmp_path, git_repo):
                 "tests_run": [], "assumptions": [], "blockers": [],
                 "confidence": "high", "failure_kind": None, "next_action": ""}))])
 
-    from omni_copilot.engine.step import StepContext
+    from infermatrix_copilot.engine.step import StepContext
 
     llm = OneShotLLM()
     ctx = StepContext(settings=settings, params={}, run_dir=tmp_path / "run",
@@ -145,7 +145,7 @@ def test_briefing_reaches_agent_dispatch(settings, trace, tmp_path, git_repo):
 
 
 def test_no_profile_no_briefing_section(settings, trace, tmp_path, git_repo):
-    from omni_copilot.engine.agent_runtime import AgentDispatchContext
+    from infermatrix_copilot.engine.agent_runtime import AgentDispatchContext
 
     rendered = AgentDispatchContext(task={}, step={}, repo={}).render()
     assert "REPO BRIEFING" not in rendered

@@ -4,7 +4,7 @@ import importlib
 
 def _fresh(monkeypatch, enabled="1"):
     monkeypatch.setenv("AGENT_TRACE", enabled)
-    import omni_copilot.tracing as tracing
+    import infermatrix_copilot.tracing as tracing
     importlib.reload(tracing)
     return tracing
 
@@ -79,8 +79,8 @@ def test_top_sinks_label_non_llm_spans(monkeypatch, tmp_path):
 def test_llm_create_records_span(monkeypatch, tmp_path):
     tr = _fresh(monkeypatch)
     tr.init("run-llm", tmp_path / "trace.jsonl")
-    from omni_copilot.config import Settings
-    from omni_copilot.llm import LLM
+    from infermatrix_copilot.config import Settings
+    from infermatrix_copilot.llm import LLM
 
     class Usage:
         input_tokens = 800

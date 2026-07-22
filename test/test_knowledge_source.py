@@ -11,12 +11,12 @@ from pathlib import Path
 
 import pytest
 
-from omni_copilot.adapters.base import (
+from infermatrix_copilot.adapters.base import (
     _BRIEFING_CAP,
     RepoAdapter,
     render_briefing_docs,
 )
-from omni_copilot.engine.agent_runtime.knowledge import _repo_docs_tool
+from infermatrix_copilot.engine.agent_runtime.knowledge import _repo_docs_tool
 
 
 def _adapter(tmp_path: Path, manifest: dict) -> RepoAdapter:
@@ -144,8 +144,8 @@ def test_doc_tools_absent_when_no_knowledge_base(tmp_path):
 
 # ── shipped setup: shared knowledge/ submodule + vllm_omni adapter ────────────
 def test_real_setup_separates_general_and_repo_specific():
-    from omni_copilot.adapters.base import load_adapter
-    from omni_copilot.config import Settings
+    from infermatrix_copilot.adapters.base import load_adapter
+    from infermatrix_copilot.config import Settings
 
     s = Settings()
     if not (s.knowledge_dir / "repos").exists():

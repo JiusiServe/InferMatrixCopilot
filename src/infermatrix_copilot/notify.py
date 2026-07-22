@@ -64,7 +64,7 @@ class Notifier:
         self.run_dir.mkdir(parents=True, exist_ok=True)
         path.write_text(body, encoding="utf-8")
         self.trace.record("escalation", reason=reason, phase=phase, severity=severity)
-        self._email(f"[omni-copilot] {severity}: {phase}", body)
+        self._email(f"[infermatrix-copilot] {severity}: {phase}", body)
         return path
 
     def _render(self, esc: Escalation) -> str:
@@ -104,7 +104,7 @@ class Notifier:
                 req = urllib.request.Request(
                     "https://api.resend.com/emails",
                     data=json.dumps({
-                        "from": "omni-copilot <onboarding@resend.dev>",
+                        "from": "infermatrix-copilot <onboarding@resend.dev>",
                         "to": [to], "subject": subject, "text": body,
                     }).encode(),
                     headers={

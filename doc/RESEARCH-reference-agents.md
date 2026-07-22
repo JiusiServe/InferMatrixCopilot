@@ -38,7 +38,7 @@ Output-level deltas (baseline has, ours lacks):
 
 ## C. Mechanism entries — install/routing UX & orchestration (cline / openclaw / hermes sweep)
 
-**C1. One-command bootstrap + preflight that prints the exact fix** (hermes) — source-backed: `hermes-agent/README.md:34-65`, `setup-hermes.sh:66-127` (per-dep probe; on failure capture installer output and print the real error + manual fix URL; two-stage `curl -o` then `sh`). Cross-check: we have nothing (manual pip + hand-filled .env; gh auth undocumented). Benefit: UX. Cost M. **Verdict: adapt** — an `install.sh` + `omni-copilot doctor` that validates venv, .env keys (names only), `gh auth status`, repo paths, and prints the fix command per miss.
+**C1. One-command bootstrap + preflight that prints the exact fix** (hermes) — source-backed: `hermes-agent/README.md:34-65`, `setup-hermes.sh:66-127` (per-dep probe; on failure capture installer output and print the real error + manual fix URL; two-stage `curl -o` then `sh`). Cross-check: we have nothing (manual pip + hand-filled .env; gh auth undocumented). Benefit: UX. Cost M. **Verdict: adapt** — an `install.sh` + `infermatrix-copilot doctor` that validates venv, .env keys (names only), `gh auth status`, repo paths, and prints the fix command per miss.
 
 **C2. `doctor` / `doctor fix` diagnose-then-remediate** (cline) — source-backed: `cline/apps/cli/src/commands/doctor.ts:408-462,464-550` (+`--json`). Also documented for Claude Code: `claude doctor` prints read-only install/settings diagnostics with suggested fixes (code.claude.com/docs/en/setup, "Verify your installation"); install one-liner `curl -fsSL https://claude.ai/install.sh | bash`. Cross-check: absent. **Verdict: adopt** (read-only doctor; auto-fix only for safe items like creating .env from template).
 
@@ -85,7 +85,7 @@ Cross-clone negative results (load-bearing): no clone runs a same-model multi-pe
 | 3 | Issue completeness contract: explicit slots (root cause/fix/workaround/verification/disposition/prevention) + final re-read checklist + preconditions list | B1, B6, autopsy #5-#7 | issue completeness |
 | 4 | Related-artifact mining: timeline events → linked PRs/commits tool | B7 | issue grounding/completeness |
 | 5 | Deterministic-first routing: URL/PR-ref parser (keeps org/repo, typed errors), registry fast-path, LLM fallback w/ one retry, upfront clarify, params from NL | C3, C4, C5, D3 | UX, routing accuracy, latency |
-| 6 | One-click setup: `install.sh` + `omni-copilot doctor` (gh auth, .env, repo paths; prints exact fixes) | C1, C2, Claude Code bar | UX |
+| 6 | One-click setup: `install.sh` + `infermatrix-copilot doctor` (gh auth, .env, repo paths; prints exact fixes) | C1, C2, Claude Code bar | UX |
 | 7 | Selective MoA: heterogeneous lens proposers from `LLM_MIXTURE` on full-depth/hard tasks; tier-model aggregator (existing reducer); breaker + timeout + cost cap + single-model fallback | D1, D5, D7, personal-agent `_mixture` | PR recall / issue completeness at bounded cost |
 | 8 | Usage-enumeration sweep prompt (changed-symbol callers) | B4 | PR recall |
 | — | Experiment-only: issue-seeded PageRank repo-map (B8) — revisit if recall still lags after 1-8 | B8 | PR recall ceiling |

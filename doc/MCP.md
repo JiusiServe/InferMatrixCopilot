@@ -1,8 +1,8 @@
 # MCP integration — Claude Code & Codex
 
-The copilot ships an **MCP stdio server** (`omni-copilot-mcp`, module
-`src/omni_copilot/mcp_server.py`) that exposes its **read-only** task kinds to
-any MCP host. The standalone `omni-copilot` CLI is unchanged; MCP is additive and
+The copilot ships an **MCP stdio server** (`infermatrix-copilot-mcp`, module
+`src/infermatrix_copilot/mcp_server.py`) that exposes its **read-only** task kinds to
+any MCP host. The standalone `infermatrix-copilot` CLI is unchanged; MCP is additive and
 its dependency is gated behind the `[mcp]` extra.
 
 ## What it exposes (V1 — all read-only, start/poll)
@@ -27,11 +27,11 @@ else — enforced in the child, so a rewritten `request.json` cannot widen it.
 ## Install the package first (required by both hosts)
 
 Installing a plugin / adding a Codex MCP entry does **not** install the Python
-package — the `omni-copilot-mcp` command must already resolve on PATH. Install a
+package — the `infermatrix-copilot-mcp` command must already resolve on PATH. Install a
 pinned build:
 
 ```bash
-uv tool install 'omni-copilot[mcp]'      # or: pipx install 'omni-copilot[mcp]'
+uv tool install 'infermatrix-copilot[mcp]'      # or: pipx install 'infermatrix-copilot[mcp]'
 # from a local checkout:  pip install -e '.[mcp]'
 ```
 
@@ -41,18 +41,18 @@ optionally `ANTHROPIC_BASE_URL`, `DEFAULT_REPO`, and repo paths.
 ## Claude Code
 
 The repo is a plugin marketplace (`.claude-plugin/marketplace.json`) whose
-`omni-copilot` plugin (`plugin/.claude-plugin/plugin.json` + `plugin/.mcp.json`)
+`infermatrix-copilot` plugin (`plugin/.claude-plugin/plugin.json` + `plugin/.mcp.json`)
 declares the stdio server. In Claude Code:
 
 ```
-/plugin marketplace add tzhouam/vllm-omni-copilot
-/plugin install omni-copilot@omni-copilot-marketplace
+/plugin marketplace add JiusiServe/InferMatrixCopilot
+/plugin install infermatrix-copilot@infermatrix-copilot-marketplace
 ```
 
 Host-agnostic alternative (no plugin/marketplace) — register the server directly:
 
 ```
-claude mcp add omni-copilot -- omni-copilot-mcp
+claude mcp add infermatrix-copilot -- infermatrix-copilot-mcp
 ```
 
 > The exact marketplace-manifest schema and `/plugin` flow are per the current
@@ -71,7 +71,7 @@ literal values.
   (authoritatively) in the child: only `READ_ONLY_KINDS`, `post` forced False,
   repo allowlisted, `pr`/`issue` positive, unknown params stripped — regardless
   of what a same-user process may have written into `request.json`.
-- **Isolated execution.** Each run is a subprocess (`python -m omni_copilot
+- **Isolated execution.** Each run is a subprocess (`python -m infermatrix_copilot
   --execute-reserved <id>`); its stdout goes to `<run_dir>/console.log`, so the
   server's stdio channel carries only MCP protocol bytes.
 - **Durable, single-writer status.** `run_status.json` (see `run_status.py`) is

@@ -97,7 +97,7 @@ being a forge other than what a CI/forge adapter declares; storing secrets
 
 ## 6. Data & artifacts (the ground truth)
 
-- **Per run** — `~/.omni-copilot/runs/run-<ts>/`: `run_trace.jsonl` (append-only
+- **Per run** — `~/.infermatrix-copilot/runs/run-<ts>/`: `run_trace.jsonl` (append-only
   facts), `progress.json` (step checkpoints), `RUN_REPORT.md`, `metrics.json`,
   `ESCALATION.md` (only when blocked), plus step-specific artifacts
   (`rebase_status.json`, `COMPARISON.md`, evidence archives).
@@ -131,7 +131,7 @@ Blocked runs write `ESCALATION.md`, notify, and exit 3 — notify, never guess.
 ## 8. Repo invariance (the multi-repo contract) [partly planned]
 
 Quality on a profiled repo must stay within a declared band of the reference
-repo, and onboarding a repo requires **zero** edits under `src/omni_copilot/`.
+repo, and onboarding a repo requires **zero** edits under `src/infermatrix_copilot/`.
 Enforced by: repo-neutral core (`test_repo_neutral_core`), capability-matched
 playbooks, explicit `capability_gap` degradation, per-repo knowledge
 namespacing. Measured by the cross-repo eval + invariance index

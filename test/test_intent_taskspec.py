@@ -1,8 +1,8 @@
 import json
 
-from omni_copilot.intent import parse_intent
-from omni_copilot.llm import Block, Reply
-from omni_copilot.task_spec import TaskSpec
+from infermatrix_copilot.intent import parse_intent
+from infermatrix_copilot.llm import Block, Reply
+from infermatrix_copilot.task_spec import TaskSpec
 
 
 class FakeLLM:
@@ -75,7 +75,7 @@ def test_system_prompt_instructs_injection_defense():
     # The substantive (non-mocked) injection guard is our system prompt telling
     # the model to clarify on injection-looking input. Assert it is present so a
     # future prompt edit can't silently drop it.
-    from omni_copilot.intent import _LLM_SYSTEM
+    from infermatrix_copilot.intent import _LLM_SYSTEM
 
     low = _LLM_SYSTEM.lower()
     assert "inject" in low and "confidence" in low and "clarify" in low

@@ -76,14 +76,14 @@ def _run_cc(prompt: str, allowed: list[str]) -> tuple[str, dict]:
 def pr_prompt(n: int) -> str:
     return (f"Use the vllm-omni-review skill to review PR #{n} of {REPO}. "
             f"A read-only checkout of the repo (post-merge main) is at "
-            f"/rebase/vllm-omni. IMPORTANT: do NOT post anything to GitHub — "
+            f"{os.environ.get('OMNI_REPO', 'the local checkout')}. IMPORTANT: do NOT post anything to GitHub — "
             f"output the complete review (verdict + comments with file:line) "
             f"as your final message.")
 
 
 def issue_prompt(n: int) -> str:
     return (f"Answer issue #{n} of {REPO} as a knowledgeable maintainer. "
-            f"A read-only checkout of the repo is at /rebase/vllm-omni — "
+            f"A read-only checkout of the repo is at {os.environ.get('OMNI_REPO', 'the local checkout')} — "
             f"investigate the code before answering; cite files/lines where "
             f"relevant. If the issue is a question, answer it; if a bug, give "
             f"the likely root cause and a concrete fix or workaround; if it "

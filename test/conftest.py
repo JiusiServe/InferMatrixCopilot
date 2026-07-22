@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from omni_copilot.config import Settings
-from omni_copilot.run_trace import RunTrace
+from infermatrix_copilot.config import Settings
+from infermatrix_copilot.run_trace import RunTrace
 
 
 @pytest.fixture()
@@ -168,7 +168,7 @@ def fake_agent(monkeypatch, tmp_path: Path, git_repo):
     for name, mod in modules.items():
         monkeypatch.setitem(sys.modules, name, mod)
 
-    from omni_copilot.engine.steps import rebase_native
+    from infermatrix_copilot.engine.steps import rebase_native
     rebase_native._RUNTIME.clear()
     yield control
     rebase_native._RUNTIME.clear()

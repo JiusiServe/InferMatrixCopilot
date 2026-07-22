@@ -1,8 +1,8 @@
 # Design
 
-This repo implements the **vLLM-Omni Copilot** design
-(`vllm-omni-rebase-agent/docs/copilot/copilot_design`, plus its
-`implementation/` milestone plan). This document maps the design onto the code
+This repo implements the **InferMatrixCopilot** design — originally specified as
+"vLLM-Omni Copilot" in `vllm-omni-rebase-agent/docs/copilot/copilot_design`, plus
+its `implementation/` milestone plan. This document maps the design onto the code
 here; the rationale lives in those source docs.
 
 Part I below describes the v1 architecture as built. **Part II (Design v2,
@@ -73,23 +73,23 @@ is pointed at.
 
 | Path | Design concept |
 |---|---|
-| `src/omni_copilot/task_spec.py`, `intent.py`, `cli/` | §3.Y conversational CLI, TaskSpec, clarify-not-guess (intent classification is LLM-only) |
-| `src/omni_copilot/engine/step.py`, `registry.py` | §3.X Step abstraction, vetted step library |
-| `src/omni_copilot/engine/executor.py` | engine substrate: checkpoint/resume, typed failure routing |
-| `src/omni_copilot/engine/planner.py` | §3.2 reuse > adapt > generate, L0/L1/L2 |
-| `src/omni_copilot/engine/steps/` | vetted step library (guard, rebase, review gate, push, gh reads, agent steps) — self-registering |
-| `src/omni_copilot/engine/agent_runtime/` | unified Agent-Step runtime (修正方案; package: dispatch/knowledge/utils substrate + runner/ensemble entries): AgentDispatchContext, evidence pack (cap+archive), skill/memory retrieval + gated candidates, enforced scopes, structured output contract, full RunTrace; `run_agent_step_ensemble` — perspective-diverse fan-out + verify-and-merge for run-to-run robustness (eval-informed; any list-output agent step) |
-| `src/omni_copilot/playbooks/store.py`, `playbooks/*.yaml` | Playbook registry: versioned, provenance, candidate/active/locked/retired |
-| `src/omni_copilot/scopes.py`, `tools.py`, `agent_loop.py` | 框架层改进 (2): ToolScope/PathScope at one choke point |
-| `src/omni_copilot/review/` | 框架层改进 (3): diff summary → trigger rules → read-only patch reviewer |
-| `src/omni_copilot/run_trace.py`, `memory/` | 框架层改进 (4): RunTrace / DebugMemory / gated skills |
-| `src/omni_copilot/adapters/` | RepoAdapter: adapter zero, registry, deterministic bootstrap → draft |
-| `src/omni_copilot/push.py` | Push authorization: `PushPolicy` + unified `guard_push` (no separate Target layer) |
-| `src/omni_copilot/notify.py` | goal #4: escalation channel, blocked exit code 3 |
+| `src/infermatrix_copilot/task_spec.py`, `intent.py`, `cli/` | §3.Y conversational CLI, TaskSpec, clarify-not-guess (intent classification is LLM-only) |
+| `src/infermatrix_copilot/engine/step.py`, `registry.py` | §3.X Step abstraction, vetted step library |
+| `src/infermatrix_copilot/engine/executor.py` | engine substrate: checkpoint/resume, typed failure routing |
+| `src/infermatrix_copilot/engine/planner.py` | §3.2 reuse > adapt > generate, L0/L1/L2 |
+| `src/infermatrix_copilot/engine/steps/` | vetted step library (guard, rebase, review gate, push, gh reads, agent steps) — self-registering |
+| `src/infermatrix_copilot/engine/agent_runtime/` | unified Agent-Step runtime (修正方案; package: dispatch/knowledge/utils substrate + runner/ensemble entries): AgentDispatchContext, evidence pack (cap+archive), skill/memory retrieval + gated candidates, enforced scopes, structured output contract, full RunTrace; `run_agent_step_ensemble` — perspective-diverse fan-out + verify-and-merge for run-to-run robustness (eval-informed; any list-output agent step) |
+| `src/infermatrix_copilot/playbooks/store.py`, `playbooks/*.yaml` | Playbook registry: versioned, provenance, candidate/active/locked/retired |
+| `src/infermatrix_copilot/scopes.py`, `tools.py`, `agent_loop.py` | 框架层改进 (2): ToolScope/PathScope at one choke point |
+| `src/infermatrix_copilot/review/` | 框架层改进 (3): diff summary → trigger rules → read-only patch reviewer |
+| `src/infermatrix_copilot/run_trace.py`, `memory/` | 框架层改进 (4): RunTrace / DebugMemory / gated skills |
+| `src/infermatrix_copilot/adapters/` | RepoAdapter: adapter zero, registry, deterministic bootstrap → draft |
+| `src/infermatrix_copilot/push.py` | Push authorization: `PushPolicy` + unified `guard_push` (no separate Target layer) |
+| `src/infermatrix_copilot/notify.py` | goal #4: escalation channel, blocked exit code 3 |
 
 ## Data & artifacts per run
 
-`~/.omni-copilot/runs/run-<ts>/`: `run_trace.jsonl` (facts), `progress.json`
+`~/.infermatrix-copilot/runs/run-<ts>/`: `run_trace.jsonl` (facts), `progress.json`
 (step checkpoints — resume re-enters the first incomplete step),
 `RUN_REPORT.md`, `ESCALATION.md` (only when blocked).
 
@@ -246,7 +246,7 @@ the benchmark literature (§V2.0.4) shows same-model resolve rates swinging
 
 1. **Repo-neutral core, enforced.** No repo-specific literal (repo names,
    module names, domain prompts, absolute paths) anywhere in
-   `src/omni_copilot/` — such knowledge lives only under `adapters/<repo>/`.
+   `src/infermatrix_copilot/` — such knowledge lives only under `adapters/<repo>/`.
    Pinned by a `test_repo_neutral_core` test that scans the source for the
    known-leak patterns and fails on new ones. Prompts in the core may state
    *how to review/debug/triage*; only the profile states *what this repo is*.
@@ -389,7 +389,7 @@ adapters/<repo>/
 
 ### V2.3.2 Profile memory architecture (borrowed from the personal agent)
 
-The personal agent (`/rebase/personal-agent`, `profile_store.py` +
+The personal agent (a sibling project — `profile_store.py` +
 `RESEARCH_AGENT_MEMORY_2026.md`) maintains a person-profile with exactly the
 lifecycle a repo profile needs. We adopt its skeleton wholesale, translated
 to repo terms:
@@ -508,7 +508,7 @@ consolidation is one reviewed, revertable commit.
 **Acceptance criteria**
 
 1. A second repository is onboarded end-to-end (fingerprint → profile →
-   active) with **zero commits to `src/omni_copilot/`**.
+   active) with **zero commits to `src/infermatrix_copilot/`**.
 2. All six task kinds execute on the second repo — at full capability where
    the profile provides it, and with *recorded* `capability_gap` degradation
    where it does not; no silent quality loss.

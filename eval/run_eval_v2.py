@@ -29,8 +29,8 @@ EVAL_DIR = Path(__file__).resolve().parent
 RAW = EVAL_DIR / "raw"
 sys.path.insert(0, str(EVAL_DIR.parent / "src"))
 
-from omni_copilot.config import Settings  # noqa: E402
-from omni_copilot.llm import LLM, parse_json_reply  # noqa: E402
+from infermatrix_copilot.config import Settings  # noqa: E402
+from infermatrix_copilot.llm import LLM, parse_json_reply  # noqa: E402
 
 from run_eval import ARMS, GROUND_TRUTH, PRS  # noqa: E402  (v1 harness)
 
@@ -50,7 +50,7 @@ for _pr, _meta in _GT_META.items():
 JUDGE_MODELS = [m.strip() for m in os.environ.get(
     "V2_JUDGE_MODELS", "deepseek-v4-pro,deepseek-v4-flash").split(",") if m.strip()]
 CLAIMS_MODEL = os.environ.get("V2_CLAIMS_MODEL", "deepseek-v4-flash")
-OMNI_REPO = Path(os.environ.get("OMNI_REPO", "/rebase/vllm-omni"))
+OMNI_REPO = Path(os.environ.get("OMNI_REPO", "")) if os.environ.get("OMNI_REPO") else Path.cwd()
 
 
 def _cached(path: Path, fn):

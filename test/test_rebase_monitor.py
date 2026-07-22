@@ -4,10 +4,10 @@ import asyncio
 import json
 import sys
 
-from omni_copilot.engine.steps import register_builtin_steps
-from omni_copilot.engine.registry import StepRegistry
-from omni_copilot.engine.step import FailureKind, StepContext
-from omni_copilot.rebase.monitor import (
+from infermatrix_copilot.engine.steps import register_builtin_steps
+from infermatrix_copilot.engine.registry import StepRegistry
+from infermatrix_copilot.engine.step import FailureKind, StepContext
+from infermatrix_copilot.rebase.monitor import (
     build_command,
     build_escalation,
     classify_failure,

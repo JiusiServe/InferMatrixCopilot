@@ -1,7 +1,7 @@
 # Evaluation plan v3 — quality/cost/latency vs baseline (goal task #23)
 
 ## Context
-W1-W7 landed (uncommitted) in /rebase/vllm-omni-copilot. This plan measures the quality gates and reports quality+cost+latency together. Metric definitions REUSED unchanged (eval/dataset/judge_val.py: 7 dims, blind pairwise vs the recorded CC+Opus arm, 3 judge replicates, Sonnet-5 judge). The recorded baseline is never rerun. The evaluation is **retrospective synthesis under thread visibility** (issue arms read the resolution thread, as every arm always has), NOT blind pre-resolution maintenance — stated verbatim in the report.
+W1-W7 landed (uncommitted) in /rebase/vllm-infermatrix-copilot. This plan measures the quality gates and reports quality+cost+latency together. Metric definitions REUSED unchanged (eval/dataset/judge_val.py: 7 dims, blind pairwise vs the recorded CC+Opus arm, 3 judge replicates, Sonnet-5 judge). The recorded baseline is never rerun. The evaluation is **retrospective synthesis under thread visibility** (issue arms read the resolution thread, as every arm always has), NOT blind pre-resolution maintenance — stated verbatim in the report.
 
 ## Evidence matrix (reported as-is; no symmetry claim)
 | Arm | PR checkout | PR discussion | pr_context | Issue thread |

@@ -9,7 +9,7 @@ review threads provide ground truth.
 | Arm | What runs |
 |---|---|
 | **pure skill** | A tool-using agent (read_file/list_dir/grep over the repo + the skill's references) whose instructions are the [vllm-omni-review skill](https://github.com/hsliuustc0106/vllm-omni-skills) SKILL.md — i.e. the "Claude Code + skill" configuration, on DeepSeek. |
-| **pure copilot** | omni-copilot's `pr-review` playbook step exactly as shipped: `agent.review_diff`, single structured pass over the fetched diff with the generic reviewer prompt. No skill, no repo tools. |
+| **pure copilot** | infermatrix-copilot's `pr-review` playbook step exactly as shipped: `agent.review_diff`, single structured pass over the fetched diff with the generic reviewer prompt. No skill, no repo tools. |
 | **copilot + skill** | The copilot's structured review step with the skill injected as guidance (SKILL.md + the references its routing table selects for this diff) — how the copilot's skill store would feed `adaptive_guidance`. |
 
 ## Benchmark set
@@ -59,7 +59,7 @@ python eval/run_eval.py --skill-dir /path/to/vllm-omni-skills/skills/vllm-omni-r
 # artifacts land in eval/raw/, scores in eval/RESULTS.md
 ```
 
-Requires: `.env` with the DeepSeek key, `gh` authenticated, /rebase/vllm-omni checkout.
+Requires: `.env` with the DeepSeek key, `gh` authenticated, and a local vllm-omni checkout (set `OMNI_REPO`).
 All stages cache into `eval/raw/` — reruns only redo missing pieces.
 
 Metric v2 (literature-grounded redesign): see [METRIC_V2.md](./METRIC_V2.md).

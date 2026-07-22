@@ -6,15 +6,15 @@ import json
 
 import pytest
 
-from omni_copilot.engine.agent_runtime import (
+from infermatrix_copilot.engine.agent_runtime import (
     BASE_OUTPUT_SCHEMA,
     run_agent_step,
 )
-from omni_copilot.engine.steps import register_builtin_steps
-from omni_copilot.engine.registry import StepRegistry
-from omni_copilot.engine.step import FailureKind, StepContext
-from omni_copilot.llm import Block, Reply
-from omni_copilot.memory.skills import SkillStore
+from infermatrix_copilot.engine.steps import register_builtin_steps
+from infermatrix_copilot.engine.registry import StepRegistry
+from infermatrix_copilot.engine.step import FailureKind, StepContext
+from infermatrix_copilot.llm import Block, Reply
+from infermatrix_copilot.memory.skills import SkillStore
 
 
 class ScriptedLLM:

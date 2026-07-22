@@ -12,15 +12,15 @@ import json
 import re
 from pathlib import Path
 
-from omni_copilot.engine.steps import register_builtin_steps
-from omni_copilot.engine.steps._common import require_repo
-from omni_copilot.engine.executor import Executor
-from omni_copilot.engine.registry import StepRegistry
-from omni_copilot.engine.step import FailureKind, StepContext, StepResult, StepSpec
-from omni_copilot.llm import Block, Reply
-from omni_copilot.playbooks.store import Playbook, PlaybookStep, PlaybookStore
-from omni_copilot.review.diff_summary import DiffSummary
-from omni_copilot.review.triggers import evaluate_triggers
+from infermatrix_copilot.engine.steps import register_builtin_steps
+from infermatrix_copilot.engine.steps._common import require_repo
+from infermatrix_copilot.engine.executor import Executor
+from infermatrix_copilot.engine.registry import StepRegistry
+from infermatrix_copilot.engine.step import FailureKind, StepContext, StepResult, StepSpec
+from infermatrix_copilot.llm import Block, Reply
+from infermatrix_copilot.playbooks.store import Playbook, PlaybookStep, PlaybookStore
+from infermatrix_copilot.review.diff_summary import DiffSummary
+from infermatrix_copilot.review.triggers import evaluate_triggers
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -228,7 +228,7 @@ def _write_skill(directory: Path, name: str, description: str) -> None:
 
 def test_per_repo_skills_rank_first_and_receive_proposals(settings, trace,
                                                           tmp_path, git_repo):
-    from omni_copilot.engine.agent_runtime import _retrieve_skills
+    from infermatrix_copilot.engine.agent_runtime import _retrieve_skills
 
     _write_skill(settings.skills_dir, "shared-skill", "how to fix ci failures")
     adapter_root = settings.adapters_dir / "myrepo"
@@ -251,7 +251,7 @@ def test_per_repo_skills_rank_first_and_receive_proposals(settings, trace,
 
 
 def test_no_adapter_falls_back_to_shared_pool(settings, trace, tmp_path, git_repo):
-    from omni_copilot.engine.agent_runtime import _retrieve_skills
+    from infermatrix_copilot.engine.agent_runtime import _retrieve_skills
 
     _write_skill(settings.skills_dir, "shared-skill", "how to fix ci failures")
     ctx = StepContext(settings=settings, params={}, run_dir=tmp_path / "run",
@@ -269,7 +269,7 @@ def test_no_adapter_falls_back_to_shared_pool(settings, trace, tmp_path, git_rep
 def test_high_risk_modules_from_adapter_override():
     summary = DiffSummary(changed_files=["x.py"], insertions=1,
                           tests_run=["pytest"])
-    from omni_copilot.config import Settings
+    from infermatrix_copilot.config import Settings
     settings = Settings(_env_file=None)
     assert "custom_mod" not in settings.high_risk_modules
     fired = evaluate_triggers(summary, settings, touched_modules=("custom_mod",),
@@ -281,7 +281,7 @@ def test_high_risk_modules_from_adapter_override():
 
 
 def test_adapter_zero_declares_risk_tiers():
-    from omni_copilot.adapters.base import load_adapter
+    from infermatrix_copilot.adapters.base import load_adapter
     adapter = load_adapter(REPO_ROOT / "adapters" / "vllm_omni")
     assert set(adapter.high_risk_modules) == {"worker_runner", "model_executor",
                                              "scheduler"}
@@ -293,7 +293,7 @@ def test_adapter_zero_declares_risk_tiers():
 # list can only shrink. A new repo-specific literal anywhere else fails.
 _KNOWN_LEAKS = {
     "__init__.py": 1,            # package docstring
-    "config.py": 3,              # default_repo + rebase_agent_root default
+    "config.py": 2,              # default_repo + rebase_agent_root sibling name
     "engine/steps/rebase_ext.py": 1,     # orchestrator-not-found hint (delegation)
     "engine/steps/rebase_native.py": 6,  # parent-package delegation (by design)
     "intent.py": 2,              # parse_* default_repo parameter defaults
@@ -304,7 +304,7 @@ _LEAK = re.compile(r"vllm[_\- ]?omni|/rebase/", re.IGNORECASE)
 
 
 def test_repo_neutral_core():
-    src = REPO_ROOT / "src" / "omni_copilot"
+    src = REPO_ROOT / "src" / "infermatrix_copilot"
     for path in sorted(src.rglob("*.py")):
         rel = str(path.relative_to(src))
         count = len(_LEAK.findall(path.read_text(encoding="utf-8")))

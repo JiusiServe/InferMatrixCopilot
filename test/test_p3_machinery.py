@@ -8,13 +8,13 @@ import asyncio
 import json
 import time
 
-from omni_copilot.engine.steps import register_builtin_steps
-from omni_copilot.engine.registry import StepRegistry
-from omni_copilot.engine.step import StepContext
-from omni_copilot.llm import Block, Reply
-from omni_copilot.adapters.base import load_adapter
-from omni_copilot.profiles.consolidate import decay_stale, detect_drift
-from omni_copilot.profiles.store import ProfileStore
+from infermatrix_copilot.engine.steps import register_builtin_steps
+from infermatrix_copilot.engine.registry import StepRegistry
+from infermatrix_copilot.engine.step import StepContext
+from infermatrix_copilot.llm import Block, Reply
+from infermatrix_copilot.adapters.base import load_adapter
+from infermatrix_copilot.profiles.consolidate import decay_stale, detect_drift
+from infermatrix_copilot.profiles.store import ProfileStore
 
 import sys
 from pathlib import Path
@@ -158,7 +158,7 @@ def test_judge_reports_but_never_mutates(settings, trace, tmp_path, git_repo):
 
 
 def test_consolidate_playbook_is_candidate_only(settings):
-    from omni_copilot.playbooks.store import PlaybookStore
+    from infermatrix_copilot.playbooks.store import PlaybookStore
     from test_v2_p0 import REPO_ROOT
 
     store = PlaybookStore(REPO_ROOT / "playbooks", _registry())
@@ -171,7 +171,7 @@ def test_consolidate_playbook_is_candidate_only(settings):
 # -- ablation switch (§V2.3.5) -----------------------------------------------------
 
 def test_briefing_ablation_switch(settings, trace, tmp_path, git_repo):
-    from omni_copilot.engine.agent_runtime import run_agent_step
+    from infermatrix_copilot.engine.agent_runtime import run_agent_step
 
     adapter, _ = _adapter_with_profile(
         settings, git_repo, [_fact_op("uv", "Use `uv pip install` only")])

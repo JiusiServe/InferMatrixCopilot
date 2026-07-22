@@ -1,4 +1,4 @@
-# Docstring style — omni-copilot
+# Docstring style — infermatrix-copilot
 
 The house convention for docstrings, grounded in [PEP 257](https://peps.python.org/pep-0257/)
 (structure) and the [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html)

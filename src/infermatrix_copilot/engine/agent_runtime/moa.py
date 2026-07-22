@@ -52,7 +52,7 @@ def resolve_members(settings: Any) -> list[Member]:
 
     from ...metrics import MODEL_PRICES
 
-    log = logging.getLogger("omni_copilot")
+    log = logging.getLogger("infermatrix_copilot")
     has_override = (float(getattr(settings, "token_price_in_per_mtok", 0)) > 0
                     or float(getattr(settings, "token_price_out_per_mtok", 0)) > 0)
     out: list[Member] = []

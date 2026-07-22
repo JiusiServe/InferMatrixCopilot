@@ -21,7 +21,7 @@ owner approval; WS1 is in-repo and proceeds on owner's go.
 
 ### Goal
 One MCP server exposing the copilot's **genuinely read-only** task kinds over
-**stdio**, usable from **both** Claude Code and Codex, while the `omni-copilot`
+**stdio**, usable from **both** Claude Code and Codex, while the `infermatrix-copilot`
 CLI keeps working unchanged and **in-process**. The safety guarantee — *the host
 cannot widen the server's permissions* — is enforced **structurally in the
 child**, not by tool schemas or file trust.
@@ -61,7 +61,7 @@ could rewrite, so policy is enforced **twice**, child-authoritative:
   **no** run dir (asserted by a test). `reserve_run`/reserved-exec child are new
   and **MCP-only**.
 - **MCP launches a subprocess** via `sys.executable -m
-  omni_copilot.<reserved-exec-entry> --run-id <id>` — keeps copilot stdout in
+  infermatrix_copilot.<reserved-exec-entry> --run-id <id>` — keeps copilot stdout in
   `<run_dir>/console.log` (server stdout = JSON-RPC only) and makes
   `tracing._default` / `last_run_dir` per-process. Dir exists **before** planning
   by design; a plan-review `blocked` / failure is a **terminal** poll record, not
@@ -118,32 +118,32 @@ touched (the rev-4/5 multi-server bug).
    `READ_ONLY_KINDS`), `reserve_run`, reserved-exec module entry (id-validated,
    dir contained in-child, child writes own pid, single-writer transitions).
    CLI `run_task` **unchanged**; all 227 tests hold.
-2. **MCP server** (`src/omni_copilot/mcp_server.py`, new): `mcp` SDK (FastMCP)
+2. **MCP server** (`src/infermatrix_copilot/mcp_server.py`, new): `mcp` SDK (FastMCP)
    over stdio; `server_id` + liveness token; single-worker `queue.Queue`;
    `sys.executable -m` launcher; parent-on-exit + lazy-at-read + startup/periodic
    ownership-aware reconciliation under `flock`; V1 tools; allowlist/pagination
-   settings. `omni-copilot-mcp` console-script behind an optional `[mcp]` extra.
+   settings. `infermatrix-copilot-mcp` console-script behind an optional `[mcp]` extra.
 3. **Claude Code plugin** — **verified layout & flow** (`discover-plugins.md`,
    `plugins.md`):
    - Plugin: `.claude-plugin/plugin.json` `{name, version, description, author?}`;
      plugin-root `.mcp.json`
-     `{"mcpServers":{"omni-copilot":{"type":"stdio","command":"…","args":[…],
+     `{"mcpServers":{"infermatrix-copilot":{"type":"stdio","command":"…","args":[…],
      "env":{…}}}}` with `${CLAUDE_PLUGIN_ROOT}` / `${VAR:-default}` substitution.
    - Marketplace: a repo-level **`.claude-plugin/marketplace.json`** naming the
-     marketplace and listing the `omni-copilot` plugin + its `source`.
+     marketplace and listing the `infermatrix-copilot` plugin + its `source`.
    - Install flow (a marketplace is **always** required — no bare-GitHub install):
      `/plugin marketplace add tzhouam/<repo>` then
-     `/plugin install omni-copilot@<marketplace>` (or the non-interactive CLI
-     `claude plugin install omni-copilot@<marketplace> [--scope …]`).
+     `/plugin install infermatrix-copilot@<marketplace>` (or the non-interactive CLI
+     `claude plugin install infermatrix-copilot@<marketplace> [--scope …]`).
    - **Package prerequisite (verified):** installing the plugin does **not**
      pip/uv-install the Python package — the `.mcp.json` `command` must already
      resolve. **Prefer a preinstalled, pinned package** (`uv tool
-     install`/`pipx install 'omni-copilot==<pinned>'`, command =
-     `omni-copilot-mcp` or a plugin `bin/` shim). A floating `uvx --from
+     install`/`pipx install 'infermatrix-copilot==<pinned>'`, command =
+     `infermatrix-copilot-mcp` or a plugin `bin/` shim). A floating `uvx --from
      git+…@<ref>` is an explicit opt-in fallback only (network latency +
      supply-chain drift + startup-timeout risk).
    - Host-agnostic escape hatch remains `claude mcp add`.
-4. **Codex**: `docs/codex/config.toml` `[mcp_servers.omni_copilot]`
+4. **Codex**: `docs/codex/config.toml` `[mcp_servers.infermatrix_copilot]`
    (`command`/`args`); **forward secrets via Codex `env_vars`**, not literal
    `env` values; optional `AGENTS.md`. No plugin.
 5. **Tests** (offline): `reserve_run` → id + `queued`, no LLM;
@@ -196,7 +196,7 @@ touched (the rev-4/5 multi-server bug).
 
 ## Sequencing & ownership
 - WS1 and WS2 are independent.
-- **WS1** is in-repo → proceeds on owner's go; PR to `tzhouam/vllm-omni-copilot`.
+- **WS1** is in-repo → proceeds on owner's go; PR to `JiusiServe/InferMatrixCopilot`.
   Order: `enforce_mcp_policy` + `reserve_run` + reserved-exec child (single-
   writer) → ownership stamps + parent-on-exit + lazy/startup reconciliation →
   MCP subprocess/queue → boundary/pagination → packaging. (`pr-debug-report` +

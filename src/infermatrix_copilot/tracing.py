@@ -505,7 +505,7 @@ def _main() -> int:
 
     pos = [a for a in sys.argv[1:] if not a.startswith("-")]
     if not pos:
-        print("usage: python -m omni_copilot.tracing <trace.jsonl | run_id> [--io]")
+        print("usage: python -m infermatrix_copilot.tracing <trace.jsonl | run_id> [--io]")
         return 1
     arg = pos[0]
     path = Path(arg)

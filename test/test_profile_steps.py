@@ -5,18 +5,18 @@ redundancy filter, and the repo-profile playbook/task-kind plumbing."""
 import asyncio
 import json
 
-from omni_copilot.engine.steps import register_builtin_steps
-from omni_copilot.engine.steps.review import _sweep_targets
-from omni_copilot.engine.planner import Planner
-from omni_copilot.engine.registry import StepRegistry
-from omni_copilot.engine.step import StepContext
-from omni_copilot.llm import Block, Reply
-from omni_copilot.playbooks.store import PlaybookStore
-from omni_copilot.adapters.base import load_adapter
-from omni_copilot.profiles.establish import (build_doc_corpus, extract_directives,
+from infermatrix_copilot.engine.steps import register_builtin_steps
+from infermatrix_copilot.engine.steps.review import _sweep_targets
+from infermatrix_copilot.engine.planner import Planner
+from infermatrix_copilot.engine.registry import StepRegistry
+from infermatrix_copilot.engine.step import StepContext
+from infermatrix_copilot.llm import Block, Reply
+from infermatrix_copilot.playbooks.store import PlaybookStore
+from infermatrix_copilot.adapters.base import load_adapter
+from infermatrix_copilot.profiles.establish import (build_doc_corpus, extract_directives,
                                              is_redundant, scan_modules)
-from omni_copilot.profiles.store import ProfileStore
-from omni_copilot.task_spec import TaskSpec
+from infermatrix_copilot.profiles.store import ProfileStore
+from infermatrix_copilot.task_spec import TaskSpec
 
 from test_v2_p0 import REPO_ROOT
 
@@ -202,8 +202,8 @@ def test_planner_recalls_repo_profile_for_any_repo():
 
 def test_intent_parses_profile_command():
     # intent is LLM-only; verify repo_profile maps end-to-end through a fake reply
-    from omni_copilot.intent import parse_intent
-    from omni_copilot.llm import Block, Reply
+    from infermatrix_copilot.intent import parse_intent
+    from infermatrix_copilot.llm import Block, Reply
 
     class _LLM:
         available = True

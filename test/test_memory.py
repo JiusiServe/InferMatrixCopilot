@@ -1,7 +1,7 @@
 import pytest
 
-from omni_copilot.memory.debug_memory import DebugMemory
-from omni_copilot.memory.skills import SkillStore
+from infermatrix_copilot.memory.debug_memory import DebugMemory
+from infermatrix_copilot.memory.skills import SkillStore
 
 
 def _entry(**overrides):
@@ -68,7 +68,7 @@ def test_skill_find_ranks_module_match(tmp_path):
 def test_skill_touch_increments_usage(tmp_path):
     """SkillStore.touch bumps run_count + stamps last_used_at, preserving the
     body; unknown names return False instead of raising."""
-    from omni_copilot.memory.skills import SkillStore
+    from infermatrix_copilot.memory.skills import SkillStore
 
     store = SkillStore(tmp_path)
     d = tmp_path / "my-skill"
@@ -85,11 +85,11 @@ def test_skill_touch_increments_usage(tmp_path):
 def test_debug_memory_recorded_from_step_helper(tmp_path):
     """record_debug_memory writes a contract-complete entry into the shared
     pool and never raises on failure."""
-    from omni_copilot.config import Settings
-    from omni_copilot.engine.step import StepContext
-    from omni_copilot.engine.steps._common import record_debug_memory
-    from omni_copilot.memory.debug_memory import DebugMemory
-    from omni_copilot.run_trace import RunTrace
+    from infermatrix_copilot.config import Settings
+    from infermatrix_copilot.engine.step import StepContext
+    from infermatrix_copilot.engine.steps._common import record_debug_memory
+    from infermatrix_copilot.memory.debug_memory import DebugMemory
+    from infermatrix_copilot.run_trace import RunTrace
 
     settings = Settings(_env_file=None, adapters_dir=tmp_path / "adapters",
                         memory_db=tmp_path / "mem.db")

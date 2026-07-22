@@ -5,12 +5,12 @@ import json
 
 import pytest
 
-from omni_copilot.config import _REPO_ROOT
-from omni_copilot.engine import Executor, StepRegistry
-from omni_copilot.engine.steps import register_builtin_steps
-from omni_copilot.engine.steps import rebase_native as rns
-from omni_copilot.notify import Notifier
-from omni_copilot.playbooks.store import PlaybookStore
+from infermatrix_copilot.config import _REPO_ROOT
+from infermatrix_copilot.engine import Executor, StepRegistry
+from infermatrix_copilot.engine.steps import register_builtin_steps
+from infermatrix_copilot.engine.steps import rebase_native as rns
+from infermatrix_copilot.notify import Notifier
+from infermatrix_copilot.playbooks.store import PlaybookStore
 
 
 @pytest.fixture()
@@ -162,7 +162,7 @@ def test_native_blocked_without_parent_package(settings, trace, tmp_path, git_re
     rns._RUNTIME.clear()
 
     registry = register_builtin_steps(StepRegistry())
-    from omni_copilot.engine.step import StepContext
+    from infermatrix_copilot.engine.step import StepContext
     ctx = StepContext(settings=settings, state={"task_spec": {}}, params={},
                       run_dir=tmp_path, trace=trace)
     result = asyncio.run(registry.get("rebase.prelude").handler(ctx))

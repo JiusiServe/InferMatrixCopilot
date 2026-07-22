@@ -4,12 +4,12 @@ capability gaps degrade loudly, never silently."""
 
 import pytest
 
-from omni_copilot.engine.steps import register_builtin_steps
-from omni_copilot.engine.planner import Planner, PlanningError
-from omni_copilot.engine.registry import StepRegistry
-from omni_copilot.playbooks.store import PlaybookStore
-from omni_copilot.adapters.base import load_adapter
-from omni_copilot.task_spec import TaskSpec
+from infermatrix_copilot.engine.steps import register_builtin_steps
+from infermatrix_copilot.engine.planner import Planner, PlanningError
+from infermatrix_copilot.engine.registry import StepRegistry
+from infermatrix_copilot.playbooks.store import PlaybookStore
+from infermatrix_copilot.adapters.base import load_adapter
+from infermatrix_copilot.task_spec import TaskSpec
 
 from test_v2_p0 import REPO_ROOT
 

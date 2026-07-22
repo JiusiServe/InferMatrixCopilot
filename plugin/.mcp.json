@@ -1,8 +1,8 @@
 {
   "mcpServers": {
-    "omni-copilot": {
+    "infermatrix-copilot": {
       "type": "stdio",
-      "command": "omni-copilot-mcp",
+      "command": "infermatrix-copilot-mcp",
       "args": [],
       "env": {
         "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}",
