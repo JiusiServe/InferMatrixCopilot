@@ -132,7 +132,8 @@ class Executor:
             # run-scoped ones rather than the other way round.
             step_params = {**task_params, **pstep.params}
             results = await asyncio.gather(
-                *(self._run_step(spec, step_params, state, item) for item in items)
+                *(self._run_step(spec, step_params, state, item, pstep.id)
+                  for item in items)
             )
             result = _merge(results)
             outcome.step_results[pstep.id] = result
@@ -174,7 +175,8 @@ class Executor:
 
         return outcome
 
-    async def _run_step(self, spec, params: dict, state: dict, item) -> StepResult:
+    async def _run_step(self, spec, params: dict, state: dict, item,
+                        step_id: str = "") -> StepResult:
         """Invoke one step's handler inside a tracing span, retrying only on
         RETRYABLE up to `settings.max_step_retries`. Builds the StepContext from
         `params`, shared `state`, and the current foreach `item`; an unhandled
@@ -188,9 +190,15 @@ class Executor:
         )
         attempts = 1 + max(0, self.settings.max_step_retries)
         last: StepResult | None = None
+        # `step` alone cannot identify the work: a playbook may run the same spec
+        # twice (repo-rebase-native uses rebase.module_rebase for both waves) and
+        # foreach fans it out again, so record the playbook step id and the item.
+        ident = {"step_id": step_id} if step_id else {}
+        if item is not None:
+            ident["item"] = _item_key(item)
         for attempt in range(1, attempts + 1):
             try:
-                with tracing.span("step", step=spec.name, attempt=attempt):
+                with tracing.span("step", step=spec.name, attempt=attempt, **ident):
                     last = await spec.handler(ctx)
             except Exception as exc:  # handler bug != typed failure
                 last = StepResult(False, FailureKind.BLOCKED,
@@ -199,6 +207,20 @@ class Executor:
                 return last
             self.trace.record("step_retry", spec=spec.name, attempt=attempt)
         return last  # exhausted retries
+
+
+def _item_key(item) -> str:
+    """A short label identifying one `foreach` item on its step span — a module
+    name, a failure-group id — so fan-out siblings are told apart in a trace.
+    Length-bounded: this is an identifier for reading, not the item itself."""
+    if isinstance(item, str):
+        return item[:80]
+    if isinstance(item, dict):
+        for k in ("id", "name", "module", "label", "key"):
+            v = item.get(k)
+            if v:
+                return str(v)[:80]
+    return str(item)[:80]
 
 
 def _eval_when(when: str, state: dict) -> bool:

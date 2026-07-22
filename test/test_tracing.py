@@ -163,3 +163,119 @@ def test_llm_create_records_io_text_and_tokens(monkeypatch, tmp_path):
     assert resp["cache_read_tokens"] == 9000
     assert resp["span_id"] == req["span_id"]           # joinable to the span
     assert "in=1000 out=3 cached=9000" in tr.render_events(tmp_path / "trace.jsonl")
+
+
+# ── run header: which workflow produced this trace ───────────────────────────
+def test_run_meta_round_trip_and_report_header(monkeypatch, tmp_path):
+    tr = _fresh(monkeypatch)
+    path = tmp_path / "trace.jsonl"
+    tr.init("run-meta", path)
+    tr.run_meta(playbook="issue-triage@2", task_kind="issue_filter",
+                repo="vllm-omni", tier="L2")
+    with tr.span("step", step="issue.fetch", step_id="fetch"):
+        pass
+    meta = tr.load_run_meta(path)
+    assert meta["playbook"] == "issue-triage@2" and meta["repo"] == "vllm-omni"
+    # the header must not pollute the span stream
+    assert [s["name"] for s in tr.load_spans(path)] == ["step"]
+    out = tr.report(path)
+    assert "playbook=issue-triage@2" in out and "task_kind=issue_filter" in out
+
+
+def test_run_meta_redacts_non_allowlisted_params(monkeypatch, tmp_path):
+    """A trace gets shared for workload analysis, so free-form params (paths,
+    shell commands) must not ride along -- keys yes, values only if allowlisted."""
+    tr = _fresh(monkeypatch)
+    path = tmp_path / "trace.jsonl"
+    tr.init("run-redact", path)
+    tr.run_meta(playbook="p@1", params={
+        "limit": 5,                                  # allowlisted -> kept
+        "review_depth": "full",                      # allowlisted -> kept
+        "command": "omni-rebase --token s3cr3t",     # free-form  -> redacted
+        "state_file": "/home/me/private/state.json",  # path      -> redacted
+    })
+    p = tr.load_run_meta(path)["params"]
+    assert p["limit"] == 5 and p["review_depth"] == "full"
+    assert p["command"] == "<redacted>" and p["state_file"] == "<redacted>"
+    assert set(p) == {"limit", "review_depth", "command", "state_file"}  # keys kept
+    assert "s3cr3t" not in path.read_text() and "private" not in path.read_text()
+
+
+def test_run_meta_is_size_bounded(monkeypatch, tmp_path):
+    tr = _fresh(monkeypatch)
+    path = tmp_path / "trace.jsonl"
+    tr.init("run-big", path)
+    tr.run_meta(playbook="p@1", params={f"k{i}": f"v{i}" for i in range(500)})
+    line = [l for l in path.read_text().splitlines() if l.strip()][0]
+    assert len(line) <= 2048
+    meta = tr.load_run_meta(path)
+    assert meta["truncated"] is True and "params" not in meta
+    assert meta["playbook"] == "p@1"        # identity survives the truncation
+
+
+def test_resume_appends_a_second_header_and_last_wins(monkeypatch, tmp_path):
+    """Resuming re-inits onto the same trace file. Both executions are recorded;
+    readers take the last as current and the report says the trace is spliced."""
+    tr = _fresh(monkeypatch)
+    path = tmp_path / "trace.jsonl"
+    tr.init("run-r", path)
+    tr.run_meta(playbook="p@1", resuming=False)
+    with tr.span("step", step="a", step_id="a"):
+        pass
+    tr.init("run-r", path)                   # <- resume: same file
+    tr.run_meta(playbook="p@1", resuming=True)
+    with tr.span("step", step="b", step_id="b"):
+        pass
+    assert len(tr.load_run_metas(path)) == 2
+    assert tr.load_run_meta(path)["resuming"] is True     # last wins
+    assert len(tr.load_spans(path)) == 2                  # spans from both
+    assert "resumed ×2" in tr.report(path)
+
+
+def test_report_without_a_run_header_still_renders(monkeypatch, tmp_path):
+    """Traces written before headers existed must keep reporting."""
+    tr = _fresh(monkeypatch)
+    path = tmp_path / "trace.jsonl"
+    tr.init("run-old", path)
+    with tr.span("step", step="issue.fetch"):
+        with tr.span("llm", model="m") as sp:
+            tr.set_usage(sp, {"input_tokens": 10, "output_tokens": 2})
+    assert tr.load_run_meta(path) == {}
+    out = tr.report(path)
+    assert "TRACE run-old" in out and "issue.fetch" in out
+
+
+# ── rollup attribution ───────────────────────────────────────────────────────
+def test_rollup_falls_back_to_steps_and_attributes_per_span(monkeypatch, tmp_path):
+    """Two foreach siblings share a step name; each row must get only its own
+    calls/tokens. Keying the rollup by name would fold them together."""
+    tr = _fresh(monkeypatch)
+    path = tmp_path / "trace.jsonl"
+    tr.init("run-fan", path)
+    for mod, ntok in (("model_executor", 100), ("scheduler", 700)):
+        with tr.span("step", step="rebase.module_rebase", step_id="wave1", item=mod):
+            with tr.span("llm", model="m") as sp:
+                tr.set_usage(sp, {"input_tokens": ntok, "output_tokens": 1})
+    out = tr.report(path)
+    rows = [l for l in out.splitlines() if "wave1[" in l]
+    assert len(rows) == 2                       # not merged into one row
+    me = [r for r in rows if "model_executor" in r][0]
+    sc = [r for r in rows if "scheduler" in r][0]
+    assert me.split()[-2:] == ["100", "1"]      # in_tok / out_tok, own only
+    assert sc.split()[-2:] == ["700", "1"]
+    assert "  step " in out and "phase" not in out.split("Top time sinks")[0]
+
+
+def test_rollup_does_not_double_count_a_retry(monkeypatch, tmp_path):
+    tr = _fresh(monkeypatch)
+    path = tmp_path / "trace.jsonl"
+    tr.init("run-retry", path)
+    for attempt, ntok in ((1, 50), (2, 60)):
+        with tr.span("step", step="s.flaky", step_id="flaky", attempt=attempt):
+            with tr.span("llm", model="m") as sp:
+                tr.set_usage(sp, {"input_tokens": ntok, "output_tokens": 1})
+    out = tr.report(path)
+    rows = [l for l in out.splitlines() if l.strip().startswith("flaky")]
+    assert len(rows) == 2
+    assert rows[0].split()[-2] == "50"
+    assert "flaky#2" in rows[1] and rows[1].split()[-2] == "60"

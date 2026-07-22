@@ -232,6 +232,13 @@ class Copilot:
         self.last_run_dir = run_dir
         from .. import tracing
         tracing.init(run_dir.name, run_dir / "trace.jsonl")
+        # Stamp the workflow into the span file itself, so a trace lifted out of
+        # its run directory still says which playbook and task produced it.
+        tracing.run_meta(playbook=f"{playbook.name}@{playbook.version}",
+                         task_kind=spec.kind, repo=spec.repo, tier=tier,
+                         mode=spec.mode, resolution=resolution_mode,
+                         report_only=spec.report_only, post=spec.post,
+                         resuming=resuming, params=spec.params)
         trace = RunTrace(run_dir / "run_trace.jsonl")
         notifier = Notifier(self.settings, run_dir, trace, run_dir.name)
         trace.record("task", spec=spec.model_dump(), resolution=resolution_mode,

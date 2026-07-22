@@ -48,6 +48,14 @@ _IO = os.environ.get("AGENT_TRACE_IO", "0").strip().lower() in ("1", "true", "ye
 _IO_MAX = 0 if os.environ.get("AGENT_TRACE_IO_FULL", "0").strip().lower() in ("1", "true", "yes", "on") \
     else int(os.environ.get("AGENT_TRACE_IO_MAX", "8192") or 8192)
 
+# The run header (see ``run_meta``) is metadata, not payload: hard-bounded, and
+# task params are recorded key-only unless the value is a known-safe scalar.
+_META_MAX = 2048
+_PARAM_ALLOWLIST = frozenset({
+    "limit", "review_depth", "max_groups", "local_ci_only",
+    "continue_on_module_failure",
+})
+
 
 class Span:
     """One timed node. ``set()`` adds attributes; ``mark_ttft()`` stamps the
@@ -156,6 +164,21 @@ class Tracer:
         except Exception:
             pass  # tracing must never break the agent
 
+    def _write_meta(self, rec: dict) -> None:
+        """Append the run header to trace.jsonl (locked, best-effort). It rides
+        in the span file rather than a sibling so a trace stays self-describing
+        when it is copied out of its run directory on its own."""
+        try:
+            line = json.dumps(rec, ensure_ascii=False, default=str)
+            if len(line) > _META_MAX:  # never let a header crowd out the spans
+                rec = dict(rec, truncated=True)
+                rec.pop("params", None)
+                line = json.dumps(rec, ensure_ascii=False, default=str)
+            with self._lock, self.path.open("a", encoding="utf-8") as f:
+                f.write(line + "\n")
+        except Exception:
+            pass  # tracing must never break the agent
+
     @contextlib.contextmanager
     def span(self, name: str, **attr: Any) -> Iterator[Any]:
         """Open a child span named `name`, nesting via the contextvar and
@@ -210,6 +233,39 @@ def span(name: str, **attr: Any):
 def enabled() -> bool:
     """True when tracing is on and a default tracer is installed."""
     return _ENABLED and _default is not None
+
+
+def redact_params(params: Any) -> dict:
+    """Keep every param *key* but only allowlisted, known-scalar *values*.
+
+    A trace is the artifact we hand around for workload analysis, so it has to
+    be safe to share on its own — and params are free-form: steps take a
+    ``command`` to run and ``state_file``/``baseline_status``/``repo_path``
+    filesystem paths. Knowing a param was set is what explains the workload;
+    its value usually is not. Mirrors the allowlist precedent in mcp_policy."""
+    if not isinstance(params, dict):
+        return {}
+    return {str(k): (v if k in _PARAM_ALLOWLIST and isinstance(v, (int, float, bool, str))
+                     and len(str(v)) <= 64 else "<redacted>")
+            for k, v in params.items()}
+
+
+def run_meta(**fields: Any) -> None:
+    """Record what workflow produced this trace: playbook, task kind, repo,
+    tier, params — whatever the caller knows at init time.
+
+    Written as a ``{"t": "run"}`` header line rather than a root span, so span
+    parenting is untouched and every existing reader ignores it (``load_spans``
+    filters on ``t == "span"``). Resuming a run re-inits onto the same file and
+    appends a second header; that is legal and meaningful — the trace really
+    does hold spans from two executions. Readers take the last as current."""
+    if _default is None or not _ENABLED:
+        return
+    rec = {"t": "run", "trace_id": _default.run_id, "ts": round(time.time(), 6)}
+    if "params" in fields:
+        fields = dict(fields, params=redact_params(fields["params"]))
+    rec.update(fields)
+    _default._write_meta(rec)
 
 
 def usage_counts(usage: Any) -> dict:
@@ -353,6 +409,35 @@ def load_spans(trace_path: os.PathLike | str) -> list[dict]:
     return spans
 
 
+def load_run_metas(trace_path: os.PathLike | str) -> list[dict]:
+    """Every ``{"t": "run"}`` header in the trace, in file order. More than one
+    means the run was resumed onto the same file — each header opens a distinct
+    execution, so the count is itself part of why the trace looks as it does."""
+    metas = []
+    p = Path(trace_path)
+    if not p.exists():
+        return metas
+    for line in p.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if rec.get("t") == "run":
+            metas.append(rec)
+    return metas
+
+
+def load_run_meta(trace_path: os.PathLike | str) -> dict:
+    """The current run header — the *last* one written, so a resumed run
+    reports the execution that actually produced the latest spans. Empty dict
+    for traces written before headers existed."""
+    metas = load_run_metas(trace_path)
+    return metas[-1] if metas else {}
+
+
 def _pctl(values: list[float], q: float) -> float:
     """Return the `q` quantile (0..1) of `values`; 0.0 when empty."""
     if not values:
@@ -378,31 +463,50 @@ def report(trace_path: os.PathLike | str) -> str:
 
     lines = [f"TRACE {spans[0]['trace_id']}   spans={len(spans)}"]
 
-    # per-phase rollup
-    phases = by_name.get("phase", [])
-    if phases:
-        lines.append("\n  phase        wall_s   llm_calls  tool_calls  in_tok    out_tok")
+    # what workflow produced this trace (absent on traces predating run headers)
+    metas = load_run_metas(trace_path)
+    if metas:
+        m = metas[-1]
+        desc = "  ".join(f"{k}={v}" for k, v in m.items()
+                         if k not in ("t", "trace_id", "ts") and v not in (None, "", {}))
+        lines.append(f"  {desc}")
+        if len(metas) > 1:
+            lines.append(f"  resumed ×{len(metas)} — spans below span several executions")
+
+    # per-phase rollup, falling back to per-step for playbook runs (which have
+    # no phase spans — this table silently rendered nothing for them before)
+    groups = by_name.get("phase", []) or by_name.get("step", [])
+    if groups:
+        gname = "phase" if by_name.get("phase") else "step"
+        lines.append(f"\n  {gname:<11}  wall_s   llm_calls  tool_calls  in_tok    out_tok")
         span_by_id = {s["span_id"]: s for s in spans}
 
-        def _phase_of(s: dict) -> Optional[str]:
-            """Walk parents (bounded) to find the enclosing phase name, if any."""
+        def _group_of(s: dict) -> Optional[str]:
+            """Walk parents (bounded) for the enclosing group span, keyed by
+            span_id. Keying by name would merge foreach siblings and retries —
+            which share a step name — into one row and double-count them."""
             cur = s
             seen = 0
             while cur and seen < 12:
-                if cur["name"] == "phase":
-                    return cur["attr"].get("phase") or cur["span_id"]
+                if cur["name"] == gname:
+                    return cur["span_id"]
                 cur = span_by_id.get(cur.get("parent"))
                 seen += 1
             return None
 
-        for ph in phases:
-            pname = ph["attr"].get("phase", ph["span_id"])
-            plls = [s for s in llm if _phase_of(s) == pname]
-            ptools = [s for s in tools if _phase_of(s) == pname]
-            in_tok = sum(s["attr"].get("prompt_tokens", 0) for s in plls)
-            out_tok = sum(s["attr"].get("completion_tokens", 0) for s in plls)
-            lines.append(f"  {pname:<11} {ph['dur_ms']/1000:>7.1f}  {len(plls):>9}  "
-                         f"{len(ptools):>10}  {in_tok:>7}  {out_tok:>7}")
+        for g in groups:
+            a = g["attr"]
+            label = a.get("phase") or a.get("step_id") or a.get("step") or g["span_id"]
+            if a.get("item"):            # foreach fan-out: which item drove this
+                label = f"{label}[{a['item']}]"
+            if (a.get("attempt") or 1) > 1:
+                label = f"{label}#{a['attempt']}"
+            glls = [s for s in llm if _group_of(s) == g["span_id"]]
+            gtools = [s for s in tools if _group_of(s) == g["span_id"]]
+            in_tok = sum(s["attr"].get("prompt_tokens", 0) for s in glls)
+            out_tok = sum(s["attr"].get("completion_tokens", 0) for s in glls)
+            lines.append(f"  {label:<11} {g['dur_ms']/1000:>7.1f}  {len(glls):>9}  "
+                         f"{len(gtools):>10}  {in_tok:>7}  {out_tok:>7}")
 
     # inference-engine view
     if llm:

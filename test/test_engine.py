@@ -165,3 +165,49 @@ def test_handler_exception_becomes_blocked(env):
     outcome = asyncio.run(executor.run(playbook([PlaybookStep("a", "s.boom")]), {}))
     assert outcome.status == "blocked"
     assert "bug in handler" in outcome.blocked_reason
+
+
+def test_step_span_records_step_id_and_foreach_item(env, tmp_path):
+    """A step span must say which playbook step and which foreach item it was:
+    repo-rebase-native runs rebase.module_rebase for BOTH waves and fans each
+    out, so `step` alone cannot tell those spans apart."""
+    import infermatrix_copilot.tracing as tracing
+    registry, executor, _ = env
+    path = tmp_path / "trace.jsonl"
+    tracing.init("run-fan", path)
+    try:
+        registry.register(make_step("s.mod", lambda ctx: StepResult(True, summary="ok")))
+        pb = playbook([PlaybookStep("wave1", "s.mod", foreach="modules")])
+        outcome = asyncio.run(executor.run(
+            pb, {"modules": ["model_executor", "scheduler"]}))
+        assert outcome.status == "done"
+        steps = [s for s in tracing.load_spans(path) if s["name"] == "step"]
+        assert len(steps) == 2
+        assert {s["attr"]["step_id"] for s in steps} == {"wave1"}
+        assert {s["attr"]["item"] for s in steps} == {"model_executor", "scheduler"}
+    finally:
+        tracing.init("noop", tmp_path / "discard.jsonl")
+
+
+def test_step_span_omits_item_when_not_foreach(env, tmp_path):
+    import infermatrix_copilot.tracing as tracing
+    registry, executor, _ = env
+    path = tmp_path / "trace.jsonl"
+    tracing.init("run-plain", path)
+    try:
+        registry.register(make_step("s.one", lambda ctx: StepResult(True, summary="ok")))
+        asyncio.run(executor.run(playbook([PlaybookStep("fetch", "s.one")]), {}))
+        step = [s for s in tracing.load_spans(path) if s["name"] == "step"][0]
+        assert step["attr"]["step_id"] == "fetch"
+        assert "item" not in step["attr"]
+    finally:
+        tracing.init("noop", tmp_path / "discard.jsonl")
+
+
+def test_item_key_shortens_dicts_and_strings():
+    from infermatrix_copilot.engine.executor import _item_key
+    assert _item_key("model_executor") == "model_executor"
+    assert _item_key({"name": "grp-3", "detail": "x" * 999}) == "grp-3"
+    assert _item_key({"id": 7}) == "7"
+    assert len(_item_key("z" * 500)) == 80
+    assert len(_item_key({"unknown": "y" * 500})) == 80   # falls back to str()
