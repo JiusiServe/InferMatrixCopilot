@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive reviewer concerns (bot noise + 'thanks'), so both candidates are judged on diff-grounded quality alone. Both correctly verify the core fix (>=10 → ==10 excludes sm_120/121) and independently raise the same legitimate sm_110a gap as a hedged minor note with concrete file:line. Y goes further with explicit caller-chain tracing (quack_fp8.py→patch.py:412-414), a broader validated checklist, and one additional concrete finding (stale 'Blackwell-only' comment in pyproject.toml:102) that X doesn't surface, giving Y a modest edge in thoroughness and actionability without sacrificing precision.",
+  "_cost_usd": 0.1292082,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "c02e666ff1b806fb8d7fc433b18ddf864e17ec844031da0a5955cc0722eaf6d5",
+    "judge_rep": 1
+  }
+}

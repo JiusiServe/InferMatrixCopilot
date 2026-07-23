@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.9,
+    "actionability": 0.4,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Neither candidate surfaces the one substantive ground-truth concern (whether the test should more deeply verify the reduce_scatter wiring beyond hasattr), so recall is near-zero for both. X delivers three concrete, file/line-anchored findings grounded in the diff (stale comment after the cfg_parallel_size guard change is a real inconsistency; missing docstring and 'dead' None-check are minor but valid and actionable), giving it far higher actionability. Y's review is mostly narrative validation of correctness (DPMetadata construction, cleanup, group separation) ending in APPROVE with a single vague 'worth a comment' suggestion that isn't a concrete code change, so despite being technically ungrounded-free, it offers little actionable value.",
+  "_cost_usd": 0.15700150000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "0d0cc37be66331aef02bb481c365aff8902f505a8ce5ece8ecad354383d60972",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.7,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.75,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y recalls the two most significant author-confirmed bugs from the human thread — the trust_remote_code default flip and the endpoint-restrictions-resolved-from-wrong-pipeline issue (correctly noting the latter is now covered by a regression test) — plus touches the hf-config caching/mutability concern. X only substantively catches the trust_remote_code issue; its other findings (docstring gaps, duplicate warning logs, e2e-only coverage) are plausible but don't map to ground-truth concerns and one (duplicate warnings) is weakly grounded. X is more structured and evidence-tagged (slightly higher actionability), but Y's broader recall of the real reviewer concerns outweighs that.",
+  "_cost_usd": 0.30949519999999997,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "5d7b8c346b2d6e374478ac2160487dfb2da33f36f64f546726e01f12a1d71fd9",
+    "judge_rep": 2
+  }
+}

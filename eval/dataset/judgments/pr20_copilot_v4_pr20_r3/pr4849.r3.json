@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.45,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X's minor findings substantively engage the same fragile-assumption territory the human reviewer flagged (indexing source_outputs[0]/outputs[0] without guards) and independently proposes concrete verification runs, mirroring Bounty-hunter's ask for a specific pytest invocation — each finding is grounded with file:line citations and a concrete fix/test suggestion. Y is essentially a clean APPROVE with thin non-blocking notes (dead param, vague CI caveat, one 'optional' test gap), missing the actual back-and-forth (parent-identity check request, precommit fix, specific test run) that occurred on this PR, so despite being well-grounded it under-covers reviewer concerns and gives little for an author to act on.",
+  "_cost_usd": 0.0785568,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "a8e0833216b086fdc787f0eb13267eb9e085dad7ac19e435de196020bf9850b7",
+    "judge_rep": 3
+  }
+}

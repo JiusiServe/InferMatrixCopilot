@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.65,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The sole substantive ground-truth concern (yJader's comment) is that already_submitted shouldn't gate the unwrap because both submit_initial and submit_update reject list prompts identically. X explicitly verifies exactly this (stage_pool.py:951-955 and 1022-1026), reproducing the reviewer's core reasoning almost precisely. Y identifies the same line and calls the fix correct but never checks that both submit paths reject lists, missing the semantic 'why' that is the entire content of the ground-truth comment. Y also inflates a non-issue into a [major] blocking-style test request despite two clean LGTM approvals, and adds a docstring/hasattr claim that can't be grounded in the given diff. Both cite an issue number not present in the diff (X: #4079, Y: #4839), a wash on that front. X is more tightly grounded and mirrors the actual reviewer insight, giving it a clear edge.",
+  "_cost_usd": 0.1430502,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "e8fc984f9cae97fe43bb7be733c0df09a7064c59be1153d6845cde562f519099",
+    "judge_rep": 1
+  }
+}

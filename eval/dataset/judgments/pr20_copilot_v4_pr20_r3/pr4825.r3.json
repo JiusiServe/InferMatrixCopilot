@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.65,
+    "actionability": 0.1,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth's substantive concern (dsocek's suggestion to derive component/name mapping from `_packed_modules_mapping`/`stacked_params_mapping` rather than hardcoded lists) isn't hit precisely by either candidate, but X's comment #1 about consolidating hardcoded component lists into a single source of truth (`_dit_modules`) is conceptually adjacent and shows real investigative grounding with specific file/line citations; X also flags a concrete, plausible follow-up gap (text-encoder LoRA silent no-op). Y merely re-validates that the diff is correct and recommends APPROVE with zero critical or forward-looking findings, missing all reviewer concerns and offering nothing actionable. X's comments are concrete and pinpointed while Y's are purely confirmatory.",
+  "_cost_usd": 0.0719629,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "d994f274c9182cdba73846a7739bf89f32218a7a145188f1ae5be9998b252162",
+    "judge_rep": 3
+  }
+}

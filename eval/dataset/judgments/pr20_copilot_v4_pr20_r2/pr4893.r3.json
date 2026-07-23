@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.75,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth is thin and mostly social (blurred-image question, LGTM, a startup-success confirmation) plus one inline ask about whether the test's reduce_scatter hasattr checks are sufficient; neither candidate reproduces that concern, but Y at least explicitly engages the same test lines (121-126) while X never mentions reduce_scatter testing at all, giving Y marginally better recall. Both candidates' own findings are plausible and diff-grounded, but X leans on an unverified claim about destroy_model_parallel behavior from a file not in the diff, whereas Y stays strictly within the shown diff and offers two concrete, actionable suggestions (add a branch test for the dp_group-None/world_size<=1 guard with specifics on what to mock/assert, and add an inline comment justifying the cfg_parallel_size guard removal). X's single suggested comment is vaguer ('worth a one-line comment'). Overall Y is slightly stronger on grounding and actionability.",
+  "_cost_usd": 0.1813262,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "0a642a2b50aed28cdb8a37855b1332e64e031e309348d08c4b57f3e2f31a0566",
+    "judge_rep": 3
+  }
+}

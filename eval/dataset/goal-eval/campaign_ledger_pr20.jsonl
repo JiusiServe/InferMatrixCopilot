@@ -1,0 +1,13 @@
+{"kind": "reserve", "rid": "gen-r1", "hard_max_usd": 24.0, "note": "generate copilot_v4_pr20_r1", "ts": "2026-07-22T18:17:30"}
+{"kind": "settle", "rid": "gen-r1", "usd": 4.1086, "note": "gen copilot_v4_pr20_r1", "ts": "2026-07-22T19:32:47"}
+{"kind": "reserve", "rid": "judge-r1", "hard_max_usd": 18.0, "note": "judge copilot_v4_pr20_r1", "ts": "2026-07-22T19:32:48"}
+{"kind": "settle", "rid": "judge-r1", "usd": 11.516998900000003, "note": "judge copilot_v4_pr20_r1 n=60", "ts": "2026-07-22T20:01:28"}
+{"kind": "reserve", "rid": "gen-r2", "hard_max_usd": 24.0, "note": "generate copilot_v4_pr20_r2", "ts": "2026-07-22T20:01:28"}
+{"kind": "settle", "rid": "gen-r2", "usd": 3.4758, "note": "gen copilot_v4_pr20_r2", "ts": "2026-07-22T21:06:09"}
+{"kind": "reserve", "rid": "judge-r2", "hard_max_usd": 18.0, "note": "judge copilot_v4_pr20_r2", "ts": "2026-07-22T21:06:11"}
+{"kind": "settle", "rid": "judge-r2", "usd": 11.078029299999995, "note": "judge copilot_v4_pr20_r2 n=60", "ts": "2026-07-22T21:31:53"}
+{"kind": "reserve", "rid": "gen-r3", "hard_max_usd": 24.0, "note": "generate copilot_v4_pr20_r3", "ts": "2026-07-22T21:31:53"}
+{"kind": "settle", "rid": "gen-r3", "usd": 3.6748, "note": "gen copilot_v4_pr20_r3", "ts": "2026-07-22T22:38:55"}
+{"kind": "reserve", "rid": "judge-r3", "hard_max_usd": 18.0, "note": "judge copilot_v4_pr20_r3", "ts": "2026-07-22T22:38:57"}
+{"kind": "settle", "rid": "judge-r3", "usd": 11.580331800000002, "note": "judge copilot_v4_pr20_r3 n=60", "ts": "2026-07-22T23:07:57"}
+{"kind": "settle", "rid": "judge-r3-fix", "usd": 0.0551, "note": "re-judge 1 malformed verdict (lowercase winner) pr4816.r2", "ts": "2026-07-22T23:09:23"}

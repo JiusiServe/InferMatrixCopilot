@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.55,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y catches the two concerns human reviewers emphasized most — the trust_remote_code default flip (near-verbatim match to alex-jw-brooks's inline comment) and the endpoint-restriction/deploy-override resolution order, correctly noting the regression test now covers it — while X misses the pipeline-resolution-order issue entirely despite it being the PR's most-discussed bug. X's findings (docstring staleness tagged 'major', an unverifiable claim about a missing try/except, minor naming nitpicks) are lower-value and less grounded, whereas Y's extra findings (UNSUPPORTED_ROUTES skip path, cache invalidation scope, status_code fragility) are specific, calibrated, and tied to actual code paths. Both give concrete file/line pointers, so actionability is comparably strong; neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.2633135,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "7a48dfe65a8a9a9554d9c6d602ff53ca6a10854603c302b7f7f4fa1544d282d1",
+    "judge_rep": 2
+  }
+}

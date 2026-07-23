@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.28,
+    "precision": 0.75,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.38,
+    "precision": 0.8,
+    "actionability": 0.78
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently rediscovered the api_server.py hasattr-guard bug that silently skips the global UNSUPPORTED_ROUTES restriction, and both flagged the trust_remote_code default flip (True→False) as the main behavior-change concern, matching GT's core threads. Y additionally engages with the endpoint-restriction-resolves-wrong-pipeline thread (confirming the fix holds) and the hf_config caching/mutability concern raised by yuanheng-zhao, giving it broader recall of GT's discussion threads, while X's unique contributions (dead-code nit, missing UNSUPPORTED_ROUTES test) are more minor. X is slightly more actionable with explicit file:line/severity tags and concrete 'Fix:' instructions, but Y's narrative still ties findings to specific code and gives a clear verdict. Neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.2596652,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "51a2e92fba251424948dde686ef47589a9df9ded906b0119e60de63664046eb5",
+    "judge_rep": 2
+  }
+}

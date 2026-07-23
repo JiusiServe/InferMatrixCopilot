@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.6,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth centers on two threads: (1) the seed-reproducibility regression for talker_mtp under full cudagraphs (gcanlin's 'mtp seed failed when decode batch > 1'), and (2) the NPU deploy config needing cudagraph_mode: PIECEWISE to avoid a crash (Wallbreazzz). Y explicitly surfaces both — flagging the missing accuracy A/B given the seeding change and questioning whether the NPU PIECEWISE addition was applied correctly to both stages — while X never mentions seeding or the NPU config at all. X's major findings (OOM risk from max_num_seqs 64, missing tests for graph-wrapped/async paths) are grounded in the diff but are speculative and partly contradicted by the PR's own benchmark evidence (256/256 requests completed with no OOM). Both candidates independently catch the two stale-comment issues (prefix caching, batch-token header) with good file/line specificity, and both are reasonably actionable, but Y's findings track the actual human review concerns far more closely.",
+  "_cost_usd": 0.2593586,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "885ddb1a2ed6fe92e53a8fa20b5fb2ce75d4226de38effb4aa49c463f20ee6db",
+    "judge_rep": 1
+  }
+}

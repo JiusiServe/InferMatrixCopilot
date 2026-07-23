@@ -1,0 +1,636 @@
+{
+ "arms": {
+  "copilot_v4_pr20_r1": [
+   {
+    "run_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1/runs/pr4762/run-20260722-190517-513f95",
+    "errors": [],
+    "run_trace_events": 126,
+    "bytes": {
+     "trace.jsonl": 24273,
+     "events.jsonl": 15671398,
+     "run_trace.jsonl": 28932
+    },
+    "llm_spans": 54,
+    "llm_requests": 54,
+    "llm_responses": 54,
+    "spans_total": 59,
+    "tokens": {
+     "spans": {
+      "in": 888472,
+      "out": 100553
+     },
+     "events": {
+      "in": 888472,
+      "out": 100553
+     },
+     "metrics": {
+      "in": 888472,
+      "out": 100553
+     }
+    },
+    "usd": 0.4309,
+    "stem": "pr4762"
+   },
+   {
+    "run_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1/runs/pr4777/run-20260722-192039-162777",
+    "errors": [],
+    "run_trace_events": 84,
+    "bytes": {
+     "trace.jsonl": 15341,
+     "events.jsonl": 7900427,
+     "run_trace.jsonl": 19167
+    },
+    "llm_spans": 33,
+    "llm_requests": 33,
+    "llm_responses": 33,
+    "spans_total": 38,
+    "tokens": {
+     "spans": {
+      "in": 532745,
+      "out": 24920
+     },
+     "events": {
+      "in": 532745,
+      "out": 24920
+     },
+     "metrics": {
+      "in": 532745,
+      "out": 24920
+     }
+    },
+    "usd": 0.208,
+    "stem": "pr4777"
+   },
+   {
+    "run_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1/runs/pr4804/run-20260722-183323-dc7b94",
+    "errors": [],
+    "run_trace_events": 128,
+    "bytes": {
+     "trace.jsonl": 30172,
+     "events.jsonl": 19203337,
+     "run_trace.jsonl": 31920
+    },
+    "llm_spans": 68,
+    "llm_requests": 68,
+    "llm_responses": 68,
+    "spans_total": 73,
+    "tokens": {
+     "spans": {
+      "in": 771757,
+      "out": 100383
+     },
+     "events": {
+      "in": 771757,
+      "out": 100383
+     },
+     "metrics": {
+      "in": 771757,
+      "out": 100383
+     }
+    },
+    "usd": 0.4319,
+    "stem": "pr4804"
+   },
+   {
+    "run_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1/runs/pr4810/run-20260722-181732-136b92",
+    "errors": [],
+    "run_trace_events": 105,
+    "bytes": {
+     "trace.jsonl": 20042,
+     "events.jsonl": 13673113,
+     "run_trace.jsonl": 26573
+    },
+    "llm_spans": 44,
+    "llm_requests": 44,
+    "llm_responses": 44,
+    "spans_total": 49,
+    "tokens": {
+     "spans": {
+      "in": 884931,
+      "out": 74733
+     },
+     "events": {
+      "in": 884931,
+      "out": 74733
+     },
+     "metrics": {
+      "in": 884931,
+      "out": 74733
+     }
+    },
+    "usd": 0.3914,
+    "stem": "pr4810"
+   },
+   {
+    "run_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1/runs/pr4816/run-20260722-182811-b5b215",
+    "errors": [],
+    "run_trace_events": 27,
+    "bytes": {
+     "trace.jsonl": 5719,
+     "events.jsonl": 3967457,
+     "run_trace.jsonl": 7191
+    },
+    "llm_spans": 11,
+    "llm_requests": 11,
+    "llm_responses": 11,
+    "spans_total": 15,
+    "tokens": {
+     "spans": {
+      "in": 123390,
+      "out": 5687
+     },
+     "events": {
+      "in": 123390,
+      "out": 5687
+     },
+     "metrics": {
+      "in": 123390,
+      "out": 5687
+     }
+    },
+    "usd": 0.0621,
+    "stem": "pr4816"
+   },
+   {
+    "run_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1/runs/pr4816/run-20260722-183014-f0e4d4",
+    "errors": [],
+    "run_trace_events": 29,
+    "bytes": {
+     "trace.jsonl": 6398,
+     "events.jsonl": 3331851,
+     "run_trace.jsonl": 7235
+    },
+    "llm_spans": 12,
+    "llm_requests": 12,
+    "llm_responses": 12,
+    "spans_total": 17,
+    "tokens": {
+     "spans": {
+      "in": 168667,
+      "out": 6889
+     },
+     "events": {
+      "in": 168667,
+      "out": 6889
+     },
+     "metrics": {
+      "in": 168667,
+      "out": 6889
+     }
+    },
+    "usd": 0.0704,
+    "stem": "pr4816"
+   },
+   {
+    "run_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1/runs/pr4817/run-20260722-184528-0f89cf",
+    "errors": [],
+    "run_trace_events": 70,
+    "bytes": {
+     "trace.jsonl": 15765,
+     "events.jsonl": 2179954,
+     "run_trace.jsonl": 15486
+    },
+    "llm_spans": 34,
+    "llm_requests": 34,
+    "llm_responses": 34,
+    "spans_total": 39,
+    "tokens": {
+     "spans": {
+      "in": 116857,
+      "out": 61587
+     },
+     "events": {
+      "in": 116857,
+      "out": 61587
+     },
+     "metrics": {
+      "in": 116857,
+      "out": 61587
+     }
+    },
+    "usd": 0.1156,
+    "stem": "pr4817"
+   },
+   {
+    "run_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1/runs/pr4825/run-20260722-182408-8dad5f",
+    "errors": [],
+    "run_trace_events": 31,
+    "bytes": {
+     "trace.jsonl": 6819,
+     "events.jsonl": 2158543,
+     "run_trace.jsonl": 7849
+    },
+    "llm_spans": 13,
+    "llm_requests": 13,
+    "llm_responses": 13,
+    "spans_total": 18,
+    "tokens": {
+     "spans": {
+      "in": 104894,
+      "out": 14253
+     },
+     "events": {
+      "in": 104894,
+      "out": 14253
+     },
+     "metrics": {
+      "in": 104894,
+      "out": 14253
+     }
+    },
+    "usd": 0.0565,
+    "stem": "pr4825"
+   },
+   {
+    "run_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1/runs/pr4834/run-20260722-190550-f9938c",
+    "errors": [],
+    "run_trace_events": 56,
+    "bytes": {
+     "trace.jsonl": 11100,
+     "events.jsonl": 4073179,
+     "run_trace.jsonl": 12980
+    },
+    "llm_spans": 23,
+    "llm_requests": 23,
+    "llm_responses": 23,
+    "spans_total": 28,
+    "tokens": {
+     "spans": {
+      "in": 227244,
+      "out": 28779
+     },
+     "events": {
+      "in": 227244,
+      "out": 28779
+     },
+     "metrics": {
+      "in": 227244,
+      "out": 28779
+     }
+    },
+    "usd": 0.1141,
+    "stem": "pr4834"
+   },
+   {
+    "run_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1/runs/pr4837/run-20260722-182507-2f2a4f",
+    "errors": [],
+    "run_trace_events": 25,
+    "bytes": {
+     "trace.jsonl": 6818,
+     "events.jsonl": 3461770,
+     "run_trace.jsonl": 6610
+    },
+    "llm_spans": 13,
+    "llm_requests": 13,
+    "llm_responses": 13,
+    "spans_total": 18,
+    "tokens": {
+     "spans": {
+      "in": 154445,
+      "out": 10410
+     },
+     "events": {
+      "in": 154445,
+      "out": 10410
+     },
+     "metrics": {
+      "in": 154445,
+      "out": 10410
+     }
+    },
+    "usd": 0.0698,
+    "stem": "pr4837"
+   },
+   {
+    "run_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1/runs/pr4849/run-20260722-191050-ddbb72",
+    "errors": [],
+    "run_trace_events": 92,
+    "bytes": {
+     "trace.jsonl": 24244,
+     "events.jsonl": 11024138,
+     "run_trace.jsonl": 23246
+    },
+    "llm_spans": 54,
+    "llm_requests": 54,
+    "llm_responses": 54,
+    "spans_total": 59,
+    "tokens": {
+     "spans": {
+      "in": 666975,
+      "out": 67890
+     },
+     "events": {
+      "in": 666975,
+      "out": 67890
+     },
+     "metrics": {
+      "in": 666975,
+      "out": 67890
+     }
+    },
+    "usd": 0.3104,
+    "stem": "pr4849"
+   },
+   {
+    "run_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1/runs/pr4859/run-20260722-185729-c45964",
+    "errors": [],
+    "run_trace_events": 126,
+    "bytes": {
+     "trace.jsonl": 19581,
+     "events.jsonl": 9868801,
+     "run_trace.jsonl": 28708
+    },
+    "llm_spans": 43,
+    "llm_requests": 43,
+    "llm_responses": 43,
+    "spans_total": 48,
+    "tokens": {
+     "spans": {
+      "in": 588296,
+      "out": 72560
+     },
+     "events": {
+      "in": 588296,
+      "out": 72560
+     },
+     "metrics": {
+      "in": 588296,
+      "out": 72560
+     }
+    },
+    "usd": 0.2921,
+    "stem": "pr4859"
+   },
+   {
+    "run_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1/runs/pr4870/run-20260722-184029-9c89e6",
+    "errors": [],
+    "run_trace_events": 118,
+    "bytes": {
+     "trace.jsonl": 22988,
+     "events.jsonl": 17503760,
+     "run_trace.jsonl": 28794
+    },
+    "llm_spans": 51,
+    "llm_requests": 51,
+    "llm_responses": 51,
+    "spans_total": 56,
+    "tokens": {
+     "spans": {
+      "in": 1195646,
+      "out": 47741
+     },
+     "events": {
+      "in": 1195646,
+      "out": 47741
+     },
+     "metrics": {
+      "in": 1195646,
+      "out": 47741
+     }
+    },
+    "usd": 0.4557,
+    "stem": "pr4870"
+   },
+   {
+    "run_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1/runs/pr4893/run-20260722-181732-329c97",
+    "errors": [],
+    "run_trace_events": 49,
+    "bytes": {
+     "trace.jsonl": 11089,
+     "events.jsonl": 2896792,
+     "run_trace.jsonl": 11634
+    },
+    "llm_spans": 23,
+    "llm_requests": 23,
+    "llm_responses": 23,
+    "spans_total": 28,
+    "tokens": {
+     "spans": {
+      "in": 171109,
+      "out": 35406
+     },
+     "events": {
+      "in": 171109,
+      "out": 35406
+     },
+     "metrics": {
+      "in": 171109,
+      "out": 35406
+     }
+    },
+    "usd": 0.1014,
+    "stem": "pr4893"
+   },
+   {
+    "run_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1/runs/pr4923/run-20260722-183222-3c27be",
+    "errors": [],
+    "run_trace_events": 124,
+    "bytes": {
+     "trace.jsonl": 24229,
+     "events.jsonl": 8622294,
+     "run_trace.jsonl": 28725
+    },
+    "llm_spans": 54,
+    "llm_requests": 54,
+    "llm_responses": 54,
+    "spans_total": 59,
+    "tokens": {
+     "spans": {
+      "in": 603793,
+      "out": 76677
+     },
+     "events": {
+      "in": 603793,
+      "out": 76677
+     },
+     "metrics": {
+      "in": 603793,
+      "out": 76677
+     }
+    },
+    "usd": 0.2939,
+    "stem": "pr4923"
+   },
+   {
+    "run_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1/runs/pr4926/run-20260722-185039-00afca",
+    "errors": [],
+    "run_trace_events": 114,
+    "bytes": {
+     "trace.jsonl": 24240,
+     "events.jsonl": 6556783,
+     "run_trace.jsonl": 27212
+    },
+    "llm_spans": 54,
+    "llm_requests": 54,
+    "llm_responses": 54,
+    "spans_total": 59,
+    "tokens": {
+     "spans": {
+      "in": 330133,
+      "out": 95135
+     },
+     "events": {
+      "in": 330133,
+      "out": 95135
+     },
+     "metrics": {
+      "in": 330133,
+      "out": 95135
+     }
+    },
+    "usd": 0.2352,
+    "stem": "pr4926"
+   },
+   {
+    "run_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1/runs/pr4950/run-20260722-190210-9b5a8c",
+    "errors": [],
+    "run_trace_events": 28,
+    "bytes": {
+     "trace.jsonl": 6809,
+     "events.jsonl": 860099,
+     "run_trace.jsonl": 6842
+    },
+    "llm_spans": 13,
+    "llm_requests": 13,
+    "llm_responses": 13,
+    "spans_total": 18,
+    "tokens": {
+     "spans": {
+      "in": 30966,
+      "out": 12016
+     },
+     "events": {
+      "in": 30966,
+      "out": 12016
+     },
+     "metrics": {
+      "in": 30966,
+      "out": 12016
+     }
+    },
+    "usd": 0.0278,
+    "stem": "pr4950"
+   },
+   {
+    "run_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1/runs/pr4954/run-20260722-191915-a862fd",
+    "errors": [],
+    "run_trace_events": 112,
+    "bytes": {
+     "trace.jsonl": 22956,
+     "events.jsonl": 6932445,
+     "run_trace.jsonl": 26122
+    },
+    "llm_spans": 51,
+    "llm_requests": 51,
+    "llm_responses": 51,
+    "spans_total": 56,
+    "tokens": {
+     "spans": {
+      "in": 376266,
+      "out": 98756
+     },
+     "events": {
+      "in": 376266,
+      "out": 98756
+     },
+     "metrics": {
+      "in": 376266,
+      "out": 98756
+     }
+    },
+    "usd": 0.2522,
+    "stem": "pr4954"
+   },
+   {
+    "run_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1/runs/pr4970/run-20260722-185941-61fa51",
+    "errors": [],
+    "run_trace_events": 30,
+    "bytes": {
+     "trace.jsonl": 6824,
+     "events.jsonl": 2993424,
+     "run_trace.jsonl": 7608
+    },
+    "llm_spans": 13,
+    "llm_requests": 13,
+    "llm_responses": 13,
+    "spans_total": 18,
+    "tokens": {
+     "spans": {
+      "in": 192268,
+      "out": 8563
+     },
+     "events": {
+      "in": 192268,
+      "out": 8563
+     },
+     "metrics": {
+      "in": 192268,
+      "out": 8563
+     }
+    },
+    "usd": 0.0763,
+    "stem": "pr4970"
+   },
+   {
+    "run_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1/runs/pr4977/run-20260722-184746-145391",
+    "errors": [],
+    "run_trace_events": 30,
+    "bytes": {
+     "trace.jsonl": 6396,
+     "events.jsonl": 960656,
+     "run_trace.jsonl": 7128
+    },
+    "llm_spans": 12,
+    "llm_requests": 12,
+    "llm_responses": 12,
+    "spans_total": 17,
+    "tokens": {
+     "spans": {
+      "in": 43359,
+      "out": 11207
+     },
+     "events": {
+      "in": 43359,
+      "out": 11207
+     },
+     "metrics": {
+      "in": 43359,
+      "out": 11207
+     }
+    },
+    "usd": 0.031,
+    "stem": "pr4977"
+   },
+   {
+    "run_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1/runs/pr5009/run-20260722-182850-a3c87d",
+    "errors": [],
+    "run_trace_events": 35,
+    "bytes": {
+     "trace.jsonl": 6408,
+     "events.jsonl": 2808475,
+     "run_trace.jsonl": 8594
+    },
+    "llm_spans": 12,
+    "llm_requests": 12,
+    "llm_responses": 12,
+    "spans_total": 17,
+    "tokens": {
+     "spans": {
+      "in": 184800,
+      "out": 14917
+     },
+     "events": {
+      "in": 184800,
+      "out": 14917
+     },
+     "metrics": {
+      "in": 184800,
+      "out": 14917
+     }
+    },
+    "usd": 0.0817,
+    "stem": "pr5009"
+   }
+  ]
+ }
+}

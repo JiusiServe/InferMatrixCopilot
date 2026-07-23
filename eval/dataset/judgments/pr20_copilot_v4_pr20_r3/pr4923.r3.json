@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.12,
+    "precision": 0.55,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y engages the two threads that actually mattered post-hoc — it explicitly questions the NPU stage-1 PIECEWISE addition (the exact fix Wallbreazzz's crash report produced) and demands accuracy/perf evidence (echoing the Sy0307/amy-why-3459 benchmark exchange) — while X ignores NPU entirely and never asks for benchmarks. X's headline 'major' finding (max_num_seqs OOM risk) is contradicted by the actual posted benchmarks showing no OOM and large throughput gains, hurting its precision, and its other two majors are generic 'add a test' asks not grounded in real reviewer concerns. Y's claims are all tied to specific verified file:line evidence (including cross-checking runner code), making it both more grounded and more actionable; both candidates share similar minor catches (stale YAML comments) but Y also adds a redundant-assignment nit X misses.",
+  "_cost_usd": 0.1303474,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "885ddb1a2ed6fe92e53a8fa20b5fb2ce75d4226de38effb4aa49c463f20ee6db",
+    "judge_rep": 3
+  }
+}

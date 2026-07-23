@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth is just LGTM approvals with zero substantive concerns, so recall is trivially satisfied by both. Both candidates build solid, well-cited verification tables confirming the PR's claims against source (curl vs SDK flattening, two-choices behavior, silent-audio fallback), showing comparable precision. Y edges ahead on actionability by surfacing a genuine, concrete cross-file consistency gap (stale extra_body pattern in examples/online_serving/minicpmo/README.md:58) with a specific suggested fix, whereas X's only additional comment is a hedged, low-confidence note that adds little concrete value.",
+  "_cost_usd": 0.060723700000000005,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "ea1ab2e40697a6b59a4be37d15999fcf9fde658ada872cb56b15bc847affa081",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.3,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth shows a clean, unanimous approval with no substantive concerns, so recall is vacuously satisfied by both. X's central 'blocking' findings (three stale reliability tests in files entirely absent from the diff, with fabricated-looking exact line numbers and code snippets) are ungrounded and contradict the human validator's report that all tests passed, making X's REQUEST_CHANGES verdict poorly calibrated and its precision suspect. Y stays grounded in the actual diff, correctly lands on a COMMENT verdict matching the real LGTM/APPROVED outcome, and offers one legitimate, low-risk, actionable nit (missing ge/le constraints) directly tied to a diff line.",
+  "_cost_usd": 0.2120621,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "8d3d4425962e84eb1355a98a034dc34fd2ae3b57abc98bfdf8badb3a05372747",
+    "judge_rep": 1
+  }
+}

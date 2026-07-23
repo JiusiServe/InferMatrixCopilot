@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly flag the audio_vae.py config-mutation issue and the patch_emission.py +2 window change, matching real GT threads. But X completely misses the serving_speech.py language/dialect-dropping issue, which was a substantive, actively-discussed GT concern (amy-why-3459/LHXuuu) — a notable recall gap. Y catches that concern explicitly and adds a plausible, grounded extra finding (stale README table) from checking the full PR-time tree, giving it broader coverage without sacrificing groundedness. Both are reasonably actionable with file/line citations, but Y's evidence-tagged, specific suggestions edge out X's narrative style.",
+  "_cost_usd": 0.0861443,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "6547231fe41c2f02f02e31b5ec9941ac0ed77d8f69966dde73bbbaca4a6084ac",
+    "judge_rep": 2
+  }
+}

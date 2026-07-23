@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y independently surfaces the same class of bug RuixiangMa flagged and the author fixed: _forward_varlen_masked/_forward_varlen_dense call self.flash_attn_varlen_func unconditionally even though __init__ only guarantees one of flash_attn_func/flash_attn_varlen_func is present — a real, grounded, still-live crash risk. X's five findings (test-coverage gaps, a comment nit, duplication, missing version logging) are all plausible and grounded but never touch any of the actual reviewer threads (kernels version docs, test markers, version=1/2 explanation, the varlen crash, SM90 gating, or the weak-test-validation concern). Y's precision takes a hit from its 'PEP440 string vs int' claim about get_kernel, which the maintainer's own clarification (versions are git branches) suggests is likely wrong, but this doesn't offset the value of catching the one bug that mattered most in the ground truth.",
+  "_cost_usd": 0.35038719999999995,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "77e626371cb056b4ad81d30dae039eebdd8d9278a8e8a63c922b92411372b374",
+    "judge_rep": 3
+  }
+}

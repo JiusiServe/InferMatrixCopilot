@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.65,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates miss all four core confirmed bugs (slot leak on abort, cumulative/delta re-slice, ceil-division length bug, legacy-checkpoint v2 dispatch), so recall is near-zero for both, with X getting a sliver of credit for a tangential load_weights/legacy-checkpoint fragility note. Critically, X asserts slot-lifecycle cleanup is 'handled' and vendored files carry 'proper' provenance headers — both directly contradicting the two highest-severity confirmed findings (slot leak, missing vendor provenance), which actively misleads rather than just omitting. Y avoids that severity of error (its one wrong validation is on a minor WER-fallback point) and its shared findings (max_new_frames TypeError regression, ignored talker_mtp sampling params, missing tests) are backed by explicit grep/line evidence, giving it higher precision and slightly crisper actionability. Neither review surfaces a LATENT GAP CHECK section.",
+  "_cost_usd": 0.1614268,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "e765e30ee3f135f3463ce18448fc1e04709329b18feae074ca240edfb3054a0e",
+    "judge_rep": 3
+  }
+}

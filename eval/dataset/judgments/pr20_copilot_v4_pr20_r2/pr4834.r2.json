@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.25,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both reviews are well-grounded with specific file:line evidence, but X's Major finding (default sleep(level=2) plus the new hard NotImplementedError permanently bricks wake_up/generate) directly foreshadows the real post-merge incident (#4905, relaxed by #4912) and explicitly argues the guard is too strict for the default/common caller path — a stronger, more central gap_hit than Y's. X also more directly engages the two actual ground-truth reviewer threads (enum placement/usage, adequacy of the added regression tests), giving it better recall. Y produces solid, well-evidenced secondary findings (stale docs example, dead `_is_sleeping` reference, stale docstring, untested NotImplementedError path in wakeup endpoint) that also touch the gap criterion via the untested-path comment, but these are more peripheral and don't zero in on the core over-strictness issue with the same severity or actionable clarity as X.",
+  "_cost_usd": 0.1369726,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "238ec0d04020403b0c8b01dfb9074704087ed1c725e2372c0bb74cdaeb2d7cfc",
+    "judge_rep": 2
+  }
+}

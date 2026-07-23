@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.85,
+    "actionability": 0.4,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth is thin (mostly approval/off-topic comments) with one substantive inline ask about deepening reduce_scatter test verification; neither candidate directly surfaces that gap, though X's sweep at least engages with the reduce_scatter fake-group logic while Y never touches the test file's coverage question. X offers three grounded, file/line-anchored nits (stale comment, missing docstring, arguably-dead None check) with concrete fix instructions, giving it stronger actionability than Y's single vague 'worth a one-line comment' suggestion. Y's broader approve-with-verification narrative is well-grounded in vLLM API checks but yields almost no concrete, actionable findings.",
+  "_cost_usd": 0.0874009,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "0d0cc37be66331aef02bb481c365aff8902f505a8ce5ece8ecad354383d60972",
+    "judge_rep": 2
+  }
+}

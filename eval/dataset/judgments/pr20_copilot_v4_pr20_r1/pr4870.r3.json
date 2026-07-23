@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.65,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently rediscover the async_chunk default-inconsistency issue (echoing the GT Low comment), but Y's version is sharper — it cites the exact sibling default (line 3823) and the real OmniModelConfig field default, while X's is a plausible but less precise cross-file comparison. X pads its findings with several weak 'please re-run this test' asks that are grounded but low-value and dilute precision. Y is the only one to explicitly question whether the split-by-total_scheduled_tokens logic still handles tensors aligned to hidden_states.shape[0], correctly anticipating the multi-axis gap later fixed by PR #4910 — satisfying the LATENT GAP CHECK, which X never touches. Neither candidate recovers the amy-why-3459 'move to model' design question or explicitly the original (already-fixed) Med gating concern, capping recall for both.",
+  "_cost_usd": 0.16931050000000003,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "14c03c556f05798ae0db3e30ae148e0343e840290dab95f4d7bdf38b9a310a46",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates verify the Cosmos3 override argument for the scope concern, but X goes further and cites the FLUX.1-dev -14.1% latency figure that matches the GT resolution almost exactly, showing it actually tracked how the reviewer's scope objection was resolved. X's follow-ups (vacuous test parametrization, ROCm inductor-logic divergence) are substantive and independently valuable, while Y's two 'findings' are essentially the same observation (unused vllm_config) restated twice with cosmetic 'add a comment' suggestions, thinner in actionable value despite heavy evidence citation. Neither candidate caught Gaohan123's 'pytest mark is not complete' comment, capping recall for both.",
+  "_cost_usd": 0.2706233,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "8db9582ca4fd83f91efd22aef9d64657ab323bba0f72d3687937ecabe87c3b09",
+    "judge_rep": 1
+  }
+}

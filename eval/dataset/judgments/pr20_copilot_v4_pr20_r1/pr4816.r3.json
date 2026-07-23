@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.55,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns (just an 'lgtm' approval), so both candidates correctly reach APPROVE and recall is trivially satisfied. Y's cited line numbers (754, 1017, 1157, 1248, 1286, 1329, 2533, 2546, 2615) match the diff hunks exactly, and it flags a genuine pre-existing edge case (None handler) without over-alarming. X cites an unverifiable external PR number (vllm#46022) and gives test-file line numbers (2638/2651/2720) that don't match the diff's actual hunk locations (2533/2546/2615), suggesting fabricated or unchecked specifics despite claiming verification against upstream. Both are actionable in structure, but Y's grounding is materially more trustworthy.",
+  "_cost_usd": 0.06861679999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "8d59aa98c9a0c81f8b90fe58d1a86e63e9664f8ea638de0ba48a3df675edd158",
+    "judge_rep": 3
+  }
+}

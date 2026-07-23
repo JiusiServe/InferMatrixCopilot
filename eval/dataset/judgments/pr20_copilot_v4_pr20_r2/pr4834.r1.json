@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.25,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates independently surface the latent gap (X via the default level=2 + hardware-gated-tests-never-run-in-CI angle, Y via the docs example that would now fail), so gap_hit is true for both, with X hitting it more directly on two fronts. X also engages substantively with both real reviewer threads from the GT (test adequacy and the CuMemTag enum's shallow usage), giving it noticeably higher recall than Y, which only tangentially touches a stale test attribute and never discusses the enum. Precision is high for both, though Y's speculative HTTP-501-endpoint finding (grep found no matching handler) is a weaker, hedged claim that slightly dilutes its precision versus X's tightly grounded findings. Actionability is comparably strong in both (concrete file/line, concrete fixes, clear verdicts), so the deciding factors are recall and grounding, favoring X.",
+  "_cost_usd": 0.24963620000000003,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "238ec0d04020403b0c8b01dfb9074704087ed1c725e2372c0bb74cdaeb2d7cfc",
+    "judge_rep": 1
+  }
+}

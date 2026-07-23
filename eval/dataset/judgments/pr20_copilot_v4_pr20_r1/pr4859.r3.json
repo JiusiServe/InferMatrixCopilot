@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.72,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.75,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates independently converge on the two real hotspots human reviewers debated (audio_vae.py config mutation, patch_emission.py +1→+2 gating), but X also raises the stale README documentation tied to the dropped language/方言 mapping — the same concern amy-why-3459 raised about docs/tests for that change — while Y omits it entirely and frames everything as a clean APPROVE. X's findings are more concrete and actionable (specific boundary-value test cases, exact deepcopy fix, exact README line), though it overstates severity on the config-mutation item that maintainers ultimately deemed intentional/harmless, and has one redundant duplicate finding. Y is slightly more precise/calibrated (correctly treats resolved items as non-blocking) but is thinner on recall and gives vaguer 'consider'/'worth a comment' suggestions rather than concrete fixes.",
+  "_cost_usd": 0.2888251,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "4f58cb402395a1b9815b6aa69e781bc6aa897bbe1dc3373b787f764b97cb4264",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.45,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Neither candidate surfaces the one real GT concern (the VoxCPM2 regression follow-up), so recall is essentially zero for both against this sparse GT. X's technical diagnosis is specific and well-grounded (exact file:line trace of tts_local_seed propagation), and its APPROVE verdict with optional, non-blocking suggestions matches the actual outcome (human LGTM). Y traces the same mechanism but then manufactures a 'major'/FOLLOW-UP-REQUIRED blocker demanding perf benchmarks per an unverified 'repo evidence gate,' while itself admitting it couldn't confirm the model-gating logic — an overreaching, weakly-grounded finding that contradicts the real reviewer's clean approval, hurting precision despite similar actionability in citing lines.",
+  "_cost_usd": 0.11288720000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "175976d2de42a56b7287a151a173ce5f891a9077e775961e4465dc3387d4a113",
+    "judge_rep": 3
+  }
+}

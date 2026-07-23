@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.45,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates thoroughly verify the diff's technical claims against source with specific file:line citations and reach the same correct 'no blockers, approve/comment' conclusion consistent with the GT's LGTM-only reviews. Y goes further with a genuine, actionable, well-grounded finding — examples/online_serving/minicpmo/README.md:58 still has the stale extra_body-only guidance the PR just corrected elsewhere, with a concrete suggested fix — while X's sole extra comment is a hedgy, low-confidence musing that explicitly defers back to the user rather than proposing a concrete change. Neither fabricates anything or misses real GT concerns (there are none beyond approval), so recall/precision are comparable, but Y's actionability edge decides it.",
+  "_cost_usd": 0.0551862,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "06eab3c9860e2ecb70c91df0c838d7cf4c436e0ded2a4ada2466db3949201ba6",
+    "judge_rep": 3
+  }
+}

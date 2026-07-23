@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.6,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both hit the latent gap (X very concretely, by naming five existing tests that call sleep(level=2)+wake_up() and would now break — closely mirroring the real #4905 CI break; Y frames it as the default level=2 'bricking' the common path). X's top 'blocker' claim (stale `_is_sleeping` attribute assignment 'will raise AttributeError') is almost certainly wrong for a normal Python object without __slots__, hurting its precision, whereas Y's findings (default-level footgun, tag-set vs None semantics, dead getattr guards, pre-existing desync noted as low-severity) are all well-grounded and calibrated, and Y is the only one to directly engage the ground-truth reviewer's 'separate place for the enum' comment. Actionability is comparably strong on both sides with concrete file/line fixes.",
+  "_cost_usd": 0.2837982,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "dd20f35fbcf2f899b879752d67a0948d6baa103f5c03f67598fa9769e0088cfa",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.8,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth is essentially content-free (LGTM approvals plus a bot verification comment), so neither candidate had real concerns to recall. X's only finding is a valid but trivial nit (missing ge/le Pydantic constraints) that adds little practical value. Y's core validation of the runtime change is equally solid, but it goes further by flagging two specific reliability-suite test files that still encode the old lower bound of 3 in a form (tuple-based assertion) that X's own literal-string sweep would not catch — a plausible, well-grounded, and highly actionable gap with exact file/line and suggested fixes. Y's findings are more substantive and useful even though unverifiable against the truncated diff, giving it the edge in precision-weighted value and actionability.",
+  "_cost_usd": 0.0741369,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "8d3d4425962e84eb1355a98a034dc34fd2ae3b57abc98bfdf8badb3a05372747",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth shows no substantive reviewer concerns (just LGTM approvals), so both candidates trivially satisfy recall. Y did more rigorous, precisely-cited code verification (exact line ranges like serving_chat.py:452-456, :2140, :2586) and reached an APPROVE verdict that matches the actual clean-merge outcome; its one extra comment is a hedged, low-value 'sanity check' suggestion. X's verification is similarly grounded but slightly vaguer (e.g. 'line ~430'), and its single added finding (stale README.md:58) is concrete and actionable with a specific fix, though it's a scope-creep nitpick on a file the PR didn't touch and reviewers never raised. X wins on actionability, Y wins on grounding rigor and correctness of overall verdict, making this a close call slightly favoring Y.",
+  "_cost_usd": 0.1294212,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "06eab3c9860e2ecb70c91df0c838d7cf4c436e0ded2a4ada2466db3949201ba6",
+    "judge_rep": 1
+  }
+}

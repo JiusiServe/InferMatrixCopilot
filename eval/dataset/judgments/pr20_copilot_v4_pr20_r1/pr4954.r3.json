@@ -1,0 +1,26 @@
+{
+  "x": {
+    "recall": 0.75,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.65,
+    "actionability": 0.75
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates correctly confirm the core fix (codes.audio vs legacy audio) matching the GT's main point. X also independently surfaces the GT's key non-blocking concern — that the new containment fallback silently loosens the assertion for ALL callers, not just opt-in ones — backing it with a concrete counterexample, which closely tracks the reviewer's docstring-inconsistency complaint. Y's findings are mostly sweep/validation filler plus low-value nits (missing docstring, 'dead' guard removal, magic numbers, CJK edge case) that never touch the GT's actual concern about the stale strict-behavior docstring, and some claims (downstream info_dict consumption, CJK regex specifics) reference code outside the given diff and are unverifiable from it. Both are concrete and file/line-anchored, but X's comments are tighter, better grounded, and higher-recall against the ground truth.",
+  "_cost_usd": 0.13315169999999998,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "e0ed1b70396446d1337800c9523c45469e4db32cb0ba284bc4154064bafe7b8a",
+    "judge_rep": 3
+  }
+}

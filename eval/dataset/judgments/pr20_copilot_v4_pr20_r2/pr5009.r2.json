@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.45,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y engages the two substantive GT threads that X misses entirely: the global-scope risk of making vllm_c default for every CUDA diffusion model (GT's line-252 concern), and it cites perf/accuracy numbers (26.9% Qwen-Image, -14.1% FLUX.1-dev, SSIM/PSNR figures) that match NumberWan's actual follow-up comments almost exactly, showing real grounding rather than fabrication. Both candidates independently note the vacuous CompilationMode parametrization in the new test, but Y extends this into a more actionable ROCm-divergence follow-up. X's two findings are accurate but trivial (suggesting explanatory comments), covering little of the reviewer's real concerns and missing the pytest-mark and scope-justification threads that GT emphasizes. Neither candidate flags the 'pytest mark not complete' inline comment, and neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.2406646,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "8db9582ca4fd83f91efd22aef9d64657ab323bba0f72d3687937ecabe87c3b09",
+    "judge_rep": 2
+  }
+}

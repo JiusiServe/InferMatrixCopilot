@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently surfaced the key latent gap — the unswept get_cache_scale call in hunyuan_image3_transformer.py — with concrete file/line evidence, matching the LATENT GAP CHECK. Y goes further by verifying the AutoWeightsLoader mapping mechanism against actual vLLM source and identifying a real test-design weakness (the delegated-loader test bypasses AutoWeightsLoader entirely), which closely echoes the human reviewer's real-checkpoint-validation concern that X never mentions. X is broader in scan coverage and gives more discrete action items, but pads its findings with two low-value 'add an explanatory comment' nitpicks and misses the ground-truth test-coverage caveat, giving it slightly lower recall and precision than Y.",
+  "_cost_usd": 0.34871379999999996,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "6cd0b0797c4cde00135d9760a20e1f5d3cf0855189aef09276ef53eb5fbe58db",
+    "judge_rep": 2
+  }
+}

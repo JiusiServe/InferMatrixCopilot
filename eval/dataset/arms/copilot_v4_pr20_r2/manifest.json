@@ -1,0 +1,22 @@
+{
+  "arm": "copilot_v4_pr20_r2",
+  "engine": "infermatrix-copilot CLI (shipped pipeline, pr-review@6 adaptive-depth ensemble; issue-answer dry-run)",
+  "llm": "per .env (DeepSeek-routed)",
+  "dataset": "vllm_omni_dataset.yaml",
+  "splits": [
+    "train",
+    "val",
+    "test"
+  ],
+  "kinds": [
+    "pr_review"
+  ],
+  "n_items": 20,
+  "trace": {
+    "AGENT_TRACE": "1",
+    "AGENT_TRACE_IO": "1",
+    "AGENT_TRACE_IO_FULL": "1"
+  },
+  "moa_when": "off",
+  "pr_context_mode": "no_discussion"
+}

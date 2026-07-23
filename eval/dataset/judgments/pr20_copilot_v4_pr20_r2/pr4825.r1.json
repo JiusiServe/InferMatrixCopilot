@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.9,
+    "actionability": 0.1,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Neither candidate hits the ground truth's actual substantive concern (dsocek's naming-conflict/_packed_modules_mapping comment, which appears tied to a part of the PR later removed per tthakkal's reply). X at least raises analogous design concerns — hardcoded component lists vs. single-source-of-truth (_dit_modules), and a silent-no-op risk for text-encoder LoRA that echoes the PR's own stated failure mode — with specific file/line grounding and concrete suggested changes. Y is a well-grounded validation pass (repo-wide greps, exact line citations) but surfaces zero findings or suggestions, making it precise but not useful as a review. X provides more actionable value despite imperfect overlap with the ground truth.",
+  "_cost_usd": 0.13841320000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "6630f87db639634b8fbe302bcbe2a77fe301ccab96c772be8e297d76f5afc018",
+    "judge_rep": 1
+  }
+}

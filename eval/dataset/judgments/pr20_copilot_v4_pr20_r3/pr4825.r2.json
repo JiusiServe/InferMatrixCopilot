@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.9,
+    "actionability": 0.2,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "The one substantive ground-truth concern (dsocek's suggestion to derive component/naming discovery from existing mapping data like _packed_modules_mapping rather than hardcoded lists) is echoed in spirit by X's comment about reading pipeline._dit_modules instead of maintaining a fourth hardcoded list, with concrete file/line grounding. X also raises a plausible, well-grounded follow-up (text-encoder LoRA silent no-op) with specific actionable suggestions. Y's review is purely a validation/approval report with zero critique or suggestions, so despite being accurate it contributes almost nothing actionable and misses the one real reviewer concern entirely.",
+  "_cost_usd": 0.054547899999999996,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "d994f274c9182cdba73846a7739bf89f32218a7a145188f1ae5be9998b252162",
+    "judge_rep": 2
+  }
+}

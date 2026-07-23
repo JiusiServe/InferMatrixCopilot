@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.8,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "The one substantive ground-truth concern (trust_remote_code causing a regression on locked kernels<0.15.0 installs) was missed by both candidates, who instead flagged the inverse claim that trust_remote_code is absent despite the PR description mentioning it — same blind spot, so recall is equally low for both. Both are well-grounded and non-fabricated on their own terms (caching correctness, fallback-order preservation, lock-serialization/thread-safety observations), but Y edges out with three concrete, cite-and-line-numbered findings (description mismatch, missing docstrings, untested caching behavior with a specific mocking suggestion) versus X's two, giving Y slightly better precision and actionability. Neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.2069222,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "fff52cbca5d3096335456dc579c477e41d5518d18c7c7f584fbadafbc0d1661e",
+    "judge_rep": 2
+  }
+}

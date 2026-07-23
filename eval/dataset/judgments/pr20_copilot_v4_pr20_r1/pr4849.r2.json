@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.65,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.8,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "X directly surfaces the reviewers' central concern (source_outputs[0] as parent is an unenforced assumption) and, matching Gaohan123's actual ask, recommends adding an assertion/guard — the single most actionable and grounded finding in either review. Y independently investigates the same question but concludes 'no issue, verified correct,' missing the reviewer's actual request for a safety check, and neither candidate mentions the precommit-fix or benchmark-run asks. Y's findings are more rigorously cross-referenced with orchestrator line numbers (higher precision, lower fabrication risk) but are mostly confirmatory rather than actionable, while X pairs a possibly-speculative major finding (NPU/GPU platform claim) with several concrete, well-grounded suggestions.",
+  "_cost_usd": 0.2075555,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "dbc0fe0703fa4fcfd6358710be414406d23b63ccdd5c6aa18b412be897c34d56",
+    "judge_rep": 2
+  }
+}

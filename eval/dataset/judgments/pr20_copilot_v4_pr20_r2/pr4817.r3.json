@@ -1,0 +1,26 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.85
+  },
+  "winner": "tie",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns to recall, so both trivially satisfy recall by correctly finding no blockers. Both independently converge on the same legitimate nit (the ==10 gate excluding hypothetical sm_110a from the PR's own tcgen05 target list), grounded and actionable with file:line. X adds one more specific, plausible nit (stale 'Blackwell-only' comment in pyproject.toml:102) giving slightly broader coverage, while Y is marginally tighter/more rigorous in its verification narrative and its APPROVE verdict better matches the actual merged/approved outcome than X's COMMENT verdict.",
+  "gap_hit": false,
+  "_cost_usd": 0.12928320000000001,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "c02e666ff1b806fb8d7fc433b18ddf864e17ec844031da0a5955cc0722eaf6d5",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.8,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.85,
+    "actionability": 0.8
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Neither candidate surfaces the actual ground-truth concern (trust_remote_code kwarg breaking on locked kernels<0.15.0 installs) — both instead flag that the PR description's trust_remote_code claim doesn't appear in the visible diff, a valid but tangential observation given identical input. Both sets of findings are grounded with concrete file:line evidence and no fabrication. Y edges ahead with a technically deeper, correct observation about the global lock serializing FA2/FA3 loads, more careful verification of cache-miss/failure semantics, and a final verdict (APPROVE, non-blocking notes) that better matches the actual reviewer outcome (LGTM, one P2 nitpick) versus X's overly strong 'FOLLOW-UP REQUIRED' for what are mostly minor/stylistic issues.",
+  "_cost_usd": 0.1451172,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "fff52cbca5d3096335456dc579c477e41d5518d18c7c7f584fbadafbc0d1661e",
+    "judge_rep": 1
+  }
+}

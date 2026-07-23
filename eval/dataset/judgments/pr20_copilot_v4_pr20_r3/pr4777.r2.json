@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth here is essentially empty (two LGTMs and a manual verification comment, no inline concerns), so recall is trivially satisfied by both. X's single finding (missing positive unit test for layers=2) is valid, grounded, and actionable but minor. Y additionally traces the shared-constant change to two out-of-diff reliability test files still hardcoding the old '3' bound, giving exact file/line locations, code snippets, and concrete fixes for a real functional break the PR author and human reviewers missed — higher-impact, well-evidenced, and more actionable than X's coverage nit.",
+  "_cost_usd": 0.08559890000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "f218f87d0de63eb189da54ee340797718b08899c1a6b6057f91e291bae6e43c5",
+    "judge_rep": 2
+  }
+}

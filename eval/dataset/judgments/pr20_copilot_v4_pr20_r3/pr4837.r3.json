@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.6,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates correctly explain the core orchestrator.py:1290 fix, matching the substance of the single GT inline comment; X's framing (verifying that both submit_initial and submit_update reject list prompts) tracks the GT reviewer's actual reasoning most closely and resolves the .images/.output dead-branch question with a concrete code citation rather than leaving it open. X also reaches the same verdict as the real reviewers (clean approve), while Y escalates to 'FOLLOW-UP REQUIRED' and a 'major' test-coverage demand that isn't grounded in any real reviewer concern, plus an unverifiable docstring quote not present in the shown diff, hurting precision despite Y's findings being formatted with slightly more concrete action steps.",
+  "_cost_usd": 0.10367390000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "e8fc984f9cae97fe43bb7be733c0df09a7064c59be1153d6845cde562f519099",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both independently caught the single most important ground-truth issue (trust_remote_code default silently flipped True→False) and the same latent bug (api_server.py else-branch skipping the global UNSUPPORTED_ROUTES guard). Y edges ahead on recall by also flagging the missing test coverage for the batch-completions rejection path, which echoes the PR discussion's explicit ask to audit/test other endpoints, plus a couple of extra grounded minor findings (dead hf_config assignment, kwargs mutation). Y's findings are also slightly more actionable, each pairing a specific line with a concrete fix. Neither candidate surfaces the hf_config-mutability caching concern or the positional-argument signature risk from the inline ground truth, and neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.2400302,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "51a2e92fba251424948dde686ef47589a9df9ded906b0119e60de63664046eb5",
+    "judge_rep": 1
+  }
+}

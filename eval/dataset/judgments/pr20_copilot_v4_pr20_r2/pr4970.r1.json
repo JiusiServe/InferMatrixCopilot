@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.5,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth is sparse (LGTM approval plus an unrelated aside about a separate VoxCPM2 regression PR); neither candidate addresses that aside, so recall is low and tied. Both correctly trace the seed→tts_local_seed→batched-fast-path mechanism, but X escalates to a 'major/FOLLOW-UP REQUIRED' verdict demanding benchmark evidence via an invented 'evidence gate' policy, contradicting the actual reviewer's plain approval and inflating severity beyond what's grounded in the diff. Y's APPROVE verdict matches the real outcome, its non-blocking suggestions (guard comment, noting stage-1 removal was already inert) are accurate and well-grounded with precise line citations, making it more precise and equally or more actionable.",
+  "_cost_usd": 0.11186220000000001,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "175976d2de42a56b7287a151a173ce5f891a9077e775961e4465dc3387d4a113",
+    "judge_rep": 1
+  }
+}

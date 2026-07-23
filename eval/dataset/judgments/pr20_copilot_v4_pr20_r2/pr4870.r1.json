@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.7,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates correctly verified the runner fix's root cause and the streaming FINAL_ONLY scoping (matching the reviewer's main validated points), and both independently flagged the same async_chunk default=True inconsistency that echoes the ground truth's Low-severity robustness concern. X edges ahead because its note that the split 'keys solely on total_num_scheduled_tokens' and drops hidden-shape alignment directly anticipates the single-vs-multi-axis gap later fixed by PR #4910, while Y's analogous NPU-parity finding, though grounded, doesn't touch the batch-axis issue. Neither candidate addressed the amy-why-3459 'move variable into model' design question.",
+  "_cost_usd": 0.31896440000000004,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "4b3547e5f333cc2500ce51a050ce68daee251cb717e2e5af42872c52c25a0617",
+    "judge_rep": 1
+  }
+}

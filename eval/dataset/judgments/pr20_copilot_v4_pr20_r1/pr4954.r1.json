@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.5,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "GT's substance is: (1) approve, core fix correctly restores codes.audio feedback matching #4527; (2) the new containment fallback silently drops the 'strict behavior preserved' guarantee for all callers, docstring is now stale; (3) minor note on legacy-vs-nested check order. Y independently verifies the writer/reader shape match (citing tts_postprocess:246 and stage_input_processors usage, matching GT's own reasoning) and its top non-blocking comment — containment fallback loosens ALL callers, with a concrete 'hello'/'hello world goodbye' failure example — is essentially the same discovery as GT's docstring-staleness comment, just framed as a behavioral risk rather than a doc fix. X's findings cluster around plausible-but-tangential nits (docstring on tts_preprocess rather than the actual stale docstring in assertions.py, magic numbers, CJK splitting) and includes a self-contradiction: its 'Validated' section calls the transcript_words guard 'reachable... correctly returns False' then later claims the same line is 'unreachable dead code,' undermining precision. Both give file:line-anchored, concrete suggestions, so actionability is comparable, but Y is clearly stronger on recall and precision.",
+  "_cost_usd": 0.19836250000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "e0ed1b70396446d1337800c9523c45469e4db32cb0ba284bc4154064bafe7b8a",
+    "judge_rep": 1
+  }
+}

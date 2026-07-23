@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "GT's two nits are (1) docs/module-comment don't clarify the containment fallback applies to ALL callers, not just opt-in escalation ones, and (2) a minor note about legacy-vs-nested check order and whether the legacy audio producer still exists. X's non-blocking comment #1 directly hits the substance of concern (1) — it flags that the fallback 'globally loosens every caller' regardless of opt-in, which is exactly the scope gap the human reviewer wanted documented. Y never raises the doc-staleness/scope issue and its closest analog (missing collision test for codes vs legacy audio) is tangential to concern (2) rather than a direct hit, so Y's recall is lower despite being a deeper, well-evidenced review (hand-verified substring containment bug, dead-code guard, inconsistent preprocessing pipelines) with excellent actionability. Both are grounded and low on fabrication; X edges out on matching the actual human concerns while Y compensates with more rigorous, independently-verified findings.",
+  "_cost_usd": 0.20909240000000004,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "2328537111b34c5894a8eb46f8d3d52ef10d50795dec0acf4f50506d02bd9d9a",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.88,
+    "actionability": 0.88
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.75,
+    "actionability": 0.7
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Y independently surfaces the version=1/2 integer-vs-string kernel loading defect, which closely tracks (and actually resolves) wtomin's exact ground-truth question that even the PR author had to clarify — a genuinely valuable, non-obvious catch neither GT reviewer nor X identified as a bug. Both candidates correctly find the flash_attn_varlen_func-None crash risk (matching RuixiangMa's GT comment) and flag weak test coverage of non-happy-path branches. However, X is more rigorous and precise: its line numbers were verified to match the actual diff exactly (e.g. line 108 RuntimeError check, lines 92-103 kernel cascade), it flags a real unguarded-third-get_kernel-call bug and an insufficiently-strict platform gate check, and it explicitly validates rather than assumes several claims. Y's citations for most findings (other than #1) come from a self-acknowledged diverged 'post-merge main' checkout, so its line numbers don't map cleanly onto the diff under review, denting actionability/precision despite the underlying claims being substantively sound.",
+  "_cost_usd": 0.5739648,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "5a1cd4f27ed4de0a2c8c8a700d08bc0324404e8845edcc3d5e42154f23870b7d",
+    "judge_rep": 3
+  }
+}

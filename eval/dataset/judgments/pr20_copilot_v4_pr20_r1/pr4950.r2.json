@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth is essentially empty (just LGTM/approvals), so both candidates trivially satisfy recall; the real differentiator is depth and usefulness of extra findings. X's source-code verification is rigorous but its only 'comment' is heavily hedged and non-actionable ('defer to your test', 'keep current wording either way'), amounting to a pure sanity-check rather than a concrete ask. Y did a repo-wide grep sweep and caught a genuine, grounded cross-file consistency gap (stale extra_body usage in examples/online_serving/minicpmo/README.md:58) with a concrete suggested fix, which is a real value-add beyond the diff; its two 'nit' wording critiques are grounded but low-value/pedantic, slightly denting precision. Net, Y is more thorough and actionable at a small cost to precision, giving it a slight edge.",
+  "_cost_usd": 0.11772450000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "553aac9cdac4b3bc20f2bde02e4664fc8c2666f72906e50cb513efb4c43fea6c",
+    "judge_rep": 2
+  }
+}

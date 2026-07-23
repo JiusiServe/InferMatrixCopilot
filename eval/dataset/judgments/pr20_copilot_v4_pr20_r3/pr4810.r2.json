@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.82,
+    "actionability": 0.8,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.78,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates correctly validate the core migration logic and both independently surface the exact latent gap (the unmigrated hunyuan_image3_transformer.py:2238 diffusion caller of get_cache_scale), so gap_hit is true for both. Y goes further by verifying the design against the actual upstream vLLM source (AutoWeightsLoader/fp8.py/weight_utils.py with line numbers) and lands a sharp, technically valid critique that the delegated-loader test bypasses AutoWeightsLoader and never proves the outer mapping happens — closer in spirit to lishunyang12's 'test doesn't prove real end-to-end resolution' concern than X's finding. X's review is solid and well-organized but its extra minor comments (missing comments on two blocks) are low-value nitpicks, and Y's claim that the diffusion gap was 'since addressed... see #4810' is a shaky, possibly fabricated specific that slightly dents its precision. Overall Y edges out X on recall and actionability at a small cost to precision.",
+  "_cost_usd": 0.22664820000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "c489068ef66cb6eb79e2378110428f3e551340f3adcabcf9cb76f2d878938278",
+    "judge_rep": 2
+  }
+}

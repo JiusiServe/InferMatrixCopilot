@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates converge on the same discrepancy the ground-truth comment orbits (the description's trust_remote_code claim vs. the visible code), but neither reproduces the ground truth's precise concern (kernels<0.15.0 lacking that kwarg regressing hub loading), so recall is similarly partial for both. X pads out with a docstring nit and a test-confirmation ask that are grounded but low-value; Y adds a sharper, correctly-reasoned finding (global lock serializing FA2/FA3 loads) and reaches a verdict (APPROVE with non-blocking notes) that matches the actual outcome (LGTM/approved with one P2 comment) better than X's 'FOLLOW-UP REQUIRED'. Both are concrete and file/line-anchored, but Y's technical depth and calibration edge it out.",
+  "_cost_usd": 0.09668209999999999,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "f617724ad6b14212a0081ebcad7859972857606d0aa8211c0ebaa748c24de3a1",
+    "judge_rep": 3
+  }
+}

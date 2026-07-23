@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.7,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.7,
+    "precision": 0.65,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates independently catch the one still-live GT concern (the async_chunk getattr default inconsistency, True vs False) and correctly confirm the qwen3_tts scoping and seq_len cleanup already resolve the other named GT items; neither raises the amy-why-3459 design question about moving model-specific logic out of serving. X pulls ahead on the latent gap check: it explicitly flags that the split now keys solely on total_num_scheduled_tokens and drops hidden-shape alignment, questioning multi-axis handling and grounding it with what the downstream fix (#4910) later did — exactly the gap the human reviewers missed. Y touches the same code but declares it 'correct' and only asks for a comment, missing the gap. Y also pads its findings with speculative, hard-to-verify asks (an unverifiable claim about which PR-description test command ran, a docstring check with no evidence one exists), diluting precision versus X's tighter, well-verified findings.",
+  "_cost_usd": 0.37604799999999994,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "14c03c556f05798ae0db3e30ae148e0343e840290dab95f4d7bdf38b9a310a46",
+    "judge_rep": 1
+  }
+}

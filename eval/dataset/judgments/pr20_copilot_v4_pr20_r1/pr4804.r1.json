@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.65,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates miss the two sharpest GT bugs (the abort slot-leak and the cumulative/delta chunk_np re-slice bug) and the latent ceil-division bug; neither is a strong recall performer. Y independently surfaces the legacy-checkpoint/v2-tokenizer collision (matching GT's second High-severity finding via load_weights fragility/inferred_channels heuristic) and gives more nuanced, cross-referenced analysis (sibling function inconsistency, dead-code consumer check), though its confident claim that slot-leak cleanup is 'handled' is likely a false reassurance on a real bug. X's findings (unused sampling params, missing try/except, test-coverage gaps) are grounded but generic and don't overlap with any GT concern. Both are well-structured with file:line citations and concrete fixes/commands, so actionability is comparably high.",
+  "_cost_usd": 0.3577463,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "e765e30ee3f135f3463ce18448fc1e04709329b18feae074ca240edfb3054a0e",
+    "judge_rep": 1
+  }
+}

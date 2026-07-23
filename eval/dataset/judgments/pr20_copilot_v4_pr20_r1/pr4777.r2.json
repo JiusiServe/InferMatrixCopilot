@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth is essentially empty (approvals plus an informal manual-QA comment, no inline concerns), so recall is low-value for both. X is careful and diff-grounded (verified via grep that the range constant and error-message logic propagate correctly) but its sole finding — a missing positive unit assertion for layers=2 — is a minor nitpick already effectively covered by the e2e test. Y reaches the same correctness conclusion but additionally surfaces specific, highly plausible follow-up breakage in two untouched reliability test files that still hardcode the old '3'/'layers=2-invalid' boundary, with exact lines and suggested fixes — a substantive, actionable catch directly tied to the PR's core change. Assuming Y's repo claims are accurate (they are specific enough to be grounded rather than fabricated), Y provides materially more useful review content.",
+  "_cost_usd": 0.08117090000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "a0c07f8fb30d8d376782d2c74fae4bc3959ac053e10760a7dfe2fed87231469a",
+    "judge_rep": 2
+  }
+}

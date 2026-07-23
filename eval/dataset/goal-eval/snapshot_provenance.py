@@ -27,7 +27,8 @@ from pathlib import Path
 
 HERE = Path(__file__).parent
 ROOT = HERE.parent.parent.parent          # repo root
-OUT = HERE / "provenance_val.json"
+DATASET = HERE.parent / "vllm_omni_dataset.yaml"
+OUT = Path(os.environ.get("PROVENANCE_OUT") or HERE / "provenance_val.json")
 HEADS = HERE / "expected_pr_heads.json"
 VAL_PRS = [4893, 4810, 4825, 4837, 4816]
 
@@ -35,7 +36,19 @@ _KNOB_ALLOWLIST = (
     "MOA_WHEN", "PR_CONTEXT_MODE", "REVIEW_DEPTH", "ECO_MODEL",
     "PERFORMANCE_MODEL", "AGENT_MODEL", "INTENT_MODEL", "MOA_MAX_USD",
     "MOA_MAX_MEMBERS", "REVIEW_ENSEMBLE",
+    # trace configuration is part of what was run: a payload-capturing campaign
+    # is not the same artifact as a spans-only one
+    "AGENT_TRACE", "AGENT_TRACE_IO", "AGENT_TRACE_IO_FULL", "AGENT_TRACE_IO_MAX",
 )
+
+
+def campaign_prs() -> list[int]:
+    """Every `pr_review` item in the dataset (all splits), in manifest order —
+    the single source of truth, so the PR list can never drift from the yaml."""
+    import yaml
+
+    d = yaml.safe_load(DATASET.read_text())
+    return [int(i["pr"]) for i in d["pr_review"]]
 
 
 def _run(cmd: list[str], cwd: Path = ROOT) -> bytes:
@@ -85,20 +98,49 @@ def _settings_view() -> dict:
     }
 
 
+def _resolve_head(pr: int) -> str:
+    """The PR's head SHA exactly as `pr.fetch_diff` derives it — the oid of the
+    LAST commit on the PR (`engine/steps/pr/fetch.py`)."""
+    out = _run(["gh", "pr", "view", str(pr), "--json", "commits"],
+               cwd=Path(os.environ.get("OMNI_REPO") or Path.cwd()))
+    try:
+        commits = json.loads(out or b"{}").get("commits") or []
+        return str(commits[-1].get("oid", "")) if commits else ""
+    except (json.JSONDecodeError, AttributeError, IndexError):
+        return ""
+
+
+def freeze_heads(prs: list[int] | None = None) -> dict:
+    """Freeze `pr -> head sha` for every campaign PR, ADDITIVELY.
+
+    A PR already in the file is re-resolved and any change is REPORTED, never
+    silently overwritten: a force-push since the last campaign means runs pinned
+    to the new head are not comparable to the numbers recorded against the old
+    one. Returns {"heads":…, "added":[…], "drift":{pr:(old,new)}, "unresolved":[…]}.
+    """
+    prs = prs or campaign_prs()
+    old = json.loads(HEADS.read_text()) if HEADS.exists() else {}
+    heads, added, drift, unresolved = dict(old), [], {}, []
+    for pr in prs:
+        sha = _resolve_head(pr)
+        if not sha:
+            unresolved.append(pr)
+            continue
+        prev = old.get(str(pr))
+        if prev is None:
+            added.append(pr)
+        elif prev != sha:
+            drift[str(pr)] = (prev, sha)
+            continue        # keep the frozen value; the caller decides
+        heads[str(pr)] = sha
+    HEADS.write_text(json.dumps(heads, indent=1, sort_keys=True))
+    return {"heads": heads, "added": added, "drift": drift,
+            "unresolved": unresolved}
+
+
 def snapshot() -> dict:
     prov = {**_digest(), **_settings_view()}
     OUT.write_text(json.dumps(prov, indent=1))
-    if not HEADS.exists():
-        heads = {}
-        for pr in VAL_PRS:
-            out = _run(["gh", "pr", "view", str(pr), "--json", "commits"],
-                       cwd=Path(os.environ.get("OMNI_REPO") or Path.cwd()))
-            try:
-                commits = json.loads(out or b"{}").get("commits") or []
-                heads[str(pr)] = str(commits[-1].get("oid", "")) if commits else ""
-            except (json.JSONDecodeError, AttributeError, IndexError):
-                heads[str(pr)] = ""
-        HEADS.write_text(json.dumps(heads, indent=1))
     return prov
 
 
@@ -119,6 +161,11 @@ def check() -> bool:
 if __name__ == "__main__":
     if "--assert" in sys.argv:
         raise SystemExit(0 if check() else 1)
+    if "--freeze-heads" in sys.argv:
+        r = freeze_heads()
+        print(json.dumps({k: v for k, v in r.items() if k != "heads"}, indent=1))
+        print(f"frozen heads: {len(r['heads'])}")
+        raise SystemExit(1 if (r["drift"] or r["unresolved"]) else 0)
     p = snapshot()
     print(json.dumps({k: p[k] for k in ("head", "tracked_diff_sha256",
                                         "untracked_source_sha256")}, indent=1))

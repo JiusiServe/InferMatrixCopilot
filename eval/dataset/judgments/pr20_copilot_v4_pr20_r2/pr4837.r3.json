@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.6,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The only substantive ground-truth concern (yJader's note that already_submitted shouldn't gate the diffusion singleton-list unwrap since both submit paths funnel into the same DiffusionEngine call) is addressed by both, but X reconstructs the same reasoning with grounded citations (stage_pool.py:951/1022 raising ValueError on both paths), while Y just asserts consistency without the underlying why. X also correctly identifies 'return outputs' vs 'DiffusionOutput(output=raw)' as a strict improvement, backed by a specific citation showing ZImagePipeline's actual return construction (pipeline_z_image.py:720), whereas Y flags the same change as a 'major' risk needing confirmation based on vague, uncited claims about request_id/finished fields — an unsubstantiated and inflated-severity finding that hurts its precision. Both give file:line-anchored, actionable suggestions (regression test), but X's verdict (APPROVE) also matches the actual outcome while Y's 'FOLLOW-UP REQUIRED' is a needless overcall.",
+  "_cost_usd": 0.1047852,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "003755cbeb02e85f05bd7853e30ff3f2a454abdbc54f42ee0d12e24e95383d01",
+    "judge_rep": 3
+  }
+}

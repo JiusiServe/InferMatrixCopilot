@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.7,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "GT's core concern is that the containment-fallback docstring/comment at L644-657 now misdescribes behavior since the fallback applies to all callers, not just opt-in escalation tests. X independently surfaces the same locus (unconditional containment fallback loosening all callers) with a concrete counterexample, earning partial recall credit even though it proposes gating rather than doc updates; Y instead explicitly validates that ordering as 'optimal,' missing the concern entirely. Neither candidate catches GT's minor point about check-order/legacy-producer liveness, though Y's get/pop-asymmetry note is tangentially adjacent. X's two extra findings (unconditional fallback risk, always-true short_text guard) are correct, well-evidenced, and higher value; Y's five findings are all technically valid but mostly trivial nitpicks (dead code guard, undocumented thresholds, docstring completeness) that pad volume without matching real reviewer concerns. Both are concretely actionable with file/line references, but X is more precise and better matches the ground truth.",
+  "_cost_usd": 0.2520629,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "9cd7f5cf411b90def793342f5596c34a504daf47a66baeb096a66c073c3f68a7",
+    "judge_rep": 2
+  }
+}

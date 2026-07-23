@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth is dominated by reviewer asks for evidence (perf comparison, accuracy comparison, non-Qwen scope justification) and test coverage, most of which the author addressed via PR description data. X explicitly checks and cites that exact evidence (26.9%/-14.1% latency, SSIM/PSNR accuracy, FLUX non-Qwen validation), directly engaging the threads reviewers actually cared about, while Y's review is purely code/grep-grounded and never engages with the perf/accuracy justification at all. Both miss Gaohan123's 'pytest mark is not complete' comment. Both are well-grounded and actionable with concrete file:line follow-ups, but X covers substantially more of the real concerns.",
+  "_cost_usd": 0.22107260000000004,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "3950704630e067a9c300ea725d7642a14aed8a26314651f194dfe00fcf433631",
+    "judge_rep": 1
+  }
+}

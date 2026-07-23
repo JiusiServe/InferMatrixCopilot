@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.9,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.7,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth here is thin (two LGTMs plus a QA walkthrough confirming boundary/unit-test/e2e behavior), so recall is mostly about matching that QA checklist — Y covers it more fully by also validating the pipeline's layers-generic logic and flagging the unconfirmed H100 e2e run, while X only checks static consistency. X's single finding (missing positive layers=2 unit test) is fully grounded in the shown diff and clearly actionable, giving it near-perfect precision. Y's headline findings (stale tests in tests/dfx/reliability/...) reference files entirely outside the provided diff with verbatim code snippets that can't be verified here, which is a real fabrication risk even though the reasoning is internally consistent and highly specific; if genuine, they're far more valuable (real CI breakage) and more actionable than X's minor test-gap suggestion. Net effect is a modest edge to Y, tempered by that unverifiable precision risk.",
+  "_cost_usd": 0.1617808,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "f218f87d0de63eb189da54ee340797718b08899c1a6b6057f91e291bae6e43c5",
+    "judge_rep": 3
+  }
+}

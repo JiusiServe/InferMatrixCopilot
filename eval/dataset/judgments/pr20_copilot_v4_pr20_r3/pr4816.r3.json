@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (just a bot notice and an 'lgtm' approval), so both candidates correctly approve this trivial mechanical rename with full recall. Precision favors Y: its cited file/line numbers for every changed site align almost exactly with the actual diff hunks, while X cites test_serving_speech.py:2638,2651,2720 for the three test edits, which are off by roughly 100 lines from where those changes actually occur (2533/2546/2615), suggesting a fabricated detail. Y also adds a near-miss substring sweep for extra rigor, though its output is cluttered with irrelevant run-report metadata that X's cleaner format avoids.",
+  "_cost_usd": 0.07885419999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "26d05ff377ca3b42994af63aaee803eadc07f40636e6608444edf57eaac0666c",
+    "judge_rep": 3
+  }
+}

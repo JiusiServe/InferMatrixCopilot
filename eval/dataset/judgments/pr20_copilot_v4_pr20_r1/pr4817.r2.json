@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive reviewer concerns, so both trivially satisfy recall. Both candidates independently raise the same grounded, low-severity nit about sm_110a/cc 11.x being excluded by the `==10` gate, and both do credible repo-wide verification of the rename and callers. Y additionally catches a second grounded, actionable gap (missing (10,1)/sm_101a test parametrize case, directly traceable to the sm_101a mention in the new test docstring) and its COMMENT verdict is more consistent with the concrete suggestions it makes, whereas X hedges its one nit as low-signal and leans toward a clean APPROVE, slightly undercutting its own actionability. X has marginally more precise line citations, but Y's broader, still well-grounded coverage edges it out.",
+  "_cost_usd": 0.1508962,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "691f71145176b5b54c6e5075ff993b7d3e8933b1227c748ed9e1b9c49321701f",
+    "judge_rep": 2
+  }
+}

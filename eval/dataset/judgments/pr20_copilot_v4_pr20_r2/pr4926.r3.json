@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.25,
+    "precision": 0.65,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both largely miss the ground-truth's core threads because most GT comments (SM90 gating, try/except-swallowing tests, hardware markers) were already fixed by the time of this diff; Y partially compensates by independently finding a real latent bug (flash_attn_varlen_func can be None but is called unguarded in _forward_varlen_masked), which echoes RuixiangMa's None-crash concern more closely than anything X found. However, Y's headline 'Medium correctness' finding — that integer version=1/2 args are invalid PEP440 specifiers and silently no-op — is directly contradicted by SamitHuang's own ground-truth clarification that these ints correctly map to git branches, making Y's top claim likely fabricated/wrong despite honest hedging. X's five findings (duplicated Impl classes, untested masked/piecewise paths, L4 GPU never exercising the FA3 path, a copy-pasted docstring, and a misleading fallback-chain doc sentence) are all independently verified and accurate, giving it much higher precision at the cost of not surfacing anything as deep as Y's crash bug. Both are highly actionable with precise file/line references and concrete fixes.",
+  "_cost_usd": 0.3405122,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "2d8d80de5ef0bd05c5f3bf7c5d8ca5ca31b4992493d17acb302c29cad228ab74",
+    "judge_rep": 3
+  }
+}

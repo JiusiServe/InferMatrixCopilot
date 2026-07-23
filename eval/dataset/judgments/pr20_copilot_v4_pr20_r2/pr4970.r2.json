@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.55,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.75,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates did genuine, grounded mechanism tracing (serving_speech.py propagation → gpu_model_runner.py consumption) and neither surfaces the one real GT concern (spinning off the VoxCPM2 regression), which likely wasn't even visible in the truncated diff either candidate saw, so recall is low and tied. X's sole substantive finding demands blocking perf evidence before merge ('FOLLOW-UP REQUIRED'), which is defensible in principle but is miscalibrated against what actually happened (the PR was approved/LGTM'd for exactly this kind of low-risk revert). Y reaches the same technical understanding but calibrates severity correctly (APPROVE, non-blocking), adds a genuinely novel and verified insight the other missed (stage 1's seed removal was inert since only stage 0 is propagated and stage 1 uses temperature=0.0), and gives a more concretely actionable suggestion (add a guard comment at the exact line to prevent regression creep) than X's more process-oriented ask for a smoke-test run.",
+  "_cost_usd": 0.082617,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "175976d2de42a56b7287a151a173ce5f891a9077e775961e4465dc3387d4a113",
+    "judge_rep": 2
+  }
+}

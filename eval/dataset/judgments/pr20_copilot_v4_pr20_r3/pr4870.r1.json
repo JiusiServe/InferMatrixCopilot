@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.8,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates correctly validate the core runner fix and the qwen3_tts gating, and both raise a similar 'async_chunk default True vs False inconsistency' point that echoes the ground-truth Low concern. X is more explicit and precise: it directly confirms the Med-comment scoping is safe with concrete evidence, and its second non-blocking note explicitly identifies that the split now only handles the scheduled-tokens axis and drops the old hidden-shape axis, correctly forecasting the dual-batch-axis fix later shipped in #4910 — a clean gap_hit. Y's parallel finding (assertion for shape mismatch in to_payload_element) is grounded but more generic and doesn't name the two-axis distinction, and Y spends one finding on an off-topic style nit (extracting a qwen3_tts helper) that dilutes precision. Neither addresses amy's model-placement question, capping recall for both.",
+  "_cost_usd": 0.27115219999999995,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "a6b9a889fabffd4f8156a594a97e7a1b0edd761498fe3ca0b1817c5387520cd8",
+    "judge_rep": 1
+  }
+}

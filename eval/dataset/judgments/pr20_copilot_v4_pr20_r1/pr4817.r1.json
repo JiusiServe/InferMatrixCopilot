@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive reviewer concerns (bot credit-limit messages and a 'thanks' comment), so both candidates trivially achieve full recall. Both reviews are well-grounded in the diff, correctly validate the >=10→==10 fix and the rename/test coverage, and independently raise the same sm_110a/cc-11.x edge case (likely from the fuller PR description), suggesting neither fabricated it. Y edges ahead on actionability with two concrete, file:line nits including a specific missing test parametrization ((10,1) for sm_101) plus an explicit consumer-safety sweep (quack_enabled/install_quack_fp8_patch callers), while X's single nit is hedged as optional/omittable.",
+  "_cost_usd": 0.1353225,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "691f71145176b5b54c6e5075ff993b7d3e8933b1227c748ed9e1b9c49321701f",
+    "judge_rep": 1
+  }
+}

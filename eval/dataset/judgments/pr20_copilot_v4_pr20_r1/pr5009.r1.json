@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.6,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The ground truth's most substantive concern (hsliuustc0106's line-252 comment: the platform default now applies to ALL CUDA diffusion models but was only validated on Qwen-Image, requiring non-Qwen A/B justification) is explicitly caught by X, which cites the FLUX.1-dev evidence as resolving exactly that risk — matching the real resolution path. Y does a thorough code sweep (Cosmos3 override, ROCm/XPU scope) but never surfaces this central scope/blast-radius concern at all, a major recall miss. X's three follow-up findings are all solidly grounded (vacuous parametrize, ROCm drift, upstream divergence), while Y's findings are more mixed — one is a specific but unverifiable claim about issue #3588 being a 'prior accidental revert,' and another explicitly hedges ('or whatever the accessor is'), weakening precision despite Y's suggestions being written with more literal actionable text. Neither candidate mentions Gaohan123's 'pytest mark not complete' comment.",
+  "_cost_usd": 0.3100845,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "5102ed840fde4784bb4cd3e533d05c95a5070427e7ff473ac81e4a8edc4443b6",
+    "judge_rep": 1
+  }
+}

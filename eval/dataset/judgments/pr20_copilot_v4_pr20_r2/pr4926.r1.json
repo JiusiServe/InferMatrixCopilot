@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.95,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X independently surfaces the same crash-risk theme the human reviewer (RuixiangMa) raised about `flash_attn_varlen_func`/`flash_attn_func` being allowed to be None while downstream paths call one unconditionally — and correctly notes the masked-path fix was incomplete. Y explicitly lists this exact code as '[validated] ... Correct', a false reassurance that misses the real latent bug. X also raises a plausible, well-grounded correctness bug (int `version=` args silently no-op'ing against `get_kernel`'s PEP440-string API) that echoes the human back-and-forth about version semantics, whereas Y's findings (duplication, test-path coverage, stale comment, docs fallback wording) are all valid and actionable but orthogonal to what actual reviewers flagged. Both reviews are similarly concrete/actionable with file:line references, but X has materially higher recall against the ground-truth concerns and no false-confidence claims.",
+  "_cost_usd": 0.34717719999999996,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "2d8d80de5ef0bd05c5f3bf7c5d8ca5ca31b4992493d17acb302c29cad228ab74",
+    "judge_rep": 1
+  }
+}

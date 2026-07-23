@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates independently confirm the parent-first ordering assumption that Gaohan123 flagged inline, but neither explicitly echoes the 'add a check or comment' ask verbatim (the diff already carries that comment). X converts its investigation into five concrete, file/line-anchored, actionable suggestions (unused param, untested None-prompt branch, untested multi_modal_data path, missing guard comment, and a hardware-verification ask that echoes the spirit of Bounty-hunter's pytest request) while Y's review is mostly a well-grounded justification for APPROVE with only three thinner non-blocking notes and no concrete testing ask. Neither mentions the precommit-fix comment. X's higher density of specific, actionable line-level findings gives it the edge on both recall and actionability while precision is comparably high for both.",
+  "_cost_usd": 0.1931882,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "a8e0833216b086fdc787f0eb13267eb9e085dad7ac19e435de196020bf9850b7",
+    "judge_rep": 2
+  }
+}

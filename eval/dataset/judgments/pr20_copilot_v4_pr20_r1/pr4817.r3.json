@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.6
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive reviewer concerns (just thanks/codex-limit noise), so recall is trivially satisfied by both. Both candidates independently surface the same legitimate edge case (sm_110a/cc 11.x tcgen05 parts not covered by the `==10` gate), which is grounded and plausible given the PR's own description. X goes further with a second, concrete finding (missing (10,1)/sm_101 parametrize case) and phrases both as clear file:line nits with a specific suggested fix (add a code comment, add a test row). Y raises the sm_110 point but hedges it away ('almost certainly fine... I'd lean toward a clean approve'), ending with no concrete ask, and misses the sm_101 test-coverage gap entirely. Both verdicts (COMMENT vs APPROVE) are reasonable for this low-risk PR, but X is more actionable while remaining equally grounded.",
+  "_cost_usd": 0.1369525,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "691f71145176b5b54c6e5075ff993b7d3e8933b1227c748ed9e1b9c49321701f",
+    "judge_rep": 3
+  }
+}

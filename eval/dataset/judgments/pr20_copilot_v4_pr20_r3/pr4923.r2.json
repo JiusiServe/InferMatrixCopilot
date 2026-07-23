@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.8,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.55,
+    "actionability": 0.75
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates independently catch the two stale YAML doc comments (prefix-caching rationale, max_num_batched_tokens header), but X also surfaces the seed-reproducibility tradeoff under full cudagraphs that was the crux of gcanlin's inline thread — Y misses it entirely. Neither flags the core 'cudagraph_mode shouldn't live in the model layer' design critique that dominated the GT discussion. Y's OOM claim leans on a suspiciously specific unverifiable doc citation (docs/serving/speech_api.md:667) and its 'missing test' findings are generic absence-of-evidence asks rather than grounded defects, dragging down precision; X's line-level tracing through the runner/wrapper path is more consistent and its asks (rewrite comment, drop redundant line, add A/B) are more concrete.",
+  "_cost_usd": 0.2675359,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "885ddb1a2ed6fe92e53a8fa20b5fb2ce75d4226de38effb4aa49c463f20ee6db",
+    "judge_rep": 2
+  }
+}

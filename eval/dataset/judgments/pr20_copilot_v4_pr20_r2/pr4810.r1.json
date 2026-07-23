@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.78,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.88,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently rediscover the exact latent gap (hunyuan_image3_transformer.py:2238 still calling the removed get_cache_scale API), and both confirm the core design correctness the human reviewer praised, but neither captures the ground truth's specific 'test with a real FP8 checkpoint' caveat or the qwen2_old silent-degradation nuance. X's gap finding includes an unverifiable and likely fabricated addendum claiming the issue was 'since addressed on main' with a '(see #4810)' comment — the actual fix landed under a later, differently-numbered issue (#4891), so this specific sub-claim looks hallucinated and dings precision. Y's five findings are all grounded in the diff/PR text (though two are near-duplicates and two are low-value comment nitpicks), each paired with a concrete file/line and remedy, giving it a slight edge in precision and actionability.",
+  "_cost_usd": 0.3219668,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "6cd0b0797c4cde00135d9760a20e1f5d3cf0855189aef09276ef53eb5fbe58db",
+    "judge_rep": 1
+  }
+}

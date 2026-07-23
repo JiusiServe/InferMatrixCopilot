@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both independently rediscover the exact latent gap (the unswept hunyuan_image3_transformer.py diffusion caller of get_cache_scale), which the human reviewers never mentioned. Y additionally reproduces GT's specific qwen2_old 'getattr guard = dead code, not regression' framing and its coordination-with-#4808 point almost verbatim, plus gives very concrete, quotable comment/test fixes, edging out X on recall and actionability. X's design verification against actual vLLM source is more rigorously grounded and its test-coverage critique (outer AutoWeightsLoader never actually exercised) is sharper than GT's own note, keeping precision high, but it covers slightly fewer of GT's specific points and includes a couple of lower-value asides.",
+  "_cost_usd": 0.21787949999999998,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "8c2f3ce561b266b52b996ed2198f08c5d681c768f851fa7990d6ae89d7ed5634",
+    "judge_rep": 1
+  }
+}

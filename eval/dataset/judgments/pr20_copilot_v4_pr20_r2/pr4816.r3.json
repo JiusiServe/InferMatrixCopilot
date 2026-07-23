@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.6,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly approve with no blockers, matching the ground truth 'lgtm' with no substantive concerns, so recall is trivially satisfied for both. However, X cites specific line numbers for the updated tests (2638, 2651, 2720) that are wrong by ~100 lines versus the actual diff hunks (~2533, 2546, 2615), and leans on unverifiable external claims (a specific upstream PR number, a PR-body repro, exact upstream file:line citations) that read as confabulated precision. Y's grep-based verification cites line numbers that match the diff almost exactly and traces the actual call chain (_create_speech_error_json_response → base() → serving_tokenization), making it more grounded and trustworthy, despite a minor internal miscount (says '4 occurrences' but lists 6 line numbers).",
+  "_cost_usd": 0.09029290000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "e1e7bf64e488ff7ffe2d8076e469629c538117ca9f61ff1ad60c092d5bd5ac38",
+    "judge_rep": 3
+  }
+}

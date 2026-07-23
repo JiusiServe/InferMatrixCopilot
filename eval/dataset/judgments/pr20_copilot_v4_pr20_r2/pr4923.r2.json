@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground-truth concerns center on: whether the model should read cudagraph_mode (architecture placement), the TODO needing to flag mtp-seed non-reproducibility under batch>1, an NPU compilation_config fix, and requests for perf benchmarks. X's comment 4 independently surfaces the seed-reproducibility consequence and asks for an accuracy A/B, partially echoing gcanlin's point and the benchmark asks, while Y's findings pivot almost entirely to missing unit-test coverage, a concern absent from the human thread. Both correctly and independently flag the stale/contradictory yaml comments and the duplicate omni_pooler_payload_include_hidden assignment, and both are well-grounded with concrete file/line targets and actionable fixes. Precision and actionability are comparable, but X's slightly closer alignment with the actual reviewer concerns gives it the edge on recall.",
+  "_cost_usd": 0.2397172,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "0d84e32c4d42fc419c147e38cc90b837710ecca04aa44204288363cc345526ce",
+    "judge_rep": 2
+  }
+}

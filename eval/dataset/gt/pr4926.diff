@@ -1,0 +1,697 @@
+diff --git a/docs/user_guide/diffusion/attention_backends.md b/docs/user_guide/diffusion/attention_backends.md
+index abc63ebed72..12446f3fe27 100644
+--- a/docs/user_guide/diffusion/attention_backends.md
++++ b/docs/user_guide/diffusion/attention_backends.md
+@@ -20,6 +20,8 @@ The full set of backends and their platform defaults is in the **Backend Options
+ | `TORCH_SDPA` | PyTorch `scaled_dot_product_attention` with the default backend dispatcher. Most conservative; always available. |
+ | `SAGE_ATTN` | SageAttention 2.2 — INT8-quantized attention with FP16 accumulation. Lossy but typically visually indistinguishable on diffusion outputs. Requires `sageattention`. |
+ | `SAGE_ATTN_3` | Requires `sageattn3` from `SageAttention/sageattention3_blackwell`. CUDA only, intended for Blackwell GPUs, with GQA/MQA requests falling back to PyTorch SDPA. |
++| `FLASH_ATTN_HUB` | FlashAttention 2 from HuggingFace `kernels` library. Useful for train/rollout alignment. |
++| `FLASH_ATTN_3_HUB` | FlashAttention 3 from HuggingFace `kernels` library. CUDA Hopper (sm_90+) only; falls back to `FLASH_ATTN_HUB` on older GPUs. |
+ 
+ 
+ ## Configuration
+@@ -210,6 +212,36 @@ Notes:
+ - `SAGE_ATTN_3` is only selected on CUDA when `sageattn3` is importable and the GPU is Blackwell-class.
+ - SageAttention3's Blackwell kernel assumes `Hq == Hkv`. In vLLM-Omni, GQA/MQA diffusion requests fall back to PyTorch SDPA for correctness.
+ 
++## HuggingFace Kernels Hub Backends
++
++To achieve perfect numerical consistency between **training** (typically using HuggingFace Diffusers with Hub kernels) and **serving/rollout** (using vLLM-Omni), you can use the Hub-based attention backends. This eliminates numerical drift / sampling divergence caused by executing different local kernel versions during rollout.
++
++The following backend options are supported:
++- `FLASH_ATTN_HUB` (HuggingFace `kernels-community/flash-attn2`)
++- `FLASH_ATTN_3_HUB` (HuggingFace `kernels-community/flash-attn3`, Hopper sm_90+ only)
++
++### Installation
++
++To use these backends, you must install the `kernels` library:
++
++```bash
++pip install kernels==0.14.1
++```
++
++If the `kernels` library is not available in the environment, vLLM-Omni will log a warning and fall back gracefully to the corresponding local backend implementations (`FLASH_ATTN`). On CUDA GPUs below Hopper (compute capability < 9.0), `FLASH_ATTN_3_HUB` falls back to `FLASH_ATTN_HUB`.
++
++### Usage
++
++Select a Hub backend using the global CLI flag or environment variables:
++
++```bash
++# Environment variable
++export DIFFUSION_ATTENTION_BACKEND=FLASH_ATTN_HUB
++
++# CLI flag
++vllm-omni serve <model> --diffusion-attention-backend FLASH_ATTN_HUB
++```
++
+ ## Usage Examples
+ 
+ ### Default (auto-route)
+diff --git a/tests/diffusion/attention/test_kernels_hub.py b/tests/diffusion/attention/test_kernels_hub.py
+new file mode 100644
+index 00000000000..0f22a1244ee
+--- /dev/null
++++ b/tests/diffusion/attention/test_kernels_hub.py
+@@ -0,0 +1,104 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++
++import sys
++import types
++
++import pytest
++import torch
++
++from tests.helpers.mark import hardware_test
++from vllm_omni.diffusion.attention.backends.abstract import AttentionMetadata
++from vllm_omni.diffusion.attention.backends.registry import DiffusionAttentionBackendEnum
++from vllm_omni.diffusion.attention.backends.sdpa import SDPAImpl
++from vllm_omni.platforms import current_omni_platform
++
++
++@pytest.mark.core_model
++@pytest.mark.cpu
++def test_kernels_hub_platform_fallback(monkeypatch: pytest.MonkeyPatch):
++    """Test that when kernels package is not available, the platform fallback logic
++
++    routes to local FLASH_ATTN.
++    """
++    from vllm_omni.platforms.cuda.platform import CudaOmniPlatform
++
++    # Temporarily hide/remove kernels module if present
++    monkeypatch.setitem(sys.modules, "kernels", None)
++
++    # Use monkeypatch to mock CudaOmniPlatform capability and package checker to allow FLASH_ATTN
++    from vllm.platforms.interface import DeviceCapability
++
++    from vllm_omni.diffusion.envs import PACKAGES_CHECKER
++
++    monkeypatch.setattr(
++        CudaOmniPlatform,
++        "get_device_capability",
++        classmethod(lambda cls, device_id=0: DeviceCapability(8, 0)),
++    )
++    monkeypatch.setattr(PACKAGES_CHECKER, "get_packages_info", lambda: {"has_flash_attn": True})
++
++    # Test FLASH_ATTN_HUB falls back to FLASH_ATTN when kernels is unavailable
++    backend_path = CudaOmniPlatform.get_diffusion_attn_backend_cls("FLASH_ATTN_HUB", head_size=64)
++    assert backend_path == DiffusionAttentionBackendEnum.FLASH_ATTN.get_path()
++
++    # Test FLASH_ATTN_3_HUB falls back to FLASH_ATTN when kernels is unavailable
++    backend_path = CudaOmniPlatform.get_diffusion_attn_backend_cls("FLASH_ATTN_3_HUB", head_size=64)
++    assert backend_path == DiffusionAttentionBackendEnum.FLASH_ATTN.get_path()
++
++    # Test FLASH_ATTN_3_HUB falls back to FLASH_ATTN_HUB on pre-Hopper GPUs
++    kernels_module = types.ModuleType("kernels")
++    monkeypatch.setitem(sys.modules, "kernels", kernels_module)
++    backend_path = CudaOmniPlatform.get_diffusion_attn_backend_cls("FLASH_ATTN_3_HUB", head_size=64)
++    assert backend_path == DiffusionAttentionBackendEnum.FLASH_ATTN_HUB.get_path()
++
++
++@pytest.mark.core_model
++@hardware_test(res={"cuda": "L4"}, num_cards=1)
++def test_kernels_hub_execution():
++    """Verify basic forward of flash_attn_hub and flash_attn_3_hub, comparing with SDPA reference."""
++    device = torch.device(current_omni_platform.device_type)
++    dtype = torch.bfloat16
++
++    num_heads = 8
++    head_dim = 64
++    seq_len = 32
++    batch_size = 1
++
++    torch.manual_seed(42)
++    q = torch.randn(batch_size, seq_len, num_heads, head_dim, device=device, dtype=dtype)
++    k = q.clone()
++    v = q.clone()
++
++    # 1. Test PyTorch SDPA reference
++    sdpa_impl = SDPAImpl(num_heads=num_heads, head_size=head_dim, softmax_scale=1.0 / (head_dim**0.5), causal=False)
++    attn_metadata_sdpa = AttentionMetadata(attn_mask=None)
++    output_ref = sdpa_impl.forward(q.clone(), k.clone(), v.clone(), attn_metadata_sdpa)
++
++    # 2. Test FlashAttentionHubBackend (FlashAttention 2)
++    from vllm_omni.diffusion.attention.backends.flash_attn_hub import FlashAttentionHubImpl
++
++    fa_hub_impl = FlashAttentionHubImpl(
++        num_heads=num_heads, head_size=head_dim, softmax_scale=1.0 / (head_dim**0.5), causal=False
++    )
++    output_fa_hub = fa_hub_impl.forward(q.clone(), k.clone(), v.clone(), attn_metadata_sdpa)
++    assert output_fa_hub.shape == q.shape
++    assert not torch.isnan(output_fa_hub).any()
++    max_diff = torch.max(torch.abs(output_ref - output_fa_hub)).item()
++    assert max_diff < 1e-2, f"FlashAttentionHub output differs too much from SDPA reference: {max_diff}"
++
++    # 3. Test FlashAttention3HubBackend (FlashAttention 3, Hopper+ only)
++    major, _minor = torch.cuda.get_device_capability()
++    if major < 9:
++        pytest.skip("FLASH_ATTN_3_HUB execution requires Hopper-class GPU (compute capability >= 9.0)")
++
++    from vllm_omni.diffusion.attention.backends.flash_attn_hub import FlashAttention3HubImpl
++
++    fa3_hub_impl = FlashAttention3HubImpl(
++        num_heads=num_heads, head_size=head_dim, softmax_scale=1.0 / (head_dim**0.5), causal=False
++    )
++    output_fa3_hub = fa3_hub_impl.forward(q.clone(), k.clone(), v.clone(), attn_metadata_sdpa)
++    assert output_fa3_hub.shape == q.shape
++    assert not torch.isnan(output_fa3_hub).any()
++    max_diff = torch.max(torch.abs(output_ref - output_fa3_hub)).item()
++    assert max_diff < 1e-2, f"FlashAttention3Hub output differs too much from SDPA reference: {max_diff}"
+diff --git a/vllm_omni/diffusion/attention/backends/flash_attn_hub.py b/vllm_omni/diffusion/attention/backends/flash_attn_hub.py
+new file mode 100644
+index 00000000000..bfb59b46fe6
+--- /dev/null
++++ b/vllm_omni/diffusion/attention/backends/flash_attn_hub.py
+@@ -0,0 +1,406 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++
++from functools import partial
++
++import torch
++from vllm.logger import init_logger
++
++from vllm_omni.diffusion.attention.backends.abstract import (
++    AttentionBackend,
++    AttentionImpl,
++    AttentionMetadata,
++)
++from vllm_omni.diffusion.attention.backends.utils.piecewise_attn import (
++    piecewise_attn,
++)
++
++logger = init_logger(__name__)
++
++
++def _run_varlen_dense(
++    varlen_func,
++    query: torch.Tensor,
++    key: torch.Tensor,
++    value: torch.Tensor,
++    *,
++    causal: bool,
++    softmax_scale: float,
++) -> torch.Tensor:
++    batch_size, q_len = query.size()[:2]
++    k_len = key.size(1)
++    cu_seqlens_q = torch.arange(0, (batch_size + 1) * q_len, step=q_len, dtype=torch.int32, device=query.device)
++    cu_seqlens_k = torch.arange(0, (batch_size + 1) * k_len, step=k_len, dtype=torch.int32, device=query.device)
++
++    out = varlen_func(
++        q=query.flatten(0, 1),
++        k=key.flatten(0, 1),
++        v=value.flatten(0, 1),
++        cu_seqlens_q=cu_seqlens_q,
++        cu_seqlens_k=cu_seqlens_k,
++        max_seqlen_q=q_len,
++        max_seqlen_k=k_len,
++        causal=causal,
++        softmax_scale=softmax_scale,
++    )
++    if isinstance(out, tuple):
++        out = out[0]
++    return out.reshape(batch_size, q_len, *out.shape[1:])
++
++
++class FlashAttentionHubBackend(AttentionBackend):
++    accept_output_buffer: bool = True
++
++    @classmethod
++    def supports_attention_mask(cls) -> bool:
++        return True
++
++    @staticmethod
++    def get_supported_head_sizes() -> list[int]:
++        return [64, 96, 128, 192, 256]
++
++    @staticmethod
++    def get_name() -> str:
++        return "FLASH_ATTN_HUB"
++
++    @staticmethod
++    def get_impl_cls() -> type["FlashAttentionHubImpl"]:
++        return FlashAttentionHubImpl
++
++
++class FlashAttentionHubImpl(AttentionImpl):
++    def __init__(
++        self,
++        num_heads: int,
++        head_size: int,
++        softmax_scale: float,
++        causal: bool = False,
++        num_kv_heads: int | None = None,
++        prefix: str = "",
++        qkv_layout: str | None = None,
++        backend_kwargs: dict | None = None,
++        **extra_impl_args,
++    ) -> None:
++        self.num_heads = num_heads
++        self.causal = causal
++        self.softmax_scale = softmax_scale
++        self.qkv_layout = qkv_layout
++        if backend_kwargs:
++            logger.warning("FlashAttentionHubImpl ignoring backend_kwargs: %s", list(backend_kwargs.keys()))
++
++        # Lazily get the kernel from the Hub to avoid network/disk overhead on import
++        from kernels import get_kernel
++
++        logger.info("Loading flash-attn2 kernel from HuggingFace Hub...")
++        try:
++            hub_module = get_kernel("kernels-community/flash-attn2", version=1)
++        except Exception as e:
++            try:
++                logger.info("Failed to load version 1, attempting version 2: %s", e)
++                hub_module = get_kernel("kernels-community/flash-attn2", version=2)
++            except Exception as e2:
++                logger.info("Failed to load version 2, attempting default: %s", e2)
++                hub_module = get_kernel("kernels-community/flash-attn2")
++
++        self.flash_attn_func = getattr(hub_module, "flash_attn_func", None)
++        self.flash_attn_varlen_func = getattr(hub_module, "flash_attn_varlen_func", None)
++
++        if self.flash_attn_func is None and self.flash_attn_varlen_func is None:
++            raise RuntimeError("Failed to load flash-attn2 kernel from HuggingFace Hub: no functions found")
++
++    @staticmethod
++    def _unwrap_flash_output(out: torch.Tensor | tuple[torch.Tensor, ...]) -> torch.Tensor:
++        # FA3 may return (out, lse), FA2 returns out
++        return out[0] if isinstance(out, tuple) else out
++
++    def _flash_wrapper(self, q, k, v, *, attn_func, **kwargs):
++        if attn_func is not None:
++            return self._unwrap_flash_output(attn_func(q, k, v, **kwargs))
++        return _run_varlen_dense(
++            self.flash_attn_varlen_func,
++            q,
++            k,
++            v,
++            causal=kwargs.get("causal", self.causal),
++            softmax_scale=kwargs.get("softmax_scale", self.softmax_scale),
++        )
++
++    def _forward_varlen_masked(
++        self,
++        query: torch.Tensor,
++        key: torch.Tensor,
++        value: torch.Tensor,
++        attention_mask: torch.Tensor,
++    ) -> torch.Tensor:
++        from vllm_omni.diffusion.attention.backends.utils.fa import (
++            _pad_input,
++            _unpad_input,
++            _upad_input,
++        )
++
++        assert attention_mask.ndim == 2, "attention_mask must be 2D, (batch_size, seq_len)"
++        query_length = query.size(1)
++        q, k, v, indices_q, (cu_seq_lens_q, cu_seq_lens_k), (max_length_q, max_length_k) = _upad_input(
++            query, key, value, attention_mask, query_length, _unpad_input
++        )
++
++        out_unpad = self.flash_attn_varlen_func(
++            q,
++            k,
++            v,
++            cu_seqlens_q=cu_seq_lens_q,
++            cu_seqlens_k=cu_seq_lens_k,
++            max_seqlen_q=max_length_q,
++            max_seqlen_k=max_length_k,
++            **{
++                "causal": self.causal,
++                "softmax_scale": self.softmax_scale,
++            },
++        )
++        out_unpad = self._unwrap_flash_output(out_unpad)
++        return _pad_input(out_unpad, indices_q, query.size(0), query_length)
++
++    def _forward_varlen_dense(
++        self,
++        query: torch.Tensor,
++        key: torch.Tensor,
++        value: torch.Tensor,
++    ) -> torch.Tensor:
++        return _run_varlen_dense(
++            self.flash_attn_varlen_func,
++            query,
++            key,
++            value,
++            causal=self.causal,
++            softmax_scale=self.softmax_scale,
++        )
++
++    def forward_cuda(
++        self,
++        query: torch.Tensor,
++        key: torch.Tensor,
++        value: torch.Tensor,
++        attn_metadata: AttentionMetadata = None,
++    ) -> torch.Tensor:
++        attention_mask = attn_metadata.attn_mask if attn_metadata is not None else None
++        full_attn_spans = attn_metadata.full_attn_spans if attn_metadata is not None else None
++
++        # Try piecewise attention
++        if full_attn_spans is not None:
++            logger.debug("Using piecewise Flash Attention for mixed causal/full mask")
++            attn_func = partial(
++                self._flash_wrapper,
++                attn_func=self.flash_attn_func,
++            )
++
++            return piecewise_attn(
++                query,
++                key,
++                value,
++                full_attn_spans,
++                self.softmax_scale,
++                attn_func,
++            )
++
++        if attention_mask is not None and torch.any(~attention_mask):
++            return self._forward_varlen_masked(
++                query,
++                key,
++                value,
++                attention_mask,
++            )
++
++        if self.flash_attn_func is not None:
++            out = self.flash_attn_func(
++                query,
++                key,
++                value,
++                causal=self.causal,
++                softmax_scale=self.softmax_scale,
++            )
++            return self._unwrap_flash_output(out)
++
++        return self._forward_varlen_dense(
++            query,
++            key,
++            value,
++        )
++
++
++class FlashAttention3HubBackend(AttentionBackend):
++    accept_output_buffer: bool = True
++
++    @classmethod
++    def supports_attention_mask(cls) -> bool:
++        return True
++
++    @staticmethod
++    def get_supported_head_sizes() -> list[int]:
++        return [64, 96, 128, 192, 256]
++
++    @staticmethod
++    def get_name() -> str:
++        return "FLASH_ATTN_3_HUB"
++
++    @staticmethod
++    def get_impl_cls() -> type["FlashAttention3HubImpl"]:
++        return FlashAttention3HubImpl
++
++
++class FlashAttention3HubImpl(AttentionImpl):
++    def __init__(
++        self,
++        num_heads: int,
++        head_size: int,
++        softmax_scale: float,
++        causal: bool = False,
++        num_kv_heads: int | None = None,
++        prefix: str = "",
++        qkv_layout: str | None = None,
++        backend_kwargs: dict | None = None,
++        **extra_impl_args,
++    ) -> None:
++        self.num_heads = num_heads
++        self.causal = causal
++        self.softmax_scale = softmax_scale
++        self.qkv_layout = qkv_layout
++        if backend_kwargs:
++            logger.warning("FlashAttention3HubImpl ignoring backend_kwargs: %s", list(backend_kwargs.keys()))
++
++        # Lazily get the kernel from the Hub to avoid network/disk overhead on import
++        from kernels import get_kernel
++
++        logger.info("Loading flash-attn3 kernel from HuggingFace Hub...")
++        try:
++            hub_module = get_kernel("kernels-community/flash-attn3", version=1)
++        except Exception as e:
++            try:
++                logger.info("Failed to load version 1, attempting version 2: %s", e)
++                hub_module = get_kernel("kernels-community/flash-attn3", version=2)
++            except Exception as e2:
++                logger.info("Failed to load version 2, attempting default: %s", e2)
++                hub_module = get_kernel("kernels-community/flash-attn3")
++
++        self.flash_attn_func = getattr(hub_module, "flash_attn_func", None)
++        self.flash_attn_varlen_func = getattr(hub_module, "flash_attn_varlen_func", None)
++
++        if self.flash_attn_func is None and self.flash_attn_varlen_func is None:
++            raise RuntimeError("Failed to load flash-attn3 kernel from HuggingFace Hub: no functions found")
++
++    @staticmethod
++    def _unwrap_flash_output(out: torch.Tensor | tuple[torch.Tensor, ...]) -> torch.Tensor:
++        # FA3 returns (out, lse)
++        return out[0] if isinstance(out, tuple) else out
++
++    def _flash_wrapper(self, q, k, v, *, attn_func, **kwargs):
++        if attn_func is not None:
++            return self._unwrap_flash_output(attn_func(q, k, v, **kwargs))
++        return _run_varlen_dense(
++            self.flash_attn_varlen_func,
++            q,
++            k,
++            v,
++            causal=kwargs.get("causal", self.causal),
++            softmax_scale=kwargs.get("softmax_scale", self.softmax_scale),
++        )
++
++    def _forward_varlen_masked(
++        self,
++        query: torch.Tensor,
++        key: torch.Tensor,
++        value: torch.Tensor,
++        attention_mask: torch.Tensor,
++    ) -> torch.Tensor:
++        from vllm_omni.diffusion.attention.backends.utils.fa import (
++            _pad_input,
++            _unpad_input,
++            _upad_input,
++        )
++
++        assert attention_mask.ndim == 2, "attention_mask must be 2D, (batch_size, seq_len)"
++        query_length = query.size(1)
++        q, k, v, indices_q, (cu_seq_lens_q, cu_seq_lens_k), (max_length_q, max_length_k) = _upad_input(
++            query, key, value, attention_mask, query_length, _unpad_input
++        )
++
++        out_unpad = self.flash_attn_varlen_func(
++            q,
++            k,
++            v,
++            cu_seqlens_q=cu_seq_lens_q,
++            cu_seqlens_k=cu_seq_lens_k,
++            max_seqlen_q=max_length_q,
++            max_seqlen_k=max_length_k,
++            **{
++                "causal": self.causal,
++                "softmax_scale": self.softmax_scale,
++            },
++        )
++        out_unpad = self._unwrap_flash_output(out_unpad)
++        return _pad_input(out_unpad, indices_q, query.size(0), query_length)
++
++    def _forward_varlen_dense(
++        self,
++        query: torch.Tensor,
++        key: torch.Tensor,
++        value: torch.Tensor,
++    ) -> torch.Tensor:
++        return _run_varlen_dense(
++            self.flash_attn_varlen_func,
++            query,
++            key,
++            value,
++            causal=self.causal,
++            softmax_scale=self.softmax_scale,
++        )
++
++    def forward_cuda(
++        self,
++        query: torch.Tensor,
++        key: torch.Tensor,
++        value: torch.Tensor,
++        attn_metadata: AttentionMetadata = None,
++    ) -> torch.Tensor:
++        attention_mask = attn_metadata.attn_mask if attn_metadata is not None else None
++        full_attn_spans = attn_metadata.full_attn_spans if attn_metadata is not None else None
++
++        # Try piecewise attention
++        if full_attn_spans is not None:
++            logger.debug("Using piecewise Flash Attention for mixed causal/full mask")
++            attn_func = partial(
++                self._flash_wrapper,
++                attn_func=self.flash_attn_func,
++            )
++
++            return piecewise_attn(
++                query,
++                key,
++                value,
++                full_attn_spans,
++                self.softmax_scale,
++                attn_func,
++            )
++
++        if attention_mask is not None and torch.any(~attention_mask):
++            return self._forward_varlen_masked(
++                query,
++                key,
++                value,
++                attention_mask,
++            )
++
++        if self.flash_attn_func is not None:
++            out = self.flash_attn_func(
++                query,
++                key,
++                value,
++                causal=self.causal,
++                softmax_scale=self.softmax_scale,
++            )
++            return self._unwrap_flash_output(out)
++
++        return self._forward_varlen_dense(
++            query,
++            key,
++            value,
++        )
+diff --git a/vllm_omni/diffusion/attention/backends/registry.py b/vllm_omni/diffusion/attention/backends/registry.py
+index 8c22cc2cd7d..a822d78fb17 100644
+--- a/vllm_omni/diffusion/attention/backends/registry.py
++++ b/vllm_omni/diffusion/attention/backends/registry.py
+@@ -62,6 +62,8 @@ class MyCustomBackend:
+     SAGE_ATTN_3 = "vllm_omni.diffusion.attention.backends.sage_attn3.SageAttention3Backend"
+     CUDNN_ATTN = "vllm_omni.diffusion.attention.backends.cudnn_attn.CuDNNAttentionBackend"
+     FLASHINFER_ATTN = "vllm_omni.diffusion.attention.backends.flashinfer_attn.FlashInferAttentionBackend"
++    FLASH_ATTN_HUB = "vllm_omni.diffusion.attention.backends.flash_attn_hub.FlashAttentionHubBackend"
++    FLASH_ATTN_3_HUB = "vllm_omni.diffusion.attention.backends.flash_attn_hub.FlashAttention3HubBackend"
+ 
+     def get_path(self, include_classname: bool = True) -> str:
+         """Get the class path for this backend (respects overrides).
+diff --git a/vllm_omni/platforms/cuda/platform.py b/vllm_omni/platforms/cuda/platform.py
+index 2127509eb3b..81eaa3066f2 100644
+--- a/vllm_omni/platforms/cuda/platform.py
++++ b/vllm_omni/platforms/cuda/platform.py
+@@ -121,6 +121,31 @@ def get_diffusion_attn_backend_cls(
+ 
+         if selected_backend is not None:
+             backend_upper = selected_backend.upper()
++            if backend_upper in ("FLASH_ATTN_HUB", "FLASH_ATTN_3_HUB"):
++                try:
++                    importlib.import_module("kernels")
++                    logger.info("Using HuggingFace kernels-backed attention backend '%s'", backend_upper)
++                except ImportError:
++                    if backend_upper == "FLASH_ATTN_HUB":
++                        logger.warning(
++                            "HuggingFace `kernels` library is not available. Falling back to local FLASH_ATTN."
++                        )
++                        backend_upper = "FLASH_ATTN"
++                    elif backend_upper == "FLASH_ATTN_3_HUB":
++                        logger.warning(
++                            "HuggingFace `kernels` library is not available. Falling back to local FLASH_ATTN."
++                        )
++                        backend_upper = "FLASH_ATTN"
++
++            if backend_upper == "FLASH_ATTN_3_HUB":
++                fa3_hub_supported = compute_capability is not None and compute_capability.major >= 9
++                if not fa3_hub_supported:
++                    logger.warning(
++                        "FLASH_ATTN_3_HUB requires a Hopper-class GPU with compute capability >= 9.0. "
++                        "Falling back to FLASH_ATTN_HUB."
++                    )
++                    backend_upper = "FLASH_ATTN_HUB"
++
+             if backend_upper == "FLASH_ATTN" and not flash_attn_supported:
+                 if not compute_supported:
+                     logger.warning(
+diff --git a/vllm_omni/platforms/musa/platform.py b/vllm_omni/platforms/musa/platform.py
+index 96e27edf30d..92a194d59e0 100644
+--- a/vllm_omni/platforms/musa/platform.py
++++ b/vllm_omni/platforms/musa/platform.py
+@@ -78,6 +78,14 @@ def get_diffusion_attn_backend_cls(
+ 
+         if selected_backend is not None:
+             backend_upper = selected_backend.upper()
++            if backend_upper in ("FLASH_ATTN_HUB", "FLASH_ATTN_3_HUB"):
++                logger.warning(
++                    "HuggingFace kernels-backed FlashAttention is "
++                    "not supported on MUSA. Falling back to local "
++                    "FLASH_ATTN."
++                )
++                backend_upper = "FLASH_ATTN"
++
+             if backend_upper == "FLASH_ATTN" and not flash_attn_supported:
+                 if not compute_supported:
+                     logger.warning(
+diff --git a/vllm_omni/platforms/npu/platform.py b/vllm_omni/platforms/npu/platform.py
+index f03fdb1bfaf..30aafdb324b 100644
+--- a/vllm_omni/platforms/npu/platform.py
++++ b/vllm_omni/platforms/npu/platform.py
+@@ -107,6 +107,14 @@ def get_diffusion_attn_backend_cls(
+ 
+         if selected_backend is not None:
+             backend_upper = selected_backend.upper()
++            if backend_upper in ("FLASH_ATTN_HUB", "FLASH_ATTN_3_HUB"):
++                logger.warning(
++                    "HuggingFace kernels-backed FlashAttention is "
++                    "not supported on NPU. Falling back to local "
++                    "FLASH_ATTN."
++                )
++                backend_upper = "FLASH_ATTN"
++
+             backend = DiffusionAttentionBackendEnum[backend_upper]
+             logger.debug("Using diffusion attention backend '%s'", backend_upper)
+             return backend.get_path()
+diff --git a/vllm_omni/platforms/rocm/platform.py b/vllm_omni/platforms/rocm/platform.py
+index b932d37940b..f905fd73c86 100644
+--- a/vllm_omni/platforms/rocm/platform.py
++++ b/vllm_omni/platforms/rocm/platform.py
+@@ -88,6 +88,14 @@ def get_diffusion_attn_backend_cls(
+ 
+         if selected_backend is not None:
+             backend_upper = selected_backend.upper()
++            if backend_upper in ("FLASH_ATTN_HUB", "FLASH_ATTN_3_HUB"):
++                logger.warning(
++                    "HuggingFace kernels-backed FlashAttention is "
++                    "not supported on ROCm. Falling back to local "
++                    "FLASH_ATTN."
++                )
++                backend_upper = "FLASH_ATTN"
++
+             if backend_upper == "FLASH_ATTN" and not aiter_supported:
+                 logger.warning(
+                     "Flash Attention requires `aiter` library which is only supported "
+diff --git a/vllm_omni/platforms/xpu/platform.py b/vllm_omni/platforms/xpu/platform.py
+index 8be01939fd9..0bc782e0374 100644
+--- a/vllm_omni/platforms/xpu/platform.py
++++ b/vllm_omni/platforms/xpu/platform.py
+@@ -42,6 +42,14 @@ def get_diffusion_attn_backend_cls(
+ 
+         if selected_backend is not None:
+             backend_upper = selected_backend.upper()
++            if backend_upper in ("FLASH_ATTN_HUB", "FLASH_ATTN_3_HUB"):
++                logger.warning(
++                    "HuggingFace kernels-backed FlashAttention is "
++                    "not supported on XPU. Falling back to local "
++                    "FLASH_ATTN."
++                )
++                backend_upper = "FLASH_ATTN"
++
+             backend = DiffusionAttentionBackendEnum[backend_upper]
+             logger.debug("Using diffusion attention backend '%s'", backend_upper)
+             return backend.get_path()

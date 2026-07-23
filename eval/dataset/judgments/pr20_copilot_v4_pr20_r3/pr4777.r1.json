@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.8,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns (two LGTM approvals plus a manual verification comment confirming the fix works), so both candidates trivially satisfy recall and neither can score a gap_hit. X goes further: it validates the core diff correctly, then flags three specific stale hardcoded-'3' boundary tests in reliability suites outside the diff that would break from this exact change, with precise file:line and before/after fixes — a substantive, high-value catch mirroring the pattern the PR author already fixed elsewhere, though these files aren't in the visible diff so their existence can't be fully re-verified here. Y's single finding (missing positive unit test for layers=2) is fully grounded in the visible diff and clearly valid, but is a minor nitpick already largely covered by the e2e test the PR modified. X's review is more thorough, equally well-grounded on the parts checkable against the diff, and more actionable overall.",
+  "_cost_usd": 0.21614589999999997,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "f218f87d0de63eb189da54ee340797718b08899c1a6b6057f91e291bae6e43c5",
+    "judge_rep": 1
+  }
+}

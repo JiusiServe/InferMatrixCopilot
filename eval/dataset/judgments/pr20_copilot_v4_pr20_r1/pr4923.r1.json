@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.5,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.75,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y directly engages the three real GT threads: it validates/explains the exact cudagraph_mode-in-modeling question gcanlin raised and the TODO resolving it, explains the seed-reproducibility tradeoff gcanlin flagged, explicitly asks for the before/after benchmark evidence multiple reviewers demanded, and questions the NPU compilation_config fix tied to Wallbreazzz's crash report. X instead spends its 'major' findings on generic 'add a unit test' asks that no GT reviewer raised, only weakly brushing against the TODO/benchmark topics. Both correctly flag the stale/contradictory YAML comments and the redundant omni_pooler_payload_include_hidden line, but Y's findings are more substantively grounded in verified runner/config code paths, giving it better precision alongside much higher recall.",
+  "_cost_usd": 0.2889171,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "9c468aa836407346dead6212974934c8ff4bbb59684c20425f658394a1b9477f",
+    "judge_rep": 1
+  }
+}

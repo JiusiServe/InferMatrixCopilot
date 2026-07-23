@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates spot the same core discrepancy the ground-truth reviewer flagged (trust_remote_code mentioned in the PR description but not reflected in the code), though neither reproduces the ground truth's specific angle (version-compat risk with kernels<0.15), so recall is capped similarly for both. X surfaces more grounded, actionable findings (missing cache test, lock serializing FA2/FA3 loads, lost 'attempting version X' log detail, dead last_error init) each tied to a specific line with a concrete fix, while Y is more concise with only two non-blocking notes and explicitly waves off the test-coverage gap that X reasonably flags. Neither fabricates findings, so precision is comparably high, but X's broader, well-grounded coverage edges out Y slightly on actionability.",
+  "_cost_usd": 0.1765682,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "210d1fff3131ae25d07fda3c522a8f8b6f9f05e344eddebf9284defc3965834d",
+    "judge_rep": 1
+  }
+}

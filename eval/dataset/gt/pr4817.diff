@@ -1,0 +1,143 @@
+diff --git a/docs/user_guide/quantization/fp8.md b/docs/user_guide/quantization/fp8.md
+index 290f1adf448..6114812dbdd 100644
+--- a/docs/user_guide/quantization/fp8.md
++++ b/docs/user_guide/quantization/fp8.md
+@@ -44,10 +44,16 @@ pip install vllm-omni[quack]
+ pip install 'quack-kernels[cu13]' --extra-index-url https://download.pytorch.org/whl/cu130
+ ```
+ 
+-It is enabled automatically once installed (no flag needed) and is **Blackwell-only**:
+-on Hopper/Ada the CUTLASS FP8 kernel already fuses bias, so quack is not used there.
+-Set `VLLM_OMNI_USE_QUACK_FP8=0` to force the FlashInfer path. If `quack-kernels` is
+-not installed, FP8 still works — it just keeps the unfused FlashInfer path.
++It is enabled automatically once installed (no flag needed) and is **datacenter
++Blackwell only** (`sm_100` / `sm_101` / `sm_103`, compute capability `10.x`, e.g.
++B200): quack's CuteDSL GEMM uses the 5th-gen `tcgen05` tensor-core MMA, which exists
++only on those parts. On Hopper/Ada the CUTLASS FP8 kernel already fuses bias, and on
++workstation/consumer Blackwell (`sm_120` / `sm_121`, compute capability `12.x`, e.g.
++RTX PRO 6000 / RTX 50-series) `tcgen05` is absent — so quack is **not** auto-enabled
++there and FlashInfer's native FP8 path is used instead. Set
++`VLLM_OMNI_USE_QUACK_FP8=1` to force quack on, or `VLLM_OMNI_USE_QUACK_FP8=0` to force
++the FlashInfer path. If `quack-kernels` is not installed, FP8 still works — it just
++keeps the unfused FlashInfer path.
+ 
+ #### Compile cache and warmup
+ 
+diff --git a/tests/quantization/test_quack_fp8_gate.py b/tests/quantization/test_quack_fp8_gate.py
+new file mode 100644
+index 00000000000..4a8848ffaf4
+--- /dev/null
++++ b/tests/quantization/test_quack_fp8_gate.py
+@@ -0,0 +1,75 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""Unit tests for the quack FP8 auto-enable gate.
++
++quack's CuteDSL FP8 GEMM uses the 5th-gen ``tcgen05`` tensor-core MMA, which
++exists only on datacenter Blackwell (``sm_100a`` / ``sm_101a`` / ``sm_103a``,
++compute capability ``10.x``). It must NOT auto-enable on workstation/consumer
++Blackwell (``sm_120`` / ``sm_121``, cc ``12.x``, e.g. RTX PRO 6000 / RTX
++50-series), where ``tcgen05`` is absent and every FP8 GEMM would fall back to
++FlashInfer one call at a time (catastrophically slow). See
++``vllm_omni/quantization/quack_fp8.py``.
++
++Regression guard for the ``>= 10`` gate that matched cc ``12.x`` too. These
++tests are hardware-free: the ``torch.cuda`` probes are monkeypatched, so no GPU
++is required.
++"""
++
++import pytest
++import torch
++
++from vllm_omni.quantization import quack_fp8
++
++_ENV = "VLLM_OMNI_USE_QUACK_FP8"
++
++
++def _fake_cuda(monkeypatch: pytest.MonkeyPatch, capability: tuple[int, int]) -> None:
++    """Pretend a CUDA device with the given (major, minor) capability is present."""
++    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
++    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda *a, **k: capability)
++
++
++@pytest.mark.parametrize(
++    "capability, expected",
++    [
++        ((10, 0), True),  # sm_100 datacenter Blackwell — tcgen05 present
++        ((10, 3), True),  # sm_103 datacenter Blackwell
++        ((12, 0), False),  # sm_120 workstation Blackwell — the regression
++        ((12, 1), False),  # sm_121 consumer Blackwell
++        ((9, 0), False),  # Hopper — CUTLASS already fuses bias, quack unused
++        ((8, 9), False),  # Ada
++    ],
++)
++def test_auto_enable_only_on_datacenter_blackwell(
++    monkeypatch: pytest.MonkeyPatch,
++    capability: tuple[int, int],
++    expected: bool,
++) -> None:
++    monkeypatch.delenv(_ENV, raising=False)
++    _fake_cuda(monkeypatch, capability)
++    assert quack_fp8._is_quack_capable() is expected
++    assert quack_fp8.quack_enabled() is expected
++
++
++def test_no_cuda_disables_quack(monkeypatch: pytest.MonkeyPatch) -> None:
++    monkeypatch.delenv(_ENV, raising=False)
++    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
++    assert quack_fp8._is_quack_capable() is False
++    assert quack_fp8.quack_enabled() is False
++
++
++@pytest.mark.parametrize("value", ["1", "true", "yes", "on", "TRUE", "On"])
++def test_env_override_forces_on_even_on_sm120(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
++    # sm_120 auto-disables, but an explicit truthy override forces quack on
++    # (e.g. once CuteDSL ships sm_120a support).
++    _fake_cuda(monkeypatch, (12, 0))
++    monkeypatch.setenv(_ENV, value)
++    assert quack_fp8.quack_enabled() is True
++
++
++@pytest.mark.parametrize("value", ["0", "false", "no", "off", ""])
++def test_env_override_forces_off_even_on_datacenter_blackwell(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
++    # sm_100 auto-enables, but an explicit non-truthy override forces quack off.
++    _fake_cuda(monkeypatch, (10, 0))
++    monkeypatch.setenv(_ENV, value)
++    assert quack_fp8.quack_enabled() is False
+diff --git a/vllm_omni/quantization/quack_fp8.py b/vllm_omni/quantization/quack_fp8.py
+index ba68d078dd1..8c7251e435c 100644
+--- a/vllm_omni/quantization/quack_fp8.py
++++ b/vllm_omni/quantization/quack_fp8.py
+@@ -15,11 +15,21 @@
+ _gemm_interface = None
+ 
+ 
+-def _is_blackwell() -> bool:
++def _is_quack_capable() -> bool:
++    """quack's CuteDSL FP8 / block-scaled MMA is built on the 5th-gen tensor-core
++    ``tcgen05`` instruction family, which is datacenter-Blackwell only
++    (``sm_100a`` / ``sm_101a`` / ``sm_103a``, compute capability ``10.x``).
++
++    Workstation/consumer Blackwell (``sm_120`` / ``sm_121``, compute capability
++    ``12.x``, e.g. RTX PRO 6000 / RTX 50-series) lacks ``tcgen05``, so quack can
++    never run there — CuteDSL rejects the arch and every GEMM falls back to
++    FlashInfer one call at a time, which is catastrophically slow. Those GPUs
++    have working native FlashInfer FP8 kernels, so default quack off for them.
++    """
+     try:
+         if not torch.cuda.is_available():
+             return False
+-        return torch.cuda.get_device_capability()[0] >= 10
++        return torch.cuda.get_device_capability()[0] == 10
+     except Exception:  # noqa: BLE001
+         return False
+ 
+@@ -28,7 +38,7 @@ def quack_enabled() -> bool:
+     override = os.environ.get("VLLM_OMNI_USE_QUACK_FP8")
+     if override is not None:
+         return override.lower() in _TRUTHY
+-    return _is_blackwell()
++    return _is_quack_capable()
+ 
+ 
+ def _set_persistent_cache_dir() -> None:

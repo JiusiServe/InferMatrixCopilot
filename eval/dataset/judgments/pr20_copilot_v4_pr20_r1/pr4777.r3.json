@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.9,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth is thin (LGTM approvals plus an informal QA comment confirming boundary/unit/e2e checks), so neither candidate has much substantive human feedback to recall against. X correctly validates the range-consistency logic and flags a minor, low-value gap (no positive unit assertion for layers=2). Y does the same core validation but goes further, tracing the constant through both entrypoints and the pipeline implementation, and surfaces two concrete stale reliability-test files with old hardcoded bounds ('3'/'layers=2 invalid') that would now fail — a specific, plausible, high-value catch mirroring exactly the kind of regression this PR's narrow scope (unit tests only) would miss. Y's findings are more actionable (exact files/lines/diffs) and higher-impact if accurate, giving it better recall of the underlying verification concerns and stronger overall value despite similar precision risk.",
+  "_cost_usd": 0.0645109,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "a0c07f8fb30d8d376782d2c74fae4bc3959ac053e10760a7dfe2fed87231469a",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.25,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates correctly validate the core codes.audio fix but miss GT's two specific non-blocking asks (update the stale docstring/module comment, and question whether the legacy top-level-audio producer still exists). X's two follow-up comments are tightly grounded, verified with a concrete failing example (short 'hello' vs 'hello world goodbye' passing containment), and closer in spirit to GT's concern about the fallback's scope/behavior. Y produces more findings but many are low-value nits (docstring for a different function, magic-number extraction, speculative dead-code claim) that dilute precision and don't better match GT's actual concerns despite the extensive validation sweep.",
+  "_cost_usd": 0.3007482,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "e0ed1b70396446d1337800c9523c45469e4db32cb0ba284bc4154064bafe7b8a",
+    "judge_rep": 2
+  }
+}

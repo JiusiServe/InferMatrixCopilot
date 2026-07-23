@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.6,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Y engages more directly with the ground truth's two most-repeated concerns (the platform-wide scope of the default-priority change, and the requested P1+P2-vs-main perf comparison), even citing perf numbers (-26.9%, -14.1%) that match the actual PR thread. But Y's cited code locations for the RMSNorm swap sites (qwen_image_transformer.py:640-643, :1140) are demonstrably wrong against the diff's own hunk headers (actual lines are ~557-558, 595-596, 1009), which undercuts trust in its other unverifiable file/line claims. X's findings are fewer and cover less of the ground-truth thread, but every cited line number matches the diff exactly, and its two flagged issues (misleading test name covering a non-inductor case, dropped docstring rationale) are valid, precise, and directly actionable.",
+  "_cost_usd": 0.45083590000000007,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "3950704630e067a9c300ea725d7642a14aed8a26314651f194dfe00fcf433631",
+    "judge_rep": 2
+  }
+}

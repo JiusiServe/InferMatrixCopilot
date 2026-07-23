@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.55,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y directly hits the latent gap: it greps the full PR-time tree and names five pre-existing tests (test_diffusion_sleep_handshake, test_diffusion_integrity_bit_level, test_diffusion_vram_lifecycle_audit, test_diffusion_model_sleep_tp, test_multistage_sleep_h100) that call sleep(level=2)+wake_up() and will now hit the new NotImplementedError — precisely the over-strictness that broke merge CI in real life (#4905). X's closest analog (default sleep level=2 'bricks the engine') is speculative/unverifiable from the diff and contradicts X's own note that vLLM convention and worker defaults are level=1, making it a plausible fabrication rather than a grounded finding; X's test-coverage finding only flags the *new* tests' hardware gating, not that *existing* CI tests would break. Both cover the resolved ground-truth threads (regression tests, CuMemTag enum) reasonably and are file/line actionable, but Y's concrete, verifiable blockers give it higher precision and a real gap_hit, while X carries a risky, likely-wrong 'major' claim as its headline finding.",
+  "_cost_usd": 0.2234242,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "ce24fe648af8be3175e22e079bbfdbb199287cc3db0f1ff72de5586e5cc5760a",
+    "judge_rep": 2
+  }
+}

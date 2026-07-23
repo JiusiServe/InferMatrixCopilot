@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.9,
+    "actionability": 0.4,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "The sole substantive ground-truth concern (whether the test should verify reduce_scatter behavior, not just device_communicator presence) is missed by both candidates, so recall is low for both. X mostly restates/validates the diff and offers only one soft, ungrounded-in-severity comment about dp_metadata caching; Y independently flags the same collective-invariant issue plus several additional, mostly valid and concretely actionable findings (untested RuntimeError path, missing cfg_parallel_size=1 test) with specific file/line evidence, though a couple of its nits are low-value padding. Y's greater concreteness and actionability edge out X's higher-but-thinner precision.",
+  "_cost_usd": 0.1893282,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "e5aee40870353dfa1d3c022cdf9da5686c17f2e74ae3d4f816f0288fa150f749",
+    "judge_rep": 3
+  }
+}

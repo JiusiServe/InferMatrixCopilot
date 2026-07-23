@@ -1,0 +1,109 @@
+{
+  "wall_s": 259.8,
+  "split": "test",
+  "rc": 0,
+  "run_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2/runs/pr4777/run-20260722-205615-e14bf2",
+  "recorded_at": "2026-07-22T21:00:33",
+  "attempts": [
+    {
+      "invocation_id": "inv-c9cfd6e5",
+      "outcome": "run:run-20260722-205615-e14bf2",
+      "rc": 0,
+      "pre_run": null
+    },
+    {
+      "run_dir": "run-20260722-205615-e14bf2",
+      "llm_calls": 32,
+      "input_tokens": 429028,
+      "output_tokens": 23278,
+      "usd": 0.169544,
+      "source": "spans"
+    }
+  ],
+  "attempt_usd_total": 0.169544,
+  "llm_calls": 32,
+  "input_tokens": 429028,
+  "output_tokens": 23278,
+  "usd": 0.169544,
+  "source": "spans",
+  "metrics": {
+    "schema": 1,
+    "run": "run-20260722-205615-e14bf2",
+    "task_kind": "pr_review",
+    "status": "done",
+    "quality": {
+      "q": null,
+      "weight_coverage": 0.0,
+      "partial": true,
+      "abstained": false,
+      "components": {
+        "recall_w": null,
+        "precision_v": null,
+        "useful": null,
+        "calib": null,
+        "decision": null
+      }
+    },
+    "cost": {
+      "usd": 0.1695,
+      "minutes": 4.29,
+      "ci_minutes": 0,
+      "input_tokens": 429028,
+      "output_tokens": 23278,
+      "tool_calls": 65,
+      "usd_ref": 1.0,
+      "min_ref": 10.0,
+      "cost_index": 1.2336,
+      "source": "spans",
+      "llm_calls": 32,
+      "by_role": {
+        "planner": {
+          "usd": 0.000506,
+          "input_tokens": 90,
+          "output_tokens": 400,
+          "calls": 1
+        },
+        "agent": {
+          "usd": 0.165688,
+          "input_tokens": 425494,
+          "output_tokens": 20693,
+          "calls": 30
+        },
+        "reducer": {
+          "usd": 0.003351,
+          "input_tokens": 3444,
+          "output_tokens": 2185,
+          "calls": 1
+        }
+      },
+      "cache_read_tokens": 1040768,
+      "cache_creation_tokens": 0
+    },
+    "timings": {
+      "steps": {
+        "fetch": 3.21,
+        "gate": 0.55,
+        "review": 253.66,
+        "report": 0.03
+      },
+      "time_to_first_result_s": 257.45
+    },
+    "risk": {
+      "incidents": {
+        "catastrophic": 0,
+        "severe": 0,
+        "moderate": 0,
+        "minor": 0
+      },
+      "safety_multiplier": 1.0
+    },
+    "catq": null,
+    "tus": null,
+    "signals": {
+      "escalations": 0,
+      "pushes": 0,
+      "posted": 0,
+      "steps_completed": 4
+    }
+  }
+}

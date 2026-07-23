@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.65,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates engage with the two ground-truth concerns (regression tests added, CuMemTag enum introduced) to similar depth. The decisive difference is the latent gap: Y pinpoints five pre-existing tests (sleep(level=2) followed by wake_up()) that will now raise NotImplementedError due to the new guard — exactly the over-strictness that broke merge CI per #4905/#4912 — with precise file/line citations and fixes. X's finding #1 gestures at the same mechanism via the sleep() default level but never ties it to concrete failing call sites, making it a weaker, more speculative version of the same insight. Y's findings are also more tightly grounded (explicit grep validations, exact line numbers per broken test) versus some of X's less-verifiable claims (e.g. worker-side default citations, allocator tag semantics).",
+  "_cost_usd": 0.24089750000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "ce24fe648af8be3175e22e079bbfdbb199287cc3db0f1ff72de5586e5cc5760a",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates verify the already-resolved Med (qwen3_tts gating) and Nit (seq_len removal) concerns and both surface the live Low concern (async_chunk default fallback), but Y's version is more precisely grounded — it cites the exact sibling default elsewhere in the same file and the real field default, closely mirroring the ground-truth Low comment. X's remaining findings (extract a qwen3_tts helper, add explanatory comments) are valid but low-value stylistic notes rather than substantive risks. Neither candidate addresses amy-why's design question about relocating the model-specific check. Critically, Y explicitly questions whether the split now only handles the scheduled-token axis and notes hidden-shape-aligned tensors would no longer slice — directly anticipating the dual-batch-axis issue later fixed in PR #4910 — while X's closest analog (a generic shape-mismatch assertion suggestion) never frames the issue in terms of multiple batch axes.",
+  "_cost_usd": 0.39519039999999994,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "a6b9a889fabffd4f8156a594a97e7a1b0edd761498fe3ca0b1817c5387520cd8",
+    "judge_rep": 2
+  }
+}

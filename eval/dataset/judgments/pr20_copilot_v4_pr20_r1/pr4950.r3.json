@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.92,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth contains no substantive concerns (only LGTM/approval), so recall is trivially maxed for both. X performs deeper source-level verification (tracing actual code paths in serving_chat.py and the TTS talker module) but produces only one actionable comment, and that comment is heavily hedged ('if you observed silent WAV directly, keep the current wording'), reducing its actionability. Y verifies claims via repo-wide greps and additionally catches a genuinely valuable out-of-diff issue — a sibling doc (examples/online_serving/minicpmo/README.md:58) left with the same stale extra_body pattern this PR fixes — plus gives concrete suggested rewordings with file:line for all three findings, though one nit slightly overclaims 'deterministic' behavior from a single test run. Y's extra grounded finding and more concrete, actionable suggestions edge out X's greater verification depth but thinner actionable output.",
+  "_cost_usd": 0.0750922,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "553aac9cdac4b3bc20f2bde02e4664fc8c2666f72906e50cb513efb4c43fea6c",
+    "judge_rep": 3
+  }
+}

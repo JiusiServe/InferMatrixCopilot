@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.6,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.55
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "The GT's dominant concern (hsliuustc0106 + NumberWan thread) is that the platform default was globalized to all CUDA diffusion models but validated only on Qwen-Image, later justified with FLUX.1-dev A/B numbers. Y directly surfaces this scope risk, explains the per-model override safety mechanism, and cites the same FLUX (-14.1%, SSIM parity) evidence that resolved it in the real thread — a strong recall hit. X never raises this scope issue at all, instead spending its findings on speculative documentation nits (add a comment warning against reverting RMSNorm, assert an untested `.default` field) that aren't grounded in any reviewer concern and read as manufactured filler. Y also catches a sharp, well-grounded gap (the new parametrized test no longer branches on compilation mode since the code stopper reading it) that no candidate other than a careful reviewer would notice. X's suggestions are more concretely actionable (exact comment text, exact assert), giving it an edge on actionability, but this doesn't offset its much weaker recall and higher fabrication risk.",
+  "_cost_usd": 0.21850560000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "5102ed840fde4784bb4cd3e533d05c95a5070427e7ff473ac81e4a8edc4443b6",
+    "judge_rep": 3
+  }
+}

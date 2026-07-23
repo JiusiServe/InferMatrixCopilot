@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -31,6 +32,9 @@ HERE = Path(__file__).parent
 HEADS = HERE / "expected_pr_heads.json"
 VAL_STEMS = ["pr4893", "pr4810", "pr4825", "pr4837", "pr4816",
              "issue4793", "issue4827", "issue4905", "issue4891", "issue4842"]
+# The 20-case PR-review campaign validates a different stem set. EVAL_STEMS (a
+# comma list) overrides; absent, the val stems keep every existing call working.
+_ENV_STEMS = [s for s in (os.environ.get("EVAL_STEMS") or "").split(",") if s]
 PR_DIMS = ("recall", "precision", "actionability")
 ISSUE_DIMS = ("correctness", "grounding", "completeness")
 WINNERS = {"X", "Y", "tie"}
@@ -109,10 +113,12 @@ def _check_moa(arm_dir: Path, stem: str, members: list[str],
 
 
 def validate(arm_dir: Path, judge_dir: Path,
-             moa_members: list[str] | None = None) -> list[str]:
+             moa_members: list[str] | None = None,
+             stems: list[str] | None = None) -> list[str]:
     errors: list[str] = []
+    stems = stems or _ENV_STEMS or VAL_STEMS
     heads = json.loads(HEADS.read_text()) if HEADS.exists() else {}
-    for stem in VAL_STEMS:
+    for stem in stems:
         cj = arm_dir / f"{stem}.cost.json"
         md = arm_dir / f"{stem}.md"
         if not md.exists() or not cj.exists():
@@ -138,7 +144,7 @@ def validate(arm_dir: Path, judge_dir: Path,
             else:
                 _check_verdict(f, stem, rep, arm_dir, errors)
     extra = {p.name for p in judge_dir.glob("*.json")} - {
-        f"{s}.r{r}.json" for s in VAL_STEMS for r in (1, 2, 3)}
+        f"{s}.r{r}.json" for s in stems for r in (1, 2, 3)}
     if extra:
         _fail(errors, f"unexpected verdict files: {sorted(extra)[:5]}")
     return errors

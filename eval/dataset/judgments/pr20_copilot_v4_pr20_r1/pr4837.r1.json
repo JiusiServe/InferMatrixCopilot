@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.45,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "GT's sole substantive point (yJader's inline comment) explains that removing `already_submitted` is safe because both submit_initial and submit_update reject list prompts identically for diffusion — X reproduces this exact reasoning almost verbatim, citing stage_pool.py line numbers, and reaches the same APPROVE verdict the actual reviewers gave (two LGTMs). Y's structured sweep is thorough but its 'major' finding — that multi-element lists 'fall through silently' as a result of this diff — misattributes pre-existing, unchanged behavior to the PR's change (the len>1 case was identical before and after), which is a grounding error, and its 'FOLLOW-UP REQUIRED' verdict contradicts the real outcome. Both candidates are actionable with concrete file/line references, but X's claims are tighter, correct, and mirror the ground truth reviewer's actual logic, while Y overstates scope and reaches the wrong bottom line.",
+  "_cost_usd": 0.13017949999999998,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "f0ce62aaaeee2a04e6500b7cfc096c87ddb5effa2f667c933b9ff6d7a6a14332",
+    "judge_rep": 1
+  }
+}

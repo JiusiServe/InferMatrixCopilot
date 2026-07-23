@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.7,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "The dominant ground-truth concern (raised twice by hsliuustc0106 and answered by the author with FLUX.1-dev A/B numbers) is that the platform-wide default change was validated only on Qwen-Image but applied to all CUDA diffusion models. Y explicitly surfaces and investigates this scope question, correctly traces the Cosmos3 override path, and cites the FLUX.1-dev −14.1% latency / SSIM 0.992 figures that match the ground truth's actual resolution almost exactly — strong grounding, not fabrication. X performs similar Cosmos3/scope investigation internally but never surfaces it as a finding, instead producing two low-value 'add a comment' suggestions about an unused parameter and vacuous test parametrization that don't map to any reviewer concern. Neither candidate flags the 'pytest mark not complete' comment, and neither includes a LATENT GAP CHECK section, so gap_hit is false for both. Y's findings are more grounded and actionable overall, giving it clearly higher recall and precision.",
+  "_cost_usd": 0.1512644,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "8db9582ca4fd83f91efd22aef9d64657ab323bba0f72d3687937ecabe87c3b09",
+    "judge_rep": 3
+  }
+}

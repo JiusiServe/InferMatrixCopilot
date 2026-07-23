@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.6,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.9,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y independently verifies both submit_initial/submit_update reject list prompts (stage_pool.py:951-955, 1022-1026), reproducing almost exactly the reasoning in the ground-truth inline comment about why already_submitted-gating was wrong, and further confirms via pipeline_z_image.py that DiffusionOutput lacks __getitem__ (old code would TypeError) — grounded, verified findings matching the actual APPROVE outcome. X reaches the opposite overall verdict (FOLLOW-UP REQUIRED) despite the PR being cleanly approved, labels missing tests as 'major' without matching reviewer sentiment, and its hasattr-fallback concern is left unresolved/speculative ('please confirm by grepping') rather than verified. Both lack a LATENT GAP CHECK section.",
+  "_cost_usd": 0.1355352,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "e8fc984f9cae97fe43bb7be733c0df09a7064c59be1153d6845cde562f519099",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.55,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth contains no substantive concerns (just an 'lgtm' approval), so both candidates correctly reach APPROVE and recall is moot for both. X reads well but its specific citations don't hold up: its cited test-file line numbers (2638/2651/2720) don't match the diff's hunk positions (2530/2543/2612), and it invents unverifiable specifics (a precise upstream PR number 'vllm#46022' and a 'concrete repro' from the PR body) that aren't grounded in the given diff. Y's line citations (2533/2546/2615, 1017) align exactly with the diff hunk offsets, and it flags a legitimate pre-existing edge case (None handling in diffusion mode) without overreaching into unverifiable claims, making it more trustworthy and better grounded.",
+  "_cost_usd": 0.1623286,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "8d59aa98c9a0c81f8b90fe58d1a86e63e9664f8ea638de0ba48a3df675edd158",
+    "judge_rep": 2
+  }
+}

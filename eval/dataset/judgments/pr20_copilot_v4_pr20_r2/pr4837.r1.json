@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.55,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X's core analysis of orchestrator.py:1290 independently verifies (via stage_pool.py:951/1022) that both submit_initial and submit_update reject list prompts, which is almost exactly the crux of yJader's ground-truth inline comment; Y's coverage of the same line is shallower and misses that specific StagePool-rejects-both-paths reasoning. Y also introduces likely-fabricated claims not grounded in the diff (a nonexistent-seeming '_route_output' function and '.request_id/.finished' fields on DiffusionOutput, plus a 'linked issue #4839' reference), which hurts its precision, whereas X's claims are all tied to concrete, checkable file:line evidence.",
+  "_cost_usd": 0.1323832,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "003755cbeb02e85f05bd7853e30ff3f2a454abdbc54f42ee0d12e24e95383d01",
+    "judge_rep": 1
+  }
+}

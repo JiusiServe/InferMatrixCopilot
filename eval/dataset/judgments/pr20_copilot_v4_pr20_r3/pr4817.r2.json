@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive reviewer concerns to recall, so both are roughly equal there. Both correctly validate the core `==10` fix and independently raise the same sm_110a edge-case concern (plausible, likely sourced from the PR description). Y goes further with two additional grounded, actionable nits (missing sm_101 test case, doc heading/body inconsistency) with precise line references, while X's single suggestion ('`in (10,)` phrased so 11.x can be added later') is logically muddled since that syntax doesn't actually add 11.x support. Y's greater specificity and correctness in its actionable suggestions gives it a slight edge.",
+  "_cost_usd": 0.0662944,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "907fbad9f5ce52c91ee788e09c016b303937a3692823595ae570059ff645a467",
+    "judge_rep": 2
+  }
+}

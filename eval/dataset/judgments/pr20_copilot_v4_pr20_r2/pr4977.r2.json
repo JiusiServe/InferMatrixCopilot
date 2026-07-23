@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 1.0,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.95,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently caught the same discrepancy underlying the ground-truth concern — the PR description's trust_remote_code=True claim doesn't appear in the diff — but neither surfaced the specific mechanism the human reviewer flagged (kernels 0.13.x incompatibility / missing pyproject lower bound), so recall is capped similarly for both. X's two findings (description/diff mismatch, lock held across I/O serializing FA2/FA3 loads) are accurate and grounded but sparse. Y covers the same two points plus three more grounded, diff-verified observations (missing cache test, lost 'attempting version X' log detail, dead last_error=None init), each with precise line numbers, severity tags, and concrete fixes, giving it a modest edge in actionability and thoroughness despite one debatable-severity nit.",
+  "_cost_usd": 0.1969932,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "210d1fff3131ae25d07fda3c522a8f8b6f9f05e344eddebf9284defc3965834d",
+    "judge_rep": 2
+  }
+}

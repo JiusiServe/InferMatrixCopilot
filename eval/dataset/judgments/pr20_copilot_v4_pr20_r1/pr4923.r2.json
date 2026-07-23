@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.7,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both catch the mtp-seed reproducibility loss under full cudagraphs and the redundant omni_pooler_payload_include_hidden assignment, and both flag the stale prefix-caching comment vs. new false value — but neither surfaces the Wallbreazzz NPU crash/fix thread or Sy0307's seed-yaml-removal benchmark confound, capping recall for both. Y engages more directly with the GT's central design objection (cudagraph_mode leaking into modeling, tied explicitly to the TODO and a call for a tracking issue) and grounds findings in explicit repo greps; X's yaml-header quote about a stale max_num_batched_tokens rationale isn't supported by the visible diff context, weakening its precision. Actionability is comparable, with Y's concrete test-addition asks slightly more concrete.",
+  "_cost_usd": 0.27374350000000003,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "9c468aa836407346dead6212974934c8ff4bbb59684c20425f658394a1b9477f",
+    "judge_rep": 2
+  }
+}

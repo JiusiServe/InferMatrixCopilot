@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (just LGTM/approvals), so both trivially cover it and neither fabricates anything obviously wrong — both verify the PR's core claims against source with specific file/line citations. X's only 'comment' is hedged and ultimately recommends keeping the current wording, offering little actionable value beyond validating the PR. Y goes further with a repo-wide sweep and surfaces a genuine, concretely actionable gap (stale extra_body wording in examples/online_serving/minicpmo/README.md:58, with a quoted line and suggested fix), giving it an edge on actionability and added value despite similar precision.",
+  "_cost_usd": 0.15896339999999998,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "06eab3c9860e2ecb70c91df0c838d7cf4c436e0ded2a4ada2466db3949201ba6",
+    "judge_rep": 2
+  }
+}

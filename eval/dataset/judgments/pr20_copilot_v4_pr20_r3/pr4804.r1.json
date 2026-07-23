@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.5,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates miss nearly all the ground-truth reviewers' core findings (the High-severity stream-slot-leak, the cumulative/delta rewind silent bug, the ceil-division latent bug, and most of the non-blocking docstring/cleanup/generalizability comments); Y gets partial credit for brushing against the legacy-checkpoint/v2-tokenizer issue via its load_weights note. Y's precision is hurt more seriously, though: it explicitly asserts the slot-leak lifecycle 'looks complete' and that vendored files 'carry a proper... attribution header', both of which directly contradict the ground truth (a fixed High-severity bug and an explicit reviewer ask for a missing provenance header) — confident wrong claims are worse than omissions. X's five flagged findings (preprocess type-guard regression, hardcoded sampling params, missing tests) are grounded and actionable but don't overlap with GT and it never engages the codec/legacy-checkpoint files where the real bugs live. Y is more thorough and its actionable suggestions are slightly better specified, but the false-confidence issues tip this narrowly to X.",
+  "_cost_usd": 0.2968102,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "d9f1110c2ac4027eef5889c5d15404bbc040716c1b72360e6a6b121f8f8f180f",
+    "judge_rep": 1
+  }
+}

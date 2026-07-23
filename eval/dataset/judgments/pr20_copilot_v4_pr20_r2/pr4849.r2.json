@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently verified the exact question the human reviewer raised (is source_outputs[0] really the parent?) but neither recommended the actual requested action (add a check/comment), so recall is low for both. Y additionally flags the failing buildkite/NPU/AMD CI checks (echoing the GT's 'fix precommit' ask) and grounds its approval in concrete caller-compatibility tracing (orchestrator.py line ranges) that is more verifiable and directly relevant than X's scattered minor nitpicks, one of which (the hardcoded 'Request 0' log) isn't even a real finding. X's items are grounded but mostly low-value test-coverage nits; Y's are fewer but more precise and better tied to what the real reviewers cared about (compatibility + CI health).",
+  "_cost_usd": 0.1807222,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "e98da0db32aa49aa1f1e025ab7dbfe816e24d3c385aa6229d45c84f284fce0a4",
+    "judge_rep": 2
+  }
+}

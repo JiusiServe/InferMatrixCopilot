@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.7,
+    "actionability": 0.2,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The ground truth's substantive concern (dsocek questioning whether the hardcoded component list generalizes across PEFT naming conflicts, suggesting deriving from _packed_modules_mapping instead) is conceptually echoed by X's comment about reusing pipeline._dit_modules as a single source of truth instead of a fourth hardcoded list — a good-faith, well-grounded, actionable match even if not the identical mechanism. Y instead produces a validation-only report (greps confirming correctness, no other pipeline conflicts) and concludes 'ready to merge' with zero substantive findings, missing the actual reviewer pushback entirely and offering no concrete suggestions. Both avoid fabrication, but X is clearly more useful and closer to the real review.",
+  "_cost_usd": 0.1371452,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "d994f274c9182cdba73846a7739bf89f32218a7a145188f1ae5be9998b252162",
+    "judge_rep": 1
+  }
+}

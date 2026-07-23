@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.8,
+    "actionability": 0.75
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y correctly recognizes that the major reviewer concern (endpoint restrictions resolved from the wrong/auto-detected pipeline) was already fixed via get_pipeline_config's deploy-override-first ordering and the new regression test, and independently surfaces the trust_remote_code default flip (matching the alex-jw-brooks inline bug comment) plus related caching/error-response territory the human reviewers touched. X's findings (missing try/except, stale docstring, import coupling, kwarg naming) are plausible and concrete but mostly orthogonal to what the ground-truth reviewers actually flagged, giving it much lower recall despite similar precision and actionability. Both omit several ground-truth points (positional-arg risk, debug-msg scope, mutability-of-cached-config specifics) and neither has a LATENT GAP CHECK section.",
+  "_cost_usd": 0.1076761,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "7a48dfe65a8a9a9554d9c6d602ff53ca6a10854603c302b7f7f4fa1544d282d1",
+    "judge_rep": 3
+  }
+}

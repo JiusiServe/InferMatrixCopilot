@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.8,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.75
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "GT's one substantive non-blocking comment is that the docstring/module comment claiming 'original strict behaviour is preserved... other tests unaffected' is now false because the containment fallback applies unconditionally to all callers, not just opt-in escalation tests. Y hits this almost exactly, with a concrete failing example (hello vs. hello world goodbye) showing the practical consequence. X's closest finding reframes the same underlying fact as a request to run additional GLM TTS e2e tests rather than flagging the stale doc/contract, so it only tangentially overlaps. Neither candidate catches GT's minor (reviewer-flagged as skippable) note about check ordering/legacy producer liveness. X compensates with several additional well-grounded, highly actionable findings (character-level containment bug, dead code guard, missing priority-collision test) that GT didn't raise, giving it a slight actionability edge, but these don't improve recall against the actual GT concerns.",
+  "_cost_usd": 0.1884732,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "2328537111b34c5894a8eb46f8d3d52ef10d50795dec0acf4f50506d02bd9d9a",
+    "judge_rep": 1
+  }
+}

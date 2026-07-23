@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.7,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth centers on three real reviewer concerns: the design debate over reading cudagraph_mode in modeling vs. the runner (gcanlin/R2-Y), the TODO documenting that mtp seed reproducibility breaks under full cudagraphs with decode batch>1, and the NPU yaml fix needed for compilation_config (Wallbreazzz). Y explicitly engages all three — validating the TODO's accuracy, flagging the silent seeding regression and requesting an accuracy A/B, and questioning the NPU stage-1 PIECEWISE addition — plus catches two genuinely stale/misleading yaml comments and the duplicate omni_pooler_payload_include_hidden assignment (also caught by X). X's four 'major' findings are all speculative test-coverage requests never raised by any human reviewer, entirely missing the NPU yaml hunk and only glancingly touching the design/seed concerns in an unelaborated sweep bullet, so recall is much lower despite plausible-looking grep evidence. Both are reasonably actionable with concrete file/line pointers, but Y's grounding in the actual diff content (comment-vs-value contradictions) is more clearly verifiable than X's untested claims about test coverage.",
+  "_cost_usd": 0.2956717,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "0d84e32c4d42fc419c147e38cc90b837710ecca04aa44204288363cc345526ce",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.8,
+    "actionability": 0.45,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The one substantive GT concern (yenuo26 questioning whether reduce_scatter verification was added to the test) is explicitly engaged by X, which calls out those exact assertions (lines 121-126) in its validation sweep and separately flags a real, verifiable gap: the new TestSetForwardContextDPMetadata tests never exercise the dp_group=None/world_size<=1 early-return branch. X's second finding (missing comment on the cfg_parallel_size>1 guard removal) is also accurate and concretely actionable. Y produces a thorough but ultimately approve-everything review; its only comment is a vague 'worth a one-line comment' suggestion with no concrete ask, and it never engages the reduce_scatter test-coverage thread the human reviewer raised. Neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.1701962,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "0a642a2b50aed28cdb8a37855b1332e64e031e309348d08c4b57f3e2f31a0566",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.45,
+    "actionability": 0.7
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.85
+  },
+  "gap_hit": false,
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "X confidently asserts two things that ground truth directly contradicts: it claims the stream-slot leak on abort is 'handled' when linyueqian's confirmed High-severity finding (fixed by the author) says slots leak on client disconnect, and it claims the vendored files carry proper provenance headers when GT explicitly flags them as missing 'Vendored from...' notes — these are false reassurances on the PR's real bugs, not just omissions. X's own 5 findings are plausible but entirely speculative/unverifiable against the shown diff and don't overlap any GT item. Y independently surfaces a conceptually similar streaming-state-leak-on-abort issue (different file, same theme as the confirmed High bug) and correctly catches that the qwen3_tts guard around seed propagation in serving_speech.py was removed, making it apply to all TTS models unconditionally — this is directly verifiable in the diff and echoes amy-why-3459's real review comment questioning that same generalization. Both miss the majority of GT's specific bugs (the audio_tokenizer_v2 ceil/floor bug, the legacy-codec model_type collision, the cumulative/delta re-slice bug), so overall recall is low for both, but Y is meaningfully more grounded and closer to real GT concerns, with equally strong file/line actionability.",
+  "_cost_usd": 0.16058479999999997,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "a9b2c30607f3922e9260dc61cfa1cc6db3d6f81861a003f7ce5e26f4ae2f1925",
+    "judge_rep": 3
+  }
+}

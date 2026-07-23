@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "X caught the one substantive bug ground truth reviewers flagged and got fixed — the piecewise_attn/None-attn_func crash when only one of flash_attn_func/flash_attn_varlen_func is present (RuixiangMa's comment, matched almost verbatim) — while Y's own validation pass explicitly signed off on that exact guard as 'matching existing pattern' and missed the downstream crash entirely. Y is otherwise more precise (duplication, coverage gaps, doc mismatches, fallback-chain doc nit are all solid and well-evidenced), but X's headline finding about version=1/2 'silently no-opping' appears to contradict the author's later clarification that these are Hub git-branch tags, not PEP440 specifiers, hurting X's precision. Neither review touches the docs/test-marker discussion thread that dominates the ground truth.",
+  "_cost_usd": 0.154477,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "2d8d80de5ef0bd05c5f3bf7c5d8ca5ca31b4992493d17acb302c29cad228ab74",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.9,
+    "actionability": 0.25,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently verified the same mechanism (seed removal restores the batched-multinomial fast path) with grounded references to serving_speech.py and gpu_model_runner.py, and neither surfaces the ground truth's only substantive ask (spin out VoxCPM2 fix), so recall and base precision are comparable. Y goes further with a genuinely useful grounded observation (stage 1's seed removal is inert since it's greedy/temperature=0) and gives concrete, file/line-anchored actionable suggestions (guard comment at yaml:60/90, test-coverage note), whereas X's review is just a verification narrative ending in a bare APPROVE with no concrete suggestions. Ground truth itself is thin (LGTM + out-of-scope ask), capping how much recall differentiates the two.",
+  "_cost_usd": 0.0917452,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "f9ec2e10c764baf63925ad0e90a3435cbbd5bd02a3e834806ddba1cca6426322",
+    "judge_rep": 1
+  }
+}

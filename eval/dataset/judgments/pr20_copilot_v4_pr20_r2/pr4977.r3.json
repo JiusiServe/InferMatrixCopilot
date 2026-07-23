@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Neither candidate surfaces the GT's actual concern (kernels<0.15 lacking a lower bound so trust_remote_code would break on 0.13.x), but both notice the adjacent description/diff mismatch around trust_remote_code, so recall is equally partial. X is more thorough and equally well-grounded: it adds a concrete missing-test-for-caching finding with a specific proposed assertion, flags the lock-serialization issue, the debuggability regression in log messages, and a minor dead-init nit — all valid, evidence-cited, and actionable with file/line anchors. Y raises only the same trust_remote_code and lock-serialization points, and explicitly (and less convincingly) waves off the missing-cache-test concern as unnecessary, making it less thorough despite being well-written.",
+  "_cost_usd": 0.09638870000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "210d1fff3131ae25d07fda3c522a8f8b6f9f05e344eddebf9284defc3965834d",
+    "judge_rep": 3
+  }
+}

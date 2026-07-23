@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.4,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth has zero substantive concerns (just LGTM/approve), so recall is trivially satisfied by both. Both candidates do solid diff-grounded verification of the PR's technical claims with specific code citations; neither fabricates issues. X adds one genuinely actionable, concrete suggestion (stale extra_body pattern in a sibling README with a proposed fix), giving it real actionability, whereas Y's only comment is a hedged non-request ('keep current wording if you tested it') that asks for no concrete change. Y's verification is marginally deeper/cleaner and stays strictly in-diff, edging precision slightly, but X's added value outweighs that on actionability, giving it a slight overall edge.",
+  "_cost_usd": 0.20444589999999999,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "ea1ab2e40697a6b59a4be37d15999fcf9fde658ada872cb56b15bc847affa081",
+    "judge_rep": 1
+  }
+}

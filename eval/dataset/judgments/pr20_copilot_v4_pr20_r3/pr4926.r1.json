@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.6,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.8,
+    "actionability": 0.85
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "X surfaces a genuine, actionable defect (masked/varlen path calling flash_attn_varlen_func when only flash_attn_func may be present, causing a TypeError) that Y actually reviewed and incorrectly cleared as 'correct routing' in its validation sweep — a real miss given GT reviewers (RuixiangMa) flagged this exact class of None-callable crash risk. X's headline finding (#1, version=1/2 'silently swallowed') is contradicted by the PR author's GT reply explaining these are valid branch identifiers, which hurts its precision since it's presented as the top correctness issue. Y is more disciplined and free of fabrication, with solid, well-evidenced findings (test-path coverage gaps, FA3 untested on L4, duplication), but its explicit dismissal of the except-Exception and masked-path patterns as safe misses concerns GT reviewers explicitly raised, so recall and net usefulness land slightly behind X. Both are comparably actionable with concrete file/line references and clear fixes; neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.41821220000000003,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "77e626371cb056b4ad81d30dae039eebdd8d9278a8e8a63c922b92411372b374",
+    "judge_rep": 1
+  }
+}

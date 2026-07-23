@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 1.0,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Neither candidate catches the ground truth's actual concern (trust_remote_code kwarg breaking compatibility with locked kernels<0.15.0 installs) — both only note that the PR description mentions trust_remote_code while the visible diff doesn't contain it, which is a valid but tangential observation, not the substantive dependency-compatibility bug. Both reviews are grounded with no fabrications. Y edges out X slightly: its test-coverage finding (test plan cites a test that doesn't exercise the new cache path) is a concrete, useful, well-cited addition, and its line citations are more precise, though its docstring nitpick is low-value; X's lock-contention observation is a good but explicitly 'optional' finding.",
+  "_cost_usd": 0.1376455,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "f617724ad6b14212a0081ebcad7859972857606d0aa8211c0ebaa748c24de3a1",
+    "judge_rep": 2
+  }
+}

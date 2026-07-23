@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.45,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.8,
+    "actionability": 0.75,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently surface a real async_chunk getattr default-inconsistency (True vs False) that echoes the ground-truth 'Low' robustness concern, and both validate the qwen3_tts scoping fix (echoing the 'Med' thread). Neither candidate raises amy-why's design question about moving the qwen3-specific variable into the model. X pads its review with several low-value, weakly-grounded asks ('please re-run this specific pytest invocation', claims about a 'PR's manual test command' not present in the given diff context) that read as fabricated/unverifiable filler, hurting precision. Y is tighter and better grounded, verifies is_streaming_request's actual scope, and crucially flags that the split now keys solely on total_num_scheduled_tokens and would miss tensors aligned to hidden_states.shape[0] instead — directly hitting the latent dual-batch-axis gap later fixed by PR #4910, even though Y (perhaps having peeked at post-merge main) prematurely waves it off as already handled.",
+  "_cost_usd": 0.29703050000000003,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "14c03c556f05798ae0db3e30ae148e0343e840290dab95f4d7bdf38b9a310a46",
+    "judge_rep": 2
+  }
+}

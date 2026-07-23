@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.25,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Neither candidate recovers GT's two actual concerns (stale docstring wording, confirming a live producer for the legacy `audio` key) with any precision, but Y's finding that the containment fallback is unconditional and can accept a wrong-but-longer transcript (e.g. 'hello' matching 'hello world goodbye') is thematically close to GT's point that the new fallback silently changes behavior for all callers, and Y also correctly narrates the core bug (postprocess writes `codes.audio`, preprocess previously read only legacy `audio`) matching the GT reviewer's own framing almost exactly. X's findings (dead code guard, hardcoded thresholds, docstring completeness nits) are all valid and grounded but mostly cosmetic/nit-level and never touch the core fix's correctness narrative. X is somewhat more actionable with concrete prescribed fixes, but Y's findings are more substantive and better grounded in cross-file verification.",
+  "_cost_usd": 0.2690709,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "9cd7f5cf411b90def793342f5596c34a504daf47a66baeb096a66c073c3f68a7",
+    "judge_rep": 1
+  }
+}

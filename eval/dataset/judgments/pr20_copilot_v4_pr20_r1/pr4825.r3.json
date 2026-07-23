@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.45,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X's suggestion to derive the component list from the pipeline's declarative _dit_modules instead of hardcoding echoes the actual reviewer concern (dsocek's comment about generalizing PEFT-naming fixes via existing mapping infra) even though the exact mechanism cited differs. Y's investigation is thorough but its two 'nit' findings are stale docstrings in unrelated files (flux2_klein, ovis_image) never touched by this diff, which are irrelevant scope-creep and hurt precision; its one on-topic finding (mocked test doesn't cover real UNet layer compatibility) is valid but narrower than the reviewer's actual concern. X stays tightly scoped to the changed file with concrete, grounded suggestions.",
+  "_cost_usd": 0.068119,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "123034ac04084329d91e588519589a089b8431f49727fe41135d83004e66480e",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.6,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently validate the parent-first ordering assumption that Gaohan123 questioned (already resolved by the docstring in this diff), but neither catches the ground-truth 'please fix precommit' concern, and neither surfaces Bounty-hunter's specific benchmark-script request (Y's suggestion to rerun the e2e test is only a loose analog). X asserts 'Local CI gates (build 3.11/3.12, pre-commit, DCO...) are green,' which directly contradicts the ground-truth reviewer's explicit precommit-failure comment — a grounding error that hurts precision. Y's findings (untested multi_modal_data path, untested None-prompt branch, missing guard comment) are all specific, line-anchored, and independently verifiable, giving it stronger actionability without any comparable false claim.",
+  "_cost_usd": 0.1934932,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "a8e0833216b086fdc787f0eb13267eb9e085dad7ac19e435de196020bf9850b7",
+    "judge_rep": 1
+  }
+}

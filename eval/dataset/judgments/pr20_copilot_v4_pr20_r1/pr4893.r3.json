@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.7,
+    "actionability": 0.3
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Neither candidate captures the sole substantive ground-truth concern (test coverage for reduce_scatter, already resolved in the shown diff), so recall is near-zero for both. X's review is largely a confirmatory 'looks good, approve' report with one soft, vague suggestion and little concrete actionable content. Y surfaces three specific, diff-grounded nits with exact file:line citations and concrete fixes (stale comment describing outdated conditional logic, missing docstring, defensively dead code check) — all verifiable against the diff and genuinely useful to a reviewer, making it clearly more precise and actionable.",
+  "_cost_usd": 0.2467364,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "0d0cc37be66331aef02bb481c365aff8902f505a8ce5ece8ecad354383d60972",
+    "judge_rep": 3
+  }
+}

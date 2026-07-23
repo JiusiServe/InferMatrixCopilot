@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.55,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.75,
+    "actionability": 0.75
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y independently investigated and refuted X's headline 'major' finding (put_req_chunk never incremented), citing a framework-managed counter pattern shared with sibling processors — a strong signal X's claim is a false positive from an incomplete grep. Y also lands closer to a real GT High-severity concern (legacy MOSS-Audio-Tokenizer checkpoints mis-instantiating as v2) via its load_weights fallback/inferred_channels finding, while X's five findings mostly miss the substantive GT issues (legacy tokenizer bug, cumulative/delta rewind, ceil/floor codes-length bug, WER raw-bytes fallback, vendoring headers). Both share the test-coverage gap for the new streaming processor. X is slightly more directive/actionable with explicit fix snippets, but Y's higher-confidence, better-calibrated findings and self-correcting rigor outweigh that.",
+  "_cost_usd": 0.3007022,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "a9b2c30607f3922e9260dc61cfa1cc6db3d6f81861a003f7ce5e26f4ae2f1925",
+    "judge_rep": 1
+  }
+}

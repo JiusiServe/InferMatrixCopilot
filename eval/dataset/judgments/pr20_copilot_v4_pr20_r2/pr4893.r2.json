@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth is thin (mostly non-technical thread plus one inline comment about verifying the reduce_scatter assertions in the layout test, which the diff already addresses). X explicitly calls out and validates exactly those reduce_scatter/device_communicator assertions at the relevant lines, and adds two concrete, file/line-anchored, actionable findings (missing test for the world_size<=1 guard branch; missing comment explaining the cfg_parallel_size>1 removal). Y produces a deeper technical correctness narrative (DPMetadata construction, cleanup safety) but never engages with the specific reduce_scatter test-coverage point reviewers actually raised, and its lone suggestion is a vague 'worth a comment' aside rather than a concrete change. Both are well-grounded with no fabrication, so precision is comparable, but X edges out on recall and actionability.",
+  "_cost_usd": 0.0800258,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "0a642a2b50aed28cdb8a37855b1332e64e031e309348d08c4b57f3e2f31a0566",
+    "judge_rep": 2
+  }
+}

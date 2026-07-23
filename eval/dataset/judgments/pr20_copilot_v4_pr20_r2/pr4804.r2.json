@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.3,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.55,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y's findings are concrete, line-anchored, and evidence-backed (e.g. the serving_speech.py:3714 finding that the qwen3_tts guard was removed making tts_local_seed apply unconditionally is independently verifiable from the diff and correct), and its transfer_manager leak-on-abort finding closely parallels the ground truth's top High-severity concern (stream slot leak on client abort) that X completely misses. X, by contrast, actively asserts in its 'Validated' section that slot-leak cleanup and abort handling are complete and that vendored files carry proper provenance headers — both directly contradicted by the real reviewers' comments, which is a serious precision failure since it's presented as verified fact rather than speculation. Both reviews have generally low recall against the specific GT concerns (cumulative/delta rewind bug, ceil/floor division bug, docstring mismatches, cleanup questions are missed by both), but Y's methodology (grep-backed evidence per finding, explicit validated-safe sweep) is more rigorous and its claims are more actionable and trustworthy overall.",
+  "_cost_usd": 0.30133719999999997,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "a9b2c30607f3922e9260dc61cfa1cc6db3d6f81861a003f7ce5e26f4ae2f1925",
+    "judge_rep": 2
+  }
+}

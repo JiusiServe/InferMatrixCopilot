@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates correctly validate the core migration logic and both independently surface the latent gap (the unswept diffusion-transformer caller of get_cache_scale), satisfying gap_hit. Y is more rigorous: it cross-references actual upstream vLLM source (AutoWeightsLoader, weight_utils.py, fp8.py) to substantiate its correctness claims rather than asserting them, and its top finding — that the delegated-loader test bypasses AutoWeightsLoader and thus never proves the outer mapping actually happens — closely mirrors lishunyang12's real non-blocking concern about unverified real-checkpoint behavior. X's findings are valid and well-cited but skew toward low-value nits (docstring wording, assert ordering) and one speculative 'please confirm' ask that it doesn't verify itself. X does explicitly namecheck #4808, giving it a slight edge on that one GT point, but overall Y's precision and depth are stronger.",
+  "_cost_usd": 0.2858145,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "8c2f3ce561b266b52b996ed2198f08c5d681c768f851fa7990d6ae89d7ed5634",
+    "judge_rep": 2
+  }
+}

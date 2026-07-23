@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive technical concerns (just LGTM approvals), so both candidates trivially satisfy recall by validating the PR's claims thoroughly with grounded code citations. Both are well-evidenced and precise, but Y adds a genuinely useful, concrete finding beyond the diff itself (examples/online_serving/minicpmo/README.md:58 still uses the stale extra_body pattern, now inconsistent with the fixed recipe) with a specific suggested fix, whereas X's sole comment is hedged and non-actionable ('sanity check... but keep current wording if you observed it'). Y's structured scan/sweep format and crisper actionable suggestion give it a slight edge.",
+  "_cost_usd": 0.0873794,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "ea1ab2e40697a6b59a4be37d15999fcf9fde658ada872cb56b15bc847affa081",
+    "judge_rep": 2
+  }
+}

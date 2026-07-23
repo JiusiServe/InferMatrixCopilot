@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.45,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.8,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth is nearly empty (LGTM + an unrelated request to spin off a VoxCPM2 fix into a separate PR, not inferable from this diff), so both candidates converge on the same correct outcome (APPROVE) via similarly deep, well-grounded tracing of the seed-propagation mechanism through serving_speech.py and gpu_model_runner.py. X reads as a thorough validation report but stops at confirming correctness. Y does the same verification plus adds concrete, line-anchored suggestions (a guard comment at yaml:60/90 to prevent regression, and a grounded observation that stage 1's seed removal is inert because temperature=0.0), making it more actionable; its references to specific prior PR numbers are a minor unverifiable-precision risk but don't undermine the core analysis.",
+  "_cost_usd": 0.0494037,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "f9ec2e10c764baf63925ad0e90a3435cbbd5bd02a3e834806ddba1cca6426322",
+    "judge_rep": 2
+  }
+}

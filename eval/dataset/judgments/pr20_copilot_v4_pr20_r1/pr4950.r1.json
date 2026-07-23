@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.45,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (just LGTM/approval), so both candidates trivially satisfy recall. X delivers three concrete, grounded findings with exact file/line and suggested rewrites, including a genuinely useful catch that a sibling doc (README.md:58) still has the stale extra_body pattern this PR fixes elsewhere. Y does impressive deep source-code verification (citing specific vllm-omni line numbers) confirming the PR's technical claims, but its single comment is hedgy and non-actionable, essentially deferring back to the author rather than requesting a change. X's edge in actionability gives it a slight overall advantage.",
+  "_cost_usd": 0.1368495,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "553aac9cdac4b3bc20f2bde02e4664fc8c2666f72906e50cb513efb4c43fea6c",
+    "judge_rep": 1
+  }
+}

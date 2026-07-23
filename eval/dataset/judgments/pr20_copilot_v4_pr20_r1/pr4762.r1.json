@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.75,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.8,
+    "actionability": 0.85
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "X engages more directly with the ground-truth threads: it explicitly discusses the trust_remote_code default flip (matches alex-jw-brooks's own bug note), confirms the deploy-override endpoint-restriction resolution now correctly follows the final pipeline (matches hsliuustc0106's major concern), and notes the switch to create_error_response (matches yuanheng-zhao's inline comment) — giving it broader recall of what reviewers actually flagged. Y also catches trust_remote_code and validates the resolution order, but misses the create_error_response point and the HF-config caching-mutability concern entirely. Y's findings (especially the missing try/except regression) are more rigorously line-anchored with quoted before/after evidence, giving it a slight precision/actionability edge, but one low-value finding (async_omni_engine naming) is unverifiable and minor. Neither review includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.3844606,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "7a48dfe65a8a9a9554d9c6d602ff53ca6a10854603c302b7f7f4fa1544d282d1",
+    "judge_rep": 1
+  }
+}

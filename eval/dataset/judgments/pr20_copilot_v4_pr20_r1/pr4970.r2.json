@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.95,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently traced the same seed→tts_local_seed→sampling-path mechanism correctly and landed on the same non-blocking nit (add a comment explaining the intentional omission), which is reasonably grounded given ground truth is just an LGTM/approve with no inline concerns. Y edges ahead by additionally noting stage 1's seed removal was functionally inert (temperature=0.0 greedy decode reads only stage 0), a correct and non-obvious technical distinction X missed, and by explicitly recommending APPROVE, matching the ground-truth verdict more closely than X's more conservative COMMENT. Both are well-grounded in the diff and equally actionable with file/line pointers.",
+  "_cost_usd": 0.08508160000000001,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "5d78d893d2a1c8a98aed5308864882929a0256da026243ab45230c093952cbd7",
+    "judge_rep": 2
+  }
+}

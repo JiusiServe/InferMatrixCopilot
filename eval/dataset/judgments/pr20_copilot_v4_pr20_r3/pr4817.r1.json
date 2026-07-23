@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns, so recall is trivial for both. Both correctly validate the core fix (== 10 gate, rename, env override, docs) and both raise the same speculative sm_110a point, but Y additionally catches a concrete, verifiable gap — the test parametrization omits (10,1)/sm_101 despite the docstring listing it — and phrases all findings with exact lines and concrete edits (add test case, add comment text, change heading), making it more actionable. X's review is clean and correct but its one comment is hedged and explicitly recommended for omission, adding less value than Y's extra grounded finding.",
+  "_cost_usd": 0.12977319999999998,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "907fbad9f5ce52c91ee788e09c016b303937a3692823595ae570059ff645a467",
+    "judge_rep": 1
+  }
+}

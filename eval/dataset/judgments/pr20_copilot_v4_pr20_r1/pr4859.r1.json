@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.9,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.72,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly flag the audio_vae.py:141 config-mutation issue that matches the GT thread, but X's phrasing is more precise (it notes the encoder's actual layer count is unaffected since it's built before mutation, matching LHXuuu's clarification) while Y's phrasing overstates it as 'misrepresenting the encoder's actual layers.' Y has broader coverage — it also touches the decode-window tightening and, via a stale README claim, brushes against the language/dialect-removal thread that X misses entirely — giving Y higher recall and more concrete actionable fixes (deepcopy snippet, boundary-value test cases). Y's precision is dragged down by an unverifiable out-of-diff README claim and redundant/severity-inflated findings (two entries for the same stochastic-latent observation, both labeled major/minor for what's essentially a test-coverage nice-to-have). Neither review surfaces the minor definitions.py:331 comment.",
+  "_cost_usd": 0.2465495,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "4f58cb402395a1b9815b6aa69e781bc6aa897bbe1dc3373b787f764b97cb4264",
+    "judge_rep": 1
+  }
+}

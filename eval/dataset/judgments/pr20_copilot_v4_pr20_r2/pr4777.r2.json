@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.7,
+    "precision": 0.9,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.8,
+    "precision": 0.45,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both correctly validate the core range-boundary change (dynamic error message, consistent 2-10 across protocol/util/tests). X stays grounded strictly in the diff, offering one defensible, low-risk nit (missing ge/le Field constraints) with a COMMENT verdict matching the actual outcome (two human LGTMs, merged). Y's headline claims are three specific 'blocking' bugs in files entirely absent from the diff (dfx reliability tests), asserting exact stale content/line numbers that cannot be checked against anything shown and directly drive an aggressive REQUEST_CHANGES verdict on a PR that was actually approved and merged — a high-stakes, ungrounded claim per the diff-grounding precision criterion, even though its actionability (precise file/line/fix) is strong if true. The safer, verifiably-grounded review wins on precision by a clear margin.",
+  "_cost_usd": 0.2341532,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "8d3d4425962e84eb1355a98a034dc34fd2ae3b57abc98bfdf8badb3a05372747",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.25,
+    "precision": 0.85,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "winner": "tie",
+  "margin": "slight",
+  "rationale": "Both largely miss the GT's actual concerns (the parent-prompt-ordering question was already resolved in-diff via the docstring both candidates independently re-verify, and neither flags the requested benchmark re-run or the precommit fix, though Y's CI-failure note is a loose partial hit). Precision is comparably high on both sides — findings are grounded with specific line references (dead requires_multimodal_data param, unguarded indexing, missing tests) rather than fabricated. X wins on actionability with itemized file:line findings and concrete fix suggestions in standard review format; Y wins on depth of verification (traces orchestrator caller logic in detail) and correctly lands on APPROVE matching the real outcome, but its notes are narrative and less concretely actionable.",
+  "_cost_usd": 0.1246905,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "e98da0db32aa49aa1f1e025ab7dbfe816e24d3c385aa6229d45c84f284fce0a4",
+    "judge_rep": 3
+  }
+}

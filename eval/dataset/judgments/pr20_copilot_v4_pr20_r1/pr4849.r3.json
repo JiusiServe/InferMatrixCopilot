@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.4,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The GT's central concern (Gaohan123's line-118 comment questioning whether source_outputs[0] is reliably the parent) is directly hit by X, which flags the same unenforced assumption with a concrete fix (add an assertion/guard) and also raises re-running verification tests, echoing Bounty-hunter's ask. Y investigates the same question but concludes it's fully validated and approves with no requested changes, effectively missing the actionability of that concern even though its analysis is technically accurate and well-grounded. X's findings are more concrete and actionable (specific lines, specific fixes); Y's are mostly PASS/optional notes with a blanket APPROVE verdict, giving it lower recall and actionability despite comparable precision.",
+  "_cost_usd": 0.0906488,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "dbc0fe0703fa4fcfd6358710be414406d23b63ccdd5c6aa18b412be897c34d56",
+    "judge_rep": 3
+  }
+}

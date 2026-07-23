@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y's review converges with the actual reviewer thread: it flags the same seed-reproducibility/full-cudagraph consequence the inline comments dwell on, explicitly questions the NPU stage-1 PIECEWISE addition (mirroring Wallbreazzz's crash report and fix), and calls out the missing accuracy/benchmark evidence that Sy0307/amy-why-3459 debated at length — none of which X touches. X instead invents three 'major' findings about missing unit tests, which are plausible and grounded in the diff but orthogonal to what any human reviewer actually raised, so its recall against the ground truth is much weaker despite similar per-claim validity. Both candidates independently flag the redundant `omni_pooler_payload_include_hidden` assignment and the stale prefix-caching comment, giving both good actionability, but Y's claims are better hedged (explicit 'can't verify' framing) making it slightly more trustworthy overall.",
+  "_cost_usd": 0.11131649999999998,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "9c468aa836407346dead6212974934c8ff4bbb59684c20425f658394a1b9477f",
+    "judge_rep": 3
+  }
+}

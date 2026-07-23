@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.6,
+    "actionability": 0.8
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both catch the key GT-aligned issue (shared-config mutation in audio_vae.py:141) with grounded, actionable fixes, and neither surfaces the dialect-removal question that GT reviewers actually debated. X correctly identifies the stochastic latent-sampling change and its rationale (HF parity, WER gain) with calibrated non-blocking severity, landing on APPROVE which matches the PR's actual outcome (LGTM/approved). Y pads three of five 'major' findings with test-coverage asks for changes that GT reviewers already confirmed correct via vendor alignment, inflating severity and reaching a 'FOLLOW-UP REQUIRED' verdict that conflicts with the real outcome, though its README staleness catch is a nice grounded bonus and its fixes are highly specific.",
+  "_cost_usd": 0.1168406,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "4f58cb402395a1b9815b6aa69e781bc6aa897bbe1dc3373b787f764b97cb4264",
+    "judge_rep": 2
+  }
+}

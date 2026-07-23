@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns, so recall is vacuously satisfied by both. Both candidates correctly validate the core gate-logic fix and identify the same latent sm_110 ambiguity, with no fabricated claims apparent in either. X is more actionable: it surfaces a concrete, verifiable test-coverage gap (missing (10,1)/sm_101 parametrization), proposes exact inline-comment text, and includes a doc-heading nit with a specific fix, whereas Y raises essentially the same sm_110 point but then argues for omitting it and recommends a clean approve with no concrete deltas.",
+  "_cost_usd": 0.13452820000000001,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "907fbad9f5ce52c91ee788e09c016b303937a3692823595ae570059ff645a467",
+    "judge_rep": 3
+  }
+}

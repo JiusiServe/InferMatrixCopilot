@@ -13,6 +13,7 @@ Usage: compute_results.py <label:arm_prefix> ...  e.g.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -22,7 +23,28 @@ PR_DIMS = ("recall", "precision", "actionability", "gap_hit")
 ISSUE_DIMS = ("correctness", "grounding", "completeness")
 VAL_STEMS = ["pr4893", "pr4810", "pr4825", "pr4837", "pr4816",
              "issue4793", "issue4827", "issue4905", "issue4891", "issue4842"]
-GAP_STEMS = {"pr4810"}   # gap_hit scored only on the GOLD latent-gap item
+# gap_hit is scored ONLY on the three GOLD latent-gap items — one per split, so
+# a gap number is always a 1-item measurement within its split (train #4870,
+# val #4810, test #4834). Stems absent from a run are simply never collected.
+GAP_STEMS = {"pr4870", "pr4810", "pr4834"}
+# EVAL_STEMS / JUDGE_DIR_PREFIX retarget this at another campaign (the 20-case
+# PR-review sweep uses the 20 pr stems under judgments/pr20_<arm>_r<k>).
+_ENV_STEMS = [s for s in (os.environ.get("EVAL_STEMS") or "").split(",") if s]
+_PREFIX = os.environ.get("JUDGE_DIR_PREFIX") or "val"
+
+
+def _split_of() -> dict[str, str]:
+    """stem -> dataset split, read from the manifest (never a second hardcoded
+    list) so per-split breakdowns cannot drift from the dataset."""
+    import yaml
+
+    d = yaml.safe_load((DS / "vllm_omni_dataset.yaml").read_text())
+    out = {}
+    for kind, key, pfx in (("pr_review", "pr", "pr"),
+                           ("issue_answer", "issue", "issue")):
+        for i in d.get(kind, []):
+            out[f"{pfx}{i[key]}"] = i["split"]
+    return out
 
 
 def collect(arm_prefix: str) -> tuple[dict, dict]:
@@ -30,7 +52,7 @@ def collect(arm_prefix: str) -> tuple[dict, dict]:
     dims_all: dict[str, list[float]] = defaultdict(list)
     per_item: dict[tuple[str, str], list[float]] = defaultdict(list)
     for k in (1, 2, 3):
-        jdir = DS / "judgments" / f"val_{arm_prefix}_r{k}"
+        jdir = DS / "judgments" / f"{_PREFIX}_{arm_prefix}_r{k}"
         if not jdir.exists():
             continue
         for f in sorted(jdir.glob("*.json")):
@@ -71,12 +93,35 @@ def main() -> None:
         if len(means) > 1:
             row += f"  Δ={means[-1] - means[0]:+.4f}"
         print(row)
+    stems = _ENV_STEMS or VAL_STEMS
+    split_of = _split_of()
+    splits = sorted({split_of.get(s, "?") for s in stems})
+    if len(splits) > 1:
+        # A campaign spanning several dataset splits must be read per split:
+        # train is the adaptation stream, val the promotion gate, test the
+        # frozen holdout — pooling them into one mean hides all three roles.
+        print("\nper-split means (mean over items x generation x judge reps):")
+        for sp in splits:
+            sp_stems = [s for s in stems if split_of.get(s) == sp]
+            print(f"  [{sp}] n={len(sp_stems)}")
+            for d in all_dims:
+                row = f"    {d:14s} "
+                any_val = False
+                for lb in labels:
+                    vals = [v for s in sp_stems
+                            for v in (arms[lb][1].get((s, d)) or [])]
+                    if vals:
+                        any_val = True
+                    row += (f"{sum(vals) / len(vals):8.4f} " if vals
+                            else f"{'-':>8s} ")
+                if any_val:
+                    print(row)
     if len(labels) == 2:
         a, b = labels
         print("\npaired per-item deltas (B−A, mean over judge reps):")
         for d in all_dims:
             deltas = []
-            for stem in VAL_STEMS:
+            for stem in stems:
                 va = arms[a][1].get((stem, d))
                 vb = arms[b][1].get((stem, d))
                 if va and vb:

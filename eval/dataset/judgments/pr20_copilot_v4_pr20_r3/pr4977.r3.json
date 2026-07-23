@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently surface the same tangential match to the ground-truth concern (PR description claims trust_remote_code=True was added but it's absent from the diff/file), so recall is equal and only partial since neither identifies the actual kernels<0.15.0 version-compatibility mechanism the ground truth flags. Y's remaining findings (failure-not-cached correctness, cache-key correctness, and especially the lock-serializes-FA2/FA3-loads observation) are more technically substantive and accurately grounded than X's weaker docstring nitpick, though X's missing-cache-test suggestion is a reasonable, valid addition. Both are well-anchored with file/line references and concrete suggested actions, keeping actionability close, but Y edges out on precision/insight.",
+  "_cost_usd": 0.1277754,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "fff52cbca5d3096335456dc579c477e41d5518d18c7c7f584fbadafbc0d1661e",
+    "judge_rep": 3
+  }
+}

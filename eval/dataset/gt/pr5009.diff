@@ -1,0 +1,110 @@
+diff --git a/tests/platforms/test_cuda_ir_op_priority.py b/tests/platforms/test_cuda_ir_op_priority.py
+new file mode 100644
+index 00000000000..c27afb7ee0e
+--- /dev/null
++++ b/tests/platforms/test_cuda_ir_op_priority.py
+@@ -0,0 +1,38 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++
++import pytest
++from vllm.config import CompilationConfig, CompilationMode, DeviceConfig, VllmConfig
++
++from vllm_omni.platforms.cuda.platform import CudaOmniPlatform
++
++pytestmark = [pytest.mark.core_model, pytest.mark.cpu]
++
++
++def _vllm_config(*, backend: str = "inductor", mode: CompilationMode) -> VllmConfig:
++    return VllmConfig(
++        device_config=DeviceConfig(device="cpu"),
++        compilation_config=CompilationConfig(backend=backend, mode=mode),
++    )
++
++
++@pytest.mark.parametrize(
++    "mode",
++    [CompilationMode.NONE, CompilationMode.VLLM_COMPILE, CompilationMode.STOCK_TORCH_COMPILE],
++)
++def test_cuda_default_ir_op_priority_prefers_vllm_c_when_inductor_backend(mode: CompilationMode) -> None:
++    """Regression for #4964: inductor-active configs must not switch to native-only."""
++    priority = CudaOmniPlatform.get_default_ir_op_priority(_vllm_config(mode=mode))
++    assert priority.rms_norm == ["vllm_c", "native"]
++    assert priority.fused_add_rms_norm == ["vllm_c", "native"]
++
++
++def test_cuda_default_ir_op_priority_with_oink(monkeypatch: pytest.MonkeyPatch) -> None:
++    import vllm.envs as envs
++
++    monkeypatch.setattr(envs, "VLLM_USE_OINK_OPS", True)
++    priority = CudaOmniPlatform.get_default_ir_op_priority(
++        _vllm_config(mode=CompilationMode.VLLM_COMPILE),
++    )
++    assert priority.rms_norm == ["oink", "vllm_c", "native"]
++    assert priority.fused_add_rms_norm == ["oink", "vllm_c", "native"]
+diff --git a/vllm_omni/diffusion/models/qwen_image/qwen_image_transformer.py b/vllm_omni/diffusion/models/qwen_image/qwen_image_transformer.py
+index 07015a4f498..67e2d0db7a3 100644
+--- a/vllm_omni/diffusion/models/qwen_image/qwen_image_transformer.py
++++ b/vllm_omni/diffusion/models/qwen_image/qwen_image_transformer.py
+@@ -17,7 +17,6 @@
+ from diffusers.models.modeling_outputs import Transformer2DModelOutput
+ from diffusers.models.normalization import AdaLayerNormContinuous
+ from vllm.logger import init_logger
+-from vllm.model_executor.layers.layernorm import RMSNorm
+ from vllm.model_executor.layers.linear import (
+     ColumnParallelLinear,
+     QKVParallelLinear,
+@@ -555,8 +554,8 @@ def __init__(
+         self.query_num_heads = self.to_qkv.num_heads
+         self.kv_num_heads = self.to_qkv.num_kv_heads
+ 
+-        self.norm_q = RMSNorm(head_dim, eps=eps) if qk_norm else nn.Identity()
+-        self.norm_k = RMSNorm(head_dim, eps=eps) if qk_norm else nn.Identity()
++        self.norm_q = nn.RMSNorm(head_dim, eps=eps) if qk_norm else nn.Identity()
++        self.norm_k = nn.RMSNorm(head_dim, eps=eps) if qk_norm else nn.Identity()
+ 
+         self.inner_dim = out_dim if out_dim is not None else head_dim * self.total_num_heads
+ 
+@@ -593,8 +592,8 @@ def __init__(
+             prefix=f"{prefix}.to_out.0",
+         )
+ 
+-        self.norm_added_q = RMSNorm(head_dim, eps=eps)
+-        self.norm_added_k = RMSNorm(head_dim, eps=eps)
++        self.norm_added_q = nn.RMSNorm(head_dim, eps=eps)
++        self.norm_added_k = nn.RMSNorm(head_dim, eps=eps)
+ 
+         self.attn = Attention(
+             num_heads=self.query_num_heads,
+@@ -1007,7 +1006,7 @@ def __init__(
+             quant_config=quant_config,
+         )
+ 
+-        self.txt_norm = RMSNorm(joint_attention_dim, eps=1e-6)
++        self.txt_norm = nn.RMSNorm(joint_attention_dim, eps=1e-6)
+ 
+         # Entry projections (image/text) are kept full precision —
+         # small sensitive layers at the network boundary (see #2728).
+diff --git a/vllm_omni/platforms/cuda/platform.py b/vllm_omni/platforms/cuda/platform.py
+index 81eaa3066f2..a05bb289a3c 100644
+--- a/vllm_omni/platforms/cuda/platform.py
++++ b/vllm_omni/platforms/cuda/platform.py
+@@ -249,16 +249,8 @@ def get_device_name(cls, device_id: int = 0) -> str:
+ 
+     @classmethod
+     def get_default_ir_op_priority(cls, vllm_config: VllmConfig) -> IrOpPriorityConfig:
+-        """Copied from upstream CudaPlatformBase with inductor-aware logic.
+-
+-        When inductor is active (compiling) use native as the default;
+-        otherwise prefer vllm_c kernels where available.
+-        """
+-        from vllm.config.compilation import CompilationMode
+-
+-        cc = vllm_config.compilation_config
+-        using_inductor = cc.backend == "inductor" and cc.mode != CompilationMode.NONE
+-        default = ["native"] if using_inductor else ["vllm_c", "native"]
++        """Prefer ``vllm_c`` CUDA kernels over ``native`` for diffusion IR ops."""
++        default = ["vllm_c", "native"]
+ 
+         # Use oink if enabled for rms_norm
+         # TODO(Laurawly/luka): remove this env var,

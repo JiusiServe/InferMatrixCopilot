@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.87,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "tie",
+  "margin": "slight",
+  "rationale": "Ground truth offers almost nothing to recall against (just an unrelated 'split out VoxCPM2 regression' ask and an LGTM), which neither candidate addresses, so recall is low and equal for both. Both candidates independently trace the same seed→tts_local_seed→gpu_model_runner mechanism with consistent, plausible line references and correctly reach a non-blocking verdict; X adds a nice extra correctness check (stage 1 is inert due to temperature=0.0) but also cites an unverifiable PR number (#4889), while Y does a broader repo-wide sweep and gives a fully-written suggested guard comment, making it marginally more grounded and actionable. Overall it's a close call.",
+  "_cost_usd": 0.1293745,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "5d78d893d2a1c8a98aed5308864882929a0256da026243ab45230c093952cbd7",
+    "judge_rep": 3
+  }
+}

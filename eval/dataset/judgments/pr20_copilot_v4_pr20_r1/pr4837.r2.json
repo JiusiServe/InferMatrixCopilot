@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.4,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.85,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "The one substantive GT insight (yJader's inline comment) is that removing `already_submitted` is correct because StagePool rejects list prompts in both submit_initial and submit_update, so unwrapping shouldn't depend on that flag. Y independently verifies exactly this by reading stage_pool.py's ValueError raises in both paths, arriving at the same reasoning and correctly recommending APPROVE (matching the actual unanimous LGTM outcome). X instead flags the multi-element fall-through as a 'major' silent-failure bug requiring a new elif/ValueError, but its own evidence quotes the PR description saying such lists are already rejected downstream — contradicting itself and missing that this is precisely the behavior GT confirms is intentional and sufficient, leading X to an unwarranted FOLLOW-UP-REQUIRED verdict. X's remaining findings (defensive assert, generic test-coverage note) are speculative rather than grounded bugs, dragging down precision despite decent actionability.",
+  "_cost_usd": 0.12827449999999999,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "f0ce62aaaeee2a04e6500b7cfc096c87ddb5effa2f667c933b9ff6d7a6a14332",
+    "judge_rep": 2
+  }
+}

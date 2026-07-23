@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.8,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both reviews are well-grounded and cite concrete file/line evidence, but X's #1 finding (the version=1/2/default cascade silently swallowing failures and falling through to an unpinned kernel) closely matches the ground truth's two strongest live concerns (RuixiangMa and yenuo26 both flag the try/except masking failures as a CI false-pass risk), and X's #3 independently surfaces a still-present variant of the attn_func=None crash class that RuixiangMa raised. Y's findings (test-path coverage gaps, a docstring wording nit, duplication) are technically valid but mostly orthogonal to what the actual PR reviewers cared about, since the SM90-gating and piecewise-crash bugs were already fixed in the shown diff and Y doesn't catch the residual masked-path issue or frame the version-cascade concern as sharply. Both are similarly actionable and precise, but X's findings track the ground truth's substance better.",
+  "_cost_usd": 0.1680633,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "77e626371cb056b4ad81d30dae039eebdd8d9278a8e8a63c922b92411372b374",
+    "judge_rep": 2
+  }
+}

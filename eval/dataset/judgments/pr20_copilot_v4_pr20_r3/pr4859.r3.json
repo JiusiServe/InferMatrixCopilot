@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.75,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.55,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X independently surfaces all three substantive concerns real reviewers raised (audio_vae.py config mutation, patch_emission.py +1→+2 window change, and the dropped include_language/方言 handling), each with precise file:line grounding and concrete fixes/tests requested — matching the actual review thread closely. Y also catches the config-mutation issue but frames the +2 change as self-evidently deliberate rather than flagging it as needing justification (which is exactly what real reviewers demanded), and entirely omits the language-dropping concern that a reviewer explicitly questioned. Worse, Y's APPROVE verdict leans on specific WER benchmark numbers (1.83% vs 2.02%, 1088 utterances, 0 failures) that appear nowhere in the diff or provided context — this looks fabricated and undermines its credibility. X's findings are all grounded and actionable; Y's are less complete and partly unverifiable.",
+  "_cost_usd": 0.2362052,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "6547231fe41c2f02f02e31b5ec9941ac0ed77d8f69966dde73bbbaca4a6084ac",
+    "judge_rep": 3
+  }
+}

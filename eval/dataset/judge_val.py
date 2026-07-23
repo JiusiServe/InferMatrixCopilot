@@ -41,11 +41,24 @@ _SPLITS = {
             "issues": [4793, 4827, 4905, 4891, 4842]},
     "test": {"prs": [4762, 4834, 4849, 4954, 4777],
              "issues": [4957, 4962, 4815, 4826, 4802]},
+    # PR-only sweep over every split (the 20-case pr_review campaign). Issues
+    # are empty on purpose: this split scores review quality alone, and the
+    # per-split breakdown is reconstructed at scoring time from the stem list.
+    "all_pr": {"prs": [5009, 4923, 4804, 4870, 4817, 4977, 4926, 4859, 4970,
+                       4950,                                    # train
+                       4893, 4810, 4825, 4837, 4816,            # val
+                       4762, 4834, 4849, 4954, 4777],           # test
+               "issues": []},
 }
 _SPLIT = os.environ.get("SPLIT", "val")
 PR_ITEMS = _SPLITS[_SPLIT]["prs"]
 ISSUE_ITEMS = _SPLITS[_SPLIT]["issues"]
 GAP_NOTES = {
+    4870: ("LATENT GAP CHECK: history proves human review missed a dual-batch-"
+           "axis case in this PR's payload splitting, fixed later by follow-up "
+           "PR #4910. gap_hit = does the candidate question the splitting "
+           "logic's handling of more than one batch axis (or demand a test "
+           "covering the multi-axis case)?"),
     4810: ("LATENT GAP CHECK: history proves human review missed that one more "
            "caller of the removed get_cache_scale API existed (the HunyuanImage3 "
            "diffusion loader, later issue #4891). gap_hit = does the candidate "

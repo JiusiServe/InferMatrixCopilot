@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.55,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.75,
+    "actionability": 0.45,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth is thin (mostly social comments plus one inline nitpick about reduce_scatter test coverage, which the diff already addresses). X engages more with test-coverage completeness for the new vLLM group additions (RuntimeError path untested, cfg_parallel_size=1 untested), thematically closer to the reviewer's concern, and gives concrete file/line/test suggestions, though several of its nits (docstrings, inline comments) are low-value padding that dilutes precision. Y is well-verified and grounded but essentially rubber-stamps approval with a single soft, non-actionable comment, missing the test-scrutiny angle the human reviewer raised.",
+  "_cost_usd": 0.1050934,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "e5aee40870353dfa1d3c022cdf9da5686c17f2e74ae3d4f816f0288fa150f749",
+    "judge_rep": 2
+  }
+}

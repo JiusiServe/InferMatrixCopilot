@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.8,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y correctly identifies and credits the PR's central, most-discussed thread (endpoint restrictions must follow the final/deploy-overridden pipeline, not the auto-detected one), recognizing the regression test that closes it — X's sweep describes the same code path but misses its significance entirely. Both flag the trust_remote_code default flip and the api_server.py else-branch gap with similar grounding/precision, but Y additionally brushes against the create_error_response and cache-invalidation threads from the ground truth, giving it broader recall. Actionability and precision are comparable between the two, with neither fabricating obviously ungrounded claims.",
+  "_cost_usd": 0.1688354,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "51a2e92fba251424948dde686ef47589a9df9ded906b0119e60de63664046eb5",
+    "judge_rep": 3
+  }
+}

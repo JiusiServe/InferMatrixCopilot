@@ -188,18 +188,28 @@ def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     want = (sys.argv[1] if len(sys.argv) > 1 else "val,train").split(",")
     only = sys.argv[2] if len(sys.argv) > 2 else ""
+    # KINDS restricts the sweep to one task kind (e.g. the 20-case PR-review
+    # campaign: KINDS=pr_review with splits train,val,test). Default = both,
+    # so existing invocations are unchanged.
+    kinds = [k for k in (_os.environ.get("KINDS") or
+                         "pr_review,issue_answer").split(",") if k]
     items = ([("pr_review", i["pr"], i["split"]) for i in d["pr_review"]]
              + [("issue_answer", i["issue"], i["split"]) for i in d["issue_answer"]])
-    items = [t for t in items if t[2] in want]
+    items = [t for t in items if t[2] in want and t[0] in kinds]
     if only:
         items = [t for t in items
                  if ("pr" if t[0] == "pr_review" else "issue") + str(t[1]) == only]
     items.sort(key=lambda t: SPLIT_ORDER[t[2]])
     (OUT / "manifest.json").write_text(json.dumps({
-        "arm": "copilot_v2", "engine": "infermatrix-copilot CLI (shipped pipeline, "
-        "pr-review@4 ensemble; issue-answer dry-run)",
+        "arm": OUT.name, "engine": "infermatrix-copilot CLI (shipped pipeline, "
+        "pr-review@6 adaptive-depth ensemble; issue-answer dry-run)",
         "llm": "per .env (DeepSeek-routed)", "dataset": DATASET.name,
-        "splits": want, "n_items": len(items)}, indent=2))
+        "splits": want, "kinds": kinds, "n_items": len(items),
+        "trace": {k: _os.environ.get(k, "(default)") for k in
+                  ("AGENT_TRACE", "AGENT_TRACE_IO", "AGENT_TRACE_IO_FULL")},
+        "moa_when": _os.environ.get("MOA_WHEN", "(default)"),
+        "pr_context_mode": _os.environ.get("PR_CONTEXT_MODE", "(default)"),
+    }, indent=2))
     print(f"[copilot-arm] {len(items)} items -> {OUT}", flush=True)
     with ThreadPoolExecutor(max_workers=2) as ex:
         futs = {ex.submit(one, *t): t for t in items}

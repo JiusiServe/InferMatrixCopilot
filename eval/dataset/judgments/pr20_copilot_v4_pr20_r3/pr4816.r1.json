@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly identify this as a clean, complete mechanical rename and approve, matching the ground truth's trivial 'lgtm.' However, X's specific verification claims are undermined by fabricated line numbers for the three test citations (2638/2651/2720), each off by a consistent +105 from the actual diff lines (2533/2546/2615) — a real grounding failure for a review that explicitly touts having 'verified.' Y's citations (api_server.py:754,1017,1157,1248,1286,1329; test file:2533,2546,2615) match the diff's hunk headers exactly, and it also runs extra sub-prefix/near-miss sweeps, making it slightly more trustworthy despite reaching the same correct verdict.",
+  "_cost_usd": 0.1581322,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "26d05ff377ca3b42994af63aaee803eadc07f40636e6608444edf57eaac0666c",
+    "judge_rep": 1
+  }
+}

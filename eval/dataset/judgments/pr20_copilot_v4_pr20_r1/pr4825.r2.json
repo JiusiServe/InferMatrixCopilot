@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.75,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.55,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The one substantive ground-truth concern (dsocek's point that the hardcoded component list is fragile and should instead be derived from an existing declarative source like the packed-modules mapping) is captured in spirit by X's finding #1, which independently flags that default_components duplicates _dit_modules/registry.py and suggests deriving from the pipeline's own declaration. Y's sweep is thorough but never surfaces this concern, instead spending two of its three findings on pre-existing stale docstrings in unrelated files not touched by the diff, which hurts precision by drifting off-target. Both are concretely actionable with file/line pointers, but X's comments stay tightly scoped to the actual diff logic while Y's nits are largely irrelevant scope creep.",
+  "_cost_usd": 0.07723399999999998,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "123034ac04084329d91e588519589a089b8431f49727fe41135d83004e66480e",
+    "judge_rep": 2
+  }
+}

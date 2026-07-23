@@ -31,14 +31,33 @@ VAL_STEMS = ("pr4893", "pr4810", "pr4825", "pr4837", "pr4816",
              "issue4793", "issue4827", "issue4905", "issue4891", "issue4842")
 
 
+def _campaign_stems(split: str) -> tuple[str, ...]:
+    """The exact stems a split must find in the baseline dir. `val` keeps its
+    frozen tuple; `all_pr` (the 20-case PR campaign) reads the dataset manifest
+    so the list cannot drift from it. EVAL_STEMS overrides for ad-hoc slices."""
+    import os
+
+    env = tuple(s for s in (os.environ.get("EVAL_STEMS") or "").split(",") if s)
+    if env:
+        return env
+    if split == "val":
+        return VAL_STEMS
+    if split == "all_pr":
+        import yaml
+
+        d = yaml.safe_load(
+            (Path(__file__).parent / "vllm_omni_dataset.yaml").read_text())
+        return tuple(f"pr{i['pr']}" for i in d["pr_review"])
+    raise SystemExit(f"unknown --split {split!r} (val | all_pr)")
+
+
 def aggregate_baseline(base_dir: Path, split: str) -> dict:
     """Recorded-baseline aggregation (plan round-3 fix): REQUIRES a split and
     validates the exact expected item stems — the baseline dir mixes
     val/train/test artifacts; wrong/missing items are a hard error."""
-    if split != "val":
-        raise SystemExit("only --split val is supported for this campaign")
+    stems = _campaign_stems(split)
     walls, usds, tins, touts = [], [], [], []
-    for stem in VAL_STEMS:
+    for stem in stems:
         cj = base_dir / f"{stem}.cost.json"
         if not cj.exists():
             raise SystemExit(f"baseline missing expected item: {stem}")
@@ -48,7 +67,7 @@ def aggregate_baseline(base_dir: Path, split: str) -> dict:
         tins.append(float(c.get("input_tokens") or 0.0))
         touts.append(float(c.get("output_tokens") or 0.0))
     return {"arm": f"baseline:{base_dir.name}", "split": split,
-            "items": len(VAL_STEMS), "basis": "real_billed_final_attempt",
+            "items": len(stems), "basis": "real_billed_final_attempt",
             "wall_s": _stats(walls), "usd": _stats(usds),
             "input_tokens": _stats(tins), "output_tokens": _stats(touts),
             "total_usd": round(sum(usds), 4)}

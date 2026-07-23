@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.55,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The one substantive ground-truth point is yJader's inline comment explaining that dropping the `already_submitted` gate is safe because both submit_initial and submit_update reject list prompts identically for diffusion — X independently verifies this exact reasoning (citing stage_pool.py:951/1022) and concludes APPROVE, matching the actual LGTM/LGTM outcome. Y engages the same line but reaches the opposite conclusion, flagging a 'major' issue that multi-element lists 'fall through silently' and need a new elif/ValueError — this contradicts the ground truth's point that list rejection in submit_* is the intended, already-correct contract, making it a fabricated-severity finding. Both are reasonably actionable with file/line specificity, but X's grounding is accurate while Y's headline finding is a false positive that pushes an unwarranted 'FOLLOW-UP REQUIRED' verdict against a PR two reviewers approved outright.",
+  "_cost_usd": 0.0631091,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "f0ce62aaaeee2a04e6500b7cfc096c87ddb5effa2f667c933b9ff6d7a6a14332",
+    "judge_rep": 3
+  }
+}

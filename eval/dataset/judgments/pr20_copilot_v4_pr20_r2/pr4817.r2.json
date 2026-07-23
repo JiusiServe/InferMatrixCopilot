@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive reviewer concerns (just a 'thanks' comment and bot spam), so both candidates trivially achieve full recall. Both give accurate, diff-grounded technical assessments and independently converge on the same valid minor point (the == 10 gate excluding a hypothetical sm_110a part mentioned in the PR description). Y goes one step further with a second concrete, plausible nit (stale 'Blackwell-only' wording in pyproject.toml not updated to match the doc/code) and lands on a COMMENT verdict with two actionable file:line items, whereas X's single concern is self-described as low-signal and folded into a plain APPROVE, giving Y a slight edge in actionability.",
+  "_cost_usd": 0.1214548,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "c02e666ff1b806fb8d7fc433b18ddf864e17ec844031da0a5955cc0722eaf6d5",
+    "judge_rep": 2
+  }
+}

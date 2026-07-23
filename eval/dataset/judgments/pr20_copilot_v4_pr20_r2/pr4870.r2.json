@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently find the same valid async_chunk default (True vs False) inconsistency and correctly validate that the seq_len nit was already fixed and the streaming scoping was already resolved. Y goes further: it explicitly flags that the split now depends solely on total_num_scheduled_tokens and notes the risk for tensors keyed on hidden_states.shape[0] instead — directly touching the dual-batch-axis gap that PR #4910 later fixed — while X's extra findings (NPU runner parity, missing test assertion) are plausible but more speculative/lower-value. X is slightly more actionable per-finding (concrete fix asks), but Y's deeper control-flow verification and gap coverage edge it out.",
+  "_cost_usd": 0.2095112,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "4b3547e5f333cc2500ce51a050ce68daee251cb717e2e5af42872c52c25a0617",
+    "judge_rep": 2
+  }
+}

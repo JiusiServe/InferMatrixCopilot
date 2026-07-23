@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.7,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth found zero issues (two LGTMs plus a manual verification that everything, including the L2 e2e test, passed), so recall is vacuously full for both. X's four touched files analysis is accurate and it additionally flags three specific, high-value stale-boundary assertions in reliability test files outside the diff that would plausibly break on the old '3' lower bound — concrete and actionable, though unverifiable from the given diff and carrying some fabrication risk since no verification trail is shown for those claims. Y stays strictly within grounded, shown evidence (explicit grep trail confirming no other hardcoded range references) and its one finding (missing positive unit assertion for layers=2) is valid but minor, since the e2e test already covers that case. X's finding is higher-value if accurate; Y's is safer but less impactful.",
+  "_cost_usd": 0.1269509,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "a0c07f8fb30d8d376782d2c74fae4bc3959ac053e10760a7dfe2fed87231469a",
+    "judge_rep": 1
+  }
+}

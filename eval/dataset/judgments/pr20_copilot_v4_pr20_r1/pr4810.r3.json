@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.65,
+    "actionability": 0.6,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.7,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently find the exact latent gap (the unswept get_cache_scale call in hunyuan_image3_transformer.py), but Y verifies it more rigorously by checking the actual upstream vLLM source (AutoWeightsLoader, weight_utils.py, fp8.py) to confirm the delegated-loader design is correct, and separately confirms whether the diffusion loader gap was later fixed — X merely assumes PR #4808 already covers it without verification, which is a weaker, less-grounded claim. Y also lands a sharper, more substantive test-coverage finding (the delegated-loader test never actually exercises the outer AutoWeightsLoader mapping it depends on) that echoes the ground truth's concern about the test only using a fake param rather than validating against real behavior; X's parallel findings (double-mapping confirmation request, comment-wording nits, assert-order nit) are comparatively low-value and partly speculative. Both are file/line-grounded and actionable, but Y's recommendations are more concrete fixes versus X's more cosmetic suggestions.",
+  "_cost_usd": 0.15979500000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "8c2f3ce561b266b52b996ed2198f08c5d681c768f851fa7990d6ae89d7ed5634",
+    "judge_rep": 3
+  }
+}

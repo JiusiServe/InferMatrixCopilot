@@ -1,0 +1,97 @@
+{
+  "wall_s": 220.3,
+  "split": "val",
+  "rc": 0,
+  "run_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3/runs/pr4825/run-20260722-213900-50b439",
+  "recorded_at": "2026-07-22T21:42:37",
+  "attempts": [
+    {
+      "invocation_id": "inv-ffec1fb1",
+      "outcome": "run:run-20260722-213900-50b439",
+      "rc": 0,
+      "pre_run": null
+    },
+    {
+      "run_dir": "run-20260722-213900-50b439",
+      "llm_calls": 13,
+      "input_tokens": 89633,
+      "output_tokens": 13159,
+      "usd": 0.049241,
+      "source": "spans"
+    }
+  ],
+  "attempt_usd_total": 0.049241,
+  "llm_calls": 13,
+  "input_tokens": 89633,
+  "output_tokens": 13159,
+  "usd": 0.049241,
+  "source": "spans",
+  "metrics": {
+    "schema": 1,
+    "run": "run-20260722-213900-50b439",
+    "task_kind": "pr_review",
+    "status": "done",
+    "quality": {
+      "q": null,
+      "weight_coverage": 0.0,
+      "partial": true,
+      "abstained": false,
+      "components": {
+        "recall_w": null,
+        "precision_v": null,
+        "useful": null,
+        "calib": null,
+        "decision": null
+      }
+    },
+    "cost": {
+      "usd": 0.0492,
+      "minutes": 3.63,
+      "ci_minutes": 0,
+      "input_tokens": 89633,
+      "output_tokens": 13159,
+      "tool_calls": 22,
+      "usd_ref": 1.0,
+      "min_ref": 10.0,
+      "cost_index": 1.158,
+      "source": "spans",
+      "llm_calls": 13,
+      "by_role": {
+        "agent": {
+          "usd": 0.049241,
+          "input_tokens": 89633,
+          "output_tokens": 13159,
+          "calls": 13
+        }
+      },
+      "cache_read_tokens": 391296,
+      "cache_creation_tokens": 0
+    },
+    "timings": {
+      "steps": {
+        "fetch": 3.35,
+        "gate": 0.61,
+        "review": 213.45,
+        "report": 0.03
+      },
+      "time_to_first_result_s": 217.48
+    },
+    "risk": {
+      "incidents": {
+        "catastrophic": 0,
+        "severe": 0,
+        "moderate": 0,
+        "minor": 0
+      },
+      "safety_multiplier": 1.0
+    },
+    "catq": null,
+    "tus": null,
+    "signals": {
+      "escalations": 0,
+      "pushes": 0,
+      "posted": 0,
+      "steps_completed": 4
+    }
+  }
+}

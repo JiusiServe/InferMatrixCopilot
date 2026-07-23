@@ -1,0 +1,88 @@
+{
+ "head": "c1fcd654f18e6a54335b2330c5206f249da2beea",
+ "tracked_diff_sha256": "3382954f3b31c37c87886a6f7a4671e1c68748890c780156ad3398b2b9f1368d",
+ "untracked_source_sha256": "852634482ff43f49ac7cc151d9a0a10286151cbddec3a8f98ea020bc7382c403",
+ "tier_models": {
+  "eco": "deepseek-v4-pro[1m]",
+  "performance": "claude-opus-4-8[1m]"
+ },
+ "moa_members": [
+  "mimo-v2.5@token-plan-cn.xiaomimimo.com",
+  "qwen3.6-plus@token-plan.cn-beijing.maas.aliyuncs.com"
+ ],
+ "model_prices": [
+  [
+   "claude-fable",
+   [
+    12.0,
+    60.0
+   ]
+  ],
+  [
+   "claude-opus",
+   [
+    15.0,
+    75.0
+   ]
+  ],
+  [
+   "claude-sonnet",
+   [
+    3.0,
+    15.0
+   ]
+  ],
+  [
+   "claude-haiku",
+   [
+    1.0,
+    5.0
+   ]
+  ],
+  [
+   "deepseek-reasoner",
+   [
+    0.55,
+    2.19
+   ]
+  ],
+  [
+   "deepseek",
+   [
+    0.27,
+    1.1
+   ]
+  ],
+  [
+   "mimo",
+   [
+    0.35,
+    1.4
+   ]
+  ],
+  [
+   "qwen",
+   [
+    0.4,
+    1.2
+   ]
+  ]
+ ],
+ "knobs": {
+  "MOA_WHEN": "off",
+  "PR_CONTEXT_MODE": "no_discussion",
+  "REVIEW_DEPTH": "auto",
+  "ECO_MODEL": "(default)",
+  "PERFORMANCE_MODEL": "(default)",
+  "AGENT_MODEL": "(default)",
+  "INTENT_MODEL": "(default)",
+  "MOA_MAX_USD": "(default)",
+  "MOA_MAX_MEMBERS": "(default)",
+  "REVIEW_ENSEMBLE": "(default)",
+  "AGENT_TRACE": "1",
+  "AGENT_TRACE_IO": "1",
+  "AGENT_TRACE_IO_FULL": "1",
+  "AGENT_TRACE_IO_MAX": "(default)"
+ },
+ "pip_freeze_sha256": "dd4438edf0137370eec111692747274a41ad2889884b9bdc5ed3dd22eb9e81bf"
+}

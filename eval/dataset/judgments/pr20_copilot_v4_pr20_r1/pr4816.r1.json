@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.7,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth is essentially empty (just an 'lgtm' approval), so both candidates trivially achieve full recall. Both correctly approve and verify the rename is complete and consistent, but Y's cited file:line references (api_server.py:1157/1248/1286/1329, test_serving_speech.py:2533/2546/2615) align precisely with the actual diff hunk positions, while X's test line citations (2638/2651/2720) are off by ~100 lines and X introduces unverifiable external claims (a specific upstream PR number, an unshown PR-body repro) that add fabrication risk. Y also flags a scoped, correctly-caveated pre-existing None-handling gap without over-claiming it as a blocker.",
+  "_cost_usd": 0.1249235,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "8d59aa98c9a0c81f8b90fe58d1a86e63e9664f8ea638de0ba48a3df675edd158",
+    "judge_rep": 1
+  }
+}

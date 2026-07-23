@@ -14,11 +14,18 @@ confirmation budget is EARMARKED at campaign start.
 from __future__ import annotations
 
 import json
+import os
 import time
 from pathlib import Path
 
-LEDGER = Path(__file__).parent / "campaign_ledger.jsonl"
-CEILING_USD = 150.0
+# A campaign gets its OWN ledger file + ceiling (CAMPAIGN_LEDGER /
+# CAMPAIGN_CEILING_USD): reusing a settled ledger would have its remaining
+# headroom refuse the next campaign's hard-max reservations, and mixing two
+# campaigns' spend in one file makes neither auditable. Defaults reproduce the
+# original val-campaign ledger exactly.
+LEDGER = Path(os.environ.get("CAMPAIGN_LEDGER")
+              or Path(__file__).parent / "campaign_ledger.jsonl")
+CEILING_USD = float(os.environ.get("CAMPAIGN_CEILING_USD") or 150.0)
 FINAL_EARMARK_USD = 30.0   # reserved at start for the conditional confirmation
 
 

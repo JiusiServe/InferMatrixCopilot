@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.6,
+    "actionability": 0.8,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly validate the direct-vs-delegated loader design and both flag the same latent gap (the still-unfixed diffusion-stage hunyuan_image3_transformer.py caller of the removed API), so gap_hit is true for both. Y is better grounded, citing actual upstream vLLM source lines (utils.py, weight_utils.py, fp8.py) to prove the design claim, and its test-coverage critique (delegated-loader test never actually exercises AutoWeightsLoader's mapping) echoes the ground truth's core non-blocking concern about tests only proving the mapper is 'called' rather than truly validated — X misses this entirely. X's parallel finding relies on a suspicious 'gist screenshot in PR body' citation that reads as fabricated flavor, and pads its report with low-value nitpicks (suggesting explanatory comments) that don't map to any real reviewer concern, hurting precision. Both are concretely actionable with file/line anchors, but Y's recommendations are more technically precise and its gap-flag is more measured/accurate (correctly notes it was fixed later) versus X's more speculative 'will raise AttributeError' framing.",
+  "_cost_usd": 0.13418760000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "6cd0b0797c4cde00135d9760a20e1f5d3cf0855189aef09276ef53eb5fbe58db",
+    "judge_rep": 3
+  }
+}

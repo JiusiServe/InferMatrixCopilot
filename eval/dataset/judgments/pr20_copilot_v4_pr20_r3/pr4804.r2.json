@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.12,
+    "precision": 0.65,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.06,
+    "precision": 0.75,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates miss nearly all the confirmed ground-truth bugs (chunk re-slice rewind bug, ceil/floor length bug, legacy-checkpoint-routes-to-v2-tokenizer bug, WER raw-bytes fallback), so recall is low for both. X investigates more broadly (renames, seq_token_counts, chunk threshold, vendored headers) and surfaces several additional grounded, specific findings (dead ref-codes output, hardcoded sampler params, load_weights fragility), but its confident claim that stream-slot lifecycle is 'handled'/'complete' directly contradicts the PR's confirmed High-severity leak bug (which the author explicitly fixed), a notable false-reassurance error. Y is more conservative and avoids confirmed false claims, but 3 of its 5 'major' findings are repetitive 'add a unit test' filler, giving it less unique signal despite decent grounding. Both give file/line-level actionable suggestions; X's are slightly more varied and specific.",
+  "_cost_usd": 0.3140302,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "d9f1110c2ac4027eef5889c5d15404bbc040716c1b72360e6a6b121f8f8f180f",
+    "judge_rep": 2
+  }
+}

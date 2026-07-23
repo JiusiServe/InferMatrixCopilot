@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.45,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "The only substantive ground-truth signal is yJader's inline comment explaining that already_submitted-gating is unnecessary because both submit_initial and submit_update reject list prompts identically in diffusion's StagePool. Y independently verifies this exact claim by reading stage_pool.py (lines 951-955, 1022-1026) and pipeline_z_image.py, closely reproducing the reviewer's actual reasoning and reaching the same APPROVE conclusion as the real reviewers (two LGTMs). X reaches a similar surface conclusion about the orchestrator hunk but via different (weaker) reasoning about len() safety, and pads its review with a 'major' finding about return outputs losing fields that is speculative and unverified — Y actually checked this and found it's a strict improvement, exposing X's flagged risk as unfounded. X's FOLLOW-UP REQUIRED verdict is also less grounded than Y's verified APPROVE.",
+  "_cost_usd": 0.1270582,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "003755cbeb02e85f05bd7853e30ff3f2a454abdbc54f42ee0d12e24e95383d01",
+    "judge_rep": 2
+  }
+}

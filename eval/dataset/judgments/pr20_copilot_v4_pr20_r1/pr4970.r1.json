@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth offers almost no substantive concerns (just an LGTM/approve and an unrelated ask to file a separate VoxCPM2 PR), which neither candidate addresses, so recall is low and tied. Both candidates independently traced the seed→tts_local_seed→gpu_model_runner mechanism accurately and reached an approve-level verdict with a similar guard-comment nit, showing strong grounding and actionability. Y edges ahead by additionally distinguishing that stage 1's seed removal was inert (greedy temperature, propagation only reads stage 0) versus stage 0's being the real fix, yielding a more precise, two-part actionable comment.",
+  "_cost_usd": 0.1268695,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "5d78d893d2a1c8a98aed5308864882929a0256da026243ab45230c093952cbd7",
+    "judge_rep": 1
+  }
+}

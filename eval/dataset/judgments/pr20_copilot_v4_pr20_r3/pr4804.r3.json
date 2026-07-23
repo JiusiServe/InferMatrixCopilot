@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.12,
+    "precision": 0.72,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 0.08,
+    "precision": 0.62,
+    "actionability": 0.7
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates miss the highest-value confirmed GT bugs (stream-slot leak on abort, cumulative/delta chunk_np resplice, ceil-division/input_lengths mismatch, v2-tokenizer-swallows-legacy-checkpoint) — recall is low for both. X actually asserts the slot-leak is 'handled' via on_requests_finished, a false claim that directly contradicts the confirmed High-severity bug gcanlin fixed, which is a real precision ding, but X's own findings (max_new_frames guard removal, hardcoded talker_mtp sampling params, dead ref-codes output, v1/v2 codec load_weights fragility) are each grounded and specific with file/line. Y's findings are mostly duplicative 'no unit test' claims and it internally contradicts itself by citing 'modeling_moss_tts_local.py' for talker_mtp/make_omni_output in its major findings while its own sweep notes place the same functions in 'modeling_moss_tts_talker.py' — a file-attribution inconsistency that undercuts trust and actionability for two of its five findings. Neither has a LATENT GAP CHECK section, so gap_hit is false for both. X edges out on precision/actionability despite its bad safety claim, since Y's core content is thinner and internally inconsistent.",
+  "_cost_usd": 0.1703439,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r3",
+    "arm_a_sha256": "d9f1110c2ac4027eef5889c5d15404bbc040716c1b72360e6a6b121f8f8f180f",
+    "judge_rep": 3
+  }
+}

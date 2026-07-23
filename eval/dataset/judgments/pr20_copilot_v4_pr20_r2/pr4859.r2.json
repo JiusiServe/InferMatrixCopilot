@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.7,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently caught the audio_vae.py:141 shared-config mutation bug, which matches GT's most substantive inline finding (amy-why-3459), with Y giving a slightly more precise fix (copy.deepcopy) and evidence trail. However, X completely misses the serving_speech.py language/dialect-dropping concern that GT's amy-why-3459 raised and LHXuuu had to clarify at length — a notable discussion thread in the ground truth — while Y flags it almost identically, asking for a documenting comment. Both sets of findings are grounded in the diff with concrete file/line references and no fabrication, though Y's systematic 'validated/sweep' evidence annotations give it a slight edge in actionability and verifiability. Neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.10265720000000002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/rebase/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r2",
+    "arm_a_sha256": "5a7322b226a5ec0e524cd427d19871219139883b2b17cf02b9b72e179ef608f9",
+    "judge_rep": 2
+  }
+}
