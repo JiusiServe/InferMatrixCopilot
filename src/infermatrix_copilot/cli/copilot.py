@@ -19,7 +19,7 @@ from typing import NamedTuple
 
 import yaml
 
-from ..config import Settings
+from ..config import Settings, TierNotConfiguredError
 from ..engine.executor import Executor
 from ..engine.planner import Planner, PlanningError, Resolution
 from ..engine.registry import StepRegistry
@@ -135,6 +135,14 @@ class Copilot:
         except PlanningError as exc:
             print(style("✋ cannot plan: ", "red", "bold") + str(exc))
             return BLOCKED_EXIT
+        # tier preflight (plan v2): backend availability is DEPLOYMENT state,
+        # so it is enforced here at resolution — before the echo, the gate,
+        # and the run dir — never discovered as a BLOCKED step minutes in.
+        try:
+            tier_target = self.settings.tier_target(spec.mode)
+        except TierNotConfiguredError as exc:
+            print(style("✋ cannot run: ", "red", "bold") + str(exc))
+            return BLOCKED_EXIT
 
         print(style("→ task: ", "bold", "cyan") + spec.describe())
         print(style("→ plan: ", "bold", "magenta") + f"{resolution.mode} {resolution.playbook.name}"
@@ -143,7 +151,8 @@ class Copilot:
         for note in resolution.notes:
             print(f"  · {note}")
         print(style("→ path: ", "bold", "cyan")
-              + f"{spec.mode} · agent-model={self.settings.model_for(spec.mode)}")
+              + f"{spec.mode} · agent-model={tier_target.model}"
+                f" @ {tier_target.host}")
         if plan_only:
             return 0
 
@@ -305,6 +314,12 @@ class Copilot:
             saved = json.loads(task_file.read_text(encoding="utf-8"))
             spec = TaskSpec(**saved["spec"])
             playbook = parse_playbook(saved["playbook"], str(task_file))
+            try:  # tier preflight holds on re-entry too (deployment state
+                # may have changed since the run was created)
+                self.settings.tier_target(spec.mode)
+            except TierNotConfiguredError as exc:
+                print(style("✋ cannot resume: ", "red", "bold") + str(exc))
+                return BLOCKED_EXIT
             print(f"↻ resuming {run_dir.name}: {spec.describe()}")
             return self._execute(playbook, spec, run_dir, resuming=True)
         print("no resumable run found")
@@ -379,6 +394,11 @@ class Copilot:
             resolution = self.resolve(spec)
         except PlanningError as exc:
             rs.mark(run_dir, rs.BLOCKED, note=f"cannot plan: {exc}")
+            return BLOCKED_EXIT
+        try:  # tier preflight is re-enforced in the MCP child (authoritative)
+            self.settings.tier_target(spec.mode)
+        except TierNotConfiguredError as exc:
+            rs.mark(run_dir, rs.BLOCKED, note=f"cannot run: {exc}")
             return BLOCKED_EXIT
         (run_dir / "task.json").write_text(json.dumps({
             "spec": spec.model_dump(),

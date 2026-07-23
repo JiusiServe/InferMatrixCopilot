@@ -113,6 +113,17 @@ def model_price(model: str, settings: "Settings | None" = None,
     return _DEFAULT_PRICE
 
 
+def model_price_known(model: str, settings: "Settings | None" = None) -> bool:
+    """True when `model` has a real price source (settings override or a
+    MODEL_PRICES row). When False, callers must flag the cost as partial —
+    pricing an unknown model at the default row fabricates a number (plan v2)."""
+    if settings is not None and (settings.token_price_in_per_mtok > 0
+                                 or settings.token_price_out_per_mtok > 0):
+        return True
+    name = (model or "").lower()
+    return any(key in name for key, _ in MODEL_PRICES)
+
+
 def cost_index(usd: float, minutes: float, usd_ref: float, min_ref: float) -> float:
     """C = (1+log10(1+usd/usd_ref)) · (1+log10(1+min/min_ref)); ≥1, lower better."""
     usd_ref = max(usd_ref, 1e-9)
@@ -238,7 +249,8 @@ def cost_from_spans(trace_path: "Path", settings: "Settings | None" = None,
     read_f = float(getattr(settings, "cache_read_price_factor", 0) or 0) \
         or CACHE_READ_FACTOR
     totals = {"input_tokens": 0, "output_tokens": 0, "cache_read_tokens": 0,
-              "cache_creation_tokens": 0, "usd": 0.0, "llm_calls": 0}
+              "cache_creation_tokens": 0, "usd": 0.0, "llm_calls": 0,
+              "unpriced_calls": 0}
     by_role: dict[str, dict] = {}
     for line in lines:
         try:
@@ -248,7 +260,16 @@ def cost_from_spans(trace_path: "Path", settings: "Settings | None" = None,
         if rec.get("name") != "llm":
             continue
         a = rec.get("attr") or {}
-        model = str(a.get("model") or "")
+        # price by the SERVED model when the span recorded one (plan v2) —
+        # the requested name is what we asked for, not what we were billed for
+        model = str(a.get("served_model") or a.get("model") or "")
+        if not model_price_known(model, settings):
+            # an unpriced call makes the total a lower bound, never a guess
+            totals["unpriced_calls"] += 1
+            totals["llm_calls"] += 1
+            totals["input_tokens"] += int(a.get("prompt_tokens") or 0)
+            totals["output_tokens"] += int(a.get("completion_tokens") or 0)
+            continue
         p_in, p_out = model_price(model, settings)
         tin = int(a.get("prompt_tokens") or 0)
         tout = int(a.get("completion_tokens") or 0)
@@ -273,6 +294,7 @@ def cost_from_spans(trace_path: "Path", settings: "Settings | None" = None,
     if not totals["llm_calls"]:
         return None
     totals["usd"] = round(totals["usd"], 6)
+    totals["cost_partial"] = totals["unpriced_calls"] > 0  # usd = lower bound
     totals["by_role"] = {k: {**v, "usd": round(v["usd"], 6)}
                          for k, v in by_role.items()}
     totals["source"] = "spans"
@@ -404,7 +426,10 @@ def collect_run_metrics(run_dir: Path, settings: "Settings",
     s = safety_multiplier(incidents)
     usd_ref = settings.cost_ref_usd.get(kind, settings.cost_ref_usd.get("default", 1.0))
     min_ref = settings.cost_ref_min.get(kind, settings.cost_ref_min.get("default", 10.0))
-    c = cost_index(usd, minutes, usd_ref, min_ref)
+    cost_partial = bool((span_cost or {}).get("cost_partial"))
+    # a partial usd is a lower bound — a cost index over it would flatter the
+    # run, so it is omitted rather than computed from a fabrication
+    c = None if cost_partial else cost_index(usd, minutes, usd_ref, min_ref)
 
     components = _auto_components(kind, events, progress, status)
     for key, value in (extra_components or {}).items():
@@ -436,7 +461,9 @@ def collect_run_metrics(run_dir: Path, settings: "Settings",
             "tool_calls": tool_calls,
             "usd_ref": usd_ref,
             "min_ref": min_ref,
-            "cost_index": round(c, 4),
+            "cost_index": round(c, 4) if c is not None else None,
+            "cost_partial": cost_partial,
+            "unpriced_calls": (span_cost or {}).get("unpriced_calls", 0),
             "source": cost_source,
             "llm_calls": (span_cost or {}).get("llm_calls"),
             "by_role": (span_cost or {}).get("by_role"),
@@ -448,8 +475,8 @@ def collect_run_metrics(run_dir: Path, settings: "Settings",
             "incidents": incidents,
             "safety_multiplier": round(s, 4),
         },
-        "catq": None if q is None else round(catq(q, s, c), 4),
-        "tus": None if q is None else round(tus(q, s, c), 4),
+        "catq": None if (q is None or c is None) else round(catq(q, s, c), 4),
+        "tus": None if (q is None or c is None) else round(tus(q, s, c), 4),
         "signals": {
             "escalations": sum(1 for ev in events if ev.get("kind") == "escalation"),
             "pushes": sum(1 for ev in events if ev.get("kind") == "push_requested"),

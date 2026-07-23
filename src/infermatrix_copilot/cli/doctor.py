@@ -103,6 +103,95 @@ def _check_playbooks(settings) -> tuple[bool, str]:
         return False, f"playbooks failed to load: {exc} — fix: git checkout playbooks/"
 
 
+# Hosts whose served-model families are KNOWN — the static (free) tier check.
+# api.deepseek.com maps claude-* names to its own two models silently (verified
+# 2026-07-23), which is exactly the mislabel this check exists to catch.
+# Unknown gateways stay silent here; `doctor --probe` is the real check there.
+_HOST_MODEL_PREFIXES: dict[str, tuple[str, ...]] = {
+    "api.deepseek.com": ("deepseek-",),
+    "api.anthropic.com": ("claude-",),
+}
+
+
+def _tier_targets(settings) -> list[tuple[str, "object"]]:
+    """(label, ResolvedTarget) per configured tier; performance omitted (not
+    an error) when deferred/unconfigured."""
+    from ..config import TierNotConfiguredError
+
+    out = [("eco", settings.tier_target("eco"))]
+    try:
+        out.append(("performance", settings.tier_target("performance")))
+    except TierNotConfiguredError:
+        pass
+    return out
+
+
+def _check_model_backends(settings) -> tuple[bool, str]:
+    """Free static check: a tier model whose family a KNOWN host cannot serve
+    is a config error with an exact fix — the endpoint would silently
+    substitute (the fail-closed runtime guard would then kill every run)."""
+    problems, oks = [], []
+    for label, t in _tier_targets(settings):
+        allowed = _HOST_MODEL_PREFIXES.get(t.host)
+        family_ok = allowed is None or any(
+            t.model.lower().startswith(p) for p in allowed)
+        if not family_ok:
+            problems.append(
+                f"{label}: {t.host} cannot serve {t.model!r} (it silently "
+                f"maps foreign names — serves only {'/'.join(allowed)}*); "
+                f"fix: set a {'/'.join(allowed)}* model, or point "
+                f"{label.upper()}_BASE_URL(+_API_KEY+_MODEL) at an endpoint "
+                "that really serves it")
+        else:
+            oks.append(f"{label}={t.model}@{t.host}")
+    if problems:
+        return False, "; ".join(problems)
+    perf_note = "" if any(lbl == "performance" for lbl, _ in
+                          _tier_targets(settings)) \
+        else "; performance tier unconfigured (requests will fail upfront)"
+    return True, "tier backends plausible (" + ", ".join(oks) + ")" + perf_note
+
+
+def _probe_tiers(settings) -> tuple[bool, str]:
+    """`--probe` only: one 1-token live request per tier — the ONLY paid doctor
+    check, and the strong one: prints requested→served from the response."""
+    results, ok_all = [], True
+    for label, t in _tier_targets(settings):
+        if not t.api_key:
+            results.append(f"{label}: no API key resolved")
+            ok_all = False
+            continue
+        try:
+            import anthropic
+
+            kwargs = {"api_key": t.api_key, "timeout": 15.0, "max_retries": 0}
+            if t.base_url:
+                kwargs["base_url"] = t.base_url
+            resp = anthropic.Anthropic(**kwargs).messages.create(
+                model=t.model, max_tokens=1,
+                messages=[{"role": "user", "content": "hi"}])
+            served = str(getattr(resp, "model", "") or "")
+        except Exception as exc:
+            results.append(f"{label}: probe failed ({type(exc).__name__}: {exc})")
+            ok_all = False
+            continue
+        from ..llm import canonical_model
+
+        aliases = settings.model_aliases or {}
+        if not served:
+            results.append(f"{label}: {t.model} → (no model field: unverified)")
+        elif canonical_model(served, aliases) == canonical_model(t.model, aliases):
+            results.append(f"{label}: {t.model} → {served} ✓")
+        else:
+            results.append(
+                f"{label}: {t.model} → {served} MISMATCH — {t.host} is "
+                "substituting models; fix the tier backend")
+            ok_all = False
+    if not any(lbl == "performance" for lbl, _ in _tier_targets(settings)):
+        results.append("performance: unconfigured (valid deferred state)")
+    return ok_all, "; ".join(results)
+
+
 def _check_mixture(settings) -> tuple[bool, str]:
     mix = getattr(settings, "llm_mixture", {}) or {}
     members = mix.get("members") or []
@@ -120,8 +209,10 @@ def _check_mixture(settings) -> tuple[bool, str]:
                   + "; keys never printed)")
 
 
-def run_doctor(as_json: bool = False) -> int:
-    """Run every check; return 0 when all pass, 1 otherwise."""
+def run_doctor(as_json: bool = False, probe: bool = False) -> int:
+    """Run every check; return 0 when all pass, 1 otherwise. Doctor makes no
+    paid LLM call by default; `probe=True` (`--probe`) is the one explicit
+    exception — a 1-token request per tier to verify the served model."""
     from ..config import Settings
 
     try:
@@ -140,9 +231,12 @@ def run_doctor(as_json: bool = False) -> int:
         ("env", _check_env(settings)),
         ("gh", _check_gh()),
         ("repos", _check_repos(settings)),
+        ("backends", _check_model_backends(settings)),
         ("playbooks", _check_playbooks(settings)),
         ("moa", _check_mixture(settings)),
     ]
+    if probe:
+        checks.append(("probe", _probe_tiers(settings)))
     ok_all = all(ok for _, (ok, _) in checks)
     if as_json:
         print(json.dumps({"ok": ok_all, "checks": [

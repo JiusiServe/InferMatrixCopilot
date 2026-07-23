@@ -51,10 +51,18 @@ Rules:
 - Leave `ALLOW_PUSH=0` and `ALLOW_POST=0` during setup. Every workflow is a
   useful dry run without them.
 - Multi-line/JSON values (e.g. `LLM_MIXTURE`) must be single-quoted.
-- Optional, skip at first init: `ECO_MODEL`/`PERFORMANCE_MODEL` (dual-path),
-  `REVIEWER_MODEL`, `INTENT_MODEL`, escalation email (`NOTIFY_EMAIL` +
-  Resend/SMTP), MoA (`LLM_MIXTURE`, `MOA_WHEN`, `MOA_MAX_USD`),
-  `REBASE_ORCHESTRATOR_CMD` (only for the locked nightly-rebase delegation).
+- Optional, skip at first init: dual-path tiers (`ECO_MODEL`/
+  `PERFORMANCE_MODEL`, each optionally with its own `*_BASE_URL`+`*_API_KEY`
+  — all three or none; unconfigured performance ⇒ performance requests fail
+  upfront by design), `REVIEWER_MODEL`, `INTENT_MODEL`, escalation email
+  (`NOTIFY_EMAIL` + Resend/SMTP), MoA (`LLM_MIXTURE`, `MOA_WHEN`,
+  `MOA_MAX_USD`), `REBASE_ORCHESTRATOR_CMD` (locked nightly-rebase delegation).
+- The model you name must be one the endpoint REALLY serves — responses are
+  checked (fail-closed) and gateways that silently map foreign names (e.g.
+  claude-* on api.deepseek.com) kill the run with an exact message.
+  `doctor` flags implausible model/host pairs for free;
+  `./infermatrix-copilot doctor --probe` (1 paid token per tier) prints
+  `requested → served` as proof.
 
 ## 3. Preflight — doctor
 

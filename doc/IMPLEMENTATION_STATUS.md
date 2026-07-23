@@ -256,6 +256,40 @@ replicate arms ({profile} / {no-profile} × repos), feed scores into
 `eval/invariance.py`, act on the verdicts. Also future: gh feedback
 collectors + post-push CI snapshot (metrics roadmap).
 
+## Per-tier backends + served-model guard (plan v2, 2026-07-23)
+
+Root incident: this deployment requested `claude-opus-4-8[1m]` from DeepSeek's
+`/anthropic` endpoint, which silently maps Claude names to its own models —
+the "performance" run was served by `deepseek-v4-pro` and priced from the Opus
+table (fabricated ≈$3.00 for ≈$0.05). Landed, gpt-reviewed (2 rounds, folded):
+
+- **`ResolvedTarget` + `Settings.tier_target`** (config.py): central
+  tier→backend resolution — model+endpoint+credential as one immutable value.
+  Atomic inheritance (fully-unset | model-only | full triple; partial URL/key
+  = startup error). Performance unconfigured ⇒ `TierNotConfiguredError`
+  **upfront** (Copilot.run_task preflight, re-enforced in the MCP child and
+  on resume) — the silent agent_model fallback is gone.
+- **Served-model guard** (llm.py): every response's `model` is compared to the
+  request after alias normalization (`[1m]` stripped for comparison only;
+  audited `MODEL_ALIASES`); requested/served/endpoint/request-id recorded on
+  the span + an `llm.served` event, match or not. Mismatch ⇒
+  `ModelMismatchError` (default `MODEL_MISMATCH_POLICY=fail`) carrying the
+  paid reply — `BudgetedLLM` settles actual MoA spend before propagating.
+  Absent served model ⇒ `unverified` warning (probe is the strong check).
+  Detects metadata-visible substitution only.
+- **Honest metrics** (metrics.py): spans priced by SERVED model; calls with
+  no known price row ⇒ `cost_partial: true` + `unpriced_calls` (usd is a
+  lower bound; cost_index/CATQ omitted rather than fabricated).
+- **Model-only tier boundary**: `performance_briefing_docs` →
+  `briefing_docs_extra`, injected for ALL tiers (legacy key still read, with
+  a deprecation warning) — eco-vs-performance differences are now
+  attributable to the model backend alone.
+- **Doctor**: free static tier/host plausibility check (known-host registry;
+  catches claude-* on api.deepseek.com — the `.env.template` default trap);
+  `doctor --probe` = 1-token live probe per tier, prints requested→served
+  (the only paid doctor check, opt-in).
+- Pinned by `test/test_tier_split.py` (21 tests).
+
 ## Deliberate v1 boundaries
 - Playbooks are ordered step lists with `foreach` fan-out and `when:` conditions —
   no cross-step DAG edges yet; none of the six playbooks needs one.

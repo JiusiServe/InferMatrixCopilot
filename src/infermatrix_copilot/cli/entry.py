@@ -94,6 +94,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="doctor: preflight diagnostics with exact fixes")
     parser.add_argument("--json", action="store_true",
                         help="with doctor: machine-readable output")
+    parser.add_argument("--probe", action="store_true",
+                        help="with doctor: 1-token live probe per model tier "
+                             "(the only paid doctor check) — prints "
+                             "requested→served and fails on a mismatch")
     parser.add_argument("-p", "--prompt", help="one-shot natural-language command")
     parser.add_argument("--yes", action="store_true",
                         help="skip confirmation prompts (headless)")
@@ -125,7 +129,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "doctor":  # diagnostics only — no Copilot/LLM spin-up
         from .doctor import run_doctor
 
-        return run_doctor(as_json=args.json)
+        return run_doctor(as_json=args.json, probe=args.probe)
 
     # per-invocation accounting (W7): intent parsing runs BEFORE any run dir
     # exists, so pre-run spend (clarify retries!) needs its own artifact. The

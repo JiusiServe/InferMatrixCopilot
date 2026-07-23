@@ -39,9 +39,16 @@ def test_taskspec_mode_defaults_eco_and_describe():
 
 
 def test_model_for_tiers_and_fallbacks():
+    import pytest as _pytest
+
+    from infermatrix_copilot.config import TierNotConfiguredError
+
     base = Settings(_env_file=None, agent_model="base")
     assert base.model_for("eco") == "base"          # eco unset -> agent_model
-    assert base.model_for("performance") == "base"  # perf unset -> agent_model (no-op)
+    # perf unset now FAILS UPFRONT (plan v2) — the silent agent_model fallback
+    # is how a run once carried a high-capability label on the eco-class model
+    with _pytest.raises(TierNotConfiguredError):
+        base.model_for("performance")
     cfg = Settings(_env_file=None, agent_model="base",
                    eco_model="cheap", performance_model="strong")
     assert cfg.model_for("eco") == "cheap"

@@ -31,9 +31,10 @@ knowledge:
   briefing_docs:                  # always-on repo-specific slice: rules + nav
   - repos/vllm-omni/rules.md
   - repos/vllm-omni/_index.md
-  # Performance mode gets only a compact owner router; deep component/model
-  # pages remain on-demand through doc_read/doc_search.
-  performance_briefing_docs:
+  # Extended slice for ALL tiers (plan v2: the eco/performance boundary is
+  # model-only): a compact owner router; deep component/model pages remain
+  # on-demand through doc_read/doc_search.
+  briefing_docs_extra:
   - repos/vllm-omni/review/guides/maintainer-pattern-routing.md
 
 modules:

@@ -208,14 +208,23 @@ class BudgetedLLM:
         try:
             reply = self._client.create(**{**kwargs, "model": self._member.model,
                                            "role": self._role})
-        except Exception:
-            self._budget.release(rid)
+        except Exception as exc:
+            # a served-model mismatch is raised AFTER the provider was paid —
+            # the guard attaches the reply, so settle actual spend instead of
+            # releasing (a release would let fallbacks exceed MOA_MAX_USD)
+            paid = getattr(exc, "reply", None)
+            if paid is not None and getattr(paid, "usage", None):
+                self._budget.settle(rid, self._actual_cost(paid.usage))
+            else:
+                self._budget.release(rid)
             raise
-        usage = getattr(reply, "usage", None) or {}
-        p_in, p_out = model_price(self._member.model)
-        actual = ((usage.get("input_tokens", 0) or 0) / 1e6 * p_in
-                  + (usage.get("output_tokens", 0) or 0) / 1e6 * p_out
-                  + (usage.get("cache_creation_input_tokens", 0) or 0)
-                  / 1e6 * p_in * CACHE_CREATE_FACTOR)
-        self._budget.settle(rid, actual)
+        self._budget.settle(rid, self._actual_cost(getattr(reply, "usage", None)))
         return reply
+
+    def _actual_cost(self, usage: dict | None) -> float:
+        usage = usage or {}
+        p_in, p_out = model_price(self._member.model)
+        return ((usage.get("input_tokens", 0) or 0) / 1e6 * p_in
+                + (usage.get("output_tokens", 0) or 0) / 1e6 * p_out
+                + (usage.get("cache_creation_input_tokens", 0) or 0)
+                / 1e6 * p_in * CACHE_CREATE_FACTOR)

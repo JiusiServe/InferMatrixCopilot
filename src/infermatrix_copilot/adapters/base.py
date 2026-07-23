@@ -181,8 +181,19 @@ class RepoAdapter:
         else empty."""
         kn = self.manifest.get("knowledge") or {}
         docs = list(kn.get("briefing_docs") or [])
-        performance_docs = (list(kn.get("performance_briefing_docs") or [])
-                            if mode == "performance" else [])
+        # Extra briefing docs are TIER-INDEPENDENT (plan v2): the eco/performance
+        # boundary is the model backend and nothing else, so any eco-vs-perf
+        # difference is attributable to the model. `performance_briefing_docs`
+        # is the deprecated tier-coupled name for the same list.
+        extra_docs = list(kn.get("briefing_docs_extra") or [])
+        legacy = list(kn.get("performance_briefing_docs") or [])
+        if legacy:
+            if warnings is not None:
+                warnings.append(
+                    "manifest key performance_briefing_docs is deprecated — "
+                    "rename it to briefing_docs_extra (now injected for ALL "
+                    "tiers; the tier boundary is model-only)")
+            extra_docs = extra_docs or legacy
         repo_subdir = str(kn.get("repo_subdir") or "").rstrip("/")
         if repo_subdir:
             def scoped(items: list[str]) -> list[str]:
@@ -198,8 +209,8 @@ class RepoAdapter:
                 return out
 
             docs = scoped(docs)
-            performance_docs = scoped(performance_docs)
-        if knowledge_root is not None and (docs or performance_docs):
+            extra_docs = scoped(extra_docs)
+        if knowledge_root is not None and (docs or extra_docs):
             parts = []
             if docs:
                 parts.append(render_briefing_docs(
@@ -207,10 +218,10 @@ class RepoAdapter:
                     header=(f"Repo-specific knowledge (source: {kn.get('source', '')}; "
                             "open the linked deeper docs with doc_read / doc_search):"),
                     warnings=warnings))
-            if performance_docs:
+            if extra_docs:
                 parts.append(render_briefing_docs(
-                    knowledge_root, performance_docs,
-                    header="Performance-only review knowledge router:",
+                    knowledge_root, extra_docs,
+                    header="Extended review knowledge router:",
                     warnings=warnings))
             body = "\n\n".join(part for part in parts if part)
             if body:

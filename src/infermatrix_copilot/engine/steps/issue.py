@@ -112,9 +112,12 @@ async def _maybe_moa_draft(ctx, *, step_name: str, purpose: str, guidance: str,
                  for r, o in [r_o] if o and o.get("status") == "success"]
     if not proposals:
         return None  # exactly ONE legacy tier draft (the pre-MoA baseline)
-    tier_model = ctx.settings.model_for(spec.get("mode", "eco"))
-    agg = BudgetedLLM(Member(model=tier_model), ctx.llm, budget,
-                      role="moa_aggregator")
+    _tt = ctx.settings.tier_target(spec.get("mode", "eco"))
+    tier_model = _tt.model
+    agg = BudgetedLLM(Member(model=tier_model),
+                      (ctx.llm.for_target(_tt)
+                       if hasattr(ctx.llm, "for_target") else ctx.llm),
+                      budget, role="moa_aggregator")
     contract_desc = _json.dumps({k: v for k, v in extension.items()},
                                 ensure_ascii=False)
     prompt = ("Synthesize ONE best answer from these independent proposals "

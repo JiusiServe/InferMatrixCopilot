@@ -44,9 +44,18 @@ ALLOW_PUSH=0     # 1 = allow git push (still --force-with-lease only, never to m
 ALLOW_POST=0     # 1 = allow posting PR comments / issue replies
 ```
 
-Optional: `REVIEWER_MODEL`, `INTENT_MODEL`, `PERFORMANCE_MODEL` (dual-path),
-`NOTIFY_EMAIL`+`RESEND_API_KEY`/SMTP (escalation email), `LLM_MIXTURE` (MoA).
-See `.env.template` for all knobs.
+Optional: `REVIEWER_MODEL`, `INTENT_MODEL`, the dual-path tier backends
+(`ECO_MODEL`/`PERFORMANCE_MODEL`, each optionally with its own
+`*_BASE_URL`+`*_API_KEY` — set all three or none; an unconfigured performance
+tier makes performance requests fail upfront rather than silently running the
+eco model), `NOTIFY_EMAIL`+`RESEND_API_KEY`/SMTP (escalation email),
+`LLM_MIXTURE` (MoA). See `.env.template` for all knobs.
+
+Every response's served model is verified against the request (fail-closed —
+endpoints that silently substitute models, e.g. Claude names on DeepSeek's
+`/anthropic`, are caught, not mislabeled). `doctor` checks tier/host
+plausibility for free; `doctor --probe` makes one 1-token call per tier and
+prints `requested → served`.
 
 ## 3. Preflight
 

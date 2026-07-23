@@ -2,13 +2,43 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Literal
+from urllib.parse import urlparse
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+class TierNotConfiguredError(RuntimeError):
+    """A performance-mode run was requested but no performance backend is
+    configured. Deliberately NOT a silent fallback to the eco model — that
+    fallback is how a run once carried a high-capability label while the
+    endpoint silently served the eco-class model."""
+
+
+@dataclass(frozen=True)
+class ResolvedTarget:
+    """One immutable LLM destination: which model, on which endpoint, with
+    which credential — resolved centrally by `Settings.tier_target` so loose
+    (model, client) pairs can never recombine a tier's model with the wrong
+    backend. `source` labels the resolution for traces ("tier:eco" /
+    "tier:performance" / "global"); the key itself never appears in logs."""
+
+    role: str
+    model: str
+    base_url: str
+    api_key: str
+    source: str
+
+    @property
+    def host(self) -> str:
+        """Endpoint hostname for traces/echo lines (default Anthropic when no
+        base_url override is set)."""
+        return urlparse(self.base_url).netloc if self.base_url else "api.anthropic.com"
 
 
 class Settings(BaseSettings):
@@ -34,7 +64,25 @@ class Settings(BaseSettings):
     # `model_for`. Both empty -> `agent_model` (so the split is a no-op until
     # `performance_model` is configured, and never changes existing behavior).
     eco_model: str = ""          # empty -> agent_model (the cost-effective default)
-    performance_model: str = ""  # empty -> agent_model (high-capability path)
+    performance_model: str = ""  # empty -> performance mode FAILS UPFRONT (tier_target)
+    # Per-tier backends (plan v2): each tier may override the shared ANTHROPIC_*
+    # backend. Atomic rule (validated below): a tier is fully unset (inherit
+    # everything), model-only (different model on the shared backend), or
+    # model+base_url+api_key all three (an independent backend). Partial
+    # URL/key combos are startup errors — a tier URL must never receive the
+    # shared credential, nor a tier credential the shared URL.
+    eco_base_url: str = ""
+    eco_api_key: str = ""
+    performance_base_url: str = ""
+    performance_api_key: str = ""
+    # Served-model guard: "fail" (default) raises when a response names a
+    # different model than requested (after alias normalization) — the
+    # endpoint is substituting models; "warn" records loudly and continues.
+    model_mismatch_policy: Literal["fail", "warn"] = "fail"
+    # Audited requested->served equivalences that are NOT substitutions
+    # (e.g. a gateway echoing a canonical/dated name). JSON in .env,
+    # single-quoted; every application is traced (model_alias_applied).
+    model_aliases: Annotated[dict, NoDecode] = {}
     llm_max_tokens: int = 16000  # 8k truncated verbose lens replies mid-JSON
 
     # Repos
@@ -166,6 +214,42 @@ class Settings(BaseSettings):
     moa_max_usd: float = 1.50            # per-run MoA spend cap (reservations)
     moa_max_members: int = 4
 
+    @field_validator("model_aliases", mode="before")
+    @classmethod
+    def _parse_aliases(cls, v):
+        """Strictly parse MODEL_ALIASES env JSON: malformed ⇒ ValueError (this
+        is a guard-policy surface — a silently-dropped alias would turn a
+        legitimate equivalence into a run-killing mismatch, or vice versa)."""
+        import json as _json
+
+        if isinstance(v, dict):
+            return v
+        if not (isinstance(v, str) and v.strip()):
+            return {}
+        obj = _json.loads(v)  # raises on malformed — never tolerated here
+        if not isinstance(obj, dict) or not all(
+                isinstance(k, str) and isinstance(val, str)
+                for k, val in obj.items()):
+            raise ValueError("MODEL_ALIASES must be a JSON object of "
+                             "string->string equivalences")
+        return obj
+
+    @model_validator(mode="after")
+    def _validate_tier_atomicity(self):
+        """Reject partial tier backends at startup: URL or key alone could pair
+        the shared credential with a tier host (or the reverse)."""
+        for tier in ("eco", "performance"):
+            model = getattr(self, f"{tier}_model")
+            url = getattr(self, f"{tier}_base_url")
+            key = getattr(self, f"{tier}_api_key")
+            if (url or key) and not (url and key and model):
+                raise ValueError(
+                    f"partial {tier} backend: {tier.upper()}_BASE_URL, "
+                    f"{tier.upper()}_API_KEY and {tier.upper()}_MODEL must be "
+                    "set together (or the URL/key both left unset to inherit "
+                    "the shared ANTHROPIC_* backend)")
+        return self
+
     @field_validator("llm_mixture", mode="before")
     @classmethod
     def _parse_mixture(cls, v):
@@ -225,14 +309,40 @@ class Settings(BaseSettings):
         """The intent-classification model, falling back to `agent_model`."""
         return self.intent_model or self.agent_model
 
-    def model_for(self, mode: str) -> str:
-        """The agent-reasoning model for an execution tier (双路径):
-        `performance` -> the high-capability model (`performance_model`, falling
-        back to `agent_model`); anything else (`eco`, the default) -> the
-        cost-effective model (`eco_model`, falling back to `agent_model`)."""
+    def tier_target(self, mode: str, role: str = "agent") -> ResolvedTarget:
+        """Central tier→backend resolution (双路径, plan v2): the ONLY place a
+        tier's model is paired with an endpoint and credential. `eco` (the
+        default) -> `eco_model` or `agent_model` on the eco backend (or the
+        shared one); `performance` with no `performance_model` raises
+        `TierNotConfiguredError` — failing upfront replaced the silent
+        agent_model fallback that once mislabeled a whole run."""
         if mode == "performance":
-            return self.performance_model or self.agent_model
-        return self.eco_model or self.agent_model
+            if not self.performance_model:
+                raise TierNotConfiguredError(
+                    "performance tier is not configured — set PERFORMANCE_MODEL "
+                    "in .env (plus PERFORMANCE_BASE_URL + PERFORMANCE_API_KEY "
+                    "for an independent backend), or run without requesting "
+                    "the high-performance model")
+            if self.performance_base_url:
+                return ResolvedTarget(role, self.performance_model,
+                                      self.performance_base_url,
+                                      self.performance_api_key,
+                                      "tier:performance")
+            return ResolvedTarget(role, self.performance_model,
+                                  self.anthropic_base_url,
+                                  self.anthropic_api_key, "global")
+        model = self.eco_model or self.agent_model
+        if self.eco_base_url:
+            return ResolvedTarget(role, model, self.eco_base_url,
+                                  self.eco_api_key, "tier:eco")
+        return ResolvedTarget(role, model, self.anthropic_base_url,
+                              self.anthropic_api_key, "global")
+
+    def model_for(self, mode: str) -> str:
+        """The agent-reasoning model name for an execution tier — delegates to
+        `tier_target` (same upfront failure for an unconfigured performance
+        tier; no silent fallback)."""
+        return self.tier_target(mode).model
 
     @property
     def mcp_allowed_repos(self) -> list[str]:

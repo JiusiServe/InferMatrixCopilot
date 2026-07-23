@@ -64,11 +64,16 @@ async def run_agent_step(
         scope = replace(scope, root=str(repo_root))
     spec = ctx.state.get("task_spec") or {}
     # dual-path (双路径): the run's execution tier (set from intent, eco by
-    # default) selects the agent-reasoning model here — the split point is after
-    # intent, and everything upstream (planning, evidence, knowledge) is shared.
+    # default) selects the agent BACKEND here — model + endpoint + credential
+    # as one ResolvedTarget (plan v2) — the split point is after intent, and
+    # everything upstream (planning, evidence, knowledge) is shared. An
+    # unconfigured performance tier failed upfront at Copilot.run_task, so
+    # tier_target cannot raise for a run that got this far.
     tier = spec.get("mode", "eco")
-    tier_model = model_override or ctx.settings.model_for(tier)
-    step_llm = llm_override or ctx.llm
+    target = ctx.settings.tier_target(tier)
+    tier_model = model_override or target.model
+    step_llm = llm_override or (ctx.llm.for_target(target)
+                                if hasattr(ctx.llm, "for_target") else ctx.llm)
     contract = {**BASE_OUTPUT_SCHEMA, **(output_extension or {})}
     capped, refs = _build_evidence(ctx, evidence)
 
@@ -139,6 +144,7 @@ async def run_agent_step(
                      evidence={k: len(v) for k, v in capped.items()},
                      skills=[s["name"] for s in skills],
                      memories=len(memories), mode=tier, model=tier_model,
+                     endpoint=target.host, target_source=target.source,
                      permissions=dispatch_ctx.permissions)
 
     budget = max_iters or ctx.settings.review_max_iters

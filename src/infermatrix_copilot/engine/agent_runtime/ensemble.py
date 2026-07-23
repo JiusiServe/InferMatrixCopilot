@@ -77,7 +77,10 @@ async def run_agent_step_ensemble(
             moa_members = []
         else:
             moa_budget = MoaBudget.start(ctx.settings)
-            fallback_model = ctx.settings.model_for(spec0.get("mode", "eco"))
+            _fb_target = ctx.settings.tier_target(spec0.get("mode", "eco"))
+            fallback_model = _fb_target.model
+            fallback_llm = (ctx.llm.for_target(_fb_target)
+                            if hasattr(ctx.llm, "for_target") else ctx.llm)
             ctx.trace.record(
                 "moa_dispatch", step=step_name,
                 members=[m.label() for m in moa_members],
@@ -91,7 +94,7 @@ async def run_agent_step_ensemble(
         m = moa_members[lens_i % len(moa_members)]
         return {"llm_override": BudgetedLLM(
                     m, ctx.llm.for_member(m), moa_budget,
-                    fallback=(ctx.llm, fallback_model)),
+                    fallback=(fallback_llm, fallback_model)),
                 "model_override": m.model}
 
     async def _one_lens(lens: dict, j: int, idx: int = 0,
@@ -282,12 +285,15 @@ async def run_agent_step_ensemble(
         + json.dumps(numbered, ensure_ascii=False, indent=1)
         + f"\n\n## EVIDENCE\n{ev_text}")
     # the reducer is agent reasoning too — it rides the run's dual-path tier
-    # (lens agents already do via run_agent_step; without this the merge
-    # silently fell back to agent_model on performance runs)
-    tier_model = ctx.settings.model_for(
+    # BACKEND (lens agents already do via run_agent_step; without this the
+    # merge silently fell back to agent_model on performance runs)
+    _tt = ctx.settings.tier_target(
         (ctx.state.get("task_spec") or {}).get("mode", "eco"))
+    tier_model = _tt.model
+    reducer_llm = (ctx.llm.for_target(_tt)
+                   if hasattr(ctx.llm, "for_target") else ctx.llm)
     reply = await asyncio.to_thread(
-        ctx.llm.create, system=merge_system,
+        reducer_llm.create, system=merge_system,
         messages=[{"role": "user", "content": merge_prompt}],
         model=tier_model, role="reducer",
         max_tokens=max(6000, ctx.settings.llm_max_tokens))
@@ -305,7 +311,7 @@ async def run_agent_step_ensemble(
     if not (isinstance(reduced, dict) and isinstance(reduced.get("verdicts"), list)):
         reduced = None
         if (reply_text or "").strip():  # one repair round (never on empty text)
-            fix = ctx.llm.create(
+            fix = reducer_llm.create(
                 system=("Convert the draft into a single JSON object matching "
                         "this contract exactly (keep all substance):\n"
                         + json.dumps(reduce_contract, ensure_ascii=False)),
