@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni 开发与配置"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-23
 type: index
 tags: [vllm-omni, dev]
 sources: []
@@ -21,4 +21,5 @@ sources: []
 
 | 遇到什么 | 查看哪里 |
 |---|---|
+| 修改配置字段、归一化或新老入口 | [配置开发门禁](rules.md) |
 | 审计配置来源和多层加工 | [dev guides](guides/_index.md) |

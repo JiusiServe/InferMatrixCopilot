@@ -17,11 +17,11 @@
 
 实现任务只选一个主题完成路由。仅因一个代码 diff 同时包含测试和文档，不需要在开工时横向读完 `ci/` 和 `docs/` 主题；选定代码 owner 后，先查真实仓库里最近的测试和文档入口。任务主目标命中 CI、测试体系或文档，或本页和仓库场景触发器明确要求专项门禁时，仍必须进入对应主题。
 
-### 开发任务十分钟首次落盘
+### 开发任务五分钟首次落盘
 
-用户已经授权实现、真实 checkout 可写且不是纯分析任务时，记录开工时间。确认主要 owner 后立即写出四项：`owner`、开发阶段命中的规则 ID/章节、第一批要打开的源码函数、当前唯一阻塞；没有阻塞就进入 live 源码，不再继续浏览同级主题、其他 owner、incidents 或 history。开发者只读当前任务命中的 owner 规则，完整规则枚举属于写完后的 reviewer，不在编码前手工跑一遍。
+用户已经授权实现、真实 checkout 可写且不是纯分析任务时，记录开工时间。用户或主 agent 已经给出 canonical 仓库、精确 owner 和规则路径时，开发快路径固定读取四个页面的命中段落：本页、[code taste](general/review/guides/code-taste.md)、目标仓库根 `rules.md` 和该 owner 的 `rules.md`；此时跳过 `repos/_index.md`、仓库/topic/model discovery 索引、未被仓库硬门禁直接命中的 planning/review guide 和同级 owner。仓库根规则直接要求 mini spec、远端门禁或其他安全页时仍必须读取那一篇，不能为了页面预算跳过。确认主要 owner 后立即写出四项：`owner`、开发阶段命中的仓库/owner 规则 ID 或触发组、第一批要打开的源码函数、当前唯一阻塞；没有阻塞就进入 live 源码。开发者只读当前任务命中的规则；owner 定义触发组时，组内完整枚举属于写完后的 reviewer，不在编码前手工跑整页。
 
-开工到第一次有效落盘目标不超过十分钟。有效落盘是 owner-aligned 的最小行为改动、绑定已确认合同的失败回归测试，或文档任务中真实改变目标规则/结构的正文；TODO、注释、纯格式、占位测试和空骨架不计。测试环境与路由并行做一次不超过两分钟的最小 preflight；缺依赖、模型或 GPU 时立即记录行为验证边界，不用更多静态阅读冒充验证。十分钟仍不能安全落盘时，必须报告一个能阻止实现的具体未知量和下一处唯一源码证据；“继续熟悉代码”“再多看看相关模块”不是阻塞，也不能据此横向扩大阅读。
+开工到第一次有效落盘目标不超过五分钟。有效落盘是 owner-aligned 的最小行为改动、绑定已确认合同的失败回归测试，或文档任务中真实改变目标规则/结构的正文；TODO、注释、纯格式、占位测试和空骨架不计。测试环境与路由并行做一次不超过两分钟的最小 preflight；缺依赖、模型或 GPU 时立即记录行为验证边界，不用更多静态阅读冒充验证。五分钟仍不能安全落盘时，必须报告一个能阻止实现的具体未知量和下一处唯一源码证据；“继续熟悉代码”“再多看看相关模块”不是阻塞，也不能据此横向扩大阅读。
 
 这个时间门禁不允许为了赶时间跳过 public contract、owner 或 live source。发现调用链确实跨 owner、官方语义冲突或当前计划会改变用户接口时，先记录证据再扩展一个必要边界。阶段耗时只使用实际时间戳，格式见 [agent loop](general/agents/guides/agent-loop-workflow.md#开发阶段耗时记录)。
 
@@ -63,14 +63,14 @@
 | 用户正在做什么 | 必读入口 | 最低要求 |
 |---|---|---|
 | 写代码或修改公开接口 | [code taste](general/review/guides/code-taste.md) | 先理解现有 owner、调用链、测试和用户可见行为 |
-| 开发完成、准备交给 reviewer 或项目 owner | [维护者审查闭环](general/agents/guides/agent-loop-workflow.md#开发交付的维护者审查闭环) | 独立 reviewer 全量审 diff，修复后重审，直到没有实质问题 |
+| 开发完成、准备交给 reviewer 或项目 owner | [维护者审查闭环](general/agents/guides/agent-loop-workflow.md#开发交付的维护者审查闭环) | 先确认唯一审查负责人；被委派的开发默认交回父 agent 统一 review，不嵌套重复审查 |
 | code review 或 reviewer follow-up | [独立审查执行合同](general/review/guides/review-execution-contract.md) | 先完成 owner 规则、公开入口和 producer→consumer 覆盖，再开放找问题 |
 | UI、CLI、文档或其他用户可见改动 | [用户可见验收](general/docs/guides/user-visible-acceptance.md) | 绿测之外还要跑普通用户真实路径 |
 | benchmark 或性能结论 | [benchmark contract](general/benchmark/guides/benchmark-contract.md) | 先固定版本、工作负载、指标和证据来源 |
 | SSH、容器、远端服务或长跑 | [远端入口](general/remote/_index.md) | 先验证目标、环境、超时、状态文件和清理边界 |
 | 多 agent 或并行工作 | [agent loop](general/agents/guides/agent-loop-workflow.md) | 只拆能独立验证的任务，主 agent 复核结论 |
 | 产品规划或 roadmap | [产品闭环](general/planning/guides/product-loop-planning.md) | 先写用户可感知的完整闭环，再拆技术任务 |
-| 复盘、沉淀经验或总结教训 | [复盘到规则](general/debug/guides/retrospective-to-rules.md) | 默认更新最近 owner 的规则；只有复杂证据值得长期保留时才新增错题 |
+| 复盘、沉淀经验或总结教训 | [复盘到规则](general/debug/guides/retrospective-to-rules.md) | 先按语义分流；incident 默认不创建，须通过三项准入门禁 |
 
 仓库入口链接的 `rules.md` 可以增加更严格的门禁，但不能放宽这里的通用 P0。
 
@@ -79,10 +79,10 @@
 - 能反复避免问题、改变下一次行为的结论 → 最近 owner 的 `rules.md`。跨仓库规则放 `general/<主题>/`，仓库规则放 `repos/<仓库>/`，模块或模型规则继续下沉到对应目录。
 - 稳定的数据流、职责和边界 → 最近 owner 的 `architecture.md`。
 - 需要展开说明但不是硬门禁的方法 → 对应主题的 `guides/`。
-- `incidents/` 只保存规则无法承载的复杂复现、证据链或历史背景；它可有可无，不能成为正常开工必须猜路径才能找到的知识入口。
+- `incidents/` 默认不创建；只有规则与架构已完成、仍有其他载体无法保存的证据、且存在具体未来查询触发时才准入，不能成为正常开工必须猜路径才能找到的知识入口。
 - 当前机器事实 → ignored `local/`。
 
-用户要求“复盘”时，必须回答为什么发生、为什么原有规则或测试没有发现、怎样提前阻止，并把可执行结论写进最近 owner 的 `rules.md`。只有事故过程本身仍有独立查询价值时，才同时保留一篇 incident 并从规则链接过去。
+用户要求“复盘”时，必须回答为什么发生、为什么原有规则或测试没有发现、怎样提前阻止，并在写文件前按语义分流。incident 默认不创建；只有规则和架构已完成、仍有其他载体无法保存的证据、且存在具体未来查询触发时才准入，不能用它收纳从规则中剔除的历史细节。
 
 长期知识禁止写入系统、全局或个人 memory 位置。新增、移动、拆分或删除 Markdown 前先读短入口 [CONTRIBUTING.md](CONTRIBUTING.md)，再按任务只读它链接的一篇专题规范；同步最近的 `_index.md`，然后运行：
 

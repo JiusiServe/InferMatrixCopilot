@@ -1,13 +1,22 @@
 ---
 title: "Model Executor 规则"
 created: 2026-07-10
-updated: 2026-07-20
+updated: 2026-07-23
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: [vllm_omni/worker/gpu_model_runner.py, tests/worker/test_omni_gpu_model_runner.py, vllm_omni/config/stage_config.py, "PR #3642", "PR #4730"]
+sources: [vllm_omni/worker/gpu_model_runner.py, tests/worker/test_omni_gpu_model_runner.py, vllm_omni/config/stage_config.py, "PR #3642", "PR #4730", "claude-workflow-starter-private@09dca46"]
 ---
 
 # Model Executor 规则
+
+## 严格配置校验
+
+### EXEC-3a — 严格配置校验不能靠扩大白名单
+
+- 触发条件：新增或收紧 stage config、deploy YAML、CLI 到 runtime config 的未知字段校验，或者准备向 projection、`TypedDict`、known-fields 集合、compat/service allowlist 增加字段。
+- 必须做：先冻结 PR 基线，逐个枚举相对基线新增的可接受字段；对每个字段写清公开 producer、入口归一化、唯一 canonical owner 和最终 runtime consumer。CLI/legacy 别名只允许在入口转换，转换后不得继续出现在核心 schema；service-only 字段必须交给 service owner，不能混入 stage runtime config。直接 constructor、结构化 YAML 和真实 startup builder 必须使用同一组最小正负样例核对。
+- 禁止：不能因为严格校验开始报错，就把报错字段加入核心 dataclass、projection、known-fields 或专门白名单；不能接受字段后在分区时丢弃；不能为同一语义新增两个核心字段再补优先级；不能用“构造成功”“字段不在最终 payload”或只有测试 fixture 使用来证明字段必要。
+- 验收：每个新增可接受字段都必须有 PR 前已存在或本次明确新增的真实 consumer，并有从公开入口到 consumer 的正向断言；无 consumer 或 owner 不在 stage runtime 的字段必须在入口报错；别名与 canonical 同时出现必须报冲突。最终 diff 中新增的 schema 字段数量应与 producer-consumer 表逐项一致。
 
 ## Runner 到模型的预处理合同
 

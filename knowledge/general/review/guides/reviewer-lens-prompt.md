@@ -1,7 +1,7 @@
 ---
 title: "Reviewer Lens Prompt"
 created: 2026-07-10
-updated: 2026-07-13
+updated: 2026-07-23
 type: guide
 tags: [general, review]
 sources: []
@@ -24,11 +24,14 @@ when the diff changes the knowledge tree. Add each additional owner only when
 the live producer-consumer trace crosses that boundary.
 
 For every owner in that proven chain, read its existing rules.md if present.
-Inventory every stable constraint ID and mark each PASS / FAIL /
-MISSING_EVIDENCE / NOT_APPLICABLE with file/function/test/run evidence. N/A
-also needs evidence; omission cannot produce a clean result. Group/namespace
-headings do not count as IDs. For an ID with a fixed evidence matrix, report
-every row; one missing row prevents PASS. When an old rules
+When that owner defines review groups, select `core` plus every group triggered
+by the current diff and reachable paths, then inventory every stable constraint
+ID in those groups. Only owners without review groups require a full-page ID
+inventory. Mark each selected ID PASS / FAIL / MISSING_EVIDENCE /
+NOT_APPLICABLE with file/function/test/run evidence. N/A also needs evidence;
+omission cannot produce a clean result. Group/namespace headings do not count
+as IDs. For an ID with a fixed evidence matrix, report every triggered row; one
+missing row prevents PASS. When an old rules
 page has no stable sub-IDs, treat each bullet or prose paragraph as one source
 unit, quote it, and list every normative requirement you identify inside it.
 Report that page as legacy-unstructured; do not claim exact clause coverage or
@@ -168,7 +171,20 @@ Return findings in markdown. For each finding, first state:
 1. what bad thing can happen;
 2. why this PR owns it;
 3. the smallest acceptable fix.
-End with:
+Give every blocking finding a stable local ID such as `P1 F1`. On the same
+finding line include `DIFF:`, `PATH:`, `CONTRACT:`, `FAILURE:`,
+`COUNTEREVIDENCE:`, and `FIX:`. Architecture suspicion without all six is an
+investigation note, not a P0/P1/P2. In the owner audit,
+map every `FAIL` to `FINDING:F1`; map `MISSING_EVIDENCE` to a finding or a
+specific `DRAFT:<blocked evidence>` reason. For each public ingress, name the
+actual dispatcher, first expensive operation, and owner adapter/consumer;
+the existence of an unused helper is not coverage.
+Every finding must also be referenced by an owner-row Disposition; if no
+existing owner rule applies, put `OWNER_RULE:NONE` after its F ID. When two
+parallel reviewers are merged, re-evaluate affected PASS/NOT_APPLICABLE rows
+instead of appending the second reviewer's prose unchanged.
+End with one `OWNER RULE GROUPS: <path>: core,<triggered groups>` line for each
+grouped owner, then:
 "OWNER RULE COVERAGE: <path or none>: X/Y stable IDs inventoried — A pass / B fail / C missing evidence / D not applicable" or "OWNER RULE COVERAGE: <legacy path>: X source units inventoried — A pass / B fail / C missing evidence / D not applicable — legacy-unstructured, no exact clause-coverage claim" (one line per owner), then
 "RISK TAGS: ...; LENSES: ..." and then on a separate line "AUDITS RUN: coverage,ingress,producer-consumer,duplication,layering,edge-cases,surface-area[,path,lifecycle,evidence] — N findings (Pa P0, Pb P1, Pc P2)".
 ```

@@ -20,8 +20,10 @@ REQUIRED_HEADINGS = (
 MATRIX_SCHEMAS = {
     "Public ingress matrix": (
         "Ingress",
-        "Validation/normalization",
-        "Before expensive work?",
+        "Actual dispatcher",
+        "Contract check",
+        "First expensive operation",
+        "Owner adapter/consumer",
         "Production-path test/evidence",
     ),
     "Producer-consumer trace": (
@@ -52,19 +54,71 @@ RULE_DEFINITION_RE = re.compile(
     r"\*\*([A-Z][A-Z0-9]*-\d+[a-z]?)"
     r"(?:\s+—|\*\*\s*\|)"
 )
-REPORT_RULE_ROW_RE = re.compile(
-    r"^\|\s*([A-Z][A-Z0-9]*-\d+[a-z]?)\s*\|"
-    r"\s*(PASS|FAIL|MISSING_EVIDENCE|NOT_APPLICABLE)\s*\|"
-    r"\s*(.*?)\s*\|\s*$"
+STABLE_RULE_ID_RE = re.compile(r"^[A-Z][A-Z0-9]*-\d+[a-z]?$")
+LEGACY_RULE_LABEL_RE = re.compile(r"^LEGACY:(.+?)#(\d+)$")
+FINDING_LINE_RE = re.compile(
+    r"^\s*[-*]\s+(?:\*\*)?P[012]\s+(F\d+)(?![A-Za-z0-9_])"
+    r"(?:\s+(OWNER_RULE:NONE))?\s*(.*)$",
+    re.MULTILINE | re.IGNORECASE,
 )
-LEGACY_REPORT_ROW_RE = re.compile(
-    r"^\|\s*LEGACY:(.+?)#(\d+)\s*\|"
-    r"\s*(PASS|FAIL|MISSING_EVIDENCE|NOT_APPLICABLE)\s*\|"
-    r"\s*(.*?)\s*\|\s*$"
+FINDING_DISPOSITION_RE = re.compile(
+    r"^FINDING:(F\d+(?:\s*,\s*F\d+)*)$",
+    re.IGNORECASE,
+)
+RULE_GROUP_SELECTION_RE = re.compile(
+    r"^OWNER RULE GROUPS:\s*(.+?):\s*"
+    r"([a-z0-9-]+(?:\s*,\s*[a-z0-9-]+)*)\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+RULE_GROUP_HEADERS = {
+    ("审查组", "什么时候触发", "规则 ID"),
+    ("Review group", "Trigger", "Rule IDs"),
+}
+FINDING_PROOF_LABELS = (
+    "DIFF",
+    "PATH",
+    "CONTRACT",
+    "FAILURE",
+    "COUNTEREVIDENCE",
+    "FIX",
+)
+DRAFT_DISPOSITION_RE = re.compile(r"^DRAFT:(\S.*)$", re.IGNORECASE)
+SENTINEL_VALUES = {
+    "-",
+    "n/a",
+    "n/a-with-evidence",
+    "none",
+    "unknown",
+    "tbd",
+    "todo",
+    "x",
+}
+DRAFT_SENTINELS = SENTINEL_VALUES | {
+    "blocked",
+    "blocked evidence",
+    "specific blocker",
+    "x",
+}
+DRAFT_OBJECT_RE = re.compile(
+    r"(?:\b(?:test|pytest|dependency|runtime|artifact|model|gpu|file|path|"
+    r"network)\b|测试|依赖|运行时|产物|模型|文件|路径|网络)",
+    re.IGNORECASE,
+)
+DRAFT_CONDITION_RE = re.compile(
+    r"(?:\b(?:missing|unavailable|failed|cannot|offline|blocked)\b|"
+    r"缺少|失败|不可用|阻塞)",
+    re.IGNORECASE,
+)
+CODE_PATH_RE = re.compile(
+    r"(?:[A-Za-z_][\w-]*(?:[.:/\\][\w.:/\\()\-]+)+|"
+    r"[A-Za-z_][\w-]*\([^)]*\))"
 )
 TEMPLATE_PLACEHOLDERS = {
     "<offline/API/chat/internal entry>",
-    "<owner and behavior>",
+    "<real function reached from the public entry>",
+    "<validation/normalization and location>",
+    "<decode/load/GPU/VAE call>",
+    "<actual adapter or bypass>",
     "<evidence>",
     "<field/behavior>",
     "<source>",
@@ -170,9 +224,9 @@ def extract_legacy_source_units(text: str) -> list[str]:
         if stripped.startswith("#"):
             flush_paragraph()
             continue
-        if re.match(r"^\s*[-*+]\s+", line):
+        if re.match(r"^\s*(?:[-*+]|\d+[.)])\s+", line):
             flush_paragraph()
-            units.append(re.sub(r"^\s*[-*+]\s+", "", line).strip())
+            units.append(re.sub(r"^\s*(?:[-*+]|\d+[.)])\s+", "", line).strip())
             continue
         if stripped.startswith("|"):
             flush_paragraph()
@@ -211,6 +265,51 @@ def extract_section(text: str, heading: str) -> str | None:
     )
     match = pattern.search(text)
     return match.group(1) if match else None
+
+
+def visible_markdown(text: str) -> str:
+    """Remove fenced blocks and HTML comments before structural parsing."""
+    without_comments = re.sub(r"<!--.*?(?:-->|$)", "", text, flags=re.DOTALL)
+    without_hidden_html = re.sub(
+        r"<(div|details|section)\b[^>]*(?:\bhidden\b|display\s*:\s*none)[^>]*>"
+        r".*?</\1\s*>",
+        "",
+        without_comments,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+    without_hidden_html = re.sub(
+        r"<template\b[^>]*>.*?</template\s*>",
+        "",
+        without_hidden_html,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+    visible_lines: list[str] = []
+    fence: tuple[str, int] | None = None
+    for line in without_hidden_html.splitlines():
+        if fence is not None:
+            marker_char, opening_length = fence
+            if re.fullmatch(
+                rf" {{0,3}}{re.escape(marker_char)}{{{opening_length},}}\s*",
+                line,
+            ):
+                fence = None
+            continue
+        opening_match = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line)
+        if opening_match:
+            marker = opening_match.group(1)
+            fence = (marker[0], len(marker))
+            continue
+        if line.startswith("\t") or line.startswith("    "):
+            continue
+        heading_match = re.match(
+            r"^(##)\s+(.+?)(?:\s+#+\s*)?$",
+            line,
+        )
+        if heading_match and heading_match.group(2).strip() in REQUIRED_HEADINGS:
+            visible_lines.append(f"## {heading_match.group(2).strip()}")
+        else:
+            visible_lines.append(line)
+    return "\n".join(visible_lines) + "\n"
 
 
 def split_markdown_row(line: str) -> list[str]:
@@ -268,6 +367,114 @@ def markdown_table(section: str) -> tuple[list[str], list[list[str]]]:
     return (rows[0], rows[1:]) if rows else ([], [])
 
 
+def extract_rule_groups(text: str) -> dict[str, list[str]]:
+    """Extract human-readable review groups from a rules Markdown table."""
+    groups: dict[str, list[str]] = {}
+    lines = text.splitlines()
+    index = 0
+    while index < len(lines):
+        stripped = lines[index].strip()
+        if not stripped.startswith("|"):
+            index += 1
+            continue
+        header = tuple(split_markdown_row(stripped))
+        if header not in RULE_GROUP_HEADERS:
+            index += 1
+            continue
+        index += 1
+        while index < len(lines):
+            row_text = lines[index].strip()
+            if not row_text.startswith("|"):
+                break
+            row = split_markdown_row(row_text)
+            index += 1
+            if row and all(re.fullmatch(r":?-{3,}:?", cell) for cell in row):
+                continue
+            if len(row) != 3:
+                continue
+            group_name = plain_markdown_cell(row[0]).strip("`").casefold()
+            rule_ids = re.findall(r"[A-Z][A-Z0-9]*-\d+[a-z]?", row[2])
+            if group_name:
+                groups.setdefault(group_name, []).extend(rule_ids)
+        continue
+    return {name: list(dict.fromkeys(rule_ids)) for name, rule_ids in groups.items()}
+
+
+def missing_finding_proof_labels(body: str) -> list[str]:
+    return [
+        label
+        for label in FINDING_PROOF_LABELS
+        if not re.search(rf"\b{label}\s*:", body, re.IGNORECASE)
+    ]
+
+
+def empty_finding_proof_labels(body: str) -> list[str]:
+    matches = list(
+        re.finditer(
+            r"\b(" + "|".join(FINDING_PROOF_LABELS) + r")\s*:",
+            body,
+            re.IGNORECASE,
+        )
+    )
+    empty: list[str] = []
+    for index, match in enumerate(matches):
+        label = match.group(1).upper()
+        value_end = (
+            matches[index + 1].start() if index + 1 < len(matches) else len(body)
+        )
+        value = body[match.end() : value_end].strip(" ;|—-`*")
+        if (
+            len(value) < 8
+            or plain_markdown_cell(value).casefold() in SENTINEL_VALUES
+            or not re.search(r"[A-Za-z0-9_\u4e00-\u9fff]", value)
+        ):
+            empty.append(label)
+    return empty
+
+
+def disposition_finding_ids(disposition: str) -> list[str] | None:
+    match = FINDING_DISPOSITION_RE.fullmatch(disposition.strip())
+    if not match:
+        return None
+    return [item.strip().upper() for item in match.group(1).split(",")]
+
+
+def concrete_draft_reason(disposition: str) -> bool:
+    match = DRAFT_DISPOSITION_RE.fullmatch(disposition.strip())
+    if not match:
+        return False
+    reason = match.group(1).strip()
+    return (
+        len(reason) >= 12
+        and reason.casefold() not in DRAFT_SENTINELS
+        and bool(re.search(r"[A-Za-z0-9_\u4e00-\u9fff]", reason))
+        and bool(DRAFT_OBJECT_RE.search(reason))
+        and bool(DRAFT_CONDITION_RE.search(reason))
+    )
+
+
+def plain_markdown_cell(cell: str) -> str:
+    value = cell.strip()
+    while len(value) >= 2 and (
+        (value.startswith("`") and value.endswith("`"))
+        or (value.startswith("**") and value.endswith("**"))
+        or (value.startswith("__") and value.endswith("__"))
+        or (value.startswith("*") and value.endswith("*"))
+        or (value.startswith("_") and value.endswith("_"))
+    ):
+        if value.startswith(("**", "__")):
+            value = value[2:-2].strip()
+        else:
+            value = value[1:-1].strip()
+    return value
+
+
+def has_concrete_code_path(cell: str) -> bool:
+    return any(
+        CODE_PATH_RE.fullmatch(code.strip()) for code in re.findall(r"`([^`]+)`", cell)
+    )
+
+
 def main() -> int:
     args = parse_args()
     errors: list[str] = []
@@ -276,18 +483,28 @@ def main() -> int:
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)
         return 1
+    report = visible_markdown(report)
 
     sections: dict[str, str] = {}
     for heading in REQUIRED_HEADINGS:
+        heading_count = len(
+            re.findall(
+                rf"^##\s+{re.escape(heading)}\s*$",
+                report,
+                re.MULTILINE,
+            )
+        )
+        if heading_count > 1:
+            errors.append(f"duplicate section: ## {heading}")
         section = extract_section(report, heading)
         if section is None:
             errors.append(f"missing section: ## {heading}")
         else:
             sections[heading] = section
 
-    expected_ids: list[str] = []
+    all_rule_ids_by_owner: dict[Path, list[str]] = {}
+    rule_groups_by_owner: dict[Path, dict[str, list[str]]] = {}
     definition_owner: dict[str, Path] = {}
-    rule_ids_by_owner: dict[Path, list[str]] = {}
     for rules_path in args.rules:
         rules_text = read_text(rules_path, "rules file", errors)
         if rules_path.is_file() and not rules_text.strip():
@@ -295,7 +512,7 @@ def main() -> int:
         rule_ids = extract_rule_ids(rules_text)
         if rules_text.strip() and not rule_ids:
             errors.append(f"no stable rule IDs found in: {rules_path}")
-        rule_ids_by_owner[rules_path] = []
+        all_rule_ids_by_owner[rules_path] = []
         for rule_id in rule_ids:
             if rule_id in definition_owner:
                 errors.append(
@@ -304,8 +521,95 @@ def main() -> int:
                 )
                 continue
             definition_owner[rule_id] = rules_path
-            expected_ids.append(rule_id)
-            rule_ids_by_owner[rules_path].append(rule_id)
+            all_rule_ids_by_owner[rules_path].append(rule_id)
+        rule_groups = extract_rule_groups(rules_text)
+        rule_groups_by_owner[rules_path] = rule_groups
+        if rule_groups and "core" not in rule_groups:
+            errors.append(f"grouped rules file is missing the core group: {rules_path}")
+        grouped_ids = {
+            rule_id for group_ids in rule_groups.values() for rule_id in group_ids
+        }
+        for group_name, group_ids in rule_groups.items():
+            if not re.fullmatch(r"[a-z0-9-]+", group_name):
+                errors.append(
+                    f"review group name must use lowercase letters, digits, "
+                    f"and hyphens: {rules_path}:{group_name}"
+                )
+            if not group_ids:
+                errors.append(
+                    f"review group has no rule IDs: {rules_path}:{group_name}"
+                )
+            for rule_id in group_ids:
+                if rule_id not in rule_ids:
+                    errors.append(
+                        f"review group {rules_path}:{group_name} references "
+                        f"undefined rule ID: {rule_id}"
+                    )
+        ungrouped_ids = sorted(set(rule_ids) - grouped_ids)
+        if rule_groups and ungrouped_ids:
+            errors.append(
+                f"grouped rules file leaves stable IDs ungrouped: {rules_path}: "
+                + ", ".join(ungrouped_ids)
+            )
+
+    completion = sections.get("Completion", "")
+    selection_matches = list(RULE_GROUP_SELECTION_RE.finditer(completion))
+    raw_selection_count = len(
+        re.findall(r"^OWNER RULE GROUPS:", completion, re.MULTILINE)
+    )
+    if raw_selection_count != len(selection_matches):
+        errors.append("Completion contains an unparseable OWNER RULE GROUPS footer")
+    selected_groups_by_owner: dict[Path, list[str]] = {}
+    for match in selection_matches:
+        label = match.group(1).strip()
+        owner_matches = matching_owner_paths(label, list(all_rule_ids_by_owner))
+        if len(owner_matches) != 1:
+            errors.append(
+                f"OWNER RULE GROUPS label must match exactly one --rules path: {label}"
+            )
+            continue
+        owner = owner_matches[0]
+        if owner in selected_groups_by_owner:
+            errors.append(f"duplicate OWNER RULE GROUPS footer: {label}")
+            continue
+        group_names = [name.strip().casefold() for name in match.group(2).split(",")]
+        selected_groups_by_owner[owner] = list(dict.fromkeys(group_names))
+
+    expected_ids: list[str] = []
+    rule_ids_by_owner: dict[Path, list[str]] = {}
+    for owner, all_rule_ids in all_rule_ids_by_owner.items():
+        groups = rule_groups_by_owner.get(owner, {})
+        selected_groups = selected_groups_by_owner.get(owner)
+        if not groups:
+            if selected_groups is not None:
+                errors.append(
+                    f"OWNER RULE GROUPS supplied for rules file without groups: {owner}"
+                )
+            selected_ids = all_rule_ids
+        else:
+            if selected_groups is None:
+                errors.append(
+                    f"Completion is missing OWNER RULE GROUPS footer for: {owner}"
+                )
+                selected_groups = ["core"]
+            if "core" not in selected_groups:
+                errors.append(f"OWNER RULE GROUPS must include core: {owner}")
+            unknown_groups = sorted(set(selected_groups) - set(groups))
+            if unknown_groups:
+                errors.append(
+                    f"OWNER RULE GROUPS contains unknown group(s) for {owner}: "
+                    + ", ".join(unknown_groups)
+                )
+            selected_id_set = {
+                rule_id
+                for group_name in selected_groups
+                for rule_id in groups.get(group_name, [])
+            }
+            selected_ids = [
+                rule_id for rule_id in all_rule_ids if rule_id in selected_id_set
+            ]
+        rule_ids_by_owner[owner] = selected_ids
+        expected_ids.extend(selected_ids)
 
     legacy_source_units: dict[Path, list[str]] = {}
     for rules_path in args.legacy_rules:
@@ -321,33 +625,44 @@ def main() -> int:
         if rules_text.strip() and not legacy_source_units[rules_path]:
             errors.append(f"no legacy source units found in: {rules_path}")
 
-    report_rows: dict[str, list[tuple[str, str]]] = {}
-    legacy_report_rows: dict[Path, list[tuple[int, str, str]]] = {
+    report_rows: dict[str, list[tuple[str, str, str]]] = {}
+    legacy_report_rows: dict[Path, list[tuple[int, str, str, str]]] = {
         path: [] for path in args.legacy_rules
     }
     rule_section = sections.get("Owner rule audit", "")
-    for line in rule_section.splitlines():
-        match = REPORT_RULE_ROW_RE.match(line.strip())
-        if not match:
+    rule_header, audit_rows = markdown_table(rule_section)
+    expected_rule_header = ("Rule ID", "Status", "Evidence", "Disposition")
+    if args.rules or args.legacy_rules:
+        if tuple(rule_header) != expected_rule_header:
+            errors.append(
+                "Owner rule audit header must be: " + " | ".join(expected_rule_header)
+            )
+    for row_number, row in enumerate(audit_rows, start=1):
+        if len(row) != len(expected_rule_header):
+            errors.append(
+                f"Owner rule audit row {row_number} has {len(row)} cells; "
+                f"expected {len(expected_rule_header)}"
+            )
             continue
-        rule_id, status, evidence = match.groups()
-        report_rows.setdefault(rule_id, []).append((status, evidence.strip()))
-
-    for line in rule_section.splitlines():
-        match = LEGACY_REPORT_ROW_RE.match(line.strip())
-        if not match:
+        label, status, evidence, disposition = (cell.strip() for cell in row)
+        if STABLE_RULE_ID_RE.fullmatch(label):
+            report_rows.setdefault(label, []).append((status, evidence, disposition))
             continue
-        label, unit_number_text, status, evidence = match.groups()
-        owner_matches = matching_owner_paths(label.strip(), args.legacy_rules)
+        legacy_match = LEGACY_RULE_LABEL_RE.fullmatch(label)
+        if not legacy_match:
+            errors.append(f"unrecognized owner rule audit label: {label}")
+            continue
+        legacy_label, unit_number_text = legacy_match.groups()
+        owner_matches = matching_owner_paths(legacy_label.strip(), args.legacy_rules)
         if len(owner_matches) != 1:
             errors.append(
                 "legacy audit row label must match exactly one --legacy-rules "
-                f"path: {label.strip()}"
+                f"path: {legacy_label.strip()}"
             )
             continue
         owner = owner_matches[0]
         legacy_report_rows[owner].append(
-            (int(unit_number_text), status, evidence.strip())
+            (int(unit_number_text), status, evidence, disposition)
         )
 
     for rule_id in expected_ids:
@@ -359,14 +674,74 @@ def main() -> int:
 
     unexpected = sorted(set(report_rows) - set(expected_ids))
     for rule_id in unexpected:
-        errors.append(f"report rule ID is not defined by supplied rules files: {rule_id}")
+        errors.append(
+            f"report rule ID is not selected or not defined by supplied rules files: {rule_id}"
+        )
+
+    open_findings = sections.get("Open findings", "")
+    finding_records = [
+        (
+            finding_id.upper(),
+            bool(owner_rule_none),
+            body.strip().strip("*"),
+        )
+        for finding_id, owner_rule_none, body in FINDING_LINE_RE.findall(open_findings)
+    ]
+    finding_ids = [finding_id for finding_id, _, _ in finding_records]
+    finding_id_set = set(finding_ids)
+    if len(finding_ids) != len(finding_id_set):
+        errors.append("Open findings contains duplicate F<number> IDs")
+    for finding_id, _, body in finding_records:
+        substantive_body = body.strip(" —:-*`")
+        if len(substantive_body) < 20:
+            errors.append(
+                f"open finding {finding_id} must contain a substantive failure, "
+                "ownership, and smallest fix"
+            )
+        missing_labels = missing_finding_proof_labels(body)
+        if missing_labels:
+            errors.append(
+                f"open finding {finding_id} is missing proof label(s): "
+                + ", ".join(missing_labels)
+            )
+        else:
+            empty_labels = empty_finding_proof_labels(body)
+            if empty_labels:
+                errors.append(
+                    f"open finding {finding_id} has empty proof value(s): "
+                    + ", ".join(empty_labels)
+                )
+
+    referenced_finding_ids: set[str] = set()
+
+    def check_disposition(label: str, status: str, disposition: str) -> None:
+        finding_refs = disposition_finding_ids(disposition)
+        if status == "FAIL" and finding_refs is None:
+            errors.append(f"FAIL row must map to FINDING:F<number>: {label}")
+            return
+        if status == "MISSING_EVIDENCE":
+            if finding_refs is None and not concrete_draft_reason(disposition):
+                errors.append(
+                    "MISSING_EVIDENCE row must map to FINDING:F<number> or "
+                    f"DRAFT:<specific blocker>: {label}"
+                )
+                return
+        if status in {"PASS", "NOT_APPLICABLE"} and disposition != "-":
+            errors.append(f"{status} row disposition must be '-': {label}")
+        for finding_ref in finding_refs or []:
+            referenced_finding_ids.add(finding_ref)
+            if finding_ref not in finding_id_set:
+                errors.append(
+                    f"owner rule row {label} references missing finding: {finding_ref}"
+                )
 
     for rule_id, rows in report_rows.items():
-        for status, evidence in rows:
+        for status, evidence, disposition in rows:
             if status not in VALID_STATUSES:
                 errors.append(f"invalid status for {rule_id}: {status}")
             if not evidence or evidence in {"-", "N/A"}:
                 errors.append(f"missing evidence for owner rule row: {rule_id}")
+            check_disposition(rule_id, status, disposition)
             if args.require_clean and status in {"FAIL", "MISSING_EVIDENCE"}:
                 errors.append(f"review is not clean: {rule_id} is {status}")
 
@@ -374,28 +749,55 @@ def main() -> int:
         if not rows:
             errors.append(f"legacy owner audit has no source-unit row: {owner}")
             continue
-        unit_numbers = [unit_number for unit_number, _, _ in rows]
+        unit_numbers = [unit_number for unit_number, _, _, _ in rows]
         if len(unit_numbers) != len(set(unit_numbers)):
             errors.append(f"duplicate legacy source-unit number for: {owner}")
         if sorted(unit_numbers) != list(range(1, len(unit_numbers) + 1)):
-            errors.append(f"legacy source-unit numbers must be contiguous from 1: {owner}")
+            errors.append(
+                f"legacy source-unit numbers must be contiguous from 1: {owner}"
+            )
         expected_unit_count = len(legacy_source_units.get(owner, []))
         if len(rows) != expected_unit_count:
             errors.append(
                 f"legacy source-unit row count for {owner} does not match file: "
                 f"report={len(rows)}, expected={expected_unit_count}"
             )
-        for unit_number, status, evidence in rows:
+        for unit_number, status, evidence, disposition in rows:
+            if status not in VALID_STATUSES:
+                errors.append(
+                    f"invalid status for legacy source unit "
+                    f"{owner}#{unit_number}: {status}"
+                )
             if not evidence or evidence in {"-", "N/A"}:
                 errors.append(
                     f"missing evidence for legacy source unit {owner}#{unit_number}"
                 )
+            check_disposition(f"{owner}#{unit_number}", status, disposition)
             if args.require_clean and status in {"FAIL", "MISSING_EVIDENCE"}:
-                errors.append(
-                    f"review is not clean: {owner}#{unit_number} is {status}"
-                )
+                errors.append(f"review is not clean: {owner}#{unit_number} is {status}")
 
-    if not args.rules and not args.legacy_rules and "OWNER RULES: none" not in rule_section:
+    for finding_id, owner_rule_none, body in finding_records:
+        if re.search(r"\bOWNER_RULE:NONE\b", body, re.IGNORECASE):
+            errors.append(
+                f"open finding {finding_id} places OWNER_RULE:NONE outside "
+                "the structured position after its F<number>"
+            )
+        if finding_id in referenced_finding_ids and owner_rule_none:
+            errors.append(
+                f"open finding {finding_id} is mapped to an owner rule and "
+                "cannot also declare OWNER_RULE:NONE"
+            )
+        if finding_id not in referenced_finding_ids and not owner_rule_none:
+            errors.append(
+                f"open finding {finding_id} is not referenced by an owner rule; "
+                "use a Disposition mapping or OWNER_RULE:NONE"
+            )
+
+    if (
+        not args.rules
+        and not args.legacy_rules
+        and "OWNER RULES: none" not in rule_section
+    ):
         errors.append(
             "no --rules supplied; Owner rule audit must contain 'OWNER RULES: none'"
         )
@@ -406,9 +808,7 @@ def main() -> int:
             continue
         header, data_rows = markdown_table(section)
         if tuple(header) != expected_header:
-            errors.append(
-                f"{heading} header must be: {' | '.join(expected_header)}"
-            )
+            errors.append(f"{heading} header must be: {' | '.join(expected_header)}")
         if not data_rows:
             errors.append(f"{heading} has no Markdown data row")
             continue
@@ -424,13 +824,36 @@ def main() -> int:
                     errors.append(
                         f"{heading} row {row_number} column {column_number} is empty"
                     )
-                elif cell in TEMPLATE_PLACEHOLDERS:
+                elif plain_markdown_cell(cell) in TEMPLATE_PLACEHOLDERS:
                     errors.append(
                         f"{heading} row {row_number} column {column_number} "
                         "still contains a template placeholder"
                     )
+                elif plain_markdown_cell(cell).casefold() in SENTINEL_VALUES:
+                    errors.append(
+                        f"{heading} row {row_number} column {column_number} "
+                        "contains a sentinel instead of concrete evidence"
+                    )
+            if heading == "Public ingress matrix":
+                ingress_value = plain_markdown_cell(row[0])
+                if ingress_value.casefold().startswith("n/a-with-evidence:"):
+                    reason = ingress_value.split(":", 1)[1].strip()
+                    if len(reason) < 20 or any(
+                        len(plain_markdown_cell(cell)) < 20 for cell in row[1:]
+                    ):
+                        errors.append(
+                            f"{heading} row {row_number} N/A form requires a "
+                            "concrete reason in every column and production evidence"
+                        )
+                else:
+                    for column_index in (1, 3, 4):
+                        if not has_concrete_code_path(row[column_index]):
+                            errors.append(
+                                f"{heading} row {row_number} column "
+                                f"{column_index + 1} must name a concrete "
+                                "code path in backticks"
+                            )
 
-    completion = sections.get("Completion", "")
     if "OWNER RULE COVERAGE:" not in completion:
         errors.append("Completion is missing OWNER RULE COVERAGE footer")
     if "AUDITS RUN:" not in completion:
@@ -524,7 +947,7 @@ def main() -> int:
             "NOT_APPLICABLE": not_applicable,
         }
         actual_status_counts = {
-            status: sum(row_status == status for _, row_status, _ in rows)
+            status: sum(row_status == status for _, row_status, _, _ in rows)
             for status in VALID_STATUSES
         }
         expected_unit_count = len(legacy_source_units.get(owner, []))
@@ -539,6 +962,12 @@ def main() -> int:
                 f"match audit rows: footer={footer_status_counts}, "
                 f"body={actual_status_counts}"
             )
+        if sum(actual_status_counts.values()) != expected_unit_count:
+            errors.append(
+                f"legacy owner status counts for {label} do not cover every "
+                f"source unit: counted={sum(actual_status_counts.values())}, "
+                f"expected={expected_unit_count}"
+            )
     for path in sorted(set(args.legacy_rules) - matched_legacy_owners, key=str):
         errors.append(f"Completion is missing legacy coverage footer for: {path}")
 
@@ -547,7 +976,10 @@ def main() -> int:
         if args.rules or args.legacy_rules
         else 1
     )
-    if len(stable_coverage_matches) + len(legacy_coverage_matches) != expected_coverage_lines:
+    if (
+        len(stable_coverage_matches) + len(legacy_coverage_matches)
+        != expected_coverage_lines
+    ):
         errors.append(
             "Completion must contain exactly one owner coverage footer per owner"
         )
@@ -557,7 +989,9 @@ def main() -> int:
     if raw_audits_footer_count != len(audits_matches):
         errors.append("Completion contains an unparseable AUDITS RUN footer")
     if len(audits_matches) != 1:
-        errors.append("Completion must contain exactly one machine-readable AUDITS RUN footer")
+        errors.append(
+            "Completion must contain exactly one machine-readable AUDITS RUN footer"
+        )
     else:
         audits_match = audits_matches[0]
         reported_audits = {
@@ -568,22 +1002,28 @@ def main() -> int:
         missing_audits = sorted(REQUIRED_AUDITS - reported_audits)
         if missing_audits:
             errors.append(
-                "Completion AUDITS RUN footer is missing: "
-                + ", ".join(missing_audits)
+                "Completion AUDITS RUN footer is missing: " + ", ".join(missing_audits)
             )
         footer_total, footer_p0, footer_p1, footer_p2 = map(
             int, audits_match.groups()[1:]
         )
         footer_counts = (footer_p0, footer_p1, footer_p2)
         if footer_total != sum(footer_counts):
-            errors.append(
-                "Completion finding total does not equal its P0/P1/P2 counts"
-            )
+            errors.append("Completion finding total does not equal its P0/P1/P2 counts")
         open_findings = sections.get("Open findings", "")
         actual_counts = tuple(
-            len(re.findall(rf"^\s*[-*]\s+(?:\*\*)?P{priority}\b", open_findings, re.MULTILINE))
+            len(
+                re.findall(
+                    rf"^\s*[-*]\s+(?:\*\*)?P{priority}\b", open_findings, re.MULTILINE
+                )
+            )
             for priority in range(3)
         )
+        if sum(actual_counts) != len(finding_ids):
+            errors.append(
+                "each open finding must have one unique F<number> after its "
+                "P0/P1/P2 priority"
+            )
         if actual_counts != footer_counts:
             errors.append(
                 "Open findings do not match Completion P0/P1/P2 counts: "
@@ -592,7 +1032,9 @@ def main() -> int:
         if footer_total == 0 and not re.search(
             r"^\s*[-*]\s+(?:\*\*)?none\b", open_findings, re.MULTILINE | re.IGNORECASE
         ):
-            errors.append("Open findings must contain an explicit 'none' when count is zero")
+            errors.append(
+                "Open findings must contain an explicit 'none' when count is zero"
+            )
         if args.require_clean and footer_total != 0:
             errors.append(
                 "review is not clean: Completion reports "
@@ -606,20 +1048,20 @@ def main() -> int:
         return 1
 
     fail_count = sum(
-        status == "FAIL" for rows in report_rows.values() for status, _ in rows
+        status == "FAIL" for rows in report_rows.values() for status, _, _ in rows
     ) + sum(
         status == "FAIL"
         for rows in legacy_report_rows.values()
-        for _, status, _ in rows
+        for _, status, _, _ in rows
     )
     missing_count = sum(
         status == "MISSING_EVIDENCE"
         for rows in report_rows.values()
-        for status, _ in rows
+        for status, _, _ in rows
     ) + sum(
         status == "MISSING_EVIDENCE"
         for rows in legacy_report_rows.values()
-        for _, status, _ in rows
+        for _, status, _, _ in rows
     )
     print(
         "Review report structure complete: "

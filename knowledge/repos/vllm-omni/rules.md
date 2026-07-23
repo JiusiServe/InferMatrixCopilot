@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni 硬门禁"
 created: 2026-07-10
-updated: 2026-07-16
+updated: 2026-07-23
 type: rule
 tags: [vllm-omni]
 sources: [benchmark/incidents/_index.md, ci/incidents/_index.md, git/incidents/_index.md, remote/incidents/_index.md]
@@ -27,7 +27,7 @@ sources: [benchmark/incidents/_index.md, ci/incidents/_index.md, git/incidents/_
 | profiling、trace、Perfetto、Nsight、算子或时序 | [profiling 状态机](benchmark/guides/ar-graph-profiling.md) 和 [benchmark incidents](benchmark/incidents/_index.md) | 默认交付 trace artifact 和质量摘要；benchmark stats 不能冒充 trace |
 | graph mode、`enforce_eager=false` | 同上 | trace、目标请求和 server 日志必须证明来自同一轮 graph run |
 | e2e、QPS、latency 或性能对比 | [benchmark scope](benchmark/guides/benchmark-scope.md) 和 [evidence gate](benchmark/guides/evidence-gate.md) | 先固定完整 metric contract，再跑正式 sweep |
-| config、deploy、pipeline 或 CLI cleanup | [配置审计](dev/guides/config-audit-plain-language.md) | 沿入口、默认值、多层加工和新老路径查所有权 |
+| config、deploy、pipeline 或 CLI cleanup | [配置开发门禁](dev/rules.md) 和 [配置审计](dev/guides/config-audit-plain-language.md) | 执行 `VOMNI-CFG-1a` 至 `VOMNI-CFG-1c`；只审受影响路径和一个相邻 control |
 | stage config、并行度、设备映射或 worker 启动 | [Model Executor 规则](components/model-executor/rules.md) | 展开最终配置，并在 worker 前验证并行 world size 和可见设备 |
 | runner `_preprocess` 生产的逐请求 phase metadata，例如 `_omni_prompt_len`、`_omni_num_computed_tokens`、`_omni_is_prefill`，或由它们决定的 preprocess/MTP 路由 | [Model Executor 规则](components/model-executor/rules.md#runner-到模型的预处理合同) | 先查共享 worker runner 的 producer 和路由，再查具体模型 consumer |
 | 模型适配、checkpoint 或 HF 对齐 | [model guardrails](review/guides/model-adaptation-guardrails.md) 和对应模型入口 | plumbing 绿灯不等于语义正确 |

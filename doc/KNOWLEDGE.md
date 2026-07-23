@@ -1,14 +1,29 @@
 # Knowledge base — provenance, authorization & layout
 
-The copilot's repo knowledge is a **vendored copy** of the human-curated community
-knowledge base **zuiho-kai/claude-workflow-starter**, imported at upstream commit
-`f2dc8248f62fa590c9bae13f92492a175a7c3c32` and maintained **in this repo** as
-ordinary tracked files at the repo-root **`knowledge/`** (= `settings.knowledge_dir`).
-It is being reorganized in-repo (folder rename, code-mirror, detail-preserving
-curation — see `doc/PLAN-knowledge-reorg.md`); upstream is not modified.
+The copilot's repo knowledge is a **vendored adaptation** of the human-curated
+common knowledge base **zuiho-kai/claude-workflow-starter-private**. The original
+tree was imported at `f2dc8248f62fa590c9bae13f92492a175a7c3c32`; common rules are
+currently synchronized through private `master @
+e423b8d92a3b7568d9b5feca6e648db105ed8a7c`. They are maintained **in this repo**
+as ordinary tracked files at the repo-root **`knowledge/`**
+(= `settings.knowledge_dir`).
 
-- Source: https://github.com/zuiho-kai/claude-workflow-starter
+The relationship is subset-based, not snapshot replacement:
+
+```text
+private master common knowledge ⊆ InferMatrixCopilot knowledge
+```
+
+`InferMatrixCopilot` may retain adapter-, component-, model-, schema- and
+frontmatter-specific extensions. A common-baseline sync imports missing semantic
+deltas with `framework/` mapped to `general/`; it must not delete target-only
+extensions merely because they are absent from the common source.
+
+- Current common source: https://github.com/zuiho-kai/claude-workflow-starter-private
+- Original public source: https://github.com/zuiho-kai/claude-workflow-starter
 - Imported from commit: `f2dc8248f62fa590c9bae13f92492a175a7c3c32` (2026-07-13)
+- Common baseline synchronized through:
+  `e423b8d92a3b7568d9b5feca6e648db105ed8a7c` (2026-07-23)
 - **Authorization:** the author (zuiho) authorized copying the content into this
   repo for local use and reorganization; confirmed by the repo owner (Taichang
   Zhou) on 2026-07-16 — "we can also copy there contents as our local content,
@@ -79,6 +94,9 @@ through normal PR review plus the tree's own gates:
     python knowledge/tools/check_knowledge_tree.py
     python knowledge/tools/check_wiki_lint.py
 
-To cherry-pick a future upstream improvement, diff against
-https://github.com/zuiho-kai/claude-workflow-starter and import the specific
-pages (deliberate, reviewable — there is no submodule link anymore).
+For a future common-baseline sync, diff the last recorded private-source commit
+against `zuiho-kai/claude-workflow-starter-private` `master`, then import only
+the semantic delta. Preserve target-only pages and additions, map
+`framework/` to `general/`, retain target frontmatter, and resolve rule-ID
+collisions explicitly. There is no submodule link and a whole-tree replacement
+is not a valid synchronization method.

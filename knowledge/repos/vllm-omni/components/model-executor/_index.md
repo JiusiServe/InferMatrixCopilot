@@ -1,7 +1,7 @@
 ---
 title: "Model Executor"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-23
 type: index
 tags: [vllm-omni, components, model-executor]
 sources: []
@@ -30,4 +30,4 @@ sources: []
 | 遇到什么 | 查看哪里 |
 |---|---|
 | 理解共享职责和阶段边界 | [architecture](architecture.md) |
-| 修改 runner 预处理合同、逐行 phase、MTP 路由、stage 并行度、设备映射或启动校验 | [rules](rules.md) |
+| 修改严格 stage 配置校验、runner 预处理合同、逐行 phase、MTP 路由、stage 并行度、设备映射或启动校验 | [rules](rules.md) |
