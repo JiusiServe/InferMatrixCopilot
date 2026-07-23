@@ -76,6 +76,24 @@ _DEPTH_LIGHT = re.compile(r"\b(quick(?:ly)?|light|fast)\b.{0,20}\breview\b"
 _REVIEW_VERB = re.compile(r"\b(review|审查|评审)\b", re.IGNORECASE)
 _ANSWER_VERB = re.compile(r"\b(answer|reply|respond|回答|回复)\b", re.IGNORECASE)
 _TRIAGE_VERB = re.compile(r"\b(triage|filter|classify|分类|归类)\b", re.IGNORECASE)
+# post/publish intent: negation always wins, and absence means False — the
+# fail-safe read-only default. `post(?!-)` keeps "post-merge review" read-only.
+_POST_NEG = re.compile(
+    r"\b(?:do\s*n[o']?t|not|no|never|without|skip)\b[^,.;]{0,24}?"
+    r"\b(?:post(?:ing)?|publish(?:ing)?)\b"
+    r"|[不别勿][要须]?\s*发[布表]", re.IGNORECASE)
+_POST_POS = re.compile(r"\b(?:post(?!-)|publish)\b|发[布表]", re.IGNORECASE)
+
+
+def _wants_post(text: str) -> bool:
+    """Explicit post/publish intent in a deterministic command. The LLM path
+    fills the JSON `post` field; the fast paths must extract the same signal
+    or an explicit "and post it" is silently dropped and the playbook's
+    `when: post` step skips after a full (paid) run."""
+    t = text or ""
+    if _POST_NEG.search(t):
+        return False
+    return bool(_POST_POS.search(t))
 
 _remote_cache: dict[str, str | None] = {}
 
@@ -119,6 +137,18 @@ def resolve_repo_alias(owner: str, repo: str, settings) -> str | None:
     return None
 
 
+def repo_identity(alias: str, settings) -> str | None:
+    """The `owner/repo` GitHub identity of a configured alias:
+    `settings.repo_full_names` first, else the checkout's origin remote.
+    None means URL commands cannot route to this alias — doctor warns and the
+    routing clarify names the alias instead of claiming it is unconfigured."""
+    full = (settings.repo_full_names or {}).get(alias)
+    if full:
+        return str(full)
+    path = (settings.repo_paths or {}).get(alias)
+    return _remote_full_name(str(path)) if path else None
+
+
 def _depth_param(text: str) -> dict:
     if _DEPTH_FULL.search(text):
         return {"review_depth": "full"}
@@ -152,6 +182,7 @@ def pre_parse(text: str, settings) -> IntentResult | None:
         return None
     mode = "performance" if _wants_performance(text) else "eco"
     params = _depth_param(text)
+    post = _wants_post(text)
 
     m = _GH_URL.search(text)
     if m:
@@ -160,6 +191,17 @@ def pre_parse(text: str, settings) -> IntentResult | None:
         alias = resolve_repo_alias(owner, repo, settings)
         if alias is None:
             known = ", ".join(sorted(settings.repo_paths or {})) or "(none)"
+            unresolved = sorted(a for a in (settings.repo_paths or {})
+                                if repo_identity(a, settings) is None)
+            if unresolved:
+                return IntentResult(clarify=(
+                    f"I don't manage {owner}/{repo} — configured repos: "
+                    f"{known}, but the GitHub identity of "
+                    f"{', '.join(unresolved)} is unknown (no REPO_FULL_NAMES "
+                    "entry and no parseable GitHub origin remote). If one of "
+                    "these is that repo, set REPO_FULL_NAMES="
+                    f'{{"{unresolved[0]}": "{owner}/{repo}"}} in .env; '
+                    "otherwise add it to REPO_PATHS (and REPO_FULL_NAMES)."))
             return IntentResult(clarify=(
                 f"I don't manage {owner}/{repo} — configured repos: {known}. "
                 "Add it to REPO_PATHS (and REPO_FULL_NAMES) to route URLs to it."))
@@ -168,10 +210,13 @@ def pre_parse(text: str, settings) -> IntentResult | None:
             if _ANSWER_VERB.search(text):
                 kind = "pr_review"  # answering a PR is still a review draft
             spec = TaskSpec(kind=kind, mode=mode, repo=alias, pr=number,
-                            params=params)
+                            post=post, params=params)
         else:
             kind = "issue_filter" if _TRIAGE_VERB.search(text) else "issue_answer"
+            # triage has no post step — a post flag there would demand a
+            # confirmation for a write that cannot happen
             spec = TaskSpec(kind=kind, mode=mode, repo=alias, issue=number,
+                            post=post if kind == "issue_answer" else False,
                             params={})
         err = validate_spec(spec)
         return IntentResult(clarify=err) if err else IntentResult(spec=spec)
@@ -194,13 +239,13 @@ def pre_parse(text: str, settings) -> IntentResult | None:
     if pr_m and not issue_m and _REVIEW_VERB.search(text):
         spec = TaskSpec(kind="pr_review", mode=mode,
                         repo=settings.default_repo, pr=int(pr_m.group(1)),
-                        params=params)
+                        post=post, params=params)
         return IntentResult(spec=spec)
     if issue_m and not pr_m:
         if _ANSWER_VERB.search(text):
             return IntentResult(spec=TaskSpec(
                 kind="issue_answer", mode=mode, repo=settings.default_repo,
-                issue=int(issue_m.group(1))))
+                issue=int(issue_m.group(1)), post=post))
         if _TRIAGE_VERB.search(text):
             return IntentResult(spec=TaskSpec(
                 kind="issue_filter", mode=mode, repo=settings.default_repo,

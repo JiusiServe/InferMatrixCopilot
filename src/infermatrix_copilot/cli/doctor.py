@@ -71,7 +71,21 @@ def _check_repos(settings) -> tuple[bool, str]:
         return False, ("repo path(s) missing: "
                        + "; ".join(f"{a} -> {p}" for a, p in missing.items())
                        + " — fix: clone the repo(s) or correct REPO_PATHS")
-    return True, f"repo paths exist ({', '.join(sorted(settings.repo_paths))})"
+    detail = f"repo paths exist ({', '.join(sorted(settings.repo_paths))})"
+    # URL routing additionally needs each alias's GitHub identity; a path that
+    # exists but cannot resolve one passes here yet fails the first pasted URL,
+    # so warn (not fail — bare `review pr N` commands never need identity).
+    from ..intent import repo_identity
+
+    unresolved = sorted(a for a in settings.repo_paths
+                        if repo_identity(a, settings) is None)
+    if unresolved:
+        detail += ("; ⚠ GitHub identity unknown for "
+                   + ", ".join(unresolved)
+                   + " — pasted-URL commands cannot route there; fix: set "
+                   'REPO_FULL_NAMES={"<alias>": "<owner>/<repo>"} in .env '
+                   "(or point the checkout's origin remote at GitHub)")
+    return True, detail
 
 
 def _check_playbooks(settings) -> tuple[bool, str]:

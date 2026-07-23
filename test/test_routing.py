@@ -159,3 +159,85 @@ def test_triage_url_with_filter_verb(rsettings):
         "triage https://github.com/vllm-project/vllm-omni/issues/5123",
         llm=NeverLLM(), settings=rsettings)
     assert r.spec and r.spec.kind == "issue_filter" and r.spec.issue == 5123
+
+
+# ---- post intent on the deterministic paths (issue #1) ----------------------
+
+
+def test_url_with_explicit_post_intent_sets_post(rsettings):
+    r = parse_intent(f"review {URL} and post the review to GitHub",
+                     llm=NeverLLM(), settings=rsettings)
+    assert r.spec and r.spec.post is True
+    assert "[post]" in r.spec.describe()
+
+
+def test_url_chinese_post_intent_sets_post(rsettings):
+    r = parse_intent(f"审查 {URL} 并发布评审", llm=NeverLLM(),
+                     settings=rsettings)
+    assert r.spec and r.spec.post is True
+
+
+def test_negated_post_stays_false(rsettings):
+    for cmd in (f"review {URL}, do not post",
+                f"review {URL} without posting anything",
+                f"审查 {URL}，不要发布"):
+        r = parse_intent(cmd, llm=NeverLLM(), settings=rsettings)
+        assert r.spec and r.spec.post is False, cmd
+
+
+def test_plain_url_review_stays_read_only(rsettings):
+    r = parse_intent(f"review {URL}", llm=NeverLLM(), settings=rsettings)
+    assert r.spec and r.spec.post is False
+    r2 = parse_intent(f"review the post-merge state of {URL}",
+                      llm=NeverLLM(), settings=rsettings)
+    assert r2.spec and r2.spec.post is False
+
+
+def test_bare_ref_post_intent_sets_post(rsettings):
+    r = parse_intent("review pr 5156 and post it", llm=NeverLLM(),
+                     settings=rsettings)
+    assert r.spec and r.spec.post is True
+
+
+def test_issue_url_post_intent_sets_post(rsettings):
+    r = parse_intent(
+        "answer https://github.com/vllm-project/vllm-omni/issues/4842 "
+        "and post the reply", llm=NeverLLM(), settings=rsettings)
+    assert r.spec and r.spec.kind == "issue_answer" and r.spec.post is True
+
+
+def test_triage_url_never_carries_post(rsettings):
+    r = parse_intent(
+        "triage https://github.com/vllm-project/vllm-omni/issues/4842 "
+        "and post", llm=NeverLLM(), settings=rsettings)
+    assert r.spec and r.spec.kind == "issue_filter" and r.spec.post is False
+
+
+# ---- repo identity diagnostics (issue #2) -----------------------------------
+
+
+def test_url_mismatch_names_unresolvable_alias(rsettings, tmp_path):
+    rsettings.repo_paths = {"other": str(tmp_path)}  # exists, no git remote
+    rsettings.repo_full_names = {}
+    r = parse_intent("review https://github.com/acme/other/pull/7",
+                     llm=NeverLLM(), settings=rsettings)
+    assert r.needs_clarification
+    assert "identity" in r.clarify and "other" in r.clarify
+    assert 'REPO_FULL_NAMES={"other": "acme/other"}' in r.clarify
+
+
+def test_doctor_repos_warns_on_unresolvable_identity(settings, tmp_path):
+    from infermatrix_copilot.cli.doctor import _check_repos
+    settings.repo_paths = {"myrepo": str(tmp_path)}
+    settings.repo_full_names = {}
+    ok, detail = _check_repos(settings)
+    assert ok, "unknown identity is a warning — URL routing is optional"
+    assert "myrepo" in detail and "REPO_FULL_NAMES" in detail
+
+
+def test_doctor_repos_clean_when_identity_mapped(settings, tmp_path):
+    from infermatrix_copilot.cli.doctor import _check_repos
+    settings.repo_paths = {"myrepo": str(tmp_path)}
+    settings.repo_full_names = {"myrepo": "acme/myrepo"}
+    ok, detail = _check_repos(settings)
+    assert ok and "⚠" not in detail
