@@ -341,7 +341,7 @@ infermatrix-copilot --resume                           # 从首个未完成 step
 - **改交付/评审行为前先看 trace 取证**:评测教训是裁判扣分约九成来自机械
   交付问题而非分析能力;先读 `eval/dataset/judgments/T3_FORENSICS.md`。
 
-## 12. 第三条数据流 —— MCP 服务端(Claude Code / Codex → 只读工具)
+## 12. 第三条数据流 —— MCP 服务端(Claude Code / Codex / Cursor → 只读工具)
 
 叠在核心之上、面向宿主的一条独立入口。宿主非交互(无 `[y/N]`),所以"宿主
 不能放大权限"必须是**结构性**保证,且不能依赖磁盘上 `request.json` 未被同用户
@@ -371,8 +371,8 @@ infermatrix-copilot --resume                           # 从首个未完成 step
   解释器拉起 `--execute-reserved` 子进程。CLI 主路径(`run_task`)不变:仍在建
   run 目录**前**过门,弃用计划不落目录;预约(先建目录后规划)是 MCP 专属形状。
 - 打包:`plugin/`(`.claude-plugin/plugin.json` + 根 `.mcp.json`)、根
-  `.claude-plugin/marketplace.json`、`docs/codex/config.toml`;安装说明见
-  `doc/MCP.md`。`mcp` 依赖在 `[mcp]` extra 后,独立 CLA 安装保持零依赖。由
+  `.claude-plugin/marketplace.json`、`docs/codex/config.toml`、
+  `docs/cursor/mcp.json`;安装说明见 `doc/MCP.md`。`mcp` 依赖在 `[mcp]` extra 后,独立 CLA 安装保持零依赖。由
   `test_mcp.py` 固定(篡改防御、单写者对账、分页、只读工具集)。
 
 ## 附录:文件 → 段落(完整索引)

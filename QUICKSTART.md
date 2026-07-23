@@ -166,7 +166,7 @@ Repo knowledge lives at the edge in `adapters/<repo>/` (human-gated
 `manifest.yaml` + agent-established, evidence-gated `profile/`) — never in
 `src/`. `PROFILE_BRIEFING_ENABLED=0` runs the {no-profile} eval ablation arm.
 
-## 10. Advanced: MCP server (Claude Code / Codex)
+## 10. Advanced: MCP server (Claude Code / Codex / Cursor)
 
 ```bash
 pip install -e '.[mcp]'      # optional extra, kept out of the base install

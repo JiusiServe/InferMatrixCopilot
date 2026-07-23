@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "infermatrix-copilot": {
+      "command": "infermatrix-copilot-mcp",
+      "args": []
+    }
+  }
+}

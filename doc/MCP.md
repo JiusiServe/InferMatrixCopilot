@@ -1,4 +1,4 @@
-# MCP integration — Claude Code & Codex
+# MCP integration — Claude Code, Codex & Cursor
 
 The copilot ships an **MCP stdio server** (`infermatrix-copilot-mcp`, module
 `src/infermatrix_copilot/mcp_server.py`) that exposes its **read-only** task kinds to
@@ -65,6 +65,21 @@ Add the block from `docs/codex/config.toml` to `~/.codex/config.toml`. Secrets a
 forwarded **by name** via `env_vars` (read from your shell), not pasted as
 literal values.
 
+## Cursor
+
+Merge `docs/cursor/mcp.json` into `~/.cursor/mcp.json` (all projects) or
+`<project>/.cursor/mcp.json` (one project), then enable the server under
+Cursor Settings → MCP. Same prerequisite as the other hosts: the package must
+already be on PATH.
+
+Note the config deliberately has **no `env` block**: Cursor does not expand
+`${VAR}` references in `env` values, and pasting literal secrets into
+`mcp.json` is not acceptable. The server instead reads credentials from your
+shell environment or from the checkout's `.env` (a local
+`pip install -e '.[mcp]'` finds the repo `.env` regardless of cwd — the same
+resolution `doctor` uses). If Cursor was launched from a GUI session that
+lacks your shell env, the local-checkout `.env` path is the one that works.
+
 ## Safety model (why the host cannot widen permissions)
 
 - **Structural read-only.** `enforce_mcp_policy` runs at the boundary AND
@@ -78,7 +93,8 @@ literal values.
   written by one process at a time under an advisory lock; a run always reaches a
   terminal state — via the child, the parent after `.wait()`, or ownership-aware
   reconciliation (lazy-at-read / startup) for runs orphaned by a server death.
-- **Multi-server safe.** Claude Code and Codex may each launch a server; runs
+- **Multi-server safe.** Multiple hosts (Claude Code, Codex, Cursor) may each
+  launch a server; runs
   carry `owner_server_id`/`owner_server_pid`/`child_pid`, and a server reconciles
   only runs whose owner is confirmed dead — never another live server's queued
   run. (The queue serializes one server process; machine-wide serialization would
