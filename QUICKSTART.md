@@ -196,5 +196,3 @@ Deeper reading: [`doc/DESIGN.md`](doc/DESIGN.md) ·
 [`doc/CODE_TOUR.md`](doc/CODE_TOUR.md) ·
 [`doc/IMPLEMENTATION_STATUS.md`](doc/IMPLEMENTATION_STATUS.md) ·
 [`doc/SPEC/`](doc/SPEC/README.md) · [`doc/MCP.md`](doc/MCP.md)
-</content>
-</invoke>
