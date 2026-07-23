@@ -4,7 +4,7 @@ The copilot's repo knowledge is a **vendored adaptation** of the human-curated
 common knowledge base **zuiho-kai/claude-workflow-starter-private**. The original
 tree was imported at `f2dc8248f62fa590c9bae13f92492a175a7c3c32`; common rules are
 currently synchronized through private `master @
-e423b8d92a3b7568d9b5feca6e648db105ed8a7c`. They are maintained **in this repo**
+957def45e26e01471168e6edfe1e0beeeba0b924`. They are maintained **in this repo**
 as ordinary tracked files at the repo-root **`knowledge/`**
 (= `settings.knowledge_dir`).
 
@@ -23,7 +23,7 @@ extensions merely because they are absent from the common source.
 - Original public source: https://github.com/zuiho-kai/claude-workflow-starter
 - Imported from commit: `f2dc8248f62fa590c9bae13f92492a175a7c3c32` (2026-07-13)
 - Common baseline synchronized through:
-  `e423b8d92a3b7568d9b5feca6e648db105ed8a7c` (2026-07-23)
+  `957def45e26e01471168e6edfe1e0beeeba0b924` (2026-07-23)
 - **Authorization:** the author (zuiho) authorized copying the content into this
   repo for local use and reorganization; confirmed by the repo owner (Taichang
   Zhou) on 2026-07-16 — "we can also copy there contents as our local content,
