@@ -21,6 +21,7 @@ import yaml
 
 from ..config import Settings, TierNotConfiguredError
 from ..engine.executor import Executor
+from ..engine.lifecycle import RunLock, RunLockHeld, run_guarded
 from ..engine.planner import Planner, PlanningError, Resolution
 from ..engine.registry import StepRegistry
 from ..engine.steps import register_builtin_steps
@@ -267,7 +268,19 @@ class Copilot:
                 state["high_risk_modules"] = adapter.high_risk_modules
         executor = Executor(self.registry, self.settings, run_dir=run_dir,
                             trace=trace, llm=self.llm, notifier=notifier)
-        outcome = asyncio.run(executor.run(playbook, state))
+        try:
+            lock = RunLock(run_dir).acquire()
+        except RunLockHeld as exc:
+            print(style("✋ ", "red", "bold") + str(exc))
+            return BLOCKED_EXIT
+        try:
+            # run_guarded finalizes inside the event loop: playbooks that
+            # register run finalizers (lifecycle.register_finalizer) get
+            # teardown on every exit path. Nothing registered == no-op.
+            outcome = asyncio.run(
+                run_guarded(executor.run(playbook, state), run_dir))
+        finally:
+            lock.release()
 
         if self.settings.metrics_enabled:
             try:  # metrics are facts about the run; never let them break it
