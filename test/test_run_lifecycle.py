@@ -60,6 +60,40 @@ def test_run_lock_reacquirable_after_release(tmp_path):
         pass  # no raise
 
 
+def test_run_lock_excludes_across_processes(tmp_path):
+    """The lock's whole point is cross-process exclusion (two --resume
+    invocations), so contend against a real second process holding the flock."""
+    import subprocess
+    import sys
+    import time
+
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    holder = subprocess.Popen(
+        [sys.executable, "-c",
+         "import fcntl,sys,time; f=open(sys.argv[1],'w'); "
+         "fcntl.flock(f, fcntl.LOCK_EX); print('held',flush=True); time.sleep(30)",
+         str(run_dir / ".lock")],
+        stdout=subprocess.PIPE, text=True)
+    try:
+        assert holder.stdout.readline().strip() == "held"
+        with pytest.raises(RunLockHeld):
+            RunLock(run_dir).acquire()
+    finally:
+        holder.kill()
+        holder.wait()
+    time.sleep(0.05)  # kernel releases the flock with the process
+    RunLock(run_dir).acquire().release()
+
+
+def test_run_lock_degrades_without_fcntl(tmp_path, monkeypatch):
+    """Non-POSIX platforms have no fcntl (run_status.py precedent): the lock
+    becomes a no-op rather than an import error or a crash at acquire."""
+    monkeypatch.setattr(lifecycle, "fcntl", None)
+    lock = RunLock(tmp_path / "run").acquire()  # no raise, no lock file needed
+    lock.release()
+
+
 # -- finalizer hook point ------------------------------------------------------
 
 def test_finalize_is_noop_when_nothing_registered(tmp_path):
@@ -111,6 +145,28 @@ def test_finalizers_run_exactly_once(tmp_path):
     asyncio.run(lifecycle.finalize(run_dir, "x"))
     asyncio.run(lifecycle.finalize(run_dir, "y"))  # consumed: second is a no-op
     assert seen == ["x"]
+
+
+def test_cancelled_finalizer_never_masks_the_outcome(tmp_path):
+    """CancelledError is a BaseException: a finalizer that trips on an
+    already-cancelled task must not mask the run's outcome or skip siblings."""
+    run_dir = tmp_path / "run"
+    ran = []
+
+    async def cancelled(outcome):
+        raise asyncio.CancelledError()
+
+    async def good(outcome):
+        ran.append(True)
+
+    lifecycle.register_finalizer(run_dir, cancelled)
+    lifecycle.register_finalizer(run_dir, good)
+
+    async def work():
+        return "ok"
+
+    assert asyncio.run(run_guarded(work(), run_dir)) == "ok"
+    assert ran == [True]
 
 
 def test_finalizer_exception_never_masks_the_outcome(tmp_path):

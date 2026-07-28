@@ -240,64 +240,67 @@ class Copilot:
         status. `resuming` seeds the state so steps can pick up where they left
         off. Returns the exit code (0 done, BLOCKED_EXIT blocked, else 1)."""
         self.last_run_dir = run_dir
-        from .. import tracing
-        tracing.init(run_dir.name, run_dir / "trace.jsonl")
-        # Stamp the workflow into the span file itself, so a trace lifted out of
-        # its run directory still says which playbook and task produced it.
-        tracing.run_meta(playbook=f"{playbook.name}@{playbook.version}",
-                         task_kind=spec.kind, repo=spec.repo, tier=tier,
-                         mode=spec.mode, resolution=resolution_mode,
-                         report_only=spec.report_only, post=spec.post,
-                         resuming=resuming, params=spec.params)
-        trace = RunTrace(run_dir / "run_trace.jsonl")
-        notifier = Notifier(self.settings, run_dir, trace, run_dir.name)
-        trace.record("task", spec=spec.model_dump(), resolution=resolution_mode,
-                     playbook=playbook.name, tier=tier)
-        state: dict = {
-            "task_spec": spec.model_dump(),
-            "repo_path": self._resolve_repo_path(spec.repo),
-            "push_policy": PushPolicy(),  # steps may replace with a derived policy
-            "protected_branches": self.settings.protected_branches,
-            "resuming": resuming,
-        }
-        adapter = self._adapter_for(spec.repo)
-        if adapter is not None:
-            # repo knowledge from the adapter, not core settings (v2 P0 fix #5)
-            state["protected_branches"] = adapter.protected_branches
-            if adapter.high_risk_modules:
-                state["high_risk_modules"] = adapter.high_risk_modules
-        executor = Executor(self.registry, self.settings, run_dir=run_dir,
-                            trace=trace, llm=self.llm, notifier=notifier)
         try:
+            # First, before any trace/status write: a losing concurrent
+            # invocation (second --resume, duplicate execute_reserved) must
+            # leave the active run's artifacts completely untouched.
             lock = RunLock(run_dir).acquire()
         except RunLockHeld as exc:
             print(style("✋ ", "red", "bold") + str(exc))
             return BLOCKED_EXIT
         try:
+            from .. import tracing
+            tracing.init(run_dir.name, run_dir / "trace.jsonl")
+            # Stamp the workflow into the span file itself, so a trace lifted out of
+            # its run directory still says which playbook and task produced it.
+            tracing.run_meta(playbook=f"{playbook.name}@{playbook.version}",
+                             task_kind=spec.kind, repo=spec.repo, tier=tier,
+                             mode=spec.mode, resolution=resolution_mode,
+                             report_only=spec.report_only, post=spec.post,
+                             resuming=resuming, params=spec.params)
+            trace = RunTrace(run_dir / "run_trace.jsonl")
+            notifier = Notifier(self.settings, run_dir, trace, run_dir.name)
+            trace.record("task", spec=spec.model_dump(), resolution=resolution_mode,
+                         playbook=playbook.name, tier=tier)
+            state: dict = {
+                "task_spec": spec.model_dump(),
+                "repo_path": self._resolve_repo_path(spec.repo),
+                "push_policy": PushPolicy(),  # steps may replace with a derived policy
+                "protected_branches": self.settings.protected_branches,
+                "resuming": resuming,
+            }
+            adapter = self._adapter_for(spec.repo)
+            if adapter is not None:
+                # repo knowledge from the adapter, not core settings (v2 P0 fix #5)
+                state["protected_branches"] = adapter.protected_branches
+                if adapter.high_risk_modules:
+                    state["high_risk_modules"] = adapter.high_risk_modules
+            executor = Executor(self.registry, self.settings, run_dir=run_dir,
+                                trace=trace, llm=self.llm, notifier=notifier)
             # run_guarded finalizes inside the event loop: playbooks that
             # register run finalizers (lifecycle.register_finalizer) get
             # teardown on every exit path. Nothing registered == no-op.
             outcome = asyncio.run(
                 run_guarded(executor.run(playbook, state), run_dir))
+
+            if self.settings.metrics_enabled:
+                try:  # metrics are facts about the run; never let them break it
+                    from ..metrics import collect_run_metrics
+                    m = collect_run_metrics(run_dir, self.settings, outcome.status)
+                    print(format_metrics_line(m, run_dir))
+                except Exception as exc:
+                    trace.record("metrics_error", error=f"{type(exc).__name__}: {exc}")
+
+            for step_id, r in outcome.step_results.items():
+                mark = style("✓", "green") if r.ok else style("✗", "red", "bold")
+                print(f"  {mark} {step_id}: {r.summary}")
+            print(f"run {run_dir.name}: {outcome.status}  ({run_dir})")
+            if outcome.status == "blocked":
+                print(style("  ⚠ ", "yellow", "bold") + f"{outcome.blocked_reason}\n  see {run_dir / 'ESCALATION.md'}")
+                return BLOCKED_EXIT
+            return 0 if outcome.status == "done" else 1
         finally:
             lock.release()
-
-        if self.settings.metrics_enabled:
-            try:  # metrics are facts about the run; never let them break it
-                from ..metrics import collect_run_metrics
-                m = collect_run_metrics(run_dir, self.settings, outcome.status)
-                print(format_metrics_line(m, run_dir))
-            except Exception as exc:
-                trace.record("metrics_error", error=f"{type(exc).__name__}: {exc}")
-
-        for step_id, r in outcome.step_results.items():
-            mark = style("✓", "green") if r.ok else style("✗", "red", "bold")
-            print(f"  {mark} {step_id}: {r.summary}")
-        print(f"run {run_dir.name}: {outcome.status}  ({run_dir})")
-        if outcome.status == "blocked":
-            print(style("  ⚠ ", "yellow", "bold") + f"{outcome.blocked_reason}\n  see {run_dir / 'ESCALATION.md'}")
-            return BLOCKED_EXIT
-        return 0 if outcome.status == "done" else 1
 
     def run_queue(self, specs: list[TaskSpec], *, assume_yes: bool = False,
                   plan_only: bool = False) -> int:

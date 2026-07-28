@@ -17,10 +17,14 @@ processes:
 from __future__ import annotations
 
 import asyncio
-import fcntl
 import os
 from pathlib import Path
 from typing import Any, Awaitable, Callable
+
+try:  # same guard as run_status.py: fcntl is POSIX-only
+    import fcntl
+except ImportError:  # pragma: no cover - Windows
+    fcntl = None  # type: ignore
 
 Finalizer = Callable[[Any], Awaitable[None]]
 
@@ -44,6 +48,8 @@ class RunLock:
         self._fd: int | None = None
 
     def acquire(self) -> "RunLock":
+        if fcntl is None:  # non-POSIX: no advisory locking; keep runs working
+            return self
         self.path.parent.mkdir(parents=True, exist_ok=True)
         fd = os.open(self.path, os.O_CREAT | os.O_RDWR, 0o644)
         try:
@@ -83,7 +89,10 @@ async def finalize(run_dir: Path, outcome: Any) -> None:
     for fn in _finalizers.pop(str(Path(run_dir)), []):
         try:
             await fn(outcome)
-        except Exception:
+        except (Exception, asyncio.CancelledError):
+            # CancelledError is BaseException: without naming it, a finalizer
+            # awaiting an already-cancelled task would mask the run's outcome
+            # and skip its siblings.
             pass
 
 
