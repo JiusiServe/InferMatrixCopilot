@@ -145,6 +145,21 @@ class GpuLock:
         self.release()
 
 
+def visible_devices(spec: str) -> list[str]:
+    """CUDA-aware device-list parsing: negative entries are CUDA's
+    hide-everything sentinel (`CUDA_VISIBLE_DEVICES=-1`), not devices —
+    textual comma-counting would report one GPU and run gated jobs."""
+    out = []
+    for d in spec.split(","):
+        d = d.strip()
+        if not d:
+            continue
+        if d.lstrip("-").isdigit() and int(d) < 0:
+            return []  # a negative sentinel invalidates the selection
+        out.append(d)
+    return out
+
+
 def _pid_alive(pid: int) -> bool:
     try:
         os.kill(pid, 0)
@@ -200,7 +215,7 @@ def cleanup_orphan_gpu_procs(devices: str, *,
         return 0
     kill = kill or (lambda pid, sig: os.kill(pid, sig))
     own = {os.getpid(), os.getppid()}
-    idxs = [d for d in devices.split(",") if d.strip()]
+    idxs = visible_devices(devices)
 
     killed = 0
     for idx in idxs:
@@ -234,7 +249,7 @@ def wait_gpu_memory_idle(devices: str, *, max_usage_frac: float = 0.10,
     a warning, never fatal (shell parity). Returns True when idle was reached."""
     if not devices or (run is _run and shutil.which("nvidia-smi") is None):
         return True
-    idxs = [d for d in devices.split(",") if d.strip()]
+    idxs = visible_devices(devices)
     waited = 0.0
     while waited < timeout_sec:
         all_idle = True

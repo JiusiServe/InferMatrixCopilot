@@ -26,7 +26,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from .gpu_lock import GpuLock, cleanup_orphan_gpu_procs, wait_gpu_memory_idle
+from .gpu_lock import (GpuLock, cleanup_orphan_gpu_procs, visible_devices,
+                       wait_gpu_memory_idle)
 from .watchdog import LogWatchdog, WatchdogPatterns
 
 PY_TIMEOUT_MARGIN_SEC = 900  # safety margin; must fire strictly after primary
@@ -273,7 +274,7 @@ class TestRunner:
         run_env = {**env, **job.env}
         if "CUDA_VISIBLE_DEVICES" in run_env:
             job_cuda = run_env["CUDA_VISIBLE_DEVICES"]
-            avail = len([d for d in job_cuda.split(",") if d.strip()])
+            avail = len(visible_devices(job_cuda))
         else:
             job_cuda = self.cuda
             avail = self.available_gpus()
@@ -316,10 +317,13 @@ class TestRunner:
 
             # cov-strip fallback: only for the specific argparse failure, and
             # only when the PRIMARY attempt printed it — setup output must
-            # not turn an unrelated failure into a cov retry and false pass
-            if rc != 0 and self._log_has(log_file,
-                                         r"unrecognized arguments: .*--cov",
-                                         from_offset=primary_offset):
+            # not turn an unrelated failure into a cov retry and false pass.
+            # A fatal primary (watchdog kill, timeout) never qualifies: those
+            # outcomes must not be overwritten by a passing fallback.
+            if rc != 0 and not wd_hit and not timed_out \
+                    and self._log_has(log_file,
+                                      r"unrecognized arguments: .*--cov",
+                                      from_offset=primary_offset):
                 fallback = strip_cov_flags(job.command)
                 if fallback != job.command:
                     with open(log_file, "a", encoding="utf-8") as f:

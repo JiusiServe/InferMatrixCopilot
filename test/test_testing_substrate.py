@@ -859,6 +859,34 @@ def test_setup_cov_noise_never_triggers_fallback(runner, tmp_path):
     assert "[coverage-fallback]" not in log
 
 
+def test_cuda_minus_one_hides_all_devices(runner, tmp_path):
+    from infermatrix_copilot.testing.gpu_lock import visible_devices
+    assert visible_devices("-1") == []
+    assert visible_devices("0,1") == ["0", "1"]
+    assert visible_devices("") == []
+    out = runner.run(TestJob(key="hidden", command="true", timeout_sec=10,
+                             min_gpus=1, index=26,
+                             env={"CUDA_VISIBLE_DEVICES": "-1"}),
+                     dict(os.environ))
+    assert out.skipped  # -1 is zero devices, not one
+
+
+def test_fatal_primary_never_enters_cov_fallback(runner, tmp_path):
+    """A watchdog-killed primary must keep its fatal outcome even when the
+    log happens to contain the cov-argparse line — a passing fallback must
+    not mint a pass marker over a CUDA OOM."""
+    log = tmp_path / "tests" / "27_fatal.log"
+    job = TestJob(
+        key="fatal", timeout_sec=30, min_gpus=0, index=27,
+        command=(f"echo 'ERROR: unrecognized arguments: --cov=x' >> {log}\n"
+                 f"echo 'CUDA out of memory' >> {log}\n"
+                 f"sleep 30"))
+    out = runner.run(job, dict(os.environ))
+    assert out.watchdog_triggered and out.rc != 0
+    assert "[coverage-fallback]" not in log.read_text()
+    assert not (tmp_path / "tests" / ".passed_fatal").exists()
+
+
 def test_failing_recorder_never_suppresses_a_kill(tmp_path, patterns):
     """Telemetry is best-effort: a recorder raising (full disk) must not
     leave a reviewer-confirmed KILL unexecuted."""
