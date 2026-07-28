@@ -47,6 +47,7 @@ def test_save_progress_crash_leaves_old_checkpoint(executor, monkeypatch):
 # -- same-run lock -------------------------------------------------------------
 
 def test_run_lock_excludes_second_holder(tmp_path):
+    pytest.importorskip("fcntl")  # exclusion exists only where flock does
     run_dir = tmp_path / "run"
     with RunLock(run_dir):
         with pytest.raises(RunLockHeld):
@@ -224,6 +225,7 @@ def test_duplicate_execute_reserved_leaves_status_untouched(settings, tmp_path):
     """The reserved-run race: a duplicate child losing the lock must return
     BLOCKED_EXIT without rewriting child_pid or marking run_status.json — a
     poller must never observe a terminal state while the winner is running."""
+    pytest.importorskip("fcntl")  # exclusion exists only where flock does
     import json as _json
 
     from infermatrix_copilot import run_status as rs
