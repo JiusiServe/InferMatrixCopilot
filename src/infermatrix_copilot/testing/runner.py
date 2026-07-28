@@ -1,0 +1,362 @@
+"""Single-test executor — port of test_runner.sh's `run_ci_cmd_with_watchdog`
+(local mode; remote-exec was retired with the shell layer).
+
+Timeout layering (invariant, pinned by tests): the **primary** timer fires at
+`job.timeout_sec` and kills the whole process group (the shell's `timeout(1)`
+only killed the direct child, leaving pytest workers holding GPU memory — the
+outer Python killpg existed to reap them; here one timer does both). The
+watchdog may kill earlier on log patterns. The **safety** timer at
+`timeout_sec + PY_TIMEOUT_MARGIN_SEC` fires strictly later and SIGKILLs the
+group — it only matters if the primary path itself wedged.
+
+One deliberate divergence from the shell, by design (plan §7): a hardware
+gate produces an explicit `skipped` outcome instead of the shell's rc=0,
+which inflated pass counts and marked never-run tests complete for resume
+(`phase3._shell_skipped` existed to undo that).
+"""
+
+from __future__ import annotations
+
+import os
+import re
+import signal
+import subprocess
+import threading
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Callable, Optional
+
+from .gpu_lock import GpuLock, cleanup_orphan_gpu_procs, wait_gpu_memory_idle
+from .watchdog import LogWatchdog, WatchdogPatterns
+
+PY_TIMEOUT_MARGIN_SEC = 900  # safety margin; must fire strictly after primary
+TIMEOUT_RC = 124  # bash `timeout` parity
+
+_COV_STRIP = [  # exact sed-equivalents from test_runner.sh
+    (re.compile(r"\s+--cov=\S+"), ""),
+    (re.compile(r"\s+--cov-branch"), ""),
+    (re.compile(r"\s+--cov-report=\S+"), ""),
+]
+
+# "usable failure signal already captured" — the shell's footer no-op grep
+_SIGNAL_RE = re.compile(
+    r"(=+ .* (passed|failed|error|skipped)|Traceback \(most recent call last\)"
+    r"|^FAILED |^ERROR |short test summary info|pytest\.ExitCode|SystemExit:)",
+    re.M)
+_COLLECTION_RE = re.compile(
+    r"(ERROR: file or directory not found:|ERROR: not found:"
+    r"|collected 0 items|no tests ran)")
+
+
+@dataclass
+class TestJob:
+    """One manifest job: `key` (slug), the shell `command`, optional `setup`
+    (best-effort, output appended), per-job `env` pairs, `timeout_sec`,
+    `min_gpus`, and the display `index` used in the log filename."""
+    __test__ = False  # "Test" prefix is domain naming, not a pytest class
+    key: str
+    command: str
+    timeout_sec: float
+    min_gpus: int = 1
+    env: dict[str, str] = field(default_factory=dict)
+    setup: str = ""
+    index: int = 0
+    hw: str = ""  # informational only — never enforced (shell parity)
+
+
+@dataclass
+class RunPlan:
+    """What would run — returned as-is under dry_run for command-echo parity."""
+    argv: list[str]
+    env_overlay: dict[str, str]
+    timeout_sec: float
+    needs_gpu_lock: bool
+    log_file: str
+    cwd: str
+
+
+@dataclass
+class TestOutcome:
+    rc: int
+    skipped: bool = False
+    skip_reason: str = ""
+    watchdog_triggered: bool = False
+    timed_out: bool = False
+    log_file: str = ""
+    plan: RunPlan | None = None
+
+
+def artifact_suffix(baseline: bool) -> str:
+    return "_main_baseline" if baseline else ""
+
+
+def log_file_for(tests_dir: Path, job: TestJob, *, baseline: bool = False) -> Path:
+    return Path(tests_dir) / (
+        f"{job.index:02d}_{job.key}{artifact_suffix(baseline)}.log")
+
+
+def pass_marker_for(tests_dir: Path, job: TestJob, *, baseline: bool = False) -> Path:
+    return Path(tests_dir) / f".passed_{job.key}{artifact_suffix(baseline)}"
+
+
+def backup_prev_log(log_file: Path) -> None:
+    """Preserve the previous attempt's traceback as `.prev`, truncate the log."""
+    log_file = Path(log_file)
+    try:
+        if log_file.is_file() and log_file.stat().st_size > 0:
+            log_file.with_name(log_file.name + ".prev").write_bytes(
+                log_file.read_bytes())
+        log_file.write_text("")
+    except OSError:
+        pass
+
+
+def append_silent_log_footer(log_file: Path, rc: int, context: str = "primary"
+                             ) -> None:
+    """Postmortem footer when a command failed but the log carries no pytest
+    signal at all. rc=4/5 or collection markers get the actionable
+    COLLECTION/PATH footer instead of the OOM one — sending the debug agent
+    after a hardware ghost for a renamed test path burned real retries."""
+    log_file = Path(log_file)
+    if rc == 0 or not log_file.is_file():
+        return
+    try:
+        text = log_file.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return
+    if text and _SIGNAL_RE.search(text):
+        return
+    bar = "=" * 74
+    p = f"[postmortem/{context}]"
+    if rc in (4, 5) or _COLLECTION_RE.search(text):
+        hits = [ln for ln in text.splitlines()
+                if "ERROR: file or directory not found:" in ln
+                or "ERROR: not found:" in ln][:5]
+        body = "\n".join([
+            "", bar,
+            f"{p} COLLECTION/PATH ERROR — pytest collected no tests (rc={rc})",
+            f"{p}   NOT an OOM/SIGKILL: the test path or marker in the",
+            f"{p}   manifest command matches no file on disk.",
+            f"{p}   Most likely an upstream test rename (e.g. *_expansion.py).",
+            *(f"{p}   {ln}" for ln in hits),
+            f"{p}   FIX: correct the manifest/test path;",
+            f"{p}   do NOT retry on GPU — the outcome will not change.",
+            bar, ""])
+    else:
+        prev = log_file.with_name(log_file.name + ".prev")
+        body = "\n".join([
+            "", bar,
+            f"{p} SILENT EXIT — no pytest/traceback signal captured",
+            f"{p}   rc={rc}  captured_bytes={len(text.encode())}",
+            f"{p}   log_file={log_file}",
+            f"{p} Likely causes: child SIGKILL (OOM / external kill),",
+            f"{p}   stream truncation, or pytest worker crash before",
+            f"{p}   buffered stdout was flushed.",
+            *([f"{p} Previous attempt's log preserved at: {prev}"]
+              if prev.exists() else []),
+            bar, ""])
+    try:
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(body)
+    except OSError:
+        pass
+
+
+def strip_cov_flags(command: str) -> str:
+    for pat, repl in _COV_STRIP:
+        command = pat.sub(repl, command)
+    return command
+
+
+def _exec_wrap(command: str) -> str:
+    return command if "set +e" in command else f"set -e\n{command}"
+
+
+def cleanup_test_artifacts(repo_root: Path, globs: list[str]) -> int:
+    """Delete well-known per-test artifact files at depth 1 of the repo root
+    (never recursive — real fixtures under tests/data must never be touched)."""
+    removed = 0
+    root = Path(repo_root)
+    if not root.is_dir():
+        return 0
+    for pattern in globs:
+        for f in root.glob(pattern):
+            if f.is_file():
+                try:
+                    f.unlink()
+                    removed += 1
+                except OSError:
+                    pass
+    return removed
+
+
+class TestRunner:
+    """Runs `TestJob`s with GPU lock, watchdog, layered timeouts, silent-exit
+    postmortems, the cov-strip fallback, artifact cleanup, and pass markers.
+
+    Collaborators are injectable (`available_gpus`, `patterns`, `review_fn`,
+    `artifact_globs`) so everything tests offline; `dry_run=True` returns the
+    exact `RunPlan` without spawning anything (command-echo parity)."""
+
+    __test__ = False  # "Test" prefix is domain naming, not a pytest class
+
+    def __init__(self, *, repo_root: Path, tests_dir: Path,
+                 patterns: WatchdogPatterns | None = None,
+                 review_fn: Callable[[str, str], str] | None = None,
+                 record_fn: Callable[[str, str, str], None] | None = None,
+                 report_fn: Callable[[str, str, str], None] | None = None,
+                 artifact_globs: list[str] | None = None,
+                 gpu_lock_dir: Path | None = None,
+                 cuda_visible_devices: str = "",
+                 available_gpus: Callable[[], int] | None = None,
+                 watchdog_interval: float = 10.0):
+        self.repo_root = Path(repo_root)
+        self.tests_dir = Path(tests_dir)
+        self.patterns = patterns
+        self.review_fn = review_fn
+        self.record_fn = record_fn
+        self.report_fn = report_fn
+        self.artifact_globs = artifact_globs or []
+        self.gpu_lock_dir = gpu_lock_dir
+        self.cuda = cuda_visible_devices
+        self.available_gpus = available_gpus or (
+            lambda: len([d for d in self.cuda.split(",") if d.strip()]))
+        self.watchdog_interval = watchdog_interval
+
+    def run(self, job: TestJob, env: dict[str, str], *, baseline: bool = False,
+            dry_run: bool = False) -> TestOutcome:
+        log_file = log_file_for(self.tests_dir, job, baseline=baseline)
+        plan = RunPlan(
+            argv=["bash", "-c", _exec_wrap(job.command)],
+            env_overlay=dict(job.env), timeout_sec=job.timeout_sec,
+            needs_gpu_lock=job.min_gpus > 0, log_file=str(log_file),
+            cwd=str(self.repo_root))
+        if dry_run:
+            return TestOutcome(rc=0, log_file=str(log_file), plan=plan)
+
+        # hw gate: explicit skip, never a silent rc=0 pass
+        avail = self.available_gpus()
+        if avail < job.min_gpus:
+            return TestOutcome(
+                rc=0, skipped=True, log_file=str(log_file), plan=plan,
+                skip_reason=f"needs {job.min_gpus} GPU(s), {avail} available")
+
+        self.tests_dir.mkdir(parents=True, exist_ok=True)
+        backup_prev_log(log_file)
+        run_env = {**env, **job.env}
+
+        if job.setup:  # best-effort, output appended (shell parity)
+            with open(log_file, "a", encoding="utf-8") as lf:
+                subprocess.run(["bash", "-c", job.setup], cwd=self.repo_root,
+                               env=run_env, stdout=lf, stderr=lf,
+                               timeout=job.timeout_sec, check=False)
+
+        lock: GpuLock | None = None
+        if job.min_gpus > 0 and self.gpu_lock_dir is not None:
+            lock = GpuLock(self.gpu_lock_dir).acquire()
+        try:
+            rc, wd_hit, timed_out = self._spawn(
+                _exec_wrap(job.command), job, run_env, log_file, append=False)
+        finally:
+            if lock is not None:
+                cleanup_orphan_gpu_procs(self.cuda)
+                wait_gpu_memory_idle(self.cuda)
+                lock.release()
+
+        append_silent_log_footer(log_file, rc, "primary")
+        if wd_hit:
+            rc = rc or 1
+
+        # cov-strip fallback: only for the specific argparse failure
+        if rc != 0 and self._log_has(log_file, r"unrecognized arguments: .*--cov"):
+            fallback = strip_cov_flags(job.command)
+            if fallback != job.command:
+                with open(log_file, "a", encoding="utf-8") as f:
+                    f.write("\n[coverage-fallback] Retrying without --cov "
+                            f"flags:\n{fallback}\n")
+                rc, wd_hit, timed_out = self._spawn(
+                    _exec_wrap(fallback), job, run_env, log_file, append=True)
+                append_silent_log_footer(log_file, rc, "cov-fallback")
+                if wd_hit:
+                    rc = rc or 1
+
+        cleanup_test_artifacts(self.repo_root, self.artifact_globs)
+        if rc == 0:
+            pass_marker_for(self.tests_dir, job, baseline=baseline).touch()
+        return TestOutcome(rc=rc, watchdog_triggered=wd_hit,
+                           timed_out=timed_out, log_file=str(log_file),
+                           plan=plan)
+
+    # -- internals ------------------------------------------------------------
+    def _spawn(self, exec_cmd: str, job: TestJob, env: dict[str, str],
+               log_file: Path, *, append: bool) -> tuple[int, bool, bool]:
+        timed_out = threading.Event()
+        with open(log_file, "a" if append else "w", encoding="utf-8") as lf:
+            proc = subprocess.Popen(["bash", "-c", exec_cmd],
+                                    cwd=self.repo_root, env=env,
+                                    stdout=lf, stderr=lf,
+                                    start_new_session=True)
+            watchdog = None
+            if self.patterns is not None:
+                watchdog = LogWatchdog(
+                    self.patterns, log_file, proc.pid, job.key,
+                    check_interval=self.watchdog_interval,
+                    review_fn=self.review_fn, record_fn=self.record_fn,
+                    report_fn=self.report_fn,
+                    kill_fn=lambda pid: self._killpg(proc, signal.SIGTERM,
+                                                     then_kill=True)).start()
+
+            def primary():
+                timed_out.set()
+                self._killpg(proc, signal.SIGTERM, then_kill=True)
+
+            def safety():  # only matters if the primary path wedged
+                self._killpg(proc, signal.SIGKILL, then_kill=False)
+
+            t_primary = threading.Timer(job.timeout_sec, primary)
+            t_safety = threading.Timer(job.timeout_sec + PY_TIMEOUT_MARGIN_SEC,
+                                       safety)
+            t_primary.start()
+            t_safety.start()
+            try:
+                rc = proc.wait()
+            finally:
+                t_primary.cancel()
+                t_safety.cancel()
+                if watchdog is not None:
+                    watchdog.stop()
+        wd_hit = bool(watchdog is not None and watchdog.result.triggered)
+        if timed_out.is_set():
+            rc = TIMEOUT_RC
+        return rc, wd_hit, timed_out.is_set()
+
+    @staticmethod
+    def _killpg(proc: subprocess.Popen, sig: int, *, then_kill: bool,
+                grace: float = 60.0) -> None:
+        try:
+            pgid = os.getpgid(proc.pid)
+        except ProcessLookupError:
+            return
+        try:
+            os.killpg(pgid, sig)
+        except OSError:
+            return
+        if then_kill:
+            deadline = time.monotonic() + grace
+            while time.monotonic() < deadline:
+                if proc.poll() is not None:
+                    return
+                time.sleep(0.2)
+            try:
+                os.killpg(pgid, signal.SIGKILL)
+            except OSError:
+                pass
+
+    @staticmethod
+    def _log_has(log_file: Path, pattern: str) -> bool:
+        try:
+            return re.search(pattern, Path(log_file).read_text(
+                encoding="utf-8", errors="replace")) is not None
+        except OSError:
+            return False

@@ -1,0 +1,97 @@
+# Watchdog patterns for vllm-omni test runs — data port of test_watchdog.sh's
+# four arrays (Python `re` syntax; tier matching is case-insensitive, noise
+# filtering is case-sensitive, simulation allowlist is fixed-substring — the
+# exact grep semantics of the shell implementation).
+#
+# Tier 1: catastrophic — always kill, no review. Keep conservative: anything a
+# unit test may legitimately simulate belongs in Tier 2 (a single false
+# positive kills pytest mid-run and strands phase 3).
+critical:
+  - "CUDA error"
+  - "CUDA out of memory"
+  - "torch\\.cuda\\.OutOfMemoryError"
+  - "RuntimeError.*NCCL"
+  - "AsyncEngineDeadError"
+  - "EngineDeadError"
+  - "Segmentation fault"
+  - "core dumped"
+  # whole-line Killed only (shell OOM); "was killed by signal 15" is benign
+  - "^\\s*Killed\\s*$"
+  - "Cannot re-initialize CUDA in forked subprocess"
+  - "cuDNN error"
+  - "CUBLAS_STATUS"
+  - "FATAL"
+
+# Tier 2: broad — an eco-tier agent decides KILL vs CONTINUE.
+review:
+  - "Traceback \\(most recent call last\\)"
+  - "Error:"
+  - "Exception:"
+  - "RuntimeError"
+  - "ValueError"
+  - "TypeError"
+  - "AssertionError"
+  - "OSError"
+  - "ConnectionError"
+  - "TimeoutError"
+  - "BrokenPipeError"
+  # unit tests routinely simulate ZMQError (omni_coordinator reconnect tests)
+  - "zmq\\.error\\.ZMQError"
+  - "engine.*error"
+  - "engine.*shutdown"
+  - "engine.*crashed"
+  - "engine.*dead"
+  - "engine process.*died"
+  - "failed to"
+  - "abort"
+  - "panic"
+
+# Fixed substrings: known-good test simulations; never a kill, even on Tier 1.
+simulation_allowlist:
+  - "simulated reconnect failure"
+  - "simulated send failure"
+  - "simulated heartbeat failure"
+  - "transient heartbeat failure"
+  - "Unknown connector: mock"
+  - "EngineDeadError"
+  - "DeadErrorPassthrough"
+  - "test_runtime_error"
+  - "test_inline_check_health_marks_engine_dead"
+  - "marks_engine_dead"
+  - "error_wrapped_in_output"
+  - "--- Running test:"
+  # test_non_fatal_* names match Tier-1 "FATAL" case-insensitively
+  - "non_fatal"
+
+# Regexes (case-sensitive): pytest/python noise stripped before Tier-2 review
+# so a PytestUnknownMarkWarning never costs an agent round-trip.
+noise:
+  - "PytestUnknownMarkWarning"
+  - "PytestCollectionWarning"
+  - "PytestDeprecationWarning"
+  - "PytestCacheWarning"
+  - "PytestConfigWarning"
+  - "PytestAssertRewriteWarning"
+  - "PytestRemovedIn[0-9]+Warning"
+  - "DeprecationWarning"
+  - "PendingDeprecationWarning"
+  - "FutureWarning"
+  - "UserWarning"
+  - "ResourceWarning"
+  - "RuntimeWarning"
+  - "ImportWarning"
+  - "SyntaxWarning"
+  - "You are using a model of type.*to instantiate a model of type"
+  - "Failed to load diffusers config via DiffusionPipeline"
+  - "Shutdown complete"
+  - "Shutdown initiated"
+  - "MultiprocWorkerMonitor: shutdown already initiated"
+  - "gpu_lock.sh.*integer expression expected"
+  - "KeyError: '/loky-"
+
+# Case-insensitive regex over the test name: error-passthrough tests whose
+# names mark intentional failure simulation.
+simulated_test_name: "DeadError|test_runtime_error|test_error.*passthrough|test_error.*wrapped|marks_engine_dead|test_check_health.*dead|test_engine.*dead|test_dead"
+
+# A matched line that is itself a pytest header is identification, not output.
+pytest_header: "tests/.*::.*--- Running test:"
