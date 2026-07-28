@@ -831,6 +831,34 @@ def test_failing_report_writer_never_breaks_the_outcome(runner, tmp_path):
     assert out.watchdog_triggered and out.rc != 0
 
 
+def test_runner_cuda_selection_reaches_the_child(patterns, tmp_path):
+    (tmp_path / "repo").mkdir()
+    r = TestRunner(repo_root=tmp_path / "repo", tests_dir=tmp_path / "tests",
+                   patterns=patterns, cuda_visible_devices="0",
+                   available_gpus=lambda: 1, watchdog_interval=0.05)
+    env = dict(os.environ)
+    env.pop("CUDA_VISIBLE_DEVICES", None)  # base env silent on devices
+    out = r.run(TestJob(key="vis", timeout_sec=10, min_gpus=0, index=24,
+                        command="echo \"child sees: $CUDA_VISIBLE_DEVICES\""),
+                env)
+    assert out.rc == 0
+    log = (tmp_path / "tests" / "24_vis.log").read_text()
+    assert "child sees: 0" in log  # not every host GPU
+
+
+def test_setup_cov_noise_never_triggers_fallback(runner, tmp_path):
+    """Setup printing the cov-argparse line + a primary failing for another
+    reason must NOT retry without coverage (and possibly false-pass)."""
+    job = TestJob(
+        key="covnoise", timeout_sec=15, min_gpus=0, index=25,
+        command="echo 'real failure'; exit 7",
+        setup="echo 'ERROR: unrecognized arguments: --cov=x (setup noise)'")
+    out = runner.run(job, dict(os.environ))
+    assert out.rc == 7  # the real failure, not a fallback result
+    log = (tmp_path / "tests" / "25_covnoise.log").read_text()
+    assert "[coverage-fallback]" not in log
+
+
 def test_failing_recorder_never_suppresses_a_kill(tmp_path, patterns):
     """Telemetry is best-effort: a recorder raising (full disk) must not
     leave a reviewer-confirmed KILL unexecuted."""

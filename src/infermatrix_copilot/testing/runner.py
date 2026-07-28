@@ -277,6 +277,11 @@ class TestRunner:
         else:
             job_cuda = self.cuda
             avail = self.available_gpus()
+            if self.cuda:
+                # the runner's device selection must reach the child too —
+                # gating/cleanup on GPU 0 while the child sees every host
+                # GPU would run and leak on devices we never inspect
+                run_env["CUDA_VISIBLE_DEVICES"] = self.cuda
 
         # hw gate: explicit skip, never a silent rc=0 pass
         if avail < job.min_gpus:
@@ -299,15 +304,22 @@ class TestRunner:
             # append: backup_prev_log already truncated this attempt's log,
             # and truncating again here (shell parity: main command used `>`)
             # would discard the setup output and any setup-failure diagnostic
+            try:
+                primary_offset = log_file.stat().st_size
+            except OSError:
+                primary_offset = 0
             rc, wd_hit, timed_out = self._spawn(
                 _exec_wrap(job.command), job, run_env, log_file, append=True)
             append_silent_log_footer(log_file, rc, "primary")
             if wd_hit:
                 rc = rc or 1
 
-            # cov-strip fallback: only for the specific argparse failure
+            # cov-strip fallback: only for the specific argparse failure, and
+            # only when the PRIMARY attempt printed it — setup output must
+            # not turn an unrelated failure into a cov retry and false pass
             if rc != 0 and self._log_has(log_file,
-                                         r"unrecognized arguments: .*--cov"):
+                                         r"unrecognized arguments: .*--cov",
+                                         from_offset=primary_offset):
                 fallback = strip_cov_flags(job.command)
                 if fallback != job.command:
                     with open(log_file, "a", encoding="utf-8") as f:
@@ -490,11 +502,15 @@ class TestRunner:
         _kill_group(pgid, signal.SIGKILL)
 
     @staticmethod
-    def _log_has(log_file: Path, pattern: str) -> bool:
-        """Streaming line search (the shell's grep) — never whole-file."""
+    def _log_has(log_file: Path, pattern: str, *,
+                 from_offset: int = 0) -> bool:
+        """Streaming line search (the shell's grep) — never whole-file.
+        `from_offset` restricts the scan to one attempt's own region."""
         rx = re.compile(pattern)
         try:
             with open(log_file, encoding="utf-8", errors="replace") as f:
+                if from_offset:
+                    f.seek(from_offset)
                 return any(rx.search(line) for line in f)
         except OSError:
             return False
