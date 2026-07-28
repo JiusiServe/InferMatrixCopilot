@@ -248,12 +248,15 @@ class TestRunner:
         marker = pass_marker_for(self.tests_dir, job, baseline=baseline)
         marker.unlink(missing_ok=True)
 
-        # a job may redirect itself to other GPUs via its env pairs — gate on
-        # and clean up the devices it will actually use, not the runner's
-        job_cuda = job.env.get("CUDA_VISIBLE_DEVICES", self.cuda)
-        if "CUDA_VISIBLE_DEVICES" in job.env:
+        # gate on and clean up the devices the child will ACTUALLY see: the
+        # effective env is {**env, **job.env}, and either layer may redirect
+        # CUDA_VISIBLE_DEVICES away from the runner's own view
+        run_env = {**env, **job.env}
+        if "CUDA_VISIBLE_DEVICES" in run_env:
+            job_cuda = run_env["CUDA_VISIBLE_DEVICES"]
             avail = len([d for d in job_cuda.split(",") if d.strip()])
         else:
+            job_cuda = self.cuda
             avail = self.available_gpus()
 
         # hw gate: explicit skip, never a silent rc=0 pass
@@ -263,7 +266,6 @@ class TestRunner:
                 skip_reason=f"needs {job.min_gpus} GPU(s), {avail} available")
 
         backup_prev_log(log_file)
-        run_env = {**env, **job.env}
 
         if job.setup:
             self._run_setup(job, run_env, log_file)
@@ -325,19 +327,29 @@ class TestRunner:
                                         cwd=self.repo_root, env=env,
                                         stdout=lf, stderr=lf,
                                         start_new_session=True)
+                # pgid is captured while the leader is certainly alive: the
+                # group must be killable even after the leader exits, or a
+                # TERM-ignoring background child survives into the main test
+                try:
+                    pgid = os.getpgid(proc.pid)
+                except ProcessLookupError:
+                    pgid = proc.pid
                 try:
                     rc = proc.wait(timeout=job.timeout_sec)
                     if rc != 0:
                         note = f"[setup] ignored failure: rc={rc}"
                 except subprocess.TimeoutExpired:
-                    self._killpg(proc, signal.SIGTERM)
+                    _kill_group(pgid, signal.SIGTERM)
                     try:
                         proc.wait(timeout=10)
                     except subprocess.TimeoutExpired:
-                        self._killpg(proc, signal.SIGKILL)
-                        proc.wait(timeout=10)
+                        pass
                     note = (f"[setup] ignored failure: timeout after "
                             f"{job.timeout_sec}s (process group killed)")
+                finally:
+                    # unconditional group KILL: the leader exiting promptly
+                    # must not spare children that ignored the TERM
+                    _kill_group(pgid, signal.SIGKILL)
         except OSError as exc:
             note = f"[setup] ignored failure: {type(exc).__name__}: {exc}"
         if note:
@@ -426,3 +438,11 @@ class TestRunner:
                 encoding="utf-8", errors="replace")) is not None
         except OSError:
             return False
+
+
+def _kill_group(pgid: int, sig: int) -> None:
+    """killpg by a pre-captured pgid — usable after the leader has exited."""
+    try:
+        os.killpg(pgid, sig)
+    except OSError:
+        pass

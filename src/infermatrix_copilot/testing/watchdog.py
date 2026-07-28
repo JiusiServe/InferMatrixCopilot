@@ -126,6 +126,11 @@ class LogWatchdog:
     def check_once(self) -> bool:
         """Inspect the log tail once. Returns True when the watchdog killed
         (the caller's loop should stop)."""
+        if self.result.triggered:
+            # the kill marker we append grows the log, so without this guard
+            # the caller's final scan would rediscover the same error and
+            # kill/record/report a second time
+            return True
         if not self.log_file.exists():
             return False
         size = self.log_file.stat().st_size

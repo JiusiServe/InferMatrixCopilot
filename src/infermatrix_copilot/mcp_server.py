@@ -124,7 +124,7 @@ class CopilotMCP:
                 **popen_kwargs,
             )
             proc.wait()
-        rs.reconcile_after_wait(run_dir)
+        rs.reconcile_after_wait(run_dir, child_pid=proc.pid)
 
     # -- start (reserve + enqueue) -------------------------------------------
     def start(self, spec_dict: dict) -> str:

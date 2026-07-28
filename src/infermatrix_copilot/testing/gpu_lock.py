@@ -74,48 +74,48 @@ class GpuLock:
     def _steal_if_stale(self) -> bool:
         """Steal a dead owner's lock without ever unlinking a live one.
 
-        Staleness is judged from the LOCK file itself (authoritative — the
-        owner file lags it). The steal is an atomic rename to a private name,
-        then the renamed file's content is re-verified: if a live owner's
-        fresh lock was swept up in the race window, it is restored via
-        `os.link` (which fails atomically rather than clobbering a newer
-        lock). Returns True when the caller should retry the create."""
+        All Python-era steals serialize on an flock'd side file (never read
+        by the shell, so protocol compatibility is untouched), and the
+        staleness verdict is re-derived from the LOCK file *inside* that
+        critical section — so between contenders here, verify-then-unlink is
+        atomic and a freshly created live lock can never be swept up (the
+        rename-and-restore dance this replaces could delete a live owner's
+        lock under a three-way race). Shell-era processes never steal through
+        this path; their own steal was unsynchronized, which mixed-era runs
+        inherit as a known, pre-existing exposure. Without fcntl there is no
+        safe steal, so stale locks are simply waited out."""
+        try:
+            import fcntl
+        except ImportError:  # pragma: no cover - Windows
+            return False
+        steal_guard = self.lock_dir / ".steal.flock"
+        with open(steal_guard, "w") as guard:
+            try:
+                fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                return False  # another contender is mid-steal; poll again
+            try:
+                if not self._lock_is_stale():
+                    return False
+                _log(f"GPU lock owner (pid={self._lock_content() or 'unknown'})"
+                     " is dead. Stealing lock.")
+                self.lock_file.unlink(missing_ok=True)
+                return True
+            finally:
+                fcntl.flock(guard, fcntl.LOCK_UN)
+
+    def _lock_is_stale(self) -> bool:
         content = self._lock_content()
         if content is None:
-            return False  # lock vanished; retry create
+            return False  # already vanished; just retry the create
         if content.isdigit():
-            if _pid_alive(int(content)):
-                return False
-        else:
-            # empty/garbled: a writer mid-create, or a crash artifact
-            try:
-                age = time.time() - self.lock_file.stat().st_mtime
-            except OSError:
-                return False
-            if age < self.EMPTY_LOCK_GRACE_SEC:
-                return False
-        claim = self.lock_file.with_name(f".steal.{os.getpid()}")
+            return not _pid_alive(int(content))
+        # empty/garbled: a writer mid-create, or a crash artifact
         try:
-            os.rename(self.lock_file, claim)
+            age = time.time() - self.lock_file.stat().st_mtime
         except OSError:
-            return False  # someone else stole first; retry create
-        try:
-            taken = claim.read_text().strip()
-        except OSError:
-            taken = ""
-        if taken.isdigit() and _pid_alive(int(taken)):
-            # raced a fresh live lock: put it back without clobbering
-            try:
-                os.link(claim, self.lock_file)
-            except OSError:
-                _log(f"GPU lock steal race lost against pid={taken}; "
-                     "could not restore — proceeding as contender")
-            claim.unlink(missing_ok=True)
             return False
-        _log(f"GPU lock owner (pid={taken or 'unknown'}) is dead. "
-             "Stealing lock.")
-        claim.unlink(missing_ok=True)
-        return True
+        return age >= self.EMPTY_LOCK_GRACE_SEC
 
     def release(self) -> None:
         # only unlink a lock file we still own — ours may have been stolen

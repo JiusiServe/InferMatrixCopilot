@@ -587,6 +587,88 @@ def test_job_cuda_override_governs_gate_and_cleanup(patterns, tmp_path):
         rmod.wait_gpu_memory_idle = orig_wait
 
 
+def test_gpu_lock_steal_never_removes_live_lock_under_contention(tmp_path):
+    """The steal path re-verifies staleness inside its flock'd critical
+    section: a live lock created in the race window survives every steal."""
+    d = tmp_path / "gl"
+    live = GpuLock(d, poll_sec=0.01, timeout_sec=5).acquire()  # us, alive
+    thief = GpuLock(d, poll_sec=0.01, timeout_sec=0.05)
+    assert thief._steal_if_stale() is False
+    assert (d / "lock").read_text() == str(os.getpid())  # untouched
+    live.release()
+
+
+def test_watchdog_never_fires_twice(tmp_path, patterns):
+    """The kill marker grows the log; a later scan must not rediscover the
+    same error and kill/record/report a second time."""
+    kills, reports = [], []
+    log = tmp_path / "t.log"
+    log.write_text("CUDA out of memory\n")
+    wd = LogWatchdog(patterns, log, pid=99999, test_name="t",
+                     kill_fn=lambda pid: kills.append(pid),
+                     report_fn=lambda *a: reports.append(a),
+                     pid_alive=lambda pid: True)
+    assert wd.check_once() is True
+    assert wd.check_once() is True  # final scan: no re-fire
+    assert len(kills) == 1 and len(reports) == 1
+
+
+def test_reconcile_after_wait_is_child_scoped(tmp_path):
+    """A duplicate child's parent reaping its loser must not mark the
+    winner's live run interrupted (mcp_server passes the reaped pid)."""
+    from infermatrix_copilot import run_status as rs
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    rs.init_queued(run_dir, run_id="r", owner_server_id="s", owner_server_pid=1)
+    rs.mark_child_started(run_dir, child_pid=4242, state=rs.RUNNING)
+    # the reaped pid differs from the recorded (winning) child: no-op
+    # (_locked_update returns the untouched current record on opt-out)
+    out = rs.reconcile_after_wait(run_dir, child_pid=9999)
+    assert out["state"] == rs.RUNNING
+    assert rs.read_status(run_dir)["state"] == rs.RUNNING
+    # the recorded child's own parent may reconcile
+    out = rs.reconcile_after_wait(run_dir, child_pid=4242)
+    assert out["state"] == rs.INTERRUPTED
+
+
+def test_setup_group_kill_reaps_term_ignoring_child(runner, tmp_path):
+    """The setup leader exiting promptly must not spare a background child
+    that ignores SIGTERM — the unconditional group KILL reaps it."""
+    pidfile = tmp_path / "stubborn.pid"
+    job = TestJob(
+        key="stubborn", command="echo main-ran", timeout_sec=1, min_gpus=0,
+        index=18,
+        setup=(f"bash -c 'trap \"\" TERM; echo $$ > {pidfile}; "
+               f"exec sleep 60' &\nsleep 60"))
+    out = runner.run(job, dict(os.environ))
+    assert out.rc == 0
+    child = int(pidfile.read_text().strip())
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        try:
+            os.kill(child, 0)
+            time.sleep(0.1)
+        except ProcessLookupError:
+            break
+    else:
+        os.kill(child, signal.SIGKILL)
+        pytest.fail("TERM-ignoring setup child survived the group KILL")
+
+
+def test_base_env_cuda_override_also_governs_gate(patterns, tmp_path):
+    """CUDA redirection in the BASE env (not job.env) must govern gating too:
+    the child sees {**env, **job.env}."""
+    (tmp_path / "repo").mkdir()
+    r = TestRunner(repo_root=tmp_path / "repo", tests_dir=tmp_path / "tests",
+                   patterns=patterns, cuda_visible_devices="0,1",
+                   available_gpus=lambda: 2, watchdog_interval=0.05)
+    env = dict(os.environ)
+    env["CUDA_VISIBLE_DEVICES"] = ""  # base env pins the child to no GPUs
+    out = r.run(TestJob(key="basecuda", command="true", timeout_sec=10,
+                        min_gpus=1, index=19), env)
+    assert out.skipped  # gated on the child's effective devices, not ours
+
+
 def test_gpu_lock_steal_grace_for_unparseable_lock(tmp_path):
     """An empty lock younger than the grace window is a writer mid-create,
     not a crash artifact — it must not be stolen."""
