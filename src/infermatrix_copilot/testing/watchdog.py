@@ -106,7 +106,8 @@ class LogWatchdog:
                  kill_fn: Callable[[int], None] | None = None,
                  record_fn: Callable[[str, str, str], None] | None = None,
                  report_fn: Callable[[str, str, str], None] | None = None,
-                 pid_alive: Callable[[int], bool] | None = None):
+                 pid_alive: Callable[[int], bool] | None = None,
+                 start_offset: int = 0):
         self.patterns = patterns
         self.log_file = Path(log_file)
         self.pid = pid
@@ -117,9 +118,13 @@ class LogWatchdog:
         self.record_fn = record_fn or (lambda *a: None)
         self.report_fn = report_fn or (lambda *a: None)
         self.pid_alive = pid_alive or self._default_alive
+        # scope every scan to THIS attempt: bytes before start_offset are
+        # setup or previous-attempt output — a setup that printed 'CUDA out
+        # of memory' must not get a passing main run killed
+        self.start_offset = start_offset
         self.result = WatchdogResult()
         self._stop = threading.Event()
-        self._last_size = 0
+        self._last_size = start_offset
         self._thread: threading.Thread | None = None
 
     # -- one poll cycle, extracted for deterministic tests --
@@ -198,8 +203,14 @@ class LogWatchdog:
         self.kill_fn(self.pid)
         trigger = (f"Critical pattern: `{matched_line}`" if tier == 1
                    else f"Agent-reviewed error: `{matched_line}`")
-        self.report_fn(self.test_name, trigger,
-                       "\n".join(self._tail(REPORT_TAIL_LINES)))
+        try:
+            # report writing is best-effort: an I/O failure here must not
+            # propagate out of the caller's synchronous final scan after the
+            # process is already dead
+            self.report_fn(self.test_name, trigger,
+                           "\n".join(self._tail(REPORT_TAIL_LINES)))
+        except Exception:
+            pass
 
     # backward-chunked tail: bounded I/O per poll without approximating the
     # line count by bytes. The hard cap is the explicit maximum-line policy —
@@ -209,14 +220,15 @@ class LogWatchdog:
     _TAIL_MAX_BYTES = 8 * 1024 * 1024
 
     def _tail(self, n: int) -> list[str]:
+        floor = self.start_offset  # never read into pre-attempt bytes
         try:
             with open(self.log_file, "rb") as f:
                 f.seek(0, 2)
                 pos = f.tell()
                 buf = b""
-                while pos > 0 and buf.count(b"\n") <= n \
+                while pos > floor and buf.count(b"\n") <= n \
                         and len(buf) < self._TAIL_MAX_BYTES:
-                    step = min(self._TAIL_CHUNK, pos)
+                    step = min(self._TAIL_CHUNK, pos - floor)
                     pos -= step
                     f.seek(pos)
                     buf = f.read(step) + buf

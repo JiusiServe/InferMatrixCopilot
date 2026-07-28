@@ -381,6 +381,12 @@ class TestRunner:
     def _spawn(self, exec_cmd: str, job: TestJob, env: dict[str, str],
                log_file: Path, *, append: bool) -> tuple[int, bool, bool]:
         timed_out = threading.Event()
+        # scope this attempt's watchdog to bytes IT produces — setup output
+        # and previous-attempt tails are not this attempt's evidence
+        try:
+            attempt_offset = log_file.stat().st_size if append else 0
+        except OSError:
+            attempt_offset = 0
         with open(log_file, "a" if append else "w", encoding="utf-8") as lf:
             proc = subprocess.Popen(["bash", "-c", exec_cmd],
                                     cwd=self.repo_root, env=env,
@@ -425,7 +431,7 @@ class TestRunner:
                     self.patterns, log_file, proc.pid, job.key,
                     check_interval=self.watchdog_interval,
                     review_fn=self.review_fn, record_fn=self.record_fn,
-                    report_fn=self.report_fn,
+                    report_fn=self.report_fn, start_offset=attempt_offset,
                     kill_fn=lambda pid: _kill_snapshot()).start()
 
             def primary():

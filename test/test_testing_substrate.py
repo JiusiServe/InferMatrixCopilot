@@ -802,6 +802,35 @@ def test_final_scan_kill_reaches_reparented_setsid_child(runner, tmp_path):
         pytest.fail("reparented setsid child survived the snapshot kill")
 
 
+def test_scrub_prefix_collisions_and_cred_suffix_veto():
+    env = {"HOME": "/root", "HOME_TOKEN": "x", "USER": "u",
+           "USER_PASSWORD": "x", "HOST_API_KEY": "x", "PATHS_SECRET": "x",
+           "PYTHON_API_KEY": "x", "PYTHONPATH": "/p",
+           "GIT_CONFIG_COUNT": "1"}
+    out = env_plan.scrub_agent_shell_env(env)
+    assert set(out) == {"HOME", "USER", "PYTHONPATH", "GIT_CONFIG_COUNT"}
+
+
+def test_watchdog_scoped_to_attempt_ignores_setup_output(runner, tmp_path):
+    """A best-effort setup printing a critical line must not get a passing
+    main run killed: each attempt's watchdog starts at its own log offset."""
+    job = TestJob(key="setupnoise", command="echo fine; true", timeout_sec=15,
+                  min_gpus=0, index=22,
+                  setup="echo 'CUDA out of memory (from setup, harmless)'")
+    out = runner.run(job, dict(os.environ))
+    assert out.rc == 0 and not out.watchdog_triggered
+    assert (tmp_path / "tests" / ".passed_setupnoise").exists()
+
+
+def test_failing_report_writer_never_breaks_the_outcome(runner, tmp_path):
+    runner.report_fn = lambda *a: (_ for _ in ()).throw(OSError("disk full"))
+    log = tmp_path / "tests" / "23_rep.log"
+    job = TestJob(key="rep", timeout_sec=30, min_gpus=0, index=23,
+                  command=f"echo 'CUDA out of memory' >> {log}; sleep 30")
+    out = runner.run(job, dict(os.environ))  # no exception escapes
+    assert out.watchdog_triggered and out.rc != 0
+
+
 def test_failing_recorder_never_suppresses_a_kill(tmp_path, patterns):
     """Telemetry is best-effort: a recorder raising (full disk) must not
     leave a reviewer-confirmed KILL unexecuted."""
