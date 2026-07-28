@@ -13,18 +13,24 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-# Credential material the agent shell must not see. Fail-closed: any name
-# shaped like a credential is stripped (that includes this repo's own
-# per-tier ECO_API_KEY/PERFORMANCE_API_KEY), and HF tokens are re-added only
-# on explicit opt-in (adapter manifests declaring gated-model tests).
-AGENT_SHELL_SCRUB_PREFIXES = (
-    "ANTHROPIC_", "OPENAI_", "CURSOR_", "RESEND_", "SMTP_",
-)
-AGENT_SHELL_SCRUB_SUFFIXES = (
-    "_API_KEY", "_TOKEN", "_SECRET", "_PASSWORD",
-)
-AGENT_SHELL_SCRUB_EXACT = (
-    "GIT_ASKPASS", "SSH_ASKPASS",
+# The agent shell env is ALLOWLIST-based: two rounds of denylist review each
+# found surviving credential shapes (tier keys, then AWS_SECRET_ACCESS_KEY /
+# GOOGLE_APPLICATION_CREDENTIALS), and unknown forms are unenumerable in an
+# inherited environment. Fail-closed means: a name not matching a known-safe
+# prefix is dropped. The list is generous for runtime knobs (CUDA/NCCL/
+# TORCH/VLLM/proxies/locale) and includes GIT_CONFIG_ because the push-block
+# env-config injection must survive the scrub. HF tokens re-enter only on
+# explicit opt-in (adapter manifests declaring gated-model tests).
+AGENT_SHELL_SAFE_PREFIXES = (
+    "PATH", "HOME", "LANG", "LC_", "TERM", "TMP", "TEMP", "USER", "LOGNAME",
+    "SHELL", "PWD", "OLDPWD", "HOST", "TZ", "XDG_", "DISPLAY", "COLUMNS",
+    "LINES", "VIRTUAL_ENV", "PYTHON", "PIP_", "CONDA_", "LD_",
+    "CUDA_", "NCCL_", "TORCH_", "VLLM_", "HF_HOME", "HF_HUB_", "OMP_",
+    "MKL_", "NVIDIA_", "TRITON_",
+    "SSL_CERT", "REQUESTS_CA", "CURL_CA",
+    "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
+    "http_proxy", "https_proxy", "no_proxy",
+    "GIT_CONFIG_",
 )
 _HF_TOKEN_KEYS = ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN")
 
@@ -57,17 +63,18 @@ def build_subprocess_env(*, venv: Path | None = None,
 
 
 def scrub_agent_shell_env(env: dict[str, str], *,
-                          keep_hf_token: bool = False) -> dict[str, str]:
-    """Strip credential material from an agent-shell child env. Pure function:
-    returns a new dict, never mutates. Fail-closed default: HF tokens are
-    stripped too unless the caller opts in (`keep_hf_token=True`, driven by
-    the adapter manifest's gated-model declaration)."""
-    out = {
-        k: v for k, v in env.items()
-        if not k.startswith(AGENT_SHELL_SCRUB_PREFIXES)
-        and not k.endswith(AGENT_SHELL_SCRUB_SUFFIXES)
-        and k not in AGENT_SHELL_SCRUB_EXACT
-    }
+                          keep_hf_token: bool = False,
+                          extra_safe_prefixes: tuple[str, ...] = ()
+                          ) -> dict[str, str]:
+    """Build the agent-shell child env by allowlist. Pure function: returns a
+    new dict, never mutates. Anything not matching a known-safe prefix is
+    dropped (fail-closed for unknown credential shapes). HF tokens are
+    re-added only on explicit opt-in; adapters with legitimate extra runtime
+    vars widen via `extra_safe_prefixes` (manifest data), never by weakening
+    the default."""
+    safe = AGENT_SHELL_SAFE_PREFIXES + extra_safe_prefixes
+    out = {k: v for k, v in env.items()
+           if k.startswith(safe) and k not in _HF_TOKEN_KEYS}
     if keep_hf_token:
         for k in _HF_TOKEN_KEYS:
             if k in env:

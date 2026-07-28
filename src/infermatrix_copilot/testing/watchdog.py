@@ -106,8 +106,7 @@ class LogWatchdog:
                  kill_fn: Callable[[int], None] | None = None,
                  record_fn: Callable[[str, str, str], None] | None = None,
                  report_fn: Callable[[str, str, str], None] | None = None,
-                 pid_alive: Callable[[int], bool] | None = None,
-                 on_poll: Callable[[], None] | None = None):
+                 pid_alive: Callable[[int], bool] | None = None):
         self.patterns = patterns
         self.log_file = Path(log_file)
         self.pid = pid
@@ -118,7 +117,6 @@ class LogWatchdog:
         self.record_fn = record_fn or (lambda *a: None)
         self.report_fn = report_fn or (lambda *a: None)
         self.pid_alive = pid_alive or self._default_alive
-        self.on_poll = on_poll  # e.g. the runner's process-tree snapshotter
         self.result = WatchdogResult()
         self._stop = threading.Event()
         self._last_size = 0
@@ -133,11 +131,6 @@ class LogWatchdog:
             # the caller's final scan would rediscover the same error and
             # kill/record/report a second time
             return True
-        if self.on_poll is not None:
-            try:
-                self.on_poll()
-            except Exception:
-                pass
         if not self.log_file.exists():
             return False
         size = self.log_file.stat().st_size
@@ -167,12 +160,19 @@ class LogWatchdog:
         if self.review_fn is None:
             return False  # no reviewer available: never kill on Tier 2 alone
         verdict = self._reviewed_verdict(line, "\n".join(tail))
-        self.record_fn(line, verdict, self.test_name)
-        self.result.decisions.append({"pattern": line, "verdict": verdict})
-        if verdict == "KILL":
+        killed = verdict == "KILL"
+        if killed:
+            # the kill executes FIRST: telemetry is best-effort and must
+            # never suppress a confirmed kill (a full disk in the decision
+            # log would otherwise leave a broken engine running, with
+            # _last_size already advanced past the evidence)
             self._kill(2, line)
-            return True
-        return False
+        try:
+            self.record_fn(line, verdict, self.test_name)
+        except Exception:
+            pass
+        self.result.decisions.append({"pattern": line, "verdict": verdict})
+        return killed
 
     def _reviewed_verdict(self, line: str, snippet: str) -> str:
         try:

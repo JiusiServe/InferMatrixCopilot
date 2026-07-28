@@ -218,17 +218,31 @@ def test_env_overlay_order_and_no_mutation(tmp_path):
     assert dict(os.environ) == before  # our own env never mutated
 
 
-def test_agent_shell_scrub_fails_closed():
+def test_agent_shell_scrub_is_an_allowlist():
     env = {"ANTHROPIC_API_KEY": "k", "GITHUB_TOKEN": "t", "HF_TOKEN": "h",
            "PATH": "/bin", "OPENAI_API_KEY": "o", "GIT_ASKPASS": "a",
            "ECO_API_KEY": "e", "PERFORMANCE_API_KEY": "p",
            "BUILDKITE_API_TOKEN": "b", "MY_SERVICE_SECRET": "s",
-           "DB_PASSWORD": "d", "HUGGING_FACE_HUB_TOKEN": "h2"}
-    out = env_plan.scrub_agent_shell_env(env)  # default: everything stripped
-    assert set(out) == {"PATH"}
+           "DB_PASSWORD": "d", "HUGGING_FACE_HUB_TOKEN": "h2",
+           # denylist escapees the review found — allowlist drops unknowns
+           "AWS_SECRET_ACCESS_KEY": "aws", "GOOGLE_APPLICATION_CREDENTIALS": "g",
+           "TOTALLY_NOVEL_CRED": "x",
+           # runtime knobs that must survive
+           "NCCL_DEBUG": "WARN", "CUDA_VISIBLE_DEVICES": "0",
+           "HTTP_PROXY": "proxy", "GIT_CONFIG_COUNT": "1",
+           "VLLM_USE_V1": "1", "HF_HOME": "/hf"}
+    out = env_plan.scrub_agent_shell_env(env)  # default: fail-closed
+    assert set(out) == {"PATH", "NCCL_DEBUG", "CUDA_VISIBLE_DEVICES",
+                        "HTTP_PROXY", "GIT_CONFIG_COUNT", "VLLM_USE_V1",
+                        "HF_HOME"}
     # explicit opt-in re-adds ONLY the HF tokens (gated-model adapters)
     opted = env_plan.scrub_agent_shell_env(env, keep_hf_token=True)
-    assert set(opted) == {"PATH", "HF_TOKEN", "HUGGING_FACE_HUB_TOKEN"}
+    assert "HF_TOKEN" in opted and "HUGGING_FACE_HUB_TOKEN" in opted
+    assert "AWS_SECRET_ACCESS_KEY" not in opted
+    # adapters widen via manifest data, never by weakening the default
+    extra = env_plan.scrub_agent_shell_env(
+        env, extra_safe_prefixes=("TOTALLY_NOVEL_",))
+    assert "TOTALLY_NOVEL_CRED" in extra
     assert env["ANTHROPIC_API_KEY"] == "k"  # pure function
 
 
@@ -761,13 +775,17 @@ def test_learn_truncated_patterns_match_their_source(tmp_path):
 
 def test_final_scan_kill_reaches_reparented_setsid_child(runner, tmp_path):
     """A setsid'd child is reparented to init once the leader is reaped —
-    only the watchdog's live descendant snapshot can still name it."""
+    only the snapshot thread's last live walk can still name it. The
+    watchdog interval is set far above the command's lifetime, proving the
+    snapshot cadence (not a watchdog poll) preserved the tree."""
+    runner.SNAPSHOT_INTERVAL = 0.05
+    runner.watchdog_interval = 5.0  # no poll happens while the job lives
     pidfile = tmp_path / "detached.pid"
     log = tmp_path / "tests" / "21_detached.log"
     job = TestJob(
         key="detached", timeout_sec=30, min_gpus=0, index=21,
         command=(f"setsid bash -c 'echo $$ > {pidfile}; exec sleep 60' &\n"
-                 f"sleep 0.3\n"  # let a poll snapshot the live tree
+                 f"sleep 0.3\n"  # a couple of snapshot cycles
                  f"echo 'CUDA out of memory' >> {log}; true"))
     out = runner.run(job, dict(os.environ))
     assert out.watchdog_triggered
@@ -782,6 +800,24 @@ def test_final_scan_kill_reaches_reparented_setsid_child(runner, tmp_path):
     else:
         os.kill(child, signal.SIGKILL)
         pytest.fail("reparented setsid child survived the snapshot kill")
+
+
+def test_failing_recorder_never_suppresses_a_kill(tmp_path, patterns):
+    """Telemetry is best-effort: a recorder raising (full disk) must not
+    leave a reviewer-confirmed KILL unexecuted."""
+    kills = []
+    log = tmp_path / "t.log"
+    log.write_text("RuntimeError: engine wedged\n")
+
+    def bad_recorder(p, v, t):
+        raise OSError("disk full")
+
+    wd = LogWatchdog(patterns, log, pid=99999, test_name="t",
+                     review_fn=lambda t, s: "KILL",
+                     kill_fn=lambda pid: kills.append(pid),
+                     record_fn=bad_recorder, pid_alive=lambda pid: True)
+    assert wd.check_once() is True
+    assert kills == [99999]  # the kill happened despite the recorder
 
 
 def test_tail_survives_one_huge_final_line(tmp_path, patterns):

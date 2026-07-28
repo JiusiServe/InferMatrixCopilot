@@ -100,12 +100,14 @@ def pass_marker_for(tests_dir: Path, job: TestJob, *, baseline: bool = False) ->
 
 
 def backup_prev_log(log_file: Path) -> None:
-    """Preserve the previous attempt's traceback as `.prev`, truncate the log."""
+    """Preserve the previous attempt's traceback as `.prev`, truncate the log.
+    Streaming copy (the shell's `cp -p`) — logs can be huge."""
+    import shutil
+
     log_file = Path(log_file)
     try:
         if log_file.is_file() and log_file.stat().st_size > 0:
-            log_file.with_name(log_file.name + ".prev").write_bytes(
-                log_file.read_bytes())
+            shutil.copy2(log_file, log_file.with_name(log_file.name + ".prev"))
         log_file.write_text("")
     except OSError:
         pass
@@ -120,18 +122,31 @@ def append_silent_log_footer(log_file: Path, rc: int, context: str = "primary"
     log_file = Path(log_file)
     if rc == 0 or not log_file.is_file():
         return
+    # single streaming pass (the shell's grep): logs can be huge, and every
+    # pattern here is single-line, so nothing needs the whole file in memory
+    has_signal = has_collection = False
+    hits: list[str] = []
+    size = 0
     try:
-        text = log_file.read_text(encoding="utf-8", errors="replace")
+        with open(log_file, encoding="utf-8", errors="replace") as f:
+            for ln in f:
+                size += len(ln.encode("utf-8", errors="replace"))
+                line = ln.rstrip("\n")
+                if _SIGNAL_RE.search(line):
+                    has_signal = True
+                if _COLLECTION_RE.search(line):
+                    has_collection = True
+                if len(hits) < 5 and (
+                        "ERROR: file or directory not found:" in line
+                        or "ERROR: not found:" in line):
+                    hits.append(line)
     except OSError:
         return
-    if text and _SIGNAL_RE.search(text):
+    if size and has_signal:
         return
     bar = "=" * 74
     p = f"[postmortem/{context}]"
-    if rc in (4, 5) or _COLLECTION_RE.search(text):
-        hits = [ln for ln in text.splitlines()
-                if "ERROR: file or directory not found:" in ln
-                or "ERROR: not found:" in ln][:5]
+    if rc in (4, 5) or has_collection:
         body = "\n".join([
             "", bar,
             f"{p} COLLECTION/PATH ERROR — pytest collected no tests (rc={rc})",
@@ -147,7 +162,7 @@ def append_silent_log_footer(log_file: Path, rc: int, context: str = "primary"
         body = "\n".join([
             "", bar,
             f"{p} SILENT EXIT — no pytest/traceback signal captured",
-            f"{p}   rc={rc}  captured_bytes={len(text.encode())}",
+            f"{p}   rc={rc}  captured_bytes={size}",
             f"{p}   log_file={log_file}",
             f"{p} Likely causes: child SIGKILL (OOM / external kill),",
             f"{p}   stream truncation, or pytest worker crash before",
@@ -206,6 +221,10 @@ class TestRunner:
     exact `RunPlan` without spawning anything (command-echo parity)."""
 
     __test__ = False  # "Test" prefix is domain naming, not a pytest class
+
+    # descendant-snapshot cadence; also the bound on the residual window in
+    # which a child that spawns and is orphaned can escape the final scan
+    SNAPSHOT_INTERVAL = 0.5
 
     def __init__(self, *, repo_root: Path, tests_dir: Path,
                  patterns: WatchdogPatterns | None = None,
@@ -375,15 +394,27 @@ class TestRunner:
                 pgid = os.getpgid(proc.pid)
             except ProcessLookupError:
                 pgid = proc.pid
-            # every watchdog poll refreshes a descendant snapshot: after the
-            # leader is reaped, setsid'd children are reparented to init and
-            # can no longer be discovered — the last snapshot still names them
+            # a dedicated thread snapshots the live descendant tree on a fast
+            # fixed cadence (independent of the 10 s watchdog poll): after
+            # the leader is reaped, setsid'd children are reparented to init
+            # and only the last snapshot still names them. A child that both
+            # spawns and is orphaned inside one cadence window is the
+            # documented residual (bounded by SNAPSHOT_INTERVAL).
             from .process_tree import collect_descendants
             tree = {"pids": [proc.pid]}
+            stop_snap = threading.Event()
 
             def _snapshot():
                 if proc.poll() is None:
                     tree["pids"] = collect_descendants(proc.pid)
+
+            def _snap_loop():
+                while not stop_snap.is_set() and proc.poll() is None:
+                    _snapshot()
+                    stop_snap.wait(self.SNAPSHOT_INTERVAL)
+
+            snap_thread = threading.Thread(target=_snap_loop, daemon=True)
+            snap_thread.start()
 
             def _kill_snapshot():
                 self._terminate_tree(proc.pid, pgid, extra=tree["pids"])
@@ -394,7 +425,7 @@ class TestRunner:
                     self.patterns, log_file, proc.pid, job.key,
                     check_interval=self.watchdog_interval,
                     review_fn=self.review_fn, record_fn=self.record_fn,
-                    report_fn=self.report_fn, on_poll=_snapshot,
+                    report_fn=self.report_fn,
                     kill_fn=lambda pid: _kill_snapshot()).start()
 
             def primary():
@@ -413,6 +444,8 @@ class TestRunner:
             try:
                 rc = proc.wait()
             finally:
+                stop_snap.set()
+                snap_thread.join(timeout=10)
                 # cancel then JOIN: a fired primary timer is mid-escalation in
                 # its own thread — returning before it finishes would let the
                 # next job start while own-pgroup descendants still hold GPUs
@@ -452,9 +485,11 @@ class TestRunner:
 
     @staticmethod
     def _log_has(log_file: Path, pattern: str) -> bool:
+        """Streaming line search (the shell's grep) — never whole-file."""
+        rx = re.compile(pattern)
         try:
-            return re.search(pattern, Path(log_file).read_text(
-                encoding="utf-8", errors="replace")) is not None
+            with open(log_file, encoding="utf-8", errors="replace") as f:
+                return any(rx.search(line) for line in f)
         except OSError:
             return False
 
