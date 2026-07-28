@@ -194,12 +194,21 @@ class LogWatchdog:
         self.report_fn(self.test_name, trigger,
                        "\n".join(self._tail(REPORT_TAIL_LINES)))
 
+    # generous byte window per requested line: keeps every poll O(window)
+    # instead of re-reading a multi-GB GPU-test log to keep 150 lines
+    _TAIL_BYTES_PER_LINE = 512
+
     def _tail(self, n: int) -> list[str]:
+        window = n * self._TAIL_BYTES_PER_LINE
         try:
-            return self.log_file.read_text(encoding="utf-8",
-                                           errors="replace").splitlines()[-n:]
+            with open(self.log_file, "rb") as f:
+                f.seek(0, 2)
+                size = f.tell()
+                f.seek(max(0, size - window))
+                chunk = f.read()
         except OSError:
             return []
+        return chunk.decode("utf-8", errors="replace").splitlines()[-n:]
 
     # -- background thread --
     def start(self) -> "LogWatchdog":

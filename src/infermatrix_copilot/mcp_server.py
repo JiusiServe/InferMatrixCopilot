@@ -124,7 +124,10 @@ class CopilotMCP:
                 **popen_kwargs,
             )
             proc.wait()
-        rs.reconcile_after_wait(run_dir, child_pid=proc.pid)
+        # BLOCKED_EXIT without a terminal status is the lock-loser signature:
+        # a genuinely blocked child writes its terminal state before exiting 3
+        rs.reconcile_after_wait(run_dir, child_pid=proc.pid,
+                                suspect_lock_loser=(proc.returncode == 3))
 
     # -- start (reserve + enqueue) -------------------------------------------
     def start(self, spec_dict: dict) -> str:

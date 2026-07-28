@@ -367,6 +367,14 @@ class TestRunner:
                                     cwd=self.repo_root, env=env,
                                     stdout=lf, stderr=lf,
                                     start_new_session=True)
+            # capture the pgid while the leader is certainly alive: the final
+            # watchdog scan runs after proc.wait(), and a short command that
+            # logs a critical line, backgrounds a child, and exits must still
+            # have its group killable through the reaped leader's pgid
+            try:
+                pgid = os.getpgid(proc.pid)
+            except ProcessLookupError:
+                pgid = proc.pid
             watchdog = None
             if self.patterns is not None:
                 watchdog = LogWatchdog(
@@ -374,14 +382,15 @@ class TestRunner:
                     check_interval=self.watchdog_interval,
                     review_fn=self.review_fn, record_fn=self.record_fn,
                     report_fn=self.report_fn,
-                    kill_fn=lambda pid: self._terminate_tree(proc)).start()
+                    kill_fn=lambda pid: self._terminate_tree(proc.pid, pgid)
+                ).start()
 
             def primary():
                 timed_out.set()
-                self._terminate_tree(proc)
+                self._terminate_tree(proc.pid, pgid)
 
             def safety():  # only matters if the primary path wedged
-                self._killpg(proc, signal.SIGKILL)
+                _kill_group(pgid, signal.SIGKILL)
 
             t_primary = threading.Timer(job.timeout_sec, primary)
             t_safety = threading.Timer(job.timeout_sec + PY_TIMEOUT_MARGIN_SEC,
@@ -410,26 +419,21 @@ class TestRunner:
         return rc, wd_hit, timed_out.is_set()
 
     @staticmethod
-    def _terminate_tree(proc: subprocess.Popen) -> None:
+    def _terminate_tree(pid: int, pgid: int) -> None:
         """Kill the leader's process group AND every descendant individually.
         Descendants are collected BEFORE any signal (a dead leader can't be
         walked), because spawn-mode multiprocessing children create their own
         process groups — killpg alone never reaches them, and the leader
         exiting must not end the escalation while they hold GPU memory.
-        `kill_tree` then owns TERM → grace → KILL per pid, survivors logged."""
+        `kill_tree` then owns TERM → grace → KILL per pid, survivors logged.
+        `pgid` is pre-captured by the caller so this works after the leader
+        has been reaped."""
         from .process_tree import collect_descendants, kill_tree
 
-        targets = collect_descendants(proc.pid)
-        TestRunner._killpg(proc, signal.SIGTERM)
+        targets = collect_descendants(pid)
+        _kill_group(pgid, signal.SIGTERM)
         kill_tree(targets)
-        TestRunner._killpg(proc, signal.SIGKILL)
-
-    @staticmethod
-    def _killpg(proc: subprocess.Popen, sig: int) -> None:
-        try:
-            os.killpg(os.getpgid(proc.pid), sig)
-        except OSError:
-            pass
+        _kill_group(pgid, signal.SIGKILL)
 
     @staticmethod
     def _log_has(log_file: Path, pattern: str) -> bool:

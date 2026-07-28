@@ -24,9 +24,14 @@ PROMOTE_MIN_COUNT = 3
 PROMOTE_MIN_DAYS = 5
 
 
-def _unescape(pattern: str) -> str:
-    """Invert `re.escape` (every escape it emits is a single backslash)."""
-    return re.sub(r"\\(.)", r"\1", pattern)
+def _to_noise_regex(pattern: str) -> str:
+    """A normalized (possibly truncated) raw line as a noise regex. The
+    truncation marker becomes a real wildcard — escaping the literal `...`
+    would demand three dots the original line never had, so promoted long
+    patterns would never match their own source lines."""
+    if pattern.endswith("..."):
+        return re.escape(pattern[:-3]) + ".*"
+    return re.escape(pattern)
 
 
 def normalize_pattern(pattern: str) -> str:
@@ -121,16 +126,17 @@ def promote(decision_log: Path, overlay: Path, *, seed_noise: list[str],
     if overlay.exists():
         doc = yaml.safe_load(overlay.read_text(encoding="utf-8")) or {}
     current = list(doc.get("noise", []))
-    # overlay entries are escaped regexes while candidates are raw lines —
-    # compare both forms, else every promote() re-appends the same pattern
-    existing = set(seed_noise) | set(current) | {
-        _unescape(e) for e in current}
 
-    new = eligible_patterns(read_decisions(decision_log), existing=existing,
-                            min_count=min_count, min_days=min_days)
+    # seed patterns are compared raw (either-direction substring); overlay
+    # dedup compares in regex space — the one representation each side
+    # actually stores — so repeated promote() calls append nothing
+    candidates = eligible_patterns(
+        read_decisions(decision_log), existing=set(seed_noise),
+        min_count=min_count, min_days=min_days)
+    new = [p for p in candidates if _to_noise_regex(p) not in set(current)]
     if not new:
         return []
-    doc["noise"] = current + [re.escape(p) for p in new]
+    doc["noise"] = current + [_to_noise_regex(p) for p in new]
     overlay.parent.mkdir(parents=True, exist_ok=True)
     tmp = overlay.with_name(overlay.name + ".tmp")
     tmp.write_text(yaml.safe_dump(doc, allow_unicode=True, sort_keys=False),

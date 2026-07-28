@@ -669,6 +669,90 @@ def test_base_env_cuda_override_also_governs_gate(patterns, tmp_path):
     assert out.skipped  # gated on the child's effective devices, not ours
 
 
+def test_reconcile_unclaimed_status_spared_for_lock_loser(tmp_path):
+    """Winner holds the run lock but hasn't published its pid yet; the
+    loser's parent (exit code 3, no terminal status) must not reconcile."""
+    from infermatrix_copilot import run_status as rs
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    rs.init_queued(run_dir, run_id="r", owner_server_id="s", owner_server_pid=1)
+    out = rs.reconcile_after_wait(run_dir, child_pid=9999,
+                                  suspect_lock_loser=True)
+    assert out["state"] == rs.QUEUED  # untouched
+    # a genuine pre-publish crash (non-3 exit) still reconciles
+    out = rs.reconcile_after_wait(run_dir, child_pid=9999,
+                                  suspect_lock_loser=False)
+    assert out["state"] == rs.INTERRUPTED
+
+
+def test_final_scan_kill_works_after_leader_reaped(runner, tmp_path):
+    """Short command logs a critical line, backgrounds a child, exits: the
+    final scan fires after proc.wait(), and the kill must still reach the
+    group via the pre-captured pgid."""
+    pidfile = tmp_path / "bg.pid"
+    log = tmp_path / "tests" / "20_fastbg.log"
+    job = TestJob(
+        key="fastbg", timeout_sec=30, min_gpus=0, index=20,
+        command=(f"bash -c 'echo $$ > {pidfile}; exec sleep 60' &\n"
+                 f"echo 'CUDA out of memory' >> {log}; true"))
+    out = runner.run(job, dict(os.environ))
+    assert out.watchdog_triggered and out.rc != 0
+    child = int(pidfile.read_text().strip())
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        try:
+            os.kill(child, 0)
+            time.sleep(0.1)
+        except ProcessLookupError:
+            break
+    else:
+        os.kill(child, signal.SIGKILL)
+        pytest.fail("background child survived the post-reap final-scan kill")
+
+
+def test_watchdog_tail_reads_bounded_window(tmp_path, patterns):
+    """The tail must not slurp the whole log: a huge file is read through a
+    bounded window and still yields the trailing lines."""
+    log = tmp_path / "big.log"
+    with open(log, "w") as f:
+        for i in range(200_000):
+            f.write(f"line {i}\n")
+        f.write("RuntimeError: at the end\n")
+    wd = LogWatchdog(patterns, log, pid=1, test_name="t",
+                     pid_alive=lambda pid: True)
+    tail = wd._tail(150)
+    assert len(tail) == 150 and tail[-1] == "RuntimeError: at the end"
+    # window is bounded: far below the file size
+    assert 150 * wd._TAIL_BYTES_PER_LINE < log.stat().st_size
+
+
+def test_gpu_lock_rolls_back_on_owner_write_failure(tmp_path):
+    d = tmp_path / "gl"
+    lock = GpuLock(d, poll_sec=0.01, timeout_sec=5)
+    lock.owner_file = d / "no-such-dir" / "owner"  # injected write failure
+    with pytest.raises(OSError):
+        lock.acquire()
+    assert not (d / "lock").exists()  # rolled back, not wedged for an hour
+
+
+def test_learn_truncated_patterns_match_their_source(tmp_path):
+    import json
+
+    import yaml
+    long_line = "W0101 worker error: " + "x" * 150 + " tail-differs"
+    logf = tmp_path / "d.jsonl"
+    logf.write_text("\n".join(json.dumps(
+        {"ts": f"2026-07-0{d} 10:00:00",
+         "pattern": watchdog_learn.normalize_pattern(long_line),
+         "verdict": "CONTINUE"}) for d in (1, 7, 9)))
+    overlay = tmp_path / "overlay.yaml"
+    assert len(watchdog_learn.promote(logf, overlay, seed_noise=[])) == 1
+    regex = yaml.safe_load(overlay.read_text())["noise"][0]
+    assert __import__("re").search(regex, long_line)  # matches the original
+    # and stays idempotent in regex space
+    assert watchdog_learn.promote(logf, overlay, seed_noise=[]) == []
+
+
 def test_gpu_lock_steal_grace_for_unparseable_lock(tmp_path):
     """An empty lock younger than the grace window is a writer mid-create,
     not a crash artifact — it must not be stolen."""

@@ -52,11 +52,17 @@ class GpuLock:
         while elapsed < self.timeout_sec:
             try:
                 fd = os.open(self.lock_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-                with os.fdopen(fd, "w") as f:
-                    f.write(owner)
-                # owner file is written for shell-era readers only; staleness
-                # decisions never consult it (it lags the lock file)
-                self.owner_file.write_text(owner)
+                try:
+                    with os.fdopen(fd, "w") as f:
+                        f.write(owner)
+                    # owner file is for shell-era readers only; staleness
+                    # decisions never consult it (it lags the lock file)
+                    self.owner_file.write_text(owner)
+                except OSError:
+                    # roll back: a lock naming our live pid would otherwise
+                    # block every contender until this long-lived process dies
+                    self.lock_file.unlink(missing_ok=True)
+                    raise
                 self._held = True
                 self._owner = owner
                 _log(f"GPU lock acquired by: {owner}")
