@@ -375,19 +375,32 @@ class TestRunner:
                 pgid = os.getpgid(proc.pid)
             except ProcessLookupError:
                 pgid = proc.pid
+            # every watchdog poll refreshes a descendant snapshot: after the
+            # leader is reaped, setsid'd children are reparented to init and
+            # can no longer be discovered — the last snapshot still names them
+            from .process_tree import collect_descendants
+            tree = {"pids": [proc.pid]}
+
+            def _snapshot():
+                if proc.poll() is None:
+                    tree["pids"] = collect_descendants(proc.pid)
+
+            def _kill_snapshot():
+                self._terminate_tree(proc.pid, pgid, extra=tree["pids"])
+
             watchdog = None
             if self.patterns is not None:
                 watchdog = LogWatchdog(
                     self.patterns, log_file, proc.pid, job.key,
                     check_interval=self.watchdog_interval,
                     review_fn=self.review_fn, record_fn=self.record_fn,
-                    report_fn=self.report_fn,
-                    kill_fn=lambda pid: self._terminate_tree(proc.pid, pgid)
-                ).start()
+                    report_fn=self.report_fn, on_poll=_snapshot,
+                    kill_fn=lambda pid: _kill_snapshot()).start()
 
             def primary():
                 timed_out.set()
-                self._terminate_tree(proc.pid, pgid)
+                _snapshot()  # leader still alive here: refresh before killing
+                self._terminate_tree(proc.pid, pgid, extra=tree["pids"])
 
             def safety():  # only matters if the primary path wedged
                 _kill_group(pgid, signal.SIGKILL)
@@ -419,18 +432,20 @@ class TestRunner:
         return rc, wd_hit, timed_out.is_set()
 
     @staticmethod
-    def _terminate_tree(pid: int, pgid: int) -> None:
+    def _terminate_tree(pid: int, pgid: int,
+                        extra: list[int] | None = None) -> None:
         """Kill the leader's process group AND every descendant individually.
         Descendants are collected BEFORE any signal (a dead leader can't be
         walked), because spawn-mode multiprocessing children create their own
         process groups — killpg alone never reaches them, and the leader
         exiting must not end the escalation while they hold GPU memory.
         `kill_tree` then owns TERM → grace → KILL per pid, survivors logged.
-        `pgid` is pre-captured by the caller so this works after the leader
-        has been reaped."""
+        `pgid` is pre-captured and `extra` carries the caller's last live
+        descendant snapshot, so this also works after the leader was reaped
+        and its setsid'd children were reparented away."""
         from .process_tree import collect_descendants, kill_tree
 
-        targets = collect_descendants(pid)
+        targets = sorted(set(collect_descendants(pid)) | set(extra or []))
         _kill_group(pgid, signal.SIGTERM)
         kill_tree(targets)
         _kill_group(pgid, signal.SIGKILL)

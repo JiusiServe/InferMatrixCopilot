@@ -85,16 +85,21 @@ class Executor:
             os.fsync(f.fileno())
         os.replace(tmp, self.progress_file)
         try:
-            # directory fsync makes the rename itself durable; opening a
-            # directory is unsupported on some platforms (Windows), where the
-            # rename's atomicity is all we get — best-effort, never fatal
+            # directory fsync makes the rename itself durable
             dir_fd = os.open(self.run_dir, os.O_RDONLY)
             try:
                 os.fsync(dir_fd)
             finally:
                 os.close(dir_fd)
-        except OSError:
-            pass
+        except OSError as exc:
+            # opening/fsyncing a directory is unsupported on some platforms
+            # (Windows) and filesystems — those degrade to rename atomicity.
+            # Real storage failures (EIO) mean the durability guarantee is
+            # gone and MUST propagate rather than continue on a bad disk.
+            import errno
+            if exc.errno not in (errno.EINVAL, errno.ENOTSUP, errno.EACCES,
+                                 errno.EPERM, errno.EISDIR, errno.EBADF):
+                raise
 
     # -- execution ------------------------------------------------------------
     async def run(self, playbook: "Playbook", state: dict) -> RunOutcome:

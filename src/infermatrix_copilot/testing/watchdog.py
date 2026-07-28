@@ -106,7 +106,8 @@ class LogWatchdog:
                  kill_fn: Callable[[int], None] | None = None,
                  record_fn: Callable[[str, str, str], None] | None = None,
                  report_fn: Callable[[str, str, str], None] | None = None,
-                 pid_alive: Callable[[int], bool] | None = None):
+                 pid_alive: Callable[[int], bool] | None = None,
+                 on_poll: Callable[[], None] | None = None):
         self.patterns = patterns
         self.log_file = Path(log_file)
         self.pid = pid
@@ -117,6 +118,7 @@ class LogWatchdog:
         self.record_fn = record_fn or (lambda *a: None)
         self.report_fn = report_fn or (lambda *a: None)
         self.pid_alive = pid_alive or self._default_alive
+        self.on_poll = on_poll  # e.g. the runner's process-tree snapshotter
         self.result = WatchdogResult()
         self._stop = threading.Event()
         self._last_size = 0
@@ -131,6 +133,11 @@ class LogWatchdog:
             # the caller's final scan would rediscover the same error and
             # kill/record/report a second time
             return True
+        if self.on_poll is not None:
+            try:
+                self.on_poll()
+            except Exception:
+                pass
         if not self.log_file.exists():
             return False
         size = self.log_file.stat().st_size
@@ -194,21 +201,28 @@ class LogWatchdog:
         self.report_fn(self.test_name, trigger,
                        "\n".join(self._tail(REPORT_TAIL_LINES)))
 
-    # generous byte window per requested line: keeps every poll O(window)
-    # instead of re-reading a multi-GB GPU-test log to keep 150 lines
-    _TAIL_BYTES_PER_LINE = 512
+    # backward-chunked tail: bounded I/O per poll without approximating the
+    # line count by bytes. The hard cap is the explicit maximum-line policy —
+    # a pathological log whose last lines exceed it is truncated at the cap's
+    # front (the tail end, where errors surface, is always retained).
+    _TAIL_CHUNK = 64 * 1024
+    _TAIL_MAX_BYTES = 8 * 1024 * 1024
 
     def _tail(self, n: int) -> list[str]:
-        window = n * self._TAIL_BYTES_PER_LINE
         try:
             with open(self.log_file, "rb") as f:
                 f.seek(0, 2)
-                size = f.tell()
-                f.seek(max(0, size - window))
-                chunk = f.read()
+                pos = f.tell()
+                buf = b""
+                while pos > 0 and buf.count(b"\n") <= n \
+                        and len(buf) < self._TAIL_MAX_BYTES:
+                    step = min(self._TAIL_CHUNK, pos)
+                    pos -= step
+                    f.seek(pos)
+                    buf = f.read(step) + buf
         except OSError:
             return []
-        return chunk.decode("utf-8", errors="replace").splitlines()[-n:]
+        return buf.decode("utf-8", errors="replace").splitlines()[-n:]
 
     # -- background thread --
     def start(self) -> "LogWatchdog":

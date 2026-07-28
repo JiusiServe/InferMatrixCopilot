@@ -218,13 +218,17 @@ def test_env_overlay_order_and_no_mutation(tmp_path):
     assert dict(os.environ) == before  # our own env never mutated
 
 
-def test_agent_shell_scrub():
+def test_agent_shell_scrub_fails_closed():
     env = {"ANTHROPIC_API_KEY": "k", "GITHUB_TOKEN": "t", "HF_TOKEN": "h",
-           "PATH": "/bin", "OPENAI_API_KEY": "o", "GIT_ASKPASS": "a"}
-    out = env_plan.scrub_agent_shell_env(env)
-    assert set(out) == {"HF_TOKEN", "PATH"}
-    assert "HF_TOKEN" not in env_plan.scrub_agent_shell_env(
-        env, keep_hf_token=False)
+           "PATH": "/bin", "OPENAI_API_KEY": "o", "GIT_ASKPASS": "a",
+           "ECO_API_KEY": "e", "PERFORMANCE_API_KEY": "p",
+           "BUILDKITE_API_TOKEN": "b", "MY_SERVICE_SECRET": "s",
+           "DB_PASSWORD": "d", "HUGGING_FACE_HUB_TOKEN": "h2"}
+    out = env_plan.scrub_agent_shell_env(env)  # default: everything stripped
+    assert set(out) == {"PATH"}
+    # explicit opt-in re-adds ONLY the HF tokens (gated-model adapters)
+    opted = env_plan.scrub_agent_shell_env(env, keep_hf_token=True)
+    assert set(opted) == {"PATH", "HF_TOKEN", "HUGGING_FACE_HUB_TOKEN"}
     assert env["ANTHROPIC_API_KEY"] == "k"  # pure function
 
 
@@ -714,16 +718,18 @@ def test_watchdog_tail_reads_bounded_window(tmp_path, patterns):
     """The tail must not slurp the whole log: a huge file is read through a
     bounded window and still yields the trailing lines."""
     log = tmp_path / "big.log"
+    pad = "x" * 60
     with open(log, "w") as f:
         for i in range(200_000):
-            f.write(f"line {i}\n")
+            f.write(f"line {i} {pad}\n")
         f.write("RuntimeError: at the end\n")
     wd = LogWatchdog(patterns, log, pid=1, test_name="t",
                      pid_alive=lambda pid: True)
     tail = wd._tail(150)
     assert len(tail) == 150 and tail[-1] == "RuntimeError: at the end"
-    # window is bounded: far below the file size
-    assert 150 * wd._TAIL_BYTES_PER_LINE < log.stat().st_size
+    # the backward-chunked read is bounded: its hard cap is far below this
+    # file's size, so correctness here proves it never slurped the whole log
+    assert wd._TAIL_MAX_BYTES < log.stat().st_size
 
 
 def test_gpu_lock_rolls_back_on_owner_write_failure(tmp_path):
@@ -751,6 +757,70 @@ def test_learn_truncated_patterns_match_their_source(tmp_path):
     assert __import__("re").search(regex, long_line)  # matches the original
     # and stays idempotent in regex space
     assert watchdog_learn.promote(logf, overlay, seed_noise=[]) == []
+
+
+def test_final_scan_kill_reaches_reparented_setsid_child(runner, tmp_path):
+    """A setsid'd child is reparented to init once the leader is reaped —
+    only the watchdog's live descendant snapshot can still name it."""
+    pidfile = tmp_path / "detached.pid"
+    log = tmp_path / "tests" / "21_detached.log"
+    job = TestJob(
+        key="detached", timeout_sec=30, min_gpus=0, index=21,
+        command=(f"setsid bash -c 'echo $$ > {pidfile}; exec sleep 60' &\n"
+                 f"sleep 0.3\n"  # let a poll snapshot the live tree
+                 f"echo 'CUDA out of memory' >> {log}; true"))
+    out = runner.run(job, dict(os.environ))
+    assert out.watchdog_triggered
+    child = int(pidfile.read_text().strip())
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        try:
+            os.kill(child, 0)
+            time.sleep(0.1)
+        except ProcessLookupError:
+            break
+    else:
+        os.kill(child, signal.SIGKILL)
+        pytest.fail("reparented setsid child survived the snapshot kill")
+
+
+def test_tail_survives_one_huge_final_line(tmp_path, patterns):
+    """A final line far larger than any per-line byte estimate must still be
+    seen in full enough form to match its leading critical text."""
+    log = tmp_path / "huge.log"
+    log.write_text("ok line\n" + "CUDA out of memory " + "x" * 100_000 + "\n")
+    wd = LogWatchdog(patterns, log, pid=1, test_name="t",
+                     pid_alive=lambda pid: True)
+    tail = wd._tail(150)
+    assert any(ln.startswith("CUDA out of memory") for ln in tail)
+
+
+def test_dir_fsync_swallow_is_scoped_to_unsupported(settings, trace, tmp_path,
+                                                    monkeypatch):
+    import errno
+
+    from infermatrix_copilot.engine.executor import Executor
+    from infermatrix_copilot.engine.registry import StepRegistry
+    ex = Executor(StepRegistry(), settings, run_dir=tmp_path / "r", trace=trace)
+    import infermatrix_copilot.engine.executor as exmod
+    real_open = exmod.os.open
+
+    def raising_open(path, flags, *a, **k):
+        if str(path) == str(ex.run_dir):
+            raise OSError(errno.EIO, "I/O error")
+        return real_open(path, flags, *a, **k)
+
+    monkeypatch.setattr(exmod.os, "open", raising_open)
+    with pytest.raises(OSError):  # real storage failure propagates
+        ex._save_progress({"completed": {}})
+
+    def unsupported_open(path, flags, *a, **k):
+        if str(path) == str(ex.run_dir):
+            raise OSError(errno.EINVAL, "not supported")
+        return real_open(path, flags, *a, **k)
+
+    monkeypatch.setattr(exmod.os, "open", unsupported_open)
+    ex._save_progress({"completed": {}})  # degraded, not fatal
 
 
 def test_gpu_lock_steal_grace_for_unparseable_lock(tmp_path):

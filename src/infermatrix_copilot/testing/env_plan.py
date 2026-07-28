@@ -13,15 +13,20 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-# Credential material the agent shell must not see. HF_TOKEN is deliberately
-# NOT here — gated-model downloads need it; adapters opt in via manifest.
+# Credential material the agent shell must not see. Fail-closed: any name
+# shaped like a credential is stripped (that includes this repo's own
+# per-tier ECO_API_KEY/PERFORMANCE_API_KEY), and HF tokens are re-added only
+# on explicit opt-in (adapter manifests declaring gated-model tests).
 AGENT_SHELL_SCRUB_PREFIXES = (
     "ANTHROPIC_", "OPENAI_", "CURSOR_", "RESEND_", "SMTP_",
 )
+AGENT_SHELL_SCRUB_SUFFIXES = (
+    "_API_KEY", "_TOKEN", "_SECRET", "_PASSWORD",
+)
 AGENT_SHELL_SCRUB_EXACT = (
-    "BUILDKITE_API_TOKEN", "GITHUB_TOKEN", "GH_TOKEN",
     "GIT_ASKPASS", "SSH_ASKPASS",
 )
+_HF_TOKEN_KEYS = ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN")
 
 
 def build_subprocess_env(*, venv: Path | None = None,
@@ -52,16 +57,19 @@ def build_subprocess_env(*, venv: Path | None = None,
 
 
 def scrub_agent_shell_env(env: dict[str, str], *,
-                          keep_hf_token: bool = True) -> dict[str, str]:
+                          keep_hf_token: bool = False) -> dict[str, str]:
     """Strip credential material from an agent-shell child env. Pure function:
-    returns a new dict, never mutates. `keep_hf_token=False` also drops
-    HF_TOKEN for adapters that don't declare gated-model tests."""
+    returns a new dict, never mutates. Fail-closed default: HF tokens are
+    stripped too unless the caller opts in (`keep_hf_token=True`, driven by
+    the adapter manifest's gated-model declaration)."""
     out = {
         k: v for k, v in env.items()
         if not k.startswith(AGENT_SHELL_SCRUB_PREFIXES)
+        and not k.endswith(AGENT_SHELL_SCRUB_SUFFIXES)
         and k not in AGENT_SHELL_SCRUB_EXACT
     }
-    if not keep_hf_token:
-        out.pop("HF_TOKEN", None)
-        out.pop("HUGGING_FACE_HUB_TOKEN", None)
+    if keep_hf_token:
+        for k in _HF_TOKEN_KEYS:
+            if k in env:
+                out[k] = env[k]
     return out
