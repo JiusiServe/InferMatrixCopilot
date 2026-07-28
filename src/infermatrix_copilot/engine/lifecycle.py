@@ -98,11 +98,24 @@ async def finalize(run_dir: Path, outcome: Any) -> None:
 
 async def run_guarded(run: Awaitable[Any], run_dir: Path) -> Any:
     """Await the executor coroutine, then ALWAYS finalize — on completion,
-    failure, or exception — inside the same event loop. The shield keeps a
-    cancellation delivered during teardown from abandoning it halfway."""
+    failure, or exception — inside the same event loop.
+
+    Cancellation during teardown must not abandon it: `shield` alone raises in
+    the outer task while the finalizer keeps running, and `asyncio.run`'s loop
+    shutdown would then cancel that orphan mid-flight. So keep re-awaiting the
+    shielded future until teardown actually completes, then let the
+    cancellation propagate."""
     outcome: Any = None
     try:
         outcome = await run
         return outcome
     finally:
-        await asyncio.shield(finalize(run_dir, outcome))
+        fin = asyncio.ensure_future(finalize(run_dir, outcome))
+        cancelled = False
+        while not fin.done():
+            try:
+                await asyncio.shield(fin)
+            except asyncio.CancelledError:
+                cancelled = True  # teardown still owed; keep waiting
+        if cancelled:
+            raise asyncio.CancelledError()

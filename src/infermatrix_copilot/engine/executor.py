@@ -84,11 +84,17 @@ class Executor:
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp, self.progress_file)
-        dir_fd = os.open(self.run_dir, os.O_RDONLY)
         try:
-            os.fsync(dir_fd)
-        finally:
-            os.close(dir_fd)
+            # directory fsync makes the rename itself durable; opening a
+            # directory is unsupported on some platforms (Windows), where the
+            # rename's atomicity is all we get — best-effort, never fatal
+            dir_fd = os.open(self.run_dir, os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+        except OSError:
+            pass
 
     # -- execution ------------------------------------------------------------
     async def run(self, playbook: "Playbook", state: dict) -> RunOutcome:

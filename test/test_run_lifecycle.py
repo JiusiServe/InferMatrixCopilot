@@ -63,6 +63,7 @@ def test_run_lock_reacquirable_after_release(tmp_path):
 def test_run_lock_excludes_across_processes(tmp_path):
     """The lock's whole point is cross-process exclusion (two --resume
     invocations), so contend against a real second process holding the flock."""
+    pytest.importorskip("fcntl")  # POSIX-only; the lock degrades elsewhere
     import subprocess
     import sys
     import time
@@ -187,3 +188,59 @@ def test_finalizer_exception_never_masks_the_outcome(tmp_path):
 
     assert asyncio.run(run_guarded(work(), run_dir)) == 42
     assert ran == [True]  # sibling still ran after the buggy one
+
+
+def test_cancellation_during_active_finalizer_completes_teardown(tmp_path):
+    """Cancelling run_guarded while a finalizer is mid-flight must let the
+    teardown finish (shield alone would orphan it to loop shutdown), then
+    propagate the cancellation."""
+    run_dir = tmp_path / "run"
+    completed = []
+
+    async def scenario():
+        started = asyncio.Event()
+
+        async def slow_fin(outcome):
+            started.set()
+            await asyncio.sleep(0.05)
+            completed.append(outcome)
+
+        lifecycle.register_finalizer(run_dir, slow_fin)
+
+        async def work():
+            return "ok"
+
+        task = asyncio.ensure_future(run_guarded(work(), run_dir))
+        await started.wait()  # finalizer is now mid-flight
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert completed == ["ok"]  # teardown finished before the cancel won
+
+    asyncio.run(scenario())
+
+
+def test_duplicate_execute_reserved_leaves_status_untouched(settings, tmp_path):
+    """The reserved-run race: a duplicate child losing the lock must return
+    BLOCKED_EXIT without rewriting child_pid or marking run_status.json — a
+    poller must never observe a terminal state while the winner is running."""
+    import json as _json
+
+    from infermatrix_copilot import run_status as rs
+    from infermatrix_copilot.cli.copilot import Copilot
+    from infermatrix_copilot.notify import BLOCKED_EXIT
+
+    copilot = Copilot(settings)
+    run_id = "run-20260728-000000-abc123"
+    run_dir = settings.run_root / run_id
+    run_dir.mkdir(parents=True)
+    (run_dir / "request.json").write_text("{}")
+    rs.init_queued(run_dir, run_id=run_id, owner_server_id="s", owner_server_pid=1)
+    rs.mark_child_started(run_dir, child_pid=4242, state=rs.RUNNING)
+    before = _json.loads((run_dir / "run_status.json").read_text())
+
+    with RunLock(run_dir):  # the winning process
+        assert copilot.execute_reserved(run_id) == BLOCKED_EXIT
+
+    after = _json.loads((run_dir / "run_status.json").read_text())
+    assert after == before  # pid still 4242, state still running — untouched

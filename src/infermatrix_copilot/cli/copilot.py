@@ -232,7 +232,7 @@ class Copilot:
 
     def _execute(self, playbook, spec: TaskSpec, run_dir: Path, *,
                  resolution_mode: str = "resume", tier: str = "?",
-                 resuming: bool = False) -> int:
+                 resuming: bool = False, held_lock: RunLock | None = None) -> int:
         """Run a resolved `playbook` to completion in `run_dir`: init tracing +
         notifier, seed the shared state (repo path, push policy, protected
         branches / high-risk modules from the adapter when present), drive the
@@ -240,14 +240,17 @@ class Copilot:
         status. `resuming` seeds the state so steps can pick up where they left
         off. Returns the exit code (0 done, BLOCKED_EXIT blocked, else 1)."""
         self.last_run_dir = run_dir
-        try:
-            # First, before any trace/status write: a losing concurrent
-            # invocation (second --resume, duplicate execute_reserved) must
-            # leave the active run's artifacts completely untouched.
-            lock = RunLock(run_dir).acquire()
-        except RunLockHeld as exc:
-            print(style("✋ ", "red", "bold") + str(exc))
-            return BLOCKED_EXIT
+        lock = held_lock
+        if lock is None:
+            try:
+                # First, before any trace/status write: a losing concurrent
+                # invocation (second --resume) must leave the active run's
+                # artifacts completely untouched. execute_reserved holds the
+                # lock across its whole lifecycle and passes it in instead.
+                lock = RunLock(run_dir).acquire()
+            except RunLockHeld as exc:
+                print(style("✋ ", "red", "bold") + str(exc))
+                return BLOCKED_EXIT
         try:
             from .. import tracing
             tracing.init(run_dir.name, run_dir / "trace.jsonl")
@@ -300,7 +303,8 @@ class Copilot:
                 return BLOCKED_EXIT
             return 0 if outcome.status == "done" else 1
         finally:
-            lock.release()
+            if held_lock is None:
+                lock.release()
 
     def run_queue(self, specs: list[TaskSpec], *, assume_yes: bool = False,
                   plan_only: bool = False) -> int:
@@ -395,10 +399,26 @@ class Copilot:
         MCP policy on the persisted request (request.json is untrusted — a host
         could have rewritten it), plans, then executes, driving
         `run_status.json` planning -> running -> terminal. Returns the exit code."""
+        run_dir = self._contained_run_dir(run_id)
+        try:
+            # Lock the whole reserved-run lifecycle before the first status
+            # write: a duplicate child must not overwrite child_pid, flip
+            # run_status.json through PLANNING, or mark the active run
+            # BLOCKED while the winning process is still executing.
+            lock = RunLock(run_dir).acquire()
+        except RunLockHeld as exc:
+            print(style("✋ ", "red", "bold") + str(exc))
+            return BLOCKED_EXIT
+        try:
+            return self._execute_reserved_locked(run_dir, lock)
+        finally:
+            lock.release()
+
+    def _execute_reserved_locked(self, run_dir: Path, lock: RunLock) -> int:
+        """The body of `execute_reserved`, run while holding the run lock."""
         from .. import run_status as rs
         from ..mcp_policy import PolicyError, enforce_mcp_policy
 
-        run_dir = self._contained_run_dir(run_id)
         rs.mark_child_started(run_dir, child_pid=os.getpid(), state=rs.PLANNING)
         try:
             raw = json.loads((run_dir / "request.json").read_text(encoding="utf-8"))
@@ -423,7 +443,8 @@ class Copilot:
         rs.mark(run_dir, rs.RUNNING)
         try:
             code = self._execute(resolution.playbook, spec, run_dir,
-                                 resolution_mode=resolution.mode, tier=resolution.tier)
+                                 resolution_mode=resolution.mode, tier=resolution.tier,
+                                 held_lock=lock)
         except Exception as exc:  # a crash still leaves a terminal record
             rs.mark(run_dir, rs.FAILED, note=f"{type(exc).__name__}: {exc}")
             raise
