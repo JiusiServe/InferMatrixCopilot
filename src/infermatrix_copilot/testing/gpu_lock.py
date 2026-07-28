@@ -107,19 +107,24 @@ def _run(cmd: list[str]) -> str:
 
 def _device_pids(gpu_idx: str, run: Callable[[list[str]], str]) -> set[int]:
     """Compute-app pids ∪ pmon pids for one device — pmon catches processes
-    holding the device without a CUDA context (an init lock, for instance)."""
+    holding the device without a CUDA context (an init lock, for instance).
+
+    pmon rows are `<gpu> <pid> <type> ...`; the pid is field 2. The shell
+    version awk'd field 1 (the gpu index) — on GPU 0 that meant `kill 0`,
+    signalling its own process group. Deliberately fixed, not ported.
+    Non-positive pids are rejected for the same reason."""
     pids: set[int] = set()
     out = run(["nvidia-smi", f"--id={gpu_idx}", "--query-compute-apps=pid",
                "--format=csv,noheader,nounits"])
     for line in out.splitlines():
         line = line.strip()
-        if line.isdigit():
+        if line.isdigit() and int(line) > 0:
             pids.add(int(line))
     out = run(["nvidia-smi", "pmon", "-c", "1", "-i", gpu_idx, "--select", "C"])
     for line in out.splitlines()[2:]:
-        first = line.split()[0] if line.split() else ""
-        if first.isdigit():
-            pids.add(int(first))
+        fields = line.split()
+        if len(fields) >= 2 and fields[1].isdigit() and int(fields[1]) > 0:
+            pids.add(int(fields[1]))
     return pids
 
 

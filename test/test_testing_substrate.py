@@ -229,6 +229,22 @@ def test_gpu_lock_protocol_and_dead_owner_steal(tmp_path):
     GpuLock(d, poll_sec=0.01, timeout_sec=5).acquire().release()
 
 
+def test_gpu_cleanup_parses_pmon_pid_column_never_kills_zero():
+    """pmon rows are `<gpu> <pid> <type> ...`; the shell awk'd field 1 (the
+    gpu index) — on GPU 0 that meant `kill 0`, signalling its own process
+    group. The port must take field 2 and refuse non-positive pids."""
+    pmon = ("# gpu   pid  type  sm  mem  enc  dec  command\n"
+            "# Idx     #   C/G   %    %    %    %  name\n"
+            "    0  7777     C  42   10    0    0  python\n")
+    outs = iter(["", pmon, "", pmon])  # compute-apps empty; pmon has the row
+    kills = []
+    cleanup_orphan_gpu_procs("0", run=lambda cmd: next(outs, ""),
+                             kill=lambda pid, sig: kills.append((pid, sig)),
+                             sleep=lambda s: None)
+    assert (7777, 15) in kills
+    assert all(pid > 0 for pid, _ in kills)  # never 0, never the gpu index
+
+
 def test_gpu_cleanup_excludes_own_tree_and_escalates():
     kills = []
     outs = iter([
@@ -398,3 +414,88 @@ def test_timeout_layering_constants():
     # the safety margin is the load-bearing 900 s from phase3; the safety
     # timer fires strictly after the primary by construction (timeout + margin)
     assert PY_TIMEOUT_MARGIN_SEC == 900
+
+
+def test_timeout_kills_own_pgroup_descendants(runner, tmp_path):
+    """A spawn-mode child in its OWN process group must die too: killpg never
+    reaches it, and the leader exiting must not end the escalation."""
+    pidfile = tmp_path / "child.pid"
+    job = TestJob(
+        key="orphan", timeout_sec=0.5, min_gpus=0, index=8,
+        command=(f"setsid bash -c 'echo $$ > {pidfile}; exec sleep 60' &\n"
+                 f"sleep 60"))
+    out = runner.run(job, dict(os.environ))
+    assert out.timed_out
+    deadline = time.monotonic() + 10
+    child = int(pidfile.read_text().strip())
+    while time.monotonic() < deadline:
+        try:
+            os.kill(child, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(0.1)
+    else:
+        os.kill(child, signal.SIGKILL)
+        pytest.fail(f"own-pgroup descendant {child} survived the tree kill")
+
+
+def test_cov_fallback_runs_under_the_gpu_lock(patterns, tmp_path):
+    """Missing pytest-cov is exactly when the fallback does the real GPU
+    workload — it must run while the lock is still held."""
+    (tmp_path / "repo").mkdir()
+    lock_dir = tmp_path / "gpu_lock"
+    r = TestRunner(repo_root=tmp_path / "repo", tests_dir=tmp_path / "tests",
+                   patterns=patterns, gpu_lock_dir=lock_dir,
+                   cuda_visible_devices="", available_gpus=lambda: 1,
+                   watchdog_interval=0.05)
+    probe = tmp_path / "repo" / "probe.sh"
+    probe.write_text(
+        "#!/bin/bash\n"
+        'if [[ "$*" == *--cov* ]]; then\n'
+        '  echo "ERROR: unrecognized arguments: --cov=x"; exit 2\nfi\n'
+        f'test -f {lock_dir / "lock"} && echo LOCKED-DURING-FALLBACK\n')
+    out = r.run(TestJob(key="covlock", command="bash probe.sh --cov=x",
+                        timeout_sec=20, min_gpus=1, index=9),
+                dict(os.environ))
+    assert out.rc == 0
+    log = (tmp_path / "tests" / "09_covlock.log").read_text()
+    assert "LOCKED-DURING-FALLBACK" in log
+    assert not (lock_dir / "lock").exists()  # released afterwards
+
+
+def test_setup_timeout_is_best_effort(runner, tmp_path):
+    job = TestJob(key="setup", command="echo main-ran", timeout_sec=0.4,
+                  min_gpus=0, index=10, setup="sleep 60")
+    out = runner.run(job, dict(os.environ))
+    assert out.rc == 0  # the job itself still ran and passed
+    log = (tmp_path / "tests" / "10_setup.log").read_text()
+    assert "[setup] ignored failure" in log and "main-ran" in log
+
+
+def test_artifact_globs_cannot_escape_or_recurse(runner, tmp_path):
+    from infermatrix_copilot.testing.runner import cleanup_test_artifacts
+    repo = tmp_path / "repo"
+    (repo / "sub").mkdir()
+    (repo / "sub" / "nested.wav").write_text("keep")
+    outside = tmp_path / "outside.wav"
+    outside.write_text("keep")
+    removed = cleanup_test_artifacts(
+        repo, ["**/*.wav", "../outside.wav", "sub/nested.wav"])
+    assert removed == 0
+    assert (repo / "sub" / "nested.wav").exists() and outside.exists()
+
+
+def test_failure_and_skip_clear_stale_pass_marker(runner, tmp_path):
+    ok = TestJob(key="flip", command="true", timeout_sec=10, min_gpus=0,
+                 index=11)
+    runner.run(ok, dict(os.environ))
+    marker = tmp_path / "tests" / ".passed_flip"
+    assert marker.exists()
+    runner.run(TestJob(key="flip", command="false", timeout_sec=10,
+                       min_gpus=0, index=11), dict(os.environ))
+    assert not marker.exists()  # failure removed the stale marker
+    runner.run(ok, dict(os.environ))
+    assert marker.exists()
+    runner.run(TestJob(key="flip", command="true", timeout_sec=10,
+                       min_gpus=9, index=11), dict(os.environ))  # hw skip
+    assert not marker.exists()  # a skip must not retain a misleading marker

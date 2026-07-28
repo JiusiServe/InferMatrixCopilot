@@ -22,10 +22,9 @@ import re
 import signal
 import subprocess
 import threading
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable
 
 from .gpu_lock import GpuLock, cleanup_orphan_gpu_procs, wait_gpu_memory_idle
 from .watchdog import LogWatchdog, WatchdogPatterns
@@ -175,14 +174,21 @@ def _exec_wrap(command: str) -> str:
 
 def cleanup_test_artifacts(repo_root: Path, globs: list[str]) -> int:
     """Delete well-known per-test artifact files at depth 1 of the repo root
-    (never recursive — real fixtures under tests/data must never be touched)."""
+    (never recursive — real fixtures under tests/data must never be touched).
+    Patterns are basenames only, like the shell's `find -maxdepth 1 -name`:
+    a pattern containing a separator, `..`, or `**` is refused, and every
+    match's parent must be the repo root itself."""
     removed = 0
-    root = Path(repo_root)
+    root = Path(repo_root).resolve()
     if not root.is_dir():
         return 0
     for pattern in globs:
+        if os.sep in pattern or "/" in pattern or ".." in pattern \
+                or "**" in pattern:
+            continue  # adapter data, but never a path expression
         for f in root.glob(pattern):
-            if f.is_file():
+            if f.is_file() and not f.is_symlink() \
+                    and f.resolve().parent == root:
                 try:
                     f.unlink()
                     removed += 1
@@ -235,6 +241,13 @@ class TestRunner:
         if dry_run:
             return TestOutcome(rc=0, log_file=str(log_file), plan=plan)
 
+        self.tests_dir.mkdir(parents=True, exist_ok=True)
+        # a stale marker from an earlier pass must never survive a rerun OR a
+        # skip: resume logic reads markers as "this run completed it", so the
+        # unlink happens before the hardware gate can return
+        marker = pass_marker_for(self.tests_dir, job, baseline=baseline)
+        marker.unlink(missing_ok=True)
+
         # hw gate: explicit skip, never a silent rc=0 pass
         avail = self.available_gpus()
         if avail < job.min_gpus:
@@ -242,48 +255,60 @@ class TestRunner:
                 rc=0, skipped=True, log_file=str(log_file), plan=plan,
                 skip_reason=f"needs {job.min_gpus} GPU(s), {avail} available")
 
-        self.tests_dir.mkdir(parents=True, exist_ok=True)
         backup_prev_log(log_file)
         run_env = {**env, **job.env}
 
-        if job.setup:  # best-effort, output appended (shell parity)
-            with open(log_file, "a", encoding="utf-8") as lf:
-                subprocess.run(["bash", "-c", job.setup], cwd=self.repo_root,
-                               env=run_env, stdout=lf, stderr=lf,
-                               timeout=job.timeout_sec, check=False)
+        if job.setup:  # best-effort, output appended — never aborts the job
+            try:
+                with open(log_file, "a", encoding="utf-8") as lf:
+                    subprocess.run(["bash", "-c", job.setup],
+                                   cwd=self.repo_root, env=run_env,
+                                   stdout=lf, stderr=lf,
+                                   timeout=job.timeout_sec, check=False)
+            except (subprocess.TimeoutExpired, OSError) as exc:
+                with open(log_file, "a", encoding="utf-8") as lf:
+                    lf.write(f"\n[setup] ignored failure: "
+                             f"{type(exc).__name__}: {exc}\n")
 
+        # The GPU lock spans the primary attempt AND the cov fallback: a
+        # missing pytest-cov is exactly the case where the primary exits
+        # before touching the GPU and the fallback does the real workload.
         lock: GpuLock | None = None
         if job.min_gpus > 0 and self.gpu_lock_dir is not None:
             lock = GpuLock(self.gpu_lock_dir).acquire()
         try:
+            # append: backup_prev_log already truncated this attempt's log,
+            # and truncating again here (shell parity: main command used `>`)
+            # would discard the setup output and any setup-failure diagnostic
             rc, wd_hit, timed_out = self._spawn(
-                _exec_wrap(job.command), job, run_env, log_file, append=False)
+                _exec_wrap(job.command), job, run_env, log_file, append=True)
+            append_silent_log_footer(log_file, rc, "primary")
+            if wd_hit:
+                rc = rc or 1
+
+            # cov-strip fallback: only for the specific argparse failure
+            if rc != 0 and self._log_has(log_file,
+                                         r"unrecognized arguments: .*--cov"):
+                fallback = strip_cov_flags(job.command)
+                if fallback != job.command:
+                    with open(log_file, "a", encoding="utf-8") as f:
+                        f.write("\n[coverage-fallback] Retrying without --cov "
+                                f"flags:\n{fallback}\n")
+                    rc, wd_hit, timed_out = self._spawn(
+                        _exec_wrap(fallback), job, run_env, log_file,
+                        append=True)
+                    append_silent_log_footer(log_file, rc, "cov-fallback")
+                    if wd_hit:
+                        rc = rc or 1
         finally:
             if lock is not None:
                 cleanup_orphan_gpu_procs(self.cuda)
                 wait_gpu_memory_idle(self.cuda)
                 lock.release()
 
-        append_silent_log_footer(log_file, rc, "primary")
-        if wd_hit:
-            rc = rc or 1
-
-        # cov-strip fallback: only for the specific argparse failure
-        if rc != 0 and self._log_has(log_file, r"unrecognized arguments: .*--cov"):
-            fallback = strip_cov_flags(job.command)
-            if fallback != job.command:
-                with open(log_file, "a", encoding="utf-8") as f:
-                    f.write("\n[coverage-fallback] Retrying without --cov "
-                            f"flags:\n{fallback}\n")
-                rc, wd_hit, timed_out = self._spawn(
-                    _exec_wrap(fallback), job, run_env, log_file, append=True)
-                append_silent_log_footer(log_file, rc, "cov-fallback")
-                if wd_hit:
-                    rc = rc or 1
-
         cleanup_test_artifacts(self.repo_root, self.artifact_globs)
         if rc == 0:
-            pass_marker_for(self.tests_dir, job, baseline=baseline).touch()
+            marker.touch()
         return TestOutcome(rc=rc, watchdog_triggered=wd_hit,
                            timed_out=timed_out, log_file=str(log_file),
                            plan=plan)
@@ -304,15 +329,14 @@ class TestRunner:
                     check_interval=self.watchdog_interval,
                     review_fn=self.review_fn, record_fn=self.record_fn,
                     report_fn=self.report_fn,
-                    kill_fn=lambda pid: self._killpg(proc, signal.SIGTERM,
-                                                     then_kill=True)).start()
+                    kill_fn=lambda pid: self._terminate_tree(proc)).start()
 
             def primary():
                 timed_out.set()
-                self._killpg(proc, signal.SIGTERM, then_kill=True)
+                self._terminate_tree(proc)
 
             def safety():  # only matters if the primary path wedged
-                self._killpg(proc, signal.SIGKILL, then_kill=False)
+                self._killpg(proc, signal.SIGKILL)
 
             t_primary = threading.Timer(job.timeout_sec, primary)
             t_safety = threading.Timer(job.timeout_sec + PY_TIMEOUT_MARGIN_SEC,
@@ -332,26 +356,26 @@ class TestRunner:
         return rc, wd_hit, timed_out.is_set()
 
     @staticmethod
-    def _killpg(proc: subprocess.Popen, sig: int, *, then_kill: bool,
-                grace: float = 60.0) -> None:
+    def _terminate_tree(proc: subprocess.Popen) -> None:
+        """Kill the leader's process group AND every descendant individually.
+        Descendants are collected BEFORE any signal (a dead leader can't be
+        walked), because spawn-mode multiprocessing children create their own
+        process groups — killpg alone never reaches them, and the leader
+        exiting must not end the escalation while they hold GPU memory.
+        `kill_tree` then owns TERM → grace → KILL per pid, survivors logged."""
+        from .process_tree import collect_descendants, kill_tree
+
+        targets = collect_descendants(proc.pid)
+        TestRunner._killpg(proc, signal.SIGTERM)
+        kill_tree(targets)
+        TestRunner._killpg(proc, signal.SIGKILL)
+
+    @staticmethod
+    def _killpg(proc: subprocess.Popen, sig: int) -> None:
         try:
-            pgid = os.getpgid(proc.pid)
-        except ProcessLookupError:
-            return
-        try:
-            os.killpg(pgid, sig)
+            os.killpg(os.getpgid(proc.pid), sig)
         except OSError:
-            return
-        if then_kill:
-            deadline = time.monotonic() + grace
-            while time.monotonic() < deadline:
-                if proc.poll() is not None:
-                    return
-                time.sleep(0.2)
-            try:
-                os.killpg(pgid, signal.SIGKILL)
-            except OSError:
-                pass
+            pass
 
     @staticmethod
     def _log_has(log_file: Path, pattern: str) -> bool:
