@@ -24,6 +24,11 @@ PROMOTE_MIN_COUNT = 3
 PROMOTE_MIN_DAYS = 5
 
 
+def _unescape(pattern: str) -> str:
+    """Invert `re.escape` (every escape it emits is a single backslash)."""
+    return re.sub(r"\\(.)", r"\1", pattern)
+
+
 def normalize_pattern(pattern: str) -> str:
     """A stable key from a full matched line: drop `(Proc pid=NNN)` prefixes,
     cap the length — raw lines carry pids and payloads that never repeat."""
@@ -116,7 +121,10 @@ def promote(decision_log: Path, overlay: Path, *, seed_noise: list[str],
     if overlay.exists():
         doc = yaml.safe_load(overlay.read_text(encoding="utf-8")) or {}
     current = list(doc.get("noise", []))
-    existing = set(seed_noise) | set(current)
+    # overlay entries are escaped regexes while candidates are raw lines —
+    # compare both forms, else every promote() re-appends the same pattern
+    existing = set(seed_noise) | set(current) | {
+        _unescape(e) for e in current}
 
     new = eligible_patterns(read_decisions(decision_log), existing=existing,
                             min_count=min_count, min_days=min_days)

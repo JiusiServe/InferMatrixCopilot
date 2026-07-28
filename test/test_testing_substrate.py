@@ -182,6 +182,20 @@ def test_learn_promote_appends_escaped_to_overlay(tmp_path):
     assert p.is_noise("odd (x) warning")
 
 
+def test_learn_promote_is_idempotent(tmp_path):
+    import json
+    logf = tmp_path / "d.jsonl"
+    logf.write_text("\n".join(json.dumps(
+        {"ts": f"2026-07-0{d} 10:00:00", "pattern": "odd (y) warning",
+         "verdict": "CONTINUE"}) for d in (1, 7, 9)))
+    overlay = tmp_path / "overlay.yaml"
+    assert watchdog_learn.promote(logf, overlay, seed_noise=[]) == \
+        ["odd (y) warning"]
+    before = overlay.read_text()
+    assert watchdog_learn.promote(logf, overlay, seed_noise=[]) == []
+    assert overlay.read_text() == before  # second call appends nothing
+
+
 def test_learn_record_normalizes_pid_prefix(tmp_path):
     logf = tmp_path / "d.jsonl"
     watchdog_learn.record(logf, pattern="(StageEngineCoreProc pid=123) boom",
@@ -483,6 +497,105 @@ def test_artifact_globs_cannot_escape_or_recurse(runner, tmp_path):
         repo, ["**/*.wav", "../outside.wav", "sub/nested.wav"])
     assert removed == 0
     assert (repo / "sub" / "nested.wav").exists() and outside.exists()
+
+
+def test_final_scan_catches_fast_failures(runner, tmp_path):
+    """A job shorter than the watchdog poll interval that prints a critical
+    line and exits 0 must NOT earn a pass marker — the final scan sees it."""
+    job = TestJob(key="fast", timeout_sec=30, min_gpus=0, index=12,
+                  command="echo 'CUDA out of memory'; true")
+    out = runner.run(job, dict(os.environ))
+    assert out.watchdog_triggered and out.rc != 0
+    assert not (tmp_path / "tests" / ".passed_fast").exists()
+
+
+def test_timeout_return_waits_for_tree_kill(runner, tmp_path):
+    """_spawn must not return while the fired primary timer is still
+    escalating: by return time the own-pgroup child is already dead."""
+    pidfile = tmp_path / "child2.pid"
+    job = TestJob(
+        key="join", timeout_sec=0.5, min_gpus=0, index=13,
+        command=(f"setsid bash -c 'echo $$ > {pidfile}; exec sleep 60' &\n"
+                 f"sleep 0.2; wait"))
+    out = runner.run(job, dict(os.environ))
+    assert out.timed_out
+    child = int(pidfile.read_text().strip())
+    with pytest.raises(ProcessLookupError):  # dead already, not eventually
+        os.kill(child, 0)
+
+
+def test_setup_nonzero_rc_is_logged(runner, tmp_path):
+    job = TestJob(key="setuprc", command="echo main-ran", timeout_sec=10,
+                  min_gpus=0, index=14, setup="false")
+    out = runner.run(job, dict(os.environ))
+    assert out.rc == 0
+    log = (tmp_path / "tests" / "14_setuprc.log").read_text()
+    assert "[setup] ignored failure: rc=1" in log
+
+
+def test_setup_timeout_kills_its_session_children(runner, tmp_path):
+    pidfile = tmp_path / "setup_child.pid"
+    job = TestJob(
+        key="setupkill", command="echo main-ran", timeout_sec=1, min_gpus=0,
+        index=15,
+        setup=f"bash -c 'echo $$ > {pidfile}; exec sleep 60' &\nsleep 60")
+    out = runner.run(job, dict(os.environ))
+    assert out.rc == 0
+    child = int(pidfile.read_text().strip())
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        try:
+            os.kill(child, 0)
+            time.sleep(0.1)
+        except ProcessLookupError:
+            break
+    else:
+        os.kill(child, signal.SIGKILL)
+        pytest.fail("setup's background child survived the group kill")
+
+
+def test_job_cuda_override_governs_gate_and_cleanup(patterns, tmp_path):
+    """A job redirecting itself to other GPUs is gated on ITS devices and
+    cleaned up on ITS devices, not the runner's."""
+    (tmp_path / "repo").mkdir()
+    cleaned = []
+    import infermatrix_copilot.testing.runner as rmod
+    orig_clean, orig_wait = rmod.cleanup_orphan_gpu_procs, rmod.wait_gpu_memory_idle
+    rmod.cleanup_orphan_gpu_procs = lambda dev, **k: cleaned.append(dev) or 0
+    rmod.wait_gpu_memory_idle = lambda dev, **k: True
+    try:
+        r = TestRunner(repo_root=tmp_path / "repo",
+                       tests_dir=tmp_path / "tests", patterns=patterns,
+                       gpu_lock_dir=tmp_path / "gl",
+                       cuda_visible_devices="0",
+                       available_gpus=lambda: 1, watchdog_interval=0.05)
+        # runner has 1 GPU, but the job redirects to 2 — gate on the job's
+        out = r.run(TestJob(key="redir", command="true", timeout_sec=10,
+                            min_gpus=2, index=16,
+                            env={"CUDA_VISIBLE_DEVICES": "2,3"}),
+                    dict(os.environ))
+        assert not out.skipped and out.rc == 0
+        assert cleaned == ["2,3"]  # cleanup targeted the job's devices
+        # and the reverse: runner has GPUs, job pins itself to none
+        out = r.run(TestJob(key="none", command="true", timeout_sec=10,
+                            min_gpus=1, index=17,
+                            env={"CUDA_VISIBLE_DEVICES": ""}),
+                    dict(os.environ))
+        assert out.skipped
+    finally:
+        rmod.cleanup_orphan_gpu_procs = orig_clean
+        rmod.wait_gpu_memory_idle = orig_wait
+
+
+def test_gpu_lock_steal_grace_for_unparseable_lock(tmp_path):
+    """An empty lock younger than the grace window is a writer mid-create,
+    not a crash artifact — it must not be stolen."""
+    d = tmp_path / "gl"
+    d.mkdir()
+    (d / "lock").write_text("")
+    lock = GpuLock(d, poll_sec=0.01, timeout_sec=0.05)
+    with pytest.raises(Exception):
+        lock.acquire()  # fresh empty lock: honored, so acquire times out
 
 
 def test_failure_and_skip_clear_stale_pass_marker(runner, tmp_path):

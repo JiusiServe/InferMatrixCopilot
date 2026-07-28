@@ -248,8 +248,15 @@ class TestRunner:
         marker = pass_marker_for(self.tests_dir, job, baseline=baseline)
         marker.unlink(missing_ok=True)
 
+        # a job may redirect itself to other GPUs via its env pairs — gate on
+        # and clean up the devices it will actually use, not the runner's
+        job_cuda = job.env.get("CUDA_VISIBLE_DEVICES", self.cuda)
+        if "CUDA_VISIBLE_DEVICES" in job.env:
+            avail = len([d for d in job_cuda.split(",") if d.strip()])
+        else:
+            avail = self.available_gpus()
+
         # hw gate: explicit skip, never a silent rc=0 pass
-        avail = self.available_gpus()
         if avail < job.min_gpus:
             return TestOutcome(
                 rc=0, skipped=True, log_file=str(log_file), plan=plan,
@@ -258,17 +265,8 @@ class TestRunner:
         backup_prev_log(log_file)
         run_env = {**env, **job.env}
 
-        if job.setup:  # best-effort, output appended — never aborts the job
-            try:
-                with open(log_file, "a", encoding="utf-8") as lf:
-                    subprocess.run(["bash", "-c", job.setup],
-                                   cwd=self.repo_root, env=run_env,
-                                   stdout=lf, stderr=lf,
-                                   timeout=job.timeout_sec, check=False)
-            except (subprocess.TimeoutExpired, OSError) as exc:
-                with open(log_file, "a", encoding="utf-8") as lf:
-                    lf.write(f"\n[setup] ignored failure: "
-                             f"{type(exc).__name__}: {exc}\n")
+        if job.setup:
+            self._run_setup(job, run_env, log_file)
 
         # The GPU lock spans the primary attempt AND the cov fallback: a
         # missing pytest-cov is exactly the case where the primary exits
@@ -302,8 +300,8 @@ class TestRunner:
                         rc = rc or 1
         finally:
             if lock is not None:
-                cleanup_orphan_gpu_procs(self.cuda)
-                wait_gpu_memory_idle(self.cuda)
+                cleanup_orphan_gpu_procs(job_cuda)
+                wait_gpu_memory_idle(job_cuda)
                 lock.release()
 
         cleanup_test_artifacts(self.repo_root, self.artifact_globs)
@@ -314,6 +312,41 @@ class TestRunner:
                            plan=plan)
 
     # -- internals ------------------------------------------------------------
+    def _run_setup(self, job: TestJob, env: dict[str, str],
+                   log_file: Path) -> None:
+        """Setup is best-effort but every failure mode leaves a diagnostic:
+        nonzero rc is logged, a timeout kills the setup's whole process group
+        (its own session, so background children can't outlive it and race
+        the main test), and none of it ever aborts the job."""
+        note = ""
+        try:
+            with open(log_file, "a", encoding="utf-8") as lf:
+                proc = subprocess.Popen(["bash", "-c", job.setup],
+                                        cwd=self.repo_root, env=env,
+                                        stdout=lf, stderr=lf,
+                                        start_new_session=True)
+                try:
+                    rc = proc.wait(timeout=job.timeout_sec)
+                    if rc != 0:
+                        note = f"[setup] ignored failure: rc={rc}"
+                except subprocess.TimeoutExpired:
+                    self._killpg(proc, signal.SIGTERM)
+                    try:
+                        proc.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        self._killpg(proc, signal.SIGKILL)
+                        proc.wait(timeout=10)
+                    note = (f"[setup] ignored failure: timeout after "
+                            f"{job.timeout_sec}s (process group killed)")
+        except OSError as exc:
+            note = f"[setup] ignored failure: {type(exc).__name__}: {exc}"
+        if note:
+            try:
+                with open(log_file, "a", encoding="utf-8") as lf:
+                    lf.write(f"\n{note}\n")
+            except OSError:
+                pass
+
     def _spawn(self, exec_cmd: str, job: TestJob, env: dict[str, str],
                log_file: Path, *, append: bool) -> tuple[int, bool, bool]:
         timed_out = threading.Event()
@@ -346,10 +379,19 @@ class TestRunner:
             try:
                 rc = proc.wait()
             finally:
+                # cancel then JOIN: a fired primary timer is mid-escalation in
+                # its own thread — returning before it finishes would let the
+                # next job start while own-pgroup descendants still hold GPUs
                 t_primary.cancel()
                 t_safety.cancel()
+                t_primary.join()
+                t_safety.join()
                 if watchdog is not None:
                     watchdog.stop()
+                    # final scan: a job shorter than the poll interval (or a
+                    # line written after the last poll) must still be seen —
+                    # "CUDA out of memory" + exit 0 is not a pass
+                    watchdog.check_once()
         wd_hit = bool(watchdog is not None and watchdog.result.triggered)
         if timed_out.is_set():
             rc = TIMEOUT_RC
