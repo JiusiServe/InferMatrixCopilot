@@ -238,7 +238,19 @@ def build_mcp(settings: Optional[Settings] = None):
     from mcp.server.fastmcp import FastMCP
 
     core = CopilotMCP(settings)
-    mcp = FastMCP("infermatrix-copilot")
+    mcp = FastMCP(
+        "infermatrix-copilot",
+        instructions=(
+            "Read-only repository copilot with curated knowledge. For a PR "
+            "review, call start_review once, save its run_id, then poll "
+            "get_result with that run_id until the state is terminal. If the "
+            "user explicitly asks for the advanced/strong/high-performance "
+            "model, pass mode='performance'; otherwise use mode='eco'. Return "
+            "the complete paged report by following next_offset. Never start "
+            "a second review merely because the first is still running. Use "
+            "doc_search then doc_read for direct knowledge questions."
+        ),
+    )
 
     @mcp.tool()
     def start_review(pr: int, repo: str = "", review_depth: str = "",

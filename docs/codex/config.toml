@@ -1,21 +1,16 @@
-# Codex CLI integration — add this block to ~/.codex/config.toml
-#
-# Prerequisite: the infermatrix-copilot package (with the MCP extra) must be installed
-# and on PATH — installing a Codex MCP entry does NOT install the package:
-#     uv tool install 'infermatrix-copilot[mcp]'      # or: pipx install 'infermatrix-copilot[mcp]'
-#
-# Forward secrets by NAME via `env_vars` (Codex reads them from your shell
-# environment) rather than pasting literal secret values into this file.
+# Thin Codex integration — see docs/codex/README.md for the complete setup.
+# Replace this path with the absolute path to the editable source checkout.
+# No API key or model configuration is required.
 
 [mcp_servers.infermatrix_copilot]
-command = "infermatrix-copilot-mcp"
+command = "D:\\src\\InferMatrixCopilot\\.venv\\Scripts\\infermatrix-copilot-mcp.exe"
 args = []
-env_vars = ["ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "DEFAULT_REPO"]
+startup_timeout_sec = 30
+tool_timeout_sec = 60
 
-# Tools exposed (all read-only, start/poll):
-#   start_review(pr, repo?)        -> {run_id}
-#   start_issue_answer(issue, repo?) -> {run_id}
-#   start_issue_triage(repo?)      -> {run_id}
-#   get_result(run_id, offset?)    -> {state, report?, next_offset?, report_path?}
-#   get_status(run_id)             -> {status, progress?}
-#   list_playbooks()               -> {read_only_kinds, playbooks}
+# Tools exposed:
+#   review(target, changed_files?, change_summary?, repo?, mode="direct")
+#   submit_review_stage(run_id, stage, artifact)
+#   get_review_status(run_id)
+#   doc_search(query, repo?, limit?)
+#   doc_read(path, repo?, offset?)
