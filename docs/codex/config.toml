@@ -9,8 +9,7 @@ startup_timeout_sec = 30
 tool_timeout_sec = 60
 
 # Tools exposed:
-#   prepare_review(target, changed_files, change_summary?, repo?)
-#   start_strict_review(target, repo?)
+#   review(target, changed_files?, change_summary?, repo?, mode="direct")
 #   submit_review_stage(run_id, stage, artifact)
 #   get_review_status(run_id)
 #   doc_search(query, repo?, limit?)

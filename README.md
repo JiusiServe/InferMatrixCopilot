@@ -31,9 +31,9 @@ Use InferMatrixCopilot to review
 https://github.com/vllm-project/vllm-omni/pull/5172.
 ```
 
-Codex calls `prepare_review`, reads the relevant knowledge, and reviews with the
-model already selected in Codex. See [`docs/codex/README.md`](docs/codex/README.md)
-for macOS/Linux and manual setup.
+Codex calls `review` in its default direct mode, reads the relevant knowledge,
+and reviews with the model already selected in Codex. See
+[`docs/codex/README.md`](docs/codex/README.md) for macOS/Linux and manual setup.
 
 For stronger process adherence, ask Codex to use **strict workflow mode**.
 InferMatrixCopilot then owns a persistent `evidence → gates → review → verify`

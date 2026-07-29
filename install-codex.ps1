@@ -4,14 +4,24 @@ $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Push-Location $ProjectRoot
 try {
     if (Get-Command py -ErrorAction SilentlyContinue) {
-        & py -3.11 -m venv .venv
+        & py -3 -c "import sys; assert sys.version_info >= (3, 11), 'Python 3.11+ required'"
+        if ($LASTEXITCODE -ne 0) {
+            throw "The default Python 3 is older than 3.11."
+        }
+        & py -3 -m venv .venv
     }
     elseif (Get-Command python -ErrorAction SilentlyContinue) {
         & python -c "import sys; assert sys.version_info >= (3, 11), 'Python 3.11+ required'"
+        if ($LASTEXITCODE -ne 0) {
+            throw "Python 3.11+ is required."
+        }
         & python -m venv .venv
     }
     else {
         throw "Python 3.11+ is required."
+    }
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to create the Python virtual environment."
     }
 
     $VenvPython = Join-Path $ProjectRoot ".venv\Scripts\python.exe"

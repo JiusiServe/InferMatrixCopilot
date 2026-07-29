@@ -18,7 +18,7 @@ Use InferMatrixCopilot to review
 https://github.com/vllm-project/vllm-omni/pull/5172.
 ```
 
-Codex first inspects the live PR, then calls `prepare_review` with the changed
+Codex first inspects the live PR, then calls `review` with the changed
 files so the returned knowledge is specific to the affected modules.
 
 For server-enforced sequencing, say:
@@ -50,11 +50,11 @@ confirm that `infermatrix_copilot` is connected.
 
 ## What the default MCP exposes
 
-- `prepare_review(target, changed_files, ...)`: direct best-effort review with
-  changed-file-specific knowledge routing.
-- `start_strict_review(target, repo?)`: starts a persistent strict run.
+- `review(target, changed_files?, mode="direct")`: the only starting point.
+  Direct is the default; strict is selected only when the user explicitly asks.
 - `submit_review_stage(run_id, stage, artifact)`: validates and advances one
-  strict stage.
+  strict stage. Each response includes an `artifact_example`; scalar list fields
+  are normalized automatically.
 - `get_review_status(run_id)`: resumes a strict run.
 - `doc_search(query, repo?)`: finds deeper model/component rules.
 - `doc_read(path, repo?)`: reads a selected knowledge page.

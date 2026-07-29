@@ -99,20 +99,47 @@ def _next_action(stage: str) -> dict:
         "evidence": {
             "task": "Inspect the live target and submit immutable review evidence.",
             "required": ["head", "base", "changed_files", "diff_summary"],
+            "artifact_example": {
+                "head": "<commit SHA>",
+                "base": "<commit SHA>",
+                "changed_files": ["path/to/file.py"],
+                "diff_summary": "<short summary>",
+            },
         },
         "gates": {
             "task": "Check merge state, CI state, and deterministic risk signals.",
             "required": ["merge_state", "ci_status", "risk_areas"],
+            "artifact_example": {
+                "merge_state": "<state>",
+                "ci_status": "<status and validation boundary>",
+                "risk_areas": ["<risk area>"],
+            },
         },
         "review": {
             "task": "Review the routed modules and submit grounded candidate findings.",
             "required": ["coverage", "findings"],
+            "artifact_example": {
+                "coverage": ["path/to/reviewed_file.py"],
+                "findings": [{
+                    "title": "<finding title>",
+                    "location": "path/to/file.py:line",
+                    "body": "<evidence and impact>",
+                }],
+            },
         },
         "verify": {
             "task": "Re-check every candidate against current code; discard weak findings.",
             "required": ["verified_findings", "discarded_findings"],
+            "artifact_example": {
+                "verified_findings": [],
+                "discarded_findings": [],
+            },
         },
-        "complete": {"task": "Return final_report to the user.", "required": []},
+        "complete": {
+            "task": "Return final_report to the user.",
+            "required": [],
+            "artifact_example": {},
+        },
     }
     return {"stage": stage, **actions[stage]}
 
@@ -140,28 +167,47 @@ def build_mcp():
     mcp = FastMCP(
         "infermatrix-copilot",
         instructions=(
-            "This server has two host-model modes and never calls another model. "
-            "Default direct mode: inspect the target first, then call "
-            "prepare_review with its changed_files. Strict mode: call "
-            "start_strict_review and obey each next_action, submitting artifacts "
-            "through submit_review_stage until complete. Only a completed strict "
-            "run has a final_report. Use doc_search/doc_read for deeper rules."
+            "Always begin with the review tool. Unless the user explicitly asks "
+            "for strict workflow mode, use its default direct mode. Never choose "
+            "strict mode merely because it is available. This server never calls "
+            "another model. In strict mode, obey each next_action and submit "
+            "artifacts through submit_review_stage until complete."
         ),
     )
 
     @mcp.tool()
-    def prepare_review(target: str, changed_files: list[str],
-                       change_summary: str = "",
-                       repo: str = "vllm-omni") -> dict:
-        """Prepare best-effort direct review knowledge after Codex inspects code.
+    def review(target: str, changed_files: list[str] | None = None,
+               change_summary: str = "", repo: str = "vllm-omni",
+               mode: str = "direct") -> dict:
+        """Begin a review. Use direct unless the user explicitly requests strict.
 
         `target` is a PR URL/number or a short description of local changes.
-        `changed_files` makes knowledge routing target-specific. This tool does
-        not fetch code; the host inspects the PR/worktree with its normal tools.
+        Direct mode requires `changed_files` after the host inspects the target
+        and immediately returns routed knowledge. Strict mode starts the staged
+        workflow and returns a run_id plus its first next_action.
         """
         def run() -> dict:
             if not str(target).strip():
                 raise ValueError("target must not be empty")
+            selected_mode = str(mode).strip().casefold() or "direct"
+            if selected_mode not in {"direct", "strict"}:
+                raise ValueError("mode must be 'direct' or 'strict'")
+            if selected_mode == "strict":
+                _docs(repo)
+                record = {
+                    "run_id": uuid.uuid4().hex,
+                    "target": str(target).strip(),
+                    "repo": repo,
+                    "mode": "strict",
+                    "stage": "evidence",
+                    "artifacts": {},
+                }
+                _save_run(record)
+                return {
+                    "run_id": record["run_id"],
+                    "mode": "strict",
+                    "next_action": _next_action("evidence"),
+                }
             if not isinstance(changed_files, list) or not changed_files:
                 raise ValueError(
                     "changed_files is required; inspect the target before calling")
@@ -182,30 +228,13 @@ def build_mcp():
         return _guard(run)
 
     @mcp.tool()
-    def start_strict_review(target: str, repo: str = "vllm-omni") -> dict:
-        """Start the server-enforced host workflow; returns run_id + next_action."""
-        def run() -> dict:
-            if not str(target).strip():
-                raise ValueError("target must not be empty")
-            _docs(repo)
-            record = {
-                "run_id": uuid.uuid4().hex,
-                "target": str(target).strip(),
-                "repo": repo,
-                "mode": "strict",
-                "stage": "evidence",
-                "artifacts": {},
-            }
-            _save_run(record)
-            return {"run_id": record["run_id"], "mode": "strict",
-                    "next_action": _next_action("evidence")}
-
-        return _guard(run)
-
-    @mcp.tool()
     def submit_review_stage(run_id: str, stage: str,
                             artifact: dict[str, Any]) -> dict:
-        """Submit the current strict stage; skipping or stale stages are refused."""
+        """Advance strict mode using the artifact_example from next_action.
+
+        Fields documented as arrays also accept one scalar item and normalize it
+        to a one-item array, so a harmless shape mismatch does not block a run.
+        """
         def run() -> dict:
             record = _load_run(run_id)
             current = record["stage"]
@@ -228,7 +257,7 @@ def build_mcp():
             }.get(stage, ())
             for list_field in list_fields:
                 if not isinstance(artifact[list_field], list):
-                    raise ValueError(f"{list_field} must be a list")
+                    artifact[list_field] = [artifact[list_field]]
             if stage == "review" and not artifact["coverage"]:
                 raise ValueError("coverage must be a non-empty list")
             record["artifacts"][stage] = artifact
