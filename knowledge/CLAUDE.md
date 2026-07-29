@@ -7,11 +7,11 @@
 1. 确认用户正在操作哪个真实仓库；不要用当前 shell 路径或历史对话猜。
 2. 先查下面场景触发器。精确命中具体 guide 时直接读 guide，不再先读它所在主题的 `_index.md`；没有直接命中时，才从知识地图选一个 `general/<主题>/_index.md`。
 3. 只有 canonical `repos/<slug>/` 已由本轮的显式知识路径或仓库映射验证时，才直接读它的 `rules.md`。用户只给 upstream 名、URL、显示名或本地目录名时，先只读 [仓库列表](repos/_index.md) 的映射表，不能自行拼 slug。规则精确指向 owner 就立即完成路由；没有匹配、owner 不清楚或需要职责地图时，再读 `repos/<slug>/_index.md` 和一个主要仓库主题。不能读完 `general/` 就直接开始查源码。
-4. 仓库主题入口负责继续路由。涉及源码时先看 `components/_index.md` 的职责地图，只属于某个模型时看 `models/_index.md`；确认一个主要 owner 后读取对应 `_index.md` 和其中已有的 `rules.md`，并停止横向展开。只有 live 调用链证明错误跨越另一个模块边界时才读取第二个模块，不能为了保险遍历所有相关目录。找不到 owner 时以 live 源码继续调查，复盘确认稳定边界后再补路由，不要为一次问题临时造模块。
+4. 仓库主题入口负责继续路由。仓库 `rules.md` 已精确命中 owner 时，直接读取该 owner 的 `rules.md` 并停止导航；不要再读 owner `_index.md`、同级主题或职责地图。只有 owner 不明时才看 `components/_index.md` 的职责地图，只属于某个模型时看 `models/_index.md`；职责地图确认一个主要 owner 后直接读取其 `rules.md`，仅在规则不存在或 owner 边界仍不清楚时读取对应 `_index.md`。只有 live 调用链证明错误跨越另一个模块边界时才读取第二个模块，不能为了保险遍历所有相关目录。找不到 owner 时以 live 源码继续调查，复盘确认稳定边界后再补路由，不要为一次问题临时造模块。
 5. 当前机器地址、路径、账号、cache、venv 和临时状态只从 ignored `local/` 获取，并用 live 命令重新验证。
 6. 不要递归加载整棵知识树；历史错题不是默认入口，只在规则明确提示、出现高度相似错误或用户明确调查历史时搜索。
 
-路由阶段只读取 `_index.md`、当前仓库 `rules.md` 和命中的 owner 规则。仓库 `rules.md` 的场景触发器已经直接指向 owner 时，路由立即完成，不再读取同级 `dev/components/models` 候选入口。只有没有直接匹配时才用职责地图选择 owner。先写出“用户入口 → 主要 owner → 准备核对的源码边界”，再按需要读取一篇具体 guide；不能在 owner 未确定前预读多篇方法正文。
+路由阶段只读取当前仓库 `rules.md` 和命中的 owner 规则；`_index.md` 只在仓库 slug 或 owner 不明时用于发现。仓库 `rules.md` 的场景触发器已经直接指向 owner 时，路由立即完成，不再读取 owner `_index.md` 或同级 `dev/components/models` 候选入口。只有没有直接匹配时才用职责地图选择 owner。先写出“用户入口 → 主要 owner → 准备核对的源码边界”，再按需要读取一篇具体 guide；不能在 owner 未确定前预读多篇方法正文。
 
 仓库同名主题按任务目的选，不按通用 guide 所在的物理目录选。例如“写代码”会读 `general/review/guides/code-taste.md`，但不因此自动进入仓库 `review/`；只有任务本身是 code review、reviewer follow-up 或仓库规则明确指向时才进入。
 
@@ -33,7 +33,7 @@
 
 | 正在做什么 | 第一个入口 | 识别仓库后必须检查 |
 |---|---|---|
-| code review 和 reviewer follow-up | [general/review](general/review/_index.md) | `repos/<仓库>/review/_index.md` |
+| code review 和 reviewer follow-up | [独立审查执行合同](general/review/guides/review-execution-contract.md) | 当前仓库 `rules.md`；精确命中后直接读 owner `rules.md` |
 | 测试选择和 CI | [general/ci](general/ci/_index.md) | `repos/<仓库>/ci/_index.md` |
 | 写文档、RFC 和用户可见说明 | [general/docs](general/docs/_index.md) | `repos/<仓库>/docs/_index.md` |
 | Git、commit、rebase 和 PR | [general/git](general/git/_index.md) | `repos/<仓库>/git/_index.md` |

@@ -49,7 +49,8 @@ try {
     }
 
     $VenvPython = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
-    & $VenvPython -m pip install --disable-pip-version-check --no-input "mcp>=1.2,<2"
+    & $VenvPython -m pip install --disable-pip-version-check --no-input `
+        "mcp>=1.2,<2" "PyYAML>=6.0"
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to install the MCP runtime."
     }
