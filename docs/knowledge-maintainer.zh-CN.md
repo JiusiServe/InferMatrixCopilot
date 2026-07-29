@@ -8,12 +8,11 @@
 
 ## 只想马上加一条规则
 
-不要从头写。打开
-[`knowledge-rule-samples.zh-CN.md`](knowledge-rule-samples.zh-CN.md)，选择：
+不要从头写。只打开符合当前情况的一个样本：
 
-- 已有 component：复制样本 A。
-- 已有 model：复制样本 B。
-- 新增模块或模型目录：复制样本 C。
+- [已有 component：增加规则](samples/add-component-rule.zh-CN.md)
+- [已有 model：增加规则](samples/add-model-rule.zh-CN.md)
+- [新模型还没有目录：创建完整 owner](samples/add-new-model-owner.zh-CN.md)
 
 替换尖括号里的内容，运行两个校验脚本，然后提交 PR。下面的章节用于解释为什么这样
 写，不是每次维护的必读前置。
@@ -126,7 +125,7 @@
 
 如果目录尚不存在：
 
-1. 优先复制[完整新 owner 样本](knowledge-rule-samples.zh-CN.md#样本-c新增一个模型-owner)；
+1. 优先复制[完整新 model owner 样本](samples/add-new-model-owner.zh-CN.md)；
    需要其他页面类型时再看
    [`doc/knowledge-templates/`](../doc/knowledge-templates/README.md)。
 2. 创建 `_index.md`，写清源码路径、职责边界、测试入口和依赖关系。

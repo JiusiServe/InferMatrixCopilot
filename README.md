@@ -112,9 +112,11 @@ python knowledge/tools/check_wiki_lint.py
 Windows 上 Git 提示 `LF will be replaced by CRLF` 只是换行符提醒；上述命令退出码为
 0 且没有错误时不算校验失败。
 
-不知道应该改哪个文件，或者需要新增模块/模型时，直接照着完整样本改：
+直接选择自己的情况，不需要先读总手册：
 
-[`docs/knowledge-rule-samples.zh-CN.md`](docs/knowledge-rule-samples.zh-CN.md)
+- [已有 component：复制一条 component 规则](docs/samples/add-component-rule.zh-CN.md)
+- [已有 model：复制一条 model 规则](docs/samples/add-model-rule.zh-CN.md)
+- [新模型还没有目录：复制完整 model owner](docs/samples/add-new-model-owner.zh-CN.md)
 
 规则卡片、人工与 agent 分工、Codex 提示词和 PR 检查清单见：
 
