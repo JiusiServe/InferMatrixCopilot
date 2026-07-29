@@ -98,7 +98,9 @@ Codex 按该入口已有的目录地图和落盘规范，自行选择 owner、�
 ```
 
 新规则必须有可核对来源：把 PR、源码路径或设计文档追加到文件顶部 `sources`，并在
-规则末尾标记，例如 `^[PR #1234]`。没有任何来源时先补证据，不提交规则。
+规则末尾标记，例如 `^[PR #1234]`。同一规则使用多个来源时写在同一个标记里，用
+分号分隔：`^[PR #1234; vllm_omni/path/to/file.py]`。没有任何来源时先补证据，
+不提交规则。
 
 然后更新文件顶部的 `updated`，运行：
 
@@ -106,6 +108,9 @@ Codex 按该入口已有的目录地图和落盘规范，自行选择 owner、�
 python knowledge/tools/check_knowledge_tree.py
 python knowledge/tools/check_wiki_lint.py
 ```
+
+Windows 上 Git 提示 `LF will be replaced by CRLF` 只是换行符提醒；上述命令退出码为
+0 且没有错误时不算校验失败。
 
 不知道应该改哪个文件，或者需要新增模块/模型时，直接照着完整样本改：
 
