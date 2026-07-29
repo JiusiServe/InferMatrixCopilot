@@ -11,6 +11,37 @@ new readers: start with the code walkthrough in [doc/CODE_TOUR.md](doc/CODE_TOUR
 The normative per-layer specification (contracts, invariants, constraints) is
 in [doc/SPEC/](doc/SPEC/README.md).
 
+## Codex: review a PR with your current model
+
+The default MCP is thin: Codex reviews the code itself and this project supplies
+curated knowledge. It needs no second model, API key, endpoint, or model tier.
+
+On Windows:
+
+```powershell
+git clone https://github.com/JiusiServe/InferMatrixCopilot.git
+cd InferMatrixCopilot
+.\install-codex.ps1
+```
+
+Restart Codex, then say:
+
+```text
+Use InferMatrixCopilot to review
+https://github.com/vllm-project/vllm-omni/pull/5172.
+```
+
+Codex calls `prepare_review`, reads the relevant knowledge, and reviews with the
+model already selected in Codex. See [`docs/codex/README.md`](docs/codex/README.md)
+for macOS/Linux and manual setup.
+
+For stronger process adherence, ask Codex to use **strict workflow mode**.
+InferMatrixCopilot then owns a persistent `evidence → gates → review → verify`
+state machine while Codex's current model performs each reasoning step.
+
+The autonomous BYOK workflow (which runs its own model) remains available
+separately as `infermatrix-copilot-workflow-mcp`; it is not the default.
+
 ## Layout
 
 ```
@@ -21,7 +52,10 @@ playbooks/          registered playbooks (repo-rebase is LOCKED)
 adapters/            repo adapters (adapter zero: vllm_omni)
 ```
 
-## Install — one command
+## Optional: autonomous BYOK workflow
+
+Everything below configures the separate autonomous CLI/workflow server. Skip
+this section when you only want the default thin Codex MCP above.
 
 ```bash
 bash install.sh             # venv + package + .env seed + ./infermatrix-copilot wrapper + doctor
