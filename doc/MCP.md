@@ -1,101 +1,112 @@
-# MCP integration — Claude Code, Codex & Cursor
+# 在 Codex、Claude Code、Cursor 中使用 InferMatrixCopilot
 
-The copilot ships an **MCP stdio server** (`infermatrix-copilot-mcp`, module
-`src/infermatrix_copilot/mcp_server.py`) that exposes its **read-only** task kinds to
-any MCP host. The standalone `infermatrix-copilot` CLI is unchanged; MCP is additive and
-its dependency is gated behind the `[mcp]` extra.
+InferMatrixCopilot 是本地 stdio MCP 服务。Agent 仍使用自己当前的模型完成
+代码阅读和审查；MCP 只返回知识库入口，不需要 API Key 或第二个模型。
 
-## What it exposes (V1 — all read-only, start/poll)
+## 推荐：一键安装
 
-A review can take 5–12 min, so each task is a **start + poll** pair: `start_*`
-returns a `run_id` immediately; poll it with `get_result`.
+```powershell
+.\install-codex.ps1
+.\install-claude.ps1
+.\install-cursor.ps1
+```
 
-| Tool | Kind | Notes |
-|------|------|-------|
-| `start_review(pr, repo?)` | `pr_review` | never posts |
-| `start_issue_answer(issue, repo?)` | `issue_answer` | drafts only; never posts |
-| `start_issue_triage(repo?)` | `issue_filter` | classifies recent open issues |
-| `get_result(run_id, offset?)` | — | `{state, report?, next_offset?, report_path?}` |
-| `get_status(run_id)` | — | `{status, progress?}` |
-| `list_playbooks()` | — | the read-only kinds + backing playbooks |
+每次只运行与你的 Agent 对应的一条。脚本会同时安装 MCP 和 `imreview`：
 
-There is **no** posting, pushing, rebase, or debug tool in V1. The surface is the
-three `READ_ONLY_KINDS` (`pr_review`, `issue_answer`, `issue_filter`) and nothing
-else — enforced in the child, so a rewritten `request.json` cannot widen it.
-`repo` is restricted to `mcp_repo_allowlist` (default: `[default_repo]`).
+```text
+/imreview <PR URL>
+```
 
-## Install the package first (required by both hosts)
+## 手工配置
 
-Installing a plugin / adding a Codex MCP entry does **not** install the Python
-package — the `infermatrix-copilot-mcp` command must already resolve on PATH. Install a
-pinned build:
+Windows：
+
+```powershell
+git clone https://github.com/JiusiServe/InferMatrixCopilot.git
+cd InferMatrixCopilot
+py -3 -c "import sys; assert sys.version_info >= (3, 11), 'Python 3.11+ required'"
+py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install "mcp>=1.2,<2" "PyYAML>=6.0"
+```
+
+macOS / Linux：
 
 ```bash
-uv tool install 'infermatrix-copilot[mcp]'      # or: pipx install 'infermatrix-copilot[mcp]'
-# from a local checkout:  pip install -e '.[mcp]'
+git clone https://github.com/JiusiServe/InferMatrixCopilot.git
+cd InferMatrixCopilot
+python3 -c "import sys; assert sys.version_info >= (3, 11), 'Python 3.11+ required'"
+python3 -m venv .venv
+./.venv/bin/python -m pip install "mcp>=1.2,<2" "PyYAML>=6.0"
 ```
-
-Provide credentials via the environment (or the repo `.env`): `ANTHROPIC_API_KEY`,
-optionally `ANTHROPIC_BASE_URL`, `DEFAULT_REPO`, and repo paths.
-
-## Claude Code
-
-The repo is a plugin marketplace (`.claude-plugin/marketplace.json`) whose
-`infermatrix-copilot` plugin (`plugin/.claude-plugin/plugin.json` + `plugin/.mcp.json`)
-declares the stdio server. In Claude Code:
-
-```
-/plugin marketplace add JiusiServe/InferMatrixCopilot
-/plugin install infermatrix-copilot@infermatrix-copilot-marketplace
-```
-
-Host-agnostic alternative (no plugin/marketplace) — register the server directly:
-
-```
-claude mcp add infermatrix-copilot -- infermatrix-copilot-mcp
-```
-
-> The exact marketplace-manifest schema and `/plugin` flow are per the current
-> Claude Code docs (`discover-plugins.md`, `plugins.md`); re-check them at publish
-> time if the CLI reports a manifest error.
 
 ## Codex
 
-Add the block from `docs/codex/config.toml` to `~/.codex/config.toml`. Secrets are
-forwarded **by name** via `env_vars` (read from your shell), not pasted as
-literal values.
+Windows 直接运行：
+
+```powershell
+.\install-codex.ps1
+```
+
+其他平台和手工配置见 [`docs/codex/README.md`](../docs/codex/README.md)。
+
+## Claude Code
+
+在仓库根目录运行。
+
+Windows PowerShell：
+
+```powershell
+$Root = (Resolve-Path .).Path
+claude mcp add --env "PYTHONPATH=$Root\src" --transport stdio --scope user `
+  infermatrix_copilot -- "$Root\.venv\Scripts\python.exe" `
+  -m infermatrix_copilot.thin_mcp_server
+claude mcp list
+```
+
+macOS / Linux：
+
+```bash
+ROOT="$PWD"
+claude mcp add --env "PYTHONPATH=$ROOT/src" --transport stdio --scope user \
+  infermatrix_copilot -- "$ROOT/.venv/bin/python" \
+  -m infermatrix_copilot.thin_mcp_server
+claude mcp list
+```
 
 ## Cursor
 
-Merge `docs/cursor/mcp.json` into `~/.cursor/mcp.json` (all projects) or
-`<project>/.cursor/mcp.json` (one project), then enable the server under
-Cursor Settings → MCP. Same prerequisite as the other hosts: the package must
-already be on PATH.
+把 [`docs/cursor/mcp.json`](../docs/cursor/mcp.json) 复制到项目的
+`.cursor/mcp.json` 或用户目录的 `~/.cursor/mcp.json`，然后把示例中的
+`D:\\path\\to\\InferMatrixCopilot` 替换为真实绝对路径。
 
-Note the config deliberately has **no `env` block**: Cursor does not expand
-`${VAR}` references in `env` values, and pasting literal secrets into
-`mcp.json` is not acceptable. The server instead reads credentials from your
-shell environment or from the checkout's `.env` (a local
-`pip install -e '.[mcp]'` finds the repo `.env` regardless of cwd — the same
-resolution `doctor` uses). If Cursor was launched from a GUI session that
-lacks your shell env, the local-checkout `.env` path is the one that works.
+## 其他 MCP Agent
 
-## Safety model (why the host cannot widen permissions)
+只要宿主支持本地 stdio MCP，就使用与 Cursor 相同的三个字段：
 
-- **Structural read-only.** `enforce_mcp_policy` runs at the boundary AND
-  (authoritatively) in the child: only `READ_ONLY_KINDS`, `post` forced False,
-  repo allowlisted, `pr`/`issue` positive, unknown params stripped — regardless
-  of what a same-user process may have written into `request.json`.
-- **Isolated execution.** Each run is a subprocess (`python -m infermatrix_copilot
-  --execute-reserved <id>`); its stdout goes to `<run_dir>/console.log`, so the
-  server's stdio channel carries only MCP protocol bytes.
-- **Durable, single-writer status.** `run_status.json` (see `run_status.py`) is
-  written by one process at a time under an advisory lock; a run always reaches a
-  terminal state — via the child, the parent after `.wait()`, or ownership-aware
-  reconciliation (lazy-at-read / startup) for runs orphaned by a server death.
-- **Multi-server safe.** Multiple hosts (Claude Code, Codex, Cursor) may each
-  launch a server; runs
-  carry `owner_server_id`/`owner_server_pid`/`child_pid`, and a server reconciles
-  only runs whose owner is confirmed dead — never another live server's queued
-  run. (The queue serializes one server process; machine-wide serialization would
-  need a filesystem lock — deferred.)
+```json
+{
+  "command": "D:\\path\\to\\InferMatrixCopilot\\.venv\\Scripts\\python.exe",
+  "args": ["-m", "infermatrix_copilot.thin_mcp_server"],
+  "env": {
+    "PYTHONPATH": "D:\\path\\to\\InferMatrixCopilot\\src"
+  }
+}
+```
+
+macOS / Linux 把 `command` 换成 `<repo>/.venv/bin/python`，把
+`PYTHONPATH` 换成 `<repo>/src`。
+
+## 使用方法
+
+连接后，对任意 Agent 使用同一句话：
+
+```text
+Use InferMatrixCopilot to review
+https://github.com/vllm-project/vllm-omni/pull/5172.
+```
+
+默认 Direct 模式下，`review` 返回 `knowledge/AGENTS.md`，Agent 按其中的地图
+读取相关规则。需要维护知识库时调用 `update_knowledge`；只有用户明确要求时才
+使用 Strict workflow mode。
+
+Direct MCP 不运行模型、不发 GitHub 评论、不推送代码。
