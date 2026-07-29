@@ -1,7 +1,7 @@
 {
   "name": "infermatrix-copilot",
   "version": "0.1.0",
-  "description": "InferMatrixCopilot — governed, read-only repo-maintenance tools (PR review, issue answer, issue triage) exposed over MCP. Requires the `infermatrix-copilot[mcp]` Python package on PATH.",
+  "description": "InferMatrixCopilot — maintainer-grounded Direct PR review over MCP, with an imreview skill.",
   "author": {
     "name": "tzhouam",
     "url": "https://github.com/tzhouam"
