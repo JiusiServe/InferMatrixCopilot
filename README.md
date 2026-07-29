@@ -3,6 +3,12 @@
 给 Codex 注入 vLLM-Omni 项目经验，让 PR 审查更符合维护者规则。
 它不运行第二个模型，也不会自动发布评论。
 
+这个项目同时服务两类人：
+
+- 使用者：安装 MCP，让 Codex 在 review 时读取 vLLM-Omni 知识库。
+- vLLM-Omni 维护者：把自己负责模块或模型的稳定经验写成规则，让人和 agent
+  下次都能复用。
+
 ## 安装到 Codex
 
 Windows：
@@ -74,6 +80,35 @@ from this review.
 Codex 按该入口已有的目录地图和落盘规范，自行选择 owner、修改 Markdown、
 更新索引并执行文档中要求的校验。MCP 本身不猜 owner，也不写规则。
 
+## 模块和模型 owner 怎样维护规则
+
+不需要先理解整棵知识库，也不需要会写 MCP。最常见的维护只做三件事：
+
+1. 找到自己负责的目录：
+   - 共享模块：`knowledge/repos/vllm-omni/components/<模块>/`
+   - 单个模型：`knowledge/repos/vllm-omni/models/<模型>/`
+2. 在该目录的 `rules.md` 增加一条包含“触发、必须、禁止、验收”的规则。
+3. 运行两个校验脚本并提交 PR：
+
+```powershell
+python knowledge/tools/check_knowledge_tree.py
+python knowledge/tools/check_wiki_lint.py
+```
+
+可以完全手工编辑，也可以先填写一张规则卡片，再让 Codex 生成改动，由 owner
+审核。中文维护手册提供目录判断、规则卡片、component/model 示例、可复制提示词和
+PR 检查清单：
+
+[`docs/knowledge-maintainer.zh-CN.md`](docs/knowledge-maintainer.zh-CN.md)
+
+不想直接改 Markdown 的 owner，可以
+[提交中文规则建议](https://github.com/JiusiServe/InferMatrixCopilot/issues/new?template=knowledge-rule.yml)。
+只需填写触发、必须、禁止、验收和来源，知识库维护者或 agent 再整理成 PR。
+
+现有可复制文件模板位于
+[`doc/knowledge-templates/`](doc/knowledge-templates/README.md)。知识树的权威贡献
+规范仍是 [`knowledge/CONTRIBUTING.md`](knowledge/CONTRIBUTING.md)。
+
 ## Direct MCP 工具
 
 - `review(target, repo?)`：返回审查知识入口。
@@ -83,11 +118,11 @@ Codex 按该入口已有的目录地图和落盘规范，自行选择 owner、�
 
 Direct 模式不需要 API Key、endpoint 或额外模型配置。
 
-## Strict workflow mode
+## Strict 工作流模式
 
-For stronger process adherence, ask Codex to use **strict workflow mode**.
-InferMatrixCopilot then owns a persistent `evidence → gates → review → verify`
-state machine while Codex's current model performs each reasoning step.
+如果需要更强的流程约束，可以明确要求 Codex 使用 **Strict 工作流模式**。
+InferMatrixCopilot 会维护持久化的
+`evidence → gates → review → verify` 状态机，各阶段的分析仍由 Codex 当前模型完成。
 
 ## 其他模式
 
