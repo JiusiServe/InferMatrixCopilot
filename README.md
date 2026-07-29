@@ -1,22 +1,11 @@
 # InferMatrixCopilot
 
-> Formerly `vllm-infermatrix-copilot`. The Python package and CLI are still named
-> `infermatrix_copilot` / `infermatrix-copilot`; only the project/repo name changed.
+给 Codex 注入 vLLM-Omni 项目经验，让 PR 审查更符合维护者规则。
+它不运行第二个模型，也不会自动发布评论。
 
-Playbook-driven repo-maintenance copilot for [vLLM-Omni], implementing the
-architecture in `vllm-omni-rebase-agent/docs/copilot/copilot_design`
-(3-layer RepoAdapter / Target / Engine, Step abstraction, dynamic pipelines with
-reuse > adapt > generate, conversational CLI). See [doc/DESIGN.md](doc/DESIGN.md);
-new readers: start with the code walkthrough in [doc/CODE_TOUR.md](doc/CODE_TOUR.md).
-The normative per-layer specification (contracts, invariants, constraints) is
-in [doc/SPEC/](doc/SPEC/README.md).
+## 安装到 Codex
 
-## Codex: review a PR with your current model
-
-The default MCP is thin: Codex reviews the code itself and this project supplies
-curated knowledge. It needs no second model, API key, endpoint, or model tier.
-
-On Windows:
+Windows：
 
 ```powershell
 git clone https://github.com/JiusiServe/InferMatrixCopilot.git
@@ -24,123 +13,86 @@ cd InferMatrixCopilot
 .\install-codex.ps1
 ```
 
-Restart Codex, then say:
+安装完成后重启 Codex，然后直接说：
 
 ```text
 Use InferMatrixCopilot to review
 https://github.com/vllm-project/vllm-omni/pull/5172.
 ```
 
-Codex calls `review` in its default direct mode, reads the relevant knowledge,
-and reviews with the model already selected in Codex. See
-[`docs/codex/README.md`](docs/codex/README.md) for macOS/Linux and manual setup.
+macOS、Linux 和手工配置见
+[`docs/codex/README.md`](docs/codex/README.md)。
+
+## 它能做什么
+
+| 能做 | 不能做 |
+|---|---|
+| 把知识库入口交给当前 Codex 模型 | 不运行第二个模型 |
+| 让 Codex 按知识库地图选择相关规则 | 不替模型选择知识页面 |
+| 辅助审查 vLLM-Omni PR 或本地改动 | 不自动发布 GitHub 评论 |
+| 把知识维护入口交给 Codex，由 Codex 直接修改 Markdown | 不在 MCP 内部自动改写规则 |
+
+默认是 **Direct 模式**：Codex 负责读取代码、理解改动和输出审查结果；
+InferMatrixCopilot 只提供知识库入口。
+
+## 怎样确认它真的被用了
+
+先用 `/mcp` 或下面的命令确认 `infermatrix_copilot` 已连接：
+
+```powershell
+codex mcp list
+```
+
+Direct `review` 的 MCP 返回很短：
+
+```json
+{
+  "knowledge_entry": "C:\\...\\InferMatrixCopilot\\knowledge\\AGENTS.md"
+}
+```
+
+Codex 随后从这个入口读取文档地图，自行判断应使用哪些规则，再正常输出
+带文件和行号的 review findings。MCP 不返回预制审查结果，也不一次性注入完整规则。
+
+## 更新知识库
+
+对 Codex 说：
+
+```text
+Use InferMatrixCopilot to update the knowledge base with the reusable rule
+from this review.
+```
+
+`update_knowledge` 只返回：
+
+```json
+{
+  "knowledge_entry": "C:\\...\\InferMatrixCopilot\\knowledge\\CONTRIBUTING.md"
+}
+```
+
+Codex 按该入口已有的目录地图和落盘规范，自行选择 owner、修改 Markdown、
+更新索引并执行文档中要求的校验。MCP 本身不猜 owner，也不写规则。
+
+## Direct MCP 工具
+
+- `review(target, repo?)`：返回审查知识入口。
+- `update_knowledge(repo?)`：返回知识维护入口。
+- `doc_search(query, repo?)`：按文本搜索知识库。
+- `doc_read(path, repo?)`：读取指定知识页面。
+
+Direct 模式不需要 API Key、endpoint 或额外模型配置。
+
+## Strict workflow mode
 
 For stronger process adherence, ask Codex to use **strict workflow mode**.
 InferMatrixCopilot then owns a persistent `evidence → gates → review → verify`
 state machine while Codex's current model performs each reasoning step.
 
-The autonomous BYOK workflow (which runs its own model) remains available
-separately as `infermatrix-copilot-workflow-mcp`; it is not the default.
+## 其他模式
 
-## Layout
-
-```
-src/infermatrix_copilot/   implementation (engine, playbooks, adapters, review, memory, CLI)
-test/               pytest suite (no GPU, no network, no API key needed)
-doc/                design + implementation status
-playbooks/          registered playbooks (repo-rebase is LOCKED)
-adapters/            repo adapters (adapter zero: vllm_omni)
-```
-
-## Optional: autonomous BYOK workflow
-
-Everything below configures the separate autonomous CLI/workflow server. Skip
-this section when you only want the default thin Codex MCP above.
-
-```bash
-bash install.sh             # venv + package + .env seed + ./infermatrix-copilot wrapper + doctor
-```
-
-Then edit `.env` (set `ANTHROPIC_API_KEY`; adjust `REPO_PATHS` if your checkouts
-live elsewhere — `.env` is git-ignored, NEVER commit it) and re-check:
-
-```bash
-./infermatrix-copilot doctor       # every ✗ prints the exact fix (needs gh auth login once)
-```
-
-`bash install.sh --uninstall` removes only what the installer created. Manual
-install (`pip install -e .` + `cp .env.template .env`) still works.
-
-## Use — one natural-language interface
-
-```bash
-./infermatrix-copilot                            # conversational chat (Claude-Code-style)
-./infermatrix-copilot -p "review pr 4830" --yes
-./infermatrix-copilot -p "review https://github.com/vllm-project/vllm-omni/pull/4830"
-./infermatrix-copilot -p "do a full depth review of pr 4830"   # depth from plain English
-./infermatrix-copilot -p "answer issue 4842, do not post"
-./infermatrix-copilot -p "rebase pr 4830, then review it"      # compound -> ordered queue
-./infermatrix-copilot --resume                   # re-enter the last run's first incomplete step
-```
-
-You never need to know the internal task kinds or memorize trigger phrases:
-URLs route to the right repo/workflow (a URL for an unconfigured repo is
-rejected, never silently run against the default), unambiguous commands skip
-the LLM parser entirely, and an incomplete request ("review this") gets one
-concrete clarifying question upfront — in `-p --yes` mode it exits nonzero
-with the fix instead of failing later.
-
-Built-ins inside the REPL: `/status`, `/logs [n]`, `/playbooks`, `/resume`, `/quit`.
-
-**Chat mode** (default when an LLM is configured): a persistent conversation with
-streaming replies and full terminal chrome — session banner, spinner while
-thinking, live streaming tail that resolves into markdown-rendered replies
-(tables, headers, bold), color-coded tool calls and step results, and
-arrow-key input history (`~/.infermatrix-copilot/history`). Everything degrades to
-plain text on pipes/non-TTY, so scripting output stays stable. The model answers questions about the repo and past runs,
-and executes work through tools — `run_task`/`run_playbook` (same TaskSpec,
-planner, and [y/N] confirmation path as the flag CLI; chat can never widen
-permissions), `get_status`/`get_logs`/`read_run_report`, and `repo_read`/
-`repo_grep` jailed to the configured repos (secret files refused). Sessions are
-traced to `~/.infermatrix-copilot/sessions/`. One-shot `-p` keeps the deterministic
-parser (cheap, scriptable).
-
-Natural language is parsed into a **TaskSpec** (kind, PR/issue, flags) and echoed
-back; write/push-capable tasks require confirmation; ambiguous commands get a
-clarifying question, never a guessed execution. The planner then resolves
-**reuse > adapt > generate**:
-
-- `repo_rebase` → the **locked** `repo-rebase` playbook, run verbatim (L0). It
-  delegates to the proven 5-phase orchestrator (`REBASE_ORCHESTRATOR_CMD`),
-  **monitored**: per-phase/per-module progress streams from the parent's
-  state.json into `/status` and the run trace, failures are classified and
-  escalated with artifacts, and `/resume` maps onto the parent's `--resume`.
-  A native decomposition (`repo-rebase-native`, candidate) wraps the parent
-  package's own phase wrappers + per-module agents as copilot steps — run it
-  explicitly with `--playbook repo-rebase-native` for side-by-side validation;
-  see `doc/IMPLEMENTATION_STATUS.md` for the promotion path.
-- `pr_rebase` / `pr_debug` → vetted playbooks (L1): fork-aware checkout,
-  rebase with agent conflict resolution (abort+escalate without an LLM),
-  per-module verification, signature-grouped CI debugging — force-with-lease
-  only for the rebased PR head, strictly additive pushes for debug fixes.
-- `pr_review` / `issue_answer` / `issue_filter` → vetted read-only playbooks;
-  posting needs the explicit `post` intent AND `ALLOW_POST=1` (dry-run otherwise).
-  Kinds without a vetted playbook fall back to generated plans (L2), plan-review
-  gated; generation is structurally barred from write/push steps.
-
-## Safety posture
-
-- **Push guard**: single choke point — pushes need an allowing `PushPolicy`,
-  are dry-run unless `ALLOW_PUSH=1`, force is only `--force-with-lease`, and
-  protected branches (`main`) are never pushed to, policy or not.
-- **ToolScope/PathScope**: agent tool calls pass one scope-enforcing dispatcher;
-  pre-plan scopes can only write the plan dir; out-of-scope edits execute but
-  are recorded, never silent.
-- **Conditional Patch Review**: cheap diff summary always; LLM diff review on
-  risk triggers (out-of-scope, large diff, no tests, full-file rewrite,
-  pre-push, knowledge edits) — fail-closed when no reviewer is available.
-- **Escalation**: blocked runs write `ESCALATION.md`, email if configured, and
-  exit 3 — notify, never guess.
-- **Memory governance**: RunTrace records everything; debug memories require
-  root-cause + verification fields; skills/playbooks/adapters are
-  candidate-then-promote (high-risk adapter sections are human-only).
+- Strict 模式的状态机用法见
+  [`docs/codex/README.md`](docs/codex/README.md)。
+- 自主工作流会运行自己的模型，是另一套产品入口，见
+  [`docs/autonomous-workflow.md`](docs/autonomous-workflow.md)。
+- 项目内部设计和实现说明见 [`doc/`](doc/)。

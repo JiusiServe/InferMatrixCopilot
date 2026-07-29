@@ -18,8 +18,17 @@ Use InferMatrixCopilot to review
 https://github.com/vllm-project/vllm-omni/pull/5172.
 ```
 
-Codex first inspects the live PR, then calls `review` with the changed
-files so the returned knowledge is specific to the affected modules.
+Codex calls `review`, receives the local `knowledge/AGENTS.md` path, and follows
+that document's routing map itself. The MCP does not guess which owner applies
+and does not inject complete rule pages.
+
+The tool response is intentionally small:
+
+```json
+{
+  "knowledge_entry": "C:\\...\\InferMatrixCopilot\\knowledge\\AGENTS.md"
+}
+```
 
 For server-enforced sequencing, say:
 
@@ -50,8 +59,10 @@ confirm that `infermatrix_copilot` is connected.
 
 ## What the default MCP exposes
 
-- `review(target, changed_files?, mode="direct")`: the only starting point.
-  Direct is the default; strict is selected only when the user explicitly asks.
+- `review(target, repo?, mode="direct")`: returns `knowledge/AGENTS.md` in
+  Direct mode. Strict is selected only when the user explicitly asks.
+- `update_knowledge(repo?)`: returns `knowledge/CONTRIBUTING.md`; the host model
+  follows that document and edits the Markdown files itself.
 - `submit_review_stage(run_id, stage, artifact)`: validates and advances one
   strict stage. Each response includes an `artifact_example`; scalar list fields
   are normalized automatically.
@@ -59,12 +70,10 @@ confirm that `infermatrix_copilot` is connected.
 - `doc_search(query, repo?)`: finds deeper model/component rules.
 - `doc_read(path, repo?)`: reads a selected knowledge page.
 
-It does not run another model, post comments, push code, or require a local
-target-repository path.
+Direct mode does not run another model, choose a knowledge owner, edit knowledge
+inside the MCP, post comments, or push code.
 
 ## Optional autonomous BYOK workflow
 
-The old start/poll workflow is still available as
-`infermatrix-copilot-workflow-mcp`. It runs its own agents and therefore still
-requires `.env` model and repository configuration. It is intentionally not
-the default Codex experience.
+The autonomous workflow has separate setup and documentation:
+[`../autonomous-workflow.md`](../autonomous-workflow.md).

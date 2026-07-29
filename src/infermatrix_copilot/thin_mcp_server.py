@@ -25,6 +25,15 @@ _ROUTES = {
 }
 
 
+def _supported_repos() -> list[str]:
+    if not (_KNOWLEDGE / "repos").is_dir():
+        return []
+    return sorted(
+        path.name for path in (_KNOWLEDGE / "repos").iterdir()
+        if path.is_dir() and (path / "_index.md").is_file()
+    )
+
+
 def _docs(repo: str) -> KnowledgeDocs:
     repo = (repo or "vllm-omni").strip()
     repo_dir = _KNOWLEDGE / "repos" / repo
@@ -38,6 +47,13 @@ def _guard(fn):
         return fn()
     except (KnowledgeDocsError, FileNotFoundError, ValueError) as exc:
         return {"error": str(exc)}
+
+
+def _knowledge_entry(name: str) -> str:
+    path = (_KNOWLEDGE / name).resolve()
+    if not path.is_file():
+        raise FileNotFoundError(f"knowledge entry is missing: {path}")
+    return str(path)
 
 
 def _review_knowledge(repo: str, changed_files: list[str]) -> list[dict]:
@@ -167,6 +183,8 @@ def build_mcp():
     mcp = FastMCP(
         "infermatrix-copilot",
         instructions=(
+            "In direct mode, read the returned knowledge_entry and let the host "
+            "model follow its routing instructions. "
             "Always begin with the review tool. Unless the user explicitly asks "
             "for strict workflow mode, use its default direct mode. Never choose "
             "strict mode merely because it is available. This server never calls "
@@ -176,14 +194,13 @@ def build_mcp():
     )
 
     @mcp.tool()
-    def review(target: str, changed_files: list[str] | None = None,
-               change_summary: str = "", repo: str = "vllm-omni",
+    def review(target: str, repo: str = "vllm-omni",
                mode: str = "direct") -> dict:
         """Begin a review. Use direct unless the user explicitly requests strict.
 
         `target` is a PR URL/number or a short description of local changes.
-        Direct mode requires `changed_files` after the host inspects the target
-        and immediately returns routed knowledge. Strict mode starts the staged
+        Direct mode returns the knowledge entrypoint; the host model reads its
+        routing map and decides what applies. Strict mode starts the staged
         workflow and returns a run_id plus its first next_action.
         """
         def run() -> dict:
@@ -208,22 +225,22 @@ def build_mcp():
                     "mode": "strict",
                     "next_action": _next_action("evidence"),
                 }
-            if not isinstance(changed_files, list) or not changed_files:
-                raise ValueError(
-                    "changed_files is required; inspect the target before calling")
-            return {
-                "target": str(target).strip(),
-                "repo": repo,
-                "mode": "direct",
-                "changed_files": changed_files,
-                "change_summary": change_summary,
-                "instructions": [
-                    "Apply the supplied rules only to their owning modules.",
-                    "Use doc_search then doc_read for changed models/components.",
-                    "Report only actionable findings with current file/line anchors.",
-                ],
-                "knowledge": _review_knowledge(repo, changed_files),
-            }
+            _docs(repo)
+            return {"knowledge_entry": _knowledge_entry("AGENTS.md")}
+
+        return _guard(run)
+
+    @mcp.tool()
+    def update_knowledge(repo: str = "vllm-omni") -> dict:
+        """Return the knowledge contribution entrypoint for the host to follow.
+
+        The host model reads the documentation map, chooses the owner, edits the
+        Markdown files, and runs the documented checks. The MCP does not decide
+        placement and does not write knowledge itself.
+        """
+        def run() -> dict:
+            _docs(repo)
+            return {"knowledge_entry": _knowledge_entry("CONTRIBUTING.md")}
 
         return _guard(run)
 
@@ -292,12 +309,29 @@ def build_mcp():
     @mcp.tool()
     def doc_search(query: str, repo: str = "vllm-omni",
                    limit: int = 20) -> dict:
-        """Search general and repository-specific curated review knowledge."""
-        return _guard(lambda: {
-            "query": query,
-            "repo": repo,
-            "matches": _docs(repo).search(query, limit=limit),
-        })
+        """Literal text search over knowledge; use entries for task routing."""
+        def run() -> dict:
+            repo_dir = _KNOWLEDGE / "repos" / (repo or "vllm-omni").strip()
+            if not repo_dir.is_dir():
+                supported = ", ".join(_supported_repos()) or "(none)"
+                return {
+                    "error": (
+                        f"unsupported knowledge repo: {repo}. "
+                        f"Supported: {supported}. The repo argument selects a "
+                        "knowledge scope; put search terms in query."
+                    )
+                }
+            matches = _docs(repo).search(query, limit=limit)
+            result = {"query": query, "repo": repo, "matches": matches}
+            if not matches:
+                result["hint"] = (
+                    "No literal text match. For review routing, call review and "
+                    "read its knowledge_entry. For knowledge edits, call "
+                    "update_knowledge and read its knowledge_entry."
+                )
+            return result
+
+        return _guard(run)
 
     @mcp.tool()
     def doc_read(path: str, repo: str = "vllm-omni",
