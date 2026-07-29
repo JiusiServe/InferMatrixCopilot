@@ -82,22 +82,30 @@ Codex 按该入口已有的目录地图和落盘规范，自行选择 owner、�
 
 ## 模块和模型 owner 怎样维护规则
 
-不需要先理解整棵知识库，也不需要会写 MCP。最常见的维护只做三件事：
+不需要先理解整棵知识库，也不需要会写 MCP。已有模块或模型目录时，打开自己的
+`rules.md`，把下面这段复制到末尾再改五处：
 
-1. 找到自己负责的目录：
-   - 共享模块：`knowledge/repos/vllm-omni/components/<模块>/`
-   - 单个模型：`knowledge/repos/vllm-omni/models/<模型>/`
-2. 在该目录的 `rules.md` 增加一条包含“触发、必须、禁止、验收”的规则。
-3. 运行两个校验脚本并提交 PR：
+```markdown
+### <沿用本页前缀的新 ID> — <一句话标题>
+
+- 触发：<什么改动或现象需要这条规则>
+- 必须：<实现或审核时必须做什么>
+- 禁止：<最容易犯的错误>
+- 验收：<什么测试或代码路径证明它满足>
+```
+
+然后更新文件顶部的 `updated` 和 `sources`，运行：
 
 ```powershell
 python knowledge/tools/check_knowledge_tree.py
 python knowledge/tools/check_wiki_lint.py
 ```
 
-可以完全手工编辑，也可以先填写一张规则卡片，再让 Codex 生成改动，由 owner
-审核。中文维护手册提供目录判断、规则卡片、component/model 示例、可复制提示词和
-PR 检查清单：
+不知道应该改哪个文件，或者需要新增模块/模型时，直接照着完整样本改：
+
+[`docs/knowledge-rule-samples.zh-CN.md`](docs/knowledge-rule-samples.zh-CN.md)
+
+规则卡片、人工与 agent 分工、Codex 提示词和 PR 检查清单见：
 
 [`docs/knowledge-maintainer.zh-CN.md`](docs/knowledge-maintainer.zh-CN.md)
 

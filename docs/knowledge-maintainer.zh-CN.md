@@ -6,6 +6,18 @@
 社区维护者直接向 InferMatrixCopilot 提交规则即可，不需要访问私有知识源。同步流程
 必须保留目标仓库已有的模块和模型规则，不能用上游知识树整棵覆盖。
 
+## 只想马上加一条规则
+
+不要从头写。打开
+[`knowledge-rule-samples.zh-CN.md`](knowledge-rule-samples.zh-CN.md)，选择：
+
+- 已有 component：复制样本 A。
+- 已有 model：复制样本 B。
+- 新增模块或模型目录：复制样本 C。
+
+替换尖括号里的内容，运行两个校验脚本，然后提交 PR。下面的章节用于解释为什么这样
+写，不是每次维护的必读前置。
+
 ## 最常见的维护方式
 
 已有 owner 目录时，只需要：
@@ -67,7 +79,8 @@
 - 验收：<可以检查的完成标准>
 ```
 
-规则 ID 使用该 owner 已有前缀并继续编号，例如 `CONF-6a`、`HY3-8a`。
+规则 ID 使用该 owner 已有前缀并继续编号，例如把样本中的 `CONF-NEXT`、`HY3-NEXT`
+替换为当前未使用的下一个 ID。
 不要重排或复用旧 ID。
 
 规则不保存完整 diff、review 对话、调查时间线和大段日志。GitHub PR 本身负责保存
@@ -107,7 +120,9 @@
 
 如果目录尚不存在：
 
-1. 从 [`doc/knowledge-templates/`](../doc/knowledge-templates/README.md) 复制对应模板。
+1. 优先复制[完整新 owner 样本](knowledge-rule-samples.zh-CN.md#样本-c新增一个模型-owner)；
+   需要其他页面类型时再看
+   [`doc/knowledge-templates/`](../doc/knowledge-templates/README.md)。
 2. 创建 `_index.md`，写清源码路径、职责边界、测试入口和依赖关系。
 3. 有稳定架构信息时创建 `architecture.md`。
 4. 第一条真实规则出现时才创建 `rules.md`，不要提交空页面。
