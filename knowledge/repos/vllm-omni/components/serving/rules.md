@@ -112,15 +112,33 @@ confidence: high
 - 验收：合法旧输入恰好记录一次警告；因冲突返回 4xx 的输入不记录兼容警告；用户响应
   合同与日志合同分别断言。
 
-### SERV-4f — 一个请求合同只能在 serving 边界编译一次
+### SERV-4f — Serving 只编译当前 slice 拥有的请求语义
 
-- 触发：多个 dispatcher/stage 共享同类用户输入。
-- 强制：由唯一 request-contract compiler 处理所有 raw ingress、默认值区分、alias、
-  兼容字段、冲突验证和弃用事件，并产出规范化合同对象。
-- 禁止：dispatcher 或 stage 再次读取 `request`、`model_extra`、`extra_body`，或自行决定
-  冲突、HTTP 错误和弃用日志。
-- 验收：每种支持的 dispatcher 运行同一组合法、冲突和 deprecated 输入，断言编译恰好
-  一次、最终 consumer 一致、冲突响应一致、弃用日志至多一次且拒绝请求时不出现。
+- 触发：同一 serving 字段存在 flattened、nested、canonical 或 legacy 来源。
+- 强制：在 request mutation、preprocess 和 dispatcher 分支之前完成一次来源校验，并
+  产出当前 slice 限定字段的 consumer view。
+- 禁止：dispatcher 重读 raw request 或重新决定优先级；为了 request-extra
+  normalization 把 topology、模型能力、逐 stage 参数或其他 owner 吸进完整 compiler。
+- 验收：root control + nested extras 分别经过 pure/mixed dispatcher 到达 prompt、
+  AR metadata 与 diffusion sampling consumer；registry 字段与 service control 重名时
+  仍只有一个 owner。
+
+### SERV-4g — 多来源合同编码前必须完成来源矩阵
+
+- 触发：一个语义存在多个来源、dispatcher 或 stage scope。
+- 强制：按 [source-consumer decision matrix](../../../../general/review/guides/review-execution-contract.md#source-consumer-decision-matrix)
+  标明路由、重复拒绝、不适用和 defaults。
+- 禁止：矩阵缺失时声称实现或审查完成。
+- 验收：每个来源组合都有明确 decision 和生产路径证据。
+
+### SERV-4h — 请求合同膨胀时停止逐评论修补
+
+- 触发：生产 diff 超过预算上限 1.5 倍、出现第二个重叠语义 owner，或下一审查波次
+  再次发现同一 owner 漏洞。
+- 强制：执行 [架构重置验收](../../../../general/review/guides/code-taste.md#架构重置怎样验收)，
+  重新确认唯一最终产物、删除清单和规模上限。
+- 禁止：继续堆 helper、compatibility branch 或 reviewer-specific patch。
+- 验收：恢复编码前 owner、consumer、删除项和 diff 预算都有可检查记录。
 
 请求到 engine 的边界见 [Serving architecture](architecture.md)；公开协议通用检查见
 [review contracts](../../../../general/review/guides/reviewer-lens-contracts.md)。

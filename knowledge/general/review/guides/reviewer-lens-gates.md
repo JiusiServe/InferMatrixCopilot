@@ -214,6 +214,28 @@ KNOWN FINDINGS CLOSED != FULL DIFF CLEAN
 
 Unless all three passes ran, do not say `full PR reviewed` or `clean`.
 
+## Subtraction claim audit
+
+“做了减法”“合并了测试”“缩小了 diff”是独立于 correctness review 的可验证声明。参数化以后看起来更整齐、case 数下降、测试全绿或 correctness reviewer 没有 finding，都不能证明代码实际减少。
+
+先冻结目标 base 和开始减法前的 comparison head，再分别测量：
+
+```powershell
+git diff --numstat <target-base-sha>...HEAD -- <affected paths>
+git diff --numstat <before-subtraction-sha>..HEAD -- <affected paths>
+```
+
+未提交改动把第二条的 `HEAD` 换成 working tree comparison。第一组回答“当前 PR 总体仍有多大”，第二组回答“本轮声称的减法实际净增还是净删”；两组不能互相替代。新增 regression 与删除重复测试分别报告，不能用新覆盖的必要性把“净增”表述成“已经减量”。
+
+测试减法开始前列出 `production invariant -> owner test -> required wiring/dispatcher evidence`。同一不变量默认只保留一个最近 owner 单测；只有 production wiring、错误边界或不同 dispatcher 的最终 consumer 无法由 owner 单测证明时，才保留一条集成证据。删除后必须报告：
+
+- 受影响测试路径的 additions、deletions 和 net；
+- 删除了哪些重复表达，保留在哪个 owner；
+- case 数变化，且明确它不是行数指标；
+- 同一聚焦测试命令的实际结果。
+
+正确性审查和减法审查可以由同一个人执行，但任务和结论必须分别写明；只被要求找 P0–P2 的 reviewer 没有承担代码预算验收，不能用它的 `no further findings` 证明 scope 已收敛。
+
 ## Authoring-time delta audit
 
 When another Codex process, bot, or reviewer can point out multiple issues in a diff I wrote, treat that as authoring-time self-review failure. The issue is not just missing CI and not that the other process is stricter; it means I wrote code without continuously applying the same reviewer lens to the files and behavior surface I was changing.

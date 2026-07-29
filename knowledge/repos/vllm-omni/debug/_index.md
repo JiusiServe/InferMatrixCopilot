@@ -24,7 +24,7 @@ sources: []
 
 | 下一步要确认什么 | 查看哪里 |
 |---|---|
-| 配置、开发入口或仓库级实现约束 | [dev](../dev/_index.md) |
+| 配置入口、字段归属、归一化或构造链路 | [Configuration](../components/configuration/_index.md) |
 | 问题属于哪个共享源码模块 | [组件职责地图](../components/_index.md) |
 | 问题是否只属于一个模型 | [模型列表](../models/_index.md) |
 | 模型对齐、随机性、尺寸或图像风格方法 | [debug guides](guides/_index.md) |

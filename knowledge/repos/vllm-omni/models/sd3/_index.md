@@ -15,7 +15,7 @@ sources: [vllm_omni/diffusion/models/sd3/, vllm_omni/diffusion/registry.py]
 
 - diffusion registry：`StableDiffusion3Pipeline` →（`sd3`, `pipeline_sd3`）,
   post `get_sd3_image_post_process_func`。单 stage diffusion,引擎默认 stage
-  配置（[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
+  配置（[Config 组件](../../components/configuration/architecture.md)）。无 deploy YAML。
 - 源码：`pipeline_sd3.py`（33 KB）+ `sd3_transformer.py`
   （`SD3Transformer2DModel`）。无变体有据,无 deploy YAML,树内未 pin
   checkpoint。

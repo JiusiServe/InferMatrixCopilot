@@ -1,30 +1,36 @@
 ---
-title: "复盘到规则"
+title: "复盘语义分流"
 created: 2026-07-10
-updated: 2026-07-23
+updated: 2026-07-29
 type: guide
 tags: [general, debug]
 sources: []
 ---
 
-# 复盘到规则
+# 复盘语义分流
 
 ## 什么时候使用
 
 用户要求复盘、沉淀经验、总结教训，或者一次问题暴露出现有门禁缺口时使用。
 
-## 默认产物是规则
+## 默认产物是完成语义分流后的可执行结论
 
-复盘不是先写事故记录。默认修改离根因最近、下次任务一定会读取的 `rules.md`：
+复盘不能先选 `rules.md` 再填内容。动笔前必须完成
+[语义分流台账](../../../contributing/incidents.md#动笔前的语义分流台账)，把每个内容
+单元唯一归为 RULE、ARCHITECTURE、GUIDE、INCIDENT 或 DROP；`rules.md` 最后编辑，
+只接收同时具备 trigger、must、forbid 和 acceptance 的硬门禁。
+
+确有 RULE 候选时，再选择离根因最近、下次任务一定会读取的 owner：
 
 - 跨仓库都成立 → 对应 `general/<主题>/` 的规则入口；
-- 某仓库都成立 → `repos/<仓库>/rules.md` 或仓库主题规则；
+- 某仓库都成立 → 仓库主题规则；
 - 共享源码模块专有 → `repos/<仓库>/components/<模块>/rules.md`；
 - 某模型专有 → `repos/<仓库>/models/<模型>/rules.md`。
 
-“仓库专属”不能单独证明应该写进仓库根；动笔前必须通过[仓库根 `rules.md` 准入门禁](../../../contributing/page-rules.md#仓库根-rulesmd-准入门禁)，专项规则下沉到最近 owner，根页只保留路由。
-
-规则必须让没有见过原事故的人也能执行，不依赖日期、issue 编号或聊天上下文。
+“仓库专属”不能单独证明应该写进仓库根；动笔前必须通过
+[仓库根 `rules.md` 准入门禁](../../../contributing/page-rules.md#仓库根-rulesmd-准入门禁)，
+专项规则下沉到最近 owner，根页只保留路由。规则必须让没有见过原事故的人也能执行，
+不依赖日期、issue 编号或聊天上下文。没有合格 RULE 候选时允许不修改任何 `rules.md`。
 
 ## 写文件前先按语义分流
 
@@ -38,6 +44,8 @@ sources: []
 | 日期、PR/SHA、一次性测试数量、调查时间线 | 默认不落盘；需要追溯时使用 Git/PR 历史 |
 
 不得把时间线、一次性测试证据和聊天复述塞进 `rules.md`；也不得因为这些内容不属于规则，就自动创建 incident “先存着再说”。
+
+正文完成后必须回到语义分流台账，执行 `RULES PURITY` 和 `DUPLICATE BODY` 检查；知识树脚本通过不代表语义归属正确。
 
 ## 复盘必须回答四个问题
 

@@ -46,7 +46,7 @@ sources: [vllm_omni/model_executor/models/higgs_audio_v2/, vllm_omni/model_execu
   `vllm_omni/entrypoints/openai/serving_speech.py`（v3 参考音频 code LRU
   cache 256 条/64 MiB + in-flight 去重）与
   `vllm_omni/entrypoints/openai/protocol/audio.py`（v3 references 映射、v2
-  富输入别名拒绝）;[Config 组件](../../components/config/architecture.md)。
+  富输入别名拒绝）;[Config 组件](../../components/configuration/architecture.md)。
 
 ## 目录内容
 

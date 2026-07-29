@@ -42,6 +42,20 @@ PR #2495 把 HunyuanImage3 perf test 从 mandatory "Diffusion X2I(&A&T) · Perf 
 - 原来一个 JSON（3 个 test case）拆成 3 个独立 JSON（tp4_fp8, tp2_fp8_sp2, tp2_fp8_cfgp2），每个 pytest 调用只起一个 server，防止显存残留
 - profiling 脚本从 `scripts/profiling/` 移到 `tools/`，shell 脚本改为通用（model 作为 CLI 参数）
 
+## 4. CI 红时自动调查外部 check
+
+用户说“CI 炸了”、check fail 或贴出红色 PR 时，自动完成 GitHub Actions 和外部 CI 的日志调查，不先问“是否继续查 Buildkite”。
+
+1. 刷新当前 PR head、完整 checks 和 diff。
+2. GitHub Actions 用 `gh run view --log`；Buildkite 先打开公开 build 页面，从页面里的 `build_data_base_path` 读取：
+   - `<build_data_base_path>/steps?exclude_group_steps=true&state=failed`
+   - 每个失败 step 的 `statistics.latest_job_id`
+   - `/organizations/<org>/pipelines/<pipeline>/builds/<build>/jobs/<job_id>/log`
+3. Buildkite API 返回 `401` 时自动降级到公开页面和上述 data/log 端点；只有公开端点也拒绝日志时才报告权限边界。
+4. 对每个失败 job 提取 exact step、命令、第一处真实错误和最终 summary，再与当前 PR diff、producer/consumer owner 对照，分别标记“PR 导致”“无关”“证据不足”。
+
+调查是自动动作；修改 PR 代码或触发外部 rerun 仍遵守对应的写入和权限边界。
+
 ## 相关
 
 - 历史 CI 失败的完整证据链见 [CI incidents](../incidents/_index.md)。

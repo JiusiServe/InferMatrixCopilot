@@ -30,7 +30,7 @@ sources: [vllm_omni/model_executor/models/fish_speech/, vllm_omni/attention/fish
   `vllm_omni/model_executor/stage_input_processors/fish_speech.py`;serving
   适配 `vllm_omni/entrypoints/openai/tts_adapters/fish_speech.py`。
 - 依赖共享模块：`utils/speaker_cache`（克隆参考音频 DAC 编码进程内完成）、
-  [Config 组件](../../components/config/architecture.md);**全家族唯一自带
+  [Config 组件](../../components/configuration/architecture.md);**全家族唯一自带
   attention 内核的**:`vllm_omni/attention/fish_kvcache_*`（Triton,
   `VLLM_OMNI_FISH_KVCACHE_ATTN` 默认开,1024 token 长短路径分割）。
 

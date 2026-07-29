@@ -24,7 +24,7 @@ sources: [vllm_omni/model_executor/models/cosyvoice3/cosyvoice3.py, vllm_omni/mo
   TensorRT（启动时 ONNX→plan,按设备缓存 plan;campplus 有 CPU-ONNX 兜底）,
   统一由 `COSYVOICE3_TRT` 门控,默认开。
 - 共享：diffusion Attention 层、SharedMemoryConnector、
-  [Config 组件](../../components/config/architecture.md)。
+  [Config 组件](../../components/configuration/architecture.md)。
 
 ## 配置、checkpoint 和兼容范围
 

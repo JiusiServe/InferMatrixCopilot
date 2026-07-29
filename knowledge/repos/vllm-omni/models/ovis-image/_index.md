@@ -17,7 +17,7 @@ sources: [vllm_omni/diffusion/models/ovis_image/, vllm_omni/diffusion/registry.p
   记录。diffusion registry:
   `OvisImagePipeline` →（`ovis_image`, `pipeline_ovis_image`）,
   post `get_ovis_image_post_process_func`。单 stage diffusion,引擎默认 stage
-  配置（[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
+  配置（[Config 组件](../../components/configuration/architecture.md)）。无 deploy YAML。
 - 源码：`pipeline_ovis_image.py`（27 KB）+ `ovis_image_transformer.py`（22 KB）。
 - 依赖共享模块：[Diffusion 组件](../../components/diffusion/_index.md)。
 

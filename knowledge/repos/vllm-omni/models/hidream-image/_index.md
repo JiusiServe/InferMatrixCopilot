@@ -17,7 +17,7 @@ sources: [vllm_omni/diffusion/models/hidream_image/, vllm_omni/diffusion/registr
   记录。diffusion registry：`HiDreamImagePipeline` →
   （`hidream_image`, `pipeline_hidream_image`）,post
   `get_hidream_image_post_process_func`。单 stage diffusion,引擎默认 stage
-  配置（[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
+  配置（[Config 组件](../../components/configuration/architecture.md)）。无 deploy YAML。
 - 源码：`pipeline_hidream_image.py`（49 KB）+ `hidream_image_transformer.py`
   （43 KB）。
 - 依赖共享模块：[Diffusion 组件](../../components/diffusion/_index.md)。

@@ -28,7 +28,7 @@ sources: [vllm_omni/model_executor/models/step_audio2/step_audio2_thinker.py, vl
 - 常量单一来源 `step_audio2_constants.py`：文本 ≤151688;音频 token
   **151696–158257**（`audio_vocab_size` 6562,相对 `audio_eos` 6561）;流式
   `chunk_size 25` / `pre_lookahead_len 3` / mel cache 8 帧。
-- 共享：[Config 组件](../../components/config/architecture.md);
+- 共享：[Config 组件](../../components/configuration/architecture.md);
   `serving_speech.py` 的 TTS 入口。
 
 ## 配置、checkpoint 和兼容范围

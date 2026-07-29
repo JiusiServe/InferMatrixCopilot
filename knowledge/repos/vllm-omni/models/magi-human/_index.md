@@ -20,7 +20,7 @@ sources: [vllm_omni/diffusion/models/magi_human/, vllm_omni/diffusion/registry.p
   （`magi_human`, `pipeline_magi_human`, `MagiHumanPipeline`）,pre 为
   pass-through,post
   `get_magi_human_post_process_func`。单 stage diffusion,引擎默认 stage 配置
-  （[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
+  （[Config 组件](../../components/configuration/architecture.md)）。无 deploy YAML。
 - 源码仅 3 文件但全尾部最大：`pipeline_magi_human.py` **96 KB** +
   `magi_human_dit.py` 62 KB（头注：移植自 daVinci-MagiHuman
   `dit_module.py`,去掉了 Ulysses context-parallel）。

@@ -37,7 +37,7 @@ sources: [vllm_omni/model_executor/models/cosyvoice3/, vllm_omni/deploy/cosyvoic
   `flow_estimator_trt.py`/`speaker_embedding_trt.py`。
 - 依赖共享模块：[Diffusion 组件](../../components/diffusion/_index.md)的
   Attention 层、SharedMemoryConnector（stage 间码流）、
-  [Config 组件](../../components/config/architecture.md)。
+  [Config 组件](../../components/configuration/architecture.md)。
 
 ## 目录内容
 

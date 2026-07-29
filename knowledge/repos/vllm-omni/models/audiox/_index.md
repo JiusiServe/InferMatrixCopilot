@@ -18,7 +18,7 @@ sources: [vllm_omni/diffusion/models/audiox/, vllm_omni/diffusion/registry.py]
   `get_audiox_post_process_func`;在 `_NO_CACHE_ACCELERATION` 名单
   （不吃 cache_dit/tea_cache 加速）。
 - 单 stage diffusion,不在 `OMNI_PIPELINES`（引擎默认 diffusion stage 配置,
-  见 [Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
+  见 [Configuration](../../components/configuration/architecture.md)）。无 deploy YAML。
 - 源码：`vllm_omni/diffusion/models/audiox/`（`pipeline_audiox.py` 40 KB +
   `audiox_transformer.py`,`MMDiffusionTransformer`）。
 - 依赖共享模块：[Diffusion 组件](../../components/diffusion/_index.md)。

@@ -35,12 +35,17 @@ VALID_REPORT = """# Review report
 |---|---|---|---|---|---|
 | size | CLI | config | model | parser | test_cli |
 
+## Source-consumer decision matrix
+| Source | Consumer scope / dispatcher | Decision | Conflicts with | Production-path evidence |
+|---|---|---|---|---|
+| CLI size | model / `cli.main` | ROUTE | no other source reaches the model size scope | test_cli |
+
 ## Open findings
 - none
 
 ## Completion
 OWNER RULE COVERAGE: rules.md: 2/2 stable IDs inventoried — 1 pass / 0 fail / 0 missing evidence / 1 not applicable
-AUDITS RUN: coverage,ingress,producer-consumer,duplication,layering,edge-cases,surface-area — 0 findings (0 P0, 0 P1, 0 P2)
+AUDITS RUN: coverage,ingress,producer-consumer,source-consumer,duplication,layering,edge-cases,surface-area — 0 findings (0 P0, 0 P1, 0 P2)
 """
 
 VALID_FINDING = (
@@ -123,6 +128,34 @@ class ReviewReportCheckerTest(unittest.TestCase):
         self.assertEqual(return_code, 1)
         self.assertIn("template placeholder", output)
 
+    def test_source_consumer_matrix_is_required(self) -> None:
+        rules = """- **DEMO-1a — first rule.**\n- **DEMO-1b — second rule.**\n"""
+        report = VALID_REPORT.replace(
+            """## Source-consumer decision matrix
+| Source | Consumer scope / dispatcher | Decision | Conflicts with | Production-path evidence |
+|---|---|---|---|---|
+| CLI size | model / `cli.main` | ROUTE | no other source reaches the model size scope | test_cli |
+
+""",
+            "",
+        )
+        return_code, output = self.run_checker(report, rules)
+        self.assertEqual(return_code, 1)
+        self.assertIn(
+            "missing section: ## Source-consumer decision matrix",
+            output,
+        )
+
+    def test_source_consumer_matrix_rejects_implicit_decision(self) -> None:
+        rules = """- **DEMO-1a — first rule.**\n- **DEMO-1b — second rule.**\n"""
+        report = VALID_REPORT.replace(
+            "| CLI size | model / `cli.main` | ROUTE |",
+            "| CLI size | model / `cli.main` | merge later |",
+        )
+        return_code, output = self.run_checker(report, rules)
+        self.assertEqual(return_code, 1)
+        self.assertIn("decision must be one of", output)
+
     def test_require_clean_rejects_open_findings(self) -> None:
         rules = """- **DEMO-1a — first rule.**\n- **DEMO-1b — second rule.**\n"""
         report = VALID_REPORT.replace(
@@ -194,7 +227,7 @@ class ReviewReportCheckerTest(unittest.TestCase):
             "OWNER RULE COVERAGE: rules.md: 2/2 stable IDs inventoried — 1 pass / 0 fail / 0 missing evidence / 1 not applicable",
             "OWNER RULE COVERAGE: nonsense",
         ).replace(
-            "AUDITS RUN: coverage,ingress,producer-consumer,duplication,layering,edge-cases,surface-area",
+            "AUDITS RUN: coverage,ingress,producer-consumer,source-consumer,duplication,layering,edge-cases,surface-area",
             "AUDITS RUN: nothing",
         )
         return_code, output = self.run_checker(report, rules)
@@ -800,7 +833,7 @@ class ReviewReportCheckerTest(unittest.TestCase):
     def test_duplicate_audits_footer_fails(self) -> None:
         rules = """- **DEMO-1a — first rule.**\n- **DEMO-1b — second rule.**\n"""
         audit_line = (
-            "AUDITS RUN: coverage,ingress,producer-consumer,duplication,"
+            "AUDITS RUN: coverage,ingress,producer-consumer,source-consumer,duplication,"
             "layering,edge-cases,surface-area — 0 findings (0 P0, 0 P1, 0 P2)"
         )
         report = VALID_REPORT.replace(audit_line, f"{audit_line}\n{audit_line}")

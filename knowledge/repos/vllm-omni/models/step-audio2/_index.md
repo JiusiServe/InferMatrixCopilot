@@ -35,7 +35,7 @@ sources: [vllm_omni/model_executor/models/step_audio2/, vllm_omni/deploy/step_au
   `step_audio2_token2wav.py`、`step_audio2_constants.py`）;桥
   `vllm_omni/model_executor/stage_input_processors/step_audio2.py`;deploy
   `vllm_omni/deploy/step_audio_2{,_async_chunk,_asr}.yaml`。
-- 依赖共享模块：[Config 组件](../../components/config/architecture.md);
+- 依赖共享模块：[Config 组件](../../components/configuration/architecture.md);
   家族专属 reasoning parser（`vllm_omni/reasoning/step_audio_reasoning_parser.py`）;
   serving 双入口——chat completions **和** `/v1/audio/speech`
   （`serving_speech.py`）。

@@ -40,7 +40,7 @@ sources: [vllm_omni/diffusion/models/gr00t/, vllm_omni/deploy/Gr00tN1d7.yaml, vl
   [internvla-a1](../internvla-a1/_index.md)。
 - 依赖共享模块：diffusion worker 管线
   （[Diffusion 组件](../../components/diffusion/_index.md)）、
-  [Config 组件](../../components/config/architecture.md)。
+  [Config 组件](../../components/configuration/architecture.md)。
 
 ## 目录内容
 

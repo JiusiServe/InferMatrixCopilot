@@ -33,7 +33,7 @@ sources: [vllm_omni/model_executor/models/indextts2/, vllm_omni/deploy/indextts2
 - 依赖共享模块：vLLM 原生 GPT-2 块/PagedAttention（talker 基座）、
   SharedMemoryConnector、diffusion hub 预取锁（BigVGAN 懒加载守卫）、
   `utils/speaker_cache`、
-  [Config 组件](../../components/config/architecture.md)。
+  [Config 组件](../../components/configuration/architecture.md)。
 
 ## 目录内容
 

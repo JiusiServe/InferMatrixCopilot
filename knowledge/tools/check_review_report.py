@@ -14,6 +14,7 @@ REQUIRED_HEADINGS = (
     "Owner rule audit",
     "Public ingress matrix",
     "Producer-consumer trace",
+    "Source-consumer decision matrix",
     "Open findings",
     "Completion",
 )
@@ -34,11 +35,19 @@ MATRIX_SCHEMAS = {
         "Stop/failure owner",
         "Evidence",
     ),
+    "Source-consumer decision matrix": (
+        "Source",
+        "Consumer scope / dispatcher",
+        "Decision",
+        "Conflicts with",
+        "Production-path evidence",
+    ),
 }
 REQUIRED_AUDITS = {
     "coverage",
     "ingress",
     "producer-consumer",
+    "source-consumer",
     "duplication",
     "layering",
     "edge-cases",
@@ -125,6 +134,10 @@ TEMPLATE_PLACEHOLDERS = {
     "<every handoff>",
     "<actual reader>",
     "<boundary>",
+    "<root/nested/alias/per-stage/default source>",
+    "<specific stage or consumer>",
+    "<specific sources or concrete reason no conflict exists>",
+    "<test/run evidence>",
 }
 COVERAGE_FOOTER_RE = re.compile(
     r"^OWNER RULE COVERAGE:\s*(.+?):\s*(\d+)\s*/\s*(\d+)\s+"
@@ -853,6 +866,29 @@ def main() -> int:
                                 f"{column_index + 1} must name a concrete "
                                 "code path in backticks"
                             )
+            elif heading == "Source-consumer decision matrix":
+                source_value = plain_markdown_cell(row[0])
+                if source_value.casefold().startswith("n/a-with-evidence:"):
+                    reason = source_value.split(":", 1)[1].strip()
+                    if len(reason) < 20 or any(
+                        len(plain_markdown_cell(cell)) < 20 for cell in row[1:]
+                    ):
+                        errors.append(
+                            f"{heading} row {row_number} N/A form requires a "
+                            "concrete reason in every column and production evidence"
+                        )
+                else:
+                    decision = plain_markdown_cell(row[2]).upper()
+                    if decision not in {
+                        "ROUTE",
+                        "REJECT_DUP",
+                        "NOT_APPLICABLE",
+                        "DEFAULT",
+                    }:
+                        errors.append(
+                            f"{heading} row {row_number} decision must be one of: "
+                            "ROUTE, REJECT_DUP, NOT_APPLICABLE, DEFAULT"
+                        )
 
     if "OWNER RULE COVERAGE:" not in completion:
         errors.append("Completion is missing OWNER RULE COVERAGE footer")

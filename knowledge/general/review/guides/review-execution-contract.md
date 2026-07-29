@@ -20,6 +20,8 @@ sources: []
 
 找到很多新问题不能代替覆盖轮。不能为了省事漏掉命中组，也不能为了“更全面”把未触发组全部展开成噪声。缺少所选规则行、可达入口、changed-value consumer 或证据时，结论只能是 `partial review`；不能说 `clean`、`ready` 或 `fully reviewed`。
 
+同一用户语义如果有多个输入来源、dispatcher、stage 类型或兼容入口，覆盖轮还必须先写完**来源 × consumer scope 决策矩阵**，再读具体实现。每个 source/scope 单元格只能标成：路由到哪个 consumer、与哪些来源重复时拒绝、明确不适用，或非用户 default；不能留给字典合并顺序和分支先后隐式决定。至少验证每个合法单来源、每组同 scope 重复、一个跨 scope 共存 control，以及每条 production dispatcher 的等价结果。矩阵缺失时，即使当前测试和开放轮没有 finding，也只能报 `partial review`。
+
 PR 声称“严格校验”“拒绝未知字段”“统一 normalization”或其他全入口行为时，公开入口不能只按 changed hunk 或当前 production caller 枚举。必须搜索同一合同的所有可调用 constructor、factory、classmethod、兼容 helper 和旧入口，包括本次未修改、已退出当前主调用链但仍可被仓库测试或外部调用者直接使用的入口；对每个入口运行同一个最小负向样例并记录结果。任一入口仍静默接受、过滤或覆盖该样例时，整体合同未闭环；如果宽松行为确属兼容要求，必须有明确文档、专门回归测试和不把它算作严格入口的 scope 声明。只证明两条 production 路径严格，不能据此宣称整个配置或 API surface 已严格化。
 
 ## Reviewer 只读输入
@@ -75,6 +77,13 @@ PR 声称“严格校验”“拒绝未知字段”“统一 normalization”或
 |---|---|---|---|---|---|
 | <field/behavior> | <source> | <every handoff> | <actual reader> | <boundary> | <evidence> |
 
+## Source-consumer decision matrix
+| Source | Consumer scope / dispatcher | Decision | Conflicts with | Production-path evidence |
+|---|---|---|---|---|
+| <root/nested/alias/per-stage/default source> | <specific stage or consumer> | ROUTE / REJECT_DUP / NOT_APPLICABLE / DEFAULT | <specific sources or concrete reason no conflict exists> | <test/run evidence> |
+
+只有能够证明当前 diff 不存在多来源、多 dispatcher、多 stage 或兼容入口时，本节才可使用 N/A；仍须保留表头，并在唯一数据行的每个单元格写具体理由，第一格以 `N/A-with-evidence:` 开头。一个 source 有多个 consumer scope 时分行写，不能在一个单元格里用“视情况”概括。
+
 ## Open findings
 - `P0 F1` / `P1 F2` / `P2 F3` or `none`. Blocking finding uses one machine-readable line:
   `- P1 F1 — DIFF:<changed hunk>; PATH:<reachable runtime path>; CONTRACT:<pre-existing source>; FAILURE:<user-visible break>; COUNTEREVIDENCE:<canonical alternative checked>; FIX:<smallest safe fix>`
@@ -83,7 +92,7 @@ PR 声称“严格校验”“拒绝未知字段”“统一 normalization”或
 ## Completion
 OWNER RULE GROUPS: <rules path>: core,prompt-token[,other-triggered-group]；owner 没有组时不写
 OWNER RULE COVERAGE: <rules path>: X/Y stable IDs inventoried — A pass / B fail / C missing evidence / D not applicable
-AUDITS RUN: coverage,ingress,producer-consumer,duplication,layering,edge-cases,surface-area — N findings (Pa P0, Pb P1, Pc P2)
+AUDITS RUN: coverage,ingress,producer-consumer,source-consumer,duplication,layering,edge-cases,surface-area — N findings (Pa P0, Pb P1, Pc P2)
 ```
 
 每个稳定 ID owner 各写一行 `OWNER RULE COVERAGE`。owner 的 `rules.md` 包含“审查组”表时，`Completion` 必须写一行 `OWNER RULE GROUPS`，至少选择 `core`；覆盖分母是所选组去重后的稳定 ID 数，不是整页总数。未定义组的 owner 保持全量覆盖。`PASS` / `NOT_APPLICABLE` 的 Disposition 写 `-`；`FAIL` 必须写 `FINDING:F<number>` 并指向已完成六项证明的正式 finding；`MISSING_EVIDENCE` 必须写 finding，或用 `DRAFT:<具体且可核对的依赖、测试或 artifact 阻塞>` 说明为什么只能作为 implementation draft。多个规则可以指向同一个 finding，不能从失败行里随意挑几个上报；每个 finding 也必须反向被规则行引用，只有紧跟 F ID 的 `OWNER_RULE:NONE` 新问题例外。

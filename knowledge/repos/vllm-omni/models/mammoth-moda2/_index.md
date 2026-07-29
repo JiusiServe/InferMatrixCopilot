@@ -33,7 +33,7 @@ sources: [vllm_omni/model_executor/models/mammoth_moda2/, vllm_omni/diffusion/mo
 - 依赖共享模块：AR 侧继承 vLLM Qwen2.5-VL 栈（processor/模型基类,加
   MammothU tokenizer）;AR runner 的 latent 导出;
   `stage_input_processors/mammoth_moda2.py`;
-  [Config 组件](../../components/config/architecture.md)。t2i 走共享示例
+  [Config 组件](../../components/configuration/architecture.md)。t2i 走共享示例
   `examples/offline_inference/text_to_image/`,AR-only 示例在
   `examples/offline_inference/mammothmodal2_preview/`。
 

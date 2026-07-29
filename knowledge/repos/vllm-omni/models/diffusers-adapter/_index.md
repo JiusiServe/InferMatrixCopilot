@@ -16,7 +16,7 @@ sources: [vllm_omni/diffusion/models/diffusers_adapter/, vllm_omni/diffusion/reg
 - diffusion registry：`DiffusersAdapterPipeline` →
   （`diffusers_adapter`, `pipeline_diffusers_adapter`）;**无** pre/post-process
   绑定。单 stage diffusion,引擎默认 stage 配置
-  （[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
+  （[Config 组件](../../components/configuration/architecture.md)）。无 deploy YAML。
 - 用途：以接近零 per-model 代码服务任意 HF Diffusers pipeline——执行直接委托
   diffusers `DiffusionPipeline.__call__`。
 - 无变体有据,无 deploy YAML,树内未 pin checkpoint（黑盒桥按被服务的
@@ -37,5 +37,5 @@ sources: [vllm_omni/diffusion/models/diffusers_adapter/, vllm_omni/diffusion/reg
 
 - 判断一个 diffusers-only 模型能否先经 adapter 服务再做原生适配;审查 adapter
   IO 胶水或量化转换改动。
-- 原生适配流程见 [dev/adding-a-model](../../dev/guides/adding-a-model.md);
+- 原生适配流程见 [adding-a-model](../../components/configuration/guides/adding-a-model.md);
   共享实现归属见 [Diffusion 组件](../../components/diffusion/_index.md)。

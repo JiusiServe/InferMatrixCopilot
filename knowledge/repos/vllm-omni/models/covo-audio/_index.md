@@ -21,7 +21,7 @@ sources: [vllm_omni/model_executor/models/covo_audio/, vllm_omni/deploy/covo_aud
 - pipeline key `covo_audio`：stage 0 `fused_thinker_talker`（LLM_AR,多模态入、
   latent 出,`ignore_eos: True`,stop 151645）→ stage 1 `code2wav`
   （LLM_GENERATION,音频）。
-- 依赖共享模块：[Config 组件](../../components/config/architecture.md)、
+- 依赖共享模块：[Config 组件](../../components/configuration/architecture.md)、
   Whisper 风格音频编码（`covo_audio.py`,`MAX_AUDIO_TOKENS=188`,16× 下采样）。
 
 ## 结构与 serving

@@ -18,7 +18,7 @@ sources: [vllm_omni/diffusion/models/flux2_klein/, vllm_omni/diffusion/registry.
   `get_flux2_klein_post_process_func`——**独立于 flux2 家族目录**,与
   [flux2](../flux2/_index.md)、[flux](../flux/_index.md) 互为姊妹家族。
 - 单 stage diffusion,引擎默认 stage 配置
-  （[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
+  （[Config 组件](../../components/configuration/architecture.md)）。无 deploy YAML。
 - 源码：`pipeline_flux2_klein.py`（46 KB）+ `flux2_klein_transformer.py`（41 KB）。
 
 ## 结构与要点

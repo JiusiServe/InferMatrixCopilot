@@ -35,7 +35,7 @@ sources: [vllm_omni/model_executor/models/dynin_omni/, vllm_omni/deploy/dynin_om
   ——变化只来自按请求任务路由与三份 deploy。
 - 依赖共享模块：worker-connector 全载荷数据面
   （`OmniConnectorModelRunnerMixin`）、
-  [Config 组件](../../components/config/architecture.md)。
+  [Config 组件](../../components/configuration/architecture.md)。
 
 ## 目录内容
 

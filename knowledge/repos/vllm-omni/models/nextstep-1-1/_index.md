@@ -18,7 +18,7 @@ sources: [vllm_omni/diffusion/models/nextstep_1_1/, vllm_omni/diffusion/registry
 - registry：`NextStep11Pipeline` →（`nextstep_1_1`, `pipeline_nextstep_1_1`）,
   post `get_nextstep11_post_process_func`;在 `_NO_CACHE_ACCELERATION` 名单。
   单 stage,引擎默认 stage 配置
-  （[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
+  （[Config 组件](../../components/configuration/architecture.md)）。无 deploy YAML。
 - 源码：`pipeline_nextstep_1_1.py` + `modeling_nextstep*.py`
   （Config/Model/Llama 基座/flow 头）+ `modeling_flux_vae.py`
   （树内 `AutoencoderKL` 移植）。

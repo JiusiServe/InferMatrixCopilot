@@ -17,7 +17,7 @@ sources: [vllm_omni/diffusion/models/z_image/, vllm_omni/diffusion/registry.py]
   post 绑定到**通用命名的 `get_post_process_func`**——全清单唯一没有模型前缀
   post 函数名的家族,grep post 函数时容易漏。
 - 单 stage diffusion,引擎默认 stage 配置
-  （[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
+  （[Config 组件](../../components/configuration/architecture.md)）。无 deploy YAML。
 - 源码：`pipeline_z_image.py`（31 KB）+ `z_image_transformer.py`
   （39 KB,`ZImageTransformer2DModel`）。无变体有据,树内未 pin checkpoint。
 

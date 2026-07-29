@@ -25,7 +25,11 @@ TYPES = {"rule", "guide", "architecture", "index"}
 CONFIDENCE = {"high", "medium", "low"}
 REQUIRED = ("title", "created", "updated", "type", "tags")
 ADAPTER_KNOWLEDGE_KEYS = {
-    "source", "repo_subdir", "briefing_docs", "performance_briefing_docs"
+    "source",
+    "repo_subdir",
+    "briefing_docs",
+    "briefing_docs_extra",
+    "performance_briefing_docs",
 }
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 MARKDOWN_LINK = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
@@ -78,7 +82,11 @@ def check_adapter_briefings() -> None:
         if unknown:
             errors.append(
                 f"adapter knowledge 出现未授权字段 {unknown}：{manifest}")
-        for field in ("briefing_docs", "performance_briefing_docs"):
+        for field in (
+            "briefing_docs",
+            "briefing_docs_extra",
+            "performance_briefing_docs",
+        ):
             docs = knowledge.get(field) or []
             if (not isinstance(docs, list)
                     or not all(isinstance(d, str) for d in docs)):
@@ -88,6 +96,8 @@ def check_adapter_briefings() -> None:
                 if set(Path(doc).parts) & RAW_PARTS:
                     errors.append(
                         f"adapter {field} 禁止加载原始证据层页面（{doc}）：{manifest}")
+
+
 def frontmatter(path: Path) -> dict | None:
     text = path.read_text(encoding="utf-8-sig")
     if not text.startswith("---"):

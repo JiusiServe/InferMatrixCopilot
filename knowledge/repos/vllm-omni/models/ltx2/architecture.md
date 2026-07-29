@@ -25,7 +25,7 @@ sources: [recipes/LTX/LTX-2.3.md, vllm_omni/diffusion/registry.py, "#4381", "#44
   `get_ltx2_post_process_func`。
 - 单段 diffusion 模型不在 `OMNI_PIPELINES` registry（走
   `async_omni_engine.py` 的默认 diffusion stage 兜底），deploy 语义见
-  [Config 组件](../../components/config/architecture.md)。
+  [Config 组件](../../components/configuration/architecture.md)。
 
 ## 已有证据索引（只链接，不复制正文）
 

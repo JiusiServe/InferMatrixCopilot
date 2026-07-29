@@ -27,7 +27,7 @@ sources: [vllm_omni/diffusion/models/qwen_image/, vllm_omni/diffusion/registry.p
   layered 输出后处理是否在 pipeline 内完成未在 pin 上追清,评审 layered 输出
   路径改动时先追这条线。
 - 单 stage diffusion,引擎默认 stage 配置
-  （[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
+  （[Config 组件](../../components/configuration/architecture.md)）。无 deploy YAML。
 
 ## 结构与要点
 

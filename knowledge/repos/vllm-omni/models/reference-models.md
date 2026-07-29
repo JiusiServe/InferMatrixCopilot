@@ -32,7 +32,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/config/pipeline
 - 落脚页：[bagel](bagel/_index.md)（KV 桥、3 路 CFG 伴随请求、MoT）;派生
   家族 [lance](lance/_index.md)。
 - 相关硬规则：多 stage 共卡显存预算见
-  [Config 规则 CONF-1a](../components/config/rules.md)（Bagel 正是案例）。
+  [Config 规则 CONF-1a](../components/configuration/rules.md)（Bagel 正是案例）。
 
 ## Qwen2.5/3-Omni — thinker/talker 多 stage 全家桶参照
 
@@ -44,6 +44,6 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/config/pipeline
 
 ## 相关
 
-- 加模型的注册点清单见 [dev/adding-a-model](../dev/guides/adding-a-model.md)。
+- 加模型的注册点清单见 [adding-a-model](../components/configuration/guides/adding-a-model.md)。
 - 语义验收（plumbing≠语义）见
   [model-adaptation-guardrails](../review/guides/model-adaptation-guardrails.md)。

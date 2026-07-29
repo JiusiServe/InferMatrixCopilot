@@ -1,0 +1,12 @@
+page	reason	surviving_page	batch	commit
+knowledge/repos/vllm-omni/components/config/_index.md	configuration owner consolidation	knowledge/repos/vllm-omni/components/configuration/_index.md	common-sync-2026-07-29	296ea45
+knowledge/repos/vllm-omni/components/config/architecture.md	configuration owner consolidation	knowledge/repos/vllm-omni/components/configuration/architecture.md	common-sync-2026-07-29	296ea45
+knowledge/repos/vllm-omni/components/config/rules.md	rules distilled and detail retained as guide	knowledge/repos/vllm-omni/components/configuration/rules.md	common-sync-2026-07-29	296ea45
+knowledge/repos/vllm-omni/dev/_index.md	configuration owner consolidation	knowledge/repos/vllm-omni/components/configuration/_index.md	common-sync-2026-07-29	296ea45
+knowledge/repos/vllm-omni/dev/rules.md	configuration owner consolidation	knowledge/repos/vllm-omni/components/configuration/rules.md	common-sync-2026-07-29	296ea45
+knowledge/repos/vllm-omni/dev/guides/_index.md	configuration owner consolidation	knowledge/repos/vllm-omni/components/configuration/guides/_index.md	common-sync-2026-07-29	296ea45
+knowledge/repos/vllm-omni/dev/guides/adding-a-model.md	configuration owner consolidation	knowledge/repos/vllm-omni/components/configuration/guides/adding-a-model.md	common-sync-2026-07-29	296ea45
+knowledge/repos/vllm-omni/dev/guides/config-audit-plain-language.md	configuration owner consolidation	knowledge/repos/vllm-omni/components/configuration/guides/config-audit-plain-language.md	common-sync-2026-07-29	296ea45
+knowledge/repos/vllm-omni/dev/guides/config-normalization-parity.md	configuration owner consolidation	knowledge/repos/vllm-omni/components/configuration/guides/config-normalization-parity.md	common-sync-2026-07-29	296ea45
+knowledge/repos/vllm-omni/dev/guides/deploy-yaml.md	configuration owner consolidation	knowledge/repos/vllm-omni/components/configuration/guides/deploy-yaml.md	common-sync-2026-07-29	296ea45
+knowledge/repos/vllm-omni/dev/guides/omni-init-args.md	configuration owner consolidation	knowledge/repos/vllm-omni/components/configuration/guides/omni-init-args.md	common-sync-2026-07-29	296ea45

@@ -58,7 +58,7 @@ soulxsinger_svc、soulxsinger_svs、step_audio_2、step_audio_2_asr、voxcpm2、
 voxtral_tts、wan2_2_ti2v
 
 注意：单 stage diffusion 模型**多数不在** `OMNI_PIPELINES`（引擎为它们生成
-默认 diffusion stage 配置,见 [Config 组件](../components/config/architecture.md)）;
+默认 diffusion stage 配置,见 [Config 组件](../components/configuration/architecture.md)）;
 但存在例外——omnivoice、soulxsinger、Gr00tN1d7、lance、dreamzero 等单 stage
 家族也有显式 key,勿以"在不在 OMNI_PIPELINES"倒推 stage 数。
 

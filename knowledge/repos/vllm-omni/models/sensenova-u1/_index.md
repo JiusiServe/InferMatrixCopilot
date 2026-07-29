@@ -16,7 +16,7 @@ sources: [vllm_omni/diffusion/models/sensenova_u1/, vllm_omni/diffusion/registry
 - diffusion registry：`SenseNovaU1Pipeline` →
   （`sensenova_u1`, `pipeline_sensenova_u1`）,post
   `get_sensenova_u1_post_process_func`。单 stage diffusion,引擎默认 stage
-  配置（[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
+  配置（[Config 组件](../../components/configuration/architecture.md)）。无 deploy YAML。
 - 无变体有据,无 deploy YAML,树内未 pin checkpoint。
 - 源码：`pipeline_sensenova_u1.py`（66 KB,内含 `NEOVisionModel`/
   `TimestepEmbedder`/`ConvDecoder`/`SenseNovaU1DenoisingAdapter`）+

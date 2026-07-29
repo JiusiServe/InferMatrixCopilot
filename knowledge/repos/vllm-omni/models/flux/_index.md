@@ -20,7 +20,7 @@ sources: [vllm_omni/diffusion/models/flux/, vllm_omni/diffusion/registry.py]
   `get_flux_post_process_func`（base+DMD2）与
   `get_flux_kontext_post_process_func`。
 - 单 stage diffusion,引擎默认 stage 配置
-  （[Config 组件](../../components/config/architecture.md)）。无 deploy
+  （[Config 组件](../../components/configuration/architecture.md)）。无 deploy
   YAML,pin 上无 checkpoint↔变体映射记录。
 - 依赖共享模块：[Diffusion 组件](../../components/diffusion/_index.md)、
   `diffusion/models/t5_encoder`。

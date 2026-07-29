@@ -11,7 +11,7 @@ sources: [vllm_omni/model_executor/models/dynin_omni/dynin_omni_common.py, vllm_
 
 事实在 `main @ 5d44868e` 复核;入口速览见 [index](_index.md);语义验收方法见
 [model-validation](../../review/guides/model-validation.md),stage 配置语义见
-[Config 组件](../../components/config/architecture.md)。
+[Config 组件](../../components/configuration/architecture.md)。
 
 ## 模型专有部分与共享模块的边界
 
