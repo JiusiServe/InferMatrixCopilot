@@ -36,7 +36,7 @@ sources: [vllm_omni/model_executor/models/ming_flash_omni/, vllm_omni/diffusion/
   （仅 thinker）/ `ming_flash_omni_image`（thinker latent → MingImagePipeline
   DIFFUSION）。
 - 依赖共享模块：[Diffusion 组件](../../components/diffusion/_index.md)、
-  [Config 组件](../../components/config/architecture.md)。
+  [Config 组件](../../components/configuration/architecture.md)。
 
 ## 目录内容
 

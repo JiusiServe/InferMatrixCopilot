@@ -22,7 +22,7 @@ sources: [vllm_omni/model_executor/models/indextts2/indextts2_talker.py, vllm_om
   （`CFM` 流匹配 + `DiT` + gpt-fast 风格 Transformer + BigVGAN）;BigVGAN
   懒加载并剥 weight-norm;**双 CUDA-graph 系统**——`CUDAGraphDiTRunner`
   （按形状捕获 DiT）与 `CUDAGraphBigVGANWrapper`（vocoder）。
-- 共享：[Config 组件](../../components/config/architecture.md)、
+- 共享：[Config 组件](../../components/configuration/architecture.md)、
   SharedMemoryConnector（`codec_streaming: false`）。
 
 ## 配置、checkpoint 和兼容范围

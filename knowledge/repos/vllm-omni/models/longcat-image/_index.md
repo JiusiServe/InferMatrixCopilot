@@ -21,7 +21,7 @@ sources: [vllm_omni/diffusion/models/longcat_image/, vllm_omni/diffusion/registr
   post 共用 `get_longcat_image_post_process_func`,pre 仅 Edit 绑定
   `get_longcat_image_edit_pre_process_func`。
 - 单 stage diffusion,引擎默认 stage 配置
-  （[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
+  （[Config 组件](../../components/configuration/architecture.md)）。无 deploy YAML。
 - 依赖共享模块：[Diffusion 组件](../../components/diffusion/_index.md)。
 
 ## 结构与要点

@@ -15,6 +15,7 @@ KNOWLEDGE_ROOTS = (ROOT / "contributing", ROOT / "general", ROOT / "repos")
 INDEX_NAME = "_index.md"
 SPECIAL_PAGES = {INDEX_NAME, "rules.md", "architecture.md"}
 GROUP_DIRS = {"guides", "history", "incidents", "references", "results", "rfcs"}
+SOURCE_OWNER_DIRS = {"components", "models"}
 INCIDENT_NAME = re.compile(r"^\d{4}-\d{2}-\d{2}-[a-z0-9][a-z0-9-]*\.md$")
 MARKDOWN_LINK = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
 INCIDENT_FIELDS = ("- 编号：", "- 归属：", "- 状态：", "- 搜索词：", "- 影响范围：")
@@ -281,6 +282,63 @@ def check_directory(directory: Path) -> None:
         )
 
 
+def owner_axis_violations(repo: Path) -> list[str]:
+    """Return deterministic workflow/source-owner nesting violations."""
+    violations: list[str] = []
+
+    for owner_name in SOURCE_OWNER_DIRS:
+        for candidate in repo.rglob(owner_name):
+            if candidate.is_dir() and candidate.parent != repo:
+                violations.append(
+                    f"源码 owner 目录必须直属仓库，不能被工作主题或其他 owner 包住："
+                    f"{display(candidate)}"
+                )
+
+    return violations
+
+
+def check_repo_owner_axes() -> None:
+    repos_root = ROOT / "repos"
+    if not repos_root.is_dir():
+        return
+    for repo in sorted(path for path in repos_root.iterdir() if path.is_dir()):
+        errors.extend(owner_axis_violations(repo))
+
+
+def exact_page_duplicate_violations(paths: list[Path]) -> list[str]:
+    """Return byte-for-byte duplicate non-index pages across different owners."""
+    pages_by_body: dict[str, list[Path]] = {}
+    for path in paths:
+        if path.name == INDEX_NAME:
+            continue
+        body = read_text(path).strip()
+        if len(body) < 200:
+            continue
+        pages_by_body.setdefault(body, []).append(path)
+
+    violations: list[str] = []
+    for duplicate_paths in pages_by_body.values():
+        owners = {path.parent.resolve() for path in duplicate_paths}
+        if len(owners) < 2:
+            continue
+        rendered = ", ".join(display(path) for path in sorted(duplicate_paths))
+        violations.append(
+            f"整页正文在多个 owner 下完全重复；只保留最近 owner 的正文，"
+            f"其他入口只链接：{rendered}"
+        )
+    return violations
+
+
+def check_exact_page_duplicates() -> None:
+    paths = [
+        path
+        for root in KNOWLEDGE_ROOTS
+        if root.is_dir()
+        for path in root.rglob("*.md")
+    ]
+    errors.extend(exact_page_duplicate_violations(paths))
+
+
 def check_local_is_untracked() -> None:
     result = subprocess.run(
         ["git", "ls-files", "--", "local"],
@@ -341,6 +399,8 @@ def main() -> int:
 
     check_local_is_untracked()
     check_short_contributing_entry()
+    check_repo_owner_axes()
+    check_exact_page_duplicates()
 
     for message in warnings:
         print(f"提醒：{message}")

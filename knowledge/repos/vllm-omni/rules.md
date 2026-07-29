@@ -27,14 +27,15 @@ sources: [benchmark/incidents/_index.md, ci/incidents/_index.md, git/incidents/_
 | profiling、trace、Perfetto、Nsight、算子或时序 | [profiling 状态机](benchmark/guides/ar-graph-profiling.md) 和 [benchmark incidents](benchmark/incidents/_index.md) | 默认交付 trace artifact 和质量摘要；benchmark stats 不能冒充 trace |
 | graph mode、`enforce_eager=false` | 同上 | trace、目标请求和 server 日志必须证明来自同一轮 graph run |
 | e2e、QPS、latency 或性能对比 | [benchmark scope](benchmark/guides/benchmark-scope.md) 和 [evidence gate](benchmark/guides/evidence-gate.md) | 先固定完整 metric contract，再跑正式 sweep |
-| config、deploy、pipeline 或 CLI cleanup | [配置开发门禁](dev/rules.md) 和 [配置审计](dev/guides/config-audit-plain-language.md) | 执行 `VOMNI-CFG-1a` 至 `VOMNI-CFG-1c`；只审受影响路径和一个相邻 control |
+| CI 红、check fail、CI 炸了 | [外部 CI 自动调查](ci/guides/ci-gotchas.md#4-ci-红时自动调查外部-check) | 自动读取所有失败 job 的真实日志并完成 diff 归因；不能因为是 Buildkite 等外部 provider 就停下来问用户 |
+| config、deploy、pipeline、CLI、strict schema、默认 factory 或 direct kwargs | [Configuration 规则](components/configuration/rules.md) 和 [配置审计](components/configuration/guides/config-audit-plain-language.md) | 基础修改执行 `1a`–`1c`；scope 膨胀加 `1d`；strict/value-state 改动加 `1e`–`1f`；rebase/schema 扩张加 `1g` |
 | stage config、并行度、设备映射或 worker 启动 | [Model Executor 规则](components/model-executor/rules.md) | 展开最终配置，并在 worker 前验证并行 world size 和可见设备 |
 | runner `_preprocess` 生产的逐请求 phase metadata，例如 `_omni_prompt_len`、`_omni_num_computed_tokens`、`_omni_is_prefill`，或由它们决定的 preprocess/MTP 路由 | [Model Executor 规则](components/model-executor/rules.md#runner-到模型的预处理合同) | 先查共享 worker runner 的 producer 和路由，再查具体模型 consumer |
 | 模型适配、checkpoint 或 HF 对齐 | [model guardrails](review/guides/model-adaptation-guardrails.md) 和对应模型入口 | plumbing 绿灯不等于语义正确 |
 | 共享 diffusion pipeline、denoise loop 或**噪声/采样调度器**接入 | [Diffusion 组件](components/diffusion/_index.md) | 多模型共享代码的结论放 components，单模型问题放 models |
 | AR/生成**请求调度**、`OmniARScheduler`、KV transfer 调度面、prefix cache 截断 | [Scheduler 组件](components/scheduler/_index.md) | 请求调度 ≠ diffusion 噪声调度 |
 | connector、mooncake、跨 stage 传输损坏或 `Address already in use` | [Distributed 组件](components/distributed/_index.md) | 数据面与端口分配的坑先查这里 |
-| deploy YAML/CLI 合并语义、stage 显存预算（`gpu_memory_utilization`/KV pin） | [Config 组件](components/config/_index.md) | 争议以展开后的最终配置为准（CONF-3a） |
+| deploy YAML/CLI 合并语义、stage 显存预算（`gpu_memory_utilization`/KV pin） | [Configuration](components/configuration/_index.md) | 争议以展开后的最终配置为准（CONF-3a） |
 | 对齐 upstream vLLM：rebase、API 漂移、模块波次 | [rebase 主题](rebase/_index.md) | 漂移模式两页 + 工作流 |
 | CLI、HTTP、OpenAI-compatible API 或 offline/online 请求行为不一致 | [Serving 组件](components/serving/_index.md) | 先查入口到 engine 的边界，再进模型内部 |
 | PR review 或 reviewer follow-up | [review 入口](review/_index.md) 和 [Git/PR 入口](git/_index.md) | 绑定当前 head、diff、live review thread 和真实代码路径 |
@@ -90,7 +91,7 @@ sources: [benchmark/incidents/_index.md, ci/incidents/_index.md, git/incidents/_
 - [CI](ci/_index.md)
 - [docs 和 RFC](docs/_index.md)
 - [debug](debug/_index.md)
-- [dev 和配置](dev/_index.md)
+- [Configuration](components/configuration/_index.md)
 - [Git 和 PR](git/_index.md)
 - [benchmark 和 profiling](benchmark/_index.md)
 - [remote](remote/_index.md)

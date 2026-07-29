@@ -33,7 +33,7 @@ confidence: high
 | benchmark 脚本、percentile、warmup、replica isolation | [performance evidence](../../benchmark/guides/performance-evidence.md) | 计时、统计、失败退出、完整 key set |
 | 模块移动、compat shim、重复 class/schema | [API surface](../../../../general/review/guides/code-taste-api-surface.md) | identity、旧行为、返回合同 |
 | checkpoint adapter、component quantization、graph/eager、HSDP/FSDP | [Diffusion rules](../../components/diffusion/rules.md) | namespace/consumer、数值 parity、真实 fully_shard |
-| composable strategy、stage YAML、headless override | [Config rules](../../components/config/rules.md) | wired axis、拓扑单源、显存预算 |
+| composable strategy、stage YAML、headless override | [Config rules](../../components/configuration/rules.md) | wired axis、拓扑单源、显存预算 |
 | runtime bridge、`runtime_info`、`OmniOutput` | [Model Executor rules](../../components/model-executor/rules.md) | producer→consumer、逐请求 batch |
 | prefix-cache side stream、pinned host tensor | [Scheduler rules](../../components/scheduler/rules.md) | buffer 生命周期、CPU fallback |
 | SSE/audio format、artifact readiness、Prometheus replica stats | [Serving rules](../../components/serving/rules.md) | 首 chunk 前校验、cache capability、owner 生命周期 |

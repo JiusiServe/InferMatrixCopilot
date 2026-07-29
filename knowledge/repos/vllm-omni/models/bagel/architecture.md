@@ -11,7 +11,7 @@ sources: [vllm_omni/model_executor/models/bagel/bagel.py, vllm_omni/diffusion/mo
 
 事实在 `main @ 5d44868e` 复核;行号随源码漂移,改代码前以当前版本为准。
 本页只写数据流与合同,入口/变体速览见 [BAGEL index](_index.md);多 stage 共卡
-显存预算见 [Config 规则 CONF-1a](../../components/config/rules.md)。
+显存预算见 [Config 规则 CONF-1a](../../components/configuration/rules.md)。
 
 ## 模型专有部分与共享模块的边界
 

@@ -70,12 +70,13 @@
 | SSH、容器、远端服务或长跑 | [远端入口](general/remote/_index.md) | 先验证目标、环境、超时、状态文件和清理边界 |
 | 多 agent 或并行工作 | [agent loop](general/agents/guides/agent-loop-workflow.md) | 只拆能独立验证的任务，主 agent 复核结论 |
 | 产品规划或 roadmap | [产品闭环](general/planning/guides/product-loop-planning.md) | 先写用户可感知的完整闭环，再拆技术任务 |
-| 复盘、沉淀经验或总结教训 | [复盘到规则](general/debug/guides/retrospective-to-rules.md) | 先按语义分流；incident 默认不创建，须通过三项准入门禁 |
+| 复盘、沉淀经验或总结教训 | [复盘语义分流](general/debug/guides/retrospective-to-rules.md) | 动笔前先完成[语义分流台账](contributing/incidents.md#动笔前的语义分流台账)；`rules.md` 最后编辑，incident 默认不创建 |
 
 仓库入口链接的 `rules.md` 可以增加更严格的门禁，但不能放宽这里的通用 P0。
 
 ## 4. 知识写到哪里
 
+- **先定 owner，再选载体**：写任何正文前先按[写入前 owner 凭证](contributing/layout.md#写入前-owner-凭证)记录内容、最近 owner、owner 证据和目标目录。不能因为现有 `rules.md` 方便追加就先选文件；工作主题不能覆盖源码 owner，父级只路由、不复制正文。
 - 能反复避免问题、改变下一次行为的结论 → 最近 owner 的 `rules.md`。跨仓库规则放 `general/<主题>/`，仓库规则放 `repos/<仓库>/`，模块或模型规则继续下沉到对应目录。
 - 稳定的数据流、职责和边界 → 最近 owner 的 `architecture.md`。
 - 需要展开说明但不是硬门禁的方法 → 对应主题的 `guides/`。

@@ -202,8 +202,8 @@ module=input_output，status=active，run_count=1）：`test_async_omni_engine_a
 
 | 症状 | 去哪里 |
 |---|---|
-| 多 stage 共卡加载期 OOM（`create_weights`） | [Config 规则 CONF-1a](../../components/config/rules.md) |
-| voxcpm2 L4 decode 期静默后被杀 | [Config 规则 CONF-2a](../../components/config/rules.md) |
+| 多 stage 共卡加载期 OOM（`create_weights`） | [Config 规则 CONF-1a](../../components/configuration/rules.md) |
+| voxcpm2 L4 decode 期静默后被杀 | [Config 规则 CONF-2a](../../components/configuration/rules.md) |
 | 并发小 token 预算 GPU hang | [Scheduler 规则 SCHED-2a](../../components/scheduler/rules.md) |
 
 ## 相关

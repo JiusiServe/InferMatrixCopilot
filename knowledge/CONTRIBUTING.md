@@ -23,10 +23,10 @@ frontmatter、标签和溯源元数据，不能据此发明第二套知识结构
 
 ## 最短落盘流程
 
-1. 确认真实仓库和最近 owner；位置不确定时，本次专题选择 [目录与归属](contributing/layout.md)。
-2. 按上表只选一篇与当前动作匹配的专题；不要为了保险横向通读。
-3. 写正文，同时更新最近 `_index.md`；不预建空目录或占位页面。
-4. 用户要求复盘时先按语义分流：硬门禁进 `rules.md`，稳定职责和数据流进 `architecture.md`，非硬门禁方法进 `guides/`，一次性历史默认不落盘；incident 只有通过三项准入门禁才创建。
+1. 写任何正文前先完成[写入前 owner 凭证](contributing/layout.md#写入前-owner-凭证)：先确定最近 owner 和目标目录，再选择 `rules.md`、`architecture.md` 或 `guides/`；已有文件不能反过来证明 owner。
+2. 按上表只选一篇与当前动作匹配的专题；位置不确定时选择 [目录与归属](contributing/layout.md)，不要为了保险横向通读。
+3. 写正文，同时更新最近 `_index.md`；父级只增加路由，不复制正文，不预建空目录或占位页面。
+4. 用户要求复盘时，动笔前先完成[语义分流台账](contributing/incidents.md#动笔前的语义分流台账)，不能先打开 `rules.md` 再把不适合的内容往外搬。硬门禁进 `rules.md`，稳定职责和数据流进 `architecture.md`，非硬门禁方法进 `guides/`，一次性历史默认不落盘；incident 只有通过三项准入门禁才创建。
 5. 对照本页“交付前五项”检查链接、索引、隐私和拆分阈值，然后运行：
 
 ```powershell
@@ -51,9 +51,9 @@ python tools/check_knowledge_tree.py
 
 ## 交付前五项
 
-- [ ] 位置符合内容 owner，没有把工作主题和代码模块套娃。
-- [ ] 最近 `_index.md` 能找到新页面，旧路径没有残留有效链接。
-- [ ] 可执行结论已进 `rules.md`，没有 raw、回放、PR 案例或临时索引残留。
+- [ ] 写入前 owner 凭证完整，位置符合内容 owner，没有把工作主题和代码模块套娃。
+- [ ] 最近 `_index.md` 能找到唯一正文，旧路径没有残留有效链接；父级和其他入口只链接，没有复制正文。
+- [ ] 语义分流台账已完成；`rules.md` 候选逐条通过 purity audit，方法、架构和历史证据没有混入。
 - [ ] 没有公开机器信息、凭据、私人路径或本地临时产物。
 - [ ] `python tools/check_knowledge_tree.py` 和 `python tools/check_wiki_lint.py`
   都通过，并已检查当前完整 diff。

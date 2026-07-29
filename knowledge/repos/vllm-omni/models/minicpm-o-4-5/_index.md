@@ -18,7 +18,7 @@ confidence: high
 - 配置与入口：`config/pipeline_registry.py`、`deploy/minicpmo_4_5.yaml`、
   `minicpmo_4_5_3gpu.yaml`、`minicpmo_4_5_8x4090.yaml`。
 - 共享 owner：[Model Executor](../../components/model-executor/_index.md)、
-  [Config](../../components/config/_index.md) 和 [Serving](../../components/serving/_index.md)。
+  [Config](../../components/configuration/_index.md) 和 [Serving](../../components/serving/_index.md)。
 
 ## 版本与 stage 边界
 

@@ -35,7 +35,7 @@ sources: [vllm_omni/model_executor/models/mimo_audio/, vllm_omni/deploy/mimo_aud
   `vllm_omni/model_executor/models/mimo_audio/pipeline.py`;桥
   `vllm_omni/model_executor/stage_input_processors/mimo_audio.py`。
 - 依赖共享模块：vLLM qwen2_audio 处理栈、SharedMemoryConnector、
-  [Config 组件](../../components/config/architecture.md)。
+  [Config 组件](../../components/configuration/architecture.md)。
 
 ## 目录内容
 

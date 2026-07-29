@@ -20,7 +20,7 @@ sources: [vllm_omni/diffusion/models/internvla_a1/, vllm_omni/diffusion/registry
   `InternVLAA1Pipeline` →
   （`internvla_a1`, `pipeline_internvla_a1`, `InternVLAA1Pipeline`）,post
   `get_internvla_a1_post_process_func`（薄封装）。单 stage,引擎默认 stage
-  配置（[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
+  配置（[Config 组件](../../components/configuration/architecture.md)）。无 deploy YAML。
 - 源码（7 文件,尾部家族里最异构）：`model_internvla_a1.py`（41 KB,
   `Qwen3VLWithExpertModel`/`InternVLAA1Policy`/
   `resolve_cosmos_checkpoint_paths`）、`adapter_qwen3_vl.py`（重写的

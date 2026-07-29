@@ -20,7 +20,7 @@ sources: [vllm_omni/model_executor/models/glm_tts/, vllm_omni/deploy/glm_tts.yam
 - pipeline key `glm_tts`：stage 0 AR（Llama 基座,LLM_AR,latent;stop token
   为 "👂" id 59253,代码注释称按 tokenizer 动态解析校验）→ stage 1
   `glm_tts_dit`（LLM_GENERATION,音频）。
-- 依赖共享模块：[Config 组件](../../components/config/architecture.md);
+- 依赖共享模块：[Config 组件](../../components/configuration/architecture.md);
   vocoder 为家族内 `HiFTWrapper`/`Vocos2DWrapper` + `ConvRNNF0Predictor`。
 
 ## 结构与 serving

@@ -12,7 +12,7 @@ sources: []
 - 上游仓库：`vllm-project/vllm-omni`
 - 常用分支：默认分支 `main`；对齐 upstream vLLM 的重构分支 `dev/vllm-align`
 - 适用范围：vLLM-Omni 的开发、测试、文档、模型、性能和远端验证
-- 组件源码映射（下表 components 入口）已按 `main @ 238fc0a6`（此前亦在 `dev/vllm-align @ 4f2b32c` 验证，结果一致） 校验
+- 组件源码映射需在使用前按目标仓库当前 `main` 重新验证
 
 ## 什么时候查这里
 
@@ -32,10 +32,10 @@ sources: []
 | 查看 CI 规则和测试配置 | [ci](ci/_index.md) | vLLM-Omni CI |
 | 查看文档和 RFC 状态 | [docs](docs/_index.md) | 仓库文档入口 |
 | 调查仓库专有 bug、crash 或行为异常 | [debug](debug/_index.md) | 完成通用调试后的仓库二次路由 |
-| 查看配置和开发入口 | [dev](dev/_index.md) | 开发和配置说明 |
+| 查看配置入口、字段归属和构造链路 | [Configuration](components/configuration/_index.md) | 共享配置模块的架构、规则和指南 |
 | 处理分支、PR 和公开证据 | [git](git/_index.md) | 仓库专有 Git/PR 规则 |
 | 跑 benchmark、profiling 或查历史结果 | [benchmark](benchmark/_index.md) | 性能入口 |
 | 在远端验证仓库改动 | [remote](remote/_index.md) | 仓库专有远端策略 |
 | 对齐 upstream vLLM（rebase、API 漂移、波次） | [rebase](rebase/_index.md) | 上游对齐工作流与漂移登记 |
-| 查看共享代码模块 | [components](components/_index.md) | diffusion、model-executor、serving |
+| 查看共享代码模块 | [components](components/_index.md) | configuration、diffusion、distributed、model-executor、scheduler、serving |
 | 查看支持模型 | [models](models/_index.md) | 模型架构与经验 |

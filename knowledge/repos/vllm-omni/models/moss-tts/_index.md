@@ -39,7 +39,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/config/pipeline
     `moss_tts_local`→`moss_tts_local_codec`（serving 适配按此路由）。
   - `moss_tts_nano`:**单 stage**,AR LM+codec 全在 `forward()` 内以 VoxCPM
     式 `inference_stream()` 生成器跑,EOS id 2 由 compute_logits 强制。
-- 依赖共享模块：[Config 组件](../../components/config/architecture.md)、
+- 依赖共享模块：[Config 组件](../../components/configuration/architecture.md)、
   `utils/speaker_cache`、serving 适配
   `entrypoints/openai/tts_adapters/moss_tts.py`。
 

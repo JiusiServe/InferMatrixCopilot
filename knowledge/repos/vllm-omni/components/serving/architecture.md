@@ -35,14 +35,25 @@ Serving 只公开有明确请求语义和下游 consumer 的字段。Sampling da
 ## 请求参数怎样流动
 
 ```text
-声明请求字段 ---------\
-flattened client extras +--> 保留来源 -> 冲突/别名校验 -> 按 consumer 分流
-raw nested compatibility /                         |-> prompt / control
-canonical extra_args ------------------------------|-> sampling params
-                                                   |-> model extra_args
+声明请求字段 ----------------\
+flattened client extras --------\
+raw nested compatibility --------+-> 未修改请求的来源快照
+canonical / legacy containers ---/             |
+                                               |-> 当前 RFC slice 的来源校验
+                                               |      |-> normalized model extra_args
+                                               |      \-> bounded consumer view
+                                               |
+                                               \-> 既有 pure / mixed dispatcher
+                                                      |-> prompt / control
+                                                      |-> AR metadata
+                                                      \-> diffusion sampling params
 ```
 
-来源信息只能在冲突检查之后丢弃。Common sampling 字段写入 sampling 参数；prompt 或控制字段进入对应 prompt/dispatcher；模型专属字段进入 `extra_args`。未知 root 字段按公开合同忽略或拒绝，不能因为与内部状态同名而被当成已支持字段。
+来源信息只能在冲突检查之后丢弃。Request-extra slice 在 serving 对请求写回默认值、preprocess、decode 和 dispatcher 分支之前产出两个不同用途的结果：模型专属字段进入 normalized `extra_args`；common sampling 字段和既有 service controls 进入限定字段的 consumer view。Pure、mixed 和 AR sampling 路径只消费这个 view，不再读取 raw extras。
+
+字段 owner 必须互斥。若 registry 声明字段与既有 service control 重名，例如 `negative_prompt`，该字段仍参与跨来源冲突检查，但只由 service-control consumer view 持有，不能同时作为 model `extra_args` 再登记一次。未知 root 字段按公开合同忽略或拒绝，不能因为与内部状态同名而被当成已支持字段。
+
+逐 stage 用户 overrides、topology、模型能力和部署/YAML stage defaults 有各自既有 owner；除非目标 RFC 明确改变这些合同，request-extra normalization 不应把它们收进新的全请求 compiler。Single owner 的含义是“当前 slice 的语义只有一个 owner”，不是“所有相邻职责必须合并成一个对象”。
 
 ## 调查顺序
 
@@ -59,7 +70,7 @@ Serving 层不应该偷偷修正模型算法、制造静默 fallback，或用入
 
 ## 怎样验证
 
-1. 为 flattened、nested、alias 和 canonical container 建立来源矩阵。
+1. 为当前 RFC slice 实际接受的声明字段、flattened、nested 和 canonical/legacy container 维护可执行的来源矩阵；未被 slice 拥有的逐 stage、topology、capability 和 server defaults 明确标为不在范围内。
 2. 重复的已消费字段必须产生可观察的 4xx；不重叠字段必须保留。
-3. 每条生产 dispatcher 至少用一个非默认值断言最终 consumer。
-4. 增加一个内部同名字段反例，防止内部 schema 扩张公开 API。
+3. 每条生产 dispatcher 用真实请求对象断言 normalization boundary 只运行一次、失败发生在 preprocess/decode/engine 前，并以 root control + nested extras 断言最终 consumer。
+4. 增加一个内部同名字段反例，防止内部 schema 扩张公开 API；helper mock 不能代替生产入口证明。

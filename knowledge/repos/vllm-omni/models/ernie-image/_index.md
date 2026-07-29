@@ -16,7 +16,7 @@ sources: [vllm_omni/diffusion/models/ernie_image/, vllm_omni/diffusion/registry.
 - diffusion registry：`ErnieImagePipeline` →
   （`ernie_image`, `pipeline_ernie_image`）,post
   `get_ernie_image_post_process_func`。单 stage diffusion,引擎默认 stage
-  配置（[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
+  配置（[Config 组件](../../components/configuration/architecture.md)）。无 deploy YAML。
 - 源码：`pipeline_ernie_image.py`（23 KB）+ `ernie_image_transformer.py`
   （`ErnieImageTransformer2DModel`）。
 - 依赖共享模块：[Diffusion 组件](../../components/diffusion/_index.md)。

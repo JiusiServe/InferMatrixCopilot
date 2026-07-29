@@ -36,7 +36,7 @@ sources: [vllm_omni/model_executor/models/bagel/, vllm_omni/diffusion/models/bag
 - 依赖共享模块：[Diffusion 组件](../../components/diffusion/_index.md)
   （CFGParallelMixin、分布式 VAE）;stage 间连接器默认配置为
   SharedMemoryConnector,Mooncake RDMA 是 YAML 中的备选项;多 stage 共卡
-  显存预算见 [Config 规则 CONF-1a](../../components/config/rules.md)
+  显存预算见 [Config 规则 CONF-1a](../../components/configuration/rules.md)
   （Bagel 正是案例）。
 
 ## 目录内容

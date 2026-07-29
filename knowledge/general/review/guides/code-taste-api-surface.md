@@ -114,7 +114,7 @@ When many JSON/YAML cases repeat the same hardware or marker metadata, keep the
 canonical value in one generator, fixture, or patch function and regenerate the
 cases. Review both the source-of-truth code and rendered examples so a docs-only
 rename cannot drift from execution. Related repository-specific routing lives in
-[vLLM-Omni Config rules](../../../repos/vllm-omni/components/config/rules.md) and
+[vLLM-Omni Configuration rules](../../../repos/vllm-omni/components/configuration/rules.md) and
 [CI guidance](../../../repos/vllm-omni/ci/guides/ci-environment-gotchas.md).
 
 ## PR #3626 example

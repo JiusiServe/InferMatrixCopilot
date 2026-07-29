@@ -15,7 +15,7 @@ sources: [vllm_omni/diffusion/models/sdxl/, vllm_omni/diffusion/registry.py]
 
 - diffusion registry：`StableDiffusionXLPipeline` →（`sdxl`, `pipeline_sdxl`）,
   post `get_sdxl_image_post_process_func`。单 stage diffusion,引擎默认 stage
-  配置（[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
+  配置（[Config 组件](../../components/configuration/architecture.md)）。无 deploy YAML。
 - 源码：`pipeline_sdxl.py`（16 KB）+ `sdxl_unet.py`
   （`SDXLUNet2DConditionModel`,33 KB）。无变体有据,树内未 pin checkpoint。
 - 依赖共享模块：[Diffusion 组件](../../components/diffusion/_index.md)。

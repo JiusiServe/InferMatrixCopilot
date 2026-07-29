@@ -28,6 +28,6 @@ Overview、5 篇 feature、metrics、3 篇 module）；**完整树比索引大�
 | `feature/{tensor,pipeline,sequence,expert,cfg,vae}_parallel.md`、`hsdp.md` | 并行策略 | [diffusion guides](../components/diffusion/guides/parallelism.md) |
 | `feature/ray_based_execution.md` | Ray vs MP 后端、多机集群 | [serving](../components/serving/_index.md)（暂无专页） |
 | `metrics.md`、`qwen3_omni_tts_performance_optimization.md` | Prometheus 指标；TTS 性能优化实录 | [qwen-omni](../models/qwen-omni/architecture.md)（perf 部分） |
-| `docs/configuration/*` | 配置 schema spec | [config](../components/config/architecture.md) |
+| `docs/configuration/*` | 配置 schema spec | [configuration](../components/configuration/architecture.md) |
 | `docs/contributing/ci/*` | L1–L5 与 markers | [ci guides](../ci/guides/test-tiers.md) |
-| `docs/contributing/model/*` | 加模型三条路径 | [dev/adding-a-model](../dev/guides/adding-a-model.md) |
+| `docs/contributing/model/*` | 加模型三条路径 | [adding-a-model](../components/configuration/guides/adding-a-model.md) |

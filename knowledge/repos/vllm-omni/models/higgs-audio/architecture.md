@@ -23,7 +23,7 @@ sources: [vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_talker.p
 - 共享 codec 内核：`higgs_audio_decoder.py`（RVQ + Boson DAC,v3 直接 import
   v2 的类）;codes `[B,8,T]` → RVQ 求和 → DAC 反卷积 → 24 kHz PCM
   （25 fps × 960 hop）。
-- 共享框架面：[Config 组件](../../components/config/architecture.md)、
+- 共享框架面：[Config 组件](../../components/configuration/architecture.md)、
   SharedMemoryConnector、`serving_speech.py`。
 
 ## 配置、checkpoint 和兼容范围

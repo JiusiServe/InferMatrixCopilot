@@ -18,7 +18,7 @@ sources: [vllm_omni/diffusion/models/omnigen2/, vllm_omni/diffusion/registry.py]
   `OmniGen2Pipeline` →（`omnigen2`, `pipeline_omnigen2`）,
   pre `get_omnigen2_pre_process_func` + post `get_omnigen2_post_process_func`。
   单 stage diffusion,引擎默认 stage 配置
-  （[Config 组件](../../components/config/architecture.md)）。无 deploy YAML。
+  （[Config 组件](../../components/configuration/architecture.md)）。无 deploy YAML。
 - 源码：`pipeline_omnigen2.py`（55 KB）+ `omnigen2_transformer.py`
   （50 KB,`OmniGen2Transformer2DModel` + `OmniGen2RotaryPosEmbed`）。
 - 依赖共享模块：[Diffusion 组件](../../components/diffusion/_index.md)。

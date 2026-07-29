@@ -33,7 +33,7 @@ sources: [vllm_omni/model_executor/models/voxcpm2/, vllm_omni/deploy/voxcpm2.yam
   `get_runner_assisted_full_attention_metadata_request` 钩子
   （`gpu_ar_model_runner.py`,NPU runner 有镜像）、`utils/speaker_cache`
   （`_validate_voxcpm2_profile`）、
-  [Config 组件](../../components/config/architecture.md)。
+  [Config 组件](../../components/configuration/architecture.md)。
 - serving 入口：`entrypoints/openai/tts_adapters/voxcpm2.py`
   （`VoxCPM2Adapter`,stage key `latent_generator`;声音校验:零样本 +
   预计算 profile,拒绝纯 embedding 上传）;prompt 链

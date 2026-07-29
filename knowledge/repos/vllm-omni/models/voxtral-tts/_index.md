@@ -20,7 +20,7 @@ sources: [vllm_omni/model_executor/models/voxtral_tts/, vllm_omni/deploy/voxtral
 - pipeline key `voxtral_tts`：stage 0 `audio_generation`（LLM_AR,tokenizer
   owner,latent）→ stage 1 `audio_tokenizer`（LLM_GENERATION,音频;
   `tts_args.max_instructions_length: 500`）。
-- 依赖共享模块：[Config 组件](../../components/config/architecture.md)。
+- 依赖共享模块：[Config 组件](../../components/configuration/architecture.md)。
 
 ## 结构与 serving
 

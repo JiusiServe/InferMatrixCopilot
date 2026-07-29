@@ -25,7 +25,7 @@ sources: [vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py, 
 - 共享 codec `MossTTSCodecDecoder`：**同一解码器里装两代 audio tokenizer**
   （v1 24 kHz;v2 48 kHz 立体声,带 `RingKVCache` 流式基建）+ 两个 CUDA-graph
   wrapper（批解码 vs 流式解码）;按 codec checkpoint config 运行期选代。
-- 共享框架面：[Config 组件](../../components/config/architecture.md)、
+- 共享框架面：[Config 组件](../../components/configuration/architecture.md)、
   SharedMemoryConnector、speaker cache（`reference_encoder.py`,树内注明援引
   Fish/CosyVoice3/Qwen3-TTS 先例）。
 

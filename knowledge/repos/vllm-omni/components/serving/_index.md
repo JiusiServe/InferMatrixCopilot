@@ -28,4 +28,4 @@ sources: []
 | 遇到什么 | 查看哪里 |
 |---|---|
 | 理解入口到 engine 的边界 | [architecture](architecture.md) |
-| 审查 streaming preflight、格式 owner、多 replica 指标、请求字段、兼容输入、冲突检查或参数传播 | [rules](rules.md) |
+| 审查 streaming preflight、格式 owner、多 replica 指标、请求字段、兼容输入、冲突检查、来源矩阵或参数传播 | [rules](rules.md) |
