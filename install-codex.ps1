@@ -3,35 +3,66 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Push-Location $ProjectRoot
 try {
+    $PythonCandidates = @()
+
     if (Get-Command py -ErrorAction SilentlyContinue) {
-        & py -3 -c "import sys; assert sys.version_info >= (3, 11), 'Python 3.11+ required'"
-        if ($LASTEXITCODE -ne 0) {
-            throw "The default Python 3 is older than 3.11."
+        $PreviousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        $LauncherOutput = & py -0p 2>$null
+        $ErrorActionPreference = $PreviousErrorActionPreference
+        $LauncherOutput | ForEach-Object {
+            if ($_ -match '^\s*-\S+\s+\*?\s*(.+?)\s*$') {
+                $PythonCandidates += $Matches[1].Trim().Trim('"')
+            }
         }
-        & py -3 -m venv .venv
     }
-    elseif (Get-Command python -ErrorAction SilentlyContinue) {
-        & python -c "import sys; assert sys.version_info >= (3, 11), 'Python 3.11+ required'"
-        if ($LASTEXITCODE -ne 0) {
-            throw "Python 3.11+ is required."
+
+    foreach ($Name in @("python", "python3")) {
+        $Resolved = Get-Command $Name -ErrorAction SilentlyContinue
+        if ($Resolved) {
+            $PythonCandidates += $Resolved.Source
         }
-        & python -m venv .venv
     }
-    else {
-        throw "Python 3.11+ is required."
+
+    $PythonExe = $null
+    foreach ($Candidate in $PythonCandidates | Select-Object -Unique) {
+        if (-not (Test-Path -LiteralPath $Candidate) -and
+            -not (Get-Command $Candidate -ErrorAction SilentlyContinue)) {
+            continue
+        }
+        & $Candidate -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)" 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            $PythonExe = $Candidate
+            break
+        }
     }
+
+    if (-not $PythonExe) {
+        throw "No compatible Python found. Install any Python 3.11 or newer."
+    }
+
+    $PythonVersion = & $PythonExe -c "import sys; print('.'.join(map(str, sys.version_info[:3])))"
+    Write-Host "Using Python $PythonVersion at $PythonExe"
+    & $PythonExe -m venv .venv
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to create the Python virtual environment."
     }
 
     $VenvPython = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
-    $McpCommand = Join-Path $ProjectRoot ".venv\Scripts\infermatrix-copilot-mcp.exe"
-    & $VenvPython -m pip install -e ".[mcp]"
+    & $VenvPython -m pip install --disable-pip-version-check --no-input "mcp>=1.2,<2"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to install the MCP runtime."
+    }
 
     if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {
         throw "Codex CLI is not on PATH."
     }
-    & codex mcp add infermatrix_copilot -- $McpCommand
+    $PythonPath = Join-Path $ProjectRoot "src"
+    & codex mcp add infermatrix_copilot --env "PYTHONPATH=$PythonPath" -- `
+        $VenvPython -m infermatrix_copilot.thin_mcp_server
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to register infermatrix_copilot with Codex."
+    }
 
     Write-Host ""
     Write-Host "Installed. Restart Codex, then say:"
