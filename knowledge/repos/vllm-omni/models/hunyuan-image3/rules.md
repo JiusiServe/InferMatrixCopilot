@@ -1,10 +1,10 @@
 ---
 title: "HunyuanImage3 开发规则"
 created: 2026-07-13
-updated: 2026-07-23
+updated: 2026-07-30
 type: rule
 tags: [vllm-omni, models, hunyuan-image3]
-sources: [incidents/painterly/_index.md, guides/hf-alignment-pitfalls.md, vllm_omni/diffusion/models/hunyuan_image3/prompt_utils.py]
+sources: [incidents/painterly/_index.md, guides/hf-alignment-pitfalls.md, vllm_omni/diffusion/models/hunyuan_image3/prompt_utils.py, vllm_omni/model_extras/hunyuan_image3.py, vllm_omni/model_extras/registry.py]
 ---
 
 # HunyuanImage3 开发规则
@@ -13,7 +13,7 @@ sources: [incidents/painterly/_index.md, guides/hf-alignment-pitfalls.md, vllm_o
 
 ## 开发快速入口
 
-- **HY3-0a — 开发阶段按任务选规则。** 开发者只合并下表命中的规则和源码入口，不在编码前手工枚举整页；任务命中多行时必须取规则与源码并集，不能只选看起来最接近的一行。独立 reviewer 按当前完整 diff 审计 `core` 和所有真实命中组。
+- **HY3-0a — 开发阶段按任务选规则。** 开发者只合并下表命中的规则和源码入口，不在编码前手工枚举整页；Direct review 先用 PR title/body 的声明目标选择表格行，再用 pinned diff 验证真实命中范围。任务命中多行时必须取规则与源码并集，不能只选看起来最接近的一行。PR 描述只负责导航，不能作为 finding 证据；独立 reviewer 仍按当前完整 diff 审计 `core` 和所有真实命中组。
 
 | 正在修改什么 | 开发阶段先读 | 第一批 live 源码 |
 |---|---|---|
@@ -24,9 +24,10 @@ sources: [incidents/painterly/_index.md, guides/hf-alignment-pitfalls.md, vllm_o
 | `size=auto`、ratio token、batch ratio | `core`、`size-ratio`、`stage-transition` | live public dispatcher；`_extract_ratio_index`；`ar2diffusion`；最终 size consumer |
 | alpha、resize/crop、条件 VAE、seed/RNG | `core`、`image`、`randomness` | live public dispatcher；`prepare_seed`、`_encode_cond_image`、`prepare_model_inputs`；AR 模型的 image/VAE owner |
 | shared serving 分层和模型 adapter | `core`、`layering`、`public-topology` | live public dispatcher 到 owner adapter；模型 owner 的 `prompt_utils.py` 和 `stage_input_processors/hunyuan_image3.py` |
+| `model_extras`、shared task examples、`extra_body`、`ar_input_builder`、tokenizer validator/fallback | `core`、`prompt-token`、`stop-sampling`、`public-topology`、`layering` | `vllm_omni/model_extras/hunyuan_image3.py::{build_ar_stage_inputs,HUNYUAN_IMAGE3_EXTRA_BODY_PARAMS}`；`vllm_omni/model_extras/registry.py::{get_extra_body_params,get_ar_input_builder,get_ar_tokenizer_validator}`；`vllm_omni/entrypoints/openai/serving_chat.py::_get_diffusion_extra_body_params`；`examples/offline_inference/{text_to_image/text_to_image.py,image_to_image/image_edit.py}::_apply_ar_stage_inputs`；`prompt_utils.py::build_ar_prompt_inputs`；`stage_config.py::_build_engine_args` |
 | prompt、stop 已对齐后仍有真实 HF 差异 | `core`、`alignment-residual`，再按差异进入 image 或 runtime owner | 对齐后的最小复现；processor 输出；`hunyuan_image3.py::{_parse_and_validate_image_input,_vae_encode}`；router/top-k；实际 TP/paged-KV 边界 |
 
-- **HY3-0b — 代码地图之后停止读文档。** 打开命中行的第一批源码后就沿 live producer-consumer 调用链实现；只有规则明确链接的官方机制、源码证明跨 owner 或一个具体未知量阻止落盘时，才再读一篇 guide 或增加一个 owner，不能预读 incidents/history。
+- **HY3-0b — 代码地图之后停止读文档。** 开发或 Direct review 打开命中行的第一批源码后就沿 live producer-consumer 调用链实现或审查；只有规则明确链接的官方机制、源码证明跨 owner 或一个具体未知量阻止继续时，才再读一篇 guide 或增加一个 owner，不能预读 incidents/history。
 
 ## 审查触发组
 
@@ -34,7 +35,7 @@ sources: [incidents/painterly/_index.md, guides/hf-alignment-pitfalls.md, vllm_o
 
 | 审查组 | 什么时候触发 | 规则 ID |
 |---|---|---|
-| `author-routing` | 只供开发者确认路由和停止阅读，不进入代码审查 | `HY3-0a`, `HY3-0b` |
+| `author-routing` | 只供开发者或 Direct reviewer 确认导航和停止阅读，不作为 finding 审计规则 | `HY3-0a`, `HY3-0b` |
 | `core` | 每次 HunyuanImage3 代码审查 | `HY3-1f`, `HY3-2g`, `HY3-6a`, `HY3-6j` |
 | `prompt-token` | task、bot task、system prompt、模板、token IDs | `HY3-1a`, `HY3-1c`, `HY3-1e`, `HY3-3a`, `HY3-3b`, `HY3-3c`, `HY3-3d`, `HY3-6e`, `HY3-6f` |
 | `stop-sampling` | stop、sampling defaults、finish reason | `HY3-1a`, `HY3-1c`, `HY3-1e`, `HY3-3a`, `HY3-3e`, `HY3-6e`, `HY3-6f` |
