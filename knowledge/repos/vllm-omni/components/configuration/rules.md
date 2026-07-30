@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni 配置开发门禁"
 created: 2026-07-16
-updated: 2026-07-29
+updated: 2026-07-30
 type: rule
 tags: [vllm-omni, components, config]
 sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031"]
@@ -9,7 +9,9 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031"]
 
 # vLLM-Omni 配置开发门禁
 
-只在修改 vLLM-Omni 的 config、deploy、pipeline、CLI 字段归属、alias、unknown-field 校验、flat→nested 归一化或默认 factory 时使用。具体矩阵和操作顺序见 [config normalization parity](guides/config-normalization-parity.md)。
+只在修改 vLLM-Omni 的 config、deploy、pipeline、CLI 字段归属、alias、unknown-field 校验、flat→nested 归一化或默认 factory 时使用。第一次读这些规则时，先看
+[config audit 说人话规则](guides/config-audit-plain-language.md)；需要执行时再看
+[config normalization parity](guides/config-normalization-parity.md) 的矩阵和操作顺序。
 
 ## 配置归一化与新老路径一致性
 

@@ -91,6 +91,15 @@ python knowledge/tools/check_wiki_lint.py
 [`docs/knowledge-maintainer.zh-CN.md`](docs/knowledge-maintainer.zh-CN.md)；
 不想直接改 Markdown，也可以
 [提交中文规则建议](https://github.com/JiusiServe/InferMatrixCopilot/issues/new?template=knowledge-rule.yml)。
+Agent 按该入口已有的目录地图和落盘规范，自行选择 owner、修改 Markdown、
+更新索引并执行文档中要求的校验。MCP 本身不猜 owner，也不写规则。
+
+## Direct MCP 工具
+
+- `review(target, repo?)`：Direct 忽略 `repo`，只返回审查知识入口。
+- `update_knowledge(repo?)`：`repo` 仅为兼容旧调用保留，返回知识维护入口。
+- `doc_search(query, repo?)`：按文本搜索知识库。
+- `doc_read(path, repo?)`：读取指定知识页面。
 
 ## 工作模式
 

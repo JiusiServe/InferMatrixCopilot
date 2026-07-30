@@ -1,10 +1,10 @@
 ---
 title: "独立审查执行合同"
 created: 2026-07-13
-updated: 2026-07-23
+updated: 2026-07-30
 type: guide
 tags: [general, review]
-sources: []
+sources: ["InferMatrixCopilot Issue #17"]
 ---
 
 # 独立审查执行合同
@@ -15,10 +15,25 @@ sources: []
 
 审查分两轮，顺序不能交换：
 
-1. **覆盖轮：** 冻结基线和完整 diff。owner 定义审查触发组时，选择 `core` 加当前 diff 命中的组并完整枚举组内稳定 ID；没有触发组时才枚举该 owner 全部稳定 ID。随后填写当前可达公开入口和 changed-value producer→consumer 表。
+1. **覆盖轮：** 冻结基线和完整 diff。先按[通用设计审查规则](../rules.md)检查同族实现和条件分支的结构触发；命中时记录 `REV-1a`/`REV-1b` 的覆盖结论。owner 定义审查触发组时，选择 `core` 加当前 diff 命中的组并完整枚举组内稳定 ID；没有触发组时才枚举该 owner 全部稳定 ID。随后填写当前可达公开入口和 changed-value producer→consumer 表。
 2. **开放轮：** 再查 duplication、layering、edge cases、surface area 和命中的专项风险。
 
 找到很多新问题不能代替覆盖轮。不能为了省事漏掉命中组，也不能为了“更全面”把未触发组全部展开成噪声。缺少所选规则行、可达入口、changed-value consumer 或证据时，结论只能是 `partial review`；不能说 `clean`、`ready` 或 `fully reviewed`。
+
+规则覆盖表、入口矩阵和 producer→consumer trace 是 reviewer 的内部审计产物，不是默认
+给用户看的 review。对外只交付已经证实、能落到具体代码位置的 actionable findings。
+
+## 用户可见输出
+
+默认输出必须像正常 GitHub code review，而不是合规报告：
+
+1. 每个 finding 绑定精确 `path:line` 或 diff hunk。
+2. 正文依次说清具体触发输入/调用路径、当前行为、为什么有风险、最小修复方向。
+3. 不显示规则 ID、覆盖表、入口矩阵、`PASS`、`MISSING_EVIDENCE` 或 `Disposition`；
+   这些只在用户明确要求完整审计产物时附上。
+4. 没有 actionable finding 时只简短说明没有发现问题，并指出真正影响结论的验证缺口。
+
+规则用于帮助 reviewer 找到问题和防止漏检，不能成为用户自己翻译的输出格式。
 
 同一用户语义如果有多个输入来源、dispatcher、stage 类型或兼容入口，覆盖轮还必须先写完**来源 × consumer scope 决策矩阵**，再读具体实现。每个 source/scope 单元格只能标成：路由到哪个 consumer、与哪些来源重复时拒绝、明确不适用，或非用户 default；不能留给字典合并顺序和分支先后隐式决定。至少验证每个合法单来源、每组同 scope 重复、一个跨 scope 共存 control，以及每条 production dispatcher 的等价结果。矩阵缺失时，即使当前测试和开放轮没有 finding，也只能报 `partial review`。
 
@@ -29,6 +44,7 @@ PR 声称“严格校验”“拒绝未知字段”“统一 normalization”或
 - 用户需求和允许修改的范围；
 - 固定的 target/base SHA；
 - 当前完整 diff，以及属于任务的未跟踪文件；
+- [通用设计审查规则](../rules.md)及当前 diff 命中的结构触发；
 - live 调用链证明的 owner `rules.md`；
 - 每个 owner 的规则组选择及触发理由；有触发组时必须包含 `core`，选择错误由主 agent 复核，checker 只验证组内覆盖完整；
 - 编码前已存在的 mini spec 或合同矩阵；不存在时记 `MISSING_EVIDENCE`，不能事后代写；
@@ -49,7 +65,10 @@ PR 声称“严格校验”“拒绝未知字段”“统一 normalization”或
 
 第三方新增 owner 时只需手工增加同样的表和稳定 ID；checker 会验证组名、`core`、未分组 ID、未知 ID 和报告里的组内覆盖，但不会替人判断触发条件是否写得合理。
 
-## 必须交付的 Markdown
+## 内部审计 Markdown
+
+reviewer 或审查负责人把下面内容保存为内部 Markdown，供 checker 检查覆盖完整性。除非
+用户明确要求完整审计，不要把它原样粘贴到 GitHub review 或聊天回复。
 
 ```markdown
 # Review report
