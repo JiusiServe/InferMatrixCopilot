@@ -74,6 +74,11 @@ def test_review_runtime_flow(settings, trace, tmp_path, git_repo):
     review = state["review_text"]
     assert review.index("mod_b.py") < review.index("mod_a.py")
     assert review.endswith("**Verdict:** REQUEST CHANGES")
+    assert state["review_comments"][0]["file"] == "mod_b.py"
+    assert state["review_summary"].endswith("**Verdict:** REQUEST CHANGES")
+    updates = result.outputs["state_updates"]
+    assert updates["review_comments"] == state["review_comments"]
+    assert updates["review_summary"] == state["review_summary"]
 
     # dispatch context reached the model: evidence fenced, gate report included,
     # checklist guidance at the prompt TAIL (the system prompt stays static so

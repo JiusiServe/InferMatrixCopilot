@@ -1,4 +1,5 @@
 import asyncio
+import json
 import subprocess
 from pathlib import Path
 
@@ -167,14 +168,184 @@ def test_debug_group_blocked_without_llm(registry, settings, trace, tmp_path):
 def test_post_review_gating(registry, settings, trace, tmp_path):
     step = registry.get("pr.post_review")
     # post flag not set -> no-op
-    state = {"review_text": "looks fine", "task_spec": {"pr": 7, "post": False}}
+    state = {
+        "review_text": "looks fine\n\n**Verdict:** COMMENT",
+        "review_summary": "looks fine\n\n**Verdict:** COMMENT",
+        "review_comments": [],
+        "task_spec": {"pr": 7, "post": False},
+        "pr_state": "OPEN",
+    }
     result = asyncio.run(step.handler(_ctx(settings, trace, tmp_path, state)))
     assert result.ok and "not posting" in result.summary
     # post flag set but ALLOW_POST=0 -> dry-run
     state["task_spec"]["post"] = True
     result = asyncio.run(step.handler(_ctx(settings, trace, tmp_path, state)))
     assert result.ok and result.outputs.get("dry_run") is True
-    assert "looks fine" in result.outputs["body"]
+    assert result.outputs["payload"]["event"] == "COMMENT"
+
+
+_REVIEW_DIFF = """\
+diff --git a/a.py b/a.py
+index 1111111..2222222 100644
+--- a/a.py
++++ b/a.py
+@@ -9,3 +9,4 @@
+ context
+-old
++new
+ tail
++added
+"""
+
+
+def _finding(path, line, severity="major", text="fix this"):
+    return {
+        "file": path,
+        "line": line,
+        "severity": severity,
+        "comment": text,
+        "evidence": "verified against the hunk",
+    }
+
+
+def test_review_payload_validates_diff_lines_and_preserves_fallbacks():
+    from infermatrix_copilot.engine.steps.pr.publish import _review_payload
+
+    state = {
+        "diff_text": _REVIEW_DIFF,
+        "review_comments": [
+            _finding("a.py", 10),
+            _finding("a.py", 99, "minor", "stale line"),
+            _finding("missing.py", 1, "minor", "wrong path"),
+        ],
+        "review_summary": "summary\n\n**Verdict:** REQUEST CHANGES",
+        "review_text": "full\n\n**Verdict:** REQUEST CHANGES",
+        "pr_state": "OPEN",
+        "pr_head_sha": "a" * 40,
+    }
+    payload, downgraded = _review_payload(state)
+
+    assert payload["event"] == "REQUEST_CHANGES"
+    assert payload["commit_id"] == "a" * 40
+    assert payload["comments"] == [{
+        "path": "a.py",
+        "line": 10,
+        "side": "RIGHT",
+        "body": "**[major]** fix this\n\nEvidence: verified against the hunk",
+    }]
+    assert downgraded == 2
+    assert "a.py:99" in payload["body"]
+    assert "missing.py:1" in payload["body"]
+
+
+def test_review_payload_downgrades_all_comments_when_head_changed():
+    from infermatrix_copilot.engine.steps.pr.publish import _review_payload
+
+    state = {
+        "diff_text": _REVIEW_DIFF,
+        "review_comments": [_finding("a.py", 10)],
+        "review_summary": "summary\n\n**Verdict:** REQUEST CHANGES",
+        "pr_state": "OPEN",
+        "pr_head_sha": "a" * 40,
+    }
+    payload, downgraded = _review_payload(state, current_head="b" * 40)
+
+    assert payload["comments"] == []
+    assert payload["commit_id"] == "b" * 40
+    assert downgraded == 1
+    assert "PR head changed after review" in payload["body"]
+
+
+@pytest.mark.parametrize(
+    ("comments", "pr_state", "review_text", "event"),
+    [
+        ([_finding("a.py", 10, "major")], "OPEN", "", "REQUEST_CHANGES"),
+        ([_finding("a.py", 10, "minor")], "OPEN", "", "COMMENT"),
+        ([], "OPEN", "**Verdict:** APPROVE", "APPROVE"),
+        ([_finding("a.py", 10, "major")], "MERGED", "", "COMMENT"),
+    ],
+)
+def test_review_event_mapping(comments, pr_state, review_text, event):
+    from infermatrix_copilot.engine.steps.pr.publish import _event_for_review
+
+    assert _event_for_review(comments, pr_state, review_text) == event
+
+
+def test_post_review_submits_one_review_with_inline_comments(
+        registry, settings, trace, tmp_path, monkeypatch):
+    from infermatrix_copilot.engine.steps.pr import publish
+
+    settings.allow_post = True
+    state = {
+        "repo_path": str(tmp_path),
+        "task_spec": {"pr": 7, "post": True},
+        "diff_text": _REVIEW_DIFF,
+        "review_comments": [
+            _finding("a.py", 10),
+            _finding("a.py", 99, "minor", "stale line"),
+        ],
+        "review_summary": "summary\n\n**Verdict:** REQUEST CHANGES",
+        "review_text": "full\n\n**Verdict:** REQUEST CHANGES",
+        "pr_state": "OPEN",
+        "pr_head_sha": "b" * 40,
+    }
+    captured = {}
+    monkeypatch.setattr(
+        publish, "_repo_full_name", lambda ctx, repo: "owner/repo")
+
+    def fake_gh(args, cwd=None):
+        if args[:2] == ["pr", "view"]:
+            return 0, json.dumps({"commits": [{"oid": "b" * 40}]})
+        captured["args"] = args
+        captured["cwd"] = cwd
+        payload_path = Path(args[args.index("--input") + 1])
+        captured["payload"] = json.loads(payload_path.read_text(encoding="utf-8"))
+        return 0, json.dumps({"html_url": "https://github.com/owner/repo/pull/7#review"})
+
+    monkeypatch.setattr(publish, "_gh", fake_gh)
+    result = asyncio.run(registry.get("pr.post_review").handler(
+        _ctx(settings, trace, tmp_path, state)))
+
+    assert result.ok, result.summary
+    assert captured["args"][:3] == ["api", "--method", "POST"]
+    assert captured["args"][3] == "repos/owner/repo/pulls/7/reviews"
+    assert len(captured["payload"]["comments"]) == 1
+    assert result.outputs["inline"] == 1
+    assert result.outputs["downgraded"] == 1
+    assert result.outputs["event"] == "REQUEST_CHANGES"
+    assert result.outputs["url"].endswith("#review")
+
+
+def test_post_review_api_failure_escalates_with_payload(
+        registry, settings, trace, tmp_path, monkeypatch):
+    from infermatrix_copilot.engine.steps.pr import publish
+
+    settings.allow_post = True
+    state = {
+        "repo_path": str(tmp_path),
+        "task_spec": {"pr": 7, "post": True},
+        "diff_text": _REVIEW_DIFF,
+        "review_comments": [_finding("a.py", 10)],
+        "review_summary": "summary\n\n**Verdict:** REQUEST CHANGES",
+        "review_text": "full\n\n**Verdict:** REQUEST CHANGES",
+        "pr_state": "OPEN",
+    }
+    monkeypatch.setattr(
+        publish, "_repo_full_name", lambda ctx, repo: "owner/repo")
+
+    def fake_gh(args, cwd=None):
+        if args[:2] == ["pr", "view"]:
+            return 0, json.dumps({"commits": [{"oid": "c" * 40}]})
+        return 1, "HTTP 422 stale line"
+
+    monkeypatch.setattr(publish, "_gh", fake_gh)
+
+    result = asyncio.run(registry.get("pr.post_review").handler(
+        _ctx(settings, trace, tmp_path, state)))
+
+    assert not result.ok and result.failure is FailureKind.ESCALATE
+    assert "422" in result.summary
+    assert Path(result.outputs["artifacts"][0]).is_file()
 
 
 def test_worktree_at_creates_and_reuses(git_repo, tmp_path):
@@ -224,5 +395,6 @@ def test_fetch_diff_pins_pr_time_checkout(settings, trace, tmp_path, git_repo,
     assert result.ok, result.summary
     upd = result.outputs["state_updates"]
     assert "PR-TIME TREE" in upd["checkout_note"]
+    assert upd["pr_head_sha"] == sha
     assert upd["repo_path"].endswith("-pr7")
     assert (tmp_path / ".infermatrix-copilot" / "worktrees").exists()
