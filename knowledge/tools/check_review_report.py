@@ -10,7 +10,6 @@ from pathlib import Path
 
 
 REQUIRED_HEADINGS = (
-    "Plain-language summary",
     "Review scope",
     "Owner rule audit",
     "Public ingress matrix",
@@ -515,18 +514,6 @@ def main() -> int:
             errors.append(f"missing section: ## {heading}")
         else:
             sections[heading] = section
-
-    plain_summary = sections.get("Plain-language summary", "")
-    for label in ("Conclusion", "User impact", "Next action"):
-        if not re.search(
-            rf"^\s*[-*]\s+\*\*{re.escape(label)}:\*\*\s+\S.+$",
-            plain_summary,
-            re.MULTILINE,
-        ):
-            errors.append(
-                "Plain-language summary must include substantive "
-                f"'**{label}:**' bullet"
-            )
 
     all_rule_ids_by_owner: dict[Path, list[str]] = {}
     rule_groups_by_owner: dict[Path, dict[str, list[str]]] = {}

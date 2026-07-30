@@ -20,9 +20,20 @@ sources: []
 
 找到很多新问题不能代替覆盖轮。不能为了省事漏掉命中组，也不能为了“更全面”把未触发组全部展开成噪声。缺少所选规则行、可达入口、changed-value consumer 或证据时，结论只能是 `partial review`；不能说 `clean`、`ready` 或 `fully reviewed`。
 
-规则覆盖表是给 reviewer 和检查器追溯用的，不是给用户的结论。最终报告必须先用人话说清
-“结论、用户影响、下一步”，再放规则 ID、状态和证据；不能只交付一张规则表，让用户自己
-翻 `rules.md` 猜这些状态意味着什么。
+规则覆盖表、入口矩阵和 producer→consumer trace 是 reviewer 的内部审计产物，不是默认
+给用户看的 review。对外只交付已经证实、能落到具体代码位置的 actionable findings。
+
+## 用户可见输出
+
+默认输出必须像正常 GitHub code review，而不是合规报告：
+
+1. 每个 finding 绑定精确 `path:line` 或 diff hunk。
+2. 正文依次说清具体触发输入/调用路径、当前行为、为什么有风险、最小修复方向。
+3. 不显示规则 ID、覆盖表、入口矩阵、`PASS`、`MISSING_EVIDENCE` 或 `Disposition`；
+   这些只在用户明确要求完整审计产物时附上。
+4. 没有 actionable finding 时只简短说明没有发现问题，并指出真正影响结论的验证缺口。
+
+规则用于帮助 reviewer 找到问题和防止漏检，不能成为用户自己翻译的输出格式。
 
 同一用户语义如果有多个输入来源、dispatcher、stage 类型或兼容入口，覆盖轮还必须先写完**来源 × consumer scope 决策矩阵**，再读具体实现。每个 source/scope 单元格只能标成：路由到哪个 consumer、与哪些来源重复时拒绝、明确不适用，或非用户 default；不能留给字典合并顺序和分支先后隐式决定。至少验证每个合法单来源、每组同 scope 重复、一个跨 scope 共存 control，以及每条 production dispatcher 的等价结果。矩阵缺失时，即使当前测试和开放轮没有 finding，也只能报 `partial review`。
 
@@ -53,15 +64,13 @@ PR 声称“严格校验”“拒绝未知字段”“统一 normalization”或
 
 第三方新增 owner 时只需手工增加同样的表和稳定 ID；checker 会验证组名、`core`、未分组 ID、未知 ID 和报告里的组内覆盖，但不会替人判断触发条件是否写得合理。
 
-## 必须交付的 Markdown
+## 内部审计 Markdown
+
+reviewer 或审查负责人把下面内容保存为内部 Markdown，供 checker 检查覆盖完整性。除非
+用户明确要求完整审计，不要把它原样粘贴到 GitHub review 或聊天回复。
 
 ```markdown
 # Review report
-
-## Plain-language summary
-- **Conclusion:** <一句话说明是否有真实问题，不能只写规则 ID>
-- **User impact:** <这个问题会怎样影响调用者；没有行为问题时明确说只是证据缺口>
-- **Next action:** <最小修复、需要补的测试，或无需动作>
 
 ## Review scope
 - Base SHA: <sha>
@@ -105,11 +114,6 @@ AUDITS RUN: coverage,ingress,producer-consumer,source-consumer,duplication,layer
 ```
 
 每个稳定 ID owner 各写一行 `OWNER RULE COVERAGE`。owner 的 `rules.md` 包含“审查组”表时，`Completion` 必须写一行 `OWNER RULE GROUPS`，至少选择 `core`；覆盖分母是所选组去重后的稳定 ID 数，不是整页总数。未定义组的 owner 保持全量覆盖。`PASS` / `NOT_APPLICABLE` 的 Disposition 写 `-`；`FAIL` 必须写 `FINDING:F<number>` 并指向已完成六项证明的正式 finding；`MISSING_EVIDENCE` 必须写 finding，或用 `DRAFT:<具体且可核对的依赖、测试或 artifact 阻塞>` 说明为什么只能作为 implementation draft。多个规则可以指向同一个 finding，不能从失败行里随意挑几个上报；每个 finding 也必须反向被规则行引用，只有紧跟 F ID 的 `OWNER_RULE:NONE` 新问题例外。
-
-`Plain-language summary` 不能把 `FAIL` 和 `MISSING_EVIDENCE` 混成一件事：
-`FAIL` 表示已有证据证明合同被破坏；`MISSING_EVIDENCE` 表示当前还不能证明行为正确，
-不等于已经发现运行时 bug。规则表中的 `Disposition` 只是指向正式 finding 或证据阻塞，
-用户真正要读的是顶部摘要和 `Open findings`。
 
 旧规则页没有稳定 ID 时传 `--legacy-rules`，按文件顺序给每个项目符号、普通段落和 Markdown 表格数据行写一行连续编号的 `LEGACY:<rules path>#N`，尾签写 `OWNER RULE COVERAGE: <rules path>: X source units inventoried — A pass / B fail / C missing evidence / D not applicable — legacy-unstructured, no exact clause-coverage claim`。脚本只核对这些机械源单元是否齐全，不声称能把一个自然语言段落自动拆成精确子句。完全没有 `rules.md` 时在规则表写 `OWNER RULES: none`，尾签写 `OWNER RULE COVERAGE: none: 0/0 stable IDs inventoried — 0 pass / 0 fail / 0 missing evidence / 0 not applicable`。其他表仍要完成；只列当前 diff 可达入口和 changed values。完全不适用时使用 `N/A-with-evidence: <至少二十字具体原因>`，每个单元格都给出具体解释，不能用 `-`、`none`、`unknown` 填充。正常入口的 dispatcher、第一处昂贵操作和 owner consumer 用反引号写真实代码路径。
 

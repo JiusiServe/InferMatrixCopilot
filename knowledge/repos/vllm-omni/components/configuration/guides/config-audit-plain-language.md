@@ -76,8 +76,9 @@ CLI / deploy YAML / legacy / default factory
 - `NOT_APPLICABLE`：当前 diff 没触发这条规则。
 - `Disposition`：只是把失败或证据缺口链接到具体 finding / draft，不是新的结论。
 
-用户应先读报告顶部的人话摘要和 `Open findings`。规则表是 reviewer 用来证明“没有漏
-检查”的审计附录，不应该成为整份 review 的唯一输出。
+这些状态和规则表只属于内部审计。对外 review 应转换成普通 GitHub inline comment：
+绑定具体文件和行，说明触发输入、当前行为、影响与最小修复方向。用户明确要求完整审计时，
+才附上规则表。
 
 ## 围绕五个问题展开
 
