@@ -4,12 +4,24 @@ created: 2026-07-13
 updated: 2026-07-30
 type: guide
 tags: [general, review]
-sources: ["InferMatrixCopilot Issue #17", "zuiho-kai/claude-workflow-starter@c217fc6"]
+sources: ["InferMatrixCopilot Issue #17", "InferMatrixCopilot Issue #24", "zuiho-kai/claude-workflow-starter@c217fc6"]
 ---
 
 # 独立审查执行合同
 
-**何时使用：** 开发完成后的独立 review、完整 diff review、准备交给项目 owner 前的最后审查。这里是可直接执行的短入口；风险解释和专项 lens 只在本页要求时继续读取。
+**何时使用：** 开发完成后的独立 review、完整 diff review、准备交给项目 owner 前的最后审查。这里是默认 Direct 的单次审查入口；风险解释和专项 lens 只在首次审查留下具体高风险未知量时继续读取。
+
+## 单次输入与简明检查单
+
+主审查只采集一次 `{base_sha, head_sha, PR title/body, changed files, diff, mergeability, CI}`。先用 title/body 的声明目标选择精确 owner/model 规则组和第一批源码函数，再用 changed files 验证和补全范围；PR 描述只负责导航，不能作为 finding 证据。
+
+同一份证据包持续追加已读文件、caller 搜索、测试结果和 findings，后续步骤必须复用，不能重新抓取或重复调查。第一次 Codex review 使用这份简明检查单：
+
+- 快速门禁：snapshot、mergeability、CI、完整 diff；
+- owner 路由：命中的 owner/model 规则组和第一批源码函数；
+- 行为合同：public ingress → producer → final consumer、默认值、fallback、兼容；
+- 验证合同：真实命中路径、相关测试、未验证边界；
+- 设计减法：越界 scope、重复 abstraction、最小 owner 设计。
 
 ## 完成条件
 
@@ -24,16 +36,16 @@ sources: ["InferMatrixCopilot Issue #17", "zuiho-kai/claude-workflow-starter@c21
 规则覆盖表、入口矩阵和 producer→consumer trace 是 reviewer 的内部审计产物，不是默认
 给用户看的 review。对外只交付已经证实、能落到具体代码位置的 actionable findings。
 
-## 默认双角色与时限
+## 默认一次审查与条件专项
 
-每次 PR review 都包含两个不可互相替代的角色：
+每次 PR review 只有一个主 Codex review，但必须在同一篇内部报告里覆盖两个维度：
 
-- **Correctness reviewer：** 追公开入口、producer→consumer、行为、兼容、默认值和测试。
-- **Design/subtraction reviewer：** 先删越界 scope，再查模块 owner、最小数据流、最小修改、既有复用和可删/并/内联/迁移的层。
+- **Correctness：** 追公开入口、producer→consumer、行为、兼容、默认值和测试。
+- **Design/subtraction：** 先删越界 scope，再查模块 owner、最小数据流、最小修改、既有复用和可删/并/内联/迁移的层。
 
-有 multi-agent 时，冻结 base/head 和合同后必须实际 spawn 两个独立只读 reviewer；不能只描述角色或由同一 agent 兼任。两者输入相同且不能互看结果。只有无新增 public behavior、owner、abstraction 或兼容路径的单文件窄 diff 才可由一人顺序完成。
+不能把两个维度拆成两篇通用审查。只有主审查遇到新颖、证据矛盾或仍未覆盖的高风险合同，才允许追加一个有边界的专项问题；专项只读取共享证据包和完成该问题所需的新增源码，不重跑完整 diff，也不独立输出 verdict 或评论。
 
-用户未指定深审时，端到端默认 10 分钟，每名 reviewer 最多 6 分钟。到时停止新工具调用并返回现有结论；主 agent立即收口，不能为完整 CI、全量测试、历史 thread 或额外专项无限等待。
+用户未指定深审时，端到端默认 10 分钟。到时停止新工具调用并返回现有结论；不能为完整 CI、全量测试、历史 thread 或额外专项无限等待。
 
 ## 解释压力反查
 
@@ -62,12 +74,13 @@ correctness bug 不算减法。减法 `PASS` 必须给可执行的删/并/内联
 
 默认输出必须像正常 GitHub code review，而不是合规报告：
 
-1. 每个 finding 绑定精确 `path:line` 或 diff hunk。
-2. 正文依次说清具体触发输入/调用路径、当前行为、为什么有风险、最小修复方向。
-3. 不显示规则 ID、覆盖表、入口矩阵、`PASS`、`MISSING_EVIDENCE` 或 `Disposition`；
+1. 每个 pinned head 只发布一篇合并后的 review comment；专项结果回到主审查，不能各发一篇。渐进状态留在宿主对话或状态流，除非用户明确要求，不发布“初稿评论 + 最终评论”。
+2. 每个 finding 绑定精确 `path:line` 或 diff hunk。
+3. 正文依次说清具体触发输入/调用路径、当前行为、为什么有风险、最小修复方向。
+4. 不显示规则 ID、覆盖表、入口矩阵、`PASS`、`MISSING_EVIDENCE` 或 `Disposition`；
    这些只在用户明确要求完整审计产物时附上。
-4. 单独给出一到三项具体 scope/architecture 减法；没有可删项时简短说明最小设计证据。
-5. 没有 actionable finding 时只简短说明没有发现问题，并指出真正影响结论的验证缺口。
+5. 单独给出一到三项具体 scope/architecture 减法；没有可删项时简短说明最小设计证据。
+6. 没有 actionable finding 时只简短说明没有发现问题，并指出真正影响结论的验证缺口。
 
 规则用于帮助 reviewer 找到问题和防止漏检，不能成为用户自己翻译的输出格式。
 

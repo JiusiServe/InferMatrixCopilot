@@ -1,10 +1,10 @@
 ---
 title: "Reviewer-lens audit"
 created: 2026-07-10
-updated: 2026-07-23
+updated: 2026-07-30
 type: guide
 tags: [general, review]
-sources: []
+sources: ["InferMatrixCopilot Issue #24"]
 ---
 
 # Reviewer-lens audit
@@ -13,7 +13,7 @@ sources: []
 
 需要立即执行独立审查时先用短入口 [独立审查执行合同](review-execution-contract.md)。本页解释审查方法，不能替代执行合同要求的覆盖报告和机器检查。
 
-派生自 [review_delegation_framing](../../agents/guides/review-delegation-framing.md)：那条管怎么 spawn，这条管必须审什么。
+派生自 [review_delegation_framing](../../agents/guides/review-delegation-framing.md)：那条管专项问题怎么委派，这条管一次主审查必须审什么。
 
 ## 先分类再审
 
@@ -50,7 +50,7 @@ OWNER RULE AUDIT:
 - <owner path> <rule id or quoted legacy unit>: PASS | FAIL | MISSING_EVIDENCE | NOT_APPLICABLE — <evidence>
 ```
 
-命中 async / concurrency / scheduler / thread / process / IPC / shared memory / socket / file / cache / GPU-CPU transfer / pinned memory / lock / resource lifetime / performance claim 时，基础四项不够。必须加 systems/runtime owner；有性能、质量、可靠性、精度 claim 时还要加 evidence/benchmark auditor。没写 risk tags 和 selected lenses，只能叫 partial review。
+命中 async / concurrency / scheduler / thread / process / IPC / shared memory / socket / file / cache / GPU-CPU transfer / pinned memory / lock / resource lifetime / performance claim 时，基础四项不够，主审查必须加入对应 systems/runtime 或 evidence 检查。只有共享证据仍留下具体高风险未知量时才委派专项，不因命中标签自动再跑一篇审查。没写 risk tags 和 selected lenses，只能叫 partial review。
 
 ## 先别这样问
 
@@ -67,7 +67,7 @@ OWNER RULE AUDIT:
 
 ## 必跑四项
 
-每次 push 前、spawn review sub-agent 前、准备把 PR 交给 reviewer 前，至少审这四项：
+每次 push 前、第一次 Codex review 中、准备把 PR 交给 reviewer 前，至少审这四项：
 
 1. **Duplication:** 新函数 / class / 算法 / 常量是否已有 in-repo 或 upstream 实现。
 2. **Layering:** 逻辑是否住在拥有数据和语义的 owner 模块。
@@ -78,7 +78,7 @@ OWNER RULE AUDIT:
 
 P2 表示低严重度但仍需修复的实质问题。纯样式、不影响行为、可维护性和证据的建议单独标为 `nit`，不计入 P2。
 
-直接粘贴用的 sub-agent prompt 在 [reviewer_lens_prompt](reviewer-lens-prompt.md)。
+需要对未覆盖高风险合同做专项追问时，可裁剪使用 [reviewer_lens_prompt](reviewer-lens-prompt.md)；不能把完整模板再跑成第二篇通用审查。
 
 ## 什么时候升级
 
@@ -119,12 +119,9 @@ AUDITS RUN: coverage,ingress,producer-consumer,duplication,layering,edge-cases,s
 
 **Sub-agent review:** 用 [reviewer_lens_prompt](reviewer-lens-prompt.md) 的完整模板，不要把自己的怀疑原因塞进去。
 
-**并行 multi-framing:** 高风险 PR 拆成两个同时运行且职责正交的只读 reviewer，不串行增加墙钟时间：
+**条件专项追问：** 主 Codex review 已复用同一份文件、caller、测试和 finding 证据后，仍出现新颖、证据矛盾或未覆盖的高风险合同时，才把这个合同作为一个只读专项问题委派。例如只问 tokenizer/checkpoint parity，或只问默认 CLI 与真实 topology 是否一致。
 
-- 语义 reviewer：官方入口、token、stop、sampling、精度和模型语义。
-- 集成 reviewer：默认 CLI、真实 topology、资源可用性、public ingress、online/offline 和 unaffected control。
-
-两者使用相同基线、diff、owner 和任务合同，不能互看结果，也不能重复做一遍宽泛 producer-consumer 扫描。finding 标出命中的 owner rule；没有现成规则时标 `OWNER_RULE:NONE`。主 agent 自己 union 结果，重判 finding 影响的规则行，不再 spawn “汇总 agent”。
+专项使用相同基线、diff、owner 规则组和共享证据包，只补回答该问题必需的新证据；不能再做宽泛 producer-consumer 扫描，不能独立输出 verdict 或公开评论。主审查复核增量证据后合入唯一报告。
 
 ## 反模式
 

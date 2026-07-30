@@ -4,7 +4,7 @@ created: 2026-07-30
 updated: 2026-07-30
 type: rule
 tags: [general, review]
-sources: ["InferMatrixCopilot Issue #17", "vllm-project/vllm-omni PR #5394", "zuiho-kai/claude-workflow-starter@c217fc6"]
+sources: ["InferMatrixCopilot Issue #17", "InferMatrixCopilot Issue #24", "vllm-project/vllm-omni PR #5394", "zuiho-kai/claude-workflow-starter@c217fc6"]
 confidence: high
 ---
 
@@ -41,16 +41,17 @@ confidence: high
 
 ## 审查角色与减法
 
-### REV-2a — 非琐碎 PR 必须独立完成 correctness 与 design/subtraction
+### REV-2a — 一次 Direct 审查必须同时完成 correctness 与 design/subtraction
 
 - 触发：用户要求审核 PR，包括只提供 PR 链接；或交付前审查发现新增 public behavior、
   owner、abstraction、兼容路径或跨模块数据流。
-- 强制：冻结相同 base/head 和授权合同；有 multi-agent 能力时实际并行启动两个互不
-  看结果的只读 reviewer，一个追行为和 producer→consumer，一个做项目级和模块级减法。
-- 禁止：一个 agent 在报告里自称两个角色；找到 blocking bug 后跳过减法；用综合的
-  “建议/不建议合并”代替两个独立 verdict。
-- 验收：最终分别给出 correctness verdict 与 subtraction verdict；任一角色缺失只能
-  报 `partial review`。 ^[zuiho-kai/claude-workflow-starter@c217fc6]
+- 强制：冻结 base/head 和授权合同；一次获取 PR 描述、changed files、diff、caller、
+  tests 与已有 findings，并把精确 owner/model 规则组加入同一个 Codex review。主审查
+  同时追行为和 producer→consumer，并完成项目级与模块级减法。
+- 禁止：为 correctness 和 subtraction 各跑一篇通用审查；让不同 reviewer 重复读取
+  同一文件、搜索 caller 或运行同一测试；分别发布多篇 review comment。
+- 验收：一份内部报告覆盖 correctness 与 subtraction，一篇对外评论给出合并后的
+  findings 和 verdict；任一维度缺失只能报 `partial review`。 ^[InferMatrixCopilot Issue #24]
 
 ### REV-2b — 减法先删越界 scope，再压缩模块设计
 
@@ -68,12 +69,13 @@ confidence: high
 ### REV-2c — 交互式 PR review 必须按时返回最小可用结论
 
 - 触发：用户未指定深审或更长预算，只要求审核 PR。
-- 强制：默认端到端预算 10 分钟；两名 reviewer 并行且各自最多使用 6 分钟，截止时停止
-  新工具调用，返回当前 finding、减法账本和未验证边界，由主 agent立即收口。
+- 强制：默认端到端预算 10 分钟；主审查先完成合并/CI/diff 快速检查并复用同一证据包。
+  只有新颖、矛盾或未覆盖的高风险合同才允许在剩余预算内追加有边界的专项追问；截止时
+  停止新工具调用，返回当前 finding、减法账本和未验证边界。
 - 禁止：为了补齐外围 CI、全量测试、历史 thread 或额外专项无限延长；在 reviewer 已超时
   后继续无上限等待“完整结果”。
 - 验收：10 分钟内给用户 actionable findings 或明确的 `partial review`；更深验证作为
-  后续可选任务，不阻塞本轮答复。 ^[zuiho-kai/claude-workflow-starter@c217fc6]
+  后续可选任务，不阻塞本轮答复。 ^[InferMatrixCopilot Issue #24]
 
 具体审查执行顺序见[独立审查执行合同](guides/review-execution-contract.md)，输入、输出与
 边界矩阵写法见[Reviewer Lens Contracts](guides/reviewer-lens-contracts.md)。

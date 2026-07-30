@@ -17,6 +17,12 @@
 
 实现任务只选一个主题完成路由。仅因一个代码 diff 同时包含测试和文档，不需要在开工时横向读完 `ci/` 和 `docs/` 主题；选定代码 owner 后，先查真实仓库里最近的测试和文档入口。任务主目标命中 CI、测试体系或文档，或本页和仓库场景触发器明确要求专项门禁时，仍必须进入对应主题。
 
+### Direct PR review 单次路由
+
+默认 Direct review 只执行一篇 Codex 审查。先固定 base/head，再一次性获取 PR title/body、changed files、diff、mergeability 和 CI；用 title/body 的声明目标选择精确 owner/model 规则组和第一批源码函数，changed files 只校验并补全真实范围。把已读文件、caller 搜索、测试结果和 findings 放进同一份证据包，correctness 与 design/subtraction 在这次审查中共用，不能各自重新导航或重复采集。
+
+只有首次审查留下新颖、互相矛盾或未覆盖的高风险合同问题时，才对该问题发起一个有边界的专项追问；专项不得重跑通用 diff review，也不得独立发布评论。主审查合并结果后只输出一篇 review comment。需要渐进反馈时在宿主对话或状态中更新，不用“初稿评论 + 最终评论”制造两篇公开审查。
+
 ### 开发任务五分钟首次落盘
 
 用户已经授权实现、真实 checkout 可写且不是纯分析任务时，记录开工时间。用户或主 agent 已经给出 canonical 仓库、精确 owner 和规则路径时，开发快路径固定读取四个页面的命中段落：本页、[code taste](general/review/guides/code-taste.md)、目标仓库根 `rules.md` 和该 owner 的 `rules.md`；此时跳过 `repos/_index.md`、仓库/topic/model discovery 索引、未被仓库硬门禁直接命中的 planning/review guide 和同级 owner。仓库根规则直接要求 mini spec、远端门禁或其他安全页时仍必须读取那一篇，不能为了页面预算跳过。确认主要 owner 后立即写出四项：`owner`、开发阶段命中的仓库/owner 规则 ID 或触发组、第一批要打开的源码函数、当前唯一阻塞；没有阻塞就进入 live 源码。开发者只读当前任务命中的规则；owner 定义触发组时，组内完整枚举属于写完后的 reviewer，不在编码前手工跑整页。
@@ -64,7 +70,7 @@
 |---|---|---|
 | 写代码或修改公开接口 | [code taste](general/review/guides/code-taste.md) | 先理解现有 owner、调用链、测试和用户可见行为 |
 | 开发完成、准备交给 reviewer 或项目 owner | [维护者审查闭环](general/agents/guides/agent-loop-workflow.md#开发交付的维护者审查闭环) | 先确认唯一审查负责人；被委派的开发默认交回父 agent 统一 review，不嵌套重复审查 |
-| code review、reviewer follow-up，或用户只给 PR 链接让你“审核一下” | [独立审查执行合同](general/review/guides/review-execution-contract.md) | 同时完成 correctness 与 design/subtraction；有 multi-agent 时冻结输入后立即并行 spawn 两个只读 reviewer。默认 10 分钟内交付，找到 bug 不能代替项目级和模块级减法 |
+| code review、reviewer follow-up，或用户只给 PR 链接让你“审核一下” | [独立审查执行合同](general/review/guides/review-execution-contract.md) | 一次 Direct 审查复用同一份路由与证据，同时完成 correctness 和 design/subtraction；只在未覆盖的高风险合同上做专项追问，最终只发一篇评论 |
 | UI、CLI、文档或其他用户可见改动 | [用户可见验收](general/docs/guides/user-visible-acceptance.md) | 绿测之外还要跑普通用户真实路径 |
 | benchmark 或性能结论 | [benchmark contract](general/benchmark/guides/benchmark-contract.md) | 先固定版本、工作负载、指标和证据来源 |
 | SSH、容器、远端服务或长跑 | [远端入口](general/remote/_index.md) | 先验证目标、环境、超时、状态文件和清理边界 |
