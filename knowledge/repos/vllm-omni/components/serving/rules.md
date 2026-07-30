@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-07-23
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #3576", "PR #4718", "PR #5157", "claude-workflow-starter-private@09dca46"]
+sources: ["PR #3576", "PR #4718", "PR #5157", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6"]
 confidence: high
 ---
 
@@ -127,9 +127,13 @@ confidence: high
 
 - 触发：一个语义存在多个来源、dispatcher 或 stage scope。
 - 强制：按 [source-consumer decision matrix](../../../../general/review/guides/review-execution-contract.md#source-consumer-decision-matrix)
-  标明路由、重复拒绝、不适用和 defaults。
-- 禁止：矩阵缺失时声称实现或审查完成。
-- 验收：每个来源组合都有明确 decision 和生产路径证据。
+  标明路由、重复拒绝、不适用和 defaults；兼容写法默认进入同一 consumer scope，只有
+  矩阵声明不同语义时才能分流。规范化结果拆成多个 consumer view 时默认互不重叠，
+  同一字段确需进入多个 view 时逐一命名最终 consumer。
+- 禁止：矩阵缺失时声称实现或审查完成；由字段集合运算、输入写法或 dispatcher 末端
+  defaults 隐式决定 scope。
+- 验收：每个来源组合都有明确 decision 和生产路径证据；每个 consumer view 的重叠项
+  都有显式最终 consumer，不存在接受后丢弃或末端重新读取 raw request。
 
 ### SERV-4h — 请求合同膨胀时停止逐评论修补
 

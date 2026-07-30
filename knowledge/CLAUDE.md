@@ -33,7 +33,7 @@
 
 | 正在做什么 | 第一个入口 | 识别仓库后必须检查 |
 |---|---|---|
-| code review 和 reviewer follow-up | [独立审查执行合同](general/review/guides/review-execution-contract.md) | 当前仓库 `rules.md`；精确命中后直接读 owner `rules.md` |
+| code review、reviewer follow-up 或只给 PR 链接 | [独立审查执行合同](general/review/guides/review-execution-contract.md) | 当前仓库 `rules.md`；精确命中后直接读 owner `rules.md` |
 | 测试选择和 CI | [general/ci](general/ci/_index.md) | `repos/<仓库>/ci/_index.md` |
 | 写文档、RFC 和用户可见说明 | [general/docs](general/docs/_index.md) | `repos/<仓库>/docs/_index.md` |
 | Git、commit、rebase 和 PR | [general/git](general/git/_index.md) | `repos/<仓库>/git/_index.md` |
@@ -64,7 +64,7 @@
 |---|---|---|
 | 写代码或修改公开接口 | [code taste](general/review/guides/code-taste.md) | 先理解现有 owner、调用链、测试和用户可见行为 |
 | 开发完成、准备交给 reviewer 或项目 owner | [维护者审查闭环](general/agents/guides/agent-loop-workflow.md#开发交付的维护者审查闭环) | 先确认唯一审查负责人；被委派的开发默认交回父 agent 统一 review，不嵌套重复审查 |
-| code review 或 reviewer follow-up | [独立审查执行合同](general/review/guides/review-execution-contract.md) | 先完成 owner 规则、公开入口和 producer→consumer 覆盖，再开放找问题 |
+| code review、reviewer follow-up，或用户只给 PR 链接让你“审核一下” | [独立审查执行合同](general/review/guides/review-execution-contract.md) | 同时完成 correctness 与 design/subtraction；有 multi-agent 时冻结输入后立即并行 spawn 两个只读 reviewer。默认 10 分钟内交付，找到 bug 不能代替项目级和模块级减法 |
 | UI、CLI、文档或其他用户可见改动 | [用户可见验收](general/docs/guides/user-visible-acceptance.md) | 绿测之外还要跑普通用户真实路径 |
 | benchmark 或性能结论 | [benchmark contract](general/benchmark/guides/benchmark-contract.md) | 先固定版本、工作负载、指标和证据来源 |
 | SSH、容器、远端服务或长跑 | [远端入口](general/remote/_index.md) | 先验证目标、环境、超时、状态文件和清理边界 |

@@ -4,7 +4,7 @@ created: 2026-07-13
 updated: 2026-07-30
 type: guide
 tags: [general, review]
-sources: ["InferMatrixCopilot Issue #17"]
+sources: ["InferMatrixCopilot Issue #17", "zuiho-kai/claude-workflow-starter@c217fc6"]
 ---
 
 # 独立审查执行合同
@@ -13,15 +13,50 @@ sources: ["InferMatrixCopilot Issue #17"]
 
 ## 完成条件
 
-审查分两轮，顺序不能交换：
+审查分三轮，顺序不能交换：
 
 1. **覆盖轮：** 冻结基线和完整 diff。先按[通用设计审查规则](../rules.md)检查同族实现和条件分支的结构触发；命中时记录 `REV-1a`/`REV-1b` 的覆盖结论。owner 定义审查触发组时，选择 `core` 加当前 diff 命中的组并完整枚举组内稳定 ID；没有触发组时才枚举该 owner 全部稳定 ID。随后填写当前可达公开入口和 changed-value producer→consumer 表。
-2. **开放轮：** 再查 duplication、layering、edge cases、surface area 和命中的专项风险。
+2. **减法轮：** 先按用户目标和当前 RFC/mini spec slice 删除越界 behavior、文件和测试；再枚举保留的 production abstraction，写出最小 owner 设计和逐项减法账本。
+3. **开放轮：** 再查 correctness、duplication、layering、edge cases、surface area 和命中的专项风险。
 
-找到很多新问题不能代替覆盖轮。不能为了省事漏掉命中组，也不能为了“更全面”把未触发组全部展开成噪声。缺少所选规则行、可达入口、changed-value consumer 或证据时，结论只能是 `partial review`；不能说 `clean`、`ready` 或 `fully reviewed`。
+找到很多新问题不能代替覆盖轮或减法轮。任一轮发现 P0/P1/P2 都不能提前结束其他轮次。缺少所选规则行、可达入口、changed-value consumer、scope ledger、abstraction census、最小设计或证据时，结论只能是 `partial review`；不能说 `clean`、`ready` 或 `fully reviewed`。
 
 规则覆盖表、入口矩阵和 producer→consumer trace 是 reviewer 的内部审计产物，不是默认
 给用户看的 review。对外只交付已经证实、能落到具体代码位置的 actionable findings。
+
+## 默认双角色与时限
+
+每次 PR review 都包含两个不可互相替代的角色：
+
+- **Correctness reviewer：** 追公开入口、producer→consumer、行为、兼容、默认值和测试。
+- **Design/subtraction reviewer：** 先删越界 scope，再查模块 owner、最小数据流、最小修改、既有复用和可删/并/内联/迁移的层。
+
+有 multi-agent 时，冻结 base/head 和合同后必须实际 spawn 两个独立只读 reviewer；不能只描述角色或由同一 agent 兼任。两者输入相同且不能互看结果。只有无新增 public behavior、owner、abstraction 或兼容路径的单文件窄 diff 才可由一人顺序完成。
+
+用户未指定深审时，端到端默认 10 分钟，每名 reviewer 最多 6 分钟。到时停止新工具调用并返回现有结论；主 agent立即收口，不能为完整 CI、全量测试、历史 thread 或额外专项无限等待。
+
+## 解释压力反查
+
+减法轮必须用最终 head 做一次不依赖历史的人话解释：只说输入、每个 source × scope 的唯一 owner 产物和最终 consumer。若必须靠修复时间线说明结构，检查：
+
+- 两个字段组、helper 或中间对象没有不同 consumer，最终只是立即合并、转发或拆后再合；
+- 同一 owner 产物跨层不断换名，尤其把已校验 projection 又叫回 raw request 或 kwargs；
+- normalizer 已产出最终值，下游仍重读原始输入、补 default、重做 alias 或 precedence；
+- 当前 RFC slice 明确不拥有的职责，production diff 却修改了其真实 consumer。
+
+命中后写出“当前结构 → 最小结构 → 具体删除或迁移项”。只有 representation、lifecycle 或 failure policy 不同才允许额外层；“兼容复杂”“测试很多”不是证明。
+
+## 减法轮交付合同
+
+减法轮先做 scope subtraction，再做 architecture subtraction，并在内部审计中交付：
+
+1. **Scope ledger：** 每个新增 behavior、production 文件和测试组映射到当前目标或 RFC slice；无法映射就 `DELETE / DEFER`。
+2. **当前 census：** 枚举保留范围内新增或扩张的 helper、class、field group、allowlist、owner projection、跨层 artifact 和末端补偿。
+3. **最小设计：** 在保持 scope 外 base 行为不变时，写出最少 owner artifact、transformation 和 consumer。
+4. **逐项账本：** 对 census 每项标记 `KEEP / INLINE / MERGE / MOVE / DELETE` 并给代码锚点；改名、换文件、删临时变量不算减法。
+5. **净结果：** 分别报告 scope 删除项，以及 abstraction、owner、重复 projection、末端补偿和 production branch 的净减少。
+
+correctness bug 不算减法。减法 `PASS` 必须给可执行的删/并/内联方案，或用完整 ledger 证明授权 scope 和 census 已经最小。
 
 ## 用户可见输出
 
@@ -31,9 +66,12 @@ sources: ["InferMatrixCopilot Issue #17"]
 2. 正文依次说清具体触发输入/调用路径、当前行为、为什么有风险、最小修复方向。
 3. 不显示规则 ID、覆盖表、入口矩阵、`PASS`、`MISSING_EVIDENCE` 或 `Disposition`；
    这些只在用户明确要求完整审计产物时附上。
-4. 没有 actionable finding 时只简短说明没有发现问题，并指出真正影响结论的验证缺口。
+4. 单独给出一到三项具体 scope/architecture 减法；没有可删项时简短说明最小设计证据。
+5. 没有 actionable finding 时只简短说明没有发现问题，并指出真正影响结论的验证缺口。
 
 规则用于帮助 reviewer 找到问题和防止漏检，不能成为用户自己翻译的输出格式。
+
+### Source-consumer decision matrix
 
 同一用户语义如果有多个输入来源、dispatcher、stage 类型或兼容入口，覆盖轮还必须先写完**来源 × consumer scope 决策矩阵**，再读具体实现。每个 source/scope 单元格只能标成：路由到哪个 consumer、与哪些来源重复时拒绝、明确不适用，或非用户 default；不能留给字典合并顺序和分支先后隐式决定。至少验证每个合法单来源、每组同 scope 重复、一个跨 scope 共存 control，以及每条 production dispatcher 的等价结果。矩阵缺失时，即使当前测试和开放轮没有 finding，也只能报 `partial review`。
 
@@ -96,6 +134,25 @@ reviewer 或审查负责人把下面内容保存为内部 Markdown，供 checker
 |---|---|---|---|---|---|
 | <field/behavior> | <source> | <every handoff> | <actual reader> | <boundary> | <evidence> |
 
+## Subtraction audit
+### Scope ledger
+| Behavior / production file / test group | Authorized goal or current RFC slice | KEEP / DELETE / DEFER | Evidence |
+|---|---|---|---|
+| <item> | <merge condition or none> | <decision> | <contract anchor> |
+
+### Abstraction census and minimal design
+- Current census: <every helper/class/field group/projection/artifact/compensation flow>
+- Minimal owner design: <least owner artifacts, transformations and consumers>
+
+### Item ledger
+| Current abstraction | KEEP / INLINE / MERGE / MOVE / DELETE | Code anchor | Survival proof or removal |
+|---|---|---|---|
+| <item> | <decision> | <path:symbol> | <reason> |
+
+### Net result
+- Scope subtraction: <behaviors/files/tests removed or zero with proof>
+- Architecture subtraction: <net abstraction/owner/projection/compensation/branch counts>
+
 ## Source-consumer decision matrix
 | Source | Consumer scope / dispatcher | Decision | Conflicts with | Production-path evidence |
 |---|---|---|---|---|
@@ -111,6 +168,8 @@ reviewer 或审查负责人把下面内容保存为内部 Markdown，供 checker
 ## Completion
 OWNER RULE GROUPS: <rules path>: core,prompt-token[,other-triggered-group]；owner 没有组时不写
 OWNER RULE COVERAGE: <rules path>: X/Y stable IDs inventoried — A pass / B fail / C missing evidence / D not applicable
+SUBTRACTION VERDICT: PASS / FAIL / PARTIAL — <scope and architecture result>
+CORRECTNESS VERDICT: PASS / FAIL / PARTIAL — <findings or clean evidence>
 AUDITS RUN: coverage,ingress,producer-consumer,source-consumer,duplication,layering,edge-cases,surface-area — N findings (Pa P0, Pb P1, Pc P2)
 ```
 
