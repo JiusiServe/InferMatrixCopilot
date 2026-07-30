@@ -64,6 +64,7 @@ def _pr_time_checkout(ctx: StepContext, repo: Path, pr: int) -> tuple[str, str]:
         return str(repo), ("checkout: CURRENT MAIN (PR head unresolvable) — "
                            "the tree may already contain post-PR fixes; a "
                            "clean grep does NOT clear PR-time state")
+    ctx.state["pr_head_sha"] = sha
     if not injected:
         code, out = _git(repo, "fetch", "origin", f"pull/{pr}/head")
         if code != 0:
@@ -268,7 +269,9 @@ async def _pr_fetch_diff(ctx: StepContext) -> StepResult:
                 f"{len(pr_context)} chars); {note.split(' — ')[0]}",
         outputs={"state_updates": {"diff_text": out, "pr_context": pr_context,
                                    "repo_path": wt_path,
-                                   "checkout_note": note}})
+                                   "checkout_note": note,
+                                   "pr_head_sha":
+                                       ctx.state.get("pr_head_sha", "")}})
 
 
 @step("pr.gate_check", "deterministic", "read",

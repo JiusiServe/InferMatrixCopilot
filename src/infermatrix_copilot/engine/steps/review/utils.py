@@ -96,6 +96,78 @@ def _category_of(c: dict) -> str:
     return "Correctness"
 
 
+def _review_verdict(comments: list[dict], pr_state: str = "") -> str:
+    """Map structured findings to the product verdict used by GitHub reviews."""
+    def uncertain(comment: dict) -> bool:
+        hay = (
+            str(comment.get("comment", ""))
+            + " "
+            + str(comment.get("evidence", ""))
+        ).lower()
+        return any(marker in hay for marker in (
+            "uncertain", "unverified", "could not verify", "cannot verify",
+            "budget exhaust", "not able to confirm",
+        ))
+
+    blocking = any(
+        str(comment.get("severity", "")).lower() in ("blocker", "major")
+        and not uncertain(comment)
+        for comment in comments
+    )
+    if blocking:
+        return (
+            "FOLLOW-UP REQUIRED (post-merge)"
+            if str(pr_state).upper() == "MERGED"
+            else "REQUEST CHANGES"
+        )
+    return "COMMENT" if comments else "APPROVE"
+
+
+def _review_summary_parts(output: dict) -> list[str]:
+    """Render the scan and positive validation sections shared by both views."""
+    comments = output.get("review_comments") or []
+    validated = [
+        str(finding).strip()
+        for finding in (output.get("findings") or [])
+        if str(finding).lstrip().lower().startswith(
+            ("[validated]", "[upstream-verify]", "[sweep]")
+        )
+    ][:8]
+    counts: dict[str, int] = {}
+    for comment in comments:
+        category = _category_of(comment)
+        counts[category] = counts.get(category, 0) + 1
+    scan = ["| Category | Result |", "|---|---|"]
+    for name, _ in _CATEGORY_RULES:
+        count = counts.get(name, 0)
+        scan.append(
+            f"| {name} | "
+            f"{f'{count} finding(s) below' if count else 'no finding reported'} |"
+        )
+    parts = ["**Scan:**\n" + "\n".join(scan)]
+    if validated:
+        parts.append(
+            "**Validated:**\n"
+            + "\n".join(f"- {finding}" for finding in validated)
+        )
+    return parts
+
+
+def _render_review_summary(output: dict, pr_state: str = "") -> str:
+    """Render a concise review body; individual findings are posted inline."""
+    comments = output.get("review_comments") or []
+    parts = _review_summary_parts(output)
+    summary = str(output.get("summary") or "").strip()
+    if summary:
+        parts.append(summary)
+    elif comments:
+        parts.append(f"{len(comments)} actionable finding(s).")
+    else:
+        parts.append("No actionable findings.")
+    parts.append(f"**Verdict:** {_review_verdict(comments, pr_state)}")
+    return "\n\n".join(parts)
+
+
 def _render_review_md(output: dict, pr_state: str = "") -> str:
     """Render the review output dict as Markdown: a category scan table
     (finding counts per category; empty rows say `no finding reported`),
@@ -115,43 +187,7 @@ def _render_review_md(output: dict, pr_state: str = "") -> str:
         ev = f" (evidence: {c['evidence']})" if c.get("evidence") else ""
         lines.append(f"{loc} [{c.get('severity', 'minor')}] — "
                      f"{c.get('comment', '')}{ev}")
-    # "What I validated": lenses record positive verifications as findings
-    # ([validated]/[upstream-verify]/[sweep] prefixes). On approved PRs the
-    # human reviewers' "concerns" are mostly validation reasoning — a
-    # comments-only review structurally caps recall (T3 forensics #4).
-    validated = [str(f).strip() for f in (output.get("findings") or [])
-                 if str(f).lstrip().lower().startswith(
-                     ("[validated]", "[upstream-verify]", "[sweep]"))][:8]
-    # Verdict calibration (T3 forensics #2): only blocker/major block — a
-    # `minor` is an in-PR ask but not merge-blocking (14/15 human-approved
-    # PRs got REQUEST CHANGES under the old rule). A comment whose own text
-    # or evidence declares uncertainty can never block.
-    def _uncertain(c: dict) -> bool:
-        hay = (str(c.get("comment", "")) + " " + str(c.get("evidence", ""))).lower()
-        return any(m in hay for m in ("uncertain", "unverified", "could not verify",
-                                      "cannot verify", "budget exhaust",
-                                      "not able to confirm"))
-    blocking = any(str(c.get("severity", "")).lower() in ("blocker", "major")
-                   and not _uncertain(c) for c in comments)
-    if blocking:
-        verdict = "FOLLOW-UP REQUIRED (post-merge)" \
-            if str(pr_state).upper() == "MERGED" else "REQUEST CHANGES"
-    elif comments:
-        verdict = "COMMENT"  # non-blocking asks; mergeable as-is
-    else:
-        verdict = "APPROVE"
-    parts = []
-    # category scan: judge-visible coverage without claiming verification
-    counts: dict[str, int] = {}
-    for c in comments:
-        counts[_category_of(c)] = counts.get(_category_of(c), 0) + 1
-    scan = ["| Category | Result |", "|---|---|"]
-    for name, _ in _CATEGORY_RULES:
-        n = counts.get(name, 0)
-        scan.append(f"| {name} | {f'{n} finding(s) below' if n else 'no finding reported'} |")
-    parts.append("**Scan:**\n" + "\n".join(scan))
-    if validated:
-        parts.append("**Validated:**\n" + "\n".join(f"- {v}" for v in validated))
+    parts = _review_summary_parts(output)
     parts.append("\n\n".join(lines) if lines else output.get("summary", "No findings."))
     body = "\n\n".join(parts)
-    return f"{body}\n\n**Verdict:** {verdict}"
+    return f"{body}\n\n**Verdict:** {_review_verdict(comments, pr_state)}"

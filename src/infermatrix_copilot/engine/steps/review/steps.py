@@ -24,7 +24,12 @@ from .._common import gh_read_tools as _gh_read_tools
 from .._common import repo_path as _repo_path
 from .._common import step
 from .prompts import _REVIEW_LENSES, _REVIEW_MERGE, _REVIEW_SYSTEM
-from .utils import _SEVERITY_ORDER, _render_review_md, _sweep_targets
+from .utils import (
+    _SEVERITY_ORDER,
+    _render_review_md,
+    _render_review_summary,
+    _sweep_targets,
+)
 
 
 @step("review.patch_gate", "validation", "read",
@@ -197,9 +202,22 @@ async def _review_diff(ctx: StepContext) -> StepResult:
     if result.ok:
         review_md = _render_review_md(output,
                                       pr_state=str(ctx.state.get("pr_state", "")))
-        ctx.state["review_text"] = review_md
+        review_summary = _render_review_summary(
+            output, pr_state=str(ctx.state.get("pr_state", "")))
+        review_comments = output.get("review_comments") or []
+        ctx.state.update({
+            "review_text": review_md,
+            "review_summary": review_summary,
+            "review_comments": review_comments,
+        })
         result.outputs["review_text"] = review_md
-        result.outputs.setdefault("state_updates", {})["review_text"] = review_md
+        result.outputs["review_summary"] = review_summary
+        result.outputs["review_comments"] = review_comments
+        result.outputs.setdefault("state_updates", {}).update({
+            "review_text": review_md,
+            "review_summary": review_summary,
+            "review_comments": review_comments,
+        })
         depth_note = f"; depth={plan.depth} via {plan.planner}" if plan else ""
         result.summary = (f"review produced ({len(output.get('review_comments') or [])} "
                           f"comments{depth_note}) — {result.summary}")
