@@ -106,8 +106,7 @@ def no_llm_gap(ctx: StepContext, step: str, effect: str, *,
     return StepResult(True, summary=summary)
 
 
-def gh(args: list[str], cwd: Path | None = None, *,
-       input_text: str | None = None) -> tuple[int, str]:
+def gh(args: list[str], cwd: Path | None = None) -> tuple[int, str]:
     """Run the `gh` CLI with `args` in `cwd`, returning `(returncode, output)`
     where output is stdout or, if empty, stderr. A missing CLI yields
     `(127, ...)` instead of raising, so callers branch on the code, not an
@@ -115,7 +114,7 @@ def gh(args: list[str], cwd: Path | None = None, *,
     try:
         out = subprocess.run(["gh", *args], cwd=str(cwd) if cwd else None,
                              capture_output=True, text=True, encoding="utf-8",
-                             errors="replace", timeout=120, input=input_text)
+                             errors="replace", timeout=120)
         return out.returncode, out.stdout or out.stderr
     except FileNotFoundError:
         return 127, "gh CLI not installed"
