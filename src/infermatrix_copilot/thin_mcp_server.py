@@ -15,6 +15,9 @@ _ROOT = Path(__file__).resolve().parents[2]
 _KNOWLEDGE = _ROOT / "knowledge"
 _RUN_ROOT = Path.home() / ".infermatrix-copilot" / "host-review-runs"
 _STAGES = ("evidence", "gates", "review", "verify", "complete")
+_REPO_ALIASES = {
+    "vllm-project/vllm-omni": "vllm-omni",
+}
 _ROUTES = {
     "vllm_omni/config/": "repos/vllm-omni/components/config/rules.md",
     "vllm_omni/core/": "repos/vllm-omni/components/scheduler/rules.md",
@@ -23,6 +26,11 @@ _ROUTES = {
     "vllm_omni/models/": "repos/vllm-omni/models/_index.md",
     "vllm_omni/diffusion/": "repos/vllm-omni/components/diffusion/rules.md",
 }
+
+
+def _normalize_repo(repo: str) -> str:
+    selected = str(repo or "vllm-omni").strip()
+    return _REPO_ALIASES.get(selected.casefold(), selected)
 
 
 def _supported_repos() -> list[str]:
@@ -35,7 +43,7 @@ def _supported_repos() -> list[str]:
 
 
 def _docs(repo: str) -> KnowledgeDocs:
-    repo = (repo or "vllm-omni").strip()
+    repo = _normalize_repo(repo)
     repo_dir = _KNOWLEDGE / "repos" / repo
     if not repo_dir.is_dir():
         raise KnowledgeDocsError(f"unsupported knowledge repo: {repo}")
@@ -57,6 +65,7 @@ def _knowledge_entry(name: str) -> str:
 
 
 def _review_knowledge(repo: str, changed_files: list[str]) -> list[dict]:
+    repo = _normalize_repo(repo)
     docs = _docs(repo)
     paths = [
         "general/review/_index.md",
@@ -199,6 +208,8 @@ def build_mcp():
         """Begin a review. Use direct unless the user explicitly requests strict.
 
         `target` is a PR URL/number or a short description of local changes.
+        Direct mode ignores `repo`; strict mode accepts a knowledge short name
+        or its canonical owner/name.
         Direct mode returns the knowledge entrypoint; the host model reads its
         routing map and decides what applies. Strict mode starts the staged
         workflow and returns a run_id plus its first next_action.
@@ -210,11 +221,12 @@ def build_mcp():
             if selected_mode not in {"direct", "strict"}:
                 raise ValueError("mode must be 'direct' or 'strict'")
             if selected_mode == "strict":
-                _docs(repo)
+                selected_repo = _normalize_repo(repo)
+                _docs(selected_repo)
                 record = {
                     "run_id": uuid.uuid4().hex,
                     "target": str(target).strip(),
-                    "repo": repo,
+                    "repo": selected_repo,
                     "mode": "strict",
                     "stage": "evidence",
                     "artifacts": {},
@@ -225,7 +237,6 @@ def build_mcp():
                     "mode": "strict",
                     "next_action": _next_action("evidence"),
                 }
-            _docs(repo)
             return {"knowledge_entry": _knowledge_entry("AGENTS.md")}
 
         return _guard(run)
@@ -234,12 +245,12 @@ def build_mcp():
     def update_knowledge(repo: str = "vllm-omni") -> dict:
         """Return the knowledge contribution entrypoint for the host to follow.
 
+        `repo` is accepted for compatibility but intentionally ignored.
         The host model reads the documentation map, chooses the owner, edits the
         Markdown files, and runs the documented checks. The MCP does not decide
         placement and does not write knowledge itself.
         """
         def run() -> dict:
-            _docs(repo)
             return {"knowledge_entry": _knowledge_entry("CONTRIBUTING.md")}
 
         return _guard(run)
@@ -309,9 +320,10 @@ def build_mcp():
     @mcp.tool()
     def doc_search(query: str, repo: str = "vllm-omni",
                    limit: int = 20) -> dict:
-        """Literal text search over knowledge; use entries for task routing."""
+        """Search knowledge; repo accepts a short name or canonical owner/name."""
         def run() -> dict:
-            repo_dir = _KNOWLEDGE / "repos" / (repo or "vllm-omni").strip()
+            selected_repo = _normalize_repo(repo)
+            repo_dir = _KNOWLEDGE / "repos" / selected_repo
             if not repo_dir.is_dir():
                 supported = ", ".join(_supported_repos()) or "(none)"
                 return {
@@ -321,8 +333,8 @@ def build_mcp():
                         "knowledge scope; put search terms in query."
                     )
                 }
-            matches = _docs(repo).search(query, limit=limit)
-            result = {"query": query, "repo": repo, "matches": matches}
+            matches = _docs(selected_repo).search(query, limit=limit)
+            result = {"query": query, "repo": selected_repo, "matches": matches}
             if not matches:
                 result["hint"] = (
                     "No literal text match. For review routing, call review and "
@@ -336,8 +348,15 @@ def build_mcp():
     @mcp.tool()
     def doc_read(path: str, repo: str = "vllm-omni",
                  offset: int = 0) -> dict:
-        """Read a Markdown page returned by doc_search; follow next_offset."""
-        return _guard(lambda: {"repo": repo, **_docs(repo).read(path, offset=offset)})
+        """Read a doc_search page; repo accepts short or canonical owner/name."""
+        def run() -> dict:
+            selected_repo = _normalize_repo(repo)
+            return {
+                "repo": selected_repo,
+                **_docs(selected_repo).read(path, offset=offset),
+            }
+
+        return _guard(run)
 
     return mcp
 

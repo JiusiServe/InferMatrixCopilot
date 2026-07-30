@@ -78,8 +78,8 @@ Agent 按该入口已有的目录地图和落盘规范，自行选择 owner、�
 
 ## Direct MCP 工具
 
-- `review(target, repo?)`：返回审查知识入口。
-- `update_knowledge(repo?)`：返回知识维护入口。
+- `review(target, repo?)`：Direct 忽略 `repo`，只返回审查知识入口。
+- `update_knowledge(repo?)`：`repo` 仅为兼容旧调用保留，返回知识维护入口。
 - `doc_search(query, repo?)`：按文本搜索知识库。
 - `doc_read(path, repo?)`：读取指定知识页面。
 
