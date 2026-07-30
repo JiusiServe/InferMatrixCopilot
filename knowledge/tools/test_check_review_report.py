@@ -13,6 +13,11 @@ import check_review_report
 
 VALID_REPORT = """# Review report
 
+## Plain-language summary
+- **Conclusion:** The changed validation preserves the supported CLI path.
+- **User impact:** Invalid values still fail before model loading; no behavior regression found.
+- **Next action:** No code change is required after the targeted test passes.
+
 ## Review scope
 - Base SHA: abc
 - Diff: abc -> working tree
@@ -107,6 +112,25 @@ class ReviewReportCheckerTest(unittest.TestCase):
         return_code, output = self.run_checker(VALID_REPORT, rules)
         self.assertEqual(return_code, 0, output)
         self.assertIn("2 stable rule row(s)", output)
+
+    def test_missing_plain_language_summary_fails(self) -> None:
+        report = VALID_REPORT.replace(
+            """## Plain-language summary
+- **Conclusion:** The changed validation preserves the supported CLI path.
+- **User impact:** Invalid values still fail before model loading; no behavior regression found.
+- **Next action:** No code change is required after the targeted test passes.
+
+""",
+            "",
+        )
+        return_code, output = self.run_checker(
+            report,
+            """- **DEMO-1a — first rule.**
+- **DEMO-1b — second rule.**
+""",
+        )
+        self.assertEqual(return_code, 1)
+        self.assertIn("missing section: ## Plain-language summary", output)
 
     def test_missing_rule_row_fails(self) -> None:
         rules = """- **DEMO-1a — first rule.**\n- **DEMO-1b — second rule.**\n"""

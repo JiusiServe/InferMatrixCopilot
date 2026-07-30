@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni config audit 说人话规则"
 created: 2026-07-16
-updated: 2026-07-29
+updated: 2026-07-30
 type: guide
 tags: [vllm-omni, components, config]
 sources: ["claude-workflow-starter-private@296ea45"]
@@ -20,6 +20,64 @@ sources: ["claude-workflow-starter-private@296ea45"]
 先说：
 
 > 配置现在不是一个地方说了算，而是好几个地方都在改配置。
+
+这些规则的共同目标只有一个：
+
+> 同一份用户配置，不管从 CLI、YAML、legacy 入口还是默认 factory 进入，都应在真正
+> 使用前得到同一个结果；拼错的字段不能在某条路径报错、在另一条路径却被静默吃掉。
+
+## 一个具体例子
+
+假设某个入口收到：
+
+```python
+{
+    "stage_0_runner_cls": "MyRunner",
+    "stage_0_runnre_cls": None,  # 拼错了
+}
+```
+
+真实数据流不是“字典直接进 engine”，而是：
+
+```text
+CLI / deploy YAML / legacy / default factory
+  → 合并来源、处理 alias、flat→nested
+  → 检查每个 key 归谁
+  → 按 shared / stage / diffusion 分区
+  → 构造最终 config
+  → engine / worker 消费
+```
+
+如果 CLI 会拒绝拼错的 `stage_0_runnre_cls`，但默认 factory 在校验前把值为 `None` 的
+未知字段删掉，那么两条入口表面都能启动，实际合同却不同。以后字段改名或 rebase 后，
+这种差异很容易变成“用户配置看起来被接受，运行时却没生效”的问题。
+
+## 每组规则为什么存在
+
+- `VOMNI-CFG-1a`：先确认这次到底改了哪些入口和值状态，防止漏掉仍可调用的老入口，也
+  防止把测试膨胀成无关的全排列。
+- `VOMNI-CFG-1b`、`1e`：所有入口要在第一位真正使用者之前汇合到同一套归一化和校验；
+  否则每个 factory 都会慢慢长出不同语义。
+- `VOMNI-CFG-1f`：字段名是否存在与字段值是否有效是两件事。`None`、`False`、`0`
+  不能都靠 `if value` 处理，拼错且值为 `None` 的字段也不能逃过严格校验。
+- `VOMNI-CFG-1c`：helper 单测只能证明 helper，不能证明 CLI、legacy 或默认 factory
+  真的调用了它，所以至少要有一条真实生产路径证据。
+- `VOMNI-CFG-1d`：一个兼容修复如果开始新增 owner、来源优先级或路由，就已经变成另一
+  个配置改造，应重新切片，避免评论驱动的补丁越滚越大。
+- `VOMNI-CFG-1g`：rebase 可能新增字段却不产生冲突；旧白名单仍能编译，但会静默丢掉
+  新字段，所以必须在最新 base 重新审计。
+
+## 怎么读审查表
+
+- `PASS`：当前证据证明这条合同成立。
+- `FAIL`：已经有可达路径和失败行为，说明是真问题。
+- `MISSING_EVIDENCE`：没有足够测试或运行环境证明它成立；这是证据缺口，不等于已经
+  发现运行时 bug。
+- `NOT_APPLICABLE`：当前 diff 没触发这条规则。
+- `Disposition`：只是把失败或证据缺口链接到具体 finding / draft，不是新的结论。
+
+用户应先读报告顶部的人话摘要和 `Open findings`。规则表是 reviewer 用来证明“没有漏
+检查”的审计附录，不应该成为整份 review 的唯一输出。
 
 ## 围绕五个问题展开
 
