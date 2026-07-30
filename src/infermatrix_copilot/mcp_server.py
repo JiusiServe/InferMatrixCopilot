@@ -37,7 +37,11 @@ from typing import Any, Callable, Literal, Optional
 from . import run_status as rs
 from .config import Settings
 from .knowledge_docs import KnowledgeDocs, KnowledgeDocsError
-from .mcp_policy import PolicyError, enforce_mcp_policy
+from .mcp_policy import (
+    PolicyError,
+    enforce_mcp_policy,
+    enforce_strict_review_policy,
+)
 from .task_spec import READ_ONLY_KINDS
 
 
@@ -60,7 +64,7 @@ class CopilotMCP:
         self.pid = os.getpid()
         rs.register_server(self.run_root, self.server_id, self.pid)
         rs.startup_reconcile(self.run_root)
-        self._q: "queue.Queue[str]" = queue.Queue()
+        self._q: "queue.Queue[tuple[str, bool]]" = queue.Queue()
         self._worker = threading.Thread(target=self._worker_loop, daemon=True,
                                         name="omni-mcp-worker")
         self._worker.start()
@@ -70,9 +74,9 @@ class CopilotMCP:
         """Drain the queue forever, launching one run subprocess at a time. A
         launch failure marks the run failed but never kills the worker."""
         while True:
-            run_id = self._q.get()
+            run_id, strict_compat = self._q.get()
             try:
-                self._launch(run_id)
+                self._launch(run_id, strict_compat=strict_compat)
             except Exception as exc:  # noqa: BLE001 - worker must survive
                 try:
                     rs.mark(self.run_root / run_id, rs.FAILED,
@@ -82,13 +86,18 @@ class CopilotMCP:
             finally:
                 self._q.task_done()
 
-    def _launch(self, run_id: str) -> None:
+    def _launch(self, run_id: str, *, strict_compat: bool = False) -> None:
         """Run one reserved run as `python -m infermatrix_copilot --execute-reserved
-        <id>`, child stdout+stderr -> console.log, outward-write env forced off.
+        <id>`, child stdout+stderr -> console.log. The workflow MCP forces
+        outward writes off; Strict preserves the old explicit post/config gate.
         After `.wait()` the child is reaped, so we reconcile as sole writer."""
         run_dir = self.run_root / run_id
         env = dict(os.environ)
-        env["ALLOW_POST"] = "0"  # defense in depth; policy already forces post off
+        # The standalone workflow MCP stays structurally read-only. Strict is
+        # the old Eco path: it preserves the old dual post gate (explicit task
+        # intent plus this server's ALLOW_POST setting).
+        env["ALLOW_POST"] = (
+            "1" if strict_compat and self.settings.allow_post else "0")
         env["ALLOW_PUSH"] = "0"
         # The Windows Store Python runtime otherwise inherits the machine's
         # legacy console code page (commonly GBK). Reports legitimately contain
@@ -117,8 +126,12 @@ class CopilotMCP:
             # its stdio MCP parent is restarted.
             popen_kwargs["start_new_session"] = True
         with open(run_dir / "console.log", "ab") as log:
+            execute_arg = (
+                "--execute-strict-reserved"
+                if strict_compat else "--execute-reserved"
+            )
             proc = subprocess.Popen(
-                [sys.executable, "-m", "infermatrix_copilot", "--execute-reserved", run_id],
+                [sys.executable, "-m", "infermatrix_copilot", execute_arg, run_id],
                 stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
                 cwd=str(self.run_root), env=env,
                 **popen_kwargs,
@@ -132,7 +145,17 @@ class CopilotMCP:
         spec = enforce_mcp_policy(spec_dict, allowed_repos=self.settings.mcp_allowed_repos, settings=self.settings)
         run_id = self.copilot.reserve_run(
             spec, owner_server_id=self.server_id, owner_server_pid=self.pid)
-        self._q.put(run_id)
+        self._q.put((run_id, False))
+        return run_id
+
+    def start_strict_review(self, spec_dict: dict) -> str:
+        """Reserve the old Eco review workflow behind its Strict public name."""
+        spec = enforce_strict_review_policy(
+            spec_dict, allowed_repos=self.settings.mcp_allowed_repos,
+            settings=self.settings)
+        run_id = self.copilot.reserve_run(
+            spec, owner_server_id=self.server_id, owner_server_pid=self.pid)
+        self._q.put((run_id, True))
         return run_id
 
     # -- poll -----------------------------------------------------------------

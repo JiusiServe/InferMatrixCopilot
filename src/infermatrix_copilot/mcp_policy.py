@@ -101,6 +101,33 @@ def enforce_mcp_policy(raw: dict[str, Any], *, allowed_repos: list[str],
                     report_only=False, post=False, params=params)
 
 
+def enforce_strict_review_policy(raw: dict[str, Any], *,
+                                 allowed_repos: list[str],
+                                 settings: Any = None) -> TaskSpec:
+    """Validate the Direct MCP's Strict compatibility path.
+
+    Strict is the public name for the previous Eco PR-review workflow. It may
+    preserve an explicit post request, but cannot select the performance tier
+    or widen the task beyond ``pr_review``.
+    """
+    if not isinstance(raw, dict):
+        raise PolicyError("request is not an object")
+    if raw.get("kind") != "pr_review":
+        raise PolicyError("strict mode only permits PR reviews")
+
+    normalized = dict(raw)
+    normalized["mode"] = "eco"
+    normalized["post"] = False
+    spec = enforce_mcp_policy(
+        normalized, allowed_repos=allowed_repos, settings=settings)
+
+    post = raw.get("post", False)
+    if not isinstance(post, bool):
+        raise PolicyError("post must be a boolean")
+    spec.post = post
+    return spec
+
+
 def _positive_or_none(value: Any, field: str) -> int | None:
     """Coerce `value` to a positive int, allow None/absent, else raise."""
     if value is None:

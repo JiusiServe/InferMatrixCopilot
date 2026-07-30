@@ -124,6 +124,8 @@ def main(argv: list[str] | None = None) -> int:
     # server, in this fresh subprocess. Hidden from --help.
     parser.add_argument("--execute-reserved", metavar="RUN_ID",
                         help=argparse.SUPPRESS)
+    parser.add_argument("--execute-strict-reserved", metavar="RUN_ID",
+                        help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
 
     if args.command == "doctor":  # diagnostics only — no Copilot/LLM spin-up
@@ -152,6 +154,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.execute_reserved:
         return copilot.execute_reserved(args.execute_reserved)
+    if args.execute_strict_reserved:
+        return copilot.execute_strict_reserved(args.execute_strict_reserved)
     if args.resume:
         return copilot.resume_last()
     if args.playbook:
