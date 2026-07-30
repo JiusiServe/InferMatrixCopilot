@@ -50,6 +50,15 @@ This guarantees the sequence for reports produced through the MCP, but an MCP
 host can still bypass a tool entirely. Use the autonomous BYOK/managed executor
 when the workflow itself must own every model call.
 
+If the user explicitly asks to publish the review, call strict `review` with
+`post=true`. The workflow becomes
+`evidence → gates → review → verify → publish → complete`. The publish action
+returns one `github_review` payload containing the review event, body, and
+validated inline comments. Submit that payload as one GitHub pull request
+review; with the GitHub connector map `event → action`, `body → review`, and
+`comments → file_comments`. Never flatten it into a PR Conversation comment.
+Strict mode remains read-only when `post` is omitted or false.
+
 ## macOS/Linux
 
 ```bash
@@ -65,8 +74,10 @@ confirm that `infermatrix_copilot` is connected.
 
 ## What the default MCP exposes
 
-- `review(target, repo?, mode="direct")`: Direct ignores `repo` and returns
-  `knowledge/AGENTS.md`. Strict uses `repo` only when explicitly selected.
+- `review(target, repo?, mode="direct", post=false)`: Direct ignores `repo` and
+  returns `knowledge/AGENTS.md`. Strict uses `repo` only when explicitly
+  selected. `post=true` is accepted only in Strict mode and only for explicit
+  user publication intent.
 - `update_knowledge(repo?)`: keeps `repo` only for call compatibility and
   returns `knowledge/CONTRIBUTING.md`; the host model follows that document and
   edits the Markdown files itself.

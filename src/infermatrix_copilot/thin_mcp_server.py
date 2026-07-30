@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import signal
 import sys
 import uuid
@@ -14,7 +15,8 @@ from .knowledge_docs import KnowledgeDocs, KnowledgeDocsError
 _ROOT = Path(__file__).resolve().parents[2]
 _KNOWLEDGE = _ROOT / "knowledge"
 _RUN_ROOT = Path.home() / ".infermatrix-copilot" / "host-review-runs"
-_STAGES = ("evidence", "gates", "review", "verify", "complete")
+_STAGES = ("evidence", "gates", "review", "verify", "publish", "complete")
+_SEVERITIES = frozenset({"blocker", "major", "minor", "nit"})
 _REPO_ALIASES = {
     "vllm-project/vllm-omni": "vllm-omni",
 }
@@ -119,7 +121,169 @@ def _require(artifact: dict, fields: tuple[str, ...]) -> None:
         raise ValueError(f"artifact missing required fields: {missing}")
 
 
-def _next_action(stage: str) -> dict:
+def _normalize_finding(finding: Any, index: int) -> dict:
+    """Return one verified finding in the stable host-delivery schema."""
+    if not isinstance(finding, dict):
+        raise ValueError(f"verified_findings[{index}] must be an object")
+    path = str(finding.get("path") or finding.get("file") or "").strip()
+    line = finding.get("line")
+    location = str(finding.get("location") or "").strip()
+    if (not path or line is None) and ":" in location:
+        candidate_path, candidate_line = location.rsplit(":", 1)
+        path = path or candidate_path.strip()
+        line = line if line is not None else candidate_line.strip()
+    path = path.replace("\\", "/").removeprefix("./")
+    try:
+        line = int(line)
+    except (TypeError, ValueError):
+        line = 0
+    severity = str(finding.get("severity") or "").strip().casefold()
+    title = str(finding.get("title") or "").strip()
+    body = str(finding.get("body") or finding.get("evidence") or "").strip()
+    missing = [name for name, value in (
+        ("path", path), ("line", line), ("severity", severity),
+        ("title", title), ("body", body),
+    ) if not value]
+    if missing:
+        raise ValueError(
+            f"verified_findings[{index}] missing required fields: {missing}")
+    if line < 1:
+        raise ValueError(f"verified_findings[{index}].line must be positive")
+    if severity not in _SEVERITIES:
+        raise ValueError(
+            f"verified_findings[{index}].severity must be one of "
+            f"{sorted(_SEVERITIES)}")
+    return {"path": path, "line": line, "severity": severity,
+            "title": title, "body": body}
+
+
+def _validate_diff_hunks(artifact: dict) -> None:
+    """Validate compact new-side diff anchors supplied by the host."""
+    hunks = artifact.get("diff_hunks")
+    if not isinstance(hunks, list):
+        raise ValueError("diff_hunks must be a list")
+    changed = {
+        str(path).replace("\\", "/").removeprefix("./")
+        for path in artifact["changed_files"]
+    }
+    normalized = []
+    for index, hunk in enumerate(hunks):
+        if not isinstance(hunk, dict):
+            raise ValueError(f"diff_hunks[{index}] must be an object")
+        path = str(hunk.get("path") or "").replace("\\", "/").removeprefix("./")
+        try:
+            start = int(hunk.get("right_start"))
+            count = int(hunk.get("right_count"))
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"diff_hunks[{index}] needs integer right_start/right_count")
+        if path not in changed:
+            raise ValueError(
+                f"diff_hunks[{index}].path is not in changed_files: {path}")
+        if start < 1 or count < 0:
+            raise ValueError(
+                f"diff_hunks[{index}] has invalid right-side range")
+        normalized.append(
+            {"path": path, "right_start": start, "right_count": count})
+    artifact["diff_hunks"] = normalized
+
+
+def _is_inline_anchor(finding: dict, hunks: list[dict]) -> bool:
+    return any(
+        hunk["path"] == finding["path"]
+        and hunk["right_start"]
+        <= finding["line"]
+        < hunk["right_start"] + hunk["right_count"]
+        for hunk in hunks
+    )
+
+
+def _review_delivery(run: dict) -> dict:
+    """Build the exact GitHub payload plus separately tracked delivery counts."""
+    findings = run["artifacts"]["verify"]["verified_findings"]
+    hunks = run["artifacts"]["evidence"].get("diff_hunks") or []
+    inline = []
+    fallback = []
+    for finding in findings:
+        if _is_inline_anchor(finding, hunks):
+            inline.append({
+                "path": finding["path"],
+                "line": finding["line"],
+                "side": "RIGHT",
+                "body": (
+                    f"**[{finding['severity']}] {finding['title']}**\n\n"
+                    f"{finding['body']}"
+                ),
+            })
+        else:
+            fallback.append(finding)
+
+    blocking = any(
+        finding["severity"] in {"blocker", "major"} for finding in findings)
+    merge_state = str(
+        run["artifacts"].get("gates", {}).get("merge_state") or "").upper()
+    event = "COMMENT" if "MERGED" in merge_state else (
+        "REQUEST_CHANGES" if blocking else "COMMENT" if findings else "APPROVE")
+    body = [
+        "Strict review completed against "
+        f"`{run['artifacts']['evidence']['head']}`.",
+        "",
+        f"- Verified findings: {len(findings)}",
+        f"- Inline comments: {len(inline)}",
+        f"- Findings included in this review body: {len(fallback)}",
+    ]
+    if fallback:
+        body.extend([
+            "",
+            "### Findings not posted inline",
+            "These verified findings do not map to a current right-side diff line:",
+        ])
+        for finding in fallback:
+            body.extend([
+                "",
+                f"**[{finding['severity']}] {finding['title']}**",
+                f"`{finding['path']}:{finding['line']}`",
+                finding["body"],
+            ])
+    return {
+        "github_review": {
+            "commit_id": run["artifacts"]["evidence"]["head"],
+            "body": "\n".join(body),
+            "event": event,
+            "comments": inline,
+        },
+        "inline_count": len(inline),
+        "fallback_count": len(fallback),
+    }
+
+
+def _completion(run: dict) -> dict:
+    out = {
+        "run_id": run["run_id"],
+        "mode": "strict",
+        "stage": "complete",
+        "final_report": run["final_report"],
+        "verified_findings": run["artifacts"]["verify"]["verified_findings"],
+    }
+    if run.get("review_delivery"):
+        delivery = run["review_delivery"]
+        out["github_review"] = delivery["github_review"]
+        out["delivery_counts"] = {
+            "inline_count": delivery["inline_count"],
+            "fallback_count": delivery["fallback_count"],
+        }
+    if run["artifacts"].get("publish"):
+        out["publication"] = run["artifacts"]["publish"]
+    return out
+
+
+def _next_stage(run: dict, stage: str) -> str:
+    stages = _STAGES if run.get("post") else tuple(
+        item for item in _STAGES if item != "publish")
+    return stages[stages.index(stage) + 1]
+
+
+def _next_action(stage: str, run: dict | None = None) -> dict:
     actions = {
         "evidence": {
             "task": "Inspect the live target and submit immutable review evidence.",
@@ -129,6 +293,11 @@ def _next_action(stage: str) -> dict:
                 "base": "<commit SHA>",
                 "changed_files": ["path/to/file.py"],
                 "diff_summary": "<short summary>",
+                "diff_hunks": [{
+                    "path": "path/to/file.py",
+                    "right_start": 10,
+                    "right_count": 5,
+                }],
             },
         },
         "gates": {
@@ -147,7 +316,9 @@ def _next_action(stage: str) -> dict:
                 "coverage": ["path/to/reviewed_file.py"],
                 "findings": [{
                     "title": "<finding title>",
-                    "location": "path/to/file.py:line",
+                    "path": "path/to/file.py",
+                    "line": 12,
+                    "severity": "major",
                     "body": "<evidence and impact>",
                 }],
             },
@@ -156,8 +327,31 @@ def _next_action(stage: str) -> dict:
             "task": "Re-check every candidate against current code; discard weak findings.",
             "required": ["verified_findings", "discarded_findings"],
             "artifact_example": {
-                "verified_findings": [],
+                "verified_findings": [{
+                    "title": "<finding title>",
+                    "path": "path/to/file.py",
+                    "line": 12,
+                    "severity": "major",
+                    "body": "<verified evidence and impact>",
+                }],
                 "discarded_findings": [],
+            },
+        },
+        "publish": {
+            "task": (
+                "Submit exactly one GitHub pull request review using "
+                "github_review. Keep comments inline; never flatten them into "
+                "a PR Conversation comment. With a GitHub connector, map "
+                "event→action, body→review, and comments→file_comments. Then "
+                "submit the publication proof."
+            ),
+            "required": [
+                "review_url", "event", "inline_count", "fallback_count"],
+            "artifact_example": {
+                "review_url": "https://github.com/owner/repo/pull/1#pullrequestreview-1",
+                "event": "REQUEST_CHANGES",
+                "inline_count": 1,
+                "fallback_count": 0,
             },
         },
         "complete": {
@@ -166,7 +360,18 @@ def _next_action(stage: str) -> dict:
             "artifact_example": {},
         },
     }
-    return {"stage": stage, **actions[stage]}
+    action = {"stage": stage, **actions[stage]}
+    if stage == "evidence" and run and run.get("post"):
+        action["required"] = [*action["required"], "diff_hunks"]
+    if stage == "publish":
+        delivery = (run or {}).get("review_delivery", {})
+        action["github_review"] = delivery.get("github_review", {})
+        action["expected_publication"] = {
+            "event": delivery.get("github_review", {}).get("event"),
+            "inline_count": delivery.get("inline_count"),
+            "fallback_count": delivery.get("fallback_count"),
+        }
+    return action
 
 
 def _render_report(run: dict) -> str:
@@ -198,13 +403,18 @@ def build_mcp():
             "for strict workflow mode, use its default direct mode. Never choose "
             "strict mode merely because it is available. This server never calls "
             "another model. In strict mode, obey each next_action and submit "
-            "artifacts through submit_review_stage until complete."
+            "artifacts through submit_review_stage until complete. Set post=true "
+            "only when the user explicitly asks to publish. At the publish stage, "
+            "submit github_review as one pull request review with its inline "
+            "comments; never flatten it into a PR Conversation comment. For a "
+            "GitHub connector, map event to action, body to review, and comments "
+            "to file_comments."
         ),
     )
 
     @mcp.tool()
     def review(target: str, repo: str = "vllm-omni",
-               mode: str = "direct") -> dict:
+               mode: str = "direct", post: bool = False) -> dict:
         """Begin a review. Use direct unless the user explicitly requests strict.
 
         `target` is a PR URL/number or a short description of local changes.
@@ -220,6 +430,8 @@ def build_mcp():
             selected_mode = str(mode).strip().casefold() or "direct"
             if selected_mode not in {"direct", "strict"}:
                 raise ValueError("mode must be 'direct' or 'strict'")
+            if post and selected_mode != "strict":
+                raise ValueError("post=true requires strict mode")
             if selected_mode == "strict":
                 selected_repo = _normalize_repo(repo)
                 _docs(selected_repo)
@@ -228,6 +440,7 @@ def build_mcp():
                     "target": str(target).strip(),
                     "repo": selected_repo,
                     "mode": "strict",
+                    "post": bool(post),
                     "stage": "evidence",
                     "artifacts": {},
                 }
@@ -235,7 +448,8 @@ def build_mcp():
                 return {
                     "run_id": record["run_id"],
                     "mode": "strict",
-                    "next_action": _next_action("evidence"),
+                    "post": record["post"],
+                    "next_action": _next_action("evidence", record),
                 }
             return {"knowledge_entry": _knowledge_entry("AGENTS.md")}
 
@@ -267,17 +481,18 @@ def build_mcp():
             record = _load_run(run_id)
             current = record["stage"]
             if current == "complete":
-                return {"run_id": run_id, "stage": current,
-                        "final_report": record["final_report"]}
+                return _completion(record)
             if stage != current:
                 raise ValueError(
                     f"expected stage {current!r}, received {stage!r}")
-            required = tuple(_next_action(stage)["required"])
+            required = tuple(_next_action(stage, record)["required"])
             _require(artifact, required)
             if stage == "evidence" and (
                     not isinstance(artifact["changed_files"], list)
                     or not artifact["changed_files"]):
                 raise ValueError("changed_files must be a non-empty list")
+            if stage == "evidence" and record.get("post"):
+                _validate_diff_hunks(artifact)
             list_fields = {
                 "gates": ("risk_areas",),
                 "review": ("coverage", "findings"),
@@ -288,19 +503,45 @@ def build_mcp():
                     artifact[list_field] = [artifact[list_field]]
             if stage == "review" and not artifact["coverage"]:
                 raise ValueError("coverage must be a non-empty list")
+            if stage == "verify":
+                artifact["verified_findings"] = [
+                    _normalize_finding(finding, index)
+                    for index, finding in enumerate(
+                        artifact["verified_findings"])
+                ]
+            if stage == "publish":
+                delivery = record["review_delivery"]
+                expected = {
+                    "event": delivery["github_review"]["event"],
+                    "inline_count": delivery["inline_count"],
+                    "fallback_count": delivery["fallback_count"],
+                }
+                if not re.match(
+                        r"^https://github\.com/[^/]+/[^/]+/pull/\d+"
+                        r"#pullrequestreview-\d+$",
+                        str(artifact["review_url"])):
+                    raise ValueError(
+                        "review_url must identify a GitHub pull request review")
+                for field in ("event", "inline_count", "fallback_count"):
+                    if artifact[field] != expected[field]:
+                        raise ValueError(
+                            f"publication proof {field} does not match "
+                            "github_review")
             record["artifacts"][stage] = artifact
-            next_stage = _STAGES[_STAGES.index(stage) + 1]
+            next_stage = _next_stage(record, stage)
             record["stage"] = next_stage
-            if next_stage == "complete":
+            if stage == "verify":
                 record["final_report"] = _render_report(record)
+                if record.get("post"):
+                    record["review_delivery"] = _review_delivery(record)
             _save_run(record)
             out = {"run_id": run_id, "stage": next_stage,
-                   "next_action": _next_action(next_stage)}
+                   "next_action": _next_action(next_stage, record)}
             if stage == "evidence":
                 out["knowledge"] = _review_knowledge(
                     record["repo"], artifact["changed_files"])
             if next_stage == "complete":
-                out["final_report"] = record["final_report"]
+                return _completion(record)
             return out
 
         return _guard(run)
@@ -308,14 +549,18 @@ def build_mcp():
     @mcp.tool()
     def get_review_status(run_id: str) -> dict:
         """Resume a strict run and return its current next action/report."""
-        return _guard(lambda: {
-            "run_id": run_id,
-            "mode": "strict",
-            "stage": (record := _load_run(run_id))["stage"],
-            "next_action": _next_action(record["stage"]),
-            **({"final_report": record["final_report"]}
-               if record["stage"] == "complete" else {}),
-        })
+        def run() -> dict:
+            record = _load_run(run_id)
+            if record["stage"] == "complete":
+                return _completion(record)
+            return {
+                "run_id": run_id,
+                "mode": "strict",
+                "stage": record["stage"],
+                "next_action": _next_action(record["stage"], record),
+            }
+
+        return _guard(run)
 
     @mcp.tool()
     def doc_search(query: str, repo: str = "vllm-omni",

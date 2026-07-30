@@ -106,7 +106,7 @@ Agent 按该入口已有的目录地图和落盘规范，自行选择 owner、�
 | 模式 | 适合场景 | 说明 |
 |---|---|---|
 | Direct（默认） | 日常 PR 和本地审查 | Agent 自己完成推理，MCP 只提供知识入口 |
-| Strict | 需要强制审查步骤 | 按 `evidence → gates → review → verify` 保存并校验阶段状态 |
+| Strict | 需要强制审查步骤 | 按 `evidence → gates → review → verify` 保存并校验阶段状态；用户明确要求发布时追加受控 `publish` 阶段 |
 | Autonomous | 需要独立执行器 | 使用单独配置的模型和工作流 |
 
 Strict 模式需要用户明确提出。具体用法见
