@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni 硬门禁"
 created: 2026-07-10
-updated: 2026-07-29
+updated: 2026-07-30
 type: rule
 tags: [vllm-omni]
 sources: [benchmark/incidents/_index.md, ci/incidents/_index.md, git/incidents/_index.md, remote/incidents/_index.md]
@@ -38,7 +38,7 @@ sources: [benchmark/incidents/_index.md, ci/incidents/_index.md, git/incidents/_
 | deploy YAML/CLI 合并语义、stage 显存预算（`gpu_memory_utilization`/KV pin） | [Configuration 规则](components/configuration/rules.md) | 争议以展开后的最终配置为准（CONF-3a） |
 | 对齐 upstream vLLM：rebase、API 漂移、模块波次 | [rebase 主题](rebase/_index.md) | 漂移模式两页 + 工作流 |
 | CLI、HTTP、OpenAI-compatible API 或 offline/online 请求行为不一致 | [Serving 组件](components/serving/_index.md) | 先查入口到 engine 的边界，再进模型内部 |
-| PR review | 按 changed files 和公开入口命中组件或模型 owner 的 `rules.md`；owner 不明时才看 [组件职责地图](components/_index.md) 或 [模型列表](models/_index.md) | 通用 review contract 只读一次；绑定当前 head、diff 和真实代码路径 |
+| PR review | 先从 PR title/body 的声明目标命中组件或模型 owner 的快速入口，再用 changed files 和公开入口闭合 scope；owner 不明时才看 [组件职责地图](components/_index.md) 或 [模型列表](models/_index.md) | PR 描述只用于导航、不能证明 finding；命中 owner 后停止文档漫游，绑定当前 head、diff 和真实代码路径 |
 | reviewer follow-up 且需要读取或操作 live thread | [Git/PR 入口](git/_index.md) | 绑定当前 head、diff、live review thread 和真实代码路径；不需要 live thread 时不读 |
 
 ## 3. 代码和模型

@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni"
 created: 2026-07-10
-updated: 2026-07-29
+updated: 2026-07-30
 type: index
 tags: [vllm-omni]
 sources: []
@@ -28,7 +28,7 @@ sources: []
 | 遇到什么 | 查看哪里 | 说明 |
 |---|---|---|
 | 开始任何 vLLM-Omni 修改、测试、远端或发布任务 | [硬门禁](rules.md) | 仅适用于 vLLM-Omni 的仓库规则 |
-| 审查模型适配和仓库专有改动 | [review](review/_index.md) | vLLM-Omni 审查规则 |
+| 审查 PR、模型适配和仓库专有改动 | [review](review/_index.md) | 先按 PR 声明目标命中 owner 快速入口；changed files 用于闭合 scope |
 | 查看 CI 规则和测试配置 | [ci](ci/_index.md) | vLLM-Omni CI |
 | 查看文档和 RFC 状态 | [docs](docs/_index.md) | 仓库文档入口 |
 | 调查仓库专有 bug、crash 或行为异常 | [debug](debug/_index.md) | 完成通用调试后的仓库二次路由 |
