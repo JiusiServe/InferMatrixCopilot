@@ -94,9 +94,12 @@ python knowledge/tools/check_wiki_lint.py
 Agent 按该入口已有的目录地图和落盘规范，自行选择 owner、修改 Markdown、
 更新索引并执行文档中要求的校验。MCP 本身不猜 owner，也不写规则。
 
-## Direct MCP 工具
+## 默认 MCP 工具
 
-- `review(target, repo?)`：Direct 忽略 `repo`，只返回审查知识入口。
+- `review(target, repo?, mode?, post?)`：Direct 只返回审查知识入口；显式指定
+  `mode="strict"` 时运行旧 Eco 审查工作流。
+- `get_review_result(run_id)`：轮询 Strict 结果。
+- `get_review_status(run_id)`：查看 Strict 的原工作流进度。
 - `update_knowledge(repo?)`：`repo` 仅为兼容旧调用保留，返回知识维护入口。
 - `doc_search(query, repo?)`：按文本搜索知识库。
 - `doc_read(path, repo?)`：读取指定知识页面。
@@ -106,8 +109,11 @@ Agent 按该入口已有的目录地图和落盘规范，自行选择 owner、�
 | 模式 | 适合场景 | 说明 |
 |---|---|---|
 | Direct（默认） | 日常 PR 和本地审查 | Agent 自己完成推理，MCP 只提供知识入口 |
-| Strict | 需要强制审查步骤 | 按 `evidence → gates → review → verify` 保存并校验阶段状态 |
+| Strict | 需要旧版完整审查工作流 | Strict 只是旧 Eco 的新名称，继续使用原 playbook、模型和运行状态 |
 | Autonomous | 需要独立执行器 | 使用单独配置的模型和工作流 |
+
+Strict 不会自动发布评论。只有调用时明确传入 `post=true`，并且服务端配置
+`ALLOW_POST=1`，原工作流的发布步骤才会执行。
 
 Strict 模式需要用户明确提出。具体用法见
 [`docs/codex/README.md`](docs/codex/README.md)；Autonomous 模式见

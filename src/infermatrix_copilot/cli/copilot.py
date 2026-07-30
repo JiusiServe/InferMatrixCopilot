@@ -379,14 +379,28 @@ class Copilot:
         MCP policy on the persisted request (request.json is untrusted — a host
         could have rewritten it), plans, then executes, driving
         `run_status.json` planning -> running -> terminal. Returns the exit code."""
+        from ..mcp_policy import enforce_mcp_policy
+
+        return self._execute_reserved(run_id, enforce_mcp_policy)
+
+    def execute_strict_reserved(self, run_id: str) -> int:
+        """Execute a reserved Strict review using the previous Eco workflow."""
+        from ..mcp_policy import enforce_strict_review_policy
+
+        return self._execute_reserved(run_id, enforce_strict_review_policy)
+
+    def _execute_reserved(self, run_id: str, policy) -> int:
+        """Shared reserved-run executor with an authoritative child policy."""
         from .. import run_status as rs
-        from ..mcp_policy import PolicyError, enforce_mcp_policy
+        from ..mcp_policy import PolicyError
 
         run_dir = self._contained_run_dir(run_id)
         rs.mark_child_started(run_dir, child_pid=os.getpid(), state=rs.PLANNING)
         try:
             raw = json.loads((run_dir / "request.json").read_text(encoding="utf-8"))
-            spec = enforce_mcp_policy(raw, allowed_repos=self.settings.mcp_allowed_repos, settings=self.settings)
+            spec = policy(
+                raw, allowed_repos=self.settings.mcp_allowed_repos,
+                settings=self.settings)
         except (PolicyError, OSError, json.JSONDecodeError, ValueError) as exc:
             rs.mark(run_dir, rs.FAILED, note=f"policy/request rejected: {exc}")
             return 1

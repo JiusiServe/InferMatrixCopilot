@@ -13,7 +13,11 @@ import pytest
 
 from infermatrix_copilot import run_status as rs
 from infermatrix_copilot.cli.copilot import Copilot
-from infermatrix_copilot.mcp_policy import PolicyError, enforce_mcp_policy
+from infermatrix_copilot.mcp_policy import (
+    PolicyError,
+    enforce_mcp_policy,
+    enforce_strict_review_policy,
+)
 from infermatrix_copilot.task_spec import READ_ONLY_KINDS, TaskSpec
 
 ALLOW = ["vllm-omni"]
@@ -80,6 +84,26 @@ def test_policy_rejects_invalid_review_depth():
         enforce_mcp_policy(
             {"kind": "pr_review", "repo": "vllm-omni", "pr": 7,
              "params": {"review_depth": "ful"}},  # typo must not pass silently
+            allowed_repos=ALLOW)
+
+
+def test_strict_policy_is_old_eco_review_with_explicit_post_only():
+    spec = enforce_strict_review_policy(
+        {"kind": "pr_review", "repo": "vllm-omni", "pr": 7,
+         "mode": "performance", "post": True,
+         "params": {"review_depth": "FULL", "force_push": True}},
+        allowed_repos=ALLOW)
+
+    assert spec == TaskSpec(
+        kind="pr_review", repo="vllm-omni", pr=7, mode="eco", post=True,
+        params={"review_depth": "full"})
+
+
+def test_strict_policy_cannot_widen_beyond_pr_review():
+    with pytest.raises(PolicyError, match="only permits PR reviews"):
+        enforce_strict_review_policy(
+            {"kind": "pr_rebase", "repo": "vllm-omni", "pr": 7,
+             "post": True},
             allowed_repos=ALLOW)
 
 
@@ -275,6 +299,41 @@ def test_exposed_tools_are_read_only_only(settings):
                      "start_issue_answer", "start_issue_triage", "start_review"]
     assert not any(bad in n for n in names
                    for bad in ("post", "push", "debug", "rebase"))
+
+
+@pytest.mark.parametrize(
+    ("strict_compat", "allow_post", "expected"),
+    [(False, True, "0"), (True, False, "0"), (True, True, "1")],
+)
+def test_child_launch_preserves_strict_post_gate(
+        settings, monkeypatch, strict_compat, allow_post, expected):
+    from infermatrix_copilot import mcp_server
+
+    core = _core(settings)
+    core.settings.allow_post = allow_post
+    run_id = core.copilot.reserve_run(
+        TaskSpec(kind="pr_review", repo="vllm-omni", pr=3),
+        owner_server_id=core.server_id, owner_server_pid=core.pid)
+    captured = {}
+
+    class FakeProcess:
+        def wait(self):
+            return 0
+
+    def fake_popen(argv, **kwargs):
+        captured["argv"] = argv
+        captured["env"] = kwargs["env"]
+        return FakeProcess()
+
+    monkeypatch.setattr(mcp_server.subprocess, "Popen", fake_popen)
+    core._launch(run_id, strict_compat=strict_compat)
+
+    assert captured["env"]["ALLOW_POST"] == expected
+    assert captured["env"]["ALLOW_PUSH"] == "0"
+    expected_arg = (
+        "--execute-strict-reserved" if strict_compat else "--execute-reserved")
+    assert expected_arg in captured["argv"]
+    core.close()
 
 
 def test_subprocess_tamper_defense(settings):

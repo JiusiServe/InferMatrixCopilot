@@ -44,11 +44,13 @@ https://github.com/vllm-project/vllm-omni/pull/5172.
 Do not return a review until the strict run is complete.
 ```
 
-This uses a persistent `evidence → gates → review → verify → complete` state
-machine. Codex performs the reasoning; the MCP refuses skipped or stale stages.
-This guarantees the sequence for reports produced through the MCP, but an MCP
-host can still bypass a tool entirely. Use the autonomous BYOK/managed executor
-when the workflow itself must own every model call.
+Strict is the new public name for the previous Eco mode. It runs the same
+configured model, `pr-review` playbook, progress tracking, report generation,
+and publishing gates as Eco. Poll `get_review_result` until the run is
+terminal.
+
+Strict never posts implicitly. Posting still requires both an explicit
+`post=true` tool argument and server-side `ALLOW_POST=1`.
 
 ## macOS/Linux
 
@@ -65,15 +67,13 @@ confirm that `infermatrix_copilot` is connected.
 
 ## What the default MCP exposes
 
-- `review(target, repo?, mode="direct")`: Direct ignores `repo` and returns
-  `knowledge/AGENTS.md`. Strict uses `repo` only when explicitly selected.
+- `review(target, repo?, mode="direct", post=false)`: Direct ignores `repo`
+  and returns `knowledge/AGENTS.md`. Strict maps to the previous Eco workflow.
 - `update_knowledge(repo?)`: keeps `repo` only for call compatibility and
   returns `knowledge/CONTRIBUTING.md`; the host model follows that document and
   edits the Markdown files itself.
-- `submit_review_stage(run_id, stage, artifact)`: validates and advances one
-  strict stage. Each response includes an `artifact_example`; scalar list fields
-  are normalized automatically.
-- `get_review_status(run_id)`: resumes a strict run.
+- `get_review_result(run_id, offset?)`: polls and pages the Strict report.
+- `get_review_status(run_id)`: returns the old workflow's durable progress.
 - `doc_search(query, repo?)`: finds deeper model/component rules.
 - `doc_read(path, repo?)`: reads a selected knowledge page.
 
