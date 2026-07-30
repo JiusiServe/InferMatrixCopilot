@@ -1,10 +1,10 @@
 ---
 title: "Agent loop / sub-agent workflow"
 created: 2026-07-10
-updated: 2026-07-23
+updated: 2026-07-30
 type: guide
 tags: [general, agents]
-sources: []
+sources: ["zuiho-kai/claude-workflow-starter@c217fc6"]
 ---
 
 # Agent loop / sub-agent workflow
@@ -55,7 +55,7 @@ sources: []
 
 - 每个基线和当前完整 diff 只能有一个 agent 负责安排独立审查。开发任务由父 agent 委派时，默认由父 agent 负责；只有委派合同明确写明“开发者负责审查闭环”时，开发 sub-agent 才能启动 reviewer。根 agent 自己开发且没有上层调度者时，由根 agent 负责。
 - 父 agent 负责审查时，开发 sub-agent 完成实现、最小验证和反证扫描后立即记录 `AUTHOR_COMPLETE`，返回 diff、测试、未验证边界和自发现问题，并标记“待父 agent 独立审查”。它不得读取完整 review guide、生成正式 review report、启动嵌套 reviewer，或等待 reviewer 后再改写 author 完成时间。
-- 审查负责人只启动一次与风险匹配的审查：普通窄修改一个 reviewer，高风险任务才按下文拆成两个正交 reviewer。相同基线、相同 diff 已有一份合格独立审查且代码未改变时直接复用，不再以“更保险”为由重复全量审查。
+- 审查负责人只启动一次与风险匹配的审查。非琐碎 PR review 在有 multi-agent 能力时，冻结输入后立即显式 spawn 两个正交只读 reviewer：correctness reviewer 与 design/subtraction reviewer；不能让一个 agent 在内部自称完成两个角色。单文件且没有新增 public behavior、owner、abstraction 或兼容路径的窄 diff 才由一个 reviewer 顺序执行两种角色。相同基线、相同 diff 已有两种 verdict 的合格独立审查且代码未改变时直接复用，不再以“更保险”为由重复全量审查。
 - 只有新增了不同风险面并能说清专项合同，才增加专项 reviewer；例如安全审计和 GPU 实测不是同一职责。必须分别记录目的和耗时，不能把两个宽泛 review 伪装成正交审查。
 - reviewer 提出问题并发生代码修改后，仍由同一个审查负责人安排复审当前完整 diff。所有 checker、review report 和最终 clean 判定也由审查负责人负责，不下沉给开发 worker 重复执行。
 
@@ -66,6 +66,7 @@ sources: []
 - 同一批文件只能有一个写入 owner。并行 agent 默认只读发现问题；“谁发现谁修”只适用于文件所有权互不重叠、测试可独立验证的子任务，不能让多个 agent 同时修改共享 dispatcher、schema、normalizer 或测试基类。
 - 修复完成后由原审查负责人针对新完整 diff 发起一次复审。若复审再次出现两个以上同类新 finding，不进入第三轮逐条修补；退回合同矩阵，指出遗漏的 source、scope 或 consumer，再重新实现。
 - 用户明确要求立即 push 时，不再启动新的开放式审查波次。先处理当前已知 P0/P1、运行与改动相称的最小验证并 push；已经启动的 reviewer 只允许交回当前结果，不能借“再保险”扩大 scope。仍有已知 P0/P1、测试失败或远端漂移时必须明确报告，不能用这条规则绕过安全阻塞。
+- 用户没有指定深审预算时，交互式 PR review 默认端到端最多 10 分钟：两名 reviewer 并行且各自最多 6 分钟。截止时审查负责人要求停止新工具调用并返回现有 finding、减法账本和未验证边界；主 agent 立即给出 `partial review` 或当前 verdict，不能继续等待完整外围验证。只有用户明确要求继续深审，才启动下一段有界预算。
 
 ## 开发阶段耗时记录
 
@@ -107,9 +108,9 @@ owner 锁定：
 精确 consumer 反查必须在扩充测试矩阵前完成。扫描发现问题就先修再自测；时间到点仍有关键链路未知时，把具体未知量标为 `implementation draft` 交给 reviewer，不能用更多搜索、stub、lint、compile 或“另一条入口正常”冒充完成。反证扫描结果不喂给盲审 reviewer；reviewer 仍从任务合同、owner 规则和完整 diff 独立判断。
 
 1. 开发 agent 完成实现、目标测试和自审，记录 `AUTHOR_COMPLETE`，但此时只能说“待独立审查”。父 agent 默认负责安排审查；开发 sub-agent 返回交接后停止，不自行嵌套 reviewer。
-2. 审查负责人换一个没参与设计和编码的 reviewer。它只读用户要求、本轮确认的仓库规则、基线、当前完整 diff，以及绑定当前基线和 changed surfaces 的 canonical mini spec/编码前 contract matrix；后者是允许核对的设计合同，不等于允许继承作者的根因假设、自审结论或“重点帮我看 X”。记录不存在时 reviewer 明确报 `MISSING_EVIDENCE`，不能在 review 阶段代写。先提供主要 owner 的 `rules.md`；只有 live producer-consumer trace 跨越其他 owner 时才沿调用链补充每个实际 owner 的规则，incidents/history 不作为盲审默认输入。
-   高风险任务才同时启动两个只读 reviewer，且职责必须正交：语义 reviewer 负责官方入口、token、stop、sampling、精度和模型语义；集成 reviewer 负责默认 CLI、真实 topology、public ingress、资源可用性、online/offline 和 unaffected control。两者墙钟时间取最大值而不是相加，输入的基线、diff、owner 和任务合同相同，不能互看结果，也不能都做一遍宽泛 producer→consumer 扫描。普通窄修改只用一个 reviewer。
-3. reviewer 按 [独立审查执行合同](../../review/guides/review-execution-contract.md) 分两轮审：owner 定义触发组时先选择 `core` 加当前 diff 命中的组并完整枚举组内稳定 ID；没有组时才全量枚举该 owner。逐条判定 `PASS / FAIL / MISSING_EVIDENCE / NOT_APPLICABLE`，填写当前可达入口和 changed-value producer→consumer 表，再按 [全量 diff 审查](../../review/guides/reviewer-lens-gates.md#full-diff-review) 查 duplication、layering、edge cases 和 surface area。新的 blocking finding 必须完成 `DIFF / PATH / CONTRACT / FAILURE / COUNTEREVIDENCE / FIX` 六项证明；证据不足的架构怀疑写调查 note，不能用来制造 `FAIL`。
+2. 审查负责人安排没参与设计和编码的 reviewer。它们只读用户要求、本轮确认的仓库规则、基线、当前完整 diff，以及绑定当前基线和 changed surfaces 的 canonical mini spec/编码前 contract matrix；后者是允许核对的设计合同，不等于允许继承作者的根因假设、自审结论或“重点帮我看 X”。记录不存在时 reviewer 明确报 `MISSING_EVIDENCE`，不能在 review 阶段代写。先提供主要 owner 的 `rules.md`；只有 live producer-consumer trace 跨越其他 owner 时才沿调用链补充每个实际 owner 的规则，incidents/history 不作为盲审默认输入。
+   非琐碎 PR 必须实际同时 spawn correctness 与 design/subtraction 两个只读 reviewer，并等待两者在预算内返回；在主 agent 自己的分析里列两个标题不算多角色。前者负责官方入口、行为、兼容、默认值、最终 consumer 和测试证据；后者必须分别完成 project-level RFC/scope ledger，以及 module-level owner、数据流、最小修改、现有 abstraction 复用、census、最小设计和逐项减法账本。两者输入的基线、diff、owner 和任务合同相同，不能互看结果。
+3. reviewer 按 [独立审查执行合同](../../review/guides/review-execution-contract.md) 完成覆盖、减法和开放三轮审查：owner 定义触发组时先选择 `core` 加当前 diff 命中的组并完整枚举组内稳定 ID；没有组时才全量枚举该 owner。逐条判定 `PASS / FAIL / MISSING_EVIDENCE / NOT_APPLICABLE`，填写当前可达入口和 changed-value producer→consumer 表，再按 [全量 diff 审查](../../review/guides/reviewer-lens-gates.md#full-diff-review) 查 duplication、layering、edge cases 和 surface area。新的 blocking finding 必须完成 `DIFF / PATH / CONTRACT / FAILURE / COUNTEREVIDENCE / FIX` 六项证明；证据不足的架构怀疑写调查 note，不能用来制造 `FAIL`。
 4. 语气可以像强硬的项目 owner：直接、不放水、不接受假证据；但只评代码和证据，不攻击人。
 5. 原开发者在原实现工作区修复 P0/P1/P2；写入 agent 继续遵守已约定的隔离目录、worktree 或文件所有权边界。P2 表示低严重度但仍需修复的实质问题；纯样式 nit 单列且不阻止完成，不能把维护问题降级成 nit。
 6. 修复后由 reviewer 重新审查当前完整 diff，既检查旧 finding 是否真正关闭，也查修复引入的新问题。只关闭旧问题不等于全量复审。

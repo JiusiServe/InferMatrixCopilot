@@ -4,7 +4,7 @@ created: 2026-07-30
 updated: 2026-07-30
 type: rule
 tags: [general, review]
-sources: ["InferMatrixCopilot Issue #17", "vllm-project/vllm-omni PR #5394"]
+sources: ["InferMatrixCopilot Issue #17", "vllm-project/vllm-omni PR #5394", "zuiho-kai/claude-workflow-starter@c217fc6"]
 confidence: high
 ---
 
@@ -38,6 +38,42 @@ confidence: high
   语义必然不同。
 - 验收：同一入口覆盖条件边界两侧及切换边界，断言用户可观察结果或明确允许的差异；
   新增共享行为时，两条路径的测试或不适用理由必须同时出现。 ^[vllm-project/vllm-omni PR #5394]
+
+## 审查角色与减法
+
+### REV-2a — 非琐碎 PR 必须独立完成 correctness 与 design/subtraction
+
+- 触发：用户要求审核 PR，包括只提供 PR 链接；或交付前审查发现新增 public behavior、
+  owner、abstraction、兼容路径或跨模块数据流。
+- 强制：冻结相同 base/head 和授权合同；有 multi-agent 能力时实际并行启动两个互不
+  看结果的只读 reviewer，一个追行为和 producer→consumer，一个做项目级和模块级减法。
+- 禁止：一个 agent 在报告里自称两个角色；找到 blocking bug 后跳过减法；用综合的
+  “建议/不建议合并”代替两个独立 verdict。
+- 验收：最终分别给出 correctness verdict 与 subtraction verdict；任一角色缺失只能
+  报 `partial review`。 ^[zuiho-kai/claude-workflow-starter@c217fc6]
+
+### REV-2b — 减法先删越界 scope，再压缩模块设计
+
+- 触发：PR 新增 production behavior、文件、测试、helper、class、normalizer、validator、
+  allowlist、owner projection、中间 artifact 或末端补偿。
+- 强制：先把每项变化映射到用户目标或当前 RFC/mini spec slice，未映射项
+  `DELETE / DEFER`；再枚举保留 abstraction，写出不依赖当前实现的最小 owner 设计，
+  逐项标记 `KEEP / INLINE / MERGE / MOVE / DELETE`，优先最小修改和复用既有 owner。
+- 禁止：把字段丢失、默认值错误等 correctness bug 算作减法；用删局部变量、改名、
+  换文件或多 caller 证明设计已经最简；让后续 RFC slice 因为已写完而混入当前 PR。
+- 验收：报告先给 scope 删除项，再给模块 abstraction/owner/分支的净减少；没有可删项时，
+  必须用完整 scope ledger、census 和最小设计证明当前已经最小。
+  ^[zuiho-kai/claude-workflow-starter@c217fc6]
+
+### REV-2c — 交互式 PR review 必须按时返回最小可用结论
+
+- 触发：用户未指定深审或更长预算，只要求审核 PR。
+- 强制：默认端到端预算 10 分钟；两名 reviewer 并行且各自最多使用 6 分钟，截止时停止
+  新工具调用，返回当前 finding、减法账本和未验证边界，由主 agent立即收口。
+- 禁止：为了补齐外围 CI、全量测试、历史 thread 或额外专项无限延长；在 reviewer 已超时
+  后继续无上限等待“完整结果”。
+- 验收：10 分钟内给用户 actionable findings 或明确的 `partial review`；更深验证作为
+  后续可选任务，不阻塞本轮答复。 ^[zuiho-kai/claude-workflow-starter@c217fc6]
 
 具体审查执行顺序见[独立审查执行合同](guides/review-execution-contract.md)，输入、输出与
 边界矩阵写法见[Reviewer Lens Contracts](guides/reviewer-lens-contracts.md)。
