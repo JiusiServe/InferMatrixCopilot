@@ -195,11 +195,23 @@ async def _review_diff(ctx: StepContext) -> StepResult:
                                          "planner": plan.planner,
                                          "reason": plan.reason}
     if result.ok:
+        review_comments = [dict(c) for c in output.get("review_comments") or []]
         review_md = _render_review_md(output,
                                       pr_state=str(ctx.state.get("pr_state", "")))
+        review_body = _render_review_md(
+            output, pr_state=str(ctx.state.get("pr_state", "")),
+            include_comment_details=False)
         ctx.state["review_text"] = review_md
+        ctx.state["review_body"] = review_body
+        ctx.state["review_comments"] = review_comments
         result.outputs["review_text"] = review_md
-        result.outputs.setdefault("state_updates", {})["review_text"] = review_md
+        result.outputs["review_body"] = review_body
+        result.outputs["review_comments"] = review_comments
+        result.outputs.setdefault("state_updates", {}).update({
+            "review_text": review_md,
+            "review_body": review_body,
+            "review_comments": review_comments,
+        })
         depth_note = f"; depth={plan.depth} via {plan.planner}" if plan else ""
         result.summary = (f"review produced ({len(output.get('review_comments') or [])} "
                           f"comments{depth_note}) — {result.summary}")

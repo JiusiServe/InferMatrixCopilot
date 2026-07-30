@@ -167,14 +167,108 @@ def test_debug_group_blocked_without_llm(registry, settings, trace, tmp_path):
 def test_post_review_gating(registry, settings, trace, tmp_path):
     step = registry.get("pr.post_review")
     # post flag not set -> no-op
-    state = {"review_text": "looks fine", "task_spec": {"pr": 7, "post": False}}
+    state = {"review_text": "looks fine", "review_body": "summary",
+             "review_comments": [],
+             "task_spec": {"pr": 7, "post": False}}
     result = asyncio.run(step.handler(_ctx(settings, trace, tmp_path, state)))
     assert result.ok and "not posting" in result.summary
     # post flag set but ALLOW_POST=0 -> dry-run
     state["task_spec"]["post"] = True
     result = asyncio.run(step.handler(_ctx(settings, trace, tmp_path, state)))
     assert result.ok and result.outputs.get("dry_run") is True
-    assert "looks fine" in result.outputs["body"]
+    assert result.outputs["payload"]["event"] == "APPROVE"
+
+
+def test_review_payload_validates_lines_and_downgrades_invalid():
+    from infermatrix_copilot.engine.steps.pr.publish import _review_payload
+
+    diff = "\n".join([
+        "diff --git a/a.py b/a.py",
+        "--- a/a.py",
+        "+++ b/a.py",
+        "@@ -10,2 +10,3 @@",
+        " context",
+        "-old",
+        "+new",
+        "+more",
+    ])
+    comments = [
+        {"file": "a.py", "line": 11, "severity": "major",
+         "comment": "valid", "evidence": "diff"},
+        {"file": "a.py", "line": 99, "severity": "minor",
+         "comment": "stale", "evidence": "tree"},
+    ]
+    payload, fallback = _review_payload(comments, diff, "scan")
+    assert payload["event"] == "REQUEST_CHANGES"
+    assert payload["comments"] == [{
+        "path": "a.py", "line": 11, "side": "RIGHT",
+        "body": "**[major]** valid\n\nEvidence: diff",
+    }]
+    assert fallback == [comments[1]]
+    assert "Findings not posted inline" in payload["body"]
+    assert "`a.py:99`" in payload["body"]
+
+
+def test_post_review_posts_api_payload(registry, settings, trace, tmp_path,
+                                       monkeypatch):
+    from infermatrix_copilot.engine.steps.pr import publish
+
+    calls = []
+
+    def fake_gh(args, cwd=None, *, input_text=None):
+        calls.append((args, input_text))
+        if args[:2] == ["repo", "view"]:
+            return 0, '{"nameWithOwner":"o/r"}'
+        return 0, '{"html_url":"https://github.test/o/r/pull/7#review"}'
+
+    monkeypatch.setattr(publish, "_gh", fake_gh)
+    settings.allow_post = True
+    state = {
+        "review_text": "full",
+        "review_body": "scan\n\n**Verdict:** REQUEST CHANGES",
+        "review_comments": [
+            {"file": "a.py", "line": 2, "severity": "major",
+             "comment": "broken", "evidence": "test"},
+        ],
+        "diff_text": "+++ b/a.py\n@@ -1 +1,2 @@\n x\n+y",
+        "task_spec": {"pr": 7, "post": True},
+    }
+    result = asyncio.run(registry.get("pr.post_review").handler(
+        _ctx(settings, trace, tmp_path, state)))
+    assert result.ok, result.summary
+    assert result.outputs == {
+        "inline_count": 1, "fallback_count": 0,
+        "event": "REQUEST_CHANGES",
+        "url": "https://github.test/o/r/pull/7#review",
+    }
+    args, raw_payload = calls[-1]
+    assert args == ["api", "--method", "POST",
+                    "repos/o/r/pulls/7/reviews", "--input", "-"]
+    payload = __import__("json").loads(raw_payload)
+    assert payload["comments"][0]["side"] == "RIGHT"
+
+
+def test_post_review_api_failure_escalates(registry, settings, trace, tmp_path,
+                                           monkeypatch):
+    from infermatrix_copilot.engine.steps.pr import publish
+
+    def fake_gh(args, cwd=None, *, input_text=None):
+        if args[:2] == ["repo", "view"]:
+            return 0, '{"nameWithOwner":"o/r"}'
+        return 1, "HTTP 422 stale line"
+
+    monkeypatch.setattr(publish, "_gh", fake_gh)
+    settings.allow_post = True
+    state = {
+        "review_body": "scan",
+        "review_comments": [],
+        "diff_text": "",
+        "task_spec": {"pr": 7, "post": True},
+    }
+    result = asyncio.run(registry.get("pr.post_review").handler(
+        _ctx(settings, trace, tmp_path, state)))
+    assert not result.ok and result.failure is FailureKind.ESCALATE
+    assert "HTTP 422" in result.summary
 
 
 def test_worktree_at_creates_and_reuses(git_repo, tmp_path):

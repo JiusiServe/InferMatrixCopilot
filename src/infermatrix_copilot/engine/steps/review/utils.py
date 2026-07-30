@@ -96,7 +96,24 @@ def _category_of(c: dict) -> str:
     return "Correctness"
 
 
-def _render_review_md(output: dict, pr_state: str = "") -> str:
+def _review_verdict(comments: list[dict], pr_state: str = "") -> str:
+    """Map structured findings to the rendered/product verdict."""
+    def _uncertain(c: dict) -> bool:
+        hay = (str(c.get("comment", "")) + " " + str(c.get("evidence", ""))).lower()
+        return any(m in hay for m in ("uncertain", "unverified", "could not verify",
+                                      "cannot verify", "budget exhaust",
+                                      "not able to confirm"))
+
+    blocking = any(str(c.get("severity", "")).lower() in ("blocker", "major")
+                   and not _uncertain(c) for c in comments)
+    if blocking:
+        return "FOLLOW-UP REQUIRED (post-merge)" \
+            if str(pr_state).upper() == "MERGED" else "REQUEST CHANGES"
+    return "COMMENT" if comments else "APPROVE"
+
+
+def _render_review_md(output: dict, pr_state: str = "", *,
+                      include_comment_details: bool = True) -> str:
     """Render the review output dict as Markdown: a category scan table
     (finding counts per category; empty rows say `no finding reported`),
     comments sorted by severity as `file:line [severity] — comment`, then a
@@ -123,23 +140,8 @@ def _render_review_md(output: dict, pr_state: str = "") -> str:
                  if str(f).lstrip().lower().startswith(
                      ("[validated]", "[upstream-verify]", "[sweep]"))][:8]
     # Verdict calibration (T3 forensics #2): only blocker/major block — a
-    # `minor` is an in-PR ask but not merge-blocking (14/15 human-approved
-    # PRs got REQUEST CHANGES under the old rule). A comment whose own text
-    # or evidence declares uncertainty can never block.
-    def _uncertain(c: dict) -> bool:
-        hay = (str(c.get("comment", "")) + " " + str(c.get("evidence", ""))).lower()
-        return any(m in hay for m in ("uncertain", "unverified", "could not verify",
-                                      "cannot verify", "budget exhaust",
-                                      "not able to confirm"))
-    blocking = any(str(c.get("severity", "")).lower() in ("blocker", "major")
-                   and not _uncertain(c) for c in comments)
-    if blocking:
-        verdict = "FOLLOW-UP REQUIRED (post-merge)" \
-            if str(pr_state).upper() == "MERGED" else "REQUEST CHANGES"
-    elif comments:
-        verdict = "COMMENT"  # non-blocking asks; mergeable as-is
-    else:
-        verdict = "APPROVE"
+    # `minor` is an in-PR ask but not merge-blocking.
+    verdict = _review_verdict(comments, pr_state)
     parts = []
     # category scan: judge-visible coverage without claiming verification
     counts: dict[str, int] = {}
@@ -152,6 +154,10 @@ def _render_review_md(output: dict, pr_state: str = "") -> str:
     parts.append("**Scan:**\n" + "\n".join(scan))
     if validated:
         parts.append("**Validated:**\n" + "\n".join(f"- {v}" for v in validated))
-    parts.append("\n\n".join(lines) if lines else output.get("summary", "No findings."))
+    if include_comment_details:
+        parts.append("\n\n".join(lines) if lines
+                     else output.get("summary", "No findings."))
+    elif not comments:
+        parts.append(output.get("summary", "No findings."))
     body = "\n\n".join(parts)
     return f"{body}\n\n**Verdict:** {verdict}"
