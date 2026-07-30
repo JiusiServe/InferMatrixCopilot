@@ -1,0 +1,91 @@
+name: vLLM-Omni 规则建议
+description: 模块或模型 owner 提交可复用的维护规则，不要求直接修改 Markdown
+title: "[Knowledge] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请填写一条可长期复用的规则。知识库维护者或 agent 会负责查重、选择文件、生成 PR 和运行校验，原 owner 负责确认规则语义。
+
+  - type: dropdown
+    id: owner_type
+    attributes:
+      label: Owner 类型
+      options:
+        - 共享代码模块（component）
+        - 单个模型（model）
+        - vLLM-Omni 仓库级
+        - 跨仓库通用
+    validations:
+      required: true
+
+  - type: input
+    id: owner
+    attributes:
+      label: 模块或模型名称
+      description: 例如 Configuration、Scheduler、HunyuanImage3
+      placeholder: HunyuanImage3
+    validations:
+      required: true
+
+  - type: textarea
+    id: owner_evidence
+    attributes:
+      label: Owner 依据
+      description: 哪些源码目录、维护职责或测试证明规则属于这里？
+      placeholder: |
+        源码：
+        测试：
+        维护边界：
+    validations:
+      required: true
+
+  - type: textarea
+    id: trigger
+    attributes:
+      label: 触发
+      description: 什么改动、现象或任务需要使用这条规则？
+    validations:
+      required: true
+
+  - type: textarea
+    id: must
+    attributes:
+      label: 必须
+      description: 实现或审核时必须做什么？
+    validations:
+      required: true
+
+  - type: textarea
+    id: must_not
+    attributes:
+      label: 禁止
+      description: 最容易出现、必须阻止的错误是什么？
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 验收
+      description: 什么测试、输出或代码路径能证明规则满足？
+    validations:
+      required: true
+
+  - type: textarea
+    id: sources
+    attributes:
+      label: 来源
+      description: 请提供相关源码路径、设计文档、issue 或 PR 链接。完整 diff 和日志无需复制进知识库。
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Owner 确认
+      options:
+        - label: 我确认这条规则属于上述 owner，并且不是只对一次 PR 有效。
+          required: true
+        - label: 我愿意审核最终生成的知识库 PR。
+          required: true

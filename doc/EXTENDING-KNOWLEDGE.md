@@ -3,6 +3,9 @@
 A practical guideline for users and developers who want to **add or change a page**
 in the curated Markdown wiki at repo-root `knowledge/`.
 
+Chinese maintainer guide:
+[`docs/knowledge-maintainer.zh-CN.md`](../docs/knowledge-maintainer.zh-CN.md).
+
 `knowledge/` is a **vendored** copy of `zuiho-kai/claude-workflow-starter`
 (provenance and copy authorization in [KNOWLEDGE.md](KNOWLEDGE.md)); it is
 maintained in-repo as ordinary tracked files. The wiki's own short entry point is
