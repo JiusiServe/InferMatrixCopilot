@@ -65,10 +65,11 @@ confirm that `infermatrix_copilot` is connected.
 
 ## What the default MCP exposes
 
-- `review(target, repo?, mode="direct")`: returns `knowledge/AGENTS.md` in
-  Direct mode. Strict is selected only when the user explicitly asks.
-- `update_knowledge(repo?)`: returns `knowledge/CONTRIBUTING.md`; the host model
-  follows that document and edits the Markdown files itself.
+- `review(target, repo?, mode="direct")`: Direct ignores `repo` and returns
+  `knowledge/AGENTS.md`. Strict uses `repo` only when explicitly selected.
+- `update_knowledge(repo?)`: keeps `repo` only for call compatibility and
+  returns `knowledge/CONTRIBUTING.md`; the host model follows that document and
+  edits the Markdown files itself.
 - `submit_review_stage(run_id, stage, artifact)`: validates and advances one
   strict stage. Each response includes an `artifact_example`; scalar list fields
   are normalized automatically.
