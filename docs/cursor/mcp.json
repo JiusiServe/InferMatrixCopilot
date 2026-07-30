@@ -1,8 +1,14 @@
 {
   "mcpServers": {
-    "infermatrix-copilot": {
-      "command": "infermatrix-copilot-mcp",
-      "args": []
+    "infermatrix_copilot": {
+      "command": "D:\\path\\to\\InferMatrixCopilot\\.venv\\Scripts\\python.exe",
+      "args": [
+        "-m",
+        "infermatrix_copilot.thin_mcp_server"
+      ],
+      "env": {
+        "PYTHONPATH": "D:\\path\\to\\InferMatrixCopilot\\src"
+      }
     }
   }
 }

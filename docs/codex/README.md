@@ -18,6 +18,12 @@ Use InferMatrixCopilot to review
 https://github.com/vllm-project/vllm-omni/pull/5172.
 ```
 
+The installer also adds the `imreview` skill, so the short form is:
+
+```text
+/imreview https://github.com/vllm-project/vllm-omni/pull/5172
+```
+
 Codex calls `review`, receives the local `knowledge/AGENTS.md` path, and follows
 that document's routing map itself. The MCP does not guess which owner applies
 and does not inject complete rule pages.

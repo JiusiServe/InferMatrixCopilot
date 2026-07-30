@@ -1,0 +1,4 @@
+interface:
+  display_name: "InferMatrix Review"
+  short_description: "Run a maintainer-grounded Direct PR review"
+  default_prompt: "Use $imreview to review the current PR in Direct mode."

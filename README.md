@@ -1,154 +1,112 @@
 # InferMatrixCopilot
 
-给 Codex 注入 vLLM-Omni 项目经验，让 PR 审查更符合维护者规则。
-它不运行第二个模型，也不会自动发布评论。
+让 Codex、Claude Code、Cursor 按 **vLLM-Omni 的项目规则**审查代码。
 
-这个项目同时服务两类人：
+InferMatrixCopilot 是一个本地 MCP 知识插件。它把维护者沉淀的模型、组件和工程规则
+提供给你正在使用的 Coding Agent，帮助 Agent 少做泛泛的代码检查，多关注真正影响
+vLLM-Omni 的兼容性、正确性和性能问题。
 
-- 使用者：安装 MCP，让 Codex 在 review 时读取 vLLM-Omni 知识库。
-- vLLM-Omni 维护者：把自己负责模块或模型的稳定经验写成规则，让人和 agent
-  下次都能复用。
+默认模式下：
 
-## 安装到 Codex
+- 继续使用 Agent 当前选择的模型，不运行第二个模型；
+- 不需要额外的 API Key；
+- 不会自动发 GitHub 评论，也不会推送代码。
 
-Windows：
+## 快速开始
+
+要求：Windows、Python 3.11+，以及已经安装好的 Codex、Claude Code 或 Cursor。
 
 ```powershell
 git clone https://github.com/JiusiServe/InferMatrixCopilot.git
 cd InferMatrixCopilot
+
+# 只运行与你的 Agent 对应的一条
 .\install-codex.ps1
+.\install-claude.ps1
+.\install-cursor.ps1
 ```
 
-安装完成后重启 Codex，然后直接说：
+脚本会安装 MCP 和 `/imreview` 命令。重启 Agent 后，把 PR 地址交给它：
 
 ```text
-Use InferMatrixCopilot to review
-https://github.com/vllm-project/vllm-omni/pull/5172.
+/imreview https://github.com/vllm-project/vllm-omni/pull/5172
 ```
 
-macOS、Linux 和手工配置见
-[`docs/codex/README.md`](docs/codex/README.md)。
+不带地址时，`/imreview` 会审查当前 PR 或本地工作区。
 
-## 它能做什么
+macOS、Linux、手工配置和其他 MCP Agent 的接入方法见
+[`doc/MCP.md`](doc/MCP.md)。
 
-| 能做 | 不能做 |
+## 它是怎么工作的
+
+```text
+你发起 /imreview
+  → Agent 读取 PR 或本地改动
+  → InferMatrixCopilot 返回知识库入口
+  → Agent 按改动选择相关模型、组件和通用规则
+  → Agent 输出带文件和行号的审查结论
+```
+
+代码理解和推理由 Agent 当前模型完成。InferMatrixCopilot 只负责提供知识地图和维护者
+规则，不返回一份预先生成的审查结果，也不会把整套知识库一次性塞进上下文。
+
+| 它负责什么 | 它不负责什么 |
 |---|---|
-| 把知识库入口交给当前 Codex 模型 | 不运行第二个模型 |
-| 让 Codex 按知识库地图选择相关规则 | 不替模型选择知识页面 |
-| 辅助审查 vLLM-Omni PR 或本地改动 | 不自动发布 GitHub 评论 |
-| 把知识维护入口交给 Codex，由 Codex 直接修改 Markdown | 不在 MCP 内部自动改写规则 |
+| 提供 vLLM-Omni 知识库入口 | 运行或替换 Agent 的模型 |
+| 帮助 Agent 找到相关 owner 规则 | 替 Agent 理解代码和下结论 |
+| 支持审查远程 PR 和本地改动 | 自动发布评论或推送代码 |
+| 提供知识维护入口 | 在 MCP 内部自动改写规则 |
 
-默认是 **Direct 模式**：Codex 负责读取代码、理解改动和输出审查结果；
-InferMatrixCopilot 只提供知识库入口。
+## 确认安装成功
 
-## 怎样确认它真的被用了
-
-先用 `/mcp` 或下面的命令确认 `infermatrix_copilot` 已连接：
+在 Agent 中查看 MCP 列表，确认 `infermatrix_copilot` 已连接。Codex 可以运行：
 
 ```powershell
 codex mcp list
 ```
 
-Direct `review` 的 MCP 返回很短：
-
-```json
-{
-  "knowledge_entry": "C:\\...\\InferMatrixCopilot\\knowledge\\AGENTS.md"
-}
-```
-
-Codex 随后从这个入口读取文档地图，自行判断应使用哪些规则，再正常输出
-带文件和行号的 review findings。MCP 不返回预制审查结果，也不一次性注入完整规则。
-
-## 更新知识库
-
-对 Codex 说：
+如果审查时没有调用 InferMatrixCopilot，直接说明：
 
 ```text
-Use InferMatrixCopilot to update the knowledge base with the reusable rule
-from this review.
+Use InferMatrixCopilot to review this PR.
 ```
 
-`update_knowledge` 只返回：
+## 维护项目知识
 
-```json
-{
-  "knowledge_entry": "C:\\...\\InferMatrixCopilot\\knowledge\\CONTRIBUTING.md"
-}
-```
+如果你是 vLLM-Omni 的模块或模型维护者，不需要先理解整棵知识树。选择最接近的示例，
+复制现有规则，再补齐触发条件、要求、禁止项、验收方法和来源：
 
-Codex 按该入口已有的目录地图和落盘规范，自行选择 owner、修改 Markdown、
-更新索引并执行文档中要求的校验。MCP 本身不猜 owner，也不写规则。
+- [给已有组件增加规则](docs/samples/add-component-rule.zh-CN.md)
+- [给已有模型增加规则](docs/samples/add-model-rule.zh-CN.md)
+- [为新模型创建 owner 目录](docs/samples/add-new-model-owner.zh-CN.md)
 
-## 模块和模型 owner 怎样维护规则
-
-不需要先理解整棵知识库，也不需要会写 MCP。已有模块或模型目录时，打开自己的
-`rules.md`，**复制文件中最后一条现有规则**到末尾，再改 ID、标题、触发、必须/强制、
-禁止、验收和来源。这样标题层级和本页格式天然一致。
-
-如果文件还没有现成规则，再复制下面这段：
-
-```markdown
-### <沿用本页前缀的新 ID> — <一句话标题>
-
-- 触发：<什么改动或现象需要这条规则>
-- 必须：<实现或审核时必须做什么>
-- 禁止：<最容易犯的错误>
-- 验收：<什么测试或代码路径证明它满足>
-```
-
-新规则必须有可核对来源：把 PR、源码路径或设计文档追加到文件顶部 `sources`，并在
-规则末尾标记，例如 `^[PR #1234]`。同一规则使用多个来源时写在同一个标记里，用
-分号分隔：`^[PR #1234; vllm_omni/path/to/file.py]`。没有任何来源时先补证据，
-不提交规则。
-
-然后更新文件顶部的 `updated`，运行：
+每条规则都要能追溯到 PR、源码或设计文档。提交前运行：
 
 ```powershell
 python knowledge/tools/check_knowledge_tree.py
 python knowledge/tools/check_wiki_lint.py
 ```
 
-Windows 上 Git 提示 `LF will be replaced by CRLF` 只是换行符提醒；上述命令退出码为
-0 且没有错误时不算校验失败。
-
-直接选择自己的情况，不需要先读总手册：
-
-- [已有 component：复制一条 component 规则](docs/samples/add-component-rule.zh-CN.md)
-- [已有 model：复制一条 model 规则](docs/samples/add-model-rule.zh-CN.md)
-- [新模型还没有目录：复制完整 model owner](docs/samples/add-new-model-owner.zh-CN.md)
-
-规则卡片、人工与 agent 分工、Codex 提示词和 PR 检查清单见：
-
-[`docs/knowledge-maintainer.zh-CN.md`](docs/knowledge-maintainer.zh-CN.md)
-
-不想直接改 Markdown 的 owner，可以
+完整流程见
+[`docs/knowledge-maintainer.zh-CN.md`](docs/knowledge-maintainer.zh-CN.md)；
+不想直接改 Markdown，也可以
 [提交中文规则建议](https://github.com/JiusiServe/InferMatrixCopilot/issues/new?template=knowledge-rule.yml)。
-只需填写触发、必须、禁止、验收和来源，知识库维护者或 agent 再整理成 PR。
 
-现有可复制文件模板位于
-[`doc/knowledge-templates/`](doc/knowledge-templates/README.md)。知识树的权威贡献
-规范仍是 [`knowledge/CONTRIBUTING.md`](knowledge/CONTRIBUTING.md)。
+## 工作模式
 
-## Direct MCP 工具
+| 模式 | 适合场景 | 说明 |
+|---|---|---|
+| Direct（默认） | 日常 PR 和本地审查 | Agent 自己完成推理，MCP 只提供知识入口 |
+| Strict | 需要强制审查步骤 | 按 `evidence → gates → review → verify` 保存并校验阶段状态 |
+| Autonomous | 需要独立执行器 | 使用单独配置的模型和工作流 |
 
-- `review(target, repo?)`：返回审查知识入口。
-- `update_knowledge(repo?)`：返回知识维护入口。
-- `doc_search(query, repo?)`：按文本搜索知识库。
-- `doc_read(path, repo?)`：读取指定知识页面。
+Strict 模式需要用户明确提出。具体用法见
+[`docs/codex/README.md`](docs/codex/README.md)；Autonomous 模式见
+[`docs/autonomous-workflow.md`](docs/autonomous-workflow.md)。
 
-Direct 模式不需要 API Key、endpoint 或额外模型配置。
+## 文档
 
-## Strict 工作流模式
-
-如果需要更强的流程约束，可以明确要求 Codex 使用 **Strict 工作流模式**。
-InferMatrixCopilot 会维护持久化的
-`evidence → gates → review → verify` 状态机，各阶段的分析仍由 Codex 当前模型完成。
-
-## 其他模式
-
-- Strict 模式的状态机用法见
-  [`docs/codex/README.md`](docs/codex/README.md)。
-- 自主工作流会运行自己的模型，是另一套产品入口，见
-  [`docs/autonomous-workflow.md`](docs/autonomous-workflow.md)。
-- 项目内部设计和实现说明见 [`doc/`](doc/)。
+- [安装和 MCP 配置](doc/MCP.md)
+- [知识库贡献规范](knowledge/CONTRIBUTING.md)
+- [项目设计与实现](doc/)
+- [评测说明](eval/README.md)
