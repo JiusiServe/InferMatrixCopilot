@@ -1,10 +1,10 @@
 ---
 title: "独立审查执行合同"
 created: 2026-07-13
-updated: 2026-07-23
+updated: 2026-07-30
 type: guide
 tags: [general, review]
-sources: []
+sources: ["InferMatrixCopilot Issue #17"]
 ---
 
 # 独立审查执行合同
@@ -15,7 +15,7 @@ sources: []
 
 审查分两轮，顺序不能交换：
 
-1. **覆盖轮：** 冻结基线和完整 diff。owner 定义审查触发组时，选择 `core` 加当前 diff 命中的组并完整枚举组内稳定 ID；没有触发组时才枚举该 owner 全部稳定 ID。随后填写当前可达公开入口和 changed-value producer→consumer 表。
+1. **覆盖轮：** 冻结基线和完整 diff。先按[通用设计审查规则](../rules.md)检查同族实现和条件分支的结构触发；命中时记录 `REV-1a`/`REV-1b` 的覆盖结论。owner 定义审查触发组时，选择 `core` 加当前 diff 命中的组并完整枚举组内稳定 ID；没有触发组时才枚举该 owner 全部稳定 ID。随后填写当前可达公开入口和 changed-value producer→consumer 表。
 2. **开放轮：** 再查 duplication、layering、edge cases、surface area 和命中的专项风险。
 
 找到很多新问题不能代替覆盖轮。不能为了省事漏掉命中组，也不能为了“更全面”把未触发组全部展开成噪声。缺少所选规则行、可达入口、changed-value consumer 或证据时，结论只能是 `partial review`；不能说 `clean`、`ready` 或 `fully reviewed`。
@@ -29,6 +29,7 @@ PR 声称“严格校验”“拒绝未知字段”“统一 normalization”或
 - 用户需求和允许修改的范围；
 - 固定的 target/base SHA；
 - 当前完整 diff，以及属于任务的未跟踪文件；
+- [通用设计审查规则](../rules.md)及当前 diff 命中的结构触发；
 - live 调用链证明的 owner `rules.md`；
 - 每个 owner 的规则组选择及触发理由；有触发组时必须包含 `core`，选择错误由主 agent 复核，checker 只验证组内覆盖完整；
 - 编码前已存在的 mini spec 或合同矩阵；不存在时记 `MISSING_EVIDENCE`，不能事后代写；
