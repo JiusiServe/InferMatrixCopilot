@@ -131,7 +131,9 @@
 2. 创建 `_index.md`，写清源码路径、职责边界、测试入口和依赖关系。
 3. 有稳定架构信息时创建 `architecture.md`。
 4. 第一条真实规则出现时才创建 `rules.md`，不要提交空页面。
-5. 在父级 `components/_index.md` 或 `models/_index.md` 增加入口。
+5. 新增 component 时在 `components/_index.md` 增加入口；新增 model 时不用维护
+   父级长表，目录会由 `models/` 文件系统清单自动发现。新增别名或 registry key
+   时才更新 `models/catalog.md`。
 
 模块与模型的区别：
 

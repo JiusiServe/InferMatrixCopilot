@@ -11,7 +11,7 @@ sources: [vllm_omni/model_executor/models/glm_image/, vllm_omni/diffusion/models
 
 以下事实在 `main @ 5d44868e` 复核。**树内定位**（知识树自身的路由约定,非源码
 事实）：AR→DiT 图像编辑（i2i/IT2I）行为对齐时的参照家族——hunyuan 的
-[it2i-gap](../hunyuan-image3/guides/it2i-gap.md) 以它为对齐基准,定位依据见
+[it2i-gap](../hunyuan-image3/it2i-gap.md) 以它为对齐基准,定位依据见
 [reference-models](../reference-models.md)。
 
 ## 名称与范围

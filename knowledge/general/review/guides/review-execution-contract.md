@@ -13,7 +13,7 @@ sources: ["InferMatrixCopilot Issue #17", "InferMatrixCopilot Issue #24", "zuiho
 
 ## 单次输入与简明检查单
 
-主审查只采集一次 `{base_sha, head_sha, PR title/body, changed files, diff, mergeability, CI}`。先用 title/body 的声明目标选择精确 owner/model 规则组和第一批源码函数，再用 changed files 验证和补全范围；PR 描述只负责导航，不能作为 finding 证据。
+主审查只采集一次 `{base_sha, head_sha, PR title/body, changed files, diff, mergeability, CI}`。元数据返回后先发宿主进度，再把 title/body/changed files 一次传给 Direct；使用返回的至多 3 个精确 owner/model `knowledge_routes` 内嵌 `quick_map`，只有具体歧义阻塞源码审查时才打开完整规则文件，不得从总入口和索引重新导航。changed files 只验证和补全范围；PR 描述只负责导航，不能作为 finding 证据。
 
 同一份证据包持续追加已读文件、caller 搜索、测试结果和 findings，后续步骤必须复用，不能重新抓取或重复调查。第一次 Codex review 使用这份简明检查单：
 
@@ -25,14 +25,28 @@ sources: ["InferMatrixCopilot Issue #17", "InferMatrixCopilot Issue #24", "zuiho
 
 ## 60 秒渐进状态
 
-审查开始后 60 秒内，宿主先在当前对话报告：
+审查开始后 60 秒内，快照元数据一返回，宿主就在任何知识读取、源码搜索或测试之前报告：
 
 - 固定的 head SHA；
 - 当前 CI 状态；
 - 当前可合并性；
 - 已有早期 finding，或明确写“暂未发现”。
 
-早期 finding 必须标记为“初步”，宿主随后继续同一次审查。该状态只用于避免用户长时间看不到进展，不是完整 review，也不是 GitHub 评论；不能发布“初稿评论”，最终仍只有一篇合并后的 review comment。CI 未完成或可合并性未知时报告真实状态，不等待它们完成才发进度。
+早期 finding 必须标记为“初步”，宿主随后继续同一次审查。该状态只用于避免用户长时间看不到进展，不是完整 review，也不是 GitHub 评论；不能发布“初稿评论”，最终仍只有一篇合并后的 review comment。CI 未完成或可合并性未知时报告真实状态，不等待它们完成，也不能先做知识导航再发进度。
+
+## Direct 并行与可预测验证
+
+固定快照后先让状态轨完成首次宿主进度，再并行推进其余证据轨：
+
+- **状态轨：** head SHA、CI、可合并性；首次元数据返回就发进度；
+- **知识/源码轨：** 只读 Direct 返回的精确 owner/model routes，然后进入首批源码、限定范围的 `rg` 和 caller；
+- **验证轨：** 先做 import/version 兼容性预检，通过后运行目标测试和低成本静态检查。
+
+三条轨共用当前审查的一份证据包。已读文件、搜索结果、caller、测试、repo-map、知识路由和 finding 不重复获取；搜索必须限定目录、glob 或输出量，不用无边界全仓递归扫描。Direct 不新增持久缓存、后台调度器或 progress API。
+
+CI 默认只作为状态证据；只有首个失败异常与 frozen diff 重叠或阻塞判决时才打开日志。纯文档改动跳过依赖预检和 pytest，只做 diff hygiene、链接/构建检查以及对被引用 live contract 的有界核对。
+
+验证记录必须包含 `{repo, head_sha, command, result, environment_fingerprint}`。环境指纹至少覆盖依赖锁摘要、Python 和平台；只有依赖指纹匹配才复用环境。head 变化使旧测试结果失效，但依赖没有变化时不重建环境。预检失败就报告具体不兼容项，不继续运行或声称 pytest 已验证。预检通过后，目标测试和静态检查应与源码审查并行，不能等模型审完才启动。每条变化语义已有 finding 或明确 no-issue 结论后停止，不为增加信心继续追加搜索。
 
 ## 完成条件
 

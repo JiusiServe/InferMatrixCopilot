@@ -57,6 +57,10 @@
 - 依赖哪些共享代码模块；
 - checkpoint、尺寸和量化版本的差异。
 
+父级 `models/_index.md` 是例外：它用 `<!-- children: filesystem -->` 声明模型
+子目录由文件系统发现，不逐个复制链接。新增模型时只创建模型目录和该目录自己的
+`_index.md`；只有新增别名或 registry key 时才更新 `models/catalog.md`。
+
 ## `architecture.md` 写稳定边界
 
 代码模块的 `architecture.md` 至少包含：
@@ -126,6 +130,10 @@
 
 `guides/`、`incidents/`、`rfcs/` 等只用来组织同类页面。创建时必须同时创建 `_index.md`，并在上一层 `_index.md` 增加入口。
 
+`components/<owner>/` 和 `models/<model>/` 不使用 `guides/`；特性文档直接放 owner
+根目录。工作主题下允许使用 `guides/`，但父级索引应直接链接常见问题对应的正文，
+不要强迫读者再读一层 guides 索引。
+
 分类 `_index.md` 必须列出里面的每篇当前有效页面。过期但仍有历史价值的页面单独分组，不与当前规则混在一起。
 
 ## 人类手工新增内容
@@ -134,7 +142,8 @@
 
 1. 参考一个现有同类目录的最小结构，不复制整棵模板。
 2. 创建 `_index.md`，写清“什么时候查”、“不放什么”和“目录内容”。
-3. 在上一层 `_index.md` 增加入口。
+3. 在上一层 `_index.md` 增加入口；新增模型 owner 时由 `models/` 目录自动发现，
+   不修改父级 `models/_index.md`。
 4. 添加真实内容，不提交空目录。
 5. 运行 `python tools/check_knowledge_tree.py`。
 

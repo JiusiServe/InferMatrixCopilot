@@ -132,5 +132,5 @@ PR #3474 的教训是：新模型接入时，shape / state dict / stub smoke 都
 - PR #3444 review iteration：[Hunyuan KV reuse 错题](../../../repos/vllm-omni/models/hunyuan-image3/incidents/2026-05-13-kv-reuse-orchestrator.md)（review iteration 段）
 - PR #3626 review iteration：[reviewer_lens_audit](reviewer-lens-audit.md)（4 条评论同一根因）
 - PR #3474 review iteration：GO-1-Air shape-compatible semantic mismatch
-- 相邻：[hf_alignment_pitfalls](../../../repos/vllm-omni/models/hunyuan-image3/guides/hf-alignment-pitfalls.md)（HF model 接入时 grep README/demo）
+- 相邻：[hf_alignment_pitfalls](../../../repos/vllm-omni/models/hunyuan-image3/hf-alignment-pitfalls.md)（HF model 接入时 grep README/demo）
 - 派生硬规则：CLAUDE.md B30

@@ -33,5 +33,5 @@ sources: [docs/design/feature/diffusion_step_execution.md, docs/design/feature/d
 
 ## 相关
 
-- 噪声调度/采样归 [Diffusion 组件](../_index.md)；请求级排队语义见
-  [Scheduler 组件](../../scheduler/_index.md)（AR 侧对照）。
+- 噪声调度/采样归 [Diffusion 组件](_index.md)；请求级排队语义见
+  [Scheduler 组件](../scheduler/_index.md)（AR 侧对照）。

@@ -20,7 +20,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/config/pipeline
 ## GLM-Image — AR+DiT 多 stage 的 IT2I 精度参照
 
 - 何时参考：做 AR→DiT 桥接、IT2I 行为对齐时（hunyuan 的
-  [it2i-gap](hunyuan-image3/guides/it2i-gap.md) 与
+  [it2i-gap](hunyuan-image3/it2i-gap.md) 与
   [ar-dit-bridge 历史](hunyuan-image3/history/_index.md) 均以它为基准）。
 - 落脚页：[glm-image](glm-image/_index.md)（token 桥、编辑 KV cache、
   魔数矩阵、MRoPE 隐性依赖）。
@@ -44,6 +44,6 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/config/pipeline
 
 ## 相关
 
-- 加模型的注册点清单见 [adding-a-model](../components/configuration/guides/adding-a-model.md)。
+- 加模型的注册点清单见 [adding-a-model](../components/configuration/adding-a-model.md)。
 - 语义验收（plumbing≠语义）见
   [model-adaptation-guardrails](../review/guides/model-adaptation-guardrails.md)。

@@ -46,4 +46,4 @@ sources: [vllm_omni/model_executor/models/aura_omni/, vllm_omni/deploy/aura_omni
 
 - 审查 aura_omni 拓扑、config shim 或 stage 复用改动;qwen3_tts 侧行为变化会
   直接影响本家族 stage 2–3。
-- 新模型注册点清单见 [adding-a-model](../../components/configuration/guides/adding-a-model.md)。
+- 新模型注册点清单见 [adding-a-model](../../components/configuration/adding-a-model.md)。

@@ -11,9 +11,9 @@ sources: ["claude-workflow-starter-private@296ea45"]
 
 ## 什么时候用
 
-实现 [配置开发门禁](../rules.md) 时使用。本页只说明怎样收集最小证据，不扩大审查范围。
+实现 [配置开发门禁](rules.md) 时使用。本页只说明怎样收集最小证据，不扩大审查范围。
 字段所有权的解释方法见 [config audit](config-audit-plain-language.md)，stage runtime 的严格
-配置约束见 [Model Executor 规则](../../model-executor/rules.md)。
+配置约束见 [Model Executor 规则](../model-executor/rules.md)。
 
 ## 先写最小矩阵
 
@@ -35,7 +35,7 @@ sources: ["claude-workflow-starter-private@296ea45"]
 
 ## 严格 schema 的固定执行顺序
 
-完整配置路径见 [配置构造架构](../architecture.md)。实现时不得把下面四步折叠成“validator 顺手整理 kwargs”：
+完整配置路径见 [配置构造架构](architecture.md)。实现时不得把下面四步折叠成“validator 顺手整理 kwargs”：
 
 1. **Normalize**：按 source priority 合并，再处理 alias、flat→nested、类型转换和 compatibility route。
 2. **Validate ownership**：对仍包含所有 key 的规范化映射检查 owner；此时未知 `None` 不能消失。

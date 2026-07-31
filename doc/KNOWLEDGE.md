@@ -65,8 +65,8 @@ capabilities, push policy) is human-authored and stays — the code depends on i
 - **Briefing (always-on):** the general slice `settings.knowledge_general_docs`
   + the adapter's repo-specific `briefing_docs`
   (`repos/<repo>/rules.md` + `_index.md`), each capped.
-- **On demand:** the cross-platform `doc_search` / `doc_read` tools reach every
-  deeper guide, incident, component, and model page in the shared `general/`
+- **On demand:** the cross-platform `doc_search` / `doc_read` tools recursively
+  reach every deeper Markdown page in the shared `general/`
   slice plus the active adapter's `knowledge.repo_subdir`. Other repos' slices
   are refused. Search is implemented in Python (no host `grep` dependency), and
   title/frontmatter/heading hits rank first.
@@ -82,12 +82,13 @@ capabilities, push policy) is human-authored and stays — the code depends on i
 Edit `knowledge/` in place like any other tracked content; every change goes
 through normal PR review plus the tree's own gates:
 
-1. Read `doc/PLAN-knowledge-reorg.md`, `knowledge/CONTRIBUTING.md`, and exactly
-   one linked contribution topic. Preserve the plan's owner-scoped inventory,
-   union-first curation, and raw/synthesized split.
-2. Route content by role and owner: rules for auditable invariants, guides for
-   procedures, architecture for stable boundaries, and the existing raw layer
-   for complex evidence. Do not create a catch-all review page.
+1. Read `knowledge/CONTRIBUTING.md`, `knowledge/SCHEMA.md`, and exactly one
+   linked contribution topic. The reorganization plan is historical, not an
+   active directory contract.
+2. Route content by role and owner: rules for auditable invariants, direct
+   feature pages for component/model procedures, architecture for stable
+   boundaries, and the existing raw layer for complex evidence. Do not create
+   a catch-all review page or a `guides/` layer under a source owner.
 3. Treat `knowledge/SCHEMA.md` only as an additive metadata overlay. Evaluation
    cases, hidden labels, predictions, judgments, and generated reports stay in
    `eval/` and outside always-on briefing documents.

@@ -1,6 +1,6 @@
-<!-- TEMPLATE: a method / how-to page for a guides/ dir. Depth is welcome here
-     (pulled on demand, not always-on). Add a row for it in the sibling
-     guides/_index.md, then delete this comment. -->
+<!-- TEMPLATE: an on-demand method page. Put component/model methods directly
+     in the owner root; work-topic collections may use guides/. Register the
+     page in its nearest _index.md, then delete this comment. -->
 ---
 title: "<Guide title>"
 created: <YYYY-MM-DD>

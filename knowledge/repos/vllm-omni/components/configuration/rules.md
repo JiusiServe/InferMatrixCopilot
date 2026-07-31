@@ -10,8 +10,8 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "zu
 # vLLM-Omni 配置开发门禁
 
 只在修改 vLLM-Omni 的 config、deploy、pipeline、CLI 字段归属、alias、unknown-field 校验、flat→nested 归一化或默认 factory 时使用。第一次读这些规则时，先看
-[config audit 说人话规则](guides/config-audit-plain-language.md)；需要执行时再看
-[config normalization parity](guides/config-normalization-parity.md) 的矩阵和操作顺序。
+[config audit 说人话规则](config-audit-plain-language.md)；需要执行时再看
+[config normalization parity](config-normalization-parity.md) 的矩阵和操作顺序。
 
 ## Direct 代码快速入口
 

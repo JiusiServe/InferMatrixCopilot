@@ -101,12 +101,14 @@ sources: [<源码路径、设计文档或 PR URL>]
 - 验收：<可检查的完成标准> ^[<PR、源码路径或设计文档>]
 ```
 
-## 文件 4：登记模型入口
+## 文件 4：需要别名时才更新 catalog
 
-在 `knowledge/repos/vllm-omni/models/_index.md` 的模型表格增加：
+`models/` 目录本身就是模型清单，不修改父级 `_index.md`。只有正式名称之外还需要
+别名或 registry key 路由时，才在
+`knowledge/repos/vllm-omni/models/catalog.md` 增加对应关系。
 
 ```markdown
-| <模型正式名称和常见别名> | [<模型正式名称>](<model-slug>/_index.md) | <一句话适用范围> |
+| <别名或 registry key> | <model-slug> | <源码目录或定位信号> |
 ```
 
 ## 提交前复制

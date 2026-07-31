@@ -120,6 +120,22 @@ skills/
 
 默认只有 `_index.md` 和 `architecture.md`。checkpoint、尺寸和量化版本先作为同一模型入口的别名和差异；只有源码、配置语义或完整流程真正不同才建新模型目录。
 
+`models/_index.md` 使用 `<!-- children: filesystem -->`，模型目录本身就是清单。
+新增模型 owner 不再手工维护父级长表；创建目录和自己的 `_index.md` 后，由
+`Get-ChildItem models -Directory` 发现。别名和 registry key 只维护在
+`models/catalog.md`。
+
+### Component / model owner 保持扁平
+
+`components/<owner>/` 和 `models/<model>/` 下不再创建通用 `guides/` 中转层。稳定特性
+文档使用有意义的文件名直接放在 owner 根目录，例如
+`components/diffusion/parallelism.md`。`_index.md` 必须直接写
+“问题 → 正文”，不能把读者先送到另一个索引。
+
+`general/<topic>/`、`repos/<repo>/<work-topic>/` 这类方法集合仍可使用 `guides/`；
+但父级已能确定具体问题时也应直接链接正文。只有需要浏览整个集合时才链接
+`guides/_index.md`。
+
 ### `local/`
 
 `local/` 只放当前机器事实，不被正式 `_index.md` 链接，不能有被 Git 跟踪的文件。需要记录远端环境时可以创建 `local/remote.md`：

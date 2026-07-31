@@ -1,7 +1,7 @@
 ---
-title: "vLLM-Omni"
+title: "vLLM-Omni 入口"
 created: 2026-07-10
-updated: 2026-07-30
+updated: 2026-07-31
 type: index
 tags: [vllm-omni]
 sources: []
@@ -9,33 +9,35 @@ sources: []
 
 # vLLM-Omni
 
-- 上游仓库：`vllm-project/vllm-omni`
-- 常用分支：默认分支 `main`；对齐 upstream vLLM 的重构分支 `dev/vllm-align`
-- 适用范围：vLLM-Omni 的开发、测试、文档、模型、性能和远端验证
-- 组件源码映射需在使用前按目标仓库当前 `main` 重新验证
+上游：`vllm-project/vllm-omni`。开始任何任务先遵守
+[仓库硬规则](rules.md)。
 
-## 什么时候查这里
+## Review 最短路径
 
-- 当前 Git 仓库或用户明确目标是 vLLM-Omni。
+PR title/body 先选择 owner；changed files 只校验实际范围。Direct 已返回精确
+`quick_map` 时，不再读取本页、组件总表或模型总表。
 
-## 不放什么
+| PR 声明目标 | 直接 owner |
+|---|---|
+| PipelineConfig、YAML、registry、default、endpoint policy | [configuration rules](components/configuration/rules.md) |
+| HTTP/OpenAI request、response、endpoint、engine lifecycle | [serving rules](components/serving/rules.md) |
+| checkpoint、tokenizer、processor、stage input/handoff | [model-executor rules](components/model-executor/rules.md) |
+| diffusion pipeline、denoise、VAE/DiT、图像生成 | [diffusion rules](components/diffusion/rules.md) |
+| connector、collective、跨 stage 通信 | [distributed](components/distributed/_index.md) |
+| queue、token budget、prefix cache、调度 | [scheduler rules](components/scheduler/rules.md) |
+| 明确模型名或 registry key | 直接查看 [models 目录](models/_index.md) |
 
-- 跨仓库通用的方法。
-- Jianghan 或其他仓库的规则。
+owner 仍不明确时才看 [components 职责表](components/_index.md)；模型别名不确定时才查
+[`models/catalog.md`](models/catalog.md)。
 
-## 当前入口
+## 工作主题
 
-| 遇到什么 | 查看哪里 | 说明 |
-|---|---|---|
-| 开始任何 vLLM-Omni 修改、测试、远端或发布任务 | [硬门禁](rules.md) | 仅适用于 vLLM-Omni 的仓库规则 |
-| 审查 PR、模型适配和仓库专有改动 | [review](review/_index.md) | 先按 PR 声明目标命中 owner 快速入口；changed files 用于闭合 scope |
-| 查看 CI 规则和测试配置 | [ci](ci/_index.md) | vLLM-Omni CI |
-| 查看文档和 RFC 状态 | [docs](docs/_index.md) | 仓库文档入口 |
-| 调查仓库专有 bug、crash 或行为异常 | [debug](debug/_index.md) | 完成通用调试后的仓库二次路由 |
-| 查看配置入口、字段归属和构造链路 | [Configuration 规则](components/configuration/rules.md) | 直接进入共享配置 owner 规则；owner 不明时才看组件职责地图 |
-| 处理分支、PR 和公开证据 | [git](git/_index.md) | 仓库专有 Git/PR 规则 |
-| 跑 benchmark、profiling 或查历史结果 | [benchmark](benchmark/_index.md) | 性能入口 |
-| 在远端验证仓库改动 | [remote](remote/_index.md) | 仓库专有远端策略 |
-| 对齐 upstream vLLM（rebase、API 漂移、波次） | [rebase](rebase/_index.md) | 上游对齐工作流与漂移登记 |
-| 查看共享代码模块 | [components](components/_index.md) | configuration、diffusion、distributed、model-executor、scheduler、serving |
-| 查看支持模型 | [models](models/_index.md) | 模型架构与经验 |
+| 任务 | 入口 |
+|---|---|
+| PR 审查专项 | [review](review/_index.md) |
+| CI 和测试配置 | [ci](ci/_index.md) |
+| 文档和 RFC | [docs](docs/_index.md) |
+| bug 和行为异常 | [debug](debug/_index.md) |
+| Git、PR、rebase | [git](git/_index.md)、[upstream rebase](rebase/_index.md) |
+| benchmark / profiling | [benchmark](benchmark/_index.md) |
+| 远端验证 | [remote](remote/_index.md) |

@@ -37,5 +37,5 @@ sources: [vllm_omni/diffusion/models/diffusers_adapter/, vllm_omni/diffusion/reg
 
 - 判断一个 diffusers-only 模型能否先经 adapter 服务再做原生适配;审查 adapter
   IO 胶水或量化转换改动。
-- 原生适配流程见 [adding-a-model](../../components/configuration/guides/adding-a-model.md);
+- 原生适配流程见 [adding-a-model](../../components/configuration/adding-a-model.md);
   共享实现归属见 [Diffusion 组件](../../components/diffusion/_index.md)。

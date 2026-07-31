@@ -32,9 +32,17 @@ The plugin also adds the `imreview` skill, so the short form is:
 Codex calls `review`, receives the local `knowledge/AGENTS.md` path plus a
 compact first-review checklist, and follows that document's routing map itself.
 The MCP does not guess which owner applies and does not inject complete rule
-pages. Within 60 seconds, Codex reports the pinned head SHA, current CI,
-mergeability, and preliminary findings in the host conversation, then continues
-the same review without posting an interim GitHub comment. Before the only final review comment, Codex calls
+pages. After pinning the snapshot, Codex immediately reports the pinned head SHA,
+current CI, mergeability, and preliminary findings in the host conversation.
+It does this before reading knowledge, searching source, or running tests and
+does not wait for CI completion or resolved mergeability. Codex then calls
+Direct once with the collected title, body, and changed files, uses the embedded
+`quick_map` in each exact route without opening the full rule page, and runs
+knowledge/source and validation tracks concurrently. It reuses one in-review
+evidence packet and runs an import/version
+compatibility preflight before pytest. Validation results are bound to the head
+SHA and an environment fingerprint. The progress update is not an interim
+GitHub comment. Before the only final review comment, Codex calls
 `validate_direct_review`. A normal small fix uses `subtraction_signal="none"`
 without a minimality proof. Only a diff that adds or expands a helper, class,
 fallback, compatibility branch, or public behavior uses `"triggered"` and
@@ -45,7 +53,31 @@ The tool response is intentionally small:
 ```json
 {
   "mode": "direct",
-  "knowledge_entry": "C:\\...\\InferMatrixCopilot\\knowledge\\AGENTS.md",
+  "knowledge_entry": "C:\\...\\knowledge\\repos\\vllm-omni\\components\\serving\\rules.md",
+  "knowledge_routes": [
+    {
+      "owner": "serving",
+      "path": "C:\\...\\knowledge\\repos\\vllm-omni\\components\\serving\\rules.md",
+      "reason": "title/body: endpoint, request",
+      "quick_map": "## Direct 代码快速入口\n...",
+      "read_required": false
+    }
+  ],
+  "navigation_policy": {
+    "progress_before_knowledge": true,
+    "use_embedded_quick_maps": true,
+    "open_route_file_only_for_concrete_ambiguity": true,
+    "max_routes": 3,
+    "stop_after_routes": true
+  },
+  "execution_budget": {
+    "profile": "code",
+    "knowledge_file_reads": 0,
+    "validation_commands": 4,
+    "total_command_calls": 20,
+    "hard_ceiling": true,
+    "extension_command_calls": 4
+  },
   "first_review_checklist": ["...", "Run subtraction only when the diff has a subtraction signal ..."],
   "progress_update": {
     "deadline_seconds": 60,
@@ -92,9 +124,14 @@ confirm that `infermatrix-copilot` is connected.
 
 ## What the default MCP exposes
 
-- `review(target, repo?, mode="direct", post=false)`: Direct ignores `repo`
-  and returns `knowledge/AGENTS.md`, the first-review checklist, the 60-second
-  host-conversation update contract, and the single-comment completion contract.
+- `review(target, repo?, mode="direct", post=false, title="", body="",
+  changed_files=[])`: after the host progress update, Direct uses title/body to
+  return at most three exact owner/model routes with compact embedded
+  `quick_map` excerpts. Changed files only validate scope. The host does not
+  open full rule files unless a concrete ambiguity blocks source review and
+  treats the returned docs/code `execution_budget` as a hard ceiling. A single
+  bounded extension is reserved for one stated unresolved P1/high-risk
+  contract.
   Strict maps to the previous Eco workflow.
 - `validate_direct_review(subtraction_signal, subtraction?, minimality_proof?,
   final_comment_count=1)`: `none` completes an ordinary small fix without a
@@ -108,9 +145,10 @@ confirm that `infermatrix-copilot` is connected.
 - `doc_search(query, repo?)`: finds deeper model/component rules.
 - `doc_read(path, repo?)`: reads a selected knowledge page.
 
-Direct mode does not run another model, choose a knowledge owner, edit knowledge
-inside the MCP, post comments, or push code. The completion validator checks
-review structure; Codex still owns the truth of the cited code evidence.
+Direct mode does not run another model, edit knowledge, post comments, or push
+code. Its deterministic router selects bounded knowledge owners from the PR
+description; Codex still owns scope validation and the truth of cited code
+evidence. The completion validator checks review structure.
 
 ## Optional autonomous BYOK workflow
 

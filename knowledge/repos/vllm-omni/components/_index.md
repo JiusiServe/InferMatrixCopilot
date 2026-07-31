@@ -1,35 +1,25 @@
 ---
-title: "vLLM-Omni 代码模块"
+title: "vLLM-Omni 组件 owner"
 created: 2026-07-10
-updated: 2026-07-29
+updated: 2026-07-31
 type: index
 tags: [vllm-omni, components]
 sources: []
 ---
 
-# vLLM-Omni 代码模块
+# 组件 owner
 
-本目录是知识树对 `vllm_omni/` 源码空间的镜像（code-owner 轴）。每个模块页的
-"源码入口"列出它拥有的真实源码路径；所有模块页的路径均已验证存在——建目录时
-已有的 diffusion/model-executor/serving 在 `main @ 238fc0a6`（此前亦在
-`dev/vllm-align @ 4f2b32c` 验证，结果一致），2026-07-16 新增的
-scheduler/distributed/configuration 在当日 `main @ 5c390096`。只有确有知识沉淀的模块才
-建目录，不预建空目录（此前预告的 scheduler、configuration 已在第一条稳定结论落盘时建立；
-attention、lora、quantization 等同理，等第一条稳定结论落盘时再建）。
+仅在 PR 描述和 Direct 路由都不能确定 owner 时查本页。选中一个主要 owner 后直接进入
+其 `rules.md`；只有真实调用链跨边界时才打开第二个 owner。
 
-注意：这里的模块划分服务于**知识归属**（一个 owner 覆盖一条职责链），与
-copilot `adapters/vllm_omni/manifest.yaml` 的 `modules:`（服务于运行时
-`module_for_path()` 路由与 PR 验证分片）粒度不同，属有意为之——例如
-Model Executor 在这里同时拥有 `worker/`，而 manifest 将其拆为
-`model_executor` 与 `worker_runner` 两个运行时模块。
-
-| 代码模块 | 查看哪里 | 负责什么 |
+| Owner | 负责范围 | 直接入口 |
 |---|---|---|
-| Configuration | [configuration rules](configuration/rules.md) | PipelineConfig/deploy YAML、pipeline registry、endpoint 策略、CLI/default/direct factory 的配置归一化、字段归属、严格校验与构造 |
-| Diffusion | [diffusion](diffusion/_index.md) | 多模型共享的 diffusion pipeline、denoise 和执行机制 |
-| Distributed | [distributed](distributed/_index.md) | 跨 stage 通信、connector 后端、KV 迁移管理、协调与负载均衡 |
-| Model Executor | [model-executor](model-executor/_index.md) | AR/LLM stage、stage config、并行与设备启动、输入处理和跨 stage 数据桥接 |
-| Scheduler | [scheduler](scheduler/_index.md) | AR/生成请求调度、KV transfer 调度面、chunk/full-payload 等待与 tensor prefix cache |
-| Serving | [serving](serving/_index.md) | 用户入口、请求解析、在线服务和 engine 边界 |
+| [Configuration](configuration/_index.md) | deploy YAML、PipelineConfig、registry、字段归属、default 和 endpoint policy | [rules](configuration/rules.md) |
+| [Serving](serving/_index.md) | 用户请求、OpenAI API、响应、AsyncOmni engine 生命周期 | [rules](serving/rules.md) |
+| [Model Executor](model-executor/_index.md) | stage config/input、模型加载、worker、跨 stage 数据桥 | [rules](model-executor/rules.md) |
+| [Diffusion](diffusion/_index.md) | diffusion pipeline、denoise、VAE/DiT、并行和 cache | [rules](diffusion/rules.md) |
+| Distributed | connector、KV 迁移、collective、跨 stage 通信 | [index](distributed/_index.md) |
+| [Scheduler](scheduler/_index.md) | 请求队列、token budget、KV transfer、prefix cache | [rules](scheduler/rules.md) |
 
-目录维护登记：[Configuration index](configuration/_index.md)。它只用于维护目录内容，不是命中 Configuration owner 后的必读下一跳。
+需要解释稳定数据流时再进入对应 owner 的 `architecture.md`，不要把 architecture 当成
+review 的默认前置阅读。

@@ -2,7 +2,7 @@
 """检查沉淀层页面的 frontmatter、标签分类法、孤页与陈旧度（SCHEMA.md 机制）。
 
 范围：general/ 与 repos/ 下的沉淀层页面。证据层（incidents/、history/、
-results/）、repos/jianghan-roleplay-data-pipeline/ 与 _archive/ 不检查。
+results/）与 repos/jianghan-roleplay-data-pipeline/ 不检查。
 结构/索引/链接/错题校验属于 check_knowledge_tree.py，这里不重复。
 """
 
@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SCHEMA = ROOT / "SCHEMA.md"
 SYNTH_ROOTS = (ROOT / "general", ROOT / "repos")
 RAW_PARTS = {"incidents", "history", "results"}
-SKIP_PARTS = {"_archive"}
+SKIP_PARTS: set[str] = set()
 SKIP_SUBTREES = (ROOT / "repos" / "jianghan-roleplay-data-pipeline",)
 TYPES = {"rule", "guide", "architecture", "index"}
 CONFIDENCE = {"high", "medium", "low"}

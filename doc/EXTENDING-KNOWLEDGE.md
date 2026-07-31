@@ -69,7 +69,7 @@ symptom appeared.
 |---|---|---|
 | A rule that must change the **next** run (trigger → do → don't → how to verify) | `rules.md` in the nearest owner dir | The default product of a retrospective. Always-on (see §2) — keep it tight. |
 | A **stable** data-flow / responsibility / boundary description | `architecture.md` | No title-only stubs. |
-| A longer method that isn't a hard gate | a page in `guides/` | Pulled on demand, so depth is welcome here. |
+| A longer method that isn't a hard gate | a feature page in the owner root; work-topic collections may use `guides/` | Component/model owners stay flat; all deeper pages are pulled on demand. |
 | **Complex reproducible history** a rule can't carry | `incidents/YYYY-MM-DD-short-name.md` | Optional. Only when the repro chain / evidence still has independent lookup value. |
 
 **Retrospective rule of thumb:** the default output of "复盘 / record a lesson" is a
@@ -88,8 +88,8 @@ Wiring lives in `src/infermatrix_copilot/engine/agent_runtime/knowledge.py` +
   - the adapter's `briefing_docs` — for vllm-omni: `repos/vllm-omni/rules.md` +
     `repos/vllm-omni/_index.md`;
   - `performance_briefing_docs` for strong models (compact review patterns).
-- **On demand** — the `doc_search` / `doc_read` tools reach every deeper `guides/`,
-  `incidents/`, `components/`, and `models/` page in `general/` **plus the active
+- **On demand** — the `doc_search` / `doc_read` tools recursively reach every
+  deeper Markdown page in `general/` **plus the active
   adapter's `repo_subdir` only** (other repos' slices are refused; path traversal
   is blocked; `doc_read` windows 24k chars and pages with an offset).
 - **MCP** — the same repo-scoped `doc_search` / `doc_read` are exposed read-only
@@ -97,7 +97,7 @@ Wiring lives in `src/infermatrix_copilot/engine/agent_runtime/knowledge.py` +
 
 **Practical implication for authors:** `rules.md` and `_index.md` are *budget* —
 they load on every task. Keep them to triggers + gates + navigation. Push
-narrative, long repros, and step-by-step method into `guides/` / `incidents/`,
+narrative, long repros, and step-by-step method into on-demand feature pages or `incidents/`,
 which are pulled only when a run actually needs them.
 
 To register a **new repo's** slice, point its adapter manifest at it
@@ -213,7 +213,7 @@ sources: []
 
 | 用户提到 | 必读 | 硬约束 |
 |---|---|---|
-| <trigger phrase> | [<guide>](guides/<guide>.md) | <what MUST/ MUST-NOT happen + how to verify> |
+| <trigger phrase> | [<method>](<method>.md) | <what MUST/ MUST-NOT happen + how to verify> |
 
 ## 规则（每条给稳定 ID）
 
@@ -262,7 +262,7 @@ Model variant (same frontmatter, `type: architecture`):
 ## 怎样验证功能、精度和性能
 ```
 
-### 3.6 An ordinary `guides/` page
+### 3.6 An ordinary method page
 
 ```markdown
 ---
@@ -286,7 +286,9 @@ sources: []
 - <the check that proves it worked>
 ```
 
-Then add a row for it in the sibling `guides/_index.md`.
+For a component/model, put the page directly in the owner root and link it from
+the owner's `_index.md`. Work-topic collections may place it in `guides/` and
+register it in `guides/_index.md`.
 
 ### 3.7 An `incidents/` page (validator-checked fields)
 

@@ -10,7 +10,7 @@ sources: ["claude-workflow-starter-private@296ea45", "SK-fix-missing-gpu-memory-
 # Deploy 配置与显存预算案例
 
 本页保留 deploy 配置与显存预算的具体诊断材料；可执行门禁已提炼到
-[Configuration rules](../rules.md) 的 `CONF-*` 规则。运营 runbook 仍以 rebase-agent
+[Configuration rules](rules.md) 的 `CONF-*` 规则。运营 runbook 仍以 rebase-agent
 仓库为准。
 
 ## CONF-1a — 多 stage 共卡时 diffusion stage 必须显式设 gpu_memory_utilization
@@ -88,7 +88,7 @@ modules=[worker_runner]，status=active，run_count=30，2026-06-07 创建 / 07-
 - 强制：以 `resolve_deploy_yaml → load_deploy_config → merge_pipeline_deploy →
   build_stage_runtime_overrides` 展开后的**最终逐 stage 配置**为唯一事实，逐字段
   打印核对（工作法见 [配置审计](config-audit-plain-language.md)）；
-  合并语义见 [architecture](../architecture.md)。
+  合并语义见 [architecture](architecture.md)。
 - 禁止：拿某一层 YAML 原文当生效值；用默认值脑补缺失字段（`gpu_memory_utilization`
   缺省=0.9、`async_chunk` 缺省=true 这类默认正是事故来源）。
 
@@ -124,5 +124,5 @@ modules=[worker_runner]，status=active，run_count=30，2026-06-07 创建 / 07-
 
 ## 相关
 
-- schema 与解析链见 [architecture](../architecture.md)；启动期并行度×设备容量验收在
-  [Model Executor 规则](../../model-executor/rules.md)。
+- schema 与解析链见 [architecture](architecture.md)；启动期并行度×设备容量验收在
+  [Model Executor 规则](../model-executor/rules.md)。

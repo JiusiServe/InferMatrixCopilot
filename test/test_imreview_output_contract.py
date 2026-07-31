@@ -26,3 +26,13 @@ def test_imreview_returns_github_style_findings(prompt_path: Path) -> None:
     assert "classify `subtraction_signal`" in prompt
     assert "Use `none` without a minimality proof" in prompt
     assert "Use `triggered` for those changes" in prompt
+    assert (
+        "After the progress update, run independent knowledge/source and "
+        "validation tracks concurrently"
+    ) in prompt
+    assert "Use the embedded `quick_map`" in prompt
+    assert "Do not open the full route file" in prompt
+    assert "before reading knowledge, searching source, or running tests" in prompt
+    assert "bounded `rg` searches" in prompt
+    assert "import/version compatibility preflight" in prompt
+    assert "head SHA and an environment fingerprint" in prompt

@@ -10,7 +10,7 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/stage_conf
 # PipelineConfig 与 deploy YAML 详细 schema
 
 以下事实在 `main @ 5c390096` 复核；当前稳定职责见
-[Configuration architecture](../architecture.md)，官方 spec 见
+[Configuration architecture](architecture.md)，官方 spec 见
 `docs/configuration/stage_configs.md`
 （schema 全表）与 `composable_parallel.md`。
 
@@ -33,7 +33,7 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/stage_conf
 - per-stage `StageDeployConfig` 字段直接平铺（无嵌套 `engine_args:`）：`stage_id`
   （必填，对齐 `PipelineConfig.stages[*].stage_id`）、`max_num_seqs`（默认 64）、
   `gpu_memory_utilization`（**默认 0.9**——多 stage 共卡时必须显式设，见
-  [rules](../rules.md) `CONF-1a`）、`tensor_parallel_size`、`enforce_eager`、
+  [rules](rules.md) `CONF-1a`）、`tensor_parallel_size`、`enforce_eager`、
   `max_num_batched_tokens`（默认 32768）、`max_model_len`、`devices`（默认 "0"）、
   `input_connectors`/`output_connectors`（`from_stage_<n>`/`to_stage_<n>` 键引用顶层
   `connectors:` 注册名）、`default_sampling_params`、`engine_extras`（未知键兜底，

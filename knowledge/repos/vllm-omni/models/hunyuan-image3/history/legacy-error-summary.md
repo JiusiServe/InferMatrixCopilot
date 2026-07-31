@@ -55,4 +55,4 @@
 
 **衍生教训**：HF `prepare_model_inputs(...)` 返回的 kw dict 自带 `max_new_tokens` / `eos_token_id`（来自 generation_config），调 `model.generate(**kw, max_new_tokens=2048, eos_token_id=[...])` 撞 `TypeError`。必先 `kw.pop("max_new_tokens", None); kw.pop("eos_token_id", None)`。
 
-当前方法见 [HF alignment pitfalls](../guides/hf-alignment-pitfalls.md)。
+当前方法见 [HF alignment pitfalls](../hf-alignment-pitfalls.md)。

@@ -4,7 +4,7 @@ created: 2026-07-13
 updated: 2026-07-31
 type: rule
 tags: [vllm-omni, models, hunyuan-image3]
-sources: [incidents/painterly/_index.md, guides/hf-alignment-pitfalls.md, vllm_omni/diffusion/models/hunyuan_image3/prompt_utils.py, vllm_omni/model_extras/hunyuan_image3.py, vllm_omni/model_extras/registry.py]
+sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/diffusion/models/hunyuan_image3/prompt_utils.py, vllm_omni/model_extras/hunyuan_image3.py, vllm_omni/model_extras/registry.py]
 ---
 
 # HunyuanImage3 开发规则
@@ -63,7 +63,7 @@ sources: [incidents/painterly/_index.md, guides/hf-alignment-pitfalls.md, vllm_o
 - **HY3-1c — 内部字段保持正交。** `task` 表示用户要做什么，`bot_task` 表示 AR 怎样生成；进入模型计划后两者不得互相充当默认值。
 - **HY3-1d — legacy 有回归证据。** 新旧公开入口各保留一个行为测试。
 - **HY3-1e — 单一模型计划。** prompt、stage transition、final stop、CoT 边界和 DiT prompt 必须由同一份模型专属计划导出。每种模式同时写明真实交接机制是 token IDs、decoded text、KV、图片状态、其他 stage state，还是没有下游阶段；字段出现在字典里或没有直接 reader 都不能单独证明对错。
-- **HY3-1f — 官方主入口是语义基线。** 对齐官方 `generate_image()` 等真实用户入口，不用绕过阶段跳转的底层 `generate()` 代替。机制解释见 [HF alignment pitfalls](guides/hf-alignment-pitfalls.md)。
+- **HY3-1f — 官方主入口是语义基线。** 对齐官方 `generate_image()` 等真实用户入口，不用绕过阶段跳转的底层 `generate()` 代替。机制解释见 [HF alignment pitfalls](hf-alignment-pitfalls.md)。
 - **HY3-1g — 模型语义留在 owner。** shared serving 不实现 HunyuanImage3 状态机，不导入模型 prompt helper，也不堆模型名称分支；它只传通用请求事实并调用模型 owner 暴露的 adapter/capability，模型专属默认值和跳转计划留在 owner。
 - **HY3-1h — 行为表逐行验收。** 每行必须同时给出官方源码、vLLM-Omni consumer 和测试证据；受影响行缺少任一项时状态只能是 `implementation draft`。
 - **HY3-1i — 先证明阶段合同。** 在要求某段 AR text、KV 或图片被 DiT 直接读取前，必须从官方用户入口和当前 topology 证明该值就是阶段合同的一部分。若 canonical 路径通过其他 state 完成跳转，或当前模式没有 DiT，不能因为搜索不到字段 reader 就报缺 consumer。
@@ -84,7 +84,7 @@ sources: [incidents/painterly/_index.md, guides/hf-alignment-pitfalls.md, vllm_o
 - **HY3-3a — 官方分段 tokenization。** HunyuanImage3 chat prompt 使用官方分段 tokenization；需要 Token 级对齐时传 `prompt_token_ids`，不得静默退回整串 BPE。
 - **HY3-3b — 缺少模型工件就 fail fast。** tokenizer、processor 或模型专属配置缺失时在 owner 边界报出具体缺项，不切到会改变 token 边界的路径。
 - **HY3-3c — system prompt 是完整合同。** 类型、正文、尾部换行、normalization 点和 bot prefix 都必须与对应官方入口一致；不得随手 `strip()` 或保留空白，也不得把一个官方入口的 normalization 推广到另一条 token path。差异必须由真实入口和 token IDs 证明。
-- **HY3-3d — 使用真实 tokenizer 验收。** 至少一个测试使用真实 tokenizer/processor，并同时断言 token ids、raw prompt、system prompt 和图像占位符数量。格式解释见 [official prompt format](guides/official-prompt-format.md)。
+- **HY3-3d — 使用真实 tokenizer 验收。** 至少一个测试使用真实 tokenizer/processor，并同时断言 token ids、raw prompt、system prompt 和图像占位符数量。格式解释见 [official prompt format](official-prompt-format.md)。
 - **HY3-3e — stop 和 sampling 在 owner 构造点确定。** 每个受影响模式列出完整 stop token 集合、finish 边界和 sampling defaults。优先修改 stage config 或受支持的构造 API；构造完成后直接改公开字段时，必须证明 scheduler 内部集合也同步。stop 修复不得顺手改变 temperature、top-p、top-k 或其他无关默认值。
 - **HY3-3f — 资源获取服从 topology。** 获取 tokenizer、processor、engine 或 stage resource 前，列出哪些 topology 拥有它、默认 CLI 走哪条 topology，以及不存在时的 owner 路径。至少跑一个默认入口和一个受影响入口；不能因为 AR-first 路径有 stage-0 tokenizer 就让 diffusion-only 路径启动即失败。
 

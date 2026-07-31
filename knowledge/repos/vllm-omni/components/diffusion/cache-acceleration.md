@@ -29,4 +29,4 @@ sources: [docs/design/feature/cache_dit.md, docs/design/feature/teacache.md, vll
 ## 相关
 
 - 后端选择入口在 `diffusion/registry.py::initialize_model`（加载类、量化、VAE
-  slicing/tiling、并行注入的同一初始化链）；组件边界见 [architecture](../architecture.md)。
+  slicing/tiling、并行注入的同一初始化链）；组件边界见 [architecture](architecture.md)。

@@ -29,13 +29,13 @@ serving TTS 适配 `entrypoints/openai/tts_adapters/`、`recipes/<Org>/<Model>.m
 
 ## 照抄谁
 
-参照清单见 [reference-models](../../../models/reference-models.md)（GLM-Image /
-BAGEL）与 [qwen-omni](../../../models/qwen-omni/_index.md)；当前注册全量见
-[models/catalog](../../../models/catalog.md)。
+参照清单见 [reference-models](../../models/reference-models.md)（GLM-Image /
+BAGEL）与 [qwen-omni](../../models/qwen-omni/_index.md)；当前注册全量见
+[models/catalog](../../models/catalog.md)。
 
 ## 验收档位
 
 plumbing 绿灯（0 missing/0 unexpected、shape smoke、mock 权重）**不等于**语义
 正确——semantic parity 矩阵与逐入口验收见
-[model-adaptation-guardrails](../../../review/guides/model-adaptation-guardrails.md)
-与仓库 [rules.md](../../../rules.md) 第 3 节。
+[model-adaptation-guardrails](../../review/guides/model-adaptation-guardrails.md)
+与仓库 [rules.md](../../rules.md) 第 3 节。
