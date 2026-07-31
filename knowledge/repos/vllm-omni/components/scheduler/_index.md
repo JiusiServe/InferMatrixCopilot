@@ -1,7 +1,7 @@
 ---
 title: "Scheduler（AR/生成请求调度）"
 created: 2026-07-16
-updated: 2026-07-16
+updated: 2026-07-31
 type: index
 tags: [vllm-omni, components, scheduler]
 sources: [vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/prefix_cache.py, docs/design/module/ar_module.md]
@@ -35,4 +35,4 @@ sources: [vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/prefix_cache
 | 遇到什么 | 查看哪里 |
 |---|---|
 | 理解调度器继承链、KV transfer 与 prefix cache 语义 | [architecture](architecture.md) |
-| 修改 prefix cache 关键 key、小 token 预算或对齐 upstream 调度接口 | [rules](rules.md) |
+| 按 PR 描述直达 prefix cache、token budget、upstream 接口或 side-stream 首批源码 | [rules / Direct 代码快速入口](rules.md#direct-代码快速入口) |

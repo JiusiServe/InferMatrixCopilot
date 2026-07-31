@@ -1,7 +1,7 @@
 ---
 title: "MiniCPM-o 4.5"
 created: 2026-07-20
-updated: 2026-07-20
+updated: 2026-07-31
 type: index
 tags: [vllm-omni, models, model-executor]
 sources: ["PR #3642", vllm_omni/model_executor/models/minicpmo_4_5/]
@@ -27,7 +27,7 @@ MiniCPM-o 多个版本共享通用 `MiniCPMO` architecture 名称，4.5 不能�
 runtime bridge 交给 TTS stage，再包装为 `OmniOutput.multimodal_outputs`；deploy 变体改变
 资源拓扑，不改变数据合同。
 
-模型专有门禁见 [rules](rules.md)；新模型语义验证见
+描述直达源码与模型专有门禁见 [rules](rules.md#direct-代码快速入口)；新模型语义验证见
 [model validation](../../review/guides/model-validation.md)。
 
 ## 什么时候查这里

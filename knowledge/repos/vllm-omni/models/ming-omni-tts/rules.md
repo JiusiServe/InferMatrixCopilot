@@ -1,7 +1,7 @@
 ---
 title: "Ming-Omni-TTS 规则"
 created: 2026-07-20
-updated: 2026-07-20
+updated: 2026-07-31
 type: rule
 tags: [vllm-omni, models, model-executor]
 sources: ["PR #4341"]
@@ -11,6 +11,16 @@ confidence: high
 # Ming-Omni-TTS 规则
 
 只有 `MING-数字字母` 是可审计规则 ID。
+
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则组 | 第一批源码 |
+|---|---|---|
+| Ming-TTS dense/MoE、`ming_tts(_moe)` | MING-2a | `config/pipeline_registry.py::OMNI_PIPELINES` → `model_executor/models/ming_tts/pipeline.py`；`model_executor/models/registry.py::_OMNI_MODELS` |
+| CFM CUDA Graph、solver dtype、noise/timestep | MING-1a | `model_executor/models/ming_tts/fm/cfm_cudagraph.py` → eager solver |
+| CFG 近零分支 | MING-1b | graph/eager CFM forward 与 CFG branch |
+| 最后一步 ODE/SDE 更新 | MING-1c | graph step loop → `Solver.integrate` |
+| speech API/adaptation | 对应规则 + Serving | `entrypoints/openai/tts_adapters/ming_tts.py::MingTTSAdapter` → `model_executor/models/ming_tts/ming_tts.py::MingTTSForConditionalGeneration` |
 
 ## MING-1a — CFM graph 保持 eager 的 float32 solver 边界
 

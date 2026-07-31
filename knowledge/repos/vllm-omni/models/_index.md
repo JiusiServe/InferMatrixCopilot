@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni 模型"
 created: 2026-07-10
-updated: 2026-07-21
+updated: 2026-07-31
 type: index
 tags: [vllm-omni, models]
 sources: []
@@ -95,5 +95,5 @@ registry 家族均有源码派生落脚页（`main @ 5d44868e` 复核,全量清�
 
 | 遇到什么 | 查看哪里 | 说明 |
 |---|---|---|
-| 全量注册模型清单（registry 快照） | [catalog](catalog.md) | 四注册点机械派生 |
+| PR 描述/别名或 registry key 自动定位模型目录 | [catalog / Direct 模型代码入口](catalog.md#direct-模型代码入口) | 搜三处 registry，进入 AR/diffusion models 目录 |
 | 新模型适配的参照定位 | [reference-models](reference-models.md) | GLM-Image/BAGEL/Qwen-Omni 等 |

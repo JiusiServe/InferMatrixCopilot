@@ -1,7 +1,7 @@
 ---
 title: "Krea 2 规则"
 created: 2026-07-20
-updated: 2026-07-20
+updated: 2026-07-31
 type: rule
 tags: [vllm-omni, models, diffusion]
 sources: ["PR #4730"]
@@ -11,6 +11,15 @@ confidence: high
 # Krea 2 规则
 
 只有 `KREA-数字字母` 是可审计规则 ID。
+
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则组 | 第一批源码 |
+|---|---|---|
+| Krea 2、pipeline/transformer | KREA-1a | `diffusion/registry.py::_DIFFUSION_MODELS["Krea2Pipeline"]` → `diffusion/models/krea2/pipeline_krea2.py::Krea2Pipeline`、`krea2_transformer.py::Krea2Transformer2DModel` |
+| text encoder/VAE dtype、峰值显存 | KREA-1a | `Krea2Pipeline` 的 component loader |
+| `model_index.json`、`vae/config.json`、Hub/cache | KREA-1b | `pipeline_krea2.py` 的 config fetch 与 VAE scale consumer |
+| online/HSDP/offload/VAE parallel 支持声明 | KREA-2a | capability 文档/recipe → 实际 offline/online 入口 |
 
 ## KREA-1a — text encoder 与 VAE 显式继承目标 dtype
 

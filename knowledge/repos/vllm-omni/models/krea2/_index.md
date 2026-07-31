@@ -1,7 +1,7 @@
 ---
 title: "Krea 2"
 created: 2026-07-20
-updated: 2026-07-20
+updated: 2026-07-31
 type: index
 tags: [vllm-omni, models, diffusion]
 sources: ["PR #4730", vllm_omni/diffusion/models/krea2/]
@@ -27,7 +27,7 @@ scale 配置，加载 text encoder、VAE、tokenizer、scheduler 与 transformer
 必须单独验证。
 
 请求经 text encoder 形成多层 hidden-state stack，进入 transformer denoise，再由 VAE
-decode 输出图像。模型专有门禁见 [rules](rules.md)；公开入口矩阵见
+decode 输出图像。描述直达源码与模型专有门禁见 [rules](rules.md#direct-代码快速入口)；公开入口矩阵见
 [model adaptation guardrails](../../review/guides/model-adaptation-guardrails.md)。
 
 ## 什么时候查这里

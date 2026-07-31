@@ -1,16 +1,35 @@
 ---
-title: "模型目录快照（registry 派生）"
+title: "模型代码入口与 registry 快照"
 created: 2026-07-16
-updated: 2026-07-21
+updated: 2026-07-31
 type: guide
 tags: [vllm-omni, models]
 sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/registry.py, vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/]
 ---
 
-# 模型目录快照（registry 派生）
+# 模型代码入口与 registry 快照
 
-从四个注册点**机械派生**的模型清单,快照于 `main @ 5d44868e`（2026-07-21）。
-数字会漂移——需要精确清单时用文末命令重派生,不要凭本页断言"不支持"。
+本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数仍是
+`main @ 5d44868e`（2026-07-21）快照，数字会漂移，不能凭它断言“不支持”。
+
+## Direct 模型代码入口
+
+从 PR title/body 提取模型名、architecture 或 `model_type`，一次性搜索：
+
+1. `vllm_omni/model_executor/models/registry.py::_OMNI_MODELS`
+2. `vllm_omni/diffusion/registry.py::_DIFFUSION_MODELS`
+3. `vllm_omni/config/pipeline_registry.py::OMNI_PIPELINES`
+
+registry tuple 给出 folder、module 和 class 后，直接进入：
+
+- AR/omni：`vllm_omni/model_executor/models/<folder>/`
+- diffusion：`vllm_omni/diffusion/models/<folder>/`
+
+命中 `OMNI_PIPELINES` 时继续打开对应 pipeline 定义，补齐多 stage 的所有模型目录。若正式
+名称和目录 slug 不同（如 MiniCPM-o → `minicpmo_4_5`），以 registry 结果为准；若一个
+模型同时命中 AR 和 diffusion（如 GLM-Image），两个目录都进入初始 scope。然后再用
+changed files 校验是否还跨到 `model_extras/`、`stage_input_processors/` 或 serving
+adapter。已有专属知识 owner 可从 [models index](_index.md) 按名称进入。
 
 ## 四个注册点与计数
 

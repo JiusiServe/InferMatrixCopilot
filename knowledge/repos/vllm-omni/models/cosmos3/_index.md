@@ -1,7 +1,7 @@
 ---
 title: "Cosmos3"
 created: 2026-07-20
-updated: 2026-07-20
+updated: 2026-07-31
 type: index
 tags: [vllm-omni, models, diffusion]
 sources: ["PR #5001", vllm_omni/diffusion/models/cosmos3/]
@@ -28,7 +28,7 @@ transformer 还要维护自己的 layerwise-offload block 声明。architecture 
 
 请求中的 seed/guidance 等字段进入 Cosmos3 pipeline，pipeline 选择变体 scheduler，使用
 请求本地 generator 创建噪声并完成 denoise/transfer，最后交给共享 diffusion 输出路径。
-变体专有不变量见 [rules](rules.md)。新模型通用验证见
+变体专有不变量与描述直达源码入口见 [rules](rules.md#direct-代码快速入口)。新模型通用验证见
 [model validation](../../review/guides/model-validation.md)。
 
 ## 什么时候查这里

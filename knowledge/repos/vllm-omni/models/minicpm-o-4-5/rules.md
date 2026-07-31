@@ -1,7 +1,7 @@
 ---
 title: "MiniCPM-o 4.5 规则"
 created: 2026-07-20
-updated: 2026-07-20
+updated: 2026-07-31
 type: rule
 tags: [vllm-omni, models, model-executor]
 sources: ["PR #3642"]
@@ -11,6 +11,15 @@ confidence: high
 # MiniCPM-o 4.5 规则
 
 只有 `MCPMO-数字字母` 是可审计规则 ID。
+
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则组 | 第一批源码 |
+|---|---|---|
+| MiniCPM-o 4.5、`minicpmo_4_5`、版本识别 | MCPMO-2a | `config/pipeline_registry.py::OMNI_PIPELINES["minicpmo_4_5"]` → `model_executor/models/minicpmo_4_5/pipeline.py`；`model_executor/models/registry.py::_OMNI_MODELS` |
+| tokenizer/processor、`trust_remote_code` | MCPMO-1a | pipeline/config factory → `model_executor/models/minicpmo_4_5/` loader |
+| TTS extra、backend 初始化、空音频 | MCPMO-1b | `minicpmo_4_5_omni_tts.py::MiniCPMO45OmniTTSForConditionalGeneration`、`minicpmo_4_5_token2wav.py::MiniCPMO45Token2wav` |
+| batch、`runtime_info`、stage handoff | MCPMO-3a/3b | `stage_input_processors/minicpmo_4_5_omni.py` → `minicpmo_4_5_omni.py::MiniCPMO45OmniForConditionalGeneration` → TTS/code2wav |
 
 ## MCPMO-1a — trust_remote_code 服从用户选择
 

@@ -1,7 +1,7 @@
 ---
 title: "Scheduler 规则"
 created: 2026-07-16
-updated: 2026-07-20
+updated: 2026-07-31
 type: rule
 tags: [vllm-omni, components, scheduler]
 sources: ["vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, "PR #4106"]
@@ -12,6 +12,21 @@ sources: ["vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-pre
 只有 `SCHED-数字字母` 是可审计规则 ID。运营 runbook 以 rebase-agent 仓库为准，
 本页是知识树沉淀快照（2026-07-16，agent @122a9468；skills 工作树含未提交遥测更新，
 快照以工作树为准）。
+
+## Direct 代码快速入口
+
+PR 描述先命中下表，再打开对应规则组和首批源码；changed files 强制校验并补齐是否还
+跨到 Distributed、Serving 或 Model Executor，描述与 diff 冲突时以后者为准。
+
+| PR 描述信号 | 规则组 | 第一批源码 |
+|---|---|---|
+| prefix cache、truncated prefill、mm key、deferred payload | SCHED-1a | `core/prefix_cache.py::OmniTensorPrefixCache.maybe_init_missing_mm_cache_keys`；`worker/gpu_model_runner.py::initialize_metadata_builders`；`worker/gpu_ar_model_runner.py::_deferred_prefix_cache_mm_keys` |
+| `max_num_batched_tokens`、prefill throttle、低预算 GPU hang | SCHED-2a | `core/sched/omni_ar_scheduler.py::OmniARScheduler.schedule`；`core/sched/omni_generation_scheduler.py::OmniGenerationScheduler.schedule`；触发它的 deploy/test 配置 |
+| vLLM bump、scheduler rebase、KV connector stats | SCHED-3a | 两个 scheduler 的 `schedule` / `update_from_output` 与 live upstream `vllm/v1/core/sched/` |
+| side-stream D2H、pinned host tensor、源 buffer 复用 | SCHED-4a/4b | `worker/gpu_ar_model_runner.py::_copy_tensor_payload_to_cpu`、`_get_or_create_omni_payload_copy_stream`；`core/prefix_cache.py` 的 async copy 路径 |
+
+若描述只写模型症状，先从模型 owner 找到 payload producer/consumer；只有实际断点落在调度、
+prefix cache 或 copy lifetime 时才把 Scheduler 加为 owner。
 
 ## SCHED-1a — prefix cache 的关键 key 必须显式声明，禁止抬 cap 或关缓存
 

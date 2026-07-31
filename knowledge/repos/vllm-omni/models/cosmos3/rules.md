@@ -1,7 +1,7 @@
 ---
 title: "Cosmos3 规则"
 created: 2026-07-20
-updated: 2026-07-20
+updated: 2026-07-31
 type: rule
 tags: [vllm-omni, models, diffusion]
 sources: ["PR #5001"]
@@ -11,6 +11,19 @@ confidence: high
 # Cosmos3 规则
 
 只有 `COSMOS-数字字母` 是可审计规则 ID。
+
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则组 | 第一批源码 |
+|---|---|---|
+| Cosmos3/Edge、layerwise offload、专有 block | COSMOS-1a | `diffusion/registry.py::_DIFFUSION_MODELS`；`diffusion/models/cosmos3/transformer_cosmos3_edge.py::Cosmos3EdgeVFMTransformer` |
+| Distilled、SDE scheduler、`t_list` | COSMOS-1b | `diffusion/models/cosmos3/pipeline_cosmos3.py::Cosmos3OmniDiffusersPipeline` 及 scheduler config consumer |
+| seed/generator、逐步噪声 | COSMOS-2a | `pipeline_cosmos3.py::Cosmos3OmniDiffusersPipeline` 的 request-local sampling 路径 |
+| `guidance=0`、request extra | COSMOS-2b | `model_extras/cosmos3.py` → pipeline sampling params |
+| online/offload/HSDP/VAE parallel 支持声明 | COSMOS-3a | capability 文档/recipe → 对应公开入口与实现路径 |
+
+若描述只写 Cosmos3，先从 registry 的 class key 进入 pipeline；只有命中共享 RNG、graph
+或 offload 机制时再加 [Diffusion owner](../../components/diffusion/rules.md)。
 
 ## COSMOS-1a — Edge 的 offload 声明覆盖全部专有 block
 

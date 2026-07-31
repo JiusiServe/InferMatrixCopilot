@@ -1,7 +1,7 @@
 ---
 title: "PR intent 到 maintainer owner 路由"
 created: 2026-07-20
-updated: 2026-07-30
+updated: 2026-07-31
 type: guide
 tags: [vllm-omni, review]
 sources: ["InferMatrixCopilot Issue #24", "PR #3576", "PR #3642", "PR #4106", "PR #4281", "PR #4341", "PR #4718", "PR #4730", "PR #4980", "PR #5001", "PR #5031", "PR #5037", "PR #5052", "PR #5084", "PR #5087", "PR #5088", "PR #5136", "PR #5157"]
@@ -30,8 +30,13 @@ diff 的 producer、consumer、失败路径与链接规则一致。
 
 ## PR 描述 / 风险到 owner
 
+这张 always-on 表只保留总入口。模型名、别名、architecture 或 `model_type` 统一进入
+[Direct 模型代码入口](../../models/catalog.md#direct-模型代码入口)，由三处 live registry
+解析到 AR/diffusion models 目录；命中专属模型规则地图时再进入对应 `rules.md`。
+
 | PR 描述或风险信号 | 主 owner | 重点 |
 |---|---|---|
+| 任意模型名、别名、architecture、pipeline/model registry key | [Model resolver](../../models/catalog.md#direct-模型代码入口) | 搜三处 registry → folder/module/class → AR/diffusion models 目录 |
 | HunyuanImage3、`model_extras`、shared task examples、`extra_body`、AR prompt/tokenizer | [HunyuanImage3 rules](../../models/hunyuan-image3/rules.md) | 按描述命中快速代码地图；registry、server/offline seam、默认值与 fallback |
 | `tests/diffusion/quantization`、可选包 import、硬件支持文档 | [CI environment](../../ci/guides/ci-environment-gotchas.md) | 未安装环境、真实 kernel、claim 一致性 |
 | benchmark 脚本、percentile、warmup、replica isolation | [performance evidence](../../benchmark/guides/performance-evidence.md) | 计时、统计、失败退出、完整 key set |
@@ -40,6 +45,7 @@ diff 的 producer、consumer、失败路径与链接规则一致。
 | composable strategy、stage YAML、headless override | [Config rules](../../components/configuration/rules.md) | wired axis、拓扑单源、显存预算 |
 | runtime bridge、`runtime_info`、`OmniOutput` | [Model Executor rules](../../components/model-executor/rules.md) | producer→consumer、逐请求 batch |
 | prefix-cache side stream、pinned host tensor | [Scheduler rules](../../components/scheduler/rules.md) | buffer 生命周期、CPU fallback |
+| connector backend、KV transfer、load balancer、跨 stage 端口 | [Distributed map](../../components/distributed/_index.md#direct-代码快速入口) | put/get、connector lifecycle、replica selection、route port |
 | SSE/audio format、artifact readiness、Prometheus replica stats | [Serving rules](../../components/serving/rules.md) | 首 chunk 前校验、cache capability、owner 生命周期 |
 | Cosmos3 Edge/Distilled | [Cosmos3 rules](../../models/cosmos3/rules.md) | scheduler、RNG、zero、offload |
 | FLUX.2、Mistral text encoder FP8 | [FLUX.2 rules](../../models/flux2/rules.md) | component prefix、量化排除项、meta/offload |

@@ -1,7 +1,7 @@
 ---
 title: "Qwen3-TTS"
 created: 2026-07-20
-updated: 2026-07-20
+updated: 2026-07-31
 type: index
 tags: [vllm-omni, models, serving, qwen-omni]
 sources: ["PR #5157", vllm_omni/entrypoints/openai/serving_speech.py]
@@ -19,5 +19,5 @@ confidence: high
 ## 什么时候查这里
 
 - 审查 `x_vector_only_mode`、ICL、`ref_audio` artifact-only reuse 或 engine 存活性。
-- 具体不变量见 [Qwen3-TTS rules](rules.md)；模型家族结构见
+- 描述直达源码与具体不变量见 [Qwen3-TTS rules](rules.md#direct-代码快速入口)；模型家族结构见
   [Qwen-Omni](../qwen-omni/_index.md)。

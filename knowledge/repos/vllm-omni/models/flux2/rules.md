@@ -1,7 +1,7 @@
 ---
 title: "FLUX.2 规则"
 created: 2026-07-20
-updated: 2026-07-20
+updated: 2026-07-31
 type: rule
 tags: [vllm-omni, models, diffusion]
 sources: ["PR #5136"]
@@ -11,6 +11,16 @@ confidence: high
 # FLUX.2 规则
 
 只有 `FLUX2-数字字母` 是可审计规则 ID。
+
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则组 | 第一批源码 |
+|---|---|---|
+| FLUX.2 pipeline/transformer | FLUX2-1b | `diffusion/registry.py::_DIFFUSION_MODELS["Flux2Pipeline"]` → `diffusion/models/flux2/pipeline_flux2.py::Flux2Pipeline`、`flux2_transformer.py::Flux2Transformer2DModel` |
+| Mistral text encoder、FP8、component namespace | FLUX2-1a | `diffusion/models/mistral_encoder/` → component quantization selector/loader |
+| meta parameter、CPU offload、BF16 baseline | FLUX2-1b | FLUX.2 component loader/materialization 路径 → `Flux2Pipeline` |
+
+FLUX.1 和 FLUX.2-Klein 不自动归到本页；必须由描述/registry key 明确命中对应 owner。
 
 ## FLUX2-1a — Mistral text encoder FP8 保留 component namespace
 

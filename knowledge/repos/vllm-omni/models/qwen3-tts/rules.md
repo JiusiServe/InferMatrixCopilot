@@ -1,7 +1,7 @@
 ---
 title: "Qwen3-TTS 规则"
 created: 2026-07-20
-updated: 2026-07-20
+updated: 2026-07-31
 type: rule
 tags: [vllm-omni, models, serving, qwen-omni]
 sources: ["PR #5157"]
@@ -11,6 +11,15 @@ confidence: high
 # Qwen3-TTS 规则
 
 只有 `Q3TTS-数字字母` 是可审计规则 ID。
+
+## Direct 代码快速入口
+
+| PR 描述信号 | 规则组 | 第一批源码 |
+|---|---|---|
+| Qwen3-TTS、`qwen3_tts` pipeline | Q3TTS-1a/1b | `config/pipeline_registry.py::OMNI_PIPELINES["qwen3_tts"]`；`model_executor/models/qwen3_tts/pipeline.py` |
+| `ref_audio`、x-vector、ICL、artifact-only reuse | Q3TTS-1a/1b | `entrypoints/openai/serving_speech.py::_qwen3_tts_can_use_ref_audio_artifact_only`、`_track_ref_audio_artifact_warmup`、`_mark_ref_audio_artifact_ready_for_request` |
+| talker/code2wav、deferred audio codes | Model Executor / Scheduler 共享规则 | `model_executor/models/qwen3_tts/qwen3_tts_talker.py::Qwen3TTSTalkerForConditionalGeneration`、`qwen3_tts_code2wav.py::Qwen3TTSCode2Wav` |
+| OpenAI speech adapter | Q3TTS-1a/1b + Serving | `entrypoints/openai/tts_adapters/qwen3_tts.py::Qwen3TTSAdapter` → `serving_speech.py` |
 
 ## Q3TTS-1a — ref-audio readiness 按 mode/capability 隔离
 

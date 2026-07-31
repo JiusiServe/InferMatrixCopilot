@@ -1,7 +1,7 @@
 ---
 title: "Distributed（跨 stage 通信与数据搬运）"
 created: 2026-07-16
-updated: 2026-07-16
+updated: 2026-07-31
 type: index
 tags: [vllm-omni, components, distributed]
 sources: [vllm_omni/distributed/omni_connectors/, vllm_omni/distributed/omni_coordinator/, docs/design/feature/disaggregated_inference.md]
@@ -28,6 +28,16 @@ sources: [vllm_omni/distributed/omni_connectors/, vllm_omni/distributed/omni_coo
 - 选择/配置 connector 后端（单机 SHM、跨机 Mooncake/Mori/Yuanrong）。
 - 排查 KV cache 跨 stage 迁移的数据面（`OmniKVTransferManager`）。
 
+## Direct 代码快速入口
+
+| PR 描述信号 | 第一批源码 | 已有知识 |
+|---|---|---|
+| connector backend、put/get、跨 stage 数据损坏 | `distributed/omni_connectors/connectors/base.py::OmniConnectorBase`；目标 backend 的 `put` / `get` | architecture |
+| Mooncake、RDMA/TCP fallback、object decode | `connectors/mooncake_transfer_engine_connector.py::MooncakeTransferEngineConnector` | connector pitfalls |
+| KV transfer、connector lifecycle | `distributed/omni_connectors/kv_transfer_manager.py::OmniKVTransferManager` | architecture |
+| coordinator、replica selection、负载均衡 | `distributed/omni_coordinator/load_balancer.py::LoadBalancer` 及具体 balancer | architecture |
+| `Address already in use`、route/handshake/input/output port | `engine/stage_engine_startup.py::_port_from_zmq_address`、`OmniMasterServer._allocate_route_locked`、`_alloc_unique_ports` | connector pitfalls |
+
 ## 不放什么
 
 - 调度侧的 KV/输入等待状态机属于 [Scheduler](../scheduler/_index.md)。
@@ -37,6 +47,7 @@ sources: [vllm_omni/distributed/omni_connectors/, vllm_omni/distributed/omni_coo
 
 | 遇到什么 | 查看哪里 |
 |---|---|
+| 按 PR 描述直达 connector、KV transfer、load balancer 或 route-port 首批源码 | [本页 Direct 代码快速入口](#direct-代码快速入口) |
 | 理解 connector 合同、6 后端、KV 迁移管理与负载均衡 | [architecture](architecture.md) |
 | 已修过的 connector/端口产品坑 | [connector pitfalls](connector-pitfalls.md) |
 | 后端选择与 async_chunk 特性语义 | [特性指南](guides/_index.md) |

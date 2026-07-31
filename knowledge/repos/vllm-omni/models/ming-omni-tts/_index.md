@@ -1,7 +1,7 @@
 ---
 title: "Ming-Omni-TTS"
 created: 2026-07-20
-updated: 2026-07-20
+updated: 2026-07-31
 type: index
 tags: [vllm-omni, models, model-executor]
 sources: ["PR #4341", vllm_omni/model_executor/models/ming_tts/]
@@ -26,7 +26,7 @@ LLM/conditioning 产生 latent condition，CFM/DiT solver 运行 ODE/SDE 采样�
 把 latent 解码为 waveform。CUDA Graph 路径必须复刻 eager solver 的 float32 状态、CFG
 边界与最后一步更新；dense 模型不应因为 MoE-only 依赖的顶层 import 而不可导入。
 
-具体不变量见 [rules](rules.md)；共享优化路径门禁见
+描述直达源码与具体不变量见 [rules](rules.md#direct-代码快速入口)；共享优化路径门禁见
 [Diffusion rules](../../components/diffusion/rules.md)。
 
 ## 什么时候查这里
