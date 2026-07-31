@@ -171,8 +171,19 @@ def _parse_k8s_gpu_count(step: dict, fallback: int) -> int:
     return fallback
 
 
+def _format_env_pairs(env_map: Mapping) -> str:
+    """A pipeline-level `env:` mapping as shell-safe "K=V" tokens (the same
+    encoding job-level `export` lines produce) — values with spaces stay a
+    single token for the downstream shlex parse."""
+    import shlex as _shlex
+    return " ".join(_shlex.quote(f"{k}={v}")
+                    for k, v in env_map.items()
+                    if isinstance(k, str) and k)
+
+
 def _extract_steps(steps_list: list, source: str,
-                   spec: ManifestSpec) -> list[ManifestJob]:
+                   spec: ManifestSpec,
+                   pipeline_env: str = "") -> list[ManifestJob]:
     jobs: list[ManifestJob] = []
     ref_rx = re.compile(
         r"(?:%s)/[\w/_.*-]+" % "|".join(re.escape(p)
@@ -181,7 +192,8 @@ def _extract_steps(steps_list: list, source: str,
         if not isinstance(step, dict):
             continue
         if "group" in step and "steps" in step:
-            jobs.extend(_extract_steps(step["steps"], source, spec))
+            jobs.extend(_extract_steps(step["steps"], source, spec,
+                                       pipeline_env))
             continue
         label = step.get("label", "")
         if not label or _should_skip(label, spec.skip_patterns):
@@ -203,6 +215,12 @@ def _extract_steps(steps_list: list, source: str,
         min_gpus = _parse_k8s_gpu_count(step, min_gpus)
         env_vars = " ".join(ln.replace("export ", "").strip()
                             for ln in env_lines)
+        if pipeline_env:
+            # top-level pipeline env FIRST so a job's own export wins the
+            # later last-key-wins parse — the live pipelines declare shared
+            # runtime settings there, and dropping them would run local
+            # jobs outside their authoritative CI environment
+            env_vars = f"{pipeline_env} {env_vars}".strip()
 
         cmd_normalized = cmd_clean
         m = re.match(r"^timeout\s+\d+m\s+bash\s+-c\s*['\"](.*)['\"]\s*$",
@@ -237,7 +255,11 @@ def _parse_ci_yaml(repo: Path, spec: ManifestSpec) -> list[ManifestJob]:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
         if not data or "steps" not in data:
             continue
-        for job in _extract_steps(data["steps"], source, spec):
+        top_env = data.get("env")
+        pipeline_env = _format_env_pairs(top_env) \
+            if isinstance(top_env, dict) else ""
+        for job in _extract_steps(data["steps"], source, spec,
+                                  pipeline_env):
             if job.slug not in all_jobs or source == spec.priority_source:
                 all_jobs[job.slug] = job
     return list(all_jobs.values())

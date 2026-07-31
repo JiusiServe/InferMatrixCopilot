@@ -130,6 +130,9 @@ def ci_repo(tmp_path):
     (repo / "tests" / "worker" / "test_a_expansion.py").write_text("x")
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
     (repo / ".buildkite" / "cuda" / "test-merge.yml").write_text(yaml.safe_dump({
+        # top-level pipeline env (the live pipelines declare shared runtime
+        # settings here) — must reach every job, with job exports winning
+        "env": {"SHARED_FLAG": "cuda", "FOO": "0"},
         "steps": [
             {"label": "Worker Tests", "timeout_in_minutes": 10,
              "agents": {"queue": "gpu_4_queue"},
@@ -160,6 +163,14 @@ def test_manifest_build(ci_repo):
     wt = by_slug["worker_tests"]
     assert wt.source == "ready" and wt.timeout_sec == 1200  # ready wins slug
     assert wt.env == "" or "FOO" not in wt.command          # env split out
+    # top-level pipeline env reaches the merge-pipeline job; the job's own
+    # export wins the last-key-wins parse
+    from infermatrix_copilot.engine.steps.rebase_v3 import _parse_env_pairs
+    k8s_env = _parse_env_pairs(by_slug["k8s_job"].env)
+    assert k8s_env["SHARED_FLAG"] == "cuda"
+    assert k8s_env["FOO"] == "0"                    # no job export here
+    # pipeline env comes FIRST, so a job's own export wins the parse
+    assert _parse_env_pairs("FOO=0 FOO=1")["FOO"] == "1"
     # rename-family path correction: test_a.py -> test_a_expansion.py
     assert "tests/worker/test_a_expansion.py" in wt.command
     k8s = by_slug["k8s_job"]
@@ -474,8 +485,12 @@ def v3_env(settings, tmp_path, monkeypatch):
 def test_v3_report_only_partial_e2e(v3_env, tmp_path, settings, trace):
     """report_only end to end: prelude seeds mode flags, the mutating guard
     and full-mode steps are when-gated OFF, the scan writes the manifest
-    artifact, finalize passes on clean substate."""
+    artifact, finalize passes on clean substate. The repo carries a lock
+    file a PRIOR mutating run legitimately left under locks/ — report-only
+    must not read persistent lock infrastructure as dirt."""
     executor, playbook, repo, run_dir = v3_env
+    (repo / "locks").mkdir()
+    (repo / "locks" / "omni.lock").write_text("")
     spec = SimpleNamespace(params={"rebase_mode": ""}, report_only=False)
     resolve_effective_mode(spec)
     state = {"task_spec": {"kind": "repo_rebase", "repo": "vllm-omni",
@@ -892,6 +907,16 @@ def test_v3_module_scope_and_serialization(v3_agent_env, settings, trace,
         return {"status": "done", "exit_code": 0, "debug_attempts": 0,
                 "turns": 1, "summary": ""}
     monkeypatch.setattr(mr, "rebase_module", fake_rebase_module)
+    # capture the agent-shell env handed to the tool set
+    from infermatrix_copilot.rebase_engine import rebase_tools as rt_mod
+    agent_envs = {}
+    orig_build = rt_mod.build_rebase_tools
+
+    def spy_build(defs, paths, backends):
+        agent_envs.update(paths.env)
+        return orig_build(defs, paths, backends)
+    monkeypatch.setattr(rt_mod, "build_rebase_tools", spy_build)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-agent-secret")
     registry = register_builtin_steps(StepRegistry())
     handler = registry.get("rebase.v3_module_rebase").handler
 
@@ -947,10 +972,22 @@ def test_v3_module_scope_and_serialization(v3_agent_env, settings, trace,
     d = scope.path_scope.check_write(f"{root}/vllm_omni/engine/core.py")
     assert d.allowed and d.out_of_scope
     assert not scope.path_scope.check_write("/etc/passwd").allowed
-    # the served-model policy travels with the config (aliases + mismatch)
+    # the agent shell gets the imx-omni-pytest contract + TARGET runtime
+    # overlay, with credentials scrubbed
+    assert agent_envs["IMX_TARGET_REPO"] == str(repo)
+    assert agent_envs["IMX_LOG_DIR"] == str(run_dir)
+    assert agent_envs["IMX_GPU_MUTEX"] == "1"
+    assert agent_envs["IMX_ADAPTER_REBASE"].endswith("vllm_omni/rebase")
+    assert agent_envs["VIRTUAL_ENV"].endswith("omni-venv")
+    assert "ANTHROPIC_API_KEY" not in agent_envs      # scrub still applies
+    # the served-model policy travels with the config (aliases + mismatch);
+    # CUDA/HF facts describe THIS host, not the dataclass defaults
     cfg = configs["worker_runner"]
     assert cfg.model_mismatch_policy == settings.model_mismatch_policy
     assert cfg.model_aliases == settings.model_aliases
+    import os as _os
+    assert cfg.cuda_devices == _os.environ.get("CUDA_VISIBLE_DEVICES",
+                                               "0,1")
     # an UNKNOWN module (unassigned debug job) records EVERY repo write as
     # out-of-scope instead of silently blessing the whole tree
     manifest = yaml.safe_load(
@@ -1436,16 +1473,25 @@ def test_v3_backends_are_production(v3_env, settings, trace, tmp_path,
         plan_json_path=str(plan_dir / "nope.json"))
 
     # pytest: runs through the runner in the TARGET env
-    envs = []
+    envs, cmds = [], []
 
     def fake_run(self, job, env, *, baseline=False, dry_run=False):
         envs.append(dict(env))
+        cmds.append(job.command)
         return runner_mod.TestOutcome(rc=0)
     monkeypatch.setattr(runner_mod.TestRunner, "run", fake_run)
     out = backends.run_pytest(test_paths=["tests/x.py"])
     assert out["passed"] is True
     assert envs[0]["VIRTUAL_ENV"] == str(tmp_path / "omni-venv")
     assert "error" in backends.run_pytest()          # no paths
+
+    # precommit: a file-scoped call DROPS --all-files (mutually exclusive)
+    out = backends.run_precommit(files=["a.py", "b.py"])
+    assert out["passed"] is True
+    assert "--all-files" not in cmds[-1]
+    assert "--files a.py b.py" in cmds[-1]
+    out = backends.run_precommit()
+    assert "--all-files" in cmds[-1]                 # unscoped keeps it
 
     # debug memory: real store roundtrip
     out = backends.record_debug_memory(
@@ -1455,13 +1501,18 @@ def test_v3_backends_are_production(v3_env, settings, trace, tmp_path,
     found = backends.search_debug_memory(keyword="boom")
     assert found["results"] and found["results"][0]["module"] == "worker"
 
-    # skills: propose-only governance — a candidate, never a SKILL.md
+    # skills: propose-only governance — a candidate in the RUNTIME state
+    # dir; the checked-in adapter tree stays untouched (read-only at run
+    # time, Rev 8 §1.1 seed/runtime split)
     out = backends.skill_manage(action="create", name="new-trick",
                                 description="d", body="b")
     assert out.get("ok") and "CANDIDATE" in out["note"]
-    skills_dir = Path(settings.adapters_dir) / "vllm_omni" / "skills"
-    assert (skills_dir / "_candidates.json").exists()
-    assert not (skills_dir / "new-trick" / "SKILL.md").exists()
+    runtime_dir = Path(settings.memory_db).parent / "state" / "vllm-omni" \
+        / "skills_runtime"
+    assert (runtime_dir / "_candidates.json").exists()
+    adapter_skills = Path(settings.adapters_dir) / "vllm_omni" / "skills"
+    assert not (adapter_skills / "_candidates.json").exists()
+    assert not (runtime_dir / "new-trick" / "SKILL.md").exists()
     assert "error" in backends.skill_manage(action="delete", name="x")
 
 
@@ -1654,6 +1705,58 @@ def test_v3_module_gets_live_test_plan(v3_agent_env, settings, trace,
                                               "upstream_changes"}
     # the scan artifact was produced as a side product for later modules
     assert (run_dir / "test_manifest.json").exists()
+
+
+def test_v3_scratch_adoption_reregisters_teardown(v3_env, settings, trace,
+                                                  tmp_path, monkeypatch):
+    """A resumed process that ADOPTS a surviving scratch checkout must
+    re-register its teardown — the disposable clone may not outlive the
+    run just because the registering process crashed."""
+    from infermatrix_copilot.engine import lifecycle
+    from infermatrix_copilot.engine.step import StepContext
+    from infermatrix_copilot.engine.steps import rebase_v3
+    _, _, repo, _ = v3_env
+    rd = tmp_path / "adopt-run"
+    (rd / "upstream_scratch").mkdir(parents=True)
+    subprocess.run(["git", "init", "-q"], cwd=rd / "upstream_scratch",
+                   check=True)
+    # fresh process: no teardown registered yet for this run dir
+    monkeypatch.setattr(rebase_v3, "_SCRATCH_REGISTERED", set())
+    ctx = StepContext(
+        settings=settings, params={}, run_dir=rd, trace=trace,
+        state={"task_spec": {"repo": "vllm-omni", "params": {}},
+               "run_id": "adopt-run",
+               "upstream_path": str(rd / "upstream_scratch"),
+               "upstream_origin_path": str(repo)})
+    out = rebase_v3._ensure_upstream_scratch(ctx)
+    assert out == str(rd / "upstream_scratch")
+    asyncio.run(lifecycle.finalize(rd, None))
+    assert not (rd / "upstream_scratch").exists()     # torn down anyway
+
+
+def test_v3_push_gate_override_is_logged(v3_env, settings, trace, tmp_path):
+    """push_with_failures is 'explicit and logged': the overridden
+    structural failures land in the trace, the summary, and state — never
+    indistinguishable from a genuinely clean gate."""
+    from infermatrix_copilot.engine.registry import StepRegistry
+    from infermatrix_copilot.engine.step import StepContext
+    from infermatrix_copilot.engine.steps import register_builtin_steps
+    registry = register_builtin_steps(StepRegistry())
+    rd = tmp_path / "override-run"
+    rd.mkdir()
+    Substate(rd, "ov").update(
+        {"modules": {"m1": {"status": "failed"}},
+         "tests": {"pipeline": {"failed_tests": []}}})
+    ctx = StepContext(
+        settings=settings, params={}, run_dir=rd, trace=trace,
+        state={"task_spec": {"repo": "vllm-omni",
+                             "params": {"push_with_failures": True}},
+               "run_id": "ov"})
+    r = asyncio.run(registry.get("rebase.v3_push_gate").handler(ctx))
+    assert r.ok
+    assert "OVERRIDDEN" in r.summary and "m1" in r.summary
+    assert r.outputs["state_updates"]["push_gate_overrides"]
+    assert any(e for e in trace.events("push_gate_override"))
 
 
 def test_runner_model_download_notify(tmp_path):

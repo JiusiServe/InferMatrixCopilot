@@ -38,7 +38,10 @@ steps:
   - {id: prelude, step: rebase.v3_prelude}
   # report_only still validates the tree — but through the honestly read-only
   # guard (check-only, never mutates merge state)
-  - {id: guard_check, step: workspace.guard_clean, when: mode_report_only}
+  # locks/ survives a prior mutating run BY DESIGN (the shared flock file
+  # persists after release) — report-only must not read it as dirt
+  - {id: guard_check, step: workspace.guard_clean, when: mode_report_only,
+     params: {ignore_untracked_prefixes: [locks/]}}
   # v3-owned wrapper: takes the checkout flocks BEFORE the self-cleaning
   # guard mutates (first-mutator on resume) and injects the adapter's
   # rebase.guard policy

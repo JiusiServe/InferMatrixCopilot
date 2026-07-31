@@ -117,6 +117,33 @@ def _target_test_env(ctx: StepContext, manifest: dict,
         pythonpath_prepend=pythonpath_prepend)
 
 
+def _agent_shell_env(ctx: StepContext, manifest: dict, repo_root: str,
+                     adapter_dir: Path, *, gpu_mutex: bool = True) -> dict:
+    """The env for AGENT shells (`run_shell` + everything it spawns): the
+    PR1 credential scrub over the process env, then the TARGET runtime
+    overlay (venv PATH/VIRTUAL_ENV, host CUDA selection, HF_HOME) and the
+    `imx-omni-pytest` contract variables — without IMX_TARGET_REPO/
+    IMX_LOG_DIR the mandated pytest wrapper exits immediately, and without
+    the venv overlay agent verification runs against the copilot's own
+    environment."""
+    import os
+    from ...testing.env_plan import build_subprocess_env
+    venv = _target_venv(manifest)
+    env = build_subprocess_env(
+        base=scrubbed_agent_env(),
+        venv=Path(venv) if venv else None,
+        cuda_visible_devices=os.environ.get("CUDA_VISIBLE_DEVICES"),
+        hf_home=os.environ.get("HF_HOME"))
+    env["IMX_TARGET_REPO"] = str(repo_root)
+    env["IMX_LOG_DIR"] = str(ctx.run_dir)
+    env["IMX_ADAPTER_REBASE"] = str(adapter_dir / "rebase")
+    if gpu_mutex:
+        # Phase-2 module agents serialize every wrapper invocation on the
+        # GPU lock (parent contract)
+        env["IMX_GPU_MUTEX"] = "1"
+    return env
+
+
 def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
     """The PRODUCTION `RebaseBackends`: plan review on the run's resolved
     tier backend, pytest/reproduce/precommit through the PR1 runner in the
@@ -193,6 +220,11 @@ def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
         if isinstance(files, str):
             files = files.split()
         if files:
+            # `--all-files` and `--files` are mutually exclusive — a
+            # file-scoped call must drop the manifest command's all-files
+            # sweep or pre-commit refuses to run at all
+            import re as _re
+            command = _re.sub(r"\s(?:--all-files|-a)\b", "", command)
             command += " --files " + " ".join(str(f) for f in files)
         runner = TestRunner(repo_root=Path(repo),
                             tests_dir=ctx.run_dir / "tests",
@@ -236,16 +268,27 @@ def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
         except Exception as exc:  # noqa: BLE001
             return {"error": f"debug memory write failed: {exc}"}
 
-    def _skills() -> SkillStore:
-        return SkillStore(Path(ctx.settings.adapters_dir)
-                          / repo_name.replace("-", "_") / "skills")
+    # seed skills live in the (runtime-READ-ONLY) adapter tree; agent
+    # proposals land in the RUNTIME state dir — writing candidates into
+    # the checked-in adapter source would dirty it and bypass the module
+    # scope's writable wall (Rev 8 §1.1 seed/runtime split)
+    seed_skills_dir = Path(ctx.settings.adapters_dir) \
+        / repo_name.replace("-", "_") / "skills"
+    runtime_skills_dir = Path(ctx.settings.memory_db).parent / "state" \
+        / repo_name / "skills_runtime"
 
     def search_skills(**kw) -> dict:
-        skills = _skills().find(query=str(kw.get("keyword", "") or ""),
-                                module=str(kw.get("module", "") or ""),
-                                k=int(kw.get("max_results") or 3))
+        query = str(kw.get("keyword", "") or "")
+        module_q = str(kw.get("module", "") or "")
+        k = int(kw.get("max_results") or 3)
+        # retrieval = seed ∪ runtime (runtime wins name collisions)
+        merged: dict[str, object] = {}
+        for store_dir in (seed_skills_dir, runtime_skills_dir):
+            for s in SkillStore(store_dir).find(query=query,
+                                                module=module_q, k=k):
+                merged[s.name] = s
         return {"skills": [{"name": s.name, "description": s.description}
-                           for s in skills]}
+                           for s in list(merged.values())[:k]]}
 
     def skill_manage(**kw) -> dict:
         action = str(kw.get("action", ""))
@@ -255,9 +298,10 @@ def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
         try:
             # governance: agents PROPOSE candidates; promotion to a real
             # SKILL.md is a curator/human action (read-wide/write-narrow)
-            _skills().propose(name=str(kw.get("name", "")),
-                              description=str(kw.get("description", "")),
-                              body=str(kw.get("body", "")))
+            SkillStore(runtime_skills_dir).propose(
+                name=str(kw.get("name", "")),
+                description=str(kw.get("description", "")),
+                body=str(kw.get("body", "")))
             return {"ok": True, "proposed": str(kw.get("name", "")),
                     "note": "recorded as a CANDIDATE — human promotion "
                             "required"}
@@ -325,13 +369,36 @@ def _drop_serial_lock(run_dir) -> None:
         per_loop.pop(str(run_dir), None)
 
 
+# run dirs whose scratch teardown finalizer is registered in THIS process —
+# a resumed run that ADOPTS an existing scratch must re-register teardown or
+# the "disposable" checkout survives its run
+_SCRATCH_REGISTERED: set[str] = set()
+
+
+def _register_scratch_teardown(ctx: StepContext, scratch: Path) -> None:
+    key = str(ctx.run_dir)
+    if key in _SCRATCH_REGISTERED:
+        return
+    _SCRATCH_REGISTERED.add(key)
+    from ..lifecycle import register_finalizer
+
+    async def _teardown_scratch(_outcome, _path=scratch, _key=key) -> None:
+        import shutil
+        shutil.rmtree(_path, ignore_errors=True)
+        _SCRATCH_REGISTERED.discard(_key)
+
+    register_finalizer(ctx.run_dir, _teardown_scratch)
+
+
 def _ensure_upstream_scratch(ctx: StepContext) -> str | StepResult:
     """The per-run DISPOSABLE upstream checkout (Rev 8 §4 risk reduction):
     wheel selection resets/checks out the tree and agent `run_shell` can
     mutate it, so those operations get a `git clone --shared` scratch of
     the canonical upstream, torn down by a lifecycle finalizer. Returns
-    the scratch path, re-cloning on resume if a prior teardown removed it;
-    BLOCKED when no canonical upstream is known or the clone fails."""
+    the scratch path — re-cloning on resume if a prior teardown removed
+    it, and RE-REGISTERING teardown when a resumed process merely adopts
+    a surviving scratch; BLOCKED when no canonical upstream is known or
+    the clone fails."""
     import subprocess
     scratch = Path(ctx.state.get("upstream_path", "") or "")
     origin = ctx.state.get("upstream_origin_path", "")
@@ -340,6 +407,7 @@ def _ensure_upstream_scratch(ctx: StepContext) -> str | StepResult:
     # never be adopted as the mutable tree
     if str(scratch).startswith(str(ctx.run_dir)) \
             and (scratch / ".git").exists():
+        _register_scratch_teardown(ctx, scratch)
         return str(scratch)
     if not origin:
         return StepResult(False, FailureKind.BLOCKED,
@@ -356,14 +424,8 @@ def _ensure_upstream_scratch(ctx: StepContext) -> str | StepResult:
         subprocess.run(["git", "-C", str(scratch), "checkout", "--detach",
                         "HEAD"], capture_output=True, text=True,
                        timeout=300)
-        from ..lifecycle import register_finalizer
-
-        async def _teardown_scratch(_outcome, _path=scratch) -> None:
-            import shutil
-            shutil.rmtree(_path, ignore_errors=True)
-
-        register_finalizer(ctx.run_dir, _teardown_scratch)
         ctx.trace.record("upstream_scratch_created", path=str(scratch))
+    _register_scratch_teardown(ctx, scratch)
     ctx.state["upstream_path"] = str(scratch)
     return str(scratch)
 
@@ -773,7 +835,8 @@ async def _run_debug_agent(ctx: StepContext, manifest: dict, module: str,
     repo_root = ctx.state.get("repo_path", "")
     paths = RebasePaths(omni_path=repo_root,
                         vllm_path=ctx.state.get("upstream_path", ""),
-                        env=scrubbed_agent_env())
+                        env=_agent_shell_env(ctx, manifest, repo_root,
+                                             adapter_dir))
     tools = build_rebase_tools(
         defs, paths, _build_backends(ctx, manifest, repo_root, target))
     prompt = build_debug_prompt(module or slug, traceback_text,
@@ -1081,9 +1144,18 @@ async def _v3_push_gate(ctx: StepContext) -> StepResult:
     summary = "push gate open"
     if decision.flagged:
         summary += f" ({len(decision.flagged)} flagged test failure(s))"
+    if decision.reasons:
+        # "explicit and logged" (Rev 8 §2.3): a push_with_failures override
+        # must be UNMISTAKABLE in the trace and report — never
+        # indistinguishable from a genuinely clean gate
+        ctx.trace.record("push_gate_override",
+                         reasons=list(decision.reasons))
+        summary += (f"; OVERRIDDEN structural failure(s): "
+                    + "; ".join(decision.reasons))
     return StepResult(True, summary=summary,
                       outputs={"state_updates": {
-                          "push_gate_flagged": list(decision.flagged)}})
+                          "push_gate_flagged": list(decision.flagged),
+                          "push_gate_overrides": list(decision.reasons)}})
 
 
 @step("rebase.v3_finalize", "deterministic", "read",
@@ -1167,7 +1239,8 @@ async def _v3_module_rebase(ctx: StepContext) -> StepResult:
     repo_root = ctx.state.get("repo_path", "")
     paths = RebasePaths(omni_path=repo_root,
                         vllm_path=ctx.state.get("upstream_path", ""),
-                        env=scrubbed_agent_env())
+                        env=_agent_shell_env(ctx, manifest, repo_root,
+                                             adapter_dir))
     tools = build_rebase_tools(
         defs, paths, _build_backends(ctx, manifest, repo_root, target))
     hooks = load_hooks(adapter_dir, manifest)
@@ -1202,12 +1275,17 @@ async def _v3_module_rebase(ctx: StepContext) -> StepResult:
                          "omni_specific": mp.omni_specific_tests}
     except Exception:  # noqa: BLE001 - plan enrichment is best-effort
         ctx.trace.record("module_test_plan_unavailable", module=module)
+    import os
     config = ModuleRunConfig(
         vllm_path=paths.vllm_path, omni_path=paths.omni_path,
         script_dir=str(adapter_dir / "rebase"), model=target.model,
         log_dir=str(ctx.run_dir),
         last_rebase_vllm_commit=ctx.state.get("last_rebase_upstream_commit",
                                               ""),
+        # the prompt's CUDA/HF facts must describe THIS host, not the
+        # dataclass defaults
+        cuda_devices=os.environ.get("CUDA_VISIBLE_DEVICES", "0,1"),
+        hf_home=os.environ.get("HF_HOME", "/model"),
         model_aliases=ctx.settings.model_aliases,
         model_mismatch_policy=ctx.settings.model_mismatch_policy)
     async with _serial_lock(ctx.run_dir):

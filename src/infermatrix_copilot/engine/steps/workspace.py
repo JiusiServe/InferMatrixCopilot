@@ -31,8 +31,16 @@ async def _guard_clean(ctx: StepContext) -> StepResult:
     out = _porcelain(repo)
     if out.returncode != 0:
         return StepResult(False, FailureKind.BLOCKED, f"not a git repo: {repo}")
-    if out.stdout.strip():
-        dirty = out.stdout.strip().splitlines()
+    # `ignore_untracked_prefixes` (params, default none — behavior-preserving):
+    # persistent infrastructure files a prior run legitimately left behind
+    # (the shared checkout flock under locks/ survives release BY DESIGN) are
+    # excluded from the verdict; still strictly read-only — nothing is touched
+    ignore = tuple(ctx.params.get("ignore_untracked_prefixes") or ())
+    entries = [ln for ln in out.stdout.strip().splitlines()
+               if not (ignore and ln.startswith("?? ")
+                       and ln[3:].startswith(ignore))]
+    if any(e.strip() for e in entries):
+        dirty = entries
         return StepResult(False, FailureKind.BLOCKED,
                           f"workspace dirty ({len(dirty)} entries) — refuse to start",
                           outputs={"dirty": dirty[:20]})
