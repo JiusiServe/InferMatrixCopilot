@@ -340,6 +340,7 @@ def test_agent_loop_partial_e2e(omni_repo, trace, tmp_path):
     result = asyncio.run(run_agent_loop(
         client, "SYSTEM PROMPT", model="fake-model", tool_defs=defs,
         extra_tools=tools, scope=scope, trace=trace,
+        plan_write_prefix=str(tmp_path / "plans"),
         agent_log=str(tmp_path / "agent.log")))
 
     assert result == {"done": True,
@@ -387,7 +388,7 @@ def test_gate_unlocks_only_on_successful_decision_write(omni_repo, tmp_path):
                           "old_string": "return 1", "new_string": "H"})]),
         # a SUCCESSFUL decision write unlocks
         _resp([_blk_tool("write_file", "t3",
-                         {"file_path": str(tmp_path / "p.decision.md"),
+                         {"file_path": str(tmp_path / "plans" / "p.decision.md"),
                           "content": "accept"})]),
         _resp([_blk_tool("edit_file", "t4",
                          {"file_path": str(omni_repo / "mod.py"),
@@ -395,7 +396,8 @@ def test_gate_unlocks_only_on_successful_decision_write(omni_repo, tmp_path):
         _resp([_blk_text("done")]),
     ])
     result = asyncio.run(run_agent_loop(
-        client, "P", model="m", tool_defs=defs, extra_tools=tools, scope=scope))
+        client, "P", model="m", tool_defs=defs, extra_tools=tools, scope=scope,
+        plan_write_prefix="/"))
     assert result["done"] is True
     assert not Path("/etc/plan-v0.decision.md").exists()
     assert "return 1" in (omni_repo / "mod.py").read_text() or         "return 9" in (omni_repo / "mod.py").read_text()
@@ -416,6 +418,99 @@ def test_gate_unlocks_only_on_successful_decision_write(omni_repo, tmp_path):
     assert (omni_repo / "mod.py").read_text().count("return 9") == 1
 
 
+def test_gate_confines_pre_decision_writes_to_plan_dir(omni_repo, tmp_path):
+    """While the plan gate is closed, write_file may only land under the
+    plan directory — overwriting product code pre-decision is the exact
+    bypass the gate exists to prevent."""
+    defs, tools = _tools(omni_repo)
+    before = (omni_repo / "mod.py").read_text()
+    client = FakeClient([
+        _resp([_blk_tool("write_file", "t1",
+                         {"file_path": str(omni_repo / "mod.py"),
+                          "content": "SABOTAGE"})]),
+        _resp([_blk_text("ok I will plan first")]),
+    ])
+    result = asyncio.run(run_agent_loop(
+        client, "P", model="m", tool_defs=defs, extra_tools=tools,
+        plan_write_prefix=str(tmp_path / "plans")))
+    assert result["done"] is True
+    assert (omni_repo / "mod.py").read_text() == before   # untouched
+    results = {tr["tool_use_id"]: tr
+               for m in client.requests[-1]["messages"]
+               if isinstance(m.get("content"), list)
+               for tr in m["content"]
+               if isinstance(tr, dict) and tr.get("type") == "tool_result"}
+    err = json.loads(results["t1"]["content"])["error"]
+    assert "outside the plan directory" in err
+    # a REQUIRED prefix: the gate cannot be configured bypassable
+    with pytest.raises(ValueError, match="plan_write_prefix"):
+        asyncio.run(run_agent_loop(client, "P", model="m", tool_defs=defs,
+                                   extra_tools=tools))
+
+
+def test_agent_loop_model_mismatch_fails_closed(omni_repo):
+    """A served model differing from the requested one aborts the run —
+    repo invariant: model substitution fails by default."""
+    defs, tools = _tools(omni_repo)
+    resp = _resp([_blk_text("hello")])
+    resp.model = "cheap-substitute"
+    client = FakeClient([resp])
+    r = asyncio.run(run_agent_loop(client, "P", model="claude-real",
+                                   tool_defs=defs, extra_tools=tools,
+                                   require_plan_review=False))
+    assert r["done"] is False and "Model mismatch" in r["text"]
+    assert "cheap-substitute" in r["text"]
+
+
+def test_agent_loop_partial_input_reaches_guard_not_dispatch(omni_repo):
+    """A write with a path but truncated-away content (the common truncation
+    shape) must hit the guard, not a cryptic dispatch TypeError."""
+    defs, tools = _tools(omni_repo)
+    client = FakeClient([
+        _resp([_blk_tool("write_file", "t1",
+                         {"file_path": "/tmp/x.py"})], stop_reason="max_tokens"),
+        _resp([_blk_tool("edit_file", "t2",
+                         {"file_path": str(omni_repo / "mod.py"),
+                          "old_string": "return 1"})]),
+        _resp([_blk_text("stopping")]),
+    ])
+    r = asyncio.run(run_agent_loop(client, "P", model="m", tool_defs=defs,
+                                   extra_tools=tools,
+                                   require_plan_review=False))
+    assert r["done"] is True
+    results = {tr["tool_use_id"]: tr
+               for m in client.requests[-1]["messages"]
+               if isinstance(m.get("content"), list)
+               for tr in m["content"]
+               if isinstance(tr, dict) and tr.get("type") == "tool_result"}
+    for tid in ("t1", "t2"):
+        assert "missing required input" in             json.loads(results[tid]["content"])["error"]
+
+
+def test_extra_tool_audit_classifies_parent_shaped_errors(tmp_path, trace):
+    """Parent-shaped failures are ordinary strings: the transport payload
+    stays ok (the bytes ARE the result) but the trace records ok=False, so
+    failure accounting sees missing files and unwired backends."""
+    from infermatrix_copilot.rebase_engine.rebase_tools import (
+        RebasePaths, build_rebase_tools, load_tool_schemas)
+    tools = build_rebase_tools(load_tool_schemas(SCHEMAS),
+                               RebasePaths(omni_path=str(tmp_path),
+                                           vllm_path=str(tmp_path)))
+    bad = dispatch("read_file", {"file_path": str(tmp_path / "absent.py")},
+                   trace=trace, extra=tools)
+    assert bad["ok"] and "File not found" in bad["result"]   # bytes unchanged
+    unwired = dispatch("search_skills", {}, trace=trace, extra=tools)
+    assert unwired["ok"] and "not wired" in unwired["result"]
+    events = [e for e in trace.events("tool_call")]
+    assert [e.get("ok") for e in events] == [False, False]
+    good = dispatch("write_file",
+                    {"file_path": str(tmp_path / "ok.py"), "content": "x"},
+                    trace=trace, extra=tools)
+    assert good["ok"]
+    events = [e for e in trace.events("tool_call")]
+    assert events[-1].get("ok") is True
+
+
 def test_agent_loop_truncated_text_only_not_done(omni_repo):
     """A text-only response cut off at max_tokens is an involuntary ending —
     deliberate divergence from the parent, which reported done=True."""
@@ -423,7 +518,8 @@ def test_agent_loop_truncated_text_only_not_done(omni_repo):
     client = FakeClient([_resp([_blk_text("half a summar")],
                                stop_reason="max_tokens")])
     r = asyncio.run(run_agent_loop(client, "P", model="m", tool_defs=defs,
-                                   extra_tools=tools))
+                                   extra_tools=tools,
+                                   require_plan_review=False))
     assert r["done"] is False and "Truncated at max_tokens" in r["text"]
 
 
@@ -434,7 +530,8 @@ def test_agent_loop_incomplete_write_guard(omni_repo, tmp_path):
         _resp([_blk_text("giving up")]),
     ])
     result = asyncio.run(run_agent_loop(
-        client, "P", model="m", tool_defs=defs, extra_tools=tools))
+        client, "P", model="m", tool_defs=defs, extra_tools=tools,
+        require_plan_review=False))
     assert result["done"] is True
     content = json.loads(
         client.requests[1]["messages"][-1]["content"][0]["content"])
@@ -448,7 +545,8 @@ def test_agent_loop_truncation_streak_aborts(omni_repo):
                    stop_reason="max_tokens") for i in range(3)]
     client = FakeClient(burst)
     result = asyncio.run(run_agent_loop(
-        client, "P", model="m", tool_defs=defs, extra_tools=tools))
+        client, "P", model="m", tool_defs=defs, extra_tools=tools,
+        require_plan_review=False))
     assert result == {"done": False,
                       "text": "Aborted: repeated output truncation", "turns": 3}
 
@@ -457,12 +555,14 @@ def test_agent_loop_error_classification(omni_repo):
     defs, tools = _tools(omni_repo)
     fatal = FakeClient([RuntimeError("401 Unauthorized: invalid_api_key")])
     r = asyncio.run(run_agent_loop(fatal, "P", model="m", tool_defs=defs,
-                                   extra_tools=tools))
+                                   extra_tools=tools,
+                                   require_plan_review=False))
     assert not r["done"] and r["text"].startswith("Fatal API error")
     transient = FakeClient([ConnectionError("read timeout"),
                             _resp([_blk_text("unreached")])])
     r = asyncio.run(run_agent_loop(transient, "P", model="m", tool_defs=defs,
-                                   extra_tools=tools))
+                                   extra_tools=tools,
+                                   require_plan_review=False))
     assert not r["done"] and r["text"].startswith("Stream error (turn 1)")
 
 
@@ -471,7 +571,8 @@ def test_agent_loop_turn_budget(omni_repo):
     client = FakeClient([_resp([_blk_tool("git_diff", f"t{i}", {})])
                          for i in range(3)])
     r = asyncio.run(run_agent_loop(client, "P", model="m", tool_defs=defs,
-                                   extra_tools=tools, max_turns=3))
+                                   extra_tools=tools, max_turns=3,
+                                   require_plan_review=False))
     assert r == {"done": False, "text": "Agent exceeded max turns", "turns": 3}
 
 

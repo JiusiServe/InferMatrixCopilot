@@ -51,6 +51,12 @@ class ToolDef:
     input_schema: dict
     handler: Callable[..., str]
     write_path_arg: str | None = None  # arg holding the path a write lands on
+    # Optional audit classifier for tools whose FAILURES are ordinary return
+    # values (parent-shaped {"error": ...} strings): dispatch keeps the
+    # transport payload ok=True (the bytes ARE the tool result) but records
+    # the trace event with the classifier's verdict, so failure accounting
+    # sees missing files/unwired backends as failures, not successes.
+    audit_ok: Callable[[str], bool] | None = None
 
 
 def _read_file(path: str, max_bytes: int = 48_000, offset: int = 0,
@@ -203,8 +209,14 @@ def dispatch(
                 out_of_scope = decision.out_of_scope
         try:
             result = tool.handler(**args)
+            audit = True
+            if tool.audit_ok is not None:
+                try:
+                    audit = bool(tool.audit_ok(result))
+                except Exception:  # noqa: BLE001 - classifier never breaks dispatch
+                    audit = False
             if trace:
-                trace.record("tool_call", tool=name, ok=True,
+                trace.record("tool_call", tool=name, ok=audit,
                              out_of_scope=out_of_scope,
                              path=str(write_path) if write_path else None)
                 if out_of_scope:

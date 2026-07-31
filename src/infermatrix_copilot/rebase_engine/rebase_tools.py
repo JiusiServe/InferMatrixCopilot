@@ -256,6 +256,14 @@ def build_rebase_tools(tool_defs: list[dict], paths: RebasePaths,
             return json.dumps(handler(**kwargs))
         return call
 
+    def _audit_ok(result: str) -> bool:
+        # parent-shaped failures are ordinary strings — classify them for
+        # dispatch's trace so failure accounting stays accurate
+        try:
+            return "error" not in json.loads(result)
+        except (TypeError, ValueError):
+            return False
+
     handlers: dict[str, tuple[Handler, str | None]] = {
         "run_shell": (handle_run_shell, None),
         "read_file": (_handle_read_file, None),
@@ -285,5 +293,6 @@ def build_rebase_tools(tool_defs: list[dict], paths: RebasePaths,
         handler, write_arg = handlers[d["name"]]
         out[d["name"]] = ToolDef(d["name"], d["description"],
                                  d["input_schema"], _wrap(handler),
-                                 write_path_arg=write_arg)
+                                 write_path_arg=write_arg,
+                                 audit_ok=_audit_ok)
     return out

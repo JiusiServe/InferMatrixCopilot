@@ -85,11 +85,22 @@ class Copilot:
         # compatibility path — a malformed/unreadable KNOWN adapter must fail
         # closed here, not fail open into capabilities=None and recall a
         # playbook whose requirements were never established.
-        from ..adapters.base import AdapterNotFound, AdapterRegistry
+        from ..adapters.base import AdapterError, AdapterNotFound, AdapterRegistry
+        adapter_name = spec.repo.replace("-", "_")
         try:
             adapter = AdapterRegistry(self.settings.adapters_dir).resolve(
-                name=spec.repo.replace("-", "_"))
+                name=adapter_name)
         except AdapterNotFound:
+            # the registry resolves by DECLARED manifest name and skips
+            # manifest-less directories — so "not found" alone does not
+            # prove absence. Only a genuinely absent directory is the
+            # v1-compatible path; an existing directory that failed to
+            # load/resolve (deleted manifest, wrong name:) fails closed.
+            if (Path(self.settings.adapters_dir) / adapter_name).exists():
+                raise AdapterError(
+                    f"adapter directory {adapter_name!r} exists but did not "
+                    "load/resolve (missing manifest.yaml or mismatched "
+                    "name:) — refusing to plan with unknown capabilities")
             adapter = None                # absence: v1-compatible
         except FileNotFoundError:
             adapter = None                # no adapters directory at all

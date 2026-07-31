@@ -61,10 +61,20 @@ async def run_agent_loop(
     max_turns: int = 150,
     max_tokens: int = 32000,
     require_plan_review: bool = True,
+    plan_write_prefix: str = "",
     agent_log: str = "",
 ) -> dict:
     """Send prompt → receive tool calls → dispatch → repeat until a text-only
-    response or the turn budget. Returns ``{"done", "text", "turns"}``."""
+    response or the turn budget. Returns ``{"done", "text", "turns"}``.
+
+    `plan_write_prefix` is REQUIRED when the plan gate is on: while locked,
+    `write_file` is confined to paths under it (the run's plan directory) —
+    without this, the gate is bypassable by simply overwriting product code
+    with `write_file` before any decision exists."""
+    if require_plan_review and not plan_write_prefix:
+        raise ValueError("plan_write_prefix is required when "
+                         "require_plan_review is on — the gate would be "
+                         "bypassable via pre-decision write_file")
     messages: list[dict] = [{"role": "user", "content": system_prompt}]
     write_log = _log_writer(agent_log)
     write_log(f"=== Agent started (model={model}, max_turns={max_turns}) ===\n")
@@ -104,6 +114,18 @@ async def run_agent_loop(
                 return {"done": False, "text": f"Fatal API error: {exc}",
                         "turns": turn}
             return {"done": False, "text": f"Stream error (turn {turn}): {exc}",
+                    "turns": turn}
+
+        # Served-model guard (repo invariant: model substitution fails by
+        # default — a silently substituted backend once fabricated 60× cost
+        # metrics). The endpoint's reported model must match what was asked.
+        served = getattr(response, "model", "") or ""
+        if served and served != model:
+            write_log(f"\n=== Model mismatch: requested {model}, "
+                      f"served {served} — aborting ===\n")
+            return {"done": False,
+                    "text": f"Model mismatch: requested {model}, "
+                            f"served {served}",
                     "turns": turn}
 
         truncated = getattr(response, "stop_reason", None) == "max_tokens"
@@ -162,23 +184,39 @@ async def run_agent_loop(
             tinput = tool_use.input or {}
             # The tools LIST only controls advertisement — the model can
             # still emit a call it was never offered. While the plan gate is
-            # closed, gated calls are rejected at dispatch, not just hidden.
-            if require_plan_review and not plan_done and \
-                    tool_use.name in GATED_TOOL_NAMES:
-                write_log(f"[guard] rejected gated tool {tool_use.name} "
-                          "before plan-review decision")
+            # closed, gated calls are rejected at dispatch, not just hidden,
+            # and write_file is confined to the plan directory (product code
+            # must be untouchable before a decision exists).
+            gate_closed = require_plan_review and not plan_done
+            locked_write = (gate_closed and tool_use.name == "write_file"
+                            and not str(tinput.get("file_path", ""))
+                            .startswith(plan_write_prefix))
+            if (gate_closed and tool_use.name in GATED_TOOL_NAMES) \
+                    or locked_write:
+                what = ("write_file outside the plan directory"
+                        if locked_write else tool_use.name)
+                write_log(f"[guard] rejected {what} before plan-review "
+                          "decision")
                 tool_results.append({"type": "tool_result",
                                      "tool_use_id": tool_use.id,
                                      "content": json.dumps({"error": (
-                                         f"{tool_use.name} is locked until the "
+                                         f"{what} is locked until the "
                                          "plan-review decision file "
-                                         "(.decision.md) is written.")})})
+                                         "(.decision.md) is written."
+                                         + (" Write plan/decision files under "
+                                            f"{plan_write_prefix}"
+                                            if locked_write else ""))})})
                 continue
             # Guard against truncated/incomplete tool input: a write/edit
-            # whose JSON was cut off loses file_path/content, and dispatching
-            # would produce a cryptic error the model blindly retries.
-            if tool_use.name in ("write_file", "edit_file") and \
-                    not tinput.get("file_path"):
+            # whose JSON was cut off loses ANY of its required args, and
+            # dispatching would produce the cryptic TypeError the model
+            # blindly retries (a path with the content cut off is the common
+            # shape, not just fully-empty input).
+            _required = {"write_file": ("file_path", "content"),
+                         "edit_file": ("file_path", "old_string",
+                                       "new_string")}
+            if tool_use.name in _required and \
+                    any(k not in tinput for k in _required[tool_use.name]):
                 hint = (" Your previous response was truncated at the output "
                         "token limit, so this tool call is incomplete."
                         if truncated else "")
