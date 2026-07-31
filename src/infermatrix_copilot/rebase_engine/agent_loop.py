@@ -141,13 +141,39 @@ async def run_agent_loop(
             write_log(f"[tools] {', '.join(t.name for t in tool_uses)}")
 
         if not tool_uses:
+            if truncated:
+                # Deliberate divergence from the parent (which returned
+                # done=True here): a text-only response cut off at the token
+                # cap is an INVOLUNTARY ending — reporting it as successful
+                # completion could mark a half-finished module done.
+                write_log(f"\n=== Agent output truncated with no tool calls "
+                          f"(turn {turn}) — not a completion ===\n")
+                return {"done": False,
+                        "text": "Truncated at max_tokens with no tool calls: "
+                                + "\n".join(text_parts),
+                        "turns": turn}
             write_log(f"\n=== Agent finished (turn {turn}) ===\n")
             return {"done": True, "text": "\n".join(text_parts), "turns": turn}
 
         messages.append({"role": "assistant", "content": response.content})
         tool_results = []
+        decision_written = False
         for tool_use in tool_uses:
             tinput = tool_use.input or {}
+            # The tools LIST only controls advertisement — the model can
+            # still emit a call it was never offered. While the plan gate is
+            # closed, gated calls are rejected at dispatch, not just hidden.
+            if require_plan_review and not plan_done and \
+                    tool_use.name in GATED_TOOL_NAMES:
+                write_log(f"[guard] rejected gated tool {tool_use.name} "
+                          "before plan-review decision")
+                tool_results.append({"type": "tool_result",
+                                     "tool_use_id": tool_use.id,
+                                     "content": json.dumps({"error": (
+                                         f"{tool_use.name} is locked until the "
+                                         "plan-review decision file "
+                                         "(.decision.md) is written.")})})
+                continue
             # Guard against truncated/incomplete tool input: a write/edit
             # whose JSON was cut off loses file_path/content, and dispatching
             # would produce a cryptic error the model blindly retries.
@@ -174,6 +200,15 @@ async def run_agent_loop(
             if payload.get("ok"):
                 # handlers serialize the parent-shaped dict themselves
                 content = payload["result"]
+                # the gate unlocks only on a SUCCESSFUL decision write: a
+                # refused/failed write_file (or one whose parent-shaped
+                # result carries an error) proves nothing was decided
+                if (tool_use.name == "write_file"
+                        and ".decision.md" in tinput.get("file_path", "")):
+                    try:
+                        decision_written = "error" not in json.loads(content)
+                    except (TypeError, ValueError):
+                        decision_written = False
             else:
                 content = json.dumps({"error": payload.get("error", "unknown")})
             tool_results.append({"type": "tool_result",
@@ -181,13 +216,10 @@ async def run_agent_loop(
                                  "content": content})
         messages.append({"role": "user", "content": tool_results})
 
-        if not plan_done:
-            for tool_use in tool_uses:
-                if tool_use.name == "write_file" and \
-                        ".decision.md" in (tool_use.input or {}).get("file_path", ""):
-                    plan_done = True
-                    write_log("\n--- PLAN-REVIEW-DECISION COMPLETE — edit "
-                              "tools unlocked ---\n")
+        if not plan_done and decision_written:
+            plan_done = True
+            write_log("\n--- PLAN-REVIEW-DECISION COMPLETE — edit "
+                      "tools unlocked ---\n")
 
         for i, tr in enumerate(tool_results):
             write_log(f"[tool_result {i}] {str(tr.get('content', ''))[:300]}")

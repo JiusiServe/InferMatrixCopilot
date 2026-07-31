@@ -84,6 +84,12 @@ class AdapterError(Exception):
     unknown adapter name, or an agent-side write to a high-risk section."""
 
 
+class AdapterNotFound(AdapterError):
+    """Specifically an UNKNOWN adapter name — callers that treat absence as
+    a compatibility path must catch this subclass, never the base class (a
+    malformed KNOWN adapter has to stay a hard failure)."""
+
+
 @dataclass
 class RepoAdapter:
     """A loaded repo adapter: its `name`, on-disk `root`, and parsed `manifest`
@@ -286,7 +292,7 @@ class AdapterRegistry:
             for p in adapters:
                 if p.name == name:
                     return p
-            raise AdapterError(f"no adapter named {name!r}")
+            raise AdapterNotFound(f"no adapter named {name!r}")
         if repo_path:
             resolved = str(Path(repo_path).resolve())
             for p in adapters:

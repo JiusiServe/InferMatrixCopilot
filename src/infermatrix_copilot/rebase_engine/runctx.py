@@ -109,21 +109,40 @@ class RebaseRuntime:
 
     def teardown(self, *, timeout_sec: float = 60.0) -> list[str]:
         """Run finalizers newest-first inside a bounded window. Never raises;
-        returns the labels of finalizers that failed or were skipped when the
-        window closed (surfaced by the caller's report)."""
+        returns the labels of finalizers that failed, hung past their share
+        of the window, or were skipped when it closed.
+
+        Each finalizer runs in a daemon thread joined against the REMAINING
+        window — a blocked finalizer (dead NFS, wedged subprocess) cannot
+        hang teardown forever and defeat the lifecycle contract. Python
+        cannot kill the hung thread; it is abandoned (daemon) and reported,
+        which the caller surfaces as a lock-leak warning."""
         if self._torn_down:
             return []
         self._torn_down = True
         failures: list[str] = []
         deadline = time.monotonic() + timeout_sec
         for label, fn in reversed(self._finalizers):
-            if time.monotonic() > deadline:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
                 failures.append(f"{label} (skipped: teardown window closed)")
                 continue
-            try:
-                fn()
-            except Exception as exc:  # noqa: BLE001 - teardown never raises
-                failures.append(f"{label} ({type(exc).__name__}: {exc})")
+            outcome: list[str] = []
+
+            def runner(fn=fn, outcome=outcome):
+                try:
+                    fn()
+                except Exception as exc:  # noqa: BLE001 - never raises out
+                    outcome.append(f"{type(exc).__name__}: {exc}")
+
+            t = threading.Thread(target=runner, daemon=True)
+            t.start()
+            t.join(remaining)
+            if t.is_alive():
+                failures.append(f"{label} (hung past the teardown window; "
+                                "thread abandoned)")
+            elif outcome:
+                failures.append(f"{label} ({outcome[0]})")
         self._finalizers.clear()
         return failures
 

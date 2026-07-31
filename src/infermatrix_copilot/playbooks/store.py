@@ -173,17 +173,21 @@ class PlaybookStore:
         candidates.sort(key=lambda p: (p.status != "locked", -p.version))
         return candidates[0] if candidates else None
 
-    def missing_capabilities(self, task_kind: str,
-                             capabilities: set[str]) -> dict[str, list[str]]:
-        """Per playbook of this kind — exact-repo AND repo-neutral — the
-        unmet requirements (escalation material for capability_gap
-        reporting; an exact-repo playbook that stopped matching must say
-        WHY, not vanish silently)."""
+    def missing_capabilities(self, task_kind: str, capabilities: set[str],
+                             repo: str | None = None) -> dict[str, list[str]]:
+        """Per playbook of this kind the unmet requirements (escalation
+        material for capability_gap reporting). Repo-neutral playbooks
+        always report; exact-repo playbooks report only when they target the
+        REQUESTED `repo` — telling another repo's user to satisfy a
+        capability its selector can never match is noise, not guidance. An
+        exact-repo playbook that stopped matching must say WHY, not vanish
+        silently."""
         return {
             p.name: sorted(set(p.requires) - capabilities)
             for p in self._playbooks.values()
             if task_kind in p.task_kinds
             and p.status in ("active", "locked")
+            and (not p.repos or (repo is not None and repo in p.repos))
             and not set(p.requires) <= capabilities
         }
 

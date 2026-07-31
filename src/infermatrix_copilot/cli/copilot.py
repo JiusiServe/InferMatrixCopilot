@@ -81,7 +81,18 @@ class Copilot:
         capability set so the planner only reuses playbooks the target supports.
         Capabilities come from the repo's adapter (if any), plus `repo.path` when
         a path is resolvable even without a adapter (REPO_PATHS works adapter-less)."""
-        adapter = self._adapter_for(spec.repo)
+        # Only genuine adapter ABSENCE takes the unknown-capabilities
+        # compatibility path — a malformed/unreadable KNOWN adapter must fail
+        # closed here, not fail open into capabilities=None and recall a
+        # playbook whose requirements were never established.
+        from ..adapters.base import AdapterNotFound, AdapterRegistry
+        try:
+            adapter = AdapterRegistry(self.settings.adapters_dir).resolve(
+                name=spec.repo.replace("-", "_"))
+        except AdapterNotFound:
+            adapter = None                # absence: v1-compatible
+        except FileNotFoundError:
+            adapter = None                # no adapters directory at all
         if adapter is None:
             # No adapter means capabilities are UNKNOWN, not zero — the
             # store's requires-filter (now covering exact-repo playbooks too)

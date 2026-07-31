@@ -101,6 +101,28 @@ async def _acquire_conflict(reg, run_dir):
     reg.get_or_create(run_dir, "run-B")
 
 
+def test_teardown_bounds_a_hung_finalizer(tmp_path):
+    """A blocked finalizer must not hang teardown past the window: it is
+    joined against the remaining budget, abandoned, and reported — later
+    finalizers still run."""
+    import threading as _th
+    rt = RebaseRuntime(tmp_path, "run-1")
+    ran = []
+    release = _th.Event()
+    rt.add_finalizer("early", lambda: ran.append("early"))
+    rt.add_finalizer("hang", release.wait)          # blocks until released
+    rt.add_finalizer("late", lambda: ran.append("late"))
+    t0 = __import__("time").monotonic()
+    failures = rt.teardown(timeout_sec=0.5)
+    elapsed = __import__("time").monotonic() - t0
+    release.set()                                   # let the daemon die
+    assert elapsed < 5
+    assert ran == ["late"]        # newest ran; the hang exhausted the window
+    assert any("hung past the teardown window" in f for f in failures)
+    # the finalizer behind the hang is skipped AND reported, never silent
+    assert any("early" in f and "skipped" in f for f in failures)
+
+
 def test_runtime_teardown_reverse_order_never_raises(tmp_path):
     rt = RebaseRuntime(tmp_path, "run-1")
     order = []
@@ -347,6 +369,64 @@ def test_agent_loop_partial_e2e(omni_repo, trace, tmp_path):
     assert "PLAN-REVIEW-DECISION COMPLETE" in log
 
 
+def test_gate_unlocks_only_on_successful_decision_write(omni_repo, tmp_path):
+    """A refused (out-of-wall) or failing decision write must NOT unlock the
+    gated tools, and a gated call emitted while locked is rejected at
+    dispatch — the tools list only controls advertisement."""
+    defs, tools = _tools(omni_repo)
+    scope = ToolScope(name="m", allowed_tools=frozenset(),
+                      path_scope=PathScope(writable=(f"{tmp_path}/*",)))
+    client = FakeClient([
+        # decision write OUTSIDE the writable wall -> refused -> still locked
+        _resp([_blk_tool("write_file", "t1",
+                         {"file_path": "/etc/plan-v0.decision.md",
+                          "content": "x"})]),
+        # the model tries edit_file anyway while locked -> rejected
+        _resp([_blk_tool("edit_file", "t2",
+                         {"file_path": str(omni_repo / "mod.py"),
+                          "old_string": "return 1", "new_string": "H"})]),
+        # a SUCCESSFUL decision write unlocks
+        _resp([_blk_tool("write_file", "t3",
+                         {"file_path": str(tmp_path / "p.decision.md"),
+                          "content": "accept"})]),
+        _resp([_blk_tool("edit_file", "t4",
+                         {"file_path": str(omni_repo / "mod.py"),
+                          "old_string": "return 1", "new_string": "return 9"})]),
+        _resp([_blk_text("done")]),
+    ])
+    result = asyncio.run(run_agent_loop(
+        client, "P", model="m", tool_defs=defs, extra_tools=tools, scope=scope))
+    assert result["done"] is True
+    assert not Path("/etc/plan-v0.decision.md").exists()
+    assert "return 1" in (omni_repo / "mod.py").read_text() or         "return 9" in (omni_repo / "mod.py").read_text()
+    # gated tools were withheld through turn 3 and offered on turn 4
+    names_by_turn = [[t["name"] for t in req["tools"]]
+                     for req in client.requests]
+    assert "edit_file" not in names_by_turn[1]
+    assert "edit_file" not in names_by_turn[2]
+    assert "edit_file" in names_by_turn[3]
+    # t2 (locked edit) was rejected, not executed
+    results = {tr["tool_use_id"]: tr
+               for m in client.requests[-1]["messages"]
+               if isinstance(m.get("content"), list)
+               for tr in m["content"]
+               if isinstance(tr, dict) and tr.get("type") == "tool_result"}
+    assert "locked until the plan-review decision" in         json.loads(results["t2"]["content"])["error"]
+    assert json.loads(results["t4"]["content"])["occurrences"] == 1
+    assert (omni_repo / "mod.py").read_text().count("return 9") == 1
+
+
+def test_agent_loop_truncated_text_only_not_done(omni_repo):
+    """A text-only response cut off at max_tokens is an involuntary ending —
+    deliberate divergence from the parent, which reported done=True."""
+    defs, tools = _tools(omni_repo)
+    client = FakeClient([_resp([_blk_text("half a summar")],
+                               stop_reason="max_tokens")])
+    r = asyncio.run(run_agent_loop(client, "P", model="m", tool_defs=defs,
+                                   extra_tools=tools))
+    assert r["done"] is False and "Truncated at max_tokens" in r["text"]
+
+
 def test_agent_loop_incomplete_write_guard(omni_repo, tmp_path):
     defs, tools = _tools(omni_repo)
     client = FakeClient([
@@ -410,9 +490,53 @@ def test_store_exact_repo_requires_filter(tmp_path):
     assert store.find("repo_rebase", "repo-a", None) is not None
     # authoritative capabilities without the requirement: filtered out...
     assert store.find("repo_rebase", "repo-a", {"repo.path"}) is None
-    # ...and the gap is REPORTED for the exact-repo playbook
-    assert store.missing_capabilities("repo_rebase", {"repo.path"}) == {
+    # ...and the gap is REPORTED for the exact-repo playbook (repo-scoped)
+    assert store.missing_capabilities("repo_rebase", {"repo.path"},
+                                      repo="repo-a") == {
         "x": ["orchestrator.external"]}
     # satisfied: recalled
     assert store.find("repo_rebase", "repo-a",
                       {"repo.path", "orchestrator.external"}) is not None
+    # gap reporting is repo-scoped: another repo's exact playbook is noise
+    assert store.missing_capabilities("repo_rebase", {"repo.path"},
+                                      repo="repo-b") == {}
+    assert store.missing_capabilities("repo_rebase", {"repo.path"},
+                                      repo="repo-a") == {
+        "x": ["orchestrator.external"]}
+
+
+def test_extra_write_file_records_full_file_write(tmp_path, trace):
+    """A whole-.py rewrite through an extra write tool must arm the same
+    full-file-fallback audit event as the builtin branch."""
+    from infermatrix_copilot.rebase_engine.rebase_tools import (
+        RebaseBackends, RebasePaths, build_rebase_tools, load_tool_schemas)
+    tools = build_rebase_tools(load_tool_schemas(SCHEMAS),
+                               RebasePaths(omni_path=str(tmp_path),
+                                           vllm_path=str(tmp_path)))
+    scope = ToolScope(name="m", allowed_tools=frozenset(),
+                      path_scope=PathScope(writable=(f"{tmp_path}/*",)))
+    out = dispatch("write_file",
+                   {"file_path": str(tmp_path / "big.py"), "content": "x"},
+                   scope=scope, trace=trace, extra=tools)
+    assert out["ok"]
+    assert any(True for _ in trace.events("full_file_write"))
+
+
+def test_resolve_fails_closed_on_malformed_known_adapter(tmp_path, settings,
+                                                         git_repo):
+    """A malformed KNOWN adapter must be a hard failure, not fail open into
+    capabilities=None and recall a playbook whose requirements were never
+    established."""
+    import shutil
+    from infermatrix_copilot.cli import Copilot
+    from infermatrix_copilot.config import _REPO_ROOT
+    from infermatrix_copilot.task_spec import TaskSpec
+    settings.playbooks_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(_REPO_ROOT / "playbooks" / "repo-rebase.yaml",
+                settings.playbooks_dir / "repo-rebase.yaml")
+    settings.repo_paths = {"vllm-omni": str(git_repo)}
+    bad = Path(settings.adapters_dir) / "vllm_omni"
+    bad.mkdir(parents=True, exist_ok=True)
+    (bad / "manifest.yaml").write_text("{not yaml: [")
+    with pytest.raises(Exception):
+        Copilot(settings).resolve(TaskSpec(kind="repo_rebase"))

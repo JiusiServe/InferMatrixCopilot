@@ -210,6 +210,12 @@ def dispatch(
                 if out_of_scope:
                     trace.record("out_of_scope_edit", tool=name,
                                  path=str(write_path))
+                # same audit event as the builtin branch: a whole-.py rewrite
+                # through an extra write tool must still arm the
+                # full-file-fallback review trigger
+                if name == "write_file" and write_path and \
+                        Path(write_path).suffix == ".py":
+                    trace.record("full_file_write", path=str(write_path))
             return {"ok": True, "result": result, "out_of_scope": out_of_scope}
         except Exception as exc:
             if trace:
