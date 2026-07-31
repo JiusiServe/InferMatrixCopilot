@@ -917,6 +917,7 @@ def test_v3_module_scope_and_serialization(v3_agent_env, settings, trace,
         return orig_build(defs, paths, backends)
     monkeypatch.setattr(rt_mod, "build_rebase_tools", spy_build)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-agent-secret")
+    monkeypatch.setenv("HF_TOKEN", "hf-gated-secret")
     registry = register_builtin_steps(StepRegistry())
     handler = registry.get("rebase.v3_module_rebase").handler
 
@@ -980,6 +981,19 @@ def test_v3_module_scope_and_serialization(v3_agent_env, settings, trace,
     assert agent_envs["IMX_ADAPTER_REBASE"].endswith("vllm_omni/rebase")
     assert agent_envs["VIRTUAL_ENV"].endswith("omni-venv")
     assert "ANTHROPIC_API_KEY" not in agent_envs      # scrub still applies
+    # HF token retained under the manifest's EXPLICIT opt-in (Rev 8 §4:
+    # validation.requires_hf_token — gated-model verification needs it)...
+    assert agent_envs["HF_TOKEN"] == "hf-gated-secret"
+    # ...and stripped for an adapter that does NOT declare the opt-in
+    from infermatrix_copilot.engine.steps.rebase_v3 import _agent_shell_env
+    manifest_no_opt = yaml.safe_load(
+        (Path(settings.adapters_dir) / "vllm_omni" / "manifest.yaml")
+        .read_text())
+    manifest_no_opt["validation"].pop("requires_hf_token")
+    plain_ctx = SimpleNamespace(run_dir=run_dir, settings=settings)
+    env2 = _agent_shell_env(plain_ctx, manifest_no_opt, str(repo),
+                            Path(settings.adapters_dir) / "vllm_omni")
+    assert "HF_TOKEN" not in env2
     # the served-model policy travels with the config (aliases + mismatch);
     # CUDA/HF facts describe THIS host, not the dataclass defaults
     cfg = configs["worker_runner"]
@@ -1514,6 +1528,25 @@ def test_v3_backends_are_production(v3_env, settings, trace, tmp_path,
     assert not (adapter_skills / "_candidates.json").exists()
     assert not (runtime_dir / "new-trick" / "SKILL.md").exists()
     assert "error" in backends.skill_manage(action="delete", name="x")
+
+    # retrieval is a REAL seed UNION runtime: a full seed page can never
+    # starve distinct runtime skills out of the result
+    def write_skill(root, name, desc):
+        d = root / name
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "SKILL.md").write_text(
+            f"---\nname: {name}\ndescription: {desc}\n"
+            "status: active\n---\nbody\n")
+    write_skill(adapter_skills, "seed-one", "rebase widget seed")
+    write_skill(adapter_skills, "seed-two", "rebase widget seed")
+    write_skill(runtime_dir, "runtime-one", "rebase widget learned")
+    names = {s["name"] for s in backends.search_skills(
+        keyword="rebase widget", max_results=3)["skills"]}
+    assert "runtime-one" in names and "seed-one" in names
+    # k=1: the learned (runtime) skill is never crowded out by seed
+    top = backends.search_skills(keyword="rebase widget",
+                                 max_results=1)["skills"]
+    assert top[0]["name"] == "runtime-one"
 
 
 def test_v3_wheel_installs_into_target_venv(v3_env, settings, trace,

@@ -220,6 +220,10 @@ rebase:
 validation:
   test_manifest_sources: [.buildkite/]
   precommit: true
+  # gated-model tests (TTS/omni checkpoints) need the HF token inside agent
+  # shells — the Rev 8 §4 EXPLICIT opt-in; without it the credential scrub
+  # strips HF_TOKEN and gated-model verification fails
+  requires_hf_token: true
 
 ci:
   provider: buildkite

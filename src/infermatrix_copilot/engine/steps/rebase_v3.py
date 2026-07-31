@@ -129,8 +129,13 @@ def _agent_shell_env(ctx: StepContext, manifest: dict, repo_root: str,
     import os
     from ...testing.env_plan import build_subprocess_env
     venv = _target_venv(manifest)
+    # HF token only on the manifest's EXPLICIT opt-in (Rev 8 §4:
+    # validation.requires_hf_token — gated-model verification needs it;
+    # every other adapter keeps the token scrubbed)
+    keep_hf = bool((manifest.get("validation") or {})
+                   .get("requires_hf_token"))
     env = build_subprocess_env(
-        base=scrubbed_agent_env(),
+        base=scrubbed_agent_env(keep_hf_token=keep_hf),
         venv=Path(venv) if venv else None,
         cuda_visible_devices=os.environ.get("CUDA_VISIBLE_DEVICES"),
         hf_home=os.environ.get("HF_HOME"))
@@ -281,12 +286,14 @@ def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
         query = str(kw.get("keyword", "") or "")
         module_q = str(kw.get("module", "") or "")
         k = int(kw.get("max_results") or 3)
-        # retrieval = seed ∪ runtime (runtime wins name collisions)
+        # retrieval = a REAL seed ∪ runtime union: runtime (learned, newer)
+        # first, then seed entries it doesn't override — a full seed page
+        # can never starve distinct runtime skills out of the result
         merged: dict[str, object] = {}
-        for store_dir in (seed_skills_dir, runtime_skills_dir):
+        for store_dir in (runtime_skills_dir, seed_skills_dir):
             for s in SkillStore(store_dir).find(query=query,
                                                 module=module_q, k=k):
-                merged[s.name] = s
+                merged.setdefault(s.name, s)
         return {"skills": [{"name": s.name, "description": s.description}
                            for s in list(merged.values())[:k]]}
 
