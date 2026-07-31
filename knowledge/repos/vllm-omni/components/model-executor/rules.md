@@ -1,13 +1,34 @@
 ---
 title: "Model Executor 规则"
 created: 2026-07-10
-updated: 2026-07-23
+updated: 2026-07-31
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: [vllm_omni/worker/gpu_model_runner.py, tests/worker/test_omni_gpu_model_runner.py, vllm_omni/config/stage_config.py, "PR #3642", "PR #4730", "claude-workflow-starter-private@09dca46"]
+sources: [vllm_omni/worker/gpu_model_runner.py, tests/worker/test_omni_gpu_model_runner.py, vllm_omni/config/stage_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, "PR #3642", "PR #4730", "claude-workflow-starter-private@09dca46"]
 ---
 
 # Model Executor 规则
+
+## Direct 代码快速入口
+
+- **EXEC-0a — PR 描述先选代码地图。** Direct review 先按 title/body 声明的 runner、stage、bridge、loader 或设备语义命中下表，再用 pinned changed files 验证真实模型 consumer；路径只负责范围反查。
+- **EXEC-0b — 共享 producer 先于模型补丁。** 命中共享 runner、stage runtime 或 bridge producer 后立即沿 live consumer 审查；只有 producer 正确且问题只属于一个模型时才进入该模型 owner。
+
+| PR 描述在做什么 | 精确规则组 | 第一批 live 源码 |
+|---|---|---|
+| strict stage config、known-fields/projection、service/stage 字段归属、runtime config | `strict-stage-config`：`EXEC-3a` | `vllm_omni/config/stage_config.py::{build_stage_runtime_overrides,_build_engine_args}` → `vllm_omni/config/omni_config.py::{_build_common_stage_config_kwargs,VllmOmniConfig.from_pipeline_config}` → 真实 startup consumer |
+| runner `_preprocess`、逐请求 metadata、prefill/decode phase、batch preprocess、MTP | `runner-preprocess`：本页“Runner 到模型的预处理合同” | `vllm_omni/worker/gpu_model_runner.py::{OmniGPUModelRunner._maybe_run_batch_preprocess,_preprocess,_build_model_kwargs_extra,_talker_mtp_forward}` → `vllm_omni/model_executor/models/<命中模型>` consumer |
+| stage TP/PP/DP、devices、replica、visible devices、worker 启动、容量 fail-fast | `stage-runtime`：本页“Stage 并行度和设备容量必须一起验收” | `vllm_omni/config/stage_config.py::build_stage_runtime_overrides` → `vllm_omni/engine/stage_runtime.py::{StageRuntime.initialize,StageRuntime._resolve_replica_physical_devices}` → `stage_engine_startup.py::{launch_stage_replica,get_headless_replica_devices}` |
+| `runtime_info`、`OmniOutput`、multimodal payload、跨 stage bridge、batch 串线 | `bridge-batch`：`EXEC-1a`, `EXEC-1b` | `vllm_omni/worker/gpu_model_runner.py::{extract_multimodal_outputs,_gather_runtime_additional_information,_build_model_kwargs_extra}` → `vllm_omni/model_executor/stage_input_processors/<命中模型>` |
+| loader dtype、只取 checkpoint config、避免整仓权重下载 | `loader-contract`：`EXEC-2a` | `vllm_omni/model_executor/model_loader/weight_utils.py::download_weights_from_hf_specific` → `vllm_omni/model_executor/models/<命中模型>` loader |
+
+| 审查组 | 什么时候触发 | 规则 ID |
+|---|---|---|
+| `core` | 每次 model-executor 审查 | `EXEC-1a` |
+| `strict-stage-config` | stage schema、projection、known fields | `EXEC-3a` |
+| `bridge-batch` | runtime info、跨 stage payload、batch | `EXEC-1a`, `EXEC-1b` |
+| `loader-contract` | dtype、checkpoint config 获取、loader | `EXEC-2a` |
+| `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `EXEC-0a`, `EXEC-0b` |
 
 ## 严格配置校验
 

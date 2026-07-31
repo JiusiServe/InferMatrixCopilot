@@ -1,16 +1,37 @@
 ---
 title: "Serving 规则"
 created: 2026-07-20
-updated: 2026-07-23
+updated: 2026-07-31
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #3576", "PR #4718", "PR #5157", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6"]
+sources: ["PR #3576", "PR #4718", "PR #5157", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/metrics/prometheus.py]
 confidence: high
 ---
 
 # Serving 规则
 
 只有 `SERV-数字字母` 是可审计规则 ID。
+
+## Direct 代码快速入口
+
+- **SERV-0a — PR 描述先选代码地图。** Direct review 先按 title/body 声明的协议、请求字段或服务能力命中下表，再用 pinned changed files 校验真实 dispatcher 和范围；描述不能作为 finding 证据。
+- **SERV-0b — 复用同一份 serving 证据。** 第一次 Codex review 打开命中函数后，把 request 对象、caller 搜索、测试和 findings 追加到同一份证据包；不得让专项重新扫描整个 serving 树。
+
+| PR 描述在做什么 | 精确规则组 | 第一批 live 源码 |
+|---|---|---|
+| `extra_body`、flattened/nested/canonical/legacy 输入、alias、`negative_prompt`、diffusion request extras | `request-contract`：`SERV-4a`–`4h` | `vllm_omni/entrypoints/openai/diffusion_request_utils.py::{normalize_diffusion_request_args,apply_normalized_diffusion_request_extra_args}` → `serving_chat.py::{OmniOpenAIServingChat._preprocess_chat,OmniOpenAIServingChat.generate_diffusion_images}` |
+| SSE/streaming speech、audio format、PCM/WAV、speed、首 chunk 前校验 | `streaming-format`：`SERV-1a`, `SERV-1b` | `vllm_omni/entrypoints/openai/protocol/audio.py::{OpenAICreateSpeechRequest.validate_streaming_constraints,StreamingSpeechSessionConfig.validate_streaming_constraints}` → `serving_speech.py::{OmniOpenAIServingSpeech._validate_speech_streaming_request,OmniOpenAIServingSpeech.create_speech}` |
+| `ref_audio`、x-vector/ICL、artifact cache、readiness、失败后 engine 存活 | `artifact-readiness`：`SERV-3a`, `SERV-3b` | `vllm_omni/entrypoints/openai/serving_speech.py::{_qwen3_tts_can_use_ref_audio_artifact_only,_track_ref_audio_artifact_warmup,_mark_ref_audio_artifact_ready_for_request,_discard_ref_audio_artifact_ready_if_unreferenced}` |
+| Prometheus、waiting/running gauge、replica stats、throttle、collector lifecycle | `metrics-lifecycle`：`SERV-2a`, `SERV-2b` | `vllm_omni/entrypoints/omni_base.py::{OmniBase._log_summary_and_cleanup,OmniBase._process_stage_metrics_message}` → `vllm_omni/metrics/prometheus.py::{OmniPrometheusMetrics.__init__,set_running,set_waiting}` |
+
+| 审查组 | 什么时候触发 | 规则 ID |
+|---|---|---|
+| `core` | 每次 serving 审查 | `SERV-4c` |
+| `streaming-format` | SSE、audio streaming、format/default/capability | `SERV-1a`, `SERV-1b` |
+| `metrics-lifecycle` | metrics、gauge、replica、collector | `SERV-2a`, `SERV-2b` |
+| `artifact-readiness` | artifact cache、capability、ready/mark/discard | `SERV-3a`, `SERV-3b` |
+| `request-contract` | 请求字段、来源、冲突、dispatcher、consumer view | `SERV-4a`, `SERV-4b`, `SERV-4c`, `SERV-4d`, `SERV-4e`, `SERV-4f`, `SERV-4g`, `SERV-4h` |
+| `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `SERV-0a`, `SERV-0b` |
 
 ## SERV-1a — 所有可预判错误在第一个 streaming chunk 前返回
 

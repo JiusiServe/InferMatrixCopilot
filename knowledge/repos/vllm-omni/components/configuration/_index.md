@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni Configuration"
 created: 2026-07-16
-updated: 2026-07-29
+updated: 2026-07-31
 type: index
 tags: [vllm-omni, components, config]
 sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
@@ -32,7 +32,7 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
 | 遇到什么 | 查看哪里 |
 |---|---|
 | 理解配置从 deploy、CLI、默认 factory 到 structured/legacy config 的稳定边界 | [配置构造架构](architecture.md) |
-| 修改配置字段、strict schema、归一化、默认 factory 或新老入口 | [配置开发门禁](rules.md) |
+| 根据 PR 描述直达 strict schema、deploy/topology、composable strategy 或显存配置的规则组与第一批源码 | [配置开发门禁与代码地图](rules.md) |
 | 审计配置来源、多层加工或初始化参数 | [configuration guides](guides/_index.md) |
 
 旧 `components/config/` 与 `dev/` 页面已归档，仅用于迁移追溯：

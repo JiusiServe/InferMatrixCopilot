@@ -1,10 +1,10 @@
 ---
 title: "Diffusion 共享规则"
 created: 2026-07-20
-updated: 2026-07-20
+updated: 2026-07-31
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136"]
+sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/distributed/hsdp.py]
 confidence: high
 ---
 
@@ -12,6 +12,28 @@ confidence: high
 
 只有 `DIFF-数字字母` 是可审计规则 ID。模型专有常量和已验证偏差留在对应
 [模型 owner](../../models/_index.md)；本页只承载多个 diffusion 模型共用的不变量。
+
+## Direct 代码快速入口
+
+- **DIFF-0a — PR 描述先选共享执行地图。** Direct review 先按 title/body 声明的 graph、RNG、checkpoint、HSDP、quantization 或质量语义命中下表，再用 pinned changed files 验证是否确属共享 diffusion owner。
+- **DIFF-0b — 共享 runner 与模型 pipeline 分层。** 先打开命中行的共享 producer；只有 live 调用链证明偏差属于某个模型 pipeline、checkpoint 或常量时才进入模型 owner，不能横向遍历所有 diffusion 模型。
+
+| PR 描述在做什么 | 精确规则组 | 第一批 live 源码 |
+|---|---|---|
+| CUDA Graph、compile、fused scheduler/solver、cache path、eager parity | `execution-parity`：`DIFF-1a` | `vllm_omni/diffusion/compile.py::regionally_compile` → `vllm_omni/diffusion/worker/diffusion_model_runner.py::{DiffusionModelRunner.execute_model,execute_model_batch}` → 命中模型的 denoise/solver consumer |
+| seed、request-local generator、guidance=0、并发 RNG、batched generators | `execution-parity`：`DIFF-1b` | `vllm_omni/inputs/data.py::OmniDiffusionSamplingParams` → `diffusion_model_runner.py::DiffusionModelRunner._initialize_generator` → `request_batch.py::DiffusionRequestBatch.collate_sampling_param_generators` |
+| ModelOpt/checkpoint adapter、weight/scale remap、unknown tensor、resolution path | `checkpoint-distributed`：`DIFF-2a` | `vllm_omni/diffusion/model_loader/diffusers_loader.py::{DiffusersPipelineLoader._get_checkpoint_adapter,load_weights}` → `checkpoint_adapters/modelopt.py::{ModelOptFp8CheckpointAdapter._resolve_target_and_output_names,adapt}` |
+| HSDP/FSDP、`fully_shard`、DeviceMesh、packed/scalar parameter、FP8 | `checkpoint-distributed`：`DIFF-2b` | `vllm_omni/diffusion/distributed/hsdp.py::{apply_hsdp_to_model,shard_model}` → `model_loader/diffusers_loader.py::DiffusersPipelineLoader._load_model_with_hsdp` → `quantization/hsdp_fp8.py::prepare_fp8_layers_for_fsdp` |
+| component quantization、text encoder/transformer/VAE 独立配置、owner prefix、meta/offload | `checkpoint-distributed`：`DIFF-2c` | `vllm_omni/diffusion/data.py::OmniDiffusionConfig._propagate_quantization_from_tf_config` → `model_loader/diffusers_loader.py::{DiffusersPipelineLoader._get_weight_sources,_process_weights_after_loading}` → 命中 component 的真实 linear consumer |
+| LPIPS/PSNR/相似度阈值、CPU offload、量化质量证据 | `quality-evidence`：`DIFF-3a` | changed quality test 的 exact case → `vllm_omni/diffusion/worker/diffusion_model_runner.py::DiffusionModelRunner.execute_model` → 命中 pipeline；baseline/candidate 必须复用同一路径 |
+
+| 审查组 | 什么时候触发 | 规则 ID |
+|---|---|---|
+| `core` | 每次共享 diffusion 审查 | `DIFF-1a`, `DIFF-1b` |
+| `execution-parity` | graph/eager、solver、RNG、generator、zero/default | `DIFF-1a`, `DIFF-1b` |
+| `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP | `DIFF-2a`, `DIFF-2b`, `DIFF-2c` |
+| `quality-evidence` | 质量阈值、offload、A/B case | `DIFF-3a` |
+| `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `DIFF-0a`, `DIFF-0b` |
 
 ## 优化路径与 eager 的等价合同
 

@@ -1,7 +1,7 @@
 ---
 title: "Diffusion"
 created: 2026-07-10
-updated: 2026-07-20
+updated: 2026-07-31
 type: index
 tags: [vllm-omni, components, diffusion]
 sources: []
@@ -28,5 +28,5 @@ sources: []
 | 遇到什么 | 查看哪里 |
 |---|---|
 | 理解共享职责和数据流 | [architecture](architecture.md) |
-| 审查 graph/eager parity、请求 RNG、checkpoint remap 或 HSDP | [rules](rules.md) |
+| 根据 PR 描述直达 execution parity、checkpoint/distributed 或 quality evidence 的规则组与第一批源码 | [rules 与代码地图](rules.md) |
 | step 执行/batching/缓存加速/并行等特性语义 | [特性指南](guides/_index.md) |
