@@ -16,6 +16,15 @@ repos: [vllm-omni]
 requires: [modules, upstream.fork_tracking, ci.provider]
 # mode governance (Rev 8 §2.1): resolve_effective_mode runs before plan echo
 # and confirmation; `when:` gates below use ONLY the seeded mode_* flags.
+# The §2.2 per-mode matrix, spelled out (composite flags precompute the
+# or-of-modes because `when:` is single-key):
+#   report_only : prelude, guard_check(read-only), scan, report, finalize
+#   local_ci    : prelude, guard, tests(local loop), report, finalize
+#                 (push gate VACUOUS — nothing gets pushed; §2.3)
+#   remote_ci   : prelude, guard, push_gate, ci, report, finalize
+#                 (NO local test loop — phase 4 is push+monitor)
+#   full        : prelude, guard, wheel, assign, wave1, wave_gate, wave2,
+#                 tests, push_gate, ci, report, finalize
 mode_aware: true
 params:
   rebase_mode: {type: str, default: ""}     # report_only|full|local_ci|remote_ci
@@ -26,17 +35,28 @@ params:
   strict_push_gate: {type: bool, default: false}
 steps:
   - {id: prelude, step: rebase.v3_prelude}
-  - {id: guard, step: workspace.guard_clean_rebase, when: not mode_report_only}
+  # report_only still validates the tree — but through the honestly read-only
+  # guard (check-only, never mutates merge state)
+  - {id: guard_check, step: workspace.guard_clean, when: mode_report_only}
+  - {id: guard, step: workspace.guard_clean_rebase,
+     when: not mode_report_only}
   - {id: scan, step: rebase.v3_scan, when: mode_report_only}
   - {id: wheel, step: rebase.v3_wheel, when: mode_full}
   - {id: assign, step: rebase.v3_assign, when: mode_full}
-  - {id: waves, step: rebase.v3_module_rebase, foreach: active_modules,
+  # wave ordering is a dependency contract: wave 1 completes before the gate
+  # rules, and only then does wave 2 fan out (the gate empties it on failure)
+  - {id: wave1, step: rebase.v3_module_rebase, foreach: wave1_modules,
      when: mode_full}
-  - {id: tests, step: rebase.v3_test_loop, when: not mode_report_only}
-  - {id: push_gate, step: rebase.v3_push_gate, when: not mode_report_only}
-  - {id: ci, step: rebase.v3_ci, when: mode_remote_ci}
-  - {id: finalize, step: rebase.v3_finalize}
+  - {id: wave_gate, step: rebase.v3_wave_gate, when: mode_full}
+  - {id: wave2, step: rebase.v3_module_rebase, foreach: wave2_modules,
+     when: mode_full}
+  - {id: tests, step: rebase.v3_test_loop, when: mode_runs_local_tests}
+  - {id: push_gate, step: rebase.v3_push_gate, when: mode_runs_push_gate}
+  - {id: ci, step: rebase.v3_ci, when: mode_runs_remote_ci}
+  # report BEFORE finalize: the terminal-row ruling may end the run blocked
+  # (needs-human, exit 3) and RUN_REPORT must already exist when it does
   - {id: report, step: report.final_summary}
+  - {id: finalize, step: rebase.v3_finalize}
 success: substate phase=done with zero unexplained module/test failures; in
   full mode the push gate ruled and the transition table's terminal row was
-  honored (needs_human => blocked/exit 3)
+  honored (needs_human => blocked/exit 3, ruled AFTER the report is written)

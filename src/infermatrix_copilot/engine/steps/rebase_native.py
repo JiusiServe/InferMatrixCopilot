@@ -197,6 +197,18 @@ async def _prelude(ctx: StepContext) -> StepResult:
                               "(locks/omni.lock) — an external or archival "
                               "run is active on this checkout")
         _RUNTIME["omni_lock"] = lock
+        # release on EVERY exit path (blocked module, denied push, exception,
+        # cancellation) via the run's lifecycle finalizer — a lock parked in
+        # the process-global _RUNTIME would otherwise outlive the run and
+        # starve external/archival users of the checkout
+        from ..lifecycle import register_finalizer
+
+        async def _release_omni_lock(_outcome, _lock=lock) -> None:
+            _lock.release()
+            if _RUNTIME.get("omni_lock") is _lock:
+                _RUNTIME.pop("omni_lock", None)
+
+        register_finalizer(ctx.run_dir, _release_omni_lock)
 
     # wave lists from the parent settings, minus already-done modules on resume
     done: set[str] = set()

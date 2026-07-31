@@ -97,6 +97,10 @@ rebase:
   # adapter is active; this whole `rebase:` section is HIGH-RISK (human-only
   # writes) so an agent can never self-install hooks
   hooks: rebase/hooks.py
+  # the shared checkout flock name: v3, the v1 backend, EXT1's external
+  # startup guard, and PR7 archival ALL take locks/<lock_name>.lock inside
+  # the checkout, so exclusion is mutual (repo data — the core stays neutral)
+  lock_name: omni
   wheel:
     package: vllm
     index_url_template: "https://wheels.vllm.ai/{commit}/{variant}/{package}/"

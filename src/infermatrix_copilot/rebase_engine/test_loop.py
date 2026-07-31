@@ -37,6 +37,11 @@ class TestRunResult:
     output: str = ""
     skipped: bool = False
     skip_reason: str = ""
+    # non-empty = INFRASTRUCTURE failure (timeout, watchdog kill, harness
+    # crash) — Rev 8 §2.3 classifies these STRUCTURAL, never as ordinary
+    # test-assertion failures, so the loop must keep them out of
+    # `failed_tests` (which the push gate passes through flagged)
+    infra: str = ""
 
 
 # run_fn(slug) -> TestRunResult; baseline_fn(slug) -> TestRunResult | None
@@ -57,14 +62,17 @@ async def run_test_loop(
     visible_gpus: int = 0,
     phase_label: str = "Phase 3",
 ) -> dict:
-    """Returns the parent's shape: ``{"passed", "failed", "failed_tests",
-    "skipped_tests", "completed_slugs"}``. Progress lives under the
+    """Returns the parent's shape plus the structural split:
+    ``{"passed", "failed", "failed_tests", "skipped_tests",
+    "completed_slugs", "infra_failures"}`` — `failed_tests` holds ONLY
+    assertion failures; infrastructure failures live in `infra_failures`. Progress lives under the
     substate's ``phase3_progress`` (run-stamped, so a phase-4 fallback in
     the same run resumes past everything phase 3 already ran)."""
     prev = substate.get("phase3_progress", {}) or {}
     prev_completed = set(prev.get("completed", []))
     prev_failed = set(prev.get("failed", []))
     prev_skipped = set(prev.get("skipped", []))
+    prev_infra = list(prev.get("infra", []))
     if prev_completed or prev_failed or prev_skipped:
         log.info("%s resume: %d passed, %d failed, %d skipped from previous "
                  "attempt", phase_label, len(prev_completed),
@@ -74,11 +82,14 @@ async def run_test_loop(
     skipped_tests: list[str] = []
     failed_tests: list[str] = []
     completed_slugs: list[str] = []
+    infra_failures: list[str] = list(prev_infra)
+    infra_slugs = {i.split(":", 1)[0] for i in prev_infra}
 
     def checkpoint(current: str = "") -> None:
         substate.update({"phase3_progress": {
             "completed": completed_slugs, "failed": failed_tests,
-            "skipped": skipped_tests, "current": current}})
+            "skipped": skipped_tests, "infra": infra_failures,
+            "current": current}})
 
     for job in jobs:
         slug = job.get("slug", "unknown")
@@ -92,6 +103,11 @@ async def run_test_loop(
             continue
         if slug in prev_skipped:
             skipped_tests.append(slug)
+            continue
+        if slug in infra_slugs:
+            # a recorded infrastructure failure stays structural on resume —
+            # re-running could flip a timeout into a pass and un-block the gate
+            failed += 1
             continue
 
         if visible_gpus > 0 and min_gpus > visible_gpus:
@@ -116,6 +132,17 @@ async def run_test_loop(
             log.info("  PASSED: %s", label)
             passed += 1
             completed_slugs.append(slug)
+            checkpoint()
+            continue
+        if result.infra:
+            # STRUCTURAL (Rev 8 §2.3): timeouts / watchdog kills / harness
+            # crashes never enter the baseline-vs-regression split or the
+            # assertion pass-through — the push gate blocks on these
+            log.warning("  INFRA FAILURE (%s): %s (rc=%d)", result.infra,
+                        label, result.rc)
+            infra_failures.append(f"{slug}: {result.infra}")
+            infra_slugs.add(slug)
+            failed += 1
             checkpoint()
             continue
 
@@ -150,7 +177,8 @@ async def run_test_loop(
                     len(failed_tests), ", ".join(failed_tests[:5]))
     return {"passed": passed, "failed": failed,
             "failed_tests": failed_tests, "skipped_tests": skipped_tests,
-            "completed_slugs": completed_slugs}
+            "completed_slugs": completed_slugs,
+            "infra_failures": infra_failures}
 
 
 # ── main-baseline worktree helpers ───────────────────────────────────────────
