@@ -16,7 +16,7 @@ from typing import Mapping
 
 
 class RebaseHooks:
-    """Neutral defaults. Adapters subclass in `<adapter>/rebase/hooks.py`
+    """Neutral defaults. Adapters subclass in the manifest-declared hooks file
     and export HOOKS (an instance)."""
 
     def adaptive_guidance(self, module: str) -> str:
