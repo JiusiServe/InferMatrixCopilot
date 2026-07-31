@@ -191,6 +191,14 @@ def test_resolve_push_url_and_canonical_identity(tmp_path):
         {"github.com/org/proj"}
     assert gitio.canonical_remote_identity("/local/path/origin.git") == \
         "/local/path/origin.git"
+    # schemes are case-insensitive: a mixed-case URL must strip creds and
+    # canonicalize to the same identity
+    assert gitio.credential_free_url("HTTPS://user:SECRET@github.com/o/p.git") \
+        == "HTTPS://github.com/o/p.git"
+    assert gitio.canonical_remote_identity(
+        "HTTPS://user:SECRET@GitHub.com/org/proj.git") == "github.com/org/proj"
+    assert "SECRET" not in gitio.apply_token_transport(
+        "HTTPS://user:SECRET@github.com/o/p.git", "tok")
 
 
 def _allowed_decision(branch="ci-x", *, options=()) -> PushDecision:

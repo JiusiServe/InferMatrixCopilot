@@ -219,8 +219,10 @@ def ls_remote_oid(repo: Path, url: str, ref: str, *, token: str = "",
 
 
 def credential_free_url(url: str) -> str:
-    """Userinfo stripped from an HTTP(S) URL."""
-    return re.sub(r"^(https?://)[^@/]*@", r"\1", url)
+    """Userinfo stripped from an HTTP(S) URL. Schemes are case-insensitive
+    (RFC 3986) — `HTTPS://user:SECRET@...` must strip exactly like the
+    lowercase form."""
+    return re.sub(r"^(https?://)[^@/]*@", r"\1", url, flags=re.IGNORECASE)
 
 
 def canonical_remote_identity(url: str) -> str:
@@ -231,10 +233,10 @@ def canonical_remote_identity(url: str) -> str:
     url = credential_free_url(url.strip())
     m = re.match(r"^git@([^:]+):(.+?)(\.git)?/?$", url)
     if m:
-        return f"{m.group(1)}/{m.group(2)}"
-    m = re.match(r"^[a-z+]+://([^/]+)/(.+?)(\.git)?/?$", url)
+        return f"{m.group(1).lower()}/{m.group(2)}"
+    m = re.match(r"^[a-z+]+://([^/]+)/(.+?)(\.git)?/?$", url, re.IGNORECASE)
     if m:
-        return f"{m.group(1)}/{m.group(2)}"
+        return f"{m.group(1).lower()}/{m.group(2)}"
     return url.rstrip("/")
 
 
