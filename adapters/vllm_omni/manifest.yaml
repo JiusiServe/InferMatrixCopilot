@@ -112,6 +112,13 @@ rebase:
       url_pattern: 'wheels\.vllm\.ai/[0-9a-f]{40}'
       url_template: "wheels.vllm.ai/{commit}"
       commit_env_var: VLLM_PRECOMPILED_WHEEL_COMMIT
+  testing:
+    # root-level artifacts tests leak between runs (test_artifact_cleanup.sh
+    # TEST_ARTIFACT_GLOBS, verbatim) — gitignored upstream but pile up on disk
+    artifact_globs: ["audio_chatcmpl-*.wav", "audio_[0-9]*ch_*.wav",
+                     "test_*.wav", "output.wav", "output_*.wav",
+                     "diffusion_result_test_*.json",
+                     "diffusion_result_qwen_*.json"]
   guard:
     # untracked pytest-copied stage configs are auto-discarded before the
     # dirty-tree verdict (regexes over the repo-relative path)

@@ -130,9 +130,9 @@ async def run_agent_loop(
             err = str(exc).lower()
             if any(kw in err for kw in _FATAL_AUTH_MARKERS):
                 return {"done": False, "text": f"Fatal API error: {exc}",
-                        "turns": turn}
+                    "turns": turn, "plan_done": plan_done}
             return {"done": False, "text": f"Stream error (turn {turn}): {exc}",
-                    "turns": turn}
+                    "turns": turn, "plan_done": plan_done}
 
         # Served-model guard (repo invariant: model substitution fails by
         # default — a silently substituted backend once fabricated 60× cost
@@ -152,7 +152,7 @@ async def run_agent_loop(
                 return {"done": False,
                         "text": f"Model mismatch: requested {model}, "
                                 f"served {served}",
-                        "turns": turn}
+                        "turns": turn, "plan_done": plan_done}
 
         truncated = getattr(response, "stop_reason", None) == "max_tokens"
         text_parts: list[str] = []
@@ -176,9 +176,8 @@ async def run_agent_loop(
             if consecutive_truncations >= 3:
                 write_log("\n=== Agent aborted: repeated max_tokens truncation "
                           "(likely trying to rewrite a very large file) ===\n")
-                return {"done": False,
-                        "text": "Aborted: repeated output truncation",
-                        "turns": turn}
+                return {"done": False, "text": "Aborted: repeated output truncation",
+                    "turns": turn, "plan_done": plan_done}
         else:
             consecutive_truncations = 0
 
@@ -199,9 +198,10 @@ async def run_agent_loop(
                 return {"done": False,
                         "text": "Truncated at max_tokens with no tool calls: "
                                 + "\n".join(text_parts),
-                        "turns": turn}
+                        "turns": turn, "plan_done": plan_done}
             write_log(f"\n=== Agent finished (turn {turn}) ===\n")
-            return {"done": True, "text": "\n".join(text_parts), "turns": turn}
+            return {"done": True, "text": "\n".join(text_parts),
+                    "turns": turn, "plan_done": plan_done}
 
         messages.append({"role": "assistant", "content": response.content})
         tool_results = []
@@ -290,4 +290,5 @@ async def run_agent_loop(
             write_log(f"[tool_result {i}] {str(tr.get('content', ''))[:300]}")
 
     write_log(f"\n=== Agent exceeded max turns ({max_turns}) ===\n")
-    return {"done": False, "text": "Agent exceeded max turns", "turns": turn}
+    return {"done": False, "text": "Agent exceeded max turns",
+            "turns": turn, "plan_done": plan_done}

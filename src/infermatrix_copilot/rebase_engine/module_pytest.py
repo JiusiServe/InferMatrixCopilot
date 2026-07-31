@@ -65,18 +65,47 @@ def main(argv: list[str] | None = None) -> int:
         command = "python -m pytest " + " ".join(shlex.quote(a) for a in args)
 
     patterns = None
+    artifact_globs: list[str] = []
     rebase_dir = os.environ.get("IMX_ADAPTER_REBASE", "")
     if rebase_dir:
         pat_file = Path(rebase_dir).parent / "testing" / \
             "watchdog_patterns.yaml"
         if pat_file.is_file():
             patterns = WatchdogPatterns.from_yaml(pat_file)
+        manifest = Path(rebase_dir).parent / "manifest.yaml"
+        if manifest.is_file():
+            import yaml
+            data = yaml.safe_load(manifest.read_text(encoding="utf-8")) or {}
+            artifact_globs = list(((data.get("rebase") or {})
+                                   .get("testing") or {})
+                                  .get("artifact_globs") or [])
 
     timeout = int(os.environ.get("TEST_TIMEOUT_SEC", "7200"))
     cuda = os.environ.get("CUDA_VISIBLE_DEVICES", "")
+
+    # two-tier watchdog wiring: learning + report artifacts land under the
+    # run's log dir (parent parity). The eco-tier REVIEW callback needs an
+    # LLM client the standalone keyless wrapper deliberately does not own —
+    # review-tier matches take the documented default-CONTINUE until the
+    # assembly PR threads the copilot client through; recorded divergence.
+    from ..testing import watchdog_learn
+
+    decisions = Path(log_dir) / "watchdog_decisions.jsonl"
+
+    def record_fn(pattern: str, tier: str, verdict: str) -> None:
+        watchdog_learn.record(decisions, pattern, tier, verdict)
+
+    def report_fn(test_name: str, pattern: str, detail: str) -> None:
+        report = Path(log_dir) / "tests" / f"{test_name}.watchdog_report"
+        report.parent.mkdir(parents=True, exist_ok=True)
+        with open(report, "a", encoding="utf-8") as f:
+            f.write(f"pattern={pattern}\n{detail}\n")
+
     runner = TestRunner(
         repo_root=Path(repo), tests_dir=Path(log_dir) / "tests",
         patterns=patterns, gpu_lock_dir=Path(log_dir) / "gpu_lock",
+        artifact_globs=artifact_globs,
+        record_fn=record_fn, report_fn=report_fn,
         cuda_visible_devices=cuda)
     # the mutex SERIALIZES; it is not a hardware requirement — min_gpus=0
     # so a GPU-less box still RUNS the command (a skip would be a false

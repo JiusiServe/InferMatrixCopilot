@@ -154,6 +154,34 @@ def test_module_pytest_mutex_without_gpus_still_runs(tmp_path, monkeypatch):
     assert rc == 7
 
 
+def test_module_pytest_artifact_cleanup_and_watchdog_wiring(tmp_path,
+                                                            monkeypatch):
+    """Adapter artifact globs reach the runner (leaked root-level WAVs are
+    removed) and watchdog learning/report callbacks are wired (a critical
+    pattern kill records a decision and writes a report)."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    monkeypatch.setenv("IMX_TARGET_REPO", str(repo))
+    monkeypatch.setenv("IMX_LOG_DIR", str(tmp_path / "logs"))
+    monkeypatch.setenv("IMX_ADAPTER_REBASE",
+                       str(REPO_ROOT / "adapters/vllm_omni/rebase"))
+    monkeypatch.delenv("IMX_GPU_MUTEX", raising=False)
+    rc = module_pytest.main([
+        "python", "-c",
+        "import pathlib; pathlib.Path('test_leak.wav').write_text('x')"])
+    assert rc == 0
+    assert not (repo / "test_leak.wav").exists()     # cleaned up
+    # watchdog wiring: a critical line gets the run killed AND recorded
+    monkeypatch.setenv("TEST_TIMEOUT_SEC", "30")
+    rc = module_pytest.main([
+        "python", "-c",
+        "import time,sys; print('CUDA out of memory', flush=True); "
+        "time.sleep(30)"])
+    assert rc != 0
+    reports = list((tmp_path / "logs" / "tests").glob("*.watchdog_report"))
+    assert reports and "CUDA out of memory" in reports[0].read_text()
+
+
 # -- hooks ---------------------------------------------------------------------
 
 def test_hooks_load_declared_active_adapter():
@@ -308,11 +336,24 @@ def test_module_rebase_partial_e2e(tmp_path, prompt_data):
     assert "GUIDANCE-BLOCK" in prompt
 
     # parent-parity debug retries: an incomplete first run is retried with
-    # the DEBUG prompt (built from the failure text) and can recover
+    # the DEBUG prompt (built from the failure text) — and the plan gate
+    # PERSISTS: the decision written in the initial run keeps edit tools
+    # unlocked for the retry, which performs a REAL edit before completing
+    # (the parent re-locked debug retries, leaving them unable to edit —
+    # fixed, recorded divergence)
+    (omni / "retryme.py").write_text("broken\n")
+    decision2 = log_dir / "plans" / "module-platform" / "p.decision.md"
     retry_client = FakeClient([
+        # initial attempt: passes the gate, then dies truncated
+        _resp([_blk_tool("write_file", "r1",
+                         {"file_path": str(decision2), "content": "accept"})]),
         _resp([_blk_text("half done, ran out of road")],
-              stop_reason="max_tokens"),            # attempt 0: not done
-        _resp([_blk_text("fixed it on the debug pass")]),   # debug attempt 1
+              stop_reason="max_tokens"),            # not done, gate PASSED
+        # debug attempt 1: edits WITHOUT writing a new decision, completes
+        _resp([_blk_tool("edit_file", "r2",
+                         {"file_path": str(omni / "retryme.py"),
+                          "old_string": "broken", "new_string": "fixed"})]),
+        _resp([_blk_text("fixed it on the debug pass")]),
     ])
     outcome = asyncio.run(rebase_module(
         "platform", client=retry_client, config=config,
@@ -320,9 +361,12 @@ def test_module_rebase_partial_e2e(tmp_path, prompt_data):
         substate=substate))
     assert outcome["status"] == "done" and outcome["debug_attempts"] == 1
     assert outcome["exit_code"] == 0
-    debug_req = retry_client.requests[1]["messages"][0]["content"]
+    assert (omni / "retryme.py").read_text() == "fixed\n"   # edit LANDED
+    debug_req = retry_client.requests[2]["messages"][0]["content"]
     assert debug_req.startswith("## Debug: fix failing test for module")
     assert "half done, ran out of road" in debug_req
+    # the debug turn ADVERTISED the gated tools (gate persisted as passed)
+    assert "edit_file" in [x["name"] for x in retry_client.requests[2]["tools"]]
 
     # a loop exception is substate data, never a raise
     class Boom:

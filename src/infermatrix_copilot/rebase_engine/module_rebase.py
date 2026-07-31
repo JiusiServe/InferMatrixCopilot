@@ -75,6 +75,7 @@ async def rebase_module(
         cuda_devices=config.cuda_devices, hf_home=config.hf_home,
         log_dir=config.log_dir, signal_dir=config.signal_dir,
         rebase_run_id=substate.run_id,
+        max_debug_retries=config.max_debug_retries,
         plan_review_max_rounds=config.plan_review_max_rounds,
         broken_imports=broken_imports, module_test_plan=module_test_plan,
         adaptive_guidance=guidance, live=True)
@@ -84,30 +85,39 @@ async def rebase_module(
     Path(agent_log).parent.mkdir(parents=True, exist_ok=True)
     plan_prefix = str(Path(config.log_dir) / "plans" / f"module-{module}")
 
-    async def _attempt(p: str) -> dict:
+    async def _attempt(p: str, *, require_plan_review: bool = True) -> dict:
         try:
             return await run_agent_loop(
                 client, p, model=config.model, tool_defs=tool_defs,
                 extra_tools=extra_tools, scope=scope, trace=trace,
                 max_turns=config.max_turns, plan_write_prefix=plan_prefix,
+                require_plan_review=require_plan_review,
                 model_aliases=config.model_aliases,
                 model_mismatch_policy=config.model_mismatch_policy,
                 agent_log=agent_log)
         except Exception as exc:  # noqa: BLE001 - failure is substate data
             return {"done": False, "text": f"agent loop error: {exc}",
-                    "turns": 0}
+                    "turns": 0, "plan_done": False}
 
     # parent parity: an incomplete first run gets up to max_debug_retries
-    # follow-up attempts with the debug prompt built from the failure text
+    # follow-up attempts with the debug prompt built from the failure text.
+    # The plan gate PERSISTS across attempts: once the module's decision was
+    # written, debug retries run unlocked (the debug prompt carries no
+    # plan-review contract, and the parent's re-locking left debug agents
+    # unable to edit — a fixed, recorded parent defect); an initial run that
+    # never passed the gate keeps it closed for retries.
     debug_attempts = 0
     result = await _attempt(prompt)
+    gate_passed = bool(result.get("plan_done"))
     while not result.get("done") and \
             debug_attempts < config.max_debug_retries:
         debug_attempts += 1
         debug_prompt = build_debug_prompt(
             module, result.get("text", ""),
             prompt_data.debug_prompt_template, "")
-        result = await _attempt(debug_prompt)
+        result = await _attempt(debug_prompt,
+                                require_plan_review=not gate_passed)
+        gate_passed = gate_passed or bool(result.get("plan_done"))
 
     outcome = {"status": "done" if result.get("done") else "failed",
                "exit_code": 0 if result.get("done") else -1,
