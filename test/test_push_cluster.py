@@ -373,6 +373,46 @@ def test_wal_reconcile_matrix(tmp_path):
                                   AssertionError("no calls"))) == "pushed"
 
 
+def test_execute_push_uses_provided_url_without_reresolving(tmp_path):
+    """With a pre-probed URL supplied, the remote NAME is never consulted
+    again — a concurrent `remote set-url` cannot redirect the push."""
+    pushes = []
+
+    def run(cmd, **kw):
+        if cmd[:3] == ["git", "remote", "get-url"]:
+            raise AssertionError("remote name must not be re-resolved")
+        pushes.append(cmd)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+    ok = gitio.execute_push(_allowed_decision(), tmp_path, url="probed://url",
+                            run=run, sleep=lambda s: None)
+    assert ok and "probed://url" in pushes[0]
+
+
+def test_wal_reconcile_uses_token_transport(tmp_path):
+    """An SSH origin with token-only credentials: recovery must probe over
+    the same token-backed HTTPS transport the push used, not raise on SSH."""
+    rec = _record()
+    calls = []
+
+    def run(cmd, **kw):
+        if cmd[:3] == ["git", "remote", "get-url"]:
+            return SimpleNamespace(returncode=0,
+                                   stdout="git@github.com:org/proj.git\n",
+                                   stderr="")
+        if cmd[:2] == ["git", "ls-remote"]:
+            calls.append(cmd[2])
+            if cmd[2].startswith("git@"):
+                return SimpleNamespace(returncode=128, stdout="",
+                                       stderr="Permission denied (publickey)")
+            return SimpleNamespace(
+                returncode=0,
+                stdout=f"{'d' * 40}\trefs/heads/ci-x\n", stderr="")
+        raise AssertionError(cmd)
+
+    assert push_wal.reconcile(tmp_path, rec, token="tok", run=run) == "pushed"
+    assert calls == ["https://x-access-token:tok@github.com/org/proj.git"]
+
+
 # -- push_to_ci preflights and governance --------------------------------------
 
 def test_preflight_upstream_commit():
@@ -458,6 +498,34 @@ def test_push_partial_e2e(tmp_path):
         repo, branch="ci-test", wal_dir=wal_dir, op_id="push-001",
         **_push_kwargs())
     assert out2.pushed and out2.pushed_commit == head and not out2.committed
+
+    # PRE-push crash: intent recorded, push never ran (simulated by an auth
+    # failure) — resuming the SAME op_id picks up the durable intent and
+    # completes it instead of refusing or orphaning it
+    (repo / "src/mod.py").write_text("v2.5")
+    real_run = gitio._run
+    deny = SimpleNamespace(on=True)
+
+    def failing_push(cmd, **kw):
+        if "push" in cmd and any("HEAD:ci-test" in c for c in cmd) and deny.on:
+            return SimpleNamespace(returncode=1, stdout="",
+                                   stderr="remote: No anonymous write access.")
+        return real_run(cmd, **kw)
+
+    outA = push_to_ci.commit_and_push(
+        repo, branch="ci-test", wal_dir=wal_dir, op_id="push-001b",
+        run=failing_push, **_push_kwargs())
+    assert not outA.pushed and "failed after retries" in outA.reason
+    recs = {r.op_id: r for r in push_wal.load_records(wal_dir)}
+    assert recs["push-001b"].state == "intent"     # durable, unfinished
+    deny.on = False
+    outB = push_to_ci.commit_and_push(
+        repo, branch="ci-test", wal_dir=wal_dir, op_id="push-001b",
+        **_push_kwargs())
+    assert outB.pushed
+    recs = {r.op_id: r for r in push_wal.load_records(wal_dir)}
+    assert recs["push-001b"].state == "pushed"
+    head = _git(repo, "rev-parse", "HEAD")
 
     # crash window: intent written, push landed, mark never happened —
     # the NEXT run's re-entry hygiene acknowledges it and proceeds

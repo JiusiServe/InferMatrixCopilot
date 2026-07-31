@@ -158,15 +158,20 @@ def remote_ref_oid(repo: Path, remote_or_url: str, dest_ref: str, *,
     return line.split()[0] if line else ABSENT
 
 
-def reconcile(repo: Path, record: PushRecord, *,
+def reconcile(repo: Path, record: PushRecord, *, token: str = "",
               run: RunFn = _run) -> Reconciliation:
     """Exact reconciliation of one `intent` record after a crash window.
 
-    Identity first: the record's canonical remote identity (transport- and
-    credential-independent) must still match the named remote — comparing
-    OIDs against a different repository would 'reconcile' against the wrong
-    world, so a reconfigured remote escalates. Then the OID trichotomy:
-    intended ⇒ pushed; pre-push ⇒ retry; anything else ⇒ escalate."""
+    Identity first (no network): the record's canonical remote identity
+    (transport- and credential-independent) must still match the named
+    remote — comparing OIDs against a different repository would 'reconcile'
+    against the wrong world, so a reconfigured remote escalates. Then the
+    OID trichotomy over the SAME token-capable transport the original
+    probe/push used (an SSH origin with token-only credentials must not make
+    recovery raise where the push itself worked): intended ⇒ pushed;
+    pre-push ⇒ retry; anything else ⇒ escalate."""
+    from .gitio import resolve_push_url
+
     if record.state == "pushed":
         return "pushed"
     r = run(["git", "remote", "get-url", record.remote_name], cwd=repo)
@@ -176,8 +181,9 @@ def reconcile(repo: Path, record: PushRecord, *,
     if canonical_remote_identity(configured) != \
             canonical_remote_identity(record.remote_url):
         return "escalate"
-    current = remote_ref_oid(repo, record.remote_name, record.dest_ref,
-                             run=run)
+    url = resolve_push_url(repo, remote=record.remote_name, token=token,
+                           run=run)
+    current = remote_ref_oid(repo, url, record.dest_ref, run=run)
     if current == record.intended_oid:
         return "pushed"
     if current == record.pre_push_oid:  # includes ABSENT == ABSENT
@@ -186,7 +192,7 @@ def reconcile(repo: Path, record: PushRecord, *,
 
 
 def resolve_pending(repo: Path, wal_dir: Path, *, remote_name: str,
-                    dest_ref: str,
+                    dest_ref: str, token: str = "",
                     run: RunFn = _run) -> Reconciliation | None:
     """Re-entry hygiene: before a NEW intent for `dest_ref` is recorded,
     every unresolved prior intent for the same destination must be settled.
@@ -200,7 +206,7 @@ def resolve_pending(repo: Path, wal_dir: Path, *, remote_name: str,
             continue
         if rec.remote_name != remote_name or rec.dest_ref != dest_ref:
             continue
-        outcome = reconcile(repo, rec, run=run)
+        outcome = reconcile(repo, rec, token=token, run=run)
         if outcome == "pushed":
             mark_pushed(wal_dir, rec)
         if worst is None or outcome == "escalate":

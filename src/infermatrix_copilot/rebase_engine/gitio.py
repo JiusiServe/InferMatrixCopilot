@@ -232,22 +232,27 @@ def decision_push_args(decision: PushDecision) -> tuple[str, str, list[str]]:
 
 
 def execute_push(decision: PushDecision, repo: Path, *,
-                 token: str = "",
+                 url: str = "", token: str = "",
                  retries: int = 3, base_delay: float = 5.0,
                  run: RunFn = _run,
                  sleep: Callable[[float], None] = time.sleep,
                  log: Callable[[str], None] = _log) -> bool:
     """Execute an ALLOWED push decision with bounded exponential retries.
     Fail-closed belts: a non-allowed decision raises, and the remote,
-    refspec, and every option are taken from `decision.command` itself —
-    the only substitution is the remote NAME being resolved to its URL
-    (token transport), which cannot change the destination repository.
-    Auth/permission failures abort immediately (retrying cannot fix
-    credentials)."""
+    refspec, and every option are taken from `decision.command` itself.
+
+    `url` is the caller's ALREADY-RESOLVED URL for the decision's remote —
+    the same single observation that fed the pre-push probe and the WAL
+    identity. Passing it means the remote NAME is never consulted again, so
+    a concurrent `remote set-url` between probe and push cannot redirect
+    the push to a repository the WAL never recorded. When omitted
+    (standalone use), the name is resolved here, once. Auth/permission
+    failures abort immediately (retrying cannot fix credentials)."""
     if not decision.allowed:
         raise GitIOError(f"refusing to execute a denied push: {decision.reason}")
     remote, refspec, options = decision_push_args(decision)
-    url = resolve_push_url(repo, remote=remote, token=token, run=run)
+    if not url:
+        url = resolve_push_url(repo, remote=remote, token=token, run=run)
     delay = base_delay
     for attempt in range(1, max(1, retries) + 1):
         log(f"Pushing {refspec} (attempt {attempt}/{retries})...")

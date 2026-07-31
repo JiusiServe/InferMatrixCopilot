@@ -110,7 +110,7 @@ def commit_and_push(repo: Path, *,
 
     # re-entry hygiene BEFORE any new work: unresolved intents settle first
     pending = push_wal.resolve_pending(repo, wal_dir, remote_name=remote,
-                                       dest_ref=dest_ref, run=run)
+                                       dest_ref=dest_ref, token=token, run=run)
     if pending == "escalate":
         return PushOutcome(False, reason="unresolved push intent for "
                                          f"{dest_ref} escalated — human "
@@ -133,19 +133,40 @@ def commit_and_push(repo: Path, *,
 
     head = run(["git", "rev-parse", "HEAD"], cwd=repo).stdout.strip()
 
-    # idempotent resume: this op already pushed exactly this commit
+    # resume semantics per prior record under this op_id:
+    # pushed+same-head ⇒ idempotent no-op; intent+same-head ⇒ resume THAT
+    # record (a crash between record_intent and push; resolve_pending above
+    # already proved it reconciles to retry, and re-recording would trip the
+    # overwrite guard while a fresh op_id would orphan it into a later false
+    # escalation); anything else ⇒ a different push needs a fresh op_id.
     existing = {r.op_id: r for r in push_wal.load_records(wal_dir)}
     prior = existing.get(op_id)
+    resumed = None
     if prior is not None:
         if prior.state == "pushed" and prior.intended_oid == head:
             log(f"op {op_id} already pushed {head[:12]}; nothing to do.")
             return PushOutcome(True, pushed_commit=head, committed=committed)
-        return PushOutcome(False, committed=committed,
-                           reason=f"op_id {op_id!r} already has a record for "
-                                  "a different push — use a fresh op_id")
+        if (prior.state == "intent" and prior.intended_oid == head
+                and prior.dest_ref == dest_ref
+                and prior.remote_name == remote):
+            log(f"op {op_id} has an unfinished intent for {head[:12]}; "
+                "resuming it.")
+            resumed = prior
+        else:
+            return PushOutcome(False, committed=committed,
+                               reason=f"op_id {op_id!r} already has a record "
+                                      "for a different push — use a fresh "
+                                      "op_id")
 
-    # one canonical transport for probe, WAL identity, and push
+    # one canonical transport for probe, WAL identity, and push — resolved
+    # ONCE; execution receives this exact URL so a concurrent `remote
+    # set-url` cannot redirect the push after the probe
     url = gitio.resolve_push_url(repo, remote=remote, token=token, run=run)
+    if resumed is not None and gitio.canonical_remote_identity(url) != \
+            resumed.remote_url:
+        return PushOutcome(False, committed=committed,
+                           reason="remote identity changed since the "
+                                  "unfinished intent was recorded — escalate")
     remote_oid = push_wal.remote_ref_oid(repo, url, dest_ref, run=run)
     lease_expect = ""
     pre_push_oid = push_wal.ABSENT
@@ -168,11 +189,14 @@ def commit_and_push(repo: Path, *,
         return PushOutcome(False, committed=committed, dry_run=True,
                            reason="dry-run: ALLOW_PUSH not set")
 
-    record = push_wal.PushRecord(
-        op_id=op_id, repo_root=str(repo), remote_name=remote,
-        remote_url=gitio.canonical_remote_identity(url),
-        dest_ref=dest_ref, pre_push_oid=pre_push_oid, intended_oid=head)
-    push_wal.record_intent(wal_dir, record)
+    if resumed is not None:
+        record = resumed   # the durable intent already exists; do not touch
+    else:
+        record = push_wal.PushRecord(
+            op_id=op_id, repo_root=str(repo), remote_name=remote,
+            remote_url=gitio.canonical_remote_identity(url),
+            dest_ref=dest_ref, pre_push_oid=pre_push_oid, intended_oid=head)
+        push_wal.record_intent(wal_dir, record)
 
     if lease_expect:
         log(f"Push: using --force-with-lease={branch}:{lease_expect[:12]}")
@@ -184,7 +208,7 @@ def commit_and_push(repo: Path, *,
         log(f"Push: remote branch {branch} does not exist — create-only "
             "(absence-pinned lease)")
 
-    ok = gitio.execute_push(decision, repo, token=token,
+    ok = gitio.execute_push(decision, repo, url=url, token=token,
                             retries=push_retries, base_delay=push_base_delay,
                             run=run, sleep=sleep, log=log)
     if not ok:
