@@ -14,6 +14,9 @@
 InferMatrixCopilot 提供知识入口和审查门禁，不运行第二个模型，不自动发布 GitHub
 评论，也不推送代码。
 
+开发或维护 InferMatrixCopilot 本身，请直接看
+[开发者入口](DEVELOPMENT.md)。
+
 ## 安装
 
 私有仓库过渡期：
@@ -187,6 +190,7 @@ CLI/MCP 入口。默认安装器不会注册它；只有需要独立执行 issue
 
 ## 维护者文档
 
+- [开发者入口和文档地图](DEVELOPMENT.md)
 - [安装和通用 MCP 配置](doc/MCP.md)
 - [vLLM-Omni 发版漂移审计](doc/VLLM_OMNI_RELEASE_MAINTENANCE.md)
 - [知识库贡献规范](knowledge/CONTRIBUTING.md)
