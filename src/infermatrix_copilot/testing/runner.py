@@ -419,16 +419,28 @@ class TestRunner:
             # a dedicated thread snapshots the live descendant tree on a fast
             # fixed cadence (independent of the 10 s watchdog poll): after
             # the leader is reaped, setsid'd children are reparented to init
-            # and only the last snapshot still names them. A child that both
-            # spawns and is orphaned inside one cadence window is the
-            # documented residual (bounded by SNAPSHOT_INTERVAL).
-            from .process_tree import collect_descendants
-            tree = {"pids": [proc.pid]}
+            # and only the snapshot still names them. Each walk records
+            # (pid, /proc starttime) and the map only ever GROWS: a walk that
+            # races the leader's exit sees an already-reparented (empty) tree,
+            # and letting it shrink the map is exactly how a setsid'd child
+            # escapes the final kill. Reused pids are safe to accumulate —
+            # kill_tree drops any pid whose live starttime no longer matches
+            # the recorded one. A child that both spawns and is orphaned
+            # inside one cadence window is the documented residual (bounded
+            # by SNAPSHOT_INTERVAL).
+            from .process_tree import _start_time, collect_descendants
+            tree: dict[str, dict[int, int | None]] = {
+                "idmap": {proc.pid: _start_time(proc.pid)}}
             stop_snap = threading.Event()
 
             def _snapshot():
                 if proc.poll() is None:
-                    tree["pids"] = collect_descendants(proc.pid)
+                    for p in collect_descendants(proc.pid):
+                        born = _start_time(p)
+                        # newer birth wins a pid collision (the old holder is
+                        # dead); a None birth never clobbers known identity
+                        if born is not None or p not in tree["idmap"]:
+                            tree["idmap"][p] = born
 
             def _snap_loop():
                 while not stop_snap.is_set() and proc.poll() is None:
@@ -439,7 +451,7 @@ class TestRunner:
             snap_thread.start()
 
             def _kill_snapshot():
-                self._terminate_tree(proc.pid, pgid, extra=tree["pids"])
+                self._terminate_tree(proc.pid, pgid, snapshot=tree["idmap"])
 
             watchdog = None
             if self.patterns is not None:
@@ -453,7 +465,7 @@ class TestRunner:
             def primary():
                 timed_out.set()
                 _snapshot()  # leader still alive here: refresh before killing
-                self._terminate_tree(proc.pid, pgid, extra=tree["pids"])
+                self._terminate_tree(proc.pid, pgid, snapshot=tree["idmap"])
 
             def safety():  # only matters if the primary path wedged
                 _kill_group(pgid, signal.SIGKILL)
@@ -488,21 +500,23 @@ class TestRunner:
 
     @staticmethod
     def _terminate_tree(pid: int, pgid: int,
-                        extra: list[int] | None = None) -> None:
+                        snapshot: dict[int, int | None] | None = None) -> None:
         """Kill the leader's process group AND every descendant individually.
         Descendants are collected BEFORE any signal (a dead leader can't be
         walked), because spawn-mode multiprocessing children create their own
         process groups — killpg alone never reaches them, and the leader
         exiting must not end the escalation while they hold GPU memory.
         `kill_tree` then owns TERM → grace → KILL per pid, survivors logged.
-        `pgid` is pre-captured and `extra` carries the caller's last live
-        descendant snapshot, so this also works after the leader was reaped
-        and its setsid'd children were reparented away."""
+        `pgid` is pre-captured and `snapshot` carries the accumulated
+        pid → starttime descendant map, so this also works after the leader
+        was reaped and its setsid'd children were reparented away; the
+        starttimes let kill_tree drop pids the kernel has since reused."""
         from .process_tree import collect_descendants, kill_tree
 
-        targets = sorted(set(collect_descendants(pid)) | set(extra or []))
+        snapshot = dict(snapshot or {})
+        targets = sorted(set(collect_descendants(pid)) | set(snapshot))
         _kill_group(pgid, signal.SIGTERM)
-        kill_tree(targets)
+        kill_tree(targets, identity=snapshot)
         _kill_group(pgid, signal.SIGKILL)
 
     @staticmethod

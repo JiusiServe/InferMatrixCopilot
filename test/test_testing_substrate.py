@@ -354,6 +354,26 @@ def test_kill_tree_pid_reuse_never_gets_sigkill():
     assert survivors == []                       # original target counted dead
 
 
+def test_kill_tree_recorded_identity_drops_reused_pid():
+    """Accumulate-only snapshots hand kill_tree pids recorded seconds ago; a
+    pid whose recorded starttime no longer matches the live one was reused by
+    an unrelated process and must receive NO signal at all."""
+    import infermatrix_copilot.testing.process_tree as pt
+    events = []
+    orig_alive, orig_start = pt._alive, pt._start_time
+    pt._alive = lambda pid: True
+    pt._start_time = lambda pid: {10: 111, 11: 222}[pid]
+    try:
+        survivors = process_tree.kill_tree(
+            [10, 11], kill=lambda p, s: events.append((p, s)),
+            sleep=lambda s: None,
+            identity={10: 999, 11: 222})   # 10 was reused; 11 is still ours
+    finally:
+        pt._alive, pt._start_time = orig_alive, orig_start
+    assert all(p != 10 for p, _ in events)  # reused pid untouched
+    assert (11, signal.SIGTERM) in events
+
+
 # -- runner --------------------------------------------------------------------
 
 @pytest.fixture()
