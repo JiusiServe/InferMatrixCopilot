@@ -123,11 +123,13 @@ def test_push_gate_taxonomy():
 @pytest.fixture()
 def ci_repo(tmp_path):
     repo = tmp_path / "repo"
-    (repo / ".buildkite").mkdir(parents=True)
+    # the LIVE tree nests the pipelines under .buildkite/cuda/ (the parent's
+    # hardcoded `.buildkite` is stale; our yaml_dir is adapter data)
+    (repo / ".buildkite" / "cuda").mkdir(parents=True)
     (repo / "tests" / "worker").mkdir(parents=True)
     (repo / "tests" / "worker" / "test_a_expansion.py").write_text("x")
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
-    (repo / ".buildkite" / "test-merge.yml").write_text(yaml.safe_dump({
+    (repo / ".buildkite" / "cuda" / "test-merge.yml").write_text(yaml.safe_dump({
         "steps": [
             {"label": "Worker Tests", "timeout_in_minutes": 10,
              "agents": {"queue": "gpu_4_queue"},
@@ -140,10 +142,11 @@ def ci_repo(tmp_path):
                      {"resources": {"limits": {"nvidia.com/gpu": "8"}}}]}}}],
                  "commands": ["pytest tests/worker/"]}]},
         ]}))
-    (repo / ".buildkite" / "test-ready.yml").write_text(yaml.safe_dump({
-        "steps": [{"label": "Worker Tests", "timeout_in_minutes": 20,
-                   "agents": {"queue": "gpu_1_queue"},
-                   "commands": ["pytest tests/worker/test_a.py"]}]}))
+    (repo / ".buildkite" / "cuda" / "test-ready.yml").write_text(
+        yaml.safe_dump({
+            "steps": [{"label": "Worker Tests", "timeout_in_minutes": 20,
+                       "agents": {"queue": "gpu_1_queue"},
+                       "commands": ["pytest tests/worker/test_a.py"]}]}))
     return repo
 
 
@@ -419,23 +422,27 @@ def test_scrubbed_agent_env_wiring(monkeypatch):
 # -- v3 playbook partial e2e ---------------------------------------------------
 
 @pytest.fixture()
-def v3_env(settings, tmp_path):
+def v3_env(settings, tmp_path, monkeypatch):
     import shutil
     from infermatrix_copilot.engine.executor import Executor
     from infermatrix_copilot.engine.registry import StepRegistry
     from infermatrix_copilot.engine.steps import register_builtin_steps
     from infermatrix_copilot.playbooks.store import PlaybookStore
-    # fixture repo with a .buildkite pipeline
+    # fixture repo with the LIVE nested .buildkite/cuda pipeline layout
     repo = tmp_path / "omni"
-    (repo / ".buildkite").mkdir(parents=True)
+    (repo / ".buildkite" / "cuda").mkdir(parents=True)
     (repo / "tests").mkdir()
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
-    (repo / ".buildkite" / "test-merge.yml").write_text(yaml.safe_dump({
-        "steps": [{"label": "Quick", "timeout_in_minutes": 1,
-                   "commands": ["export QUICK_ENV=1", "true"]}]}))
-    (repo / ".buildkite" / "test-nightly.yml").write_text(yaml.safe_dump({
-        "steps": [{"label": "Nightly Soak", "timeout_in_minutes": 1,
-                   "commands": ["true"]}]}))
+    (repo / ".buildkite" / "cuda" / "test-merge.yml").write_text(
+        yaml.safe_dump({
+            "steps": [{"label": "Quick", "timeout_in_minutes": 1,
+                       "commands": ["export QUICK_ENV=1", "true"]}]}))
+    (repo / ".buildkite" / "cuda" / "test-nightly.yml").write_text(
+        yaml.safe_dump({
+            "steps": [{"label": "Nightly Soak", "timeout_in_minutes": 1,
+                       "commands": ["true"]}]}))
+    # the target venv (manifest repo.venv -> ${VLLM_OMNI_VENV})
+    monkeypatch.setenv("VLLM_OMNI_VENV", str(tmp_path / "omni-venv"))
     # committed clean tree: report_only runs the read-only guard_clean
     subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
     subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
@@ -564,6 +571,11 @@ def test_v3_prelude_inits_runtime(v3_env, settings, trace, tmp_path,
     prelude = registry.get("rebase.v3_prelude")
     upstream = tmp_path / "upstream"
     upstream.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=upstream, check=True)
+    (upstream / "seed.txt").write_text("u")
+    subprocess.run(["git", "add", "-A"], cwd=upstream, check=True)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
+                    "commit", "-qm", "seed"], cwd=upstream, check=True)
 
     def ctx_for(params, run_dir):
         return StepContext(
@@ -587,7 +599,11 @@ def test_v3_prelude_inits_runtime(v3_env, settings, trace, tmp_path,
     r = asyncio.run(prelude.handler(ctx))
     assert r.ok, r.summary
     ups = r.outputs["state_updates"]
-    assert ups["upstream_path"] == str(upstream)
+    assert ups["upstream_origin_path"] == str(upstream)
+    # full mode works on a per-run DISPOSABLE scratch clone, never the
+    # canonical upstream tree
+    assert ups["upstream_path"] == str(run_dir / "upstream_scratch")
+    assert (run_dir / "upstream_scratch" / ".git").exists()
     assert ups["last_rebase_upstream_commit"] == "d" * 40
     assert ups["mode_runs_push_gate"] is True
     # both flocks held: a second taker fails
@@ -595,12 +611,14 @@ def test_v3_prelude_inits_runtime(v3_env, settings, trace, tmp_path,
     assert probe.acquire(blocking=False) is False
     probe_up = CheckoutLock(upstream, "upstream")
     assert probe_up.acquire(blocking=False) is False
-    # the lifecycle finalizer releases on every exit path
+    # the lifecycle finalizer releases on every exit path — and tears the
+    # disposable scratch down
     asyncio.run(lifecycle.finalize(run_dir, None))
     assert probe.acquire(blocking=False) is True
     probe.release()
     assert probe_up.acquire(blocking=False) is True
     probe_up.release()
+    assert not (run_dir / "upstream_scratch").exists()
 
     # report_only never locks
     run_dir2 = run_dir.parent / "run-ro"
@@ -666,7 +684,7 @@ def test_v3_assign_publishes_waves(v3_env, settings, trace, monkeypatch):
         settings=settings, params={}, run_dir=run_dir, trace=trace,
         state={"task_spec": {"repo": "vllm-omni", "params": {}},
                "run_id": "run-a", "repo_path": str(repo),
-               "upstream_path": str(repo),
+               "upstream_origin_path": str(repo),
                "last_rebase_upstream_commit": "d" * 40})
     r = asyncio.run(registry.get("rebase.v3_assign").handler(ctx))
     assert r.ok, r.summary
@@ -1338,13 +1356,16 @@ def test_v3_debug_reject_restores_worktree(v3_agent_env, settings, trace,
         rebase_v3, "_tier_client",
         lambda ctx: (object(), SimpleNamespace(
             model="m", api_key="k", base_url="", source="global")))
-    tracked = repo / ".buildkite" / "test-merge.yml"
+    tracked = repo / ".buildkite" / "cuda" / "test-merge.yml"
     original = tracked.read_text()
 
     async def fake_loop(client, prompt, **kw):
-        # the "agent" edits a tracked file and creates a stray one
+        # the "agent" edits a tracked file and creates AND STAGES a new one
+        # (the staged case broke the parent's bulk checkout restore)
         tracked.write_text(original + "\n# unverified debug patch\n")
         (repo / "stray_debug_artifact.py").write_text("x = 1\n")
+        subprocess.run(["git", "add", "stray_debug_artifact.py"],
+                       cwd=repo, check=True)
         return {"done": True, "text": "patched", "turns": 1}
     monkeypatch.setattr(al, "run_agent_loop", fake_loop)
     monkeypatch.setattr(
@@ -1368,6 +1389,271 @@ def test_v3_debug_reject_restores_worktree(v3_agent_env, settings, trace,
     # the rejected patch is GONE: tracked file reverted, stray file removed
     assert tracked.read_text() == original
     assert not (repo / "stray_debug_artifact.py").exists()
+
+
+def test_v3_backends_are_production(v3_env, settings, trace, tmp_path,
+                                    monkeypatch):
+    """The module/debug agents get REAL backends: plan review runs on the
+    resolved tier backend and writes review files; pytest executes in the
+    TARGET env; the knowledge tools hit the copilot stores (agents may
+    only PROPOSE skills). None of the `_unwired` defaults remain."""
+    import anthropic
+    from infermatrix_copilot.engine.steps.rebase_v3 import _build_backends
+    from infermatrix_copilot.testing import runner as runner_mod
+    _, _, repo, run_dir = v3_env
+    settings.memory_db = tmp_path / "mem.db"
+    manifest = yaml.safe_load(
+        (Path(settings.adapters_dir) / "vllm_omni" / "manifest.yaml")
+        .read_text())
+    ctx = SimpleNamespace(settings=settings, trace=trace, run_dir=run_dir,
+                          state={"task_spec": {"repo": "vllm-omni"},
+                                 "run_id": "run-b"})
+    target = SimpleNamespace(model="m-test", api_key="k", base_url="",
+                             source="tier:eco")
+    backends = _build_backends(ctx, manifest, str(repo), target)
+
+    # plan review: a real reviewer call, verdict files written
+    class FakeMessages:
+        def create(self, **kw):
+            assert kw["model"] == "m-test"
+            return SimpleNamespace(content=[SimpleNamespace(
+                text='{"verdict": "approve", "summary": "ok", '
+                     '"concerns": []}')])
+
+    class FakeAnthropic:
+        def __init__(self, **kw):
+            self.messages = FakeMessages()
+    monkeypatch.setattr(anthropic, "Anthropic", FakeAnthropic)
+    plan_dir = run_dir / "plans" / "module-x"
+    plan_dir.mkdir(parents=True)
+    (plan_dir / "p.json").write_text('{"plan": "do it"}')
+    (plan_dir / "p.md").write_text("# plan")
+    out = backends.request_plan_review(plan_json_path=str(plan_dir / "p.json"))
+    assert out["verdict"] == "approve"
+    assert (plan_dir / "p.review.json").exists()
+    # ...and a missing plan is an error, not a crash
+    assert "error" in backends.request_plan_review(
+        plan_json_path=str(plan_dir / "nope.json"))
+
+    # pytest: runs through the runner in the TARGET env
+    envs = []
+
+    def fake_run(self, job, env, *, baseline=False, dry_run=False):
+        envs.append(dict(env))
+        return runner_mod.TestOutcome(rc=0)
+    monkeypatch.setattr(runner_mod.TestRunner, "run", fake_run)
+    out = backends.run_pytest(test_paths=["tests/x.py"])
+    assert out["passed"] is True
+    assert envs[0]["VIRTUAL_ENV"] == str(tmp_path / "omni-venv")
+    assert "error" in backends.run_pytest()          # no paths
+
+    # debug memory: real store roundtrip
+    out = backends.record_debug_memory(
+        module="worker", key="k1", symptom="boom", root_cause="rc",
+        fix="patch", files="a.py,b.py")
+    assert out.get("ok"), out
+    found = backends.search_debug_memory(keyword="boom")
+    assert found["results"] and found["results"][0]["module"] == "worker"
+
+    # skills: propose-only governance — a candidate, never a SKILL.md
+    out = backends.skill_manage(action="create", name="new-trick",
+                                description="d", body="b")
+    assert out.get("ok") and "CANDIDATE" in out["note"]
+    skills_dir = Path(settings.adapters_dir) / "vllm_omni" / "skills"
+    assert (skills_dir / "_candidates.json").exists()
+    assert not (skills_dir / "new-trick" / "SKILL.md").exists()
+    assert "error" in backends.skill_manage(action="delete", name="x")
+
+
+def test_v3_wheel_installs_into_target_venv(v3_env, settings, trace,
+                                            tmp_path, monkeypatch):
+    """The wheel step ends with the package INSTALLED at the picked commit
+    in the TARGET venv (ensure_wheel_installed wired); an unconfigured
+    venv is BLOCKED, never a silent install into the copilot's own env."""
+    from infermatrix_copilot.engine.registry import StepRegistry
+    from infermatrix_copilot.engine.step import StepContext
+    from infermatrix_copilot.engine.steps import rebase_v3, \
+        register_builtin_steps
+    _, _, repo, run_dir = v3_env
+    upstream = tmp_path / "up"
+    upstream.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=upstream, check=True)
+    (upstream / "s.txt").write_text("s")
+    subprocess.run(["git", "add", "-A"], cwd=upstream, check=True)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
+                    "commit", "-qm", "s"], cwd=upstream, check=True)
+    calls = {}
+    monkeypatch.setattr(rebase_v3.wheel_mod, "pick_wheel_commit",
+                        lambda *a, **k: "f" * 40)
+    monkeypatch.setattr(rebase_v3.wheel_mod, "pin_dockerfile",
+                        lambda *a, **k: True)
+    monkeypatch.setattr(rebase_v3.wheel_mod, "make_arch_probe",
+                        lambda spec: None)
+
+    def fake_install(up, commit, spec, *, python, **kw):
+        calls.update({"commit": commit, "python": python, "up": str(up)})
+        return True
+    monkeypatch.setattr(rebase_v3.wheel_mod, "ensure_wheel_installed",
+                        fake_install)
+    registry = register_builtin_steps(StepRegistry())
+
+    def ctx_for(run_id):
+        rd = tmp_path / f"wheel-{run_id}"
+        rd.mkdir(exist_ok=True)
+        return StepContext(
+            settings=settings, params={}, run_dir=rd, trace=trace,
+            state={"task_spec": {"repo": "vllm-omni",
+                                 "params": {"rebase_mode": "full"}},
+                   "run_id": run_id, "repo_path": str(repo),
+                   "upstream_origin_path": str(upstream),
+                   "last_rebase_upstream_commit": "d" * 40})
+
+    r = asyncio.run(registry.get("rebase.v3_wheel").handler(ctx_for("w1")))
+    assert r.ok, r.summary
+    assert calls["commit"] == "f" * 40
+    assert calls["python"] == str(tmp_path / "omni-venv" / "bin" / "python")
+    # the install targets the SCRATCH clone, not the canonical upstream
+    assert calls["up"].startswith(str(tmp_path / "wheel-w1"))
+    asyncio.run(_finalize_run(tmp_path / "wheel-w1"))
+
+    # unconfigured venv: BLOCKED
+    monkeypatch.delenv("VLLM_OMNI_VENV")
+    r = asyncio.run(registry.get("rebase.v3_wheel").handler(ctx_for("w2")))
+    assert not r.ok and "venv" in r.summary
+    asyncio.run(_finalize_run(tmp_path / "wheel-w2"))
+
+
+def test_v3_guard_takes_locks_and_adapter_policy(v3_env, settings, trace,
+                                                 tmp_path):
+    """rebase.v3_guard is the first mutator: it takes the checkout flocks
+    BEFORE delegating to the self-cleaning guard (resume-safe), and it
+    injects the adapter's rebase.guard policy — the adapter's
+    discard_untracked_patterns actually discard."""
+    from infermatrix_copilot.engine import lifecycle
+    from infermatrix_copilot.engine.registry import StepRegistry
+    from infermatrix_copilot.engine.step import StepContext
+    from infermatrix_copilot.engine.steps import register_builtin_steps
+    from infermatrix_copilot.rebase_engine.runctx import CheckoutLock
+    _, _, repo, _ = v3_env
+    # an untracked artifact matching the adapter's discard pattern
+    junk = repo / "tests" / "e2e" / "stage_configs" / "cfg_123456.yaml"
+    junk.parent.mkdir(parents=True)
+    junk.write_text("x")
+    registry = register_builtin_steps(StepRegistry())
+    rd = tmp_path / "guard-run"
+    rd.mkdir()
+    ctx = StepContext(
+        settings=settings, params={}, run_dir=rd, trace=trace,
+        state={"task_spec": {"repo": "vllm-omni",
+                             "params": {"rebase_mode": "local_ci"}},
+               "run_id": "guard-run", "repo_path": str(repo)})
+    r = asyncio.run(registry.get("rebase.v3_guard").handler(ctx))
+    assert r.ok, r.summary
+    assert not junk.exists()                 # adapter policy applied
+    probe = CheckoutLock(repo, "omni")
+    assert probe.acquire(blocking=False) is False   # flock held FIRST
+    asyncio.run(lifecycle.finalize(rd, None))
+    assert probe.acquire(blocking=False) is True
+    probe.release()
+
+
+def test_v3_test_loop_requires_target_venv(v3_env, settings, trace,
+                                           monkeypatch, tmp_path):
+    """Without a configured target venv the local loop BLOCKS — raw
+    manifest commands must never execute against the copilot's own env."""
+    from infermatrix_copilot.engine.registry import StepRegistry
+    from infermatrix_copilot.engine.step import StepContext
+    from infermatrix_copilot.engine.steps import register_builtin_steps
+    _, _, repo, _ = v3_env
+    monkeypatch.delenv("VLLM_OMNI_VENV")
+    registry = register_builtin_steps(StepRegistry())
+    rd = tmp_path / "novenv-run"
+    rd.mkdir()
+    ctx = StepContext(
+        settings=settings, params={}, run_dir=rd, trace=trace,
+        state={"task_spec": {"repo": "vllm-omni", "params": {}},
+               "run_id": "novenv-run", "repo_path": str(repo)})
+    r = asyncio.run(registry.get("rebase.v3_test_loop").handler(ctx))
+    assert not r.ok and "venv" in r.summary
+
+
+def test_v3_assign_syncs_paths_first(v3_env, settings, trace, tmp_path,
+                                     monkeypatch):
+    """Path sync runs BEFORE assignment: an upstream path that vanished
+    (rename/refactor) is dropped from the module's map instead of silently
+    yielding zero commits and a skippable module."""
+    from infermatrix_copilot.engine.registry import StepRegistry
+    from infermatrix_copilot.engine.step import StepContext
+    from infermatrix_copilot.engine.steps import rebase_v3, \
+        register_builtin_steps
+    _, _, repo, run_dir = v3_env
+    adir = Path(settings.adapters_dir) / "vllm_omni"
+    manifest = yaml.safe_load((adir / "manifest.yaml").read_text())
+    manifest["modules"]["worker_runner"]["upstream_paths"] = [
+        "vllm/v1/worker/", "vllm/vanished/"]
+    (adir / "manifest.yaml").write_text(yaml.safe_dump(manifest))
+    upstream = tmp_path / "up"
+    (upstream / "vllm" / "v1" / "worker").mkdir(parents=True)
+    (upstream / "vllm" / "v1" / "worker" / "w.py").write_text("w")
+    subprocess.run(["git", "init", "-q"], cwd=upstream, check=True)
+    subprocess.run(["git", "add", "-A"], cwd=upstream, check=True)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
+                    "commit", "-qm", "u"], cwd=upstream, check=True)
+    captured = {}
+    monkeypatch.setattr(
+        rebase_v3, "run_commit_assignment",
+        lambda cfg, paths, sub: captured.update(paths) or SimpleNamespace(
+            total_commits=1, skip={m: True for m in paths}))
+    registry = register_builtin_steps(StepRegistry())
+    rd = tmp_path / "sync-run"
+    rd.mkdir()
+    ctx = StepContext(
+        settings=settings, params={}, run_dir=rd, trace=trace,
+        state={"task_spec": {"repo": "vllm-omni", "params": {}},
+               "run_id": "sync-run", "repo_path": str(repo),
+               "upstream_origin_path": str(upstream),
+               "last_rebase_upstream_commit": "d" * 40})
+    r = asyncio.run(registry.get("rebase.v3_assign").handler(ctx))
+    assert r.ok, r.summary
+    assert captured["worker_runner"] == ("vllm/v1/worker/",)
+    assert any(e for e in trace.events("upstream_path_sync_dropped"))
+    asyncio.run(_finalize_run(rd))
+
+
+def test_v3_module_gets_live_test_plan(v3_agent_env, settings, trace,
+                                       monkeypatch):
+    """Module agents receive the LIVE test plan (authoritative CI
+    obligations) — built from the manifest, passed as module_test_plan."""
+    from infermatrix_copilot.engine.registry import StepRegistry
+    from infermatrix_copilot.engine.step import StepContext
+    from infermatrix_copilot.engine.steps import rebase_v3, \
+        register_builtin_steps
+    from infermatrix_copilot.rebase_engine import module_rebase as mr
+    _, _, repo, run_dir = v3_agent_env
+    monkeypatch.setattr(
+        rebase_v3, "_tier_client",
+        lambda ctx: (object(), SimpleNamespace(
+            model="m", api_key="k", base_url="", source="global")))
+    plans = {}
+
+    async def fake_rebase_module(module, **kw):
+        plans[module] = kw.get("module_test_plan")
+        return {"status": "done", "exit_code": 0, "debug_attempts": 0,
+                "turns": 1, "summary": ""}
+    monkeypatch.setattr(mr, "rebase_module", fake_rebase_module)
+    registry = register_builtin_steps(StepRegistry())
+    ctx = StepContext(
+        settings=settings, params={}, run_dir=run_dir, trace=trace,
+        item="worker_runner",
+        state={"task_spec": {"repo": "vllm-omni", "params": {}},
+               "run_id": "run-plan", "repo_path": str(repo)})
+    r = asyncio.run(registry.get("rebase.v3_module_rebase").handler(ctx))
+    assert r.ok, r.summary
+    plan = plans["worker_runner"]
+    assert plan is not None and set(plan) >= {"ci_tests",
+                                              "upstream_changes"}
+    # the scan artifact was produced as a side product for later modules
+    assert (run_dir / "test_manifest.json").exists()
 
 
 def test_runner_model_download_notify(tmp_path):

@@ -73,8 +73,17 @@ async def _guard_clean_rebase(ctx: StepContext) -> StepResult:
         if removed:
             notes.append(f"discarded {len(removed)} untracked artifact(s)")
             out = _porcelain(repo)
-    if out.stdout.strip():
-        dirty = out.stdout.strip().splitlines()
+    # `ignore_untracked_prefixes`: infrastructure files that must EXIST while
+    # the run does (the shared checkout flock under locks/ — deleting a held
+    # flock file would break mutual exclusion) are excluded from the dirty
+    # VERDICT but never touched
+    ignore = tuple(ctx.params.get("ignore_untracked_prefixes") or ())
+    entries = [ln for ln in out.stdout.strip().splitlines()
+               if not (ln.startswith("?? ")
+                       and ln[3:].startswith(ignore))] \
+        if ignore else out.stdout.strip().splitlines()
+    if any(e.strip() for e in entries):
+        dirty = entries
         return StepResult(False, FailureKind.BLOCKED,
                           f"workspace dirty ({len(dirty)} entries) — refuse to start",
                           outputs={"dirty": dirty[:20], "guard_notes": notes})

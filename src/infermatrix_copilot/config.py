@@ -134,6 +134,9 @@ class Settings(BaseSettings):
     # hardcoded machine path. Override with REBASE_AGENT_ROOT if it lives elsewhere.
     rebase_agent_root: Path = _REPO_ROOT.parent / "vllm-omni-rebase-agent"
     rebase_poll_interval: int = 30
+    # v3 module-agent plan reviewer (rebase_engine/plan_review.py): empty =
+    # review on the run's own tier model — never silently skipped
+    rebase_reviewer_model: str = ""
 
     # Repo profiles (design v2 §V2.3)
     profile_stale_days: int = 90        # dormancy window for unconfirmed facts

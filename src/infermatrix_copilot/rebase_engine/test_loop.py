@@ -238,12 +238,35 @@ def restore_worktree(repo: Path, snap: str,
     try:
         changed = [f for f in _git_out(
             repo, ["diff", "--name-only", snap]).splitlines() if f.strip()]
-        if changed:
+        # split: files the snapshot KNOWS get checked out back; files the
+        # attempt CREATED-AND-STAGED do not exist in the snapshot — a single
+        # bulk `git checkout <snap> -- <all>` would fail outright (fix over
+        # the parent, whose bulk call silently left every tracked edit in
+        # place once one staged-new path was present)
+        restorable, created = [], []
+        for f in changed:
+            probe = subprocess.run(
+                ["git", "-C", str(repo), "cat-file", "-e", f"{snap}:{f}"],
+                capture_output=True, timeout=30)
+            (restorable if probe.returncode == 0 else created).append(f)
+        if restorable:
             subprocess.run(["git", "-C", str(repo), "checkout", snap,
-                            "--", *changed],
+                            "--", *restorable],
                            capture_output=True, text=True, timeout=120)
             log.info("  Reverted %d file(s) from rejected debug attempt: %s",
-                     len(changed), ", ".join(changed[:5]))
+                     len(restorable), ", ".join(restorable[:5]))
+        for f in created:
+            # unstage, then delete unless it predated the attempt
+            subprocess.run(["git", "-C", str(repo), "rm", "--cached",
+                            "-f", "-q", "--", f],
+                           capture_output=True, text=True, timeout=30)
+            if f not in untracked_before:
+                try:
+                    (Path(repo) / f).unlink()
+                    log.info("  Removed staged file created by rejected "
+                             "debug attempt: %s", f)
+                except OSError:
+                    pass
         untracked_now = {f for f in _git_out(
             repo, ["ls-files", "--others", "--exclude-standard"])
             .splitlines() if f.strip()}

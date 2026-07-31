@@ -56,3 +56,15 @@ the parent. The v3 substrate fails closed on empty commands; the
 shell-golden comparison in PR5 will enumerate any slugs affected so the
 cutover comparison isn't polluted by the parent's false passes. Decision at
 PR5.
+
+## 5. Buildkite pipeline location: `.buildkite/cuda/` vs `.buildkite/` (PR4c)
+
+The live vllm-omni tree nests its per-accelerator pipelines under
+`.buildkite/cuda/` (siblings: `amd/`, `intel/`, `npu/`, `release/`); the
+parent's `test_manifest.py` hardcodes `yaml_dir = omni / ".buildkite"` and
+would find ZERO jobs against today's tree — every manifest it built there
+would be empty. Our `yaml_dir` is adapter DATA
+(`rebase.test_manifest.yaml_dir: .buildkite/cuda`), pinned to the live
+layout; fixtures reproduce the nested layout. If the PR5 shell-golden
+capture runs the parent against the live tree, expect its manifest step to
+produce an empty set — compare against the parent's recorded run instead.

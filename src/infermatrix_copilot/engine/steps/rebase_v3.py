@@ -13,6 +13,7 @@ import asyncio
 import shlex
 import weakref
 from pathlib import Path
+from typing import Mapping
 
 import yaml
 
@@ -92,6 +93,186 @@ def _tier_client(ctx: StepContext):
     return AsyncAnthropic(**kwargs), target
 
 
+def _target_venv(manifest: dict) -> str:
+    """The TARGET repo's virtualenv from adapter data (env-expanded).
+    Empty = not configured."""
+    from ...adapters.base import expand_path
+    return expand_path((manifest.get("repo") or {}).get("venv", ""))
+
+
+def _target_test_env(ctx: StepContext, manifest: dict,
+                     *, pythonpath_prepend: str | None = None) -> dict:
+    """The env for TARGET-repo subprocesses (tests, precommit, wheel
+    installs): inherit-plus-overlay with the target venv on PATH, the
+    host's CUDA selection, and HF_HOME — raw manifest commands like
+    `pytest ...` must resolve inside the target repo's runtime, never the
+    copilot's own virtualenv."""
+    import os
+    from ...testing.env_plan import build_subprocess_env
+    venv = _target_venv(manifest)
+    return build_subprocess_env(
+        venv=Path(venv) if venv else None,
+        cuda_visible_devices=os.environ.get("CUDA_VISIBLE_DEVICES"),
+        hf_home=os.environ.get("HF_HOME"),
+        pythonpath_prepend=pythonpath_prepend)
+
+
+def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
+    """The PRODUCTION `RebaseBackends`: plan review on the run's resolved
+    tier backend, pytest/reproduce/precommit through the PR1 runner in the
+    TARGET env, and the knowledge tools on the copilot stores (agents may
+    only propose skills — governance preserved). Replaces the fail-closed
+    `_unwired` defaults for live module/debug agents; an unavailable
+    collaborator still answers with an explicit error dict, never a
+    silent success. All handlers are SYNC (tool dispatch is synchronous
+    inside the agent loop) — the reviewer uses its own sync client."""
+    from ...memory import SkillStore
+    from ...memory.debug_memory import DebugMemory
+    from ...rebase_engine.plan_review import review_plan
+    from ...rebase_engine.rebase_tools import RebaseBackends
+    from ...testing.runner import TestJob, TestRunner
+    repo_name = (ctx.state.get("task_spec") or {}).get("repo", "")
+    reviewer_model = getattr(ctx.settings, "rebase_reviewer_model", "") \
+        or target.model
+
+    def request_plan_review(**kw) -> dict:
+        from anthropic import Anthropic
+        ckw: dict = {"api_key": target.api_key}
+        if target.base_url:
+            ckw["base_url"] = target.base_url
+        return review_plan(
+            Anthropic(**ckw), reviewer_model,
+            plan_json_path=str(kw.get("plan_json_path", "")),
+            plan_md_path=str(kw.get("plan_md_path", "") or ""),
+            kind=str(kw.get("kind", "rebase")))
+
+    def _run_tests(kw: Mapping, key: str) -> dict:
+        paths = kw.get("test_paths") or []
+        if isinstance(paths, str):
+            paths = paths.split()
+        if not paths:
+            return {"error": "test_paths is required"}
+        markers = str(kw.get("markers", "") or "")
+        cmd = "python -m pytest " + " ".join(str(p) for p in paths)
+        if markers:
+            cmd += f" -m '{markers}'"
+        runner = TestRunner(repo_root=Path(repo),
+                            tests_dir=ctx.run_dir / "tests",
+                            gpu_lock_dir=ctx.run_dir / "gpu_lock")
+        outcome = runner.run(
+            TestJob(key=f"{key}_{abs(hash(cmd)) % 10 ** 8}", command=cmd,
+                    timeout_sec=float(kw.get("timeout") or 1800),
+                    min_gpus=0, gpu_lock=True),
+            _target_test_env(ctx, manifest))
+        tail = ""
+        try:
+            if outcome.log_file and Path(outcome.log_file).is_file():
+                tail = "\n".join(Path(outcome.log_file)
+                                 .read_text(encoding="utf-8",
+                                            errors="replace")
+                                 .splitlines()[-120:])
+        except OSError:
+            pass
+        return {"exit_code": outcome.rc, "passed": outcome.rc == 0,
+                "timed_out": outcome.timed_out, "output": tail,
+                "log_file": outcome.log_file}
+
+    def run_pytest(**kw) -> dict:
+        return _run_tests(kw, "agent_pytest")
+
+    def reproduce(**kw) -> dict:
+        return _run_tests(kw, "agent_repro")
+
+    def run_precommit(**kw) -> dict:
+        pc = (manifest.get("rebase") or {}).get("precommit") or {}
+        command = str(pc.get("command") or "")
+        if not command:
+            return {"error": "no precommit command declared in the adapter "
+                             "manifest"}
+        files = kw.get("files") or []
+        if isinstance(files, str):
+            files = files.split()
+        if files:
+            command += " --files " + " ".join(str(f) for f in files)
+        runner = TestRunner(repo_root=Path(repo),
+                            tests_dir=ctx.run_dir / "tests",
+                            gpu_lock_dir=ctx.run_dir / "gpu_lock")
+        outcome = runner.run(
+            TestJob(key="agent_precommit", command=command,
+                    timeout_sec=float(pc.get("timeout_sec") or 600),
+                    min_gpus=0, gpu_lock=False),
+            _target_test_env(ctx, manifest))
+        return {"exit_code": outcome.rc, "passed": outcome.rc == 0,
+                "log_file": outcome.log_file}
+
+    def _memory() -> DebugMemory:
+        return DebugMemory(ctx.settings.memory_db)
+
+    def search_debug_memory(**kw) -> dict:
+        query = " ".join(str(kw.get(k, "") or "")
+                         for k in ("keyword", "module", "tags")).strip()
+        if not query:
+            return {"results": []}
+        try:
+            return {"results": _memory().search(
+                query, k=int(kw.get("max_results") or 5), repo=repo_name)}
+        except Exception as exc:  # noqa: BLE001 - store trouble is a result
+            return {"error": f"debug memory unavailable: {exc}"}
+
+    def record_debug_memory(**kw) -> dict:
+        try:
+            entry_id = _memory().record(
+                repo=repo_name, module=str(kw.get("module", "")),
+                run_id=str(ctx.state.get("run_id", "")),
+                symptom=str(kw.get("symptom", "")),
+                root_cause=str(kw.get("root_cause", "")),
+                fix_summary=str(kw.get("fix", "")),
+                files=[f.strip() for f in
+                       str(kw.get("files", "")).split(",") if f.strip()],
+                verification="recorded by rebase agent"
+                             + (f" (key={kw.get('key')})"
+                                if kw.get("key") else ""))
+            return {"ok": True, "id": entry_id}
+        except Exception as exc:  # noqa: BLE001
+            return {"error": f"debug memory write failed: {exc}"}
+
+    def _skills() -> SkillStore:
+        return SkillStore(Path(ctx.settings.adapters_dir)
+                          / repo_name.replace("-", "_") / "skills")
+
+    def search_skills(**kw) -> dict:
+        skills = _skills().find(query=str(kw.get("keyword", "") or ""),
+                                module=str(kw.get("module", "") or ""),
+                                k=int(kw.get("max_results") or 3))
+        return {"skills": [{"name": s.name, "description": s.description}
+                           for s in skills]}
+
+    def skill_manage(**kw) -> dict:
+        action = str(kw.get("action", ""))
+        if action not in ("create", "propose", "update", "save"):
+            return {"error": f"unsupported skill action {action!r} — "
+                             "agents may only propose"}
+        try:
+            # governance: agents PROPOSE candidates; promotion to a real
+            # SKILL.md is a curator/human action (read-wide/write-narrow)
+            _skills().propose(name=str(kw.get("name", "")),
+                              description=str(kw.get("description", "")),
+                              body=str(kw.get("body", "")))
+            return {"ok": True, "proposed": str(kw.get("name", "")),
+                    "note": "recorded as a CANDIDATE — human promotion "
+                            "required"}
+        except Exception as exc:  # noqa: BLE001
+            return {"error": f"skill proposal failed: {exc}"}
+
+    return RebaseBackends(
+        search_debug_memory=search_debug_memory,
+        record_debug_memory=record_debug_memory,
+        skill_manage=skill_manage, search_skills=search_skills,
+        request_plan_review=request_plan_review,
+        run_pytest=run_pytest, reproduce=reproduce,
+        run_precommit=run_precommit)
+
+
 def _module_scope(repo_root: str, module: str, manifest: dict,
                   run_dir: Path | None = None) -> ToolScope:
     """C5 path governance for one module agent: the repo tree (plus the
@@ -144,6 +325,49 @@ def _drop_serial_lock(run_dir) -> None:
         per_loop.pop(str(run_dir), None)
 
 
+def _ensure_upstream_scratch(ctx: StepContext) -> str | StepResult:
+    """The per-run DISPOSABLE upstream checkout (Rev 8 §4 risk reduction):
+    wheel selection resets/checks out the tree and agent `run_shell` can
+    mutate it, so those operations get a `git clone --shared` scratch of
+    the canonical upstream, torn down by a lifecycle finalizer. Returns
+    the scratch path, re-cloning on resume if a prior teardown removed it;
+    BLOCKED when no canonical upstream is known or the clone fails."""
+    import subprocess
+    scratch = Path(ctx.state.get("upstream_path", "") or "")
+    origin = ctx.state.get("upstream_origin_path", "")
+    # only a path INSIDE the run dir counts as an existing scratch — a
+    # canonical path in `upstream_path` (older state, manual seeding) must
+    # never be adopted as the mutable tree
+    if str(scratch).startswith(str(ctx.run_dir)) \
+            and (scratch / ".git").exists():
+        return str(scratch)
+    if not origin:
+        return StepResult(False, FailureKind.BLOCKED,
+                          "no canonical upstream recorded — prelude gap")
+    scratch = ctx.run_dir / "upstream_scratch"
+    if not (scratch / ".git").exists():
+        r = subprocess.run(["git", "clone", "--shared", "--no-checkout",
+                            str(origin), str(scratch)],
+                           capture_output=True, text=True, timeout=600)
+        if r.returncode != 0:
+            return StepResult(False, FailureKind.BLOCKED,
+                              "upstream scratch clone failed: "
+                              + r.stderr.strip()[:300])
+        subprocess.run(["git", "-C", str(scratch), "checkout", "--detach",
+                        "HEAD"], capture_output=True, text=True,
+                       timeout=300)
+        from ..lifecycle import register_finalizer
+
+        async def _teardown_scratch(_outcome, _path=scratch) -> None:
+            import shutil
+            shutil.rmtree(_path, ignore_errors=True)
+
+        register_finalizer(ctx.run_dir, _teardown_scratch)
+        ctx.trace.record("upstream_scratch_created", path=str(scratch))
+    ctx.state["upstream_path"] = str(scratch)
+    return str(scratch)
+
+
 # process-local registry of HELD checkout flocks, keyed by run dir. The
 # prelude acquires them on a fresh run — but a `--resume` replays completed
 # steps from the checkpoint WITHOUT executing them, so every mutating step
@@ -168,7 +392,9 @@ def _ensure_checkout_locks(ctx: StepContext, manifest: dict,
     from ...rebase_engine.runctx import CheckoutLock
     rb = manifest.get("rebase") or {}
     locks = [CheckoutLock(Path(repo), rb.get("lock_name", "checkout"))]
-    upstream = ctx.state.get("upstream_path", "")
+    # the CANONICAL upstream is what external users contend on — the
+    # per-run scratch clone inside run_dir needs no shared lock
+    upstream = ctx.state.get("upstream_origin_path", "")
     if upstream and mode == "full":
         locks.append(CheckoutLock(Path(upstream), "upstream"))
     held: list = []
@@ -255,10 +481,12 @@ async def _v3_prelude(ctx: StepContext) -> StepResult:
 
     updates: dict = {}
     from ...adapters.base import expand_path
-    upstream = ctx.state.get("upstream_path", "") or expand_path(
+    upstream = ctx.state.get("upstream_origin_path", "") \
+        or ctx.state.get("upstream_path", "") or expand_path(
         (manifest.get("upstream") or {}).get("repo_path", ""))
     if upstream:
-        updates["upstream_path"] = upstream
+        updates["upstream_origin_path"] = upstream
+        ctx.state.setdefault("upstream_origin_path", upstream)
     baseline = _task_params(ctx).get("last_rebase_commit", "") \
         or ctx.state.get("last_rebase_upstream_commit", "")
     if baseline:
@@ -307,13 +535,16 @@ async def _v3_prelude(ctx: StepContext) -> StepResult:
         updates["upstream_commit"] = upstream_commit
 
     if mode in MUTATING_MODES:
-        # upstream_path must be visible to the lock helper before state
-        # publication (state_updates land only after the step returns)
-        if "upstream_path" in updates:
-            ctx.state.setdefault("upstream_path", updates["upstream_path"])
         blocked = _ensure_checkout_locks(ctx, manifest, mode)
         if blocked is not None:
             return blocked
+    if mode == "full":
+        # per-run DISPOSABLE upstream (Rev 8 §4): wheel checkout/reset and
+        # agent shells mutate the SCRATCH clone, never the canonical tree
+        scratch = _ensure_upstream_scratch(ctx)
+        if isinstance(scratch, StepResult):
+            return scratch
+        updates["upstream_path"] = scratch
 
     sub.update({"phase": "init", **{k: v for k, v in
                                     mode_state_flags(mode).items()}})
@@ -321,6 +552,36 @@ async def _v3_prelude(ctx: StepContext) -> StepResult:
                       outputs={"state_updates": {
                           **mode_state_flags(mode), **updates,
                           "run_id": sub.run_id}})
+
+
+@step("rebase.v3_guard", "deterministic", "write_workspace",
+      "Locked clean-tree gate: checkout flocks first, adapter guard policy.")
+async def _v3_guard(ctx: StepContext) -> StepResult:
+    """The pipeline's FIRST mutator: `workspace.guard_clean_rebase` can
+    abort stale git operations and discard artifacts, so checkout
+    exclusion must exist BEFORE it acts — including on a resume that
+    replays the completed prelude and starts here. Also injects the
+    adapter's guard policy (manifest `rebase.guard`), which the generic
+    step reads only from its params — without this the adapter's
+    `discard_untracked_patterns` was dead configuration."""
+    manifest = _adapter_manifest(ctx)
+    if isinstance(manifest, StepResult):
+        return manifest
+    blocked = _ensure_checkout_locks(
+        ctx, manifest, _task_params(ctx).get("rebase_mode", ""))
+    if blocked is not None:
+        return blocked
+    from .workspace import _guard_clean_rebase
+    guard_cfg = dict((manifest.get("rebase") or {}).get("guard") or {})
+    guard_cfg.setdefault("abort_stale_state", True)
+    # the shared checkout flock we JUST took lives under <repo>/locks/ —
+    # it must not read as dirt, and must never be discarded while held
+    guard_cfg.setdefault("ignore_untracked_prefixes", ["locks/"])
+    inner = StepContext(settings=ctx.settings, state=ctx.state,
+                        params={**guard_cfg, **ctx.params},
+                        run_dir=ctx.run_dir, trace=ctx.trace,
+                        llm=ctx.llm, item=ctx.item)
+    return await _guard_clean_rebase(inner)
 
 
 @step("rebase.v3_scan", "deterministic", "read",
@@ -360,10 +621,19 @@ async def _v3_wheel(ctx: StepContext) -> StepResult:
     rb = manifest.get("rebase") or {}
     wheel_spec = wheel_mod.WheelSpec.from_manifest(rb["wheel"])
     pin = wheel_mod.PinSpec.from_manifest(rb["wheel"]["pin"])
-    upstream = ctx.state.get("upstream_path", "")
-    if not upstream:
+    upstream = _ensure_upstream_scratch(ctx)
+    if isinstance(upstream, StepResult):
+        return upstream
+    venv = _target_venv(manifest)
+    if not venv:
         return StepResult(False, FailureKind.BLOCKED,
-                          "upstream_path not in state — prelude/config gap")
+                          "the target repo venv is not configured (manifest "
+                          "repo.venv / its env var) — refusing to install "
+                          "the wheel into the copilot's own environment")
+    import subprocess
+    pre_head = subprocess.run(
+        ["git", "-C", upstream, "rev-parse", "HEAD"],
+        capture_output=True, text=True, timeout=30).stdout.strip()
     branch = (manifest.get("upstream") or {}).get("target_branch") \
         or (manifest.get("repo") or {}).get("default_branch", "main")
     try:
@@ -373,12 +643,26 @@ async def _v3_wheel(ctx: StepContext) -> StepResult:
             baseline=ctx.state.get("last_rebase_upstream_commit", ""),
             force_commit=_task_params(ctx).get("force_upstream_commit", ""))
         wheel_mod.pin_dockerfile(Path(repo), found, pin)
+        # the selection contract ends with the package INSTALLED at the
+        # picked commit in the TARGET venv — otherwise stale extensions or
+        # a different installed version drive every later module check
+        installed = wheel_mod.ensure_wheel_installed(
+            Path(upstream), found, wheel_spec,
+            python=str(Path(venv) / "bin" / "python"),
+            install_log=ctx.run_dir / "wheel_install.log",
+            import_check_log=ctx.run_dir / "wheel_import_check.log",
+            pre_checkout_head=pre_head)
     except wheel_mod.WheelPickError as exc:
         return StepResult(False, FailureKind.BLOCKED, str(exc))
     except wheel_mod.PinError as exc:
         return StepResult(False, FailureKind.BLOCKED, str(exc))
+    except wheel_mod.WheelInstallError as exc:
+        return StepResult(False, FailureKind.BLOCKED, str(exc))
     _substate(ctx).set_field("upstream_commit", found)
-    return StepResult(True, summary=f"wheel commit {found[:12]}",
+    return StepResult(True,
+                      summary=f"wheel commit {found[:12]} "
+                              + ("(reinstalled)" if installed
+                                 else "(install healthy, skipped)"),
                       outputs={"state_updates": {"upstream_commit": found}})
 
 
@@ -388,19 +672,35 @@ async def _v3_assign(ctx: StepContext) -> StepResult:
     manifest = _adapter_manifest(ctx)
     if isinstance(manifest, StepResult):
         return manifest
-    upstream = ctx.state.get("upstream_path", "")
+    upstream = _ensure_upstream_scratch(ctx)
+    if isinstance(upstream, StepResult):
+        return upstream
     baseline = ctx.state.get("last_rebase_upstream_commit", "")
-    if not upstream or not baseline:
+    if not baseline:
         return StepResult(False, FailureKind.BLOCKED,
-                          "upstream_path/baseline not in state")
+                          "last-rebase baseline not in state")
     cfg = Phase1Config(
         upstream_repo=Path(upstream), target_repo=Path("."),
         log_dir=ctx.run_dir, baseline_commit=baseline,
         base_class_watch_paths=tuple((manifest.get("rebase") or {})
                                      .get("base_class_watch_paths") or ()))
     modules = manifest.get("modules") or {}
-    module_paths = {m: tuple((s or {}).get("upstream_paths") or ())
-                    for m, s in modules.items()}
+    # PATH SYNC before assignment (parent 35_sync_module_paths): after an
+    # upstream rename, `git log -- <missing-path>` yields no commits and
+    # the module would be SILENTLY marked skippable — retarget the static
+    # upstream_paths against the live tree first (existence-filtered,
+    # never-empty)
+    from ...rebase_engine.path_sync import sync_path_map
+    module_paths = {
+        m: tuple(paths) for m, paths in sync_path_map(
+            Path(upstream),
+            {m: list((s or {}).get("upstream_paths") or ())
+             for m, s in modules.items()}).items()}
+    dropped = {m: sorted(set((modules[m] or {}).get("upstream_paths") or ())
+                         - set(module_paths[m])) for m in modules}
+    dropped = {m: d for m, d in dropped.items() if d}
+    if dropped:
+        ctx.trace.record("upstream_path_sync_dropped", dropped=dropped)
     from ...rebase_engine.assign import AssignError
     try:
         result = run_commit_assignment(cfg, module_paths, _substate(ctx))
@@ -463,7 +763,7 @@ async def _run_debug_agent(ctx: StepContext, manifest: dict, module: str,
     from ...rebase_engine.agent_loop import run_agent_loop
     from ...rebase_engine.prompt_builder import (ModulePromptData,
                                                  build_debug_prompt)
-    from ...rebase_engine.rebase_tools import (RebaseBackends, RebasePaths,
+    from ...rebase_engine.rebase_tools import (RebasePaths,
                                                build_rebase_tools,
                                                load_tool_schemas)
     repo_name = (ctx.state.get("task_spec") or {}).get("repo", "")
@@ -474,7 +774,8 @@ async def _run_debug_agent(ctx: StepContext, manifest: dict, module: str,
     paths = RebasePaths(omni_path=repo_root,
                         vllm_path=ctx.state.get("upstream_path", ""),
                         env=scrubbed_agent_env())
-    tools = build_rebase_tools(defs, paths, RebaseBackends())
+    tools = build_rebase_tools(
+        defs, paths, _build_backends(ctx, manifest, repo_root, target))
     prompt = build_debug_prompt(module or slug, traceback_text,
                                 data.debug_prompt_template, slug)
     agent_log = ctx.run_dir / "agents" / f"debug-{slug}.log"
@@ -548,9 +849,14 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
                           outputs={"state_updates": {"phase3_failed": []}})
 
     import os
-    from ...testing.env_plan import build_subprocess_env
     from ...testing.runner import TestJob, TestRunner
     from ...testing.watchdog import WatchdogPatterns
+    if not _target_venv(manifest):
+        return StepResult(False, FailureKind.BLOCKED,
+                          "the target repo venv is not configured (manifest "
+                          "repo.venv / its env var) — raw manifest commands "
+                          "would execute against the copilot's own "
+                          "environment")
     rb = manifest.get("rebase") or {}
     adapter_dir = Path(ctx.settings.adapters_dir) / \
         ((ctx.state.get("task_spec") or {}).get("repo", "")).replace("-", "_")
@@ -586,9 +892,11 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
 
     def run_fn(slug: str) -> tl.TestRunResult:
         # tests INHERIT the process env (Rev 8 §6: inherit-plus-overlay;
-        # the credential scrub applies to agent shells only — stripping a
-        # test's required tokens would misclassify its failure)
-        return _to_result(runner.run(_job(slug), build_subprocess_env()))
+        # the credential scrub applies to agent shells only) with the
+        # TARGET venv + CUDA + HF_HOME overlay — raw manifest commands
+        # must resolve inside the target repo's runtime, never ours
+        return _to_result(runner.run(_job(slug),
+                                     _target_test_env(ctx, manifest)))
 
     worktree_path = ctx.run_dir / "main_worktree"
 
@@ -603,9 +911,10 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
             notify_download=notify_download)
         # main's files must import main's code: prepend the worktree so the
         # baseline never executes against rebase dependencies (parent's
-        # baseline PYTHONPATH override); infra outcomes propagate — a
-        # baseline timeout must never read as "fails on main too"
-        env = build_subprocess_env(pythonpath_prepend=str(wt))
+        # baseline PYTHONPATH override) — same TARGET env otherwise; infra
+        # outcomes propagate (a baseline timeout must never read as "fails
+        # on main too")
+        env = _target_test_env(ctx, manifest, pythonpath_prepend=str(wt))
         return _to_result(wt_runner.run(_job(slug), env, baseline=True))
 
     async def debug_fn(slug: str, label: str, rc: int,
@@ -728,7 +1037,6 @@ async def _v3_precommit(ctx: StepContext) -> StepResult:
             return halted
         return StepResult(True, summary="precommit: not declared (recorded)")
 
-    from ...testing.env_plan import build_subprocess_env
     from ...testing.runner import TestJob, TestRunner
     runner = TestRunner(repo_root=Path(repo),
                         tests_dir=ctx.run_dir / "tests",
@@ -736,14 +1044,14 @@ async def _v3_precommit(ctx: StepContext) -> StepResult:
     job = TestJob(key="__precommit__", command=command,
                   timeout_sec=float(pc.get("timeout_sec") or 600),
                   min_gpus=0, gpu_lock=False)
-    outcome = runner.run(job, build_subprocess_env())
+    outcome = runner.run(job, _target_test_env(ctx, manifest))
     attempt = 0
     if outcome.rc != 0 and pc.get("retry_once", True):
         # parity: many hooks fix files in place; a second run then passes.
         # NO `git add -A` here (parent-documented: indiscriminate staging is
         # how stray artifacts ended up in rebase commits)
         attempt = 1
-        outcome = runner.run(job, build_subprocess_env())
+        outcome = runner.run(job, _target_test_env(ctx, manifest))
     passed = outcome.rc == 0 and not outcome.timed_out
     sub.update({"tests": {"precommit": {
         "result": "passed" if passed else "failed",
@@ -849,7 +1157,7 @@ async def _v3_module_rebase(ctx: StepContext) -> StepResult:
     from ...rebase_engine.hooks import load_hooks
     from ...rebase_engine.module_rebase import ModuleRunConfig, rebase_module
     from ...rebase_engine.prompt_builder import ModulePromptData
-    from ...rebase_engine.rebase_tools import (RebaseBackends, RebasePaths,
+    from ...rebase_engine.rebase_tools import (RebasePaths,
                                                build_rebase_tools,
                                                load_tool_schemas)
     repo_name = (ctx.state.get("task_spec") or {}).get("repo", "")
@@ -860,8 +1168,40 @@ async def _v3_module_rebase(ctx: StepContext) -> StepResult:
     paths = RebasePaths(omni_path=repo_root,
                         vllm_path=ctx.state.get("upstream_path", ""),
                         env=scrubbed_agent_env())
-    tools = build_rebase_tools(defs, paths, RebaseBackends())
+    tools = build_rebase_tools(
+        defs, paths, _build_backends(ctx, manifest, repo_root, target))
     hooks = load_hooks(adapter_dir, manifest)
+    # the LIVE test plan (authoritative CI obligations + upstream test
+    # changes) goes into the module prompt — reuse the scan artifact when
+    # present, else build fresh
+    test_plan: dict | None = None
+    try:
+        import json as _json
+        plan_file = ctx.run_dir / "test_manifest.json"
+        if plan_file.is_file():
+            plans = (_json.loads(plan_file.read_text(encoding="utf-8"))
+                     .get("module_plans") or {})
+            raw = plans.get(module)
+            if raw:
+                test_plan = {"ci_tests": raw.get("ci_tests") or [],
+                             "upstream_changes":
+                                 raw.get("upstream_changes") or [],
+                             "omni_specific":
+                                 raw.get("omni_specific") or []}
+        else:
+            built = build_manifest(Path(repo_root),
+                                   ManifestSpec.from_manifest(manifest))
+            plan_file.write_text(_json.dumps(built.to_dict(), indent=1),
+                                 encoding="utf-8")
+            mp = built.for_module(module)
+            test_plan = {"ci_tests": [j.slug for j in mp.ci_tests],
+                         "upstream_changes": [
+                             {"path": c.path, "type": c.change_type,
+                              "new_path": c.new_path}
+                             for c in mp.upstream_changes],
+                         "omni_specific": mp.omni_specific_tests}
+    except Exception:  # noqa: BLE001 - plan enrichment is best-effort
+        ctx.trace.record("module_test_plan_unavailable", module=module)
     config = ModuleRunConfig(
         vllm_path=paths.vllm_path, omni_path=paths.omni_path,
         script_dir=str(adapter_dir / "rebase"), model=target.model,
@@ -877,6 +1217,7 @@ async def _v3_module_rebase(ctx: StepContext) -> StepResult:
             substate=sub, hooks=hooks,
             scope=_module_scope(repo_root, module, manifest,
                                 run_dir=ctx.run_dir),
+            module_test_plan=test_plan,
             trace=ctx.trace)
     return StepResult(True,
                       summary=f"{module}: {outcome['status']} "

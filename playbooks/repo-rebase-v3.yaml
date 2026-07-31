@@ -39,8 +39,10 @@ steps:
   # report_only still validates the tree — but through the honestly read-only
   # guard (check-only, never mutates merge state)
   - {id: guard_check, step: workspace.guard_clean, when: mode_report_only}
-  - {id: guard, step: workspace.guard_clean_rebase,
-     when: not mode_report_only}
+  # v3-owned wrapper: takes the checkout flocks BEFORE the self-cleaning
+  # guard mutates (first-mutator on resume) and injects the adapter's
+  # rebase.guard policy
+  - {id: guard, step: rebase.v3_guard, when: not mode_report_only}
   - {id: scan, step: rebase.v3_scan, when: mode_report_only}
   - {id: wheel, step: rebase.v3_wheel, when: mode_full}
   - {id: assign, step: rebase.v3_assign, when: mode_full}

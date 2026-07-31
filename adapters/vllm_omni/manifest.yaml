@@ -14,6 +14,10 @@ repo:
   default_branch: main
   rebase_branch: dev/vllm-align
   language: python
+  # the TARGET repo's virtualenv — test jobs and wheel installs run in it,
+  # never in the copilot's own venv (env-expanded; empty = not configured,
+  # which BLOCKS the modes that need it rather than silently using ours)
+  venv: ${VLLM_OMNI_VENV}
 
 upstream:
   kind: fork_tracking
@@ -133,8 +137,11 @@ rebase:
                              "HFValidationError", "RepositoryNotFoundError"]
     extra_exception_names: [ChatTemplateResolutionError, OmniEngineDeadError]
   test_manifest:
-    # dynamic manifest building (parent test_manifest.py constants, verbatim)
-    yaml_dir: .buildkite
+    # dynamic manifest building (parent test_manifest.py constants — EXCEPT
+    # yaml_dir: the live tree moved the pipelines under .buildkite/cuda/;
+    # the parent's hardcoded `.buildkite` is stale against it and would
+    # find ZERO jobs today (recorded in DRIFT_TRIAGE)
+    yaml_dir: .buildkite/cuda
     pipelines: {test-merge.yml: merge, test-ready.yml: ready, test-nightly.yml: nightly}
     priority_source: ready
     default_queue: gpu_1_queue
