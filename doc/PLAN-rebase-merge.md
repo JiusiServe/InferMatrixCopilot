@@ -188,7 +188,7 @@ implements the mode matrix.
 | PR2 | Phase-1 cluster: wheel, guard, assign, path_sync, api-drift guard | **DONE — GPT APPROVED** (5 finding rounds + 2 verification rounds; see §5.1) |
 | PR3 | Push cluster (contracts: §5.2): `gitio.py`, `push_to_ci.py` preflights, `PushPolicy.lease_expect`/`create_only`, push WAL + exact reconciliation | **DONE — GPT APPROVED** (5 finding rounds + 1 verification; 23 findings, all fixed with regression tests; see §6 items 12–14 for the recorded divergences) |
 | PR4a | Engine core, unwired: agent loop, ToolDefs + opt-in dispatch scoping, substate, loop-scoped `RuntimeRegistry`, planner `requires` filter + `missing_capabilities()` for exact-repo playbooks | **DONE — GPT APPROVED** (5 finding rounds, 15 findings all fixed; see §6 items 15–17) |
-| PR4b | Adapter knowledge: hooks base + vllm-omni hooks, manifest extension (incl. audited `local_paths` refresh), prompt templates + prompt/payload goldens, `phase1_steps.py`, `module_rebase.py`, **`imx-omni-pytest` command** (Rev 8 slated it for PR1; deferred — nothing references it until the PR4b templates) | planned |
+| PR4b | Adapter knowledge: templates + prompt/request-shape goldens, prompt_data (builder flavor; DRIFT_TRIAGE #1), hooks base + adapter hooks (HIGH-RISK `rebase` section), `imx-omni-pytest`, `module_rebase.py` + `phase1_steps.py` | **DONE — GPT APPROVED** (4 finding rounds, 9 findings all fixed; see §6 items 18–21) |
 | PR4c | Assembly: test/ci loops, v3 step set incl. `push_gate`, `resolve_effective_mode` + governance write-back (Rev 8 §2.1), transition-table wiring (Rev 8 §3.1), agent-shell scrub + model-download notification hook wiring, **manifest push-section update** (§5.3), v1 re-registered as `repo-rebase-native-v1` **with its four §4 obligations: guard_push authorization at phase-4 entry, explicit-`full`-only mode rejection, `locks/omni.lock` shared-lock participation, `REMOTE_ENABLED` forced off** | planned |
 | PR5 | Parity completion: tier-1 goldens, `shell_golden.json`, `DRIFT_TRIAGE.md` resolution, report-only dry path, timed rollback rehearsal | planned |
 | EXT1 | External checkout: startup flock guard, pinned SHA | planned |
@@ -300,6 +300,22 @@ still required at execution time (dry-run otherwise).
 17. **The loop enforces the shared served-model guard (PR4a).** The parent
    never checked `response.model`; the port aborts (or warns, per
    MODEL_MISMATCH_POLICY) via the shared canonical_model normalization.
+18. **Live prompts use the shipped stack (PR4b).** The parity templates and
+   maps stay parent-verbatim for the goldens; LIVE renders use a template
+   variant whose only delta is the wrapper prose (pinned to two lines),
+   reference `imx-omni-pytest`, and fix the parent's import-check quoting
+   bug (single-quoted payload containing quotes → NameError).
+19. **The plan gate persists across debug retries (PR4b).** The parent
+   re-locked every debug retry while its debug prompt carried no plan
+   contract — debug agents could never edit. The port carries `plan_done`
+   across attempts.
+20. **Tier-2 watchdog decisions are RECORDED under the no-LLM reviewer
+   (PR4b).** An explicit CONTINUE reviewer replaces the silent
+   short-circuit so the learning pipeline (noise promotion from accumulated
+   CONTINUEs) is fed; the eco-tier LLM reviewer swaps in at PR4c.
+21. **GPU mutex ≠ hardware gate (PR4b).** `imx-omni-pytest` serializes on
+   the lock with `min_gpus=0` — a GPU-less box RUNS the command instead of
+   skip-rc=0 false-passing.
 11. **Known accepted micro-divergence:** pin regexes use `[ \t]` where the
    shell's `[[:space:]]` also matched `\r` — unobservable on LF-normalized
    repos; goes to `DRIFT_TRIAGE.md` in PR5 rather than silently widening.
@@ -320,7 +336,7 @@ still required at execution time (dry-run otherwise).
 
 ## 7. Testing state
 
-- Full offline suite: **~610 tests green**, no GPU/network/API key.
+- Full offline suite: **~645 tests green**, no GPU/network/API key.
 - New pinned families: run-lifecycle (14), testing substrate (~75, incl.
   identity/laundering races each with a dedicated regression test), phase-1
   cluster (~40 incl. `test_phase1_partial_e2e` chaining guard → wheel pick →
