@@ -22,10 +22,101 @@ PACKAGE = (
     "git+https://github.com/JiusiServe/InferMatrixCopilot.git@main"
 )
 SERVER_COMMAND = ["uvx", "--from", PACKAGE, "infermatrix-copilot-mcp"]
+STRICT_CONFIG_DIR = ".infermatrix-copilot"
+STRICT_CONFIG_FILE = ".env"
+DEFAULT_REPO_FULL_NAME = "vllm-project/vllm-omni"
 
 
 class InstallError(RuntimeError):
     pass
+
+
+def _strict_config_path(config_root: Path) -> Path:
+    return config_root / STRICT_CONFIG_DIR / STRICT_CONFIG_FILE
+
+
+def _validate_repo_path(repo_path: Optional[Path]) -> Optional[Path]:
+    if repo_path is None:
+        return None
+    resolved = repo_path.expanduser().resolve()
+    if not resolved.is_dir() or not (resolved / ".git").exists():
+        raise InstallError(
+            f"Strict repo path is not a Git checkout: {resolved}"
+        )
+    return resolved
+
+
+def _ensure_strict_config(
+    config_root: Path,
+    repo_path: Optional[Path] = None,
+) -> Path:
+    """Create the stable per-user Strict config without overwriting secrets."""
+    path = _strict_config_path(config_root)
+    if path.exists():
+        text = path.read_text(encoding="utf-8")
+        lines = text.splitlines()
+        values = {
+            "LLM_PROVIDER": "auto",
+            "ANTHROPIC_API_KEY": "",
+            "ANTHROPIC_BASE_URL": "",
+            "OPENAI_API_KEY": "",
+            "OPENAI_BASE_URL": "",
+            "AGENT_MODEL": "claude-sonnet-5",
+            "OPENAI_MODEL": "gpt-5.6",
+            "DEFAULT_REPO": "vllm-omni",
+            "REPO_FULL_NAMES": json.dumps(
+                {"vllm-omni": DEFAULT_REPO_FULL_NAME},
+                ensure_ascii=False,
+            ),
+        }
+        if repo_path is not None:
+            values["REPO_PATHS"] = json.dumps(
+                {"vllm-omni": str(repo_path)},
+                ensure_ascii=False,
+            )
+        for key, value in values.items():
+            replacement = f"{key}={value}"
+            for index, line in enumerate(lines):
+                if line.startswith(f"{key}="):
+                    if key == "REPO_PATHS":
+                        lines[index] = replacement
+                    break
+            else:
+                lines.append(replacement)
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return path
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    repo_paths = (
+        {"vllm-omni": str(repo_path)}
+        if repo_path is not None
+        else {}
+    )
+    path.write_text(
+        "\n".join(
+            [
+                "# InferMatrixCopilot Strict runtime",
+                "# Direct mode does not need these model settings.",
+                "LLM_PROVIDER=auto",
+                "ANTHROPIC_API_KEY=",
+                "ANTHROPIC_BASE_URL=",
+                "OPENAI_API_KEY=",
+                "OPENAI_BASE_URL=",
+                "AGENT_MODEL=claude-sonnet-5",
+                "OPENAI_MODEL=gpt-5.6",
+                f"REPO_PATHS={json.dumps(repo_paths, ensure_ascii=False)}",
+                "DEFAULT_REPO=vllm-omni",
+                "REPO_FULL_NAMES="
+                + json.dumps(
+                    {"vllm-omni": DEFAULT_REPO_FULL_NAME},
+                    ensure_ascii=False,
+                ),
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return path
 
 
 def _run(command: Sequence[str], message: str) -> None:
@@ -191,6 +282,14 @@ def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         default=Path.home(),
         help="Home directory containing Agent configuration.",
     )
+    parser.add_argument(
+        "--repo-path",
+        type=Path,
+        help=(
+            "Optional local vLLM-Omni Git checkout used by Strict mode. "
+            "Saved in ~/.infermatrix-copilot/.env."
+        ),
+    )
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args(argv)
 
@@ -198,19 +297,28 @@ def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = _parse_args(argv)
     config_root = args.config_root.expanduser().resolve()
+    try:
+        repo_path = _validate_repo_path(args.repo_path)
+    except InstallError as exc:
+        print(f"Installation incomplete: {exc}", file=sys.stderr)
+        return 1
     agents = list(dict.fromkeys(args.agent or _detect_agents(config_root)))
 
     if args.dry_run:
         selected = ", ".join(agents) if agents else "generic MCP config"
         print(f"Would install: {selected}")
         print(f"Config root: {config_root}")
+        print(f"Strict config: {_strict_config_path(config_root)}")
         return 0
+
+    strict_config = _ensure_strict_config(config_root, repo_path)
 
     if not agents:
         output = PROJECT_ROOT / "infermatrix-copilot.mcp.json"
         _write_generic_config(output)
         print(f"No known Agent detected. MCP config written to:\n  {output}")
         print(f"Portable Skills:\n  {SKILLS_SOURCE}")
+        print(f"Strict config:\n  {strict_config}")
         return 0
 
     failures = []
@@ -232,6 +340,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(f"  {failure}", file=sys.stderr)
         return 1
 
+    print(f"Strict config: {strict_config}")
+    print("Set ANTHROPIC_API_KEY or OPENAI_API_KEY there before Strict mode.")
     print("Restart your Agent, then run: /imreview <PR URL> or /imupdate <repository>")
     return 0
 

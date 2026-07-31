@@ -11,14 +11,14 @@ from __future__ import annotations
 
 import importlib
 import json
-import os
 import shutil
 import subprocess
 from pathlib import Path
 
 
 def _check_deps() -> tuple[bool, str]:
-    missing = [m for m in ("pydantic", "pydantic_settings", "yaml", "anthropic")
+    missing = [m for m in (
+        "pydantic", "pydantic_settings", "yaml", "anthropic", "openai")
                if importlib.util.find_spec(m) is None]
     if missing:
         return False, ("missing python deps: " + ", ".join(missing)
@@ -27,21 +27,12 @@ def _check_deps() -> tuple[bool, str]:
 
 
 def _check_env(settings) -> tuple[bool, str]:
-    # Mirror Settings.model_config's env_file tuple: the repo's own .env loads
-    # regardless of cwd, and a cwd-local .env overrides it. Checking only the cwd
-    # reported a false ✗ (and exit 1) whenever doctor ran from outside the repo,
-    # even though the settings it was handed had loaded that .env correctly.
-    from ..config import _REPO_ROOT
-
-    if (not any(p.exists() for p in (_REPO_ROOT / ".env", Path(".env")))
-            and not os.environ.get("ANTHROPIC_API_KEY")):
-        return False, (".env missing and ANTHROPIC_API_KEY unset — fix: "
-                       f"cp {_REPO_ROOT}/.env.template {_REPO_ROOT}/.env "
-                       "&& edit ANTHROPIC_API_KEY")
-    if not (settings.anthropic_api_key or os.environ.get("ANTHROPIC_API_KEY")):
-        return False, ("ANTHROPIC_API_KEY is empty — fix: set it in .env "
-                       "(key NAME checked only; value never printed)")
-    return True, "LLM credentials configured"
+    if not settings.shared_api_key:
+        return False, (
+            "LLM credential is empty — set ANTHROPIC_API_KEY or "
+            "OPENAI_API_KEY in ~/.infermatrix-copilot/.env "
+            "(key names checked only; values never printed)")
+    return True, f"{settings.resolved_llm_provider} credentials configured"
 
 
 def _check_gh() -> tuple[bool, str]:
@@ -110,6 +101,7 @@ def _check_playbooks(settings) -> tuple[bool, str]:
 _HOST_MODEL_PREFIXES: dict[str, tuple[str, ...]] = {
     "api.deepseek.com": ("deepseek-",),
     "api.anthropic.com": ("claude-",),
+    "api.openai.com": ("gpt-", "o1", "o3", "o4"),
 }
 
 
@@ -162,15 +154,12 @@ def _probe_tiers(settings) -> tuple[bool, str]:
             ok_all = False
             continue
         try:
-            import anthropic
+            from ..llm import LLM
 
-            kwargs = {"api_key": t.api_key, "timeout": 15.0, "max_retries": 0}
-            if t.base_url:
-                kwargs["base_url"] = t.base_url
-            resp = anthropic.Anthropic(**kwargs).messages.create(
-                model=t.model, max_tokens=1,
+            reply = LLM(settings).for_target(t).create(
+                system="", model=t.model, max_tokens=1,
                 messages=[{"role": "user", "content": "hi"}])
-            served = str(getattr(resp, "model", "") or "")
+            served = reply.model
         except Exception as exc:
             results.append(f"{label}: probe failed ({type(exc).__name__}: {exc})")
             ok_all = False

@@ -8,6 +8,7 @@ dependencies = [
     "pydantic-settings>=2.2",
     "PyYAML>=6.0",
     "anthropic>=0.34",
+    "openai>=1.50",
     "rich>=13.0",
 ]
 
@@ -31,6 +32,9 @@ packages = ["src/infermatrix_copilot"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "knowledge" = "infermatrix_copilot/knowledge"
+"playbooks" = "infermatrix_copilot/_runtime/playbooks"
+"adapters" = "infermatrix_copilot/_runtime/adapters"
+"skills" = "infermatrix_copilot/_runtime/skills"
 
 [tool.pytest.ini_options]
 testpaths = ["test"]

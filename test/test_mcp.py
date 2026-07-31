@@ -7,7 +7,9 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import shutil
 import stat
+from pathlib import Path
 
 import pytest
 
@@ -18,7 +20,7 @@ from infermatrix_copilot.mcp_policy import (
     enforce_mcp_policy,
     enforce_strict_review_policy,
 )
-from infermatrix_copilot.task_spec import READ_ONLY_KINDS, TaskSpec
+from infermatrix_copilot.task_spec import TaskSpec
 
 ALLOW = ["vllm-omni"]
 
@@ -218,6 +220,45 @@ def test_cli_declined_confirm_leaves_no_run_dir(settings, monkeypatch):
 def _core(settings):
     from infermatrix_copilot.mcp_server import CopilotMCP
     return CopilotMCP(settings)
+
+
+def test_strict_readiness_reports_setup_gaps(settings):
+    core = _core(settings)
+
+    missing = core.strict_readiness("vllm-omni")
+
+    assert any("model credential missing" in item for item in missing)
+    assert any("checkout" in item for item in missing)
+    assert any("pr-review playbook missing" in item for item in missing)
+
+
+def test_strict_readiness_accepts_packaged_runtime(settings, tmp_path):
+    repo = tmp_path / "vllm-omni"
+    (repo / ".git").mkdir(parents=True)
+    settings.repo_paths = {"vllm-omni": str(repo)}
+    settings.anthropic_api_key = "test-key"
+    settings.playbooks_dir.mkdir(parents=True)
+    shutil.copy2(
+        Path(__file__).resolve().parents[1] / "playbooks" / "pr-review.yaml",
+        settings.playbooks_dir / "pr-review.yaml",
+    )
+    core = _core(settings)
+
+    assert core.strict_readiness("vllm-omni") == []
+
+
+def test_strict_readiness_accepts_openai_credential(settings, tmp_path):
+    repo = tmp_path / "vllm-omni"
+    (repo / ".git").mkdir(parents=True)
+    settings.repo_paths = {"vllm-omni": str(repo)}
+    settings.openai_api_key = "test-key"
+    settings.playbooks_dir.mkdir(parents=True)
+    shutil.copy2(
+        Path(__file__).resolve().parents[1] / "playbooks" / "pr-review.yaml",
+        settings.playbooks_dir / "pr-review.yaml",
+    )
+
+    assert _core(settings).strict_readiness("vllm-omni") == []
 
 
 def test_get_result_pagination(settings):

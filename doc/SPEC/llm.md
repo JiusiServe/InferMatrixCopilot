@@ -3,7 +3,8 @@
 `LOC ~120 · engine substrate (transport) · refactor-status: ok`
 
 ## Responsibility
-The Anthropic-SDK-compatible LLM client wrapper.
+The provider-neutral LLM client wrapper. It supports Anthropic Messages and
+OpenAI Chat Completions, including provider-specific Base URL overrides.
 
 ## Functionality
 Wraps `messages.create`, exposes availability, normalizes replies into
@@ -24,15 +25,16 @@ No prompts, no policy, no retries beyond transport. Not a place for
 task/repo logic.
 
 ## Dependencies (allowed)
-`anthropic` SDK; `config.py`.
+`anthropic` SDK; `openai` SDK; `config.py`.
 
 ## Extension points
 New provider/endpoint → behind this wrapper's constructor; keep `Reply`/`Block`
 stable so no caller changes.
 
 ## Tests
-Faked via `ScriptedLLM` in step/agent tests (not unit-tested directly).
+Provider selection and OpenAI tool translation are unit-tested; step/agent
+tests use `ScriptedLLM`.
 
 ## Refactor notes
-Thin and correct. If a second real provider is added, keep the `Reply`/`Block`
-contract as the seam — callers must never see provider-specific types.
+Keep the `Reply`/`Block` contract as the seam — callers must never see
+provider-specific types.
