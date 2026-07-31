@@ -186,7 +186,7 @@ implements the mode matrix.
 | PR0 | Executor lifecycle (behavior-preserving) | **DONE — GPT APPROVED** (4 rounds) |
 | PR1 | Testing substrate + watchdog data | **DONE — GPT APPROVED** (9 finding rounds + agreement round accepting 2 owner positions + verification round) |
 | PR2 | Phase-1 cluster: wheel, guard, assign, path_sync, api-drift guard | **DONE — GPT APPROVED** (5 finding rounds + 2 verification rounds; see §5.1) |
-| PR3 | Push cluster (contracts: Rev 8 §3.2, restated in §5.2 below): `gitio.py` (staging/unstage of generated outputs, signed-commit retry with ruff-hook detection, clean-env push execution, SSH→HTTPS URL resolution), `push_to_ci.py` preflights (40-hex commit resolved; Dockerfile pin matches), `PushPolicy.lease_expect` (SHA-pinned force-with-lease), push write-ahead log + reconciliation | next |
+| PR3 | Push cluster (contracts: §5.2): `gitio.py`, `push_to_ci.py` preflights, `PushPolicy.lease_expect`/`create_only`, push WAL + exact reconciliation | **DONE — GPT APPROVED** (5 finding rounds + 1 verification; 23 findings, all fixed with regression tests; see §6 items 12–14 for the recorded divergences) |
 | PR4a | Engine core, unwired: agent loop, ToolDefs + opt-in dispatch scoping, substate, loop-scoped `RuntimeRegistry`, planner `requires` filter **+ the `missing_capabilities()` update for exact-repo playbooks (Rev 8 §2 obligation)** | planned |
 | PR4b | Adapter knowledge: hooks base + vllm-omni hooks, manifest extension (incl. audited `local_paths` refresh), prompt templates + prompt/payload goldens, `phase1_steps.py`, `module_rebase.py`, **`imx-omni-pytest` command** (Rev 8 slated it for PR1; deferred — nothing references it until the PR4b templates) | planned |
 | PR4c | Assembly: test/ci loops, v3 step set incl. `push_gate`, `resolve_effective_mode` + governance write-back (Rev 8 §2.1), transition-table wiring (Rev 8 §3.1), agent-shell scrub + model-download notification hook wiring, **manifest push-section update** (§5.3), v1 re-registered as `repo-rebase-native-v1` **with its four §4 obligations: guard_push authorization at phase-4 entry, explicit-`full`-only mode rejection, `locks/omni.lock` shared-lock participation, `REMOTE_ENABLED` forced off** | planned |
@@ -288,14 +288,30 @@ still required at execution time (dry-run otherwise).
 11. **Known accepted micro-divergence:** pin regexes use `[ \t]` where the
    shell's `[[:space:]]` also matched `\r` — unobservable on LF-normalized
    repos; goes to `DRIFT_TRIAGE.md` in PR5 rather than silently widening.
+12. **Branch creation is create-only (PR3).** The parent used raw `--force`
+   when the remote branch did not exist; the port pushes under an
+   ABSENCE-pinned lease (`--force-with-lease=<branch>:`) — creation cannot
+   silently fast-forward a branch a racer made, and C4's with-lease-only
+   rule holds. An exact-commit racer is a git no-op and harmless.
+13. **Generated-output unstaging fails closed (PR3).** The parent tolerated
+   per-path reset failures (`|| true`); the port raises — a still-staged
+   generated file would otherwise be committed in violation of the
+   never-committed promise.
+14. **Push transport hygiene beyond the parent (PR3).** Push URLs resolve
+   via `get-url --push` (fork pushurl honored); tokens and configured
+   userinfo never reach argv/log/error text (header-only auth,
+   case-insensitive stripping); the push WAL stores transport-independent
+   canonical repository identities.
 
 ## 7. Testing state
 
-- Full offline suite: **~540 tests green**, no GPU/network/API key.
+- Full offline suite: **~572 tests green**, no GPU/network/API key.
 - New pinned families: run-lifecycle (14), testing substrate (~75, incl.
   identity/laundering races each with a dedicated regression test), phase-1
   cluster (~40 incl. `test_phase1_partial_e2e` chaining guard → wheel pick →
-  pin → assignment → path-sync over fixture git repos).
+  pin → assignment → path-sync over fixture git repos), push cluster (31
+  incl. a real-bare-remote partial e2e with crash/resume/supersession
+  reconciliation and a raced create-only push).
 - Repo-neutrality: leak-scan ceilings unchanged; `rebase_engine/` is clean.
 - Parity: behavior-level parity pinned per module (walk order, double-probed
   baseline fallback, sed-equivalent pin edits, decision JSON schema);
