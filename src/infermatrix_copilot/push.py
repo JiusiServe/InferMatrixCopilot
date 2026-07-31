@@ -26,6 +26,11 @@ class PushPolicy:
     branch: str = ""
     force_with_lease: bool = False
     lease_expect: str = ""
+    # create-only push: the branch was observed ABSENT on the remote, and an
+    # absence-pinned lease (--force-with-lease=<branch>:) guarantees the push
+    # fails if anyone created it in the observe-to-push race — a plain push
+    # would silently fast-forward a branch this run never saw.
+    create_only: bool = False
 
 
 @dataclass(frozen=True)
@@ -58,8 +63,14 @@ def guard_push(policy: PushPolicy, protected_branches: list[str]) -> PushDecisio
         return PushDecision(
             False, "lease_expect requires force_with_lease — a pinned lease "
                    "on a non-forced push signals confused intent")
+    if policy.create_only and (policy.force_with_lease or policy.lease_expect):
+        return PushDecision(
+            False, "create_only conflicts with a lease on an existing tip — "
+                   "the branch cannot be both absent and at a known SHA")
     cmd = ["git", "push", policy.remote, f"HEAD:{policy.branch}"]
-    if policy.force_with_lease:
+    if policy.create_only:
+        cmd.append(f"--force-with-lease={policy.branch}:")
+    elif policy.force_with_lease:
         if policy.lease_expect:
             cmd.append(f"--force-with-lease={policy.branch}:{policy.lease_expect}")
         else:

@@ -8,17 +8,26 @@ Sequence (each behavior pinned by test):
    commit AND leaves the CI Dockerfile pinned to a stale wheel — the code
    rebases forward while CI installs the OLD upstream, repo-wide
    ImportErrors), and the CI Dockerfile pin must match that commit.
-2. Stage everything, unstage generated outputs; commit (signed, retried)
-   only when there is something to commit.
-3. AUTHORIZATION through `push.guard_push` (constraint C4) with an optional
-   SHA-pinned lease when history was rewritten; write the WAL intent; then
-   EXECUTE via gitio; mark the WAL record pushed on acceptance.
+2. WAL re-entry hygiene: unresolved prior intents for this destination are
+   reconciled first — a landed one is acknowledged, an escalation refuses
+   the push; an already-pushed record under this op_id makes resume
+   idempotent.
+3. Stage everything, unstage generated outputs; commit (signed, retried
+   with the SAME exclusions) only when there is something to commit.
+4. AUTHORIZATION is never self-granted: the caller passes `allowed` (the
+   task/adapter governance verdict) and `allow_push` (the ALLOW_PUSH env
+   gate) — C4's double gate. `push.guard_push` rules; without `allow_push`
+   the flow stops before the WAL as a dry-run reporting the exact
+   authorized command. Execution derives its arguments from the authorized
+   command itself (`gitio.execute_push`).
+5. One canonical transport: the remote URL is resolved (token/SSH→HTTPS)
+   BEFORE the pre-push probe, and probe, push, and the WAL's canonical
+   remote identity all use it.
 """
 
 from __future__ import annotations
 
 import re
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Sequence
@@ -41,6 +50,7 @@ class PushOutcome:
     pushed: bool
     pushed_commit: str = ""
     committed: bool = False
+    dry_run: bool = False
     reason: str = ""
 
 
@@ -72,6 +82,8 @@ def commit_and_push(repo: Path, *,
                     author_name: str, author_email: str,
                     protected_branches: Sequence[str],
                     wal_dir: Path, op_id: str,
+                    allowed: bool = False,
+                    allow_push: bool = False,
                     remote: str = "origin",
                     token: str = "",
                     rebase_performed: bool = False,
@@ -83,25 +95,36 @@ def commit_and_push(repo: Path, *,
                     run: gitio.RunFn = gitio._run,
                     sleep: Callable[[float], None] = None,
                     log: Callable[[str], None] = _log) -> PushOutcome:
-    """The full deterministic push-to-CI flow. Raises `PushPreflightError` on
-    a refused preflight; returns a non-pushed `PushOutcome` with the denial
-    reason when authorization or execution fails."""
+    """The full deterministic push-to-CI flow. `allowed` and `allow_push`
+    arrive from the caller's governance (task spec / adapter policy and the
+    ALLOW_PUSH env flag) — this function NEVER self-authorizes. Raises
+    `PushPreflightError` on a refused preflight; returns a non-pushed
+    `PushOutcome` with the reason when authorization, reconciliation, or
+    execution refuses."""
     import time as _time
     sleep = sleep or _time.sleep
     repo = Path(repo)
     commit = preflight_upstream_commit(upstream_commit)
     preflight_dockerfile_pin(repo, commit, pin)
+    dest_ref = f"refs/heads/{branch}"
+
+    # re-entry hygiene BEFORE any new work: unresolved intents settle first
+    pending = push_wal.resolve_pending(repo, wal_dir, remote_name=remote,
+                                       dest_ref=dest_ref, run=run)
+    if pending == "escalate":
+        return PushOutcome(False, reason="unresolved push intent for "
+                                         f"{dest_ref} escalated — human "
+                                         "review required, not retrying")
 
     gitio.stage_commit_changes(repo, unstage_globs, run=run)
     committed = False
-    r = run(["git", "diff", "--cached", "--quiet"], cwd=repo)
-    if r.returncode != 0 or extra_commit_flags:
+    if gitio.has_staged_changes(repo, run=run) or extra_commit_flags:
         message = message_template.format(commit=commit, short=commit[:12])
         if not gitio.run_signed_commit(
                 repo, message, author_name=author_name,
                 author_email=author_email, retries=commit_retries,
-                extra_flags=extra_commit_flags, precommit_fix=precommit_fix,
-                run=run, log=log):
+                extra_flags=extra_commit_flags, unstage_patterns=unstage_globs,
+                precommit_fix=precommit_fix, run=run, log=log):
             return PushOutcome(False, reason=f"commit failed after "
                                              f"{commit_retries} attempts")
         committed = True
@@ -110,49 +133,58 @@ def commit_and_push(repo: Path, *,
 
     head = run(["git", "rev-parse", "HEAD"], cwd=repo).stdout.strip()
 
-    # After a history rewrite, pin the lease to the exact remote tip we
-    # fetched — an unqualified lease still races remote movement.
+    # idempotent resume: this op already pushed exactly this commit
+    existing = {r.op_id: r for r in push_wal.load_records(wal_dir)}
+    prior = existing.get(op_id)
+    if prior is not None:
+        if prior.state == "pushed" and prior.intended_oid == head:
+            log(f"op {op_id} already pushed {head[:12]}; nothing to do.")
+            return PushOutcome(True, pushed_commit=head, committed=committed)
+        return PushOutcome(False, committed=committed,
+                           reason=f"op_id {op_id!r} already has a record for "
+                                  "a different push — use a fresh op_id")
+
+    # one canonical transport for probe, WAL identity, and push
+    url = gitio.resolve_push_url(repo, remote=remote, token=token, run=run)
+    remote_oid = push_wal.remote_ref_oid(repo, url, dest_ref, run=run)
     lease_expect = ""
     pre_push_oid = push_wal.ABSENT
-    remote_oid = push_wal.remote_ref_oid(repo, remote,
-                                         f"refs/heads/{branch}", run=run)
     if remote_oid != push_wal.ABSENT:
         pre_push_oid = remote_oid
         if rebase_performed:
             lease_expect = remote_oid
 
-    policy = PushPolicy(allowed=True, remote=remote, branch=branch,
-                        force_with_lease=rebase_performed and bool(lease_expect),
-                        lease_expect=lease_expect)
+    policy = PushPolicy(allowed=allowed, remote=remote, branch=branch,
+                        force_with_lease=bool(lease_expect),
+                        lease_expect=lease_expect,
+                        create_only=(remote_oid == push_wal.ABSENT))
     decision = guard_push(policy, list(protected_branches))
     if not decision.allowed:
         return PushOutcome(False, committed=committed,
                            reason=f"push denied: {decision.reason}")
+    if not allow_push:
+        log(f"[dry-run] ALLOW_PUSH not set; would run: "
+            f"{' '.join(decision.command)}")
+        return PushOutcome(False, committed=committed, dry_run=True,
+                           reason="dry-run: ALLOW_PUSH not set")
 
-    url = gitio.resolve_push_url(repo, remote=remote, token=token, run=run)
     record = push_wal.PushRecord(
         op_id=op_id, repo_root=str(repo), remote_name=remote,
-        remote_url=gitio.credential_free_url(url),
-        dest_ref=f"refs/heads/{branch}", pre_push_oid=pre_push_oid,
-        intended_oid=head)
+        remote_url=gitio.canonical_remote_identity(url),
+        dest_ref=dest_ref, pre_push_oid=pre_push_oid, intended_oid=head)
     push_wal.record_intent(wal_dir, record)
 
-    extra_args = []
-    if rebase_performed:
-        if lease_expect:
-            extra_args.append(f"--force-with-lease={branch}:{lease_expect}")
-            log(f"Push: using --force-with-lease={branch}:{lease_expect[:12]}")
-        else:
-            # Deliberate divergence from the parent, which used raw --force
-            # here: a branch that does not exist on the remote is CREATED by
-            # a plain push — force adds nothing except a C4 violation. If the
-            # branch appears in the ls-remote→push race, the plain push is
-            # rejected non-fast-forward and the run fails closed.
-            log(f"Push: remote branch {branch} does not exist yet — "
-                "plain push creates it")
+    if lease_expect:
+        log(f"Push: using --force-with-lease={branch}:{lease_expect[:12]}")
+    elif remote_oid == push_wal.ABSENT:
+        # Deliberate divergence from the parent's raw --force here: creation
+        # runs under an ABSENCE-pinned lease (--force-with-lease=<branch>:)
+        # so a branch created by someone else in the observe-to-push race
+        # fails the push closed instead of being silently fast-forwarded.
+        log(f"Push: remote branch {branch} does not exist — create-only "
+            "(absence-pinned lease)")
 
-    ok = gitio.execute_push(decision, repo, url=url, refspec=f"HEAD:{branch}",
-                            extra_args=extra_args, token=token,
+    ok = gitio.execute_push(decision, repo, token=token,
                             retries=push_retries, base_delay=push_base_delay,
                             run=run, sleep=sleep, log=log)
     if not ok:

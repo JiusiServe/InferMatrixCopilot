@@ -60,8 +60,14 @@ def unstage_generated_outputs(repo: Path, patterns: Sequence[str], *,
                               run: RunFn = _run) -> list[str]:
     """Remove staged entries matching any generated-output glob (fnmatch over
     the repo-relative path — the parent's shell `case` globs are the same
-    family) so they are never committed. Returns the unstaged paths."""
+    family) so they are never committed. Returns the unstaged paths. The
+    index listing itself failing is an error (an unreadable index must not
+    read as "nothing staged"); per-path reset failures are tolerated (parent
+    `|| true`)."""
     r = run(["git", "diff", "--cached", "--name-only"], cwd=repo)
+    if r.returncode != 0:
+        raise GitIOError(f"git diff --cached failed in {repo}: "
+                         f"{(r.stderr or '').strip()}")
     removed: list[str] = []
     for rel in (r.stdout or "").splitlines():
         rel = rel.strip()
@@ -74,16 +80,24 @@ def unstage_generated_outputs(repo: Path, patterns: Sequence[str], *,
 
 def stage_commit_changes(repo: Path, patterns: Sequence[str], *,
                          run: RunFn = _run) -> list[str]:
-    """`git add -A` then drop generated outputs from the index."""
-    run(["git", "add", "-A"], cwd=repo)
+    """`git add -A` then drop generated outputs from the index. A failed
+    add is an error (the parent ran under `set -e`): swallowing it would
+    read as "no changes" and push a stale HEAD."""
+    r = run(["git", "add", "-A"], cwd=repo)
+    if r.returncode != 0:
+        raise GitIOError(f"git add -A failed in {repo}: "
+                         f"{(r.stderr or '').strip()}")
     return unstage_generated_outputs(repo, patterns, run=run)
 
 
-def staged_or_dirty(repo: Path, *, run: RunFn = _run) -> bool:
-    """True when there is anything to commit (worktree or index)."""
-    dirty = run(["git", "diff", "--quiet", "HEAD"], cwd=repo).returncode != 0
-    staged = run(["git", "diff", "--cached", "--quiet"], cwd=repo).returncode != 0
-    return dirty or staged
+def has_staged_changes(repo: Path, *, run: RunFn = _run) -> bool:
+    """True when the index differs from HEAD. rc>1 (a broken repo) raises —
+    it must never read as a clean index."""
+    r = run(["git", "diff", "--cached", "--quiet"], cwd=repo)
+    if r.returncode not in (0, 1):
+        raise GitIOError(f"git diff --cached --quiet failed in {repo}: "
+                         f"{(r.stderr or '').strip()}")
+    return r.returncode == 1
 
 
 # -- signed commit with formatter-hook retry ----------------------------------
@@ -96,12 +110,16 @@ def run_signed_commit(repo: Path, message: str, *,
                       author_name: str, author_email: str,
                       retries: int = 3,
                       extra_flags: Sequence[str] = (),
+                      unstage_patterns: Sequence[str] = (),
                       precommit_fix: Callable[[], None] | None = None,
                       run: RunFn = _run,
                       log: Callable[[str], None] = _log) -> bool:
     """`git commit --signoff` under the configured identity, retrying when a
-    formatter hook edited files (re-run the formatter, restage, retry).
-    Returns True on success, False when the retry budget is exhausted."""
+    formatter hook edited files (re-run the formatter, restage, retry). The
+    retry restage applies the SAME generated-output exclusions as the
+    initial staging — an unrestricted `add -A` here would sweep the junk
+    the first pass deliberately dropped into the retried commit. Returns
+    True on success, False when the retry budget is exhausted."""
     env = os.environ.copy()
     env.update({"GIT_AUTHOR_NAME": author_name,
                 "GIT_AUTHOR_EMAIL": author_email,
@@ -121,7 +139,7 @@ def run_signed_commit(repo: Path, message: str, *,
                     precommit_fix()
                 except Exception:  # noqa: BLE001 - best-effort, parent `|| true`
                     pass
-        run(["git", "add", "-A"], cwd=repo)
+        stage_commit_changes(repo, unstage_patterns, run=run)
     return False
 
 
@@ -163,8 +181,23 @@ def resolve_push_url(repo: Path, *, remote: str = "origin", token: str = "",
 
 
 def credential_free_url(url: str) -> str:
-    """Canonical remote identity for durable records: userinfo stripped."""
+    """Userinfo stripped from an HTTP(S) URL."""
     return re.sub(r"^(https?://)[^@/]*@", r"\1", url)
+
+
+def canonical_remote_identity(url: str) -> str:
+    """One transport-independent identity for durable records: the SSH form
+    `git@host:org/proj(.git)`, the HTTPS form, and the token-rewritten HTTPS
+    form of the SAME repository all canonicalize identically — WAL
+    reconciliation must compare repositories, not transports."""
+    url = credential_free_url(url.strip())
+    m = re.match(r"^git@([^:]+):(.+?)(\.git)?/?$", url)
+    if m:
+        return f"{m.group(1)}/{m.group(2)}"
+    m = re.match(r"^[a-z+]+://([^/]+)/(.+?)(\.git)?/?$", url)
+    if m:
+        return f"{m.group(1)}/{m.group(2)}"
+    return url.rstrip("/")
 
 
 def push_once(repo: Path, url: str, refspec: str, *,
@@ -180,23 +213,45 @@ def push_once(repo: Path, url: str, refspec: str, *,
                cwd=repo, env=_clean_push_env(), timeout=900)
 
 
+def decision_push_args(decision: PushDecision) -> tuple[str, str, list[str]]:
+    """Deconstruct an authorized command `git push <remote> <refspec>
+    [options...]` into (remote, refspec, options). Execution derives its
+    arguments EXCLUSIVELY from here — caller-supplied branch/force arguments
+    could otherwise execute something the guard never ruled on."""
+    cmd = list(decision.command)
+    if len(cmd) < 4 or cmd[:2] != ["git", "push"]:
+        raise GitIOError(f"unrecognized authorized command: {cmd!r}")
+    remote, refspec = cmd[2], cmd[3]
+    options = cmd[4:]
+    allowed_option = re.compile(r"^--force-with-lease(=.*)?$")
+    for opt in options:
+        if not allowed_option.match(opt):
+            raise GitIOError(f"authorized command carries an unexpected "
+                             f"option: {opt!r}")
+    return remote, refspec, options
+
+
 def execute_push(decision: PushDecision, repo: Path, *,
-                 url: str, refspec: str,
-                 extra_args: Sequence[str] = (), token: str = "",
+                 token: str = "",
                  retries: int = 3, base_delay: float = 5.0,
                  run: RunFn = _run,
                  sleep: Callable[[float], None] = time.sleep,
                  log: Callable[[str], None] = _log) -> bool:
     """Execute an ALLOWED push decision with bounded exponential retries.
-    Fail-closed belt: a non-allowed decision raises — authorization lives in
-    `push.guard_push`, and nothing may execute around it. Auth/permission
-    failures abort immediately (retrying cannot fix credentials)."""
+    Fail-closed belts: a non-allowed decision raises, and the remote,
+    refspec, and every option are taken from `decision.command` itself —
+    the only substitution is the remote NAME being resolved to its URL
+    (token transport), which cannot change the destination repository.
+    Auth/permission failures abort immediately (retrying cannot fix
+    credentials)."""
     if not decision.allowed:
         raise GitIOError(f"refusing to execute a denied push: {decision.reason}")
+    remote, refspec, options = decision_push_args(decision)
+    url = resolve_push_url(repo, remote=remote, token=token, run=run)
     delay = base_delay
     for attempt in range(1, max(1, retries) + 1):
         log(f"Pushing {refspec} (attempt {attempt}/{retries})...")
-        r = push_once(repo, url, refspec, extra_args=extra_args, token=token,
+        r = push_once(repo, url, refspec, extra_args=options, token=token,
                       run=run)
         if r.returncode == 0:
             return True

@@ -17,6 +17,7 @@ were ABSENT before the run.
 
 from __future__ import annotations
 
+import errno
 import json
 import os
 import re
@@ -26,7 +27,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Callable, Literal
 
-from .gitio import credential_free_url
+from .gitio import canonical_remote_identity
 
 ABSENT = "ABSENT"
 
@@ -53,6 +54,15 @@ class PushRecord:
         return Path(wal_dir) / f"{self.op_id}.json"
 
 
+# directories that cannot be fsynced (filesystem semantics) are tolerated;
+# REAL storage failures (EIO, ENOSPC, ...) propagate — a push must never
+# proceed on an intent record the disk may not actually hold (same errno
+# policy as the executor's progress.json writes)
+_DIR_FSYNC_TOLERATED = {errno.EINVAL, errno.ENOTSUP if hasattr(errno, "ENOTSUP")
+                        else errno.EOPNOTSUPP, errno.EOPNOTSUPP,
+                        errno.EACCES, errno.EPERM, errno.EISDIR, errno.EBADF}
+
+
 def _durable_write(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
@@ -67,8 +77,11 @@ def _durable_write(path: Path, payload: dict) -> None:
             os.fsync(dfd)
         finally:
             os.close(dfd)
-    except OSError:
-        pass  # same errno policy as progress.json: best-effort dir fsync
+    except OSError as e:
+        if e.errno not in _DIR_FSYNC_TOLERATED:
+            raise PushWalError(
+                f"WAL directory fsync failed ({errno.errorcode.get(e.errno, e.errno)}): "
+                f"the intent record's durability cannot be guaranteed") from e
 
 
 def record_intent(wal_dir: Path, record: PushRecord) -> Path:
@@ -85,6 +98,13 @@ def record_intent(wal_dir: Path, record: PushRecord) -> Path:
         raise PushWalError(f"dest_ref must be a full branch ref: "
                            f"{record.dest_ref!r}")
     p = record.path(wal_dir)
+    if p.exists():
+        # an op_id is one push attempt's identity: overwriting an existing
+        # record would destroy its rollback target (pre_push_oid) or erase a
+        # pushed acknowledgment — resume flows must reconcile, then either
+        # reuse the record untouched or mint a fresh op_id
+        raise PushWalError(f"WAL record already exists for op_id "
+                           f"{record.op_id!r}; reconcile it, do not overwrite")
     _durable_write(p, asdict(record))
     return p
 
@@ -122,14 +142,17 @@ def _run(cmd: list[str], *, cwd: Path | None = None,
                           timeout=timeout, check=False)
 
 
-def remote_ref_oid(repo: Path, remote: str, dest_ref: str, *,
+def remote_ref_oid(repo: Path, remote_or_url: str, dest_ref: str, *,
                    run: RunFn = _run) -> str:
     """The remote's current OID for `dest_ref`, ABSENT when the ref does not
     exist, or raises on network/remote failure (reconciliation must not
-    mistake 'cannot reach the remote' for 'ref absent')."""
-    r = run(["git", "ls-remote", remote, dest_ref], cwd=repo)
+    mistake 'cannot reach the remote' for 'ref absent'). Accepts a remote
+    name OR a resolved URL — probing and pushing must use ONE transport, or
+    an SSH-configured origin without SSH credentials fails the probe while
+    the token-authenticated HTTPS push would have worked."""
+    r = run(["git", "ls-remote", remote_or_url, dest_ref], cwd=repo)
     if r.returncode != 0:
-        raise PushWalError(f"ls-remote failed for {remote} {dest_ref}: "
+        raise PushWalError(f"ls-remote failed for {remote_or_url} {dest_ref}: "
                            f"{(r.stderr or '').strip()}")
     line = (r.stdout or "").strip()
     return line.split()[0] if line else ABSENT
@@ -139,17 +162,19 @@ def reconcile(repo: Path, record: PushRecord, *,
               run: RunFn = _run) -> Reconciliation:
     """Exact reconciliation of one `intent` record after a crash window.
 
-    Identity first: the record's credential-free remote URL must still match
-    the named remote — comparing OIDs against a different repository would
-    'reconcile' against the wrong world, so a reconfigured remote escalates.
-    Then the OID trichotomy: intended ⇒ pushed; pre-push ⇒ retry;
-    anything else ⇒ escalate."""
+    Identity first: the record's canonical remote identity (transport- and
+    credential-independent) must still match the named remote — comparing
+    OIDs against a different repository would 'reconcile' against the wrong
+    world, so a reconfigured remote escalates. Then the OID trichotomy:
+    intended ⇒ pushed; pre-push ⇒ retry; anything else ⇒ escalate."""
     if record.state == "pushed":
         return "pushed"
     r = run(["git", "remote", "get-url", record.remote_name], cwd=repo)
     if r.returncode != 0:
         return "escalate"
-    if credential_free_url((r.stdout or "").strip()) != record.remote_url:
+    configured = (r.stdout or "").strip()
+    if canonical_remote_identity(configured) != \
+            canonical_remote_identity(record.remote_url):
         return "escalate"
     current = remote_ref_oid(repo, record.remote_name, record.dest_ref,
                              run=run)
@@ -158,3 +183,26 @@ def reconcile(repo: Path, record: PushRecord, *,
     if current == record.pre_push_oid:  # includes ABSENT == ABSENT
         return "retry"
     return "escalate"
+
+
+def resolve_pending(repo: Path, wal_dir: Path, *, remote_name: str,
+                    dest_ref: str,
+                    run: RunFn = _run) -> Reconciliation | None:
+    """Re-entry hygiene: before a NEW intent for `dest_ref` is recorded,
+    every unresolved prior intent for the same destination must be settled.
+    A landed one is marked pushed; a clean retry poses no obstacle (the new
+    intent takes over with a fresh pre-push observation); an escalation is
+    returned for the caller to refuse the push. Returns the worst pending
+    outcome, or None when nothing was pending."""
+    worst: Reconciliation | None = None
+    for rec in load_records(wal_dir):
+        if rec.state != "intent":
+            continue
+        if rec.remote_name != remote_name or rec.dest_ref != dest_ref:
+            continue
+        outcome = reconcile(repo, rec, run=run)
+        if outcome == "pushed":
+            mark_pushed(wal_dir, rec)
+        if worst is None or outcome == "escalate":
+            worst = outcome
+    return worst
