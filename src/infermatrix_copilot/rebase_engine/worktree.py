@@ -29,9 +29,6 @@ def _log(msg: str) -> None:
     print(f"[worktree] {msg}", flush=True)
 
 
-RunFn = Callable[..., "subprocess.CompletedProcess[str]"]
-
-
 def _git(repo: Path, *args: str, check: bool = True,
          env: Mapping[str, str] | None = None) -> "subprocess.CompletedProcess[str]":
     return subprocess.run(["git", *args], cwd=str(repo), check=check,
