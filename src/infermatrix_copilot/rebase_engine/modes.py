@@ -38,7 +38,10 @@ def resolve_effective_mode(spec) -> str:
     """Resolve and WRITE BACK the canonical mode on `spec` (a TaskSpec-like
     object with `.params: dict` and `.report_only: bool`). Raises
     `ModeConflictError` on the BLOCKED rows and on an unknown mode string."""
-    raw = (spec.params.get("rebase_mode") or "").strip()
+    # CLI task params may coerce values to int/bool — a non-string mode must
+    # take the documented unknown-mode BLOCKED path, never crash on .strip()
+    raw_val = spec.params.get("rebase_mode")
+    raw = ("" if raw_val is None else str(raw_val)).strip()
     if raw and raw not in MODES:
         raise ModeConflictError(
             f"unknown rebase_mode {raw!r} — one of {', '.join(MODES)}")

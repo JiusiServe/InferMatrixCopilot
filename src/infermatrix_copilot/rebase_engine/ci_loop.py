@@ -129,8 +129,26 @@ def create_build_guarded(client: CIClient, ops_dir: Path, *,
     if path.exists():
         data = json.loads(path.read_text(encoding="utf-8"))
         existing = BuildOp(**data)
+        # an op id names ONE operation: re-entry with different parameters
+        # is a caller bug — adopting the old build under new intent would
+        # silently monitor the wrong world
+        mismatch = [f"{k}: {getattr(existing, k)!r} != {v!r}"
+                    for k, v in (("run_id", run_id), ("purpose", purpose),
+                                 ("branch", branch), ("commit", commit))
+                    if getattr(existing, k) != v]
+        if mismatch:
+            raise CIOpError(
+                f"build-op {op_id}: recorded identity differs from this "
+                f"request ({'; '.join(mismatch)}) — op ids are single-use, "
+                "refusing to adopt")
         if existing.state == "created" and existing.build_id:
             return existing
+        if existing.state != "intent":
+            # cancelled (or any other terminal) op is CONSUMED — recovery
+            # must never resurrect it to "created"
+            raise CIOpError(
+                f"build-op {op_id}: state {existing.state!r} is terminal — "
+                "a new operation needs a new op id")
         # crash between intent and acknowledgment: recover by exact op id
         for attempt in range(1, max(1, repoll_attempts) + 1):
             matches = client.find_builds_by_meta("imx_op_id", op_id)
@@ -198,6 +216,13 @@ class MonitorOutcome:
     def failed_jobs(self) -> list[JobResult]:
         return [j for j in self.jobs if j.classification == "failed"]
 
+    @property
+    def incomplete_jobs(self) -> list[JobResult]:
+        """Jobs that never reached a per-job terminal state inside a
+        terminal build (running/waiting/canceled/blocked/unknown) —
+        STRUCTURAL, never counted as passed."""
+        return [j for j in self.jobs if j.classification == "incomplete"]
+
 
 @dataclass(frozen=True)
 class CIClassifySpec:
@@ -238,11 +263,19 @@ def monitor_build(client: CIClient, build_id: str, *,
         name = str(job.get("name", "") or "")
         if not name:
             continue
+        raw_exit = job.get("exit_status")
         jr = JobResult(name=name, job_id=str(job.get("id", "")),
                        state=str(job.get("state", "")),
-                       exit_status=int(job.get("exit_status") or 0))
+                       exit_status=int(raw_exit or 0))
         if any(re.search(p, name) for p in spec.ignorable_name_patterns):
             jr.classification = "ignored"
+        elif jr.state not in ("passed", "finished", "failed", "timed_out") \
+                or (jr.state == "finished" and raw_exit is None):
+            # a terminal BUILD can still carry non-terminal or torn JOBS
+            # (running, waiting, canceled, blocked, unknown, or a finished
+            # job whose exit_status never landed) — a missing exit code is
+            # NOT zero; incomplete is structural, never "passed"
+            jr.classification = "incomplete"
         elif jr.state == "passed" or jr.exit_status == 0 and \
                 jr.state not in ("failed", "timed_out"):
             jr.classification = "passed"

@@ -44,6 +44,9 @@ class ManifestSpec:
     change_path_rules: Sequence[Sequence[str]] = ()
     default_queue: str = ""
     priority_source: str = "ready"                 # slug-collision winner
+    # slug -> setup command (parent CI_TEST_SETUP: pre-run model downloads;
+    # feeds the runner's model-download notification hook)
+    setup_map: Mapping[str, str] = field(default_factory=dict)
 
     @classmethod
     def from_manifest(cls, manifest: Mapping) -> "ManifestSpec":
@@ -64,6 +67,7 @@ class ManifestSpec:
                                     (tm.get("change_path_rules") or ())),
             default_queue=tm.get("default_queue", ""),
             priority_source=tm.get("priority_source", "ready"),
+            setup_map=dict(tm.get("setup_map") or {}),
         )
 
 
@@ -78,6 +82,7 @@ class ManifestJob:
     hw: str
     env: str
     module: str = ""
+    setup: str = ""                # parent CI_TEST_SETUP[slug], adapter data
     file_refs: list[str] = field(default_factory=list)
 
 
@@ -111,7 +116,8 @@ class BuiltManifest:
             "jobs": [{"slug": j.slug, "label": j.label, "source": j.source,
                       "command": j.command, "timeout_sec": j.timeout_sec,
                       "min_gpus": j.min_gpus, "hw": j.hw, "env": j.env,
-                      "module": j.module} for j in self.jobs],
+                      "module": j.module, "setup": j.setup}
+                     for j in self.jobs],
             "changes": [{"path": c.path, "type": c.change_type,
                          "new_path": c.new_path} for c in self.changes],
             "module_plans": {
@@ -212,10 +218,12 @@ def _extract_steps(steps_list: list, source: str,
             rp = ref.group(0).rstrip("'\"\\; ")
             if "*" not in rp:
                 refs.append(rp)
+        slug = _label_to_slug(label)
         jobs.append(ManifestJob(
-            slug=_label_to_slug(label), label=label, source=source,
+            slug=slug, label=label, source=source,
             command=cmd_normalized, timeout_sec=timeout_min * 60,
-            min_gpus=min_gpus, hw=hw, env=env_vars, file_refs=refs))
+            min_gpus=min_gpus, hw=hw, env=env_vars,
+            setup=spec.setup_map.get(slug, ""), file_refs=refs))
     return jobs
 
 

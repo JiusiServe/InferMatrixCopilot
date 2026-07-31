@@ -50,6 +50,11 @@ def test_mode_truth_table():
                                          report_only=True))
     with pytest.raises(ModeConflictError, match="unknown rebase_mode"):
         resolve_effective_mode(_spec({"rebase_mode": "yolo"}))
+    # CLI params may coerce to int/bool — documented BLOCKED, never a crash
+    with pytest.raises(ModeConflictError, match="unknown rebase_mode"):
+        resolve_effective_mode(_spec({"rebase_mode": 1}))
+    with pytest.raises(ModeConflictError, match="unknown rebase_mode"):
+        resolve_effective_mode(_spec({"rebase_mode": True}))
     assert mode_state_flags("full") == {
         "mode_report_only": False, "mode_full": True,
         "mode_local_ci": False, "mode_remote_ci": False,
@@ -308,10 +313,24 @@ def test_build_op_guarded_create_and_recovery(tmp_path):
             sleep=lambda s: None)
     assert ci.created == 2
 
+    # op ids are SINGLE-USE identities: different parameters never adopt
+    with pytest.raises(ci_loop.CIOpError, match="single-use"):
+        ci_loop.create_build_guarded(
+            ci, tmp_path, op_id="op-2", run_id="r", purpose="retry",
+            branch="ci-x", commit="d" * 40, message="m",
+            sleep=lambda s: None)
+
     # cancellation only for op-recorded builds
     assert ci_loop.cancel_build_guarded(ci, tmp_path, "op-1") is True
     assert ci.builds["b1"]["state"] == "canceled"
     assert ci_loop.cancel_build_guarded(ci, tmp_path, "op-nope") is False
+    # a cancelled op is CONSUMED — recovery must never resurrect it
+    with pytest.raises(ci_loop.CIOpError, match="terminal"):
+        ci_loop.create_build_guarded(
+            ci, tmp_path, op_id="op-1", run_id="r", purpose="initial",
+            branch="ci-x", commit="c" * 40, message="m",
+            sleep=lambda s: None)
+    assert ci.created == 2
 
 
 def test_monitor_classification(tmp_path):
@@ -332,6 +351,12 @@ def test_monitor_classification(tmp_path):
          "exit_status": 2},
         {"name": "Budget Kill", "id": "j5", "state": "timed_out",
          "exit_status": 255},
+        # a terminal BUILD can still carry non-terminal or torn jobs —
+        # these must never read as passed
+        {"name": "Still Running", "id": "j6", "state": "running"},
+        {"name": "Torn Exit", "id": "j7", "state": "finished"},
+        {"name": "Canceled Job", "id": "j8", "state": "canceled",
+         "exit_status": 0},
     ]
     ci.logs[(b["id"], "j3")] = "fatal: 401 Unauthorized"
     ci.logs[(b["id"], "j4")] = "FAILED tests/x.py::test_y - boom"
@@ -344,8 +369,13 @@ def test_monitor_classification(tmp_path):
     cls = {j.name: j.classification for j in out.jobs}
     assert cls == {"Good Job": "passed", "Testcase Statistics": "ignored",
                    "Gated Model": "ignored", "Real Failure": "failed",
-                   "Budget Kill": "budget_timeout"}
+                   "Budget Kill": "budget_timeout",
+                   "Still Running": "incomplete",
+                   "Torn Exit": "incomplete",
+                   "Canceled Job": "incomplete"}
     assert [j.name for j in out.failed_jobs] == ["Real Failure"]
+    assert {j.name for j in out.incomplete_jobs} == \
+        {"Still Running", "Torn Exit", "Canceled Job"}
     # no-run build states are TERMINAL, neither success nor failure
     b["state"] = "not_run"
     out = ci_loop.monitor_build(ci, b["id"], spec=spec, poll_sec=0,
@@ -416,6 +446,10 @@ def v3_env(settings, tmp_path):
     manifest = yaml.safe_load(
         (REPO_ROOT / "adapters/vllm_omni/manifest.yaml").read_text())
     manifest["repo"]["path"] = str(repo)
+    # production setup wiring (manifest -> ManifestSpec -> job -> TestJob):
+    # the real map is empty, so the fixture declares one for the pin
+    manifest["rebase"]["test_manifest"]["setup_map"] = {
+        "quick": "echo huggingface-cli download org/quick x"}
     (adir / "manifest.yaml").write_text(yaml.safe_dump(manifest))
     settings.playbooks_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy(REPO_ROOT / "playbooks" / "repo-rebase-v3.yaml",
@@ -677,7 +711,8 @@ def test_v3_test_loop_step_contract(v3_env, settings, trace, monkeypatch):
 
     def fake_run(self, job, env, *, baseline=False, dry_run=False):
         calls.append({"key": job.key, "job_env": dict(job.env),
-                      "env": dict(env), "baseline": baseline})
+                      "env": dict(env), "baseline": baseline,
+                      "setup": job.setup})
         return runner_mod.TestOutcome(rc=0 if baseline else 1,
                                       log_file="")
     monkeypatch.setattr(runner_mod.TestRunner, "run", fake_run)
@@ -700,6 +735,9 @@ def test_v3_test_loop_step_contract(v3_env, settings, trace, monkeypatch):
     # the job's declared env pairs reach the child
     assert rebase_call["job_env"] == {"QUICK_ENV": "1"}
     assert baseline_call["job_env"] == {"QUICK_ENV": "1"}
+    # the manifest setup_map reaches TestJob.setup THROUGH production
+    # wiring (feeds the runner's model-download notification hook)
+    assert rebase_call["setup"] == "echo huggingface-cli download org/quick x"
     # tests INHERIT the process env — the agent-shell scrub must not strip
     # a test's required credentials (misclassification hazard)
     assert rebase_call["env"].get("ANTHROPIC_API_KEY") == "sk-test-inherit"
@@ -857,11 +895,36 @@ def test_v3_module_scope_and_serialization(v3_agent_env, settings, trace,
     assert events[2][0] == "enter" and events[3] == ("exit", events[2][1])
     scope = scopes["worker_runner"]
     root = Path(str(repo)).resolve().as_posix()
+    rd = Path(str(run_dir)).resolve().as_posix()
     assert scope.name == "rebase-module:worker_runner"
-    assert scope.path_scope.writable == (f"{root}/*",)
+    # writable wall: the repo tree AND the run's artifact dir (the plan
+    # gate REQUIRES the decision write under <run_dir>/plans/)
+    assert scope.path_scope.writable == (f"{root}/*", f"{rd}/*")
     assert any(p.startswith(f"{root}/vllm_omni/worker")
                for p in scope.path_scope.primary)
+    assert f"{rd}/plans/*" in scope.path_scope.primary
     assert scope.root == root
+    # the decision write is allowed AND in primary (no out-of-scope noise)
+    d = scope.path_scope.check_write(
+        f"{rd}/plans/module-worker_runner/x.decision.md")
+    assert d.allowed and not d.out_of_scope
+    # ...and through the REAL dispatch choke point with the REAL write_file
+    # tool (the integration the mocks were hiding)
+    from infermatrix_copilot import tools as tools_mod
+    from infermatrix_copilot.rebase_engine.rebase_tools import (
+        RebaseBackends, RebasePaths, build_rebase_tools, load_tool_schemas)
+    defs = load_tool_schemas(Path(settings.adapters_dir) / "vllm_omni"
+                             / "rebase" / "tool_schemas.json")
+    extra = build_rebase_tools(
+        defs, RebasePaths(omni_path=str(repo), vllm_path=str(repo),
+                          env={}), RebaseBackends())
+    plan_file = Path(rd) / "plans" / "module-worker_runner" / "p.decision.md"
+    plan_file.parent.mkdir(parents=True, exist_ok=True)
+    out = tools_mod.dispatch("write_file",
+                             {"file_path": str(plan_file), "content": "d"},
+                             scope=scope, extra=extra, trace=trace)
+    assert out["ok"] and not out["out_of_scope"], out
+    assert plan_file.read_text() == "d"
     # a write inside the repo but outside local_paths is out-of-scope
     d = scope.path_scope.check_write(f"{root}/vllm_omni/engine/core.py")
     assert d.allowed and d.out_of_scope
@@ -880,12 +943,16 @@ def test_v3_module_scope_and_serialization(v3_agent_env, settings, trace,
     d = anon.path_scope.check_write(f"{root}/vllm_omni/worker/gpu.py")
     assert d.allowed and d.out_of_scope
     # in-process resume under a NEW event loop must not reuse the old
-    # loop's serialization lock (loop-scoped, stale keys pruned)
+    # loop's lock: weak loop keys mean a fresh loop gets a fresh lock
     r3 = asyncio.run(handler(ctx_for("worker_runner")))
     assert r3.ok
-    from infermatrix_copilot.engine.steps.rebase_v3 import _MODULE_SERIAL
-    assert len([k for k in _MODULE_SERIAL
-                if k[0] == str(run_dir)]) == 1
+    from infermatrix_copilot.engine.steps.rebase_v3 import _serial_lock
+
+    async def probe_lock():
+        return _serial_lock(run_dir)
+    l1 = asyncio.run(probe_lock())
+    l2 = asyncio.run(probe_lock())
+    assert l1 is not l2                      # per-loop, never resurrected
 
 
 def test_v3_tier_client_pairs_endpoint_and_credential(trace, tmp_path,
@@ -1181,6 +1248,126 @@ def test_v3_precommit_not_declared(v3_env, settings, trace):
     assert data["tests"]["precommit"]["result"] == "not_declared"
     assert evaluate_push_gate(data, {}).allowed      # recorded, not red
     assert any(e for e in trace.events("capability_gap"))
+
+
+def test_v3_halt_on_phase3_failures(v3_env, settings, trace, monkeypatch,
+                                    tmp_path):
+    """The declared safety param actually halts: with phase-3 failures in
+    substate and halt_on_phase3_failures=true, the precommit step (end of
+    phase 3 — precommit still runs first) ESCALATEs instead of proceeding
+    toward push/CI."""
+    from infermatrix_copilot.engine.registry import StepRegistry
+    from infermatrix_copilot.engine.step import FailureKind, StepContext
+    from infermatrix_copilot.engine.steps import register_builtin_steps
+    from infermatrix_copilot.testing import runner as runner_mod
+    _, _, repo, _ = v3_env
+    monkeypatch.setattr(
+        runner_mod.TestRunner, "run",
+        lambda self, job, env, *, baseline=False, dry_run=False:
+        runner_mod.TestOutcome(rc=0))
+    registry = register_builtin_steps(StepRegistry())
+
+    def run_precommit(params, run_id):
+        rd = tmp_path / f"halt-{run_id}"
+        rd.mkdir()
+        Substate(rd, run_id).update(
+            {"tests": {"pipeline": {"failed_tests": ["t1"]}}})
+        ctx = StepContext(
+            settings=settings, params={}, run_dir=rd, trace=trace,
+            state={"task_spec": {"repo": "vllm-omni", "params": params},
+                   "run_id": run_id, "repo_path": str(repo)})
+        return asyncio.run(registry.get("rebase.v3_precommit").handler(ctx))
+
+    r = run_precommit({"halt_on_phase3_failures": True}, "h1")
+    assert not r.ok and r.failure is FailureKind.ESCALATE
+    assert "halting before any push/CI" in r.summary
+    # default: failures pass through to the push gate's ruling
+    assert run_precommit({}, "h2").ok
+
+
+def test_v3_mutating_step_reacquires_locks_on_resume(v3_env, settings,
+                                                     trace, monkeypatch,
+                                                     tmp_path):
+    """A --resume replays the checkpointed prelude WITHOUT executing it —
+    the resumed mutating steps must (re)acquire the checkout flocks
+    themselves, and the lifecycle finalizer still releases them."""
+    from infermatrix_copilot.engine import lifecycle
+    from infermatrix_copilot.engine.registry import StepRegistry
+    from infermatrix_copilot.engine.step import StepContext
+    from infermatrix_copilot.engine.steps import register_builtin_steps
+    from infermatrix_copilot.rebase_engine.runctx import CheckoutLock
+    from infermatrix_copilot.testing import runner as runner_mod
+    _, _, repo, _ = v3_env
+    monkeypatch.setattr(
+        runner_mod.TestRunner, "run",
+        lambda self, job, env, *, baseline=False, dry_run=False:
+        runner_mod.TestOutcome(rc=0))
+    registry = register_builtin_steps(StepRegistry())
+    rd = tmp_path / "resumed-run"
+    rd.mkdir()
+    # resumed world: mode already resolved into params, NO prelude executed
+    ctx = StepContext(
+        settings=settings, params={}, run_dir=rd, trace=trace,
+        state={"task_spec": {"repo": "vllm-omni",
+                             "params": {"rebase_mode": "local_ci"}},
+               "run_id": "resumed-run", "repo_path": str(repo)})
+    r = asyncio.run(registry.get("rebase.v3_precommit").handler(ctx))
+    assert r.ok, r.summary
+    probe = CheckoutLock(repo, "omni")
+    assert probe.acquire(blocking=False) is False    # step took the lock
+    asyncio.run(lifecycle.finalize(rd, None))
+    assert probe.acquire(blocking=False) is True
+    probe.release()
+
+
+def test_v3_debug_reject_restores_worktree(v3_agent_env, settings, trace,
+                                           monkeypatch):
+    """A debug attempt whose verification re-run stays red must NOT leave
+    its edits in the tree — assertion failures pass the push gate by
+    default, so an unverified patch would eventually be committed and
+    pushed. Snapshot before dispatch, restore on rejection."""
+    from infermatrix_copilot.engine.registry import StepRegistry
+    from infermatrix_copilot.engine.step import StepContext
+    from infermatrix_copilot.engine.steps import rebase_v3, \
+        register_builtin_steps
+    from infermatrix_copilot.rebase_engine import agent_loop as al
+    from infermatrix_copilot.rebase_engine import test_loop as tl_mod
+    from infermatrix_copilot.testing import runner as runner_mod
+    _, _, repo, run_dir = v3_agent_env
+    monkeypatch.setattr(
+        rebase_v3, "_tier_client",
+        lambda ctx: (object(), SimpleNamespace(
+            model="m", api_key="k", base_url="", source="global")))
+    tracked = repo / ".buildkite" / "test-merge.yml"
+    original = tracked.read_text()
+
+    async def fake_loop(client, prompt, **kw):
+        # the "agent" edits a tracked file and creates a stray one
+        tracked.write_text(original + "\n# unverified debug patch\n")
+        (repo / "stray_debug_artifact.py").write_text("x = 1\n")
+        return {"done": True, "text": "patched", "turns": 1}
+    monkeypatch.setattr(al, "run_agent_loop", fake_loop)
+    monkeypatch.setattr(
+        runner_mod.TestRunner, "run",
+        lambda self, job, env, *, baseline=False, dry_run=False:
+        runner_mod.TestOutcome(rc=0 if baseline else 1))   # rerun stays red
+    monkeypatch.setattr(tl_mod, "ensure_main_worktree",
+                        lambda repo, path, base_ref="origin/main":
+                        run_dir / "wt")
+    monkeypatch.setattr(tl_mod, "remove_main_worktree",
+                        lambda repo, path: None)
+    registry = register_builtin_steps(StepRegistry())
+    ctx = StepContext(
+        settings=settings, params={}, run_dir=run_dir, trace=trace,
+        state={"task_spec": {"repo": "vllm-omni", "params": {}},
+               "run_id": "run-restore", "repo_path": str(repo)})
+    r = asyncio.run(registry.get("rebase.v3_test_loop").handler(ctx))
+    assert r.ok, r.summary
+    data = Substate(run_dir, "run-restore").read()
+    assert data["tests"]["pipeline"]["failed_tests"] == ["quick"]
+    # the rejected patch is GONE: tracked file reverted, stray file removed
+    assert tracked.read_text() == original
+    assert not (repo / "stray_debug_artifact.py").exists()
 
 
 def test_runner_model_download_notify(tmp_path):

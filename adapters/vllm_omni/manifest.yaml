@@ -148,6 +148,11 @@ rebase:
     rename_suffixes: [_tts_expansion, _expansion, _tts]
     file_ref_prefixes: [tests, vllm_omni]
     file_tree_roots: [tests, vllm_omni]
+    # slug -> pre-run setup command (parent CI_TEST_SETUP verbatim; feeds the
+    # runner's model-download notification hook). The parent's LIVE map is
+    # currently empty — its only entries are commented STALE — so this stays
+    # {} until a job declares one.
+    setup_map: {}
     # ordered change-path -> module classification (parent heuristic order:
     # entrypoints beats engine)
     change_path_rules:

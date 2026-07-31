@@ -197,6 +197,68 @@ async def run_test_loop(
             "infra_failures": infra_failures}
 
 
+# ── attempt-scoped snapshot/restore (parent `_snapshot_worktree`) ────────────
+
+def _git_out(repo: Path, args: list[str], timeout: int = 60) -> str:
+    try:
+        return subprocess.run(["git", "-C", str(repo), *args],
+                              capture_output=True, text=True,
+                              timeout=timeout).stdout
+    except Exception:  # noqa: BLE001 - snapshot machinery is best-effort
+        return ""
+
+
+def snapshot_worktree(repo: Path) -> tuple[str, set[str]]:
+    """Snapshot the working tree before a debug attempt (parent verbatim).
+
+    Returns ``(snapshot_commit, untracked_files)``. The snapshot commit is a
+    dangling commit from ``git stash create`` capturing all TRACKED files
+    (it does NOT modify the worktree or index); a clean tree falls back to
+    HEAD. Untracked files are recorded by path so files the attempt creates
+    can be identified and removed on rejection."""
+    untracked = {f for f in _git_out(repo, ["ls-files", "--others",
+                                            "--exclude-standard"])
+                 .splitlines() if f.strip()}
+    snap = _git_out(repo, ["stash", "create",
+                           "pre-debug-attempt snapshot"]).strip()
+    if not snap:
+        snap = _git_out(repo, ["rev-parse", "HEAD"]).strip()
+    return snap, untracked
+
+
+def restore_worktree(repo: Path, snap: str,
+                     untracked_before: set[str]) -> None:
+    """Revert everything a debug attempt changed, back to the snapshot
+    (parent verbatim). Rejected/unverified fixes must NOT stay in the tree:
+    they pollute every later test and debug attempt and eventually get
+    swept into a commit by the push staging. Best-effort — never raises
+    into the test loop."""
+    if not snap:
+        return
+    try:
+        changed = [f for f in _git_out(
+            repo, ["diff", "--name-only", snap]).splitlines() if f.strip()]
+        if changed:
+            subprocess.run(["git", "-C", str(repo), "checkout", snap,
+                            "--", *changed],
+                           capture_output=True, text=True, timeout=120)
+            log.info("  Reverted %d file(s) from rejected debug attempt: %s",
+                     len(changed), ", ".join(changed[:5]))
+        untracked_now = {f for f in _git_out(
+            repo, ["ls-files", "--others", "--exclude-standard"])
+            .splitlines() if f.strip()}
+        for f in sorted(untracked_now - untracked_before):
+            try:
+                (Path(repo) / f).unlink()
+                log.info("  Removed file created by rejected debug "
+                         "attempt: %s", f)
+            except OSError:
+                pass
+    except Exception as exc:  # noqa: BLE001
+        log.warning("  Could not fully restore worktree after rejected "
+                    "attempt: %s", exc)
+
+
 # ── main-baseline worktree helpers ───────────────────────────────────────────
 
 def ensure_main_worktree(repo: Path, worktree_path: Path,

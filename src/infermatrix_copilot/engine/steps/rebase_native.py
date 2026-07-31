@@ -49,6 +49,37 @@ def _blocked_import() -> StepResult:
                       "REBASE_AGENT_ROOT)")
 
 
+def _ensure_omni_lock(ctx: StepContext, settings) -> StepResult | None:
+    """(Re)acquire the SHARED checkout flock and register its lifecycle
+    release. Called from `_ensure_runtime` — NOT only the prelude — because
+    a `--resume` replays the checkpointed prelude without executing it, and
+    the resumed mutating steps must not run without checkout exclusion."""
+    from ...rebase_engine.runctx import CheckoutLock
+    lock = _RUNTIME.get("omni_lock")
+    if lock is not None and lock.held:
+        return None
+    lock = CheckoutLock(Path(str(settings.omni_path)), "omni")
+    if not lock.acquire(blocking=False):
+        return StepResult(False, FailureKind.BLOCKED,
+                          "another run holds the checkout lock "
+                          "(locks/omni.lock) — an external or archival "
+                          "run is active on this checkout")
+    _RUNTIME["omni_lock"] = lock
+    # release on EVERY exit path (blocked module, denied push, exception,
+    # cancellation) via the run's lifecycle finalizer — a lock parked in
+    # the process-global _RUNTIME would otherwise outlive the run and
+    # starve external/archival users of the checkout
+    from ..lifecycle import register_finalizer
+
+    async def _release_omni_lock(_outcome, _lock=lock) -> None:
+        _lock.release()
+        if _RUNTIME.get("omni_lock") is _lock:
+            _RUNTIME.pop("omni_lock", None)
+
+    register_finalizer(ctx.run_dir, _release_omni_lock)
+    return None
+
+
 def _ensure_runtime(ctx: StepContext) -> dict | StepResult:
     """Build (or rebuild after a process restart) the parent runtime: settings
     loaded, env exported, log dirs, stores initialized, RebaseState dict.
@@ -59,6 +90,11 @@ def _ensure_runtime(ctx: StepContext) -> dict | StepResult:
         if ctx.state.get("rebase_state") is None:
             ctx.state["rebase_state"] = _RUNTIME["state"]
             ctx.state["rebase_run_id"] = _RUNTIME["run_id"]
+        # the memoized runtime may have outlived its run's lock release
+        # (finalizers fire per run) — re-ensure before any step proceeds
+        blocked = _ensure_omni_lock(ctx, _RUNTIME["settings"])
+        if blocked is not None:
+            return blocked
         return _RUNTIME
 
     orch, _p2 = _import_parent()
@@ -137,6 +173,9 @@ def _ensure_runtime(ctx: StepContext) -> dict | StepResult:
     ctx.state["rebase_run_id"] = state["run_id"]
     ctx.state["parent_log_dir"] = str(log_dir)
     ctx.state["repo_path"] = str(settings.omni_path)
+    blocked = _ensure_omni_lock(ctx, settings)
+    if blocked is not None:
+        return blocked
     return _RUNTIME
 
 
@@ -184,31 +223,10 @@ async def _prelude(ctx: StepContext) -> StepResult:
         return rt
     settings = rt["settings"]
 
-    # v1 obligation (plan §4/§8): the SHARED checkout flock every user of
-    # the checkout holds — external runs (EXT1) and PR7 archival take the
-    # same file, so exclusion is mutual and archival can prove quiescence
-    from ...rebase_engine.runctx import CheckoutLock
-    lock = _RUNTIME.get("omni_lock")
-    if lock is None or not lock.held:
-        lock = CheckoutLock(Path(str(settings.omni_path)), "omni")
-        if not lock.acquire(blocking=False):
-            return StepResult(False, FailureKind.BLOCKED,
-                              "another run holds the checkout lock "
-                              "(locks/omni.lock) — an external or archival "
-                              "run is active on this checkout")
-        _RUNTIME["omni_lock"] = lock
-        # release on EVERY exit path (blocked module, denied push, exception,
-        # cancellation) via the run's lifecycle finalizer — a lock parked in
-        # the process-global _RUNTIME would otherwise outlive the run and
-        # starve external/archival users of the checkout
-        from ..lifecycle import register_finalizer
-
-        async def _release_omni_lock(_outcome, _lock=lock) -> None:
-            _lock.release()
-            if _RUNTIME.get("omni_lock") is _lock:
-                _RUNTIME.pop("omni_lock", None)
-
-        register_finalizer(ctx.run_dir, _release_omni_lock)
+    # v1 obligation (plan §4/§8): the SHARED checkout flock (external EXT1
+    # runs and PR7 archival take the same file) is ensured inside
+    # `_ensure_runtime` — for the prelude AND for every resumed step that
+    # rebuilds or reuses the runtime without re-running the prelude.
 
     # wave lists from the parent settings, minus already-done modules on resume
     done: set[str] = set()
