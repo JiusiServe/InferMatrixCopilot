@@ -128,46 +128,58 @@ class RebaseRuntime:
         return failures
 
 
-def _loop_id() -> int:
+def _current_loop() -> "asyncio.AbstractEventLoop | None":
     try:
-        return id(asyncio.get_running_loop())
+        return asyncio.get_running_loop()
     except RuntimeError:
-        return 0  # no running loop: sync context gets its own key space
+        return None
 
 
 class RuntimeRegistry:
-    """Process-wide registry, keyed by (run_dir, event-loop id) under a
-    threading.Lock with double-checked creation. `release()` tears the
-    runtime down and forgets it; a later acquire builds a fresh one."""
+    """Process-wide registry keyed by (run_dir, event loop) under a
+    threading.Lock with double-checked creation. The loop key is a WEAK
+    reference to the loop OBJECT — `id(loop)` is unusable, since a dead
+    loop's memory address is routinely reused by the next `asyncio.run` and
+    the stale runtime (holding the dead loop's primitives) would be handed
+    out again. When the loop is garbage-collected its runtimes vanish with
+    it. `release()` tears the runtime down and forgets it; a later acquire
+    builds a fresh one. Sync (no-loop) contexts get their own bucket."""
 
     def __init__(self):
+        import weakref
         self._lock = threading.Lock()
-        self._runtimes: dict[tuple[str, int], RebaseRuntime] = {}
+        # loop -> {run_dir -> runtime}; entries die with their loop
+        self._by_loop: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
+        self._sync: dict[str, RebaseRuntime] = {}
+
+    def _bucket(self) -> dict:
+        loop = _current_loop()
+        if loop is None:
+            return self._sync
+        bucket = self._by_loop.get(loop)
+        if bucket is None:
+            bucket = {}
+            self._by_loop[loop] = bucket
+        return bucket
 
     def get_or_create(self, run_dir: Path, run_id: str) -> RebaseRuntime:
-        key = (str(Path(run_dir)), _loop_id())
-        rt = self._runtimes.get(key)
-        if rt is not None:
-            if rt.run_id != run_id:
-                raise RuntimeError_(
-                    f"run_dir {key[0]} is registered to run {rt.run_id!r}, "
-                    f"not {run_id!r}")
-            return rt
+        key = str(Path(run_dir))
         with self._lock:
-            rt = self._runtimes.get(key)
+            bucket = self._bucket()
+            rt = bucket.get(key)
             if rt is None:
                 rt = RebaseRuntime(run_dir, run_id)
-                self._runtimes[key] = rt
+                bucket[key] = rt
             elif rt.run_id != run_id:
                 raise RuntimeError_(
-                    f"run_dir {key[0]} is registered to run {rt.run_id!r}, "
+                    f"run_dir {key} is registered to run {rt.run_id!r}, "
                     f"not {run_id!r}")
             return rt
 
     def release(self, run_dir: Path, *, timeout_sec: float = 60.0) -> list[str]:
-        key = (str(Path(run_dir)), _loop_id())
+        key = str(Path(run_dir))
         with self._lock:
-            rt = self._runtimes.pop(key, None)
+            rt = self._bucket().pop(key, None)
         return rt.teardown(timeout_sec=timeout_sec) if rt else []
 
 

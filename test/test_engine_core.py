@@ -74,10 +74,16 @@ def test_registry_is_loop_scoped(tmp_path):
     async def acquire():
         return reg.get_or_create(tmp_path, "run-1")
 
-    rt1 = asyncio.run(acquire())
-    rt2 = asyncio.run(acquire())
+    async def acquire_with_loop():
+        return reg.get_or_create(tmp_path, "run-1"), asyncio.get_running_loop()
+
+    rt1, loop1 = asyncio.run(acquire_with_loop())
+    rt2, loop2 = asyncio.run(acquire_with_loop())
     # a fresh asyncio.run means a fresh loop — the runtime must NOT carry
-    # over (its primitives would belong to the dead loop)
+    # over (its primitives would belong to the dead loop). Keeping loop1
+    # alive here also pins that a REUSED id(loop) address cannot alias:
+    # the registry keys on the loop OBJECT (weakly), never its id.
+    assert loop1 is not loop2
     assert rt1 is not rt2
 
     async def acquire_twice():
