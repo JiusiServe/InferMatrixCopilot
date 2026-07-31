@@ -1,0 +1,223 @@
+"""Working-tree hygiene for rebase runs — port of `01_guard_branch_clean.sh`
+and `lib/apply_dirty_worktree_decision.py`.
+
+Three neutral pieces:
+- `abort_stale_inflight_state`: a halted prior run can leave a merge /
+  cherry-pick / revert / rebase in flight; its unmerged entries then surface as
+  regular dirty entries that `git restore` refuses ("path is unmerged"),
+  failing cleanup in a confusing way. Abort them first.
+- `discard_untracked_matching`: quick-discard untracked artifacts matching
+  adapter-supplied patterns (e.g. pytest-copied config files) before deciding
+  the tree is dirty.
+- `apply_dirty_worktree_decision`: apply an L2 agent's discard/commit decision
+  (same JSON schema as the parent: per-repo ``{"discard": [...], "commit":
+  {"message", "paths"} | null}``). The caller supplies the decision-key →
+  repo-root mapping; every mapped key must be present in the decision.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import subprocess
+from pathlib import Path
+from typing import Callable, Iterable, Mapping
+
+
+def _log(msg: str) -> None:
+    print(f"[worktree] {msg}", flush=True)
+
+
+RunFn = Callable[..., "subprocess.CompletedProcess[str]"]
+
+
+def _git(repo: Path, *args: str, check: bool = True,
+         env: Mapping[str, str] | None = None) -> "subprocess.CompletedProcess[str]":
+    return subprocess.run(["git", *args], cwd=str(repo), check=check,
+                          text=True, capture_output=True, errors="replace",
+                          env=dict(env) if env is not None else None)
+
+
+def porcelain(repo: Path) -> str:
+    r = _git(repo, "status", "--porcelain", check=False)
+    return (r.stdout or "").strip()
+
+
+def abort_stale_inflight_state(repo: Path, *,
+                               log: Callable[[str], None] = _log) -> list[str]:
+    """Abort any leftover merge/cherry-pick/revert/rebase from a halted prior
+    run. Best-effort: each abort's failure is ignored (the guard's dirty-tree
+    check after us still fails closed). Returns the kinds aborted."""
+    repo = Path(repo)
+    if not (repo / ".git").exists():
+        return []
+    r = _git(repo, "rev-parse", "--git-dir", check=False)
+    if r.returncode != 0:
+        return []
+    git_dir = Path(r.stdout.strip())
+    if not git_dir.is_absolute():
+        git_dir = repo / git_dir
+
+    aborted: list[str] = []
+    checks = (
+        ("merge", git_dir / "MERGE_HEAD", ["merge", "--abort"]),
+        ("cherry-pick", git_dir / "CHERRY_PICK_HEAD", ["cherry-pick", "--abort"]),
+        ("revert", git_dir / "REVERT_HEAD", ["revert", "--abort"]),
+    )
+    for kind, marker, cmd in checks:
+        if marker.is_file():
+            log(f"Detected leftover {marker.name} in {repo.name}; "
+                f"aborting stale {kind}...")
+            _git(repo, *cmd, check=False)
+            aborted.append(kind)
+    if (git_dir / "rebase-merge").is_dir() or (git_dir / "rebase-apply").is_dir():
+        log(f"Detected in-progress rebase in {repo.name}; aborting...")
+        _git(repo, "rebase", "--abort", check=False)
+        aborted.append("rebase")
+    return aborted
+
+
+def discard_untracked_matching(repo: Path, patterns: Iterable[str], *,
+                               log: Callable[[str], None] = _log) -> list[str]:
+    """Remove untracked files whose repo-relative path matches any of the
+    given regexes (adapter data). Only untracked files are ever touched."""
+    repo = Path(repo)
+    compiled = [re.compile(p) for p in patterns]
+    if not compiled:
+        return []
+    r = _git(repo, "ls-files", "--others", "--exclude-standard", check=False)
+    removed: list[str] = []
+    for rel in (r.stdout or "").splitlines():
+        rel = rel.strip()
+        if rel and any(c.search(rel) for c in compiled):
+            log(f"Quick-discard untracked artifact: {rel}")
+            _git(repo, "clean", "-fd", "--", rel, check=False)
+            removed.append(rel)
+    return removed
+
+
+# -- L2 dirty-worktree decision (same JSON schema as the parent) --------------
+
+_UNMERGED_PORCELAIN_CODES = {"DD", "AU", "UD", "UA", "DU", "AA", "UU"}
+
+
+class DecisionError(RuntimeError):
+    """The decision JSON is malformed or names an illegal path."""
+
+
+def _safe_rel(repo: Path, path: str) -> None:
+    rel = Path(path)
+    if rel.is_absolute():
+        raise DecisionError(f"absolute path not allowed: {path}")
+    if ".." in rel.parts:
+        raise DecisionError(f"path must not contain '..': {path}")
+    out = (repo / rel).resolve()
+    try:
+        out.relative_to(Path(repo).resolve())
+    except ValueError as e:
+        raise DecisionError(f"path escapes repo: {path}") from e
+
+
+def _porcelain_for(repo: Path, rel: str) -> str:
+    r = _git(repo, "status", "--porcelain", "--", rel, check=False)
+    return (r.stdout or "").strip()
+
+
+def _head_has_path(repo: Path, rel: str) -> bool:
+    return _git(repo, "cat-file", "-e", f"HEAD:{rel}", check=False).returncode == 0
+
+
+def _discard_unmerged(repo: Path, rel: str) -> None:
+    """Discard an unmerged path while a merge, rebase, or cherry-pick is live:
+    `git restore` refuses unmerged entries, so snap the path back to HEAD —
+    keep the file if HEAD has it, otherwise remove it. Safe because the
+    decision said "discard": none of the in-flight side's changes are wanted."""
+    if _head_has_path(repo, rel):
+        _git(repo, "checkout", "HEAD", "--", rel)
+        _git(repo, "add", "--", rel)
+    else:
+        _git(repo, "rm", "-f", "--", rel)
+
+
+def _apply_discard(repo: Path, rel: str) -> None:
+    _safe_rel(repo, rel)
+    line = _porcelain_for(repo, rel)
+    if not line:
+        return
+    if line.startswith("??"):
+        _git(repo, "clean", "-fd", "--", rel)
+        return
+    if line[:2] in _UNMERGED_PORCELAIN_CODES:
+        _discard_unmerged(repo, rel)
+        return
+    _git(repo, "restore", "--staged", "--worktree", "--", rel)
+
+
+def _apply_commit(repo: Path, message: str, paths: list[str],
+                  author_name: str, author_email: str) -> None:
+    for rel in paths:
+        _safe_rel(repo, rel)
+    env = os.environ.copy()
+    env.update({
+        "GIT_AUTHOR_NAME": author_name,
+        "GIT_AUTHOR_EMAIL": author_email,
+        "GIT_COMMITTER_NAME": author_name,
+        "GIT_COMMITTER_EMAIL": author_email,
+    })
+    _git(repo, "add", "--", *paths, env=env)
+    _git(repo, "commit", "--signoff", "-m", message, env=env)
+
+
+def load_decision_json(path: Path) -> dict:
+    """Parse the decision file; tolerate agent chatter around the JSON by
+    falling back to the trailing {...} block (parent parity)."""
+    raw = Path(path).read_text(encoding="utf-8", errors="replace").strip()
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+    m = re.search(r"\{[\s\S]*\}\s*$", raw)
+    if m:
+        try:
+            return json.loads(m.group(0))
+        except json.JSONDecodeError:
+            pass
+    raise DecisionError(f"invalid JSON in {path}")
+
+
+def apply_dirty_worktree_decision(decision: Mapping, repos: Mapping[str, Path],
+                                  *, author_name: str, author_email: str) -> None:
+    """Apply discard/commit blocks per repo. `repos` maps the decision's keys
+    (schema-stable, e.g. the parent's "vllm"/"omni") to repo roots; every
+    mapped key must be present. Discards run before the optional commit."""
+    if not author_name or not author_email:
+        raise DecisionError("author_name and author_email are required")
+    for key, root in repos.items():
+        block = decision.get(key)
+        if not isinstance(block, Mapping):
+            raise DecisionError(f"missing or invalid '{key}' object in decision")
+        disc = block.get("discard") or []
+        if not isinstance(disc, list):
+            raise DecisionError(f"'{key}.discard' must be a list")
+        for rel in disc:
+            if not isinstance(rel, str) or not rel.strip():
+                raise DecisionError(f"invalid discard path in {key}: {rel!r}")
+            _apply_discard(Path(root), rel.strip())
+
+        commit = block.get("commit")
+        if commit is None:
+            continue
+        if not isinstance(commit, Mapping):
+            raise DecisionError(f"'{key}.commit' must be null or object")
+        msg = commit.get("message")
+        cpaths = commit.get("paths")
+        if not isinstance(msg, str) or not msg.strip():
+            raise DecisionError(f"'{key}.commit.message' required")
+        if not isinstance(cpaths, list) or not cpaths:
+            raise DecisionError(f"'{key}.commit.paths' must be non-empty list")
+        for p in cpaths:
+            if not isinstance(p, str) or not p.strip():
+                raise DecisionError(f"invalid commit path in {key}: {p!r}")
+        _apply_commit(Path(root), msg.strip(), [p.strip() for p in cpaths],
+                      author_name, author_email)

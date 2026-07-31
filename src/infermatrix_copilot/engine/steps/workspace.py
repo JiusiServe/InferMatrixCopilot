@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 
+from ...rebase_engine import worktree
 from ...review.diff_summary import build_diff_summary
 from ..step import FailureKind, StepContext, StepResult
 from ._common import require_repo, step
@@ -15,21 +16,49 @@ async def _guard_clean(ctx: StepContext) -> StepResult:
     """Fail-closed pre-flight gate: refuse to start when the working tree is
     dirty, so a run never mixes its edits with pre-existing uncommitted changes.
     Runs `git status --porcelain`; a non-git or dirty tree returns BLOCKED (the
-    dirty case carries a sample of the offending entries in `outputs`)."""
+    dirty case carries a sample of the offending entries in `outputs`).
+
+    Opt-in extensions for rebase-style runs (both default off — existing
+    playbooks are byte-identical in behavior):
+    - `abort_stale_state: true` — abort a leftover merge/cherry-pick/revert/
+      rebase from a halted prior run before judging cleanliness (its unmerged
+      entries would otherwise read as ordinary dirt that `git restore` cannot
+      clear).
+    - `discard_untracked_patterns: [regex, ...]` — quick-discard untracked
+      artifacts matching the adapter-supplied patterns (e.g. pytest-copied
+      configs) before the dirty verdict; only untracked files are touched.
+    """
     repo = require_repo(ctx)
     if isinstance(repo, StepResult):
         return repo
-    out = subprocess.run(["git", "status", "--porcelain"], cwd=str(repo),
-                         capture_output=True, text=True, encoding="utf-8",
-                         errors="replace", timeout=30)
+    notes: list[str] = []
+    if ctx.params.get("abort_stale_state"):
+        aborted = worktree.abort_stale_inflight_state(repo)
+        if aborted:
+            notes.append(f"aborted stale in-flight state: {', '.join(aborted)}")
+
+    def porcelain() -> subprocess.CompletedProcess:
+        return subprocess.run(["git", "status", "--porcelain"], cwd=str(repo),
+                              capture_output=True, text=True, encoding="utf-8",
+                              errors="replace", timeout=30)
+
+    out = porcelain()
     if out.returncode != 0:
         return StepResult(False, FailureKind.BLOCKED, f"not a git repo: {repo}")
+    patterns = ctx.params.get("discard_untracked_patterns") or []
+    if out.stdout.strip() and patterns:
+        removed = worktree.discard_untracked_matching(repo, patterns)
+        if removed:
+            notes.append(f"discarded {len(removed)} untracked artifact(s)")
+            out = porcelain()
     if out.stdout.strip():
         dirty = out.stdout.strip().splitlines()
         return StepResult(False, FailureKind.BLOCKED,
                           f"workspace dirty ({len(dirty)} entries) — refuse to start",
-                          outputs={"dirty": dirty[:20]})
-    return StepResult(True, summary="workspace clean")
+                          outputs={"dirty": dirty[:20], "guard_notes": notes})
+    summary = "workspace clean" + (f" ({'; '.join(notes)})" if notes else "")
+    return StepResult(True, summary=summary,
+                      outputs={"guard_notes": notes} if notes else {})
 
 
 @step("analysis.diff_summary", "deterministic", "read",

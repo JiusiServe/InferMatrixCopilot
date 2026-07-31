@@ -37,34 +37,102 @@ knowledge:
   briefing_docs_extra:
   - repos/vllm-omni/review/guides/maintainer-pattern-routing.md
 
+# upstream_paths/test_paths are the parent orchestrator's authoritative module
+# maps (config.sh MODULE_VLLM_PATHS / MODULE_TEST_MAP); the rebase path-sync
+# step retargets the *_paths lists against the live tree each run.
 modules:
   worker_runner:
     local_paths: [vllm_omni/worker/]
+    upstream_paths: [vllm/v1/worker/]
+    test_paths: [tests/worker/, tests/diffusion/test_diffusion_worker.py, tests/e2e/offline_inference/custom_pipeline/, tests/e2e/online_serving/test_qwen3_tts_base.py, tests/entrypoints/test_omni_sleep_mode.py]
     wave: 1
     risk: high
   model_executor:
     local_paths: [vllm_omni/model_executor/]
+    upstream_paths: [vllm/model_executor/]
+    test_paths: [tests/model_executor/, tests/diffusion/, tests/e2e/offline_inference/]
     wave: 1
     risk: high
   input_output:
     local_paths: [vllm_omni/inputs/, vllm_omni/outputs/]
+    upstream_paths: [vllm/inputs/, vllm/v1/engine/input_processor.py, vllm/v1/engine/output_processor.py, vllm/v1/request.py]
+    test_paths: [tests/entrypoints/test_omni_new_request_data.py, tests/engine/test_async_omni_engine_input.py, tests/test_outputs.py, tests/engine/]
     wave: 1
   scheduler:
     local_paths: [vllm_omni/core/]
+    upstream_paths: [vllm/v1/core/sched/]
+    test_paths: [tests/distributed/, tests/diffusion/distributed/test_ulysses_uaa_perf.py]
     wave: 1
     risk: high
   online_serving:
     local_paths: [vllm_omni/entrypoints/]
+    upstream_paths: [vllm/entrypoints/]
+    test_paths: [tests/entrypoints/test_async_omni.py, tests/entrypoints/test_async_omni_diffusion_config.py, tests/entrypoints/openai_api/, tests/e2e/online_serving/]
     wave: 1
   model_config:
     local_paths: [vllm_omni/config/]
+    upstream_paths: [vllm/config/, vllm/engine/arg_utils.py]
+    test_paths: [tests/entrypoints/test_stage_utils.py, tests/metrics/test_stats.py]
     wave: 1
   platform:
     local_paths: [vllm_omni/platforms/]
+    upstream_paths: [vllm/platforms/]
+    test_paths: [tests/]
     wave: 1
   benchmarks:
     local_paths: [benchmarks/]
+    upstream_paths: [vllm/benchmarks/, vllm/entrypoints/cli/benchmark/]
+    test_paths: [tests/benchmarks/test_serve_cli.py]
     wave: 2
+
+# Phase-1 rebase machinery data (consumed by rebase_engine — repo specifics
+# live here so the engine stays neutral). Sourced from the parent's config.sh
+# + tasks 10/20/01/40/35.
+rebase:
+  wheel:
+    package: vllm
+    index_url_template: "https://wheels.vllm.ai/{commit}/{variant}/{package}/"
+    variant: cu130
+    arch: x86_64
+    import_check_modules: [vllm._C_stable_libtorch, vllm._C]
+    ops_namespace: _C
+    stale_artifact_globs: ["_C*.so", "*.abi3.so", "_moe_C*.so"]
+    install_env: {VLLM_USE_PRECOMPILED: "1"}
+    reinstall_retries: 3
+    pin:
+      dockerfile: docker/Dockerfile.ci
+      url_pattern: 'wheels\.vllm\.ai/[0-9a-f]{40}'
+      url_template: "wheels.vllm.ai/{commit}"
+      commit_env_var: VLLM_PRECOMPILED_WHEEL_COMMIT
+  guard:
+    # untracked pytest-copied stage configs are auto-discarded before the
+    # dirty-tree verdict (regexes over the repo-relative path)
+    discard_untracked_patterns:
+      - '^tests/e2e/stage_configs/.*_[0-9]{6,}\.yaml$'
+      - '^tests/dfx/[^/]+/stage_configs/.*_[0-9]{6,}\.yaml$'
+  # upstream files whose changes signal base-class inheritance churn
+  base_class_watch_paths: [vllm/entrypoints/llm.py, vllm/v1/engine/core_client.py, vllm/engine/protocol.py, vllm/inputs/preprocess.py, vllm/v1/core/sched/scheduler.py, vllm/v1/worker/gpu_model_runner.py]
+  path_sync:
+    # curated candidate overlays (task 35): candidates are filtered against
+    # the live tree; fallback survives when none exist
+    curated:
+      local_paths:
+        input_output:
+          candidates: [vllm_omni/inputs/data.py, vllm_omni/inputs/preprocess.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/serialization.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/engine/stage_engine_core_client.py, vllm_omni/engine/input_processor.py, vllm_omni/engine/output_processor.py, vllm_omni/request.py]
+          fallback: vllm_omni/inputs/data.py
+        online_serving:
+          candidates: [vllm_omni/entrypoints/omni_base.py, vllm_omni/entrypoints/omni.py, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/async_omni_diffusion.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_chat.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/utils.py]
+          fallback: vllm_omni/entrypoints/openai/api_server.py
+      test_paths:
+        model_config:
+          candidates: [tests/entrypoints/test_stage_utils.py, tests/metrics/test_stats.py, tests/entrypoints/test_omni_llm.py]
+          fallback: tests/entrypoints/test_stage_utils.py
+        input_output:
+          candidates: [tests/entrypoints/test_omni_new_request_data.py, tests/engine/test_async_omni_engine_input.py, tests/entrypoints/test_omni_input_preprocessor.py, tests/test_outputs.py]
+          fallback: tests/entrypoints/test_omni_new_request_data.py
+        online_serving:
+          candidates: [tests/entrypoints/test_async_omni.py, tests/entrypoints/test_async_omni_diffusion_config.py, tests/entrypoints/test_omni_diffusion.py, tests/entrypoints/test_omni_stage_diffusion_config.py, tests/entrypoints/openai_api/]
+          fallback: tests/entrypoints/openai_api/
 
 validation:
   test_manifest_sources: [.buildkite/]
