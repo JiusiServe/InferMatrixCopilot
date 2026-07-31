@@ -505,50 +505,40 @@ def test_snapshot_leader_identity_immutable():
     assert idmap == {1: 100, 3: 300}
 
 
-def test_terminate_tree_requires_recorded_live_leader_to_walk(tmp_path,
-                                                             monkeypatch):
-    """No recorded leader identity (or a dead leader) ⇒ no live walk at all:
-    an unverifiable leader pid may belong to anyone."""
+def test_terminate_tree_without_identity_is_killpg_only(tmp_path, monkeypatch):
+    """With no recorded identity at all, per-pid escalation is skipped
+    entirely (killpg only): an unverifiable leader pid may belong to anyone."""
     import infermatrix_copilot.testing.runner as R
     import infermatrix_copilot.testing.process_tree as pt
-    walked, killed = [], []
+    groups, calls = [], []
+    monkeypatch.setattr(R, "_kill_group",
+                        lambda pgid, sig: groups.append((pgid, sig)))
+    monkeypatch.setattr(pt, "kill_tree",
+                        lambda targets, identity=None:
+                        calls.append((targets, identity)))
+    R.TestRunner._terminate_tree(10, 77, snapshot=None)
+    assert calls == []                       # nothing identifiable to escalate
+    assert [g[0] for g in groups] == [77, 77]  # TERM then KILL on the pgroup
+
+
+def test_terminate_tree_delegates_expansion_to_kill_tree(tmp_path, monkeypatch):
+    """_terminate_tree must never expand descendants itself: pre-walked pids
+    would reach kill_tree as identity-less LEGACY roots and bypass ancestry
+    validation. Contract: exactly the identity-carrying snapshot pids are
+    handed over as roots (identity attached); the single validated expansion
+    happens inside kill_tree."""
+    import infermatrix_copilot.testing.runner as R
+    import infermatrix_copilot.testing.process_tree as pt
+    walked, calls = [], []
     monkeypatch.setattr(R, "_kill_group", lambda pgid, sig: None)
     monkeypatch.setattr(pt, "collect_descendants",
                         lambda pid, children_of=None: walked.append(pid) or [pid])
     monkeypatch.setattr(pt, "kill_tree",
-                        lambda targets, identity=None: killed.extend(targets))
-    monkeypatch.setattr(pt, "_start_time", lambda pid: 500)
-    R.TestRunner._terminate_tree(10, 10, snapshot={20: 222})  # no leader entry
-    assert walked == [] and killed == [20]
-    killed.clear()
-    monkeypatch.setattr(pt, "_start_time", lambda pid: None)  # leader gone
+                        lambda targets, identity=None:
+                        calls.append((targets, identity)))
     R.TestRunner._terminate_tree(10, 10, snapshot={10: 111, 20: 222})
-    assert walked == [] and killed == [10, 20]
-    killed.clear()
-    monkeypatch.setattr(pt, "_start_time", lambda pid: 111)   # verified alive
-    R.TestRunner._terminate_tree(10, 10, snapshot={10: 111})
-    assert walked == [10] and killed == [10]
-
-
-def test_terminate_tree_never_walks_reused_leader(tmp_path, monkeypatch):
-    """A reused leader pid must not be expanded: the stranger's children are
-    identity-less roots nothing downstream could reject."""
-    import infermatrix_copilot.testing.runner as R
-    import infermatrix_copilot.testing.process_tree as pt
-    walked, killed = [], []
-    monkeypatch.setattr(R, "_kill_group", lambda pgid, sig: None)
-    monkeypatch.setattr(pt, "_start_time", lambda pid: {10: 999}.get(pid))
-
-    def cd(pid, children_of=None):
-        walked.append(pid)
-        return [pid, 30, 31]
-    monkeypatch.setattr(pt, "collect_descendants", cd)
-    monkeypatch.setattr(pt, "kill_tree",
-                        lambda targets, identity=None: killed.extend(targets))
-    R.TestRunner._terminate_tree(10, 10, snapshot={10: 111, 20: 222})
-    assert walked == []                 # reused leader never expanded
-    assert killed == [10, 20]           # snapshot pids still escalated
-    # (kill_tree's own identity filter then drops the reused 10)
+    assert walked == []                              # no expansion here, ever
+    assert calls == [([10, 20], {10: 111, 20: 222})]  # roots ≡ snapshot + ids
 
 @pytest.fixture()
 def runner(tmp_path, patterns) -> TestRunner:

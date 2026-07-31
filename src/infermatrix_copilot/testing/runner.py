@@ -545,35 +545,29 @@ class TestRunner:
     @staticmethod
     def _terminate_tree(pid: int, pgid: int,
                         snapshot: dict[int, int | None] | None = None) -> None:
-        """Kill the leader's process group AND every descendant individually.
-        Descendants are collected BEFORE any signal (a dead leader can't be
-        walked), because spawn-mode multiprocessing children create their own
-        process groups — killpg alone never reaches them, and the leader
-        exiting must not end the escalation while they hold GPU memory.
-        `kill_tree` then owns TERM → grace → KILL per pid, survivors logged.
-        `pgid` is pre-captured and `snapshot` carries the accumulated
-        pid → starttime descendant map, so this also works after the leader
-        was reaped and its setsid'd children were reparented away; the
-        starttimes let kill_tree drop pids the kernel has since reused.
+        """Kill the leader's process group AND every descendant individually:
+        spawn-mode multiprocessing children create their own process groups —
+        killpg alone never reaches them, and the leader exiting must not end
+        the escalation while they hold GPU memory. `kill_tree` owns
+        TERM → grace → KILL per pid, survivors logged. `pgid` is pre-captured
+        and `snapshot` carries the accumulated pid → starttime descendant
+        map, so this also works after the leader was reaped and its setsid'd
+        children were reparented away; the starttimes let kill_tree drop
+        pids the kernel has since reused.
 
-        The live descendant walk itself is gated on the leader's recorded
-        identity: expanding a REUSED leader pid would enroll the unrelated
-        new holder's children as identity-less roots that nothing downstream
-        could reject."""
-        from .process_tree import _start_time, collect_descendants, kill_tree
+        No expansion happens HERE: pre-walking and passing the results to
+        kill_tree would promote identity-less walked pids to trusted legacy
+        roots, bypassing the ancestry validation. Instead only the
+        identity-carrying snapshot pids are handed over as roots, and
+        kill_tree performs the single, validated expansion (pre- and
+        post-walk root identity checks, ancestry-chained acceptance). With
+        no recorded identity at all, escalation is killpg-only."""
+        from .process_tree import kill_tree
 
         snapshot = dict(snapshot or {})
-        recorded = snapshot.get(pid)
-        live = _start_time(pid)
-        if recorded is not None and live == recorded:
-            walk = collect_descendants(pid)
-        else:
-            # no recorded identity, leader gone, or a stranger wears the
-            # leader's pid: nothing about the live walk would be ours
-            walk = []
-        targets = sorted(set(walk) | set(snapshot))
         _kill_group(pgid, signal.SIGTERM)
-        kill_tree(targets, identity=snapshot)
+        if snapshot:
+            kill_tree(sorted(snapshot), identity=snapshot)
         _kill_group(pgid, signal.SIGKILL)
 
     @staticmethod

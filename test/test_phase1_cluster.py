@@ -466,6 +466,17 @@ def test_decision_validated_before_any_mutation(tmp_path):
         {"vllm": {"discard": ["a.py"],
                   "commit": {"message": "m", "paths": ["a.py"]}},
          "omni": {"discard": []}},
+        # equivalent spellings and directory containment must not slip past
+        # the overlap preflight either
+        {"vllm": {"discard": ["d/"],
+                  "commit": {"message": "m", "paths": ["d"]}},
+         "omni": {"discard": []}},
+        {"vllm": {"discard": ["d"],
+                  "commit": {"message": "m", "paths": ["d/inner.py"]}},
+         "omni": {"discard": []}},
+        {"vllm": {"discard": ["./a.py"],
+                  "commit": {"message": "m", "paths": ["a.py"]}},
+         "omni": {"discard": []}},
     ]
     for decision in cases:
         with pytest.raises(worktree.DecisionError):

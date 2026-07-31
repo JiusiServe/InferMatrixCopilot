@@ -105,6 +105,14 @@ class DecisionError(RuntimeError):
     """The decision JSON is malformed or names an illegal path."""
 
 
+def _norm_rel(rel: str) -> str:
+    """Canonical repo-relative spelling: strips trailing slashes, './', and
+    doubled separators (PurePosixPath semantics) so equivalent spellings like
+    'dir' and 'dir/' compare — and reach git — identically."""
+    from pathlib import PurePosixPath
+    return str(PurePosixPath(rel))
+
+
 def _lit(rel: str) -> str:
     """Literal-pathspec form: agent-named paths are file names, never globs —
     without this, a decision naming `*.py` would expand and discard/commit far
@@ -210,7 +218,7 @@ def _validate_block(key: str, block, root: Path) -> tuple[list[str],
     for rel in disc:
         if not isinstance(rel, str) or not rel.strip():
             raise DecisionError(f"invalid discard path in {key}: {rel!r}")
-        rel = rel.strip()
+        rel = _norm_rel(rel.strip())
         _safe_rel(root, rel)
         discards.append(rel)
 
@@ -229,16 +237,20 @@ def _validate_block(key: str, block, root: Path) -> tuple[list[str],
     for p in cpaths:
         if not isinstance(p, str) or not p.strip():
             raise DecisionError(f"invalid commit path in {key}: {p!r}")
-        p = p.strip()
+        p = _norm_rel(p.strip())
         _safe_rel(root, p)
         paths.append(p)
-    # discarding a path restores it to HEAD, so committing the same path is
-    # self-contradictory: the commit would fail AFTER the discard already
-    # destroyed the changes irreversibly — reject during preflight instead
-    overlap = sorted(set(discards) & set(paths))
+    # discarding a path restores it to HEAD, so committing the same path —
+    # or anything containing/contained by it — is self-contradictory: the
+    # commit would fail (or partially apply) only AFTER the discard already
+    # destroyed changes irreversibly. Compare NORMALIZED paths and reject
+    # directory containment in either direction, not just equal spellings.
+    overlap = sorted(d for d in discards
+                     if any(d == p or d.startswith(p + "/")
+                            or p.startswith(d + "/") for p in paths))
     if overlap:
         raise DecisionError(
-            f"'{key}' names the same path(s) in discard and commit: {overlap}")
+            f"'{key}' discard and commit paths overlap: {overlap}")
     return discards, (msg.strip(), paths)
 
 
