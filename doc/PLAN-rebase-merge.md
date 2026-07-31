@@ -138,9 +138,13 @@ v1-vs-parent orchestration divergences, recorded: a pre-push patch gate,
 typed copilot retries, and module-failure handling — in v1's DEFAULT mode
 (`continue_on_module_failure=false`) both suppress wave 2 on a wave-1
 failure, with the parent then continuing into phases 3–5 and reporting
-while v1 terminates the copilot run; v1's
-`continue_on_module_failure=true` parity mode runs wave 2 like the parent
-(pinned by `test_continue_on_module_failure_parity_mode`). Rollback value =
+while v1 terminates the copilot run. v1's `continue_on_module_failure=true`
+option is an INTENTIONAL DIVERGENCE, not parity: it runs wave 2 after a
+wave-1 failure, which the parent never does (the parent skips wave 2
+unconditionally on wave-1 failure and only continues the LATER phases);
+the option's v1 behavior is pinned by
+`test_continue_on_module_failure_parity_mode` — the test name predates
+this correction and pins v1 only. Rollback value =
 the parent's phase code paths, which is what live incidents would
 implicate.
 
@@ -352,12 +356,14 @@ generated) and anything else the working tree accumulated, with a
 clean-tree check proving nothing was missed; (b) captures a
 SQLite-consistent copy of the gitignored debug DB (`sqlite3 .backup`) and a
 tarball of `rebase_logs/`, stored alongside the archive. **Secrets are
-never archived**: the parent's own gitignored `agent/.env` (distinct from
-the copilot's PR6-managed `.env` block) is captured as a key-NAME inventory
-only; restore recreates it with values from the owner's secret store.
-Restore = re-clone the archive tag to the canonical path, unpack the state
-snapshot, recreate `agent/.env` from the inventory, and re-add the copilot
-`.env` orchestrator block from its timestamped backup. (By PR7 the canonical
+never archived**: the parent reads its env from `agent/.env` (preferred)
+with a root-`.env` fallback — and the canonical checkout currently uses the
+root `.env` — so archival inventories key NAMES from whichever parent env
+source(s) actually exist at archive time, values omitted; restore recreates
+the same file(s) at the same path(s) with values from the owner's secret
+store. Restore = re-clone the archive tag to the canonical path, unpack the
+state snapshot, recreate the parent env file(s) from the inventory, and
+re-add the copilot `.env` orchestrator block from its timestamped backup. (By PR7 the canonical
 knowledge already lives in the copilot runtime stores via PR4d's migration —
 the snapshot is belt-and-braces for parent-side residue.) The combined
 restore is rehearsed once, timed, as part of PR7 acceptance. Cutover rollback itself is rehearsed
