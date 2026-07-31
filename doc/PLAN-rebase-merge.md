@@ -121,12 +121,13 @@ Key mechanisms already landed:
   stat-read-to-signal gap (needs pidfds).
 - **GPU serialization**: byte-compatible on-disk lock protocol with the shell
   era; flock-serialized stale-lock steal.
-- **Env hygiene (substrate built, production wiring in PR4c)**:
-  `env_plan.build_subprocess_env` (inherit-plus-overlay) and
-  `scrub_agent_shell_env` (allowlist with exact/prefix split,
-  credential-suffix veto, HF token opt-in) exist with full test coverage but
-  have no production call sites yet — the agent-shell wiring lands in PR4c.
-  New-substrate child envs are copies.
+- **Env hygiene (production-wired in PR4c)**:
+  `env_plan.build_subprocess_env` (inherit-plus-overlay) drives every
+  target-repo subprocess (`_target_test_env`: venv + CUDA + HF_HOME) and
+  `scrub_agent_shell_env` applies to AGENT shells only via
+  `_agent_shell_env` (scrub + target overlay + the `imx-omni-pytest`
+  IMX_* contract; HF token on the manifest's `validation.requires_hf_token`
+  opt-in). Child envs are copies; the process env is never mutated.
 
 **Recorded v1-backend exceptions (owner-accepted, sunset = PR7).** The
 `repo-rebase-native-v1` backend (today's `repo-rebase-native`, renamed in
@@ -189,7 +190,7 @@ implements the mode matrix.
 | PR3 | Push cluster (contracts: §5.2): `gitio.py`, `push_to_ci.py` preflights, `PushPolicy.lease_expect`/`create_only`, push WAL + exact reconciliation | **DONE — GPT APPROVED** (5 finding rounds + 1 verification; 23 findings, all fixed with regression tests; see §6 items 12–14 for the recorded divergences) |
 | PR4a | Engine core, unwired: agent loop, ToolDefs + opt-in dispatch scoping, substate, loop-scoped `RuntimeRegistry`, planner `requires` filter + `missing_capabilities()` for exact-repo playbooks | **DONE — GPT APPROVED** (5 finding rounds, 15 findings all fixed; see §6 items 15–17) |
 | PR4b | Adapter knowledge: templates + prompt/request-shape goldens, prompt_data (builder flavor; DRIFT_TRIAGE #1), hooks base + adapter hooks (HIGH-RISK `rebase` section), `imx-omni-pytest`, `module_rebase.py` + `phase1_steps.py` | **DONE — GPT APPROVED** (4 finding rounds, 9 findings all fixed; see §6 items 18–21) |
-| PR4c | Assembly: test/ci loops, v3 step set incl. `push_gate`, `resolve_effective_mode` + governance write-back (Rev 8 §2.1), transition-table wiring (Rev 8 §3.1), agent-shell scrub + model-download notification hook wiring, **manifest push-section update** (§5.3), v1 re-registered as `repo-rebase-native-v1` **with its four §4 obligations: guard_push authorization at phase-4 entry, explicit-`full`-only mode rejection, `locks/omni.lock` shared-lock participation, `REMOTE_ENABLED` forced off** | planned |
+| PR4c | Assembly: test/ci loops, v3 step set incl. `push_gate`, `resolve_effective_mode` + governance write-back (Rev 8 §2.1), transition-table wiring (Rev 8 §3.1), agent-shell scrub + model-download notification hook wiring, **manifest push-section update** (§5.3), v1 re-registered as `repo-rebase-native-v1` **with its four §4 obligations: guard_push authorization at phase-4 entry, explicit-`full`-only mode rejection, `locks/omni.lock` shared-lock participation, `REMOTE_ENABLED` forced off** | **DONE — GPT APPROVED** (5 finding rounds + 2 verification rounds; 51 findings all fixed with dedicated regression tests; final verdict "No findings" at cd93dcb; see §6 items 22–28) |
 | PR5 | Parity completion: tier-1 goldens, `shell_golden.json`, `DRIFT_TRIAGE.md` resolution, report-only dry path, timed rollback rehearsal | planned |
 | EXT1 | External checkout: startup flock guard, pinned SHA | planned |
 | PR6 | Cutover (GPU box + human): §8 validation, playbook flip, `.env` arming | planned |
@@ -333,16 +334,66 @@ still required at execution time (dry-run otherwise).
    userinfo never reach argv/log/error text (header-only auth,
    case-insensitive stripping); the push WAL stores transport-independent
    canonical repository identities.
+22. **Mode governance is opt-in per playbook (PR4c).** `Playbook.mode_aware`
+   gates `resolve_effective_mode` in `run_task`/`run_playbook`; the LOCKED
+   `repo-rebase` does not declare it, so its specs are untouched —
+   byte-identical behavior (the §2.1 "for repo_rebase" scope refined to
+   "for mode-aware playbooks", pinned by
+   `test_locked_playbook_is_not_mode_governed`).
+23. **Composite `mode_runs_*` state flags (PR4c).** The executor's `when:`
+   is single-key, so the §2.2 or-of-modes matrix is precomputed in
+   `mode_state_flags` (`mode_runs_local_tests`, `mode_runs_push_gate`,
+   `mode_runs_remote_ci`) — one authority, matrix pinned against the real
+   yaml gates per mode.
+24. **Terminal rows realized at step level (PR4c).** Rev 8 §3.1's
+   orchestration finalizer is approximated by `rebase.v3_finalize` running
+   AFTER `report.final_summary` (row 2: RUN_REPORT exists, then
+   BLOCKED/exit-3 with substate `phase=needs_human`), plus a
+   prelude-registered lifecycle finalizer that writes a terminal
+   RUN_REPORT.md when a run blocks before the report step (row 3
+   artifacts; augments, never upgrades, never overwrites).
+25. **Structural-failure taxonomy depth (PR4c).** Beyond §2.3's list, the
+   port classifies as STRUCTURAL: agent-loop `done=False` (always
+   machinery — auth/stream/mismatch/truncation/turn budget; a finishing
+   agent returns done=True), debug-machinery failures (missing backend,
+   crash, unverifiable re-run), baseline infra outcomes
+   (regression-preserving, never "pre-existing"), zero runnable local jobs
+   (`manifest_empty`), CI jobs without a per-job terminal state
+   (`incomplete`, missing exit_status ≠ 0), and build-op recovery is
+   intent-only with single-use op-id identity.
+26. **Debug rollback handles staged new files (PR4c — fix over the
+   parent).** The parent's bulk `git checkout <snap> -- <paths>` silently
+   failed once a debug attempt created-and-staged a file, leaving every
+   tracked edit in place; the port splits snapshot-known (restore) from
+   attempt-created (unstage + delete) via `cat-file -e`.
+27. **Live-tree adaptations (PR4c).** `yaml_dir: .buildkite/cuda` — the
+   live tree nests pipelines per accelerator and the parent's hardcoded
+   `.buildkite` finds zero jobs today (DRIFT_TRIAGE #5); pipeline-level
+   `env:` mappings reach every job (job exports win); both clean-tree
+   guards accept `ignore_untracked_prefixes` so the persistent shared
+   flock under `locks/` (which survives release BY DESIGN) never reads as
+   dirt and is never discarded while held.
+28. **Model-download notification transport (PR4c).** Detection is
+   parent-verbatim (same-line `hf download` regex, HF-cache snapshot
+   probe, durable once-per-job marker with the parent's filename), but
+   the transport is a `model_download_expected` trace event surfaced in
+   the run report instead of the parent's SMTP mailer — copilot-native
+   observability, no email credentials in the engine.
 
 ## 7. Testing state
 
-- Full offline suite: **~645 tests green**, no GPU/network/API key.
+- Full offline suite: **646 tests green (+1 skip)**, no GPU/network/API key.
 - New pinned families: run-lifecycle (14), testing substrate (~75, incl.
   identity/laundering races each with a dedicated regression test), phase-1
   cluster (~40 incl. `test_phase1_partial_e2e` chaining guard → wheel pick →
   pin → assignment → path-sync over fixture git repos), push cluster (31
   incl. a real-bare-remote partial e2e with crash/resume/supersession
-  reconciliation and a raced create-only push).
+  reconciliation and a raced create-only push), assembly (~40: mode truth
+  table cell-by-cell + per-mode matrix against the real yaml gates,
+  push-gate taxonomy incl. logged overrides, manifest build over nested
+  fixtures, test/CI loop decision matrices, production backends with
+  populated stores, report-only partial e2e with a pre-existing lock file,
+  resume lock reacquisition, debug snapshot/restore, scratch lifecycle).
 - Repo-neutrality: leak-scan ceilings unchanged; `rebase_engine/` is clean.
 - Parity: behavior-level parity pinned per module (walk order, double-probed
   baseline fallback, sed-equivalent pin edits, decision JSON schema);
