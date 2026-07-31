@@ -1,10 +1,21 @@
 # PLAN — Merge `vllm-omni-rebase-agent` into InferMatrixCopilot (repo-rebase v3)
 
-Status: **active migration** on branch `feat/rebase-merge-pr0`. This document is
-the as-built successor of plan Revision 8 (7 prior GPT-5.6 Sol design reviews;
-owner locked all decisions 2026-07-28). It records what is now BUILT, what
-changed against Rev 8 and why, and the remaining delivery sequence. Update it
-at every PR boundary; it supersedes the Rev 8 file for current state.
+Status: **active migration** on branch `feat/rebase-merge-pr0`. This document
+is the as-built successor of plan Revision 8 (7 prior GPT-5.6 Sol design
+reviews; owner locked all decisions 2026-07-28). It records what is now BUILT,
+what changed against Rev 8 and why, and the remaining delivery sequence.
+Update it at every PR boundary.
+
+**Normative scope:** this document supersedes Rev 8 for *status, sequencing,
+and recorded deltas*. The detailed execution contracts Rev 8 defines are NOT
+restated here and remain normative by reference —
+`/data/zhoutaichang/.auth/claude/plans/floofy-squishing-squirrel.md`:
+§2.1 mode truth table + `resolve_effective_mode` governance write-back,
+§2.2 per-mode execution matrix, §2.3 push-gate failure taxonomy,
+§3.1 terminal-state transition table, §3.2 CI/push write-ahead logs and exact
+reconciliation rules, §3.4 run-resource lifecycle, §8 golden-parity harness
+tiers. Where this document and Rev 8 conflict, this document wins; where this
+document is silent, Rev 8 governs.
 
 ## 1. Goal
 
@@ -13,7 +24,8 @@ Eliminate `repo-rebase`'s external subprocess runs by absorbing the external
 preserving functionality and performance. Canonical external checkout:
 `/data/zhoutaichang/rebase/vllm-omni-rebase-agent` (the `copilot/` clone is a
 working copy). No live consumer of the external path exists (user-attested;
-re-verified in the PR6 preflight).
+**to be re-verified** by the PR6 preflight evidence checks — scheduler scan +
+30-day unattributed-Buildkite-build query).
 
 ## 2. Locked decisions (owner, 2026-07-28 — unchanged)
 
@@ -23,9 +35,11 @@ re-verified in the PR6 preflight).
    (`capability_gap` traced where it would have been used).
 4. Direct cutover after validation (§8); selectable `repo-rebase-native-v1`
    backend is the rollback, ParentStateFile dual-write dropped.
-5. Offline golden-parity suite + ONE supervised real full run; staged
-   enablement (report_only → local_ci → full) with recorded RUNBOOK risk
-   acceptance for unsupervised agent-mutation runs.
+5. Offline golden-parity suite + ONE supervised real full VALIDATION run
+   (§8 defines the total supervised-run count across validation + soak: two,
+   the validation run counting as the first); staged enablement
+   (report_only → local_ci → full) with recorded RUNBOOK risk acceptance for
+   unsupervised agent-mutation runs.
 6. Data-first knowledge: repo specifics live in `adapters/vllm_omni/`
    (manifest + data files + `hooks.py`); the engine stays repo-neutral
    (`test_repo_neutral_core` ceilings unchanged).
@@ -36,9 +50,11 @@ re-verified in the PR6 preflight).
 9. Knowledge migration + env-bridge deletion (PR4d) deferred until after live
    validation.
 
-## 3. Review & delivery protocol (owner, 2026-07-31)
+## 3. Review & delivery protocol (owner, 2026-07-31 — prospective)
 
-Every PR must:
+This protocol binds **PR2 onward** (it was set mid-PR1: PR0 predates it and
+PR1 ran 9 finding rounds before the cap existed, closing with the same
+agreement + verification pattern). Every PR must:
 
 - **(a) reach explicit agreement with GPT-5.6 Sol** — an APPROVE verdict —
   within **max 5 finding rounds**, plus a final verification-only round
@@ -83,18 +99,29 @@ Key mechanisms already landed:
 - **Run lifecycle (PR0)**: durable `progress.json` (tmp+fsync+replace+
   dir-fsync, EIO propagates), exclusive same-run lock spanning the reserved-run
   lifecycle incl. MCP children, cancellation-surviving finalizer hook.
-- **Process-identity kill safety (PR1/PR2 hardening)**: every kill decision is
-  identity-checked against `/proc/<pid>/stat` (starttime); descendant
+- **Process-identity kill safety (PR1/PR2 hardening)** — a guarantee of the
+  `kill_tree`/snapshot escalation path specifically: per-pid signalling is
+  identity-checked against `/proc/<pid>/stat` starttimes; descendant
   snapshots accumulate `(pid → starttime)` and never shrink; recording and
   ancestry are bound in a single stat read with a fixpoint chain anchored at
   an immutable leader identity; `kill_tree` re-validates roots after the
-  descendant walk. Residual window: stat-read-to-signal gap (needs pidfds).
+  descendant walk and `_terminate_tree` delegates the single validated
+  expansion to it. Two deliberate NON-identity paths remain: `killpg` on the
+  runner's own pre-captured process group (we created that group), and GPU
+  orphan cleanup signalling bare device pids (single-tenant lock-holder
+  design; recorded, reviewer-accepted owner position). Residual window:
+  stat-read-to-signal gap (needs pidfds).
 - **GPU serialization**: byte-compatible on-disk lock protocol with the shell
-  era; flock-serialized stale-lock steal; single-tenant orphan reaping is a
-  recorded owner position (reviewer-accepted).
-- **Env hygiene**: allowlist-based scrub for agent shells (exact/prefix split,
-  credential-suffix veto, HF token opt-in); child envs are copies — the
-  copilot process env is never mutated.
+  era; flock-serialized stale-lock steal.
+- **Env hygiene (substrate built, production wiring in PR4c)**:
+  `env_plan.build_subprocess_env` (inherit-plus-overlay) and
+  `scrub_agent_shell_env` (allowlist with exact/prefix split,
+  credential-suffix veto, HF token opt-in) exist with full test coverage but
+  have no production call sites yet — the agent-shell wiring lands in PR4c.
+  New-substrate child envs are copies; the LEGACY `repo-rebase-native-v1`
+  path still mutates `os.environ` (`_export_all_settings`) and dies at
+  PR4d/PR7 per Decision 9. The "process env never mutated" guardrail test
+  becomes global at PR4d.
 
 ## 5. Delivery sequence and status
 
@@ -103,10 +130,10 @@ Key mechanisms already landed:
 | PR0 | Executor lifecycle (behavior-preserving) | **DONE — GPT APPROVED** (4 rounds) |
 | PR1 | Testing substrate + watchdog data | **DONE — GPT APPROVED** (9 finding rounds + agreement round accepting 2 owner positions + verification round) |
 | PR2 | Phase-1 cluster: wheel, guard, assign, path_sync, api-drift guard | **DONE — GPT APPROVED** (5 finding rounds + 2 verification rounds; see §5.1) |
-| PR3 | Push cluster: `gitio.py` (staging/unstage of generated outputs, signed-commit retry with ruff-hook detection, clean-env push execution), `push_to_ci.py` preflights, `PushPolicy.lease_expect` (SHA-pinned force-with-lease), push write-ahead log + reconciliation | next |
+| PR3 | Push cluster (contracts: Rev 8 §3.2, restated in §5.2 below): `gitio.py` (staging/unstage of generated outputs, signed-commit retry with ruff-hook detection, clean-env push execution, SSH→HTTPS URL resolution), `push_to_ci.py` preflights (40-hex commit resolved; Dockerfile pin matches), `PushPolicy.lease_expect` (SHA-pinned force-with-lease), push write-ahead log + reconciliation | next |
 | PR4a | Engine core, unwired: agent loop, ToolDefs + opt-in dispatch scoping, substate, loop-scoped `RuntimeRegistry`, planner `requires` filter | planned |
-| PR4b | Adapter knowledge: hooks base + vllm-omni hooks, manifest extension (incl. audited `local_paths` refresh), prompt templates + prompt/payload goldens, `phase1_steps.py`, `module_rebase.py` | planned |
-| PR4c | Assembly: test/ci loops, v3 step set incl. `push_gate`, `resolve_effective_mode` + governance write-back, transition-table wiring, v1 re-registered as `repo-rebase-native-v1` | planned |
+| PR4b | Adapter knowledge: hooks base + vllm-omni hooks, manifest extension (incl. audited `local_paths` refresh), prompt templates + prompt/payload goldens, `phase1_steps.py`, `module_rebase.py`, **`imx-omni-pytest` command** (Rev 8 slated it for PR1; deferred — nothing references it until the PR4b templates) | planned |
+| PR4c | Assembly: test/ci loops, v3 step set incl. `push_gate`, `resolve_effective_mode` + governance write-back (Rev 8 §2.1), transition-table wiring (Rev 8 §3.1), agent-shell scrub + model-download notification hook wiring, **manifest push-section update** (§5.3), v1 re-registered as `repo-rebase-native-v1` | planned |
 | PR5 | Parity completion: tier-1 goldens, `shell_golden.json`, `DRIFT_TRIAGE.md` resolution, report-only dry path, timed rollback rehearsal | planned |
 | EXT1 | External checkout: startup flock guard, pinned SHA | planned |
 | PR6 | Cutover (GPU box + human): §8 validation, playbook flip, `.env` arming | planned |
@@ -115,12 +142,35 @@ Key mechanisms already landed:
 
 ### 5.1 PR2 review outcome
 
-Five finding rounds (18 findings, every one fixed with a dedicated regression
-test in the same round) + two verification rounds: the first confirmed one fix
-and found residual gaps in two, both fixed (`9f84e36` — notably
-`_terminate_tree` stopped expanding descendants entirely, closing a
+Five finding rounds (6+5+4+4+3 = **22 findings**, every one fixed with a
+dedicated regression test in the same round) + two verification rounds: the
+first confirmed one fix and found **2 residual gaps**, both fixed (`9f84e36` —
+notably `_terminate_tree` stopped expanding descendants entirely, closing a
 legacy-root laundering path by construction); the second returned **APPROVE
 with "No findings"**. Full review transcripts are archived per round.
+
+### 5.2 PR3 normative core (from Rev 8 §3.2)
+
+Before any `git push`, persist durably (tmp+fsync+replace)
+`{branch, remote_pre_push_oid | ABSENT, intended_oid, state: intent}`; after
+acceptance mark `state: pushed`. Crash between ⇒ re-entry reconciles by
+reading the remote OID: remote == intended ⇒ mark pushed; remote == pre-push
+⇒ retry; anything else ⇒ ESCALATE (never guess). Rollback = reverse-order
+over the log; `ABSENT` branches roll back by lease-protected deletion.
+Retries: bounded, exponential from `PUSH_RETRY_BASE_DELAY_SEC`, immediate
+abort on auth/permission errors (parent parity). Crash tests per surface.
+
+### 5.3 Push authorization resolution
+
+Today `PushPolicy.allowed` defaults false and the adapter manifest declares
+`push.allowed: false` ("deliver via PR; never direct-push main") — correct
+for every current playbook, and the rebase pipeline would be unable to push.
+Resolution (lands in PR4c as a human-gated HIGH_RISK manifest edit): the push
+section gains `rebase_branch_allowed: true` scoped to `repo.rebase_branch`
+(`dev/vllm-align`) only; the v3 pipeline constructs its `PushPolicy` for
+exactly that branch; `main` stays protected regardless. Unchanged double
+gate: `push.guard_push` remains the single choke point and `ALLOW_PUSH=1` is
+still required at execution time (dry-run otherwise).
 
 ## 6. Deltas vs Rev 8 (as-built decisions, each reviewer-driven)
 
@@ -154,7 +204,20 @@ with "No findings"**. Full review transcripts are archived per round.
    git operation uses `:(literal)` pathspecs; the whole dirty-worktree
    decision (all repos, all shapes, discard∩commit=∅) validates before any
    irreversible mutation.
-8. **Known accepted micro-divergence:** pin regexes use `[ \t]` where the
+8. **Explicit hardware-skip outcomes.** The runner returns a typed
+   `skipped` outcome (with reason) when a job's GPU requirement is not met —
+   the parent's silent rc=0 pass could not be told apart from success.
+   Deliberate improvement, pinned by test.
+9. **`nvidia-smi pmon` PID column corrected.** The parent awk'd field 1 (the
+   GPU index) — on GPU 0 that meant `kill 0`, signalling its own process
+   group. The port reads field 2 and rejects non-positive pids. Deliberately
+   fixed, not ported.
+10. **Not yet ported, scheduled (owner-visible deferrals):** the
+   model-download email notification the parent fires before test attempts
+   (`test_runner.sh` → `send_model_download_email.py`) — wired via the
+   runner's notification hooks in PR4c; `run_module_pytest.sh`'s replacement
+   command `imx-omni-pytest` — PR4b (nothing references it earlier).
+11. **Known accepted micro-divergence:** pin regexes use `[ \t]` where the
    shell's `[[:space:]]` also matched `\r` — unobservable on LF-normalized
    repos; goes to `DRIFT_TRIAGE.md` in PR5 rather than silently widening.
 
@@ -171,16 +234,38 @@ with "No findings"**. Full review transcripts are archived per round.
   byte-level goldens (prompts, request payloads, shell command echo) land in
   PR4b/PR5 per Rev 8.
 
-## 8. Validation, staged enablement, rollback (unchanged from Rev 8)
+## 8. Validation, staged enablement, rollback
 
 Controlled comparison (frozen SHAs, restored knowledge snapshots, isolated
 clones, separate validation branches); one external baseline run + one
-supervised v3 full run; gate = deterministic harness green + live outcome
-equivalence + 25% wall-clock bound + human-signed COMPARISON.md. Staged soak:
-3 clean `report_only` nightlies (semantic diffs vs frozen baseline) → 2 clean
-`local_ci` runs → 2 supervised full runs before unsupervised full. Rollback =
-v1 backend or fresh external run; rehearsed timed (<30 min) before PR6; abort
-criteria recorded in the RUNBOOK.
+supervised v3 full validation run; gate = deterministic harness green + live
+outcome equivalence + 25% wall-clock bound + human-signed COMPARISON.md.
+
+**Supervised-run count, unambiguous:** stage 3 (unsupervised push-capable
+`full`) requires **2 supervised clean full runs total, of which the PR6
+validation run counts as the first**; one additional supervised full run
+happens during soak. Staged soak: 3 clean `report_only` nightlies (semantic
+diffs vs frozen baseline) → 2 clean `local_ci` runs → the second supervised
+full run → unsupervised full.
+
+**PR4d re-validation gate (new — closes a Rev 8 gap):** PR4d (knowledge
+migration, runtime-dir cutover, env-bridge deletion) changes the runtime
+configuration PR6 validated. After PR4d lands, the soak clock partially
+resets: 1 clean `report_only` run with semantic diffs against the
+pre-PR4d baseline outputs + 1 supervised `local_ci` run must pass before
+soak counting resumes; any regression rolls back PR4d via the versioned
+knowledge backup (non-destructive move) and re-opens investigation. PR7 does
+not start until the post-PR4d soak requirement is met.
+
+**Rollback:** pre-PR7, the `repo-rebase-native-v1` backend (imports the
+external `agent` package in-process) or a fresh external run. **Post-PR7 the
+v1 backend is dead by construction** (the external package is retired), so
+PR7's RUNBOOK entry defines the restore procedure: the external repo is
+archived as a tagged clone (not deleted); restore = re-clone the archive tag
+to the canonical path, re-add the `.env` orchestrator block from its
+timestamped backup, and re-enable the delegating playbook from git history —
+rehearsed once, timed, as part of PR7 acceptance. Cutover rollback itself is
+rehearsed (<30 min) before PR6; abort criteria recorded in the RUNBOOK.
 
 ## 9. Top open risks
 
