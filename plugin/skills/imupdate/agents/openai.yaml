@@ -1,0 +1,4 @@
+interface:
+  display_name: "InferMatrix Update"
+  short_description: "Audit and update release-driven repository knowledge"
+  default_prompt: "Use $imupdate to update InferMatrix knowledge from a local upstream repository."

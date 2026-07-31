@@ -1,7 +1,7 @@
 {
   "name": "infermatrix-copilot",
   "version": "0.1.0",
-  "description": "InferMatrixCopilot — maintainer-grounded Direct PR review over MCP, with an imreview skill.",
+  "description": "InferMatrixCopilot — maintainer-grounded review and release knowledge updates, with imreview and imupdate skills.",
   "author": {
     "name": "tzhouam",
     "url": "https://github.com/tzhouam"

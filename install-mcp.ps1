@@ -13,7 +13,7 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $PythonPath = Join-Path $ProjectRoot "src"
 $VenvPython = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
-$SkillSource = Join-Path $ProjectRoot "plugin\skills\imreview"
+$SkillRoot = Join-Path $ProjectRoot "plugin\skills"
 
 function Find-CompatiblePython {
     $Candidates = @()
@@ -51,10 +51,29 @@ function Find-CompatiblePython {
     throw "No compatible Python found. Install Python 3.11 or newer."
 }
 
-function Install-ImreviewSkill([string]$Destination) {
-    New-Item -ItemType Directory -Force -Path $Destination | Out-Null
-    Get-ChildItem -LiteralPath $SkillSource -Force | ForEach-Object {
-        Copy-Item -LiteralPath $_.FullName -Destination $Destination -Recurse -Force
+function Install-AgentSkills([string]$DestinationRoot) {
+    New-Item -ItemType Directory -Force -Path $DestinationRoot | Out-Null
+    Get-ChildItem -LiteralPath $SkillRoot -Directory | ForEach-Object {
+        $Destination = Join-Path $DestinationRoot $_.Name
+        New-Item -ItemType Directory -Force -Path $Destination | Out-Null
+        Get-ChildItem -LiteralPath $_.FullName -Force | ForEach-Object {
+            Copy-Item -LiteralPath $_.FullName -Destination $Destination `
+                -Recurse -Force
+        }
+        Get-ChildItem -LiteralPath $Destination -File -Recurse | ForEach-Object {
+            $Content = Get-Content -Raw -LiteralPath $_.FullName
+            if ($Content.Contains("{{INFERMATRIX_COPILOT_ROOT}}")) {
+                $Content = $Content.Replace(
+                    "{{INFERMATRIX_COPILOT_ROOT}}",
+                    $ProjectRoot
+                )
+                [IO.File]::WriteAllText(
+                    $_.FullName,
+                    $Content,
+                    (New-Object Text.UTF8Encoding($false))
+                )
+            }
+        }
     }
 }
 
@@ -118,6 +137,18 @@ function Install-CursorConfig {
     New-Item -ItemType Directory -Force -Path $CommandRoot | Out-Null
     Copy-Item -LiteralPath (Join-Path $ProjectRoot "integrations\cursor\imreview.md") `
         -Destination (Join-Path $CommandRoot "imreview.md") -Force
+    $UpdatePrompt = Get-Content -Raw -LiteralPath (
+        Join-Path $ProjectRoot "integrations\cursor\imupdate.md"
+    )
+    $UpdatePrompt = $UpdatePrompt.Replace(
+        "{{INFERMATRIX_COPILOT_ROOT}}",
+        $ProjectRoot
+    )
+    [IO.File]::WriteAllText(
+        (Join-Path $CommandRoot "imupdate.md"),
+        $UpdatePrompt,
+        (New-Object Text.UTF8Encoding($false))
+    )
 }
 
 if ($DryRun) {
@@ -155,8 +186,8 @@ try {
             if ($LASTEXITCODE -ne 0) {
                 throw "Failed to register InferMatrixCopilot with Codex."
             }
-            Install-ImreviewSkill (Join-Path $ConfigRoot ".codex\skills\imreview")
-            $InvokeText = "/imreview <PR URL>"
+            Install-AgentSkills (Join-Path $ConfigRoot ".codex\skills")
+            $InvokeText = "/imreview <PR URL>  or  /imupdate <repo path>"
         }
         "claude" {
             if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
@@ -171,12 +202,12 @@ try {
             if ($LASTEXITCODE -ne 0) {
                 throw "Failed to register InferMatrixCopilot with Claude Code."
             }
-            Install-ImreviewSkill (Join-Path $ConfigRoot ".claude\skills\imreview")
-            $InvokeText = "/imreview <PR URL>"
+            Install-AgentSkills (Join-Path $ConfigRoot ".claude\skills")
+            $InvokeText = "/imreview <PR URL>  or  /imupdate <repo path>"
         }
         "cursor" {
             Install-CursorConfig
-            $InvokeText = "/imreview <PR URL>"
+            $InvokeText = "/imreview <PR URL>  or  /imupdate <repo path>"
         }
     }
 

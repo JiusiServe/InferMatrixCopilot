@@ -11,10 +11,12 @@ InferMatrixCopilot 是本地 stdio MCP 服务。Agent 仍使用自己当前的�
 .\install-cursor.ps1
 ```
 
-每次只运行与你的 Agent 对应的一条。脚本会同时安装 MCP 和 `imreview`：
+每次只运行与你的 Agent 对应的一条。脚本会同时安装 MCP、`imreview` 和
+`imupdate`：
 
 ```text
 /imreview <PR URL>
+/imupdate <local upstream repo>
 ```
 
 ## 手工配置

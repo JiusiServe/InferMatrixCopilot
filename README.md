@@ -26,13 +26,16 @@ cd InferMatrixCopilot
 .\install-cursor.ps1
 ```
 
-脚本会安装 MCP 和 `/imreview` 命令。重启 Agent 后，把 PR 地址交给它：
+脚本会安装 MCP、`/imreview` 和 `/imupdate`。重启 Agent 后直接使用：
 
 ```text
 /imreview https://github.com/vllm-project/vllm-omni/pull/5172
+/imupdate D:\path\to\vllm-omni
 ```
 
 不带地址时，`/imreview` 会审查当前 PR 或本地工作区。
+`/imupdate` 会把已审计版本与目标仓库当前 `HEAD` 对比，先生成只读漂移报告，
+再由 Agent 更新有证据支持的 baseline、catalog 和 source map，最后强制校验。
 
 macOS、Linux、手工配置和其他 MCP Agent 的接入方法见
 [`doc/MCP.md`](doc/MCP.md)。
@@ -45,6 +48,12 @@ macOS、Linux、手工配置和其他 MCP Agent 的接入方法见
   → InferMatrixCopilot 返回知识库入口
   → Agent 按改动选择相关模型、组件和通用规则
   → Agent 输出带文件和行号的审查结论
+
+你发起 /imupdate <仓库>
+  → Skill 读取当前 release baseline 和目标仓库 HEAD
+  → 只读审计器对比 Git 对象、注册表、pipeline、deploy 和路径路由
+  → Agent 根据报告更新结构事实，不自动生成 owner 规则
+  → enforce、知识检查和相关测试确认更新完整
 ```
 
 代码理解和推理由 Agent 当前模型完成。InferMatrixCopilot 只负责提供知识地图和维护者

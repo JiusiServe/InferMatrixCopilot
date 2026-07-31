@@ -8,7 +8,7 @@
     {
       "name": "infermatrix-copilot",
       "source": "./plugin",
-      "description": "InferMatrixCopilot — governed, read-only repo-maintenance tools (PR review, issue answer, issue triage) over MCP."
+      "description": "InferMatrixCopilot — governed PR review and release-driven knowledge maintenance over MCP and skills."
     }
   ]
 }
