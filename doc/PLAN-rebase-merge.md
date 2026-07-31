@@ -135,19 +135,29 @@ executes the PARENT'S OWN phase implementations in-process (the parent
 package's test runner, CI monitoring, and phase-4 push semantics), wrapped
 in copilot v1 orchestration — it is NOT byte-identical orchestration. Known
 v1-vs-parent orchestration divergences, recorded: a pre-push patch gate,
-typed copilot retries, and module-failure handling (a wave-1 module failure
-blocks wave 2 in v1, where the parent continues and reports; pinned by
-`test_rebase_native.py`). Rollback value = the parent's phase code paths,
-which is what live incidents would implicate. On that basis it is EXEMPT
-from two new contracts until PR7 deletes it — wrapping it would change the
-very behavior it preserves: (1) it mutates `os.environ` via
-`_export_all_settings` (the "process env never mutated" guardrail becomes
-global-except-`rebase_native.py` at PR4d — a scoped exemption list
-containing exactly that module — and fully global at PR7, when the bridge
-itself is deleted per §2.9); (2) its phase-4 push runs the parent's own
-push path gated by `ALLOW_PUSH` only, NOT routed through `push.guard_push`
-— the choke-point invariant applies to the v3 pipeline; v1 keeps the
-parent's gate. Both exceptions die with the file at PR7.
+typed copilot retries, and module-failure handling (BOTH suppress wave 2 on
+a wave-1 failure; the parent then continues into phases 3–5 and reports,
+while v1 terminates the copilot run — `test_rebase_native.py` pins the v1
+half). Rollback value = the parent's phase code paths, which is what live
+incidents would implicate.
+
+Two contract deviations, each with an explicit resolution:
+(1) **env mutation** — v1 mutates `os.environ` via `_export_all_settings`;
+the "process env never mutated" guardrail becomes
+global-except-`rebase_native.py` at PR4d (a scoped exemption list containing
+exactly that module) and fully global at PR7, when the bridge itself is
+deleted per §2.9. This one IS an owner-accepted exemption with a sunset.
+(2) **push choke point (SPEC C4 is repo-wide — no exemption):** today
+`_phase4_guarded` checks only `ALLOW_PUSH` before invoking parent phase 4.
+**PR4c fixes this**: v1's phase-4 entry first passes `push.guard_push` as
+AUTHORIZATION (a `PushPolicy` for `repo.rebase_branch`; deny ⇒ FORBIDDEN
+before any parent code runs) and only then enters the UNCHANGED parent
+implementation — authorization is restored to the choke point while the
+execution path v1 exists to preserve stays byte-identical. Residual,
+recorded: the parent's internal push falls back to raw `--force` when the
+remote branch does not yet exist (branch creation); `guard_push` denying
+protected branches means `main` can never be forced through this path, and
+the residual dies with v1 at PR7.
 
 ## 5. Delivery sequence and status
 
@@ -157,7 +167,7 @@ parent's gate. Both exceptions die with the file at PR7.
 | PR1 | Testing substrate + watchdog data | **DONE — GPT APPROVED** (9 finding rounds + agreement round accepting 2 owner positions + verification round) |
 | PR2 | Phase-1 cluster: wheel, guard, assign, path_sync, api-drift guard | **DONE — GPT APPROVED** (5 finding rounds + 2 verification rounds; see §5.1) |
 | PR3 | Push cluster (contracts: Rev 8 §3.2, restated in §5.2 below): `gitio.py` (staging/unstage of generated outputs, signed-commit retry with ruff-hook detection, clean-env push execution, SSH→HTTPS URL resolution), `push_to_ci.py` preflights (40-hex commit resolved; Dockerfile pin matches), `PushPolicy.lease_expect` (SHA-pinned force-with-lease), push write-ahead log + reconciliation | next |
-| PR4a | Engine core, unwired: agent loop, ToolDefs + opt-in dispatch scoping, substate, loop-scoped `RuntimeRegistry`, planner `requires` filter | planned |
+| PR4a | Engine core, unwired: agent loop, ToolDefs + opt-in dispatch scoping, substate, loop-scoped `RuntimeRegistry`, planner `requires` filter **+ the `missing_capabilities()` update for exact-repo playbooks (Rev 8 §2 obligation)** | planned |
 | PR4b | Adapter knowledge: hooks base + vllm-omni hooks, manifest extension (incl. audited `local_paths` refresh), prompt templates + prompt/payload goldens, `phase1_steps.py`, `module_rebase.py`, **`imx-omni-pytest` command** (Rev 8 slated it for PR1; deferred — nothing references it until the PR4b templates) | planned |
 | PR4c | Assembly: test/ci loops, v3 step set incl. `push_gate`, `resolve_effective_mode` + governance write-back (Rev 8 §2.1), transition-table wiring (Rev 8 §3.1), agent-shell scrub + model-download notification hook wiring, **manifest push-section update** (§5.3), v1 re-registered as `repo-rebase-native-v1` | planned |
 | PR5 | Parity completion: tier-1 goldens, `shell_golden.json`, `DRIFT_TRIAGE.md` resolution, report-only dry path, timed rollback rehearsal | planned |
@@ -249,7 +259,12 @@ still required at execution time (dry-run otherwise).
    model-download email notification the parent fires before test attempts
    (`test_runner.sh` → `send_model_download_email.py`) — wired via the
    runner's notification hooks in PR4c; `run_module_pytest.sh`'s replacement
-   command `imx-omni-pytest` — PR4b (nothing references it earlier).
+   command `imx-omni-pytest` — PR4b (nothing references it earlier);
+   **parity tiers 2–4, `shell_golden.json`, and `DRIFT_TRIAGE.md`** — Rev 8
+   scoped these to PR1, but PR1 as built shipped behavior-level pins only;
+   the recorded-fixture replay tiers and the one-time GPU-box `declare -p`
+   capture move to **PR5** with the tier-1 goldens (sequencing delta: the
+   drift-triage decision still gates cutover, unchanged).
 11. **Known accepted micro-divergence:** pin regexes use `[ \t]` where the
    shell's `[[:space:]]` also matched `\r` — unobservable on LF-normalized
    repos; goes to `DRIFT_TRIAGE.md` in PR5 rather than silently widening.
@@ -308,12 +323,17 @@ therefore restores BOTH sides: (1) **code**: PR7 tags the copilot at
 deploy the copilot at that tag (or revert the PR7 commit), which brings back
 the delegating playbook, its registered steps, and v1; (2) **external**: the
 parent repo is archived as a tagged clone PLUS a mutable-state snapshot — a
-tag alone cannot carry the gitignored `rebase_logs/` and
-`agent/store/debug_memory.db*`, so PR7's archival step also captures a
-SQLite-consistent copy of the debug DB (`sqlite3 .backup`) and a tarball of
-`rebase_logs/`, stored alongside the archive; restore = re-clone the archive
-tag to the canonical path, unpack the state snapshot, and re-add the `.env`
-orchestrator block from its timestamped backup. (By PR7 the canonical
+tag alone cannot carry gitignored, dirty, or untracked runtime state. The
+archival step runs **while holding the EXT1 checkout lock** (no active run
+can race the snapshot) and: (a) commits all dirty/untracked runtime state
+onto a dedicated archival branch before tagging — this covers
+`agent/skills/` (usage updates rewrite `SKILL.md`; `_candidates.json` is
+generated) and anything else the working tree accumulated, with a
+clean-tree check proving nothing was missed; (b) captures a
+SQLite-consistent copy of the gitignored debug DB (`sqlite3 .backup`) and a
+tarball of `rebase_logs/`, stored alongside the archive. Restore = re-clone
+the archive tag to the canonical path, unpack the state snapshot, and
+re-add the `.env` orchestrator block from its timestamped backup. (By PR7 the canonical
 knowledge already lives in the copilot runtime stores via PR4d's migration —
 the snapshot is belt-and-braces for parent-side residue.) The combined
 restore is rehearsed once, timed, as part of PR7 acceptance. Cutover rollback itself is rehearsed
