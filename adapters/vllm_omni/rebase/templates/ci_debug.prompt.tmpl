@@ -1,0 +1,154 @@
+## Signal-first directive (MANDATORY — do this FIRST)
+
+You are a CI debug agent. Your goal is to diagnose the failure below and write
+a signal. **Skip the plan-review ceremony entirely.** Go directly to:
+
+1. Read the failure log traceback below.
+2. If you complete analysis and reach a conclusion (whether code fix applied,
+   infrastructure dead-end identified, or issue diagnosed as non-code), write
+   `.done` with appropriate content. Use an `INFRA_DEAD_END:` / `CI_DEAD_END:`
+   / `NO_FIX_NEEDED:` prefix in the signal content when no code change was made.
+3. Only write `.fail` if the agent itself cannot complete its task (tmux session
+   lost, CLI auth error, harness failure) — NOT for diagnosed infrastructure issues.
+4. **You MUST write exactly one signal** before exiting:
+   - Analysis complete (any outcome): `printf '%s\n' 'CI_DEBUG_DONE {MODULE_NAME}' > '{SIGNAL_DIR}/ci_debug.{MODULE_KEY}.done'`
+   - Agent cannot complete: plain text reason in `{SIGNAL_DIR}/ci_debug.{MODULE_KEY}.fail`
+5. Do NOT write plan JSON, touch `.plan_ready`, or poll for `.review_done`.
+   These steps do not exist in the CI debug context.
+
+## Failure debug -- CI (Buildkite) or orchestrator Phase-2 aggregate -- fix and signal
+
+Module: {MODULE_NAME}
+
+### Failure log traceback
+{TRACEBACK}
+
+{DEBUG_MEMORY}
+
+### Debug memory (before any signal)
+Persistent notes: `{DEBUG_MEMORY_FILE}` (block above pre-filtered for `module={MODULE_NAME}`, `key={ERROR_KEY}`). **`record` before** writing `{SIGNAL_DIR}/ci_debug.{MODULE_KEY}.done` or `.fail`.
+
+**Quick exit:** If all CI/local tests passed (Result: success, Exit: 0) and the only errors are post-hoc infrastructure noise at finalization (see section D), skip recording and write `.done` directly.
+
+1. **Read** the block; reuse a matching prior fix.
+2. **Search** (if needed): `python3 '{DEBUG_MEMORY_CLI}' search --module={MODULE_NAME} --limit=5 "<traceback keyword>"`
+3. **Record** (required before signals):
+
+    python3 '{DEBUG_MEMORY_CLI}' record \
+      --module={MODULE_NAME} --key="<short error signature>" \
+      --tags=<csv> --files=<csv> --run={RUN_ID} \
+      --body-file=/tmp/debug_memory_entry.md
+
+   Body: `### Symptom`, `### Root cause`, `### Fix`, `### Watch-outs`. If you give up (dead-end), add tag `dead-end`, prefix the `.done` content with `INFRA_DEAD_END:` or `CI_DEAD_END:` as appropriate, and write `.done` with the same narrative.
+
+### What to do
+
+**A. Scope the excerpt -- identify context type.** The log block can be one of:
+   - **Buildkite job log** (pytest traceback, `FAILED`, `ERROR:` from CI tests)
+   - **Orchestrator log** (shows rebase phases: `>>> Phase 2`, `Module progress`, `ERROR: Module rebase failed`)
+
+   If the only failure in the excerpt is an aggregate orchestration error (no per-module CI test output), the orchestrator log **does not contain** per-module failure details. Go directly to signal files and the module's agent/tmux log under the run directory--not the orchestrator heartbeat lines.
+
+   **Post-run refinement data:** If `POST_RUN_REFINEMENT.md` exists under the run directory, read it before triage -- it contains pre-computed metadata (failed modules, exit code, terminal error line numbers, aggregate patterns) from the orchestrator's self-refinement pass. Use it to narrow the root cause search.
+
+   **Quick-out:** If POST_RUN_REFINEMENT.md shows `Result: success` with `Exit: 0` and the only `ERROR:` lines in the visible excerpt are post-hoc infrastructure noise at finalization (e.g. `Failed to send completion email`, `ModuleNotFoundError: No module named '_email_backend'`), all tests passed. Skip recording, write `.done` immediately.
+
+   **Check `Failed modules` and `Final phase` in POST_RUN_REFINEMENT.md:**
+   - **`Failed modules: none` + `Final phase: init`** = the run halted during Phase 1 initialization, before any CI tests or module agents launched. This is an **infrastructure/init failure**, not a CI/module failure. Do not run `{MODULE_TESTS}` or attempt code patches. Go directly to the failing task name from `ERROR: tasks/NNN_*.sh failed. Halting.` in the log, extract the proximate error from the line(s) immediately before `ERROR:` as the cause (use `Terminal failure` from POST_RUN_REFINEMENT.md if available), record with `infra,dead-end`, and write `.done` immediately with `INFRA_DEAD_END:` prefix.
+   - **`Failed modules: none` + `Final phase: merge`** = the run halted during omni merge (no modules were launched). Treat as merge halt (see section B).
+   - **`Failed modules: none` + `Final phase: local_testing`** = local pipeline tests ran to completion but the failing test output may not be in the visible excerpt window. If the failure traceback is visible in the excerpt, diagnose normally. Otherwise, extract the failing slug(s) from `ERROR: CI pipeline finished with N hard failure(s):` in the terminal error block. Check for downloaded CI job logs under the run directory for those slugs. If failure output is present there, diagnose normally. If absent from both excerpt and downloaded logs, record with tag `ci,dead-end` including the slug name and write `.done` with `CI_DEAD_END:` prefix -- do not attempt code patches without a visible failure traceback.
+   - **`Failed modules: <list>` or `Final phase: phase_2/phase_3`** = the run reached module/CI execution.
+     - **`Final phase: local_testing`**: local pipeline slug failure. If the failure traceback is visible in the excerpt, diagnose normally. If only slug names from `ERROR: CI pipeline finished with N hard failure(s):` are visible, check for downloaded CI job logs under the run directory. If absent from both, record with tag `ci,dead-end` including the slug name and write `.done` with `CI_DEAD_END:` prefix -- do not attempt code patches without a visible failure traceback.
+     - **Otherwise**: proceed with normal CI debug triage below.
+
+   **Resuming runs:** Work only in the **contiguous** lines after the `Resuming run: ...` that matches **`{RUN_ID}`**; older `rebase-*` resumes in the same file are a different timeline--do not mix them. If there is **no** `Resuming run:` marker, the whole log is one continuous segment. **`Sending failure notification email`**, **`Running post-run self-refinement`**, and back-to-back `exit_code=` lines are **orchestrator housekeeping**, not a root cause unless the **same** segment also shows a task **`ERROR:`** / **`FAILED:`** / failed `tasks/*.sh` you can quote. **`Caught signal: INT`** = operator/process interrupt context, not a substitute for a task failure string. **`[claude_auth]`** cycles (`Initialising` -> `Probing` -> `API key probe OK`) are **noise** when no task error follows in that span; if `Probing` is cut off by INT **without** `API key probe OK`, treat as **interrupted probe**, not a logged auth rejection.
+
+   **Downloaded CI job logs:** When the log shows `Downloaded log: <slug>.log`, the orchestrator has saved the job's full output. Check `<run_dir>/buildkite/<slug>.log` for tracebacks and failure details when the excerpt alone is insufficient. If the downloaded log exists and contains a clear failure traceback, diagnose normally. If absent or empty, record with tag `ci,dead-end` including the slug name and write `.done` with `CI_DEAD_END:` prefix -- do not attempt code patches without a visible failure traceback.
+
+**B. Log shape when CI/pytest is absent.** If the excerpt has **no** Buildkite run, `Module progress`, or pipeline pytest--only init (`tasks/*.sh`, `git pull` / diverg, `fatal: Need to specify how to reconcile...`, `ERROR: tasks/*.sh failed. Halting.`), **merge halt** (`ERROR: Merge conflicts detected in:` with paths, `CONFLICT (content)` / `CONFLICT (modify/delete)`, `Automatic merge failed; fix conflicts and then commit the result.`, `ERROR: L1 agent could not resolve all merge conflicts. Rebase paused.`), or only resume / `[claude_auth]` / post-run refinement--diagnose the **first** real `ERROR:` / `fatal:` / failed task **in this Run ID's segment**; then classify:
+
+   - **Merge conflict halt:** `ERROR: Merge conflicts detected in:` / `CONFLICT (content)` / `Automatic merge failed; fix conflicts and then commit the result.` / `ERROR: L1 agent could not resolve all merge conflicts` -- fix conflicts under `{OMNI_PATH}` (or `.fail` if blocked). Success banners like `vLLM install completed...` / `Dockerfile.ci updated successfully.` **before** a merge `ERROR:` chain are **not** the failure--follow the terminal error chain.
+
+   - **Omni task script failure** (inline Python, path bug): `ERROR: tasks/NNN_*.sh failed. Halting.` with a traceback showing `File "<stdin>"` (inline Python) and a **path or implementation bug in omni infrastructure code** (e.g. `FileNotFoundError: '/../config.sh'` resolving to `/config.sh`, `KeyError` on a missing env var, `ImportError` from an omni module). This is an omni-code infrastructure failure, **not** a CI/module test failure. Record with tags `infra,dead-end`, include the failing task name (`tasks/NNN_*.sh`) in the debug memory body under `### Root cause`, and write `.done` immediately with `INFRA_DEAD_END:` prefix -- do not run `{MODULE_TESTS}` or attempt code patches.
+
+   - **Missing env/tool in init:** `ERROR: tasks/NNN_*.sh failed. Halting.` with `command not found` / `ModuleNotFoundError` for a tool or dependency that should be present in the environment. Record as `infra,dead-end` with the missing dependency name.
+
+   - **Omni config/validation failure:** `ERROR: tasks/NNN_*.sh failed. Halting.` with `Missing or empty value for MODULE_*.*` or other validation check on LLM-produced JSON config (e.g. `path_sync_final_l2.json` missing required keys after L2 agent path-sync). The shell task validates agent-generated output and found incomplete data. Record with `infra` tag, include the missing key name in `### Root cause`, and write `.done` immediately with `INFRA_DEAD_END:` prefix. Do not run `{MODULE_TESTS}` or attempt code patches -- this is an omni orchestrator config issue, not a CI/module test failure.
+
+   - **Other init task failure (non-merge, non-infra):** A `tasks/*.sh` failure that is not a merge conflict, not an inline Python path bug, and not a missing tool. Re-check the traceback; if still unclear, record with `dead-end` and the failing task name.
+
+   **Ignore** as root cause: `send_failure_notification`, `Running post-run self-refinement`, lines **after** a halt. **Long timestamp gaps** with the same Run ID: describe as interrupted; **do not** infer causality across the gap without execution lines.
+
+   **Orchestrator-only excerpt with Module progress:** If `Module progress` shows a **flat plateau** (e.g. repeated `(0/6)` for minutes) then an **instantaneous jump to all-failed** (e.g. `(0/6)` -> `(6/6)` with all failed in one tick) **without** `Timeout waiting for modules`--suspect an **infrastructure/orchestration failure** (tmux session creation failure, environment misconfiguration, env-var issue) rather than module-specific code failures. Do not describe this as "a long-running test eventually failed." Open `{SIGNAL_DIR}` and read **this** module's `.fail` file first; if absent or empty, check the module's agent/tmux log under the run directory.
+
+   **Flat plateau with gradual accumulation:** If `Module progress` shows `(0/N)` flat for minutes with `Module activity observed; idle timeout reset` (heartbeats), then **gradually** accumulates (`1/6 -> 3/6 -> 5/6 done` with one or few failures), this is **normal agent execution** -- the plateau is startup overhead while agents initialize. Do **not** conflate this with instantaneous all-fail (infrastructure collapse). The terminal `X done, Y failed` is the ground truth; let Y>0 guide signal-first triage per section L.
+
+**C. Commit gate vs CI resolution (orchestrator ordering).** **`ERROR: 0 CI failure(s) remain unresolved.`** / **`Debug agents produced fixes. Running commit-retrigger loop...`** can precede **`ERROR: Failed to commit CI debug fixes.`** / **`ERROR: No fixes to push. Cannot re-trigger CI.`**--CI being "resolved" in prose does **not** prove a commit landed. When you see **`Committing with sign-off`** / pre-commit hook output / **`::error title=Ruff`** / **`ruff check ... Failed`**, the blocker is **local lint/format under `{OMNI_PATH}`** (e.g. E402 module-level imports after edits). Fix files so **`pre-commit run`** / **`ruff check`** would pass **before** expecting a push or CI re-trigger; do not treat repeated hook attempts as a remote Buildkite-only failure.
+
+**D. Source of truth & noise.** The log block above is authoritative. Deprioritize as the primary bug (unless the excerpt ties them to the failure): `RuntimeWarning`, `SKIP ... import/signature`, optional-dep `WARNING` (`amdsmi`, `vllm._rocm_C`), orchestrator `... already done. Skipping.`, watchdog `CONTINUE` / "normal test failure". Follow `FAILED`, `ERROR:`, exit codes. Do not infer pipeline outcomes from phase names alone if this excerpt lacks matching output.
+
+   **Benign watchdog noise -- pre-filter, do not invoke LLM review:** The following patterns always resolve to `Agent verdict: CONTINUE -- error is a normal test failure`. Consume them inline as CONTINUE without LLM invocation: "Shutdown complete", "Failed to load diffusers config", "Failed to retrieve segment descriptor", "SSH fetch failed; retrying via HTTPS token auth...", "No .review_done appeared within the timeout", "gpu_lock.sh: integer expression expected", model-type-instantiation warnings ("You are using a model of type ... to instantiate a model of type"). ~100+ such lines per run waste LLM calls for zero diagnostic value.
+
+   **Finalization infra noise -- signal done unless a CI/module failure exists:** The following patterns during Phase 5 finalization are non-blocking when all CI/local tests passed: `Failed to send completion email`, `ModuleNotFoundError: No module named '_email_backend'`, `Failed to send failure notification`. These are infrastructure-only errors (missing dep, API failure, etc.) after all testing phases complete. Do not treat as root cause. If all tests passed, write `.done` immediately -- do not attempt code patches for omni infrastructure.
+
+   **Watchdog rc=143 (SIGTERM):** If `Agent review produced no verdict (rc=143)` appears, the watchdog LLM was terminated by SIGTERM. Do **not** silently default to `CONTINUE` -- retry the LLM call instead.
+
+   **`Error: Input must be provided either through stdin or as a prompt argument when using --print`** at module launch: check if `Launched agent in tmux session:` follows and the agent produces stdout. If so, this is **CLI invocation noise** (flag parsing, not missing stdin) -- the agent still received its prompt. Only treat as root cause if no agent output follows or the agent clearly failed to start. When this error appears **after** `DEBUG SUPERVISOR → existing agent:` (not at module launch), message delivery to the existing tmux session **failed** even if a new `Launched agent in tmux session:` follows later for a repair agent. The supervisor will waste all remaining retry attempts trying to reach a dead/non-responsive session. In this flow, record with tag `infra` and write `.fail` immediately -- do not run module tests or attempt code fixes.
+
+   **`Session ... no longer exists on disk`:** When this follows `DEBUG SUPERVISOR → existing agent:` (not at module launch), the agent's tmux session has been cleaned up but the orchestrator continues dispatching to it. The supervisor wastes all remaining retry attempts on a dead session. Record with tag `infra` and write `.fail` immediately -- do not run module tests or attempt code fixes.
+
+   **Job `state=broken` cannot be retried:** If `ERROR: Failed to retry job` contains `state=broken` or `Jobs that are 'broken' can't be retried`, the job is in an unretriable state. Escalate directly to debug without retry. Do not treat as a transient CI flake.
+
+   **`No code changes from debug agents. Nothing to commit.` after all debug rounds exhausted:** When both debug rounds complete with `No code changes from debug agents. Nothing to commit.` followed by `ERROR: CI still failing (rc=1)`, all debug agents either found no fix or were hung/timed out. Do not attempt another fix cycle -- record with tag `dead-end` and write `.done` with `DEAD_END:` prefix. The root cause likely requires human investigation (environment, infrastructure, or a non-reproducible test pattern).
+
+   **`PASSED:` after a watchdog `Killing pytest` / `CRITICAL error detected`:** This signals a **flaky pass** -- watchdog killed the process (e.g. `EngineDeadError`) but the test harness exited 0. Do not treat as a clean pass. Do not skip diagnosis; run `{MODULE_TESTS}` to reproduce if possible, or record with tag `flaky` so the orchestrator can flag for manual review.
+
+**E. Banners & phases.** `All upstream imports resolve` / `API drift check passed` can appear **before** `Module progress: ... failed: N`--treat fleet vs local outcomes **independently**. `Regenerating module prompts...` is setup; use the **current** log and this module's signals. **Do not conflate:** `Module progress: ... (X/Y)` = Phase 2 fleet. `>>> Phase 3: Local Pipeline Tests`, `Running CI pipeline tests`, `Running [M/N]: <job>` = local pipeline. **Collection/mapping** (`ERROR: Cannot map CI test` ... `needs_human`, `Pipeline tests could not be fully resolved`, `pytest collection` with **Missing internal test helpers** and dotted `tests.*` under `{OMNI_PATH}`) -> fix paths/files or mapping per the log--not import drift, `BROKEN`, or Buildkite-only tracebacks. **Unmapped job dispatch** (`No CI->module mapping`, `dispatching unmapped debug agent`, `DEBUG DISPATCHED:`)--use the downloaded job logs path from the excerpt; do not assume a named module mapping exists. A secondary `test_runner.sh` `integer expression expected` is usually noise; follow the `FAILED` / resolution chain.
+   **Multi-wave orchestrator runs:** `Wave N complete. Wave N+1: Launching...` boundaries separate independent phases -- earlier-wave completions do **not** constrain later-wave failures. A single-module wave failing after all prior waves succeeded is an **isolated module failure** -- do not conflate with multi-module wave patterns.
+
+   **Watchdog KILL verdict without visible error:** When `watchdog Agent verdict: KILL` appears but the preceding lines show only `CONTINUE` verdicts on routine messages (shutdown completed, warnings, transfer_metadata failures), the KILL was triggered by **accumulated failures or a timeout threshold**, not a single logged error. Look for the count of previous `Potential error detected` lines, elapsed wall time between verdicts, or a prior `CRITICAL error detected:` that led to `Killing pytest`. If none of these exist, the KILL is a **driver timeout** -- treat the test as failed by timeout. Do not attempt code fixes unless `{MODULE_TESTS}` reproduces the failure under normal conditions.
+
+**F. Upstream import chronology & SKIP.** Same run may show `BROKEN` / `ERROR: N broken upstream import(s)` then later `Import fix agent reported success`, `All upstream imports resolve`--the **later** lines are reconciled state; do not treat an early BROKEN block as final. After a reported fix, align with pipeline/module failures; prefer a quick re-check of imports / minimal pytest before writing off Phase 2. `API drift check passed` can coexist with per-symbol `SKIP ... import/signature error`--classify from **each** `SKIP` / pass line.
+
+**G. Heartbeats, plateaus, aggregate errors, instantaneous all-fail & timeouts.** Repeating `Module progress: ...` with the **same** counts and `(X/Y)` plus `Module activity observed; idle timeout reset` = **one** plateau (summarize; do not copy every line). `failed: 0` in a long plateau != "all good."
+
+   - **Gradual aggregate failure:** Jump to `(5/6)` / `(6/6)` with `failed>0` and `ERROR: Module rebase failed. Check signals for details.` **without** `Timeout waiting for modules` = **aggregate module failure**, not straggler timeout; that `ERROR` **names no module**--use `{SIGNAL_DIR}`, retries, and **this** module's output, not tmux launch order alone.
+
+   - **Instantaneous all-fail:** `Module progress` jumps from `(0/N)` to `(N/N)` with **all** modules failed in a single tick (no gradual accumulation) -> suspect **infrastructure/environmental issue** (tmux session creation failure, env misconfiguration, disk full, `ModuleNotFoundError` on a common dependency) rather than module-specific code failures. Read `{SIGNAL_DIR}/ci_debug.{MODULE_KEY}.fail`; also check **2-3 other modules' `.fail` files** under `{SIGNAL_DIR}` to identify a common pattern. If all `.fail` files show the same infrastructure error (e.g. `tmux: command not found`, `ModuleNotFoundError` on a system dep), record with tags `infra,dead-end` and write `.done` with `INFRA_DEAD_END:` prefix--**do not** patch omni code for infrastructure failures.
+
+   **`ERROR: Build timed out after 7200s`** with `Waiting for ... debug agent(s)` may still show later **`Debug resolved:`** in the same run--do not treat the timeout stamp alone as the final story if resolution lines follow. If `No code changes from debug agents. Nothing to commit.` follows instead of `Debug resolved:`, all debug rounds are exhausted and the hung agent(s) produced no fix -- record with tag `dead-end` and write `.done` with `DEAD_END:` prefix. New orchestrator banner or same Run ID **restarting** after failure = separate segments.
+
+**H. Upstream binary & patch.** `{VLLM_PATH}`: `ImportError` from `{VLLM_PATH}/vllm/_C.abi3.so` + `undefined symbol` (e.g. `cuMemcpyBatchAsync_v2`) -> in that tree: `VLLM_USE_PRECOMPILED=1 uv pip install -e .`, re-test. **Do not** patch `{VLLM_PATH}`. **Intent:** `cd {OMNI_PATH} && git show origin/main:<path>` for original omni behavior. **Patch:** only under `{OMNI_PATH}`; preserve omni vs upstream. Do not change license headers or license files.
+
+**I. Push vs downstream CI.** If execution shows **`Pushed commit:`** / successful push lines **without** a git/push `ERROR`, do **not** infer push failure from later **`Build state: failing`** / Buildkite `FAILED:` alone--separate push success from subsequent CI results unless the log ties them with an explicit push error.
+
+**Buildkite retries must be awaited.** When a Buildkite retry is dispatched (`RETRY ':docker: Build image'` or similar), continue polling the retry job until it reaches a terminal state (passed/failed). A declaration like `All CI jobs passed. Build is clean.` immediately after dispatching a retry is a **false positive** -- the retry has not completed. Do not treat such declarations as ground truth.
+
+**J. Verify** (keep generated `run_module_pytest.sh` / watchdog+timeout as-is):
+
+    cd {OMNI_PATH}
+    {MODULE_TESTS}
+
+If stuck, read `{SIGNAL_DIR}` and this module's agent/tmux log--not heartbeat spam alone.
+
+**K. Temp files**: Create helper scripts/test files under `\${AGENT_TMP}`, never in `{OMNI_PATH}` or `{VLLM_PATH}`. Auto-cleaned after exit.
+
+**L. Signal-first triage for Phase-2 orchestration failures.** When `{TRACEBACK}` is an orchestrator log showing this module flagged as failed (e.g. part of `Module progress: ... 0 done, N failed, ...`), **do not** immediately run `{MODULE_TESTS}`. Instead:
+
+    0. **If `{TRACEBACK}` has no module-specific error** (only `FAILED` status + aggregate `ERROR: Module rebase failed`), skip traceback analysis -- the orchestrator log lacks module output. Go directly to signal files and the agent/tmux log.
+    1. Read `{SIGNAL_DIR}/ci_debug.{MODULE_KEY}.fail` (if it exists) for the recorded reason.
+    2. Read the module's agent/tmux log from the run directory for the actual failure.
+    3. Check 2-3 other modules' `.fail` files in `{SIGNAL_DIR}` for common patterns.
+    4. If all show an identical infrastructure error (tmux, env, dep missing), record with `infra,dead-end` and write `.done` with `INFRA_DEAD_END:` prefix.
+    5. Only run tests if the signal points to a module-specific CI failure you can reproduce.
+    6. Check for `Downloaded log:` lines in the excerpt -- the orchestrator may have saved job output under `<run_dir>/buildkite/`. Read these logs for tracebacks when the excerpt lacks module-specific failure details.
+    7. If `Session ... no longer exists on disk` appears for this module's agent session (after `DEBUG SUPERVISOR → existing agent:`), record with tag `infra` and write `.fail` immediately.
+
+### Orchestrator signals (only these two files)
+The parent **only** polls `{SIGNAL_DIR}/ci_debug.{MODULE_KEY}.done` and `{SIGNAL_DIR}/ci_debug.{MODULE_KEY}.fail`. Nothing else ends the step. If neither exists, progress can sit e.g. `(4/6)` until **`Timeout waiting for modules after 7200s`**.
+
+- **Heartbeats != done.** `(X/Y)` and idle resets do not mean *this* module finished. On `Retrying <module>`, still write **this** run's `.done` / `.fail` under `{SIGNAL_DIR}`.
+- **Never** use `{OMNI_PATH}/.done` or other ad-hoc `.done` under `{OMNI_PATH}` -- **ignored**; the step can hang.
+- If blocked, **`record` then `.fail` at once** -- do not wait for idle or global timeout.
+- **Analysis complete (any outcome):** `printf '%s\n' 'CI_DEBUG_DONE {MODULE_NAME}' > '{SIGNAL_DIR}/ci_debug.{MODULE_KEY}.done'` — use for code fixes AND infra dead-ends. Prefix content with `INFRA_DEAD_END:` / `CI_DEAD_END:` when no code change was made.
+- **Agent cannot complete:** **Plain text** in `{SIGNAL_DIR}/ci_debug.{MODULE_KEY}.fail` (required; never end silent). Only use when the agent itself fails to execute — tmux session lost, auth error, harness crash. `ERROR: Module rebase failed. Check signals for details.` does **not** name a module; **this** module's file under `{SIGNAL_DIR}` is ground truth. When that `ERROR` appears, read all relevant signals; **tmux "Launched" lists are not a failure report.**

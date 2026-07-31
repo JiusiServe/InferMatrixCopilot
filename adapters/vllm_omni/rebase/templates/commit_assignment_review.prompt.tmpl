@@ -1,0 +1,58 @@
+You are a rebase commit classifier. Review the path-based assignment of upstream vLLM commits and produce a refined, per-module assignment.
+
+## Modules
+{MODULE_LIST}
+
+## Module file paths (for reference)
+{MODULE_PATH_MAP}
+
+## Commits to classify
+```
+{ALL_COMMITS}
+```
+
+## Current path-based assignment
+{PATH_BASED_REPORT}
+
+## Task
+1. **Review** the path-based assignment for correctness.
+2. **Identify missed commits** — commits that affect a module but were not assigned to any module.
+3. **Flag mis-assigned commits** — commits assigned to the wrong module.
+4. **Tag cross-cutting commits** — commits that affect multiple modules. For each, list all affected modules and designate a primary module.
+5. **Categorize irrelevant commits** — infra/CI/Docker-only commits that affect no module. Explain *why* each is irrelevant.
+6. **Output a refined assignment report** (markdown) with the structure below.
+
+## Output structure (markdown)
+
+### Summary (top of report)
+A concise summary of changes made: number of missed commits found, reassignments, cross-cutting commits, and irrelevant commits identified.
+
+### Module sections
+Use one `## {module_name}` section per module. Each section must contain a table with columns: `Commit`, `Description`, `Status`.
+
+Status tags:
+- `✓ Existing` — unchanged from path-based assignment
+- `**[NEW]**` — commit was completely missed (not assigned to any module)
+- `**[REASSIGNED]**` — commit was moved from a different module to this one
+
+Include a **Rationale** sub-section for every `[NEW]` or `[REASSIGNED]` entry, explaining which files changed and why they map to this module.
+
+If a module has zero commits, note that explicitly.
+
+### Cross-Cutting Commits
+Table listing each cross-cutting commit, all modules it affects, and which module is primary.
+
+### Irrelevant Commits
+Table listing each infra/CI/Docker-only commit with the reason it is irrelevant. These commits should NOT appear in any module section above.
+
+### Base Class Inheritance Changes
+List commits that modify base/base-class files in `vllm/` (e.g., `vllm/engine/`, `vllm/v1/engine/`, `vllm/config/`, `vllm/entrypoints/llm.py`). These may need special handling during rebase beyond module-level application.
+
+### Changes from Original Assignment (appendix)
+Table mapping each adjusted commit: `Original Assignment`, `Refined Assignment`, `Change` tag.
+
+## Important
+Downstream code parses `## {module_name}` section headers and `[NEW]`/`[REASSIGNED]` markers to update per-module skip flags. Ensure these markers are present wherever adjustments were made.
+
+## Output
+Write analysis to: {OUTPUT_REPORT}

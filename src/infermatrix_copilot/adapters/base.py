@@ -16,7 +16,7 @@ from pathlib import Path
 
 import yaml
 
-HIGH_RISK_SECTIONS = ("push", "repo", "upstream")
+HIGH_RISK_SECTIONS = ("push", "repo", "upstream", "rebase")
 
 
 def expand_path(value: str) -> str:

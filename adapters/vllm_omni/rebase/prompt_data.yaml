@@ -1,0 +1,75 @@
+# Module-prompt data — the PARENT BUILDER's inline maps, verbatim
+# (agent/prompts/builder.py). These deliberately DIFFER from the manifest's
+# config.sh-authoritative operational maps in places (import-check strings,
+# test subsets): the parent had a dual command source, and prompt-render
+# byte-parity requires the builder's flavor. The drift is recorded in
+# doc/DRIFT_TRIAGE.md for the pre-cutover decision — do NOT "fix" one side
+# to match the other here.
+template: module_rebase.prompt.tmpl
+
+# command template for PYTEST_COMMANDS / IMPORT_CHECK lines; goldens set this
+# to the parent's run_module_pytest.sh path to prove byte-parity, live runs
+# set the imx-omni-pytest form
+pytest_wrapper: "bash '{script_dir}/lib/run_module_pytest.sh'"
+
+module_vllm_paths:
+  model_config: "vllm/config/ vllm/engine/arg_utils.py"
+  input_output: "vllm/inputs/ vllm/v1/engine/input_processor.py vllm/v1/engine/output_processor.py vllm/v1/request.py"
+  scheduler: "vllm/v1/core/sched/"
+  worker_runner: "vllm/v1/worker/"
+  model_executor: "vllm/model_executor/"
+  online_serving: "vllm/entrypoints/"
+  benchmarks: "vllm/benchmarks/ vllm/entrypoints/cli/benchmark/"
+  platform: "vllm/platforms/"
+
+module_omni_files:
+  model_config: "vllm_omni/config/model.py vllm_omni/engine/arg_utils.py"
+  input_output: "vllm_omni/inputs/data.py vllm_omni/inputs/preprocess.py vllm_omni/engine/async_omni_engine.py vllm_omni/engine/orchestrator.py vllm_omni/engine/serialization.py vllm_omni/engine/stage_init_utils.py vllm_omni/engine/stage_engine_core_client.py vllm_omni/engine/output_processor.py vllm_omni/request.py"
+  scheduler: "vllm_omni/core/sched/omni_ar_scheduler.py vllm_omni/core/sched/omni_generation_scheduler.py vllm_omni/core/sched/output.py"
+  worker_runner: "vllm_omni/worker/gpu_model_runner.py vllm_omni/worker/gpu_ar_model_runner.py vllm_omni/worker/gpu_generation_model_runner.py vllm_omni/worker/gpu_ar_worker.py"
+  model_executor: "vllm_omni/model_executor/"
+  online_serving: "vllm_omni/entrypoints/omni_base.py vllm_omni/entrypoints/omni.py vllm_omni/entrypoints/async_omni.py vllm_omni/entrypoints/openai/api_server.py vllm_omni/entrypoints/openai/serving_chat.py vllm_omni/entrypoints/openai/serving_speech.py vllm_omni/entrypoints/openai/utils.py"
+  benchmarks: "vllm_omni/benchmarks/serve.py vllm_omni/benchmarks/patch/patch.py vllm_omni/benchmarks/metrics/metrics.py vllm_omni/entrypoints/cli/benchmark/serve.py"
+  platform: "vllm_omni/platforms/cuda/platform.py vllm_omni/platforms/rocm/platform.py vllm_omni/platforms/xpu/platform.py vllm_omni/platforms/interface.py"
+
+module_test_map:
+  model_config: ["tests/entrypoints/test_stage_utils.py", "tests/metrics/test_stats.py"]
+  input_output: ["tests/entrypoints/test_omni_new_request_data.py", "tests/engine/", "tests/test_outputs.py"]
+  scheduler: ["tests/distributed/"]
+  worker_runner: ["tests/worker/", "tests/diffusion/test_diffusion_worker.py", "tests/e2e/offline_inference/custom_pipeline/"]
+  model_executor: ["tests/model_executor/", "tests/diffusion/", "tests/e2e/offline_inference/"]
+  online_serving: ["tests/entrypoints/", "tests/e2e/online_serving/"]
+  benchmarks: ["tests/benchmarks/test_serve_cli.py"]
+  platform: ["tests/"]
+
+module_import_check:
+  model_config: "from vllm_omni.config.model import OmniModelConfig; from vllm_omni.engine.arg_utils import OmniEngineArgs; print('OK')"
+  input_output: "from vllm_omni.inputs.data import *; from vllm_omni.inputs.preprocess import *; from vllm_omni.engine.async_omni_engine import AsyncOmniEngine; print('OK')"
+  scheduler: "from vllm_omni.core.sched.omni_ar_scheduler import *; from vllm_omni.core.sched.omni_generation_scheduler import *; print('OK')"
+  worker_runner: "from vllm_omni.worker.gpu_model_runner import *; from vllm_omni.worker.gpu_generation_model_runner import *; from vllm_omni.worker.gpu_ar_model_runner import *; from vllm_omni.worker.gpu_ar_worker import *; print('OK')"
+  model_executor: "from vllm_omni.model_executor.models.registry import *; print('OK')"
+  online_serving: "from vllm_omni.entrypoints.omni import Omni; from vllm_omni.entrypoints.async_omni import AsyncOmni; from vllm_omni.entrypoints.openai.api_server import omni_run_server; print('OK')"
+  benchmarks: "from vllm_omni.benchmarks.serve import main; print('OK')"
+  platform: "from vllm_omni.platforms.interface import OmniPlatform; from vllm_omni.platforms.cuda.platform import CudaOmniPlatform; print('OK')"
+
+# parent-verbatim debug prompt (prompts/builder.py build_debug_prompt)
+debug_prompt_template: |
+  ## Debug: fix failing test for module `{module}`
+
+  ### Test
+  {test_path}
+
+  ### Traceback
+  ```
+  {traceback}
+  ```
+
+  ### Your task
+  1. Read the traceback and identify the root cause
+  2. Read the upstream vLLM file for the correct API
+  3. Read the vllm-omni main branch version: `git show origin/main:<path>`
+  4. Fix the vllm-omni code to be compatible with upstream while preserving omni logic
+  5. Run the related tests to verify the fix
+  6. Write MODULE_DONE {module} to the signal file when fixed
+
+  MODULE={module}

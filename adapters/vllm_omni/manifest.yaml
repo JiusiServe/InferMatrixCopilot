@@ -93,6 +93,10 @@ modules:
 # live here so the engine stays neutral). Sourced from the parent's config.sh
 # + tasks 10/20/01/40/35.
 rebase:
+  # behavioral hooks (plan §1.2): declared explicitly, loaded only while the
+  # adapter is active; this whole `rebase:` section is HIGH-RISK (human-only
+  # writes) so an agent can never self-install hooks
+  hooks: rebase/hooks.py
   wheel:
     package: vllm
     index_url_template: "https://wheels.vllm.ai/{commit}/{variant}/{package}/"

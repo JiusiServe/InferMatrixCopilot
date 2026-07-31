@@ -1,0 +1,19 @@
+## Debug: fix failing test for module `worker_runner`
+
+### Test
+tests/t.py
+
+### Traceback
+```
+Traceback: boom
+```
+
+### Your task
+1. Read the traceback and identify the root cause
+2. Read the upstream vLLM file for the correct API
+3. Read the vllm-omni main branch version: `git show origin/main:<path>`
+4. Fix the vllm-omni code to be compatible with upstream while preserving omni logic
+5. Run the related tests to verify the fix
+6. Write MODULE_DONE worker_runner to the signal file when fixed
+
+MODULE=worker_runner

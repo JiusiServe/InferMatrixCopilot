@@ -20,6 +20,7 @@ mcp = ["mcp>=1.2"]
 [project.scripts]
 infermatrix-copilot = "infermatrix_copilot.cli:main"
 infermatrix-copilot-mcp = "infermatrix_copilot.mcp_server:main"
+imx-omni-pytest = "infermatrix_copilot.rebase_engine.module_pytest:main"
 
 [build-system]
 requires = ["setuptools>=68"]
