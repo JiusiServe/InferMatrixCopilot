@@ -45,10 +45,17 @@ def _fake_mcp(monkeypatch):
             self.settings = Settings(
                 repo_full_names={"vllm-omni": "vllm-project/vllm-omni"})
             self.requests = []
+            self.repo_configurations = []
 
         def start_strict_review(self, request):
             self.requests.append(request)
             return "run-20260730-120000-abc123"
+
+        def configure_strict_repo(self, repo, repo_path=""):
+            self.repo_configurations.append((repo, repo_path))
+
+        def strict_readiness(self, repo):
+            return []
 
         def get_result(self, run_id, offset=0):
             return {"run_id": run_id, "state": "done", "offset": offset}
@@ -436,6 +443,7 @@ def test_strict_maps_to_old_eco_request_and_preserves_explicit_post(monkeypatch)
         "post": True,
         "params": {"review_depth": "full"},
     }]
+    assert core.repo_configurations == [("vllm-omni", "")]
 
 
 def test_strict_does_not_post_by_default(monkeypatch):
@@ -446,3 +454,24 @@ def test_strict_does_not_post_by_default(monkeypatch):
     assert result["post"] is False
     assert core.requests[0]["mode"] == "eco"
     assert core.requests[0]["post"] is False
+
+
+def test_strict_reports_setup_gaps_before_starting(monkeypatch):
+    mcp, core = _fake_mcp(monkeypatch)
+    core.strict_readiness = lambda repo: [
+        "model credential missing",
+        "checkout missing",
+    ]
+
+    result = mcp.tools["review"](
+        target="https://github.com/vllm-project/vllm-omni/pull/5172",
+        mode="strict",
+    )
+
+    assert result == {
+        "error": (
+            "Strict mode is not ready: model credential missing; "
+            "checkout missing"
+        )
+    }
+    assert core.requests == []

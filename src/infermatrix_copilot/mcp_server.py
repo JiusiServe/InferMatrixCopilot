@@ -89,13 +89,13 @@ class CopilotMCP:
     def _launch(self, run_id: str, *, strict_compat: bool = False) -> None:
         """Run one reserved run as `python -m infermatrix_copilot --execute-reserved
         <id>`, child stdout+stderr -> console.log. The workflow MCP forces
-        outward writes off; Strict preserves the old explicit post/config gate.
+        outward writes off; Strict preserves the explicit post/config gate.
         After `.wait()` the child is reaped, so we reconcile as sole writer."""
         run_dir = self.run_root / run_id
         env = dict(os.environ)
-        # The standalone workflow MCP stays structurally read-only. Strict is
-        # the old Eco path: it preserves the old dual post gate (explicit task
-        # intent plus this server's ALLOW_POST setting).
+        # The standalone workflow MCP stays structurally read-only. Strict
+        # preserves the dual post gate (explicit task intent plus this server's
+        # ALLOW_POST setting).
         env["ALLOW_POST"] = (
             "1" if strict_compat and self.settings.allow_post else "0")
         env["ALLOW_PUSH"] = "0"
@@ -111,6 +111,8 @@ class CopilotMCP:
         env["RUN_ROOT"] = str(self.run_root)
         env["MCP_REPO_ALLOWLIST"] = json.dumps(self.settings.mcp_allowed_repos)
         env["DEFAULT_REPO"] = self.settings.default_repo
+        env["REPO_PATHS"] = json.dumps(self.settings.repo_paths)
+        env["REPO_FULL_NAMES"] = json.dumps(self.settings.repo_full_names)
         popen_kwargs: dict[str, Any] = {}
         if os.name == "nt":
             # Codex/Claude launch the MCP server over stdio.  Without a new
@@ -149,7 +151,7 @@ class CopilotMCP:
         return run_id
 
     def start_strict_review(self, spec_dict: dict) -> str:
-        """Reserve the old Eco review workflow behind its Strict public name."""
+        """Reserve a packaged Strict review workflow."""
         spec = enforce_strict_review_policy(
             spec_dict, allowed_repos=self.settings.mcp_allowed_repos,
             settings=self.settings)
@@ -157,6 +159,41 @@ class CopilotMCP:
             spec, owner_server_id=self.server_id, owner_server_pid=self.pid)
         self._q.put((run_id, True))
         return run_id
+
+    def configure_strict_repo(self, repo: str, repo_path: str = "") -> None:
+        """Apply an explicit per-call checkout before Strict preflight."""
+        if not repo_path:
+            return
+        path = Path(repo_path).expanduser().resolve()
+        if not path.is_dir() or not (path / ".git").exists():
+            raise ValueError(f"repo_path is not a Git checkout: {path}")
+        self.settings.repo_paths = {
+            **self.settings.repo_paths,
+            repo: str(path),
+        }
+
+    def strict_readiness(self, repo: str) -> list[str]:
+        """Return actionable setup gaps before reserving a Strict run."""
+        missing = []
+        if not self.settings.shared_api_key:
+            missing.append(
+                "model credential missing; set ANTHROPIC_API_KEY or "
+                "OPENAI_API_KEY in "
+                "~/.infermatrix-copilot/.env"
+            )
+        repo_path = self.copilot._resolve_repo_path(repo)
+        if not repo_path or not Path(repo_path).is_dir():
+            missing.append(
+                f"checkout for {repo!r} missing; run the installer with "
+                "--repo-path <path> or set REPO_PATHS in "
+                "~/.infermatrix-copilot/.env"
+            )
+        if self.copilot.store.get("pr-review") is None:
+            missing.append(
+                "packaged pr-review playbook missing; reinstall "
+                "InferMatrixCopilot"
+            )
+        return missing
 
     # -- poll -----------------------------------------------------------------
     def get_status(self, run_id: str) -> dict:

@@ -27,6 +27,49 @@ def test_no_detected_agent_writes_generic_config(monkeypatch, tmp_path):
     server = config["mcpServers"]["infermatrix-copilot"]
     assert server["command"] == "uvx"
     assert "infermatrix-copilot-mcp" in server["args"]
+    strict_config = tmp_path / ".infermatrix-copilot" / ".env"
+    assert strict_config.is_file()
+    assert "REPO_FULL_NAMES=" in strict_config.read_text(encoding="utf-8")
+
+
+def test_repo_path_is_saved_for_strict_without_overwriting_secret(
+    monkeypatch, tmp_path
+):
+    installer = _load_installer()
+    monkeypatch.setattr(installer, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(installer, "_detect_agents", lambda root: [])
+    repo = tmp_path / "vllm-omni"
+    (repo / ".git").mkdir(parents=True)
+    strict_config = tmp_path / ".infermatrix-copilot" / ".env"
+    strict_config.parent.mkdir()
+    strict_config.write_text(
+        "ANTHROPIC_API_KEY=keep-me\nREPO_PATHS={}\n",
+        encoding="utf-8",
+    )
+
+    assert installer.main([
+        "--config-root",
+        str(tmp_path),
+        "--repo-path",
+        str(repo),
+    ]) == 0
+
+    text = strict_config.read_text(encoding="utf-8")
+    assert "ANTHROPIC_API_KEY=keep-me" in text
+    assert "OPENAI_API_KEY=" in text
+    assert "OPENAI_BASE_URL=" in text
+    assert "LLM_PROVIDER=auto" in text
+    repo_paths_line = next(
+        line for line in text.splitlines()
+        if line.startswith("REPO_PATHS=")
+    )
+    assert json.loads(repo_paths_line.partition("=")[2]) == {
+        "vllm-omni": str(repo)
+    }
+    assert (
+        'REPO_FULL_NAMES={"vllm-omni": "vllm-project/vllm-omni"}'
+        in text
+    )
 
 
 def test_cursor_install_preserves_existing_config(tmp_path):

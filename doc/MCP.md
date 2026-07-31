@@ -14,9 +14,11 @@ cd InferMatrixCopilot
 
 # Windows cmd、PowerShell 或双击
 install.cmd
+install.cmd --repo-path D:\path\to\vllm-omni
 
 # macOS / Linux
 ./install-mcp.sh
+./install-mcp.sh --repo-path /path/to/vllm-omni
 ```
 
 两个入口共用 `scripts/install_mcp.py`，但用户不需要安装或直接运行 Python：
@@ -25,6 +27,11 @@ install.cmd
 - 自动识别 Codex、Claude Code 和 Cursor，检测到几个就安装几个；
 - 保留 Cursor 已有配置并先备份；
 - 没识别到已知 Agent 时生成 `infermatrix-copilot.mcp.json`，不会直接失败。
+- 创建 `~/.infermatrix-copilot/.env` 作为 Strict 的稳定配置入口；安装时传入
+  `--repo-path` 会写入本地 vLLM-Omni checkout。模型密钥不会自动复制，使用
+  Strict 前在该文件填写 `ANTHROPIC_API_KEY` 或 `OPENAI_API_KEY`。两者分别支持
+  可选的 `ANTHROPIC_BASE_URL` 和 `OPENAI_BASE_URL`；只填一种 Key 时自动选择，
+  两种都填时用 `LLM_PROVIDER` 指定。
 
 ## 公共市场上线后
 

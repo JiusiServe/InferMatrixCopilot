@@ -10,7 +10,29 @@ from urllib.parse import urlparse
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+_PACKAGE_ROOT = Path(__file__).resolve().parent
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+_USER_CONFIG = Path.home() / ".infermatrix-copilot" / ".env"
+_RESOURCE_MARKERS = {
+    "knowledge": Path("AGENTS.md"),
+    "playbooks": Path("pr-review.yaml"),
+    "adapters": Path("vllm_omni") / "manifest.yaml",
+    "skills": Path("code-quality-review") / "SKILL.md",
+}
+
+
+def _resource_dir(name: str) -> Path:
+    """Resolve source-checkout and wheel-packaged runtime data uniformly."""
+    marker = _RESOURCE_MARKERS[name]
+    candidates = (
+        _REPO_ROOT / name,
+        _PACKAGE_ROOT / "_runtime" / name,
+        _PACKAGE_ROOT / name,
+    )
+    for candidate in candidates:
+        if (candidate / marker).is_file():
+            return candidate
+    return candidates[0]
 
 
 class TierNotConfiguredError(RuntimeError):
@@ -33,12 +55,15 @@ class ResolvedTarget:
     base_url: str
     api_key: str
     source: str
+    provider: Literal["anthropic", "openai"] = "anthropic"
 
     @property
     def host(self) -> str:
-        """Endpoint hostname for traces/echo lines (default Anthropic when no
-        base_url override is set)."""
-        return urlparse(self.base_url).netloc if self.base_url else "api.anthropic.com"
+        """Endpoint hostname for traces/echo lines."""
+        if self.base_url:
+            return urlparse(self.base_url).netloc
+        return ("api.openai.com" if self.provider == "openai"
+                else "api.anthropic.com")
 
 
 class Settings(BaseSettings):
@@ -46,16 +71,23 @@ class Settings(BaseSettings):
     grouped by concern (LLM, repos, engine, push safety, metrics, escalation).
     Values are the defaults; secrets stay empty here and arrive from `.env`."""
 
-    # the repo's own .env loads regardless of cwd; a cwd-local .env overrides it
+    # The source checkout, stable per-user config, and cwd-local override are
+    # loaded in that order. Installed wheels have no writable repo-local .env,
+    # so the user config is the durable Strict setup location.
     model_config = SettingsConfigDict(
-        env_file=(str(_REPO_ROOT / ".env"), ".env"),
+        env_file=(str(_REPO_ROOT / ".env"), str(_USER_CONFIG), ".env"),
         env_file_encoding="utf-8", extra="ignore",
     )
 
-    # LLM (Anthropic-SDK-compatible endpoint; DeepSeek's /anthropic works)
+    # Shared LLM backend. `auto` selects the only configured key; when both are
+    # present it keeps the historical Anthropic default unless explicitly set.
+    llm_provider: Literal["auto", "anthropic", "openai"] = "auto"
     anthropic_api_key: str = ""
     anthropic_base_url: str = ""
+    openai_api_key: str = ""
+    openai_base_url: str = ""
     agent_model: str = "claude-sonnet-5"
+    openai_model: str = "gpt-5.6"
     reviewer_model: str = ""  # empty -> agent_model
     intent_model: str = ""  # empty -> agent_model
     # Dual-path (双路径) model tiers for agent reasoning. The tier is chosen from
@@ -65,7 +97,7 @@ class Settings(BaseSettings):
     # `performance_model` is configured, and never changes existing behavior).
     eco_model: str = ""          # empty -> agent_model (the cost-effective default)
     performance_model: str = ""  # empty -> performance mode FAILS UPFRONT (tier_target)
-    # Per-tier backends (plan v2): each tier may override the shared ANTHROPIC_*
+    # Per-tier backends (plan v2): each tier may override the selected shared
     # backend. Atomic rule (validated below): a tier is fully unset (inherit
     # everything), model-only (different model on the shared backend), or
     # model+base_url+api_key all three (an independent backend). Partial
@@ -109,15 +141,15 @@ class Settings(BaseSettings):
     # slice (manifest `knowledge.repo_subdir`); general/ is shared across all
     # repos. knowledge_general_docs is the always-on general slice; every deeper
     # doc is reachable on demand via doc_search/doc_read.
-    knowledge_dir: Path = _REPO_ROOT / "knowledge"
+    knowledge_dir: Path = _resource_dir("knowledge")
     knowledge_general_docs: list[str] = ["general/_index.md"]
 
     # Engine
     run_root: Path = Path.home() / ".infermatrix-copilot" / "runs"
     max_step_retries: int = 1
     max_agent_iters: int = 40
-    playbooks_dir: Path = _REPO_ROOT / "playbooks"
-    adapters_dir: Path = _REPO_ROOT / "adapters"
+    playbooks_dir: Path = _resource_dir("playbooks")
+    adapters_dir: Path = _resource_dir("adapters")
 
     # Push safety — dry-run by default; protected branches never force-pushed.
     allow_push: bool = False
@@ -143,7 +175,7 @@ class Settings(BaseSettings):
 
     # Agent-step runtime (engine/agent_runtime/)
     review_max_iters: int = 12          # tool-loop budget for agent steps
-    skills_dir: Path = _REPO_ROOT / "skills"
+    skills_dir: Path = _resource_dir("skills")
     memory_db: Path = Path.home() / ".infermatrix-copilot" / "debug_memory.db"
     evidence_item_chars: int = 24000  # was 6000: starving lenses pushed them
                                       # to re-read full files as per-lens tool
@@ -247,7 +279,7 @@ class Settings(BaseSettings):
                     f"partial {tier} backend: {tier.upper()}_BASE_URL, "
                     f"{tier.upper()}_API_KEY and {tier.upper()}_MODEL must be "
                     "set together (or the URL/key both left unset to inherit "
-                    "the shared ANTHROPIC_* backend)")
+                    "the selected shared backend)")
         return self
 
     @field_validator("llm_mixture", mode="before")
@@ -302,12 +334,38 @@ class Settings(BaseSettings):
     @property
     def reviewer(self) -> str:
         """The reviewer model, falling back to `agent_model` when unset."""
-        return self.reviewer_model or self.agent_model
+        return self.reviewer_model or self.shared_model
 
     @property
     def intent(self) -> str:
         """The intent-classification model, falling back to `agent_model`."""
-        return self.intent_model or self.agent_model
+        return self.intent_model or self.shared_model
+
+    @property
+    def resolved_llm_provider(self) -> Literal["anthropic", "openai"]:
+        """Resolve `auto` without making users configure a redundant switch."""
+        if self.llm_provider != "auto":
+            return self.llm_provider
+        if self.anthropic_api_key:
+            return "anthropic"
+        if self.openai_api_key:
+            return "openai"
+        return "anthropic"
+
+    @property
+    def shared_api_key(self) -> str:
+        return (self.openai_api_key if self.resolved_llm_provider == "openai"
+                else self.anthropic_api_key)
+
+    @property
+    def shared_base_url(self) -> str:
+        return (self.openai_base_url if self.resolved_llm_provider == "openai"
+                else self.anthropic_base_url)
+
+    @property
+    def shared_model(self) -> str:
+        return (self.openai_model if self.resolved_llm_provider == "openai"
+                else self.agent_model)
 
     def tier_target(self, mode: str, role: str = "agent") -> ResolvedTarget:
         """Central tier→backend resolution (双路径, plan v2): the ONLY place a
@@ -327,16 +385,20 @@ class Settings(BaseSettings):
                 return ResolvedTarget(role, self.performance_model,
                                       self.performance_base_url,
                                       self.performance_api_key,
-                                      "tier:performance")
+                                      "tier:performance",
+                                      self.resolved_llm_provider)
             return ResolvedTarget(role, self.performance_model,
-                                  self.anthropic_base_url,
-                                  self.anthropic_api_key, "global")
-        model = self.eco_model or self.agent_model
+                                  self.shared_base_url,
+                                  self.shared_api_key, "global",
+                                  self.resolved_llm_provider)
+        model = self.eco_model or self.shared_model
         if self.eco_base_url:
             return ResolvedTarget(role, model, self.eco_base_url,
-                                  self.eco_api_key, "tier:eco")
-        return ResolvedTarget(role, model, self.anthropic_base_url,
-                              self.anthropic_api_key, "global")
+                                  self.eco_api_key, "tier:eco",
+                                  self.resolved_llm_provider)
+        return ResolvedTarget(role, model, self.shared_base_url,
+                              self.shared_api_key, "global",
+                              self.resolved_llm_provider)
 
     def model_for(self, mode: str) -> str:
         """The agent-reasoning model name for an execution tier — delegates to

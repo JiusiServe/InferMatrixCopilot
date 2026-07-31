@@ -274,7 +274,8 @@ def parse_intent(text: str, *, llm: LLM | None = None,
     if llm is None or not llm.available:
         return IntentResult(clarify=(
             "Intent parsing needs an LLM, but none is configured — set "
-            "ANTHROPIC_API_KEY (or use the flag CLI / --playbook)."))
+            "ANTHROPIC_API_KEY or OPENAI_API_KEY "
+            "(or use the flag CLI / --playbook)."))
     result = _parse_llm(text, llm, default_repo, model)
     if result.spec is not None:
         err = validate_spec(result.spec)

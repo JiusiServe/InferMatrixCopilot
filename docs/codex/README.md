@@ -103,18 +103,28 @@ The tool response is intentionally small:
 }
 ```
 
-For server-enforced sequencing, say:
+Strict uses the same installed MCP. The wheel already includes its playbooks,
+adapters, and skills. Configure the local checkout during installation:
 
 ```text
-Use InferMatrixCopilot strict workflow mode to review
+install.cmd --repo-path D:\path\to\vllm-omni
+```
+
+Then set either `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` in
+`~/.infermatrix-copilot/.env`. Each provider also has an optional
+`ANTHROPIC_BASE_URL` or `OPENAI_BASE_URL` for a proxy or compatible gateway.
+With one key configured the provider is selected automatically; with both,
+set `LLM_PROVIDER=anthropic` or `LLM_PROVIDER=openai`. Restart Codex, and say:
+
+```text
+Use InferMatrixCopilot in Strict mode to review
 https://github.com/vllm-project/vllm-omni/pull/5172.
 Do not return a review until the strict run is complete.
 ```
 
-Strict is the new public name for the previous Eco mode. It runs the same
-configured model, `pr-review` playbook, progress tracking, report generation,
-and publishing gates as Eco. Poll `get_review_result` until the run is
-terminal.
+Strict runs the packaged `pr-review` playbook with its configured model,
+progress tracking, report generation, and publishing gates. Poll
+`get_review_result` until the run is terminal.
 
 Strict never posts implicitly. Posting still requires both an explicit
 `post=true` tool argument and server-side `ALLOW_POST=1`.
@@ -125,14 +135,16 @@ confirm that `infermatrix-copilot` is connected.
 ## What the default MCP exposes
 
 - `review(target, repo?, mode="direct", post=false, title="", body="",
-  changed_files=[])`: after the host progress update, Direct uses title/body to
+  changed_files=[], review_depth="", repo_path="")`: after the host progress
+  update, Direct uses title/body to
   return at most three exact owner/model routes with compact embedded
   `quick_map` excerpts. Changed files only validate scope. The host does not
   open full rule files unless a concrete ambiguity blocks source review and
   treats the returned docs/code `execution_budget` as a hard ceiling. A single
   bounded extension is reserved for one stated unresolved P1/high-risk
   contract.
-  Strict maps to the previous Eco workflow.
+  Strict starts the packaged workflow and accepts `review_depth` plus an
+  optional local checkout override through `repo_path`.
 - `validate_direct_review(subtraction_signal, subtraction?, minimality_proof?,
   final_comment_count=1)`: `none` completes an ordinary small fix without a
   minimality proof. `triggered` requires anchored subtraction actions or
@@ -141,7 +153,7 @@ confirm that `infermatrix-copilot` is connected.
   returns `knowledge/CONTRIBUTING.md`; the host model follows that document and
   edits the Markdown files itself.
 - `get_review_result(run_id, offset?)`: polls and pages the Strict report.
-- `get_review_status(run_id)`: returns the old workflow's durable progress.
+- `get_review_status(run_id)`: returns the Strict run's durable progress.
 - `doc_search(query, repo?)`: finds deeper model/component rules.
 - `doc_read(path, repo?)`: reads a selected knowledge page.
 

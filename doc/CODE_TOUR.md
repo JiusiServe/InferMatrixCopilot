@@ -142,7 +142,7 @@ re-export,公开导入面不变)。
   `ToolScope`/`PathScope` 并记 trace,三种结果:允许 / 拒绝 / 越界但记录。
   `read_file` 是**窗口化**的(48k + `offset` 分页):整文件读会吹爆会话历史、
   倍增未缓存 token、把对话推出可靠缓存长度。
-- **`llm.py`**(142)——Anthropic SDK 薄封装(兼容 DeepSeek `/anthropic`):把
+- **`llm.py`**——Anthropic/OpenAI 双后端薄封装（均支持自定义 Base URL）：把
   回复归一化成 `Reply`/`Block`,捕获 `cache_read_input_tokens` 供计费/缓存
   分析。**`tracing.py`**(340)——可移植 OTel 形状 span 记录器(零外部依赖):
   `create()` 包在 `span("llm")` 里记 TTFT/token/并发,span 关闭即写一行 jsonl,

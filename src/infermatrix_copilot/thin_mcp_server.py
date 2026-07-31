@@ -1,4 +1,4 @@
-"""Default MCP: Direct knowledge access plus Strict Eco-workflow compatibility."""
+"""Default MCP: Direct knowledge access plus the Strict review workflow."""
 
 from __future__ import annotations
 
@@ -527,7 +527,7 @@ def _strict_review_request(
     review_depth: str,
     settings: Settings,
 ) -> dict:
-    """Translate the Strict public surface to the previous Eco TaskSpec shape."""
+    """Translate the Strict public surface to the internal review TaskSpec."""
     target = str(target).strip()
     if not target:
         raise ValueError("target must not be empty")
@@ -591,8 +591,8 @@ def build_mcp(
             "does not add or expand a helper, class, fallback, compatibility "
             "branch, or public behavior. Only subtraction_signal=triggered "
             "requires subtraction evidence. "
-            "Strict is the previous Eco workflow under a new public name: it "
-            "runs the configured workflow model, returns a run_id, and must be "
+            "Strict runs the packaged background review workflow with the "
+            "configured model, returns a run_id, and must be "
             "polled with get_review_result until terminal. Posting is never "
             "implicit; pass post=true only when the user explicitly asks."
         ),
@@ -608,14 +608,16 @@ def build_mcp(
         title: str = "",
         body: str = "",
         changed_files: Optional[list[str]] = None,
+        repo_path: str = "",
     ) -> dict:
         """Begin a Direct or Strict review.
 
         For Direct, first collect the frozen PR title, body, and changed files,
         publish the host progress update, then pass that context here. Direct
         returns at most three exact owner/model routes; changed files only
-        validate scope. Strict runs the previous Eco PR-review workflow.
-        ``post`` still requires explicit intent and server-side ``ALLOW_POST=1``.
+        validate scope. Strict runs the packaged PR-review workflow and accepts
+        an optional local checkout through ``repo_path``. ``post`` still
+        requires explicit intent and server-side ``ALLOW_POST=1``.
         """
         def run() -> dict:
             if not str(target).strip():
@@ -680,6 +682,12 @@ def build_mcp(
             request = _strict_review_request(
                 target, repo, post=post, review_depth=review_depth,
                 settings=core.settings)
+            core.configure_strict_repo(request["repo"], repo_path)
+            missing = core.strict_readiness(request["repo"])
+            if missing:
+                raise ValueError(
+                    "Strict mode is not ready: " + "; ".join(missing)
+                )
             return {
                 "run_id": core.start_strict_review(request),
                 "mode": "strict",
@@ -721,7 +729,7 @@ def build_mcp(
 
     @mcp.tool()
     def get_review_status(run_id: str) -> dict:
-        """Return the old workflow's durable status and step progress."""
+        """Return a Strict run's durable status and step progress."""
         return _guard(lambda: {
             "mode": "strict",
             **core.get_status(run_id),
