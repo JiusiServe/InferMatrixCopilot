@@ -3,13 +3,18 @@
 The default MCP is a knowledge provider. Codex uses its currently selected
 model to review code, so there is no API key or model configuration.
 
-## Windows
+## Install
 
-```powershell
+Windows, macOS, and Linux use the same installer:
+
+```text
 git clone https://github.com/JiusiServe/InferMatrixCopilot.git
 cd InferMatrixCopilot
-.\install-codex.ps1
+python install-mcp.py codex
 ```
+
+Use `python3` on macOS/Linux if `python` is unavailable. On Windows,
+`py -3.11` also works.
 
 Restart Codex, then paste:
 
@@ -51,16 +56,6 @@ terminal.
 
 Strict never posts implicitly. Posting still requires both an explicit
 `post=true` tool argument and server-side `ALLOW_POST=1`.
-
-## macOS/Linux
-
-```bash
-git clone https://github.com/JiusiServe/InferMatrixCopilot.git
-cd InferMatrixCopilot
-python3.11 -m venv .venv
-./.venv/bin/python -m pip install -e '.[mcp]'
-codex mcp add infermatrix_copilot -- "$PWD/.venv/bin/infermatrix-copilot-mcp"
-```
 
 Restart Codex after installation. Use `/mcp` or `codex mcp list` if you want to
 confirm that `infermatrix_copilot` is connected.

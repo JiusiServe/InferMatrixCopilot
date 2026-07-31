@@ -21,9 +21,9 @@ git clone https://github.com/JiusiServe/InferMatrixCopilot.git
 cd InferMatrixCopilot
 
 # 只运行与你的 Agent 对应的一条
-.\install-codex.ps1
-.\install-claude.cmd
-.\install-cursor.ps1
+python install-mcp.py codex
+python install-mcp.py claude
+python install-mcp.py cursor
 ```
 
 脚本会安装 MCP 和 `/imreview` 命令。重启 Agent 后，把 PR 地址交给它：
@@ -34,8 +34,10 @@ cd InferMatrixCopilot
 
 不带地址时，`/imreview` 会审查当前 PR 或本地工作区。
 
-Claude Code 的 `.cmd` 入口在 PowerShell 和 `cmd.exe` 中都能运行。不要在
-`cmd.exe` 中直接运行 `.ps1`；Windows 可能只会用编辑器打开文件，并不会执行安装。
+同一个 `install-mcp.py` 支持 Windows、macOS 和 Linux，也支持 Codex、
+Claude Code 和 Cursor。macOS/Linux 如果没有 `python` 命令，使用 `python3`；
+Windows 也可以使用 `py -3.11`。旧的 `.ps1` 入口继续保留，但不要在
+`cmd.exe` 中直接运行 `.ps1`。
 
 macOS、Linux、手工配置和其他 MCP Agent 的接入方法见
 [`doc/MCP.md`](doc/MCP.md)。

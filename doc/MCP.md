@@ -5,10 +5,10 @@ InferMatrixCopilot 是本地 stdio MCP 服务。Agent 仍使用自己当前的�
 
 ## 推荐：一键安装
 
-```powershell
-.\install-codex.ps1
-.\install-claude.cmd
-.\install-cursor.ps1
+```text
+python install-mcp.py codex
+python install-mcp.py claude
+python install-mcp.py cursor
 ```
 
 每次只运行与你的 Agent 对应的一条。脚本会同时安装 MCP 和 `imreview`：
@@ -17,8 +17,9 @@ InferMatrixCopilot 是本地 stdio MCP 服务。Agent 仍使用自己当前的�
 /imreview <PR URL>
 ```
 
-Claude Code 的 `.cmd` 入口在 PowerShell 和 `cmd.exe` 中都能运行。不要在
-`cmd.exe` 中直接运行 `.ps1`；Windows 可能只会用编辑器打开文件，并不会执行安装。
+同一个 `install-mcp.py` 支持 Windows、macOS 和 Linux。macOS/Linux 如果没有
+`python` 命令，使用 `python3`；Windows 也可以使用 `py -3.11`。旧的 `.ps1`
+入口继续保留，但不要在 `cmd.exe` 中直接运行 `.ps1`。
 
 ## 手工配置
 
@@ -44,20 +45,20 @@ python3 -m venv .venv
 
 ## Codex
 
-Windows 直接运行：
+所有平台：
 
-```powershell
-.\install-codex.ps1
+```text
+python install-mcp.py codex
 ```
 
-其他平台和手工配置见 [`docs/codex/README.md`](../docs/codex/README.md)。
+手工配置见 [`docs/codex/README.md`](../docs/codex/README.md)。
 
 ## Claude Code
 
 在仓库根目录运行：
 
-```powershell
-.\install-claude.cmd
+```text
+python install-mcp.py claude
 ```
 
 下面是等价的手工配置。
@@ -84,7 +85,13 @@ claude mcp list
 
 ## Cursor
 
-把 [`docs/cursor/mcp.json`](../docs/cursor/mcp.json) 复制到项目的
+所有平台：
+
+```text
+python install-mcp.py cursor
+```
+
+手工配置时，把 [`docs/cursor/mcp.json`](../docs/cursor/mcp.json) 复制到项目的
 `.cursor/mcp.json` 或用户目录的 `~/.cursor/mcp.json`，然后把示例中的
 `D:\\path\\to\\InferMatrixCopilot` 替换为真实绝对路径。
 
