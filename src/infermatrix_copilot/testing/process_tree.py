@@ -68,17 +68,25 @@ def _alive(pid: int) -> bool:
         return True
 
 
-def _start_time(pid: int) -> int | None:
-    """Kernel start time (jiffies) from /proc/<pid>/stat — a (pid, starttime)
-    pair identifies a process across PID reuse. None when unreadable (process
-    gone, or no procfs)."""
+def _proc_stat_ids(pid: int) -> tuple[int, int] | None:
+    """(ppid, starttime) from ONE /proc/<pid>/stat read — a (pid, starttime)
+    pair identifies a process across PID reuse, and reading the ppid in the
+    same read lets callers verify ancestry atomically with the identity
+    capture. None when unreadable (process gone, or no procfs)."""
     try:
         stat = open(f"/proc/{pid}/stat", "rb").read().decode(errors="replace")
         # comm (field 2) may contain spaces/parens; split after the LAST ")".
-        # Fields after it start at field 3; starttime is field 22 → index 19.
-        return int(stat.rsplit(")", 1)[1].split()[19])
+        # Fields after it start at field 3; ppid is field 4 → index 1,
+        # starttime is field 22 → index 19.
+        after = stat.rsplit(")", 1)[1].split()
+        return int(after[1]), int(after[19])
     except (OSError, ValueError, IndexError):
         return None
+
+
+def _start_time(pid: int) -> int | None:
+    ids = _proc_stat_ids(pid)
+    return None if ids is None else ids[1]
 
 
 def kill_tree(pids: list[int], *, term_grace: float = 2.0,

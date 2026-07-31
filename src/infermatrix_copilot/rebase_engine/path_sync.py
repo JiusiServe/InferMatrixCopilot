@@ -54,22 +54,31 @@ class CuratedEntry:
 def sync_path_map(root: Path, current: Mapping[str, Sequence[str]],
                   curated: Mapping[str, CuratedEntry] | None = None) -> PathMap:
     """Filter every module's list to paths that still exist (first current
-    entry as fallback), then overlay the curated candidate lists (their own
-    fallback). Key set is preserved exactly — curated keys unknown to
-    `current` are rejected loudly rather than silently added."""
+    entry as fallback), then MERGE the curated candidate lists in (their own
+    fallback when nothing at all survives). Curated entries add coverage —
+    they never replace the surviving coarse prefixes, which review scoping
+    and module rebases rely on (the parent replaced outright, but its config
+    held only file lists; our manifest is a union by design). Key set is
+    preserved exactly — curated keys unknown to `current` are rejected loudly
+    rather than silently added."""
     curated = curated or {}
     unknown = sorted(set(curated) - set(current))
     if unknown:
         raise PathSyncError(f"curated overlay names unknown module(s): {unknown}")
     out: PathMap = {}
+    surviving: dict[str, list[str]] = {}
     for key, value in current.items():
         candidates = list(value)
         fallback = candidates[0] if candidates else ""
-        kept = keep_existing(root, candidates)
-        out[key] = ensure_non_empty(kept, fallback) if fallback else kept
+        surviving[key] = keep_existing(root, candidates)
+        out[key] = (ensure_non_empty(surviving[key], fallback)
+                    if fallback else surviving[key])
     for key, entry in curated.items():
         kept = keep_existing(root, list(entry.candidates))
-        out[key] = ensure_non_empty(kept, entry.fallback)
+        # merge real survivors only — a fallback placeholder for a vanished
+        # current path must not ride along once curated coverage exists
+        merged = list(dict.fromkeys([*surviving[key], *kept]))
+        out[key] = ensure_non_empty(merged, entry.fallback)
     return out
 
 
@@ -88,9 +97,14 @@ def apply_decision(root: Path, current: Mapping[str, Sequence[str]],
     """Validated application of an agent's final mapping for ONE block:
     - a key the agent omitted keeps its existing value (a newly-added module
       the prompt doesn't know about must not break the run);
+    - a key the agent invented is an error (parent parity: a typo'd module
+      name must not make the run "succeed" without the requested change);
     - an empty value is an error;
     - every path must exist under `root` (fail-closed: an agent typo must not
       silently unmap a module)."""
+    unknown = sorted(set(decision_block) - set(current))
+    if unknown:
+        raise PathSyncError(f"unknown module key(s) in decision: {unknown}")
     out: PathMap = {}
     for key, existing in current.items():
         value = decision_block.get(key)

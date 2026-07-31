@@ -201,7 +201,8 @@ def _fake_exec(script: dict):
 
 
 def test_install_skips_when_healthy(tmp_path, monkeypatch):
-    monkeypatch.setattr(wheel, "kill_by_pattern", lambda p, **k: [])
+    monkeypatch.setattr(wheel, "release_editable_install_locks",
+                        lambda repo, **k: [])
     commit = "a" * 40
     run, calls = _fake_exec({
         ("python3", "-c"): (0, f"1.0+g{commit[:9]}\n", ""),
@@ -217,7 +218,8 @@ def test_install_skips_when_healthy(tmp_path, monkeypatch):
 def test_install_retries_only_import_failures(tmp_path, monkeypatch):
     """Install failure aborts immediately; import-check failure retries with a
     stale-artifact clean between attempts."""
-    monkeypatch.setattr(wheel, "kill_by_pattern", lambda p, **k: [])
+    monkeypatch.setattr(wheel, "release_editable_install_locks",
+                        lambda repo, **k: [])
     import dataclasses
     spec = dataclasses.replace(SPEC, stale_artifact_globs=("_C*.so",))
     commit = "b" * 40
@@ -256,7 +258,8 @@ def test_install_retries_only_import_failures(tmp_path, monkeypatch):
 
 def test_install_exhausted_retries_mentions_broken_extension(tmp_path,
                                                              monkeypatch):
-    monkeypatch.setattr(wheel, "kill_by_pattern", lambda p, **k: [])
+    monkeypatch.setattr(wheel, "release_editable_install_locks",
+                        lambda repo, **k: [])
 
     def run(cmd, **kw):
         if cmd[0] == "python3" and "import importlib" in cmd[2]:
@@ -396,6 +399,51 @@ def test_apply_dirty_worktree_decision(tmp_path):
             author_name="x", author_email="y@z")
 
 
+def test_decision_paths_are_literal_never_globs(tmp_path):
+    """A decision naming `*.py` must touch only a file literally named
+    `*.py` — pathspec expansion would discard/commit far more than the
+    agent said."""
+    up = _make_repo(tmp_path / "up")
+    tg = _make_repo(tmp_path / "tg")
+    _commit(up, {"a.py": "1"}, "init")
+    _commit(tg, {"victim.py": "1"}, "init")
+    (tg / "victim.py").write_text("dirty")       # must survive
+    (tg / "*.py").write_text("glob-named junk")  # untracked, literal name
+    (up / "keep me.py").write_text("new")
+    (up / "x.py").write_text("must not be committed")
+    decision = {
+        "vllm": {"discard": [],
+                 "commit": {"message": "one literal file",
+                            "paths": ["keep me.py"]}},
+        "omni": {"discard": ["*.py"], "commit": None},
+    }
+    worktree.apply_dirty_worktree_decision(
+        decision, {"vllm": up, "omni": tg},
+        author_name="Bot", author_email="b@e.c")
+    assert not (tg / "*.py").exists()                     # the literal file
+    assert (tg / "victim.py").read_text() == "dirty"      # glob did NOT expand
+    committed = [ln for ln in _git(up, "show", "--name-only", "--format=",
+                                   "HEAD").splitlines() if ln.strip()]
+    assert committed == ["keep me.py"]                    # x.py not swept in
+    assert (up / "x.py").exists()
+
+
+def test_release_editable_install_locks_scoped_to_repo(tmp_path):
+    """Only stale installs whose cwd is inside THIS repo are killed — an
+    active install in an unrelated checkout must be untouched."""
+    repo = tmp_path / "repo"
+    (repo / "sub").mkdir(parents=True)
+    other = tmp_path / "other"
+    other.mkdir()
+    cwds = {101: repo / "sub", 102: other, 103: None}
+    killed = []
+    got = wheel.release_editable_install_locks(
+        repo, pgrep=lambda args: [101, 102, 103],
+        proc_cwd=lambda pid: cwds[pid],
+        kill=lambda pids: killed.extend(pids) or [])
+    assert got == [101] and killed == [101]
+
+
 def test_load_decision_json_tolerates_chatter(tmp_path):
     p = tmp_path / "d.json"
     p.write_text('I decided the following:\n{"vllm": {"discard": []}}\n')
@@ -482,7 +530,7 @@ def test_assignment_report_structure(upstream_pair):
 
 # -- path_sync -----------------------------------------------------------------
 
-def test_sync_path_map_filters_and_overlays(tmp_path):
+def test_sync_path_map_filters_and_merges_overlays(tmp_path):
     for rel in ("a/keep.py", "b/curated.py"):
         p = tmp_path / rel
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -491,11 +539,40 @@ def test_sync_path_map_filters_and_overlays(tmp_path):
     curated = {"m1": CuratedEntry(candidates=("b/curated.py", "b/gone.py"),
                                   fallback="b/curated.py")}
     out = path_sync.sync_path_map(tmp_path, current, curated)
-    assert out["m1"] == ["b/curated.py"]              # curated overlay wins
+    # curated coverage MERGES with surviving current entries — it never
+    # replaces them (coarse scoping prefixes must survive a sync)
+    assert out["m1"] == ["a/keep.py", "b/curated.py"]
     assert out["m2"] == ["missing/everything.py"]     # fallback = first entry
     with pytest.raises(PathSyncError, match="unknown module"):
         path_sync.sync_path_map(tmp_path, current,
                                 {"nope": CuratedEntry(("x",), "x")})
+
+
+def test_sync_with_real_manifest_overlays_preserves_coarse_prefixes(tmp_path):
+    """Apply the ACTUAL configured curated overlays from the adapter manifest
+    against a fixture tree: the coarse prefixes (vllm_omni/outputs/,
+    vllm_omni/entrypoints/) must survive the first sync — losing them would
+    silently narrow review/rebase scope."""
+    import yaml as _yaml
+    manifest = _yaml.safe_load(
+        (REPO_ROOT / "adapters/vllm_omni/manifest.yaml").read_text())
+    curated_cfg = manifest["rebase"]["path_sync"]["curated"]["local_paths"]
+    curated = {k: CuratedEntry.from_data(v) for k, v in curated_cfg.items()}
+    current = {m: list(spec["local_paths"])
+               for m, spec in manifest["modules"].items()}
+    # fixture tree: every current dir prefix + a subset of curated candidates
+    for rel in ("vllm_omni/inputs/data.py", "vllm_omni/outputs/x.py",
+                "vllm_omni/entrypoints/omni.py",
+                "vllm_omni/entrypoints/openai/api_server.py",
+                "vllm_omni/engine/async_omni_engine.py", "vllm_omni/request.py"):
+        p = tmp_path / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("x")
+    out = path_sync.sync_path_map(tmp_path, current, curated)
+    assert "vllm_omni/outputs/" in out["input_output"]
+    assert "vllm_omni/inputs/" in out["input_output"]
+    assert "vllm_omni/entrypoints/" in out["online_serving"]
+    assert "vllm_omni/entrypoints/openai/api_server.py" in out["online_serving"]
 
 
 def test_apply_decision_validation(tmp_path):
@@ -508,6 +585,9 @@ def test_apply_decision_validation(tmp_path):
         path_sync.apply_decision(tmp_path, current, {"m1": ["nope.py"]})
     with pytest.raises(PathSyncError, match="missing or empty"):
         path_sync.apply_decision(tmp_path, current, {"m1": []})
+    # a typo'd module key must fail loudly, not silently apply nothing
+    with pytest.raises(PathSyncError, match="unknown module key"):
+        path_sync.apply_decision(tmp_path, current, {"m1_typo": "ok.py"})
 
 
 def test_rewrite_manifest_modules_surgical(tmp_path):

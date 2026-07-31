@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Mapping
 
-from ..testing.process_tree import kill_by_pattern
+from ..testing.process_tree import _pgrep, kill_tree
 
 
 def _log(msg: str) -> None:
@@ -300,6 +300,40 @@ def _append(path: Path, text: str) -> None:
         f.write(text)
 
 
+def _proc_cwd(pid: int) -> Path | None:
+    try:
+        return Path(os.readlink(f"/proc/{pid}/cwd"))
+    except OSError:
+        return None
+
+
+def release_editable_install_locks(
+        repo: Path, *,
+        pattern: str = r"[u]v pip install",
+        pgrep: Callable[[list[str]], list[int]] = _pgrep,
+        proc_cwd: Callable[[int], Path | None] = _proc_cwd,
+        kill: Callable[[list[int]], list[int]] = kill_tree) -> list[int]:
+    """Terminate a stale editable install still holding THIS repo's project
+    lock (its parent died; the lock never releases). Scoped strictly to
+    processes whose cwd is inside `repo` — the parent's single-tenant
+    pkill-by-pattern would take down active installs in unrelated checkouts,
+    which a multi-repo copilot host cannot afford. Returns the pids killed."""
+    repo = Path(repo).resolve()
+    matches = []
+    for pid in pgrep(["-f", pattern]):
+        cwd = proc_cwd(pid)
+        if cwd is None:
+            continue
+        try:
+            cwd.resolve().relative_to(repo)
+        except ValueError:
+            continue
+        matches.append(pid)
+    if matches:
+        kill(matches)
+    return matches
+
+
 def _clean_stale_artifacts(repo: Path, spec: WheelSpec,
                            log: Callable[[str], None]) -> None:
     """Remove stale compiled extensions so a clean reinstall can place a single
@@ -383,8 +417,8 @@ def ensure_wheel_installed(repo: Path, commit: str, spec: WheelSpec, *,
         install_log.write_text("", encoding="utf-8")
 
         # A concurrent editable install holds the project lock forever if its
-        # parent died; release it before uninstalling (parent parity).
-        kill_by_pattern(r"[u]v pip install")
+        # parent died; release it before uninstalling — scoped to THIS repo
+        release_editable_install_locks(repo)
 
         rc, out, err = run([uv, "pip", "uninstall", spec.package], cwd=repo)
         _append(install_log, f"--- uv pip uninstall {spec.package} ---\n{out}{err}")

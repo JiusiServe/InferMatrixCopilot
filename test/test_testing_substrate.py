@@ -403,18 +403,33 @@ def test_kill_tree_reused_root_children_never_walked():
     assert (11, signal.SIGTERM) in events
 
 
-def test_snapshot_record_walk_skips_unverifiable_pids():
-    """The accumulate-only snapshot must never retain a pid without a
-    verifiable birth time — an unrelated later holder of that pid would pass
-    the kill-time identity check unchallenged."""
+def test_snapshot_record_walk_binds_identity_to_ancestry():
+    """The accumulate-only snapshot must never retain a pid it cannot verify:
+    no birth time (died mid-walk), or a ppid outside the walked tree (pid
+    reused by a stranger between pgrep and the /proc read — the laundering
+    race). Overwriting an existing record requires re-established ancestry."""
     from infermatrix_copilot.testing.runner import _record_walk
+    ROOT, PARENT = 1, 99
     idmap: dict[int, int] = {}
-    _record_walk(idmap, [1, 2, 3],
-                 start_time=lambda p: {1: 100, 2: None, 3: 300}[p])
+    stats = {1: (PARENT, 100),   # leader, parented by the runner
+             2: None,            # died mid-walk
+             3: (1, 300),        # genuine child of the leader
+             4: (777, 400)}      # pid reused: parent outside the tree
+    _record_walk(idmap, [1, 2, 3, 4], root=ROOT, root_parent=PARENT,
+                 stat_ids=lambda p: stats[p])
     assert idmap == {1: 100, 3: 300}
-    # a later walk with a newer birth for a collided pid wins
-    _record_walk(idmap, [1], start_time=lambda p: 150)
-    assert idmap[1] == 150
+    # overwrite is allowed only with ancestry re-established...
+    _record_walk(idmap, [1, 3], root=ROOT, root_parent=PARENT,
+                 stat_ids=lambda p: {1: (PARENT, 100), 3: (1, 350)}[p])
+    assert idmap[3] == 350
+    # ...and refused when the new holder's parent is a stranger (old kept)
+    _record_walk(idmap, [1, 3], root=ROOT, root_parent=PARENT,
+                 stat_ids=lambda p: {1: (PARENT, 100), 3: (777, 999)}[p])
+    assert idmap[3] == 350
+    # a reused LEADER pid is refused too
+    _record_walk(idmap, [1], root=ROOT, root_parent=PARENT,
+                 stat_ids=lambda p: (777, 111))
+    assert idmap[1] == 100
 
 @pytest.fixture()
 def runner(tmp_path, patterns) -> TestRunner:

@@ -89,7 +89,9 @@ def discard_untracked_matching(repo: Path, patterns: Iterable[str], *,
         rel = rel.strip()
         if rel and any(c.search(rel) for c in compiled):
             log(f"Quick-discard untracked artifact: {rel}")
-            _git(repo, "clean", "-fd", "--", rel, check=False)
+            # ls-files output is literal file names — glob chars in a name
+            # must not expand into neighbours
+            _git(repo, "clean", "-fd", "--", f":(literal){rel}", check=False)
             removed.append(rel)
     return removed
 
@@ -101,6 +103,13 @@ _UNMERGED_PORCELAIN_CODES = {"DD", "AU", "UD", "UA", "DU", "AA", "UU"}
 
 class DecisionError(RuntimeError):
     """The decision JSON is malformed or names an illegal path."""
+
+
+def _lit(rel: str) -> str:
+    """Literal-pathspec form: agent-named paths are file names, never globs —
+    without this, a decision naming `*.py` would expand and discard/commit far
+    more than the agent said."""
+    return f":(literal){rel}"
 
 
 def _safe_rel(repo: Path, path: str) -> None:
@@ -117,7 +126,7 @@ def _safe_rel(repo: Path, path: str) -> None:
 
 
 def _porcelain_for(repo: Path, rel: str) -> str:
-    r = _git(repo, "status", "--porcelain", "--", rel, check=False)
+    r = _git(repo, "status", "--porcelain", "--", _lit(rel), check=False)
     return (r.stdout or "").strip()
 
 
@@ -131,10 +140,10 @@ def _discard_unmerged(repo: Path, rel: str) -> None:
     keep the file if HEAD has it, otherwise remove it. Safe because the
     decision said "discard": none of the in-flight side's changes are wanted."""
     if _head_has_path(repo, rel):
-        _git(repo, "checkout", "HEAD", "--", rel)
-        _git(repo, "add", "--", rel)
+        _git(repo, "checkout", "HEAD", "--", _lit(rel))
+        _git(repo, "add", "--", _lit(rel))
     else:
-        _git(repo, "rm", "-f", "--", rel)
+        _git(repo, "rm", "-f", "--", _lit(rel))
 
 
 def _apply_discard(repo: Path, rel: str) -> None:
@@ -143,12 +152,12 @@ def _apply_discard(repo: Path, rel: str) -> None:
     if not line:
         return
     if line.startswith("??"):
-        _git(repo, "clean", "-fd", "--", rel)
+        _git(repo, "clean", "-fd", "--", _lit(rel))
         return
     if line[:2] in _UNMERGED_PORCELAIN_CODES:
         _discard_unmerged(repo, rel)
         return
-    _git(repo, "restore", "--staged", "--worktree", "--", rel)
+    _git(repo, "restore", "--staged", "--worktree", "--", _lit(rel))
 
 
 def _apply_commit(repo: Path, message: str, paths: list[str],
@@ -162,7 +171,7 @@ def _apply_commit(repo: Path, message: str, paths: list[str],
         "GIT_COMMITTER_NAME": author_name,
         "GIT_COMMITTER_EMAIL": author_email,
     })
-    _git(repo, "add", "--", *paths, env=env)
+    _git(repo, "add", "--", *(_lit(p) for p in paths), env=env)
     _git(repo, "commit", "--signoff", "-m", message, env=env)
 
 

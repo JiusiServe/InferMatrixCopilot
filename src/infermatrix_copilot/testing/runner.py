@@ -184,19 +184,34 @@ def strip_cov_flags(command: str) -> str:
     return command
 
 
-def _record_walk(idmap: dict[int, int], pids: "list[int]",
-                 start_time: "Callable[[int], int | None]" = None) -> None:
+def _record_walk(idmap: dict[int, int], walked: "list[int]", *,
+                 root: int, root_parent: int,
+                 stat_ids: "Callable[[int], tuple[int, int] | None]" = None,
+                 ) -> None:
     """Fold one descendant walk into the accumulate-only snapshot map.
-    Only VERIFIABLE identities are recorded: a pid whose /proc birth could not
-    be read (died mid-walk) must not linger in the map, or a later unrelated
-    holder of that pid would pass the kill-time identity check unchallenged.
-    Newer birth wins a pid collision (the old holder is dead)."""
-    from .process_tree import _start_time as _default_start
-    start_time = start_time or _default_start
-    for p in pids:
-        born = start_time(p)
-        if born is not None:
-            idmap[p] = born
+
+    Identity is bound to DISCOVERY: a pid can exit and be reused between the
+    pgrep walk and the /proc read, and recording the unrelated new holder's
+    (perfectly valid) starttime would launder it past the kill-time identity
+    check. So one stat read yields (ppid, starttime) atomically, and the pid
+    is recorded — or an existing record overwritten — only when that ppid
+    re-establishes ancestry: inside the walked set for descendants, the
+    runner's own pid for the leader. Unverifiable pids (died mid-walk,
+    reparented in the gap) are skipped; earlier records for them survive."""
+    from .process_tree import _proc_stat_ids as _default_stat
+    stat_ids = stat_ids or _default_stat
+    members = set(walked) | {root}
+    for p in walked:
+        ids = stat_ids(p)
+        if ids is None:
+            continue
+        ppid, born = ids
+        if p == root:
+            if ppid != root_parent:
+                continue  # leader pid reused by a stranger
+        elif ppid not in members:
+            continue      # not (or no longer) our tree — possibly laundered
+        idmap[p] = born
 
 
 def _exec_wrap(command: str) -> str:
@@ -445,12 +460,15 @@ class TestRunner:
             # by SNAPSHOT_INTERVAL).
             from .process_tree import collect_descendants
             tree: dict[str, dict[int, int]] = {"idmap": {}}
-            _record_walk(tree["idmap"], [proc.pid])
+            own_pid = os.getpid()
+            _record_walk(tree["idmap"], [proc.pid],
+                         root=proc.pid, root_parent=own_pid)
             stop_snap = threading.Event()
 
             def _snapshot():
                 if proc.poll() is None:
-                    _record_walk(tree["idmap"], collect_descendants(proc.pid))
+                    _record_walk(tree["idmap"], collect_descendants(proc.pid),
+                                 root=proc.pid, root_parent=own_pid)
 
             def _snap_loop():
                 while not stop_snap.is_set() and proc.poll() is None:
