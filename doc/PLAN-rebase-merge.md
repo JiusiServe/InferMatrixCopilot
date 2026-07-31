@@ -8,8 +8,9 @@ Update it at every PR boundary.
 
 **Normative scope:** this document supersedes Rev 8 for *status, sequencing,
 and recorded deltas*. The detailed execution contracts Rev 8 defines are NOT
-restated here and remain normative by reference —
-`/data/zhoutaichang/.auth/claude/plans/floofy-squishing-squirrel.md`:
+restated here and remain normative by reference — Rev 8 is **pinned inside
+this repository** as `doc/PLAN-rebase-merge-rev8.md` (immutable historical
+copy; any future edit to it is a defect):
 §2.1 mode truth table + `resolve_effective_mode` governance write-back,
 §2.2 per-mode execution matrix, §2.3 push-gate failure taxonomy,
 §3.1 terminal-state transition table, §3.2 CI/push write-ahead logs and exact
@@ -57,8 +58,11 @@ PR1 ran 9 finding rounds before the cap existed, closing with the same
 agreement + verification pattern). Every PR must:
 
 - **(a) reach explicit agreement with GPT-5.6 Sol** — an APPROVE verdict —
-  within **max 5 finding rounds**, plus a final verification-only round
-  confirming the last round's fixes (PR1 precedent). Reviews run via
+  within **max 5 finding rounds**, plus a bounded fix-verification cycle:
+  **max 2 verification rounds**, where a verification round may surface
+  residual defects in the fixes under verification (fixed and re-verified
+  once) but any finding OUTSIDE those fixes goes to the owner instead of
+  another round. PR2 consumed exactly this budget (5 + 2). Reviews run via
   `cursor-agent --mode ask --model gpt-5.6-sol-high` over the cumulative
   branch diff (prompt via stdin — large diffs exceed ARG_MAX as an argv);
   the ExitPlanMode hook itself times out fail-open, so reviews are
@@ -118,10 +122,19 @@ Key mechanisms already landed:
   `scrub_agent_shell_env` (allowlist with exact/prefix split,
   credential-suffix veto, HF token opt-in) exist with full test coverage but
   have no production call sites yet — the agent-shell wiring lands in PR4c.
-  New-substrate child envs are copies; the LEGACY `repo-rebase-native-v1`
-  path still mutates `os.environ` (`_export_all_settings`) and dies at
-  PR4d/PR7 per Decision 9. The "process env never mutated" guardrail test
-  becomes global at PR4d.
+  New-substrate child envs are copies.
+
+**Recorded v1-backend exceptions (owner-accepted, sunset = PR7).** The
+`repo-rebase-native-v1` backend exists precisely to reproduce the parent
+byte-for-byte as the rollback path, so it is EXEMPT from two of the new
+contracts until PR7 deletes it — wrapping it would destroy its value:
+(1) it mutates `os.environ` via `_export_all_settings` (the "process env
+never mutated" guardrail becomes global-except-`rebase_native.py` at PR4d —
+a scoped exemption list containing exactly that module — and fully global at
+PR7); (2) its phase-4 push is the parent's own path gated by `ALLOW_PUSH`
+only, NOT routed through `push.guard_push` — the choke-point invariant
+applies to the v3 pipeline; v1 keeps parent semantics. Both exceptions die
+with the file at PR7.
 
 ## 5. Delivery sequence and status
 
@@ -149,16 +162,23 @@ notably `_terminate_tree` stopped expanding descendants entirely, closing a
 legacy-root laundering path by construction); the second returned **APPROVE
 with "No findings"**. Full review transcripts are archived per round.
 
-### 5.2 PR3 normative core (from Rev 8 §3.2)
+### 5.2 PR3 normative core (Rev 8 §3.2, extended)
 
-Before any `git push`, persist durably (tmp+fsync+replace)
-`{branch, remote_pre_push_oid | ABSENT, intended_oid, state: intent}`; after
-acceptance mark `state: pushed`. Crash between ⇒ re-entry reconciles by
-reading the remote OID: remote == intended ⇒ mark pushed; remote == pre-push
-⇒ retry; anything else ⇒ ESCALATE (never guess). Rollback = reverse-order
-over the log; `ABSENT` branches roll back by lease-protected deletion.
-Retries: bounded, exponential from `PUSH_RETRY_BASE_DELAY_SEC`, immediate
-abort on auth/permission errors (parent parity). Crash tests per surface.
+Before any `git push`, persist durably (tmp+fsync+replace) a record carrying
+the full **push identity**, not just OIDs:
+`{repo_root, remote_name, remote_url_credential_free, dest_ref
+(refs/heads/<branch>), remote_pre_push_oid | ABSENT, intended_oid,
+state: intent}`; after acceptance mark `state: pushed`. Crash between ⇒
+re-entry first verifies the remote identity (credential-free URL of
+`remote_name` still matches the record — a reconfigured remote ⇒ ESCALATE,
+never compare OIDs against a different repository), then reconciles by
+reading the remote ref: remote == intended ⇒ mark pushed; remote == pre-push
+⇒ retry; anything else ⇒ ESCALATE (never guess). URL resolution (SSH→HTTPS
+token form) records the credential-free canonical form. Rollback =
+reverse-order over the log; `ABSENT` branches roll back by lease-protected
+deletion. Retries: bounded, exponential from `PUSH_RETRY_BASE_DELAY_SEC`,
+immediate abort on auth/permission errors (parent parity). Crash tests per
+surface.
 
 ### 5.3 Push authorization resolution
 
@@ -250,22 +270,35 @@ full run → unsupervised full.
 
 **PR4d re-validation gate (new — closes a Rev 8 gap):** PR4d (knowledge
 migration, runtime-dir cutover, env-bridge deletion) changes the runtime
-configuration PR6 validated. After PR4d lands, the soak clock partially
-resets: 1 clean `report_only` run with semantic diffs against the
-pre-PR4d baseline outputs + 1 supervised `local_ci` run must pass before
-soak counting resumes; any regression rolls back PR4d via the versioned
-knowledge backup (non-destructive move) and re-opens investigation. PR7 does
-not start until the post-PR4d soak requirement is met.
+configuration PR6 validated — including stores the phase-2 agents and
+curation read/write. After PR4d lands, the soak clock partially resets and
+must cover PR4d's actual blast radius: 1 clean `report_only` run with
+semantic diffs against pre-PR4d baseline outputs, 1 supervised `local_ci`
+run, **and the soak's second supervised FULL run is deliberately scheduled
+post-PR4d** (exercising phase-2 agents, knowledge writes/curation, and push
+behavior on the final runtime configuration — this run satisfies both the
+stage-3 requirement and the PR4d gate). **PR4d rollback is layered:** the
+knowledge/runtime-dir side rolls back via the versioned backup
+(non-destructive move) plus a config flag keeping the old runtime dir
+selectable for one full soak period; the code side (env-bridge deletion,
+store cutover wiring) is a single revertible commit — rollback = `git
+revert` of that commit + backup restore, rehearsed as part of PR4d
+acceptance. PR7 does not start until the post-PR4d soak requirement is met.
 
 **Rollback:** pre-PR7, the `repo-rebase-native-v1` backend (imports the
 external `agent` package in-process) or a fresh external run. **Post-PR7 the
-v1 backend is dead by construction** (the external package is retired), so
-PR7's RUNBOOK entry defines the restore procedure: the external repo is
-archived as a tagged clone (not deleted); restore = re-clone the archive tag
-to the canonical path, re-add the `.env` orchestrator block from its
-timestamped backup, and re-enable the delegating playbook from git history —
-rehearsed once, timed, as part of PR7 acceptance. Cutover rollback itself is
-rehearsed (<30 min) before PR6; abort criteria recorded in the RUNBOOK.
+v1 backend is dead by construction** — PR7 deletes the delegation code
+(`rebase.run_external`, monitor helpers, v1 playbook, orchestrator settings)
+as well as retiring the external repo. PR7's RUNBOOK restore procedure
+therefore restores BOTH sides: (1) **code**: PR7 tags the copilot at
+`pre-pr7-retirement` immediately before the deletion commit; restore =
+deploy the copilot at that tag (or revert the PR7 commit), which brings back
+the delegating playbook, its registered steps, and v1; (2) **external**: the
+parent repo is archived as a tagged clone (not deleted); restore = re-clone
+the archive tag to the canonical path and re-add the `.env` orchestrator
+block from its timestamped backup. The combined restore is rehearsed once,
+timed, as part of PR7 acceptance. Cutover rollback itself is rehearsed
+(<30 min) before PR6; abort criteria recorded in the RUNBOOK.
 
 ## 9. Top open risks
 
