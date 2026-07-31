@@ -135,29 +135,45 @@ executes the PARENT'S OWN phase implementations in-process (the parent
 package's test runner, CI monitoring, and phase-4 push semantics), wrapped
 in copilot v1 orchestration — it is NOT byte-identical orchestration. Known
 v1-vs-parent orchestration divergences, recorded: a pre-push patch gate,
-typed copilot retries, and module-failure handling (BOTH suppress wave 2 on
-a wave-1 failure; the parent then continues into phases 3–5 and reports,
-while v1 terminates the copilot run — `test_rebase_native.py` pins the v1
-half). Rollback value = the parent's phase code paths, which is what live
-incidents would implicate.
+typed copilot retries, and module-failure handling — in v1's DEFAULT mode
+(`continue_on_module_failure=false`) both suppress wave 2 on a wave-1
+failure, with the parent then continuing into phases 3–5 and reporting
+while v1 terminates the copilot run; v1's
+`continue_on_module_failure=true` parity mode runs wave 2 like the parent
+(pinned by `test_continue_on_module_failure_parity_mode`). Rollback value =
+the parent's phase code paths, which is what live incidents would
+implicate.
 
-Two contract deviations, each with an explicit resolution:
+Three contract deviations, each with an explicit resolution:
 (1) **env mutation** — v1 mutates `os.environ` via `_export_all_settings`;
 the "process env never mutated" guardrail becomes
 global-except-`rebase_native.py` at PR4d (a scoped exemption list containing
 exactly that module) and fully global at PR7, when the bridge itself is
-deleted per §2.9. This one IS an owner-accepted exemption with a sunset.
-(2) **push choke point (SPEC C4 is repo-wide — no exemption):** today
-`_phase4_guarded` checks only `ALLOW_PUSH` before invoking parent phase 4.
-**PR4c fixes this**: v1's phase-4 entry first passes `push.guard_push` as
-AUTHORIZATION (a `PushPolicy` for `repo.rebase_branch`; deny ⇒ FORBIDDEN
-before any parent code runs) and only then enters the UNCHANGED parent
-implementation — authorization is restored to the choke point while the
-execution path v1 exists to preserve stays byte-identical. Residual,
-recorded: the parent's internal push falls back to raw `--force` when the
-remote branch does not yet exist (branch creation); `guard_push` denying
-protected branches means `main` can never be forced through this path, and
-the residual dies with v1 at PR7.
+deleted per §2.9. Owner-accepted exemption with a sunset.
+(2) **push choke point — a RECORDED TEMPORARY NORMATIVE EXCEPTION to SPEC
+C4, owner-signed, sunset PR7.** Wrapping each of the parent's internal
+pushes (phase 4 pushes repeatedly across CI-debug iterations; branch
+creation uses raw `--force`) would modify the implementation v1 exists to
+preserve, so C4 is formally excepted for v1 — narrowly, with these PR4c
+mitigations, each pinned by test: (a) `push.guard_push` runs as
+AUTHORIZATION at v1's phase-4 entry — a `PushPolicy` for the rebase branch;
+deny ⇒ FORBIDDEN before any parent code runs; the authorization covers that
+phase's pushes to that branch (it is NOT per-push interception — stated
+openly as the exception's content); (b) branch equality holds by
+construction: v1 passes `REBASE_BRANCH` to the parent from the same
+manifest field (`repo.rebase_branch`) the `PushPolicy` was built from;
+(c) `REMOTE_ENABLED` is forced off at v1 entry, making the hybrid
+`remote_sync` force-push paths unreachable; (d) protected branches can
+never be pushed: `guard_push` denies them at authorization and the parent
+only ever pushes `REBASE_BRANCH`. The §5.2 push WAL governs the **v3
+pipeline only**; v1's pushes have no WAL — part of this exception,
+dying with it at PR7.
+(3) **mode contract (Rev 8 §2.1)** — v1's phase handlers ignore
+`TaskSpec.report_only`, so a defaulted mode could reach mutating phases.
+**PR4c obligation:** v1 registers with a mode REJECTION — it accepts only
+explicit `rebase_mode=full` and returns BLOCKED for every other mode
+(pinned by test). The rollback path is a full run by definition; v1 never
+implements the mode matrix.
 
 ## 5. Delivery sequence and status
 
@@ -169,7 +185,7 @@ the residual dies with v1 at PR7.
 | PR3 | Push cluster (contracts: Rev 8 §3.2, restated in §5.2 below): `gitio.py` (staging/unstage of generated outputs, signed-commit retry with ruff-hook detection, clean-env push execution, SSH→HTTPS URL resolution), `push_to_ci.py` preflights (40-hex commit resolved; Dockerfile pin matches), `PushPolicy.lease_expect` (SHA-pinned force-with-lease), push write-ahead log + reconciliation | next |
 | PR4a | Engine core, unwired: agent loop, ToolDefs + opt-in dispatch scoping, substate, loop-scoped `RuntimeRegistry`, planner `requires` filter **+ the `missing_capabilities()` update for exact-repo playbooks (Rev 8 §2 obligation)** | planned |
 | PR4b | Adapter knowledge: hooks base + vllm-omni hooks, manifest extension (incl. audited `local_paths` refresh), prompt templates + prompt/payload goldens, `phase1_steps.py`, `module_rebase.py`, **`imx-omni-pytest` command** (Rev 8 slated it for PR1; deferred — nothing references it until the PR4b templates) | planned |
-| PR4c | Assembly: test/ci loops, v3 step set incl. `push_gate`, `resolve_effective_mode` + governance write-back (Rev 8 §2.1), transition-table wiring (Rev 8 §3.1), agent-shell scrub + model-download notification hook wiring, **manifest push-section update** (§5.3), v1 re-registered as `repo-rebase-native-v1` | planned |
+| PR4c | Assembly: test/ci loops, v3 step set incl. `push_gate`, `resolve_effective_mode` + governance write-back (Rev 8 §2.1), transition-table wiring (Rev 8 §3.1), agent-shell scrub + model-download notification hook wiring, **manifest push-section update** (§5.3), v1 re-registered as `repo-rebase-native-v1` **with its four §4 obligations: guard_push authorization at phase-4 entry, explicit-`full`-only mode rejection, `locks/omni.lock` shared-lock participation, `REMOTE_ENABLED` forced off** | planned |
 | PR5 | Parity completion: tier-1 goldens, `shell_golden.json`, `DRIFT_TRIAGE.md` resolution, report-only dry path, timed rollback rehearsal | planned |
 | EXT1 | External checkout: startup flock guard, pinned SHA | planned |
 | PR6 | Cutover (GPU box + human): §8 validation, playbook flip, `.env` arming | planned |
@@ -324,16 +340,24 @@ deploy the copilot at that tag (or revert the PR7 commit), which brings back
 the delegating playbook, its registered steps, and v1; (2) **external**: the
 parent repo is archived as a tagged clone PLUS a mutable-state snapshot — a
 tag alone cannot carry gitignored, dirty, or untracked runtime state. The
-archival step runs **while holding the EXT1 checkout lock** (no active run
-can race the snapshot) and: (a) commits all dirty/untracked runtime state
+archival step runs **while holding the checkout lock that ALL users of the
+checkout share** — EXT1 makes the external executable acquire
+`locks/omni.lock` at startup, and PR4c makes the in-process v1 backend
+acquire the SAME flock at run start (shared-lock participation, pinned by
+test), so holding it during archival proves no external and no v1 run is
+active. The step then: (a) commits all dirty/untracked runtime state
 onto a dedicated archival branch before tagging — this covers
 `agent/skills/` (usage updates rewrite `SKILL.md`; `_candidates.json` is
 generated) and anything else the working tree accumulated, with a
 clean-tree check proving nothing was missed; (b) captures a
 SQLite-consistent copy of the gitignored debug DB (`sqlite3 .backup`) and a
-tarball of `rebase_logs/`, stored alongside the archive. Restore = re-clone
-the archive tag to the canonical path, unpack the state snapshot, and
-re-add the `.env` orchestrator block from its timestamped backup. (By PR7 the canonical
+tarball of `rebase_logs/`, stored alongside the archive. **Secrets are
+never archived**: the parent's own gitignored `agent/.env` (distinct from
+the copilot's PR6-managed `.env` block) is captured as a key-NAME inventory
+only; restore recreates it with values from the owner's secret store.
+Restore = re-clone the archive tag to the canonical path, unpack the state
+snapshot, recreate `agent/.env` from the inventory, and re-add the copilot
+`.env` orchestrator block from its timestamped backup. (By PR7 the canonical
 knowledge already lives in the copilot runtime stores via PR4d's migration —
 the snapshot is belt-and-braces for parent-side residue.) The combined
 restore is rehearsed once, timed, as part of PR7 acceptance. Cutover rollback itself is rehearsed
