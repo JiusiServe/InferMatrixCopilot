@@ -1,17 +1,19 @@
-# Thin Codex integration — see docs/codex/README.md for the complete setup.
-# Replace this path with the absolute path to the editable source checkout.
-# No API key or model configuration is required.
+# Generic stdio fallback. Prefer the marketplace plugin described in README.md.
 
-[mcp_servers.infermatrix_copilot]
-command = "D:\\src\\InferMatrixCopilot\\.venv\\Scripts\\infermatrix-copilot-mcp.exe"
-args = []
-startup_timeout_sec = 30
+[mcp_servers.infermatrix-copilot]
+command = "uvx"
+args = [
+  "--from",
+  "infermatrix-copilot[mcp] @ git+https://github.com/JiusiServe/InferMatrixCopilot.git@main",
+  "infermatrix-copilot-mcp",
+]
+startup_timeout_sec = 60
 tool_timeout_sec = 60
 
 # Tools exposed:
 #   review(target, repo?, mode="direct")
 #   update_knowledge(repo?)
-#   submit_review_stage(run_id, stage, artifact)
+#   get_review_result(run_id, offset?)
 #   get_review_status(run_id)
 #   doc_search(query, repo?, limit?)
 #   doc_read(path, repo?, offset?)

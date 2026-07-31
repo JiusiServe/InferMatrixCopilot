@@ -370,8 +370,9 @@ infermatrix-copilot --resume                           # 从首个未完成 step
 - **`__main__.py`**(cli)——`python -m infermatrix_copilot` 入口,供 server 以当前
   解释器拉起 `--execute-reserved` 子进程。CLI 主路径(`run_task`)不变:仍在建
   run 目录**前**过门,弃用计划不落目录;预约(先建目录后规划)是 MCP 专属形状。
-- 打包:`plugin/`(`.claude-plugin/plugin.json` + 根 `.mcp.json`)、根
-  `.claude-plugin/marketplace.json`、`docs/codex/config.toml`、
+- 打包：`plugins/infermatrix-copilot/`（共享 MCP + Skill + 薄市场清单）、根
+  `.claude-plugin/marketplace.json`、`.cursor-plugin/marketplace.json`、
+  `.agents/plugins/marketplace.json`、`docs/codex/config.toml`、
   `docs/cursor/mcp.json`;安装说明见 `doc/MCP.md`。`mcp` 依赖在 `[mcp]` extra 后,独立 CLA 安装保持零依赖。由
   `test_mcp.py` 固定(篡改防御、单写者对账、分页、只读工具集)。
 

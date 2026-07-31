@@ -1,0 +1,9 @@
+{
+  "name": "infermatrix-copilot",
+  "version": "0.1.0",
+  "description": "Maintainer-grounded vLLM-Omni review knowledge over MCP.",
+  "author": {
+    "name": "JiusiServe",
+    "url": "https://github.com/JiusiServe"
+  }
+}

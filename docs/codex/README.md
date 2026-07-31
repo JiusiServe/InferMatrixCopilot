@@ -5,18 +5,13 @@ model to review code, so there is no API key or model configuration.
 
 ## Install
 
-```text
-git clone https://github.com/JiusiServe/InferMatrixCopilot.git
-cd InferMatrixCopilot
-
-# Windows PowerShell
-.\install-mcp.ps1 codex
-
-# macOS / Linux
-./install-mcp.sh codex
+```powershell
+codex plugin marketplace add JiusiServe/InferMatrixCopilot
 ```
 
-The platform-native entrypoints share the same installer implementation.
+Then open `/plugins` and install `infermatrix-copilot`. The plugin uses the
+same MCP descriptor and Agent Skill as Claude, Cursor, and other compatible
+hosts; there is no Codex-specific installer.
 
 Restart Codex, then paste:
 
@@ -25,7 +20,7 @@ Use InferMatrixCopilot to review
 https://github.com/vllm-project/vllm-omni/pull/5172.
 ```
 
-The installer also adds the `imreview` skill, so the short form is:
+The plugin also adds the `imreview` skill, so the short form is:
 
 ```text
 /imreview https://github.com/vllm-project/vllm-omni/pull/5172
@@ -60,7 +55,7 @@ Strict never posts implicitly. Posting still requires both an explicit
 `post=true` tool argument and server-side `ALLOW_POST=1`.
 
 Restart Codex after installation. Use `/mcp` or `codex mcp list` if you want to
-confirm that `infermatrix_copilot` is connected.
+confirm that `infermatrix-copilot` is connected.
 
 ## What the default MCP exposes
 
