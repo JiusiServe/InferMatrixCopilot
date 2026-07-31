@@ -177,9 +177,12 @@ def test_run_signed_commit_exhausts_retries():
 def test_resolve_push_url_and_canonical_identity(tmp_path):
     repo = _make_repo(tmp_path / "r")
     _git(repo, "remote", "add", "origin", "git@github.com:org/proj.git")
+    # the token NEVER lands in the URL — auth rides in the header transport
     assert gitio.resolve_push_url(repo, token="tok123") == \
-        "https://x-access-token:tok123@github.com/org/proj.git"
+        "https://github.com/org/proj.git"
     assert gitio.resolve_push_url(repo) == "git@github.com:org/proj.git"
+    assert gitio.apply_token_transport("git@github.com:org/proj.git", "t") == \
+        "https://github.com/org/proj.git"
     # every transport/credential form of one repo → ONE identity
     forms = ["git@github.com:org/proj.git", "git@github.com:org/proj",
              "https://github.com/org/proj.git",
@@ -388,20 +391,24 @@ def test_execute_push_uses_provided_url_without_reresolving(tmp_path):
     assert ok and "probed://url" in pushes[0]
 
 
-def test_wal_reconcile_uses_token_transport(tmp_path):
-    """An SSH origin with token-only credentials: recovery must probe over
-    the same token-backed HTTPS transport the push used, not raise on SSH."""
+def test_wal_reconcile_uses_token_transport_single_lookup(tmp_path):
+    """An SSH origin with token-only credentials: recovery probes over the
+    header-authenticated HTTPS transport (URL credential-free, token never
+    in argv URLs), and the remote is looked up exactly ONCE — a second
+    get-url would reopen the set-url race."""
     rec = _record()
-    calls = []
+    lookups, probes = [], []
 
     def run(cmd, **kw):
         if cmd[:3] == ["git", "remote", "get-url"]:
+            lookups.append(cmd)
             return SimpleNamespace(returncode=0,
                                    stdout="git@github.com:org/proj.git\n",
                                    stderr="")
-        if cmd[:2] == ["git", "ls-remote"]:
-            calls.append(cmd[2])
-            if cmd[2].startswith("git@"):
+        if "ls-remote" in cmd:
+            url = cmd[cmd.index("ls-remote") + 1]
+            probes.append((url, "extraheader" in " ".join(cmd)))
+            if url.startswith("git@"):
                 return SimpleNamespace(returncode=128, stdout="",
                                        stderr="Permission denied (publickey)")
             return SimpleNamespace(
@@ -410,7 +417,127 @@ def test_wal_reconcile_uses_token_transport(tmp_path):
         raise AssertionError(cmd)
 
     assert push_wal.reconcile(tmp_path, rec, token="tok", run=run) == "pushed"
-    assert calls == ["https://x-access-token:tok@github.com/org/proj.git"]
+    assert len(lookups) == 1
+    assert probes == [("https://github.com/org/proj.git", True)]
+    assert all("tok" not in u for u, _ in probes)
+
+
+def test_remote_ref_oid_error_is_credential_free(tmp_path):
+    def run(cmd, **kw):
+        return SimpleNamespace(returncode=128, stdout="", stderr="denied")
+    with pytest.raises(push_wal.PushWalError) as ei:
+        push_wal.remote_ref_oid(
+            tmp_path, "https://x-access-token:SECRET@github.com/o/p.git",
+            "refs/heads/x", token="SECRET", run=run)
+    assert "SECRET" not in str(ei.value)
+
+
+def test_resumed_intent_bound_to_recorded_world(tmp_path):
+    """Between reconciliation and the pre-push probe a third party moves the
+    remote: the resumed push must ESCALATE, never re-lease onto the new
+    tip — and when the remote is still at the recorded pre-push tip the
+    resumed push runs under a lease pinned to exactly that tip."""
+    repo = _make_repo(tmp_path / "work")
+    _commit(repo, {"docker/Dockerfile.ci": f"ENV PRECOMPILED_WHEEL_COMMIT={UP}\n",
+                   "a.py": "1"}, "base")
+    bare = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "-q", "--bare", str(bare)], check=True)
+    _git(repo, "remote", "add", "origin", str(bare))
+    _git(repo, "push", "-q", "origin", "HEAD:ci-x")
+    pre = _git(repo, "rev-parse", "HEAD")
+    head = _commit(repo, {"a.py": "2"}, "work")
+    wal = tmp_path / "wal"
+    push_wal.record_intent(wal, PushRecord(
+        op_id="op-r", repo_root=str(repo), remote_name="origin",
+        remote_url=gitio.canonical_remote_identity(str(bare)),
+        dest_ref="refs/heads/ci-x", pre_push_oid=pre, intended_oid=head))
+
+    # third party moves the ref AFTER reconciliation, BEFORE the probe:
+    # resolve_pending sees pre (retry); the second ls-remote sees the mover
+    real_run = gitio._run
+    state = SimpleNamespace(probes=0)
+
+    def race_run(cmd, **kw):
+        if "ls-remote" in cmd:
+            state.probes += 1
+            if state.probes == 2:   # the pre-push probe
+                subprocess.run(["git", "push", "-q", str(bare),
+                                f"{pre}:refs/heads/ci-x", "--force"],
+                               cwd=str(repo), check=True)
+                mover = _commit(repo, {"b.py": "x"}, "mover")
+                subprocess.run(["git", "push", "-q", str(bare),
+                                f"{mover}:refs/heads/ci-x", "--force"],
+                               cwd=str(repo), check=True)
+                _git(repo, "reset", "-q", "--hard", head)
+        return real_run(cmd, **kw)
+
+    out = push_to_ci.commit_and_push(
+        repo, branch="ci-x", wal_dir=wal, op_id="op-r", run=race_run,
+        **_push_kwargs(unstage_globs=[]))
+    assert not out.pushed and "remote moved" in out.reason
+    # untouched: the intent survives for human review
+    recs = {r.op_id: r for r in push_wal.load_records(wal)}
+    assert recs["op-r"].state == "intent"
+
+
+def test_new_op_supersedes_stale_retryable_intent(tmp_path):
+    """HEAD changed and the caller correctly minted a fresh op_id: the old
+    retryable intent is durably retired (superseded) so it can never
+    resurface as a false escalation."""
+    repo = _make_repo(tmp_path / "work")
+    _commit(repo, {"docker/Dockerfile.ci": f"ENV PRECOMPILED_WHEEL_COMMIT={UP}\n",
+                   "a.py": "1"}, "base")
+    bare = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "-q", "--bare", str(bare)], check=True)
+    _git(repo, "remote", "add", "origin", str(bare))
+    _git(repo, "push", "-q", "origin", "HEAD:ci-x")
+    pre = _git(repo, "rev-parse", "HEAD")
+    old_head = _commit(repo, {"a.py": "2"}, "old work")
+    wal = tmp_path / "wal"
+    push_wal.record_intent(wal, PushRecord(
+        op_id="op-old", repo_root=str(repo), remote_name="origin",
+        remote_url=gitio.canonical_remote_identity(str(bare)),
+        dest_ref="refs/heads/ci-x", pre_push_oid=pre, intended_oid=old_head))
+    _commit(repo, {"a.py": "3"}, "new work")
+
+    out = push_to_ci.commit_and_push(
+        repo, branch="ci-x", wal_dir=wal, op_id="op-new",
+        **_push_kwargs(unstage_globs=[]))
+    assert out.pushed
+    recs = {r.op_id: r for r in push_wal.load_records(wal)}
+    assert recs["op-old"].state == "superseded"
+    assert recs["op-new"].state == "pushed"
+    # and a later run does NOT trip over the superseded record
+    _commit(repo, {"a.py": "4"}, "later")
+    out2 = push_to_ci.commit_and_push(
+        repo, branch="ci-x", wal_dir=wal, op_id="op-later",
+        **_push_kwargs(unstage_globs=[]))
+    assert out2.pushed
+
+
+def test_idempotent_success_requires_full_op_identity(tmp_path):
+    """A pushed record reused with the SAME op_id but another destination
+    must refuse, not falsely report that destination as pushed."""
+    repo = _make_repo(tmp_path / "work")
+    head = _commit(repo,
+                   {"docker/Dockerfile.ci": f"ENV PRECOMPILED_WHEEL_COMMIT={UP}\n"},
+                   "base")
+    bare = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "-q", "--bare", str(bare)], check=True)
+    _git(repo, "remote", "add", "origin", str(bare))
+    _git(repo, "push", "-q", "origin", "HEAD:ci-a")
+    wal = tmp_path / "wal"
+    rec = PushRecord(
+        op_id="op-x", repo_root=str(repo), remote_name="origin",
+        remote_url=gitio.canonical_remote_identity(str(bare)),
+        dest_ref="refs/heads/ci-a", pre_push_oid=ABSENT, intended_oid=head,
+        state="pushed")
+    push_wal.mark_pushed(wal, rec)
+    out = push_to_ci.commit_and_push(
+        repo, branch="ci-b", wal_dir=wal, op_id="op-x",
+        **_push_kwargs(unstage_globs=[]))
+    assert not out.pushed and "different push" in out.reason
+    assert not _git(repo, "ls-remote", str(bare), "refs/heads/ci-b")
 
 
 # -- push_to_ci preflights and governance --------------------------------------

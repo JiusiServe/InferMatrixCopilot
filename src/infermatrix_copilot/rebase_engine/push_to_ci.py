@@ -139,16 +139,22 @@ def commit_and_push(repo: Path, *,
     # already proved it reconciles to retry, and re-recording would trip the
     # overwrite guard while a fresh op_id would orphan it into a later false
     # escalation); anything else ⇒ a different push needs a fresh op_id.
-    existing = {r.op_id: r for r in push_wal.load_records(wal_dir)}
-    prior = existing.get(op_id)
+    all_records = push_wal.load_records(wal_dir)
+    prior = next((r for r in all_records if r.op_id == op_id), None)
     resumed = None
+    same_op_shape = (prior is not None and prior.dest_ref == dest_ref
+                     and prior.remote_name == remote
+                     and prior.repo_root == str(repo))
     if prior is not None:
-        if prior.state == "pushed" and prior.intended_oid == head:
+        # idempotent success needs the COMPLETE operation identity to match
+        # — a reused op_id pointing at another branch/remote/repo must not
+        # falsely report that destination as pushed
+        if (prior.state == "pushed" and prior.intended_oid == head
+                and same_op_shape):
             log(f"op {op_id} already pushed {head[:12]}; nothing to do.")
             return PushOutcome(True, pushed_commit=head, committed=committed)
         if (prior.state == "intent" and prior.intended_oid == head
-                and prior.dest_ref == dest_ref
-                and prior.remote_name == remote):
+                and same_op_shape):
             log(f"op {op_id} has an unfinished intent for {head[:12]}; "
                 "resuming it.")
             resumed = prior
@@ -167,12 +173,29 @@ def commit_and_push(repo: Path, *,
         return PushOutcome(False, committed=committed,
                            reason="remote identity changed since the "
                                   "unfinished intent was recorded — escalate")
-    remote_oid = push_wal.remote_ref_oid(repo, url, dest_ref, run=run)
+    remote_oid = push_wal.remote_ref_oid(repo, url, dest_ref, token=token,
+                                         run=run)
+    if resumed is not None:
+        # a resumed intent is bound to its RECORDED world: the remote must
+        # still be at the recorded pre-push tip (complete the push, leased
+        # to that exact tip) or already at the intended one (it landed) —
+        # any other OID appeared between reconciliation and this probe and
+        # overwriting it under a fresh lease would destroy a third party's
+        # update
+        if remote_oid == resumed.intended_oid:
+            push_wal.mark_pushed(wal_dir, resumed)
+            log(f"op {op_id}: the recorded push already landed; acknowledged.")
+            return PushOutcome(True, pushed_commit=head, committed=committed)
+        if remote_oid != resumed.pre_push_oid:
+            return PushOutcome(False, committed=committed,
+                               reason="remote moved since the unfinished "
+                                      "intent was recorded — escalate")
     lease_expect = ""
     pre_push_oid = push_wal.ABSENT
     if remote_oid != push_wal.ABSENT:
         pre_push_oid = remote_oid
-        if rebase_performed:
+        if rebase_performed or resumed is not None:
+            # resumed pushes are ALWAYS leased to the recorded pre-push tip
             lease_expect = remote_oid
 
     policy = PushPolicy(allowed=allowed, remote=remote, branch=branch,
@@ -192,6 +215,17 @@ def commit_and_push(repo: Path, *,
     if resumed is not None:
         record = resumed   # the durable intent already exists; do not touch
     else:
+        # a NEW operation for this destination durably retires any remaining
+        # retryable intents (different push, fresh op_id): left as `intent`,
+        # they would later see neither their pre-push nor intended OID and
+        # surface as a permanent false escalation
+        for stale in all_records:
+            if (stale.state == "intent" and stale.op_id != op_id
+                    and stale.dest_ref == dest_ref
+                    and stale.remote_name == remote):
+                push_wal.mark_superseded(wal_dir, stale)
+                log(f"op {stale.op_id}: retryable intent superseded by "
+                    f"{op_id}.")
         record = push_wal.PushRecord(
             op_id=op_id, repo_root=str(repo), remote_name=remote,
             remote_url=gitio.canonical_remote_identity(url),

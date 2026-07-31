@@ -47,7 +47,10 @@ class PushRecord:
     dest_ref: str              # refs/heads/<branch>
     pre_push_oid: str          # 40-hex or ABSENT
     intended_oid: str
-    state: Literal["intent", "pushed"] = "intent"
+    # intent → pushed (acknowledged) | superseded (a newer operation took
+    # over this destination; durable, so the stale intent can never surface
+    # later as a false escalation — data kept for the rollback walk)
+    state: Literal["intent", "pushed", "superseded"] = "intent"
     created_at: float = field(default_factory=time.time)
 
     def path(self, wal_dir: Path) -> Path:
@@ -114,6 +117,11 @@ def mark_pushed(wal_dir: Path, record: PushRecord) -> None:
     _durable_write(record.path(wal_dir), asdict(record))
 
 
+def mark_superseded(wal_dir: Path, record: PushRecord) -> None:
+    record.state = "superseded"
+    _durable_write(record.path(wal_dir), asdict(record))
+
+
 def load_records(wal_dir: Path) -> list[PushRecord]:
     out: list[PushRecord] = []
     wal_dir = Path(wal_dir)
@@ -142,18 +150,21 @@ def _run(cmd: list[str], *, cwd: Path | None = None,
                           timeout=timeout, check=False)
 
 
-def remote_ref_oid(repo: Path, remote_or_url: str, dest_ref: str, *,
+def remote_ref_oid(repo: Path, url: str, dest_ref: str, *, token: str = "",
                    run: RunFn = _run) -> str:
     """The remote's current OID for `dest_ref`, ABSENT when the ref does not
     exist, or raises on network/remote failure (reconciliation must not
-    mistake 'cannot reach the remote' for 'ref absent'). Accepts a remote
-    name OR a resolved URL — probing and pushing must use ONE transport, or
-    an SSH-configured origin without SSH credentials fails the probe while
-    the token-authenticated HTTPS push would have worked."""
-    r = run(["git", "ls-remote", remote_or_url, dest_ref], cwd=repo)
+    mistake 'cannot reach the remote' for 'ref absent'). `url` must be
+    credential-free; token auth rides in the header transport — probing and
+    pushing use ONE transport, and neither argv nor error text ever carries
+    a credential."""
+    from .gitio import credential_free_url, ls_remote_oid
+
+    r = ls_remote_oid(repo, url, dest_ref, token=token, run=run)
     if r.returncode != 0:
-        raise PushWalError(f"ls-remote failed for {remote_or_url} {dest_ref}: "
-                           f"{(r.stderr or '').strip()}")
+        raise PushWalError(
+            f"ls-remote failed for {credential_free_url(url)} {dest_ref}: "
+            f"{(r.stderr or '').strip()}")
     line = (r.stdout or "").strip()
     return line.split()[0] if line else ABSENT
 
@@ -170,10 +181,14 @@ def reconcile(repo: Path, record: PushRecord, *, token: str = "",
     probe/push used (an SSH origin with token-only credentials must not make
     recovery raise where the push itself worked): intended ⇒ pushed;
     pre-push ⇒ retry; anything else ⇒ escalate."""
-    from .gitio import resolve_push_url
+    from .gitio import apply_token_transport
 
     if record.state == "pushed":
         return "pushed"
+    if record.state == "superseded":
+        return "retry"  # terminal for reconciliation; kept for rollback data
+    # ONE remote lookup: the identity check and the probe URL both come from
+    # this observation — a second get-url would reopen the set-url race
     r = run(["git", "remote", "get-url", record.remote_name], cwd=repo)
     if r.returncode != 0:
         return "escalate"
@@ -181,9 +196,8 @@ def reconcile(repo: Path, record: PushRecord, *, token: str = "",
     if canonical_remote_identity(configured) != \
             canonical_remote_identity(record.remote_url):
         return "escalate"
-    url = resolve_push_url(repo, remote=record.remote_name, token=token,
-                           run=run)
-    current = remote_ref_oid(repo, url, record.dest_ref, run=run)
+    url = apply_token_transport(configured, token)
+    current = remote_ref_oid(repo, url, record.dest_ref, token=token, run=run)
     if current == record.intended_oid:
         return "pushed"
     if current == record.pre_push_oid:  # includes ABSENT == ABSENT

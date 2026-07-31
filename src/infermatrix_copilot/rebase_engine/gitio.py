@@ -168,16 +168,41 @@ def _clean_push_env() -> dict[str, str]:
     return env
 
 
+def apply_token_transport(url: str, token: str) -> str:
+    """Rewrite an SSH GitHub URL to HTTPS when a token is present — SSH
+    would bypass `http.extraheader` auth entirely. The token itself is NEVER
+    embedded in the URL: authentication rides exclusively in the header
+    (`push_once`/`ls_remote`), so URLs stay safe for argv, logs, and error
+    messages. Pure function of its inputs: callers apply it to an
+    already-observed URL, never triggering a second remote lookup."""
+    m = re.match(r"^git@github\.com:(.+?)(\.git)?$", url.strip())
+    if token and m:
+        return f"https://github.com/{m.group(1)}.git"
+    return url.strip()
+
+
 def resolve_push_url(repo: Path, *, remote: str = "origin", token: str = "",
                      run: RunFn = _run) -> str:
-    """The remote's URL — rewritten from SSH to HTTPS when a token is
-    present, because SSH would bypass `http.extraheader` auth entirely."""
+    """ONE lookup of the remote's URL, then the token-transport rewrite."""
     r = run(["git", "remote", "get-url", remote], cwd=repo)
-    url = (r.stdout or "").strip()
-    m = re.match(r"^git@github\.com:(.+?)(\.git)?$", url)
-    if token and m:
-        return f"https://x-access-token:{token}@github.com/{m.group(1)}.git"
-    return url
+    return apply_token_transport((r.stdout or "").strip(), token)
+
+
+def _token_header_args(token: str) -> list[str]:
+    if not token:
+        return []
+    b64 = base64.b64encode(f"x-access-token:{token}".encode()).decode()
+    # the -c value is visible in `ps` to the same uid — parent-documented
+    # residual; the host is single-user-trusted by deployment policy
+    return ["-c", f"http.extraheader=AUTHORIZATION: basic {b64}"]
+
+
+def ls_remote_oid(repo: Path, url: str, ref: str, *, token: str = "",
+                  run: RunFn = _run) -> "subprocess.CompletedProcess[str]":
+    """`git ls-remote` over the same header-authenticated transport pushes
+    use; `url` must already be credential-free (apply_token_transport)."""
+    return run(["git", *_token_header_args(token), "ls-remote", url, ref],
+               cwd=repo, timeout=120)
 
 
 def credential_free_url(url: str) -> str:
@@ -204,11 +229,10 @@ def push_once(repo: Path, url: str, refspec: str, *,
               extra_args: Sequence[str] = (), token: str = "",
               run: RunFn = _run) -> "subprocess.CompletedProcess[str]":
     """One sanitized-env push. Token auth goes through `http.extraheader`
-    (never the credential store); IDE credential helpers are disabled."""
-    git_extra = ["-c", "core.askPass=", "-c", "credential.helper="]
-    if token:
-        b64 = base64.b64encode(f"x-access-token:{token}".encode()).decode()
-        git_extra += ["-c", f"http.extraheader=AUTHORIZATION: basic {b64}"]
+    (never the credential store, never the URL); IDE credential helpers are
+    disabled."""
+    git_extra = ["-c", "core.askPass=", "-c", "credential.helper=",
+                 *_token_header_args(token)]
     return run(["git", *git_extra, "push", url, *extra_args, refspec],
                cwd=repo, env=_clean_push_env(), timeout=900)
 
