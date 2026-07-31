@@ -78,8 +78,11 @@ def main(argv: list[str] | None = None) -> int:
         repo_root=Path(repo), tests_dir=Path(log_dir) / "tests",
         patterns=patterns, gpu_lock_dir=Path(log_dir) / "gpu_lock",
         cuda_visible_devices=cuda)
+    # the mutex SERIALIZES; it is not a hardware requirement — min_gpus=0
+    # so a GPU-less box still RUNS the command (a skip would be a false
+    # pass), while gpu_lock=True holds the lock for the run
     job = TestJob(key=_job_key(args), command=command, timeout_sec=timeout,
-                  min_gpus=1 if _needs_gpu_lock(args) else 0, index=0)
+                  min_gpus=0, gpu_lock=_needs_gpu_lock(args), index=0)
     outcome = runner.run(job, dict(os.environ))
     if outcome.skipped:
         print(f"imx-omni-pytest: skipped — {outcome.skip_reason}",

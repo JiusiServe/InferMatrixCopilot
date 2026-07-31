@@ -30,6 +30,9 @@ class ModulePromptData:
     templates_dir: Path
     template: str
     pytest_wrapper: str
+    template_live: str = ""
+    pytest_wrapper_live: str = ""
+    debug_prompt_template: str = ""
     module_vllm_paths: Mapping[str, str] = field(default_factory=dict)
     module_omni_files: Mapping[str, str] = field(default_factory=dict)
     module_test_map: Mapping[str, Sequence[str]] = field(default_factory=dict)
@@ -43,6 +46,9 @@ class ModulePromptData:
         return cls(templates_dir=d / "templates",
                    template=data["template"],
                    pytest_wrapper=data["pytest_wrapper"],
+                   template_live=data.get("template_live", ""),
+                   pytest_wrapper_live=data.get("pytest_wrapper_live", ""),
+                   debug_prompt_template=data.get("debug_prompt_template", ""),
                    module_vllm_paths=data.get("module_vllm_paths", {}),
                    module_omni_files=data.get("module_omni_files", {}),
                    module_test_map=data.get("module_test_map", {}),
@@ -175,6 +181,7 @@ def build_module_prompt(
     broken_imports: list[dict] | None = None,
     module_test_plan: dict | None = None,
     adaptive_guidance: str = "",
+    live: bool = False,
     run_git: Callable[[list[str], str], str] | None = None,
 ) -> str:
     """Byte-parity render of the parent's `build_module_prompt`. `script_dir`
@@ -194,15 +201,28 @@ def build_module_prompt(
     if not commit_list:
         commit_list = "(no relevant commits)"
 
-    wrapper = data.pytest_wrapper.format(script_dir=script_dir)
+    # live mode: the shipped wrapper replaces the retired shell script, and
+    # the import-check gets PROPER quoting — the parent single-quoted a
+    # payload containing single quotes, so bash stripped them and the check
+    # died with NameError: OK. Parity mode reproduces the parent bytes
+    # exactly (goldens); both divergences are recorded in DRIFT_TRIAGE.
+    wrapper_template = (data.pytest_wrapper_live
+                        if live and data.pytest_wrapper_live
+                        else data.pytest_wrapper)
+    wrapper = wrapper_template.format(script_dir=script_dir)
     pytest_cmds = [f"{wrapper} -vv -s {test_path}"
                    for test_path in data.module_test_map.get(module, [])]
     test_commands = "\n".join(pytest_cmds)
-    import_check_cmd = (
-        f"{wrapper} python -c "
-        f"'{data.module_import_check.get(module, 'print(\"OK\")')}'")
+    check = data.module_import_check.get(module, 'print("OK")')
+    if live:
+        import shlex
+        import_check_cmd = f"{wrapper} python -c {shlex.quote(check)}"
+    else:
+        import_check_cmd = f"{wrapper} python -c '{check}'"
 
-    template_file = Path(data.templates_dir) / data.template
+    template_name = (data.template_live if live and data.template_live
+                     else data.template)
+    template_file = Path(data.templates_dir) / template_name
     if not template_file.exists():
         return f"Error: template not found at {template_file}"
     template = template_file.read_text()

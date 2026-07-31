@@ -59,6 +59,10 @@ class TestJob:
     command: str
     timeout_sec: float
     min_gpus: int = 1
+    # None: hold the GPU lock iff min_gpus > 0 (historical). Explicit True
+    # serializes on the lock WITHOUT making GPUs a hardware requirement —
+    # a mutex-holding wrapper must not "skip rc=0" on a GPU-less box.
+    gpu_lock: bool | None = None
     env: dict[str, str] = field(default_factory=dict)
     setup: str = ""
     index: int = 0
@@ -298,7 +302,9 @@ class TestRunner:
         plan = RunPlan(
             argv=["bash", "-c", _exec_wrap(job.command)],
             env_overlay=dict(job.env), timeout_sec=job.timeout_sec,
-            needs_gpu_lock=job.min_gpus > 0, log_file=str(log_file),
+            needs_gpu_lock=(job.gpu_lock if job.gpu_lock is not None
+                            else job.min_gpus > 0),
+            log_file=str(log_file),
             cwd=str(self.repo_root))
         if dry_run:
             return TestOutcome(rc=0, log_file=str(log_file), plan=plan)
@@ -341,7 +347,7 @@ class TestRunner:
         # missing pytest-cov is exactly the case where the primary exits
         # before touching the GPU and the fallback does the real workload.
         lock: GpuLock | None = None
-        if job.min_gpus > 0 and self.gpu_lock_dir is not None:
+        if plan.needs_gpu_lock and self.gpu_lock_dir is not None:
             lock = GpuLock(self.gpu_lock_dir).acquire()
         try:
             # append: backup_prev_log already truncated this attempt's log,

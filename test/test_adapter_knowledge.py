@@ -80,7 +80,18 @@ def test_templates_are_parent_verbatim():
     if not parent.is_dir():
         pytest.skip("parent checkout not present on this machine")
     for tmpl in sorted((REBASE_DATA / "templates").iterdir()):
+        if ".live." in tmpl.name:
+            # the ONE recorded exception: the live variant differs from its
+            # parity sibling only in the wrapper-name prose (pinned below)
+            continue
         assert tmpl.read_bytes() == (parent / tmpl.name).read_bytes(), tmpl.name
+    live = (REBASE_DATA / "templates" / "module_rebase.live.prompt.tmpl")
+    parity = (REBASE_DATA / "templates" / "module_rebase.prompt.tmpl")
+    diff = [(a, b) for a, b in zip(parity.read_text().splitlines(),
+                                   live.read_text().splitlines()) if a != b]
+    assert len(diff) == 2
+    assert all("imx-omni-pytest" in b and "run_module_pytest" in a
+               for a, b in diff)
 
 
 # -- request-shape golden ------------------------------------------------------
@@ -103,6 +114,44 @@ def test_request_shape_golden(prompt_data):
     if not golden_file.exists():
         golden_file.write_text(serialized)
     assert serialized == golden_file.read_text()
+
+
+def test_live_prompt_uses_shipped_wrapper_with_sound_quoting(prompt_data):
+    """Live renders reference imx-omni-pytest (the retired shell wrapper does
+    not exist here) and quote the import-check payload so bash preserves the
+    inner quotes — both recorded divergences from the parent bytes."""
+    import shlex
+    live = build_module_prompt("model_config", prompt_data, live=True,
+                               **GOLDEN_KWARGS)
+    assert "run_module_pytest.sh" not in live
+    assert "imx-omni-pytest -vv -s tests/entrypoints/test_stage_utils.py" in live
+    # the rendered import-check line round-trips through shlex intact
+    line = next(ln for ln in live.splitlines()
+                if ln.startswith("imx-omni-pytest python -c "))
+    parts = shlex.split(line)
+    assert parts[:3] == ["imx-omni-pytest", "python", "-c"]
+    assert "print('OK')" in parts[3]      # inner quotes SURVIVE
+    # parity mode still reproduces the parent's (broken) quoting for goldens
+    parity = build_module_prompt("model_config", prompt_data, **GOLDEN_KWARGS)
+    assert "run_module_pytest.sh" in parity
+
+
+def test_module_pytest_mutex_without_gpus_still_runs(tmp_path, monkeypatch):
+    """IMX_GPU_MUTEX=1 on a GPU-less box: the lock SERIALIZES but must not
+    become a hardware gate — a skip would be a false rc=0 pass."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    monkeypatch.setenv("IMX_TARGET_REPO", str(repo))
+    monkeypatch.setenv("IMX_LOG_DIR", str(tmp_path / "logs"))
+    monkeypatch.setenv("IMX_GPU_MUTEX", "1")
+    monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
+    rc = module_pytest.main(["python", "-c", "print('RAN')"])
+    assert rc == 0
+    log = next((tmp_path / "logs" / "tests").glob("*.log")).read_text()
+    assert "RAN" in log                    # executed, not skipped
+    # and a real failure's rc propagates (never masked by a skip)
+    rc = module_pytest.main(["python", "-c", "raise SystemExit(7)"])
+    assert rc == 7
 
 
 # -- hooks ---------------------------------------------------------------------
@@ -258,6 +307,23 @@ def test_module_rebase_partial_e2e(tmp_path, prompt_data):
     prompt = client.requests[0]["messages"][0]["content"]
     assert "GUIDANCE-BLOCK" in prompt
 
+    # parent-parity debug retries: an incomplete first run is retried with
+    # the DEBUG prompt (built from the failure text) and can recover
+    retry_client = FakeClient([
+        _resp([_blk_text("half done, ran out of road")],
+              stop_reason="max_tokens"),            # attempt 0: not done
+        _resp([_blk_text("fixed it on the debug pass")]),   # debug attempt 1
+    ])
+    outcome = asyncio.run(rebase_module(
+        "platform", client=retry_client, config=config,
+        prompt_data=prompt_data, tool_defs=defs, extra_tools=tools,
+        substate=substate))
+    assert outcome["status"] == "done" and outcome["debug_attempts"] == 1
+    assert outcome["exit_code"] == 0
+    debug_req = retry_client.requests[1]["messages"][0]["content"]
+    assert debug_req.startswith("## Debug: fix failing test for module")
+    assert "half done, ran out of road" in debug_req
+
     # a loop exception is substate data, never a raise
     class Boom:
         @property
@@ -269,5 +335,59 @@ def test_module_rebase_partial_e2e(tmp_path, prompt_data):
         prompt_data=prompt_data, tool_defs=defs, extra_tools=tools,
         substate=substate))
     assert outcome["status"] == "failed"
+    assert outcome["debug_attempts"] == config.max_debug_retries
     assert substate.get("modules.worker_runner.status") == "failed"
     assert substate.get("modules.model_config.status") == "done"  # untouched
+
+
+def test_phase1_steps_composition(tmp_path):
+    """The deterministic phase-1 units end-to-end over fixture repos: drift +
+    assignment reports under the parent's filenames, skip flags in substate,
+    and path-sync retargeting a manifest copy with its report embedded in a
+    subsequent assignment render."""
+    from infermatrix_copilot.rebase_engine.phase1_steps import (
+        Phase1Config, run_commit_assignment, run_path_sync)
+    up = tmp_path / "up"
+    up.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=up, check=True)
+    for k, v in (("user.name", "t"), ("user.email", "t@e.c")):
+        subprocess.run(["git", "config", k, v], cwd=up, check=True)
+    (up / "vllm").mkdir()
+    (up / "vllm" / "a.py").write_text("1")
+    subprocess.run(["git", "add", "-A"], cwd=up, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "base"], cwd=up, check=True)
+    base = subprocess.run(["git", "rev-parse", "HEAD"], cwd=up, check=True,
+                          capture_output=True, text=True).stdout.strip()
+    (up / "vllm" / "a.py").write_text("2")
+    subprocess.run(["git", "commit", "-aqm", "change"], cwd=up, check=True)
+
+    target = tmp_path / "target"
+    (target / "pkg").mkdir(parents=True)
+    (target / "pkg" / "keep.py").write_text("x")
+    manifest = tmp_path / "manifest.yaml"
+    manifest.write_text(
+        (REPO_ROOT / "adapters/vllm_omni/manifest.yaml").read_text())
+
+    log_dir = tmp_path / "logs"
+    substate = Substate(tmp_path / "run", "run-1")
+    cfg = Phase1Config(upstream_repo=up, target_repo=target, log_dir=log_dir,
+                       baseline_commit=base, target_branch="main")
+    result = run_commit_assignment(
+        cfg, {"mod_a": ["vllm/"], "mod_b": ["gone/"]}, substate)
+    assert result.counts == {"mod_a": 1, "mod_b": 0}
+    assert substate.get("modules.mod_a.skip") is False
+    assert substate.get("modules.mod_b.skip") is True
+    assert (log_dir / "commits_assignment.md").is_file()
+    assert "MISSING" in (log_dir / "path_drift_check.md").read_text()
+
+    from infermatrix_copilot.rebase_engine.path_sync import CuratedEntry
+    updates = run_path_sync(
+        cfg, manifest,
+        {"local_paths": {"input_output": ["pkg/keep.py", "pkg/gone.py"]}},
+        {}, substate)
+    assert updates["local_paths"]["input_output"] == ["pkg/keep.py"]
+    assert (log_dir / "path_sync_report.md").is_file()
+    assert substate.get("phase1.path_sync.changed") is True
+    import yaml as _yaml
+    assert _yaml.safe_load(manifest.read_text())["modules"]["input_output"][
+        "local_paths"] == ["pkg/keep.py"]

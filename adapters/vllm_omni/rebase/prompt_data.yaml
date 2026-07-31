@@ -6,11 +6,18 @@
 # doc/DRIFT_TRIAGE.md for the pre-cutover decision — do NOT "fix" one side
 # to match the other here.
 template: module_rebase.prompt.tmpl
+# live variant: identical except the two prose references to the retired
+# shell wrapper name imx-omni-pytest instead (recorded divergence — the
+# parity template above stays parent-verbatim for the byte-equality pin)
+template_live: module_rebase.live.prompt.tmpl
 
 # command template for PYTEST_COMMANDS / IMPORT_CHECK lines; goldens set this
 # to the parent's run_module_pytest.sh path to prove byte-parity, live runs
 # set the imx-omni-pytest form
 pytest_wrapper: "bash '{script_dir}/lib/run_module_pytest.sh'"
+# the LIVE wrapper (recorded divergence: live prompts reference the shipped
+# imx-omni-pytest instead of the retired shell script, and fix its quoting)
+pytest_wrapper_live: "imx-omni-pytest"
 
 module_vllm_paths:
   model_config: "vllm/config/ vllm/engine/arg_utils.py"

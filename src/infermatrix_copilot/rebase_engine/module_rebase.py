@@ -18,7 +18,8 @@ from ..run_trace import RunTrace
 from ..scopes import ToolScope
 from .agent_loop import run_agent_loop
 from .hooks import RebaseHooks
-from .prompt_builder import ModulePromptData, build_module_prompt
+from .prompt_builder import (ModulePromptData, build_debug_prompt,
+                             build_module_prompt)
 from .substate import Substate
 
 
@@ -36,6 +37,7 @@ class ModuleRunConfig:
     cuda_devices: str = "0,1"
     hf_home: str = "/model"
     max_turns: int = 150
+    max_debug_retries: int = 3
     plan_review_max_rounds: int = 2
     model_aliases: Mapping[str, str] | None = None
     model_mismatch_policy: str = "fail"
@@ -75,26 +77,41 @@ async def rebase_module(
         rebase_run_id=substate.run_id,
         plan_review_max_rounds=config.plan_review_max_rounds,
         broken_imports=broken_imports, module_test_plan=module_test_plan,
-        adaptive_guidance=guidance)
+        adaptive_guidance=guidance, live=True)
 
     substate.update({"modules": {module: {"status": "running"}}})
     agent_log = str(Path(config.log_dir) / "agents" / f"module-{module}.log")
     Path(agent_log).parent.mkdir(parents=True, exist_ok=True)
     plan_prefix = str(Path(config.log_dir) / "plans" / f"module-{module}")
 
-    try:
-        result = await run_agent_loop(
-            client, prompt, model=config.model, tool_defs=tool_defs,
-            extra_tools=extra_tools, scope=scope, trace=trace,
-            max_turns=config.max_turns, plan_write_prefix=plan_prefix,
-            model_aliases=config.model_aliases,
-            model_mismatch_policy=config.model_mismatch_policy,
-            agent_log=agent_log)
-    except Exception as exc:  # noqa: BLE001 - module failure is substate data
-        result = {"done": False, "text": f"agent loop error: {exc}",
-                  "turns": 0}
+    async def _attempt(p: str) -> dict:
+        try:
+            return await run_agent_loop(
+                client, p, model=config.model, tool_defs=tool_defs,
+                extra_tools=extra_tools, scope=scope, trace=trace,
+                max_turns=config.max_turns, plan_write_prefix=plan_prefix,
+                model_aliases=config.model_aliases,
+                model_mismatch_policy=config.model_mismatch_policy,
+                agent_log=agent_log)
+        except Exception as exc:  # noqa: BLE001 - failure is substate data
+            return {"done": False, "text": f"agent loop error: {exc}",
+                    "turns": 0}
+
+    # parent parity: an incomplete first run gets up to max_debug_retries
+    # follow-up attempts with the debug prompt built from the failure text
+    debug_attempts = 0
+    result = await _attempt(prompt)
+    while not result.get("done") and \
+            debug_attempts < config.max_debug_retries:
+        debug_attempts += 1
+        debug_prompt = build_debug_prompt(
+            module, result.get("text", ""),
+            prompt_data.debug_prompt_template, "")
+        result = await _attempt(debug_prompt)
 
     outcome = {"status": "done" if result.get("done") else "failed",
+               "exit_code": 0 if result.get("done") else -1,
+               "debug_attempts": debug_attempts,
                "turns": result.get("turns", 0),
                "summary": (result.get("text") or "")[:2000]}
     substate.update({"modules": {module: outcome}})
