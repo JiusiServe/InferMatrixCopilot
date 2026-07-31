@@ -4,7 +4,29 @@ InferMatrixCopilot 的模型清单、代码 owner 路由和源码引用会随着
 vLLM-Omni 发版而过期。这个审计只读取两个 Git 提交和本仓库声明，不会 checkout
 目标版本，也不会自动修改知识规则。
 
-## 本地运行
+## 用户入口
+
+安装 InferMatrixCopilot 后，在 Codex、Claude Code 或 Cursor 中运行：
+
+```text
+/imupdate D:\path\to\vllm-omni
+/imupdate vllm-omni
+/imupdate vllmomni
+```
+
+支持三种用法：
+
+1. 本地 Git 路径：直接用 baseline 的 `audited_sha` 对比仓库 `HEAD`，机器审计后
+   由 Agent 更新知识。
+2. 仓库名、别名或 URL：Agent 先解析权威仓库与目标版本，寻找已配置 checkout
+   或建立临时 clone，再尽量进入同一机器审计流程；无法运行机器审计时必须明确标记
+   为模型分析，不能宣称 `CLEAN`。选择版本时不得因为 GitHub “latest release”
+   忽略预发布版本而退回到比当前 baseline 更旧的版本。
+3. 下方完整 Python 命令：纯机器规则对比，不调用 LLM，也不修改文件。
+
+`/imupdate` 的可选第二个参数可以指定目标 tag 或 SHA。
+
+## 底层命令
 
 先在 vLLM-Omni checkout 中 fetch 需要比较的 tag 或 SHA，然后运行：
 
@@ -29,6 +51,13 @@ python tools/audit_vllm_omni_release.py `
 同样的提交和 baseline 会产生等价 JSON；报告不包含时间戳和本机 checkout 路径。
 默认 `--mode enforce`：存在未解释漂移时退出 1，输入或 Git 失败时退出 2。
 `--mode report-only` 仍报告 `DRIFT`，但退出 0，供定时巡检使用。
+
+底层实现不 checkout 版本：它用 `git rev-parse` 固定两个提交，用
+`git diff --name-status -M` 找新增、修改、删除和重命名，再用
+`git show <sha>:<path>` 直接读取 Git 对象。Python AST 负责提取模型和
+pipeline registry，deploy YAML 直接按提交列举；结果做排序和哈希后与 baseline、
+owner 路由、manifest、知识 `sources:` 和 pin 对账，最后输出稳定 JSON。
+这个命令只报告证据，不编辑任何文件。
 
 ## 更新一个 release
 

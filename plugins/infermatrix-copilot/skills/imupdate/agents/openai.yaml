@@ -1,0 +1,4 @@
+interface:
+  display_name: "InferMatrix Update"
+  short_description: "Audit and update release-driven repository knowledge"
+  default_prompt: "Use $imupdate to resolve a repository path or name and update InferMatrix knowledge."

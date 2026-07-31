@@ -52,3 +52,8 @@ def test_cursor_install_preserves_existing_config(tmp_path):
     assert config["mcpServers"]["infermatrix-copilot"]["command"] == "uvx"
     assert list(cursor_root.glob("mcp.json.*.bak"))
     assert (cursor_root / "skills" / "imreview" / "SKILL.md").is_file()
+    update_skill = cursor_root / "skills" / "imupdate" / "SKILL.md"
+    assert update_skill.is_file()
+    text = update_skill.read_text(encoding="utf-8")
+    assert "{{INFERMATRIX_COPILOT_ROOT}}" not in text
+    assert str(ROOT) in text

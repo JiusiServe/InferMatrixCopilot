@@ -9,7 +9,7 @@
     {
       "name": "infermatrix-copilot",
       "source": "./plugins/infermatrix-copilot",
-      "description": "Maintainer-grounded vLLM-Omni review knowledge over MCP."
+      "description": "InferMatrixCopilot — governed PR review and release-driven knowledge maintenance over MCP and skills."
     }
   ]
 }

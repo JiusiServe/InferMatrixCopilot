@@ -3,7 +3,7 @@
 InferMatrixCopilot 的核心发布物保持一份：
 
 - `plugins/infermatrix-copilot/.mcp.json`：标准 stdio MCP 描述；
-- `plugins/infermatrix-copilot/skills/imreview/SKILL.md`：开放 Agent Skills；
+- `plugins/infermatrix-copilot/skills/`：开放 Agent Skills；
 - Claude、Codex、Cursor 的市场文件只负责把同一个插件展示出来，不包含各自的安装逻辑。
 
 ## 私有仓库过渡安装
@@ -32,6 +32,7 @@ install.cmd
 
 ```text
 /imreview <PR URL>
+/imupdate <local path, repository name, alias, or URL>
 ```
 
 市场只安装同一份 MCP 与 Skill；不会把逐 Agent 逻辑带回核心包。
@@ -44,6 +45,7 @@ install.cmd
 
 ```text
 plugins/infermatrix-copilot/skills/imreview/SKILL.md
+plugins/infermatrix-copilot/skills/imupdate/SKILL.md
 ```
 
 核心 MCP 配置：
@@ -71,6 +73,8 @@ plugins/infermatrix-copilot/skills/imreview/SKILL.md
 
 ```text
 /imreview https://github.com/vllm-project/vllm-omni/pull/5172
+/imupdate D:\path\to\vllm-omni
+/imupdate vllmomni
 ```
 
 默认 Direct 模式只提供知识库，由 Agent 当前模型完成审查；不会自动评论或推送代码。
