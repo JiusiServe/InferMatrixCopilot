@@ -40,6 +40,10 @@ knowledge:
 # upstream_paths/test_paths are the parent orchestrator's authoritative module
 # maps (config.sh MODULE_VLLM_PATHS / MODULE_TEST_MAP); the rebase path-sync
 # step retargets the *_paths lists against the live tree each run.
+# local_paths is the UNION of the original coarse scoping prefixes and every
+# parent MODULE_OMNI_FILES entry not already covered by them — module rebases
+# must see the parent's full scope, and prefix-matching consumers (review
+# scoping) may only ever gain coverage here, never lose it.
 modules:
   worker_runner:
     local_paths: [vllm_omni/worker/]
@@ -54,7 +58,7 @@ modules:
     wave: 1
     risk: high
   input_output:
-    local_paths: [vllm_omni/inputs/, vllm_omni/outputs/]
+    local_paths: [vllm_omni/inputs/, vllm_omni/outputs/, vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/serialization.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/engine/stage_engine_core_client.py, vllm_omni/engine/output_processor.py, vllm_omni/request.py]
     upstream_paths: [vllm/inputs/, vllm/v1/engine/input_processor.py, vllm/v1/engine/output_processor.py, vllm/v1/request.py]
     test_paths: [tests/entrypoints/test_omni_new_request_data.py, tests/engine/test_async_omni_engine_input.py, tests/test_outputs.py, tests/engine/]
     wave: 1
@@ -70,7 +74,7 @@ modules:
     test_paths: [tests/entrypoints/test_async_omni.py, tests/entrypoints/test_async_omni_diffusion_config.py, tests/entrypoints/openai_api/, tests/e2e/online_serving/]
     wave: 1
   model_config:
-    local_paths: [vllm_omni/config/]
+    local_paths: [vllm_omni/config/, vllm_omni/engine/arg_utils.py]
     upstream_paths: [vllm/config/, vllm/engine/arg_utils.py]
     test_paths: [tests/entrypoints/test_stage_utils.py, tests/metrics/test_stats.py]
     wave: 1
@@ -80,7 +84,7 @@ modules:
     test_paths: [tests/]
     wave: 1
   benchmarks:
-    local_paths: [benchmarks/]
+    local_paths: [benchmarks/, vllm_omni/benchmarks/, vllm_omni/entrypoints/cli/benchmark/]
     upstream_paths: [vllm/benchmarks/, vllm/entrypoints/cli/benchmark/]
     test_paths: [tests/benchmarks/test_serve_cli.py]
     wave: 2

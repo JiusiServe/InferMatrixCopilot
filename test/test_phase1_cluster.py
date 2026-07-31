@@ -305,6 +305,18 @@ def test_pin_dockerfile_all_three_forms(tmp_path):
     assert wheel.pin_dockerfile(tmp_path, new, PIN) is False
 
 
+def test_pin_dockerfile_current_form_never_shields_stale_sibling(tmp_path):
+    """One already-current pin form must not skip the rewrite of a stale
+    sibling (the shell's seds are unconditional)."""
+    old, new = "0" * 40, "f" * 40
+    p = _dockerfile(tmp_path, (
+        f"RUN pip install https://wheels.example.ai/{new}/x.whl\n"
+        f"ENV PRECOMPILED_WHEEL_COMMIT={old}\n"))
+    assert wheel.pin_dockerfile(tmp_path, new, PIN) is True
+    text = p.read_text()
+    assert f"ENV PRECOMPILED_WHEEL_COMMIT={new}" in text and old not in text
+
+
 def test_pin_dockerfile_failure_modes(tmp_path):
     with pytest.raises(wheel.PinError, match="not found"):
         wheel.pin_dockerfile(tmp_path, "f" * 40, PIN)
@@ -393,25 +405,29 @@ def test_load_decision_json_tolerates_chatter(tmp_path):
         worktree.load_decision_json(p)
 
 
-def test_guard_clean_step_extensions_default_off(settings, trace, tmp_path):
-    """The stale-state abort and artifact discard are opt-in params; without
-    them the step's dirty verdict is byte-identical to the old behavior."""
+def test_guard_clean_rebase_step_and_readonly_split(settings, trace, tmp_path):
+    """The mutating passes live in `workspace.guard_clean_rebase` with risk
+    `write_workspace`; plain `workspace.guard_clean` stays read-only and its
+    dirty verdict is byte-identical to the old behavior — even when handed
+    the rebase step's params."""
     registry = register_builtin_steps(StepRegistry())
     guard = registry.get("workspace.guard_clean")
+    rebase_guard = registry.get("workspace.guard_clean_rebase")
+    assert guard.risk == "read"
+    assert rebase_guard.risk == "write_workspace"
     repo = _make_repo(tmp_path / "r")
     _conflicted_merge(repo)
 
+    params = {"abort_stale_state": True,
+              "discard_untracked_patterns":
+                  [r"^tests/e2e/stage_configs/.*_[0-9]{6,}\.yaml$"]}
     ctx = StepContext(settings=settings, state={"repo_path": str(repo)},
-                      params={}, run_dir=tmp_path, trace=trace)
+                      params=params, run_dir=tmp_path, trace=trace)
     result = asyncio.run(guard.handler(ctx))
     assert not result.ok and result.failure is FailureKind.BLOCKED
+    assert worktree.porcelain(repo)      # read-only guard mutated nothing
 
-    ctx = StepContext(settings=settings, state={"repo_path": str(repo)},
-                      params={"abort_stale_state": True,
-                              "discard_untracked_patterns":
-                                  [r"^tests/e2e/stage_configs/.*_[0-9]{6,}\.yaml$"]},
-                      run_dir=tmp_path, trace=trace)
-    result = asyncio.run(guard.handler(ctx))
+    result = asyncio.run(rebase_guard.handler(ctx))
     assert result.ok and "aborted stale in-flight state" in result.summary
 
 
@@ -433,6 +449,18 @@ def test_assign_commits_by_path(upstream_pair):
                       "benchmarks": True}
     assert len(a.base_class_commits) == 1 and "c3" in a.base_class_commits[0]
     assert a.missing_paths == [("benchmarks", "vllm/benchmarks/")]
+
+
+def test_assign_unusable_range_fails_loudly(upstream_pair, tmp_path):
+    """A bad baseline must raise, not classify zero commits everywhere and
+    silently skip the whole rebase (shell `set -e` parity)."""
+    _, clone, _ = upstream_pair
+    with pytest.raises(assign.AssignError, match="unusable|bad baseline"):
+        assign.assign_commits(clone, "0" * 40, MODULE_PATHS)
+    not_a_repo = tmp_path / "empty"
+    not_a_repo.mkdir()
+    with pytest.raises(assign.AssignError):
+        assign.assign_commits(not_a_repo, "HEAD~1", MODULE_PATHS)
 
 
 def test_assignment_report_structure(upstream_pair):
@@ -510,6 +538,56 @@ def test_rewrite_manifest_modules_surgical(tmp_path):
         path_sync.rewrite_manifest_modules(manifest, {"zzz": {"local_paths": []}})
     with pytest.raises(PathSyncError, match="non-path field"):
         path_sync.rewrite_manifest_modules(manifest, {"platform": {"wave": [2]}})
+
+
+def test_manifest_local_paths_cover_parent_module_map():
+    """Every entry of the parent orchestrator's MODULE_OMNI_FILES must be
+    covered by a local_paths prefix of the same module — module rebases scope
+    their work by local_paths, and an uncovered file silently falls out of
+    its module's rebase."""
+    import yaml as _yaml
+    manifest = _yaml.safe_load(
+        (REPO_ROOT / "adapters/vllm_omni/manifest.yaml").read_text())
+    parent_map = {  # config.sh MODULE_OMNI_FILES, verbatim
+        "model_config": ["vllm_omni/config/model.py", "vllm_omni/engine/arg_utils.py"],
+        "input_output": ["vllm_omni/inputs/data.py", "vllm_omni/inputs/preprocess.py",
+                         "vllm_omni/engine/async_omni_engine.py",
+                         "vllm_omni/engine/orchestrator.py",
+                         "vllm_omni/engine/serialization.py",
+                         "vllm_omni/engine/stage_init_utils.py",
+                         "vllm_omni/engine/stage_engine_core_client.py",
+                         "vllm_omni/engine/output_processor.py", "vllm_omni/request.py"],
+        "scheduler": ["vllm_omni/core/sched/omni_ar_scheduler.py",
+                      "vllm_omni/core/sched/omni_generation_scheduler.py",
+                      "vllm_omni/core/sched/output.py"],
+        "worker_runner": ["vllm_omni/worker/gpu_model_runner.py",
+                          "vllm_omni/worker/gpu_ar_model_runner.py",
+                          "vllm_omni/worker/gpu_generation_model_runner.py",
+                          "vllm_omni/worker/gpu_ar_worker.py"],
+        "model_executor": ["vllm_omni/model_executor/"],
+        "online_serving": ["vllm_omni/entrypoints/omni_base.py",
+                           "vllm_omni/entrypoints/omni.py",
+                           "vllm_omni/entrypoints/async_omni.py",
+                           "vllm_omni/entrypoints/openai/api_server.py",
+                           "vllm_omni/entrypoints/openai/serving_chat.py",
+                           "vllm_omni/entrypoints/openai/serving_speech.py",
+                           "vllm_omni/entrypoints/openai/utils.py"],
+        "benchmarks": ["vllm_omni/benchmarks/serve.py",
+                       "vllm_omni/benchmarks/patch/patch.py",
+                       "vllm_omni/benchmarks/metrics/metrics.py",
+                       "vllm_omni/entrypoints/cli/benchmark/serve.py"],
+        "platform": ["vllm_omni/platforms/cuda/platform.py",
+                     "vllm_omni/platforms/rocm/platform.py",
+                     "vllm_omni/platforms/xpu/platform.py",
+                     "vllm_omni/platforms/interface.py"],
+    }
+    for module, parent_entries in parent_map.items():
+        local = manifest["modules"][module]["local_paths"]
+        for entry in parent_entries:
+            assert any(entry == p or entry.startswith(p.rstrip("/") + "/")
+                       or entry == p.rstrip("/")
+                       for p in local), (
+                f"{module}: parent entry {entry} uncovered by local_paths {local}")
 
 
 # -- api drift guard (adapter script) helpers ---------------------------------
@@ -591,7 +669,7 @@ def test_phase1_partial_e2e(settings, trace, tmp_path, monkeypatch):
 
     # 1. guard: aborts the stale merge, discards the artifact, ends clean
     registry = register_builtin_steps(StepRegistry())
-    guard = registry.get("workspace.guard_clean")
+    guard = registry.get("workspace.guard_clean_rebase")
     ctx = StepContext(
         settings=settings, state={"repo_path": str(target)},
         params={"abort_stale_state": True,

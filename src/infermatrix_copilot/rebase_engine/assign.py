@@ -19,6 +19,10 @@ def _log(msg: str) -> None:
     print(f"[assign] {msg}", flush=True)
 
 
+class AssignError(RuntimeError):
+    """The commit range itself is unusable (bad baseline, not a repo, ...)."""
+
+
 def _git(repo: Path, *args: str) -> "subprocess.CompletedProcess[str]":
     return subprocess.run(["git", *args], cwd=str(repo), check=False,
                           text=True, capture_output=True, errors="replace")
@@ -79,12 +83,25 @@ def assign_commits(repo: Path, baseline: str,
                    log: Callable[[str], None] = _log) -> Assignment:
     """Classify every commit in ``baseline..HEAD`` into modules by the paths
     it touches (one commit may land in several modules — that is deliberate:
-    each module's rebase wave needs to see it)."""
+    each module's rebase wave needs to see it).
+
+    An unusable range fails loudly (`AssignError`) — the shell died under
+    `set -e` here, and silently returning zero commits would mark every
+    module skippable and skip the whole rebase. Per-module log failures stay
+    tolerated as empty (shell `|| echo ""` parity)."""
     repo = Path(repo)
-    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    r = _git(repo, "rev-parse", "HEAD")
+    if r.returncode != 0:
+        raise AssignError(f"git rev-parse HEAD failed in {repo}: "
+                          f"{r.stderr.strip()}")
+    head = r.stdout.strip()
     range_spec = f"{baseline}..HEAD"
-    total_out = _git(repo, "log", "--oneline", range_spec).stdout
-    total = len([ln for ln in total_out.splitlines() if ln.strip()])
+    r = _git(repo, "log", "--oneline", range_spec)
+    if r.returncode != 0:
+        raise AssignError(
+            f"commit range {range_spec} is unusable in {repo} "
+            f"(bad baseline?): {r.stderr.strip()}")
+    total = len([ln for ln in r.stdout.splitlines() if ln.strip()])
     log(f"Analyzing {total} commits from {baseline[:12]}..{head[:12]}")
 
     result = Assignment(baseline=baseline, head=head,

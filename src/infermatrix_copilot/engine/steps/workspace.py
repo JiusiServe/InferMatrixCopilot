@@ -10,6 +10,12 @@ from ..step import FailureKind, StepContext, StepResult
 from ._common import require_repo, step
 
 
+def _porcelain(repo) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", "status", "--porcelain"], cwd=str(repo),
+                          capture_output=True, text=True, encoding="utf-8",
+                          errors="replace", timeout=30)
+
+
 @step("workspace.guard_clean", "deterministic", "read",
       "Refuse to start on a dirty working tree.")
 async def _guard_clean(ctx: StepContext) -> StepResult:
@@ -17,9 +23,29 @@ async def _guard_clean(ctx: StepContext) -> StepResult:
     dirty, so a run never mixes its edits with pre-existing uncommitted changes.
     Runs `git status --porcelain`; a non-git or dirty tree returns BLOCKED (the
     dirty case carries a sample of the offending entries in `outputs`).
+    Strictly read-only — the rebase pipeline's self-cleaning variant is the
+    separate `workspace.guard_clean_rebase` (risk `write_workspace`)."""
+    repo = require_repo(ctx)
+    if isinstance(repo, StepResult):
+        return repo
+    out = _porcelain(repo)
+    if out.returncode != 0:
+        return StepResult(False, FailureKind.BLOCKED, f"not a git repo: {repo}")
+    if out.stdout.strip():
+        dirty = out.stdout.strip().splitlines()
+        return StepResult(False, FailureKind.BLOCKED,
+                          f"workspace dirty ({len(dirty)} entries) — refuse to start",
+                          outputs={"dirty": dirty[:20]})
+    return StepResult(True, summary="workspace clean")
 
-    Opt-in extensions for rebase-style runs (both default off — existing
-    playbooks are byte-identical in behavior):
+
+@step("workspace.guard_clean_rebase", "deterministic", "write_workspace",
+      "Clean-tree gate that first clears stale rebase-run residue.")
+async def _guard_clean_rebase(ctx: StepContext) -> StepResult:
+    """The rebase pipeline's variant of the clean-tree gate (port of
+    `01_guard_branch_clean.sh`'s deterministic passes). It may MUTATE the
+    workspace — hence its own step with risk `write_workspace`, keeping
+    `workspace.guard_clean` honestly read-only for every other playbook:
     - `abort_stale_state: true` — abort a leftover merge/cherry-pick/revert/
       rebase from a halted prior run before judging cleanliness (its unmerged
       entries would otherwise read as ordinary dirt that `git restore` cannot
@@ -27,7 +53,8 @@ async def _guard_clean(ctx: StepContext) -> StepResult:
     - `discard_untracked_patterns: [regex, ...]` — quick-discard untracked
       artifacts matching the adapter-supplied patterns (e.g. pytest-copied
       configs) before the dirty verdict; only untracked files are touched.
-    """
+    Still fail-closed: anything left dirty after those passes is BLOCKED (the
+    L2 discard/commit decision is a later agent step)."""
     repo = require_repo(ctx)
     if isinstance(repo, StepResult):
         return repo
@@ -37,12 +64,7 @@ async def _guard_clean(ctx: StepContext) -> StepResult:
         if aborted:
             notes.append(f"aborted stale in-flight state: {', '.join(aborted)}")
 
-    def porcelain() -> subprocess.CompletedProcess:
-        return subprocess.run(["git", "status", "--porcelain"], cwd=str(repo),
-                              capture_output=True, text=True, encoding="utf-8",
-                              errors="replace", timeout=30)
-
-    out = porcelain()
+    out = _porcelain(repo)
     if out.returncode != 0:
         return StepResult(False, FailureKind.BLOCKED, f"not a git repo: {repo}")
     patterns = ctx.params.get("discard_untracked_patterns") or []
@@ -50,7 +72,7 @@ async def _guard_clean(ctx: StepContext) -> StepResult:
         removed = worktree.discard_untracked_matching(repo, patterns)
         if removed:
             notes.append(f"discarded {len(removed)} untracked artifact(s)")
-            out = porcelain()
+            out = _porcelain(repo)
     if out.stdout.strip():
         dirty = out.stdout.strip().splitlines()
         return StepResult(False, FailureKind.BLOCKED,

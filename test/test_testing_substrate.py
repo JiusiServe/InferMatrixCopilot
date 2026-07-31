@@ -374,7 +374,47 @@ def test_kill_tree_recorded_identity_drops_reused_pid():
     assert (11, signal.SIGTERM) in events
 
 
-# -- runner --------------------------------------------------------------------
+def test_kill_tree_reused_root_children_never_walked():
+    """A snapshotted pid reused by an unrelated process WITH children: the
+    root is rejected by identity, and its (unrelated, identity-less) children
+    must not be collected or signalled either."""
+    import infermatrix_copilot.testing.process_tree as pt
+    events, walked = [], []
+    children = {10: [30, 31], 11: []}
+    orig_alive, orig_start, orig_cd = (pt._alive, pt._start_time,
+                                      pt.collect_descendants)
+    pt._alive = lambda pid: True
+    pt._start_time = lambda pid: {10: 999, 11: 222, 30: 5, 31: 6}[pid]
+
+    def cd(pid, children_of=None):
+        walked.append(pid)
+        return sorted({pid, *children.get(pid, [])})
+    pt.collect_descendants = cd
+    try:
+        process_tree.kill_tree([10, 11],
+                               kill=lambda p, s: events.append((p, s)),
+                               sleep=lambda s: None,
+                               identity={10: 111, 11: 222})  # 10 reused
+    finally:
+        pt._alive, pt._start_time = orig_alive, orig_start
+        pt.collect_descendants = orig_cd
+    assert 10 not in walked                       # stale root not traversed
+    assert not any(p in (10, 30, 31) for p, _ in events)
+    assert (11, signal.SIGTERM) in events
+
+
+def test_snapshot_record_walk_skips_unverifiable_pids():
+    """The accumulate-only snapshot must never retain a pid without a
+    verifiable birth time — an unrelated later holder of that pid would pass
+    the kill-time identity check unchallenged."""
+    from infermatrix_copilot.testing.runner import _record_walk
+    idmap: dict[int, int] = {}
+    _record_walk(idmap, [1, 2, 3],
+                 start_time=lambda p: {1: 100, 2: None, 3: 300}[p])
+    assert idmap == {1: 100, 3: 300}
+    # a later walk with a newer birth for a collided pid wins
+    _record_walk(idmap, [1], start_time=lambda p: 150)
+    assert idmap[1] == 150
 
 @pytest.fixture()
 def runner(tmp_path, patterns) -> TestRunner:

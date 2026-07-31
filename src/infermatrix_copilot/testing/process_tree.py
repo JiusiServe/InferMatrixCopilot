@@ -95,8 +95,18 @@ def kill_tree(pids: list[int], *, term_grace: float = 2.0,
     process and is silently dropped — this is what makes accumulate-only
     snapshots safe to kill from."""
     kill = kill or (lambda p, s: os.kill(p, s))
-    candidates = sorted({d for p in pids for d in collect_descendants(p)})
     provided = dict(identity or {})
+    # a reused ROOT must be rejected before walking: its children belong to
+    # the unrelated new holder and carry no recorded identity of their own
+    roots = []
+    for p in dict.fromkeys(pids):
+        recorded = provided.get(p)
+        if recorded is not None:
+            born_now = _start_time(p)
+            if born_now is not None and born_now != recorded:
+                continue
+        roots.append(p)
+    candidates = sorted({d for p in roots for d in collect_descendants(p)})
     # capture identity BEFORE signalling: after the grace sleep a target's pid
     # may have been reaped and reused, and escalating SIGKILL by bare pid would
     # then hit an unrelated process

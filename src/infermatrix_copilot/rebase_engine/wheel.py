@@ -446,15 +446,15 @@ def is_pinned(text: str, commit: str, pin: PinSpec) -> bool:
 def pin_dockerfile(repo: Path, commit: str, pin: PinSpec, *,
                    log: Callable[[str], None] = _log) -> bool:
     """Rewrite the CI Dockerfile's wheel pin to `commit`, supporting both the
-    direct-URL form and the ENV/ARG variable form (byte-parity with the shell
-    sed). Returns True when the file changed, False when already pinned."""
+    direct-URL form and the ENV/ARG variable form. The substitutions ALWAYS
+    run over every form (shell parity: the seds are unconditional) — one
+    already-current form must never shield a stale sibling from the rewrite.
+    Returns True when the file changed, False when every pin was already
+    current (`is_pinned` alone is only the signal-file short-circuit's job)."""
     path = Path(repo) / pin.dockerfile
     if not path.is_file():
         raise PinError(f"CI Dockerfile not found at: {path}")
     text = path.read_text(encoding="utf-8")
-    if is_pinned(text, commit, pin):
-        log(f"Wheel pin already matches commit ({commit[:12]}). Skipping.")
-        return False
 
     var = re.escape(pin.commit_env_var)
     new = re.sub(pin.url_pattern, pin.url_template.format(commit=commit), text)
@@ -465,6 +465,9 @@ def pin_dockerfile(repo: Path, commit: str, pin: PinSpec, *,
 
     if not is_pinned(new, commit, pin):
         raise PinError(f"failed to update wheel pin in {path}")
+    if new == text:
+        log(f"Wheel pin already matches commit ({commit[:12]}). Skipping.")
+        return False
     path.write_text(new, encoding="utf-8")
     log(f"Wheel pin in {pin.dockerfile} updated to commit {commit[:12]}.")
     return True

@@ -184,6 +184,21 @@ def strip_cov_flags(command: str) -> str:
     return command
 
 
+def _record_walk(idmap: dict[int, int], pids: "list[int]",
+                 start_time: "Callable[[int], int | None]" = None) -> None:
+    """Fold one descendant walk into the accumulate-only snapshot map.
+    Only VERIFIABLE identities are recorded: a pid whose /proc birth could not
+    be read (died mid-walk) must not linger in the map, or a later unrelated
+    holder of that pid would pass the kill-time identity check unchallenged.
+    Newer birth wins a pid collision (the old holder is dead)."""
+    from .process_tree import _start_time as _default_start
+    start_time = start_time or _default_start
+    for p in pids:
+        born = start_time(p)
+        if born is not None:
+            idmap[p] = born
+
+
 def _exec_wrap(command: str) -> str:
     return command if "set +e" in command else f"set -e\n{command}"
 
@@ -428,19 +443,14 @@ class TestRunner:
             # the recorded one. A child that both spawns and is orphaned
             # inside one cadence window is the documented residual (bounded
             # by SNAPSHOT_INTERVAL).
-            from .process_tree import _start_time, collect_descendants
-            tree: dict[str, dict[int, int | None]] = {
-                "idmap": {proc.pid: _start_time(proc.pid)}}
+            from .process_tree import collect_descendants
+            tree: dict[str, dict[int, int]] = {"idmap": {}}
+            _record_walk(tree["idmap"], [proc.pid])
             stop_snap = threading.Event()
 
             def _snapshot():
                 if proc.poll() is None:
-                    for p in collect_descendants(proc.pid):
-                        born = _start_time(p)
-                        # newer birth wins a pid collision (the old holder is
-                        # dead); a None birth never clobbers known identity
-                        if born is not None or p not in tree["idmap"]:
-                            tree["idmap"][p] = born
+                    _record_walk(tree["idmap"], collect_descendants(proc.pid))
 
             def _snap_loop():
                 while not stop_snap.is_set() and proc.poll() is None:
