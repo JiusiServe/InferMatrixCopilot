@@ -458,6 +458,9 @@ def test_decision_validated_before_any_mutation(tmp_path):
         {"vllm": {"discard": ["a.py"]}, "omni": {"discard": ["../up/a.py"]}},
         {"vllm": {"discard": ["a.py"]},
          "omni": {"discard": [], "commit": {"message": "", "paths": ["b.py"]}}},
+        # falsey non-list shapes must reject, not coerce to "no discards"
+        {"vllm": {"discard": ["a.py"]}, "omni": {"discard": ""}},
+        {"vllm": {"discard": ["a.py"]}, "omni": {"discard": {}}},
     ]
     for decision in cases:
         with pytest.raises(worktree.DecisionError):
@@ -625,6 +628,12 @@ def test_apply_decision_validation(tmp_path):
     # a typo'd module key must fail loudly, not silently apply nothing
     with pytest.raises(PathSyncError, match="unknown module key"):
         path_sync.apply_decision(tmp_path, current, {"m1_typo": "ok.py"})
+    # a blank entry resolves to the repo root and would render as [] in the
+    # manifest — silently unmapping the module
+    with pytest.raises(PathSyncError, match="blank or non-string"):
+        path_sync.apply_decision(tmp_path, current, {"m1": [""]})
+    with pytest.raises(PathSyncError, match="blank or non-string"):
+        path_sync.apply_decision(tmp_path, current, {"m1": [123]})
 
 
 def test_rewrite_manifest_modules_surgical(tmp_path):
@@ -722,6 +731,29 @@ def drift_guard(monkeypatch):
     spec.loader.exec_module(mod)
     yield mod
     sys.meta_path[:] = meta_before   # drop the flash-attn import blocker
+
+
+def test_drift_guard_pooling_entry_names_actual_upstream_class():
+    """The parent guard named OpenAIServingPooling for both import and call —
+    upstream's class is ServingPooling and omni calls it under that name, so
+    the entry always import-failed into a silent SKIP and pooling drift was
+    never checked. Pin the corrected entry (AST — the guard itself only runs
+    inside the target repo's env)."""
+    import ast as _ast
+    src = (REPO_ROOT / "adapters/vllm_omni/rebase/api_drift_guard.py").read_text()
+    tree = _ast.parse(src)
+    entries = []
+    for node in _ast.walk(tree):
+        if (isinstance(node, ast_assign := _ast.Assign)
+                and any(isinstance(t, _ast.Name)
+                        and t.id == "constructor_call_checks"
+                        for t in node.targets)):
+            entries = [tuple(_ast.literal_eval(e) for e in elt.elts)
+                       for elt in node.value.elts]
+    pooling = [e for e in entries if "pooling.pooling" in e[0]]
+    assert pooling == [("vllm.entrypoints.pooling.pooling.serving",
+                        "ServingPooling", "ServingPooling",
+                        "vllm_omni/entrypoints/openai/api_server.py")]
 
 
 def test_drift_guard_removed_base_method_calls(drift_guard):

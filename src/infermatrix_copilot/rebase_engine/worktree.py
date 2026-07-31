@@ -199,7 +199,11 @@ def _validate_block(key: str, block, root: Path) -> tuple[list[str],
     (message, paths) or None."""
     if not isinstance(block, Mapping):
         raise DecisionError(f"missing or invalid '{key}' object in decision")
-    disc = block.get("discard") or []
+    disc = block.get("discard")
+    if disc is None:
+        disc = []
+    # a falsey non-list ("" / 0 / {}) must fail, not coerce to "nothing to
+    # discard" — plan-then-apply only holds if malformed shapes reject here
     if not isinstance(disc, list):
         raise DecisionError(f"'{key}.discard' must be a list")
     discards: list[str] = []

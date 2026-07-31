@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # api_drift_guard.py — Inheritance/constructor/unpack drift guard for vllm-omni.
-# Ported verbatim from the rebase agent (agent/lib/api_drift_guard.py); runs
+# Ported from the rebase agent (agent/lib/api_drift_guard.py); runs
 # standalone with the TARGET repo python (cwd or OMNI_PATH = vllm-omni root).
+# Verbatim except the pooling constructor entry (see its inline comment).
 # Repo-specific maps (INHERITANCE_MAP etc.) are the point of this file living
 # in the adapter tree; the copilot core never imports it.
 # Run with cwd = vllm-omni repo root (same as tasks/41_check_api_drift.sh).
@@ -283,9 +284,14 @@ def main() -> int:
             "vllm_omni/entrypoints/openai/api_server.py",
         ),
         (
+            # Deliberate divergence from the parent guard, which named
+            # OpenAIServingPooling for both: upstream's class is
+            # ServingPooling and omni's api_server imports/calls it under
+            # that name, so the parent's entry always import-failed into a
+            # silent SKIP and pooling constructor drift was never checked.
             "vllm.entrypoints.pooling.pooling.serving",
-            "OpenAIServingPooling",
-            "OpenAIServingPooling",
+            "ServingPooling",
+            "ServingPooling",
             "vllm_omni/entrypoints/openai/api_server.py",
         ),
         (

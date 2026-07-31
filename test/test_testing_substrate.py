@@ -453,6 +453,54 @@ def test_snapshot_record_walk_requires_validated_chain():
     assert idmap == {1: 100, 3: 300, 7: 700}
 
 
+def test_snapshot_leader_identity_immutable():
+    """A recycled leader pid can wear the RIGHT ppid (the runner spawns many
+    short-lived children) — once captured, the leader's birth is immutable
+    and a same-parent stranger records nothing."""
+    from infermatrix_copilot.testing.runner import _record_walk
+    ROOT, PARENT = 1, 99
+    idmap: dict[int, int] = {}
+    _record_walk(idmap, [1], root=ROOT, root_parent=PARENT,
+                 stat_ids=lambda p: (PARENT, 100))
+    root_birth = idmap[ROOT]
+    # stranger: correct parent, different birth — leader NOT validated, and
+    # its 'child' is rejected transitively
+    _record_walk(idmap, [1, 3], root=ROOT, root_parent=PARENT,
+                 root_birth=root_birth,
+                 stat_ids=lambda p: {1: (PARENT, 555), 3: (1, 300)}[p])
+    assert idmap == {1: 100}
+    # the true leader still validates and can accrue children
+    _record_walk(idmap, [1, 3], root=ROOT, root_parent=PARENT,
+                 root_birth=root_birth,
+                 stat_ids=lambda p: {1: (PARENT, 100), 3: (1, 300)}[p])
+    assert idmap == {1: 100, 3: 300}
+
+
+def test_terminate_tree_requires_recorded_live_leader_to_walk(tmp_path,
+                                                             monkeypatch):
+    """No recorded leader identity (or a dead leader) ⇒ no live walk at all:
+    an unverifiable leader pid may belong to anyone."""
+    import infermatrix_copilot.testing.runner as R
+    import infermatrix_copilot.testing.process_tree as pt
+    walked, killed = [], []
+    monkeypatch.setattr(R, "_kill_group", lambda pgid, sig: None)
+    monkeypatch.setattr(pt, "collect_descendants",
+                        lambda pid, children_of=None: walked.append(pid) or [pid])
+    monkeypatch.setattr(pt, "kill_tree",
+                        lambda targets, identity=None: killed.extend(targets))
+    monkeypatch.setattr(pt, "_start_time", lambda pid: 500)
+    R.TestRunner._terminate_tree(10, 10, snapshot={20: 222})  # no leader entry
+    assert walked == [] and killed == [20]
+    killed.clear()
+    monkeypatch.setattr(pt, "_start_time", lambda pid: None)  # leader gone
+    R.TestRunner._terminate_tree(10, 10, snapshot={10: 111, 20: 222})
+    assert walked == [] and killed == [10, 20]
+    killed.clear()
+    monkeypatch.setattr(pt, "_start_time", lambda pid: 111)   # verified alive
+    R.TestRunner._terminate_tree(10, 10, snapshot={10: 111})
+    assert walked == [10] and killed == [10]
+
+
 def test_terminate_tree_never_walks_reused_leader(tmp_path, monkeypatch):
     """A reused leader pid must not be expanded: the stranger's children are
     identity-less roots nothing downstream could reject."""

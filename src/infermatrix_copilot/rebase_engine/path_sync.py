@@ -88,7 +88,13 @@ def normalize_paths(value) -> list[str]:
     if isinstance(value, str):
         return value.split()
     if isinstance(value, (list, tuple)):
-        return [str(v) for v in value]
+        for v in value:
+            # blank entries resolve to the repo root and pass the existence
+            # check, then render as an empty manifest list — silently
+            # unmapping the module; non-strings are agent malformation
+            if not isinstance(v, str) or not v.strip():
+                raise PathSyncError(f"blank or non-string path entry: {v!r}")
+        return list(value)
     raise PathSyncError(f"path list must be string or list, got {type(value).__name__}")
 
 

@@ -185,7 +185,7 @@ def strip_cov_flags(command: str) -> str:
 
 
 def _record_walk(idmap: dict[int, int], walked: "list[int]", *,
-                 root: int, root_parent: int,
+                 root: int, root_parent: int, root_birth: int | None = None,
                  stat_ids: "Callable[[int], tuple[int, int] | None]" = None,
                  ) -> None:
     """Fold one descendant walk into the accumulate-only snapshot map.
@@ -196,17 +196,21 @@ def _record_walk(idmap: dict[int, int], walked: "list[int]", *,
     check. One stat read yields (ppid, starttime) atomically, and a pid is
     recorded — or an existing record overwritten — only when it sits on a
     fully VALIDATED ancestry chain: the leader must be parented by the
-    runner itself, and every other node's parent must itself be validated.
-    Merely appearing in the walked set is not enough — when an intermediate
-    pid is reused, its stranger children still name a "walked" parent, and
-    accepting them would launder the stranger's subtree. Unverifiable pids
-    (died mid-walk, reparented in the gap) are skipped; earlier records for
-    them survive."""
+    runner itself AND (once captured) match its immutable `root_birth` —
+    the runner spawns many short-lived children (pgrep, git, the next job),
+    so a recycled leader pid can wear the right ppid and only the birth
+    time distinguishes the stranger. Every other node's parent must itself
+    be validated: merely appearing in the walked set is not enough — when
+    an intermediate pid is reused, its stranger children still name a
+    "walked" parent, and accepting them would launder the stranger's
+    subtree. Unverifiable pids (died mid-walk, reparented in the gap) are
+    skipped; earlier records for them survive."""
     from .process_tree import _proc_stat_ids as _default_stat
     stat_ids = stat_ids or _default_stat
     info = {p: stat_ids(p) for p in dict.fromkeys(walked)}
     validated: set[int] = set()
-    if info.get(root) is not None and info[root][0] == root_parent:
+    if (info.get(root) is not None and info[root][0] == root_parent
+            and (root_birth is None or info[root][1] == root_birth)):
         validated.add(root)
     # fixpoint over parent links (walk order is not topological)
     changed = True
@@ -471,12 +475,16 @@ class TestRunner:
             own_pid = os.getpid()
             _record_walk(tree["idmap"], [proc.pid],
                          root=proc.pid, root_parent=own_pid)
+            # the leader's identity is captured ONCE and immutable from here:
+            # later walks must match it exactly or record nothing
+            root_birth = tree["idmap"].get(proc.pid)
             stop_snap = threading.Event()
 
             def _snapshot():
                 if proc.poll() is None:
                     _record_walk(tree["idmap"], collect_descendants(proc.pid),
-                                 root=proc.pid, root_parent=own_pid)
+                                 root=proc.pid, root_parent=own_pid,
+                                 root_birth=root_birth)
 
             def _snap_loop():
                 while not stop_snap.is_set() and proc.poll() is None:
@@ -557,10 +565,12 @@ class TestRunner:
         snapshot = dict(snapshot or {})
         recorded = snapshot.get(pid)
         live = _start_time(pid)
-        if recorded is not None and live is not None and live != recorded:
-            walk: list[int] = []       # stranger wears our leader's pid
-        else:
+        if recorded is not None and live == recorded:
             walk = collect_descendants(pid)
+        else:
+            # no recorded identity, leader gone, or a stranger wears the
+            # leader's pid: nothing about the live walk would be ours
+            walk = []
         targets = sorted(set(walk) | set(snapshot))
         _kill_group(pgid, signal.SIGTERM)
         kill_tree(targets, identity=snapshot)
