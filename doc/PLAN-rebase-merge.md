@@ -48,8 +48,12 @@ working copy). No live consumer of the external path exists (user-attested;
    flagged; `strict_push_gate` available; conflicting
    `strict_push_gate`+`push_with_failures` ⇒ BLOCKED.
 8. `blocked`/exit 3 reused for every needs-human terminal state.
-9. Knowledge migration + env-bridge deletion (PR4d) deferred until after live
-   validation.
+9. Knowledge migration + runtime-dir cutover (PR4d) deferred until after live
+   validation. **Sequencing delta vs Rev 8 (recorded round 3):** the
+   env-bridge (`_export_all_settings`) deletion moves from PR4d to **PR7** —
+   the v1 rollback backend is its last caller and lives until PR7; deleting
+   the bridge at PR4d would break the rollback path before its sunset. After
+   PR4d the bridge has exactly one caller (v1); a test pins that.
 
 ## 3. Review & delivery protocol (owner, 2026-07-31 — prospective)
 
@@ -125,16 +129,25 @@ Key mechanisms already landed:
   New-substrate child envs are copies.
 
 **Recorded v1-backend exceptions (owner-accepted, sunset = PR7).** The
-`repo-rebase-native-v1` backend exists precisely to reproduce the parent
-byte-for-byte as the rollback path, so it is EXEMPT from two of the new
-contracts until PR7 deletes it — wrapping it would destroy its value:
-(1) it mutates `os.environ` via `_export_all_settings` (the "process env
-never mutated" guardrail becomes global-except-`rebase_native.py` at PR4d —
-a scoped exemption list containing exactly that module — and fully global at
-PR7); (2) its phase-4 push is the parent's own path gated by `ALLOW_PUSH`
-only, NOT routed through `push.guard_push` — the choke-point invariant
-applies to the v3 pipeline; v1 keeps parent semantics. Both exceptions die
-with the file at PR7.
+`repo-rebase-native-v1` backend (today's `repo-rebase-native`, renamed in
+PR4c) is the rollback path. Its equivalence boundary, stated precisely: it
+executes the PARENT'S OWN phase implementations in-process (the parent
+package's test runner, CI monitoring, and phase-4 push semantics), wrapped
+in copilot v1 orchestration — it is NOT byte-identical orchestration. Known
+v1-vs-parent orchestration divergences, recorded: a pre-push patch gate,
+typed copilot retries, and module-failure handling (a wave-1 module failure
+blocks wave 2 in v1, where the parent continues and reports; pinned by
+`test_rebase_native.py`). Rollback value = the parent's phase code paths,
+which is what live incidents would implicate. On that basis it is EXEMPT
+from two new contracts until PR7 deletes it — wrapping it would change the
+very behavior it preserves: (1) it mutates `os.environ` via
+`_export_all_settings` (the "process env never mutated" guardrail becomes
+global-except-`rebase_native.py` at PR4d — a scoped exemption list
+containing exactly that module — and fully global at PR7, when the bridge
+itself is deleted per §2.9); (2) its phase-4 push runs the parent's own
+push path gated by `ALLOW_PUSH` only, NOT routed through `push.guard_push`
+— the choke-point invariant applies to the v3 pipeline; v1 keeps the
+parent's gate. Both exceptions die with the file at PR7.
 
 ## 5. Delivery sequence and status
 
@@ -150,7 +163,7 @@ with the file at PR7.
 | PR5 | Parity completion: tier-1 goldens, `shell_golden.json`, `DRIFT_TRIAGE.md` resolution, report-only dry path, timed rollback rehearsal | planned |
 | EXT1 | External checkout: startup flock guard, pinned SHA | planned |
 | PR6 | Cutover (GPU box + human): §8 validation, playbook flip, `.env` arming | planned |
-| PR4d | Knowledge migration + env-bridge deletion (post-validation) | planned |
+| PR4d | Knowledge migration + runtime-dir cutover (post-validation; env-bridge deletion moved to PR7 per §2.9) | planned |
 | PR7 | Retirement: delete external delegation, archive parent repo | planned |
 
 ### 5.1 PR2 review outcome
@@ -269,7 +282,7 @@ diffs vs frozen baseline) → 2 clean `local_ci` runs → the second supervised
 full run → unsupervised full.
 
 **PR4d re-validation gate (new — closes a Rev 8 gap):** PR4d (knowledge
-migration, runtime-dir cutover, env-bridge deletion) changes the runtime
+migration, runtime-dir cutover) changes the runtime
 configuration PR6 validated — including stores the phase-2 agents and
 curation read/write. After PR4d lands, the soak clock partially resets and
 must cover PR4d's actual blast radius: 1 clean `report_only` run with
@@ -280,8 +293,8 @@ behavior on the final runtime configuration — this run satisfies both the
 stage-3 requirement and the PR4d gate). **PR4d rollback is layered:** the
 knowledge/runtime-dir side rolls back via the versioned backup
 (non-destructive move) plus a config flag keeping the old runtime dir
-selectable for one full soak period; the code side (env-bridge deletion,
-store cutover wiring) is a single revertible commit — rollback = `git
+selectable for one full soak period; the code side (store cutover wiring)
+is a single revertible commit — rollback = `git
 revert` of that commit + backup restore, rehearsed as part of PR4d
 acceptance. PR7 does not start until the post-PR4d soak requirement is met.
 
@@ -294,10 +307,16 @@ therefore restores BOTH sides: (1) **code**: PR7 tags the copilot at
 `pre-pr7-retirement` immediately before the deletion commit; restore =
 deploy the copilot at that tag (or revert the PR7 commit), which brings back
 the delegating playbook, its registered steps, and v1; (2) **external**: the
-parent repo is archived as a tagged clone (not deleted); restore = re-clone
-the archive tag to the canonical path and re-add the `.env` orchestrator
-block from its timestamped backup. The combined restore is rehearsed once,
-timed, as part of PR7 acceptance. Cutover rollback itself is rehearsed
+parent repo is archived as a tagged clone PLUS a mutable-state snapshot — a
+tag alone cannot carry the gitignored `rebase_logs/` and
+`agent/store/debug_memory.db*`, so PR7's archival step also captures a
+SQLite-consistent copy of the debug DB (`sqlite3 .backup`) and a tarball of
+`rebase_logs/`, stored alongside the archive; restore = re-clone the archive
+tag to the canonical path, unpack the state snapshot, and re-add the `.env`
+orchestrator block from its timestamped backup. (By PR7 the canonical
+knowledge already lives in the copilot runtime stores via PR4d's migration —
+the snapshot is belt-and-braces for parent-side residue.) The combined
+restore is rehearsed once, timed, as part of PR7 acceptance. Cutover rollback itself is rehearsed
 (<30 min) before PR6; abort criteria recorded in the RUNBOOK.
 
 ## 9. Top open risks
