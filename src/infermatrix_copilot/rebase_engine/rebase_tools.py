@@ -84,7 +84,10 @@ def _handle_read_file(file_path: str, offset: int = 0,
             lines = lines[offset:]
         if limit:
             lines = lines[:limit]
-        start = offset if offset else 1
+        # deliberate divergence from the parent, which labeled the first
+        # returned line as `offset` while skipping `offset` lines — physical
+        # line offset+1 was mislabeled and paginated reads misled the agent
+        start = offset + 1
         numbered = [f"{start + i}\t{line}" for i, line in enumerate(lines)]
         return {"content": "\n".join(numbered),
                 "total_lines": len(content.split("\n"))}

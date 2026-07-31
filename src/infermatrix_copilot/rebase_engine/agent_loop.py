@@ -38,6 +38,20 @@ _FATAL_AUTH_MARKERS = ("401", "unauthorized", "403", "forbidden",
                        "invalid_api_key", "authentication")
 
 
+def _under_plan_dir(file_path: str, plan_write_prefix: str) -> bool:
+    """RESOLVED-path containment — a raw startswith is bypassable via
+    `<plans>/../product.py` traversal or a `plans-evil` sibling, and dispatch
+    later canonicalizes the path against the broader writable scope."""
+    from pathlib import Path
+    if not file_path:
+        return False
+    try:
+        return Path(file_path).resolve().is_relative_to(
+            Path(plan_write_prefix).resolve())
+    except (OSError, ValueError):
+        return False  # unresolvable ⇒ not provably inside ⇒ locked
+
+
 def _log_writer(agent_log: str) -> Callable[[str], None]:
     def write(line: str) -> None:
         if agent_log:
@@ -189,8 +203,9 @@ async def run_agent_loop(
             # must be untouchable before a decision exists).
             gate_closed = require_plan_review and not plan_done
             locked_write = (gate_closed and tool_use.name == "write_file"
-                            and not str(tinput.get("file_path", ""))
-                            .startswith(plan_write_prefix))
+                            and not _under_plan_dir(
+                                str(tinput.get("file_path", "")),
+                                plan_write_prefix))
             if (gate_closed and tool_use.name in GATED_TOOL_NAMES) \
                     or locked_write:
                 what = ("write_file outside the plan directory"

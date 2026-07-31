@@ -448,6 +448,50 @@ def test_gate_confines_pre_decision_writes_to_plan_dir(omni_repo, tmp_path):
                                    extra_tools=tools))
 
 
+def test_gate_containment_is_canonical(omni_repo, tmp_path):
+    """Traversal (`<plans>/../x`) and sibling (`plans-evil/`) spellings must
+    not escape the plan-directory confinement — containment is judged on
+    RESOLVED paths."""
+    defs, tools = _tools(omni_repo)
+    plans = tmp_path / "plans"
+    plans.mkdir()
+    before = (omni_repo / "mod.py").read_text()
+    traversal = str(plans / ".." / "omni" / "mod.py")
+    sibling = str(tmp_path / "plans-evil" / "x.py")
+    client = FakeClient([
+        _resp([_blk_tool("write_file", "t1",
+                         {"file_path": traversal, "content": "SABOTAGE"}),
+               _blk_tool("write_file", "t2",
+                         {"file_path": sibling, "content": "SABOTAGE"})]),
+        _resp([_blk_text("fine")]),
+    ])
+    r = asyncio.run(run_agent_loop(
+        client, "P", model="m", tool_defs=defs, extra_tools=tools,
+        plan_write_prefix=str(plans)))
+    assert r["done"] is True
+    assert (omni_repo / "mod.py").read_text() == before
+    assert not Path(sibling).exists()
+    results = {tr["tool_use_id"]: tr
+               for m in client.requests[-1]["messages"]
+               if isinstance(m.get("content"), list)
+               for tr in m["content"]
+               if isinstance(tr, dict) and tr.get("type") == "tool_result"}
+    for tid in ("t1", "t2"):
+        assert "outside the plan directory" in             json.loads(results[tid]["content"])["error"]
+
+
+def test_read_file_pagination_labels_physical_lines(tmp_path):
+    """offset=N returns physical line N+1 and LABELS it N+1 — deliberate
+    divergence from the parent, which mislabeled paginated reads."""
+    from infermatrix_copilot.rebase_engine.rebase_tools import _handle_read_file
+    f = tmp_path / "f.txt"
+    f.write_text("\n".join(f"line{i}" for i in range(1, 6)))
+    r = _handle_read_file(str(f), offset=2, limit=2)
+    assert r["content"] == "3\tline3\n4\tline4"
+    r0 = _handle_read_file(str(f))
+    assert r0["content"].startswith("1\tline1")
+
+
 def test_agent_loop_model_mismatch_fails_closed(omni_repo):
     """A served model differing from the requested one aborts the run —
     repo invariant: model substitution fails by default."""
@@ -640,4 +684,15 @@ def test_resolve_fails_closed_on_malformed_known_adapter(tmp_path, settings,
     bad.mkdir(parents=True, exist_ok=True)
     (bad / "manifest.yaml").write_text("{not yaml: [")
     with pytest.raises(Exception):
+        Copilot(settings).resolve(TaskSpec(kind="repo_rebase"))
+    # a DELETED manifest in an existing directory is equally a hard failure
+    (bad / "manifest.yaml").unlink()
+    with pytest.raises(Exception, match="exists but did not load"):
+        Copilot(settings).resolve(TaskSpec(kind="repo_rebase"))
+    # ...as is a structurally valid manifest whose declared name mismatches
+    # the directory (the registry resolves by declared name, so the adapter
+    # is unfindable — and that must not read as absence)
+    (bad / "manifest.yaml").write_text(
+        "name: something_else\nstatus: active\nrepo:\n  path: /x\n")
+    with pytest.raises(Exception, match="exists but did not load"):
         Copilot(settings).resolve(TaskSpec(kind="repo_rebase"))
