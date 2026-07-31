@@ -1,0 +1,144 @@
+schema_version: 1
+
+upstream:
+  repository: vllm-project/vllm-omni
+  previous_audited_sha: 5d44868e918ecf9d3a6f1158c45acfad5989e1a7
+  audited_ref: v0.26.0rc1
+  audited_sha: 807db6efd70ff2e9b55a63d6e1b0530e2b74f8f2
+
+# These fingerprints are generated from sorted registry/deploy inventories.
+# They make the baseline exact without duplicating hundreds of entries here.
+inventories:
+  autoregressive:
+    count: 72
+    sha256: 79afac742125003b8d65a02e0e6b53398c4fc5f1c6e765fa8e1eb31f74871195
+  diffusion:
+    count: 61
+    sha256: f5c0b782cb98f20a9c7c77b696fda620a12d0899fd9e8abc9ccb696fe0c457e1
+  pipelines:
+    count: 46
+    sha256: ce4f6edb8748e030f04bf7a6fe038231453cd1cd75f64311c898acff8c14b14b
+  deploy_yamls:
+    count: 71
+    sha256: fb4c591580262a2dc8d03dd8c7fd681d98486f31007696d56adf349c24c25147
+
+# Structural review owners for changed upstream paths. This is deliberately
+# separate from manifest.modules: changing that runtime map alters rebase fan-out.
+path_owners:
+  benchmark:
+  - benchmarks/
+  - vllm_omni/benchmarks/
+  ci:
+  - .buildkite/
+  - .github/
+  - docker/
+  configuration:
+  - vllm_omni/config/
+  - vllm_omni/deploy/
+  diffusion:
+  - vllm_omni/diffusion/
+  distributed:
+  - vllm_omni/distributed/
+  documentation:
+  - .claude/skills/
+  - docs/
+  - examples/
+  - recipes/
+  - realtime_video_prompt_interaction_protocol.md
+  model-executor:
+  - vllm_omni/attention/
+  - vllm_omni/experimental/
+  - vllm_omni/inputs/
+  - vllm_omni/lora/
+  - vllm_omni/model_executor/
+  - vllm_omni/model_extras/
+  - vllm_omni/outputs/
+  - vllm_omni/platforms/
+  - vllm_omni/plugins/
+  - vllm_omni/quantization/
+  - vllm_omni/reasoning/
+  - vllm_omni/sample/
+  - vllm_omni/tokenizers/
+  - vllm_omni/transformers_utils/
+  - vllm_omni/utils/
+  - vllm_omni/worker/
+  observability:
+  - vllm_omni/metrics/
+  - vllm_omni/profiler/
+  scheduler:
+  - vllm_omni/core/
+  serving:
+  - vllm_omni/engine/
+  - vllm_omni/entrypoints/
+  testing:
+  - tests/
+  tooling:
+  - tools/
+  runtime-core:
+  - vllm_omni/__init__.py
+  - vllm_omni/data_entry_keys.py
+  - vllm_omni/request.py
+
+# Direct review destination for every structural owner above. The audit checks
+# that each route has a real current knowledge entrypoint.
+owner_documents:
+  benchmark:
+  - knowledge/repos/vllm-omni/benchmark/_index.md
+  ci:
+  - knowledge/repos/vllm-omni/ci/_index.md
+  configuration:
+  - knowledge/repos/vllm-omni/components/configuration/rules.md
+  diffusion:
+  - knowledge/repos/vllm-omni/components/diffusion/rules.md
+  distributed:
+  - knowledge/repos/vllm-omni/components/distributed/_index.md
+  documentation:
+  - knowledge/general/docs/_index.md
+  model-executor:
+  - knowledge/repos/vllm-omni/components/model-executor/rules.md
+  observability:
+  - knowledge/repos/vllm-omni/rules.md
+  scheduler:
+  - knowledge/repos/vllm-omni/components/scheduler/rules.md
+  serving:
+  - knowledge/repos/vllm-omni/components/serving/rules.md
+  testing:
+  - knowledge/repos/vllm-omni/ci/_index.md
+  tooling:
+  - knowledge/repos/vllm-omni/rules.md
+  runtime-core:
+  - knowledge/repos/vllm-omni/components/model-executor/rules.md
+
+ignored_paths:
+- pattern: .gitignore
+  reason: repository metadata
+- pattern: .pre-commit-config.yaml
+  reason: repository tooling
+- pattern: .readthedocs.yaml
+  reason: documentation tooling
+- pattern: CODE_OF_CONDUCT.md
+  reason: community metadata
+- pattern: CONTRIBUTING.md
+  reason: community metadata
+- pattern: LICENSE
+  reason: legal metadata
+- pattern: README.md
+  reason: repository overview
+- pattern: SECURITY.md
+  reason: community metadata
+- pattern: setup.py
+  reason: package metadata
+- pattern: pyproject.toml
+  reason: package metadata
+- pattern: requirements/
+  reason: package dependencies
+
+pin_documents:
+- doc/KNOWLEDGE.md
+- knowledge/repos/vllm-omni/models/catalog.md
+- knowledge/repos/vllm-omni/components/configuration/_index.md
+- knowledge/repos/vllm-omni/components/diffusion/_index.md
+- knowledge/repos/vllm-omni/components/distributed/_index.md
+- knowledge/repos/vllm-omni/components/model-executor/_index.md
+- knowledge/repos/vllm-omni/components/scheduler/_index.md
+- knowledge/repos/vllm-omni/components/serving/_index.md

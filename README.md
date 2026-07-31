@@ -123,5 +123,6 @@ Strict 模式需要用户明确提出。具体用法见
 
 - [安装和 MCP 配置](doc/MCP.md)
 - [知识库贡献规范](knowledge/CONTRIBUTING.md)
+- [vLLM-Omni 发版漂移审计](doc/VLLM_OMNI_RELEASE_MAINTENANCE.md)
 - [项目设计与实现](doc/)
 - [评测说明](eval/README.md)
