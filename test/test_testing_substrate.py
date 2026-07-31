@@ -431,6 +431,48 @@ def test_snapshot_record_walk_binds_identity_to_ancestry():
                  stat_ids=lambda p: (777, 111))
     assert idmap[1] == 100
 
+
+def test_snapshot_record_walk_requires_validated_chain():
+    """Naming a walked pid as parent is not enough: when an INTERMEDIATE pid
+    is reused, its stranger children still point at a 'walked' parent — only
+    a chain of validated parents anchored at a validated leader is accepted."""
+    from infermatrix_copilot.testing.runner import _record_walk
+    ROOT, PARENT = 1, 99
+    idmap: dict[int, int] = {}
+    # 5 is a reused intermediate (parented by a stranger); 6 is its child and
+    # must be rejected transitively even though its ppid (5) was walked.
+    # 3→7 is a genuine grandchild chain and must be accepted transitively.
+    stats = {1: (PARENT, 100), 3: (1, 300), 7: (3, 700),
+             5: (777, 500), 6: (5, 600)}
+    _record_walk(idmap, [1, 3, 5, 6, 7], root=ROOT, root_parent=PARENT,
+                 stat_ids=lambda p: stats[p])
+    assert idmap == {1: 100, 3: 300, 7: 700}
+    # a dead leader invalidates the whole round: nothing recorded, priors kept
+    _record_walk(idmap, [1, 3], root=ROOT, root_parent=PARENT,
+                 stat_ids=lambda p: {1: None, 3: (1, 999)}[p])
+    assert idmap == {1: 100, 3: 300, 7: 700}
+
+
+def test_terminate_tree_never_walks_reused_leader(tmp_path, monkeypatch):
+    """A reused leader pid must not be expanded: the stranger's children are
+    identity-less roots nothing downstream could reject."""
+    import infermatrix_copilot.testing.runner as R
+    import infermatrix_copilot.testing.process_tree as pt
+    walked, killed = [], []
+    monkeypatch.setattr(R, "_kill_group", lambda pgid, sig: None)
+    monkeypatch.setattr(pt, "_start_time", lambda pid: {10: 999}.get(pid))
+
+    def cd(pid, children_of=None):
+        walked.append(pid)
+        return [pid, 30, 31]
+    monkeypatch.setattr(pt, "collect_descendants", cd)
+    monkeypatch.setattr(pt, "kill_tree",
+                        lambda targets, identity=None: killed.extend(targets))
+    R.TestRunner._terminate_tree(10, 10, snapshot={10: 111, 20: 222})
+    assert walked == []                 # reused leader never expanded
+    assert killed == [10, 20]           # snapshot pids still escalated
+    # (kill_tree's own identity filter then drops the reused 10)
+
 @pytest.fixture()
 def runner(tmp_path, patterns) -> TestRunner:
     (tmp_path / "repo").mkdir()

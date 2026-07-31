@@ -115,10 +115,24 @@ def apply_decision(root: Path, current: Mapping[str, Sequence[str]],
         if not paths:
             raise PathSyncError(f"missing or empty value for {key}")
         for rel in paths:
+            _require_contained(root, rel)
             if not (Path(root) / rel.rstrip("/")).exists():
                 raise PathSyncError(f"non-existent path in decision: {rel}")
         out[key] = paths
     return out
+
+
+def _require_contained(root: Path, rel: str) -> None:
+    """An agent-supplied mapping entry must stay a repo-relative path: an
+    absolute path silently discards `root` when joined, and `../` escapes it —
+    either could smuggle an outside path into the trusted manifest."""
+    p = Path(rel)
+    if p.is_absolute():
+        raise PathSyncError(f"absolute path in decision: {rel}")
+    try:
+        (Path(root) / p).resolve().relative_to(Path(root).resolve())
+    except ValueError:
+        raise PathSyncError(f"path escapes repo root in decision: {rel}")
 
 
 # -- manifest retarget ---------------------------------------------------------

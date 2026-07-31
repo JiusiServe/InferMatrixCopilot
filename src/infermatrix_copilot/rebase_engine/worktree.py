@@ -192,38 +192,63 @@ def load_decision_json(path: Path) -> dict:
     raise DecisionError(f"invalid JSON in {path}")
 
 
+def _validate_block(key: str, block, root: Path) -> tuple[list[str],
+                                                          tuple[str, list[str]] | None]:
+    """Normalize + fully validate one repo's decision block WITHOUT touching
+    the tree. Returns (discard_paths, commit) where commit is
+    (message, paths) or None."""
+    if not isinstance(block, Mapping):
+        raise DecisionError(f"missing or invalid '{key}' object in decision")
+    disc = block.get("discard") or []
+    if not isinstance(disc, list):
+        raise DecisionError(f"'{key}.discard' must be a list")
+    discards: list[str] = []
+    for rel in disc:
+        if not isinstance(rel, str) or not rel.strip():
+            raise DecisionError(f"invalid discard path in {key}: {rel!r}")
+        rel = rel.strip()
+        _safe_rel(root, rel)
+        discards.append(rel)
+
+    commit = block.get("commit")
+    if commit is None:
+        return discards, None
+    if not isinstance(commit, Mapping):
+        raise DecisionError(f"'{key}.commit' must be null or object")
+    msg = commit.get("message")
+    cpaths = commit.get("paths")
+    if not isinstance(msg, str) or not msg.strip():
+        raise DecisionError(f"'{key}.commit.message' required")
+    if not isinstance(cpaths, list) or not cpaths:
+        raise DecisionError(f"'{key}.commit.paths' must be non-empty list")
+    paths: list[str] = []
+    for p in cpaths:
+        if not isinstance(p, str) or not p.strip():
+            raise DecisionError(f"invalid commit path in {key}: {p!r}")
+        p = p.strip()
+        _safe_rel(root, p)
+        paths.append(p)
+    return discards, (msg.strip(), paths)
+
+
 def apply_dirty_worktree_decision(decision: Mapping, repos: Mapping[str, Path],
                                   *, author_name: str, author_email: str) -> None:
     """Apply discard/commit blocks per repo. `repos` maps the decision's keys
     (schema-stable, e.g. the parent's "vllm"/"omni") to repo roots; every
-    mapped key must be present. Discards run before the optional commit."""
+    mapped key must be present. Discards run before the optional commit.
+
+    The ENTIRE decision is validated before anything is applied: discards
+    are irreversible, so a malformed later block must fail the run while
+    every tree is still untouched — never after the first repo was already
+    mutated."""
     if not author_name or not author_email:
         raise DecisionError("author_name and author_email are required")
+    plan: list[tuple[Path, list[str], tuple[str, list[str]] | None]] = []
     for key, root in repos.items():
-        block = decision.get(key)
-        if not isinstance(block, Mapping):
-            raise DecisionError(f"missing or invalid '{key}' object in decision")
-        disc = block.get("discard") or []
-        if not isinstance(disc, list):
-            raise DecisionError(f"'{key}.discard' must be a list")
-        for rel in disc:
-            if not isinstance(rel, str) or not rel.strip():
-                raise DecisionError(f"invalid discard path in {key}: {rel!r}")
-            _apply_discard(Path(root), rel.strip())
-
-        commit = block.get("commit")
-        if commit is None:
-            continue
-        if not isinstance(commit, Mapping):
-            raise DecisionError(f"'{key}.commit' must be null or object")
-        msg = commit.get("message")
-        cpaths = commit.get("paths")
-        if not isinstance(msg, str) or not msg.strip():
-            raise DecisionError(f"'{key}.commit.message' required")
-        if not isinstance(cpaths, list) or not cpaths:
-            raise DecisionError(f"'{key}.commit.paths' must be non-empty list")
-        for p in cpaths:
-            if not isinstance(p, str) or not p.strip():
-                raise DecisionError(f"invalid commit path in {key}: {p!r}")
-        _apply_commit(Path(root), msg.strip(), [p.strip() for p in cpaths],
-                      author_name, author_email)
+        discards, commit = _validate_block(key, decision.get(key), Path(root))
+        plan.append((Path(root), discards, commit))
+    for root, discards, commit in plan:
+        for rel in discards:
+            _apply_discard(root, rel)
+        if commit is not None:
+            _apply_commit(root, commit[0], commit[1], author_name, author_email)

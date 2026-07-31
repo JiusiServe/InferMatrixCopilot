@@ -444,6 +444,43 @@ def test_release_editable_install_locks_scoped_to_repo(tmp_path):
     assert got == [101] and killed == [101]
 
 
+def test_decision_validated_before_any_mutation(tmp_path):
+    """A destructive first block followed by a malformed second block must
+    leave EVERY tree untouched — discards are irreversible, so validation
+    happens for the whole decision up front."""
+    up = _make_repo(tmp_path / "up")
+    tg = _make_repo(tmp_path / "tg")
+    _commit(up, {"a.py": "clean"}, "init")
+    _commit(tg, {"b.py": "1"}, "init")
+    (up / "a.py").write_text("dirty")  # would be discarded by block 1
+    cases = [
+        {"vllm": {"discard": ["a.py"]}},                                # omni missing
+        {"vllm": {"discard": ["a.py"]}, "omni": {"discard": ["../up/a.py"]}},
+        {"vllm": {"discard": ["a.py"]},
+         "omni": {"discard": [], "commit": {"message": "", "paths": ["b.py"]}}},
+    ]
+    for decision in cases:
+        with pytest.raises(worktree.DecisionError):
+            worktree.apply_dirty_worktree_decision(
+                decision, {"vllm": up, "omni": tg},
+                author_name="x", author_email="y@z")
+        assert (up / "a.py").read_text() == "dirty", decision   # untouched
+
+
+def test_apply_decision_rejects_escaping_paths(tmp_path):
+    (tmp_path / "repo").mkdir()
+    (tmp_path / "outside.py").write_text("x")
+    (tmp_path / "repo" / "ok.py").write_text("x")
+    current = {"m1": ["ok.py"]}
+    root = tmp_path / "repo"
+    assert path_sync.apply_decision(root, current, {"m1": ["ok.py"]})
+    with pytest.raises(PathSyncError, match="absolute path"):
+        path_sync.apply_decision(root, current,
+                                 {"m1": [str(tmp_path / "outside.py")]})
+    with pytest.raises(PathSyncError, match="escapes repo root"):
+        path_sync.apply_decision(root, current, {"m1": ["../outside.py"]})
+
+
 def test_load_decision_json_tolerates_chatter(tmp_path):
     p = tmp_path / "d.json"
     p.write_text('I decided the following:\n{"vllm": {"discard": []}}\n')

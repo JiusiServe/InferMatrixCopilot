@@ -193,25 +193,33 @@ def _record_walk(idmap: dict[int, int], walked: "list[int]", *,
     Identity is bound to DISCOVERY: a pid can exit and be reused between the
     pgrep walk and the /proc read, and recording the unrelated new holder's
     (perfectly valid) starttime would launder it past the kill-time identity
-    check. So one stat read yields (ppid, starttime) atomically, and the pid
-    is recorded — or an existing record overwritten — only when that ppid
-    re-establishes ancestry: inside the walked set for descendants, the
-    runner's own pid for the leader. Unverifiable pids (died mid-walk,
-    reparented in the gap) are skipped; earlier records for them survive."""
+    check. One stat read yields (ppid, starttime) atomically, and a pid is
+    recorded — or an existing record overwritten — only when it sits on a
+    fully VALIDATED ancestry chain: the leader must be parented by the
+    runner itself, and every other node's parent must itself be validated.
+    Merely appearing in the walked set is not enough — when an intermediate
+    pid is reused, its stranger children still name a "walked" parent, and
+    accepting them would launder the stranger's subtree. Unverifiable pids
+    (died mid-walk, reparented in the gap) are skipped; earlier records for
+    them survive."""
     from .process_tree import _proc_stat_ids as _default_stat
     stat_ids = stat_ids or _default_stat
-    members = set(walked) | {root}
-    for p in walked:
-        ids = stat_ids(p)
-        if ids is None:
-            continue
-        ppid, born = ids
-        if p == root:
-            if ppid != root_parent:
-                continue  # leader pid reused by a stranger
-        elif ppid not in members:
-            continue      # not (or no longer) our tree — possibly laundered
-        idmap[p] = born
+    info = {p: stat_ids(p) for p in dict.fromkeys(walked)}
+    validated: set[int] = set()
+    if info.get(root) is not None and info[root][0] == root_parent:
+        validated.add(root)
+    # fixpoint over parent links (walk order is not topological)
+    changed = True
+    while changed:
+        changed = False
+        for p, ids in info.items():
+            if p in validated or ids is None:
+                continue
+            if ids[0] in validated:
+                validated.add(p)
+                changed = True
+    for p in validated:
+        idmap[p] = info[p][1]
 
 
 def _exec_wrap(command: str) -> str:
@@ -538,11 +546,22 @@ class TestRunner:
         `pgid` is pre-captured and `snapshot` carries the accumulated
         pid → starttime descendant map, so this also works after the leader
         was reaped and its setsid'd children were reparented away; the
-        starttimes let kill_tree drop pids the kernel has since reused."""
-        from .process_tree import collect_descendants, kill_tree
+        starttimes let kill_tree drop pids the kernel has since reused.
+
+        The live descendant walk itself is gated on the leader's recorded
+        identity: expanding a REUSED leader pid would enroll the unrelated
+        new holder's children as identity-less roots that nothing downstream
+        could reject."""
+        from .process_tree import _start_time, collect_descendants, kill_tree
 
         snapshot = dict(snapshot or {})
-        targets = sorted(set(collect_descendants(pid)) | set(snapshot))
+        recorded = snapshot.get(pid)
+        live = _start_time(pid)
+        if recorded is not None and live is not None and live != recorded:
+            walk: list[int] = []       # stranger wears our leader's pid
+        else:
+            walk = collect_descendants(pid)
+        targets = sorted(set(walk) | set(snapshot))
         _kill_group(pgid, signal.SIGTERM)
         kill_tree(targets, identity=snapshot)
         _kill_group(pgid, signal.SIGKILL)
