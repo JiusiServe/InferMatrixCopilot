@@ -1,46 +1,52 @@
 # 安装 InferMatrixCopilot
 
-InferMatrixCopilot 只维护一个发布物：
+InferMatrixCopilot 的核心发布物保持一份：
 
 - `plugins/infermatrix-copilot/.mcp.json`：标准 stdio MCP 描述；
 - `plugins/infermatrix-copilot/skills/imreview/SKILL.md`：开放 Agent Skills；
 - Claude、Codex、Cursor 的市场文件只负责把同一个插件展示出来，不包含各自的安装逻辑。
 
-## 推荐：插件市场
-
-在 Agent 的插件市场搜索并安装 `infermatrix-copilot`。插件会一起安装 MCP 和
-`imreview` Skill，不要求用户直接运行 Python、PowerShell 或 shell 脚本。
-
-当前仓库也可作为市场源：
+## 私有仓库过渡安装
 
 ```text
-# Claude Code
-claude plugin marketplace add JiusiServe/InferMatrixCopilot
-claude plugin install infermatrix-copilot@infermatrix-copilot-marketplace
+git clone git@github.com:JiusiServe/InferMatrixCopilot.git
+cd InferMatrixCopilot
 
-# Codex
-codex plugin marketplace add JiusiServe/InferMatrixCopilot
-# 然后在 /plugins 中安装 infermatrix-copilot
+# Windows cmd、PowerShell 或双击
+install.cmd
+
+# macOS / Linux
+./install-mcp.sh
 ```
 
-Cursor 的公开市场条目审核通过后，在 Agent 中运行：
+两个入口共用 `scripts/install_mcp.py`，但用户不需要安装或直接运行 Python：
+入口会自动安装 `uv`，再由 `uv` 提供隔离运行环境。安装器会：
+
+- 自动识别 Codex、Claude Code 和 Cursor，检测到几个就安装几个；
+- 保留 Cursor 已有配置并先备份；
+- 没识别到已知 Agent 时生成 `infermatrix-copilot.mcp.json`，不会直接失败。
+
+## 公共市场上线后
+
+在 Agent 的插件市场搜索 `infermatrix-copilot` 并点击安装，然后直接运行：
 
 ```text
-/add-plugin infermatrix-copilot
+/imreview <PR URL>
 ```
 
-## 其他 Agent
+市场只安装同一份 MCP 与 Skill；不会把逐 Agent 逻辑带回核心包。
 
-Skill 使用开放格式，可由通用 Skills CLI 安装；该 CLI 负责识别 Codex、Cursor、
-Claude、Trae 等客户端：
+## 其他 MCP Agent
 
-```text
-npx skills add JiusiServe/InferMatrixCopilot --skill imreview
-```
-
-MCP 客户端导入
+安装器生成的 `infermatrix-copilot.mcp.json` 与
 [`plugins/infermatrix-copilot/.mcp.json`](../plugins/infermatrix-copilot/.mcp.json)
-即可。核心配置只有一份：
+内容相同，可直接导入支持 stdio MCP 的客户端。开放 Skill 位于：
+
+```text
+plugins/infermatrix-copilot/skills/imreview/SKILL.md
+```
+
+核心 MCP 配置：
 
 ```json
 {
@@ -58,8 +64,8 @@ MCP 客户端导入
 }
 ```
 
-这里用 `uvx` 自动拉取隔离运行环境，用户不需要直接操作 Python。宿主如果能消费
-MCP Registry，则应优先使用 Registry 条目；项目不为每个新 Agent 增加安装分支。
+这里用 `uvx` 自动拉取并缓存隔离运行环境。宿主如果能消费 MCP Registry，则应优先
+使用 Registry 条目；项目不为每个新 Agent 增加安装分支。
 
 ## 使用
 

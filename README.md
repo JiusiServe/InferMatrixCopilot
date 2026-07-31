@@ -14,10 +14,24 @@ vLLM-Omni 的兼容性、正确性和性能问题。
 
 ## 快速开始
 
-推荐从 Agent 的插件市场安装 `infermatrix-copilot`。同一个插件包同时包含 MCP
-和 `imreview` Skill；仓库不再为 Codex、Claude、Cursor 分别维护安装器。
+私有仓库过渡期，克隆后运行一个入口。脚本会自动识别本机的 Codex、Claude Code
+和 Cursor，并同时安装 MCP 与 `imreview` Skill。
 
-安装后直接使用：
+```text
+git clone git@github.com:JiusiServe/InferMatrixCopilot.git
+cd InferMatrixCopilot
+
+# Windows：双击也可以
+install.cmd
+
+# macOS / Linux
+./install-mcp.sh
+```
+
+用户不需要运行 PowerShell 或 Python。没有识别到已知 Agent 时，安装器会生成标准
+`infermatrix-copilot.mcp.json`，供 Trae、WorkBuddy 等其他 MCP 客户端导入。
+
+安装后使用：
 
 ```text
 /imreview https://github.com/vllm-project/vllm-omni/pull/5172
@@ -25,9 +39,7 @@ vLLM-Omni 的兼容性、正确性和性能问题。
 
 不带地址时，`/imreview` 会审查当前 PR 或本地工作区。
 
-插件市场尚未收录的 Agent，可以安装同一份开放 Skill，并导入同一份 MCP 描述；
-包括 Codex、Claude Code、Cursor、Trae 等都不需要项目再加专用分支。具体见
-[`doc/MCP.md`](doc/MCP.md)。
+公共市场上线后的安装方法和通用 MCP 配置见 [`doc/MCP.md`](doc/MCP.md)。
 
 ## 它是怎么工作的
 

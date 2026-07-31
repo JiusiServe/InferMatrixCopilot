@@ -5,13 +5,16 @@ model to review code, so there is no API key or model configuration.
 
 ## Install
 
-```powershell
-codex plugin marketplace add JiusiServe/InferMatrixCopilot
+```text
+# Windows
+install.cmd
+
+# macOS / Linux
+./install-mcp.sh
 ```
 
-Then open `/plugins` and install `infermatrix-copilot`. The plugin uses the
-same MCP descriptor and Agent Skill as Claude, Cursor, and other compatible
-hosts; there is no Codex-specific installer.
+The bootstrap detects Codex automatically. It uses the same MCP descriptor and
+Agent Skill as Claude, Cursor, and other compatible hosts.
 
 Restart Codex, then paste:
 
