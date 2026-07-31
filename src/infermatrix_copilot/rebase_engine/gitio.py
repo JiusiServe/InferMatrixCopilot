@@ -72,8 +72,16 @@ def unstage_generated_outputs(repo: Path, patterns: Sequence[str], *,
     for rel in (r.stdout or "").splitlines():
         rel = rel.strip()
         if rel and any(fnmatch.fnmatch(rel, pat) for pat in patterns):
-            run(["git", "reset", "-q", "HEAD", "--", f":(literal){rel}"],
-                cwd=repo)
+            rr = run(["git", "reset", "-q", "HEAD", "--", f":(literal){rel}"],
+                     cwd=repo)
+            if rr.returncode != 0:
+                # deliberate divergence from the parent's `|| true`: the
+                # promise is that generated outputs NEVER reach a rebase
+                # commit, and a still-staged file after a failed reset would
+                # be committed — fail closed instead
+                raise GitIOError(
+                    f"failed to unstage generated output {rel!r}: "
+                    f"{(rr.stderr or '').strip()}")
             removed.append(rel)
     return removed
 
@@ -169,22 +177,27 @@ def _clean_push_env() -> dict[str, str]:
 
 
 def apply_token_transport(url: str, token: str) -> str:
-    """Rewrite an SSH GitHub URL to HTTPS when a token is present — SSH
-    would bypass `http.extraheader` auth entirely. The token itself is NEVER
-    embedded in the URL: authentication rides exclusively in the header
-    (`push_once`/`ls_remote`), so URLs stay safe for argv, logs, and error
-    messages. Pure function of its inputs: callers apply it to an
-    already-observed URL, never triggering a second remote lookup."""
-    m = re.match(r"^git@github\.com:(.+?)(\.git)?$", url.strip())
+    """Canonicalize a remote URL for probe/push argv: ALWAYS strip embedded
+    userinfo (a configured `https://user:SECRET@...` remote must never reach
+    argv, logs, or git's own stderr echoes — auth rides exclusively in the
+    `http.extraheader` transport), and rewrite an SSH GitHub URL to HTTPS
+    when a token is present (SSH would bypass the header entirely). Pure
+    function of its inputs: callers apply it to an already-observed URL,
+    never triggering a second remote lookup."""
+    url = credential_free_url(url.strip())
+    m = re.match(r"^git@github\.com:(.+?)(\.git)?$", url)
     if token and m:
         return f"https://github.com/{m.group(1)}.git"
-    return url.strip()
+    return url
 
 
 def resolve_push_url(repo: Path, *, remote: str = "origin", token: str = "",
                      run: RunFn = _run) -> str:
-    """ONE lookup of the remote's URL, then the token-transport rewrite."""
-    r = run(["git", "remote", "get-url", remote], cwd=repo)
+    """ONE lookup of the remote's PUSH URL (`get-url --push` — the fetch URL
+    diverges on fork setups with a configured pushurl, and pushing to the
+    fetch URL would target upstream and bypass the pushurl friction), then
+    the token-transport canonicalization."""
+    r = run(["git", "remote", "get-url", "--push", remote], cwd=repo)
     return apply_token_transport((r.stdout or "").strip(), token)
 
 

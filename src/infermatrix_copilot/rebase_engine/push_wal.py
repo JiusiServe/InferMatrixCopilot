@@ -54,6 +54,12 @@ class PushRecord:
     created_at: float = field(default_factory=time.time)
 
     def path(self, wal_dir: Path) -> Path:
+        # the op_id becomes a filename: a slash would nest the record where
+        # load_records never looks, and `..` could write outside wal_dir
+        if not re.fullmatch(r"[A-Za-z0-9._-]{1,100}", self.op_id) or \
+                self.op_id in (".", ".."):
+            raise PushWalError(f"unsafe op_id for a WAL filename: "
+                               f"{self.op_id!r}")
         return Path(wal_dir) / f"{self.op_id}.json"
 
 
@@ -122,6 +128,24 @@ def mark_superseded(wal_dir: Path, record: PushRecord) -> None:
     _durable_write(record.path(wal_dir), asdict(record))
 
 
+def _validate_record(rec: PushRecord, source: Path) -> None:
+    """Loaded records are safety-critical inputs: a mistyped state (or a
+    malformed OID/ref) must fail closed, not silently skip an unresolved
+    intent and wave a new push through."""
+    if rec.state not in ("intent", "pushed", "superseded"):
+        raise PushWalError(f"corrupt WAL record {source}: "
+                           f"unknown state {rec.state!r}")
+    if not re.fullmatch(r"[0-9a-f]{40}", rec.intended_oid):
+        raise PushWalError(f"corrupt WAL record {source}: bad intended_oid")
+    if rec.pre_push_oid != ABSENT and not re.fullmatch(
+            r"[0-9a-f]{40}", rec.pre_push_oid):
+        raise PushWalError(f"corrupt WAL record {source}: bad pre_push_oid")
+    if not rec.dest_ref.startswith("refs/heads/"):
+        raise PushWalError(f"corrupt WAL record {source}: bad dest_ref")
+    if not rec.remote_name or not rec.remote_url or not rec.repo_root:
+        raise PushWalError(f"corrupt WAL record {source}: missing identity")
+
+
 def load_records(wal_dir: Path) -> list[PushRecord]:
     out: list[PushRecord] = []
     wal_dir = Path(wal_dir)
@@ -130,9 +154,11 @@ def load_records(wal_dir: Path) -> list[PushRecord]:
     for p in sorted(wal_dir.glob("*.json")):
         try:
             data = json.loads(p.read_text(encoding="utf-8"))
-            out.append(PushRecord(**data))
+            rec = PushRecord(**data)
         except (OSError, TypeError, ValueError, json.JSONDecodeError) as e:
             raise PushWalError(f"corrupt WAL record {p}: {e}") from e
+        _validate_record(rec, p)
+        out.append(rec)
     return out
 
 
@@ -187,9 +213,11 @@ def reconcile(repo: Path, record: PushRecord, *, token: str = "",
         return "pushed"
     if record.state == "superseded":
         return "retry"  # terminal for reconciliation; kept for rollback data
-    # ONE remote lookup: the identity check and the probe URL both come from
-    # this observation — a second get-url would reopen the set-url race
-    r = run(["git", "remote", "get-url", record.remote_name], cwd=repo)
+    # ONE remote lookup of the PUSH URL (where pushes actually went): the
+    # identity check and the probe URL both come from this observation — a
+    # second get-url would reopen the set-url race
+    r = run(["git", "remote", "get-url", "--push", record.remote_name],
+            cwd=repo)
     if r.returncode != 0:
         return "escalate"
     configured = (r.stdout or "").strip()

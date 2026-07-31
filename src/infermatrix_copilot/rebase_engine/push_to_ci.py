@@ -222,7 +222,13 @@ def commit_and_push(repo: Path, *,
         for stale in all_records:
             if (stale.state == "intent" and stale.op_id != op_id
                     and stale.dest_ref == dest_ref
-                    and stale.remote_name == remote):
+                    and stale.remote_name == remote
+                    # identity, not alias: an intent recorded against a
+                    # DIFFERENT repository (origin re-pointed since) keeps
+                    # its exact reconciliation/rollback data and escalates
+                    # on its own — only same-repo intents are retired
+                    and stale.remote_url ==
+                    gitio.canonical_remote_identity(url)):
                 push_wal.mark_superseded(wal_dir, stale)
                 log(f"op {stale.op_id}: retryable intent superseded by "
                     f"{op_id}.")

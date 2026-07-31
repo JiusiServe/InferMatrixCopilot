@@ -422,6 +422,102 @@ def test_wal_reconcile_uses_token_transport_single_lookup(tmp_path):
     assert all("tok" not in u for u, _ in probes)
 
 
+def test_resolve_push_url_uses_push_url_and_strips_creds(tmp_path):
+    """Fork setups configure a distinct pushurl — pushing to the FETCH URL
+    would target upstream and bypass the pushurl friction. And a configured
+    credential-bearing URL must never reach argv."""
+    repo = _make_repo(tmp_path / "r")
+    _git(repo, "remote", "add", "origin", "https://github.com/upstream/proj.git")
+    _git(repo, "remote", "set-url", "--push", "origin",
+         "https://user:SECRET@github.com/fork/proj.git")
+    url = gitio.resolve_push_url(repo)
+    assert url == "https://github.com/fork/proj.git"     # push URL, no creds
+    assert "SECRET" not in url and "upstream" not in url
+    # reconcile's single lookup also observes the PUSH URL
+    rec = _record(remote_url="github.com/fork/proj")
+    calls = []
+
+    def run(cmd, **kw):
+        if cmd[:4] == ["git", "remote", "get-url", "--push"]:
+            return SimpleNamespace(
+                returncode=0,
+                stdout="https://user:SECRET@github.com/fork/proj.git\n",
+                stderr="")
+        if "ls-remote" in cmd:
+            calls.append(cmd[cmd.index("ls-remote") + 1])
+            return SimpleNamespace(
+                returncode=0, stdout=f"{'d' * 40}\trefs/heads/ci-x\n",
+                stderr="")
+        raise AssertionError(cmd)
+    assert push_wal.reconcile(tmp_path, rec, run=run) == "pushed"
+    assert calls == ["https://github.com/fork/proj.git"]  # creds stripped
+
+
+def test_unstage_reset_failure_fails_closed(tmp_path):
+    """A failed reset leaves the generated file staged — committing it would
+    break the never-committed promise, so the flow must raise."""
+    def run(cmd, **kw):
+        if cmd[:2] == ["git", "add"]:
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        if cmd[:4] == ["git", "diff", "--cached", "--name-only"]:
+            return SimpleNamespace(returncode=0, stdout="junk.log\n", stderr="")
+        if cmd[:2] == ["git", "reset"]:
+            return SimpleNamespace(returncode=128, stdout="",
+                                   stderr="fatal: index locked")
+        raise AssertionError(cmd)
+    with pytest.raises(gitio.GitIOError, match="failed to unstage"):
+        gitio.stage_commit_changes(tmp_path, ["*.log"], run=run)
+
+
+def test_wal_op_id_cannot_escape(tmp_path):
+    for bad in ("a/b", "../evil", "", "x" * 101, "."):
+        with pytest.raises(push_wal.PushWalError, match="unsafe op_id"):
+            push_wal.record_intent(tmp_path, _record(op_id=bad))
+    assert not (tmp_path.parent / "evil.json").exists()
+
+
+def test_wal_load_rejects_mistyped_state(tmp_path):
+    """A parseable record with state 'intnet' must fail closed — silently
+    skipping it would wave a new push past an unresolved intent."""
+    p = push_wal.record_intent(tmp_path, _record())
+    data = json.loads(p.read_text())
+    data["state"] = "intnet"
+    p.write_text(json.dumps(data))
+    with pytest.raises(push_wal.PushWalError, match="unknown state"):
+        push_wal.load_records(tmp_path)
+    data["state"] = "intent"
+    data["intended_oid"] = "zz"
+    p.write_text(json.dumps(data))
+    with pytest.raises(push_wal.PushWalError, match="bad intended_oid"):
+        push_wal.load_records(tmp_path)
+
+
+def test_supersession_requires_same_remote_identity(tmp_path):
+    """origin re-pointed to another repository: the old intent keeps its
+    reconciliation data (and will escalate on its own) — a new push to the
+    NEW repository must not retire it."""
+    repo = _make_repo(tmp_path / "work")
+    _commit(repo, {"docker/Dockerfile.ci": f"ENV PRECOMPILED_WHEEL_COMMIT={UP}\n",
+                   "a.py": "1"}, "base")
+    bare_b = tmp_path / "repo-b.git"
+    subprocess.run(["git", "init", "-q", "--bare", str(bare_b)], check=True)
+    _git(repo, "remote", "add", "origin", str(bare_b))
+    wal = tmp_path / "wal"
+    # intent recorded when origin pointed at repository A
+    push_wal.record_intent(wal, PushRecord(
+        op_id="op-a", repo_root=str(repo), remote_name="origin",
+        remote_url="github.com/org/repo-a",
+        dest_ref="refs/heads/ci-x", pre_push_oid=ABSENT,
+        intended_oid="e" * 40))
+    out = push_to_ci.commit_and_push(
+        repo, branch="ci-x", wal_dir=wal, op_id="op-b",
+        **_push_kwargs(unstage_globs=[]))
+    # the mismatched-identity intent escalates the run — never superseded
+    assert not out.pushed and "escalated" in out.reason
+    recs = {r.op_id: r for r in push_wal.load_records(wal)}
+    assert recs["op-a"].state == "intent"
+
+
 def test_remote_ref_oid_error_is_credential_free(tmp_path):
     def run(cmd, **kw):
         return SimpleNamespace(returncode=128, stdout="", stderr="denied")
