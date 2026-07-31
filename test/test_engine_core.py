@@ -343,7 +343,7 @@ def test_agent_loop_partial_e2e(omni_repo, trace, tmp_path):
         plan_write_prefix=str(tmp_path / "plans"),
         agent_log=str(tmp_path / "agent.log")))
 
-    assert result == {"done": True,
+    assert result == {"done": True, "plan_done": True,
                       "text": "module rebased; all checks green", "turns": 4}
     # plan gate: turns 1-2 must NOT offer the gated tools; turn 3 must
     names_by_turn = [[t["name"] for t in req["tools"]]
@@ -642,7 +642,7 @@ def test_agent_loop_truncation_streak_aborts(omni_repo):
     result = asyncio.run(run_agent_loop(
         client, "P", model="m", tool_defs=defs, extra_tools=tools,
         require_plan_review=False))
-    assert result == {"done": False,
+    assert result == {"done": False, "plan_done": False,
                       "text": "Aborted: repeated output truncation", "turns": 3}
 
 
@@ -668,7 +668,8 @@ def test_agent_loop_turn_budget(omni_repo):
     r = asyncio.run(run_agent_loop(client, "P", model="m", tool_defs=defs,
                                    extra_tools=tools, max_turns=3,
                                    require_plan_review=False))
-    assert r == {"done": False, "text": "Agent exceeded max turns", "turns": 3}
+    assert r == {"done": False, "text": "Agent exceeded max turns",
+                 "turns": 3, "plan_done": False}
 
 
 # -- planner requires filter ---------------------------------------------------
