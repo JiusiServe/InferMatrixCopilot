@@ -403,6 +403,35 @@ def test_kill_tree_reused_root_children_never_walked():
     assert (11, signal.SIGTERM) in events
 
 
+def test_kill_tree_root_reused_mid_walk_children_dropped():
+    """A root can pass the pre-walk identity check, exit, and be reused
+    DURING the descendant walk: its stranger children arrive identity-less
+    and must be rejected by the post-walk re-validation of the root."""
+    import infermatrix_copilot.testing.process_tree as pt
+    events = []
+    births = {10: 111}  # pre-walk read matches the recorded identity
+
+    def cd(pid, children_of=None):
+        births[10] = 999  # the root is recycled while we walk it
+        return [pid, 30, 31]
+
+    orig = (pt._alive, pt._start_time, pt._proc_stat_ids,
+            pt.collect_descendants)
+    pt._alive = lambda pid: True
+    pt._start_time = lambda pid: births.get(pid, 500)
+    pt._proc_stat_ids = lambda pid: {10: (1, births[10]), 30: (10, 300),
+                                     31: (10, 310)}.get(pid)
+    pt.collect_descendants = cd
+    try:
+        pt.kill_tree([10], kill=lambda p, s: events.append((p, s)),
+                     sleep=lambda s: None, identity={10: 111})
+    finally:
+        (pt._alive, pt._start_time, pt._proc_stat_ids,
+         pt.collect_descendants) = orig
+    # 30/31 belong to the recycled stranger: no chain to a re-verified root
+    assert not any(p in (30, 31) for p, _ in events)
+
+
 def test_snapshot_record_walk_binds_identity_to_ancestry():
     """The accumulate-only snapshot must never retain a pid it cannot verify:
     no birth time (died mid-walk), or a ppid outside the walked tree (pid

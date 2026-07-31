@@ -232,6 +232,13 @@ def _validate_block(key: str, block, root: Path) -> tuple[list[str],
         p = p.strip()
         _safe_rel(root, p)
         paths.append(p)
+    # discarding a path restores it to HEAD, so committing the same path is
+    # self-contradictory: the commit would fail AFTER the discard already
+    # destroyed the changes irreversibly — reject during preflight instead
+    overlap = sorted(set(discards) & set(paths))
+    if overlap:
+        raise DecisionError(
+            f"'{key}' names the same path(s) in discard and commit: {overlap}")
     return discards, (msg.strip(), paths)
 
 

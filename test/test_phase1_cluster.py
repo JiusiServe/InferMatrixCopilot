@@ -461,6 +461,11 @@ def test_decision_validated_before_any_mutation(tmp_path):
         # falsey non-list shapes must reject, not coerce to "no discards"
         {"vllm": {"discard": ["a.py"]}, "omni": {"discard": ""}},
         {"vllm": {"discard": ["a.py"]}, "omni": {"discard": {}}},
+        # discard+commit of the same path: the commit would fail only AFTER
+        # the discard destroyed the changes — must reject in preflight
+        {"vllm": {"discard": ["a.py"],
+                  "commit": {"message": "m", "paths": ["a.py"]}},
+         "omni": {"discard": []}},
     ]
     for decision in cases:
         with pytest.raises(worktree.DecisionError):
@@ -754,6 +759,21 @@ def test_drift_guard_pooling_entry_names_actual_upstream_class():
     assert pooling == [("vllm.entrypoints.pooling.pooling.serving",
                         "ServingPooling", "ServingPooling",
                         "vllm_omni/entrypoints/openai/api_server.py")]
+
+
+def test_drift_guard_unimportable_checked_class_fails_guard(
+        drift_guard, tmp_path, monkeypatch, capsys):
+    """An unimportable constructor-checked class IS drift (upstream
+    moved/renamed it) and must fail the guard — the silent SKIP is exactly
+    how the dead pooling entry went unnoticed in the parent. Offline (no
+    vllm installed) every constructor check import-fails, so main() must
+    return 1 with a MISMATCH per entry."""
+    monkeypatch.chdir(tmp_path)   # no tests/ dir; nothing else to scan
+    rc = drift_guard.main()
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert out.count("__init__ call-check: cannot import") == 4
+    assert "ServingPooling" in out
 
 
 def test_drift_guard_removed_base_method_calls(drift_guard):

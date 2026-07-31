@@ -2,7 +2,10 @@
 # api_drift_guard.py — Inheritance/constructor/unpack drift guard for vllm-omni.
 # Ported from the rebase agent (agent/lib/api_drift_guard.py); runs
 # standalone with the TARGET repo python (cwd or OMNI_PATH = vllm-omni root).
-# Verbatim except the pooling constructor entry (see its inline comment).
+# Verbatim except two documented divergences: the pooling constructor entry
+# (parent's spelling could never import) and constructor-check import
+# failures counting as mismatches instead of silent SKIPs (see inline
+# comments at both sites).
 # Repo-specific maps (INHERITANCE_MAP etc.) are the point of this file living
 # in the adapter tree; the copilot core never imports it.
 # Run with cwd = vllm-omni repo root (same as tasks/41_check_api_drift.sh).
@@ -319,7 +322,17 @@ def main() -> int:
             init_sig = inspect.signature(cls.__init__)
             required = required_params_without_self(init_sig)
         except Exception as e:
-            print(f"SKIP  {call_name}.__init__ call-check: import/signature error — {e}")
+            # Deliberate divergence from the parent, which SKIPped here: an
+            # unimportable checked class IS the drift this guard exists to
+            # catch (upstream moved/renamed it), and the silent SKIP is how
+            # the dead pooling entry went unnoticed. INHERITANCE_MAP keeps
+            # its SKIP (platform-legitimate absences); these four serving
+            # classes are unconditional in any installed env.
+            msg = (f"MISMATCH {call_name}.__init__ call-check: cannot import "
+                   f"{mod_path}.{import_class_name} — upstream moved/renamed "
+                   f"it (or the env is not installed): {e}")
+            print(msg)
+            mismatches.append(msg)
             continue
 
         target_file = Path(rel_file)

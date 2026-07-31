@@ -115,6 +115,37 @@ def kill_tree(pids: list[int], *, term_grace: float = 2.0,
                 continue
         roots.append(p)
     candidates = sorted({d for p in roots for d in collect_descendants(p)})
+
+    # a root can pass the pre-walk check, exit, and be reused DURING the
+    # walk — its stranger children would enter as identity-less candidates.
+    # So walked-up candidates are accepted only on an ancestry chain anchored
+    # at a root whose identity holds AFTER the walk (re-read here); pids with
+    # their own recorded identity are exempt (the per-pid baseline below
+    # drops reused ones). Legacy roots without recorded identity keep the
+    # historical behavior. The residual window is the stat-read-to-signal
+    # gap, irreducible without pidfds.
+    info = {p: _proc_stat_ids(p) for p in candidates}
+    # `chain` holds ancestry ANCHORS: legacy roots (no identity knowledge —
+    # historical behavior) and pids whose recorded identity matches their
+    # post-walk stat read. A merely-recorded pid is still a TARGET (the
+    # per-pid baseline below drops it if reused) but must not anchor
+    # children without this re-verification.
+    chain: set[int] = {r for r in roots if provided.get(r) is None}
+    for p in candidates:
+        rec = provided.get(p)
+        if rec is not None and info.get(p) is not None and info[p][1] == rec:
+            chain.add(p)
+    changed = True
+    while changed:
+        changed = False
+        for p in candidates:
+            if p in chain or p in provided:
+                continue
+            ids = info.get(p)
+            if ids is not None and ids[0] in chain:
+                chain.add(p)
+                changed = True
+    candidates = [p for p in candidates if p in chain or p in provided]
     # capture identity BEFORE signalling: after the grace sleep a target's pid
     # may have been reaped and reused, and escalating SIGKILL by bare pid would
     # then hit an unrelated process
