@@ -1,7 +1,7 @@
 ---
 title: "独立审查执行合同"
 created: 2026-07-13
-updated: 2026-07-30
+updated: 2026-07-31
 type: guide
 tags: [general, review]
 sources: ["InferMatrixCopilot Issue #17", "InferMatrixCopilot Issue #24", "zuiho-kai/claude-workflow-starter@c217fc6"]
@@ -23,15 +23,26 @@ sources: ["InferMatrixCopilot Issue #17", "InferMatrixCopilot Issue #24", "zuiho
 - 验证合同：真实命中路径、相关测试、未验证边界；
 - 设计减法：越界 scope、重复 abstraction、最小 owner 设计。
 
+## 60 秒渐进状态
+
+审查开始后 60 秒内，宿主先在当前对话报告：
+
+- 固定的 head SHA；
+- 当前 CI 状态；
+- 当前可合并性；
+- 已有早期 finding，或明确写“暂未发现”。
+
+早期 finding 必须标记为“初步”，宿主随后继续同一次审查。该状态只用于避免用户长时间看不到进展，不是完整 review，也不是 GitHub 评论；不能发布“初稿评论”，最终仍只有一篇合并后的 review comment。CI 未完成或可合并性未知时报告真实状态，不等待它们完成才发进度。
+
 ## 完成条件
 
-审查分三轮，顺序不能交换：
+审查按以下顺序执行；减法轮由信号触发：
 
 1. **覆盖轮：** 冻结基线和完整 diff。先按[通用设计审查规则](../rules.md)检查同族实现和条件分支的结构触发；命中时记录 `REV-1a`/`REV-1b` 的覆盖结论。owner 定义审查触发组时，选择 `core` 加当前 diff 命中的组并完整枚举组内稳定 ID；没有触发组时才枚举该 owner 全部稳定 ID。随后填写当前可达公开入口和 changed-value producer→consumer 表。
-2. **减法轮：** 先按用户目标和当前 RFC/mini spec slice 删除越界 behavior、文件和测试；再枚举保留的 production abstraction，写出最小 owner 设计和逐项减法账本。
+2. **条件减法轮：** diff 新增或扩张 helper、class、fallback、兼容分支或公共行为时，先按用户目标和当前 RFC/mini spec slice 删除越界 behavior、文件和测试；再枚举保留的 production abstraction，写出最小 owner 设计和逐项减法账本。没有这些信号时记录 `subtraction_signal=none` 并跳过。
 3. **开放轮：** 再查 correctness、duplication、layering、edge cases、surface area 和命中的专项风险。
 
-找到很多新问题不能代替覆盖轮或减法轮。任一轮发现 P0/P1/P2 都不能提前结束其他轮次。缺少所选规则行、可达入口、changed-value consumer、scope ledger、abstraction census、最小设计或证据时，结论只能是 `partial review`；不能说 `clean`、`ready` 或 `fully reviewed`。
+找到很多新问题不能代替覆盖轮或已触发的减法轮。任一轮发现 P0/P1/P2 都不能提前结束其他适用轮次。缺少所选规则行、可达入口或 changed-value consumer 时，结论只能是 `partial review`；减法信号已触发时，缺少 scope ledger、abstraction census、最小设计或证据也只能是 `partial review`。普通小修没有减法信号时不要求这些产物。
 
 规则覆盖表、入口矩阵和 producer→consumer trace 是 reviewer 的内部审计产物，不是默认
 给用户看的 review。对外只交付已经证实、能落到具体代码位置的 actionable findings。
@@ -49,7 +60,7 @@ sources: ["InferMatrixCopilot Issue #17", "InferMatrixCopilot Issue #24", "zuiho
 
 ## 解释压力反查
 
-减法轮必须用最终 head 做一次不依赖历史的人话解释：只说输入、每个 source × scope 的唯一 owner 产物和最终 consumer。若必须靠修复时间线说明结构，检查：
+减法信号触发后，减法轮必须用最终 head 做一次不依赖历史的人话解释：只说输入、每个 source × scope 的唯一 owner 产物和最终 consumer。若必须靠修复时间线说明结构，检查：
 
 - 两个字段组、helper 或中间对象没有不同 consumer，最终只是立即合并、转发或拆后再合；
 - 同一 owner 产物跨层不断换名，尤其把已校验 projection 又叫回 raw request 或 kwargs；
@@ -58,9 +69,15 @@ sources: ["InferMatrixCopilot Issue #17", "InferMatrixCopilot Issue #24", "zuiho
 
 命中后写出“当前结构 → 最小结构 → 具体删除或迁移项”。只有 representation、lifecycle 或 failure policy 不同才允许额外层；“兼容复杂”“测试很多”不是证明。
 
-## 减法轮交付合同
+## 触发式减法合同
 
-减法轮先做 scope subtraction，再做 architecture subtraction，并在内部审计中交付：
+先检查 diff 是否新增或扩张以下任一信号：
+
+- helper 或 class；
+- fallback 或兼容分支；
+- 对外 API、CLI、配置、默认值等公共行为。
+
+没有信号时标记 `subtraction_signal=none`，不要求 scope ledger、abstraction census 或完整最小性证明。命中任一信号时标记 `subtraction_signal=triggered`，再做 scope subtraction 和 architecture subtraction，并在内部审计中交付：
 
 1. **Scope ledger：** 每个新增 behavior、production 文件和测试组映射到当前目标或 RFC slice；无法映射就 `DELETE / DEFER`。
 2. **当前 census：** 枚举保留范围内新增或扩张的 helper、class、field group、allowlist、owner projection、跨层 artifact 和末端补偿。
@@ -79,20 +96,25 @@ correctness bug 不算减法。减法 `PASS` 必须给可执行的删/并/内联
 3. 正文依次说清具体触发输入/调用路径、当前行为、为什么有风险、最小修复方向。
 4. 不显示规则 ID、覆盖表、入口矩阵、`PASS`、`MISSING_EVIDENCE` 或 `Disposition`；
    这些只在用户明确要求完整审计产物时附上。
-5. 单独给出一到三项具体 scope/architecture 减法；没有可删项时简短说明最小设计证据。
+5. 只有减法信号触发时，才给出具体 scope/architecture 减法；普通小修不需要单独写减法或最小性证明。
 6. 没有 actionable finding 时只简短说明没有发现问题，并指出真正影响结论的验证缺口。
 
 规则用于帮助 reviewer 找到问题和防止漏检，不能成为用户自己翻译的输出格式。
 
-Direct MCP 提供完成检查工具时，最终评论前必须提交以下二选一结构：
+Direct MCP 提供完成检查工具时，最终评论前先提交 `subtraction_signal`：
+
+- `none`：本 diff 没有新增或扩张 helper、class、fallback、兼容分支或公共行为，
+  不需要额外证明；
+- `triggered`：必须继续提交以下二选一结构：
 
 - `subtraction`: 每项包含具体代码锚点、`DELETE / DEFER / INLINE / MERGE / MOVE`
   动作和风险；
 - `minimality_proof`: 包含 scope ledger 结论、abstraction census 结论，以及
   为什么没有安全删除项。
 
-两者都缺失时只能返回 `partial_review`，复用现有证据补一次有界减法检查后重新
-验证。检查不要求每个 PR 硬凑删除项，也不允许因此产生第二篇评论。
+未分类时返回 `partial_review`。只有 `triggered` 且两类证据都缺失时，才复用现有
+证据补一次有界减法检查后重新验证。普通小修不能被迫写完整最小性证明，也不允许
+因此产生第二篇评论。
 
 ### Source-consumer decision matrix
 

@@ -32,9 +32,13 @@ The plugin also adds the `imreview` skill, so the short form is:
 Codex calls `review`, receives the local `knowledge/AGENTS.md` path plus a
 compact first-review checklist, and follows that document's routing map itself.
 The MCP does not guess which owner applies and does not inject complete rule
-pages. Before the only final review comment, Codex calls
-`validate_direct_review`; a `partial_review` result requires one bounded
-subtraction pass using the evidence already collected.
+pages. Within 60 seconds, Codex reports the pinned head SHA, current CI,
+mergeability, and preliminary findings in the host conversation, then continues
+the same review without posting an interim GitHub comment. Before the only final review comment, Codex calls
+`validate_direct_review`. A normal small fix uses `subtraction_signal="none"`
+without a minimality proof. Only a diff that adds or expands a helper, class,
+fallback, compatibility branch, or public behavior uses `"triggered"` and
+requires subtraction evidence.
 
 The tool response is intentionally small:
 
@@ -42,10 +46,22 @@ The tool response is intentionally small:
 {
   "mode": "direct",
   "knowledge_entry": "C:\\...\\InferMatrixCopilot\\knowledge\\AGENTS.md",
-  "first_review_checklist": ["...", "Complete a bounded subtraction pass ..."],
+  "first_review_checklist": ["...", "Run subtraction only when the diff has a subtraction signal ..."],
+  "progress_update": {
+    "deadline_seconds": 60,
+    "channel": "host_conversation",
+    "required_fields": ["head_sha", "ci_status", "mergeability", "early_findings"],
+    "early_findings_status": "preliminary",
+    "continue_review": true,
+    "github_comment": false
+  },
   "completion_gate": {
     "tool": "validate_direct_review",
-    "require_one_of": [
+    "subtraction_signal": {
+      "none": "no subtraction evidence required",
+      "triggered": "require subtraction evidence"
+    },
+    "triggered_require_one_of": [
       "subtraction[{anchor, action, risk}]",
       "minimality_proof{scope_ledger, abstraction_census, why_no_safe_deletion}"
     ],
@@ -77,11 +93,13 @@ confirm that `infermatrix-copilot` is connected.
 ## What the default MCP exposes
 
 - `review(target, repo?, mode="direct", post=false)`: Direct ignores `repo`
-  and returns `knowledge/AGENTS.md`, the first-review checklist, and the
-  single-comment completion contract. Strict maps to the previous Eco workflow.
-- `validate_direct_review(subtraction?, minimality_proof?, final_comment_count=1)`:
-  requires either anchored subtraction actions or concrete evidence that the
-  inspected scope is already minimal. Missing evidence returns `partial_review`.
+  and returns `knowledge/AGENTS.md`, the first-review checklist, the 60-second
+  host-conversation update contract, and the single-comment completion contract.
+  Strict maps to the previous Eco workflow.
+- `validate_direct_review(subtraction_signal, subtraction?, minimality_proof?,
+  final_comment_count=1)`: `none` completes an ordinary small fix without a
+  minimality proof. `triggered` requires anchored subtraction actions or
+  concrete evidence that the inspected scope is already minimal.
 - `update_knowledge(repo?)`: keeps `repo` only for call compatibility and
   returns `knowledge/CONTRIBUTING.md`; the host model follows that document and
   edits the Markdown files itself.

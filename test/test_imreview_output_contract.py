@@ -5,7 +5,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 IMREVIEW_PROMPTS = (
-    ROOT / "plugin" / "skills" / "imreview" / "SKILL.md",
+    ROOT / "plugins" / "infermatrix-copilot" / "skills" / "imreview" / "SKILL.md",
     ROOT / "integrations" / "cursor" / "imreview.md",
 )
 
@@ -18,3 +18,11 @@ def test_imreview_returns_github_style_findings(prompt_path: Path) -> None:
     assert "exact path and line/hunk" in prompt
     assert "do not expose rule IDs, coverage tables, matrices" in prompt
     assert "unless the user explicitly asks for the full audit artifact" in prompt
+    assert "Within 60 seconds" in prompt
+    assert "pinned head SHA" in prompt
+    assert "current CI status, mergeability, and any early findings" in prompt
+    assert "not a GitHub comment" in prompt
+    assert "do not post an interim review" in prompt
+    assert "classify `subtraction_signal`" in prompt
+    assert "Use `none` without a minimality proof" in prompt
+    assert "Use `triggered` for those changes" in prompt

@@ -112,10 +112,13 @@ Agent 按该入口已有的目录地图和落盘规范，自行选择 owner、�
 ## 默认 MCP 工具
 
 - `review(target, repo?, mode?, post?)`：Direct 返回审查知识入口、首轮简明
-  checklist 和单评论完成门禁；显式指定 `mode="strict"` 时运行旧 Eco 审查工作流。
-- `validate_direct_review(subtraction?, minimality_proof?, final_comment_count?)`：
-  Direct 最终评论前的结构检查。缺少具体减法项或最小性证明时返回
-  `partial_review`，要求复用现有证据补一次有界减法检查。
+  checklist、60 秒宿主对话进度合同和单评论完成门禁；显式指定
+  `mode="strict"` 时运行旧 Eco 审查工作流。进度只显示在当前对话，不会发布
+  GitHub 初稿评论。
+- `validate_direct_review(subtraction_signal, subtraction?, minimality_proof?,
+  final_comment_count?)`：Direct 最终评论前先分类减法信号。普通小修传 `none`
+  即可；新增或扩张 helper、class、fallback、兼容分支或公共行为时传
+  `triggered`，此时才要求具体减法项或最小性证明。
 - `get_review_result(run_id)`：轮询 Strict 结果。
 - `get_review_status(run_id)`：查看 Strict 的原工作流进度。
 - `update_knowledge(repo?)`：`repo` 仅为兼容旧调用保留，返回知识维护入口。
@@ -126,7 +129,7 @@ Agent 按该入口已有的目录地图和落盘规范，自行选择 owner、�
 
 | 模式 | 适合场景 | 说明 |
 |---|---|---|
-| Direct（默认） | 日常 PR 和本地审查 | Agent 自己完成一次审查；MCP 提供知识入口、首轮 checklist 和减法完成门禁 |
+| Direct（默认） | 日常 PR 和本地审查 | Agent 自己完成一次审查；MCP 提供知识入口、首轮 checklist 和触发式减法检查 |
 | Strict | 需要旧版完整审查工作流 | Strict 只是旧 Eco 的新名称，继续使用原 playbook、模型和运行状态 |
 | Autonomous | 需要独立执行器 | 使用单独配置的模型和工作流 |
 

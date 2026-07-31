@@ -45,12 +45,27 @@ _REPO_ALIASES = {
 }
 _DIRECT_REVIEW_CHECKLIST = [
     "Freeze one base/head snapshot and collect PR intent, diff, mergeability, and CI once.",
+    "Within 60 seconds, report head SHA, CI, mergeability, and preliminary findings in the host conversation; continue the review without posting a GitHub comment.",
     "Route PR title/body to exact owner/model rules; use changed files only to validate scope.",
     "Reuse one evidence packet for callers, tests, correctness findings, and design/subtraction.",
-    "Complete a bounded subtraction pass before finalizing, even when correctness bugs were found.",
+    "Run subtraction only when the diff adds or expands a helper, class, fallback, compatibility branch, or public behavior; otherwise mark no subtraction signal.",
     "Plan exactly one consolidated final review comment.",
 ]
+_DIRECT_PROGRESS_UPDATE = {
+    "deadline_seconds": 60,
+    "channel": "host_conversation",
+    "required_fields": [
+        "head_sha",
+        "ci_status",
+        "mergeability",
+        "early_findings",
+    ],
+    "early_findings_status": "preliminary",
+    "continue_review": True,
+    "github_comment": False,
+}
 _SUBTRACTION_ACTIONS = {"DELETE", "DEFER", "INLINE", "MERGE", "MOVE"}
+_SUBTRACTION_SIGNALS = {"none", "triggered"}
 
 
 def _normalize_repo(repo: str) -> str:
@@ -90,23 +105,28 @@ def _knowledge_entry(name: str) -> str:
 
 
 def _direct_completion_result(
+    subtraction_signal: str = "",
     subtraction: Optional[list[dict[str, str]]] = None,
     minimality_proof: Optional[dict[str, str]] = None,
     final_comment_count: int = 1,
 ) -> dict:
-    """Mechanically gate Direct completion on subtraction evidence.
+    """Mechanically gate Direct completion on subtraction classification.
 
     This deliberately checks structure, not whether the review evidence is
-    true. The host still owns the code review, but cannot call a bug-only
-    result complete without either actionable subtraction or a concrete
-    explanation of why the inspected scope is already minimal.
+    true. A diff without a subtraction trigger can finish after explicitly
+    declaring ``none``. Triggered diffs still need actionable subtraction or
+    concrete evidence that the inspected scope is already minimal.
     """
+    subtraction_signal = str(subtraction_signal).strip().casefold()
     subtraction = subtraction or []
     minimality_proof = minimality_proof or {}
     missing: list[str] = []
 
     if final_comment_count != 1:
         missing.append("final_comment_count must be exactly 1")
+
+    if subtraction_signal not in _SUBTRACTION_SIGNALS:
+        missing.append("subtraction_signal must be 'none' or 'triggered'")
 
     malformed_subtractions: list[int] = []
     for index, item in enumerate(subtraction):
@@ -140,9 +160,21 @@ def _direct_completion_result(
         len(str(minimality_proof.get(field, "")).strip()) >= 12
         for field in proof_fields
     )
-    if not has_subtraction and not has_minimality_proof:
+    if (
+        subtraction_signal == "none"
+        and (subtraction or minimality_proof)
+    ):
         missing.append(
-            "provide subtraction items or a concrete minimality_proof with "
+            "subtraction_signal 'none' cannot include subtraction evidence"
+        )
+    elif (
+        subtraction_signal == "triggered"
+        and not has_subtraction
+        and not has_minimality_proof
+    ):
+        missing.append(
+            "triggered subtraction requires subtraction items or a concrete "
+            "minimality_proof with "
             "scope_ledger, abstraction_census, and why_no_safe_deletion"
         )
 
@@ -151,13 +183,15 @@ def _direct_completion_result(
         "status": "complete" if complete else "partial_review",
         "publish_ready": complete,
         "final_comment_count": final_comment_count,
+        "subtraction_signal": subtraction_signal,
+        "subtraction_required": subtraction_signal == "triggered",
         "subtraction_items": len(subtraction),
         "minimality_proof": has_minimality_proof,
         "missing": missing,
         "next_action": (
             "Return the single consolidated review comment."
             if complete
-            else "Run one bounded subtraction pass using the existing evidence packet, then validate again."
+            else "Classify the subtraction signal; only a triggered diff needs one bounded subtraction pass using the existing evidence packet."
         ),
     }
 
@@ -218,10 +252,15 @@ def build_mcp(
         instructions=(
             "Use review in direct mode unless the user explicitly requests "
             "Strict. Direct returns a knowledge entry and compact first-review "
-            "checklist for the host model. Before treating a Direct review as "
+            "checklist for the host model. Within 60 seconds the host reports "
+            "head SHA, CI, mergeability, and preliminary findings in its "
+            "conversation, then continues reviewing without posting an early "
+            "GitHub comment. Before treating a Direct review as "
             "complete or posting its only final comment, call "
-            "validate_direct_review. A partial_review result requires one "
-            "bounded subtraction pass using the existing evidence packet. "
+            "validate_direct_review. Mark subtraction_signal=none when the diff "
+            "does not add or expand a helper, class, fallback, compatibility "
+            "branch, or public behavior. Only subtraction_signal=triggered "
+            "requires subtraction evidence. "
             "Strict is the previous Eco workflow under a new public name: it "
             "runs the configured workflow model, returns a run_id, and must be "
             "polled with get_review_result until terminal. Posting is never "
@@ -254,9 +293,19 @@ def build_mcp(
                     "mode": "direct",
                     "knowledge_entry": _knowledge_entry("AGENTS.md"),
                     "first_review_checklist": list(_DIRECT_REVIEW_CHECKLIST),
+                    "progress_update": {
+                        **_DIRECT_PROGRESS_UPDATE,
+                        "required_fields": list(
+                            _DIRECT_PROGRESS_UPDATE["required_fields"]
+                        ),
+                    },
                     "completion_gate": {
                         "tool": "validate_direct_review",
-                        "require_one_of": [
+                        "subtraction_signal": {
+                            "none": "No helper/class/fallback/compatibility/public-behavior expansion; no subtraction evidence required.",
+                            "triggered": "Require subtraction items or minimality_proof.",
+                        },
+                        "triggered_require_one_of": [
                             "subtraction[{anchor, action, risk}]",
                             "minimality_proof{scope_ledger, abstraction_census, why_no_safe_deletion}",
                         ],
@@ -279,18 +328,21 @@ def build_mcp(
 
     @mcp.tool()
     def validate_direct_review(
+        subtraction_signal: str = "",
         subtraction: Optional[list[dict[str, str]]] = None,
         minimality_proof: Optional[dict[str, str]] = None,
         final_comment_count: int = 1,
     ) -> dict:
         """Validate the Direct completion gate before the only final comment.
 
-        Supply actionable subtraction items when safe deletion, merge, inline,
-        or scope deferral exists. Otherwise supply concrete scope-ledger and
-        abstraction-census evidence explaining why no safe deletion remains.
-        A ``partial_review`` result is not a completed Direct review.
+        Use ``subtraction_signal='none'`` when the diff does not add or expand a
+        helper, class, fallback, compatibility branch, or public behavior. Use
+        ``'triggered'`` for those diffs, then supply actionable subtraction
+        items or concrete minimality evidence. A ``partial_review`` result is
+        not a completed Direct review.
         """
         return _direct_completion_result(
+            subtraction_signal=subtraction_signal,
             subtraction=subtraction,
             minimality_proof=minimality_proof,
             final_comment_count=final_comment_count,

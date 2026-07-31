@@ -81,6 +81,7 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
         "mode",
         "knowledge_entry",
         "first_review_checklist",
+        "progress_update",
         "completion_gate",
     }
     assert review["mode"] == "direct"
@@ -90,9 +91,26 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
         "subtraction" in item
         for item in review["first_review_checklist"]
     )
+    assert review["progress_update"] == {
+        "deadline_seconds": 60,
+        "channel": "host_conversation",
+        "required_fields": [
+            "head_sha",
+            "ci_status",
+            "mergeability",
+            "early_findings",
+        ],
+        "early_findings_status": "preliminary",
+        "continue_review": True,
+        "github_comment": False,
+    }
     assert review["completion_gate"] == {
         "tool": "validate_direct_review",
-        "require_one_of": [
+        "subtraction_signal": {
+            "none": "No helper/class/fallback/compatibility/public-behavior expansion; no subtraction evidence required.",
+            "triggered": "Require subtraction items or minimality_proof.",
+        },
+        "triggered_require_one_of": [
             "subtraction[{anchor, action, risk}]",
             "minimality_proof{scope_ledger, abstraction_census, why_no_safe_deletion}",
         ],
@@ -108,40 +126,71 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
     )
 
 
-def test_direct_completion_requires_subtraction_or_minimality_proof():
+def test_direct_completion_requires_subtraction_signal_classification():
     result = _direct_completion_result()
 
     assert result["status"] == "partial_review"
     assert result["publish_ready"] is False
-    assert result["missing"]
+    assert result["missing"] == [
+        "subtraction_signal must be 'none' or 'triggered'"
+    ]
 
 
-def test_issue_24_direct_completion_accepts_single_comment_with_subtractions():
-    result = _direct_completion_result(subtraction=[
-        {
-            "anchor": "examples/offline_inference/text_to_image/text_to_image.py:358",
-            "action": "DELETE the unproven tokenizer fallback compatibility path",
-            "risk": "low: default fail-fast behavior remains unchanged",
-        },
-        {
-            "anchor": "examples/offline_inference/image_to_image/image_edit.py:116",
-            "action": "MERGE the duplicated AR-stage application helper into one owner",
-            "risk": "medium: preserve both public CLI call paths",
-        },
-    ])
+def test_small_fix_accepts_no_subtraction_signal_without_full_proof():
+    result = _direct_completion_result(subtraction_signal="none")
 
     assert result["status"] == "complete"
     assert result["publish_ready"] is True
+    assert result["subtraction_required"] is False
+    assert result["subtraction_items"] == 0
+
+
+def test_triggered_subtraction_requires_evidence():
+    result = _direct_completion_result(subtraction_signal="triggered")
+
+    assert result["status"] == "partial_review"
+    assert result["publish_ready"] is False
+    assert result["subtraction_required"] is True
+    assert result["missing"] == [
+        "triggered subtraction requires subtraction items or a concrete "
+        "minimality_proof with scope_ledger, abstraction_census, and "
+        "why_no_safe_deletion"
+    ]
+
+
+def test_issue_5559_trigger_accepts_single_comment_with_subtractions():
+    result = _direct_completion_result(
+        subtraction_signal="triggered",
+        subtraction=[
+            {
+                "anchor": "examples/offline_inference/text_to_image/text_to_image.py:358",
+                "action": "DELETE the unproven tokenizer fallback compatibility path",
+                "risk": "low: default fail-fast behavior remains unchanged",
+            },
+            {
+                "anchor": "examples/offline_inference/image_to_image/image_edit.py:116",
+                "action": "MERGE the duplicated AR-stage application helper into one owner",
+                "risk": "medium: preserve both public CLI call paths",
+            },
+        ],
+    )
+
+    assert result["status"] == "complete"
+    assert result["publish_ready"] is True
+    assert result["subtraction_required"] is True
     assert result["subtraction_items"] == 2
     assert result["final_comment_count"] == 1
 
 
 def test_direct_completion_accepts_concrete_minimality_proof():
-    result = _direct_completion_result(minimality_proof={
-        "scope_ledger": "Every changed production file maps to the requested API fix.",
-        "abstraction_census": "No new helper, class, projection, fallback, or compatibility branch.",
-        "why_no_safe_deletion": "Deleting any changed branch removes the only validated consumer path.",
-    })
+    result = _direct_completion_result(
+        subtraction_signal="triggered",
+        minimality_proof={
+            "scope_ledger": "Every changed production file maps to the requested API fix.",
+            "abstraction_census": "No new helper, class, projection, fallback, or compatibility branch.",
+            "why_no_safe_deletion": "Deleting any changed branch removes the only validated consumer path.",
+        },
+    )
 
     assert result["status"] == "complete"
     assert result["publish_ready"] is True
@@ -150,6 +199,7 @@ def test_direct_completion_accepts_concrete_minimality_proof():
 
 def test_direct_completion_rejects_malformed_subtraction_and_two_comments():
     result = _direct_completion_result(
+        subtraction_signal="triggered",
         subtraction=[{
             "anchor": "examples/task.py:120",
             "action": "",
@@ -164,14 +214,34 @@ def test_direct_completion_rejects_malformed_subtraction_and_two_comments():
 
 
 def test_direct_completion_does_not_count_bug_fixes_as_subtraction():
-    result = _direct_completion_result(subtraction=[{
-        "anchor": "src/adapter.py:42",
-        "action": "FIX the incorrect default value",
-        "risk": "low",
-    }])
+    result = _direct_completion_result(
+        subtraction_signal="triggered",
+        subtraction=[{
+            "anchor": "src/adapter.py:42",
+            "action": "FIX the incorrect default value",
+            "risk": "low",
+        }],
+    )
 
     assert result["status"] == "partial_review"
     assert result["publish_ready"] is False
+
+
+def test_no_signal_rejects_contradictory_subtraction_evidence():
+    result = _direct_completion_result(
+        subtraction_signal="none",
+        subtraction=[{
+            "anchor": "src/adapter.py:42",
+            "action": "DELETE unused compatibility branch",
+            "risk": "low",
+        }],
+    )
+
+    assert result["status"] == "partial_review"
+    assert result["publish_ready"] is False
+    assert result["missing"] == [
+        "subtraction_signal 'none' cannot include subtraction evidence"
+    ]
 
 
 def test_full_github_repo_name_maps_to_knowledge_repo():

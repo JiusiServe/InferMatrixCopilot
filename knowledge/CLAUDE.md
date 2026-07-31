@@ -21,7 +21,11 @@
 
 默认 Direct review 只执行一篇 Codex 审查。先固定 base/head，再一次性获取 PR title/body、changed files、diff、mergeability 和 CI；用 title/body 的声明目标选择精确 owner/model 规则组和第一批源码函数，changed files 只校验并补全真实范围。把已读文件、caller 搜索、测试结果和 findings 放进同一份证据包，correctness 与 design/subtraction 在这次审查中共用，不能各自重新导航或重复采集。
 
-只有首次审查留下新颖、互相矛盾或未覆盖的高风险合同问题时，才对该问题发起一个有边界的专项追问；专项不得重跑通用 diff review，也不得独立发布评论。主审查合并结果后只输出一篇 review comment。需要渐进反馈时在宿主对话或状态中更新，不用“初稿评论 + 最终评论”制造两篇公开审查。
+审查开始后 60 秒内，先在宿主对话中报告固定的 head SHA、当前 CI、可合并性和已有早期 finding；早期 finding 明确标记为“初步”，然后继续同一次审查。没有早期 finding 就明确写“暂未发现”，不能为了进度硬凑问题。该状态不是 GitHub 评论，不发布“初稿评论”。
+
+减法检查先看信号：只有 diff 新增或扩张 helper、class、fallback、兼容分支或公共行为时才标记 `triggered`，并完成有界减法检查。普通小修直接标记 `none`，不写 scope ledger、abstraction census 或完整最小性证明。不能为了通过门禁硬凑减法。
+
+只有首次审查留下新颖、互相矛盾或未覆盖的高风险合同问题时，才对该问题发起一个有边界的专项追问；专项不得重跑通用 diff review，也不得独立发布评论。主审查合并结果后只输出一篇 review comment。
 
 ### 开发任务五分钟首次落盘
 
