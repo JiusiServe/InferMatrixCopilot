@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import signal
 import sys
@@ -15,7 +16,25 @@ from .mcp_policy import PolicyError
 from .mcp_server import CopilotMCP
 
 _ROOT = Path(__file__).resolve().parents[2]
-_KNOWLEDGE = _ROOT / "knowledge"
+
+
+def _knowledge_root() -> Path:
+    override = os.environ.get("INFERMATRIX_KNOWLEDGE_DIR")
+    candidates = [
+        Path(override).expanduser() if override else None,
+        _ROOT / "knowledge",
+        Path(__file__).resolve().parent / "knowledge",
+    ]
+    for candidate in candidates:
+        if candidate is not None and (candidate / "AGENTS.md").is_file():
+            return candidate
+    raise FileNotFoundError(
+        "InferMatrixCopilot knowledge is missing. Reinstall the package or set "
+        "INFERMATRIX_KNOWLEDGE_DIR."
+    )
+
+
+_KNOWLEDGE = _knowledge_root()
 _PR_URL = re.compile(
     r"https?://github\.com/([\w.-]+)/([\w.-]+)/pull/(\d+)",
     re.IGNORECASE,

@@ -3,13 +3,18 @@
 The default MCP is a knowledge provider. Codex uses its currently selected
 model to review code, so there is no API key or model configuration.
 
-## Windows
+## Install
 
-```powershell
-git clone https://github.com/JiusiServe/InferMatrixCopilot.git
-cd InferMatrixCopilot
-.\install-codex.ps1
+```text
+# Windows
+install.cmd
+
+# macOS / Linux
+./install-mcp.sh
 ```
+
+The bootstrap detects Codex automatically. It uses the same MCP descriptor and
+Agent Skill as Claude, Cursor, and other compatible hosts.
 
 Restart Codex, then paste:
 
@@ -18,7 +23,7 @@ Use InferMatrixCopilot to review
 https://github.com/vllm-project/vllm-omni/pull/5172.
 ```
 
-The installer also adds the `imreview` skill, so the short form is:
+The plugin also adds the `imreview` skill, so the short form is:
 
 ```text
 /imreview https://github.com/vllm-project/vllm-omni/pull/5172
@@ -52,18 +57,8 @@ terminal.
 Strict never posts implicitly. Posting still requires both an explicit
 `post=true` tool argument and server-side `ALLOW_POST=1`.
 
-## macOS/Linux
-
-```bash
-git clone https://github.com/JiusiServe/InferMatrixCopilot.git
-cd InferMatrixCopilot
-python3.11 -m venv .venv
-./.venv/bin/python -m pip install -e '.[mcp]'
-codex mcp add infermatrix_copilot -- "$PWD/.venv/bin/infermatrix-copilot-mcp"
-```
-
 Restart Codex after installation. Use `/mcp` or `codex mcp list` if you want to
-confirm that `infermatrix_copilot` is connected.
+confirm that `infermatrix-copilot` is connected.
 
 ## What the default MCP exposes
 

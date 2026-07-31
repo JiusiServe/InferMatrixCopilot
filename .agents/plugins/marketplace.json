@@ -1,0 +1,20 @@
+{
+  "name": "infermatrix-copilot-marketplace",
+  "interface": {
+    "displayName": "InferMatrixCopilot"
+  },
+  "plugins": [
+    {
+      "name": "infermatrix-copilot",
+      "source": {
+        "source": "local",
+        "path": "./plugins/infermatrix-copilot"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

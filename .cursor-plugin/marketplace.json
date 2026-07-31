@@ -1,14 +1,15 @@
 {
   "name": "infermatrix-copilot-marketplace",
   "owner": {
-    "name": "JiusiServe",
-    "url": "https://github.com/JiusiServe"
+    "name": "JiusiServe"
   },
-  "description": "InferMatrixCopilot plugins for maintainer-grounded vLLM-Omni review.",
+  "metadata": {
+    "description": "InferMatrixCopilot plugins"
+  },
   "plugins": [
     {
       "name": "infermatrix-copilot",
-      "source": "./plugins/infermatrix-copilot",
+      "source": "plugins/infermatrix-copilot",
       "description": "Maintainer-grounded vLLM-Omni review knowledge over MCP."
     }
   ]

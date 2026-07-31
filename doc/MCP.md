@@ -1,112 +1,76 @@
-# 在 Codex、Claude Code、Cursor 中使用 InferMatrixCopilot
+# 安装 InferMatrixCopilot
 
-InferMatrixCopilot 是本地 stdio MCP 服务。Agent 仍使用自己当前的模型完成
-代码阅读和审查；MCP 只返回知识库入口，不需要 API Key 或第二个模型。
+InferMatrixCopilot 的核心发布物保持一份：
 
-## 推荐：一键安装
+- `plugins/infermatrix-copilot/.mcp.json`：标准 stdio MCP 描述；
+- `plugins/infermatrix-copilot/skills/imreview/SKILL.md`：开放 Agent Skills；
+- Claude、Codex、Cursor 的市场文件只负责把同一个插件展示出来，不包含各自的安装逻辑。
 
-```powershell
-.\install-codex.ps1
-.\install-claude.ps1
-.\install-cursor.ps1
+## 私有仓库过渡安装
+
+```text
+git clone git@github.com:JiusiServe/InferMatrixCopilot.git
+cd InferMatrixCopilot
+
+# Windows cmd、PowerShell 或双击
+install.cmd
+
+# macOS / Linux
+./install-mcp.sh
 ```
 
-每次只运行与你的 Agent 对应的一条。脚本会同时安装 MCP 和 `imreview`：
+两个入口共用 `scripts/install_mcp.py`，但用户不需要安装或直接运行 Python：
+入口会自动安装 `uv`，再由 `uv` 提供隔离运行环境。安装器会：
+
+- 自动识别 Codex、Claude Code 和 Cursor，检测到几个就安装几个；
+- 保留 Cursor 已有配置并先备份；
+- 没识别到已知 Agent 时生成 `infermatrix-copilot.mcp.json`，不会直接失败。
+
+## 公共市场上线后
+
+在 Agent 的插件市场搜索 `infermatrix-copilot` 并点击安装，然后直接运行：
 
 ```text
 /imreview <PR URL>
 ```
 
-## 手工配置
-
-Windows：
-
-```powershell
-git clone https://github.com/JiusiServe/InferMatrixCopilot.git
-cd InferMatrixCopilot
-py -3 -c "import sys; assert sys.version_info >= (3, 11), 'Python 3.11+ required'"
-py -3 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install "mcp>=1.2,<2" "PyYAML>=6.0"
-```
-
-macOS / Linux：
-
-```bash
-git clone https://github.com/JiusiServe/InferMatrixCopilot.git
-cd InferMatrixCopilot
-python3 -c "import sys; assert sys.version_info >= (3, 11), 'Python 3.11+ required'"
-python3 -m venv .venv
-./.venv/bin/python -m pip install "mcp>=1.2,<2" "PyYAML>=6.0"
-```
-
-## Codex
-
-Windows 直接运行：
-
-```powershell
-.\install-codex.ps1
-```
-
-其他平台和手工配置见 [`docs/codex/README.md`](../docs/codex/README.md)。
-
-## Claude Code
-
-在仓库根目录运行。
-
-Windows PowerShell：
-
-```powershell
-$Root = (Resolve-Path .).Path
-claude mcp add --env "PYTHONPATH=$Root\src" --transport stdio --scope user `
-  infermatrix_copilot -- "$Root\.venv\Scripts\python.exe" `
-  -m infermatrix_copilot.thin_mcp_server
-claude mcp list
-```
-
-macOS / Linux：
-
-```bash
-ROOT="$PWD"
-claude mcp add --env "PYTHONPATH=$ROOT/src" --transport stdio --scope user \
-  infermatrix_copilot -- "$ROOT/.venv/bin/python" \
-  -m infermatrix_copilot.thin_mcp_server
-claude mcp list
-```
-
-## Cursor
-
-把 [`docs/cursor/mcp.json`](../docs/cursor/mcp.json) 复制到项目的
-`.cursor/mcp.json` 或用户目录的 `~/.cursor/mcp.json`，然后把示例中的
-`D:\\path\\to\\InferMatrixCopilot` 替换为真实绝对路径。
+市场只安装同一份 MCP 与 Skill；不会把逐 Agent 逻辑带回核心包。
 
 ## 其他 MCP Agent
 
-只要宿主支持本地 stdio MCP，就使用与 Cursor 相同的三个字段：
+安装器生成的 `infermatrix-copilot.mcp.json` 与
+[`plugins/infermatrix-copilot/.mcp.json`](../plugins/infermatrix-copilot/.mcp.json)
+内容相同，可直接导入支持 stdio MCP 的客户端。开放 Skill 位于：
+
+```text
+plugins/infermatrix-copilot/skills/imreview/SKILL.md
+```
+
+核心 MCP 配置：
 
 ```json
 {
-  "command": "D:\\path\\to\\InferMatrixCopilot\\.venv\\Scripts\\python.exe",
-  "args": ["-m", "infermatrix_copilot.thin_mcp_server"],
-  "env": {
-    "PYTHONPATH": "D:\\path\\to\\InferMatrixCopilot\\src"
+  "mcpServers": {
+    "infermatrix-copilot": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "infermatrix-copilot[mcp] @ git+https://github.com/JiusiServe/InferMatrixCopilot.git@main",
+        "infermatrix-copilot-mcp"
+      ]
+    }
   }
 }
 ```
 
-macOS / Linux 把 `command` 换成 `<repo>/.venv/bin/python`，把
-`PYTHONPATH` 换成 `<repo>/src`。
+这里用 `uvx` 自动拉取并缓存隔离运行环境。宿主如果能消费 MCP Registry，则应优先
+使用 Registry 条目；项目不为每个新 Agent 增加安装分支。
 
-## 使用方法
-
-连接后，对任意 Agent 使用同一句话：
+## 使用
 
 ```text
-Use InferMatrixCopilot to review
-https://github.com/vllm-project/vllm-omni/pull/5172.
+/imreview https://github.com/vllm-project/vllm-omni/pull/5172
 ```
 
-默认 Direct 模式下，`review` 返回 `knowledge/AGENTS.md`，Agent 按其中的地图
-读取相关规则。需要维护知识库时调用 `update_knowledge`；只有用户明确要求时才
-使用 Strict workflow mode。
-
-Direct MCP 不运行模型、不发 GitHub 评论、不推送代码。
+默认 Direct 模式只提供知识库，由 Agent 当前模型完成审查；不会自动评论或推送代码。

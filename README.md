@@ -1,6 +1,6 @@
 # InferMatrixCopilot
 
-让 Codex、Claude Code、Cursor 按 **vLLM-Omni 的项目规则**审查代码。
+让支持 MCP 和 Agent Skills 的 Coding Agent 按 **vLLM-Omni 的项目规则**审查代码。
 
 InferMatrixCopilot 是一个本地 MCP 知识插件。它把维护者沉淀的模型、组件和工程规则
 提供给你正在使用的 Coding Agent，帮助 Agent 少做泛泛的代码检查，多关注真正影响
@@ -14,19 +14,24 @@ vLLM-Omni 的兼容性、正确性和性能问题。
 
 ## 快速开始
 
-要求：Windows、Python 3.11+，以及已经安装好的 Codex、Claude Code 或 Cursor。
+私有仓库过渡期，克隆后运行一个入口。脚本会自动识别本机的 Codex、Claude Code
+和 Cursor，并同时安装 MCP 与 `imreview` Skill。
 
-```powershell
-git clone https://github.com/JiusiServe/InferMatrixCopilot.git
+```text
+git clone git@github.com:JiusiServe/InferMatrixCopilot.git
 cd InferMatrixCopilot
 
-# 只运行与你的 Agent 对应的一条
-.\install-codex.ps1
-.\install-claude.ps1
-.\install-cursor.ps1
+# Windows：双击也可以
+install.cmd
+
+# macOS / Linux
+./install-mcp.sh
 ```
 
-脚本会安装 MCP 和 `/imreview` 命令。重启 Agent 后，把 PR 地址交给它：
+用户不需要运行 PowerShell 或 Python。没有识别到已知 Agent 时，安装器会生成标准
+`infermatrix-copilot.mcp.json`，供 Trae、WorkBuddy 等其他 MCP 客户端导入。
+
+安装后使用：
 
 ```text
 /imreview https://github.com/vllm-project/vllm-omni/pull/5172
@@ -34,8 +39,7 @@ cd InferMatrixCopilot
 
 不带地址时，`/imreview` 会审查当前 PR 或本地工作区。
 
-macOS、Linux、手工配置和其他 MCP Agent 的接入方法见
-[`doc/MCP.md`](doc/MCP.md)。
+公共市场上线后的安装方法和通用 MCP 配置见 [`doc/MCP.md`](doc/MCP.md)。
 
 ## 它是怎么工作的
 
@@ -59,7 +63,7 @@ macOS、Linux、手工配置和其他 MCP Agent 的接入方法见
 
 ## 确认安装成功
 
-在 Agent 中查看 MCP 列表，确认 `infermatrix_copilot` 已连接。Codex 可以运行：
+在 Agent 的 MCP 页面确认 `infermatrix-copilot` 已连接。Codex 可以运行：
 
 ```powershell
 codex mcp list

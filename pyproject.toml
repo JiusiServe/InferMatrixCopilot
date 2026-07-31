@@ -23,11 +23,14 @@ infermatrix-copilot-mcp = "infermatrix_copilot.thin_mcp_server:main"
 infermatrix-copilot-workflow-mcp = "infermatrix_copilot.mcp_server:main"
 
 [build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/infermatrix_copilot"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"knowledge" = "infermatrix_copilot/knowledge"
 
 [tool.pytest.ini_options]
 testpaths = ["test"]
