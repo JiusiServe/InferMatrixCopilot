@@ -84,6 +84,16 @@ correctness bug 不算减法。减法 `PASS` 必须给可执行的删/并/内联
 
 规则用于帮助 reviewer 找到问题和防止漏检，不能成为用户自己翻译的输出格式。
 
+Direct MCP 提供完成检查工具时，最终评论前必须提交以下二选一结构：
+
+- `subtraction`: 每项包含具体代码锚点、`DELETE / DEFER / INLINE / MERGE / MOVE`
+  动作和风险；
+- `minimality_proof`: 包含 scope ledger 结论、abstraction census 结论，以及
+  为什么没有安全删除项。
+
+两者都缺失时只能返回 `partial_review`，复用现有证据补一次有界减法检查后重新
+验证。检查不要求每个 PR 硬凑删除项，也不允许因此产生第二篇评论。
+
 ### Source-consumer decision matrix
 
 同一用户语义如果有多个输入来源、dispatcher、stage 类型或兼容入口，覆盖轮还必须先写完**来源 × consumer scope 决策矩阵**，再读具体实现。每个 source/scope 单元格只能标成：路由到哪个 consumer、与哪些来源重复时拒绝、明确不适用，或非用户 default；不能留给字典合并顺序和分支先后隐式决定。至少验证每个合法单来源、每组同 scope 重复、一个跨 scope 共存 control，以及每条 production dispatcher 的等价结果。矩阵缺失时，即使当前测试和开放轮没有 finding，也只能报 `partial review`。

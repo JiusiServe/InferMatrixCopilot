@@ -43,6 +43,14 @@ _PR_NUMBER = re.compile(r"^(?:pr\s*#?\s*)?(\d+)$", re.IGNORECASE)
 _REPO_ALIASES = {
     "vllm-project/vllm-omni": "vllm-omni",
 }
+_DIRECT_REVIEW_CHECKLIST = [
+    "Freeze one base/head snapshot and collect PR intent, diff, mergeability, and CI once.",
+    "Route PR title/body to exact owner/model rules; use changed files only to validate scope.",
+    "Reuse one evidence packet for callers, tests, correctness findings, and design/subtraction.",
+    "Complete a bounded subtraction pass before finalizing, even when correctness bugs were found.",
+    "Plan exactly one consolidated final review comment.",
+]
+_SUBTRACTION_ACTIONS = {"DELETE", "DEFER", "INLINE", "MERGE", "MOVE"}
 
 
 def _normalize_repo(repo: str) -> str:
@@ -79,6 +87,79 @@ def _knowledge_entry(name: str) -> str:
     if not path.is_file():
         raise FileNotFoundError(f"knowledge entry is missing: {path}")
     return str(path)
+
+
+def _direct_completion_result(
+    subtraction: Optional[list[dict[str, str]]] = None,
+    minimality_proof: Optional[dict[str, str]] = None,
+    final_comment_count: int = 1,
+) -> dict:
+    """Mechanically gate Direct completion on subtraction evidence.
+
+    This deliberately checks structure, not whether the review evidence is
+    true. The host still owns the code review, but cannot call a bug-only
+    result complete without either actionable subtraction or a concrete
+    explanation of why the inspected scope is already minimal.
+    """
+    subtraction = subtraction or []
+    minimality_proof = minimality_proof or {}
+    missing: list[str] = []
+
+    if final_comment_count != 1:
+        missing.append("final_comment_count must be exactly 1")
+
+    malformed_subtractions: list[int] = []
+    for index, item in enumerate(subtraction):
+        if not isinstance(item, dict):
+            malformed_subtractions.append(index)
+            continue
+        anchor = str(item.get("anchor", "")).strip()
+        action = str(item.get("action", "")).strip()
+        risk = str(item.get("risk", "")).strip()
+        action_kind = action.split(maxsplit=1)[0].upper() if action else ""
+        if (
+            ":" not in anchor
+            or action_kind not in _SUBTRACTION_ACTIONS
+            or not risk
+        ):
+            malformed_subtractions.append(index)
+    if malformed_subtractions:
+        missing.append(
+            "each subtraction item needs a path:line anchor, a "
+            "DELETE/DEFER/INLINE/MERGE/MOVE action, and a non-empty risk "
+            f"(invalid indexes: {malformed_subtractions})"
+        )
+
+    has_subtraction = bool(subtraction) and not malformed_subtractions
+    proof_fields = (
+        "scope_ledger",
+        "abstraction_census",
+        "why_no_safe_deletion",
+    )
+    has_minimality_proof = all(
+        len(str(minimality_proof.get(field, "")).strip()) >= 12
+        for field in proof_fields
+    )
+    if not has_subtraction and not has_minimality_proof:
+        missing.append(
+            "provide subtraction items or a concrete minimality_proof with "
+            "scope_ledger, abstraction_census, and why_no_safe_deletion"
+        )
+
+    complete = not missing
+    return {
+        "status": "complete" if complete else "partial_review",
+        "publish_ready": complete,
+        "final_comment_count": final_comment_count,
+        "subtraction_items": len(subtraction),
+        "minimality_proof": has_minimality_proof,
+        "missing": missing,
+        "next_action": (
+            "Return the single consolidated review comment."
+            if complete
+            else "Run one bounded subtraction pass using the existing evidence packet, then validate again."
+        ),
+    }
 
 
 def _strict_review_request(
@@ -136,7 +217,11 @@ def build_mcp(
         "infermatrix-copilot",
         instructions=(
             "Use review in direct mode unless the user explicitly requests "
-            "Strict. Direct returns a knowledge entry for the host model. "
+            "Strict. Direct returns a knowledge entry and compact first-review "
+            "checklist for the host model. Before treating a Direct review as "
+            "complete or posting its only final comment, call "
+            "validate_direct_review. A partial_review result requires one "
+            "bounded subtraction pass using the existing evidence packet. "
             "Strict is the previous Eco workflow under a new public name: it "
             "runs the configured workflow model, returns a run_id, and must be "
             "polled with get_review_result until terminal. Posting is never "
@@ -165,7 +250,20 @@ def build_mcp(
             if selected_mode not in {"direct", "strict"}:
                 raise ValueError("mode must be 'direct' or 'strict'")
             if selected_mode == "direct":
-                return {"knowledge_entry": _knowledge_entry("AGENTS.md")}
+                return {
+                    "mode": "direct",
+                    "knowledge_entry": _knowledge_entry("AGENTS.md"),
+                    "first_review_checklist": list(_DIRECT_REVIEW_CHECKLIST),
+                    "completion_gate": {
+                        "tool": "validate_direct_review",
+                        "require_one_of": [
+                            "subtraction[{anchor, action, risk}]",
+                            "minimality_proof{scope_ledger, abstraction_census, why_no_safe_deletion}",
+                        ],
+                        "final_comment_count": 1,
+                        "if_missing": "partial_review",
+                    },
+                }
 
             request = _strict_review_request(
                 target, repo, post=post, review_depth=review_depth,
@@ -178,6 +276,25 @@ def build_mcp(
             }
 
         return _guard(run)
+
+    @mcp.tool()
+    def validate_direct_review(
+        subtraction: Optional[list[dict[str, str]]] = None,
+        minimality_proof: Optional[dict[str, str]] = None,
+        final_comment_count: int = 1,
+    ) -> dict:
+        """Validate the Direct completion gate before the only final comment.
+
+        Supply actionable subtraction items when safe deletion, merge, inline,
+        or scope deferral exists. Otherwise supply concrete scope-ledger and
+        abstraction-census evidence explaining why no safe deletion remains.
+        A ``partial_review`` result is not a completed Direct review.
+        """
+        return _direct_completion_result(
+            subtraction=subtraction,
+            minimality_proof=minimality_proof,
+            final_comment_count=final_comment_count,
+        )
 
     @mcp.tool()
     def get_review_result(run_id: str, offset: int = 0) -> dict:

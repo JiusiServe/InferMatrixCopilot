@@ -7,6 +7,7 @@ import pytest
 from infermatrix_copilot.knowledge_docs import KnowledgeDocsError
 from infermatrix_copilot.thin_mcp_server import (
     build_mcp,
+    _direct_completion_result,
     _docs,
     _normalize_repo,
 )
@@ -62,6 +63,7 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
     mcp, core = _fake_mcp(monkeypatch)
     assert set(mcp.tools) == {
         "review",
+        "validate_direct_review",
         "get_review_result",
         "get_review_status",
         "update_knowledge",
@@ -75,9 +77,28 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
         mode="direct",
         post=True,
     )
-    assert set(review) == {"knowledge_entry"}
+    assert set(review) == {
+        "mode",
+        "knowledge_entry",
+        "first_review_checklist",
+        "completion_gate",
+    }
+    assert review["mode"] == "direct"
     assert core.requests == []
     assert Path(review["knowledge_entry"]).parts[-2:] == ("knowledge", "AGENTS.md")
+    assert any(
+        "subtraction" in item
+        for item in review["first_review_checklist"]
+    )
+    assert review["completion_gate"] == {
+        "tool": "validate_direct_review",
+        "require_one_of": [
+            "subtraction[{anchor, action, risk}]",
+            "minimality_proof{scope_ledger, abstraction_census, why_no_safe_deletion}",
+        ],
+        "final_comment_count": 1,
+        "if_missing": "partial_review",
+    }
 
     update = mcp.tools["update_knowledge"](repo="owner/repo")
     assert set(update) == {"knowledge_entry"}
@@ -85,6 +106,72 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
         "knowledge",
         "CONTRIBUTING.md",
     )
+
+
+def test_direct_completion_requires_subtraction_or_minimality_proof():
+    result = _direct_completion_result()
+
+    assert result["status"] == "partial_review"
+    assert result["publish_ready"] is False
+    assert result["missing"]
+
+
+def test_issue_24_direct_completion_accepts_single_comment_with_subtractions():
+    result = _direct_completion_result(subtraction=[
+        {
+            "anchor": "examples/offline_inference/text_to_image/text_to_image.py:358",
+            "action": "DELETE the unproven tokenizer fallback compatibility path",
+            "risk": "low: default fail-fast behavior remains unchanged",
+        },
+        {
+            "anchor": "examples/offline_inference/image_to_image/image_edit.py:116",
+            "action": "MERGE the duplicated AR-stage application helper into one owner",
+            "risk": "medium: preserve both public CLI call paths",
+        },
+    ])
+
+    assert result["status"] == "complete"
+    assert result["publish_ready"] is True
+    assert result["subtraction_items"] == 2
+    assert result["final_comment_count"] == 1
+
+
+def test_direct_completion_accepts_concrete_minimality_proof():
+    result = _direct_completion_result(minimality_proof={
+        "scope_ledger": "Every changed production file maps to the requested API fix.",
+        "abstraction_census": "No new helper, class, projection, fallback, or compatibility branch.",
+        "why_no_safe_deletion": "Deleting any changed branch removes the only validated consumer path.",
+    })
+
+    assert result["status"] == "complete"
+    assert result["publish_ready"] is True
+    assert result["minimality_proof"] is True
+
+
+def test_direct_completion_rejects_malformed_subtraction_and_two_comments():
+    result = _direct_completion_result(
+        subtraction=[{
+            "anchor": "examples/task.py:120",
+            "action": "",
+            "risk": "low",
+        }],
+        final_comment_count=2,
+    )
+
+    assert result["status"] == "partial_review"
+    assert result["publish_ready"] is False
+    assert len(result["missing"]) == 3
+
+
+def test_direct_completion_does_not_count_bug_fixes_as_subtraction():
+    result = _direct_completion_result(subtraction=[{
+        "anchor": "src/adapter.py:42",
+        "action": "FIX the incorrect default value",
+        "risk": "low",
+    }])
+
+    assert result["status"] == "partial_review"
+    assert result["publish_ready"] is False
 
 
 def test_full_github_repo_name_maps_to_knowledge_repo():

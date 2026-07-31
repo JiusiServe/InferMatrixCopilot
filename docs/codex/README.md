@@ -29,15 +29,29 @@ The plugin also adds the `imreview` skill, so the short form is:
 /imreview https://github.com/vllm-project/vllm-omni/pull/5172
 ```
 
-Codex calls `review`, receives the local `knowledge/AGENTS.md` path, and follows
-that document's routing map itself. The MCP does not guess which owner applies
-and does not inject complete rule pages.
+Codex calls `review`, receives the local `knowledge/AGENTS.md` path plus a
+compact first-review checklist, and follows that document's routing map itself.
+The MCP does not guess which owner applies and does not inject complete rule
+pages. Before the only final review comment, Codex calls
+`validate_direct_review`; a `partial_review` result requires one bounded
+subtraction pass using the evidence already collected.
 
 The tool response is intentionally small:
 
 ```json
 {
-  "knowledge_entry": "C:\\...\\InferMatrixCopilot\\knowledge\\AGENTS.md"
+  "mode": "direct",
+  "knowledge_entry": "C:\\...\\InferMatrixCopilot\\knowledge\\AGENTS.md",
+  "first_review_checklist": ["...", "Complete a bounded subtraction pass ..."],
+  "completion_gate": {
+    "tool": "validate_direct_review",
+    "require_one_of": [
+      "subtraction[{anchor, action, risk}]",
+      "minimality_proof{scope_ledger, abstraction_census, why_no_safe_deletion}"
+    ],
+    "final_comment_count": 1,
+    "if_missing": "partial_review"
+  }
 }
 ```
 
@@ -63,7 +77,11 @@ confirm that `infermatrix-copilot` is connected.
 ## What the default MCP exposes
 
 - `review(target, repo?, mode="direct", post=false)`: Direct ignores `repo`
-  and returns `knowledge/AGENTS.md`. Strict maps to the previous Eco workflow.
+  and returns `knowledge/AGENTS.md`, the first-review checklist, and the
+  single-comment completion contract. Strict maps to the previous Eco workflow.
+- `validate_direct_review(subtraction?, minimality_proof?, final_comment_count=1)`:
+  requires either anchored subtraction actions or concrete evidence that the
+  inspected scope is already minimal. Missing evidence returns `partial_review`.
 - `update_knowledge(repo?)`: keeps `repo` only for call compatibility and
   returns `knowledge/CONTRIBUTING.md`; the host model follows that document and
   edits the Markdown files itself.
@@ -73,7 +91,8 @@ confirm that `infermatrix-copilot` is connected.
 - `doc_read(path, repo?)`: reads a selected knowledge page.
 
 Direct mode does not run another model, choose a knowledge owner, edit knowledge
-inside the MCP, post comments, or push code.
+inside the MCP, post comments, or push code. The completion validator checks
+review structure; Codex still owns the truth of the cited code evidence.
 
 ## Optional autonomous BYOK workflow
 
