@@ -22,7 +22,7 @@ MCP 和 `imreview`：
 
 Windows 使用 `.ps1`，macOS 和 Linux 使用 `.sh`；两个入口共用同一套安装逻辑。
 旧的 `install-codex.ps1`、`install-claude.ps1` 和 `install-cursor.ps1`
-继续保留。
+继续保留。Windows 请在 PowerShell 中运行，不要在 `cmd.exe` 中直接执行 `.ps1`。
 
 ## 手工配置
 
