@@ -176,19 +176,48 @@ def dispatch(
     tool = (extra or {}).get(name) or TOOLS.get(name)
     if tool is None:
         return {"ok": False, "error": f"unknown tool: {name}", "out_of_scope": False}
-    if extra and name in extra:  # extra tools bypass the builtin allowlist only
+    if extra and name in extra:
+        # Extra tools bypass the BUILTIN allowlist only (the step vetted
+        # them). Opt-in scoping extension: an extra ToolDef that declares
+        # `write_path_arg` gets the same write-path enforcement as builtins
+        # (read-only refusal, writable wall, out-of-scope recording); extras
+        # without the declaration keep the historical bypass unchanged.
+        write_path = (args.get(tool.write_path_arg)
+                      if tool.write_path_arg else None)
+        out_of_scope = False
+        if write_path is not None and scope is not None:
+            if scope.read_only:
+                if trace:
+                    trace.record("tool_refused", tool=name,
+                                 reason="write in read-only scope")
+                return {"ok": False, "error": "refused: write in read-only scope",
+                        "out_of_scope": False}
+            if scope.path_scope is not None:
+                decision = scope.path_scope.check_write(write_path)
+                if not decision.allowed:
+                    if trace:
+                        trace.record("tool_refused", tool=name,
+                                     reason=decision.reason)
+                    return {"ok": False, "error": f"refused: {decision.reason}",
+                            "out_of_scope": False}
+                out_of_scope = decision.out_of_scope
         try:
             result = tool.handler(**args)
             if trace:
-                trace.record("tool_call", tool=name, ok=True, out_of_scope=False,
-                             path=None)
-            return {"ok": True, "result": result, "out_of_scope": False}
+                trace.record("tool_call", tool=name, ok=True,
+                             out_of_scope=out_of_scope,
+                             path=str(write_path) if write_path else None)
+                if out_of_scope:
+                    trace.record("out_of_scope_edit", tool=name,
+                                 path=str(write_path))
+            return {"ok": True, "result": result, "out_of_scope": out_of_scope}
         except Exception as exc:
             if trace:
-                trace.record("tool_call", tool=name, ok=False, out_of_scope=False,
-                             path=None)
+                trace.record("tool_call", tool=name, ok=False,
+                             out_of_scope=out_of_scope,
+                             path=str(write_path) if write_path else None)
             return {"ok": False, "error": f"{type(exc).__name__}: {exc}",
-                    "out_of_scope": False}
+                    "out_of_scope": out_of_scope}
 
     # resolve a relative path arg against the repo root before scoping/exec, so
     # the agent's repo-relative paths reach the actual tree (e.g. a PR worktree)

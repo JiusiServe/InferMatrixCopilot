@@ -152,10 +152,12 @@ class PlaybookStore:
              capabilities: set[str] | None = None) -> Playbook | None:
         """Recall: exact task-kind match, preferring repo match, locked > active.
 
-        Repo-neutral playbooks (`repos: []`) additionally declare `requires:` —
-        the profile capabilities they need (design §V2.2.3). With a known
-        capability set they only match when satisfied; `capabilities=None`
-        means "unknown" and skips the filter (v1-compatible)."""
+        Playbooks declare `requires:` — the profile capabilities they need
+        (design §V2.2.3). With a known capability set, BOTH exact-repo and
+        repo-neutral candidates only match when satisfied (an exact-repo
+        playbook whose adapter lost a capability must fall out of recall,
+        not fail mid-run); `capabilities=None` means "unknown" and skips the
+        filter (v1-compatible)."""
         candidates = [
             p for p in self._playbooks.values()
             if task_kind in p.task_kinds and p.status in ("active", "locked")
@@ -164,21 +166,23 @@ class PlaybookStore:
             scoped = [p for p in candidates if repo in p.repos]
             if not scoped:
                 scoped = [p for p in candidates if not p.repos]
-                if capabilities is not None:
-                    scoped = [p for p in scoped
-                              if set(p.requires) <= capabilities]
+            if capabilities is not None:
+                scoped = [p for p in scoped
+                          if set(p.requires) <= capabilities]
             candidates = scoped
         candidates.sort(key=lambda p: (p.status != "locked", -p.version))
         return candidates[0] if candidates else None
 
     def missing_capabilities(self, task_kind: str,
                              capabilities: set[str]) -> dict[str, list[str]]:
-        """Per repo-neutral playbook of this kind: the unmet requirements
-        (escalation material for capability_gap reporting)."""
+        """Per playbook of this kind — exact-repo AND repo-neutral — the
+        unmet requirements (escalation material for capability_gap
+        reporting; an exact-repo playbook that stopped matching must say
+        WHY, not vanish silently)."""
         return {
             p.name: sorted(set(p.requires) - capabilities)
             for p in self._playbooks.values()
-            if task_kind in p.task_kinds and not p.repos
+            if task_kind in p.task_kinds
             and p.status in ("active", "locked")
             and not set(p.requires) <= capabilities
         }

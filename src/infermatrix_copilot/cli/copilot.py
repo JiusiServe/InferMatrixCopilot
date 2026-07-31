@@ -82,7 +82,15 @@ class Copilot:
         Capabilities come from the repo's adapter (if any), plus `repo.path` when
         a path is resolvable even without a adapter (REPO_PATHS works adapter-less)."""
         adapter = self._adapter_for(spec.repo)
-        capabilities = set(adapter.capabilities) if adapter is not None else set()
+        if adapter is None:
+            # No adapter means capabilities are UNKNOWN, not zero — the
+            # store's requires-filter (now covering exact-repo playbooks too)
+            # skips on None, keeping adapter-less setups v1-compatible
+            # instead of silently dropping every playbook with a `requires:`.
+            if self._resolve_repo_path(spec.repo):
+                return self.planner.resolve(spec, capabilities=None)
+            return self.planner.resolve(spec, capabilities=set())
+        capabilities = set(adapter.capabilities)
         if self._resolve_repo_path(spec.repo):  # REPO_PATHS works adapter-less
             capabilities.add("repo.path")
         return self.planner.resolve(spec, capabilities=capabilities)
