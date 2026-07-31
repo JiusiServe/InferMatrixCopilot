@@ -16,17 +16,19 @@ vLLM-Omni 的兼容性、正确性和性能问题。
 
 要求：Windows、Python 3.11+，以及已经安装好的 Codex、Claude Code 或 Cursor。
 
-```powershell
+```text
 git clone https://github.com/JiusiServe/InferMatrixCopilot.git
 cd InferMatrixCopilot
 
-# 只运行与你的 Agent 对应的一条
-python install-mcp.py codex
-python install-mcp.py claude
-python install-mcp.py cursor
+# Windows PowerShell
+.\install-mcp.ps1 claude
+
+# macOS / Linux
+./install-mcp.sh claude
 ```
 
-脚本会安装 MCP 和 `/imreview` 命令。重启 Agent 后，把 PR 地址交给它：
+把 `claude` 换成 `codex` 或 `cursor` 即可安装到其他 Agent。脚本会安装 MCP
+和 `/imreview` 命令。重启 Agent 后，把 PR 地址交给它：
 
 ```text
 /imreview https://github.com/vllm-project/vllm-omni/pull/5172
@@ -34,10 +36,9 @@ python install-mcp.py cursor
 
 不带地址时，`/imreview` 会审查当前 PR 或本地工作区。
 
-同一个 `install-mcp.py` 支持 Windows、macOS 和 Linux，也支持 Codex、
-Claude Code 和 Cursor。macOS/Linux 如果没有 `python` 命令，使用 `python3`；
-Windows 也可以使用 `py -3.11`。旧的 `.ps1` 入口继续保留，但不要在
-`cmd.exe` 中直接运行 `.ps1`。
+Windows 使用 `.ps1`，macOS 和 Linux 使用 `.sh`；两个入口共用同一套安装逻辑。
+旧的 `install-codex.ps1`、`install-claude.ps1` 和 `install-cursor.ps1`
+继续保留。
 
 macOS、Linux、手工配置和其他 MCP Agent 的接入方法见
 [`doc/MCP.md`](doc/MCP.md)。

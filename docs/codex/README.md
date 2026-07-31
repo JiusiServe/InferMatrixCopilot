@@ -5,16 +5,18 @@ model to review code, so there is no API key or model configuration.
 
 ## Install
 
-Windows, macOS, and Linux use the same installer:
-
 ```text
 git clone https://github.com/JiusiServe/InferMatrixCopilot.git
 cd InferMatrixCopilot
-python install-mcp.py codex
+
+# Windows PowerShell
+.\install-mcp.ps1 codex
+
+# macOS / Linux
+./install-mcp.sh codex
 ```
 
-Use `python3` on macOS/Linux if `python` is unavailable. On Windows,
-`py -3.11` also works.
+The platform-native entrypoints share the same installer implementation.
 
 Restart Codex, then paste:
 

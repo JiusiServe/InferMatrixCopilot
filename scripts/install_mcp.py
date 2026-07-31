@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Optional, Sequence
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PYTHON_PATH = PROJECT_ROOT / "src"
 VENV_ROOT = PROJECT_ROOT / ".venv"
 SKILL_SOURCE = PROJECT_ROOT / "plugin" / "skills" / "imreview"

@@ -6,20 +6,23 @@ InferMatrixCopilot 是本地 stdio MCP 服务。Agent 仍使用自己当前的�
 ## 推荐：一键安装
 
 ```text
-python install-mcp.py codex
-python install-mcp.py claude
-python install-mcp.py cursor
+# Windows PowerShell
+.\install-mcp.ps1 claude
+
+# macOS / Linux
+./install-mcp.sh claude
 ```
 
-每次只运行与你的 Agent 对应的一条。脚本会同时安装 MCP 和 `imreview`：
+把 `claude` 换成 `codex` 或 `cursor` 即可安装到其他 Agent。脚本会同时安装
+MCP 和 `imreview`：
 
 ```text
 /imreview <PR URL>
 ```
 
-同一个 `install-mcp.py` 支持 Windows、macOS 和 Linux。macOS/Linux 如果没有
-`python` 命令，使用 `python3`；Windows 也可以使用 `py -3.11`。旧的 `.ps1`
-入口继续保留，但不要在 `cmd.exe` 中直接运行 `.ps1`。
+Windows 使用 `.ps1`，macOS 和 Linux 使用 `.sh`；两个入口共用同一套安装逻辑。
+旧的 `install-codex.ps1`、`install-claude.ps1` 和 `install-cursor.ps1`
+继续保留。
 
 ## 手工配置
 
@@ -45,10 +48,16 @@ python3 -m venv .venv
 
 ## Codex
 
-所有平台：
+Windows PowerShell：
 
-```text
-python install-mcp.py codex
+```powershell
+.\install-mcp.ps1 codex
+```
+
+macOS / Linux：
+
+```bash
+./install-mcp.sh codex
 ```
 
 手工配置见 [`docs/codex/README.md`](../docs/codex/README.md)。
@@ -58,7 +67,11 @@ python install-mcp.py codex
 在仓库根目录运行：
 
 ```text
-python install-mcp.py claude
+# Windows PowerShell
+.\install-mcp.ps1 claude
+
+# macOS / Linux
+./install-mcp.sh claude
 ```
 
 下面是等价的手工配置。
@@ -85,10 +98,16 @@ claude mcp list
 
 ## Cursor
 
-所有平台：
+Windows PowerShell：
 
-```text
-python install-mcp.py cursor
+```powershell
+.\install-mcp.ps1 cursor
+```
+
+macOS / Linux：
+
+```bash
+./install-mcp.sh cursor
 ```
 
 手工配置时，把 [`docs/cursor/mcp.json`](../docs/cursor/mcp.json) 复制到项目的

@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $true, Position = 0)]
     [ValidateSet("codex", "claude", "cursor")]
     [string]$Agent,
 
@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$Installer = Join-Path $ProjectRoot "install-mcp.py"
+$Installer = Join-Path $ProjectRoot "scripts\install_mcp.py"
 
 function Find-CompatiblePython {
     $Candidates = @()
