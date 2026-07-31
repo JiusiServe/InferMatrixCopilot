@@ -80,6 +80,9 @@ def _ensure_runtime(ctx: StepContext) -> dict | StepResult:
     os.environ["BUILDKITE_API_TOKEN"] = settings.buildkite_api_token
     os.environ["ANTHROPIC_API_KEY"] = settings.anthropic_api_key
     os.environ["TEST_TIMEOUT_SEC"] = "3600"
+    # v1 obligation (plan §4): the hybrid remote_sync force-push paths are
+    # UNREACHABLE — v1 is the local rollback backend, never remote
+    os.environ["REMOTE_ENABLED"] = "false"
     env_delta = sorted(k for k, v in os.environ.items() if env_before.get(k) != v)
     ctx.trace.record("env_exported", added_or_changed=env_delta[:60],
                      count=len(env_delta))
@@ -164,10 +167,36 @@ async def _prelude(ctx: StepContext) -> StepResult:
                           "resume it (/resume or omni-rebase-orchestrator --resume) "
                           "or clean it up before starting fresh")
 
+    # v1 obligation (plan §4): v1 never implements the v3 mode matrix — the
+    # rollback path is a FULL run by definition. Any resolved mode other
+    # than explicit `full` blocks (a defaulted report_only must never reach
+    # the parent's mutating phases through a backend that ignores it).
+    mode = _task_params(ctx).get("rebase_mode", "")
+    if mode != "full":
+        return StepResult(False, FailureKind.BLOCKED,
+                          "the v1 backend runs only explicit "
+                          "rebase_mode=full (got "
+                          f"{mode or 'unset'!r}); v1 does not implement the "
+                          "mode matrix — use the v3 playbook for other modes")
+
     rt = _ensure_runtime(ctx)
     if isinstance(rt, StepResult):
         return rt
     settings = rt["settings"]
+
+    # v1 obligation (plan §4/§8): the SHARED checkout flock every user of
+    # the checkout holds — external runs (EXT1) and PR7 archival take the
+    # same file, so exclusion is mutual and archival can prove quiescence
+    from ...rebase_engine.runctx import CheckoutLock
+    lock = _RUNTIME.get("omni_lock")
+    if lock is None or not lock.held:
+        lock = CheckoutLock(Path(str(settings.omni_path)), "omni")
+        if not lock.acquire(blocking=False):
+            return StepResult(False, FailureKind.BLOCKED,
+                              "another run holds the checkout lock "
+                              "(locks/omni.lock) — an external or archival "
+                              "run is active on this checkout")
+        _RUNTIME["omni_lock"] = lock
 
     # wave lists from the parent settings, minus already-done modules on resume
     done: set[str] = set()
@@ -361,6 +390,19 @@ async def _phase4_guarded(ctx: StepContext) -> StepResult:
         return StepResult(False, FailureKind.FORBIDDEN,
                           "phase 4 pushes to CI but ALLOW_PUSH=0 — run with "
                           "local_ci_only, or enable pushes deliberately")
+    # v1 obligation (plan §4, C4): guard_push rules as AUTHORIZATION before
+    # any parent code runs — the branch comes from the SAME settings field
+    # the parent pushes to, so equality holds by construction; protected
+    # branches are undeniable. Execution inside the parent stays untouched
+    # (its per-push mechanics are the recorded temporary C4 exception).
+    from ...push import PushPolicy, guard_push
+    branch = str(getattr(rt["settings"], "rebase_branch", "") or "")
+    protected = list(ctx.state.get("protected_branches", ["main"]))
+    decision = guard_push(PushPolicy(allowed=True, branch=branch), protected)
+    if not decision.allowed:
+        return StepResult(False, FailureKind.FORBIDDEN,
+                          f"push authorization denied: {decision.reason}")
+    ctx.trace.record("push_authorized", branch=branch, backend="v1")
     handler = _phase_step("phase4", "phase4_init_wrapper", None)
     return await handler(ctx)
 

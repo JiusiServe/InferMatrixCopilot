@@ -175,6 +175,21 @@ class Copilot:
             print(style("✋ cannot run: ", "red", "bold") + str(exc))
             return BLOCKED_EXIT
 
+        # Mode governance (Rev 8 §2.1): for mode-aware playbooks the ONE
+        # authority is params.rebase_mode, resolved + WRITTEN BACK before the
+        # plan echo and the confirmation gate (spec.report_only reflects the
+        # canonical mode, so every TaskSpec-derived consumer sees one truth).
+        # The locked delegating playbook does not declare mode_aware and is
+        # untouched — byte-identical behavior.
+        if getattr(resolution.playbook, "mode_aware", False):
+            from ..rebase_engine.modes import (ModeConflictError,
+                                               resolve_effective_mode)
+            try:
+                resolve_effective_mode(spec)
+            except ModeConflictError as exc:
+                print(style("✋ blocked: ", "red", "bold") + str(exc))
+                return BLOCKED_EXIT
+
         print(style("→ task: ", "bold", "cyan") + spec.describe())
         print(style("→ plan: ", "bold", "magenta") + f"{resolution.mode} {resolution.playbook.name}"
               f"@{resolution.playbook.version} ({resolution.playbook.status}) "
@@ -236,6 +251,16 @@ class Copilot:
         if err:
             print(f"✋ {err} (pass e.g. --task-param pr=5134)")
             return BLOCKED_EXIT
+        # mode governance applies to explicit invocations too — the ONLY
+        # way to run the candidate v3/v1 playbooks today (Rev 8 §2.1)
+        if getattr(playbook, "mode_aware", False):
+            from ..rebase_engine.modes import (ModeConflictError,
+                                               resolve_effective_mode)
+            try:
+                resolve_effective_mode(spec)
+            except ModeConflictError as exc:
+                print(style("✋ blocked: ", "red", "bold") + str(exc))
+                return BLOCKED_EXIT
         print(style("→ task: ", "bold", "cyan") + spec.describe()
               + style("  [explicit playbook override]", "yellow"))
         print(style("→ plan: ", "bold", "magenta") + f"explicit {playbook.name}@{playbook.version} "

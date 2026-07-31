@@ -64,6 +64,7 @@ def fake_agent(monkeypatch, tmp_path: Path, git_repo):
         vllm_path = git_repo
         rebase_venv = ""
         target_branch = "main"
+        rebase_branch = "dev/test-rebase"
         last_rebase_vllm_commit = "deadbeef"
         buildkite_api_token = ""
         anthropic_api_key = "test-key"

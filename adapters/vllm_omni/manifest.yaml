@@ -112,6 +112,41 @@ rebase:
       url_pattern: 'wheels\.vllm\.ai/[0-9a-f]{40}'
       url_template: "wheels.vllm.ai/{commit}"
       commit_env_var: VLLM_PRECOMPILED_WHEEL_COMMIT
+  ci:
+    # monitor classification data (parent monitor.py constants, verbatim)
+    ignorable_name_patterns: ["(?i)testcase statistics",
+                              "(?i)collection & email",
+                              "(?i):pipeline:\\s*(upload|load)",
+                              "(?i)(upload|load).*pipeline"]
+    ignorable_log_patterns: ["401 Unauthorized", "gated model",
+                             "HFValidationError", "RepositoryNotFoundError"]
+    extra_exception_names: [ChatTemplateResolutionError, OmniEngineDeadError]
+  test_manifest:
+    # dynamic manifest building (parent test_manifest.py constants, verbatim)
+    yaml_dir: .buildkite
+    pipelines: {test-merge.yml: merge, test-ready.yml: ready, test-nightly.yml: nightly}
+    priority_source: ready
+    default_queue: gpu_1_queue
+    queue_map:
+      gpu_1_queue: [1, any]
+      gpu_4_queue: [4, any]
+      mithril-h100-pool: [2, h100]
+    skip_patterns: ["(?i)perf", "(?i)accuracy", "(?i)testcase statistics",
+                    "(?i)collection & email", "(?i)benchmark.*nightly"]
+    # upstream test-layout refactor rename families (longest-first)
+    rename_suffixes: [_tts_expansion, _expansion, _tts]
+    file_ref_prefixes: [tests, vllm_omni]
+    file_tree_roots: [tests, vllm_omni]
+    # ordered change-path -> module classification (parent heuristic order:
+    # entrypoints beats engine)
+    change_path_rules:
+      - [/entrypoints/, online_serving]
+      - [/engine/, input_output]
+      - [/model_executor/, model_executor]
+      - [/diffusion/, model_executor]
+      - [/worker/, worker_runner]
+      - [/distributed/, scheduler]
+      - [/benchmarks/, benchmarks]
   testing:
     # root-level artifacts tests leak between runs (test_artifact_cleanup.sh
     # TEST_ARTIFACT_GLOBS, verbatim) — gitignored upstream but pile up on disk
@@ -171,3 +206,7 @@ push:
   default_remote: origin
   protected_branches: [main]
   allowed: false   # deliver via PR; never direct-push main
+  # plan §5.3 (human-gated HIGH-RISK edit): the v3 rebase pipeline may push
+  # to the REBASE BRANCH only; main stays protected regardless, guard_push
+  # remains the choke point, and ALLOW_PUSH=1 is still required at execution
+  rebase_branch_allowed: true

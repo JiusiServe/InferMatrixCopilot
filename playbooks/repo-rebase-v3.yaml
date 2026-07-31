@@ -1,0 +1,42 @@
+# repo-rebase v3 — the FULLY MERGED pipeline (no external runs): rebase_engine
+# machinery end to end. CANDIDATE: invisible to the planner (find() only
+# recalls active/locked), runnable only via
+# `infermatrix-copilot --playbook repo-rebase-v3` until the §8 validation
+# gate passes and a human promotes it over the locked `repo-rebase`
+# (doc/PLAN-rebase-merge.md PR6).
+name: repo-rebase-v3
+version: 1
+status: candidate
+provenance:
+  created_by: human
+  source: full merge of vllm-omni-rebase-agent per doc/PLAN-rebase-merge.md
+    (Rev 8 normative contracts; delivery PR4c)
+task_kinds: [repo_rebase]
+repos: [vllm-omni]
+requires: [modules, upstream.fork_tracking, ci.provider]
+# mode governance (Rev 8 §2.1): resolve_effective_mode runs before plan echo
+# and confirmation; `when:` gates below use ONLY the seeded mode_* flags.
+mode_aware: true
+params:
+  rebase_mode: {type: str, default: ""}     # report_only|full|local_ci|remote_ci
+  main_ci_idx: {type: int, default: 0}
+  halt_on_module_failure: {type: bool, default: false}
+  halt_on_phase3_failures: {type: bool, default: false}
+  push_with_failures: {type: bool, default: false}
+  strict_push_gate: {type: bool, default: false}
+steps:
+  - {id: prelude, step: rebase.v3_prelude}
+  - {id: guard, step: workspace.guard_clean_rebase, when: not mode_report_only}
+  - {id: scan, step: rebase.v3_scan, when: mode_report_only}
+  - {id: wheel, step: rebase.v3_wheel, when: mode_full}
+  - {id: assign, step: rebase.v3_assign, when: mode_full}
+  - {id: waves, step: rebase.v3_module_rebase, foreach: active_modules,
+     when: mode_full}
+  - {id: tests, step: rebase.v3_test_loop, when: not mode_report_only}
+  - {id: push_gate, step: rebase.v3_push_gate, when: not mode_report_only}
+  - {id: ci, step: rebase.v3_ci, when: mode_remote_ci}
+  - {id: finalize, step: rebase.v3_finalize}
+  - {id: report, step: report.final_summary}
+success: substate phase=done with zero unexplained module/test failures; in
+  full mode the push gate ruled and the transition table's terminal row was
+  honored (needs_human => blocked/exit 3)

@@ -45,6 +45,9 @@ class Playbook:
     steps: list[PlaybookStep]
     params: dict = field(default_factory=dict)  # declared adaptation surface
     requires: list[str] = field(default_factory=list)  # profile capabilities
+    # mode-governed playbooks (rebase v3/v1) opt into resolve_effective_mode;
+    # the locked delegating playbook stays byte-identical by NOT declaring it
+    mode_aware: bool = False
     provenance: dict = field(default_factory=dict)
     success: str = ""
 
@@ -102,6 +105,7 @@ def _parse(doc: dict, source: str) -> Playbook:
         task_kinds=list(doc["task_kinds"]), repos=list(doc.get("repos", [])),
         steps=steps, params=doc.get("params", {}) or {},
         requires=list(doc.get("requires", []) or []),
+        mode_aware=bool(doc.get("mode_aware", False)),
         provenance=doc.get("provenance", {}) or {}, success=doc.get("success", ""),
     )
 

@@ -17,14 +17,16 @@ from infermatrix_copilot.playbooks.store import PlaybookStore
 def native_env(settings, trace, tmp_path, fake_agent, git_repo):
     registry = register_builtin_steps(StepRegistry())
     store = PlaybookStore(_REPO_ROOT / "playbooks", registry)
-    playbook = store.get("repo-rebase-native")
+    playbook = store.get("repo-rebase-native-v1")
     assert playbook is not None and playbook.status == "candidate"
     run_dir = tmp_path / "copilot_run"
     notifier = Notifier(settings, run_dir, trace, "run-native")
     executor = Executor(registry, settings, run_dir=run_dir, trace=trace,
                         notifier=notifier)
     settings.allow_push = True  # let the fake phase4 run in the happy path
-    state = {"task_spec": {"kind": "repo_rebase", "params": {}},
+    state = {"task_spec": {"kind": "repo_rebase",
+                       # v1 obligation: explicit full-only mode
+                       "params": {"rebase_mode": "full"}},
              "repo_path": str(git_repo)}
     return executor, playbook, state, notifier
 
@@ -88,7 +90,7 @@ def test_prelude_refuses_inflight_state(native_env, fake_agent):
     executor, playbook, state, _ = native_env
     fake_agent["state_file"].write_text(json.dumps(
         {"run_id": "rebase-other", "phase": "module_rebase"}))
-    state["task_spec"]["params"] = {}
+    state["task_spec"]["params"] = {"rebase_mode": "full"}
     # point the prelude's in-flight check at the fake state file
     playbook.steps[1].params = {"state_file": str(fake_agent["state_file"])}
     outcome = asyncio.run(executor.run(playbook, state))
