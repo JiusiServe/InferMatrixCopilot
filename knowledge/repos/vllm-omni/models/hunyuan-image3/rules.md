@@ -1,7 +1,7 @@
 ---
 title: "HunyuanImage3 开发规则"
 created: 2026-07-13
-updated: 2026-07-30
+updated: 2026-07-31
 type: rule
 tags: [vllm-omni, models, hunyuan-image3]
 sources: [incidents/painterly/_index.md, guides/hf-alignment-pitfalls.md, vllm_omni/diffusion/models/hunyuan_image3/prompt_utils.py, vllm_omni/model_extras/hunyuan_image3.py, vllm_omni/model_extras/registry.py]
@@ -24,7 +24,7 @@ sources: [incidents/painterly/_index.md, guides/hf-alignment-pitfalls.md, vllm_o
 | `size=auto`、ratio token、batch ratio | `core`、`size-ratio`、`stage-transition` | live public dispatcher；`_extract_ratio_index`；`ar2diffusion`；最终 size consumer |
 | alpha、resize/crop、条件 VAE、seed/RNG | `core`、`image`、`randomness` | live public dispatcher；`prepare_seed`、`_encode_cond_image`、`prepare_model_inputs`；AR 模型的 image/VAE owner |
 | shared serving 分层和模型 adapter | `core`、`layering`、`public-topology` | live public dispatcher 到 owner adapter；模型 owner 的 `prompt_utils.py` 和 `stage_input_processors/hunyuan_image3.py` |
-| `model_extras`、shared task examples、`extra_body`、`ar_input_builder`、tokenizer validator/fallback | `core`、`prompt-token`、`stop-sampling`、`public-topology`、`layering` | `vllm_omni/model_extras/hunyuan_image3.py::{build_ar_stage_inputs,HUNYUAN_IMAGE3_EXTRA_BODY_PARAMS}`；`vllm_omni/model_extras/registry.py::{get_extra_body_params,get_ar_input_builder,get_ar_tokenizer_validator}`；`vllm_omni/entrypoints/openai/serving_chat.py::_get_diffusion_extra_body_params`；`examples/offline_inference/{text_to_image/text_to_image.py,image_to_image/image_edit.py}::_apply_ar_stage_inputs`；`prompt_utils.py::build_ar_prompt_inputs`；`stage_config.py::_build_engine_args` |
+| `model_extras`、shared task examples、`extra_body`、`ar_input_builder`、tokenizer validator/fallback | `core`、`prompt-token`、`stop-sampling`、`public-topology`、`layering` | `vllm_omni/model_extras/hunyuan_image3.py::{build_ar_stage_inputs,build_x_to_text_prompt,HUNYUAN_IMAGE3_EXTRA_BODY_PARAMS}`；`vllm_omni/model_extras/registry.py::{get_extra_body_params,get_ar_input_builder,get_ar_tokenizer_validator}`；`vllm_omni/entrypoints/openai/serving_chat.py::_get_diffusion_extra_body_params`；`examples/offline_inference/{text_to_image/text_to_image.py,image_to_image/image_edit.py}::_apply_ar_stage_inputs`；`examples/offline_inference/x_to_text/x_to_text.py::main`；`prompt_utils.py::build_ar_prompt_inputs`；`stage_config.py::_build_engine_args` |
 | prompt、stop 已对齐后仍有真实 HF 差异 | `core`、`alignment-residual`，再按差异进入 image 或 runtime owner | 对齐后的最小复现；processor 输出；`hunyuan_image3.py::{_parse_and_validate_image_input,_vae_encode}`；router/top-k；实际 TP/paged-KV 边界 |
 
 - **HY3-0b — 代码地图之后停止读文档。** 开发或 Direct review 打开命中行的第一批源码后就沿 live producer-consumer 调用链实现或审查；只有规则明确链接的官方机制、源码证明跨 owner 或一个具体未知量阻止继续时，才再读一篇 guide 或增加一个 owner，不能预读 incidents/history。
