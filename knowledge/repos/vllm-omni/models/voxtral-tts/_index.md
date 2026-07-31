@@ -1,15 +1,15 @@
 ---
 title: "Voxtral TTS（Mistral 两 stage 流式 TTS）"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-07-31
 type: index
 tags: [vllm-omni, models]
-sources: [vllm_omni/model_executor/models/voxtral_tts/, vllm_omni/deploy/voxtral_tts.yaml, vllm_omni/platforms/xpu/stage_configs/voxtral_tts.yaml]
+sources: [vllm_omni/model_executor/models/voxtral_tts/, vllm_omni/deploy/voxtral_tts.yaml]
 ---
 
 # Voxtral TTS
 
-以下事实在 `main @ 5d44868e` 复核（源码派生页,尚无本模型的运行经验沉淀）。
+以下事实在 `main @ 807db6ef` 复核（源码派生页,尚无本模型的运行经验沉淀）。
 
 ## 名称与范围
 
@@ -33,12 +33,11 @@ sources: [vllm_omni/model_executor/models/voxtral_tts/, vllm_omni/deploy/voxtral
   SharedMemoryConnector（`codec_chunk_frames: 25`,起始 5）;**两 stage 的
   `tokenizer_mode/config_format/load_format` 都是 `mistral` 且必须一致**
   （YAML 注释）;stage 0 采样 `extra_args.cfg_alpha: 1.2`;标注 1×H20 验证。
-- **尾部家族中唯一有 XPU stage 配置**：
-  `vllm_omni/platforms/xpu/stage_configs/voxtral_tts.yaml`
-  （XPUARWorker + OmniARScheduler）。
+- XPU override 已从独立 stage config 合并到 `vllm_omni/deploy/voxtral_tts.yaml`
+  的 `platforms.xpu.stages`，不再维护第二份拓扑。
 
 ## 什么时候查这里
 
 - 审查 voxtral_tts 的 mistral 加载三件套一致性、acoustic CUDA-graph 或
-  async-chunk 改动;XPU 路径回归先查这里的 stage 配置。
+  async-chunk 改动；XPU 路径回归检查同一 deploy YAML 的 platform override。
 - 语义验收见 [model-validation](../../review/guides/model-validation.md)。

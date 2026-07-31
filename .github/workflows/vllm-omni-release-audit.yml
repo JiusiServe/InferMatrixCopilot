@@ -1,0 +1,99 @@
+name: vLLM-Omni release drift audit
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/vllm-omni-release-audit.yml
+      - adapters/vllm_omni/manifest.yaml
+      - adapters/vllm_omni/release_baseline.yaml
+      - doc/VLLM_OMNI_RELEASE_MAINTENANCE.md
+      - knowledge/repos/vllm-omni/**
+      - tools/audit_vllm_omni_release.py
+      - tools/vllm_omni_release_audit.py
+  schedule:
+    - cron: "23 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      from_ref:
+        description: Old tag or SHA; blank uses the audited baseline
+        required: false
+        type: string
+      to_ref:
+        description: New tag or SHA
+        required: true
+        default: origin/main
+        type: string
+      mode:
+        description: Scheduled checks use report-only
+        required: true
+        default: report-only
+        type: choice
+        options:
+          - report-only
+          - enforce
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check out vLLM-Omni
+        uses: actions/checkout@v4
+        with:
+          repository: vllm-project/vllm-omni
+          path: .audit/vllm-omni
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install audit dependency
+        run: python -m pip install PyYAML
+
+      - name: Resolve audit inputs
+        id: inputs
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REQUESTED_FROM: ${{ inputs.from_ref }}
+          REQUESTED_TO: ${{ inputs.to_ref }}
+          REQUESTED_MODE: ${{ inputs.mode }}
+        run: |
+          read_baseline() {
+            python -c "import yaml; print(yaml.safe_load(open('adapters/vllm_omni/release_baseline.yaml'))['upstream']['$1'])"
+          }
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            echo "from=$(read_baseline previous_audited_sha)" >> "$GITHUB_OUTPUT"
+            echo "to=$(read_baseline audited_sha)" >> "$GITHUB_OUTPUT"
+            echo "mode=enforce" >> "$GITHUB_OUTPUT"
+          else
+            audited_sha="$(read_baseline audited_sha)"
+            echo "from=${REQUESTED_FROM:-$audited_sha}" >> "$GITHUB_OUTPUT"
+            echo "to=${REQUESTED_TO:-origin/main}" >> "$GITHUB_OUTPUT"
+            echo "mode=${REQUESTED_MODE:-report-only}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run release audit
+        run: |
+          python tools/audit_vllm_omni_release.py \
+            --from "${{ steps.inputs.outputs.from }}" \
+            --to "${{ steps.inputs.outputs.to }}" \
+            --repo .audit/vllm-omni \
+            --mode "${{ steps.inputs.outputs.mode }}" \
+            --json-output "${RUNNER_TEMP}/vllm-omni-release-audit.json"
+
+      - name: Upload machine report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vllm-omni-release-audit
+          path: ${{ runner.temp }}/vllm-omni-release-audit.json
+          if-no-files-found: warn

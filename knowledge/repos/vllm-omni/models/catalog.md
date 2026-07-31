@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数仍是
-`main @ 5d44868e`（2026-07-21）快照，数字会漂移，不能凭它断言“不支持”。
+`v0.26.0rc1 @ 807db6ef`（2026-07-28）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -35,15 +35,15 @@ adapter。已有专属知识 owner 可从 [models index](_index.md) 按名称进
 
 | 注册点 | 位置 | 计数 |
 |---|---|---|
-| AR/omni 架构 | `model_executor/models/registry.py` `_OMNI_MODELS` | 69 个架构名 / 26 个模型族目录 |
-| Diffusion pipeline | `diffusion/registry.py` `_DIFFUSION_MODELS` | 59 条 pipeline / 35 个模型族目录 |
+| AR/omni 架构 | `model_executor/models/registry.py` `_OMNI_MODELS` | 72 个架构名 / 26 个模型族目录 |
+| Diffusion pipeline | `diffusion/registry.py` `_DIFFUSION_MODELS` | 61 条 pipeline / 37 个模型族目录 |
 | Pipeline（model_type） | `config/pipeline_registry.py` `OMNI_PIPELINES` | 46 个 key |
-| Deploy YAML | `vllm_omni/deploy/*.yaml` | 65 份 |
+| Deploy YAML | `vllm_omni/deploy/*.yaml` | 71 份 |
 
-对比上一快照（`5c390096`,2026-07-16）：diffusion pipeline 58→59,
-OMNI_PIPELINES 39→46,deploy 58→65——新增的 key 集中在视频/歌声/机器人
-（`hunyuan_video_15`、`wan2_2_ti2v`、`soulxsinger_svs/svc`、
-`step_audio_2`、`step_audio_2_asr`、`Gr00tN1d7`）,多 stage 化趋势在继续。
+对比上一审计快照（`5d44868e`,2026-07-21）：AR 架构 69→72，diffusion
+pipeline 59→61，OMNI_PIPELINES 保持 46，deploy 65→71。新增 diffusion
+家族是 `boogu_image` 和 `lingbot_video`；AR 新增项属于已有的
+`mammoth_moda2` 与 `minicpmo_4_5` 家族。
 
 ## AR/omni 模型族（26）
 
@@ -53,12 +53,12 @@ mammoth_moda2、mimo_audio、ming_flash_omni、ming_tts、minicpmo_4_5、moss_tt
 moss_tts_nano、omnivoice、qwen2_5_omni、qwen3_omni、qwen3_tts、step_audio2、
 voxcpm2、voxtral_tts
 
-## Diffusion 模型族（35）
+## Diffusion 模型族（37）
 
-audiox、bagel、cosmos3、diffusers_adapter（通用 diffusers 桥）、dreamid_omni、
+audiox、bagel、boogu_image、cosmos3、diffusers_adapter（通用 diffusers 桥）、dreamid_omni、
 dreamzero、ernie_image、flux、flux2、flux2_klein、glm_image、gr00t、helios、
 hidream_image、hunyuan_image3、hunyuan_video、internvla_a1、krea2、lance、
-longcat_image、ltx2、magi_human、ming_flash_omni、nextstep_1_1、omnigen2、
+lingbot_video、longcat_image、ltx2、magi_human、ming_flash_omni、nextstep_1_1、omnigen2、
 omnivoice、ovis_image、qwen_image、sd3、sdxl、sensenova_u1、soulx_singer、
 stable_audio、wan2_2、z_image
 
@@ -84,10 +84,16 @@ voxtral_tts、wan2_2_ti2v
 ## 重派生方法
 
 ```bash
-git -C <vllm-omni> fetch origin main
-git -C <vllm-omni> show origin/main:vllm_omni/diffusion/registry.py | grep -c '":'
-# 或在 python 里 import 两个 registry 与 OMNI_PIPELINES 计数
+python tools/audit_vllm_omni_release.py \
+  --from 5d44868e \
+  --to v0.26.0rc1 \
+  --repo <vllm-omni-checkout> \
+  --mode report-only
 ```
 
-有专属沉淀页的模型见 [models/_index](_index.md)（2026-07-21 起全部家族均有
-落脚页）;参照用途见 [reference-models](reference-models.md)。
+命令从 Git 对象读取 registry，不 import vLLM；机器基线与完整维护步骤见
+`adapters/vllm_omni/release_baseline.yaml` 和
+`doc/VLLM_OMNI_RELEASE_MAINTENANCE.md`。
+
+已有专属沉淀页的模型见 [models/_index](_index.md)；没有专属规则的新家族先走共享
+Diffusion owner。参照用途见 [reference-models](reference-models.md)。

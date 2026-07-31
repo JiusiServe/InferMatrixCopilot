@@ -42,7 +42,8 @@ extensions merely because they are absent from the common source.
   history was removed — used for page frontmatter).
 - **Code-mirror pin:** the `knowledge/repos/vllm-omni/components/` source maps
   are verified against vllm-omni `main @
-  238fc0a609311235a671940cf209a7eb72c1dc29` (every stated path exists there).
+  807db6efd70ff2e9b55a63d6e1b0530e2b74f8f2`. The canonical machine baseline
+  is `adapters/vllm_omni/release_baseline.yaml`.
 
 ## Layout: general vs repo-specific
 The knowledge base separates the two, and so do we — the whole tree is **shared**,
