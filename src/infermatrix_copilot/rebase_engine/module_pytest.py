@@ -92,8 +92,11 @@ def main(argv: list[str] | None = None) -> int:
 
     decisions = Path(log_dir) / "watchdog_decisions.jsonl"
 
-    def record_fn(pattern: str, tier: str, verdict: str) -> None:
-        watchdog_learn.record(decisions, pattern, tier, verdict)
+    def record_fn(pattern: str, verdict: str, test_name: str) -> None:
+        # LogWatchdog's contract is (matched line, verdict, test name);
+        # watchdog_learn.record takes keyword-only fields
+        watchdog_learn.record(decisions, pattern=pattern, verdict=verdict,
+                              test=test_name)
 
     def report_fn(test_name: str, pattern: str, detail: str) -> None:
         report = Path(log_dir) / "tests" / f"{test_name}.watchdog_report"
@@ -101,11 +104,19 @@ def main(argv: list[str] | None = None) -> int:
         with open(report, "a", encoding="utf-8") as f:
             f.write(f"pattern={pattern}\n{detail}\n")
 
+    def review_fn(test_name: str, snippet: str) -> str:
+        # explicit no-LLM reviewer: every tier-2 match takes the documented
+        # default-CONTINUE, but RECORDED (the learning pipeline promotes
+        # noise patterns from accumulated CONTINUE decisions — a silent
+        # short-circuit would starve it). The assembly PR swaps in the
+        # copilot's eco-tier LLM reviewer.
+        return "CONTINUE"
+
     runner = TestRunner(
         repo_root=Path(repo), tests_dir=Path(log_dir) / "tests",
         patterns=patterns, gpu_lock_dir=Path(log_dir) / "gpu_lock",
         artifact_globs=artifact_globs,
-        record_fn=record_fn, report_fn=report_fn,
+        review_fn=review_fn, record_fn=record_fn, report_fn=report_fn,
         cuda_visible_devices=cuda)
     # the mutex SERIALIZES; it is not a hardware requirement — min_gpus=0
     # so a GPU-less box still RUNS the command (a skip would be a false

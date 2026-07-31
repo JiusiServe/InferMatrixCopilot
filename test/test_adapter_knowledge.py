@@ -180,6 +180,17 @@ def test_module_pytest_artifact_cleanup_and_watchdog_wiring(tmp_path,
     assert rc != 0
     reports = list((tmp_path / "logs" / "tests").glob("*.watchdog_report"))
     assert reports and "CUDA out of memory" in reports[0].read_text()
+    # TIER-2 (review) pattern: with no LLM reviewer the documented
+    # default-CONTINUE applies, and the decision IS recorded via the
+    # learning callback — the signature contract that only tier 2 exercises
+    rc = module_pytest.main([
+        "python", "-c",
+        "print('ValueError: suspicious but reviewable output')"])
+    decisions = (tmp_path / "logs" / "watchdog_decisions.jsonl")
+    assert decisions.is_file(), "tier-2 decision was not recorded"
+    import json as _json
+    entries = [_json.loads(l) for l in decisions.read_text().splitlines()]
+    assert any(e.get("verdict") == "CONTINUE" for e in entries)
 
 
 # -- hooks ---------------------------------------------------------------------
