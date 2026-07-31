@@ -329,6 +329,31 @@ def test_kill_tree_term_then_kill_survivors():
     assert survivors == [10]  # our fake never really dies
 
 
+def test_kill_tree_pid_reuse_never_gets_sigkill():
+    """After SIGTERM the target dies and the kernel reuses its pid for an
+    unrelated process during the grace sleep: the escalation must compare
+    /proc start times and leave the impostor alone."""
+    import infermatrix_copilot.testing.process_tree as pt
+    events = []
+    phase = {"reused": False}
+
+    def kill(pid, sig):
+        events.append((pid, sig))
+        phase["reused"] = True  # TERM delivered; pid recycled during grace
+
+    orig_alive, orig_start = pt._alive, pt._start_time
+    pt._alive = lambda pid: True  # the *recycled* pid is alive
+    pt._start_time = lambda pid: 999 if phase["reused"] else 111
+    try:
+        survivors = process_tree.kill_tree([10], kill=kill,
+                                           sleep=lambda s: None)
+    finally:
+        pt._alive, pt._start_time = orig_alive, orig_start
+    assert (10, signal.SIGTERM) in events
+    assert (10, signal.SIGKILL) not in events   # impostor spared
+    assert survivors == []                       # original target counted dead
+
+
 # -- runner --------------------------------------------------------------------
 
 @pytest.fixture()
@@ -869,6 +894,19 @@ def test_cuda_minus_one_hides_all_devices(runner, tmp_path):
                              env={"CUDA_VISIBLE_DEVICES": "-1"}),
                      dict(os.environ))
     assert out.skipped  # -1 is zero devices, not one
+
+
+def test_runner_default_gpu_count_honors_minus_one(tmp_path, patterns):
+    """The default available_gpus derives from the runner's own CUDA spec —
+    "-1" hides every device and must count as zero, not one (a GPU-gated job
+    would otherwise run with all GPUs masked)."""
+    (tmp_path / "repo").mkdir()
+    r = TestRunner(repo_root=tmp_path / "repo", tests_dir=tmp_path / "tests",
+                   patterns=patterns, cuda_visible_devices="-1")
+    assert r.available_gpus() == 0
+    out = r.run(TestJob(key="masked", command="true", timeout_sec=10,
+                        min_gpus=1, index=28), dict(os.environ))
+    assert out.skipped
 
 
 def test_fatal_primary_never_enters_cov_fallback(runner, tmp_path):

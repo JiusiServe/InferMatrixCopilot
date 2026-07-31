@@ -247,7 +247,7 @@ class TestRunner:
         self.gpu_lock_dir = gpu_lock_dir
         self.cuda = cuda_visible_devices
         self.available_gpus = available_gpus or (
-            lambda: len([d for d in self.cuda.split(",") if d.strip()]))
+            lambda: len(visible_devices(self.cuda)))
         self.watchdog_interval = watchdog_interval
 
     def run(self, job: TestJob, env: dict[str, str], *, baseline: bool = False,

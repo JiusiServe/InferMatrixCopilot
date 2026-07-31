@@ -68,6 +68,19 @@ def _alive(pid: int) -> bool:
         return True
 
 
+def _start_time(pid: int) -> int | None:
+    """Kernel start time (jiffies) from /proc/<pid>/stat — a (pid, starttime)
+    pair identifies a process across PID reuse. None when unreadable (process
+    gone, or no procfs)."""
+    try:
+        stat = open(f"/proc/{pid}/stat", "rb").read().decode(errors="replace")
+        # comm (field 2) may contain spaces/parens; split after the LAST ")".
+        # Fields after it start at field 3; starttime is field 22 → index 19.
+        return int(stat.rsplit(")", 1)[1].split()[19])
+    except (OSError, ValueError, IndexError):
+        return None
+
+
 def kill_tree(pids: list[int], *, term_grace: float = 2.0,
               kill_grace: float = 1.0,
               kill: Callable[[int, int], None] | None = None,
@@ -78,6 +91,17 @@ def kill_tree(pids: list[int], *, term_grace: float = 2.0,
     targets = sorted({d for p in pids for d in collect_descendants(p)})
     if not targets:
         return []
+    # capture identity BEFORE signalling: after the grace sleep a target's pid
+    # may have been reaped and reused, and escalating SIGKILL by bare pid would
+    # then hit an unrelated process
+    identity = {p: _start_time(p) for p in targets}
+
+    def same_process(pid: int) -> bool:
+        born = _start_time(pid)
+        if born is None or identity[pid] is None:
+            return _alive(pid)  # identity unverifiable — legacy pid-only check
+        return born == identity[pid]
+
     _log(f"Killing {len(targets)} process(es): {' '.join(map(str, targets))}")
     for pid in targets:
         try:
@@ -85,7 +109,7 @@ def kill_tree(pids: list[int], *, term_grace: float = 2.0,
         except OSError:
             pass
     sleep(term_grace)
-    survivors = [p for p in targets if _alive(p)]
+    survivors = [p for p in targets if _alive(p) and same_process(p)]
     if survivors:
         _log(f"{len(survivors)} survivor(s) after SIGTERM, sending SIGKILL...")
         for pid in survivors:
@@ -94,7 +118,7 @@ def kill_tree(pids: list[int], *, term_grace: float = 2.0,
             except OSError:
                 pass
         sleep(kill_grace)
-    still_alive = [p for p in targets if _alive(p)]
+    still_alive = [p for p in targets if _alive(p) and same_process(p)]
     if still_alive:
         _log(f"WARNING: {len(still_alive)} process(es) still alive: "
              f"{' '.join(map(str, still_alive))}")
