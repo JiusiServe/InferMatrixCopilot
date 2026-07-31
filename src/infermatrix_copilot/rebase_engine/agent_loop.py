@@ -48,8 +48,10 @@ def _under_plan_dir(file_path: str, plan_write_prefix: str) -> bool:
     try:
         return Path(file_path).resolve().is_relative_to(
             Path(plan_write_prefix).resolve())
-    except (OSError, ValueError):
-        return False  # unresolvable ⇒ not provably inside ⇒ locked
+    except (OSError, ValueError, RuntimeError):
+        # unresolvable ⇒ not provably inside ⇒ locked. RuntimeError is the
+        # symlink-loop signal on supported Pythons — it must lock, not crash
+        return False
 
 
 def _log_writer(agent_log: str) -> Callable[[str], None]:
@@ -76,6 +78,8 @@ async def run_agent_loop(
     max_tokens: int = 32000,
     require_plan_review: bool = True,
     plan_write_prefix: str = "",
+    model_aliases: Mapping[str, str] | None = None,
+    model_mismatch_policy: str = "fail",
     agent_log: str = "",
 ) -> dict:
     """Send prompt → receive tool calls → dispatch → repeat until a text-only
@@ -132,15 +136,23 @@ async def run_agent_loop(
 
         # Served-model guard (repo invariant: model substitution fails by
         # default — a silently substituted backend once fabricated 60× cost
-        # metrics). The endpoint's reported model must match what was asked.
+        # metrics). Uses the SHARED normalization (canonical_model: variant
+        # suffixes like `[1m]` and the audited alias map are equivalences,
+        # not substitutions) and honors MODEL_MISMATCH_POLICY=warn.
+        from ..llm import canonical_model
         served = getattr(response, "model", "") or ""
-        if served and served != model:
-            write_log(f"\n=== Model mismatch: requested {model}, "
-                      f"served {served} — aborting ===\n")
-            return {"done": False,
-                    "text": f"Model mismatch: requested {model}, "
-                            f"served {served}",
-                    "turns": turn}
+        if served and canonical_model(served, dict(model_aliases or {})) != \
+                canonical_model(model, dict(model_aliases or {})):
+            if model_mismatch_policy == "warn":
+                write_log(f"[warn] model mismatch accepted by policy: "
+                          f"requested {model}, served {served}")
+            else:
+                write_log(f"\n=== Model mismatch: requested {model}, "
+                          f"served {served} — aborting ===\n")
+                return {"done": False,
+                        "text": f"Model mismatch: requested {model}, "
+                                f"served {served}",
+                        "turns": turn}
 
         truncated = getattr(response, "stop_reason", None) == "max_tokens"
         text_parts: list[str] = []

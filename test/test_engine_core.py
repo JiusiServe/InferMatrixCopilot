@@ -504,6 +504,57 @@ def test_agent_loop_model_mismatch_fails_closed(omni_repo):
                                    require_plan_review=False))
     assert r["done"] is False and "Model mismatch" in r["text"]
     assert "cheap-substitute" in r["text"]
+    # shared normalization: a [variant] suffix is an equivalence, not a
+    # substitution (deepseek-v4-pro[1m] vs deepseek-v4-pro)
+    resp2 = _resp([_blk_text("fine")])
+    resp2.model = "deepseek-v4-pro"
+    ok = FakeClient([resp2])
+    r = asyncio.run(run_agent_loop(ok, "P", model="deepseek-v4-pro[1m]",
+                                   tool_defs=defs, extra_tools=tools,
+                                   require_plan_review=False))
+    assert r["done"] is True
+    # audited aliases are equivalences too
+    resp3 = _resp([_blk_text("fine")])
+    resp3.model = "provider/real-name"
+    ok2 = FakeClient([resp3])
+    r = asyncio.run(run_agent_loop(
+        ok2, "P", model="requested-name", tool_defs=defs, extra_tools=tools,
+        require_plan_review=False,
+        model_aliases={"requested-name": "provider/real-name"}))
+    assert r["done"] is True
+    # MODEL_MISMATCH_POLICY=warn accepts loudly and continues
+    resp4 = _resp([_blk_text("fine")])
+    resp4.model = "cheap-substitute"
+    warn = FakeClient([resp4])
+    r = asyncio.run(run_agent_loop(
+        warn, "P", model="claude-real", tool_defs=defs, extra_tools=tools,
+        require_plan_review=False, model_mismatch_policy="warn"))
+    assert r["done"] is True
+
+
+def test_plan_dir_containment_survives_symlink_loop(omni_repo, tmp_path):
+    """A symlink loop makes Path.resolve raise on supported Pythons — the
+    write must LOCK, never crash the loop."""
+    import os
+    loop_link = tmp_path / "loop"
+    os.symlink(loop_link, loop_link)
+    defs, tools = _tools(omni_repo)
+    client = FakeClient([
+        _resp([_blk_tool("write_file", "t1",
+                         {"file_path": str(loop_link / "x.md"),
+                          "content": "x"})]),
+        _resp([_blk_text("ok")]),
+    ])
+    r = asyncio.run(run_agent_loop(
+        client, "P", model="m", tool_defs=defs, extra_tools=tools,
+        plan_write_prefix=str(tmp_path / "plans")))
+    assert r["done"] is True
+    results = {tr["tool_use_id"]: tr
+               for m in client.requests[-1]["messages"]
+               if isinstance(m.get("content"), list)
+               for tr in m["content"]
+               if isinstance(tr, dict) and tr.get("type") == "tool_result"}
+    assert "outside the plan directory" in         json.loads(results["t1"]["content"])["error"]
 
 
 def test_agent_loop_partial_input_reaches_guard_not_dispatch(omni_repo):
