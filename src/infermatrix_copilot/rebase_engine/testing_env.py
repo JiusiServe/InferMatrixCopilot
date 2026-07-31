@@ -1,10 +1,13 @@
-"""Agent/test child-env construction — the PRODUCTION wiring of the PR1
+"""AGENT-shell child-env construction — the PRODUCTION wiring of the PR1
 scrub substrate (plan §4: risk reduction; the control for unsupervised
 agent-mutation runs is the recorded RUNBOOK acceptance, not this scrub).
 
-Every v3 child process (test jobs, agent shells) gets a COPY of the process
-env passed through `scrub_agent_shell_env` — credentials and IDE hooks never
-reach children; the process env itself is never mutated."""
+Scope (Rev 8 §6): the scrub applies to AGENT shells only. Test subprocesses
+use the inherit-plus-overlay plan (`testing.env_plan.build_subprocess_env`)
+— stripping the process env from tests would erase required credentials and
+runtime variables and misclassify the resulting failures. Agent shells get
+a COPY of the process env passed through `scrub_agent_shell_env`; the
+process env itself is never mutated."""
 
 from __future__ import annotations
 

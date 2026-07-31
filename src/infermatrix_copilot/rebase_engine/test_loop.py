@@ -46,10 +46,13 @@ class TestRunResult:
 
 # run_fn(slug) -> TestRunResult; baseline_fn(slug) -> TestRunResult | None
 # (None = baseline worktree unavailable); debug_fn(slug, label, rc, output)
-# -> bool (fixed)
+# -> True (fixed) | False (still failing = assertion) | str (STRUCTURAL
+# reason: debug backend unavailable/crashed, unverifiable re-run — recorded
+# under infra_failures so the push gate blocks instead of passing it
+# through as an ordinary test failure)
 RunFn = Callable[[str], TestRunResult]
 BaselineFn = Callable[[str], "TestRunResult | None"]
-DebugFn = Callable[[str, str, int, str], Awaitable[bool]]
+DebugFn = Callable[[str, str, int, str], "Awaitable[bool | str]"]
 
 
 async def run_test_loop(
@@ -153,6 +156,12 @@ async def run_test_loop(
             log.warning("  FAILED on rebase: %s (rc=%d); baseline "
                         "unavailable — treating as REGRESSION", label,
                         result.rc)
+        elif baseline.infra:
+            # a baseline timeout/kill is NOT evidence the test fails on
+            # main — classifying it pre-existing would false-pass a real
+            # regression; regression-preserving, like an absent worktree
+            log.warning("  baseline INFRA FAILURE (%s) on %s — treating as "
+                        "REGRESSION", baseline.infra, label)
         elif baseline.rc != 0:
             log.info("  [PRE-EXISTING] %s fails on main too (rebase rc=%d, "
                      "main rc=%d) — skipping, not a regression", label,
@@ -163,10 +172,17 @@ async def run_test_loop(
 
         log.info("  [REGRESSION] %s passes on main but fails on rebase — "
                  "debugging", label)
-        fixed = await debug_fn(slug, label, result.rc, result.output)
-        if fixed:
+        verdict = await debug_fn(slug, label, result.rc, result.output)
+        if verdict is True:
             passed += 1
             completed_slugs.append(slug)
+        elif isinstance(verdict, str) and verdict:
+            # STRUCTURAL: the debug machinery itself failed (no backend,
+            # agent crash, unverifiable re-run) — never an assertion failure
+            log.warning("  DEBUG INFRA FAILURE on %s: %s", label, verdict)
+            infra_failures.append(f"{slug}: {verdict}")
+            infra_slugs.add(slug)
+            failed += 1
         else:
             failed_tests.append(slug)
             failed += 1

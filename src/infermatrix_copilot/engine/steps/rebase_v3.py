@@ -95,24 +95,40 @@ def _module_scope(repo_root: str, module: str,
                   manifest: dict) -> ToolScope:
     """C5 path governance for one module agent: the repo tree is the hard
     writable wall; the module's manifest `local_paths` are its primary files
-    — writes elsewhere in the tree execute but are RECORDED out-of-scope."""
+    — writes elsewhere in the tree execute but are RECORDED out-of-scope.
+    An UNKNOWN module (e.g. a debug agent for an unassigned job) gets a
+    never-matching primary, so every one of its writes is recorded rather
+    than silently in-scope."""
     root = Path(repo_root).resolve()
     local = tuple(((manifest.get("modules") or {}).get(module) or {})
                   .get("local_paths") or ())
+    primary = tuple(f"{(root / p).as_posix()}*" for p in local) \
+        or ("/__imx_no_primary__/*",)
     return ToolScope(
         name=f"rebase-module:{module}",
         allowed_tools=frozenset(),  # extras bypass the builtin allowlist;
                                     # enforcement here is the path scope
         path_scope=PathScope(
-            writable=(f"{root.as_posix()}/*",),
-            primary=tuple(f"{(root / p).as_posix()}*" for p in local)),
+            writable=(f"{root.as_posix()}/*",), primary=primary),
         root=str(root))
 
 
 # same-checkout module agents must never run concurrently — the executor's
 # foreach fan-out gathers items, but every module mutates the SAME target
-# tree (the parent runs wave members sequentially). One lock per run dir.
-_MODULE_SERIAL: dict[str, asyncio.Lock] = {}
+# tree (the parent runs wave members sequentially). Locks are LOOP-scoped
+# (keyed by run dir + running loop) like the runtime registry: an in-process
+# resume runs under a fresh asyncio.run loop and must never touch a lock
+# bound to the previous loop; stale same-run keys are pruned on access.
+_MODULE_SERIAL: dict[tuple[str, int], asyncio.Lock] = {}
+
+
+def _serial_lock(run_dir) -> asyncio.Lock:
+    loop_id = id(asyncio.get_running_loop())
+    key = (str(run_dir), loop_id)
+    for stale in [k for k in _MODULE_SERIAL
+                  if k[0] == str(run_dir) and k[1] != loop_id]:
+        del _MODULE_SERIAL[stale]
+    return _MODULE_SERIAL.setdefault(key, asyncio.Lock())
 
 
 @step("rebase.v3_prelude", "deterministic", "read",
@@ -141,6 +157,38 @@ async def _v3_prelude(ctx: StepContext) -> StepResult:
                           "adapter is not active — v3 refuses inactive "
                           "adapters")
 
+    # transition-table row 3 (Rev 8 §3.1): a run that ends blocked at ANY
+    # later step still owes RUN_REPORT — the report step never runs on the
+    # blocked path, so a lifecycle finalizer augments the artifacts
+    # (never upgrades the outcome). Registered before anything can block.
+    from ..lifecycle import register_finalizer
+    sub = _substate(ctx)
+
+    async def _terminal_report(outcome, _run_dir=ctx.run_dir, _sub=sub,
+                               _mode=mode) -> None:
+        path = _run_dir / "RUN_REPORT.md"
+        if path.exists():
+            return
+        status = getattr(outcome, "status", None) or "aborted"
+        data = _sub.read()
+        mods = data.get("modules") or {}
+        pipeline = ((data.get("tests") or {}).get("pipeline")) or {}
+        path.write_text(
+            "# Run report (terminal — written by the run finalizer)\n\n"
+            f"- status: {status}\n"
+            f"- rebase_mode: {_mode}\n"
+            f"- substate phase: {data.get('phase', '')}\n"
+            f"- modules: "
+            f"{sum(1 for m in mods.values() if (m or {}).get('status') == 'done')}"
+            f" done / {len(mods)} total\n"
+            f"- tests: {pipeline.get('passed', 0)} passed, "
+            f"{pipeline.get('failed', 0)} failed\n\n"
+            "The run terminated before the report step; see ESCALATION.md / "
+            "DIAGNOSTICS.md and run_trace.jsonl for the failure detail.\n",
+            encoding="utf-8")
+
+    register_finalizer(ctx.run_dir, _terminal_report)
+
     updates: dict = {}
     from ...adapters.base import expand_path
     upstream = ctx.state.get("upstream_path", "") or expand_path(
@@ -162,6 +210,38 @@ async def _v3_prelude(ctx: StepContext) -> StepResult:
                               "full mode needs the last-rebase baseline — "
                               "pass --task-param last_rebase_commit=<sha>")
 
+    # §2.2 preconditions for the prepared-tree modes: they operate on a tree
+    # whose pin step already ran — refuse one that was never prepared, and
+    # (remote_ci) refuse to push without the upstream-commit signal
+    if mode in ("local_ci", "remote_ci"):
+        repo = require_repo(ctx)
+        if isinstance(repo, StepResult):
+            return repo
+        pin_data = ((manifest.get("rebase") or {}).get("wheel") or {}) \
+            .get("pin")
+        if not pin_data:
+            return StepResult(False, FailureKind.BLOCKED,
+                              f"{mode} needs the manifest wheel.pin spec — "
+                              "cannot verify the prepared tree")
+        if not wheel_mod.pin_present(Path(repo),
+                                     wheel_mod.PinSpec.from_manifest(
+                                         pin_data)):
+            return StepResult(False, FailureKind.BLOCKED,
+                              f"{mode} operates on a PREPARED tree, but the "
+                              "CI Dockerfile carries no wheel pin — run "
+                              "full mode (or pin) first")
+    if mode == "remote_ci":
+        upstream_commit = _task_params(ctx).get("upstream_commit", "") \
+            or ctx.state.get("upstream_commit", "") \
+            or (sub.read().get("upstream_commit") or "")
+        if not upstream_commit:
+            return StepResult(False, FailureKind.BLOCKED,
+                              "remote_ci needs the upstream-commit signal "
+                              "(--task-param upstream_commit=<sha>, or a "
+                              "resumed run's substate) — refusing to push "
+                              "an unprepared branch")
+        updates["upstream_commit"] = upstream_commit
+
     if mode in MUTATING_MODES:
         repo = require_repo(ctx)
         if isinstance(repo, StepResult):
@@ -181,7 +261,6 @@ async def _v3_prelude(ctx: StepContext) -> StepResult:
                                   "external or archival run is active on "
                                   "this checkout")
             held.append(lock)
-        from ..lifecycle import register_finalizer
 
         async def _release_locks(_outcome, _held=tuple(held)) -> None:
             for h in _held:
@@ -191,7 +270,6 @@ async def _v3_prelude(ctx: StepContext) -> StepResult:
         ctx.trace.record("checkout_locks_acquired",
                          paths=[str(lk.path) for lk in held])
 
-    sub = _substate(ctx)
     sub.update({"phase": "init", **{k: v for k, v in
                                     mode_state_flags(mode).items()}})
     return StepResult(True, summary=f"mode={mode}",
@@ -321,14 +399,17 @@ async def _v3_wave_gate(ctx: StepContext) -> StepResult:
 
 
 async def _run_debug_agent(ctx: StepContext, manifest: dict, module: str,
-                           slug: str, traceback_text: str) -> bool:
+                           slug: str, traceback_text: str) -> str:
     """One regression-debug agent attempt for a failing test's module —
     the configured state-injected backend the loop's `debug_fn` invokes.
-    Returns True when the agent claims completion (the caller re-runs the
-    test; only a green re-run counts as fixed)."""
+    Returns "done" when the agent claims completion (the caller re-runs the
+    test; only a green re-run counts as fixed), "not_done" when the agent
+    honestly gave up, or "error:<detail>" when the DEBUG MACHINERY itself
+    failed (structural, per the §2.3 taxonomy — agent dispatch failures are
+    never ordinary test failures)."""
     client = _tier_client(ctx)
     if isinstance(client, StepResult):
-        return False
+        return "error:debug backend unavailable"
     client, target = client
     from ...rebase_engine.agent_loop import run_agent_loop
     from ...rebase_engine.prompt_builder import (ModulePromptData,
@@ -355,13 +436,15 @@ async def _run_debug_agent(ctx: StepContext, manifest: dict, module: str,
         result = await run_agent_loop(
             client, prompt, model=target.model, tool_defs=defs,
             extra_tools=tools,
-            scope=_module_scope(repo_root, module or slug, manifest),
+            scope=_module_scope(repo_root, module, manifest),
             trace=ctx.trace, require_plan_review=False,
+            model_aliases=ctx.settings.model_aliases,
+            model_mismatch_policy=ctx.settings.model_mismatch_policy,
             agent_log=str(agent_log))
-    except Exception as exc:  # noqa: BLE001 - a debug crash is "not fixed"
+    except Exception as exc:  # noqa: BLE001 - a debug crash is STRUCTURAL
         ctx.trace.record("debug_attempt_error", slug=slug, error=str(exc))
-        return False
-    return bool(result.get("done"))
+        return f"error:debug agent crashed: {exc}"
+    return "done" if result.get("done") else "not_done"
 
 
 @step("rebase.v3_test_loop", "script", "write_workspace",
@@ -404,6 +487,7 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
                                   "set (push gate blocks)",
                           outputs={"state_updates": {"phase3_failed": []}})
 
+    import os
     from ...testing.env_plan import build_subprocess_env
     from ...testing.runner import TestJob, TestRunner
     from ...testing.watchdog import WatchdogPatterns
@@ -413,13 +497,17 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
     pat_file = adapter_dir / "testing" / "watchdog_patterns.yaml"
     patterns = WatchdogPatterns.from_yaml(pat_file) \
         if pat_file.is_file() else None
+
+    def notify_download(key: str, repo_id: str) -> None:
+        ctx.trace.record("model_download_expected", job=key, repo=repo_id)
+
     runner = TestRunner(
         repo_root=Path(repo), tests_dir=ctx.run_dir / "tests",
         patterns=patterns, gpu_lock_dir=ctx.run_dir / "gpu_lock",
         artifact_globs=list((rb.get("testing") or {})
                             .get("artifact_globs") or []),
-        cuda_visible_devices=str(
-            scrubbed_agent_env().get("CUDA_VISIBLE_DEVICES", "")))
+        cuda_visible_devices=os.environ.get("CUDA_VISIBLE_DEVICES", ""),
+        notify_download=notify_download)
     jobs_by_slug = {j["slug"]: j for j in local_jobs}
 
     def _job(slug: str) -> TestJob:
@@ -428,13 +516,18 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
                        timeout_sec=j["timeout_sec"], min_gpus=j["min_gpus"],
                        env=_parse_env_pairs(j.get("env", "")))
 
-    def run_fn(slug: str) -> tl.TestRunResult:
-        outcome = runner.run(_job(slug), scrubbed_agent_env())
+    def _to_result(outcome) -> tl.TestRunResult:
         infra = "timeout" if outcome.timed_out else \
             ("watchdog kill" if outcome.watchdog_triggered else "")
         return tl.TestRunResult(rc=outcome.rc, skipped=outcome.skipped,
                                 skip_reason=outcome.skip_reason,
                                 output=outcome.log_file, infra=infra)
+
+    def run_fn(slug: str) -> tl.TestRunResult:
+        # tests INHERIT the process env (Rev 8 §6: inherit-plus-overlay;
+        # the credential scrub applies to agent shells only — stripping a
+        # test's required tokens would misclassify its failure)
+        return _to_result(runner.run(_job(slug), build_subprocess_env()))
 
     worktree_path = ctx.run_dir / "main_worktree"
 
@@ -445,23 +538,24 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
         wt_runner = TestRunner(
             repo_root=wt, tests_dir=ctx.run_dir / "tests",
             patterns=patterns, gpu_lock_dir=ctx.run_dir / "gpu_lock",
-            cuda_visible_devices=runner.cuda)
+            cuda_visible_devices=runner.cuda,
+            notify_download=notify_download)
         # main's files must import main's code: prepend the worktree so the
         # baseline never executes against rebase dependencies (parent's
-        # baseline PYTHONPATH override)
-        env = build_subprocess_env(base=scrubbed_agent_env(),
-                                   pythonpath_prepend=str(wt))
-        outcome = wt_runner.run(_job(slug), env, baseline=True)
-        return tl.TestRunResult(rc=outcome.rc, skipped=outcome.skipped)
+        # baseline PYTHONPATH override); infra outcomes propagate — a
+        # baseline timeout must never read as "fails on main too"
+        env = build_subprocess_env(pythonpath_prepend=str(wt))
+        return _to_result(wt_runner.run(_job(slug), env, baseline=True))
 
-    async def debug_fn(slug: str, label: str, rc: int, output: str) -> bool:
+    async def debug_fn(slug: str, label: str, rc: int,
+                       output: str) -> bool | str:
         tier = _tier_client(ctx)
         if isinstance(tier, StepResult):
             ctx.trace.record("capability_gap",
                              capability="rebase.debug_agent",
                              detail=f"no agent backend; {slug} regression "
-                                    "recorded as failed")
-            return False
+                                    "recorded as a structural failure")
+            return "debug backend unavailable (capability_gap)"
         traceback_text = ""
         try:
             log_path = Path(output)
@@ -472,13 +566,19 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
                     .splitlines()[-200:])
         except OSError:
             pass
-        attempted = await _run_debug_agent(
+        verdict = await _run_debug_agent(
             ctx, manifest, jobs_by_slug[slug].get("module", ""), slug,
             traceback_text or f"{label} failed with rc={rc}")
-        if not attempted:
-            return False
-        rerun = run_fn(slug)  # only a green re-run counts as fixed
-        return rerun.rc == 0 and not rerun.skipped and not rerun.infra
+        if verdict.startswith("error:"):
+            return f"debug agent failed: {verdict[6:]}"
+        if verdict != "done":
+            return False                 # agent gave up: assertion stands
+        rerun = run_fn(slug)             # only a green re-run counts
+        if rerun.infra:
+            return f"post-debug re-run {rerun.infra}"
+        if rerun.skipped:
+            return "post-debug re-run skipped (unverifiable fix)"
+        return rerun.rc == 0
 
     result = await tl.run_test_loop(
         local_jobs, substate=sub, run_fn=run_fn,
@@ -499,6 +599,61 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
                               f"{len(result['skipped_tests'])} skipped",
                       outputs={"state_updates": {
                           "phase3_failed": result["failed_tests"]}})
+
+
+@step("rebase.v3_precommit", "script", "write_workspace",
+      "Phase-3.2 precommit workflow: run, retry once, record in substate.")
+async def _v3_precommit(ctx: StepContext) -> StepResult:
+    """The parent's Phase 3.2 (always runs after the local test loop): the
+    adapter-declared precommit command, with one retry — auto-fix hooks
+    (formatters, end-of-file fixers) often pass on the second run. The
+    result is SUBSTATE DATA: `tests.precommit.result` is what the push gate
+    reads ("failed" is a structural block, §2.3), so the step itself
+    returns ok either way. write_workspace risk: hooks auto-fix files in
+    place. An adapter with no declared precommit records `not_declared`
+    (data-driven — never invented, never silently green-as-passed)."""
+    repo = require_repo(ctx)
+    if isinstance(repo, StepResult):
+        return repo
+    manifest = _adapter_manifest(ctx)
+    if isinstance(manifest, StepResult):
+        return manifest
+    sub = _substate(ctx)
+    pc = (manifest.get("rebase") or {}).get("precommit") or {}
+    command = str(pc.get("command") or "")
+    if not command:
+        ctx.trace.record("capability_gap", capability="rebase.precommit",
+                         detail="no precommit command declared in the "
+                                "adapter manifest")
+        sub.update({"tests": {"precommit": {"result": "not_declared",
+                                            "attempt": 0}}})
+        return StepResult(True, summary="precommit: not declared (recorded)")
+
+    from ...testing.env_plan import build_subprocess_env
+    from ...testing.runner import TestJob, TestRunner
+    runner = TestRunner(repo_root=Path(repo),
+                        tests_dir=ctx.run_dir / "tests",
+                        gpu_lock_dir=ctx.run_dir / "gpu_lock")
+    job = TestJob(key="__precommit__", command=command,
+                  timeout_sec=float(pc.get("timeout_sec") or 600),
+                  min_gpus=0, gpu_lock=False)
+    outcome = runner.run(job, build_subprocess_env())
+    attempt = 0
+    if outcome.rc != 0 and pc.get("retry_once", True):
+        # parity: many hooks fix files in place; a second run then passes.
+        # NO `git add -A` here (parent-documented: indiscriminate staging is
+        # how stray artifacts ended up in rebase commits)
+        attempt = 1
+        outcome = runner.run(job, build_subprocess_env())
+    passed = outcome.rc == 0 and not outcome.timed_out
+    sub.update({"tests": {"precommit": {
+        "result": "passed" if passed else "failed",
+        "attempt": attempt, "last_log": outcome.log_file or None}}})
+    return StepResult(True,
+                      summary="precommit "
+                              + ("passed" if passed else
+                                 f"FAILED (rc={outcome.rc}; push gate "
+                                 "blocks)"))
 
 
 @step("rebase.v3_push_gate", "deterministic", "read",
@@ -540,6 +695,8 @@ async def _v3_finalize(ctx: StepContext) -> StepResult:
     failed_tests = ((tests.get("pipeline") or {}).get("failed_tests")) or []
     failures.extend(f"test {t}" for t in failed_tests)
     failures.extend(f"infra {i}" for i in tests.get("infra_failures") or [])
+    if ((tests.get("precommit") or {}).get("result")) == "failed":
+        failures.append("precommit red")
     if data.get("manifest_empty"):
         failures.append("manifest empty")
     sub.update({"phase": "needs_human" if failures else "done"})
@@ -564,6 +721,18 @@ async def _v3_module_rebase(ctx: StepContext) -> StepResult:
     if not module:
         return StepResult(False, FailureKind.BLOCKED,
                           "v3_module_rebase needs a foreach module item")
+    # substate-first idempotency (crash-window contract): a module whose
+    # durable status is already terminal-done short-circuits on re-entry —
+    # a crash between the substate write and the executor checkpoint must
+    # never run the agent (and apply its edits) twice
+    sub = _substate(ctx)
+    prior = ((sub.read().get("modules") or {}).get(module)) or {}
+    if prior.get("status") in ("done", "skipped"):
+        return StepResult(True,
+                          summary=f"{module}: already {prior['status']} "
+                                  "(substate short-circuit)",
+                          outputs={"state_updates": {
+                              f"module_{module}_status": prior["status"]}})
     manifest = _adapter_manifest(ctx)
     if isinstance(manifest, StepResult):
         return manifest
@@ -592,13 +761,14 @@ async def _v3_module_rebase(ctx: StepContext) -> StepResult:
         script_dir=str(adapter_dir / "rebase"), model=target.model,
         log_dir=str(ctx.run_dir),
         last_rebase_vllm_commit=ctx.state.get("last_rebase_upstream_commit",
-                                              ""))
-    serial = _MODULE_SERIAL.setdefault(str(ctx.run_dir), asyncio.Lock())
-    async with serial:
+                                              ""),
+        model_aliases=ctx.settings.model_aliases,
+        model_mismatch_policy=ctx.settings.model_mismatch_policy)
+    async with _serial_lock(ctx.run_dir):
         outcome = await rebase_module(
             module, client=client, config=config,
             prompt_data=data, tool_defs=defs, extra_tools=tools,
-            substate=_substate(ctx), hooks=hooks,
+            substate=sub, hooks=hooks,
             scope=_module_scope(repo_root, module, manifest),
             trace=ctx.trace)
     return StepResult(True,

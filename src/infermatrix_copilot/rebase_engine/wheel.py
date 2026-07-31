@@ -477,6 +477,22 @@ def is_pinned(text: str, commit: str, pin: PinSpec) -> bool:
                      text, re.MULTILINE))
 
 
+def pin_present(repo: Path, pin: PinSpec) -> bool:
+    """True when the CI Dockerfile exists and carries ANY wheel pin (URL or
+    ENV/ARG form) — the local_ci/remote_ci precondition (Rev 8 §2.2): those
+    modes operate on an already-prepared tree and must refuse one whose pin
+    step never ran."""
+    path = Path(repo) / pin.dockerfile
+    if not path.is_file():
+        return False
+    text = path.read_text(encoding="utf-8")
+    var = re.escape(pin.commit_env_var)
+    return bool(
+        re.search(pin.url_pattern, text)
+        or re.search(rf"^[ \t]*(ENV|ARG)[ \t]+{var}=[0-9a-f]{{40}}[ \t]*$",
+                     text, re.MULTILINE))
+
+
 def pin_dockerfile(repo: Path, commit: str, pin: PinSpec, *,
                    log: Callable[[str], None] = _log) -> bool:
     """Rewrite the CI Dockerfile's wheel pin to `commit`, supporting both the

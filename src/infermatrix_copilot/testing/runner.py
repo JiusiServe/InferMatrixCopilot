@@ -95,6 +95,32 @@ def artifact_suffix(baseline: bool) -> str:
     return "_main_baseline" if baseline else ""
 
 
+# ── model-download notification (parent `_ci_test_notify_model_download`) ────
+
+_HF_DOWNLOAD_RX = re.compile(
+    r"(?:huggingface-cli|hf)\s+download\s+(\S+)")
+
+
+def hf_repo_from_setup(setup: str) -> str:
+    """First org/repo from a `huggingface-cli download ...` / `hf download`
+    line in the job's setup command, or "" (parent regex, verbatim)."""
+    m = _HF_DOWNLOAD_RX.search(setup or "")
+    return m.group(1) if m else ""
+
+
+def hf_repo_cached(repo_id: str, hf_home: str) -> bool:
+    """True when the repo has at least one snapshot under `HF_HOME/hub`
+    (parent `_hf_hub_repo_cached`)."""
+    if not repo_id or not hf_home:
+        return False
+    d = Path(hf_home) / "hub" / f"models--{repo_id.replace('/', '--')}" \
+        / "snapshots"
+    try:
+        return d.is_dir() and any(d.iterdir())
+    except OSError:
+        return False
+
+
 def log_file_for(tests_dir: Path, job: TestJob, *, baseline: bool = False) -> Path:
     return Path(tests_dir) / (
         f"{job.index:02d}_{job.key}{artifact_suffix(baseline)}.log")
@@ -282,7 +308,8 @@ class TestRunner:
                  gpu_lock_dir: Path | None = None,
                  cuda_visible_devices: str = "",
                  available_gpus: Callable[[], int] | None = None,
-                 watchdog_interval: float = 10.0):
+                 watchdog_interval: float = 10.0,
+                 notify_download: Callable[[str, str], None] | None = None):
         self.repo_root = Path(repo_root)
         self.tests_dir = Path(tests_dir)
         self.patterns = patterns
@@ -295,6 +322,7 @@ class TestRunner:
         self.available_gpus = available_gpus or (
             lambda: len(visible_devices(self.cuda)))
         self.watchdog_interval = watchdog_interval
+        self.notify_download = notify_download
 
     def run(self, job: TestJob, env: dict[str, str], *, baseline: bool = False,
             dry_run: bool = False) -> TestOutcome:
@@ -337,6 +365,22 @@ class TestRunner:
             return TestOutcome(
                 rc=0, skipped=True, log_file=str(log_file), plan=plan,
                 skip_reason=f"needs {job.min_gpus} GPU(s), {avail} available")
+
+        # model-download heads-up (parent parity): a setup that will pull an
+        # uncached HF repo can stall a job for an hour — notify ONCE per job
+        # (durable marker, parent's filename) before spawning
+        if self.notify_download and job.setup:
+            repo_id = hf_repo_from_setup(job.setup)
+            if repo_id and not hf_repo_cached(repo_id,
+                                              run_env.get("HF_HOME", "")):
+                sent = self.tests_dir / \
+                    f".model_download_email_sent_{job.key}"
+                if not sent.exists():
+                    try:
+                        self.notify_download(job.key, repo_id)
+                        sent.touch()
+                    except Exception:  # noqa: BLE001 - a broken notifier
+                        pass           # must never block the test itself
 
         backup_prev_log(log_file)
 

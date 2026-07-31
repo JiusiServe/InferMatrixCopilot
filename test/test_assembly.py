@@ -495,12 +495,13 @@ def test_v3_per_mode_matrix():
     matrix = {
         "report_only": {"prelude", "guard_check", "scan", "report",
                         "finalize"},
-        "local_ci": {"prelude", "guard", "tests", "report", "finalize"},
+        "local_ci": {"prelude", "guard", "tests", "precommit", "report",
+                     "finalize"},
         "remote_ci": {"prelude", "guard", "push_gate", "ci", "report",
                       "finalize"},
         "full": {"prelude", "guard", "wheel", "assign", "wave1",
-                 "wave_gate", "wave2", "tests", "push_gate", "ci",
-                 "report", "finalize"},
+                 "wave_gate", "wave2", "tests", "precommit", "push_gate",
+                 "ci", "report", "finalize"},
     }
     for mode, expect in matrix.items():
         state = {"task_spec": {}, **mode_state_flags(mode)}
@@ -573,7 +574,9 @@ def test_v3_prelude_inits_runtime(v3_env, settings, trace, tmp_path,
     r = asyncio.run(prelude.handler(
         ctx_for({"rebase_mode": "report_only"}, run_dir2)))
     assert r.ok
-    assert lifecycle._finalizers.get(str(run_dir2)) is None
+    ro_probe = CheckoutLock(repo, "omni")
+    assert ro_probe.acquire(blocking=False) is True   # nothing was locked
+    ro_probe.release()
 
 
 def test_v3_wave_gate(v3_env, settings, trace):
@@ -653,8 +656,10 @@ def test_parse_env_pairs():
 
 def test_v3_test_loop_step_contract(v3_env, settings, trace, monkeypatch):
     """The local loop excludes nightly jobs, passes each job's declared env
-    pairs to the child, and runs the baseline with the worktree prepended
-    to PYTHONPATH (main's files execute main's code)."""
+    pairs to the child, INHERITS the process env for tests (the scrub is
+    agent-shell-only — Rev 8 §6), and runs the baseline with the worktree
+    prepended to PYTHONPATH (main's files execute main's code). A missing
+    debug backend is a STRUCTURAL failure, not an assertion."""
     from infermatrix_copilot.engine.registry import StepRegistry
     from infermatrix_copilot.engine.step import FailureKind, StepContext
     from infermatrix_copilot.engine.step import StepResult
@@ -667,6 +672,7 @@ def test_v3_test_loop_step_contract(v3_env, settings, trace, monkeypatch):
     monkeypatch.setattr(
         rebase_v3, "_tier_client",
         lambda ctx: StepResult(False, FailureKind.BLOCKED, "no backend"))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-inherit")
     calls = []
 
     def fake_run(self, job, env, *, baseline=False, dry_run=False):
@@ -694,12 +700,20 @@ def test_v3_test_loop_step_contract(v3_env, settings, trace, monkeypatch):
     # the job's declared env pairs reach the child
     assert rebase_call["job_env"] == {"QUICK_ENV": "1"}
     assert baseline_call["job_env"] == {"QUICK_ENV": "1"}
+    # tests INHERIT the process env — the agent-shell scrub must not strip
+    # a test's required credentials (misclassification hazard)
+    assert rebase_call["env"].get("ANTHROPIC_API_KEY") == "sk-test-inherit"
+    assert baseline_call["env"].get("ANTHROPIC_API_KEY") == "sk-test-inherit"
     # baseline PYTHONPATH prepends the worktree
     assert baseline_call["env"]["PYTHONPATH"].split(":")[0] == str(wt)
     assert rebase_call["env"].get("PYTHONPATH", "").split(":")[0] != str(wt)
-    # rc=1 vs baseline rc=0 = regression; no debug backend -> failed
+    # rc=1 vs baseline rc=0 = regression; a MISSING debug backend is a
+    # structural (infra) failure, never an ordinary assertion failure
     data = Substate(run_dir, "run-t").read()
-    assert data["tests"]["pipeline"]["failed_tests"] == ["quick"]
+    assert data["tests"]["pipeline"]["failed_tests"] == []
+    assert data["tests"]["infra_failures"] == [
+        "quick: debug backend unavailable (capability_gap)"]
+    assert not evaluate_push_gate(data, {}).allowed
 
 
 def test_v3_test_loop_empty_manifest_is_structural(v3_env, settings, trace,
@@ -811,10 +825,11 @@ def test_v3_module_scope_and_serialization(v3_agent_env, settings, trace,
         rebase_v3, "_tier_client",
         lambda ctx: (object(), SimpleNamespace(
             model="m-test", api_key="k", base_url="", source="tier:eco")))
-    events, scopes = [], {}
+    events, scopes, configs = [], {}, {}
 
     async def fake_rebase_module(module, **kw):
         scopes[module] = kw.get("scope")
+        configs[module] = kw.get("config")
         events.append(("enter", module))
         await asyncio.sleep(0.02)
         events.append(("exit", module))
@@ -851,6 +866,26 @@ def test_v3_module_scope_and_serialization(v3_agent_env, settings, trace,
     d = scope.path_scope.check_write(f"{root}/vllm_omni/engine/core.py")
     assert d.allowed and d.out_of_scope
     assert not scope.path_scope.check_write("/etc/passwd").allowed
+    # the served-model policy travels with the config (aliases + mismatch)
+    cfg = configs["worker_runner"]
+    assert cfg.model_mismatch_policy == settings.model_mismatch_policy
+    assert cfg.model_aliases == settings.model_aliases
+    # an UNKNOWN module (unassigned debug job) records EVERY repo write as
+    # out-of-scope instead of silently blessing the whole tree
+    manifest = yaml.safe_load(
+        (Path(settings.adapters_dir) / "vllm_omni" / "manifest.yaml")
+        .read_text())
+    from infermatrix_copilot.engine.steps.rebase_v3 import _module_scope
+    anon = _module_scope(str(repo), "no_such_module", manifest)
+    d = anon.path_scope.check_write(f"{root}/vllm_omni/worker/gpu.py")
+    assert d.allowed and d.out_of_scope
+    # in-process resume under a NEW event loop must not reuse the old
+    # loop's serialization lock (loop-scoped, stale keys pruned)
+    r3 = asyncio.run(handler(ctx_for("worker_runner")))
+    assert r3.ok
+    from infermatrix_copilot.engine.steps.rebase_v3 import _MODULE_SERIAL
+    assert len([k for k in _MODULE_SERIAL
+                if k[0] == str(run_dir)]) == 1
 
 
 def test_v3_tier_client_pairs_endpoint_and_credential(trace, tmp_path,
@@ -886,3 +921,301 @@ def test_v3_tier_client_pairs_endpoint_and_credential(trace, tmp_path,
                            state={"task_spec": {"mode": "eco"}})
     r = _tier_client(ctx2)
     assert isinstance(r, StepResult) and not r.ok
+
+
+# -- round 2: baseline/debug taxonomy, preconditions, precommit, artifacts -----
+
+def test_test_loop_baseline_infra_preserves_regression(tmp_path):
+    """A baseline timeout is NOT evidence the test fails on main — it must
+    go to the debug/regression path, never be classified pre-existing."""
+    sub = Substate(tmp_path, "run-bi")
+    jobs = [{"slug": "t", "label": "t", "min_gpus": 1}]
+    debugged = []
+
+    async def debug_fn(slug, label, rc, output):
+        debugged.append(slug)
+        return False
+
+    result = asyncio.run(tl.run_test_loop(
+        jobs, substate=sub, run_fn=lambda s: tl.TestRunResult(1),
+        baseline_fn=lambda s: tl.TestRunResult(1, infra="timeout"),
+        debug_fn=debug_fn))
+    assert debugged == ["t"]                      # went to debug
+    assert result["skipped_tests"] == []          # NOT pre-existing
+    assert result["failed_tests"] == ["t"]
+
+
+def test_test_loop_debug_structural_verdict(tmp_path):
+    """A debug_fn string verdict (backend missing/crashed, unverifiable
+    re-run) is recorded under infra_failures — the push gate blocks it —
+    never under the assertion pass-through."""
+    sub = Substate(tmp_path, "run-dv")
+    jobs = [{"slug": s, "label": s, "min_gpus": 1}
+            for s in ("nobackend", "gaveup")]
+    verdicts = {"nobackend": "debug backend unavailable (capability_gap)",
+                "gaveup": False}
+
+    async def debug_fn(slug, label, rc, output):
+        return verdicts[slug]
+
+    result = asyncio.run(tl.run_test_loop(
+        jobs, substate=sub, run_fn=lambda s: tl.TestRunResult(1),
+        baseline_fn=lambda s: tl.TestRunResult(0), debug_fn=debug_fn))
+    assert result["infra_failures"] == [
+        "nobackend: debug backend unavailable (capability_gap)"]
+    assert result["failed_tests"] == ["gaveup"]
+    assert not evaluate_push_gate(
+        {"tests": {"infra_failures": result["infra_failures"],
+                   "pipeline": {"failed_tests": []}}}, {}).allowed
+
+
+def test_pin_present(tmp_path):
+    from infermatrix_copilot.rebase_engine.wheel import PinSpec, pin_present
+    pin = PinSpec(dockerfile="docker/Dockerfile.ci",
+                  url_pattern=r"wheels\.example\.com/[0-9a-f]{40}",
+                  url_template="wheels.example.com/{commit}",
+                  commit_env_var="WHEEL_COMMIT")
+    repo = tmp_path / "r"
+    (repo / "docker").mkdir(parents=True)
+    assert pin_present(repo, pin) is False           # no dockerfile
+    df = repo / "docker" / "Dockerfile.ci"
+    df.write_text("FROM x\nRUN true\n")
+    assert pin_present(repo, pin) is False           # no pin
+    df.write_text(f"FROM x\nENV WHEEL_COMMIT={'a' * 40}\n")
+    assert pin_present(repo, pin) is True            # ENV form
+    df.write_text(f"FROM x\nRUN pip install https://wheels.example.com/"
+                  f"{'b' * 40}/pkg.whl\n")
+    assert pin_present(repo, pin) is True            # URL form
+
+
+def test_v3_prelude_prepared_tree_preconditions(v3_env, settings, trace,
+                                                tmp_path, monkeypatch):
+    """local_ci/remote_ci operate on a PREPARED tree: no wheel pin ⇒
+    BLOCKED; remote_ci additionally needs the upstream-commit signal."""
+    from infermatrix_copilot.engine.registry import StepRegistry
+    from infermatrix_copilot.engine.step import StepContext
+    from infermatrix_copilot.engine.steps import register_builtin_steps
+    _, _, repo, run_dir = v3_env
+    monkeypatch.delenv("VLLM_UPSTREAM_REPO", raising=False)
+    registry = register_builtin_steps(StepRegistry())
+    prelude = registry.get("rebase.v3_prelude")
+
+    def ctx_for(params, rd):
+        rd.mkdir(exist_ok=True)
+        return StepContext(
+            settings=settings, params={}, run_dir=rd, trace=trace,
+            state={"task_spec": {"kind": "repo_rebase", "repo": "vllm-omni",
+                                 "params": params},
+                   "repo_path": str(repo), "run_id": rd.name})
+
+    # no wheel pin in the tree: both prepared-tree modes refuse
+    r = asyncio.run(prelude.handler(
+        ctx_for({"rebase_mode": "local_ci"}, tmp_path / "p1")))
+    assert not r.ok and "wheel pin" in r.summary
+    r = asyncio.run(prelude.handler(
+        ctx_for({"rebase_mode": "remote_ci"}, tmp_path / "p2")))
+    assert not r.ok and "wheel pin" in r.summary
+
+    # pin the tree (manifest pin spec: ENV VLLM_PRECOMPILED_WHEEL_COMMIT)
+    (repo / "docker").mkdir(exist_ok=True)
+    (repo / "docker" / "Dockerfile.ci").write_text(
+        f"FROM base\nENV VLLM_PRECOMPILED_WHEEL_COMMIT={'c' * 40}\n")
+    r = asyncio.run(prelude.handler(
+        ctx_for({"rebase_mode": "local_ci"}, tmp_path / "p3")))
+    assert r.ok, r.summary
+    asyncio.run(_finalize_run(tmp_path / "p3"))
+
+    # remote_ci still refuses without the upstream-commit signal...
+    r = asyncio.run(prelude.handler(
+        ctx_for({"rebase_mode": "remote_ci"}, tmp_path / "p4")))
+    assert not r.ok and "upstream-commit" in r.summary
+    # ...and publishes it when given
+    r = asyncio.run(prelude.handler(
+        ctx_for({"rebase_mode": "remote_ci",
+                 "upstream_commit": "e" * 40}, tmp_path / "p5")))
+    assert r.ok, r.summary
+    assert r.outputs["state_updates"]["upstream_commit"] == "e" * 40
+    asyncio.run(_finalize_run(tmp_path / "p5"))
+
+
+async def _finalize_run(run_dir):
+    from infermatrix_copilot.engine import lifecycle
+    await lifecycle.finalize(run_dir, None)
+
+
+def test_v3_terminal_report_finalizer(v3_env, settings, trace, tmp_path):
+    """Transition-table row 3: a run that blocks before the report step
+    still gets RUN_REPORT.md, written by the prelude-registered lifecycle
+    finalizer (augments artifacts, never upgrades); an existing report is
+    never overwritten."""
+    from infermatrix_copilot.engine import lifecycle
+    from infermatrix_copilot.engine.registry import StepRegistry
+    from infermatrix_copilot.engine.step import StepContext
+    from infermatrix_copilot.engine.steps import register_builtin_steps
+    _, _, repo, _ = v3_env
+    registry = register_builtin_steps(StepRegistry())
+    prelude = registry.get("rebase.v3_prelude")
+    run_dir = tmp_path / "run-blocked"
+    run_dir.mkdir()
+    ctx = StepContext(
+        settings=settings, params={}, run_dir=run_dir, trace=trace,
+        state={"task_spec": {"kind": "repo_rebase", "repo": "vllm-omni",
+                             "params": {"rebase_mode": "report_only"}},
+               "repo_path": str(repo), "run_id": "run-blocked"})
+    assert asyncio.run(prelude.handler(ctx)).ok
+    outcome = SimpleNamespace(status="blocked")
+    asyncio.run(lifecycle.finalize(run_dir, outcome))
+    report = (run_dir / "RUN_REPORT.md").read_text()
+    assert "status: blocked" in report
+    assert "rebase_mode: report_only" in report
+    # idempotent + never clobbers the real report
+    (run_dir / "RUN_REPORT.md").write_text("REAL REPORT")
+    ctx2 = StepContext(
+        settings=settings, params={}, run_dir=run_dir, trace=trace,
+        state=dict(ctx.state))
+    assert asyncio.run(prelude.handler(ctx2)).ok
+    asyncio.run(lifecycle.finalize(run_dir, outcome))
+    assert (run_dir / "RUN_REPORT.md").read_text() == "REAL REPORT"
+
+
+def test_v3_module_rebase_idempotent_on_resume(v3_agent_env, settings,
+                                               trace, monkeypatch):
+    """Crash window: substate says the module is done but the executor
+    checkpoint was lost — re-entry must NOT run the agent (and apply its
+    edits) twice; the substate short-circuits."""
+    from infermatrix_copilot.engine.registry import StepRegistry
+    from infermatrix_copilot.engine.step import StepContext
+    from infermatrix_copilot.engine.steps import rebase_v3, \
+        register_builtin_steps
+    from infermatrix_copilot.rebase_engine import module_rebase as mr
+    _, _, repo, run_dir = v3_agent_env
+    monkeypatch.setattr(
+        rebase_v3, "_tier_client",
+        lambda ctx: (object(), SimpleNamespace(
+            model="m", api_key="k", base_url="", source="global")))
+    called = []
+
+    async def fake_rebase_module(module, **kw):
+        called.append(module)
+        return {"status": "done", "exit_code": 0, "debug_attempts": 0,
+                "turns": 1, "summary": ""}
+    monkeypatch.setattr(mr, "rebase_module", fake_rebase_module)
+    Substate(run_dir, "run-idem").update(
+        {"modules": {"worker_runner": {"status": "done", "exit_code": 0}}})
+    registry = register_builtin_steps(StepRegistry())
+    ctx = StepContext(
+        settings=settings, params={}, run_dir=run_dir, trace=trace,
+        item="worker_runner",
+        state={"task_spec": {"repo": "vllm-omni", "params": {}},
+               "run_id": "run-idem", "repo_path": str(repo)})
+    r = asyncio.run(registry.get("rebase.v3_module_rebase").handler(ctx))
+    assert r.ok and "short-circuit" in r.summary
+    assert called == []                              # agent NOT re-run
+    assert r.outputs["state_updates"]["module_worker_runner_status"] == "done"
+
+
+def test_v3_precommit_step(v3_env, settings, trace, monkeypatch):
+    """Phase 3.2: the adapter-declared precommit runs after the local loop,
+    retries once (auto-fix hooks), and its substate verdict feeds the push
+    gate; an undeclared precommit is recorded, never invented."""
+    from infermatrix_copilot.engine.registry import StepRegistry
+    from infermatrix_copilot.engine.step import StepContext
+    from infermatrix_copilot.engine.steps import register_builtin_steps
+    from infermatrix_copilot.testing import runner as runner_mod
+    _, _, repo, run_dir = v3_env
+    rcs = [1, 0]                    # first run auto-fixes, retry passes
+    ran = []
+
+    def fake_run(self, job, env, *, baseline=False, dry_run=False):
+        ran.append(job.command)
+        return runner_mod.TestOutcome(rc=rcs[len(ran) - 1])
+    monkeypatch.setattr(runner_mod.TestRunner, "run", fake_run)
+    registry = register_builtin_steps(StepRegistry())
+
+    def ctx_for(run_id):
+        rd = run_dir.parent / f"dir-{run_id}"
+        rd.mkdir(exist_ok=True)
+        return StepContext(
+            settings=settings, params={}, run_dir=rd, trace=trace,
+            state={"task_spec": {"repo": "vllm-omni", "params": {}},
+                   "run_id": run_id, "repo_path": str(repo)})
+
+    r = asyncio.run(registry.get("rebase.v3_precommit").handler(
+        ctx_for("run-pc")))
+    assert r.ok and "passed" in r.summary
+    assert len(ran) == 2 and all("pre-commit" in c for c in ran)
+    data = Substate(run_dir.parent / "dir-run-pc", "run-pc").read()
+    pc = data["tests"]["precommit"]
+    assert pc["result"] == "passed" and pc["attempt"] == 1
+    assert evaluate_push_gate(data, {}).allowed
+
+    # both attempts red: substate failed, push gate blocks (structural)
+    rcs[:] = [1, 1, 1]
+    ran.clear()
+    r = asyncio.run(registry.get("rebase.v3_precommit").handler(
+        ctx_for("run-pc2")))
+    assert r.ok and "FAILED" in r.summary            # substate data, step ok
+    data = Substate(run_dir.parent / "dir-run-pc2", "run-pc2").read()
+    assert data["tests"]["precommit"]["result"] == "failed"
+    d = evaluate_push_gate(data, {})
+    assert not d.allowed and any("precommit red" in x for x in d.reasons)
+
+
+def test_v3_precommit_not_declared(v3_env, settings, trace):
+    from infermatrix_copilot.engine.registry import StepRegistry
+    from infermatrix_copilot.engine.step import StepContext
+    from infermatrix_copilot.engine.steps import register_builtin_steps
+    _, _, repo, run_dir = v3_env
+    adir = Path(settings.adapters_dir) / "vllm_omni"
+    manifest = yaml.safe_load((adir / "manifest.yaml").read_text())
+    manifest["rebase"].pop("precommit", None)
+    (adir / "manifest.yaml").write_text(yaml.safe_dump(manifest))
+    registry = register_builtin_steps(StepRegistry())
+    ctx = StepContext(
+        settings=settings, params={}, run_dir=run_dir, trace=trace,
+        state={"task_spec": {"repo": "vllm-omni", "params": {}},
+               "run_id": "run-nd", "repo_path": str(repo)})
+    r = asyncio.run(registry.get("rebase.v3_precommit").handler(ctx))
+    assert r.ok and "not declared" in r.summary
+    data = Substate(run_dir, "run-nd").read()
+    assert data["tests"]["precommit"]["result"] == "not_declared"
+    assert evaluate_push_gate(data, {}).allowed      # recorded, not red
+    assert any(e for e in trace.events("capability_gap"))
+
+
+def test_runner_model_download_notify(tmp_path):
+    """Parent parity: a setup that will pull an uncached HF repo notifies
+    ONCE per job (durable marker) before spawning; a cached repo stays
+    silent."""
+    from infermatrix_copilot.testing.runner import (
+        TestJob, TestRunner, hf_repo_cached, hf_repo_from_setup)
+    assert hf_repo_from_setup(
+        "huggingface-cli download org/model --local-dir x") == "org/model"
+    assert hf_repo_from_setup("hf download a/b file.bin") == "a/b"
+    assert hf_repo_from_setup("pytest tests/") == ""
+    hf_home = tmp_path / "hf"
+    assert hf_repo_cached("org/model", str(hf_home)) is False
+    snap = hf_home / "hub" / "models--org--model" / "snapshots" / "abc"
+    snap.mkdir(parents=True)
+    assert hf_repo_cached("org/model", str(hf_home)) is True
+
+    notified = []
+    runner = TestRunner(repo_root=tmp_path, tests_dir=tmp_path / "tests",
+                        notify_download=lambda k, r: notified.append((k, r)))
+    # `echo` keeps the (best-effort, actually executed) setup harmless while
+    # still matching the parent's same-line download regex
+    job = TestJob(key="dl", command="true", timeout_sec=30, min_gpus=0,
+                  gpu_lock=False,
+                  setup="echo huggingface-cli download other/model x")
+    env = {"HF_HOME": str(hf_home), "PATH": "/usr/bin:/bin"}
+    assert runner.run(job, env).rc == 0
+    assert notified == [("dl", "other/model")]
+    assert (tmp_path / "tests" / ".model_download_email_sent_dl").exists()
+    assert runner.run(job, env).rc == 0              # marker: no re-notify
+    assert notified == [("dl", "other/model")]
+    # cached repo: never notified
+    job2 = TestJob(key="dl2", command="true", timeout_sec=30, min_gpus=0,
+                   gpu_lock=False,
+                   setup="echo huggingface-cli download org/model x")
+    assert runner.run(job2, env).rc == 0
+    assert [n for n in notified if n[0] == "dl2"] == []

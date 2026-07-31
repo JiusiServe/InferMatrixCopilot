@@ -101,6 +101,13 @@ rebase:
   # startup guard, and PR7 archival ALL take locks/<lock_name>.lock inside
   # the checkout, so exclusion is mutual (repo data — the core stays neutral)
   lock_name: omni
+  # phase-3.2 precommit workflow (parent config.sh §10 __precommit__ entry:
+  # command, 600s timeout, 0 GPUs; one retry — auto-fix hooks often pass on
+  # the second run)
+  precommit:
+    command: pre-commit run --all-files
+    timeout_sec: 600
+    retry_once: true
   wheel:
     package: vllm
     index_url_template: "https://wheels.vllm.ai/{commit}/{variant}/{package}/"

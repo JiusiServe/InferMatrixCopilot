@@ -19,12 +19,13 @@ requires: [modules, upstream.fork_tracking, ci.provider]
 # The §2.2 per-mode matrix, spelled out (composite flags precompute the
 # or-of-modes because `when:` is single-key):
 #   report_only : prelude, guard_check(read-only), scan, report, finalize
-#   local_ci    : prelude, guard, tests(local loop), report, finalize
-#                 (push gate VACUOUS — nothing gets pushed; §2.3)
+#   local_ci    : prelude, guard, tests(local loop), precommit, report,
+#                 finalize (push gate VACUOUS — nothing gets pushed; §2.3)
 #   remote_ci   : prelude, guard, push_gate, ci, report, finalize
-#                 (NO local test loop — phase 4 is push+monitor)
+#                 (NO local test loop — phase 4 is push+monitor; prelude
+#                 enforces the prepared-tree preconditions)
 #   full        : prelude, guard, wheel, assign, wave1, wave_gate, wave2,
-#                 tests, push_gate, ci, report, finalize
+#                 tests, precommit, push_gate, ci, report, finalize
 mode_aware: true
 params:
   rebase_mode: {type: str, default: ""}     # report_only|full|local_ci|remote_ci
@@ -51,6 +52,9 @@ steps:
   - {id: wave2, step: rebase.v3_module_rebase, foreach: wave2_modules,
      when: mode_full}
   - {id: tests, step: rebase.v3_test_loop, when: mode_runs_local_tests}
+  # phase 3.2 (parent parity: always follows the local loop) — its substate
+  # verdict is what makes the push gate's "red precommit" rule non-vacuous
+  - {id: precommit, step: rebase.v3_precommit, when: mode_runs_local_tests}
   - {id: push_gate, step: rebase.v3_push_gate, when: mode_runs_push_gate}
   - {id: ci, step: rebase.v3_ci, when: mode_runs_remote_ci}
   # report BEFORE finalize: the terminal-row ruling may end the run blocked
