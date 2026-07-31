@@ -114,6 +114,16 @@ rebase:
     discard_untracked_patterns:
       - '^tests/e2e/stage_configs/.*_[0-9]{6,}\.yaml$'
       - '^tests/dfx/[^/]+/stage_configs/.*_[0-9]{6,}\.yaml$'
+  push:
+    commit_message_template: "rebase: align vllm-omni with vLLM {short}"
+    # generated outputs never reach a rebase commit (git_helpers.sh
+    # unstage_generated_outputs case patterns, fnmatch form)
+    unstage_globs: [".pytest_cache/*", ".ruff_cache/*", "__pycache__/*",
+                    "*/__pycache__/*", "htmlcov/*", "coverage.xml",
+                    ".coverage", ".coverage.*", "pytest.xml", "junit.xml",
+                    "junit-*.xml", "rebase_logs/*", "logs/*", "*.log",
+                    "*.out", "*.tmp", "*.pid", "tests/*/artifacts/*",
+                    "tests/*/outputs/*", "tests/*/tmp/*", "tests/*/.tmp/*"]
   # upstream files whose changes signal base-class inheritance churn
   base_class_watch_paths: [vllm/entrypoints/llm.py, vllm/v1/engine/core_client.py, vllm/engine/protocol.py, vllm/inputs/preprocess.py, vllm/v1/core/sched/scheduler.py, vllm/v1/worker/gpu_model_runner.py]
   path_sync:
