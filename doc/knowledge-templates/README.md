@@ -17,7 +17,7 @@ comment, register the page in the nearest `_index.md`, then validate.
 | [`rules.md`](rules.md) | an always-on gate page | nearest owner dir |
 | [`architecture-component.md`](architecture-component.md) | a shared-module architecture page | `repos/<repo>/components/<module>/architecture.md` |
 | [`architecture-model.md`](architecture-model.md) | a model architecture page | `repos/<repo>/models/<model>/architecture.md` |
-| [`guide.md`](guide.md) | a method/how-to page | a `guides/` dir |
+| [`guide.md`](guide.md) | a method/how-to page | component/model owner root; work-topic collections may use `guides/` |
 | [`incident.md`](incident.md) | a retro / historical write-up | an `incidents/` dir — **rename to `YYYY-MM-DD-short-name.md`** |
 
 ## Copy + register + validate

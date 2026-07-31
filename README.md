@@ -111,8 +111,12 @@ Agent 按该入口已有的目录地图和落盘规范，自行选择 owner、�
 
 ## 默认 MCP 工具
 
-- `review(target, repo?, mode?, post?)`：Direct 返回审查知识入口、首轮简明
-  checklist、60 秒宿主对话进度合同和单评论完成门禁；显式指定
+- `review(target, repo?, mode?, post?, title?, body?, changed_files?)`：Direct
+  在宿主先固定快照并发出进度后，按 PR title/body 直接返回至多 3 个精确
+  `knowledge_routes`，每项内嵌裁剪后的 `quick_map`；changed files 只校验
+  范围，不再打开整篇规则或从 `AGENTS.md`、索引和 catalog 逐层导航。它同时
+  返回按 docs/code 区分的命令与验证预算、首轮简明 checklist、60 秒宿主对话进度合同
+  和单评论完成门禁；显式指定
   `mode="strict"` 时运行旧 Eco 审查工作流。进度只显示在当前对话，不会发布
   GitHub 初稿评论。
 - `validate_direct_review(subtraction_signal, subtraction?, minimality_proof?,
@@ -129,7 +133,7 @@ Agent 按该入口已有的目录地图和落盘规范，自行选择 owner、�
 
 | 模式 | 适合场景 | 说明 |
 |---|---|---|
-| Direct（默认） | 日常 PR 和本地审查 | Agent 自己完成一次审查；MCP 提供知识入口、首轮 checklist 和触发式减法检查 |
+| Direct（默认） | 日常 PR 和本地审查 | Agent 先报告固定快照状态，再只读 title/body 命中的精确规则，随后并行审查源码和验证；MCP 提供首轮 checklist 和触发式减法检查 |
 | Strict | 需要旧版完整审查工作流 | Strict 只是旧 Eco 的新名称，继续使用原 playbook、模型和运行状态 |
 | Autonomous | 需要独立执行器 | 使用单独配置的模型和工作流 |
 

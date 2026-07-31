@@ -26,6 +26,11 @@ sources: []
 |---|---|
 | 修改公开入口、prompt、AR→DiT、`model_extras`、shared task examples、条件图、size 或 seed | [开发快速入口和 rules](rules.md#开发快速入口) |
 | 理解模型和 vLLM-Omni 代码地图 | [architecture](architecture.md) |
-| HF 对齐、prompt 和运行方法 | [model guides](guides/_index.md) |
+| HF 接入常见偏差 | [HF alignment pitfalls](hf-alignment-pitfalls.md) |
+| 运行 HF baseline | [HF baseline runbook](hf-baseline-runbook.md) |
+| 对齐 HF 与 Omni 输出 | [HF/Omni alignment method](hf-omni-alignment-method.md) |
+| 调查 img-to-img 差距 | [it2i gap](it2i-gap.md) |
+| 核对官方 prompt 格式 | [official prompt format](official-prompt-format.md) |
+| 运行 image generation demo | [run image-gen demo](run-image-gen-demo.md) |
 | 调查模型专有错误 | [incidents](incidents/_index.md) |
 | 查询已结束的历史分析 | [history](history/_index.md) |

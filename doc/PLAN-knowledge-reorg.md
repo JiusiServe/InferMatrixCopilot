@@ -1,5 +1,9 @@
 # Knowledge reorganization v2 — vendored, code-mirrored, detail-preserving
 
+> Historical migration plan. Its `_archive/`-never-delete rule is superseded by
+> `knowledge/SCHEMA.md`: merge unique live content into the surviving owner,
+> delete the duplicate, and use Git history for recovery.
+
 ## Context
 The copilot's knowledge base is currently a git submodule `knowledge/` = `zuiho-kai/claude-workflow-starter` @ `f2dc824`, consumed unmodified. The author has **authorized copying the content** into this repo, so the submodule indirection (and everything it forced: upstream PRs, pin bumps, lockstep commits, cryptographic authorization) is dropped. The tree becomes ordinary tracked files we edit directly, delivered as normal copilot PRs.
 

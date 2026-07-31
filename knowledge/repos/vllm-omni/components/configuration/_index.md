@@ -35,8 +35,10 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
 |---|---|
 | 理解配置从 deploy、CLI、默认 factory 到 structured/legacy config 的稳定边界 | [配置构造架构](architecture.md) |
 | 根据 PR 描述直达 strict schema、deploy/topology、composable strategy 或显存配置的规则组与第一批源码 | [配置开发门禁与代码地图](rules.md) |
-| 审计配置来源、多层加工或初始化参数 | [configuration guides](guides/_index.md) |
-
-旧 `components/config/` 与 `dev/` 页面已归档，仅用于迁移追溯：
-[config archive](../../../../_archive/repos/vllm-omni/components/config/_index.md)、
-[dev archive](../../../../_archive/repos/vllm-omni/dev/_index.md)。
+| 审计配置来源和多层加工 | [config audit](config-audit-plain-language.md) |
+| 设计配置归一化与 parity 验证 | [config normalization parity](config-normalization-parity.md) |
+| 查询 `Omni()` 初始化参数 | [Omni init args](omni-init-args.md) |
+| 写或修改 deploy YAML | [deploy YAML](deploy-yaml.md) |
+| 核对 pipeline/deploy schema | [pipeline deploy schema](pipeline-deploy-schema.md) |
+| 计算多 stage 显存预算 | [deployment memory budget](deployment-memory-budget.md) |
+| 添加新模型和注册点 | [adding a model](adding-a-model.md) |

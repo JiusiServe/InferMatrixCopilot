@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni 代码审查"
 created: 2026-07-10
-updated: 2026-07-20
+updated: 2026-07-31
 type: index
 tags: [vllm-omni, review]
 sources: []
@@ -9,17 +9,12 @@ sources: []
 
 # vLLM-Omni 代码审查
 
-## 什么时候查这里
+默认从 PR title/body 直接进入 component/model owner；changed files 只校验范围。本目录
+只放 vLLM-Omni 特有的审查方法，不再承担 owner 导航。
 
-- 审查 vLLM-Omni 的模型适配、配置桥接或仓库专有改动。
-- 需要把 changed files 路由到 benchmark、component 或 model owner。
-
-## 不放什么
-
-- 跨仓库通用审查方法；先看 `general/review/`。
-
-## 目录内容
-
-| 遇到什么 | 查看哪里 |
+| 具体问题 | 查看哪里 |
 |---|---|
-| 审查新模型、pipeline 或近期 maintainer 风险模式 | [review guides](guides/_index.md) |
+| PR 描述如何路由精确 owner/model 代码地图 | [maintainer pattern routing](guides/maintainer-pattern-routing.md) |
+| 模型适配是否漏掉必要链路 | [model adaptation guardrails](guides/model-adaptation-guardrails.md) |
+| 模型验证是否证明语义正确 | [model validation](guides/model-validation.md) |
+| 维护或浏览本目录 | [guides index](guides/_index.md) |

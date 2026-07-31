@@ -19,9 +19,13 @@
 
 ### Direct PR review 单次路由
 
-默认 Direct review 只执行一篇 Codex 审查。先固定 base/head，再一次性获取 PR title/body、changed files、diff、mergeability 和 CI；用 title/body 的声明目标选择精确 owner/model 规则组和第一批源码函数，changed files 只校验并补全真实范围。把已读文件、caller 搜索、测试结果和 findings 放进同一份证据包，correctness 与 design/subtraction 在这次审查中共用，不能各自重新导航或重复采集。
+默认 Direct review 只执行一篇 Codex 审查。先固定 base/head，再一次性获取 PR title/body、changed files、diff、mergeability 和 CI；元数据返回后先在宿主对话发进度，再把 title/body/changed files 一次传给 Direct。使用返回的至多 3 个精确 owner/model `knowledge_routes` 内嵌 `quick_map`，随后停止知识导航；只有一个具体歧义阻塞源码审查时才打开对应完整规则文件，不得再从 `AGENTS.md`、本页、repo index 或 model catalog 逐层展开。执行返回的 docs/code `execution_budget`；只有明确未解决的 P1/高风险合同可追加一次有界调查。changed files 只校验并补全真实范围。把已读文件、caller 搜索、测试结果和 findings 放进同一份证据包，correctness 与 design/subtraction 在这次审查中共用，不能各自重新导航或重复采集。
 
-审查开始后 60 秒内，先在宿主对话中报告固定的 head SHA、当前 CI、可合并性和已有早期 finding；早期 finding 明确标记为“初步”，然后继续同一次审查。没有早期 finding 就明确写“暂未发现”，不能为了进度硬凑问题。该状态不是 GitHub 评论，不发布“初稿评论”。
+固定快照后先完成状态轨并发出宿主进度；不要让知识读取、源码搜索或测试挡住这条消息。随后知识/源码轨与验证轨并行：前者只读 Direct 返回的精确规则和命中源码，后者先做简短 import/version 兼容性预检，通过后运行目标测试与低成本静态检查。全程只维护当前审查的一份证据包，复用文件、限定目录/glob/输出量的 `rg`、caller、测试、repo-map、知识路由和 findings；不为 Direct 新建持久缓存或调度服务。
+
+每条验证命令和结果绑定当前 head SHA，并记录依赖锁摘要、Python 和平台组成的环境指纹。只有依赖指纹匹配才复用现有环境；head 变化时旧测试结果失效，但依赖未变化不重复建环境。预检失败时报告真实缺口，不运行或声称 pytest 已验证。
+
+审查开始后 60 秒内，元数据一返回就先在宿主对话中报告固定的 head SHA、当前 CI、可合并性和已有早期 finding；不要等待 CI 完成或可合并性从 unknown 变为确定，也不要先读知识、搜源码或跑测试。早期 finding 明确标记为“初步”，然后继续同一次审查。没有早期 finding 就明确写“暂未发现”，不能为了进度硬凑问题。该状态不是 GitHub 评论，不发布“初稿评论”。
 
 减法检查先看信号：只有 diff 新增或扩张 helper、class、fallback、兼容分支或公共行为时才标记 `triggered`，并完成有界减法检查。普通小修直接标记 `none`，不写 scope ledger、abstraction census 或完整最小性证明。不能为了通过门禁硬凑减法。
 
@@ -74,7 +78,7 @@
 |---|---|---|
 | 写代码或修改公开接口 | [code taste](general/review/guides/code-taste.md) | 先理解现有 owner、调用链、测试和用户可见行为 |
 | 开发完成、准备交给 reviewer 或项目 owner | [维护者审查闭环](general/agents/guides/agent-loop-workflow.md#开发交付的维护者审查闭环) | 先确认唯一审查负责人；被委派的开发默认交回父 agent 统一 review，不嵌套重复审查 |
-| code review、reviewer follow-up，或用户只给 PR 链接让你“审核一下” | [独立审查执行合同](general/review/guides/review-execution-contract.md) | 一次 Direct 审查复用同一份路由与证据，同时完成 correctness 和 design/subtraction；只在未覆盖的高风险合同上做专项追问，最终只发一篇评论 |
+| code review、reviewer follow-up，或用户只给 PR 链接让你“审核一下” | [独立审查执行合同](general/review/guides/review-execution-contract.md) | 一次 Direct 审查并行获取状态、源码和验证证据；correctness 必查，减法按信号触发；最终只发一篇评论 |
 | UI、CLI、文档或其他用户可见改动 | [用户可见验收](general/docs/guides/user-visible-acceptance.md) | 绿测之外还要跑普通用户真实路径 |
 | benchmark 或性能结论 | [benchmark contract](general/benchmark/guides/benchmark-contract.md) | 先固定版本、工作负载、指标和证据来源 |
 | SSH、容器、远端服务或长跑 | [远端入口](general/remote/_index.md) | 先验证目标、环境、超时、状态文件和清理边界 |

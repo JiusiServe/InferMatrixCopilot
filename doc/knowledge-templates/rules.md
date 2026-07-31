@@ -18,7 +18,7 @@ sources: []
 
 | 用户提到 | 必读 | 硬约束 |
 |---|---|---|
-| <trigger phrase> | [<guide>](guides/<guide>.md) | <what MUST / MUST-NOT happen + how to verify> |
+| <trigger phrase> | [<method>](<method>.md) | <what MUST / MUST-NOT happen + how to verify> |
 
 ## 规则
 

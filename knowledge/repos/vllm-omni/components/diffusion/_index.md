@@ -29,4 +29,6 @@ sources: []
 |---|---|
 | 理解共享职责和数据流 | [architecture](architecture.md) |
 | 根据 PR 描述直达 execution parity、checkpoint/distributed 或 quality evidence 的规则组与第一批源码 | [rules 与代码地图](rules.md) |
-| step 执行/batching/缓存加速/并行等特性语义 | [特性指南](guides/_index.md) |
+| diffusion step 与 request/continuous batching | [step and batching](step-and-batching.md) |
+| Cache-DiT、TeaCache 和 prefix cache | [cache acceleration](cache-acceleration.md) |
+| TP/PP/SP/CFG/VAE/HSDP 等并行策略 | [parallelism](parallelism.md) |

@@ -8,6 +8,7 @@ from infermatrix_copilot.knowledge_docs import KnowledgeDocsError
 from infermatrix_copilot.thin_mcp_server import (
     build_mcp,
     _direct_completion_result,
+    _direct_knowledge_routes,
     _docs,
     _normalize_repo,
 )
@@ -80,6 +81,10 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
     assert set(review) == {
         "mode",
         "knowledge_entry",
+        "knowledge_routes",
+        "routing",
+        "navigation_policy",
+        "execution_budget",
         "first_review_checklist",
         "progress_update",
         "completion_gate",
@@ -87,8 +92,31 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
     assert review["mode"] == "direct"
     assert core.requests == []
     assert Path(review["knowledge_entry"]).parts[-2:] == ("knowledge", "AGENTS.md")
+    assert review["knowledge_routes"] == []
+    assert review["routing"]["status"] == "needs_pr_context"
+    assert review["navigation_policy"]["progress_before_knowledge"] is True
+    assert review["navigation_policy"]["use_embedded_quick_maps"] is True
+    assert review["navigation_policy"]["stop_after_routes"] is True
+    assert review["execution_budget"]["profile"] == "code"
+    assert review["execution_budget"]["total_command_calls"] == 20
+    assert review["execution_budget"]["hard_ceiling"] is True
+    assert review["execution_budget"]["extension_command_calls"] == 4
     assert any(
         "subtraction" in item
+        for item in review["first_review_checklist"]
+    )
+    assert any(
+        "before reading knowledge, searching source, or running tests"
+        in item
+        for item in review["first_review_checklist"]
+    )
+    assert any(
+        "bounded rg searches" in item
+        for item in review["first_review_checklist"]
+    )
+    assert any(
+        "compatibility preflight" in item
+        and "environment fingerprint" in item
         for item in review["first_review_checklist"]
     )
     assert review["progress_update"] == {
@@ -103,6 +131,15 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
         "early_findings_status": "preliminary",
         "continue_review": True,
         "github_comment": False,
+        "emit_before": [
+            "knowledge_read",
+            "source_search",
+            "tests",
+        ],
+        "do_not_wait_for": [
+            "ci_completion",
+            "mergeability_resolution",
+        ],
     }
     assert review["completion_gate"] == {
         "tool": "validate_direct_review",
@@ -124,6 +161,124 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
         "knowledge",
         "CONTRIBUTING.md",
     )
+
+
+def test_direct_routes_title_body_before_changed_files(monkeypatch):
+    mcp, _core = _fake_mcp(monkeypatch)
+    review = mcp.tools["review"](
+        target="https://github.com/vllm-project/vllm-omni/pull/4762",
+        repo="vllm-project/vllm-omni",
+        mode="direct",
+        title="[Core / Bugfix] Add Mechanism for Endpoint Rejection",
+        body=(
+            "Add pipeline config endpoint restrictions and return a 400 from "
+            "the OpenAI serving layer."
+        ),
+        changed_files=[
+            "vllm_omni/config/config_factory.py",
+            "vllm_omni/entrypoints/openai/api_server.py",
+            "vllm_omni/model_executor/models/qwen3_omni/model.py",
+        ],
+    )
+
+    assert review["routing"]["status"] == "ready"
+    assert review["routing"]["changed_files_role"] == "scope_validation_only"
+    assert [route["owner"] for route in review["knowledge_routes"]] == [
+        "configuration",
+        "serving",
+    ]
+    assert review["knowledge_entry"] == review["knowledge_routes"][0]["path"]
+    assert all(
+        Path(route["path"]).is_file()
+        for route in review["knowledge_routes"]
+    )
+    assert all(
+        "## Direct" in route["quick_map"]
+        and len(route["quick_map"]) <= 3500
+        and route["read_required"] is False
+        for route in review["knowledge_routes"]
+    )
+    scope = {
+        item["owner"]: item
+        for item in review["routing"]["scope_validation"]
+    }
+    assert scope["model-executor"]["selected_from_description"] is False
+    assert review["execution_budget"]["profile"] == "code"
+    assert review["execution_budget"]["knowledge_file_reads"] == 0
+
+
+def test_direct_docs_only_budget_stays_small(monkeypatch):
+    mcp, _core = _fake_mcp(monkeypatch)
+    review = mcp.tools["review"](
+        target="https://github.com/vllm-project/vllm-omni/pull/4950",
+        mode="direct",
+        title="Fix MiniCPM-o 4.5 TTS request example",
+        body="Correct the serving request and TTS response documentation.",
+        changed_files=["recipes/OpenBMB/MiniCPM-o-4_5.md"],
+    )
+
+    assert review["execution_budget"]["profile"] == "docs_only"
+    assert review["execution_budget"]["validation_commands"] == 2
+    assert review["execution_budget"]["total_command_calls"] == 12
+    assert review["execution_budget"]["command_output_chars"] == 12000
+    assert review["execution_budget"]["hard_ceiling"] is True
+
+
+def test_direct_serving_quick_map_covers_request_and_lifecycle(monkeypatch):
+    mcp, _core = _fake_mcp(monkeypatch)
+
+    docs_review = mcp.tools["review"](
+        target="https://github.com/vllm-project/vllm-omni/pull/4950",
+        mode="direct",
+        title="Fix MiniCPM-o 4.5 TTS request example",
+        body="Correct chat_template_kwargs and the TTS response contract.",
+        changed_files=["recipes/OpenBMB/MiniCPM-o-4_5.md"],
+    )
+    assert [
+        route["owner"] for route in docs_review["knowledge_routes"]
+    ] == ["model:minicpm-o-4-5", "serving"]
+    serving_map = next(
+        route["quick_map"]
+        for route in docs_review["knowledge_routes"]
+        if route["owner"] == "serving"
+    )
+    assert "chat_template_kwargs" in serving_map
+    assert "chat_completion_full_generator" in serving_map
+
+    lifecycle_review = mcp.tools["review"](
+        target="https://github.com/vllm-project/vllm-omni/pull/4834",
+        mode="direct",
+        title="[Bugfix] Guard generation during partial wake",
+        body=(
+            "Preserve sleep/wake stage scope, validate worker ACKs, and make "
+            "wake idempotent."
+        ),
+        changed_files=[
+            "vllm_omni/entrypoints/async_omni.py",
+            "vllm_omni/worker/base.py",
+        ],
+    )
+    owners = [route["owner"] for route in lifecycle_review["knowledge_routes"]]
+    assert owners == ["serving"]
+    assert "SERV-5a" in lifecycle_review["knowledge_routes"][0]["quick_map"]
+
+
+def test_direct_routes_model_rules_without_index_navigation():
+    routing = _direct_knowledge_routes(
+        "vllm-omni",
+        title="Fix MiniCPM-o 4.5 TTS request example",
+        body="The serving request must reach the TTS stage input processor.",
+        changed_files=["recipes/OpenBMB/MiniCPM-o-4_5.md"],
+    )
+
+    assert routing["status"] == "ready"
+    assert [route["owner"] for route in routing["routes"]] == [
+        "model:minicpm-o-4-5",
+        "serving",
+        "model-executor",
+    ]
+    assert len(routing["routes"]) == 3
+    assert all(route["quick_map"] for route in routing["routes"])
 
 
 def test_direct_completion_requires_subtraction_signal_classification():

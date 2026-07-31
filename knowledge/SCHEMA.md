@@ -1,6 +1,6 @@
 # SCHEMA — 页面元数据与生命周期
 
-规定 `general/` 与 `repos/` 下**沉淀层**页面的 YAML frontmatter、标签分类法和归档
+规定 `general/` 与 `repos/` 下**沉淀层**页面的 YAML frontmatter、标签分类法和生命周期
 规则（LLMWiki 机制）。目录归属与页面写法仍以 [贡献规范](contributing/_index.md)
 为准；本文件只补充元数据机制，不重复目录规范。`repos/jianghan-roleplay-data-pipeline/`
 整棵子树暂不适用（保持原样）。
@@ -47,10 +47,10 @@ contradictions: [相对路径]         # 可选：与本页冲突的页面
 页面级证据在 frontmatter `sources:` 列出。每个沉淀层页面至少链接 2 个相关页面
 （相对 Markdown 链接，不用 wikilink）。
 
-## 归档（永不删除）
+## 被取代页面
 
-被取代或重复的页面移入根 `_archive/<原路径>`：从所在 `_index.md` 注销、入链标注
-"（已归档）"、幸存页面链接归档页。`_archive/` 不参与索引/链接校验。
+先把仍然有效的独有结论合入最近 owner 的幸存页面，再删除被取代或重复页面并修复
+入链。Git 历史负责追溯旧版本；`knowledge/` 内不再维护 `_archive/` 副本。
 
 ## 校验
 

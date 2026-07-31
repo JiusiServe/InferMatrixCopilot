@@ -21,13 +21,13 @@ Overview、5 篇 feature、metrics、3 篇 module）；**完整树比索引大�
 | `module/ar_module.md` | AR 模块继承链与请求流转 | [scheduler](../components/scheduler/architecture.md) + [model-executor](../components/model-executor/architecture.md) |
 | `module/dit_module.md` | Diffusion 引擎/调度/worker/pipeline/加速组件 | [diffusion](../components/diffusion/architecture.md) |
 | `module/entrypoint_module.md` | **stub（"update soon"）——上游文档缺口** | [serving](../components/serving/_index.md) |
-| `feature/disaggregated_inference.md` + `omni_connectors/*` | connector 选择矩阵与逐后端 spec | [distributed guides](../components/distributed/guides/connector-backends.md) |
-| `feature/diffusion_step_execution / request_level / continuous_batching` | step 合同与两种 batching | [diffusion guides](../components/diffusion/guides/step-and-batching.md) |
-| `feature/async_chunk.md` | 跨 stage 分块流式 | [distributed guides](../components/distributed/guides/async-chunk.md) |
-| `feature/cache_dit.md`、`teacache.md`、`prefix_caching.md` | 缓存加速 | [diffusion guides](../components/diffusion/guides/cache-acceleration.md) |
-| `feature/{tensor,pipeline,sequence,expert,cfg,vae}_parallel.md`、`hsdp.md` | 并行策略 | [diffusion guides](../components/diffusion/guides/parallelism.md) |
+| `feature/disaggregated_inference.md` + `omni_connectors/*` | connector 选择矩阵与逐后端 spec | [distributed](../components/distributed/connector-backends.md) |
+| `feature/diffusion_step_execution / request_level / continuous_batching` | step 合同与两种 batching | [diffusion](../components/diffusion/step-and-batching.md) |
+| `feature/async_chunk.md` | 跨 stage 分块流式 | [distributed](../components/distributed/async-chunk.md) |
+| `feature/cache_dit.md`、`teacache.md`、`prefix_caching.md` | 缓存加速 | [diffusion](../components/diffusion/cache-acceleration.md) |
+| `feature/{tensor,pipeline,sequence,expert,cfg,vae}_parallel.md`、`hsdp.md` | 并行策略 | [diffusion](../components/diffusion/parallelism.md) |
 | `feature/ray_based_execution.md` | Ray vs MP 后端、多机集群 | [serving](../components/serving/_index.md)（暂无专页） |
 | `metrics.md`、`qwen3_omni_tts_performance_optimization.md` | Prometheus 指标；TTS 性能优化实录 | [qwen-omni](../models/qwen-omni/architecture.md)（perf 部分） |
 | `docs/configuration/*` | 配置 schema spec | [configuration](../components/configuration/architecture.md) |
 | `docs/contributing/ci/*` | L1–L5 与 markers | [ci guides](../ci/guides/test-tiers.md) |
-| `docs/contributing/model/*` | 加模型三条路径 | [adding-a-model](../components/configuration/guides/adding-a-model.md) |
+| `docs/contributing/model/*` | 加模型三条路径 | [adding-a-model](../components/configuration/adding-a-model.md) |

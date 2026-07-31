@@ -10,7 +10,7 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/deploy/]
 # Deploy YAML 写作实操
 
 面向"要给模型写/改部署配置"的场景；schema 语义 owner 是
-[Configuration](../architecture.md)（本页不复制字段表）。
+[Configuration](architecture.md)（本页不复制字段表）。
 `main @ 5c390096` 复核。
 
 ## 何时需要 YAML，何时 CLI 就够
@@ -28,11 +28,11 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/deploy/]
 ## 写作时必查的字段（事故来源）
 
 - **每个共卡 stage 显式 `gpu_memory_utilization`**（缺省 0.9/0.92 是 OOM 事故源，
-  [CONF-1a](../rules.md)）。
+  [CONF-1a](rules.md)）。
 - **单 stage/端到端 pipeline pin `async_chunk: false`**
-  （[ci-gotchas](../../../ci/guides/ci-gotchas.md) 第 2 条）。
-- KV 记账外分配的模型考虑 `kv_cache_memory_bytes` pin（[CONF-2a](../rules.md)）。
-- 争议以展开后最终配置为准（[CONF-3a](../rules.md)）。
+  （[ci-gotchas](../../ci/guides/ci-gotchas.md) 第 2 条）。
+- KV 记账外分配的模型考虑 `kv_cache_memory_bytes` pin（[CONF-2a](rules.md)）。
+- 争议以展开后最终配置为准（[CONF-3a](rules.md)）。
 
 ## 代表样例（58 份 YAML 中的三类拓扑）
 
@@ -44,5 +44,5 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/deploy/]
 
 ## 相关
 
-- 字段语义/合并链：[Configuration architecture](../architecture.md)；
-  connector 声明：[connector-backends](../../distributed/guides/connector-backends.md)。
+- 字段语义/合并链：[Configuration architecture](architecture.md)；
+  connector 声明：[connector-backends](../distributed/connector-backends.md)。

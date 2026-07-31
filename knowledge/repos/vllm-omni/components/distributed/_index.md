@@ -50,4 +50,5 @@ sources: [vllm_omni/distributed/omni_connectors/, vllm_omni/distributed/omni_coo
 | 按 PR 描述直达 connector、KV transfer、load balancer 或 route-port 首批源码 | [本页 Direct 代码快速入口](#direct-代码快速入口) |
 | 理解 connector 合同、6 后端、KV 迁移管理与负载均衡 | [architecture](architecture.md) |
 | 已修过的 connector/端口产品坑 | [connector pitfalls](connector-pitfalls.md) |
-| 后端选择与 async_chunk 特性语义 | [特性指南](guides/_index.md) |
+| 选择和配置 connector backend | [connector backends](connector-backends.md) |
+| 跨 stage `async_chunk` 流式语义 | [async chunk](async-chunk.md) |

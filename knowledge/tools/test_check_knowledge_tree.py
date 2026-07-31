@@ -30,6 +30,61 @@ class OwnerAxisTests(unittest.TestCase):
             self.assertEqual(len(violations), 1)
             self.assertIn("源码 owner 目录必须直属仓库", violations[0])
 
+    def test_guides_below_source_owner_fail(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary) / "demo"
+            guides = repo / "components" / "diffusion" / "guides"
+            guides.mkdir(parents=True)
+            (guides / "parallelism.md").write_text(
+                "# Parallelism\n", encoding="utf-8"
+            )
+
+            violations = check_knowledge_tree.source_owner_guide_violations(repo)
+
+            self.assertEqual(len(violations), 1)
+            self.assertIn("不使用 guides 中转层", violations[0])
+
+    def test_guides_below_work_topic_pass(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary) / "demo"
+            guides = repo / "review" / "guides"
+            guides.mkdir(parents=True)
+            (guides / "routing.md").write_text(
+                "# Routing\n", encoding="utf-8"
+            )
+
+            self.assertEqual(
+                check_knowledge_tree.source_owner_guide_violations(repo),
+                [],
+            )
+
+
+class FilesystemChildIndexTests(unittest.TestCase):
+    def test_models_can_use_filesystem_as_child_inventory(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            models = Path(temporary) / "models"
+            models.mkdir()
+
+            self.assertTrue(
+                check_knowledge_tree.uses_filesystem_child_index(
+                    models,
+                    "<!-- children: filesystem -->\n# Models",
+                )
+            )
+
+    def test_other_directories_cannot_skip_child_registration(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            components = Path(temporary) / "components"
+            components.mkdir()
+
+            self.assertFalse(
+                check_knowledge_tree.uses_filesystem_child_index(
+                    components,
+                    "<!-- children: filesystem -->\n# Components",
+                )
+            )
+
+
 class ExactDuplicateTests(unittest.TestCase):
     def test_identical_page_body_across_owners_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

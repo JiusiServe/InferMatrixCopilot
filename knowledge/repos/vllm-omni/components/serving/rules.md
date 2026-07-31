@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-07-31
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #3576", "PR #4718", "PR #5157", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/metrics/prometheus.py]
+sources: ["PR #3576", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5157", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/metrics/prometheus.py]
 confidence: high
 ---
 
@@ -20,6 +20,9 @@ confidence: high
 | PR 描述在做什么 | 精确规则组 | 第一批 live 源码 |
 |---|---|---|
 | `extra_body`、flattened/nested/canonical/legacy 输入、alias、`negative_prompt`、diffusion request extras | `request-contract`：`SERV-4a`–`4h` | `vllm_omni/entrypoints/openai/diffusion_request_utils.py::{normalize_diffusion_request_args,apply_normalized_diffusion_request_extra_args}` → `serving_chat.py::{OmniOpenAIServingChat._preprocess_chat,OmniOpenAIServingChat.generate_diffusion_images}` |
+| `chat_template_kwargs`、raw HTTP/SDK `extra_body`、text/audio modalities、choices、空音频 | `chat-multimodal-contract`：`SERV-4c` + 命中模型规则 | upstream `ChatCompletionRequest` → `serving_chat.py::{OmniOpenAIServingChat._preprocess_chat,OmniOpenAIServingChat.chat_completion_full_generator,OmniOpenAIServingChat._create_text_choice,OmniOpenAIServingChat._create_audio_choice}` |
+| endpoint restriction、unsupported route、capability、completions/chat/speech 400 | `endpoint-capability`：`SERV-4c`, `SERV-4d` | `config/endpoint_policy.py::{OmniServingCapability,shutdown_unsupported_routes}` → `config/config_factory.py::StageConfigFactory.get_pipeline_endpoint_restrictions` → `engine/async_omni_engine.py::AsyncOmniEngine.__init__` → `entrypoints/openai/api_server.py::build_app` |
+| sleep/wake、partial stage/tag、idempotency、ACK、generation admission | `engine-lifecycle`：`SERV-5a`, `SERV-5b` | `entrypoints/async_omni.py::{AsyncOmni.sleep,AsyncOmni.wake_up,AsyncOmni.generate}` → `worker/base.py::{handle_sleep_task,handle_wake_task}` / `diffusion/worker/diffusion_worker.py` |
 | SSE/streaming speech、audio format、PCM/WAV、speed、首 chunk 前校验 | `streaming-format`：`SERV-1a`, `SERV-1b` | `vllm_omni/entrypoints/openai/protocol/audio.py::{OpenAICreateSpeechRequest.validate_streaming_constraints,StreamingSpeechSessionConfig.validate_streaming_constraints}` → `serving_speech.py::{OmniOpenAIServingSpeech._validate_speech_streaming_request,OmniOpenAIServingSpeech.create_speech}` |
 | `ref_audio`、x-vector/ICL、artifact cache、readiness、失败后 engine 存活 | `artifact-readiness`：`SERV-3a`, `SERV-3b` | `vllm_omni/entrypoints/openai/serving_speech.py::{_qwen3_tts_can_use_ref_audio_artifact_only,_track_ref_audio_artifact_warmup,_mark_ref_audio_artifact_ready_for_request,_discard_ref_audio_artifact_ready_if_unreferenced}` |
 | Prometheus、waiting/running gauge、replica stats、throttle、collector lifecycle | `metrics-lifecycle`：`SERV-2a`, `SERV-2b` | `vllm_omni/entrypoints/omni_base.py::{OmniBase._log_summary_and_cleanup,OmniBase._process_stage_metrics_message}` → `vllm_omni/metrics/prometheus.py::{OmniPrometheusMetrics.__init__,set_running,set_waiting}` |
@@ -30,6 +33,9 @@ confidence: high
 | `streaming-format` | SSE、audio streaming、format/default/capability | `SERV-1a`, `SERV-1b` |
 | `metrics-lifecycle` | metrics、gauge、replica、collector | `SERV-2a`, `SERV-2b` |
 | `artifact-readiness` | artifact cache、capability、ready/mark/discard | `SERV-3a`, `SERV-3b` |
+| `chat-multimodal-contract` | chat template kwargs、SDK flatten、text/audio response shape | `SERV-4c` + 命中模型规则 |
+| `endpoint-capability` | endpoint restriction、unsupported route、公开 400 | `SERV-4c`, `SERV-4d` |
+| `engine-lifecycle` | sleep/wake、partial stage/tag、ACK、generation admission | `SERV-5a`, `SERV-5b` |
 | `request-contract` | 请求字段、来源、冲突、dispatcher、consumer view | `SERV-4a`, `SERV-4b`, `SERV-4c`, `SERV-4d`, `SERV-4e`, `SERV-4f`, `SERV-4g`, `SERV-4h` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `SERV-0a`, `SERV-0b` |
 
@@ -164,6 +170,27 @@ confidence: high
   重新确认唯一最终产物、删除清单和规模上限。
 - 禁止：继续堆 helper、compatibility branch 或 reviewer-specific patch。
 - 验收：恢复编码前 owner、consumer、删除项和 diff 预算都有可检查记录。
+
+## Engine 生命周期合同
+
+### SERV-5a — sleep/wake 状态必须保留 stage 和 tag 作用域
+
+- 触发：sleep/wake 接受 `stage_ids`、resource tags 或 partial wake。
+- 强制：状态 key 与公开操作的 stage/tag 作用域一致；只有全部必需 stage/tag 已 warm
+  才放行 generation。
+- 禁止：用一个全局 tag set 表示多 stage 状态；唤醒一个 stage 后清掉其他 stage 的
+  sleeping 状态或把后续定向 wake 当成 already warm。
+- 验收：sleep 两个 stage、只 wake 一个时 generation 仍拒绝，随后 wake 另一个才放行。
+  ^[PR #4834]
+
+### SERV-5b — 只有成功 ACK 和真实 backend capability 才能转为 warm
+
+- 触发：worker ACK 可返回 error，或不同 backend 对 level-2 restore 能力不同。
+- 强制：逐目标确认成功 ACK 后再清状态；level-2 能力按 backend/stage 表达。
+- 禁止：错误 ACK 也清 tag；用 engine 全局禁令误伤已经支持 restore 的 diffusion worker。
+- 验收：失败 ACK 保留 sleeping 状态；支持 level-2 的 diffusion 路径仍能
+  sleep → wake → generate，不支持的 stage 在调用 worker 前明确拒绝。
+  ^[PR #4834] ^[PR #4905] ^[PR #4912]
 
 请求到 engine 的边界见 [Serving architecture](architecture.md)；公开协议通用检查见
 [review contracts](../../../../general/review/guides/reviewer-lens-contracts.md)。

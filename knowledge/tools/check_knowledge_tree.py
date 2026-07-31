@@ -16,6 +16,7 @@ INDEX_NAME = "_index.md"
 SPECIAL_PAGES = {INDEX_NAME, "rules.md", "architecture.md"}
 GROUP_DIRS = {"guides", "history", "incidents", "references", "results", "rfcs"}
 SOURCE_OWNER_DIRS = {"components", "models"}
+FILESYSTEM_CHILD_INDEX = "<!-- children: filesystem -->"
 INCIDENT_NAME = re.compile(r"^\d{4}-\d{2}-\d{2}-[a-z0-9][a-z0-9-]*\.md$")
 MARKDOWN_LINK = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
 INCIDENT_FIELDS = ("- 编号：", "- 归属：", "- 状态：", "- 搜索词：", "- 影响范围：")
@@ -148,6 +149,14 @@ def has_markdown(path: Path) -> bool:
     return any(path.rglob("*.md"))
 
 
+def uses_filesystem_child_index(directory: Path, index_text: str) -> bool:
+    """Allow model families to be discovered from the directory itself."""
+    return (
+        directory.name == "models"
+        and FILESYSTEM_CHILD_INDEX in index_text
+    )
+
+
 def check_file_size(path: Path, index_text: str) -> None:
     text = read_text(path)
     non_empty_lines = sum(1 for line in text.splitlines() if line.strip())
@@ -257,7 +266,9 @@ def check_directory(directory: Path) -> None:
     for child in child_dirs:
         child_index = (child / INDEX_NAME).resolve()
         registrations = index_targets.count(child_index)
-        if registrations == 0:
+        if registrations == 0 and not uses_filesystem_child_index(
+            directory, index_text
+        ):
             errors.append(
                 f"子目录没有登记到上一层索引：{display(child)} "
                 f"(应在 {display(index)} 链接 {child.name}/{INDEX_NAME})"
@@ -297,12 +308,30 @@ def owner_axis_violations(repo: Path) -> list[str]:
     return violations
 
 
+def source_owner_guide_violations(repo: Path) -> list[str]:
+    """Keep component/model feature pages directly under their owner."""
+    violations: list[str] = []
+    for axis in SOURCE_OWNER_DIRS:
+        axis_root = repo / axis
+        if not axis_root.is_dir():
+            continue
+        for owner in axis_root.iterdir():
+            guides = owner / "guides"
+            if owner.is_dir() and guides.is_dir() and has_markdown(guides):
+                violations.append(
+                    "源码 owner 下不使用 guides 中转层；特性正文直接放 owner "
+                    f"根目录：{display(guides)}"
+                )
+    return violations
+
+
 def check_repo_owner_axes() -> None:
     repos_root = ROOT / "repos"
     if not repos_root.is_dir():
         return
     for repo in sorted(path for path in repos_root.iterdir() if path.is_dir()):
         errors.extend(owner_axis_violations(repo))
+        errors.extend(source_owner_guide_violations(repo))
 
 
 def exact_page_duplicate_violations(paths: list[Path]) -> list[str]:
@@ -381,14 +410,12 @@ def main() -> int:
 
     excluded_parts = {
         ".git",
-        "_archive",
         "artifacts",
         "contributing",
         "general",
         "local",
         "outputs",
         "repos",
-        "遗言",
     }
     for path in ROOT.rglob("*.md"):
         relative_parts = set(path.relative_to(ROOT).parts)
