@@ -15,9 +15,7 @@ from typing import Optional, Sequence
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-SKILL_SOURCE = (
-    PROJECT_ROOT / "plugins" / "infermatrix-copilot" / "skills" / "imreview"
-)
+SKILLS_SOURCE = PROJECT_ROOT / "plugins" / "infermatrix-copilot" / "skills"
 SERVER_NAME = "infermatrix-copilot"
 PACKAGE = (
     "infermatrix-copilot[mcp] @ "
@@ -46,9 +44,23 @@ def _run_quiet(command: Sequence[str]) -> None:
     )
 
 
-def _install_skill(destination: Path) -> None:
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(SKILL_SOURCE, destination, dirs_exist_ok=True)
+def _install_skills(destination_root: Path) -> None:
+    destination_root.mkdir(parents=True, exist_ok=True)
+    for source in sorted(path for path in SKILLS_SOURCE.iterdir() if path.is_dir()):
+        destination = destination_root / source.name
+        shutil.copytree(source, destination, dirs_exist_ok=True)
+        for path in destination.rglob("*"):
+            if not path.is_file():
+                continue
+            content = path.read_text(encoding="utf-8")
+            if "{{INFERMATRIX_COPILOT_ROOT}}" in content:
+                path.write_text(
+                    content.replace(
+                        "{{INFERMATRIX_COPILOT_ROOT}}",
+                        str(PROJECT_ROOT),
+                    ),
+                    encoding="utf-8",
+                )
 
 
 def _install_codex(config_root: Path) -> None:
@@ -60,7 +72,7 @@ def _install_codex(config_root: Path) -> None:
         [codex, "mcp", "add", SERVER_NAME, "--", *SERVER_COMMAND],
         "Codex MCP registration failed.",
     )
-    _install_skill(config_root / ".codex" / "skills" / "imreview")
+    _install_skills(config_root / ".codex" / "skills")
 
 
 def _install_claude(config_root: Path) -> None:
@@ -83,7 +95,7 @@ def _install_claude(config_root: Path) -> None:
         ],
         "Claude Code MCP registration failed.",
     )
-    _install_skill(config_root / ".claude" / "skills" / "imreview")
+    _install_skills(config_root / ".claude" / "skills")
 
 
 def _install_cursor(config_root: Path) -> None:
@@ -120,7 +132,7 @@ def _install_cursor(config_root: Path) -> None:
         json.dumps(config, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    _install_skill(cursor_root / "skills" / "imreview")
+    _install_skills(cursor_root / "skills")
 
 
 def _cursor_installed(config_root: Path) -> bool:
@@ -128,10 +140,7 @@ def _cursor_installed(config_root: Path) -> bool:
         return True
     candidates = [
         config_root / ".cursor",
-        Path(os.environ.get("LOCALAPPDATA", ""))
-        / "Programs"
-        / "cursor"
-        / "Cursor.exe",
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "cursor" / "Cursor.exe",
         Path("/Applications/Cursor.app"),
     ]
     return any(path.exists() for path in candidates)
@@ -201,7 +210,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         output = PROJECT_ROOT / "infermatrix-copilot.mcp.json"
         _write_generic_config(output)
         print(f"No known Agent detected. MCP config written to:\n  {output}")
-        print(f"Portable Skill:\n  {SKILL_SOURCE}")
+        print(f"Portable Skills:\n  {SKILLS_SOURCE}")
         return 0
 
     failures = []
@@ -223,7 +232,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(f"  {failure}", file=sys.stderr)
         return 1
 
-    print("Restart your Agent, then run: /imreview <PR URL>")
+    print("Restart your Agent, then run: /imreview <PR URL> or /imupdate <repository>")
     return 0
 
 

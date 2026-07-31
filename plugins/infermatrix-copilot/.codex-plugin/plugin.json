@@ -1,7 +1,7 @@
 {
   "name": "infermatrix-copilot",
   "version": "0.1.0",
-  "description": "Maintainer-grounded vLLM-Omni review knowledge over MCP.",
+  "description": "Maintainer-grounded vLLM-Omni review and release knowledge updates.",
   "author": {
     "name": "JiusiServe",
     "url": "https://github.com/JiusiServe"
@@ -18,17 +18,19 @@
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "InferMatrixCopilot",
-    "shortDescription": "Review vLLM-Omni changes with maintainer knowledge",
-    "longDescription": "Use maintainer-grounded vLLM-Omni knowledge to review pull requests and local changes.",
+    "shortDescription": "Review and update vLLM-Omni knowledge",
+    "longDescription": "Use maintainer-grounded vLLM-Omni knowledge to review changes and update release-driven facts.",
     "developerName": "JiusiServe",
     "category": "Developer Tools",
     "capabilities": [
       "MCP",
-      "Code review"
+      "Code review",
+      "Knowledge maintenance"
     ],
     "websiteURL": "https://github.com/JiusiServe/InferMatrixCopilot",
     "defaultPrompt": [
-      "Review this PR with InferMatrixCopilot."
+      "Review this PR with InferMatrixCopilot.",
+      "Update InferMatrixCopilot knowledge from this repository."
     ]
   }
 }

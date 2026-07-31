@@ -7,6 +7,7 @@ on:
       - adapters/vllm_omni/manifest.yaml
       - adapters/vllm_omni/release_baseline.yaml
       - doc/VLLM_OMNI_RELEASE_MAINTENANCE.md
+      - plugins/infermatrix-copilot/skills/imupdate/**
       - knowledge/repos/vllm-omni/**
       - tools/audit_vllm_omni_release.py
       - tools/vllm_omni_release_audit.py

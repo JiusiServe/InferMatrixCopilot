@@ -15,7 +15,7 @@ vLLM-Omni 的兼容性、正确性和性能问题。
 ## 快速开始
 
 私有仓库过渡期，克隆后运行一个入口。脚本会自动识别本机的 Codex、Claude Code
-和 Cursor，并同时安装 MCP 与 `imreview` Skill。
+和 Cursor，并同时安装 MCP、`imreview` 和 `imupdate` Skill。
 
 ```text
 git clone git@github.com:JiusiServe/InferMatrixCopilot.git
@@ -35,9 +35,13 @@ install.cmd
 
 ```text
 /imreview https://github.com/vllm-project/vllm-omni/pull/5172
+/imupdate D:\path\to\vllm-omni
+/imupdate vllmomni
 ```
 
 不带地址时，`/imreview` 会审查当前 PR 或本地工作区。
+`/imupdate` 接受本地 Git 路径，也接受仓库名、别名或 URL。本地路径直接走机器审计；
+名字或别名先由 Agent 找到权威仓库和目标版本，再尽量获取临时 checkout 运行机器审计。
 
 公共市场上线后的安装方法和通用 MCP 配置见 [`doc/MCP.md`](doc/MCP.md)。
 
@@ -49,6 +53,13 @@ install.cmd
   → InferMatrixCopilot 返回知识库入口
   → Agent 按改动选择相关模型、组件和通用规则
   → Agent 输出带文件和行号的审查结论
+
+你发起 /imupdate <仓库>
+  → 本地路径：直接读取 baseline 和目标仓库 HEAD
+  → 仓库名/别名：Agent 先解析权威仓库、版本和可用 checkout
+  → 只读审计器对比 Git 对象、注册表、pipeline、deploy 和路径路由
+  → Agent 根据报告更新结构事实，不自动生成 owner 规则
+  → enforce、知识检查和相关测试确认更新完整
 ```
 
 代码理解和推理由 Agent 当前模型完成。InferMatrixCopilot 只负责提供知识地图和维护者
