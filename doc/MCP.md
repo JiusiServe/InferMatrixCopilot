@@ -7,7 +7,7 @@ InferMatrixCopilot 是本地 stdio MCP 服务。Agent 仍使用自己当前的�
 
 ```powershell
 .\install-codex.ps1
-.\install-claude.ps1
+.\install-claude.cmd
 .\install-cursor.ps1
 ```
 
@@ -16,6 +16,9 @@ InferMatrixCopilot 是本地 stdio MCP 服务。Agent 仍使用自己当前的�
 ```text
 /imreview <PR URL>
 ```
+
+Claude Code 的 `.cmd` 入口在 PowerShell 和 `cmd.exe` 中都能运行。不要在
+`cmd.exe` 中直接运行 `.ps1`；Windows 可能只会用编辑器打开文件，并不会执行安装。
 
 ## 手工配置
 
@@ -51,7 +54,13 @@ Windows 直接运行：
 
 ## Claude Code
 
-在仓库根目录运行。
+在仓库根目录运行：
+
+```powershell
+.\install-claude.cmd
+```
+
+下面是等价的手工配置。
 
 Windows PowerShell：
 

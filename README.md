@@ -22,7 +22,7 @@ cd InferMatrixCopilot
 
 # 只运行与你的 Agent 对应的一条
 .\install-codex.ps1
-.\install-claude.ps1
+.\install-claude.cmd
 .\install-cursor.ps1
 ```
 
@@ -33,6 +33,9 @@ cd InferMatrixCopilot
 ```
 
 不带地址时，`/imreview` 会审查当前 PR 或本地工作区。
+
+Claude Code 的 `.cmd` 入口在 PowerShell 和 `cmd.exe` 中都能运行。不要在
+`cmd.exe` 中直接运行 `.ps1`；Windows 可能只会用编辑器打开文件，并不会执行安装。
 
 macOS、Linux、手工配置和其他 MCP Agent 的接入方法见
 [`doc/MCP.md`](doc/MCP.md)。
