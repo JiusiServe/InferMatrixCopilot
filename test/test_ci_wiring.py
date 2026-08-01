@@ -557,6 +557,82 @@ def test_rounds_same_commit_full_suite_build_adopted_on_initial(tmp_path):
     assert ci_loop.load_ops(tmp_path / "ops") == []
 
 
+def test_monitor_non_script_jobs_skipped_in_poll_too():
+    """Verification round 2: waiter/trigger steps are pipeline plumbing —
+    the poll path must skip them exactly like the reconciliation path, or
+    an early-observed failed waiter dispatches a debug agent at a
+    non-job."""
+    ci = ScriptedCI(snapshots=[{"state": "passed", "jobs": [
+        _job("Gate", "failed", 1, type="waiter"),
+        _job("Real Test", "passed", 0)]}])
+    out = ci_loop.monitor_build(ci, "b", spec=CIClassifySpec(), poll_sec=0,
+                                sleep=lambda s: None)
+    assert [j.name for j in out.jobs] == ["Real Test"]
+    assert out.clean_pass and not out.failed_jobs
+
+
+def test_rounds_same_commit_manual_build_refuses(tmp_path):
+    """Verification round 2: a same-commit UI/manual build is neither
+    full-suite evidence (no adoption) nor ours to cancel (no create-over)
+    — it refuses like any other unowned active build."""
+    ci = RoundsCI([])
+    calls = {"n": 0}
+
+    def latest_builds(branch, states=(), per_page=30):
+        calls["n"] += 1
+        return [] if calls["n"] == 1 else \
+            [{"id": "ui1", "number": 5, "state": "running",
+              "commit": "c" * 40, "source": "ui"}]
+
+    ci.latest_builds = latest_builds
+    result, push_calls = _rounds(ci, tmp_path)
+    assert result.result == "refused" and "does not own" in result.reason
+    assert ci.created == 0 and push_calls == [0]
+
+
+def test_rounds_stale_intent_never_approves_new_commit(tmp_path):
+    """Verification round 2: a recovered intent whose commit is STALE
+    (the checkout advanced since the crash) must not be monitored as this
+    round's build — its green result would approve an untested commit.
+    The settled build is ours: cancelled if active, then a fresh
+    op-recorded build tests the CURRENT commit."""
+    from dataclasses import asdict
+    intent = ci_loop.BuildOp(op_id="run-1-ci-r0", run_id="run-1",
+                             purpose="initial", branch="dev",
+                             commit="a" * 40)          # the OLD commit
+    ci_loop._durable_write(intent.path(tmp_path / "ops"), asdict(intent))
+
+    class CancelOK(RoundsCI):
+        def __init__(self, bodies):
+            super().__init__(bodies)
+            self.cancelled: list[str] = []
+
+        def cancel_build(self, build_id):
+            self.cancelled.append(build_id)
+            self.builds[build_id]["state"] = "canceled"
+            return self.builds[build_id]
+
+    ci = CancelOK([{"state": "passed",
+                    "jobs": [_job("Green", "passed", 0)]}])
+    # the crashed create landed: an orphan ACTIVE build at the old commit
+    orphan = ci.create_build(branch="dev", commit="a" * 40, message="m",
+                             meta_data={"imx_op_id": "run-1-ci-r0"})
+    ci.builds[orphan["id"]]["state"] = "running"
+    ci.bodies = [{"state": "passed",
+                  "jobs": [_job("Green", "passed", 0)]}]
+    # this run pushes the NEW commit c*40 (Push default)
+    result, push_calls = _rounds(ci, tmp_path)
+    assert result.result == "passed"
+    assert ci.cancelled == [orphan["id"]]      # the stale build, ours
+    ops = {o.op_id: o for o in ci_loop.load_ops(tmp_path / "ops")}
+    assert ops["run-1-ci-r0"].state == "cancelled"
+    fresh = [o for o in ops.values() if o.op_id != "run-1-ci-r0"]
+    assert len(fresh) == 1 and fresh[0].commit == "c" * 40
+    assert fresh[0].state == "created"
+    # the monitored build is the FRESH one at the new commit
+    assert result.rounds[0].build_id == fresh[0].build_id
+
+
 def test_monitor_clean_pass_guards():
     # zero job signal is never a pass
     ci = ScriptedCI(snapshots=[{"state": "passed", "jobs": []}])

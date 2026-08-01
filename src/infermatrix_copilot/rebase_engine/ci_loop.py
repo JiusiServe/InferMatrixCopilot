@@ -469,6 +469,12 @@ def monitor_build(client: CIClient, build_id: str, *,
             jstate = str(job.get("state", ""))
             if not name or jid in processed:
                 continue
+            if job.get("type") not in (None, "script"):
+                # waiter/trigger/manual gate steps are pipeline plumbing —
+                # skipped here exactly as the final reconciliation skips
+                # them (verification round 2: classifying them only in
+                # the poll path dispatched debug agents at non-jobs)
+                continue
             if jstate in PENDING_JOB_STATES:
                 continue
             processed.add(jid)
@@ -493,7 +499,8 @@ def monitor_build(client: CIClient, build_id: str, *,
                 # here was a false-green vector (round-4 review)
             jobs_out.append(jr)
         pending = sum(1 for j in jobs
-                      if str(j.get("state", "")) in PENDING_JOB_STATES)
+                      if str(j.get("state", "")) in PENDING_JOB_STATES
+                      and j.get("type") in (None, "script"))
         pending += sum(1 for rid in expected_retries
                        if rid not in processed)
         if build_state in _TERMINAL_BUILD_STATES and pending == 0:
@@ -756,21 +763,19 @@ def op_index_base(ops: Sequence[BuildOp], run_id: str) -> int:
 
 
 def _foreign_active(active: Sequence[dict], owned_commits: set[str],
-                    owned_ids: set[str],
-                    exclude_commit: str = "") -> dict | None:
+                    owned_ids: set[str]) -> dict | None:
     """The first active build this run does NOT own. Owned means:
-    op-recorded (`owned_ids`, adopted builds included), the commit under
-    consideration, or a WEBHOOK build at a commit we pushed — that one is
-    our own push's artifact. A schedule/api build merely sharing a commit
-    we pushed is somebody else's work (round-5 review): cancelling it via
-    our next push would mutate an unowned build."""
+    op-recorded (`owned_ids`) or a WEBHOOK build at a commit we pushed —
+    that one is our own push's artifact. Nothing else is exempt
+    (verification round 2): a schedule/api build merely sharing a commit
+    we pushed is somebody else's work (those are ADOPTED before this
+    check when they qualify), and a same-commit UI/manual/trigger build
+    is neither evidence nor ours to cancel."""
     for b in active:
         if str(b.get("state", "")) in BUILD_NO_RUN_STATES:
             continue
         commit = str(b.get("commit", ""))
         if str(b.get("id", "")) in owned_ids:
-            continue
-        if exclude_commit and commit == exclude_commit:
             continue
         if commit in owned_commits and \
                 str(b.get("source", "")) == "webhook":
@@ -827,15 +832,34 @@ def _acquire_build(client: CIClient, ops_dir: Path, *, run_id: str,
                 client, ops_dir, op_id=op.op_id, run_id=run_id,
                 purpose=op.purpose, branch=op.branch, commit=op.commit,
                 message=message, sleep=sleep)
-            return CIBuildRound(purpose=op.purpose, op_id=op.op_id,
-                                build_id=recovered.build_id,
-                                build_url=recovered.build_url), ""
-        if op.state == "created" and op.build_id and op.commit == commit:
-            state = str(client.get_build(op.build_id).get("state", ""))
+            if op.commit == commit:
+                return CIBuildRound(purpose=op.purpose, op_id=op.op_id,
+                                    build_id=recovered.build_id,
+                                    build_url=recovered.build_url), ""
+            # settled, but the checkout ADVANCED since the crash: the
+            # recovered build tests a stale commit — its green result
+            # must never approve the commit we just pushed (verification
+            # round 2). It is op-recorded (ours): cancel it if still
+            # active, then fall through to a fresh operation.
+            state = str(client.get_build(recovered.build_id)
+                        .get("state", ""))
             if state in _ACTIVE_BUILD_STATES:
+                cancel_build_guarded(client, ops_dir, op.op_id)
+            continue
+        if op.state == "created" and op.build_id:
+            state = str(client.get_build(op.build_id).get("state", ""))
+            if state not in _ACTIVE_BUILD_STATES:
+                continue
+            if op.commit == commit:
                 return CIBuildRound(purpose=op.purpose, op_id=op.op_id,
                                     build_id=op.build_id,
                                     build_url=op.build_url), ""
+            # our own still-active build at a STALE commit (crash during
+            # monitor, then the tree advanced): cancel it — op-recorded
+            # cancellation is ours to perform — before building the
+            # current commit, or the pipeline's cancel-running semantics
+            # would race it anyway
+            cancel_build_guarded(client, ops_dir, op.op_id)
     active = [b for b in client.latest_builds(branch,
                                               states=_ACTIVE_BUILD_STATES)
               if str(b.get("state", "")) not in BUILD_NO_RUN_STATES]
@@ -844,20 +868,20 @@ def _acquire_build(client: CIClient, ops_dir: Path, *, run_id: str,
     # own env-carrying build instead (cancelling our own push's webhook
     # build via pipeline skip semantics is ours to accept). A QUALIFYING
     # same-commit build is adopted on EVERY round purpose (verification
-    # round 1): during the settle window a schedule/api build can start
-    # at the just-pushed commit, and creating over it would cancel a
-    # build this run does not own.
+    # round 1) and adoption is decided BEFORE the foreign refusal so the
+    # refusal needs no same-commit exemption at all (verification round
+    # 2): a same-commit UI/manual/trigger build is neither evidence nor
+    # ours to cancel — it refuses like any other unowned active build.
     same = [b for b in active if str(b.get("commit", "")) == commit
             and str(b.get("source", "")) in ("schedule", "api")]
-    foreign = _foreign_active(active, owned_commits, owned_ids,
-                              exclude_commit=commit)
-    if foreign is not None:
-        return None, _foreign_refusal(foreign, branch)
     if same:
         b = same[0]
         return CIBuildRound(purpose="adopted", build_id=str(b.get("id", "")),
                             build_url=str(b.get("web_url", "")),
                             adopted=True), ""
+    foreign = _foreign_active(active, owned_commits, owned_ids)
+    if foreign is not None:
+        return None, _foreign_refusal(foreign, branch)
     op = create_build_guarded(
         client, ops_dir, op_id=f"{run_id}-ci-r{round_idx}", run_id=run_id,
         purpose=purpose, branch=branch, commit=commit, message=message,
