@@ -23,7 +23,7 @@ history only.
 | `<frozen-upstream-sha>` | `ffd46bfab2128bb84146050e98b51a617c6575ab` |
 | `<last-rebase-baseline>` | effective `LAST_REBASE_VLLM_COMMIT` from `<external-agent-root>/config.sh` (default `d4004455d2357985830af10e432709b42c820455`) — `grep -n LAST_REBASE_VLLM_COMMIT config.sh` on run day |
 | `<knowledge-stores>` | `$AG/agent/store/debug_memory.db  $AG/agent/skills  $AG/rebase_logs/state.json` |
-| `<gpu-device-set>` | ☐ per decision B (the nightly cron session used `4,5`) |
+| `<gpu-device-set>` | `4,5,6,7` (decision B; contention fallback `4,5` — same set for BOTH runs) |
 | CI pipelines | manifest `rebase.ci.pipeline: vllm-omni-release`, `rebase.ci.baseline_pipeline: vllm-omni-rebase`, `ci.org: vllm` |
 | Push signoff | manifest `push.signoff`: tzhouam <tzhouam@connect.ust.hk> |
 
@@ -101,23 +101,41 @@ history only.
   (timestamped `.env` backup first) and Phase 6 restores/supersedes.
   EXT1's per-checkout flock covers both runs on the same world — the
   mutual exclusion it was built for.
-- **B. GPU window — OPEN**: schedule the supervised run OUTSIDE
-  ~16:00–18:00 UTC — the nightly perf CI (`0 16 * * *` root crontab)
-  seizes all GPUs and KILLS GPU compute processes after a 1-hour wait.
-  Pick the window and `<gpu-device-set>` on run day.
-- **C. Buildkite schedule race — OPEN (pause effectively required)**:
-  PAUSE the two schedules ("Scheduled build" on main, "Scheduled
-  nightly build - Align") for the validation window. CI-W's ownership
-  rules REFUSE to push while an unowned build is active on the rebase
-  branch, so an unpaused schedule can turn the v3 run into a `refused`
-  terminal, not just pollute the comparison.
+- **B. GPU window — DECIDED (owner, 2026-08-01): 03:00 CST start.**
+  Clock facts (verified): cron runs on `/etc/localtime` = **UTC**, so
+  the perf-CI crontab `0 16 * * *` fires at 16:00 UTC = **00:00 CST**
+  (it seizes all GPUs and kills GPU compute procs after a 1-hour wait;
+  its tail can run past 03:00 CST). Window: **03:00 → 23:30 CST**
+  (= 19:00 → 15:30 UTC), hard stop 23:30 CST — nothing of ours may be
+  on GPUs at midnight CST. Two window rules: (1) at 03:00 CST confirm
+  `nvidia-smi` shows the nightly's tail is done before starting; (2) if
+  ext + v3 don't both fit one window, run Phase 3 (ext) in day-1's
+  window and Phase 4 (v3) in day-2's — the Phase-3 restore step already
+  reseeds the world between them.
+  **`<gpu-device-set>` = `4,5,6,7`** — GPU 0 carries a resident ~139 GB
+  allocation (avoid); 4 visible GPUs let the `gpu_4_queue` jobs
+  actually EXECUTE (not hw-skip) in BOTH runs, maximizing §8 signal.
+  Fallback under run-day contention: drop to `4,5` (the deployed cron
+  precedent) — but the SAME set for both runs is the invariant, never
+  mixed.
+- **C. Buildkite schedule race — DECIDED (owner, 2026-08-01): pause
+  both schedules for the validation window.** Pipeline
+  `vllm/vllm-omni-rebase` → Settings → Schedules: pause "Scheduled
+  build" (main) and "Scheduled nightly build - Align" (dev/vllm-align)
+  in Phase 0; re-enable in Phase 6. Scope note (precise, post-CI-W):
+  the v3 run pushes `rebase-val-nat-<date>`, a branch the schedules
+  never build, so the ownership refusal is NOT the main exposure here —
+  the exposure is comparison stability: a scheduled main build landing
+  between the ext and nat runs would CHANGE the pre-existing-failure
+  baseline (`rebase.ci.baseline_pipeline` main-branch query) mid-
+  comparison, plus GPU/queue capacity contention. Pausing removes both.
 
 ## Run-day fill-ins (write values here on the day)
 
 | Item | Value |
 |---|---|
-| Run date / GPU window (decision B) | ☐ |
-| `<gpu-device-set>` | ☐ |
+| Run date (window: 03:00–23:30 CST per decision B) | ☐ |
+| 03:00 CST GPU-idle check passed (nightly tail done) | ☐ |
 | Buildkite schedules paused (decision C, who/when) | ☐ |
 | Copilot SHA under test | ☐ |
 | Target start SHA (`git -C $TGT rev-parse dev/vllm-align`) | ☐ |
