@@ -112,12 +112,20 @@ def test_src_has_no_python312_only_fstring_quote_reuse():
     """Round-1 review: requires-python is >=3.11, but a same-quote reuse
     inside an f-string expression (PEP 701) only parses on 3.12+ — a
     SyntaxError at import time on 3.11. `ast.parse(feature_version=...)`
-    cannot catch this (tokenizer-level), so scan the token stream."""
-    import io
+    cannot catch this (tokenizer-level), so on 3.12+ scan the token
+    stream; on 3.11 (round-2 review: FSTRING_START does not exist there)
+    plain compile() flags the defect natively."""
+    import sys
     import tokenize
     src_root = Path(__file__).resolve().parents[1] / "src"
     offenders = []
     for path in sorted(src_root.rglob("*.py")):
+        if sys.version_info < (3, 12):
+            try:
+                compile(path.read_bytes(), str(path), "exec")
+            except SyntaxError as exc:
+                offenders.append(f"{path}:{exc.lineno}")
+            continue
         stack: list[str | None] = []
         with open(path, "rb") as fh:
             for tok in tokenize.tokenize(fh.readline):
@@ -799,3 +807,170 @@ def test_cancel_owned_active_builds_on_abort(tmp_path):
     assert events[0][0] == "ci_build_cancelled_on_abort"
     # idempotent: the cancelled op is consumed in the ledger
     assert _cancel_owned_active_builds(ci, tmp_path / "ops") == []
+
+
+# ── round-2 review regressions ───────────────────────────────────────────────
+
+def test_baseline_logs_fetched_from_baseline_pipeline_client():
+    """Round-2 review: BaselineFailure.build_id belongs to the BASELINE
+    pipeline — resolving it on the build-under-test client 404s into the
+    lenient same-cause path, wrongly ignoring real regressions."""
+    baseline = (BaselineFailure(name="lane", exit_status=1,
+                                job_id="mainJ", build_id="42"),)
+    asked = []
+
+    def baseline_log(build_id, job_id):
+        asked.append((build_id, job_id))
+        return "RuntimeError: the OLD failure\nFAILED tests/l.py::t_old - z"
+
+    ci = ScriptedCI(
+        snapshots=[{"state": "failed",
+                    "jobs": [_job("Lane", "failed", 1)]}],
+        logs={"Lane": "RuntimeError: a NEW regression\n"
+                      "FAILED tests/l.py::t_new - y"})
+    out = ci_loop.monitor_build(
+        ci, "b", spec=CIClassifySpec(baseline=baseline,
+                                     baseline_log_fn=baseline_log),
+        poll_sec=0, timeout_sec=0, sleep=lambda s: None)
+    # the baseline log came from the BASELINE client, and its differing
+    # signature makes this a REAL failure, not ignored_baseline
+    assert asked == [("42", "mainJ")]
+    assert out.jobs[0].classification == "failed"
+
+
+def test_monitor_reconciliation_failure_never_passes():
+    """Round-2 review: when neither the jobs endpoint nor the build is
+    readable at reconciliation time, retrieval failure must not read as
+    'nothing missed' — clean_pass is off even with green polled jobs."""
+    class OutageCI(ScriptedCI):
+        def list_jobs(self, build_id):
+            raise BuildkiteError("list_jobs failed")
+
+    ci = OutageCI(snapshots=[
+        {"state": "passed", "jobs": [_job("Green", "passed", 0)]},
+        {},                          # the API outage begins
+    ])
+    out = ci_loop.monitor_build(ci, "b", spec=CIClassifySpec(), poll_sec=0,
+                                sleep=lambda s: None)
+    assert out.reconciled is False and not out.clean_pass
+    # with the build still readable, a raising jobs endpoint degrades to
+    # the embedded snapshot and reconciliation stands
+    ci = OutageCI(snapshots=[
+        {"state": "passed", "jobs": [_job("Green", "passed", 0)]}])
+    out = ci_loop.monitor_build(ci, "b", spec=CIClassifySpec(), poll_sec=0,
+                                sleep=lambda s: None)
+    assert out.reconciled is True and out.clean_pass
+
+
+def test_buildkite_list_jobs_raises_when_nothing_readable():
+    bk = BuildkiteCI("t", "o", "p",
+                     request=Recorder([(500, {}), (500, {})]))
+    with pytest.raises(BuildkiteError, match="build itself is unreadable"):
+        bk.list_jobs("9")
+
+
+def test_rounds_resume_recovers_intent_before_new_index(tmp_path):
+    """Round-2 review: a crash between durable intent and create ack must
+    RECOVER that op (adopt by op-id metadata) — never advance to a fresh
+    index while the earlier creation is uncertain."""
+    intent = ci_loop.BuildOp(op_id="run-1-ci-r0", run_id="run-1",
+                             purpose="initial", branch="dev",
+                             commit="c" * 40)
+    from dataclasses import asdict
+    ci_loop._durable_write(intent.path(tmp_path / "ops"), asdict(intent))
+    ci = RoundsCI([])
+    # the crashed create actually LANDED: an orphan build carries the op id
+    orphan = ci.create_build(branch="dev", commit="c" * 40, message="m",
+                             meta_data={"imx_op_id": "run-1-ci-r0"})
+    ci.builds[orphan["id"]].update(
+        {"state": "passed", "jobs": [_job("Green", "passed", 0)]})
+    result, push_calls = _rounds(ci, tmp_path)
+    assert result.result == "passed"
+    assert ci.created == 1                      # adopted, never re-created
+    ops = ci_loop.load_ops(tmp_path / "ops")
+    assert [(o.op_id, o.state, o.build_id) for o in ops] == \
+        [("run-1-ci-r0", "created", orphan["id"])]
+    assert result.rounds[0].op_id == "run-1-ci-r0"
+
+    # ...and when NO build carries the op id, recovery ESCALATES (refused)
+    intent2 = ci_loop.BuildOp(op_id="run-2-ci-r0", run_id="run-2",
+                              purpose="initial", branch="dev",
+                              commit="c" * 40)
+    ci_loop._durable_write(intent2.path(tmp_path / "ops2"),
+                           asdict(intent2))
+    ci2 = RoundsCI([])
+    result2 = _run(ci_loop.run_ci_rounds(
+        client=ci2, ops_dir=tmp_path / "ops2", run_id="run-2",
+        branch="dev", spec=CIClassifySpec(), push_fn=lambda i: Push(),
+        changes_fn=lambda: False, settle_sec=0, poll_sec=0, timeout_sec=0,
+        job_retry_max=0, sleep=lambda s: None, asleep=_noop_sleep))
+    assert result2.result == "refused"
+    assert "refusing to re-create" in result2.reason
+    assert ci2.created == 0
+
+
+def test_rounds_resume_reattaches_active_created_build(tmp_path):
+    """Round-2 review companion: a `created` op whose build is still
+    ACTIVE at this commit (crash during monitor) is re-attached — not
+    duplicated, not treated as a foreign active build."""
+    class TwoViewCI(RoundsCI):
+        def __init__(self):
+            super().__init__([])
+            self.views = 0
+
+        def get_build(self, build_id):
+            b = dict(super().get_build(build_id))
+            if b:
+                self.views += 1
+                b["state"] = "running" if self.views == 1 else "passed"
+                if b["state"] == "passed":
+                    b["jobs"] = [_job("Green", "passed", 0)]
+            return b
+
+        def list_jobs(self, build_id):
+            return [_job("Green", "passed", 0)]
+
+    ci = TwoViewCI()
+    ci_loop.create_build_guarded(ci, tmp_path / "ops",
+                                 op_id="run-1-ci-r0", run_id="run-1",
+                                 purpose="initial", branch="dev",
+                                 commit="c" * 40, message="m")
+    assert ci.created == 1
+    result, push_calls = _rounds(ci, tmp_path)
+    assert result.result == "passed"
+    assert ci.created == 1                      # re-attached, no new build
+    assert result.rounds[0].op_id == "run-1-ci-r0"
+    assert result.rounds[0].build_id == "b1"
+
+
+def test_restore_worktree_restores_untracked_content(tmp_path):
+    """Round-2 review: `stash create` skips untracked files — the snapshot
+    must capture their CONTENT so a rejected attempt's edit (or deletion)
+    of a pre-existing untracked file is rolled back, not preserved."""
+    import subprocess
+
+    from infermatrix_copilot.rebase_engine import test_loop as tl
+    repo = tmp_path / "r"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", repo], check=True)
+    (repo / "tracked.py").write_text("t = 1\n")
+    subprocess.run(["git", "-C", repo, "add", "-A"], check=True)
+    subprocess.run(["git", "-C", repo, "-c", "user.name=t", "-c",
+                    "user.email=t@t", "commit", "-qm", "seed"], check=True)
+    # an earlier ACCEPTED fix left an untracked file behind
+    (repo / "accepted_fix.py").write_text("good bytes\n")
+
+    snap, untracked = tl.snapshot_worktree(repo)
+    assert set(untracked) == {"accepted_fix.py"}
+    # the rejected attempt edits BOTH, and creates a new file
+    (repo / "tracked.py").write_text("t = 666\n")
+    (repo / "accepted_fix.py").write_text("rejected bytes\n")
+    (repo / "brand_new.py").write_text("n\n")
+    tl.restore_worktree(repo, snap, untracked)
+    assert (repo / "tracked.py").read_text() == "t = 1\n"
+    assert (repo / "accepted_fix.py").read_text() == "good bytes\n"
+    assert not (repo / "brand_new.py").exists()
+    # deletion of the pre-existing untracked file also rolls back
+    (repo / "accepted_fix.py").unlink()
+    tl.restore_worktree(repo, snap, untracked)
+    assert (repo / "accepted_fix.py").read_text() == "good bytes\n"

@@ -161,7 +161,10 @@ class BuildkiteCI:
         """Authoritative job list: the dedicated /jobs endpoint when it
         behaves, embedded jobs from a fresh build fetch otherwise (some
         builds 404 the endpoint; it can also answer with the build object
-        itself — parent-documented)."""
+        itself — parent-documented). RAISES when neither source is
+        readable: retrieval failure must stay distinguishable from a
+        genuinely empty job list, or a reconciliation during an API
+        outage would silently pass (round-2 review)."""
         try:
             status, data = self._request(
                 "GET", self._build_path(build_id) + "/jobs?per_page=100",
@@ -175,6 +178,10 @@ class BuildkiteCI:
         except BuildkiteError:
             pass
         build = self.get_build(build_id)
+        if not build:
+            raise BuildkiteError(
+                "list_jobs failed: the jobs endpoint was unusable and the "
+                "build itself is unreadable")
         return [j for j in (build.get("jobs") or []) if isinstance(j, dict)]
 
     def retry_job(self, build_id: str,

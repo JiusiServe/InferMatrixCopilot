@@ -1554,14 +1554,21 @@ async def _v3_ci(ctx: StepContext) -> StepResult:
     client = _make_ci_client(token, org, pipeline,
                              dict(ci_cfg.get("build_env") or {}))
     baseline: tuple = ()
+    baseline_log_fn = None
     baseline_pipeline = str(ci_cfg.get("baseline_pipeline") or "")
     if baseline_pipeline:
         default_branch = str((manifest.get("repo") or {})
                              .get("default_branch") or "main")
+        # the baseline's build ids belong to the BASELINE pipeline — its
+        # logs must be fetched on THAT client, never the build-under-test
+        # one (round-2 review: a cross-pipeline 404 would fall into the
+        # lenient same-cause path and ignore real regressions)
+        baseline_client = _make_ci_client(token, org, baseline_pipeline,
+                                          {})
         try:
-            baseline = ci_loop.fetch_baseline_failures(
-                _make_ci_client(token, org, baseline_pipeline, {}),
-                default_branch)
+            baseline = ci_loop.fetch_baseline_failures(baseline_client,
+                                                       default_branch)
+            baseline_log_fn = baseline_client.get_job_log
             ctx.trace.record("ci_baseline", count=len(baseline),
                              pipeline=baseline_pipeline,
                              branch=default_branch)
@@ -1576,7 +1583,7 @@ async def _v3_ci(ctx: StepContext) -> StepResult:
             ci_cfg.get("ignorable_log_patterns") or ()),
         extra_exception_names=tuple(
             ci_cfg.get("extra_exception_names") or ()),
-        baseline=baseline)
+        baseline=baseline, baseline_log_fn=baseline_log_fn)
 
     def _porcelain() -> str:
         out = subprocess.run(["git", "-C", repo, "status", "--porcelain"],

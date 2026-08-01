@@ -227,6 +227,9 @@ class JobResult:
 class MonitorOutcome:
     build_state: str
     jobs: list[JobResult] = field(default_factory=list)
+    # False when the authoritative final job list could not be retrieved
+    # at all — retrieval failure is NOT an empty job list (round-2 review)
+    reconciled: bool = True
 
     @property
     def no_run(self) -> bool:
@@ -256,9 +259,11 @@ class MonitorOutcome:
         """True only when there is nothing left to act on or wait for.
         Baseline-matched failures still count as clean (`ignored_baseline`);
         unresolved failures, never-finished jobs, budget kills, a refused
-        (no-run) build, or a build that produced NO job signal at all never
-        do — a signal-less monitor must not read as success."""
+        (no-run) build, a failed final reconciliation, or a build that
+        produced NO job signal at all never do — a signal-less monitor
+        must not read as success."""
         return (not self.no_run and self.build_state != "monitor_timeout"
+                and self.reconciled
                 and bool(self.jobs) and not self.failed_jobs
                 and not self.incomplete_jobs and not self.budget_timeouts)
 
@@ -279,12 +284,19 @@ class BaselineFailure:
 class CIClassifySpec:
     """Adapter data: which job names/log contents are ignorable, which
     exception names extend the error-signature grammar, and the baseline of
-    pre-existing failures on the default branch."""
+    pre-existing failures on the default branch.
+
+    `baseline_log_fn` fetches a BASELINE job's log — the baseline lives on
+    a DIFFERENT pipeline than the build under test, so the monitor's own
+    client cannot resolve its build ids (round-2 review: asking the wrong
+    pipeline 404s into the lenient same-cause path). None = the baseline
+    coordinates resolve on the same client (single-pipeline setups)."""
 
     ignorable_name_patterns: Sequence[str] = ()
     ignorable_log_patterns: Sequence[str] = ()
     extra_exception_names: Sequence[str] = ()
     baseline: Sequence[BaselineFailure] = ()
+    baseline_log_fn: Callable[[str, str], str] | None = None
 
 
 def _save_job_log(log_dir, name: str, text: str) -> str:
@@ -319,7 +331,8 @@ def _same_root_cause(client: CIClient, entry: BaselineFailure,
     the same cause (the parent's documented lenient default)."""
     if not entry.job_id or not entry.build_id:
         return True
-    main_log = client.get_job_log(entry.build_id, entry.job_id)
+    fetch = spec.baseline_log_fn or client.get_job_log
+    main_log = fetch(entry.build_id, entry.job_id)
     if not main_log:
         return True
     _save_job_log(log_dir, f"baseline_{entry.name}", main_log)
@@ -468,10 +481,16 @@ def monitor_build(client: CIClient, build_id: str, *,
     final = client.get_build(build_id) or {}
     if str(final.get("state", "")) and build_state != "monitor_timeout":
         build_state = str(final.get("state", ""))
+    reconciled = True
     try:
         auth = client.list_jobs(build_id)
     except Exception:  # noqa: BLE001 - degrade to the embedded snapshot
         auth = [j for j in (final.get("jobs") or []) if isinstance(j, dict)]
+        if not final:
+            # neither the jobs endpoint nor the build itself was readable:
+            # the reconciliation contract (nothing missed) cannot be
+            # honored, so the outcome must not read clean
+            reconciled = False
     for job in auth:
         jid = str(job.get("id", ""))
         name = str(job.get("name", "") or "")
@@ -491,7 +510,8 @@ def monitor_build(client: CIClient, build_id: str, *,
     for rid, orig in expected_retries.items():
         if rid not in processed and orig.classification == "retrying":
             orig.classification = "incomplete"
-    return MonitorOutcome(build_state=build_state, jobs=jobs_out)
+    return MonitorOutcome(build_state=build_state, jobs=jobs_out,
+                          reconciled=reconciled)
 
 
 # ── pure log classifiers (parent-verbatim) ───────────────────────────────────
@@ -719,7 +739,30 @@ def _acquire_build(client: CIClient, ops_dir: Path, *, run_id: str,
       settle-then-create ordering ours is the newest build, which the
       pipeline's skip rules keep (the webhook one is skipped as older).
 
-    Creation itself goes through the §3.2 guarded op ledger."""
+    Creation itself goes through the §3.2 guarded op ledger — and BEFORE
+    any new operation, THIS run's unresolved prior ops are settled
+    (round-2 review): an `intent` record is recovered under its own op id
+    (adopt by metadata / bounded repoll / escalate — never a fresh index
+    while a creation is uncertain), and a `created` op whose build is
+    still ACTIVE at this commit is re-attached (crash-during-monitor /
+    monitor-timeout resume) instead of duplicated."""
+    for op in load_ops(ops_dir):
+        if op.run_id != run_id:
+            continue
+        if op.state == "intent":
+            recovered = create_build_guarded(
+                client, ops_dir, op_id=op.op_id, run_id=run_id,
+                purpose=op.purpose, branch=op.branch, commit=op.commit,
+                message=message, sleep=sleep)
+            return CIBuildRound(purpose=op.purpose, op_id=op.op_id,
+                                build_id=recovered.build_id,
+                                build_url=recovered.build_url), ""
+        if op.state == "created" and op.build_id and op.commit == commit:
+            state = str(client.get_build(op.build_id).get("state", ""))
+            if state in _ACTIVE_BUILD_STATES:
+                return CIBuildRound(purpose=op.purpose, op_id=op.op_id,
+                                    build_id=op.build_id,
+                                    build_url=op.build_url), ""
     active = [b for b in client.latest_builds(branch,
                                               states=_ACTIVE_BUILD_STATES)
               if str(b.get("state", "")) not in BUILD_NO_RUN_STATES]

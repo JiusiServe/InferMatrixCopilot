@@ -208,17 +208,26 @@ def _git_out(repo: Path, args: list[str], timeout: int = 60) -> str:
         return ""
 
 
-def snapshot_worktree(repo: Path) -> tuple[str, set[str]]:
-    """Snapshot the working tree before a debug attempt (parent verbatim).
+def snapshot_worktree(repo: Path) -> tuple[str, dict[str, str]]:
+    """Snapshot the working tree before a debug attempt.
 
-    Returns ``(snapshot_commit, untracked_files)``. The snapshot commit is a
+    Returns ``(snapshot_commit, untracked)``. The snapshot commit is a
     dangling commit from ``git stash create`` capturing all TRACKED files
     (it does NOT modify the worktree or index); a clean tree falls back to
-    HEAD. Untracked files are recorded by path so files the attempt creates
-    can be identified and removed on rejection."""
-    untracked = {f for f in _git_out(repo, ["ls-files", "--others",
-                                            "--exclude-standard"])
-                 .splitlines() if f.strip()}
+    HEAD. Untracked files map path → blob oid (``git hash-object -w``):
+    the CONTENT is snapshotted too, because `stash create` skips untracked
+    files entirely — without the blobs, a rejected attempt's edit to a
+    pre-existing untracked file (e.g. one an earlier ACCEPTED fix created)
+    would survive restoration and leak into the next commit (2026-08-01
+    CI-wiring review)."""
+    untracked: dict[str, str] = {}
+    for f in _git_out(repo, ["ls-files", "--others",
+                             "--exclude-standard"]).splitlines():
+        f = f.strip()
+        if not f:
+            continue
+        oid = _git_out(repo, ["hash-object", "-w", "--", f]).strip()
+        untracked[f] = oid
     snap = _git_out(repo, ["stash", "create",
                            "pre-debug-attempt snapshot"]).strip()
     if not snap:
@@ -227,14 +236,17 @@ def snapshot_worktree(repo: Path) -> tuple[str, set[str]]:
 
 
 def restore_worktree(repo: Path, snap: str,
-                     untracked_before: set[str]) -> None:
-    """Revert everything a debug attempt changed, back to the snapshot
-    (parent verbatim). Rejected/unverified fixes must NOT stay in the tree:
-    they pollute every later test and debug attempt and eventually get
-    swept into a commit by the push staging. Best-effort — never raises
-    into the test loop."""
+                     untracked_before: "dict[str, str] | set[str]") -> None:
+    """Revert everything a debug attempt changed, back to the snapshot.
+    Rejected/unverified fixes must NOT stay in the tree: they pollute
+    every later test and debug attempt and eventually get swept into a
+    commit by the push staging. Pre-existing untracked files are restored
+    by CONTENT from the snapshot blobs (dict form; a legacy set restores
+    by presence only). Best-effort — never raises into the test loop."""
     if not snap:
         return
+    blobs = untracked_before if isinstance(untracked_before, dict) else {}
+    untracked_before = set(untracked_before)
     try:
         changed = [f for f in _git_out(
             repo, ["diff", "--name-only", snap]).splitlines() if f.strip()]
@@ -277,6 +289,24 @@ def restore_worktree(repo: Path, snap: str,
                          "attempt: %s", f)
             except OSError:
                 pass
+        # pre-existing untracked files: restore CONTENT from the snapshot
+        # blobs (modified or deleted by the attempt alike)
+        for f, oid in blobs.items():
+            if not oid:
+                continue
+            cur = _git_out(repo, ["hash-object", "--", f]).strip() \
+                if (Path(repo) / f).is_file() else ""
+            if cur == oid:
+                continue
+            blob = subprocess.run(
+                ["git", "-C", str(repo), "cat-file", "blob", oid],
+                capture_output=True, timeout=60)
+            if blob.returncode == 0:
+                path = Path(repo) / f
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(blob.stdout)
+                log.info("  Restored pre-existing untracked file after "
+                         "rejected debug attempt: %s", f)
     except Exception as exc:  # noqa: BLE001
         log.warning("  Could not fully restore worktree after rejected "
                     "attempt: %s", exc)
