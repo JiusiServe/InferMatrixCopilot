@@ -1397,6 +1397,65 @@ def _make_ci_client(token: str, org: str, pipeline: str,
     return BuildkiteCI(token, org, pipeline, build_env=build_env)
 
 
+def _worktree_digest(repo) -> str:
+    """Content digest of ALL uncommitted work — staged + unstaged diffs
+    AND untracked file bytes. `status --porcelain` alone cannot see a
+    content edit to an already-dirty file (round-1 review), which would
+    let a rejected debug attempt's edits leak into the next push."""
+    import hashlib
+    import subprocess
+    h = hashlib.sha256()
+    st = subprocess.run(["git", "-C", str(repo), "status", "--porcelain"],
+                        capture_output=True, text=True, timeout=60).stdout
+    h.update(st.encode("utf-8", errors="replace"))
+    diff = subprocess.run(["git", "-C", str(repo), "diff", "HEAD"],
+                          capture_output=True, timeout=120).stdout
+    h.update(diff)
+    for line in st.splitlines():
+        if not line.startswith("??"):
+            continue
+        p = Path(repo) / line[3:].strip().strip('"')
+        files = [p] if p.is_file() else \
+            sorted(q for q in p.rglob("*") if q.is_file()) \
+            if p.is_dir() else []
+        for q in files:
+            h.update(str(q).encode("utf-8", errors="replace"))
+            try:
+                h.update(q.read_bytes())
+            except OSError:
+                pass
+    return h.hexdigest()
+
+
+def _cancel_owned_active_builds(client, ops_dir,
+                                trace=None) -> list[str]:
+    """Abort cleanup (§3.3 rollback inventory: 'running CI → cancel
+    op-recorded builds'): cancel OUR still-active builds; adopted builds
+    (no op record) are never touched. Best-effort per build — cleanup must
+    never raise out of a finalizer."""
+    from ...rebase_engine import ci_loop
+    cancelled: list[str] = []
+    try:
+        ops = ci_loop.load_ops(Path(ops_dir))
+    except Exception:  # noqa: BLE001 - a corrupt ledger cannot block teardown
+        return cancelled
+    for op in ops:
+        if op.state != "created" or not op.build_id:
+            continue
+        try:
+            state = str(client.get_build(op.build_id).get("state", ""))
+            if state in (*ci_loop.PENDING_JOB_STATES, "failing"):
+                if ci_loop.cancel_build_guarded(client, Path(ops_dir),
+                                                op.op_id):
+                    cancelled.append(op.build_id)
+                    if trace is not None:
+                        trace("ci_build_cancelled_on_abort",
+                              op_id=op.op_id, build=op.build_id)
+        except Exception:  # noqa: BLE001 - best-effort per build
+            continue
+    return cancelled
+
+
 @step("rebase.v3_ci", "script", "push",
       "Remote CI: push, guarded build creation, monitored to terminal.")
 async def _v3_ci(ctx: StepContext) -> StepResult:
@@ -1459,13 +1518,23 @@ async def _v3_ci(ctx: StepContext) -> StepResult:
                           "HEAD?) — refusing to push")
     protected = sorted({*(push_cfg.get("protected_branches") or []),
                         *ctx.settings.protected_branches})
-    # the adapter-governance half of C4: the rebase pipeline may push to
-    # its (non-protected) working branch only when the manifest says so
-    if branch in protected or not push_cfg.get("rebase_branch_allowed"):
+    # the adapter-governance half of C4 (round-1 review: SCOPED, not just
+    # non-protected): the rebase pipeline may push ONLY to the branch the
+    # adapter declares — the scope itself is adapter data, fail closed
+    rebase_branch = str(push_cfg.get("rebase_branch") or "")
+    if not rebase_branch:
+        return StepResult(False, FailureKind.BLOCKED,
+                          "adapter declares no push.rebase_branch — the "
+                          "push scope is adapter data; refusing an "
+                          "unscoped push authorization")
+    if branch != rebase_branch or branch in protected \
+            or not push_cfg.get("rebase_branch_allowed"):
         return StepResult(False, FailureKind.FORBIDDEN,
-                          f"push governance refuses branch {branch!r} "
-                          "(protected, or push.rebase_branch_allowed "
-                          "unset)")
+                          f"push governance refuses branch {branch!r} — "
+                          f"only the declared rebase branch "
+                          f"{rebase_branch!r} may be pushed "
+                          "(and only with push.rebase_branch_allowed, "
+                          "never a protected branch)")
     sub = _substate(ctx)
     upstream_commit = ctx.state.get("upstream_commit", "") \
         or (sub.read().get("upstream_commit") or "")
@@ -1517,7 +1586,7 @@ async def _v3_ci(ctx: StepContext) -> StepResult:
     def changes_fn() -> bool:
         return bool(_porcelain())
 
-    def push_fn(rnd: int):
+    def push_fn(op_index: int):
         def _attempt():
             return push_to_ci.commit_and_push(
                 Path(repo), upstream_commit=upstream_commit, pin=pin,
@@ -1525,7 +1594,7 @@ async def _v3_ci(ctx: StepContext) -> StepResult:
                 unstage_globs=unstage, author_name=author_name,
                 author_email=author_email, protected_branches=protected,
                 wal_dir=ctx.run_dir / "push_wal",
-                op_id=f"{run_id}-push-r{rnd}", allowed=True,
+                op_id=f"{run_id}-push-r{op_index}", allowed=True,
                 allow_push=bool(ctx.settings.allow_push), remote=remote)
         try:
             return _attempt()
@@ -1602,7 +1671,10 @@ async def _v3_ci(ctx: StepContext) -> StepResult:
                     .splitlines()[-200:])
         except OSError:
             pass
-        before = _porcelain()
+        # CONTENT digest, not porcelain: after an accepted fix dirties a
+        # file, a later agent's edit to that same file is invisible to
+        # `status --porcelain` (round-1 review)
+        before = _worktree_digest(repo)
         snap, untracked = tl.snapshot_worktree(Path(repo))
         verdict = await _run_debug_agent(
             ctx, manifest, module, slug,
@@ -1614,8 +1686,9 @@ async def _v3_ci(ctx: StepContext) -> StepResult:
             ctx.trace.record("ci_debug_rejected", job=jr.name,
                              verdict=verdict)
             return False
-        if _porcelain() == before:
-            # completed but changed nothing — unfixed (parent parity)
+        if _worktree_digest(repo) == before:
+            # completed but changed nothing — unfixed (parent parity); an
+            # identical tree needs no restore
             ctx.trace.record("ci_debug_no_changes", job=jr.name)
             return False
         local = _verify_locally(slug)
@@ -1630,9 +1703,40 @@ async def _v3_ci(ctx: StepContext) -> StepResult:
                              reason=local)
         return True
 
+    ops_dir = ctx.run_dir / "ci_ops"
+
+    # abort cleanup (§3.3): a cancelled/killed run must not leave OUR
+    # op-recorded builds running — registered BEFORE any build can exist;
+    # adopted builds carry no op record and are never touched
+    from ..lifecycle import register_finalizer
+
+    async def _abort_ci_cleanup(outcome, _client=client, _ops=ops_dir):
+        if getattr(outcome, "status", "") == "done":
+            return
+        _cancel_owned_active_builds(_client, _ops,
+                                    trace=ctx.trace.record)
+
+    register_finalizer(ctx.run_dir, _abort_ci_cleanup)
+
+    # resume safety (round-1 review): op indices clear BOTH durable
+    # ledgers — a re-entered run must never reuse an op id that already
+    # names a different push or build
+    import re as _re
+    from ...rebase_engine import push_wal
+    try:
+        ops_base = ci_loop.op_index_base(ci_loop.load_ops(ops_dir), run_id)
+        push_rx = _re.compile(_re.escape(run_id) + r"-push-r(\d+)")
+        wal_base = max(
+            [int(m.group(1)) + 1
+             for r in push_wal.load_records(ctx.run_dir / "push_wal")
+             if (m := push_rx.fullmatch(r.op_id)) is not None] or [0])
+    except (ci_loop.CIOpError, push_wal.PushWalError) as exc:
+        return StepResult(False, FailureKind.BLOCKED,
+                          f"CI/push op ledger unreadable: {exc}")
+
     try:
         result = await ci_loop.run_ci_rounds(
-            client=client, ops_dir=ctx.run_dir / "ci_ops", run_id=run_id,
+            client=client, ops_dir=ops_dir, run_id=run_id,
             branch=branch, spec=spec, push_fn=push_fn,
             changes_fn=changes_fn, debug_fn=debug_fn,
             log_dir=ctx.run_dir / "ci_logs",
@@ -1643,6 +1747,7 @@ async def _v3_ci(ctx: StepContext) -> StepResult:
             job_retry_max=int(ctx.settings.rebase_ci_job_retry_max),
             message=message_template.format(commit=upstream_commit,
                                             short=upstream_commit[:12]),
+            op_base=max(ops_base, wal_base),
             trace=ctx.trace.record)
     except push_to_ci.PushPreflightError as exc:
         return StepResult(False, FailureKind.BLOCKED,

@@ -295,15 +295,16 @@ class FakeBK:
 
 
 def _wire_remote_ci(env, settings, tmp_path, monkeypatch, fake,
-                    allow_push=True):
-    """Bare origin + a non-protected working branch + injected provider."""
+                    allow_push=True, branch="dev/vllm-align"):
+    """Bare origin + the adapter-declared rebase branch + injected
+    provider."""
     from infermatrix_copilot.engine.steps import rebase_v3
     remote = tmp_path / "origin.git"
     subprocess.run(["git", "init", "-q", "--bare", remote], check=True)
     subprocess.run(["git", "-C", env.repo, "remote", "add", "origin",
                     str(remote)], check=True)
     subprocess.run(["git", "-C", env.repo, "checkout", "-q", "-b",
-                    "dev/align"], check=True)
+                    branch], check=True)
     clients = []
 
     def factory(token, org, pipeline, build_env):
@@ -345,13 +346,13 @@ def test_remote_ci_complete_run_green(complete_env, settings, tmp_path,
                           capture_output=True, text=True,
                           check=True).stdout.strip()
     remote_tip = subprocess.run(
-        ["git", "-C", remote, "rev-parse", "refs/heads/dev/align"],
+        ["git", "-C", remote, "rev-parse", "refs/heads/dev/vllm-align"],
         capture_output=True, text=True, check=True).stdout.strip()
     assert head == remote_tip
     from infermatrix_copilot.rebase_engine import ci_loop, push_wal
     recs = push_wal.load_records(run_dir / "push_wal")
     assert [(r.state, r.dest_ref) for r in recs] == \
-        [("pushed", "refs/heads/dev/align")]
+        [("pushed", "refs/heads/dev/vllm-align")]
     # §3.2: the build is op-recorded and meta-stamped
     ops = ci_loop.load_ops(run_dir / "ci_ops")
     assert [(o.op_id, o.purpose, o.state) for o in ops] == \
@@ -388,9 +389,33 @@ def test_remote_ci_requires_allow_push(complete_env, settings, tmp_path,
     assert "ALLOW_PUSH" in outcome.blocked_reason
     assert fake.created == 0
     check = subprocess.run(
-        ["git", "-C", remote, "rev-parse", "refs/heads/dev/align"],
+        ["git", "-C", remote, "rev-parse", "refs/heads/dev/vllm-align"],
         capture_output=True, text=True)
     assert check.returncode != 0        # nothing was pushed
+    asyncio.run(lifecycle.finalize(run_dir, outcome))
+
+
+def test_remote_ci_refuses_undeclared_branch(complete_env, settings,
+                                             tmp_path, monkeypatch):
+    """Round-1 review: push authorization is SCOPED to the adapter's
+    declared `push.rebase_branch` — any other (even non-protected)
+    checkout branch is FORBIDDEN before anything reaches the remote or
+    the provider."""
+    env = complete_env
+    fake = FakeBK([])
+    remote, _ = _wire_remote_ci(env, settings, tmp_path, monkeypatch, fake,
+                                branch="dev/other-branch")
+    executor, run_dir = env.make_run("run-remoteci-scope")
+    state = _state_for(env, run_dir, {"rebase_mode": "remote_ci",
+                                      "upstream_commit": "a" * 40})
+    outcome = asyncio.run(executor.run(env.playbook, state))
+    assert outcome.status == "blocked"
+    assert "only the declared rebase branch" in outcome.blocked_reason
+    assert "dev/vllm-align" in outcome.blocked_reason
+    assert fake.created == 0
+    assert subprocess.run(
+        ["git", "-C", remote, "rev-parse", "refs/heads/dev/other-branch"],
+        capture_output=True).returncode != 0
     asyncio.run(lifecycle.finalize(run_dir, outcome))
 
 

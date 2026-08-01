@@ -83,11 +83,11 @@ class BuildkiteCI:
 
     @property
     def base(self) -> str:
-        return (f"{_API}/organizations/{urllib.parse.quote(self.org, safe="")}"
-                f"/pipelines/{urllib.parse.quote(self.pipeline, safe="")}")
+        return (f"{_API}/organizations/{urllib.parse.quote(self.org, safe='')}"
+                f"/pipelines/{urllib.parse.quote(self.pipeline, safe='')}")
 
     def _build_path(self, build_id: str) -> str:
-        return f"{self.base}/builds/{urllib.parse.quote(str(build_id), safe="")}"
+        return f"{self.base}/builds/{urllib.parse.quote(str(build_id), safe='')}"
 
     def _norm(self, build: dict) -> dict:
         out = dict(build)
@@ -116,8 +116,13 @@ class BuildkiteCI:
         return self._norm(data)
 
     def get_build(self, build_id: str) -> dict:
-        status, data = self._request("GET", self._build_path(build_id),
-                                     None, False)
+        try:
+            status, data = self._request("GET", self._build_path(build_id),
+                                         None, False)
+        except BuildkiteError:
+            # polling read: transport errors degrade too — the poll loop
+            # re-tries on its own cadence (round-1 review)
+            return {}
         if status != 200 or not isinstance(data, dict):
             return {}
         return self._norm(data)
@@ -141,11 +146,15 @@ class BuildkiteCI:
         return self._norm(data)
 
     def get_job_log(self, build_id: str, job_id: str) -> str:
-        status, text = self._request(
-            "GET",
-            self._build_path(build_id)
-            + f"/jobs/{urllib.parse.quote(str(job_id), safe="")}/log.txt",
-            None, True)
+        try:
+            status, text = self._request(
+                "GET",
+                self._build_path(build_id)
+                + f"/jobs/{urllib.parse.quote(str(job_id), safe='')}"
+                  "/log.txt",
+                None, True)
+        except BuildkiteError:
+            return ""
         return text if status == 200 and isinstance(text, str) else ""
 
     def list_jobs(self, build_id: str) -> list[dict]:
@@ -172,17 +181,21 @@ class BuildkiteCI:
                   job_id: str) -> tuple[str | None, bool]:
         """(new_job_id | None, retryable). HTTP 400 means this job TYPE
         cannot be retried (pipeline-upload / trigger steps) — the caller
-        classifies it ignorable instead of actionable."""
+        classifies it ignorable instead of actionable. Any OTHER failure
+        RAISES (mutating-call policy): an API outage must never be
+        mistaken for a code failure — the monitor records the job
+        structurally incomplete instead of dispatching a mutation agent
+        (round-1 review)."""
         status, data = self._request(
             "PUT",
             self._build_path(build_id)
-            + f"/jobs/{urllib.parse.quote(str(job_id), safe="")}/retry",
+            + f"/jobs/{urllib.parse.quote(str(job_id), safe='')}/retry",
             None, False)
         if status in (200, 201) and isinstance(data, dict):
             return str(data.get("id", "")), True
         if status == 400:
             return None, False
-        return None, True
+        raise BuildkiteError(f"retry_job failed: HTTP {status}")
 
     # ── adoption / baseline lookups (beyond the core protocol) ─────────────
 

@@ -406,7 +406,8 @@ def monitor_build(client: CIClient, build_id: str, *,
     jobs_out: list[JobResult] = []
     processed: set[str] = set()
     retries_by_name: dict[str, int] = {}
-    expected_retries: set[str] = set()
+    # retry-attempt job id → the ORIGINAL JobResult marked `retrying`
+    expected_retries: dict[str, JobResult] = {}
     build_state = ""
     while True:
         build = client.get_build(build_id) or {}
@@ -428,15 +429,22 @@ def monitor_build(client: CIClient, build_id: str, *,
             if jstate in PENDING_JOB_STATES:
                 continue
             processed.add(jid)
-            expected_retries.discard(jid)
+            expected_retries.pop(jid, None)
             jr = _classify_terminal(client, build_id, job, spec, log_dir)
             if jr.classification == "failed" and \
                     retries_by_name.get(name, 0) < retry_max:
                 retries_by_name[name] = retries_by_name.get(name, 0) + 1
-                new_id, retryable = client.retry_job(build_id, jid)
+                try:
+                    new_id, retryable = client.retry_job(build_id, jid)
+                except Exception:  # noqa: BLE001 - provider API failure
+                    # we could neither retry nor rule flakiness out —
+                    # STRUCTURAL (incomplete), never a mutation dispatch
+                    # and never a silent pass (round-1 review)
+                    jr.classification = "incomplete"
+                    new_id, retryable = None, True
                 if new_id:
                     jr.classification = "retrying"
-                    expected_retries.add(str(new_id))
+                    expected_retries[str(new_id)] = jr
                 elif not retryable:
                     # the provider refuses retries for this job TYPE
                     # (pipeline upload / trigger steps) — infra
@@ -477,6 +485,12 @@ def monitor_build(client: CIClient, build_id: str, *,
         processed.add(jid)
         jobs_out.append(_classify_terminal(client, build_id, job, spec,
                                            log_dir))
+    # a retry attempt we requested but NEVER observed is unfinished work:
+    # its original must not linger as `retrying` (which clean_pass would
+    # wave through) — it is structurally incomplete (round-1 review)
+    for rid, orig in expected_retries.items():
+        if rid not in processed and orig.classification == "retrying":
+            orig.classification = "incomplete"
     return MonitorOutcome(build_state=build_state, jobs=jobs_out)
 
 
@@ -673,6 +687,18 @@ def _record_outcome(rec: CIBuildRound, outcome: MonitorOutcome) -> None:
                                if j.classification == "ignored_baseline")
 
 
+def op_index_base(ops: Sequence[BuildOp], run_id: str) -> int:
+    """The next free `-ci-r<N>` index for this run — derived from the
+    DURABLE ledger so a resumed invocation never reuses an op id that
+    already names a different operation (round-1 review: op ids are
+    single-use identities; a crash after round 0 must not restart at r0
+    with a new HEAD)."""
+    rx = re.compile(re.escape(run_id) + r"-ci-r(\d+)")
+    idxs = [int(m.group(1)) for o in ops
+            if (m := rx.fullmatch(o.op_id)) is not None]
+    return max(idxs) + 1 if idxs else 0
+
+
 def _acquire_build(client: CIClient, ops_dir: Path, *, run_id: str,
                    round_idx: int, purpose: str, branch: str, commit: str,
                    message: str,
@@ -751,6 +777,7 @@ async def run_ci_rounds(*, client: CIClient, ops_dir: Path, run_id: str,
                         timeout_sec: float = 4 * 3600,
                         job_retry_max: int = 2,
                         message: str = "ci build",
+                        op_base: int | None = None,
                         sleep: Callable[[float], None] = time.sleep,
                         asleep: Callable[..., Any] = asyncio.sleep,
                         now: Callable[[], float] = time.monotonic,
@@ -760,18 +787,24 @@ async def run_ci_rounds(*, client: CIClient, ops_dir: Path, run_id: str,
     ownership rules): push → webhook settle → adopt-or-guarded-create →
     monitor → SERIALIZED debug dispatch → retry rounds.
 
-    `push_fn(round)` returns a PushOutcome-shaped object (`pushed`,
+    `push_fn(op_index)` returns a PushOutcome-shaped object (`pushed`,
     `pushed_commit`, `dry_run`, `reason`) and is the ONLY authority on push
-    authorization — this loop never self-grants. `debug_fn(job)` is awaited
-    one job at a time by construction (all agents edit the one shared
-    worktree with snapshot/restore — concurrency would clobber snapshots;
-    do not gather). Retry rounds: code changes present ⇒ push fixes and
-    build fresh; none ⇒ a NEW op-recorded build at the same commit
-    (incomplete/flaky recovery — the §3.2 ledger owns every build we
-    create; adopted builds are monitor-only). Budget-timeout-only rounds
-    fail immediately: neither retries nor agents fix an operator problem.
-    A refused (no-run) build adopts the best sibling carrying signal, else
-    the run has NO CI signal and says so."""
+    authorization — this loop never self-grants; `op_index` is the
+    ledger-unique index for this round's push op id. `debug_fn(job)` is
+    awaited one job at a time by construction (all agents edit the one
+    shared worktree with snapshot/restore — concurrency would clobber
+    snapshots; do not gather). Retry rounds: code changes present ⇒ push
+    fixes and build fresh; none ⇒ a NEW op-recorded build at the same
+    commit (incomplete/flaky recovery — the §3.2 ledger owns every build
+    we create; adopted builds are monitor-only). Budget-timeout-only
+    rounds fail immediately: neither retries nor agents fix an operator
+    problem. A refused (no-run) build adopts the best sibling carrying
+    signal, else the run has NO CI signal and says so.
+
+    Resume: op indices start AFTER the highest index already in the
+    durable ledger (`op_base`, auto-derived from `ops_dir` when omitted;
+    the caller may raise it to also clear its push-WAL indices) — a
+    re-entered run never reuses an op id for a different operation."""
     def _trace(event: str, **fields) -> None:
         if trace is not None:
             trace(event, **fields)
@@ -779,9 +812,15 @@ async def run_ci_rounds(*, client: CIClient, ops_dir: Path, run_id: str,
     rounds: list[CIBuildRound] = []
     fixed_all: list[str] = []
     commit = ""
+    try:
+        base = op_base if op_base is not None \
+            else op_index_base(load_ops(ops_dir), run_id)
+    except CIOpError as exc:
+        return CIRunResult("refused", reason=str(exc))
     for rnd in range(max_retries + 1):
+        idx = base + rnd
         if rnd == 0 or changes_fn():
-            push = await asyncio.to_thread(push_fn, rnd)
+            push = await asyncio.to_thread(push_fn, idx)
             if getattr(push, "dry_run", False):
                 return CIRunResult("push_dry_run",
                                    reason=getattr(push, "reason", ""),
@@ -804,7 +843,7 @@ async def run_ci_rounds(*, client: CIClient, ops_dir: Path, run_id: str,
         try:
             rec, refusal = await asyncio.to_thread(
                 _acquire_build, client, ops_dir, run_id=run_id,
-                round_idx=rnd, purpose=purpose, branch=branch,
+                round_idx=idx, purpose=purpose, branch=branch,
                 commit=commit, message=message, sleep=sleep)
         except CIOpError as exc:
             return CIRunResult("refused", reason=str(exc), rounds=rounds,

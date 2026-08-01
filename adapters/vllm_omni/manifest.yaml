@@ -276,5 +276,8 @@ push:
   # to the REBASE BRANCH only; main stays protected regardless, guard_push
   # remains the choke point, and ALLOW_PUSH=1 is still required at execution
   rebase_branch_allowed: true
+  # the ONE branch the rebase pipeline may push (parent REBASE_BRANCH) —
+  # the push scope is data; v3_ci refuses any other checkout branch
+  rebase_branch: dev/vllm-align
   # rebase-commit author identity (parent config SIGNOFF_NAME/EMAIL)
   signoff: {name: tzhouam, email: tzhouam@connect.ust.hk}

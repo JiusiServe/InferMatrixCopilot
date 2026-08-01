@@ -88,8 +88,51 @@ def test_buildkite_retry_job_contract():
     assert bk.retry_job("9", "j") == ("new", True)
     bk = BuildkiteCI("t", "o", "p", request=Recorder([(400, {})]))
     assert bk.retry_job("9", "j") == (None, False)   # type can't retry
+    # round-1 review: an API failure is NOT a code failure — mutating-call
+    # policy raises so the monitor records the job structurally instead of
+    # dispatching a mutation agent
     bk = BuildkiteCI("t", "o", "p", request=Recorder([(500, {})]))
-    assert bk.retry_job("9", "j") == (None, True)
+    with pytest.raises(BuildkiteError, match="retry_job failed"):
+        bk.retry_job("9", "j")
+
+
+def test_buildkite_transport_errors_degrade_on_polling_reads():
+    """Round-1 review: _urllib_request raises BuildkiteError on transport
+    (OSError) failures — polling reads must still degrade, not abort a
+    monitor mid-build."""
+    def broken(method, url, body=None, raw=False):
+        raise BuildkiteError("Buildkite API unreachable: boom")
+
+    bk = BuildkiteCI("t", "o", "p", request=broken)
+    assert bk.get_build("9") == {}
+    assert bk.get_job_log("9", "j") == ""
+
+
+def test_src_has_no_python312_only_fstring_quote_reuse():
+    """Round-1 review: requires-python is >=3.11, but a same-quote reuse
+    inside an f-string expression (PEP 701) only parses on 3.12+ — a
+    SyntaxError at import time on 3.11. `ast.parse(feature_version=...)`
+    cannot catch this (tokenizer-level), so scan the token stream."""
+    import io
+    import tokenize
+    src_root = Path(__file__).resolve().parents[1] / "src"
+    offenders = []
+    for path in sorted(src_root.rglob("*.py")):
+        stack: list[str | None] = []
+        with open(path, "rb") as fh:
+            for tok in tokenize.tokenize(fh.readline):
+                if tok.type == tokenize.FSTRING_START:
+                    triple = tok.string.endswith(('"""', "'''"))
+                    stack.append(None if triple else tok.string[-1])
+                elif tok.type == tokenize.FSTRING_END:
+                    stack.pop()
+                elif tok.type == tokenize.STRING and stack:
+                    inner = tok.string.lstrip("rbufRBUF")
+                    if inner and any(q == inner[0] for q in stack if q):
+                        offenders.append(f"{path}:{tok.start[0]}")
+    assert not offenders, (
+        "3.12-only f-string quote reuse (breaks python>=3.11): "
+        + ", ".join(offenders))
 
 
 def test_buildkite_list_jobs_fallbacks():
@@ -180,21 +223,71 @@ def test_monitor_per_job_retry_flaky_recovery():
     assert ci.retry_calls == [("b", "Flaky")]
 
 
-def test_monitor_retry_exhausted_and_nonretryable():
+def test_monitor_retry_nonretryable_type_is_ignored():
     ci = ScriptedCI(
-        snapshots=[{"state": "failed", "jobs": [
-            _job("Hard", "failed", 1), _job("Upload", "failed", 1)]}],
-        logs={"Hard": "FAILED tests/h.py::test_y - x"},
-        retry_results=[(None, False)])   # Upload's type can't retry
+        snapshots=[{"state": "failed",
+                    "jobs": [_job("Upload", "failed", 1)]}],
+        logs={"Upload": "FAILED tests/u.py::t - x"},
+        retry_results=[(None, False)])   # provider: this TYPE can't retry
     out = ci_loop.monitor_build(ci, "b", spec=CIClassifySpec(), poll_sec=0,
                                 retry_max=1, timeout_sec=0,
                                 sleep=lambda s: None)
+    assert out.jobs[0].classification == "ignored"
+
+
+def test_monitor_retry_exhausted_stays_failed():
+    ci = ScriptedCI(
+        snapshots=[
+            {"state": "failed", "jobs": [_job("Hard", "failed", 1)]},
+            {"state": "failed", "jobs": [
+                _job("Hard", "failed", 1, retried=True),
+                _job("Hard", "failed", 1, id="Hard-retry")]},
+        ],
+        logs={"Hard": "FAILED tests/h.py::t - x",
+              "Hard-retry": "FAILED tests/h.py::t - x"},
+        retry_results=[("Hard-retry", True)])
+    out = ci_loop.monitor_build(ci, "b", spec=CIClassifySpec(), poll_sec=0,
+                                retry_max=1, sleep=lambda s: None)
     cls = {j.job_id: j.classification for j in out.jobs}
-    # Hard consumed its retry (got retried=queued? no — scripted returns
-    # (None, False) first for whichever is classified first) — order the
-    # jobs deterministically instead:
-    assert cls["Hard"] in ("failed", "ignored", "retrying")
+    assert cls == {"Hard": "retrying", "Hard-retry": "failed"}
+    assert [j.job_id for j in out.failed_jobs] == ["Hard-retry"]
+
+
+def test_monitor_unobserved_retry_never_passes():
+    """Round-1 review: a retry attempt we requested but never saw again
+    must not leave its original as `retrying` — clean_pass would wave the
+    build through with unfinished work aboard."""
+    ci = ScriptedCI(
+        snapshots=[
+            {"state": "failed", "jobs": [_job("Ghost", "failed", 1)]},
+            # terminal build; the retry job NEVER materializes
+            {"state": "failed",
+             "jobs": [_job("Ghost", "failed", 1, retried=True)]},
+        ],
+        logs={"Ghost": "FAILED tests/g.py::t - x"},
+        retry_results=[("Ghost-retry", True)])
+    out = ci_loop.monitor_build(ci, "b", spec=CIClassifySpec(), poll_sec=0,
+                                timeout_sec=0, retry_max=1,
+                                sleep=lambda s: None)
+    assert out.jobs[0].classification == "incomplete"
     assert not out.clean_pass
+
+
+def test_monitor_retry_api_error_is_structural():
+    """Round-1 review: a retry API failure is neither a pass nor a
+    code-debug dispatch — the job lands `incomplete` (structural)."""
+    class RaisingRetry(ScriptedCI):
+        def retry_job(self, build_id, job_id):
+            raise BuildkiteError("retry_job failed: HTTP 500")
+
+    ci = RaisingRetry(
+        snapshots=[{"state": "failed", "jobs": [_job("Flap", "failed", 1)]}],
+        logs={"Flap": "FAILED tests/f.py::t - x"})
+    out = ci_loop.monitor_build(ci, "b", spec=CIClassifySpec(), poll_sec=0,
+                                timeout_sec=0, retry_max=2,
+                                sleep=lambda s: None)
+    assert out.jobs[0].classification == "incomplete"
+    assert not out.failed_jobs and not out.clean_pass
 
 
 def test_monitor_soft_failed_and_broken_are_ignored():
@@ -609,3 +702,100 @@ def test_commit_and_push_pin_none_skips_dockerfile_preflight(tmp_path):
         author_name="a", author_email="a@b", protected_branches=["main"],
         wal_dir=tmp_path / "wal", op_id="op1", allowed=False)
     assert not out.pushed and "denied" in out.reason
+
+
+# ── round-1 review regressions: resume, digest, abort cleanup ────────────────
+
+def test_rounds_resume_never_reuses_op_ids(tmp_path):
+    """A resumed invocation starts op indices AFTER the durable ledger's
+    highest — round zero of the re-entry must not collide with the crashed
+    run's `-r0` operations (op ids are single-use identities)."""
+    seed = RoundsCI([{"state": "failed", "jobs": []}])
+    ci_loop.create_build_guarded(
+        seed, tmp_path / "ops", op_id="run-1-ci-r0", run_id="run-1",
+        purpose="initial", branch="dev", commit="c" * 40, message="m")
+    assert ci_loop.op_index_base(
+        ci_loop.load_ops(tmp_path / "ops"), "run-1") == 1
+    # foreign run ids never shift this run's base
+    assert ci_loop.op_index_base(
+        ci_loop.load_ops(tmp_path / "ops"), "run-2") == 0
+
+    ci = RoundsCI([{"state": "passed",
+                    "jobs": [_job("Green", "passed", 0)]}])
+    result, push_calls = _rounds(ci, tmp_path)
+    assert result.result == "passed"
+    # the resumed run pushed and built under index 1, not 0
+    assert push_calls == [1]
+    assert sorted(o.op_id for o in ci_loop.load_ops(tmp_path / "ops")) == \
+        ["run-1-ci-r0", "run-1-ci-r1"]
+
+
+def test_worktree_digest_sees_content_edits_porcelain_misses(tmp_path):
+    """`status --porcelain` output is identical before/after a content
+    edit to an ALREADY-dirty or untracked file — the digest must not
+    be."""
+    import subprocess
+
+    from infermatrix_copilot.engine.steps.rebase_v3 import _worktree_digest
+    repo = tmp_path / "r"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", repo], check=True)
+    (repo / "a.py").write_text("x = 1\n")
+    subprocess.run(["git", "-C", repo, "add", "-A"], check=True)
+    subprocess.run(["git", "-C", repo, "-c", "user.name=t", "-c",
+                    "user.email=t@t", "commit", "-qm", "seed"], check=True)
+
+    (repo / "a.py").write_text("x = 2\n")           # dirty
+    d1 = _worktree_digest(repo)
+    (repo / "a.py").write_text("x = 3\n")           # SAME porcelain line
+    d2 = _worktree_digest(repo)
+    assert d1 != d2
+
+    (repo / "new.py").write_text("n = 1\n")          # untracked
+    d3 = _worktree_digest(repo)
+    (repo / "new.py").write_text("n = 2\n")          # SAME porcelain line
+    d4 = _worktree_digest(repo)
+    assert d3 != d4
+    # and an unchanged tree digests stably
+    assert _worktree_digest(repo) == d4
+
+
+def test_cancel_owned_active_builds_on_abort(tmp_path):
+    """Abort cleanup cancels ONLY our still-active op-recorded builds:
+    terminal builds and adopted (ledger-less) builds are untouched, and a
+    second invocation is idempotent."""
+    from infermatrix_copilot.engine.steps.rebase_v3 import \
+        _cancel_owned_active_builds
+
+    class AbortCI(RoundsCI):
+        def __init__(self, bodies):
+            super().__init__(bodies)
+            self.cancelled: list[str] = []
+
+        def cancel_build(self, build_id):
+            self.cancelled.append(build_id)
+            self.builds[build_id]["state"] = "canceled"
+            return self.builds[build_id]
+
+    ci = AbortCI([{"state": "running", "jobs": []},
+                  {"state": "failed", "jobs": []}])
+    ci_loop.create_build_guarded(ci, tmp_path / "ops", op_id="r-ci-r0",
+                                 run_id="r", purpose="initial",
+                                 branch="dev", commit="c" * 40,
+                                 message="m")
+    ci_loop.create_build_guarded(ci, tmp_path / "ops", op_id="r-ci-r1",
+                                 run_id="r", purpose="retry",
+                                 branch="dev", commit="c" * 40,
+                                 message="m")
+    # an adopted build exists in the provider but NOT in the ledger
+    ci.builds["adopted"] = {"id": "adopted", "state": "running",
+                            "meta_data": {}}
+    events = []
+    got = _cancel_owned_active_builds(ci, tmp_path / "ops",
+                                      trace=lambda e, **kw:
+                                      events.append((e, kw)))
+    assert got == ["b1"] and ci.cancelled == ["b1"]      # running only
+    assert ci.builds["adopted"]["state"] == "running"    # never touched
+    assert events[0][0] == "ci_build_cancelled_on_abort"
+    # idempotent: the cancelled op is consumed in the ledger
+    assert _cancel_owned_active_builds(ci, tmp_path / "ops") == []
