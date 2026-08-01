@@ -498,6 +498,65 @@ def test_rounds_schedule_build_at_owned_commit_is_foreign(tmp_path):
     assert push_calls == [0, 1]
 
 
+def test_rounds_adopted_build_id_confers_no_push_ownership(tmp_path):
+    """Verification round 1: an adopted build is monitor-only — its id
+    must NOT join the ownership set, or a debug-fix push after a
+    monitor-timeout would cancel the still-running adopted build."""
+    sibling = {"id": "s1", "number": 3, "state": "failed",
+               "commit": "c" * 40, "web_url": "u/s1", "source": "api",
+               "jobs": [_job("Red", "failed", 1),
+                        _job("Hung", "running")]}
+    ci = RoundsCI([{"state": "not_run", "jobs": []}], siblings=[sibling])
+    ci.logs["Red"] = "FAILED tests/r.py::t - x"
+    calls = {"n": 0}
+
+    def latest_builds(branch, states=(), per_page=30):
+        calls["n"] += 1
+        # round 0 pre-push: nothing active; before the fix push, the
+        # adopted build is STILL running (monitor hit its deadline)
+        return [] if calls["n"] == 1 else \
+            [{"id": "s1", "number": 3, "state": "running",
+              "commit": "c" * 40, "source": "api"}]
+
+    ci.latest_builds = latest_builds
+
+    async def debug(jr):
+        return True
+
+    result, push_calls = _rounds(ci, tmp_path, changes=[True], debug=debug)
+    assert result.result == "refused" and "does not own" in result.reason
+    assert push_calls == [0]            # the fix push never happened
+
+
+def test_rounds_same_commit_full_suite_build_adopted_on_initial(tmp_path):
+    """Verification round 1: a schedule/api build that appeared at the
+    just-pushed commit during the settle window is ADOPTED on the initial
+    round too — creating over it would cancel a build this run does not
+    own (only webhook artifacts of our own push are built over)."""
+    ci = RoundsCI([])
+    ci.siblings = [{"id": "sched1", "number": 4, "state": "passed",
+                    "commit": "c" * 40, "source": "schedule",
+                    "jobs": [_job("Green", "passed", 0)]}]
+    calls = {"n": 0}
+
+    def latest_builds(branch, states=(), per_page=30):
+        calls["n"] += 1
+        # pre-push scan: quiet; the schedule build appears during the
+        # settle window, so the acquire-time scan sees it
+        return [] if calls["n"] == 1 else \
+            [{"id": "sched1", "number": 4, "state": "running",
+              "commit": "c" * 40, "source": "schedule",
+              "web_url": "u/sched1"}]
+
+    ci.latest_builds = latest_builds
+    result, push_calls = _rounds(ci, tmp_path)
+    assert result.result == "passed"
+    assert ci.created == 0              # adopted, never created over
+    assert [(r.purpose, r.adopted) for r in result.rounds] == \
+        [("adopted", True)]
+    assert ci_loop.load_ops(tmp_path / "ops") == []
+
+
 def test_monitor_clean_pass_guards():
     # zero job signal is never a pass
     ci = ScriptedCI(snapshots=[{"state": "passed", "jobs": []}])
@@ -833,8 +892,9 @@ def test_rounds_incomplete_only_rebuilds_then_adopts_same_commit(tmp_path):
 
     def latest_builds(branch, states=(), per_page=30):
         calls["n"] += 1
-        # round 0: nothing active; round 1 (rebuild): the webhook sibling
-        return [] if calls["n"] == 1 else [active_view]
+        # round 0 (pre-push scan + acquire): nothing active; round 1
+        # (rebuild acquire): the full-suite sibling has appeared
+        return [] if calls["n"] <= 2 else [active_view]
 
     ci.latest_builds = latest_builds
     result, push_calls = _rounds(ci, tmp_path, max_retries=1)

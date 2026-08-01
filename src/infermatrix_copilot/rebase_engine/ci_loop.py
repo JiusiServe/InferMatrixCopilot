@@ -800,14 +800,15 @@ def _acquire_build(client: CIClient, ops_dir: Path, *, run_id: str,
     - an ACTIVE build on the branch at a DIFFERENT commit refuses creation
       outright — with cancel-running-branch-builds pipeline semantics our
       new build would cancel a build we do not own;
-    - on a `rebuild` round (no code changes), an active build at the SAME
-      commit is ADOPTED (monitor-only) instead of duplicated — we never
-      cancel or rebuild a build we did not create;
+    - an active FULL-SUITE (schedule/api) build at the SAME commit is
+      ADOPTED (monitor-only) on every round purpose instead of duplicated
+      — we never cancel or rebuild a build we did not create;
     - after a fresh push (`initial`/`retry`), we deliberately create our
-      own build even if the push's webhook build is active at the commit:
+      own build even if the push's WEBHOOK build is active at the commit:
       only OUR build carries the trigger env's opt-in suite, and by the
       settle-then-create ordering ours is the newest build, which the
-      pipeline's skip rules keep (the webhook one is skipped as older).
+      pipeline's skip rules keep (the webhook one is skipped as older —
+      our own push's artifact either way).
 
     Creation itself goes through the §3.2 guarded op ledger — and BEFORE
     any new operation, THIS run's unresolved prior ops are settled
@@ -838,17 +839,21 @@ def _acquire_build(client: CIClient, ops_dir: Path, *, run_id: str,
     active = [b for b in client.latest_builds(branch,
                                               states=_ACTIVE_BUILD_STATES)
               if str(b.get("state", "")) not in BUILD_NO_RUN_STATES]
-    # rebuild-round adoption qualifies only FULL-SUITE sources (round-4
+    # same-commit adoption qualifies only FULL-SUITE sources (round-4
     # review): a partial webhook sibling is not evidence — we create our
     # own env-carrying build instead (cancelling our own push's webhook
-    # build via pipeline skip semantics is ours to accept)
+    # build via pipeline skip semantics is ours to accept). A QUALIFYING
+    # same-commit build is adopted on EVERY round purpose (verification
+    # round 1): during the settle window a schedule/api build can start
+    # at the just-pushed commit, and creating over it would cancel a
+    # build this run does not own.
     same = [b for b in active if str(b.get("commit", "")) == commit
             and str(b.get("source", "")) in ("schedule", "api")]
     foreign = _foreign_active(active, owned_commits, owned_ids,
                               exclude_commit=commit)
     if foreign is not None:
         return None, _foreign_refusal(foreign, branch)
-    if same and purpose == "rebuild":
+    if same:
         b = same[0]
         return CIBuildRound(purpose="adopted", build_id=str(b.get("id", "")),
                             build_url=str(b.get("web_url", "")),
@@ -993,7 +998,10 @@ async def run_ci_rounds(*, client: CIClient, ops_dir: Path, run_id: str,
         if rec is None:
             return CIRunResult("refused", reason=refusal, rounds=rounds,
                                fixed_jobs=fixed_all)
-        if rec.build_id:
+        # ONLY op-recorded builds join the ownership set — an adopted
+        # build is monitor-only, and exempting its id would let a later
+        # fix push cancel it (verification round 1)
+        if rec.build_id and not rec.adopted:
             owned_ids.add(rec.build_id)
         rounds.append(rec)
         _trace("ci_build", round=rnd, purpose=rec.purpose,
