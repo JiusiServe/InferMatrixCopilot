@@ -1591,6 +1591,8 @@ async def _v3_ci(ctx: StepContext) -> StepResult:
             ci_cfg.get("ignorable_name_patterns") or ()),
         ignorable_log_patterns=tuple(
             ci_cfg.get("ignorable_log_patterns") or ()),
+        structural_name_patterns=tuple(
+            ci_cfg.get("structural_name_patterns") or ()),
         extra_exception_names=tuple(
             ci_cfg.get("extra_exception_names") or ()),
         baseline=baseline, baseline_log_fn=baseline_log_fn)

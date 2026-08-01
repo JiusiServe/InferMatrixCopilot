@@ -231,16 +231,20 @@ def test_monitor_per_job_retry_flaky_recovery():
     assert ci.retry_calls == [("b", "Flaky")]
 
 
-def test_monitor_retry_nonretryable_type_is_ignored():
+def test_monitor_retry_nonretryable_type_stays_failed():
+    """Round-4 review: a failed job whose TYPE the provider refuses to
+    retry (HTTP 400) has still failed — the parent's ignored_infra here
+    was a false-green vector."""
     ci = ScriptedCI(
         snapshots=[{"state": "failed",
-                    "jobs": [_job("Upload", "failed", 1)]}],
-        logs={"Upload": "FAILED tests/u.py::t - x"},
+                    "jobs": [_job("Odd Lane", "failed", 1)]}],
+        logs={"Odd Lane": "FAILED tests/u.py::t - x"},
         retry_results=[(None, False)])   # provider: this TYPE can't retry
     out = ci_loop.monitor_build(ci, "b", spec=CIClassifySpec(), poll_sec=0,
                                 retry_max=1, timeout_sec=0,
                                 sleep=lambda s: None)
-    assert out.jobs[0].classification == "ignored"
+    assert out.jobs[0].classification == "failed"
+    assert not out.clean_pass
 
 
 def test_monitor_retry_exhausted_stays_failed():
@@ -369,24 +373,75 @@ def test_monitor_baseline_same_and_different_root_cause():
     assert cls == {"Lane A": "ignored_baseline", "Lane B": "failed"}
 
 
-def test_monitor_baseline_lenient_defaults():
-    """Missing baseline coordinates / missing baseline log / empty current
-    signature ⇒ same-cause (parent-documented lenient default)."""
+def test_monitor_baseline_fails_closed_on_missing_evidence():
+    """Round-4 review (deliberate divergence from the parent's lenient
+    defaults): missing baseline coordinates, an unavailable baseline log,
+    or an empty current signature mean the comparison CANNOT be made —
+    the failure stays actionable, never waved through as pre-existing."""
+    log = "RuntimeError: boom\nFAILED tests/c.py::t - x"
+    # no baseline job/build coordinates
     baseline = (BaselineFailure(name="lane c", exit_status=1),)
     ci = ScriptedCI(snapshots=[{"state": "failed", "jobs": [
-        _job("Lane C", "failed", 1)]}],
-        logs={"Lane C": "FAILED tests/c.py::t - x"})
-    out = ci_loop.monitor_build(ci, "b", spec=CIClassifySpec(
-        baseline=baseline), poll_sec=0, timeout_sec=0, sleep=lambda s: None)
-    assert out.jobs[0].classification == "ignored_baseline"
-    # exit-status mismatch means NO baseline match at all
-    baseline = (BaselineFailure(name="lane c", exit_status=2),)
-    ci = ScriptedCI(snapshots=[{"state": "failed", "jobs": [
-        _job("Lane C", "failed", 1)]}],
-        logs={"Lane C": "FAILED tests/c.py::t - x"})
+        _job("Lane C", "failed", 1)]}], logs={"Lane C": log})
     out = ci_loop.monitor_build(ci, "b", spec=CIClassifySpec(
         baseline=baseline), poll_sec=0, timeout_sec=0, sleep=lambda s: None)
     assert out.jobs[0].classification == "failed"
+    # baseline log unavailable (API outage degrades log reads to "")
+    baseline = (BaselineFailure(name="lane c", exit_status=1,
+                                job_id="mainC", build_id="mb"),)
+    ci = ScriptedCI(snapshots=[{"state": "failed", "jobs": [
+        _job("Lane C", "failed", 1)]}], logs={"Lane C": log})
+    out = ci_loop.monitor_build(ci, "b", spec=CIClassifySpec(
+        baseline=baseline), poll_sec=0, timeout_sec=0, sleep=lambda s: None)
+    assert out.jobs[0].classification == "failed"
+    # empty CURRENT signature: nothing to compare — still actionable
+    ci = ScriptedCI(snapshots=[{"state": "failed", "jobs": [
+        _job("Lane C", "failed", 1)]}],
+        logs={"Lane C": "no recognizable error grammar here",
+              "mainC": log})
+    out = ci_loop.monitor_build(ci, "b", spec=CIClassifySpec(
+        baseline=baseline), poll_sec=0, timeout_sec=0, sleep=lambda s: None)
+    assert out.jobs[0].classification == "failed"
+    # exit-status mismatch means NO baseline match at all
+    baseline = (BaselineFailure(name="lane c", exit_status=2,
+                                job_id="mainC", build_id="mb"),)
+    ci = ScriptedCI(snapshots=[{"state": "failed", "jobs": [
+        _job("Lane C", "failed", 1)]}], logs={"Lane C": log})
+    out = ci_loop.monitor_build(ci, "b", spec=CIClassifySpec(
+        baseline=baseline), poll_sec=0, timeout_sec=0, sleep=lambda s: None)
+    assert out.jobs[0].classification == "failed"
+
+
+def test_monitor_structural_suite_creation_failure_never_ignored():
+    """Round-4 review: a failed pipeline upload/load lane suppressed every
+    dynamic test job — STRUCTURAL (incomplete), even though its name would
+    otherwise be ignorable in the parent; and a build whose only jobs are
+    ignored can never pass (zero jobs actually PASSED)."""
+    spec = CIClassifySpec(
+        ignorable_name_patterns=("(?i)statistics",),
+        structural_name_patterns=(r"(?i):pipeline:\s*(upload|load)",))
+    ci = ScriptedCI(snapshots=[{"state": "failed", "jobs": [
+        _job(":pipeline: upload", "failed", 1),
+        _job("Testcase Statistics", "failed", 1)]}])
+    out = ci_loop.monitor_build(ci, "b", spec=spec, poll_sec=0,
+                                timeout_sec=0, sleep=lambda s: None)
+    cls = {j.name: j.classification for j in out.jobs}
+    assert cls == {":pipeline: upload": "incomplete",
+                   "Testcase Statistics": "ignored"}
+    assert not out.clean_pass
+    # a PASSED upload lane stays unremarkable (passed)
+    ci = ScriptedCI(snapshots=[{"state": "passed", "jobs": [
+        _job(":pipeline: upload", "passed", 0),
+        _job("Real Test", "passed", 0)]}])
+    out = ci_loop.monitor_build(ci, "b", spec=spec, poll_sec=0,
+                                sleep=lambda s: None)
+    assert out.clean_pass
+    # all-ignored build (nothing actually PASSED) is never clean
+    ci = ScriptedCI(snapshots=[{"state": "failed", "jobs": [
+        _job("Testcase Statistics", "failed", 1)]}])
+    out = ci_loop.monitor_build(ci, "b", spec=spec, poll_sec=0,
+                                timeout_sec=0, sleep=lambda s: None)
+    assert not out.clean_pass
 
 
 def test_monitor_clean_pass_guards():
@@ -432,9 +487,14 @@ def test_pick_best_build_and_baseline_fetch():
     assert ci_loop.pick_best_build([]) is None
 
     class BaselineClient:
+        def __init__(self, builds):
+            self.builds = builds
+
         def latest_builds(self, branch, states=(), per_page=30):
-            assert states == ("failed",)
-            return builds
+            # round-4 review: COMPLETED builds, not failed-only — a stale
+            # failed build must not outlive a newer green baseline run
+            assert states == ("passed", "failed")
+            return self.builds
 
         def list_jobs(self, build_id):
             assert build_id == "3"
@@ -443,10 +503,18 @@ def test_pick_best_build_and_baseline_fetch():
                     _job("Green", "passed", 0, id="jG"),
                     _job("", "failed", 1, id="jNoName")]
 
-    got = ci_loop.fetch_baseline_failures(BaselineClient(), "main")
+    got = ci_loop.fetch_baseline_failures(BaselineClient(builds), "main")
     assert got == (BaselineFailure("lane a", 1, "jA", "3"),
                    # the parent's `or -1` encoding: exit 0/None ⇒ -1
                    BaselineFailure("zero exit", -1, "jZ", "3"))
+    # round-4 review: a NEWER green run on the same trust tier wins — the
+    # stale failed build contributes NO baseline (its failures are fixed)
+    fresh_green = [
+        {"id": "9", "number": 9, "state": "passed", "source": "schedule"},
+        {"id": "3", "number": 3, "state": "failed", "source": "schedule"},
+    ]
+    assert ci_loop.fetch_baseline_failures(
+        BaselineClient(fresh_green), "main") == ()
 
 
 # ── run_ci_rounds ────────────────────────────────────────────────────────────
@@ -578,6 +646,7 @@ def test_rounds_refuses_foreign_active_build_before_push(tmp_path):
 def test_rounds_no_run_adopts_sibling_else_no_signal(tmp_path):
     sibling = {"id": "s1", "number": 3, "state": "passed",
                "commit": "c" * 40, "web_url": "u/s1",
+               "source": "schedule",
                "jobs": [_job("Green", "passed", 0)]}
     ci = RoundsCI([{"state": "not_run", "jobs": []}], siblings=[sibling])
     result, _ = _rounds(ci, tmp_path)
@@ -592,6 +661,38 @@ def test_rounds_no_run_adopts_sibling_else_no_signal(tmp_path):
     result, _ = _rounds(ci, tmp_path)
     assert result.result == "no_signal"
     assert "not going to be tested" in result.reason
+
+
+def test_rounds_partial_webhook_sibling_is_not_evidence(tmp_path):
+    """Round-4 review: a webhook/manual sibling runs WITHOUT the trigger
+    env's opt-in suite — a passing partial build must never green-light
+    the commit; only schedule/api sources qualify for adoption."""
+    webhook = {"id": "s1", "number": 3, "state": "passed",
+               "commit": "c" * 40, "web_url": "u/s1",
+               "source": "webhook",
+               "jobs": [_job("Green", "passed", 0)]}
+    ci = RoundsCI([{"state": "not_run", "jobs": []}], siblings=[webhook])
+    result, _ = _rounds(ci, tmp_path)
+    assert result.result == "no_signal"
+
+
+def test_rounds_adopted_builds_are_never_retried(tmp_path):
+    """Round-4 review: adopted = monitor-only (§3.2) — retry_job must
+    never mutate a build with no ownership record, even with retry budget
+    configured."""
+    sibling = {"id": "s1", "number": 3, "state": "failed",
+               "commit": "c" * 40, "web_url": "u/s1", "source": "api",
+               "jobs": [_job("Red", "failed", 1)]}
+
+    class NoRetry(RoundsCI):
+        def retry_job(self, build_id, job_id):
+            raise AssertionError("retry_job called on an adopted build")
+
+    ci = NoRetry([{"state": "not_run", "jobs": []}], siblings=[sibling])
+    ci.logs["Red"] = "FAILED tests/r.py::t - x"
+    result, _ = _rounds(ci, tmp_path, job_retry_max=2)
+    assert result.result == "failed"
+    assert result.unfixed_jobs == ["Red"]
 
 
 def test_rounds_debug_fix_then_green_second_build(tmp_path):
@@ -665,9 +766,10 @@ def test_rounds_budget_timeout_is_operator_problem(tmp_path):
 def test_rounds_incomplete_only_rebuilds_then_adopts_same_commit(tmp_path):
     """No code changes + unfinished jobs ⇒ a rebuild round; an ACTIVE build
     at the same commit is adopted (monitor-only) instead of duplicated."""
-    # adopt-time view (still running) vs monitor-time view (finished green)
+    # adopt-time view (still running) vs monitor-time view (finished
+    # green); a full-suite source — partial webhook siblings don't qualify
     active_view = {"id": "w1", "number": 8, "state": "running",
-                   "commit": "c" * 40, "web_url": "u/w1"}
+                   "commit": "c" * 40, "web_url": "u/w1", "source": "api"}
     finished_view = {"id": "w1", "number": 8, "state": "passed",
                      "commit": "c" * 40, "web_url": "u/w1",
                      "jobs": [_job("Hung", "passed", 0)]}

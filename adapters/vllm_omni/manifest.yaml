@@ -150,11 +150,14 @@ rebase:
     # verbatim): opts the FULL suite in — a webhook build without these
     # runs fewer tests, which is why pushed rounds create their own build
     build_env: {NIGHTLY: "1", RUN_HUNYUAN_IMAGE3_PERF: "1"}
-    # monitor classification data (parent monitor.py constants, verbatim)
+    # monitor classification data (parent monitor.py constants — EXCEPT
+    # the pipeline upload/load lanes, moved to structural: their failure
+    # suppresses every dynamic test job, so ignoring it was a false-green
+    # vector in the parent; deliberate divergence, 2026-08-01 review)
     ignorable_name_patterns: ["(?i)testcase statistics",
-                              "(?i)collection & email",
-                              "(?i):pipeline:\\s*(upload|load)",
-                              "(?i)(upload|load).*pipeline"]
+                              "(?i)collection & email"]
+    structural_name_patterns: ["(?i):pipeline:\\s*(upload|load)",
+                               "(?i)(upload|load).*pipeline"]
     ignorable_log_patterns: ["401 Unauthorized", "gated model",
                              "HFValidationError", "RepositoryNotFoundError"]
     extra_exception_names: [ChatTemplateResolutionError, OmniEngineDeadError]

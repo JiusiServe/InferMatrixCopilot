@@ -264,10 +264,14 @@ class MonitorOutcome:
         (`passed`, or `failed` with every failure explained away) can be
         clean: a canceled/blocked/refused build may have prevented later
         dynamic jobs from ever appearing, so its visible green jobs prove
-        nothing (round-3 review)."""
+        nothing (round-3 review). At least one job must have actually
+        PASSED — a build whose every job was ignored proves nothing either
+        (round-4 review: a failed suite-creation step plus ignores must
+        not read green)."""
         return (self.build_state in ("passed", "failed")
                 and self.reconciled
-                and bool(self.jobs) and not self.failed_jobs
+                and any(j.classification == "passed" for j in self.jobs)
+                and not self.failed_jobs
                 and not self.incomplete_jobs and not self.budget_timeouts)
 
 
@@ -289,6 +293,11 @@ class CIClassifySpec:
     exception names extend the error-signature grammar, and the baseline of
     pre-existing failures on the default branch.
 
+    `structural_name_patterns` name the SUITE-CREATION lanes (pipeline
+    upload/load steps): their failure suppresses every dynamic test job,
+    so it is STRUCTURAL (incomplete), never ignorable (round-4 review —
+    a deliberate divergence from the parent, which ignored them).
+
     `baseline_log_fn` fetches a BASELINE job's log — the baseline lives on
     a DIFFERENT pipeline than the build under test, so the monitor's own
     client cannot resolve its build ids (round-2 review: asking the wrong
@@ -297,6 +306,7 @@ class CIClassifySpec:
 
     ignorable_name_patterns: Sequence[str] = ()
     ignorable_log_patterns: Sequence[str] = ()
+    structural_name_patterns: Sequence[str] = ()
     extra_exception_names: Sequence[str] = ()
     baseline: Sequence[BaselineFailure] = ()
     baseline_log_fn: Callable[[str, str], str] | None = None
@@ -327,22 +337,27 @@ def _baseline_match(spec: CIClassifySpec, name: str,
 
 def _same_root_cause(client: CIClient, entry: BaselineFailure,
                      log_text: str, spec: CIClassifySpec, log_dir) -> bool:
-    """Parent-parity root-cause comparison against the baseline job's log:
-    identical normalized error signatures, or identical (non-empty) failing
-    pytest node-id sets, mean the same pre-existing failure. Missing
-    baseline coordinates/log or an empty current signature are treated as
-    the same cause (the parent's documented lenient default)."""
+    """Root-cause comparison against the baseline job's log: identical
+    normalized error signatures, or identical (non-empty) failing pytest
+    node-id sets, mean the same pre-existing failure.
+
+    FAIL-CLOSED on missing evidence (round-4 review — a deliberate
+    divergence from the parent's lenient defaults): missing baseline
+    coordinates, an unavailable baseline log (log retrieval degrades to
+    "" during API outages), or an empty current signature all mean the
+    comparison CANNOT be made — the failure stays actionable rather than
+    being waved through as pre-existing."""
     if not entry.job_id or not entry.build_id:
-        return True
+        return False
     fetch = spec.baseline_log_fn or client.get_job_log
     main_log = fetch(entry.build_id, entry.job_id)
     if not main_log:
-        return True
+        return False
     _save_job_log(log_dir, f"baseline_{entry.name}", main_log)
     cur_sig = extract_error_signature(log_text or "",
                                       spec.extra_exception_names)
     if not cur_sig:
-        return True
+        return False
     main_sig = extract_error_signature(main_log, spec.extra_exception_names)
     if cur_sig == main_sig:
         return True
@@ -361,7 +376,15 @@ def _classify_terminal(client: CIClient, build_id: str, job: dict,
     jr = JobResult(name=name, job_id=str(job.get("id", "")),
                    state=str(job.get("state", "")),
                    exit_status=int(raw_exit or 0))
-    if any(re.search(p, name) for p in spec.ignorable_name_patterns):
+    passed_like = jr.state == "passed" or (jr.state == "finished"
+                                           and raw_exit == 0)
+    if not passed_like and any(re.search(p, name)
+                               for p in spec.structural_name_patterns):
+        # a failed SUITE-CREATION lane (pipeline upload/load) suppressed
+        # every dynamic test job — structural, never ignorable (round-4
+        # review)
+        jr.classification = "incomplete"
+    elif any(re.search(p, name) for p in spec.ignorable_name_patterns):
         jr.classification = "ignored"
     elif jr.state == "broken":
         # the provider could not start the job (unmet condition, missing
@@ -461,10 +484,9 @@ def monitor_build(client: CIClient, build_id: str, *,
                 if new_id:
                     jr.classification = "retrying"
                     expected_retries[str(new_id)] = jr
-                elif not retryable:
-                    # the provider refuses retries for this job TYPE
-                    # (pipeline upload / trigger steps) — infra
-                    jr.classification = "ignored"
+                # a non-retryable TYPE (HTTP 400) changes nothing: the
+                # failure stands as `failed` — the parent's ignored_infra
+                # here was a false-green vector (round-4 review)
             jobs_out.append(jr)
         pending = sum(1 for j in jobs
                       if str(j.get("state", "")) in PENDING_JOB_STATES)
@@ -646,13 +668,20 @@ def pick_best_build(builds: Sequence[dict]) -> dict | None:
 
 def fetch_baseline_failures(client: CIClient,
                             branch: str) -> tuple[BaselineFailure, ...]:
-    """Pre-existing failures on the baseline pipeline's `branch`: the best
-    recent failed build's failed/broken/timed_out jobs, with coordinates so
-    the monitor can root-cause-compare logs. The CLIENT is scoped to the
-    BASELINE pipeline (adapter data), not the build-under-test's."""
-    builds = client.latest_builds(branch, states=("failed",), per_page=10)
+    """Pre-existing failures on the baseline pipeline's `branch`, with
+    coordinates so the monitor can root-cause-compare logs. The CLIENT is
+    scoped to the BASELINE pipeline (adapter data), not the
+    build-under-test's.
+
+    The best trustworthy COMPLETED build is selected first (schedule >
+    api > completed > newest) and failures are extracted only when THAT
+    build failed — querying failed builds alone would resurrect stale
+    failures that a newer green baseline run already proved fixed
+    (round-4 review)."""
+    builds = client.latest_builds(branch, states=("passed", "failed"),
+                                  per_page=10)
     build = pick_best_build(builds)
-    if not build:
+    if not build or str(build.get("state", "")) != "failed":
         return ()
     build_id = str(build.get("id", ""))
     out: list[BaselineFailure] = []
@@ -798,7 +827,12 @@ def _acquire_build(client: CIClient, ops_dir: Path, *, run_id: str,
     active = [b for b in client.latest_builds(branch,
                                               states=_ACTIVE_BUILD_STATES)
               if str(b.get("state", "")) not in BUILD_NO_RUN_STATES]
-    same = [b for b in active if str(b.get("commit", "")) == commit]
+    # rebuild-round adoption qualifies only FULL-SUITE sources (round-4
+    # review): a partial webhook sibling is not evidence — we create our
+    # own env-carrying build instead (cancelling our own push's webhook
+    # build via pipeline skip semantics is ours to accept)
+    same = [b for b in active if str(b.get("commit", "")) == commit
+            and str(b.get("source", "")) in ("schedule", "api")]
     foreign = _foreign_active(active, owned_commits, owned_ids,
                               exclude_commit=commit)
     if foreign is not None:
@@ -818,10 +852,13 @@ def _acquire_build(client: CIClient, ops_dir: Path, *, run_id: str,
 
 def _best_sibling(client: CIClient, branch: str, commit: str,
                   exclude_id: str) -> dict | None:
-    """The sibling build at (branch, commit) most likely to carry real test
-    signal — webhook/scheduled builds the pipeline ran while refusing ours.
-    Preference: active first, then finished, then job count (parent
-    parity). Adopted builds are monitor-only."""
+    """The sibling build at (branch, commit) most likely to carry FULL
+    test signal after the pipeline refused ours. Only `schedule`/`api`
+    sources qualify (round-4 review — a deliberate narrowing of the
+    parent): webhook/manual builds run WITHOUT the trigger env's opt-in
+    suite, so a passing partial build must never green-light the commit.
+    Preference among qualifying siblings: active first, then finished,
+    then job count. Adopted builds are monitor-only."""
     def _rank(b: dict) -> tuple:
         state = str(b.get("state", ""))
         return (state in _ACTIVE_BUILD_STATES,
@@ -830,7 +867,8 @@ def _best_sibling(client: CIClient, branch: str, commit: str,
 
     candidates = [b for b in client.builds_for_commit(branch, commit)
                   if str(b.get("state", "")) not in BUILD_NO_RUN_STATES
-                  and str(b.get("id", "")) != exclude_id]
+                  and str(b.get("id", "")) != exclude_id
+                  and str(b.get("source", "")) in ("schedule", "api")]
     return max(candidates, key=_rank) if candidates else None
 
 
@@ -952,7 +990,10 @@ async def run_ci_rounds(*, client: CIClient, ops_dir: Path, run_id: str,
         outcome = await asyncio.to_thread(
             monitor_build, client, rec.build_id, spec=spec,
             poll_sec=poll_sec, timeout_sec=timeout_sec,
-            retry_max=job_retry_max, log_dir=log_dir, sleep=sleep, now=now)
+            # adopted = MONITOR-ONLY (§3.2): never retry_job a build this
+            # run cannot prove it created (round-4 review)
+            retry_max=0 if rec.adopted else job_retry_max,
+            log_dir=log_dir, sleep=sleep, now=now)
         if outcome.no_run:
             rec.build_state = outcome.build_state
             _trace("ci_build_refused", build=rec.build_id,
@@ -976,7 +1017,7 @@ async def run_ci_rounds(*, client: CIClient, ops_dir: Path, run_id: str,
             outcome = await asyncio.to_thread(
                 monitor_build, client, rec.build_id, spec=spec,
                 poll_sec=poll_sec, timeout_sec=timeout_sec,
-                retry_max=job_retry_max, log_dir=log_dir, sleep=sleep,
+                retry_max=0, log_dir=log_dir, sleep=sleep,
                 now=now)
         _record_outcome(rec, outcome)
         if outcome.clean_pass:
