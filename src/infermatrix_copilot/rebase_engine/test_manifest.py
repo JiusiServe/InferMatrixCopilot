@@ -62,6 +62,10 @@ class ManifestSpec:
     # changes — a repo on `master` or a non-`tests/` layout supplies its own
     baseline_ref: str = "origin/main"
     test_change_roots: Sequence[str] = ("tests/",)
+    # which files the live-tree index (basename/suffix-family path
+    # correction) covers — the parent indexed .py only; a non-Python
+    # repo declares its own (2026-08-01 neutrality audit)
+    file_index_suffixes: Sequence[str] = (".py",)
 
     @classmethod
     def from_manifest(cls, manifest: Mapping) -> "ManifestSpec":
@@ -90,6 +94,8 @@ class ManifestSpec:
                           f"/{(manifest.get('repo') or {}).get('default_branch', 'main')}"),
             test_change_roots=tuple(tm.get("test_change_roots")
                                     or ("tests/",)),
+            file_index_suffixes=tuple(tm.get("file_index_suffixes")
+                                      or (".py",)),
         )
 
 
@@ -445,7 +451,7 @@ def _validate_file_paths(jobs: list[ManifestJob], repo: Path,
             continue
         for dp, _, fnames in os.walk(str(base)):
             for fn in fnames:
-                if fn.endswith(".py"):
+                if fn.endswith(tuple(spec.file_index_suffixes)):
                     rel = str((Path(dp) / fn).relative_to(repo))
                     index.setdefault(fn, []).append(rel)
                     all_files.append(rel)

@@ -42,6 +42,9 @@ WIDGET_MANIFEST = {
              "remote": "upstream", "language": "go"},
     "upstream": {"kind": "fork_tracking",
                  "repo_path": "${WIDGETLIB_UPSTREAM}", "remote": "origin"},
+    # the playbook requires ci.provider — capability data only (no
+    # live CI runs in report_only/local_ci)
+    "ci": {"provider": "buildkite", "org": "widgets"},
     "modules": {
         "parser": {"local_paths": ["widget/parser/"],
                    "upstream_paths": ["lib/parser/"],
@@ -60,6 +63,8 @@ WIDGET_MANIFEST = {
             "file_ref_prefixes": ["checks", "widget"],
             "file_tree_roots": ["checks", "widget"],
             "test_change_roots": ["checks/"],
+            # non-Python repo: the path-correction index covers .sh
+            "file_index_suffixes": [".sh"],
         },
     },
 }
@@ -91,6 +96,12 @@ def widget_env(settings, tmp_path, monkeypatch):
                    "commands": ["export WIDGET_MODE=fast",
                                 "echo checks/parser/run_check.sh"]}]}))
     (origin / "checks" / "parser" / "baseline.txt").write_text("v1\n")
+    # the check script lives at a MOVED location — the CI yaml still
+    # references the old path; unique-basename correction (over the
+    # adapter's .sh index) must rewrite it
+    (origin / "checks" / "parser" / "legacy").mkdir()
+    (origin / "checks" / "parser" / "legacy" / "run_check.sh").write_text(
+        "#!/bin/sh\ntrue\n")
     _git(origin, "add", "-A")
     _git(origin, "commit", "-qm", "seed")
     repo = tmp_path / "widgetlib"
@@ -143,11 +154,47 @@ def test_widgetlib_manifest_builds_with_adapter_baseline(widget_env):
     job = built.jobs[0]
     assert job.env == "WIDGET_MODE=fast"
     assert job.min_gpus == 0                       # cpu queue, no GPUs
+    # non-Python path correction: the stale .sh reference was
+    # rewritten to the moved location via the adapter's .sh index
+    assert "checks/parser/legacy/run_check.sh" in job.command
     # the committed new check under checks/ is CLASSIFIED as a change
     assert [(c.path, c.change_type) for c in built.changes] == [
         ("checks/parser/new_check.txt", "added")]
     # routing falls back to test_paths (no assignment flavor declared)
     assert job.module == "parser"
+
+
+def test_widgetlib_capability_gated_recall(widget_env, settings,
+                                           tmp_path):
+    """The REAL onboarding path (audit round-2): the adapter's derived
+    capabilities satisfy the playbook's requires, and capability-gated
+    find() recalls the playbook for widgetlib once it is active —
+    store.get() bypasses none of it."""
+    import yaml as _yaml
+    from infermatrix_copilot.adapters.base import load_adapter
+    from infermatrix_copilot.engine.registry import StepRegistry
+    from infermatrix_copilot.engine.steps import register_builtin_steps
+    from infermatrix_copilot.playbooks.store import PlaybookStore
+    adapter = load_adapter(Path(settings.adapters_dir) / "widgetlib")
+    caps = adapter.capabilities
+    assert set(widget_env.playbook.requires) <= caps, (
+        widget_env.playbook.requires, caps)
+    # activate a copy in a scratch store: capability-gated recall
+    # finds it for widgetlib with NO repo-name coupling
+    pb_dir = tmp_path / "active-playbooks"
+    pb_dir.mkdir()
+    doc = _yaml.safe_load(
+        (REPO_ROOT / "playbooks" / "repo-rebase-v3.yaml").read_text())
+    doc["status"] = "active"
+    (pb_dir / "repo-rebase-v3.yaml").write_text(_yaml.safe_dump(doc))
+    store = PlaybookStore(pb_dir,
+                          register_builtin_steps(StepRegistry()))
+    found = store.find("repo_rebase", repo="widgetlib",
+                       capabilities=caps)
+    assert found is not None and found.name == "repo-rebase-v3"
+    # ...and an adapter MISSING a required capability falls out
+    assert store.find("repo_rebase", repo="widgetlib",
+                      capabilities=caps - {"ci.provider"}) is None
 
 
 def test_widgetlib_report_only_end_to_end(widget_env, settings):

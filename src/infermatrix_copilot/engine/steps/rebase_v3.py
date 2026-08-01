@@ -1365,7 +1365,8 @@ async def _v3_module_rebase(ctx: StepContext) -> StepResult:
         cuda_devices=os.environ.get("CUDA_VISIBLE_DEVICES", "0,1"),
         hf_home=os.environ.get("HF_HOME", "/model"),
         model_aliases=ctx.settings.model_aliases,
-        model_mismatch_policy=ctx.settings.model_mismatch_policy)
+        model_mismatch_policy=ctx.settings.model_mismatch_policy,
+        baseline_ref=_baseline_ref(manifest))
     async with _serial_lock(ctx.run_dir):
         outcome = await rebase_module(
             module, client=client, config=config,

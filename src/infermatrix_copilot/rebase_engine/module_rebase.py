@@ -41,6 +41,9 @@ class ModuleRunConfig:
     plan_review_max_rounds: int = 2
     model_aliases: Mapping[str, str] | None = None
     model_mismatch_policy: str = "fail"
+    # adapter baseline ref (repo.remote/default_branch) — reaches the
+    # LIVE prompt's test-plan prose (2026-08-01 neutrality audit)
+    baseline_ref: str = "origin/main"
 
 
 async def rebase_module(
@@ -78,7 +81,8 @@ async def rebase_module(
         max_debug_retries=config.max_debug_retries,
         plan_review_max_rounds=config.plan_review_max_rounds,
         broken_imports=broken_imports, module_test_plan=module_test_plan,
-        adaptive_guidance=guidance, live=True)
+        adaptive_guidance=guidance, live=True,
+        baseline_ref=config.baseline_ref)
 
     substate.update({"modules": {module: {"status": "running"}}})
     agent_log = str(Path(config.log_dir) / "agents" / f"module-{module}.log")

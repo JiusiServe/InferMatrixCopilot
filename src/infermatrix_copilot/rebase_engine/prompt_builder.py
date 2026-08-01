@@ -134,7 +134,9 @@ def _broken_imports_section(imports: list[dict]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _format_module_test_plan(plan: dict) -> str:
+def _format_module_test_plan(plan: dict,
+                             baseline_ref: str = "origin/main"
+                             ) -> str:
     if not plan:
         return ""
     lines = ["## Tests you must pass", ""]
@@ -146,7 +148,8 @@ def _format_module_test_plan(plan: dict) -> str:
         lines.append("")
     changes = plan.get("upstream_changes", [])
     if changes:
-        lines.append("### Upstream test changes (compare with origin/main)")
+        lines.append("### Upstream test changes (compare with "
+                     f"{baseline_ref})")
         for c in changes:
             ct = c.get("type", "?")
             path = c.get("path", "?")
@@ -156,7 +159,7 @@ def _format_module_test_plan(plan: dict) -> str:
             elif ct == "deleted":
                 lines.append(f"- **DELETED**: `{path}` — check if omni still needs it")
             elif ct == "modified":
-                lines.append(f"- **MODIFIED**: `{path}` — `git_show_test_baseline` to see origin/main version")
+                lines.append(f"- **MODIFIED**: `{path}` — `git_show_test_baseline` to see {baseline_ref} version")
             else:
                 lines.append(f"- **{ct.upper()}**: `{path}`")
         lines.append("")
@@ -182,6 +185,7 @@ def build_module_prompt(
     module_test_plan: dict | None = None,
     adaptive_guidance: str = "",
     live: bool = False,
+    baseline_ref: str = "origin/main",
     run_git: Callable[[list[str], str], str] | None = None,
 ) -> str:
     """Byte-parity render of the parent's `build_module_prompt`. `script_dir`
@@ -255,7 +259,8 @@ def build_module_prompt(
         "PLAN_REVIEW_CONTRACT": _plan_review_contract(
             log_dir=log_dir, session=f"module-{module}"),
         "BROKEN_IMPORTS_SECTION": _broken_imports_section(broken_imports or []),
-        "MODULE_TEST_PLAN": _format_module_test_plan(module_test_plan or {}),
+        "MODULE_TEST_PLAN": _format_module_test_plan(
+            module_test_plan or {}, baseline_ref=baseline_ref),
         "PLAN_REVIEW_MAX_ROUNDS": str(plan_review_max_rounds),
         "SCRIPT_DIR":        script_dir,
         "SESSION":           f"module-{module}",

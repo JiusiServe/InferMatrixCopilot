@@ -94,11 +94,14 @@ def test_forbidden_repo_literals_nowhere():
         rel = str(path.relative_to(SRC))
         hits = _FORBIDDEN.findall(path.read_text(encoding="utf-8"))
         ceiling = _FORBIDDEN_CEILINGS.get(rel, 0)
-        assert len(hits) <= ceiling, (
+        # EXACT, headroom-free (same rule as the vocab ceilings): a
+        # literal that disappears must take its ceiling with it, or a
+        # stale ceiling would permit silent reintroduction
+        assert len(hits) == ceiling, (
             f"{rel}: {len(hits)} repo-specific literal(s) "
-            f"{sorted(set(hits))}, ceiling {ceiling} — this class has no "
-            "ceiling outside the PR7-sunset delegation; repo knowledge "
-            "belongs in adapters/<repo>/")
+            f"{sorted(set(hits))}, ceiling {ceiling} — zero outside the "
+            "PR7-sunset delegation, and delegation ceilings track the "
+            "EXACT current count (lower them when the count drops)")
 
 
 def test_parity_vocabulary_is_contained():
