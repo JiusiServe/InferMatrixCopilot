@@ -270,8 +270,9 @@ class FakeCI:
         self.created += 1
         bid = f"b{self.created}"
         self.builds[bid] = {"id": bid, "web_url": f"u/{bid}",
-                            "state": "running", "meta_data": dict(meta_data),
-                            "jobs": []}
+                            "state": "running", "branch": branch,
+                            "commit": commit,
+                            "meta_data": dict(meta_data), "jobs": []}
         return self.builds[bid]
 
     def get_build(self, build_id):
@@ -287,6 +288,21 @@ class FakeCI:
 
     def get_job_log(self, build_id, job_id):
         return self.logs.get((build_id, job_id), "")
+
+    def list_jobs(self, build_id):
+        return list(self.builds[build_id].get("jobs") or [])
+
+    def retry_job(self, build_id, job_id):
+        return None, True
+
+    def latest_builds(self, branch, states=(), per_page=30):
+        return [b for b in self.builds.values()
+                if b.get("branch") == branch
+                and (not states or b.get("state") in states)]
+
+    def builds_for_commit(self, branch, commit):
+        return [b for b in self.builds.values()
+                if b.get("branch") == branch and b.get("commit") == commit]
 
 
 def test_build_op_guarded_create_and_recovery(tmp_path):
@@ -378,8 +394,11 @@ def test_monitor_classification(tmp_path):
         "\x1b_bk;t=1000000\x07 dozens of tests executed and PASSED with "
         "healthy streaming output right up to the budget wall\n"
         "\x1b_bk;t=1200000\x07 Exceeded maximum job timeout")
+    # timeout_sec=0: the monitor now WAITS for pending jobs inside a
+    # terminal build (parent parity); an expired deadline pins the same
+    # single-snapshot classification this test always asserted
     out = ci_loop.monitor_build(ci, b["id"], spec=spec, poll_sec=0,
-                                sleep=lambda s: None)
+                                timeout_sec=0, sleep=lambda s: None)
     cls = {j.name: j.classification for j in out.jobs}
     assert cls == {"Good Job": "passed", "Testcase Statistics": "ignored",
                    "Gated Model": "ignored", "Real Failure": "failed",

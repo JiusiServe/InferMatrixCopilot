@@ -141,6 +141,15 @@ rebase:
       url_template: "wheels.vllm.ai/{commit}"
       commit_env_var: VLLM_PRECOMPILED_WHEEL_COMMIT
   ci:
+    # remote-CI pipeline identities (parent config: BUILDKITE_CI_PIPELINE
+    # for the build-under-test; the rebase pipeline is where the nightly /
+    # gate baseline of pre-existing main failures lives)
+    pipeline: vllm-omni-release
+    baseline_pipeline: vllm-omni-rebase
+    # trigger env (parent create_build env + trigger_and_monitor extra_env,
+    # verbatim): opts the FULL suite in — a webhook build without these
+    # runs fewer tests, which is why pushed rounds create their own build
+    build_env: {NIGHTLY: "1", RUN_HUNYUAN_IMAGE3_PERF: "1"}
     # monitor classification data (parent monitor.py constants, verbatim)
     ignorable_name_patterns: ["(?i)testcase statistics",
                               "(?i)collection & email",
@@ -267,3 +276,5 @@ push:
   # to the REBASE BRANCH only; main stays protected regardless, guard_push
   # remains the choke point, and ALLOW_PUSH=1 is still required at execution
   rebase_branch_allowed: true
+  # rebase-commit author identity (parent config SIGNOFF_NAME/EMAIL)
+  signoff: {name: tzhouam, email: tzhouam@connect.ust.hk}

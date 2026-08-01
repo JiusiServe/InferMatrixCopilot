@@ -9,14 +9,21 @@ Two complete runs through the REAL executor over the REAL playbook yaml:
   real nested pipeline, the REAL TestRunner executing real subprocesses,
   the real precommit step, report, finalize. Exit-0 semantics.
 
-* `full` — the whole pipeline to its CURRENT deliberate terminal: wheel
-  pick over a real `git clone --shared` upstream scratch (probe faked —
-  the only network piece), Dockerfile pin, commit assignment + waves
-  (module agent faked at the `rebase_module` boundary — the only LLM
-  piece; install faked — the only pip piece), real test loop, real
-  precommit, real push gate, then the CI step's deliberate BLOCKED stub
-  (EXT1/PR6 wiring). Pins the §3.1 row-3 artifacts: the terminal-report
-  finalizer writes RUN_REPORT.md, locks release, the scratch tears down.
+* `full` — the whole pipeline to its offline terminal: wheel pick over a
+  real `git clone --shared` upstream scratch (probe faked — the only
+  network piece), Dockerfile pin, commit assignment + waves (module agent
+  faked at the `rebase_module` boundary — the only LLM piece; install
+  faked — the only pip piece), real test loop, real precommit, real push
+  gate, then the CI step BLOCKS on the declared provider-token capability
+  gap (no BUILDKITE_API_TOKEN offline). Pins the §3.1 row-3 artifacts:
+  the terminal-report finalizer writes RUN_REPORT.md, locks release, the
+  scratch tears down.
+
+* `remote_ci` — the wired phase 4 end to end (fake provider client, real
+  everything else): real push over a real bare remote through the PR3
+  cluster (WAL + absence-pinned lease), guarded op-recorded build, monitor
+  to terminal, substate + finalize. Plus the ALLOW_PUSH-unset FORBIDDEN
+  path and the ci-failed → needs-human terminal row.
 
 Everything else — locks, substate, worktrees, env plans, state handoffs,
 when-gates, wave ordering — is production code end to end.
@@ -166,12 +173,13 @@ def test_local_ci_complete_run_green(complete_env):
 
 def test_full_mode_complete_run_to_current_terminal(complete_env,
                                                     monkeypatch):
-    """The COMPLETE full pipeline to its CURRENT terminal: wheel pick over
+    """The COMPLETE full pipeline to its offline terminal: wheel pick over
     the real scratch clone + Dockerfile pin, real commit assignment, the
     wave fan-out (module agent faked at the rebase_module boundary), real
-    tests + precommit + push gate — then the deliberate CI stub BLOCKS
-    (EXT1/PR6). Pins §3.1 row 3: RUN_REPORT via the terminal-report
-    finalizer, lock release, scratch teardown."""
+    tests + precommit + push gate — then the CI step BLOCKS on the
+    declared provider-token capability gap (offline: no CI token). Pins
+    §3.1 row 3: RUN_REPORT via the terminal-report finalizer, lock
+    release, scratch teardown."""
     env = complete_env
     from infermatrix_copilot.engine.steps import rebase_v3
     from infermatrix_copilot.rebase_engine import module_rebase as mr
@@ -205,10 +213,9 @@ def test_full_mode_complete_run_to_current_terminal(complete_env,
         "force_upstream_commit": env.head})
     outcome = asyncio.run(executor.run(env.playbook, state))
 
-    # today's deliberate terminal: BLOCKED at the CI provider stub
+    # offline terminal: BLOCKED at the CI step's token capability gap
     assert outcome.status == "blocked"
-    assert "provider" in outcome.blocked_reason.lower() \
-        or "CI" in outcome.blocked_reason
+    assert "token" in outcome.blocked_reason.lower()
     # everything BEFORE the stub completed for real
     ok_steps = {sid for sid, r in outcome.step_results.items() if r.ok}
     assert {"prelude", "guard", "wheel", "assign", "wave1", "wave_gate",
@@ -239,3 +246,181 @@ def test_full_mode_complete_run_to_current_terminal(complete_env,
         assert probe.acquire(blocking=False) is True, name
         probe.release()
     assert not (run_dir / "upstream_scratch").exists()
+
+
+# ── remote_ci: the wired phase 4 ─────────────────────────────────────────────
+
+class FakeBK:
+    """Provider fake for the e2e: created builds pop scripted bodies;
+    lookups are empty (no active siblings, no baseline builds)."""
+
+    def __init__(self, bodies):
+        self.bodies = list(bodies)
+        self.builds: dict[str, dict] = {}
+        self.created = 0
+
+    def create_build(self, *, branch, commit, message, meta_data):
+        self.created += 1
+        bid = f"b{self.created}"
+        body = self.bodies.pop(0)
+        self.builds[bid] = {"id": bid, "web_url": f"u/{bid}",
+                            "branch": branch, "commit": commit,
+                            "meta_data": dict(meta_data), **body}
+        return self.builds[bid]
+
+    def get_build(self, build_id):
+        return self.builds.get(build_id, {})
+
+    def find_builds_by_meta(self, key, value):
+        return [b for b in self.builds.values()
+                if b["meta_data"].get(key) == value]
+
+    def cancel_build(self, build_id):
+        raise AssertionError("the run must never cancel builds")
+
+    def get_job_log(self, build_id, job_id):
+        return ""
+
+    def list_jobs(self, build_id):
+        return list(self.builds.get(build_id, {}).get("jobs") or [])
+
+    def retry_job(self, build_id, job_id):
+        return None, True
+
+    def latest_builds(self, branch, states=(), per_page=30):
+        return []
+
+    def builds_for_commit(self, branch, commit):
+        return []
+
+
+def _wire_remote_ci(env, settings, tmp_path, monkeypatch, fake,
+                    allow_push=True):
+    """Bare origin + a non-protected working branch + injected provider."""
+    from infermatrix_copilot.engine.steps import rebase_v3
+    remote = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "-q", "--bare", remote], check=True)
+    subprocess.run(["git", "-C", env.repo, "remote", "add", "origin",
+                    str(remote)], check=True)
+    subprocess.run(["git", "-C", env.repo, "checkout", "-q", "-b",
+                    "dev/align"], check=True)
+    clients = []
+
+    def factory(token, org, pipeline, build_env):
+        clients.append((token, org, pipeline, dict(build_env)))
+        return fake
+
+    monkeypatch.setattr(rebase_v3, "_make_ci_client", factory)
+    settings.buildkite_api_token = "tok"
+    settings.allow_push = allow_push
+    settings.rebase_ci_settle_sec = 0
+    settings.rebase_ci_poll_sec = 0
+    return remote, clients
+
+
+def test_remote_ci_complete_run_green(complete_env, settings, tmp_path,
+                                      monkeypatch):
+    """A COMPLETE remote_ci run to `done`: prelude preconditions (pin +
+    upstream-commit signal), real guard, vacuous push gate, a REAL push
+    over a real bare remote through the PR3 cluster (WAL, absence-pinned
+    lease), a guarded op-recorded build, monitor to terminal, substate,
+    report, finalize."""
+    env = complete_env
+    fake = FakeBK([{"state": "passed", "jobs": [
+        {"id": "j1", "name": "Unit Sweep", "state": "passed",
+         "exit_status": 0}]}])
+    remote, clients = _wire_remote_ci(env, settings, tmp_path, monkeypatch,
+                                      fake)
+    executor, run_dir = env.make_run("run-remoteci")
+    state = _state_for(env, run_dir, {"rebase_mode": "remote_ci",
+                                      "upstream_commit": "a" * 40})
+    outcome = asyncio.run(executor.run(env.playbook, state))
+    assert outcome.status == "done", getattr(outcome, "blocked_reason", "")
+    data = Substate(run_dir, run_dir.name).read()
+    assert data["ci"]["result"] == "passed"
+    assert data["ci"]["rounds"][0]["purpose"] == "initial"
+    assert data["phase"] == "done"
+    # the push LANDED on the remote: HEAD == remote branch tip, WAL pushed
+    head = subprocess.run(["git", "-C", env.repo, "rev-parse", "HEAD"],
+                          capture_output=True, text=True,
+                          check=True).stdout.strip()
+    remote_tip = subprocess.run(
+        ["git", "-C", remote, "rev-parse", "refs/heads/dev/align"],
+        capture_output=True, text=True, check=True).stdout.strip()
+    assert head == remote_tip
+    from infermatrix_copilot.rebase_engine import ci_loop, push_wal
+    recs = push_wal.load_records(run_dir / "push_wal")
+    assert [(r.state, r.dest_ref) for r in recs] == \
+        [("pushed", "refs/heads/dev/align")]
+    # §3.2: the build is op-recorded and meta-stamped
+    ops = ci_loop.load_ops(run_dir / "ci_ops")
+    assert [(o.op_id, o.purpose, o.state) for o in ops] == \
+        [(f"{run_dir.name}-ci-r0", "initial", "created")]
+    assert fake.builds["b1"]["meta_data"] == {
+        "imx_op_id": f"{run_dir.name}-ci-r0", "imx_run_id": run_dir.name}
+    assert fake.builds["b1"]["commit"] == head
+    # pipeline identities + trigger env came from the ADAPTER (build
+    # client first, then the baseline-pipeline client)
+    assert [(c[1], c[2]) for c in clients] == \
+        [("vllm", "vllm-omni-release"), ("vllm", "vllm-omni-rebase")]
+    assert clients[0][3] == {"NIGHTLY": "1", "RUN_HUNYUAN_IMAGE3_PERF": "1"}
+    assert (run_dir / "RUN_REPORT.md").exists()
+    asyncio.run(lifecycle.finalize(run_dir, outcome))
+    probe = CheckoutLock(env.repo, "omni")
+    assert probe.acquire(blocking=False) is True
+    probe.release()
+
+
+def test_remote_ci_requires_allow_push(complete_env, settings, tmp_path,
+                                       monkeypatch):
+    """§2.2: remote_ci without ALLOW_PUSH=1 is FORBIDDEN at phase 4 — the
+    C4 env half is never self-granted; nothing reaches the remote or the
+    provider."""
+    env = complete_env
+    fake = FakeBK([])
+    remote, _ = _wire_remote_ci(env, settings, tmp_path, monkeypatch, fake,
+                                allow_push=False)
+    executor, run_dir = env.make_run("run-remoteci-dry")
+    state = _state_for(env, run_dir, {"rebase_mode": "remote_ci",
+                                      "upstream_commit": "a" * 40})
+    outcome = asyncio.run(executor.run(env.playbook, state))
+    assert outcome.status == "blocked"
+    assert "ALLOW_PUSH" in outcome.blocked_reason
+    assert fake.created == 0
+    check = subprocess.run(
+        ["git", "-C", remote, "rev-parse", "refs/heads/dev/align"],
+        capture_output=True, text=True)
+    assert check.returncode != 0        # nothing was pushed
+    asyncio.run(lifecycle.finalize(run_dir, outcome))
+
+
+def test_remote_ci_failure_rules_needs_human(complete_env, settings,
+                                             tmp_path, monkeypatch):
+    """CI failures that survive debugging are SUBSTATE data (parent
+    parity): the ci step itself is ok, the report is written, and the
+    finalize terminal row rules needs-human (blocked / exit-3 semantics)
+    naming the unfixed jobs."""
+    env = complete_env
+    from infermatrix_copilot.engine.steps import rebase_v3
+    fake = FakeBK([{"state": "failed", "jobs": [
+        {"id": "j1", "name": "Unit Sweep", "state": "failed",
+         "exit_status": 1}]}])
+    _wire_remote_ci(env, settings, tmp_path, monkeypatch, fake)
+
+    async def no_fix(ctx, manifest, module, slug, tb):
+        return "not_done"
+    monkeypatch.setattr(rebase_v3, "_run_debug_agent", no_fix)
+    executor, run_dir = env.make_run("run-remoteci-red")
+    state = _state_for(env, run_dir, {"rebase_mode": "remote_ci",
+                                      "upstream_commit": "a" * 40})
+    outcome = asyncio.run(executor.run(env.playbook, state))
+    assert outcome.status == "blocked"
+    assert "remote CI failed" in outcome.blocked_reason
+    assert "ci job Unit Sweep" in outcome.blocked_reason
+    data = Substate(run_dir, run_dir.name).read()
+    assert data["ci"]["result"] == "failed"
+    assert data["ci"]["unfixed"] == ["Unit Sweep"]
+    assert data["phase"] == "needs_human"
+    # row 2 ordering: the report step ran BEFORE the terminal ruling
+    assert (run_dir / "RUN_REPORT.md").exists()
+    asyncio.run(lifecycle.finalize(run_dir, outcome))

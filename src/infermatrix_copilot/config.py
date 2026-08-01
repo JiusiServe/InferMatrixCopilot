@@ -137,6 +137,13 @@ class Settings(BaseSettings):
     # v3 module-agent plan reviewer (rebase_engine/plan_review.py): empty =
     # review on the run's own tier model — never silently skipped
     rebase_reviewer_model: str = ""
+    # v3 remote CI (rebase_engine/ci_loop.run_ci_rounds) — neutral knobs;
+    # pipeline identities live in the adapter. Defaults are the parent's.
+    rebase_ci_retries: int = 2          # push/rebuild rounds after the first
+    rebase_ci_job_retry_max: int = 2    # per-job flaky retries per round
+    rebase_ci_poll_sec: int = 120
+    rebase_ci_timeout_sec: int = 10800  # per-build monitor budget
+    rebase_ci_settle_sec: int = 60      # webhook-build settle before create
 
     # Repo profiles (design v2 §V2.3)
     profile_stale_days: int = 90        # dormancy window for unconfirmed facts

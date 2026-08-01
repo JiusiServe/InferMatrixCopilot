@@ -1257,6 +1257,13 @@ async def _v3_finalize(ctx: StepContext) -> StepResult:
         failures.append("precommit red")
     if data.get("manifest_empty"):
         failures.append("manifest empty")
+    ci = data.get("ci") or {}
+    ci_result = str(ci.get("result") or "")
+    if ci_result and ci_result != "passed":
+        failures.append(f"remote CI {ci_result}"
+                        + (f": {ci.get('reason')}" if ci.get("reason")
+                           else ""))
+        failures.extend(f"ci job {name}" for name in ci.get("unfixed") or [])
     sub.update({"phase": "needs_human" if failures else "done"})
     if failures:
         return StepResult(False, FailureKind.BLOCKED,
@@ -1383,25 +1390,305 @@ async def _v3_module_rebase(ctx: StepContext) -> StepResult:
                           f"module_{module}_status": outcome["status"]}})
 
 
+def _make_ci_client(token: str, org: str, pipeline: str,
+                    build_env: dict[str, str]):
+    """Provider-client factory — module-level so tests inject a fake."""
+    from ...ci.buildkite import BuildkiteCI
+    return BuildkiteCI(token, org, pipeline, build_env=build_env)
+
+
 @step("rebase.v3_ci", "script", "push",
       "Remote CI: push, guarded build creation, monitored to terminal.")
 async def _v3_ci(ctx: StepContext) -> StepResult:
     """remote_ci/full phase 4: commit-and-push through the PR3 cluster (C4
-    double gate inside), then a guarded op-recorded build monitored to a
-    terminal state. Requires the CI provider client — absent a token this
-    BLOCKS with a declared capability_gap."""
+    double gate inside — mode + push_gate ordering are the task-governance
+    half, ALLOW_PUSH the env half), then guarded op-recorded builds
+    monitored to terminal with serialized CI-debug rounds
+    (`ci_loop.run_ci_rounds`). CI job failures that survive debugging are
+    SUBSTATE data (parent parity) — the finalize step rules needs-human;
+    structural refusals (no client, no signal, push refused) BLOCK here."""
+    import subprocess
+    from ...rebase_engine import ci_loop, push_to_ci
+    repo = require_repo(ctx)
+    if isinstance(repo, StepResult):
+        return repo
     manifest = _adapter_manifest(ctx)
-    if not isinstance(manifest, StepResult):
-        blocked = _ensure_checkout_locks(
-            ctx, manifest, _task_params(ctx).get("rebase_mode", ""))
-        if blocked is not None:
-            return blocked
-    if not getattr(ctx.settings, "buildkite_api_token", ""):
+    if isinstance(manifest, StepResult):
+        return manifest
+    blocked = _ensure_checkout_locks(
+        ctx, manifest, _task_params(ctx).get("rebase_mode", ""))
+    if blocked is not None:
+        return blocked
+    token = getattr(ctx.settings, "buildkite_api_token", "")
+    if not token:
         ctx.trace.record("capability_gap", capability="ci.provider_client",
                          detail="no CI token — remote CI cannot run")
         return StepResult(False, FailureKind.BLOCKED,
                           "remote CI needs a provider token; run local_ci "
                           "instead")
-    return StepResult(False, FailureKind.BLOCKED,
-                      "the provider HTTP client lands with the live-run "
-                      "wiring (EXT1/PR6 preflight); use local_ci until then")
+    provider = str((manifest.get("ci") or {}).get("provider") or "")
+    if provider != "buildkite":
+        ctx.trace.record("capability_gap", capability="ci.provider_client",
+                         detail=f"no remote-CI client for provider "
+                                f"{provider!r}")
+        return StepResult(False, FailureKind.BLOCKED,
+                          f"remote CI has no client for provider "
+                          f"{provider!r}")
+    org = str((manifest.get("ci") or {}).get("org") or "")
+    rb = manifest.get("rebase") or {}
+    ci_cfg = rb.get("ci") or {}
+    pipeline = str(ci_cfg.get("pipeline") or "")
+    if not org or not pipeline:
+        return StepResult(False, FailureKind.BLOCKED,
+                          "adapter declares no ci.org / rebase.ci.pipeline "
+                          "— the pipeline identity is adapter data")
+    push_cfg = manifest.get("push") or {}
+    signoff = push_cfg.get("signoff") or {}
+    author_name = str(signoff.get("name") or "")
+    author_email = str(signoff.get("email") or "")
+    if not author_name or not author_email:
+        return StepResult(False, FailureKind.BLOCKED,
+                          "adapter declares no push.signoff identity — "
+                          "refusing to commit as an unknown author")
+    br = subprocess.run(["git", "-C", repo, "rev-parse", "--abbrev-ref",
+                         "HEAD"], capture_output=True, text=True, timeout=30)
+    branch = br.stdout.strip()
+    if br.returncode != 0 or not branch or branch == "HEAD":
+        return StepResult(False, FailureKind.BLOCKED,
+                          "cannot determine the checkout branch (detached "
+                          "HEAD?) — refusing to push")
+    protected = sorted({*(push_cfg.get("protected_branches") or []),
+                        *ctx.settings.protected_branches})
+    # the adapter-governance half of C4: the rebase pipeline may push to
+    # its (non-protected) working branch only when the manifest says so
+    if branch in protected or not push_cfg.get("rebase_branch_allowed"):
+        return StepResult(False, FailureKind.FORBIDDEN,
+                          f"push governance refuses branch {branch!r} "
+                          "(protected, or push.rebase_branch_allowed "
+                          "unset)")
+    sub = _substate(ctx)
+    upstream_commit = ctx.state.get("upstream_commit", "") \
+        or (sub.read().get("upstream_commit") or "")
+    if not upstream_commit:
+        return StepResult(False, FailureKind.BLOCKED,
+                          "no upstream-commit signal — the prepared-tree "
+                          "precondition did not hold")
+    pin_data = (rb.get("wheel") or {}).get("pin")
+    pin = wheel_mod.PinSpec.from_manifest(pin_data) if pin_data else None
+    remote = str(push_cfg.get("default_remote") or "origin")
+    message_template = str((rb.get("push") or {})
+                           .get("commit_message_template")
+                           or "rebase: align with upstream {short}")
+    unstage = list((rb.get("push") or {}).get("unstage_globs") or [])
+    run_id = str(ctx.state.get("run_id") or ctx.run_dir.name)
+
+    client = _make_ci_client(token, org, pipeline,
+                             dict(ci_cfg.get("build_env") or {}))
+    baseline: tuple = ()
+    baseline_pipeline = str(ci_cfg.get("baseline_pipeline") or "")
+    if baseline_pipeline:
+        default_branch = str((manifest.get("repo") or {})
+                             .get("default_branch") or "main")
+        try:
+            baseline = ci_loop.fetch_baseline_failures(
+                _make_ci_client(token, org, baseline_pipeline, {}),
+                default_branch)
+            ctx.trace.record("ci_baseline", count=len(baseline),
+                             pipeline=baseline_pipeline,
+                             branch=default_branch)
+        except Exception as exc:  # noqa: BLE001 - baseline is best-effort
+            # parent parity: an unavailable baseline means NOTHING gets
+            # baseline-ignored (strictly safer), recorded for the report
+            ctx.trace.record("ci_baseline_unavailable", error=str(exc))
+    spec = ci_loop.CIClassifySpec(
+        ignorable_name_patterns=tuple(
+            ci_cfg.get("ignorable_name_patterns") or ()),
+        ignorable_log_patterns=tuple(
+            ci_cfg.get("ignorable_log_patterns") or ()),
+        extra_exception_names=tuple(
+            ci_cfg.get("extra_exception_names") or ()),
+        baseline=baseline)
+
+    def _porcelain() -> str:
+        out = subprocess.run(["git", "-C", repo, "status", "--porcelain"],
+                             capture_output=True, text=True, timeout=30)
+        return out.stdout.strip()
+
+    def changes_fn() -> bool:
+        return bool(_porcelain())
+
+    def push_fn(rnd: int):
+        def _attempt():
+            return push_to_ci.commit_and_push(
+                Path(repo), upstream_commit=upstream_commit, pin=pin,
+                branch=branch, message_template=message_template,
+                unstage_globs=unstage, author_name=author_name,
+                author_email=author_email, protected_branches=protected,
+                wal_dir=ctx.run_dir / "push_wal",
+                op_id=f"{run_id}-push-r{rnd}", allowed=True,
+                allow_push=bool(ctx.settings.allow_push), remote=remote)
+        try:
+            return _attempt()
+        except push_to_ci.PushPreflightError as exc:
+            # parent self-heal: a push refused over a stale Dockerfile pin
+            # names its own fix — re-pin and retry ONCE
+            if pin is not None and "wheel pin does not match" in str(exc):
+                ctx.trace.record("ci_push_pin_selfheal", detail=str(exc))
+                wheel_mod.pin_dockerfile(Path(repo), upstream_commit, pin)
+                return _attempt()
+            raise
+
+    local_jobs_cache: dict = {}
+
+    def _local_jobs() -> dict:
+        if "jobs" not in local_jobs_cache:
+            try:
+                built = build_manifest(Path(repo),
+                                       ManifestSpec.from_manifest(manifest))
+                local_jobs_cache["jobs"] = {j["slug"]: j
+                                            for j in built.to_dict()["jobs"]}
+            except Exception:  # noqa: BLE001 - verification degrades, traced
+                ctx.trace.record("ci_local_manifest_unavailable")
+                local_jobs_cache["jobs"] = {}
+        return local_jobs_cache["jobs"]
+
+    def _verify_locally(slug: str) -> str:
+        """'passed' | 'failed' | 'skipped' | 'unavailable' — the HARNESS
+        owns the fix verdict where a local manifest equivalent exists."""
+        from ...rebase_engine.test_manifest import is_runnable_command
+        job = _local_jobs().get(slug)
+        if not job or not is_runnable_command(job.get("command", "")):
+            return "unavailable"
+        if _venv_declared(manifest) and not _target_venv(manifest):
+            return "unavailable"
+        import os
+        from ...testing.runner import TestRunner
+        runner = TestRunner(
+            repo_root=Path(repo), tests_dir=ctx.run_dir / "tests",
+            gpu_lock_dir=ctx.run_dir / "gpu_lock",
+            artifact_globs=list((rb.get("testing") or {})
+                                .get("artifact_globs") or []),
+            cuda_visible_devices=os.environ.get("CUDA_VISIBLE_DEVICES", ""))
+        outcome = runner.run(manifest_job_to_test_job(job),
+                             _target_test_env(ctx, manifest))
+        if outcome.timed_out or outcome.watchdog_triggered:
+            return "failed"
+        if outcome.skipped:
+            return "skipped"
+        return "passed" if outcome.rc == 0 else "failed"
+
+    from ...rebase_engine.test_manifest import _label_to_slug
+
+    async def debug_fn(jr) -> bool:
+        """One serialized CI-debug dispatch (parent `_dispatch_sdk_ci_debug`
+        parity): snapshot → agent → tree-change check → local harness
+        verification where possible; rejected/unverified-failed attempts
+        are REVERTED so they cannot leak into the retry commit."""
+        tier = _tier_client(ctx)
+        if isinstance(tier, StepResult):
+            ctx.trace.record("capability_gap",
+                             capability="rebase.debug_agent",
+                             detail=f"no agent backend; CI failure "
+                                    f"{jr.name} recorded unfixed")
+            return False
+        slug = _label_to_slug(jr.name)
+        module = str((_local_jobs().get(slug) or {}).get("module", ""))
+        log_tail = ""
+        try:
+            if jr.log_file and Path(jr.log_file).is_file():
+                log_tail = "\n".join(
+                    Path(jr.log_file).read_text(
+                        encoding="utf-8", errors="replace")
+                    .splitlines()[-200:])
+        except OSError:
+            pass
+        before = _porcelain()
+        snap, untracked = tl.snapshot_worktree(Path(repo))
+        verdict = await _run_debug_agent(
+            ctx, manifest, module, slug,
+            log_tail or f"CI job {jr.name} failed "
+                        f"(state {jr.state}, exit {jr.exit_status}); "
+                        "no log available")
+        if verdict != "done":
+            tl.restore_worktree(Path(repo), snap, untracked)
+            ctx.trace.record("ci_debug_rejected", job=jr.name,
+                             verdict=verdict)
+            return False
+        if _porcelain() == before:
+            # completed but changed nothing — unfixed (parent parity)
+            ctx.trace.record("ci_debug_no_changes", job=jr.name)
+            return False
+        local = _verify_locally(slug)
+        if local == "failed":
+            tl.restore_worktree(Path(repo), snap, untracked)
+            ctx.trace.record("ci_debug_verify_failed", job=jr.name)
+            return False
+        if local in ("skipped", "unavailable"):
+            # no local reproduction — accept unverified; the CI re-run is
+            # the judge (parent parity, traced)
+            ctx.trace.record("ci_debug_unverified", job=jr.name,
+                             reason=local)
+        return True
+
+    try:
+        result = await ci_loop.run_ci_rounds(
+            client=client, ops_dir=ctx.run_dir / "ci_ops", run_id=run_id,
+            branch=branch, spec=spec, push_fn=push_fn,
+            changes_fn=changes_fn, debug_fn=debug_fn,
+            log_dir=ctx.run_dir / "ci_logs",
+            max_retries=int(ctx.settings.rebase_ci_retries),
+            settle_sec=float(ctx.settings.rebase_ci_settle_sec),
+            poll_sec=float(ctx.settings.rebase_ci_poll_sec),
+            timeout_sec=float(ctx.settings.rebase_ci_timeout_sec),
+            job_retry_max=int(ctx.settings.rebase_ci_job_retry_max),
+            message=message_template.format(commit=upstream_commit,
+                                            short=upstream_commit[:12]),
+            trace=ctx.trace.record)
+    except push_to_ci.PushPreflightError as exc:
+        return StepResult(False, FailureKind.BLOCKED,
+                          f"push preflight refused: {exc}")
+
+    sub.update({"ci": {
+        "result": result.result, "reason": result.reason,
+        "fixed": list(result.fixed_jobs),
+        "unfixed": list(result.unfixed_jobs),
+        "rounds": [{
+            "purpose": r.purpose, "op_id": r.op_id,
+            "build_id": r.build_id, "build_url": r.build_url,
+            "adopted": r.adopted, "build_state": r.build_state,
+            "passed": r.passed, "failed": list(r.failed),
+            "incomplete": list(r.incomplete),
+            "budget_timeouts": list(r.budget_timeouts),
+            "ignored": r.ignored,
+            "ignored_baseline": r.ignored_baseline,
+        } for r in result.rounds]}})
+    updates = {"ci_result": result.result,
+               "ci_build_urls": [r.build_url for r in result.rounds
+                                 if r.build_url]}
+    if result.result == "passed":
+        last = result.rounds[-1]
+        return StepResult(
+            True,
+            summary=f"CI passed: build {last.build_id} ({last.passed} "
+                    f"passed, {last.ignored_baseline} baseline-ignored, "
+                    f"{last.ignored} ignored)"
+                    + (f"; {len(result.fixed_jobs)} debug-fixed"
+                       if result.fixed_jobs else ""),
+            outputs={"state_updates": updates})
+    if result.result == "push_dry_run":
+        # §2.2: remote CI without ALLOW_PUSH=1 is FORBIDDEN at phase 4 —
+        # the dry-run already reported the exact authorized command
+        return StepResult(False, FailureKind.FORBIDDEN,
+                          "remote CI push is dry-run (ALLOW_PUSH not set); "
+                          + result.reason)
+    if result.result in ("push_failed", "refused", "no_signal"):
+        return StepResult(False, FailureKind.BLOCKED,
+                          f"remote CI {result.result}: {result.reason}")
+    # result == "failed": CI verdicts are substate data (parent parity) —
+    # the transition table's terminal row (finalize) rules needs-human
+    return StepResult(
+        True,
+        summary=f"CI failed: {result.reason}"
+                + (f" (unfixed: {', '.join(result.unfixed_jobs[:5])})"
+                   if result.unfixed_jobs else ""),
+        outputs={"state_updates": updates})

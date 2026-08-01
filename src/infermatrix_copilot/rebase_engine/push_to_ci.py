@@ -75,7 +75,7 @@ def preflight_dockerfile_pin(repo: Path, commit: str, pin: PinSpec) -> None:
 
 def commit_and_push(repo: Path, *,
                     upstream_commit: str,
-                    pin: PinSpec,
+                    pin: PinSpec | None,
                     branch: str,
                     message_template: str,
                     unstage_globs: Sequence[str],
@@ -105,7 +105,10 @@ def commit_and_push(repo: Path, *,
     sleep = sleep or _time.sleep
     repo = Path(repo)
     commit = preflight_upstream_commit(upstream_commit)
-    preflight_dockerfile_pin(repo, commit, pin)
+    if pin is not None:
+        # data-gated (2026-08-01 audit): an adapter that declares no wheel
+        # workflow has no Dockerfile pin to check
+        preflight_dockerfile_pin(repo, commit, pin)
     dest_ref = f"refs/heads/{branch}"
 
     # re-entry hygiene BEFORE any new work: unresolved intents settle first
