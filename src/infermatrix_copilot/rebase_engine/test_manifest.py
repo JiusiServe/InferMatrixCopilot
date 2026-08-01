@@ -189,11 +189,23 @@ def _parse_k8s_gpu_count(step: dict, fallback: int) -> int:
 
 # a PURE export line assigns env and nothing else — a compound line like
 # `export X=1 && pytest ...` is a COMMAND and must never be stripped (or a
-# job could silently lose its entire body to the env split). The ASSIGNMENT
-# is captured so extraction uses the same whitespace grammar as detection
-# (`export\tA=1` must yield the token `A=1`, never a malformed key).
+# job could silently lose its entire body to the env split). The grammar
+# covers the valid setup-only forms bash accepts: multiple assignments per
+# export (`export A=1 B=2`), chained exports (`export A=1; export B=2`), a
+# trailing `;`, and a trailing comment (whitespace-separated — a glued
+# `A=1#x` is a VALUE in bash, not a comment). Extraction shares the same
+# grammar (`export\tA=1` yields the clean token `A=1`).
+_ASSIGN = r"[A-Za-z_][A-Za-z0-9_]*=(?:\"[^\"]*\"|'[^']*'|[^\s;]*)"
+_EXPORT_GROUP = rf"export\s+{_ASSIGN}(?:\s+{_ASSIGN})*"
 _PURE_EXPORT_RX = re.compile(
-    r"^\s*export\s+([A-Za-z_][A-Za-z0-9_]*=(?:\"[^\"]*\"|'[^']*'|\S*))\s*$")
+    rf"^\s*{_EXPORT_GROUP}(?:\s*;\s*{_EXPORT_GROUP})*\s*;?(?:\s+#.*)?\s*$")
+_ASSIGN_RX = re.compile(_ASSIGN)
+
+
+def _export_tokens(line: str) -> list[str]:
+    """The K=V tokens of a line that matched `_PURE_EXPORT_RX` (trailing
+    comment removed first so its text can never masquerade as env)."""
+    return _ASSIGN_RX.findall(re.sub(r"\s+#.*$", "", line))
 
 
 def is_runnable_command(text: str) -> bool:
@@ -244,10 +256,27 @@ def _extract_steps(steps_list: list, source: str,
             cmd = str(cmds or "")
         export_matches = [_PURE_EXPORT_RX.match(ln)
                           for ln in cmd.split("\n")]
-        env_tokens = [m.group(1) for m in export_matches if m]
+        env_tokens: list[str] = []
+        for ln, m in zip(cmd.split("\n"), export_matches):
+            if m:
+                env_tokens.extend(_export_tokens(ln))
         cmd_clean = "\n".join(ln for ln, m in zip(cmd.split("\n"),
                                                   export_matches) if not m)
-        if not is_runnable_command(cmd_clean):
+
+        cmd_normalized = cmd_clean
+        m = re.match(r"^timeout\s+\d+m\s+bash\s+-c\s*['\"](.*)['\"]\s*$",
+                     cmd_clean.strip(), re.DOTALL)
+        if m:
+            inner = re.sub(r"^\s*set\s+[+-]?\w+(?:\s+[+-]?\w+)*\s*;?\s*\n",
+                           "", m.group(1).strip()).strip()
+            if inner:
+                cmd_normalized = inner
+
+        # runnability is judged on the NORMALIZED command — a wrapper like
+        # `timeout 20m bash -c "# disabled"` reduces to a comment-only body
+        # and must be dropped here (a GPU-ineligible job would be skipped
+        # before the run-side guard could classify it structural)
+        if not is_runnable_command(cmd_normalized):
             # a labeled step with no RUNNABLE command (empty, export-only,
             # or comment-only — bash treats comments as rc=0 no-ops) is NOT
             # a test job: emitting it would read as a pass (the parent's
@@ -270,15 +299,6 @@ def _extract_steps(steps_list: list, source: str,
             # runtime settings there, and dropping them would run local
             # jobs outside their authoritative CI environment
             env_vars = f"{pipeline_env} {env_vars}".strip()
-
-        cmd_normalized = cmd_clean
-        m = re.match(r"^timeout\s+\d+m\s+bash\s+-c\s*['\"](.*)['\"]\s*$",
-                     cmd_clean.strip(), re.DOTALL)
-        if m:
-            inner = re.sub(r"^\s*set\s+[+-]?\w+(?:\s+[+-]?\w+)*\s*;?\s*\n",
-                           "", m.group(1).strip()).strip()
-            if inner:
-                cmd_normalized = inner
 
         refs = []
         for ref in ref_rx.finditer(cmd_normalized):

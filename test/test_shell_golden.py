@@ -287,11 +287,22 @@ def test_empty_command_dropped_loudly(tmp_path):
             {"label": "Compound Export",
              "commands": ["export X=1 && pytest tests/y.py"]},
             {"label": "Singular Form", "command": "pytest tests/z.py"},
+            # the remaining valid setup-only false-pass forms (round-3):
+            {"label": "Multi Export", "commands": ["export A=1 B=2"]},
+            {"label": "Semicolon Export", "commands": ["export A=1;"]},
+            {"label": "Commented Export",
+             "commands": ["export A=1 # gpu knob"]},
+            {"label": "Chained Export",
+             "commands": ["export A=1; export B=2"]},
+            {"label": "Wrapped Comment",
+             "commands": ['timeout 20m bash -c "# disabled"']},
+            {"label": "Rich Env Job",
+             "commands": ["export A=1 B=2 # tuned", "pytest tests/r.py"]},
         ]}))
     built = build_manifest(repo, ManifestSpec.from_manifest(MANIFEST))
     by_slug = {j.slug: j for j in built.jobs}
     assert set(by_slug) == {"real_job", "tab_export", "compound_export",
-                            "singular_form"}
+                            "singular_form", "rich_env_job"}
     # the compound export line IS the command — never stripped into env
     assert by_slug["compound_export"].command == \
         "export X=1 && pytest tests/y.py"
@@ -301,8 +312,17 @@ def test_empty_command_dropped_loudly(tmp_path):
     # `export\tC=3` yields the clean token C=3, never a malformed key
     assert by_slug["tab_export"].env == "C=3"
     assert by_slug["tab_export"].command == "pytest tests/t.py"
+    # multi-assignment/comment env extraction stays clean and complete
+    assert by_slug["rich_env_job"].env == "A=1 B=2"
+    assert by_slug["rich_env_job"].command == "pytest tests/r.py"
     # dropped steps are SURFACED, not silent (run side marks structural);
-    # comment-only bodies are rc=0 no-ops — the same false-pass class
-    assert sorted(built.dropped) == ["Block Step", "Comment Only",
-                                     "Export Only", "Export Plus Comment"]
+    # comment-only bodies are rc=0 no-ops — the same false-pass class,
+    # including the setup-only bash forms and the wrapped comment (whose
+    # runnability is judged AFTER `timeout ... bash -c` normalization —
+    # a GPU-ineligible wrapped comment would otherwise be skipped before
+    # the run-side guard and vanish from the push gate)
+    assert sorted(built.dropped) == [
+        "Block Step", "Chained Export", "Comment Only", "Commented Export",
+        "Export Only", "Export Plus Comment", "Multi Export",
+        "Semicolon Export", "Wrapped Comment"]
     assert built.to_dict()["dropped"] == built.dropped
