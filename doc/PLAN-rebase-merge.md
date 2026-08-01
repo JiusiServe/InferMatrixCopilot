@@ -24,9 +24,10 @@ Eliminate `repo-rebase`'s external subprocess runs by absorbing the external
 5-phase LangGraph orchestrator (`vllm-omni-rebase-agent`) into the copilot,
 preserving functionality and performance. Canonical external checkout:
 `/data/zhoutaichang/rebase/vllm-omni-rebase-agent` (the `copilot/` clone is a
-working copy). No live consumer of the external path exists (user-attested;
-**to be re-verified** by the PR6 preflight evidence checks — scheduler scan +
-30-day unattributed-Buildkite-build query).
+working copy). No live consumer of the external path exists — user-attested AND
+**re-verified 2026-08-01** by the PR6 preflight evidence checks
+(scheduler scan + 30-day Buildkite attribution query; evidence in
+`doc/RUNBOOK-rebase.md` §PR6-preflight).
 
 ## 2. Locked decisions (owner, 2026-07-28 — unchanged)
 

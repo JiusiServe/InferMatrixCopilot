@@ -93,3 +93,65 @@ ESCALATION during soak stages 1–2.
 3. Push-capable `full`, unsupervised → after **2 supervised clean full
    runs** (the PR6 validation run counts as the first; the second is
    deliberately scheduled post-PR4d).
+
+## PR6 preflight — evidence & status (2026-08-01, session-executed)
+
+### No-live-consumer evidence (plan §1 re-verification: CONFIRMED)
+
+1. **Scheduler scan**: root's crontab has exactly ONE entry — `0 16 * * *
+   /rebase/nightly_local.sh` — a nightly ACCURACY/PERF CI over a third
+   checkout (`/rebase/vllm-omni`), NOT the rebase orchestrator. Nothing
+   schedules the orchestrator: `nightly_rebase_cron.sh` (designed for
+   18:30 UTC) is present but NOT installed in any crontab/timer. No
+   orchestrator process is running; the parent's `state.json` is the
+   known Jul-25 mid-flight recording (`phase=local_testing`).
+2. **Buildkite, 30 days** (`vllm/vllm-omni-rebase`, read-only API query):
+   100 builds, ALL attributed — the pipeline's OWN daily schedules
+   ("Scheduled build" on `main`, "Scheduled nightly build - Align" on
+   `dev/vllm-align`), the owner's manual API builds (Jul 27–28 v0.26.0
+   session), and webhook builds. ZERO unattributed; zero
+   `imx_op_id`-stamped builds (expected — the copilot has never pushed).
+
+### Preconditions resolved this session
+
+- **#2 tier config**: `AGENT_MODEL="claude-sonnet-5"` was untruthful on
+  `api.deepseek.com` (silently served `deepseek-v4-flash`; the guard
+  refused). Fixed to `deepseek-v4-pro[1m]`; `doctor --probe` now verifies
+  the eco tier round-trips truthfully. `.env` backup:
+  `.env.backup-20260801-155809`.
+- **#3 v1 rollback path**: `REBASE_AGENT_ROOT` already points at the
+  canonical checkout in `.env` — satisfied.
+- **#4 target venv**: `VLLM_OMNI_VENV=/data/zhoutaichang/rebase/.venv`
+  added (the parent's `REBASE_VENV`).
+- **Doctor**: fully green (deps/env/gh/repos/backends/playbooks/moa/probe).
+- **Lock-leak scan**: both vllm-omni checkouts' `locks/omni.lock` FREE.
+- **Mechanical rollback rehearsal (timed): 5 s** from decision to
+  (v1 playbook resolved via `--plan-only`) + (external orchestrator
+  `--dry-run` exit 0). The FULL rehearsal — to a v1 backend actually
+  executing phases — remains the owner-attached gate item.
+
+### Frozen-SHA candidates for the §8 comparison
+
+| World | SHA | Branch |
+|---|---|---|
+| deployed target `rebase/vllm-omni` | `05d0926e` | dev/vllm-align |
+| copilot target `copilot/vllm-omni` | `a61d5c0f` | main |
+| upstream `rebase/vllm` | `ffd46bfab2` | (detached — parent wheel pin) |
+| external agent | `0395bbe` | main (= EXT1 pin) |
+
+### NEW findings needing owner decisions before the supervised run
+
+- **A. Checkout split**: the deployed parent operates on
+  `/data/zhoutaichang/rebase/vllm-omni` (dev/vllm-align) while the
+  copilot adapter points at `/data/zhoutaichang/copilot/vllm-omni`
+  (main). EXT1 exclusion is per-checkout (correct semantics), but the
+  §8 comparison needs ONE target world — recommend pointing
+  `VLLM_OMNI_REPO` at the deployed checkout (or isolated clones per §8)
+  for the validation run.
+- **B. GPU window**: schedule the supervised run OUTSIDE ~16:00–18:00
+  UTC — the nightly perf CI seizes all GPUs and KILLS GPU compute
+  processes after a 1-hour wait; a mid-flight validation would be shot.
+- **C. Buildkite schedule race**: the pipeline's own daily Align
+  schedule builds `dev/vllm-align`; recommend PAUSING the two schedules
+  for the validation window (op-recorded-only cancellation protects us,
+  but a scheduled build would pollute the outcome comparison).
