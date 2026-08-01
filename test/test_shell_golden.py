@@ -305,8 +305,16 @@ def test_empty_command_dropped_loudly(tmp_path):
             {"label": "Pipefail Set Only",
              "commands": ["set -euo pipefail"]},
             {"label": "Option Set Only", "commands": ["set -o pipefail"]},
+            {"label": "Xtrace Set Only", "commands": ["set +o xtrace"]},
+            {"label": "Commented Set", "commands": ["set -euo pipefail # strict"]},
+            {"label": "Chained Set",
+             "commands": ["set -e; set -o pipefail"]},
+            {"label": "Set Then Export",
+             "commands": ["set -e; export A=1"]},
             {"label": "Wrapped Pipefail",
              "commands": ['timeout 20m bash -c "set -euo pipefail"']},
+            {"label": "Wrapped Chained Set",
+             "commands": ['timeout 20m bash -c "set -e; set -o pipefail"']},
             {"label": "Rich Env Job",
              "commands": ["export A=1 B=2 # tuned", "pytest tests/r.py"]},
             {"label": "Quoted Hash Job",
@@ -345,11 +353,13 @@ def test_empty_command_dropped_loudly(tmp_path):
     # no-op tests; a GPU-ineligible one would otherwise be hw-skipped
     # before the run-side guard and vanish from the push gate)
     assert sorted(built.dropped) == [
-        "Block Step", "Chained Export", "Comment Only", "Commented Export",
-        "Export Only", "Export Plus Comment", "Multi Export",
-        "Option Set Only", "Pipefail Set Only", "Semicolon Export",
-        "Wrapped Comment", "Wrapped Empty", "Wrapped Export",
-        "Wrapped Pipefail", "Wrapped Set Only"]
+        "Block Step", "Chained Export", "Chained Set", "Comment Only",
+        "Commented Export", "Commented Set", "Export Only",
+        "Export Plus Comment", "Multi Export", "Option Set Only",
+        "Pipefail Set Only", "Semicolon Export", "Set Then Export",
+        "Wrapped Chained Set", "Wrapped Comment", "Wrapped Empty",
+        "Wrapped Export", "Wrapped Pipefail", "Wrapped Set Only",
+        "Xtrace Set Only"]
     assert built.to_dict()["dropped"] == built.dropped
     # ...but a `set` line with a substitution EXECUTES and must stay
     # runnable — the setup-only grammar admits option words only
@@ -357,5 +367,9 @@ def test_empty_command_dropped_loudly(tmp_path):
         is_runnable_command
     assert is_runnable_command("set $(./collect_args.sh)")
     assert is_runnable_command("set -e\npytest tests/x.py")
+    assert is_runnable_command("set -e; pytest tests/x.py")
     assert not is_runnable_command("set -euo pipefail")
+    assert not is_runnable_command("set -euo pipefail # strict")
+    assert not is_runnable_command("set -e; set -o pipefail")
+    assert not is_runnable_command("set +o xtrace")
     assert not is_runnable_command("set -o pipefail\nexport A=1\n# note")

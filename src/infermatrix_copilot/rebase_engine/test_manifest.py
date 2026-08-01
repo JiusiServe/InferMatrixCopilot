@@ -201,14 +201,20 @@ _PURE_EXPORT_RX = re.compile(
     rf"^\s*{_EXPORT_GROUP}(?:\s*;\s*{_EXPORT_GROUP})*\s*;?(?:\s+#.*)?\s*$")
 _ASSIGN_RX = re.compile(_ASSIGN)
 _EXPORT_SKIP_RX = re.compile(r"\s+|;|export\b")
-# a bare shell-option line (`set -e`, `set +x -u`, `set -euo pipefail`,
-# `set -o pipefail`) configures the shell and runs nothing — setup-only,
-# like a pure export. Tokens are flag/option WORDS only: `$`, quotes, and
-# backticks are excluded so `set $(cmd)` (which executes cmd) can never be
-# classified as a no-op.
+# a bare shell-option line (`set -e`, `set +o xtrace`, `set -euo pipefail`)
+# configures the shell and runs nothing — setup-only, like a pure export.
+# Tokens are flag/option WORDS only: `$`, quotes, and backticks are excluded
+# so `set $(cmd)` (which executes cmd) can never be classified as a no-op.
+# The FULL setup-line grammar chains export and set groups with `;`, allows
+# a trailing `;`, and a whitespace-separated trailing comment — mirroring
+# the export grammar, so `set -euo pipefail # strict`,
+# `set -e; set -o pipefail`, and `set -e; export A=1` are all recognized
+# as running no test.
 _SET_TOKEN = r"[+-]?[A-Za-z_][A-Za-z0-9_-]*"
-_SET_LINE_RX = re.compile(
-    rf"^\s*set\s+{_SET_TOKEN}(?:\s+{_SET_TOKEN})*\s*;?\s*$")
+_SET_GROUP = rf"set\s+{_SET_TOKEN}(?:\s+{_SET_TOKEN})*"
+_SETUP_GROUP = rf"(?:{_EXPORT_GROUP}|{_SET_GROUP})"
+_PURE_SETUP_RX = re.compile(
+    rf"^\s*{_SETUP_GROUP}(?:\s*;\s*{_SETUP_GROUP})*\s*;?(?:\s+#.*)?\s*$")
 
 
 def _export_tokens(line: str) -> list[str]:
@@ -245,7 +251,7 @@ def is_runnable_command(text: str) -> bool:
         s = ln.strip()
         if not s or s.startswith("#"):
             continue
-        if _PURE_EXPORT_RX.match(ln) or _SET_LINE_RX.match(ln):
+        if _PURE_SETUP_RX.match(ln):
             continue
         return True
     return False
