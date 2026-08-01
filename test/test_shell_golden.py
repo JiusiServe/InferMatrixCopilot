@@ -296,13 +296,23 @@ def test_empty_command_dropped_loudly(tmp_path):
              "commands": ["export A=1; export B=2"]},
             {"label": "Wrapped Comment",
              "commands": ['timeout 20m bash -c "# disabled"']},
+            {"label": "Wrapped Empty",
+             "commands": ['timeout 20m bash -c ""']},
+            {"label": "Wrapped Export",
+             "commands": ['timeout 20m bash -c "export A=1"']},
+            {"label": "Wrapped Set Only",
+             "commands": ['timeout 20m bash -c "set -e"']},
             {"label": "Rich Env Job",
              "commands": ["export A=1 B=2 # tuned", "pytest tests/r.py"]},
+            {"label": "Quoted Hash Job",
+             "commands": ["export NOTE='foo # bar' # knob",
+                          "pytest tests/q.py"]},
         ]}))
     built = build_manifest(repo, ManifestSpec.from_manifest(MANIFEST))
     by_slug = {j.slug: j for j in built.jobs}
     assert set(by_slug) == {"real_job", "tab_export", "compound_export",
-                            "singular_form", "rich_env_job"}
+                            "singular_form", "rich_env_job",
+                            "quoted_hash_job"}
     # the compound export line IS the command — never stripped into env
     assert by_slug["compound_export"].command == \
         "export X=1 && pytest tests/y.py"
@@ -315,14 +325,23 @@ def test_empty_command_dropped_loudly(tmp_path):
     # multi-assignment/comment env extraction stays clean and complete
     assert by_slug["rich_env_job"].env == "A=1 B=2"
     assert by_slug["rich_env_job"].command == "pytest tests/r.py"
+    # a `#` INSIDE a quoted value is value, not comment — the child env
+    # must receive the intact assignment, while comment text after a real
+    # boundary never masquerades as env
+    assert by_slug["quoted_hash_job"].env == "NOTE='foo # bar'"
+    import shlex as _shlex
+    assert dict(t.split("=", 1) for t in _shlex.split(
+        by_slug["quoted_hash_job"].env)) == {"NOTE": "foo # bar"}
     # dropped steps are SURFACED, not silent (run side marks structural);
     # comment-only bodies are rc=0 no-ops — the same false-pass class,
-    # including the setup-only bash forms and the wrapped comment (whose
-    # runnability is judged AFTER `timeout ... bash -c` normalization —
-    # a GPU-ineligible wrapped comment would otherwise be skipped before
-    # the run-side guard and vanish from the push gate)
+    # including the setup-only bash forms and the wrapped variants (whose
+    # runnability is judged AFTER `timeout ... bash -c` normalization with
+    # the SAME setup-only grammar — wrapped empty/export/set bodies are
+    # no-op tests; a GPU-ineligible one would otherwise be hw-skipped
+    # before the run-side guard and vanish from the push gate)
     assert sorted(built.dropped) == [
         "Block Step", "Chained Export", "Comment Only", "Commented Export",
         "Export Only", "Export Plus Comment", "Multi Export",
-        "Semicolon Export", "Wrapped Comment"]
+        "Semicolon Export", "Wrapped Comment", "Wrapped Empty",
+        "Wrapped Export", "Wrapped Set Only"]
     assert built.to_dict()["dropped"] == built.dropped

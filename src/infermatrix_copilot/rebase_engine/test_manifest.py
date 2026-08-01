@@ -200,21 +200,50 @@ _EXPORT_GROUP = rf"export\s+{_ASSIGN}(?:\s+{_ASSIGN})*"
 _PURE_EXPORT_RX = re.compile(
     rf"^\s*{_EXPORT_GROUP}(?:\s*;\s*{_EXPORT_GROUP})*\s*;?(?:\s+#.*)?\s*$")
 _ASSIGN_RX = re.compile(_ASSIGN)
+_EXPORT_SKIP_RX = re.compile(r"\s+|;|export\b")
+# a bare shell-option line (`set -e`, `set +x -u`) configures the shell and
+# runs nothing — setup-only, like a pure export
+_SET_LINE_RX = re.compile(r"^\s*set\s+[+-]\w+(?:\s+[+-]\w+)*\s*;?\s*$")
 
 
 def _export_tokens(line: str) -> list[str]:
-    """The K=V tokens of a line that matched `_PURE_EXPORT_RX` (trailing
-    comment removed first so its text can never masquerade as env)."""
-    return _ASSIGN_RX.findall(re.sub(r"\s+#.*$", "", line))
+    """The K=V tokens of a line that matched `_PURE_EXPORT_RX`, scanned
+    LEFT-TO-RIGHT with the same quote-aware grammar — a `#` inside a
+    quoted value stays part of the value (`export NOTE='foo # bar'`),
+    while a `#` at a token boundary starts the comment and nothing after
+    it (e.g. `# B=2 note`) can masquerade as env."""
+    tokens: list[str] = []
+    pos = 0
+    while pos < len(line):
+        skip = _EXPORT_SKIP_RX.match(line, pos)
+        if skip:
+            pos = skip.end()
+            continue
+        if line[pos] == "#":
+            break
+        m = _ASSIGN_RX.match(line, pos)
+        if not m:       # unreachable after a _PURE_EXPORT_RX match
+            break
+        tokens.append(m.group(0))
+        pos = m.end()
+    return tokens
 
 
 def is_runnable_command(text: str) -> bool:
     """True when `text` contains at least one line that would actually DO
-    something in bash — blank and comment-only lines are no-ops whose rc=0
-    would read as a pass (the same false-pass class as an empty command:
-    `# pytest temporarily disabled` must never count as a runnable job)."""
-    return any(ln.strip() and not ln.strip().startswith("#")
-               for ln in (text or "").split("\n"))
+    something in bash. Blank lines, comment lines, pure-export lines, and
+    bare `set` option lines are all rc=0 no-ops whose exit would read as a
+    pass — the §10 false-pass class (`# pytest temporarily disabled`, a
+    wrapper-unwrapped `export A=1`, or `set -e` must never count as a
+    runnable job)."""
+    for ln in (text or "").split("\n"):
+        s = ln.strip()
+        if not s or s.startswith("#"):
+            continue
+        if _PURE_EXPORT_RX.match(ln) or _SET_LINE_RX.match(ln):
+            continue
+        return True
+    return False
 
 
 def _format_env_pairs(env_map: Mapping) -> str:
@@ -269,8 +298,10 @@ def _extract_steps(steps_list: list, source: str,
         if m:
             inner = re.sub(r"^\s*set\s+[+-]?\w+(?:\s+[+-]?\w+)*\s*;?\s*\n",
                            "", m.group(1).strip()).strip()
-            if inner:
-                cmd_normalized = inner
+            # unconditional: an EMPTY body must not resurrect the wrapper
+            # text as a "runnable" command (`timeout 20m bash -c ""` is a
+            # no-op test — fix over the parent, which kept the wrapper)
+            cmd_normalized = inner
 
         # runnability is judged on the NORMALIZED command — a wrapper like
         # `timeout 20m bash -c "# disabled"` reduces to a comment-only body
