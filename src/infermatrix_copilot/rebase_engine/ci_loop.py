@@ -971,6 +971,25 @@ async def run_ci_rounds(*, client: CIClient, ops_dir: Path, run_id: str,
     owned_commits = {op.commit for op in ledger if op.run_id == run_id}
     owned_ids = {op.build_id for op in ledger
                  if op.run_id == run_id and op.build_id}
+    # an unresolved INTENT carries no build id, but its create may have
+    # landed — resolve the orphan by op-id metadata so the pre-push scan
+    # sees it as OURS instead of refusing before `_acquire_build` can
+    # settle it (extra verification round). Lookup only: the settle
+    # itself (adopt / cancel-stale / escalate) stays in `_acquire_build`.
+    for op in ledger:
+        if op.run_id != run_id or op.state != "intent":
+            continue
+        try:
+            for b in client.find_builds_by_meta("imx_op_id", op.op_id):
+                bid = str(b.get("id", ""))
+                if bid:
+                    owned_ids.add(bid)
+        except Exception as exc:  # noqa: BLE001 - cannot prove ownership
+            return CIRunResult(
+                "refused",
+                reason=f"cannot resolve unsettled intent op {op.op_id}: "
+                       f"{exc} — refusing to scan ownership blind",
+                rounds=rounds)
     for rnd in range(max_retries + 1):
         idx = base + rnd
         if rnd == 0 or changes_fn():

@@ -569,6 +569,16 @@ def test_monitor_non_script_jobs_skipped_in_poll_too():
                                 sleep=lambda s: None)
     assert [j.name for j in out.jobs] == ["Real Test"]
     assert out.clean_pass and not out.failed_jobs
+    # a PENDING non-script job is excluded from the pending-wait count —
+    # this call returning promptly (default 4h deadline, no-op sleep) IS
+    # the proof the loop never waited on it
+    ci = ScriptedCI(snapshots=[{"state": "passed", "jobs": [
+        _job("Gate", "waiting", type="waiter"),
+        _job("Real Test", "passed", 0)]}])
+    out = ci_loop.monitor_build(ci, "b", spec=CIClassifySpec(), poll_sec=0,
+                                sleep=lambda s: None)
+    assert [j.name for j in out.jobs] == ["Real Test"]
+    assert out.clean_pass
 
 
 def test_rounds_same_commit_manual_build_refuses(tmp_path):
@@ -631,6 +641,47 @@ def test_rounds_stale_intent_never_approves_new_commit(tmp_path):
     assert fresh[0].state == "created"
     # the monitored build is the FRESH one at the new commit
     assert result.rounds[0].build_id == fresh[0].build_id
+
+
+def test_rounds_active_intent_orphan_is_owned_at_prepush(tmp_path):
+    """Extra verification round: an unsettled intent's orphan build is
+    OURS even though the intent record carries no build id — the pre-push
+    scan must resolve it by op-id metadata instead of refusing as
+    foreign, and the settle path then cancels the stale-commit orphan and
+    builds the current commit."""
+    from dataclasses import asdict
+    intent = ci_loop.BuildOp(op_id="run-1-ci-r0", run_id="run-1",
+                             purpose="initial", branch="dev",
+                             commit="a" * 40)          # the OLD commit
+    ci_loop._durable_write(intent.path(tmp_path / "ops"), asdict(intent))
+
+    class CancelOK(RoundsCI):
+        def __init__(self, bodies):
+            super().__init__(bodies)
+            self.cancelled: list[str] = []
+
+        def cancel_build(self, build_id):
+            self.cancelled.append(build_id)
+            self.builds[build_id]["state"] = "canceled"
+            return self.builds[build_id]
+
+    ci = CancelOK([])
+    orphan = ci.create_build(branch="dev", commit="a" * 40, message="m",
+                             meta_data={"imx_op_id": "run-1-ci-r0"})
+    ci.builds[orphan["id"]].update({"state": "running", "source": "api"})
+    ci.bodies = [{"state": "passed",
+                  "jobs": [_job("Green", "passed", 0)]}]
+    # the ACTIVE orphan is visible to every branch scan
+    ci.latest_builds = lambda branch, states=(), per_page=30: \
+        [ci.builds[orphan["id"]]]
+    result, push_calls = _rounds(ci, tmp_path)
+    assert result.result == "passed", result.reason   # never refused
+    assert push_calls == [1]          # resume: index 0 is ledger-taken
+    assert ci.cancelled == [orphan["id"]]             # stale orphan, ours
+    ops = {o.op_id: o for o in ci_loop.load_ops(tmp_path / "ops")}
+    assert ops["run-1-ci-r0"].state == "cancelled"
+    fresh = [o for o in ops.values() if o.op_id != "run-1-ci-r0"]
+    assert len(fresh) == 1 and fresh[0].commit == "c" * 40
 
 
 def test_monitor_clean_pass_guards():
