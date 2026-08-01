@@ -60,10 +60,15 @@ def _ensure_omni_lock(ctx: StepContext, settings) -> StepResult | None:
         return None
     lock = CheckoutLock(Path(str(settings.omni_path)), "omni")
     if not lock.acquire(blocking=False):
+        if lock.last_failure.startswith("contention"):
+            return StepResult(False, FailureKind.BLOCKED,
+                              "another run holds the checkout lock "
+                              "(locks/omni.lock) — an external or archival "
+                              "run is active on this checkout")
         return StepResult(False, FailureKind.BLOCKED,
-                          "another run holds the checkout lock "
-                          "(locks/omni.lock) — an external or archival "
-                          "run is active on this checkout")
+                          "checkout lock SETUP failed: "
+                          f"{lock.last_failure} — fix the checkout "
+                          "metadata/permissions (retrying cannot help)")
     _RUNTIME["omni_lock"] = lock
     # release on EVERY exit path (blocked module, denied push, exception,
     # cancellation) via the run's lifecycle finalizer — a lock parked in

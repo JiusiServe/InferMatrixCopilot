@@ -483,10 +483,15 @@ def _ensure_checkout_locks(ctx: StepContext, manifest: dict,
         if not lock.acquire(blocking=False):
             for h in held:
                 h.release()
+            if lock.last_failure.startswith("contention"):
+                return StepResult(False, FailureKind.BLOCKED,
+                                  f"another run holds {lock.path} — an "
+                                  "external or archival run is active on "
+                                  "this checkout")
             return StepResult(False, FailureKind.BLOCKED,
-                              f"another run holds {lock.path} — an "
-                              "external or archival run is active on this "
-                              "checkout")
+                              f"checkout lock SETUP failed for {lock.path}"
+                              f": {lock.last_failure} — fix the checkout "
+                              "metadata/permissions (retrying cannot help)")
         held.append(lock)
     _HELD_LOCKS[key] = held
     from ..lifecycle import register_finalizer

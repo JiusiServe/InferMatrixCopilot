@@ -8,12 +8,11 @@ plan doc holds the contracts, this holds the switches and checklists.
 
 - **Canonical external checkout:**
   `/data/zhoutaichang/rebase/vllm-omni-rebase-agent`
-- **Pinned SHA:** `634b002` (`fix(ext1): fail-closed lock-protected
-  exclusion; relative gitdir; baseline under the lock`, on top of
-  `71222e8` and `015344d`) — these three commits ARE the whole EXT1
-  change (guard module + orchestrator hook + fail-closed hygiene
-  shield + baseline-under-lock ordering), independently revertible
-  with `git revert 634b002 71222e8 015344d`.
+- **Pinned SHA:** `8ffcc6c` (EXT1 = the four commits `8ffcc6c`,
+  `634b002`, `71222e8`, `015344d`: guard module + orchestrator hook +
+  fail-closed root-anchored hygiene shield + baseline-under-lock
+  ordering + distinct diagnostics), independently revertible with
+  `git revert 8ffcc6c 634b002 71222e8 015344d`.
 - **Startup guard:** the orchestrator flocks
   `<omni_checkout>/locks/omni.lock` after the dry-run exit and before
   resume detection; refuses (exit 3) when a copilot run holds it.
@@ -42,15 +41,21 @@ plan doc holds the contracts, this holds the switches and checklists.
    correctly refuses; live agent runs need either a truthful backend or
    an explicit, recorded `MODEL_MISMATCH_POLICY=warn` decision. Do not
    run the supervised validation with a silently-substituting backend.
-3. **Target venv configured:** `VLLM_OMNI_VENV` (manifest `repo.venv`)
+3. **v1 rollback path points at the CANONICAL checkout:** a STALE
+   sibling working copy exists at `copilot/vllm-omni-rebase-agent`
+   (no EXT1) and `Settings.rebase_agent_root` DEFAULTS to it — set
+   `REBASE_AGENT_ROOT=/data/zhoutaichang/rebase/vllm-omni-rebase-agent`
+   in `.env` so v1 backend runs import the EXT1-guarded code (or
+   delete/refresh the stale copy).
+4. **Target venv configured:** `VLLM_OMNI_VENV` (manifest `repo.venv`)
    must point at the vllm-omni dev venv; wheel installs and the local
    test loop BLOCK without it.
-4. **DRIFT_TRIAGE has no undecided entries** (currently: all decided —
+5. **DRIFT_TRIAGE has no undecided entries** (currently: all decided —
    #1 flavors frozen, #4 manifest-built slug set, #6 map flavors, #7
    declared-vs-computed mapping).
-5. **Validation branches** `rebase-val-ext-<date>` / `rebase-val-nat-<date>`
+6. **Validation branches** `rebase-val-ext-<date>` / `rebase-val-nat-<date>`
    created; knowledge snapshots taken (`backups/<ts>/`).
-6. **Supervised v3 full run** (`ALLOW_PUSH=1`, human attached) per plan
+7. **Supervised v3 full run** (`ALLOW_PUSH=1`, human attached) per plan
    §8; comparison over the MANIFEST-BUILT slug set (DRIFT #4), module
    outcomes mapped through the golden's `assignment_routing` (DRIFT #7).
 
@@ -66,7 +71,7 @@ plan doc holds the contracts, this holds the switches and checklists.
 | Mutated omni checkout | snapshot restore (attempt-scoped) or manual steps from the run's DIAGNOSTICS |
 | Upstream | per-run scratch clone — discarded automatically by the run finalizer |
 | Runtime knowledge | move `backups/<ts>/` back (non-destructive) |
-| EXT1 | `git revert 634b002 71222e8 015344d` in the canonical checkout |
+| EXT1 | `git revert 8ffcc6c 634b002 71222e8 015344d` in the canonical checkout |
 
 **Abort criteria** (any one triggers rollback + investigation): §8
 validation gate fails; > 25 % end-to-end wall-clock regression; any

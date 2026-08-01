@@ -30,6 +30,18 @@ class RuntimeError_(RuntimeError):
     """Runtime acquisition/teardown failed."""
 
 
+_EXCLUDE_COMMENT = "# rebase checkout flock — never dirt, never cleaned"
+# ROOT-anchored: git's bare `locks/` matches a `locks` dir at ANY depth,
+# which would hide legitimate nested source dirs from status/`add -A`;
+# the runtime dir is exactly `<checkout>/locks`
+_EXCLUDE_LINE = "/locks/"
+
+
+class _GitMetaError(Exception):
+    """Git metadata exists but could not be read/decoded — fail closed,
+    never treat as a non-git directory."""
+
+
 def _ensure_lock_dir_excluded(checkout: Path) -> bool:
     """Mark `locks/` git-ignored via the LOCAL `.git/info/exclude` (never a
     committed file, never dirt itself). Without this the live lock file is
@@ -42,11 +54,14 @@ def _ensure_lock_dir_excluded(checkout: Path) -> bool:
     are exempt from status, non-`-x` clean, and `add -A`.
 
     Returns True when the exclusion is verifiably in place — or the
-    directory is not a git checkout (no git, no hygiene hazard). False
-    when the checkout IS git but the write failed: the caller FAILS
-    CLOSED. Idempotent; worktree-aware (a RELATIVE `gitdir:` pointer
-    resolves against the `.git` file's directory, as git does). Call only
-    while HOLDING the flock — the flock serializes writers, so a losing
+    directory has NO git metadata (no git, no hygiene hazard). False for
+    every failure on a git checkout, INCLUDING unreadable/undecodable
+    metadata (that is "unknown git", never "no git"): the caller FAILS
+    CLOSED. The pattern is ROOT-anchored (`/locks/`, migrating an earlier
+    unanchored line) so nested `locks` source dirs stay visible.
+    Idempotent; worktree-aware (a RELATIVE `gitdir:` pointer resolves
+    against the `.git` file's directory, as git does). Call only while
+    HOLDING the flock — the flock serializes writers, so a losing
     contender never touches the file."""
     checkout = Path(checkout)
     git = checkout / ".git"
@@ -56,7 +71,7 @@ def _ensure_lock_dir_excluded(checkout: Path) -> bool:
         try:
             target = Path(git.read_text().strip()
                           .removeprefix("gitdir:").strip())
-        except OSError:
+        except (OSError, UnicodeDecodeError):
             return False
         if not target.is_absolute():
             target = (checkout / target).resolve()
@@ -68,13 +83,20 @@ def _ensure_lock_dir_excluded(checkout: Path) -> bool:
         info.mkdir(parents=True, exist_ok=True)
         exclude = info / "exclude"
         text = exclude.read_text() if exclude.exists() else ""
-        if "locks/" not in text.split("\n"):
+        lines = text.split("\n")
+        if _EXCLUDE_LINE not in lines or "locks/" in lines:
+            # preserve foreign content verbatim; drop only OUR entries
+            # (incl. an earlier unanchored `locks/`) and trailing blanks
+            kept = [ln for ln in lines
+                    if ln not in ("locks/", _EXCLUDE_LINE,
+                                  _EXCLUDE_COMMENT)]
+            while kept and kept[-1] == "":
+                kept.pop()
             exclude.write_text(
-                (text.rstrip("\n") + "\n" if text.strip() else "")
-                + "# rebase checkout flock — never dirt, never cleaned\n"
-                  "locks/\n")
-        return "locks/" in exclude.read_text().split("\n")
-    except OSError:
+                ("\n".join(kept) + "\n" if kept else "")
+                + f"{_EXCLUDE_COMMENT}\n{_EXCLUDE_LINE}\n")
+        return _EXCLUDE_LINE in exclude.read_text().split("\n")
+    except (OSError, UnicodeDecodeError):
         return False
 
 
@@ -87,6 +109,10 @@ class CheckoutLock:
         self.checkout = Path(checkout)
         self.path = Path(checkout) / "locks" / f"{name}.lock"
         self._fh = None
+        # why the last acquire() returned False — callers must distinguish
+        # CONTENTION (retry later) from SETUP failures (permissions/
+        # metadata: retrying cannot help)
+        self.last_failure = ""
 
     def acquire(self, *, blocking: bool = True) -> bool:
         try:
@@ -96,13 +122,15 @@ class CheckoutLock:
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             fh = open(self.path, "w")
-        except OSError:
+        except OSError as exc:
+            self.last_failure = f"lock setup failed ({exc}) — not contention"
             return False
         flags = fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB)
         try:
             fcntl.flock(fh, flags)
         except OSError:
             fh.close()
+            self.last_failure = "contention: another run holds the lock"
             return False
         # the hygiene shield is installed UNDER the flock (winner-only
         # writer) and is a HARD prerequisite on git checkouts: an unignored
@@ -114,8 +142,13 @@ class CheckoutLock:
             except OSError:
                 pass
             fh.close()
+            self.last_failure = (
+                "hygiene shield could not be installed/verified (git "
+                "metadata unreadable or info/exclude unwritable) — not "
+                "contention")
             return False
         self._fh = fh
+        self.last_failure = ""
         return True
 
     def release(self) -> None:

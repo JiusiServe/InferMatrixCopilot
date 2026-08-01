@@ -146,7 +146,7 @@ def test_relative_gitdir_resolves_against_dotgit_file(tmp_path):
     guard.release_checkout_lock()
     common_exclude = main_repo / ".git" / "info" / "exclude"
     assert common_exclude.exists()
-    assert "locks/" in common_exclude.read_text().split("\n")
+    assert "/locks/" in common_exclude.read_text().split("\n")
     # the copilot side resolves identically
     wt2 = tmp_path / "wt2"
     wt2.mkdir()
@@ -175,6 +175,85 @@ def test_orchestrator_main_ordering():
     build_src = v1_src[v1_src.index("def _ensure_runtime("):]
     assert build_src.index("_ensure_omni_lock(ctx, settings)") \
         < build_src.index("orch.detect_baseline(settings)")
+
+
+def test_unreadable_git_metadata_fails_closed(tmp_path):
+    """Round-3 P1: git metadata that EXISTS but cannot be decoded is
+    "unknown git", never "no git" — acquisition must fail (an unshielded
+    lock on a real git checkout faces the hygiene deletion path), with a
+    setup diagnostic, not a contention claim."""
+    for side in ("external", "copilot"):
+        checkout = tmp_path / f"omni-{side}"
+        checkout.mkdir()
+        (checkout / ".git").write_bytes(b"gitdir: \xff\xfe\x00broken")
+        if side == "external":
+            assert guard.acquire_checkout_lock(checkout) is False
+            assert "not contention" in guard.last_failure()
+        else:
+            lock = CheckoutLock(checkout, "omni")
+            assert lock.acquire(blocking=False) is False
+            assert "not contention" in lock.last_failure
+
+
+def test_exclusion_is_root_anchored(tmp_path):
+    """Round-3 P2: the ignore pattern must be `/locks/` (root-anchored) —
+    a bare `locks/` would hide a legitimate NESTED `locks` source dir
+    from status and `git add -A`. Also migrates an earlier unanchored
+    line and preserves foreign exclude content."""
+    import subprocess
+    checkout = tmp_path / "omni"
+    checkout.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=checkout, check=True)
+    exclude = checkout / ".git" / "info" / "exclude"
+    foreign = exclude.read_text()
+    # simulate an earlier-revision unanchored entry
+    exclude.write_text(foreign + "locks/\n")
+    lock = CheckoutLock(checkout, "omni")
+    assert lock.acquire(blocking=False) is True
+    lines = exclude.read_text().split("\n")
+    assert "/locks/" in lines
+    assert "locks/" not in lines                     # migrated away
+    for ln in foreign.strip().split("\n"):
+        assert ln in lines                           # foreign content kept
+    # a NESTED locks dir stays visible to git
+    nested = checkout / "src" / "locks"
+    nested.mkdir(parents=True)
+    (nested / "semaphore.py").write_text("x")
+    out = subprocess.run(["git", "status", "--porcelain"], cwd=checkout,
+                         capture_output=True, text=True, check=True).stdout
+    assert "src/" in out                             # nested NOT hidden
+    assert "locks/omni.lock" not in out              # root lock hidden
+    lock.release()
+    # the external side writes the identical anchored form
+    checkout2 = tmp_path / "omni2"
+    checkout2.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=checkout2, check=True)
+    assert guard.acquire_checkout_lock(checkout2) is True
+    guard.release_checkout_lock()
+    lines2 = (checkout2 / ".git" / "info" / "exclude").read_text().split("\n")
+    assert "/locks/" in lines2 and "locks/" not in lines2
+
+
+def test_failure_diagnostics_are_distinct(tmp_path):
+    """Round-3 P2: contention and setup failures must be reported
+    differently — a permanent permissions/metadata failure misdiagnosed
+    as "another run holds the lock" sends the operator to wait forever."""
+    import subprocess
+    checkout = tmp_path / "omni"
+    checkout.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=checkout, check=True)
+    holder = CheckoutLock(checkout, "omni")
+    assert holder.acquire(blocking=False) is True
+    assert guard.acquire_checkout_lock(checkout) is False
+    assert guard.last_failure().startswith("contention")
+    loser = CheckoutLock(checkout, "omni")
+    assert loser.acquire(blocking=False) is False
+    assert loser.last_failure.startswith("contention")
+    holder.release()
+    # ...and the orchestrator branches on it (source pin: both messages)
+    src = (GUARD_ROOT / "agent/orchestrator.py").read_text()
+    assert 'reason.startswith("contention")' in src
+    assert "SETUP failed" in src
 
 
 def test_lock_survives_workspace_hygiene(tmp_path):
