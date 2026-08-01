@@ -194,7 +194,8 @@ implements the mode matrix.
 | PR4c | Assembly: test/ci loops, v3 step set incl. `push_gate`, `resolve_effective_mode` + governance write-back (Rev 8 §2.1), transition-table wiring (Rev 8 §3.1), agent-shell scrub + model-download notification hook wiring, **manifest push-section update** (§5.3), v1 re-registered as `repo-rebase-native-v1` **with its four §4 obligations: guard_push authorization at phase-4 entry, explicit-`full`-only mode rejection, `locks/omni.lock` shared-lock participation, `REMOTE_ENABLED` forced off** | **DONE — GPT APPROVED** (5 finding rounds + 2 verification rounds; 51 findings all fixed with dedicated regression tests; final verdict "No findings" at cd93dcb; see §6 items 22–28) |
 | PR5 | Parity completion: tier-1 goldens, `shell_golden.json`, `DRIFT_TRIAGE.md` resolution, report-only dry path, timed rollback rehearsal | **DONE — GPT APPROVED** (5 finding rounds + 2 verification rounds; 14 findings all fixed with dedicated regression tests; final verdict "No findings" at 7f4be98. Shell golden captured 2026-08-01 from the live parent config on this host — 49 §10 jobs, module maps + the routing flavor, 69 watchdog patterns, push bytes, `assignment_routing` behavioral replay; tier-3 production-path suite `test_shell_golden.py`; DRIFT #1/#4 decided + #6/#7 added (see §6.29); report-only dry path ran END-TO-END against the live checkout: 54 jobs, 310 test changes, done/exit-0; **timed rollback rehearsal deferred to the PR6 gate** — it needs the human + a runnable v1 backend session, recorded as a hard PR6 precondition, §8) |
 | EXT1 | External checkout: startup flock guard, pinned SHA | **DONE — GPT APPROVED** (5 finding rounds + 1 verification round; 14 findings all fixed with dedicated regression tests; final verdict "No findings" at external `0395bbe` — the six-commit EXT1, pinned + rollback-listed in `doc/RUNBOOK-rebase.md`. The guard hardened well beyond the plan's sketch: fail-closed root-anchored symlink-hostile ATOMIC hygiene shield under the flock, validated worktree gitdir resolution, errno-precise contention-vs-setup diagnostics, baseline detection under the lock, no checkout fabrication; copilot `CheckoutLock` mirrors every semantic and `test_ext1_checkout_guard.py` pins both sides offline) |
-| PR6 | Cutover (GPU box + human): §8 validation, playbook flip, `.env` arming | planned |
+| CI-W | `v3_ci` remote-CI wiring (PR4c's deferred stub, unblocked by EXT1 + the PR6 preflight): `ci/buildkite.py` provider client behind the neutral `CIClient` protocol, `ci_loop` monitor at parent parity + hardening, `run_ci_rounds` phase-4 orchestrator, `_v3_ci` assembly, `rebase_ci_*` knobs, adapter `rebase.ci` pipeline/env/pattern data + `push.rebase_branch`/`push.signoff` | **DONE — GPT APPROVED** (5 finding rounds + 2 verification rounds + 2 owner-authorized extra verification rounds; 28 findings all fixed with dedicated regression tests; final verdict "No findings" at 5bf7100. The review deliberately hardened BEYOND parent parity — every divergence recorded in §6.30. Offline coverage: `test_ci_wiring.py` (~55 unit/contract tests) + 6 complete `remote_ci` e2e paths in `test_v3_complete_e2e.py` incl. a green run pushing over a real bare remote through the PR3 WAL cluster) |
+| PR6 | Cutover (GPU box + human): §8 validation, playbook flip, `.env` arming | planned — **the §9.1 supervised full run now exercises live remote CI through the CI-W wiring** |
 | PR4d | Knowledge migration + runtime-dir cutover (post-validation; env-bridge deletion moved to PR7 per §2.9) | planned |
 | PR7 | Retirement: delete external delegation, archive parent repo | planned |
 
@@ -396,6 +397,48 @@ still required at execution time (dry-run otherwise).
    (`assignment_paths`) — the three map flavors are never merged, and
    routing is pinned by a behavioral-replay golden verified equal to the
    parent's own output at capture time.
+
+30. **CI-W deliberate divergences from the parent's phase 4 (2026-08-01
+    review, 9 rounds; each pinned by a regression test).** The review
+    identified several parent behaviors as false-green or
+    unowned-mutation vectors and the wiring diverges on purpose:
+    (a) CI-debug dispatch runs serialized AFTER each monitor completes
+    (outcome-equal to the parent's inline per-job dispatch; simpler and
+    deterministic). (b) No local-CI fallback inside phase 4: full mode
+    already carries the local loop's signal, remote_ci is explicitly
+    remote — failures surface as needs-human instead of silently
+    switching test beds. (c) No main-gate build: the pre-existing-failure
+    baseline comes from the adapter-declared `baseline_pipeline`'s best
+    trustworthy COMPLETED build (schedule > api > completed > newest),
+    contributing failures only when that build itself failed — and its
+    logs are fetched on the baseline pipeline's client. (d) Baseline
+    root-cause comparison FAILS CLOSED: missing coordinates, an
+    outage-degraded empty baseline log, or an empty current signature
+    keep the failure actionable (the parent waved all three through as
+    pre-existing). (e) Ownership rules beyond the parent: unowned active
+    builds refuse BEFORE every push (ownership = op-recorded ids +
+    webhook artifacts of commits this run pushed, with intent orphans
+    resolved by op-id metadata); qualifying schedule/api same-commit
+    builds are ADOPTED (monitor-only, never retried, ids conferring no
+    push ownership) on every round purpose; same-commit UI/manual builds
+    refuse; stale-commit ops of THIS run are cancelled (op-recorded)
+    rather than monitored, so a recovered old build can never approve a
+    newly pushed commit. (f) Suite-creation lanes (pipeline upload/load)
+    are STRUCTURAL (`structural_name_patterns` adapter datum) — the
+    parent ignored their failures, letting a build with zero executed
+    tests read green; relatedly `clean_pass` requires a COMPLETED build
+    (passed/failed only), a successful final reconciliation, and at
+    least one job that actually PASSED. (g) Sibling adoption after a
+    refused build accepts only full-suite sources (schedule/api) — a
+    passing partial webhook build is not evidence. (h) A failed job
+    whose type cannot be retried (HTTP 400) stays `failed` (the parent's
+    ignored_infra), retry API errors classify structurally, and a retry
+    attempt never observed again flips its original to `incomplete`.
+    (i) Debug-fix acceptance uses a CONTENT digest (staged+unstaged
+    diffs + untracked bytes/mode/symlink targets), and rejected-attempt
+    rollback restores pre-existing untracked files by content, mode, and
+    type via snapshot blobs — the parent's porcelain-compare/name-only
+    restore leaked rejected edits.
 
 ## 7. Testing state
 

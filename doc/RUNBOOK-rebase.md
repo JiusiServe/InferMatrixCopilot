@@ -29,6 +29,36 @@ plan doc holds the contracts, this holds the switches and checklists.
   fresh clone of the pinned SHA will differ from the deployed instance —
   baseline runs for §8 must use the deployed working tree as-is.
 
+## CI-W — v3_ci remote-CI wiring (DONE, 2026-08-01)
+
+The PR4c stub is gone: `rebase.v3_ci` is live-wired (plan §5 CI-W row,
+§6.30 divergences; GPT "No findings" at 5bf7100). Operational notes:
+
+- **remote_ci and full modes now reach a REAL provider.** The step needs
+  `BUILDKITE_API_TOKEN`, the adapter's `ci.org` + `rebase.ci.pipeline`
+  (build-under-test `vllm-omni-release`) + `rebase.ci.baseline_pipeline`
+  (`vllm-omni-rebase`), and pushes ONLY the adapter-declared
+  `push.rebase_branch` (`dev/vllm-align`) as `push.signoff`
+  (tzhouam <tzhouam@connect.ust.hk>). `ALLOW_PUSH=1` still gates
+  execution (dry-run is FORBIDDEN at phase 4, per the §2.2 matrix).
+- **Knobs** (`.env`, neutral): `REBASE_CI_RETRIES=2`,
+  `REBASE_CI_JOB_RETRY_MAX=2`, `REBASE_CI_POLL_SEC=120`,
+  `REBASE_CI_TIMEOUT_SEC=10800`, `REBASE_CI_SETTLE_SEC=60`.
+- **Ownership safety (supervised-run relevant):** the run refuses to
+  push/create while any UNOWNED build is active on the rebase branch —
+  pause the Buildkite Align schedules during validation (owner decision
+  C) or expect `refused` terminals. Owned = this run's op-recorded
+  builds + webhook artifacts of its own pushes; schedule/api builds at
+  the same commit are adopted monitor-only.
+- **Abort cleanup:** a cancelled/killed run cancels its own op-recorded
+  active builds via the lifecycle finalizer; adopted builds are never
+  touched. Rollback inventory row "running CI → cancel op-recorded
+  builds" is now automatic on abort; manual cancellation stays available
+  through the ledger (`<run_dir>/ci_ops/*.json`) + Buildkite UI.
+- **Push WAL** lives at `<run_dir>/push_wal/` (reverse-order rollback per
+  the inventory below); build ops at `<run_dir>/ci_ops/`; CI job logs at
+  `<run_dir>/ci_logs/`.
+
 ## PR6 preconditions (gate — none may be skipped)
 
 1. **Timed rollback rehearsal** (< 30 min from decision to a running v1
