@@ -139,6 +139,9 @@ def test_relative_gitdir_resolves_against_dotgit_file(tmp_path):
     otherwise a valid worktree layout shields the wrong repository."""
     main_repo = tmp_path / "main"
     (main_repo / ".git" / "worktrees" / "wt").mkdir(parents=True)
+    # every real git dir carries HEAD — the plausibility check requires it
+    (main_repo / ".git" / "worktrees" / "wt" / "HEAD").write_text(
+        "ref: refs/heads/main\n")
     wt = tmp_path / "wt"
     wt.mkdir()
     (wt / ".git").write_text("gitdir: ../main/.git/worktrees/wt\n")
@@ -196,42 +199,47 @@ def test_unreadable_git_metadata_fails_closed(tmp_path):
 
 
 def test_exclusion_is_root_anchored(tmp_path):
-    """Round-3 P2: the ignore pattern must be `/locks/` (root-anchored) —
-    a bare `locks/` would hide a legitimate NESTED `locks` source dir
-    from status and `git add -A`. Also migrates an earlier unanchored
-    line and preserves foreign exclude content."""
+    """Round-3 P2 + round-4 P2: the ignore pattern must be `/locks/`
+    (root-anchored — a bare `locks/` would hide a legitimate NESTED
+    `locks` source dir); ONLY the comment-paired entry we own is
+    migrated, while a FOREIGN standalone `locks/` user rule is preserved
+    verbatim (deleting it could expose/stage deliberately-ignored
+    files)."""
     import subprocess
     checkout = tmp_path / "omni"
     checkout.mkdir()
     subprocess.run(["git", "init", "-q"], cwd=checkout, check=True)
     exclude = checkout / ".git" / "info" / "exclude"
     foreign = exclude.read_text()
-    # simulate an earlier-revision unanchored entry
-    exclude.write_text(foreign + "locks/\n")
+    our_comment = "# rebase checkout flock — never dirt, never cleaned"
+    # a FOREIGN standalone rule + an OWNED (comment-paired) stale entry
+    exclude.write_text(foreign + "locks/\n" + our_comment + "\nlocks/\n")
     lock = CheckoutLock(checkout, "omni")
     assert lock.acquire(blocking=False) is True
     lines = exclude.read_text().split("\n")
-    assert "/locks/" in lines
-    assert "locks/" not in lines                     # migrated away
+    assert "/locks/" in lines                        # anchored entry in
+    assert lines.count("locks/") == 1                # FOREIGN rule kept,
+    #                                                  owned pair migrated
     for ln in foreign.strip().split("\n"):
         assert ln in lines                           # foreign content kept
-    # a NESTED locks dir stays visible to git
-    nested = checkout / "src" / "locks"
-    nested.mkdir(parents=True)
-    (nested / "semaphore.py").write_text("x")
-    out = subprocess.run(["git", "status", "--porcelain"], cwd=checkout,
-                         capture_output=True, text=True, check=True).stdout
-    assert "src/" in out                             # nested NOT hidden
-    assert "locks/omni.lock" not in out              # root lock hidden
+    # a NESTED locks dir stays visible to git... under the ANCHORED entry
+    # (the preserved foreign `locks/` would hide it — that is the USER's
+    # deliberate rule, so verify anchoring on a clean second checkout)
     lock.release()
-    # the external side writes the identical anchored form
     checkout2 = tmp_path / "omni2"
     checkout2.mkdir()
     subprocess.run(["git", "init", "-q"], cwd=checkout2, check=True)
     assert guard.acquire_checkout_lock(checkout2) is True
-    guard.release_checkout_lock()
     lines2 = (checkout2 / ".git" / "info" / "exclude").read_text().split("\n")
     assert "/locks/" in lines2 and "locks/" not in lines2
+    nested = checkout2 / "src" / "locks"
+    nested.mkdir(parents=True)
+    (nested / "semaphore.py").write_text("x")
+    out = subprocess.run(["git", "status", "--porcelain"], cwd=checkout2,
+                         capture_output=True, text=True, check=True).stdout
+    assert "src/" in out                             # nested NOT hidden
+    assert "locks/omni.lock" not in out              # root lock hidden
+    guard.release_checkout_lock()
 
 
 def test_failure_diagnostics_are_distinct(tmp_path):
@@ -254,6 +262,91 @@ def test_failure_diagnostics_are_distinct(tmp_path):
     src = (GUARD_ROOT / "agent/orchestrator.py").read_text()
     assert 'reason.startswith("contention")' in src
     assert "SETUP failed" in src
+
+
+def test_symlinked_lock_paths_fail_closed(tmp_path):
+    """Round-4 P1: a symlinked `locks` dir (or lock file) must refuse —
+    open() would truncate an arbitrary target, and git's `/locks/`
+    DIRECTORY pattern does not match a symlink, so `git clean -fd` could
+    remove it and a later run would lock a DIFFERENT inode at the same
+    path."""
+    import subprocess
+    for side in ("external", "copilot"):
+        checkout = tmp_path / f"omni-dir-{side}"
+        checkout.mkdir()
+        subprocess.run(["git", "init", "-q"], cwd=checkout, check=True)
+        elsewhere = tmp_path / f"elsewhere-{side}"
+        elsewhere.mkdir()
+        (checkout / "locks").symlink_to(elsewhere)
+        if side == "external":
+            assert guard.acquire_checkout_lock(checkout) is False
+            assert "not contention" in guard.last_failure()
+        else:
+            lock = CheckoutLock(checkout, "omni")
+            assert lock.acquire(blocking=False) is False
+            assert "not contention" in lock.last_failure
+    # ...and a symlinked lock FILE inside a real dir refuses too
+    checkout = tmp_path / "omni-file"
+    checkout.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=checkout, check=True)
+    (checkout / "locks").mkdir()
+    victim = tmp_path / "victim.txt"
+    victim.write_text("do not truncate")
+    (checkout / "locks" / "omni.lock").symlink_to(victim)
+    assert guard.acquire_checkout_lock(checkout) is False
+    assert "not contention" in guard.last_failure()
+    lock = CheckoutLock(checkout, "omni")
+    assert lock.acquire(blocking=False) is False
+    assert victim.read_text() == "do not truncate"   # never followed
+
+
+def test_non_conflict_flock_errors_are_setup_failures(tmp_path,
+                                                      monkeypatch):
+    """Round-4 P2: only a lock CONFLICT (EAGAIN/EWOULDBLOCK/EACCES) is
+    contention — ENOLCK/EIO/unsupported-filesystem errors are broken
+    setup, and telling the operator to wait would be wrong."""
+    import errno
+    import fcntl as fcntl_mod
+    import subprocess
+    checkout = tmp_path / "omni"
+    checkout.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=checkout, check=True)
+
+    def broken_flock(fh, flags):
+        raise OSError(errno.ENOLCK, "No locks available")
+    monkeypatch.setattr(fcntl_mod, "flock", broken_flock)
+    assert guard.acquire_checkout_lock(checkout) is False
+    assert "not contention" in guard.last_failure()
+    assert "flock" in guard.last_failure()
+    lock = CheckoutLock(checkout, "omni")
+    assert lock.acquire(blocking=False) is False
+    assert "not contention" in lock.last_failure
+
+
+def test_malformed_git_pointers_fail_closed(tmp_path):
+    """Round-4 P2: existing-but-INVALID `.git` pointers (no `gitdir:`
+    prefix, empty target, multiline, or a target that is not a git dir)
+    follow the same fail-closed path as undecodable metadata — an empty
+    `gitdir:` must never resolve to the checkout itself and 'shield' an
+    invented `info/` there."""
+    cases = ["random contents\n", "gitdir:\n", "gitdir: \n",
+             "gitdir: a\nb\n", "gitdir: ../does/not/exist\n"]
+    for i, content in enumerate(cases):
+        for side in ("external", "copilot"):
+            checkout = tmp_path / f"omni-{i}-{side}"
+            checkout.mkdir()
+            (checkout / ".git").write_text(content)
+            if side == "external":
+                assert guard.acquire_checkout_lock(checkout) is False, \
+                    (content, side)
+                assert "not contention" in guard.last_failure()
+            else:
+                lock = CheckoutLock(checkout, "omni")
+                assert lock.acquire(blocking=False) is False, \
+                    (content, side)
+                assert "not contention" in lock.last_failure
+            # no invented shield location was created
+            assert not (checkout / "info").exists()
 
 
 def test_lock_survives_workspace_hygiene(tmp_path):

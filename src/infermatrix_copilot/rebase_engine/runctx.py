@@ -68,13 +68,23 @@ def _ensure_lock_dir_excluded(checkout: Path) -> bool:
     if git.is_dir():
         info = git / "info"
     elif git.is_file():  # linked worktree: `gitdir: …/.git/worktrees/<n>`
+        # existing-but-INVALID metadata is as untrustworthy as unreadable
+        # metadata — an empty/garbled pointer must never resolve to an
+        # invented path we then "shield"
         try:
-            target = Path(git.read_text().strip()
-                          .removeprefix("gitdir:").strip())
+            raw = git.read_text().strip()
         except (OSError, UnicodeDecodeError):
             return False
+        if not raw.startswith("gitdir:"):
+            return False
+        target_s = raw[len("gitdir:"):].strip()
+        if not target_s or "\n" in target_s:
+            return False
+        target = Path(target_s)
         if not target.is_absolute():
             target = (checkout / target).resolve()
+        if not (target / "HEAD").exists():  # every real git dir has HEAD
+            return False
         info = (target.parent.parent / "info"
                 if target.parent.name == "worktrees" else target / "info")
     else:
@@ -84,12 +94,26 @@ def _ensure_lock_dir_excluded(checkout: Path) -> bool:
         exclude = info / "exclude"
         text = exclude.read_text() if exclude.exists() else ""
         lines = text.split("\n")
-        if _EXCLUDE_LINE not in lines or "locks/" in lines:
-            # preserve foreign content verbatim; drop only OUR entries
-            # (incl. an earlier unanchored `locks/`) and trailing blanks
-            kept = [ln for ln in lines
-                    if ln not in ("locks/", _EXCLUDE_LINE,
-                                  _EXCLUDE_COMMENT)]
+        # OWNED entries are ONLY comment-paired lines: a standalone user
+        # rule that happens to read `locks/` is FOREIGN and preserved
+        # verbatim (deleting it could expose/stage deliberately-ignored
+        # files)
+        owned_stale = any(
+            lines[i] == _EXCLUDE_COMMENT and i + 1 < len(lines)
+            and lines[i + 1] == "locks/" for i in range(len(lines)))
+        if _EXCLUDE_LINE not in lines or owned_stale:
+            kept: list[str] = []
+            i = 0
+            while i < len(lines):
+                if lines[i] == _EXCLUDE_COMMENT:
+                    if i + 1 < len(lines) and lines[i + 1] in (
+                            "locks/", _EXCLUDE_LINE):
+                        i += 2      # drop OUR comment+entry pair
+                    else:
+                        i += 1      # drop an orphaned comment of ours
+                    continue
+                kept.append(lines[i])
+                i += 1
             while kept and kept[-1] == "":
                 kept.pop()
             exclude.write_text(
@@ -119,18 +143,40 @@ class CheckoutLock:
             import fcntl
         except ImportError:  # pragma: no cover - Windows
             return True  # documented degradation: no fcntl, no exclusion
+        import errno
+        import os
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            fh = open(self.path, "w")
+            # symlink-hostile: a symlinked `locks` dir or lock file would
+            # (a) let open() truncate an arbitrary target and (b) NOT match
+            # git's `/locks/` directory pattern — `git clean -fd` could
+            # remove the symlink and a later run would lock a DIFFERENT
+            # inode at the same path
+            if self.path.parent.is_symlink() \
+                    or not self.path.parent.is_dir():
+                raise OSError(errno.EINVAL,
+                              "locks dir is not a real directory: "
+                              f"{self.path.parent}")
+            fd = os.open(self.path,
+                         os.O_CREAT | os.O_RDWR
+                         | getattr(os, "O_NOFOLLOW", 0), 0o644)
+            fh = os.fdopen(fd, "r+")
         except OSError as exc:
             self.last_failure = f"lock setup failed ({exc}) — not contention"
             return False
         flags = fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB)
         try:
             fcntl.flock(fh, flags)
-        except OSError:
+        except OSError as exc:
             fh.close()
-            self.last_failure = "contention: another run holds the lock"
+            # only a lock CONFLICT is contention; ENOLCK/EIO/unsupported-fs
+            # failures mean broken setup and waiting cannot help
+            if exc.errno in (errno.EAGAIN, errno.EWOULDBLOCK,
+                             errno.EACCES):
+                self.last_failure = "contention: another run holds the lock"
+            else:
+                self.last_failure = (f"lock setup failed (flock: {exc}) — "
+                                     "not contention")
             return False
         # the hygiene shield is installed UNDER the flock (winner-only
         # writer) and is a HARD prerequisite on git checkouts: an unignored
