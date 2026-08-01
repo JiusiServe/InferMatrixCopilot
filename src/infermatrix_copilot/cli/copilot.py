@@ -212,7 +212,7 @@ class Copilot:
         run_dir.mkdir(parents=True, exist_ok=True)
         (run_dir / "task.json").write_text(json.dumps({
             "spec": spec.model_dump(), "playbook": playbook_to_doc(resolution.playbook),
-            "invocation_id": os.environ.get("OMNI_INVOCATION_ID", ""),
+            "invocation_id": os.environ.get("IMX_INVOCATION_ID", ""),
         }, indent=2))
         return self._execute(resolution.playbook, spec, run_dir,
                              resolution_mode=resolution.mode, tier=resolution.tier)
@@ -280,7 +280,7 @@ class Copilot:
         run_dir.mkdir(parents=True, exist_ok=True)
         (run_dir / "task.json").write_text(json.dumps({
             "spec": spec.model_dump(), "playbook": playbook_to_doc(playbook),
-            "invocation_id": os.environ.get("OMNI_INVOCATION_ID", ""),
+            "invocation_id": os.environ.get("IMX_INVOCATION_ID", ""),
         }, indent=2))
         return self._execute(playbook, spec, run_dir,
                              resolution_mode="explicit", tier=spec.tier)

@@ -274,7 +274,12 @@ class Settings(BaseSettings):
     # Patch-review trigger thresholds
     large_diff_lines: int = 400
     large_diff_files: int = 8
-    high_risk_modules: list[str] = ["worker_runner", "model_executor", "scheduler"]
+    # REPO-NEUTRAL default: which modules are risky is REPO knowledge — the
+    # adapter's declared tiers win and this is only the adapter-less
+    # fallback (an unknown repo makes no risk claim). The v1-era adapter-
+    # zero module names that used to sit here were a neutrality leak
+    # (2026-08-01 audit); the adapter manifest declares them.
+    high_risk_modules: list[str] = []
 
     # Metrics (eval/METRICS_RESEARCH.md) — per-run metrics.json: CATQ = Q·S/C.
     # Reference budgets are EXPLICIT deployment assumptions (RQS3e precedent):

@@ -142,11 +142,11 @@ def main(argv: list[str] | None = None) -> int:
 
     from .. import tracing as _tracing
 
-    inv_id = os.environ.get("OMNI_INVOCATION_ID") or f"inv-{_uuid.uuid4().hex[:8]}"
+    inv_id = os.environ.get("IMX_INVOCATION_ID") or f"inv-{_uuid.uuid4().hex[:8]}"
     inv_dir = _Path.home() / ".infermatrix-copilot" / "invocations"
     inv_dir.mkdir(parents=True, exist_ok=True)
     _tracing.init(inv_id, inv_dir / f"{inv_id}.trace.jsonl")
-    os.environ["OMNI_INVOCATION_ID"] = inv_id  # visible to the run subprocess/task
+    os.environ["IMX_INVOCATION_ID"] = inv_id  # visible to the run subprocess/task
 
     copilot = Copilot()
 

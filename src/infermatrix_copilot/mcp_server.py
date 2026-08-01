@@ -62,7 +62,7 @@ class CopilotMCP:
         rs.startup_reconcile(self.run_root)
         self._q: "queue.Queue[str]" = queue.Queue()
         self._worker = threading.Thread(target=self._worker_loop, daemon=True,
-                                        name="omni-mcp-worker")
+                                        name="imx-mcp-worker")
         self._worker.start()
 
     # -- worker: one run at a time, each an isolated subprocess ---------------

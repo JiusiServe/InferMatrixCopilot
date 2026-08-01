@@ -2,7 +2,7 @@
 (plan §4 / Rev 8 §3.4).
 
 A runtime owns one run's process-lifetime resources: the substate handle,
-named checkout flocks (e.g. the shared `omni.lock` every user of a checkout
+named checkout flocks (the shared per-checkout lock every user of a checkout
 must hold), registered finalizers, and the abort flag. The registry hands out
 runtimes keyed by ``(run_dir, event-loop id)`` — asyncio primitives created
 inside a runtime must never cross ``asyncio.run`` boundaries, so a second
