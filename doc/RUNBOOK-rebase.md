@@ -66,7 +66,7 @@ plan doc holds the contracts, this holds the switches and checklists.
 | Mutated omni checkout | snapshot restore (attempt-scoped) or manual steps from the run's DIAGNOSTICS |
 | Upstream | per-run scratch clone — discarded automatically by the run finalizer |
 | Runtime knowledge | move `backups/<ts>/` back (non-destructive) |
-| EXT1 | `git revert 015344d` in the canonical checkout |
+| EXT1 | `git revert 71222e8 015344d` in the canonical checkout |
 
 **Abort criteria** (any one triggers rollback + investigation): §8
 validation gate fails; > 25 % end-to-end wall-clock regression; any
