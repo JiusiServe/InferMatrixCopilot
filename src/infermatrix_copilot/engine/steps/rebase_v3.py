@@ -112,6 +112,27 @@ def _target_venv(manifest: dict) -> str:
     return expand_path((manifest.get("repo") or {}).get("venv", ""))
 
 
+def _venv_declared(manifest: dict) -> bool:
+    """Whether the adapter DECLARES a runtime venv at all — declared-but-
+    unresolved blocks (misconfiguration must surface), while an adapter
+    that declares none (non-venv stack) proceeds with the inherited env
+    (2026-08-01 neutrality audit: the venv workflow is adapter data, not
+    a core requirement)."""
+    return "venv" in (manifest.get("repo") or {})
+
+
+def _baseline_ref(manifest: dict) -> str:
+    """`<remote>/<default_branch>` from adapter data — never a hardcoded
+    origin/main (2026-08-01 neutrality audit)."""
+    repo = manifest.get("repo") or {}
+    return f"{repo.get('remote', 'origin')}/{repo.get('default_branch', 'main')}"
+
+
+def _test_roots(manifest: dict) -> tuple:
+    tm = (manifest.get("rebase") or {}).get("test_manifest") or {}
+    return tuple(tm.get("test_change_roots") or ("tests/",))
+
+
 def _target_test_env(ctx: StepContext, manifest: dict,
                      *, pythonpath_prepend: str | None = None) -> dict:
     """The env for TARGET-repo subprocesses (tests, precommit, wheel
@@ -197,7 +218,9 @@ def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
         if not paths:
             return {"error": "test_paths is required"}
         markers = str(kw.get("markers", "") or "")
-        cmd = "python -m pytest " + " ".join(str(p) for p in paths)
+        runner_cmd = ((manifest.get("rebase") or {}).get("testing") or {}) \
+            .get("pytest_command", "python -m pytest")
+        cmd = f"{runner_cmd} " + " ".join(str(p) for p in paths)
         if markers:
             cmd += f" -m '{markers}'"
         runner = TestRunner(repo_root=Path(repo),
@@ -597,13 +620,10 @@ async def _v3_prelude(ctx: StepContext) -> StepResult:
             return repo
         pin_data = ((manifest.get("rebase") or {}).get("wheel") or {}) \
             .get("pin")
-        if not pin_data:
-            return StepResult(False, FailureKind.BLOCKED,
-                              f"{mode} needs the manifest wheel.pin spec — "
-                              "cannot verify the prepared tree")
-        if not wheel_mod.pin_present(Path(repo),
-                                     wheel_mod.PinSpec.from_manifest(
-                                         pin_data)):
+        # the prepared-tree pin check applies only to adapters WITH a
+        # wheel workflow (2026-08-01 audit: wheel-less stacks are legal)
+        if pin_data and not wheel_mod.pin_present(
+                Path(repo), wheel_mod.PinSpec.from_manifest(pin_data)):
             return StepResult(False, FailureKind.BLOCKED,
                               f"{mode} operates on a PREPARED tree, but the "
                               "CI Dockerfile carries no wheel pin — run "
@@ -709,6 +729,11 @@ async def _v3_wheel(ctx: StepContext) -> StepResult:
     if blocked is not None:
         return blocked
     rb = manifest.get("rebase") or {}
+    if not rb.get("wheel"):
+        return StepResult(False, FailureKind.BLOCKED,
+                          "the adapter declares no rebase.wheel workflow — "
+                          "full mode needs the wheel data (report_only/"
+                          "local_ci remain available)")
     wheel_spec = wheel_mod.WheelSpec.from_manifest(rb["wheel"])
     pin = wheel_mod.PinSpec.from_manifest(rb["wheel"]["pin"])
     upstream = _ensure_upstream_scratch(ctx)
@@ -717,9 +742,9 @@ async def _v3_wheel(ctx: StepContext) -> StepResult:
     venv = _target_venv(manifest)
     if not venv:
         return StepResult(False, FailureKind.BLOCKED,
-                          "the target repo venv is not configured (manifest "
-                          "repo.venv / its env var) — refusing to install "
-                          "the wheel into the copilot's own environment")
+                          "the wheel workflow requires the target venv "
+                          "(manifest repo.venv / its env var) — refusing "
+                          "to install into the copilot's own environment")
     import subprocess
     pre_head = subprocess.run(
         ["git", "-C", upstream, "rev-parse", "HEAD"],
@@ -864,7 +889,9 @@ async def _run_debug_agent(ctx: StepContext, manifest: dict, module: str,
     paths = RebasePaths(omni_path=repo_root,
                         vllm_path=ctx.state.get("upstream_path", ""),
                         env=_agent_shell_env(ctx, manifest, repo_root,
-                                             adapter_dir))
+                                             adapter_dir),
+                        baseline_ref=_baseline_ref(manifest),
+                        test_roots=_test_roots(manifest))
     tools = build_rebase_tools(
         defs, paths, _build_backends(ctx, manifest, repo_root, target))
     prompt = build_debug_prompt(module or slug, traceback_text,
@@ -953,12 +980,16 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
     import os
     from ...testing.runner import TestJob, TestRunner
     from ...testing.watchdog import WatchdogPatterns
-    if not _target_venv(manifest):
+    if _venv_declared(manifest) and not _target_venv(manifest):
         return StepResult(False, FailureKind.BLOCKED,
-                          "the target repo venv is not configured (manifest "
-                          "repo.venv / its env var) — raw manifest commands "
+                          "the adapter DECLARES a runtime venv (repo.venv) "
+                          "but its env var is unset — raw manifest commands "
                           "would execute against the copilot's own "
                           "environment")
+    if not _venv_declared(manifest):
+        ctx.trace.record("capability_note", capability="repo.venv",
+                         detail="adapter declares no runtime venv — test "
+                                "jobs run with the inherited environment")
     rb = manifest.get("rebase") or {}
     adapter_dir = Path(ctx.settings.adapters_dir) / \
         ((ctx.state.get("task_spec") or {}).get("repo", "")).replace("-", "_")
@@ -1007,7 +1038,8 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
     worktree_path = ctx.run_dir / "main_worktree"
 
     def baseline_fn(slug: str) -> tl.TestRunResult | None:
-        wt = tl.ensure_main_worktree(Path(repo), worktree_path)
+        wt = tl.ensure_main_worktree(Path(repo), worktree_path,
+                                     base_ref=_baseline_ref(manifest))
         if wt is None:
             return None
         wt_runner = TestRunner(
@@ -1284,7 +1316,9 @@ async def _v3_module_rebase(ctx: StepContext) -> StepResult:
     paths = RebasePaths(omni_path=repo_root,
                         vllm_path=ctx.state.get("upstream_path", ""),
                         env=_agent_shell_env(ctx, manifest, repo_root,
-                                             adapter_dir))
+                                             adapter_dir),
+                        baseline_ref=_baseline_ref(manifest),
+                        test_roots=_test_roots(manifest))
     tools = build_rebase_tools(
         defs, paths, _build_backends(ctx, manifest, repo_root, target))
     hooks = load_hooks(adapter_dir, manifest)

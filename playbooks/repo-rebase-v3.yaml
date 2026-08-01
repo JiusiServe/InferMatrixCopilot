@@ -12,7 +12,9 @@ provenance:
   source: full merge of vllm-omni-rebase-agent per doc/PLAN-rebase-merge.md
     (Rev 8 normative contracts; delivery PR4c)
 task_kinds: [repo_rebase]
-repos: [vllm-omni]
+# repo-NEUTRAL (2026-08-01 audit): recall is gated by `requires ⊆ the
+# adapter's capabilities`, not by repo name — a second repo onboards via
+# its adapter alone (status: candidate keeps it planner-invisible anyway)
 requires: [modules, upstream.fork_tracking, ci.provider]
 # mode governance (Rev 8 §2.1): resolve_effective_mode runs before plan echo
 # and confirmation; `when:` gates below use ONLY the seeded mode_* flags.

@@ -56,6 +56,12 @@ class ManifestSpec:
     # slug -> setup command (parent CI_TEST_SETUP: pre-run model downloads;
     # feeds the runner's model-download notification hook)
     setup_map: Mapping[str, str] = field(default_factory=dict)
+    # ADAPTER data, not assumptions (2026-08-01 neutrality audit): the
+    # baseline ref (repo.remote/default_branch) change classification
+    # diffs against, and the tree roots whose changes count as TEST
+    # changes — a repo on `master` or a non-`tests/` layout supplies its own
+    baseline_ref: str = "origin/main"
+    test_change_roots: Sequence[str] = ("tests/",)
 
     @classmethod
     def from_manifest(cls, manifest: Mapping) -> "ManifestSpec":
@@ -80,6 +86,10 @@ class ManifestSpec:
             default_queue=tm.get("default_queue", ""),
             priority_source=tm.get("priority_source", "ready"),
             setup_map=dict(tm.get("setup_map") or {}),
+            baseline_ref=(f"{(manifest.get('repo') or {}).get('remote', 'origin')}"
+                          f"/{(manifest.get('repo') or {}).get('default_branch', 'main')}"),
+            test_change_roots=tuple(tm.get("test_change_roots")
+                                    or ("tests/",)),
         )
 
 
@@ -377,12 +387,21 @@ def _parse_ci_yaml(repo: Path, spec: ManifestSpec,
     return list(all_jobs.values())
 
 
-def _classify_test_changes(repo: Path) -> list[TestChange]:
+def _classify_test_changes(repo: Path,
+                           spec: ManifestSpec) -> list[TestChange]:
     try:
         proc = subprocess.run(
-            ["git", "-C", str(repo), "diff", "--name-status", "origin/main",
-             "--", "tests/"], capture_output=True, text=True, timeout=30)
+            ["git", "-C", str(repo), "diff", "--name-status",
+             spec.baseline_ref, "--", *spec.test_change_roots],
+            capture_output=True, text=True, timeout=30)
     except Exception:  # noqa: BLE001 - parent parity: best-effort
+        return []
+    if proc.returncode != 0:
+        # best-effort stays parent parity, but NEVER silent: an
+        # unresolvable baseline ref would otherwise read as "no
+        # test changes" and mislead every module plan
+        log.warning("test-change classification failed (%s): %s",
+                    spec.baseline_ref, proc.stderr.strip()[:200])
         return []
     changes: list[TestChange] = []
     for line in proc.stdout.split("\n"):
@@ -505,7 +524,7 @@ def build_manifest(repo: Path, spec: ManifestSpec) -> BuiltManifest:
     repo = Path(repo)
     dropped: list[str] = []
     jobs = _parse_ci_yaml(repo, spec, dropped)
-    changes = _classify_test_changes(repo)
+    changes = _classify_test_changes(repo, spec)
     rename_map = {c.path: c.new_path for c in changes
                   if c.change_type == "renamed" and c.new_path}
     _validate_file_paths(jobs, repo, spec, rename_map)

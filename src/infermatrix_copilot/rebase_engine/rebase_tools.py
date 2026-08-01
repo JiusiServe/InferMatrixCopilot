@@ -36,11 +36,17 @@ Handler = Callable[..., dict]
 @dataclass(frozen=True)
 class RebasePaths:
     """Where the target/upstream checkouts and the run env live — the values
-    the parent read from env/config, now explicit."""
+    the parent read from env/config, now explicit. `baseline_ref` and
+    `test_roots` are ADAPTER data (repo.remote/default_branch and the
+    manifest's test-change roots): a repo on `master`, another remote, or a
+    non-`tests/` layout supplies its own (2026-08-01 neutrality audit —
+    these were hardcoded `origin/main` / `tests/`)."""
 
     omni_path: str
     vllm_path: str
     env: Mapping[str, str] = field(default_factory=dict)  # full child env
+    baseline_ref: str = "origin/main"
+    test_roots: tuple = ("tests/",)
 
 
 def _unwired(name: str) -> Handler:
@@ -197,10 +203,12 @@ def build_rebase_tools(tool_defs: list[dict], paths: RebasePaths,
         return _git_show(paths.vllm_path, f"{ref}:{file_path}")
 
     def handle_git_show_omni_main(file_path: str, **_: Any) -> dict:
-        return _git_show(paths.omni_path, f"origin/main:{file_path}")
+        return _git_show(paths.omni_path,
+                         f"{paths.baseline_ref}:{file_path}")
 
     def handle_git_show_test_baseline(test_path: str, **_: Any) -> dict:
-        return _git_show(paths.omni_path, f"origin/main:{test_path}")
+        return _git_show(paths.omni_path,
+                         f"{paths.baseline_ref}:{test_path}")
 
     def handle_git_log_upstream(path: str, max_count: int = 10,
                                 **_: Any) -> dict:
@@ -230,8 +238,9 @@ def build_rebase_tools(tool_defs: list[dict], paths: RebasePaths,
 
     def handle_git_diff_tests_upstream(**_: Any) -> dict:
         try:
-            proc = _run(["git", "-C", paths.omni_path, "diff", "--name-status",
-                         "origin/main", "--", "tests/"], timeout=30)
+            proc = _run(["git", "-C", paths.omni_path, "diff",
+                         "--name-status", paths.baseline_ref, "--",
+                         *paths.test_roots], timeout=30)
             changes = [ln.strip() for ln in proc.stdout.split("\n")
                        if ln.strip()]
             return {"changes": changes, "count": len(changes)}

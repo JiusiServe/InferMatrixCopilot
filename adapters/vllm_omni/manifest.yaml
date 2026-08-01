@@ -157,6 +157,8 @@ rebase:
     yaml_dir: .buildkite/cuda
     pipelines: {test-merge.yml: merge, test-ready.yml: ready, test-nightly.yml: nightly}
     priority_source: ready
+    # tree roots whose baseline diffs count as TEST changes
+    test_change_roots: [tests/]
     default_queue: gpu_1_queue
     queue_map:
       gpu_1_queue: [1, any]
