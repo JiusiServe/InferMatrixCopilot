@@ -208,26 +208,51 @@ def _git_out(repo: Path, args: list[str], timeout: int = 60) -> str:
         return ""
 
 
-def snapshot_worktree(repo: Path) -> tuple[str, dict[str, str]]:
+def _remove_path(path: Path) -> None:
+    """Remove whatever occupies `path` now (file, symlink, or a directory
+    a rejected attempt put where a file used to be)."""
+    import shutil
+    if path.is_dir() and not path.is_symlink():
+        shutil.rmtree(path, ignore_errors=True)
+    elif path.exists() or path.is_symlink():
+        try:
+            path.unlink()
+        except OSError:
+            pass
+
+
+def snapshot_worktree(repo: Path) -> tuple[str, dict[str, dict]]:
     """Snapshot the working tree before a debug attempt.
 
     Returns ``(snapshot_commit, untracked)``. The snapshot commit is a
     dangling commit from ``git stash create`` capturing all TRACKED files
     (it does NOT modify the worktree or index); a clean tree falls back to
-    HEAD. Untracked files map path → blob oid (``git hash-object -w``):
-    the CONTENT is snapshotted too, because `stash create` skips untracked
-    files entirely — without the blobs, a rejected attempt's edit to a
-    pre-existing untracked file (e.g. one an earlier ACCEPTED fix created)
-    would survive restoration and leak into the next commit (2026-08-01
-    CI-wiring review)."""
-    untracked: dict[str, str] = {}
+    HEAD. Untracked files map path → {oid, mode, link}: `stash create`
+    skips untracked files entirely, so their CONTENT (blob via
+    ``hash-object -w``), permission bits, and symlink targets are
+    snapshotted here — without them a rejected attempt's edit, chmod, or
+    type change to a pre-existing untracked file (e.g. one an earlier
+    ACCEPTED fix created) would survive restoration and leak into the
+    next commit (2026-08-01 CI-wiring review, rounds 2-3)."""
+    import os
+    untracked: dict[str, dict] = {}
     for f in _git_out(repo, ["ls-files", "--others",
                              "--exclude-standard"]).splitlines():
         f = f.strip()
         if not f:
             continue
-        oid = _git_out(repo, ["hash-object", "-w", "--", f]).strip()
-        untracked[f] = oid
+        p = Path(repo) / f
+        entry = {"oid": "", "mode": 0, "link": ""}
+        try:
+            if p.is_symlink():
+                entry["link"] = os.readlink(p)
+            elif p.is_file():
+                entry["oid"] = _git_out(repo, ["hash-object", "-w", "--",
+                                               f]).strip()
+                entry["mode"] = p.stat().st_mode & 0o777
+        except OSError:
+            pass
+        untracked[f] = entry
     snap = _git_out(repo, ["stash", "create",
                            "pre-debug-attempt snapshot"]).strip()
     if not snap:
@@ -289,24 +314,50 @@ def restore_worktree(repo: Path, snap: str,
                          "attempt: %s", f)
             except OSError:
                 pass
-        # pre-existing untracked files: restore CONTENT from the snapshot
-        # blobs (modified or deleted by the attempt alike)
-        for f, oid in blobs.items():
-            if not oid:
-                continue
-            cur = _git_out(repo, ["hash-object", "--", f]).strip() \
-                if (Path(repo) / f).is_file() else ""
-            if cur == oid:
-                continue
-            blob = subprocess.run(
-                ["git", "-C", str(repo), "cat-file", "blob", oid],
-                capture_output=True, timeout=60)
-            if blob.returncode == 0:
-                path = Path(repo) / f
+        # pre-existing untracked files: restore CONTENT, MODE, and TYPE
+        # from the snapshot (edited, chmod-ed, deleted, or replaced by a
+        # directory/symlink alike)
+        import os
+        for f, meta in blobs.items():
+            if isinstance(meta, str):        # legacy oid-only form
+                meta = {"oid": meta, "mode": 0, "link": ""}
+            path = Path(repo) / f
+            try:
+                if meta.get("link"):
+                    cur = os.readlink(path) if path.is_symlink() else None
+                    if cur == meta["link"]:
+                        continue
+                    _remove_path(path)
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    os.symlink(meta["link"], path)
+                    log.info("  Restored pre-existing untracked symlink "
+                             "after rejected debug attempt: %s", f)
+                    continue
+                oid = meta.get("oid", "")
+                if not oid:
+                    continue
+                plain_file = path.is_file() and not path.is_symlink()
+                cur = _git_out(repo, ["hash-object", "--", f]).strip() \
+                    if plain_file else ""
+                mode = int(meta.get("mode") or 0)
+                mode_now = (path.stat().st_mode & 0o777) if plain_file \
+                    else -1
+                if cur == oid and (not mode or mode_now == mode):
+                    continue
+                blob = subprocess.run(
+                    ["git", "-C", str(repo), "cat-file", "blob", oid],
+                    capture_output=True, timeout=60)
+                if blob.returncode != 0:
+                    continue
+                _remove_path(path)
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(blob.stdout)
+                if mode:
+                    os.chmod(path, mode)
                 log.info("  Restored pre-existing untracked file after "
                          "rejected debug attempt: %s", f)
+            except OSError:
+                continue
     except Exception as exc:  # noqa: BLE001
         log.warning("  Could not fully restore worktree after rejected "
                     "attempt: %s", exc)

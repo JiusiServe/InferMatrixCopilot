@@ -258,11 +258,14 @@ class MonitorOutcome:
     def clean_pass(self) -> bool:
         """True only when there is nothing left to act on or wait for.
         Baseline-matched failures still count as clean (`ignored_baseline`);
-        unresolved failures, never-finished jobs, budget kills, a refused
-        (no-run) build, a failed final reconciliation, or a build that
-        produced NO job signal at all never do — a signal-less monitor
-        must not read as success."""
-        return (not self.no_run and self.build_state != "monitor_timeout"
+        unresolved failures, never-finished jobs, budget kills, a failed
+        final reconciliation, or a build that produced NO job signal at
+        all never do — and only a build that RAN TO COMPLETION
+        (`passed`, or `failed` with every failure explained away) can be
+        clean: a canceled/blocked/refused build may have prevented later
+        dynamic jobs from ever appearing, so its visible green jobs prove
+        nothing (round-3 review)."""
+        return (self.build_state in ("passed", "failed")
                 and self.reconciled
                 and bool(self.jobs) and not self.failed_jobs
                 and not self.incomplete_jobs and not self.budget_timeouts)
@@ -719,11 +722,38 @@ def op_index_base(ops: Sequence[BuildOp], run_id: str) -> int:
     return max(idxs) + 1 if idxs else 0
 
 
+def _foreign_active(active: Sequence[dict], owned_commits: set[str],
+                    owned_ids: set[str],
+                    exclude_commit: str = "") -> dict | None:
+    """The first active build this run does NOT own: not op-recorded, not
+    at a commit we pushed (our own push's webhook sibling is OUR
+    artifact), not at the commit under consideration."""
+    for b in active:
+        if str(b.get("state", "")) in BUILD_NO_RUN_STATES:
+            continue
+        commit = str(b.get("commit", ""))
+        if str(b.get("id", "")) in owned_ids or commit in owned_commits \
+                or (exclude_commit and commit == exclude_commit):
+            continue
+        return b
+    return None
+
+
+def _foreign_refusal(b: dict, branch: str) -> str:
+    return (f"an active build (#{b.get('number', '?')}, state "
+            f"{b.get('state', '?')}, commit "
+            f"{str(b.get('commit', ''))[:12]}) exists on {branch} at a "
+            "different commit — a push or new build would cancel it "
+            "(cancel-running-branch-builds); refusing to mutate a build "
+            "this run does not own")
+
+
 def _acquire_build(client: CIClient, ops_dir: Path, *, run_id: str,
                    round_idx: int, purpose: str, branch: str, commit: str,
-                   message: str,
-                   sleep: Callable[[float], None]) -> tuple[CIBuildRound | None,
-                                                            str]:
+                   message: str, sleep: Callable[[float], None],
+                   owned_commits: set[str] | None = None,
+                   owned_ids: set[str] | None = None
+                   ) -> tuple[CIBuildRound | None, str]:
     """Create (or, on a rebuild round, adopt) with the parent's cancel-race
     safety rules:
 
@@ -746,6 +776,8 @@ def _acquire_build(client: CIClient, ops_dir: Path, *, run_id: str,
     while a creation is uncertain), and a `created` op whose build is
     still ACTIVE at this commit is re-attached (crash-during-monitor /
     monitor-timeout resume) instead of duplicated."""
+    owned_commits = owned_commits if owned_commits is not None else set()
+    owned_ids = owned_ids if owned_ids is not None else set()
     for op in load_ops(ops_dir):
         if op.run_id != run_id:
             continue
@@ -767,16 +799,10 @@ def _acquire_build(client: CIClient, ops_dir: Path, *, run_id: str,
                                               states=_ACTIVE_BUILD_STATES)
               if str(b.get("state", "")) not in BUILD_NO_RUN_STATES]
     same = [b for b in active if str(b.get("commit", "")) == commit]
-    other = [b for b in active if str(b.get("commit", "")) != commit]
-    if other:
-        b = other[0]
-        return None, (
-            f"an active build (#{b.get('number', '?')}, state "
-            f"{b.get('state', '?')}, commit "
-            f"{str(b.get('commit', ''))[:12]}) exists on {branch} at a "
-            "different commit — creating a build would cancel it "
-            "(cancel-running-branch-builds); refusing to mutate a build "
-            "this run does not own")
+    foreign = _foreign_active(active, owned_commits, owned_ids,
+                              exclude_commit=commit)
+    if foreign is not None:
+        return None, _foreign_refusal(foreign, branch)
     if same and purpose == "rebuild":
         b = same[0]
         return CIBuildRound(purpose="adopted", build_id=str(b.get("id", "")),
@@ -856,13 +882,35 @@ async def run_ci_rounds(*, client: CIClient, ops_dir: Path, run_id: str,
     fixed_all: list[str] = []
     commit = ""
     try:
+        ledger = load_ops(ops_dir)
         base = op_base if op_base is not None \
-            else op_index_base(load_ops(ops_dir), run_id)
+            else op_index_base(ledger, run_id)
     except CIOpError as exc:
         return CIRunResult("refused", reason=str(exc))
+    # ownership sets: op-recorded builds and commits WE pushed (a prior
+    # invocation's included) — a push must be refused BEFORE its webhook
+    # build can cancel an unowned active build (round-3 review)
+    owned_commits = {op.commit for op in ledger if op.run_id == run_id}
+    owned_ids = {op.build_id for op in ledger
+                 if op.run_id == run_id and op.build_id}
     for rnd in range(max_retries + 1):
         idx = base + rnd
         if rnd == 0 or changes_fn():
+            try:
+                active = await asyncio.to_thread(
+                    client.latest_builds, branch, _ACTIVE_BUILD_STATES)
+            except Exception as exc:  # noqa: BLE001 - cannot prove safety
+                return CIRunResult(
+                    "refused",
+                    reason=f"CI provider lookup failed before push: {exc} "
+                           "— cannot prove no unowned build would be "
+                           "cancelled",
+                    rounds=rounds, fixed_jobs=fixed_all)
+            foreign = _foreign_active(active, owned_commits, owned_ids)
+            if foreign is not None:
+                return CIRunResult("refused",
+                                   reason=_foreign_refusal(foreign, branch),
+                                   rounds=rounds, fixed_jobs=fixed_all)
             push = await asyncio.to_thread(push_fn, idx)
             if getattr(push, "dry_run", False):
                 return CIRunResult("push_dry_run",
@@ -874,6 +922,7 @@ async def run_ci_rounds(*, client: CIClient, ops_dir: Path, run_id: str,
                                    or "push refused", rounds=rounds,
                                    fixed_jobs=fixed_all)
             commit = str(getattr(push, "pushed_commit", ""))
+            owned_commits.add(commit)
             purpose = "initial" if rnd == 0 else "retry"
             _trace("ci_push", round=rnd, commit=commit)
             # let the push's webhook build settle first (parity: with
@@ -887,13 +936,16 @@ async def run_ci_rounds(*, client: CIClient, ops_dir: Path, run_id: str,
             rec, refusal = await asyncio.to_thread(
                 _acquire_build, client, ops_dir, run_id=run_id,
                 round_idx=idx, purpose=purpose, branch=branch,
-                commit=commit, message=message, sleep=sleep)
+                commit=commit, message=message, sleep=sleep,
+                owned_commits=owned_commits, owned_ids=owned_ids)
         except CIOpError as exc:
             return CIRunResult("refused", reason=str(exc), rounds=rounds,
                                fixed_jobs=fixed_all)
         if rec is None:
             return CIRunResult("refused", reason=refusal, rounds=rounds,
                                fixed_jobs=fixed_all)
+        if rec.build_id:
+            owned_ids.add(rec.build_id)
         rounds.append(rec)
         _trace("ci_build", round=rnd, purpose=rec.purpose,
                build=rec.build_id, adopted=rec.adopted)

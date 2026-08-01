@@ -401,6 +401,25 @@ def test_monitor_clean_pass_guards():
     out = ci_loop.monitor_build(ci, "b", spec=CIClassifySpec(), poll_sec=0,
                                 timeout_sec=0, sleep=lambda s: None)
     assert out.build_state == "monitor_timeout" and not out.clean_pass
+    # round-3 review: a CANCELED/blocked build with visible green jobs is
+    # never a pass — cancellation may have prevented later dynamic jobs
+    # from ever appearing
+    for state in ("canceled", "cancelled", "blocked"):
+        ci = ScriptedCI(snapshots=[{"state": state,
+                                    "jobs": [_job("G", "passed", 0)]}])
+        out = ci_loop.monitor_build(ci, "b", spec=CIClassifySpec(),
+                                    poll_sec=0, timeout_sec=0,
+                                    sleep=lambda s: None)
+        assert not out.clean_pass, state
+    # ...while a completed build whose only failures are baseline/ignored
+    # remains clean (state "failed" with everything explained)
+    ci = ScriptedCI(snapshots=[{"state": "failed", "jobs": [
+        _job("G", "passed", 0),
+        _job("Testcase Statistics", "failed", 1)]}])
+    out = ci_loop.monitor_build(ci, "b", spec=CIClassifySpec(
+        ignorable_name_patterns=("(?i)statistics",)), poll_sec=0,
+        timeout_sec=0, sleep=lambda s: None)
+    assert out.clean_pass
 
 
 def test_pick_best_build_and_baseline_fetch():
@@ -544,12 +563,16 @@ def test_rounds_push_gating(tmp_path):
     assert result.result == "push_failed" and "denied" in result.reason
 
 
-def test_rounds_refuses_active_build_at_other_commit(tmp_path):
+def test_rounds_refuses_foreign_active_build_before_push(tmp_path):
+    """Round-3 review: the refusal must land BEFORE the push — the push's
+    own webhook build could already cancel the unowned active build under
+    cancel-running-branch-builds semantics."""
     ci = RoundsCI([], active=[{"id": "x9", "number": 9, "state": "running",
                                "commit": "d" * 40}])
-    result, _ = _rounds(ci, tmp_path)
+    result, push_calls = _rounds(ci, tmp_path)
     assert result.result == "refused" and ci.created == 0
     assert "does not own" in result.reason
+    assert push_calls == []             # nothing was pushed
 
 
 def test_rounds_no_run_adopts_sibling_else_no_signal(tmp_path):
@@ -936,6 +959,10 @@ def test_rounds_resume_reattaches_active_created_build(tmp_path):
                                  purpose="initial", branch="dev",
                                  commit="c" * 40, message="m")
     assert ci.created == 1
+    # the still-running build is OURS (op-recorded): visible in the
+    # pre-push active scan, it must NOT trip the foreign-build refusal
+    ci.active = [{"id": "b1", "number": 1, "state": "running",
+                  "commit": "c" * 40}]
     result, push_calls = _rounds(ci, tmp_path)
     assert result.result == "passed"
     assert ci.created == 1                      # re-attached, no new build
@@ -960,6 +987,8 @@ def test_restore_worktree_restores_untracked_content(tmp_path):
     # an earlier ACCEPTED fix left an untracked file behind
     (repo / "accepted_fix.py").write_text("good bytes\n")
 
+    (repo / "accepted_fix.py").chmod(0o644)
+
     snap, untracked = tl.snapshot_worktree(repo)
     assert set(untracked) == {"accepted_fix.py"}
     # the rejected attempt edits BOTH, and creates a new file
@@ -974,3 +1003,41 @@ def test_restore_worktree_restores_untracked_content(tmp_path):
     (repo / "accepted_fix.py").unlink()
     tl.restore_worktree(repo, snap, untracked)
     assert (repo / "accepted_fix.py").read_text() == "good bytes\n"
+    # round-3 review: a chmod-only attempt rolls back too
+    (repo / "accepted_fix.py").chmod(0o755)
+    tl.restore_worktree(repo, snap, untracked)
+    assert ((repo / "accepted_fix.py").stat().st_mode & 0o777) == 0o644
+    # ...and a file-to-directory type change
+    (repo / "accepted_fix.py").unlink()
+    (repo / "accepted_fix.py").mkdir()
+    (repo / "accepted_fix.py" / "inner.txt").write_text("x\n")
+    tl.restore_worktree(repo, snap, untracked)
+    assert (repo / "accepted_fix.py").is_file()
+    assert (repo / "accepted_fix.py").read_text() == "good bytes\n"
+
+
+def test_worktree_digest_sees_chmod_and_symlink_changes(tmp_path):
+    """Round-3 review companion: mode bits and symlink targets are part
+    of the digest — a chmod-only or retarget-only attempt is a change."""
+    import os
+    import subprocess
+
+    from infermatrix_copilot.engine.steps.rebase_v3 import _worktree_digest
+    repo = tmp_path / "r"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", repo], check=True)
+    subprocess.run(["git", "-C", repo, "-c", "user.name=t", "-c",
+                    "user.email=t@t", "commit", "-q", "--allow-empty",
+                    "-m", "seed"], check=True)
+    (repo / "u.sh").write_text("#!/bin/sh\n")
+    (repo / "u.sh").chmod(0o644)
+    d1 = _worktree_digest(repo)
+    (repo / "u.sh").chmod(0o755)                 # chmod-only
+    d2 = _worktree_digest(repo)
+    assert d1 != d2
+    os.symlink("u.sh", repo / "link")
+    d3 = _worktree_digest(repo)
+    (repo / "link").unlink()
+    os.symlink("elsewhere", repo / "link")       # retarget-only
+    d4 = _worktree_digest(repo)
+    assert d3 != d4

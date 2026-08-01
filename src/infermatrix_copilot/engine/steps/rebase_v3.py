@@ -1411,17 +1411,27 @@ def _worktree_digest(repo) -> str:
     diff = subprocess.run(["git", "-C", str(repo), "diff", "HEAD"],
                           capture_output=True, timeout=120).stdout
     h.update(diff)
+    import os
     for line in st.splitlines():
         if not line.startswith("??"):
             continue
         p = Path(repo) / line[3:].strip().strip('"')
-        files = [p] if p.is_file() else \
-            sorted(q for q in p.rglob("*") if q.is_file()) \
+        files = [p] if p.is_file() or p.is_symlink() else \
+            sorted(q for q in p.rglob("*")
+                   if q.is_file() or q.is_symlink()) \
             if p.is_dir() else []
         for q in files:
             h.update(str(q).encode("utf-8", errors="replace"))
             try:
-                h.update(q.read_bytes())
+                # mode + symlink target too: a chmod-only or retarget-only
+                # attempt is still a change (round-3 review)
+                st_q = q.lstat()
+                h.update(str(st_q.st_mode).encode())
+                if q.is_symlink():
+                    h.update(os.readlink(q).encode("utf-8",
+                                                   errors="replace"))
+                else:
+                    h.update(q.read_bytes())
             except OSError:
                 pass
     return h.hexdigest()
