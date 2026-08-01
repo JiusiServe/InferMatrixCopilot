@@ -302,6 +302,11 @@ def test_empty_command_dropped_loudly(tmp_path):
              "commands": ['timeout 20m bash -c "export A=1"']},
             {"label": "Wrapped Set Only",
              "commands": ['timeout 20m bash -c "set -e"']},
+            {"label": "Pipefail Set Only",
+             "commands": ["set -euo pipefail"]},
+            {"label": "Option Set Only", "commands": ["set -o pipefail"]},
+            {"label": "Wrapped Pipefail",
+             "commands": ['timeout 20m bash -c "set -euo pipefail"']},
             {"label": "Rich Env Job",
              "commands": ["export A=1 B=2 # tuned", "pytest tests/r.py"]},
             {"label": "Quoted Hash Job",
@@ -342,6 +347,15 @@ def test_empty_command_dropped_loudly(tmp_path):
     assert sorted(built.dropped) == [
         "Block Step", "Chained Export", "Comment Only", "Commented Export",
         "Export Only", "Export Plus Comment", "Multi Export",
-        "Semicolon Export", "Wrapped Comment", "Wrapped Empty",
-        "Wrapped Export", "Wrapped Set Only"]
+        "Option Set Only", "Pipefail Set Only", "Semicolon Export",
+        "Wrapped Comment", "Wrapped Empty", "Wrapped Export",
+        "Wrapped Pipefail", "Wrapped Set Only"]
     assert built.to_dict()["dropped"] == built.dropped
+    # ...but a `set` line with a substitution EXECUTES and must stay
+    # runnable — the setup-only grammar admits option words only
+    from infermatrix_copilot.rebase_engine.test_manifest import \
+        is_runnable_command
+    assert is_runnable_command("set $(./collect_args.sh)")
+    assert is_runnable_command("set -e\npytest tests/x.py")
+    assert not is_runnable_command("set -euo pipefail")
+    assert not is_runnable_command("set -o pipefail\nexport A=1\n# note")

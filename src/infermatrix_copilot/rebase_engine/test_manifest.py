@@ -201,9 +201,14 @@ _PURE_EXPORT_RX = re.compile(
     rf"^\s*{_EXPORT_GROUP}(?:\s*;\s*{_EXPORT_GROUP})*\s*;?(?:\s+#.*)?\s*$")
 _ASSIGN_RX = re.compile(_ASSIGN)
 _EXPORT_SKIP_RX = re.compile(r"\s+|;|export\b")
-# a bare shell-option line (`set -e`, `set +x -u`) configures the shell and
-# runs nothing — setup-only, like a pure export
-_SET_LINE_RX = re.compile(r"^\s*set\s+[+-]\w+(?:\s+[+-]\w+)*\s*;?\s*$")
+# a bare shell-option line (`set -e`, `set +x -u`, `set -euo pipefail`,
+# `set -o pipefail`) configures the shell and runs nothing — setup-only,
+# like a pure export. Tokens are flag/option WORDS only: `$`, quotes, and
+# backticks are excluded so `set $(cmd)` (which executes cmd) can never be
+# classified as a no-op.
+_SET_TOKEN = r"[+-]?[A-Za-z_][A-Za-z0-9_-]*"
+_SET_LINE_RX = re.compile(
+    rf"^\s*set\s+{_SET_TOKEN}(?:\s+{_SET_TOKEN})*\s*;?\s*$")
 
 
 def _export_tokens(line: str) -> list[str]:
