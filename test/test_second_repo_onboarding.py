@@ -223,3 +223,17 @@ def test_widgetlib_local_ci_end_to_end(widget_env, settings):
     asyncio.run(lifecycle.finalize(run_dir, outcome))
     # the adapter-named lock was used and released
     assert (widget_env.repo / "locks" / "widgetlib.lock").exists()
+
+def test_live_prompt_prose_uses_adapter_baseline():
+    """The audit's P1 pinned directly: with a NON-default adapter ref the
+    live test-plan prose names the SAME baseline the injected tools use —
+    never origin/main."""
+    from infermatrix_copilot.rebase_engine.prompt_builder import \
+        _format_module_test_plan
+    prose = _format_module_test_plan(
+        {"ci_tests": ["parser_checks"],
+         "upstream_changes": [{"path": "checks/parser/a.sh",
+                               "type": "modified"}]},
+        baseline_ref="upstream/master")
+    assert "upstream/master" in prose
+    assert "origin/main" not in prose
