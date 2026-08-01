@@ -378,8 +378,19 @@ def _classify_terminal(client: CIClient, build_id: str, job: dict,
                    exit_status=int(raw_exit or 0))
     passed_like = jr.state == "passed" or (jr.state == "finished"
                                            and raw_exit == 0)
-    if not passed_like and any(re.search(p, name)
-                               for p in spec.structural_name_patterns):
+    if jr.state not in ("passed", "finished", "failed", "timed_out",
+                        "broken") \
+            or (jr.state == "finished" and raw_exit is None):
+        # a terminal BUILD can still carry non-terminal or torn JOBS
+        # (running, waiting, canceled, blocked, unknown, or a finished
+        # job whose exit_status never landed) — a missing exit code is
+        # NOT zero; incomplete is structural, never "passed". Checked
+        # FIRST: an UNFINISHED job is unfinished work even when its name
+        # would be ignorable once terminal (round-5 review — a pending
+        # stats lane at the deadline must not read `ignored`)
+        jr.classification = "incomplete"
+    elif not passed_like and any(re.search(p, name)
+                                 for p in spec.structural_name_patterns):
         # a failed SUITE-CREATION lane (pipeline upload/load) suppressed
         # every dynamic test job — structural, never ignorable (round-4
         # review)
@@ -390,13 +401,6 @@ def _classify_terminal(client: CIClient, build_id: str, job: dict,
         # the provider could not start the job (unmet condition, missing
         # agent, config error) — infra, not a test failure (parent parity)
         jr.classification = "ignored"
-    elif jr.state not in ("passed", "finished", "failed", "timed_out") \
-            or (jr.state == "finished" and raw_exit is None):
-        # a terminal BUILD can still carry non-terminal or torn JOBS
-        # (running, waiting, canceled, blocked, unknown, or a finished
-        # job whose exit_status never landed) — a missing exit code is
-        # NOT zero; incomplete is structural, never "passed"
-        jr.classification = "incomplete"
     elif jr.state == "passed" or jr.exit_status == 0 and \
             jr.state not in ("failed", "timed_out"):
         jr.classification = "passed"
@@ -754,15 +758,22 @@ def op_index_base(ops: Sequence[BuildOp], run_id: str) -> int:
 def _foreign_active(active: Sequence[dict], owned_commits: set[str],
                     owned_ids: set[str],
                     exclude_commit: str = "") -> dict | None:
-    """The first active build this run does NOT own: not op-recorded, not
-    at a commit we pushed (our own push's webhook sibling is OUR
-    artifact), not at the commit under consideration."""
+    """The first active build this run does NOT own. Owned means:
+    op-recorded (`owned_ids`, adopted builds included), the commit under
+    consideration, or a WEBHOOK build at a commit we pushed — that one is
+    our own push's artifact. A schedule/api build merely sharing a commit
+    we pushed is somebody else's work (round-5 review): cancelling it via
+    our next push would mutate an unowned build."""
     for b in active:
         if str(b.get("state", "")) in BUILD_NO_RUN_STATES:
             continue
         commit = str(b.get("commit", ""))
-        if str(b.get("id", "")) in owned_ids or commit in owned_commits \
-                or (exclude_commit and commit == exclude_commit):
+        if str(b.get("id", "")) in owned_ids:
+            continue
+        if exclude_commit and commit == exclude_commit:
+            continue
+        if commit in owned_commits and \
+                str(b.get("source", "")) == "webhook":
             continue
         return b
     return None

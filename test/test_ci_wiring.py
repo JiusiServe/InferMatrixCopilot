@@ -444,6 +444,60 @@ def test_monitor_structural_suite_creation_failure_never_ignored():
     assert not out.clean_pass
 
 
+def test_monitor_pending_ignorable_job_is_incomplete():
+    """Round-5 review: an UNFINISHED job is unfinished work even when its
+    name would be ignorable once terminal — a pending stats lane at the
+    monitor deadline must land `incomplete`, never `ignored`, or one
+    passed job would make the build a false clean pass."""
+    spec = CIClassifySpec(ignorable_name_patterns=("(?i)statistics",))
+    ci = ScriptedCI(snapshots=[{"state": "failed", "jobs": [
+        _job("Real Test", "passed", 0),
+        _job("Testcase Statistics", "running")]}])
+    out = ci_loop.monitor_build(ci, "b", spec=spec, poll_sec=0,
+                                timeout_sec=0, sleep=lambda s: None)
+    cls = {j.name: j.classification for j in out.jobs}
+    assert cls == {"Real Test": "passed",
+                   "Testcase Statistics": "incomplete"}
+    assert not out.clean_pass
+
+
+def test_rounds_schedule_build_at_owned_commit_is_foreign(tmp_path):
+    """Round-5 review: pushing a commit does not confer ownership of
+    every later build at that commit — a schedule/api build another run
+    started there is unowned, and the next fix push must refuse rather
+    than cancel it. Our own push's WEBHOOK artifact stays exempt."""
+    def scripted_rounds(source):
+        ci = RoundsCI([
+            {"state": "failed", "jobs": [_job("Red", "failed", 1)]},
+            {"state": "passed", "jobs": [_job("Red", "passed", 0)]},
+        ])
+        ci.logs["Red"] = "FAILED tests/r.py::t - x"
+        calls = {"n": 0}
+
+        def latest_builds(branch, states=(), per_page=30):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return []
+            # before the round-1 fix push: an active build appeared at
+            # the commit round 0 pushed
+            return [{"id": "other", "number": 7, "state": "running",
+                     "commit": "c" * 40, "source": source}]
+
+        ci.latest_builds = latest_builds
+
+        async def debug(jr):
+            return True
+
+        return _rounds(ci, tmp_path / source, changes=[True], debug=debug)
+
+    result, push_calls = scripted_rounds("schedule")
+    assert result.result == "refused" and "does not own" in result.reason
+    assert push_calls == [0]            # the fix push never happened
+    result, push_calls = scripted_rounds("webhook")
+    assert result.result == "passed"    # our own artifact never blocks
+    assert push_calls == [0, 1]
+
+
 def test_monitor_clean_pass_guards():
     # zero job signal is never a pass
     ci = ScriptedCI(snapshots=[{"state": "passed", "jobs": []}])
