@@ -169,19 +169,205 @@ ESCALATION during soak stages 1–2.
 | upstream `rebase/vllm` | `ffd46bfab2` | (detached — parent wheel pin) |
 | external agent | `0395bbe` | main (= EXT1 pin) |
 
-### NEW findings needing owner decisions before the supervised run
+### Owner decisions before the supervised run
 
-- **A. Checkout split**: the deployed parent operates on
-  `/data/zhoutaichang/rebase/vllm-omni` (dev/vllm-align) while the
-  copilot adapter points at `/data/zhoutaichang/copilot/vllm-omni`
-  (main). EXT1 exclusion is per-checkout (correct semantics), but the
-  §8 comparison needs ONE target world — recommend pointing
-  `VLLM_OMNI_REPO` at the deployed checkout (or isolated clones per §8)
-  for the validation run.
-- **B. GPU window**: schedule the supervised run OUTSIDE ~16:00–18:00
-  UTC — the nightly perf CI seizes all GPUs and KILLS GPU compute
-  processes after a 1-hour wait; a mid-flight validation would be shot.
-- **C. Buildkite schedule race**: the pipeline's own daily Align
-  schedule builds `dev/vllm-align`; recommend PAUSING the two schedules
-  for the validation window (op-recorded-only cancellation protects us,
-  but a scheduled build would pollute the outcome comparison).
+- **A. Checkout split — DECIDED (owner, 2026-08-01, per
+  recommendation)**: the validation target world is the DEPLOYED
+  checkout `/data/zhoutaichang/rebase/vllm-omni` (dev/vllm-align) for
+  BOTH the external baseline run and the v3 run. The run-day script
+  below repoints `VLLM_OMNI_REPO` + `REPO_PATHS` at it for the
+  validation window (timestamped `.env` backup first) and restores
+  after the freeze. EXT1's per-checkout flock now covers both runs on
+  the same world — which is exactly the mutual exclusion it was built
+  for.
+- **B. GPU window — OPEN**: schedule the supervised run OUTSIDE
+  ~16:00–18:00 UTC — the nightly perf CI (`0 16 * * *` root crontab)
+  seizes all GPUs and KILLS GPU compute processes after a 1-hour wait; a
+  mid-flight validation would be shot. Pick the window and the
+  `CUDA_VISIBLE_DEVICES` set on run day (the cron session used `4,5`).
+- **C. Buildkite schedule race — OPEN (pause strongly recommended)**:
+  the pipeline's own daily Align schedule builds `dev/vllm-align`;
+  PAUSE the two schedules ("Scheduled build" on main, "Scheduled
+  nightly build - Align") for the validation window. This is now
+  doubly required: CI-W's ownership rules REFUSE to push while an
+  unowned build is active on the branch, so an unpaused schedule can
+  turn the v3 run into a `refused` terminal, not just pollute the
+  comparison.
+
+## Run day — PR6 validation script (owner-attached)
+
+Sequential, copy-paste blocks; every mutation has its rollback in the
+inventory above. Stop at any ✗ — do not improvise past a failed check.
+Shorthands used throughout:
+
+```bash
+export COP=/data/zhoutaichang/copilot/InferMatrixCopilot
+export AG=/data/zhoutaichang/rebase/vllm-omni-rebase-agent      # EXT1 pin
+export TGT=/data/zhoutaichang/rebase/vllm-omni                  # decision A
+export UPSTREAM_SHA=ffd46bfab2128bb84146050e98b51a617c6575ab    # frozen vllm
+export VAL=$(date -u +%Y%m%d)                                   # branch suffix
+```
+
+### Phase 0 — preflight (T-1 day is fine; ~15 min)
+
+- [ ] Decisions **B** (window + GPU set) and **C** (schedules paused in
+      the Buildkite UI) are settled; record them here.
+- [ ] `cd $COP && git status --short` → clean; `git log --oneline -1`
+      recorded as the copilot SHA under test.
+- [ ] `git -C $AG log --oneline -1` → still `0395bbe`+working tree
+      (EXT1 pin; the working tree is the deployed truth — do NOT clean
+      it).
+- [ ] `./infermatrix-copilot doctor --probe` → fully green (truthful
+      eco round-trip; `MODEL_MISMATCH_POLICY` stays `fail`).
+- [ ] Locks free: `ls $TGT/locks/ $COP/../vllm-omni/locks/ 2>/dev/null`
+      → no held flocks (probe: both `omni.lock` acquirable).
+- [ ] No orchestrator running: `pgrep -af omni-rebase-orchestrator` →
+      empty.
+- [ ] Freeze table below filled in (target HEAD moves daily — record
+      run-day values):
+
+```bash
+git -C $TGT rev-parse HEAD dev/vllm-align   # target start SHA
+grep -n "LAST_REBASE_VLLM_COMMIT" $AG/config.sh   # v3 last_rebase baseline
+```
+
+| Frozen world | Value (fill on run day) |
+|---|---|
+| target `$TGT` dev/vllm-align start SHA | ☐ |
+| upstream vllm | `ffd46bfab2128bb84146050e98b51a617c6575ab` |
+| external agent | `0395bbe` + deployed working tree |
+| copilot | ☐ (git log -1 above) |
+| `LAST_REBASE_VLLM_COMMIT` (config.sh effective) | ☐ (default `d4004455d235…`) |
+
+### Phase 1 — snapshots, branches, .env repoint (~10 min)
+
+```bash
+TS=$(date +%Y%m%d-%H%M%S)
+# knowledge snapshot (restored before EACH run; non-destructive rollback)
+mkdir -p $AG/backups/$TS
+cp -a $AG/agent/store/debug_memory.db $AG/agent/skills \
+      $AG/rebase_logs/state.json $AG/backups/$TS/
+# validation branches from the frozen start SHA (one per world)
+git -C $TGT branch rebase-val-ext-$VAL dev/vllm-align
+git -C $TGT branch rebase-val-nat-$VAL dev/vllm-align
+# .env repoint (decision A) — timestamped backup FIRST
+cd $COP && cp .env .env.backup-$TS
+```
+
+- [ ] Edit `$COP/.env`: set **every** `REPO_PATHS` line to
+      `{"vllm-omni": "/data/zhoutaichang/rebase/vllm-omni"}` and
+      `VLLM_OMNI_REPO="/data/zhoutaichang/rebase/vllm-omni"`
+      (duplicate keys exist — last one wins, fix both). Leave
+      `ALLOW_PUSH` at 0 (armed per-command in Phase 4 only).
+- [ ] TEMPORARY manifest edit (HIGH-RISK section, owner-only, reverted
+      in Phase 6): in `adapters/vllm_omni/manifest.yaml` set
+      `push.rebase_branch: rebase-val-nat-<VAL>` so the v3 run pushes
+      the VALIDATION branch, never dev/vllm-align. Do not commit.
+- [ ] `./infermatrix-copilot doctor` re-run green against the deployed
+      checkout.
+
+### Phase 2 — timed FULL rollback rehearsal (gate item 1; target < 30 min)
+
+Stopwatch starts at the words "roll back", ends when the v1 backend is
+observably executing (prelude complete, phase 1 underway):
+
+```bash
+date -u +%T   # stopwatch start
+cd $COP && ./infermatrix-copilot --playbook repo-rebase-native-v1 --yes \
+    --task-param rebase_mode=full
+# watch until the v1 prelude completes and phase-1 output appears, then
+# Ctrl-C (this rehearses the SWITCH, not a full v1 run)
+date -u +%T   # stopwatch stop — record below
+```
+
+- [ ] Time recorded: ☐ (must be < 30 min; the 2026-08-01 mechanical
+      rehearsal was 5 s to plan-resolution + dry-run exit 0)
+- [ ] Post-abort: locks free again; no stray processes
+      (`pgrep -af rebase`).
+
+### Phase 3 — external baseline run to phase=done (hours; GPU window per B)
+
+The deployed parent, deployed working tree, validation branch, frozen
+upstream. Its own flock on `$TGT/locks/omni.lock` excludes the copilot
+for the duration:
+
+```bash
+git -C $TGT checkout rebase-val-ext-$VAL && git -C $TGT status --short  # clean
+cd $AG && REBASE_BRANCH=rebase-val-ext-$VAL \
+    FORCE_VLLM_COMMIT=$UPSTREAM_SHA \
+    CUDA_VISIBLE_DEVICES=<per decision B> \
+    /data/zhoutaichang/rebase/.venv/bin/omni-rebase-orchestrator \
+    2>&1 | tee rebase_logs/val-ext-$VAL.log
+```
+
+- [ ] Runs to `phase=done` (`python3 -c "import json;
+      print(json.load(open('$AG/rebase_logs/state.json'))['phase'])"`).
+      A mid-flight failure here is a PARENT failure — investigate, do
+      not paper over; the comparison needs a completed baseline.
+- [ ] Archive the ext world:
+      `mkdir -p $COP/validation/$VAL/ext && cp -a
+      $AG/rebase_logs/state.json $AG/rebase_logs/latest
+      $COP/validation/$VAL/ext/ && git -C $TGT rev-parse HEAD >
+      $COP/validation/$VAL/ext/target-head`
+- [ ] **Restore for the v3 run**: knowledge back to the Phase-1
+      snapshot (`cp -a $AG/backups/$TS/debug_memory.db
+      $AG/agent/store/; rm -rf $AG/agent/skills && cp -a
+      $AG/backups/$TS/skills $AG/agent/`); target back to the frozen
+      start (`git -C $TGT checkout rebase-val-nat-$VAL && git -C $TGT
+      status --short` → clean); locks free; GPUs idle (`nvidia-smi`).
+
+### Phase 4 — supervised v3 full run (human attached, ALLOW_PUSH armed per-command)
+
+```bash
+cd $COP && ALLOW_PUSH=1 CUDA_VISIBLE_DEVICES=<per decision B> \
+    ./infermatrix-copilot --playbook repo-rebase-v3 --yes \
+    --task-param rebase_mode=full \
+    --task-param last_rebase_commit=<LAST_REBASE_VLLM_COMMIT from Phase 0> \
+    --task-param force_upstream_commit=$UPSTREAM_SHA \
+    2>&1 | tee validation/$VAL/nat-run.log
+```
+
+Watch for (abort → rollback inventory, in order): any push to a branch
+other than `rebase-val-nat-$VAL`; any Buildkite mutation without
+`imx_op_id` metadata in the trace; a `refused` terminal naming an
+unowned build (check decision C's pause actually took); lock-leak or
+crash. A crash is resumable (`--resume`) — the WAL/op-ledger recovery
+is exactly what nine review rounds hardened.
+
+- [ ] Terminal: exit 0 (`done`) or exit 3 with explained substate —
+      record `RUN_REPORT.md`, `metrics.json`, run dir path.
+- [ ] Post-run scans: locks free; `push_wal/` all `pushed`/reconciled;
+      `ci_ops/` all terminal; no builds left running on Buildkite.
+- [ ] Archive: `cp -a ~/.infermatrix-copilot/runs/<run-dir>
+      $COP/validation/$VAL/nat`
+
+### Phase 5 — comparison + sign-off (gate)
+
+Per plan §8 + DRIFT #4/#7, over the MANIFEST-BUILT slug set:
+
+- [ ] Slug sets identical (ext vs nat manifest builds).
+- [ ] Per-module / per-slug outcomes equal-or-better (nat vs ext), ext
+      module names mapped through the golden `assignment_routing`; one
+      re-run allowed per flaky divergence, divergences investigated via
+      the v1 backend — never averaged away.
+- [ ] CI verdicts equal-or-better; push/commit shape identical (same
+      files staged, same unstage exclusions, signed-off author).
+- [ ] Wall-clock: nat ≤ 1.25 × ext end-to-end.
+- [ ] `validation/$VAL/COMPARISON.md` written from the checklist above
+      and **signed by the owner** (name + date in the file).
+
+### Phase 6 — verdict
+
+**PASS →** in one commit (the PR6 promotion): flip v3 → locked
+`repo-rebase`, retire the delegating yaml, update `CLAUDE.md`'s locked-
+playbook rule, revert the temporary `push.rebase_branch` edit; then arm
+`.env` deliberately (new timestamped backup; `--dry-run` removal per
+plan §9); unpause the Buildkite schedules; delete the validation
+branches after the comparison freeze; enter staged soak stage 1
+(`report_only` nightly).
+
+**FAIL / ABORT →** rollback inventory top-to-bottom (restore
+`.env.backup-$TS`, revert the manifest edit, cancel op-recorded builds,
+WAL-reverse pushed refs, restore knowledge snapshot, checkout restore),
+then investigate via the v1 backend. The validation branches are the
+evidence — keep them until the investigation closes.
