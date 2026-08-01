@@ -191,7 +191,7 @@ implements the mode matrix.
 | PR4a | Engine core, unwired: agent loop, ToolDefs + opt-in dispatch scoping, substate, loop-scoped `RuntimeRegistry`, planner `requires` filter + `missing_capabilities()` for exact-repo playbooks | **DONE — GPT APPROVED** (5 finding rounds, 15 findings all fixed; see §6 items 15–17) |
 | PR4b | Adapter knowledge: templates + prompt/request-shape goldens, prompt_data (builder flavor; DRIFT_TRIAGE #1), hooks base + adapter hooks (HIGH-RISK `rebase` section), `imx-omni-pytest`, `module_rebase.py` + `phase1_steps.py` | **DONE — GPT APPROVED** (4 finding rounds, 9 findings all fixed; see §6 items 18–21) |
 | PR4c | Assembly: test/ci loops, v3 step set incl. `push_gate`, `resolve_effective_mode` + governance write-back (Rev 8 §2.1), transition-table wiring (Rev 8 §3.1), agent-shell scrub + model-download notification hook wiring, **manifest push-section update** (§5.3), v1 re-registered as `repo-rebase-native-v1` **with its four §4 obligations: guard_push authorization at phase-4 entry, explicit-`full`-only mode rejection, `locks/omni.lock` shared-lock participation, `REMOTE_ENABLED` forced off** | **DONE — GPT APPROVED** (5 finding rounds + 2 verification rounds; 51 findings all fixed with dedicated regression tests; final verdict "No findings" at cd93dcb; see §6 items 22–28) |
-| PR5 | Parity completion: tier-1 goldens, `shell_golden.json`, `DRIFT_TRIAGE.md` resolution, report-only dry path, timed rollback rehearsal | **implemented — in GPT review** (shell golden captured 2026-08-01 from the live parent config on this host — 49 §10 jobs, 8 module maps, 69 watchdog patterns, push bytes; tier-3 command-echo suite `test_shell_golden.py`; DRIFT #1/#4 decided + #6 sweep corrections; report-only dry path ran END-TO-END against the live checkout: 54 jobs, 310 test changes, done/exit-0; **timed rollback rehearsal deferred to the PR6 gate** — it needs the human + a runnable v1 backend session, recorded as a PR6 precondition, §8) |
+| PR5 | Parity completion: tier-1 goldens, `shell_golden.json`, `DRIFT_TRIAGE.md` resolution, report-only dry path, timed rollback rehearsal | **DONE — GPT APPROVED** (5 finding rounds + 2 verification rounds; 14 findings all fixed with dedicated regression tests; final verdict "No findings" at 7f4be98. Shell golden captured 2026-08-01 from the live parent config on this host — 49 §10 jobs, module maps + the routing flavor, 69 watchdog patterns, push bytes, `assignment_routing` behavioral replay; tier-3 production-path suite `test_shell_golden.py`; DRIFT #1/#4 decided + #6/#7 added (see §6.29); report-only dry path ran END-TO-END against the live checkout: 54 jobs, 310 test changes, done/exit-0; **timed rollback rehearsal deferred to the PR6 gate** — it needs the human + a runnable v1 backend session, recorded as a hard PR6 precondition, §8) |
 | EXT1 | External checkout: startup flock guard, pinned SHA | planned |
 | PR6 | Cutover (GPU box + human): §8 validation, playbook flip, `.env` arming | planned |
 | PR4d | Knowledge migration + runtime-dir cutover (post-validation; env-bridge deletion moved to PR7 per §2.9) | planned |
@@ -379,6 +379,22 @@ still required at execution time (dry-run otherwise).
    the transport is a `model_download_expected` trace event surfaced in
    the run report instead of the parent's SMTP mailer — copilot-native
    observability, no email credentials in the engine.
+29. **PR5 fixes over the parent's manifest builder (details in
+   DRIFT_TRIAGE #4/#6/#7).** (a) The §10 false-pass mechanism is dead
+   AND loud: labeled CI steps with no RUNNABLE command — empty,
+   comment-only, or setup-only in every valid bash form (multi-assign/
+   chained/commented exports, `set` option lines incl. `-euo pipefail`,
+   mixed `set; export` chains, all judged AFTER `timeout … bash -c`
+   normalization with an unconditional unwrap) — are dropped at build
+   time, surfaced via `BuiltManifest.dropped`, and classified structural
+   by the run side on every path. The parent emitted them as empty
+   commands whose rc=0 read as passes (25 of its 54 live jobs false-pass
+   today). (b) Buildkite's singular `command:` form is parsed; the
+   parent read only `commands:`. (c) Job→module routing uses the
+   parent's own inline map as a dedicated adapter datum
+   (`assignment_paths`) — the three map flavors are never merged, and
+   routing is pinned by a behavioral-replay golden verified equal to the
+   parent's own output at capture time.
 
 ## 7. Testing state
 
