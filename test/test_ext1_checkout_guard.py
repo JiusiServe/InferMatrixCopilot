@@ -349,6 +349,74 @@ def test_malformed_git_pointers_fail_closed(tmp_path):
             assert not (checkout / "info").exists()
 
 
+def test_missing_checkout_is_not_fabricated(tmp_path):
+    """Round-5 P2: acquiring on a nonexistent checkout (typo, missing
+    mount) must FAIL with a setup diagnostic — and must not invent an
+    empty directory whose lock then 'succeeds'."""
+    for side in ("external", "copilot"):
+        ghost = tmp_path / f"no-such-checkout-{side}"
+        if side == "external":
+            assert guard.acquire_checkout_lock(ghost) is False
+            assert "does not exist" in guard.last_failure()
+            assert "not contention" in guard.last_failure()
+        else:
+            lock = CheckoutLock(ghost, "omni")
+            assert lock.acquire(blocking=False) is False
+            assert "does not exist" in lock.last_failure
+        assert not ghost.exists()                    # never fabricated
+
+
+def test_exclude_write_failure_preserves_foreign_rules(tmp_path,
+                                                       monkeypatch):
+    """Round-5 P2: the exclude rewrite is ATOMIC — a failed write must
+    fail the acquisition WITHOUT truncating the user's existing ignore
+    rules (the old in-place write_text destroyed them on ENOSPC/EIO)."""
+    import os as os_mod
+    import subprocess
+    checkout = tmp_path / "omni"
+    checkout.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=checkout, check=True)
+    exclude = checkout / ".git" / "info" / "exclude"
+    our_comment = "# rebase checkout flock — never dirt, never cleaned"
+    seeded = "user-rule.bin\nlocks/\n" + our_comment + "\nlocks/\n"
+    exclude.write_text(seeded)                       # forces a rewrite
+
+    def broken_replace(src, dst):
+        raise OSError(28, "No space left on device")
+    monkeypatch.setattr(os_mod, "replace", broken_replace)
+    lock = CheckoutLock(checkout, "omni")
+    assert lock.acquire(blocking=False) is False
+    assert "not contention" in lock.last_failure
+    assert exclude.read_text() == seeded             # NOT truncated
+    assert guard.acquire_checkout_lock(checkout) is False
+    assert exclude.read_text() == seeded
+    monkeypatch.undo()
+    # with the write path healthy the same acquisition succeeds
+    assert CheckoutLock(checkout, "omni").acquire(blocking=False) is True
+
+
+def test_unsupported_git_entries_fail_closed(tmp_path):
+    """Round-5 P2: a `.git` that exists as a dangling symlink or FIFO is
+    'unknown git', never 'no git' — acquisition fails closed on both
+    sides."""
+    import os as os_mod
+    shapes = {"dangling": lambda g: g.symlink_to(tmp_path / "gone"),
+              "fifo": lambda g: os_mod.mkfifo(g)}
+    for shape, make in shapes.items():
+        for side in ("external", "copilot"):
+            checkout = tmp_path / f"omni-{shape}-{side}"
+            checkout.mkdir()
+            make(checkout / ".git")
+            if side == "external":
+                assert guard.acquire_checkout_lock(checkout) is False, \
+                    (shape, side)
+                assert "not contention" in guard.last_failure()
+            else:
+                lock = CheckoutLock(checkout, "omni")
+                assert lock.acquire(blocking=False) is False, (shape, side)
+                assert "not contention" in lock.last_failure
+
+
 def test_lock_survives_workspace_hygiene(tmp_path):
     """The round-1 P1: on a REAL git checkout the live lock file must be
     invisible to every hygiene pass the parent's phase 1 (and the

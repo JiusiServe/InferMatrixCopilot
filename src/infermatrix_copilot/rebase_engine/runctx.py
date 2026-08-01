@@ -42,6 +42,26 @@ class _GitMetaError(Exception):
     never treat as a non-git directory."""
 
 
+def _atomic_write(path: Path, content: str) -> None:
+    """Same-directory tmp + fsync + rename — a failed write (ENOSPC, EIO,
+    interruption) must never leave `info/exclude` truncated with the
+    user's foreign ignore rules destroyed."""
+    import os
+    tmp = path.with_name(path.name + ".imx-tmp")
+    try:
+        with open(tmp, "w") as f:
+            f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except OSError:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise
+
+
 def _ensure_lock_dir_excluded(checkout: Path) -> bool:
     """Mark `locks/` git-ignored via the LOCAL `.git/info/exclude` (never a
     committed file, never dirt itself). Without this the live lock file is
@@ -88,6 +108,11 @@ def _ensure_lock_dir_excluded(checkout: Path) -> bool:
         info = (target.parent.parent / "info"
                 if target.parent.name == "worktrees" else target / "info")
     else:
+        import os
+        if os.path.lexists(git):
+            # dangling symlink, FIFO, socket, … — metadata EXISTS in some
+            # unsupported form; "unknown git", never "no git": fail closed
+            return False
         return True
     try:
         info.mkdir(parents=True, exist_ok=True)
@@ -116,7 +141,8 @@ def _ensure_lock_dir_excluded(checkout: Path) -> bool:
                 i += 1
             while kept and kept[-1] == "":
                 kept.pop()
-            exclude.write_text(
+            _atomic_write(
+                exclude,
                 ("\n".join(kept) + "\n" if kept else "")
                 + f"{_EXCLUDE_COMMENT}\n{_EXCLUDE_LINE}\n")
         return _EXCLUDE_LINE in exclude.read_text().split("\n")
@@ -145,8 +171,15 @@ class CheckoutLock:
             return True  # documented degradation: no fcntl, no exclusion
         import errno
         import os
+        if not self.checkout.is_dir():
+            # a typo'd path or missing mount must SURFACE, not be silently
+            # fabricated as an empty "checkout" whose lock then succeeds
+            self.last_failure = (f"lock setup failed (checkout does not "
+                                 f"exist: {self.checkout}) — not contention")
+            return False
         try:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self.path.parent.mkdir(exist_ok=True)  # only locks/, NEVER
+            #                                        the checkout itself
             # symlink-hostile: a symlinked `locks` dir or lock file would
             # (a) let open() truncate an arbitrary target and (b) NOT match
             # git's `/locks/` directory pattern — `git clean -fd` could

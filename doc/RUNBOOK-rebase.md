@@ -8,12 +8,13 @@ plan doc holds the contracts, this holds the switches and checklists.
 
 - **Canonical external checkout:**
   `/data/zhoutaichang/rebase/vllm-omni-rebase-agent`
-- **Pinned SHA:** `353b0a6` (EXT1 = the five commits `353b0a6`,
-  `8ffcc6c`, `634b002`, `71222e8`, `015344d`: guard module +
-  orchestrator hook + fail-closed root-anchored symlink-hostile
-  hygiene shield + baseline-under-lock ordering + errno-precise
-  diagnostics + validated gitdir), independently revertible with
-  `git revert 353b0a6 8ffcc6c 634b002 71222e8 015344d`.
+- **Pinned SHA:** `0395bbe` (EXT1 = six commits `0395bbe 353b0a6
+  8ffcc6c 634b002 71222e8 015344d`: guard module + orchestrator hook
+  + fail-closed root-anchored symlink-hostile atomic hygiene shield +
+  baseline-under-lock ordering + errno-precise diagnostics +
+  validated gitdir + no checkout fabrication), independently
+  revertible with `git revert 0395bbe 353b0a6 8ffcc6c 634b002
+  71222e8 015344d`.
 - **Startup guard:** the orchestrator flocks
   `<omni_checkout>/locks/omni.lock` after the dry-run exit and before
   resume detection; refuses (exit 3) when a copilot run holds it.
@@ -72,7 +73,7 @@ plan doc holds the contracts, this holds the switches and checklists.
 | Mutated omni checkout | snapshot restore (attempt-scoped) or manual steps from the run's DIAGNOSTICS |
 | Upstream | per-run scratch clone — discarded automatically by the run finalizer |
 | Runtime knowledge | move `backups/<ts>/` back (non-destructive) |
-| EXT1 | `git revert 353b0a6 8ffcc6c 634b002 71222e8 015344d` in the canonical checkout |
+| EXT1 | `git revert 0395bbe 353b0a6 8ffcc6c 634b002 71222e8 015344d` in the canonical checkout |
 
 **Abort criteria** (any one triggers rollback + investigation): §8
 validation gate fails; > 25 % end-to-end wall-clock regression; any
