@@ -8,10 +8,12 @@ plan doc holds the contracts, this holds the switches and checklists.
 
 - **Canonical external checkout:**
   `/data/zhoutaichang/rebase/vllm-omni-rebase-agent`
-- **Pinned SHA:** `015344dfc15487433a91bde4dd5065c678fcca01`
-  (`feat(ext1): startup checkout flock`) — this commit IS the whole EXT1
-  change (guard module + orchestrator hook), independently revertible
-  with `git revert 015344d`.
+- **Pinned SHA:** `71222e8913558740857f9f981e8ed97b21f2c44f`
+  (`fix(ext1): lock file invisible to workspace hygiene`, on top of
+  `015344d feat(ext1): startup checkout flock`) — these two commits ARE
+  the whole EXT1 change (guard module + orchestrator hook +
+  info/exclude hygiene shield), independently revertible with
+  `git revert 71222e8 015344d`.
 - **Startup guard:** the orchestrator flocks
   `<omni_checkout>/locks/omni.lock` after the dry-run exit and before
   resume detection; refuses (exit 3) when a copilot run holds it.

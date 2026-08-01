@@ -30,12 +30,50 @@ class RuntimeError_(RuntimeError):
     """Runtime acquisition/teardown failed."""
 
 
+def _ensure_lock_dir_excluded(checkout: Path) -> None:
+    """Mark `locks/` git-ignored via the LOCAL `.git/info/exclude` (never a
+    committed file, never dirt itself). Without this the live lock file is
+    an untracked entry, and any workspace-hygiene pass — the parent's
+    phase-1 clean-tree guard with its L2 `git clean` cleanup (which v1
+    backend runs execute against this same checkout), or a bulk
+    `git add -A` staging — would delete or commit it. A `git clean`ed lock
+    file leaves its holder flocking a DELETED inode while a new run locks
+    a fresh one at the same path: mutual exclusion defeated. Ignored files
+    are exempt from status, non-`-x` clean, and `add -A`. Best-effort,
+    idempotent, worktree-aware."""
+    git = Path(checkout) / ".git"
+    if git.is_dir():
+        info = git / "info"
+    elif git.is_file():  # linked worktree: `gitdir: …/.git/worktrees/<n>`
+        try:
+            target = Path(git.read_text().strip()
+                          .removeprefix("gitdir:").strip())
+        except OSError:
+            return
+        info = (target.parent.parent / "info"
+                if target.parent.name == "worktrees" else target / "info")
+    else:
+        return
+    try:
+        info.mkdir(parents=True, exist_ok=True)
+        exclude = info / "exclude"
+        text = exclude.read_text() if exclude.exists() else ""
+        if "locks/" not in text.split("\n"):
+            exclude.write_text(
+                (text.rstrip("\n") + "\n" if text.strip() else "")
+                + "# rebase checkout flock — never dirt, never cleaned\n"
+                  "locks/\n")
+    except OSError:
+        pass
+
+
 class CheckoutLock:
     """A named exclusive flock under `<checkout>/locks/<name>.lock` — the
     shared-participation lock (plan §8: EXT1 makes the external executable
     take it; the in-process backend and archival take the SAME file)."""
 
     def __init__(self, checkout: Path, name: str):
+        self.checkout = Path(checkout)
         self.path = Path(checkout) / "locks" / f"{name}.lock"
         self._fh = None
 
@@ -44,6 +82,7 @@ class CheckoutLock:
             import fcntl
         except ImportError:  # pragma: no cover - Windows
             return True  # documented degradation: no fcntl, no exclusion
+        _ensure_lock_dir_excluded(self.checkout)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         fh = open(self.path, "w")
         flags = fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB)
