@@ -922,16 +922,27 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
     if len(local_jobs) < len(jobs):
         ctx.trace.record("nightly_jobs_excluded",
                          count=len(jobs) - len(local_jobs))
+    # labeled steps the builder DROPPED for lack of a runnable command are
+    # STRUCTURAL on every path — including the all-dropped one, where the
+    # generic manifest_empty block must still carry the labels
+    dropped_infra = [f"step '{label}': no runnable command"
+                     for label in built.dropped]
+    if dropped_infra:
+        ctx.trace.record("manifest_steps_dropped", labels=built.dropped)
     if not local_jobs:
         # zero runnable jobs is corrupt/empty manifest territory — the push
         # gate must block, not sail through a vacuous "0 failed"
         sub.update({"manifest_empty": True,
                     "tests": {"pipeline": {"passed": 0, "failed": 0,
                                            "failed_tests": [],
-                                           "skipped": 0}}})
+                                           "skipped": 0},
+                              "infra_failures": dropped_infra}})
         return StepResult(True,
                           summary="no runnable local jobs — manifest_empty "
-                                  "set (push gate blocks)",
+                                  "set (push gate blocks)"
+                                  + (f"; {len(dropped_infra)} dropped "
+                                     "step(s) recorded"
+                                     if dropped_infra else ""),
                           outputs={"state_updates": {"phase3_failed": []}})
 
     import os
@@ -973,12 +984,14 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
                                 output=outcome.log_file, infra=infra)
 
     def run_fn(slug: str) -> tl.TestRunResult:
-        # an empty command must NEVER read as a pass — bash -c "" exits 0
-        # (the parent's §10 false-pass mechanism, DRIFT_TRIAGE #4); the
-        # builder already drops command-less steps, so one arriving here
-        # is corruption and classifies STRUCTURAL
-        if not jobs_by_slug[slug].get("command", "").strip():
-            return tl.TestRunResult(rc=1, infra="empty command")
+        # a non-RUNNABLE command (empty or comment-only) must NEVER read as
+        # a pass — bash exits 0 on both (the parent's §10 false-pass
+        # mechanism, DRIFT_TRIAGE #4); the builder already drops such
+        # steps, so one arriving here is corruption and classifies
+        # STRUCTURAL
+        from ...rebase_engine.test_manifest import is_runnable_command
+        if not is_runnable_command(jobs_by_slug[slug].get("command", "")):
+            return tl.TestRunResult(rc=1, infra="no runnable command")
         # tests INHERIT the process env (Rev 8 §6: inherit-plus-overlay;
         # the credential scrub applies to agent shells only) with the
         # TARGET venv + CUDA + HF_HOME overlay — raw manifest commands
@@ -1053,12 +1066,6 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
         visible_gpus=len([d for d in runner.cuda.split(",") if d.strip()
                           and not d.strip().startswith("-")]))
     tl.remove_main_worktree(Path(repo), worktree_path)
-    # labeled steps the builder DROPPED for lack of a runnable command are
-    # STRUCTURAL: the push gate must not pass over an omitted test
-    dropped_infra = [f"step '{label}': no runnable command"
-                     for label in built.dropped]
-    if dropped_infra:
-        ctx.trace.record("manifest_steps_dropped", labels=built.dropped)
     infra = result["infra_failures"] + dropped_infra
     sub.update({"tests": {
         "pipeline": {

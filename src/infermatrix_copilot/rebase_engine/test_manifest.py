@@ -7,10 +7,13 @@ module test map. Drives phase-2 prompt injection and phase-3 execution.
 
 Repo specifics arrive as `ManifestSpec` (adapter data): queue→GPU map, label
 skip patterns, pipeline filenames, rename-suffix families, file-ref prefixes,
-the module test map, and the change→module path rules. NOTE the parent kept a
-THIRD inline copy of the module test map here; this port reads the
-MANIFEST's operational map instead — recorded in DRIFT_TRIAGE (the prompt
-flavor is a separate, deliberate dataset).
+the module maps, and the change→module path rules. NOTE on map flavors
+(DRIFT_TRIAGE #6): the parent kept its OWN inline module map here for
+job→module ROUTING, distinct from the §11 operational test map — merging
+them changes routing scores, so this port keeps both as separate adapter
+data: `assignment_paths` (routing, parent inline flavor) and
+`modules.*.test_paths` (§11, shell test selection). The prompt flavor is a
+third, deliberate dataset (`prompt_data.yaml`).
 """
 
 from __future__ import annotations
@@ -186,9 +189,20 @@ def _parse_k8s_gpu_count(step: dict, fallback: int) -> int:
 
 # a PURE export line assigns env and nothing else — a compound line like
 # `export X=1 && pytest ...` is a COMMAND and must never be stripped (or a
-# job could silently lose its entire body to the env split)
+# job could silently lose its entire body to the env split). The ASSIGNMENT
+# is captured so extraction uses the same whitespace grammar as detection
+# (`export\tA=1` must yield the token `A=1`, never a malformed key).
 _PURE_EXPORT_RX = re.compile(
-    r"^\s*export\s+[A-Za-z_][A-Za-z0-9_]*=(?:\"[^\"]*\"|'[^']*'|\S*)\s*$")
+    r"^\s*export\s+([A-Za-z_][A-Za-z0-9_]*=(?:\"[^\"]*\"|'[^']*'|\S*))\s*$")
+
+
+def is_runnable_command(text: str) -> bool:
+    """True when `text` contains at least one line that would actually DO
+    something in bash — blank and comment-only lines are no-ops whose rc=0
+    would read as a pass (the same false-pass class as an empty command:
+    `# pytest temporarily disabled` must never count as a runnable job)."""
+    return any(ln.strip() and not ln.strip().startswith("#")
+               for ln in (text or "").split("\n"))
 
 
 def _format_env_pairs(env_map: Mapping) -> str:
@@ -228,17 +242,19 @@ def _extract_steps(steps_list: list, source: str,
                             if isinstance(c, str) and c.strip())
         else:
             cmd = str(cmds or "")
-        env_lines = [ln for ln in cmd.split("\n")
-                     if _PURE_EXPORT_RX.match(ln)]
-        cmd_clean = "\n".join(ln for ln in cmd.split("\n")
-                              if not _PURE_EXPORT_RX.match(ln))
-        if not cmd_clean.strip():
-            # a labeled step with no runnable command is NOT a test job —
-            # emitting it would hand the runner an empty command whose
-            # rc=0 reads as a pass (the parent's §10 false-pass mechanism,
-            # DRIFT_TRIAGE #4). NEVER silent: the drop is surfaced through
-            # BuiltManifest.dropped and classified structural by the run
-            # side, so the push gate cannot pass over an omitted test
+        export_matches = [_PURE_EXPORT_RX.match(ln)
+                          for ln in cmd.split("\n")]
+        env_tokens = [m.group(1) for m in export_matches if m]
+        cmd_clean = "\n".join(ln for ln, m in zip(cmd.split("\n"),
+                                                  export_matches) if not m)
+        if not is_runnable_command(cmd_clean):
+            # a labeled step with no RUNNABLE command (empty, export-only,
+            # or comment-only — bash treats comments as rc=0 no-ops) is NOT
+            # a test job: emitting it would read as a pass (the parent's
+            # §10 false-pass mechanism, DRIFT_TRIAGE #4). NEVER silent: the
+            # drop is surfaced through BuiltManifest.dropped and classified
+            # structural by the run side, so the push gate cannot pass over
+            # an omitted test
             if dropped is not None:
                 dropped.append(label)
             continue
@@ -247,8 +263,7 @@ def _extract_steps(steps_list: list, source: str,
         queue = agents.get("queue", spec.default_queue)
         min_gpus, hw = spec.queue_map.get(queue, (1, "any"))
         min_gpus = _parse_k8s_gpu_count(step, min_gpus)
-        env_vars = " ".join(ln.replace("export ", "").strip()
-                            for ln in env_lines)
+        env_vars = " ".join(env_tokens)
         if pipeline_env:
             # top-level pipeline env FIRST so a job's own export wins the
             # later last-key-wins parse — the live pipelines declare shared

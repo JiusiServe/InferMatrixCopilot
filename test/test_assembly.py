@@ -838,11 +838,18 @@ def test_v3_test_loop_empty_manifest_is_structural(v3_env, settings, trace,
     from infermatrix_copilot.engine.step import StepContext
     from infermatrix_copilot.engine.steps import register_builtin_steps
     repo2 = tmp_path / "nightly-only"
-    (repo2 / ".buildkite").mkdir(parents=True)
+    (repo2 / ".buildkite" / "cuda").mkdir(parents=True)
     subprocess.run(["git", "init", "-q"], cwd=repo2, check=True)
-    (repo2 / ".buildkite" / "test-nightly.yml").write_text(yaml.safe_dump({
-        "steps": [{"label": "Soak", "timeout_in_minutes": 1,
-                   "commands": ["true"]}]}))
+    (repo2 / ".buildkite" / "cuda" / "test-nightly.yml").write_text(
+        yaml.safe_dump({
+            "steps": [{"label": "Soak", "timeout_in_minutes": 1,
+                       "commands": ["true"]}]}))
+    # plus a merge-pipeline step that gets DROPPED (comment-only): the
+    # all-dropped/empty path must still carry the labels (round-2 P3)
+    (repo2 / ".buildkite" / "cuda" / "test-merge.yml").write_text(
+        yaml.safe_dump({
+            "steps": [{"label": "Disabled Stub", "timeout_in_minutes": 1,
+                       "commands": ["# temporarily disabled"]}]}))
     registry = register_builtin_steps(StepRegistry())
     run_dir = tmp_path / "run-empty"
     run_dir.mkdir()
@@ -854,6 +861,10 @@ def test_v3_test_loop_empty_manifest_is_structural(v3_env, settings, trace,
     assert r.ok and "manifest_empty" in r.summary
     sub = Substate(run_dir, "run-e").read()
     assert sub["manifest_empty"] is True
+    # the dropped step's label is recorded even on the all-dropped path
+    assert sub["tests"]["infra_failures"] == [
+        "step 'Disabled Stub': no runnable command"]
+    assert any(e for e in trace.events("manifest_steps_dropped"))
     assert not evaluate_push_gate(sub, {}).allowed
 
 

@@ -278,18 +278,31 @@ def test_empty_command_dropped_loudly(tmp_path):
             {"label": "Real Job", "commands": ["pytest tests/x.py"]},
             {"label": "Block Step", "commands": []},
             {"label": "Export Only", "commands": ["export A=1"]},
+            {"label": "Comment Only",
+             "commands": ["# pytest temporarily disabled"]},
+            {"label": "Export Plus Comment",
+             "commands": ["export B=2", "# disabled while flaky"]},
+            {"label": "Tab Export",
+             "commands": ["export\tC=3", "pytest tests/t.py"]},
             {"label": "Compound Export",
              "commands": ["export X=1 && pytest tests/y.py"]},
             {"label": "Singular Form", "command": "pytest tests/z.py"},
         ]}))
     built = build_manifest(repo, ManifestSpec.from_manifest(MANIFEST))
     by_slug = {j.slug: j for j in built.jobs}
-    assert set(by_slug) == {"real_job", "compound_export", "singular_form"}
+    assert set(by_slug) == {"real_job", "tab_export", "compound_export",
+                            "singular_form"}
     # the compound export line IS the command — never stripped into env
     assert by_slug["compound_export"].command == \
         "export X=1 && pytest tests/y.py"
     assert by_slug["compound_export"].env == ""
     assert by_slug["singular_form"].command == "pytest tests/z.py"
-    # dropped steps are SURFACED, not silent (run side marks structural)
-    assert sorted(built.dropped) == ["Block Step", "Export Only"]
+    # export extraction uses the SAME whitespace grammar as detection:
+    # `export\tC=3` yields the clean token C=3, never a malformed key
+    assert by_slug["tab_export"].env == "C=3"
+    assert by_slug["tab_export"].command == "pytest tests/t.py"
+    # dropped steps are SURFACED, not silent (run side marks structural);
+    # comment-only bodies are rc=0 no-ops — the same false-pass class
+    assert sorted(built.dropped) == ["Block Step", "Comment Only",
+                                     "Export Only", "Export Plus Comment"]
     assert built.to_dict()["dropped"] == built.dropped
