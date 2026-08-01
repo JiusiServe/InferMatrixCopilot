@@ -692,5 +692,91 @@
    "tests/*/tmp/*",
    "tests/*/.tmp/*"
   ]
+ },
+ "assignment_map": {
+  "_provenance": "agent/test_manifest.py _assign_modules module_patterns (the parent's job->module ROUTING flavor, transcribed verbatim 2026-08-01 — distinct from §11 MODULE_TEST_MAP)",
+  "model_config": [
+   "tests/entrypoints/test_stage_utils.py",
+   "tests/metrics/test_stats.py"
+  ],
+  "input_output": [
+   "tests/entrypoints/test_omni_new_request_data.py",
+   "tests/engine/",
+   "tests/test_outputs.py"
+  ],
+  "scheduler": [
+   "tests/distributed/"
+  ],
+  "worker_runner": [
+   "tests/worker/",
+   "tests/diffusion/test_diffusion_worker.py",
+   "tests/e2e/offline_inference/custom_pipeline/"
+  ],
+  "model_executor": [
+   "tests/model_executor/",
+   "tests/diffusion/",
+   "tests/e2e/offline_inference/"
+  ],
+  "online_serving": [
+   "tests/entrypoints/",
+   "tests/e2e/online_serving/"
+  ],
+  "benchmarks": [
+   "tests/benchmarks/test_serve_cli.py"
+  ],
+  "platform": [
+   "tests/"
+  ]
+ },
+ "assignment_routing": {
+  "_provenance": "behavioral replay golden: the production builder + _assign_modules over a fixture pipeline generated from ci_tests (capture 2026-08-01); verified IDENTICAL to the parent's own _assign_modules output on the same refs — the 13 disagreements with §10's declared CI_TEST_MODULE are parent-internal declared-vs-computed drift (DRIFT_TRIAGE #7)",
+  "bagel_online_serving_test_with_h100": "online_serving",
+  "cuda_unit_test_with_multi_cards": "platform",
+  "cuda_unit_test_with_single_card": "platform",
+  "custom_pipeline_test": "worker_runner",
+  "diffusion_bagel_test": "online_serving",
+  "diffusion_flux2_klein_test": "model_executor",
+  "diffusion_longcat_image_edit_test": "online_serving",
+  "diffusion_longcat_image_test": "online_serving",
+  "diffusion_lora_test": "model_executor",
+  "diffusion_other_test": "",
+  "diffusion_qwen_image_edit_test": "online_serving",
+  "diffusion_qwen_image_layered_test": "online_serving",
+  "diffusion_qwen_image_test": "online_serving",
+  "diffusion_sd3_test": "online_serving",
+  "diffusion_wan22_test": "online_serving",
+  "diffusion_z_image_test": "platform",
+  "distributed_test": "scheduler",
+  "enginemodel_executor_test": "platform",
+  "entrypoint_test_with_h100": "online_serving",
+  "entrypoint_test_with_l4": "online_serving",
+  "full_moon_diffusion_x2iat_doc_test": "",
+  "full_moon_diffusion_x2iat_function_test_with_h100_multi-gpu_bagel": "online_serving",
+  "full_moon_diffusion_x2iat_function_test_with_h100_multi-gpu_layeredlongcatflux": "online_serving",
+  "full_moon_diffusion_x2iat_function_test_with_h100_multi-gpu_qwen-image": "online_serving",
+  "full_moon_diffusion_x2iat_function_test_with_h100_single-gpu": "online_serving",
+  "full_moon_diffusion_x2iat_function_test_with_l4": "platform",
+  "full_moon_diffusion_x2v_function_test": "online_serving",
+  "full_moon_omni_doc_test_with_h100": "platform",
+  "full_moon_omni_doc_test_with_l4": "platform",
+  "full_moon_omni_function_test_with_l4": "",
+  "full_moon_omni_multi-replica_startup_test_with_4x_h100": "online_serving",
+  "full_moon_tts_function_test": "platform",
+  "mimo-audio_e2e_test_with_h100": "online_serving",
+  "omni_mimo_audio_test": "online_serving",
+  "omni_qwen3-omni_test": "online_serving",
+  "omni_sleep_mode_test_with_h100": "online_serving",
+  "omni_voxcpm2_test": "model_executor",
+  "qwen3-tts_base_e2e_test_modelrunner_v2": "online_serving",
+  "qwen3-tts_e2e_test": "online_serving",
+  "rlhf_verl-omni_e2e_test": "model_executor",
+  "simple_diffusion_model_executor_test": "platform",
+  "simple_other_test": "platform",
+  "simple_unit_test": "",
+  "tts_qwen3-tts_base_test": "online_serving",
+  "tts_qwen3-tts_customvoice_test": "online_serving",
+  "tts_voxtral-tts_test": "platform",
+  "voxcpm2_native_ar_e2e_test": "model_executor",
+  "voxtral-tts_e2e_test": "online_serving"
  }
 }

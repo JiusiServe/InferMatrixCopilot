@@ -68,6 +68,18 @@ def _parse_env_pairs(env_str: str) -> dict[str, str]:
     return out
 
 
+def manifest_job_to_test_job(j: Mapping):
+    """THE production conversion from a built-manifest job dict to the
+    runner's `TestJob` — one authority, used by the v3 test loop and pinned
+    by the tier-3 shell-golden parity suite (a test-local re-implementation
+    would let the two drift apart unnoticed)."""
+    from ...testing.runner import TestJob
+    return TestJob(key=j["slug"], command=j["command"],
+                   timeout_sec=j["timeout_sec"], min_gpus=j["min_gpus"],
+                   env=_parse_env_pairs(j.get("env", "")),
+                   setup=j.get("setup", ""))
+
+
 def _tier_client(ctx: StepContext):
     """The run's agent backend via `Settings.tier_target` — the ONLY place a
     tier's model may pair with an endpoint and credential. Returns
@@ -667,9 +679,13 @@ async def _v3_scan(ctx: StepContext) -> StepResult:
     out = ctx.run_dir / "test_manifest.json"
     import json
     out.write_text(json.dumps(built.to_dict(), indent=1), encoding="utf-8")
-    return StepResult(True,
-                      summary=f"{len(built.jobs)} CI jobs, "
-                              f"{len(built.changes)} test changes",
+    summary = (f"{len(built.jobs)} CI jobs, "
+               f"{len(built.changes)} test changes")
+    if built.dropped:
+        summary += (f"; {len(built.dropped)} labeled step(s) with no "
+                    "runnable command DROPPED (structural in a test run)")
+        ctx.trace.record("manifest_steps_dropped", labels=built.dropped)
+    return StepResult(True, summary=summary,
                       outputs={"state_updates": {
                           "manifest_jobs": len(built.jobs)}})
 
@@ -947,11 +963,7 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
     jobs_by_slug = {j["slug"]: j for j in local_jobs}
 
     def _job(slug: str) -> TestJob:
-        j = jobs_by_slug[slug]
-        return TestJob(key=j["slug"], command=j["command"],
-                       timeout_sec=j["timeout_sec"], min_gpus=j["min_gpus"],
-                       env=_parse_env_pairs(j.get("env", "")),
-                       setup=j.get("setup", ""))
+        return manifest_job_to_test_job(jobs_by_slug[slug])
 
     def _to_result(outcome) -> tl.TestRunResult:
         infra = "timeout" if outcome.timed_out else \
@@ -1041,16 +1053,23 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
         visible_gpus=len([d for d in runner.cuda.split(",") if d.strip()
                           and not d.strip().startswith("-")]))
     tl.remove_main_worktree(Path(repo), worktree_path)
+    # labeled steps the builder DROPPED for lack of a runnable command are
+    # STRUCTURAL: the push gate must not pass over an omitted test
+    dropped_infra = [f"step '{label}': no runnable command"
+                     for label in built.dropped]
+    if dropped_infra:
+        ctx.trace.record("manifest_steps_dropped", labels=built.dropped)
+    infra = result["infra_failures"] + dropped_infra
     sub.update({"tests": {
         "pipeline": {
             "passed": result["passed"], "failed": result["failed"],
             "failed_tests": result["failed_tests"],
             "skipped": len(result["skipped_tests"])},
-        "infra_failures": result["infra_failures"]}})
+        "infra_failures": infra}})
     return StepResult(True,
                       summary=f"{result['passed']} passed, "
                               f"{result['failed']} failed "
-                              f"({len(result['infra_failures'])} infra), "
+                              f"({len(infra)} infra), "
                               f"{len(result['skipped_tests'])} skipped",
                       outputs={"state_updates": {
                           "phase3_failed": result["failed_tests"]}})

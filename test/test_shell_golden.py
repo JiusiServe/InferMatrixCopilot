@@ -1,26 +1,32 @@
 """PR5 — tier-3 shell-golden parity (Rev 8 §8.3): the one-time capture of
 the parent's LIVE config.sh §10/§11 arrays + test_watchdog.sh arrays
 (`adapters/vllm_omni/rebase/shell_golden.json`, isolated-env `declare -p`,
-2026-08-01) versus this substrate's command echo, data maps, and pattern
-inventories.
+2026-08-01) versus this substrate's PRODUCTION pipeline.
 
-The golden is the parent's OPERATIONAL truth. Two directions are pinned:
-our runner must echo the parent's commands byte-for-byte (dry_run
-RunPlan), and our adapter DATA (module maps, watchdog patterns, push
-policy) must carry the parent's values — drift in either direction fails
-offline, before any live comparison."""
+The parity tests run the real code end to end: a fixture Buildkite
+pipeline generated from the golden's §10 entries goes through
+`build_manifest` (the production builder), `manifest_job_to_test_job`
+(the production conversion the v3 loop uses), and the real `TestRunner`
+dry_run — commands must come out byte-for-byte, env under shell
+semantics, timeouts intact, and job→module routing must reproduce the
+recorded behavioral replay (verified identical to the parent's own
+`_assign_modules` output at capture time)."""
 
 from __future__ import annotations
 
 import json
 import re
+import shlex
+import subprocess
 from pathlib import Path
 
 import pytest
 import yaml
 
-from infermatrix_copilot.engine.steps.rebase_v3 import _parse_env_pairs
-from infermatrix_copilot.testing.runner import TestJob, TestRunner, _exec_wrap
+from infermatrix_copilot.engine.steps.rebase_v3 import manifest_job_to_test_job
+from infermatrix_copilot.rebase_engine.test_manifest import (ManifestSpec,
+                                                             build_manifest)
+from infermatrix_copilot.testing.runner import TestRunner
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 GOLDEN = json.loads(
@@ -32,12 +38,36 @@ WATCHDOG_YAML = yaml.safe_load(
     .read_text())
 
 
+def _golden_jobs() -> dict:
+    return {s: t for s, t in GOLDEN["ci_tests"].items()
+            if s != "__precommit__"}
+
+
+@pytest.fixture(scope="module")
+def golden_built(tmp_path_factory):
+    """The GOLDEN-DERIVED fixture pipeline driven through the PRODUCTION
+    builder: every §10 job becomes a Buildkite step (env as export lines,
+    command verbatim, timeout in minutes) in the real nested layout."""
+    repo = tmp_path_factory.mktemp("golden-fixture") / "repo"
+    (repo / ".buildkite" / "cuda").mkdir(parents=True)
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    steps = []
+    for slug, t in sorted(_golden_jobs().items()):
+        cmds = [f"export {tok}" for tok in shlex.split(t["env"] or "")]
+        cmds += list(t["cmd"].split("\n"))
+        steps.append({"label": t["label"], "commands": cmds,
+                      "timeout_in_minutes": int(t["timeout_sec"]) // 60})
+    (repo / ".buildkite" / "cuda" / "test-ready.yml").write_text(
+        yaml.safe_dump({"steps": steps}, allow_unicode=True))
+    return build_manifest(repo, ManifestSpec.from_manifest(MANIFEST))
+
+
 def test_golden_capture_sanity():
     """The capture is complete and sane: a real job population, every job
     has a non-empty command (the parent's EMPTY-command false-pass set was
     empty at capture time — new drift shows up as live-yaml slugs missing
     from here, enumerated in DRIFT_TRIAGE #4), full module maps, all four
-    watchdog tiers."""
+    watchdog tiers, the routing sections."""
     jobs = GOLDEN["ci_tests"]
     assert len(jobs) >= 40
     assert all(t["cmd"].strip() for t in jobs.values())
@@ -52,61 +82,111 @@ def test_golden_capture_sanity():
     assert all(GOLDEN["watchdog"][k]
                for k in ("critical", "review", "simulation_allowlist",
                          "noise"))
+    assert set(GOLDEN["assignment_map"]) - {"_provenance"} == \
+        set(GOLDEN["module_maps"]["MODULE_VLLM_PATHS"])
     # sanitation held: no machine paths or credentials in the capture
     blob = json.dumps(GOLDEN)
     for needle in ("/PLACEHOLDER_ROOT", "/data/zhoutaichang", "sk-"):
         assert needle not in blob, needle
 
 
-# ── tier 3: command echo ─────────────────────────────────────────────────────
-
-def test_command_echo_parity(tmp_path):
-    """THE tier-3 pin (and this PR's partial e2e): every golden §10 job
-    driven through the REAL runner's dry_run yields a RunPlan whose child
-    command embeds the parent's command BYTE-FOR-BYTE (modulo the
-    documented `set -e` prefix), with the parent's timeout, env pairs, and
-    GPU-lock semantics."""
-    runner = TestRunner(repo_root=tmp_path, tests_dir=tmp_path / "tests")
-    for slug, t in GOLDEN["ci_tests"].items():
-        if slug == "__precommit__":
-            continue     # phase 3.2's own step, pinned in test_assembly
-        min_gpus = int(t["min_gpus"] or 1)
-        job = TestJob(key=slug, command=t["cmd"],
-                      timeout_sec=float(t["timeout_sec"] or 1800),
-                      min_gpus=min_gpus,
-                      env=_parse_env_pairs(t["env"]))
-        plan = runner.run(job, {}, dry_run=True).plan
-        assert plan is not None, slug
-        # byte parity: bash -c <parent command>, sole wrapper is the
-        # documented fail-fast prefix (absent when the command manages
-        # its own -e state)
-        assert plan.argv[:2] == ["bash", "-c"], slug
-        assert plan.argv[2] == _exec_wrap(t["cmd"]), slug
-        assert plan.argv[2].endswith(t["cmd"]), slug
-        assert plan.timeout_sec == float(t["timeout_sec"]), slug
-        # env pairs round-trip with the SHELL's own word-split + quote
-        # semantics (the parent eval-exports these strings, so K="1"
-        # must reach the child as 1, not a literal-quoted value)
-        import shlex
-        for token in shlex.split(t["env"] or ""):
-            k, v = token.split("=", 1)
-            assert plan.env_overlay.get(k) == v, (slug, token)
-        # GPU-lock semantics: min_gpus>0 holds the lock (historical rule)
-        assert plan.needs_gpu_lock == (min_gpus > 0), slug
-
-
 def test_golden_timeouts_and_gpus_are_wellformed():
     for slug, t in GOLDEN["ci_tests"].items():
         assert t["timeout_sec"].isdigit() and int(t["timeout_sec"]) > 0, slug
+        assert int(t["timeout_sec"]) % 60 == 0, slug
         assert t["min_gpus"] == "" or t["min_gpus"].isdigit(), slug
-        for pair in (t["env"] or "").split():
+        for pair in shlex.split(t["env"] or ""):
             assert "=" in pair, (slug, pair)
+
+
+# ── tier 3: command echo through the PRODUCTION path ─────────────────────────
+
+def test_command_echo_parity_production_path(golden_built, tmp_path):
+    """THE tier-3 pin (and this PR's partial e2e): every golden §10 job,
+    parsed from a fixture pipeline by the PRODUCTION builder and converted
+    by the PRODUCTION `manifest_job_to_test_job`, yields a dry-run RunPlan
+    whose child command is `set -e` + the parent's command BYTE-FOR-BYTE
+    (expected literal computed independently — no shared helper), with the
+    parent's timeout and env pairs under the shell's own word-split
+    semantics."""
+    by_slug = {j.slug: j for j in golden_built.jobs}
+    runner = TestRunner(repo_root=tmp_path, tests_dir=tmp_path / "tests")
+    assert set(by_slug) == set(_golden_jobs())      # nothing lost, no extras
+    assert golden_built.dropped == []
+    for slug, t in _golden_jobs().items():
+        job = manifest_job_to_test_job(golden_built.to_dict()["jobs"][
+            [j["slug"] for j in golden_built.to_dict()["jobs"]].index(slug)])
+        plan = runner.run(job, {}, dry_run=True).plan
+        assert plan is not None, slug
+        assert plan.argv[:2] == ["bash", "-c"], slug
+        # independent expected literal: the sole wrapper is the fail-fast
+        # prefix, absent only when the command manages -e itself
+        if "set +e" in t["cmd"]:
+            assert plan.argv[2] == t["cmd"], slug
+        else:
+            assert plan.argv[2] == "set -e\n" + t["cmd"], slug
+        assert plan.timeout_sec == float(t["timeout_sec"]), slug
+        for token in shlex.split(t["env"] or ""):
+            k, v = token.split("=", 1)
+            assert plan.env_overlay.get(k) == v, (slug, token)
+
+
+def test_gpu_lock_semantics_via_production_converter():
+    """min_gpus>0 holds the GPU lock (historical rule) through the
+    production conversion — pinned per golden job with the §10 gpu
+    counts (queue-independent)."""
+    from infermatrix_copilot.testing.runner import TestRunner
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        runner = TestRunner(repo_root=Path(td),
+                            tests_dir=Path(td) / "tests")
+        for slug, t in _golden_jobs().items():
+            min_gpus = int(t["min_gpus"] or 1)
+            job = manifest_job_to_test_job(
+                {"slug": slug, "command": t["cmd"],
+                 "timeout_sec": float(t["timeout_sec"]),
+                 "min_gpus": min_gpus, "env": t["env"],
+                 "setup": t["setup"]})
+            plan = runner.run(job, {}, dry_run=True).plan
+            assert plan.needs_gpu_lock == (min_gpus > 0), slug
+
+
+# ── routing: the behavioral replay golden ────────────────────────────────────
+
+def test_module_routing_replay(golden_built):
+    """Job→module routing through the PRODUCTION builder reproduces the
+    recorded replay (verified identical to the parent's own
+    `_assign_modules` output at capture time). This is the pin that fails
+    if the assignment flavor is ever merged away again — dropping the
+    broad prefixes silently rerouted jobs to `platform` (round-1
+    finding)."""
+    expected = {s: m for s, m in GOLDEN["assignment_routing"].items()
+                if s != "_provenance"}
+    ours = {j.slug: j.module for j in golden_built.jobs}
+    assert ours == expected
+    # the misrouting failure mode specifically: online_serving must own its
+    # jobs, and `platform`'s broad tests/ must not swallow the set
+    from collections import Counter
+    hist = Counter(ours.values())
+    assert hist["online_serving"] >= 20
+    assert hist["platform"] < len(ours) / 2
+
+
+def test_assignment_map_is_parent_verbatim():
+    """The manifest's routing flavor (rebase.test_manifest
+    .assignment_paths) is the parent test_manifest.py inline map VERBATIM
+    — a DISTINCT flavor from §11 MODULE_TEST_MAP, never merged
+    (DRIFT_TRIAGE #6)."""
+    ours = MANIFEST["rebase"]["test_manifest"]["assignment_paths"]
+    golden = {m: v for m, v in GOLDEN["assignment_map"].items()
+              if m != "_provenance"}
+    assert ours == golden
 
 
 # ── module maps: adapter data == parent §11 ──────────────────────────────────
 
 def test_module_map_parity_upstream_and_tests():
-    """`modules.*.upstream_paths` / `test_paths` carry the parent's
+    """`modules.*.upstream_paths` / `test_paths` carry the parent's §11
     MODULE_VLLM_PATHS / MODULE_TEST_MAP verbatim (order preserved)."""
     mods = MANIFEST["modules"]
     golden_up = GOLDEN["module_maps"]["MODULE_VLLM_PATHS"]
@@ -181,17 +261,15 @@ def test_push_policy_parity():
     assert push["unstage_globs"] == GOLDEN["push"]["unstage_case_patterns"]
 
 
-# ── DRIFT #4: the false-pass mechanism is dead here ──────────────────────────
+# ── DRIFT #4: the false-pass mechanism is dead AND visible ───────────────────
 
-def test_empty_command_never_passes(tmp_path):
-    """The parent's §10 false-pass (missing slug -> empty command ->
-    rc=0 'pass') is structurally impossible in this substrate: the
-    manifest builder DROPS labeled steps with no runnable command, and
-    the §2.3 taxonomy classifies an empty command as an infrastructure
-    failure if one ever arrives at the loop."""
-    from infermatrix_copilot.rebase_engine.test_manifest import (
-        ManifestSpec, build_manifest)
-    import subprocess
+def test_empty_command_dropped_loudly(tmp_path):
+    """The parent's §10 false-pass (missing slug -> empty command -> rc=0
+    'pass') is structurally impossible AND never silent: labeled steps
+    with no runnable command land in `BuiltManifest.dropped` (the run side
+    classifies each structural); pure-export stripping never eats a
+    compound `export X=1 && pytest` command; Buildkite's singular
+    `command:` form is parsed."""
     repo = tmp_path / "repo"
     (repo / ".buildkite" / "cuda").mkdir(parents=True)
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
@@ -200,7 +278,18 @@ def test_empty_command_never_passes(tmp_path):
             {"label": "Real Job", "commands": ["pytest tests/x.py"]},
             {"label": "Block Step", "commands": []},
             {"label": "Export Only", "commands": ["export A=1"]},
+            {"label": "Compound Export",
+             "commands": ["export X=1 && pytest tests/y.py"]},
+            {"label": "Singular Form", "command": "pytest tests/z.py"},
         ]}))
     built = build_manifest(repo, ManifestSpec.from_manifest(MANIFEST))
-    assert [j.slug for j in built.jobs] == ["real_job"]
-    assert all(j.command.strip() for j in built.jobs)
+    by_slug = {j.slug: j for j in built.jobs}
+    assert set(by_slug) == {"real_job", "compound_export", "singular_form"}
+    # the compound export line IS the command — never stripped into env
+    assert by_slug["compound_export"].command == \
+        "export X=1 && pytest tests/y.py"
+    assert by_slug["compound_export"].env == ""
+    assert by_slug["singular_form"].command == "pytest tests/z.py"
+    # dropped steps are SURFACED, not silent (run side marks structural)
+    assert sorted(built.dropped) == ["Block Step", "Export Only"]
+    assert built.to_dict()["dropped"] == built.dropped

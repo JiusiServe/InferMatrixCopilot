@@ -40,6 +40,12 @@ class ManifestSpec:
     file_ref_prefixes: Sequence[str] = ("tests",)  # cmd path-ref roots
     file_tree_roots: Sequence[str] = ("tests",)    # path-correction scan roots
     module_test_paths: Mapping[str, Sequence[str]] = field(default_factory=dict)
+    # job→module ROUTING patterns — the parent's test_manifest.py inline map,
+    # a DISTINCT flavor from §11 MODULE_TEST_MAP (shell test selection):
+    # scoring over a different pattern set produces different winners, so
+    # assignment must use the parent's own map verbatim (DRIFT_TRIAGE #6).
+    # Empty ⇒ fall back to module_test_paths (repo-neutral default).
+    assignment_paths: Mapping[str, Sequence[str]] = field(default_factory=dict)
     # ordered [substring, module] rules classifying CHANGE paths
     change_path_rules: Sequence[Sequence[str]] = ()
     default_queue: str = ""
@@ -63,6 +69,9 @@ class ManifestSpec:
             file_tree_roots=tuple(tm.get("file_tree_roots") or ("tests",)),
             module_test_paths={m: tuple((spec or {}).get("test_paths") or ())
                                for m, spec in modules.items()},
+            assignment_paths={m: tuple(v or ())
+                              for m, v in (tm.get("assignment_paths")
+                                           or {}).items()},
             change_path_rules=tuple(tuple(r) for r in
                                     (tm.get("change_path_rules") or ())),
             default_queue=tm.get("default_queue", ""),
@@ -107,6 +116,9 @@ class BuiltManifest:
     jobs: list[ManifestJob]
     changes: list[TestChange]
     module_plans: dict[str, ModuleTestPlan]
+    # labels of LABELED steps that carried no runnable command — surfaced,
+    # never silent (the run side classifies each as a structural failure)
+    dropped: list[str] = field(default_factory=list)
 
     def for_module(self, module: str) -> ModuleTestPlan:
         return self.module_plans.get(module, ModuleTestPlan(module=module))
@@ -120,6 +132,7 @@ class BuiltManifest:
                      for j in self.jobs],
             "changes": [{"path": c.path, "type": c.change_type,
                          "new_path": c.new_path} for c in self.changes],
+            "dropped": list(self.dropped),
             "module_plans": {
                 m: {"ci_tests": [j.slug for j in p.ci_tests],
                     "upstream_changes": [
@@ -171,6 +184,13 @@ def _parse_k8s_gpu_count(step: dict, fallback: int) -> int:
     return fallback
 
 
+# a PURE export line assigns env and nothing else — a compound line like
+# `export X=1 && pytest ...` is a COMMAND and must never be stripped (or a
+# job could silently lose its entire body to the env split)
+_PURE_EXPORT_RX = re.compile(
+    r"^\s*export\s+[A-Za-z_][A-Za-z0-9_]*=(?:\"[^\"]*\"|'[^']*'|\S*)\s*$")
+
+
 def _format_env_pairs(env_map: Mapping) -> str:
     """A pipeline-level `env:` mapping as shell-safe "K=V" tokens (the same
     encoding job-level `export` lines produce) — values with spaces stay a
@@ -183,7 +203,8 @@ def _format_env_pairs(env_map: Mapping) -> str:
 
 def _extract_steps(steps_list: list, source: str,
                    spec: ManifestSpec,
-                   pipeline_env: str = "") -> list[ManifestJob]:
+                   pipeline_env: str = "",
+                   dropped: list | None = None) -> list[ManifestJob]:
     jobs: list[ManifestJob] = []
     ref_rx = re.compile(
         r"(?:%s)/[\w/_.*-]+" % "|".join(re.escape(p)
@@ -193,27 +214,33 @@ def _extract_steps(steps_list: list, source: str,
             continue
         if "group" in step and "steps" in step:
             jobs.extend(_extract_steps(step["steps"], source, spec,
-                                       pipeline_env))
+                                       pipeline_env, dropped))
             continue
         label = step.get("label", "")
         if not label or _should_skip(label, spec.skip_patterns):
             continue
-        cmds = step.get("commands", [])
+        # Buildkite accepts both `commands:` (list) and `command:`
+        # (string or list) — the parent read only the plural form and
+        # silently produced empty jobs for the singular one
+        cmds = step.get("commands", step.get("command", []))
         if isinstance(cmds, list):
             cmd = "\n".join(c for c in cmds
                             if isinstance(c, str) and c.strip())
         else:
             cmd = str(cmds or "")
         env_lines = [ln for ln in cmd.split("\n")
-                     if ln.strip().startswith("export ")]
+                     if _PURE_EXPORT_RX.match(ln)]
         cmd_clean = "\n".join(ln for ln in cmd.split("\n")
-                              if not ln.strip().startswith("export "))
+                              if not _PURE_EXPORT_RX.match(ln))
         if not cmd_clean.strip():
-            # a labeled step with no runnable command (block/wait/trigger
-            # steps, or export-only stubs) is NOT a test job — emitting it
-            # would hand the runner an empty command whose rc=0 reads as a
-            # pass (the parent's §10 false-pass mechanism, DRIFT_TRIAGE #4;
-            # the run side ALSO guards, fail-closed twice)
+            # a labeled step with no runnable command is NOT a test job —
+            # emitting it would hand the runner an empty command whose
+            # rc=0 reads as a pass (the parent's §10 false-pass mechanism,
+            # DRIFT_TRIAGE #4). NEVER silent: the drop is surfaced through
+            # BuiltManifest.dropped and classified structural by the run
+            # side, so the push gate cannot pass over an omitted test
+            if dropped is not None:
+                dropped.append(label)
             continue
         timeout_min = step.get("timeout_in_minutes", 30)
         agents = step.get("agents", {}) or {}
@@ -252,7 +279,8 @@ def _extract_steps(steps_list: list, source: str,
     return jobs
 
 
-def _parse_ci_yaml(repo: Path, spec: ManifestSpec) -> list[ManifestJob]:
+def _parse_ci_yaml(repo: Path, spec: ManifestSpec,
+                   dropped: list | None = None) -> list[ManifestJob]:
     all_jobs: dict[str, ManifestJob] = {}
     yaml_dir = repo / spec.yaml_dir
     for yaml_file, source in spec.pipelines.items():
@@ -266,7 +294,7 @@ def _parse_ci_yaml(repo: Path, spec: ManifestSpec) -> list[ManifestJob]:
         pipeline_env = _format_env_pairs(top_env) \
             if isinstance(top_env, dict) else ""
         for job in _extract_steps(data["steps"], source, spec,
-                                  pipeline_env):
+                                  pipeline_env, dropped):
             if job.slug not in all_jobs or source == spec.priority_source:
                 all_jobs[job.slug] = job
     return list(all_jobs.values())
@@ -357,9 +385,10 @@ def _validate_file_paths(jobs: list[ManifestJob], repo: Path,
 
 
 def _assign_modules(jobs: list[ManifestJob], spec: ManifestSpec) -> None:
+    routing = spec.assignment_paths or spec.module_test_paths
     for job in jobs:
         best_module, best_score = "", 0
-        for module, patterns in spec.module_test_paths.items():
+        for module, patterns in routing.items():
             score = 0
             for ref in job.file_refs:
                 for pat in patterns:
@@ -397,11 +426,13 @@ def build_manifest(repo: Path, spec: ManifestSpec) -> BuiltManifest:
     """The parent's `TestManifest.build` sequence: parse CI YAML → classify
     changes → rename-aware path validation → module assignment → plans."""
     repo = Path(repo)
-    jobs = _parse_ci_yaml(repo, spec)
+    dropped: list[str] = []
+    jobs = _parse_ci_yaml(repo, spec, dropped)
     changes = _classify_test_changes(repo)
     rename_map = {c.path: c.new_path for c in changes
                   if c.change_type == "renamed" and c.new_path}
     _validate_file_paths(jobs, repo, spec, rename_map)
     _assign_modules(jobs, spec)
     plans = _build_module_plans(jobs, changes, spec)
-    return BuiltManifest(jobs=jobs, changes=changes, module_plans=plans)
+    return BuiltManifest(jobs=jobs, changes=changes, module_plans=plans,
+                         dropped=dropped)

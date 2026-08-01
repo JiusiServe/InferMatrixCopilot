@@ -787,6 +787,49 @@ def test_v3_test_loop_step_contract(v3_env, settings, trace, monkeypatch):
     assert not evaluate_push_gate(data, {}).allowed
 
 
+def test_v3_dropped_steps_are_structural(v3_env, settings, trace, tmp_path,
+                                         monkeypatch):
+    """A labeled CI step the builder DROPPED for lack of a runnable
+    command becomes a structural infra failure — the push gate cannot
+    pass over an omitted test (round-2 fail-open finding: other jobs
+    passing must not hide the omission)."""
+    from infermatrix_copilot.engine.registry import StepRegistry
+    from infermatrix_copilot.engine.step import StepContext, StepResult
+    from infermatrix_copilot.engine.step import FailureKind
+    from infermatrix_copilot.engine.steps import rebase_v3, \
+        register_builtin_steps
+    from infermatrix_copilot.testing import runner as runner_mod
+    repo2 = tmp_path / "dropped-repo"
+    (repo2 / ".buildkite" / "cuda").mkdir(parents=True)
+    subprocess.run(["git", "init", "-q"], cwd=repo2, check=True)
+    (repo2 / ".buildkite" / "cuda" / "test-merge.yml").write_text(
+        yaml.safe_dump({"steps": [
+            {"label": "Good", "timeout_in_minutes": 1, "commands": ["true"]},
+            {"label": "Broken Stub", "timeout_in_minutes": 1,
+             "commands": []}]}))
+    monkeypatch.setattr(
+        runner_mod.TestRunner, "run",
+        lambda self, job, env, *, baseline=False, dry_run=False:
+        runner_mod.TestOutcome(rc=0))
+    monkeypatch.setattr(
+        rebase_v3, "_tier_client",
+        lambda ctx: StepResult(False, FailureKind.BLOCKED, "no backend"))
+    registry = register_builtin_steps(StepRegistry())
+    run_dir = tmp_path / "run-dropped"
+    run_dir.mkdir()
+    ctx = StepContext(
+        settings=settings, params={}, run_dir=run_dir, trace=trace,
+        state={"task_spec": {"repo": "vllm-omni", "params": {}},
+               "run_id": "run-dr", "repo_path": str(repo2)})
+    r = asyncio.run(registry.get("rebase.v3_test_loop").handler(ctx))
+    assert r.ok, r.summary
+    data = Substate(run_dir, "run-dr").read()
+    assert data["tests"]["infra_failures"] == [
+        "step 'Broken Stub': no runnable command"]
+    assert not evaluate_push_gate(data, {}).allowed     # gate blocks
+    assert any(e for e in trace.events("manifest_steps_dropped"))
+
+
 def test_v3_test_loop_empty_manifest_is_structural(v3_env, settings, trace,
                                                    tmp_path):
     """Zero runnable local jobs marks `manifest_empty` — the push gate

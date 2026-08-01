@@ -382,7 +382,9 @@ still required at execution time (dry-run otherwise).
 
 ## 7. Testing state
 
-- Full offline suite: **646 tests green (+1 skip)**, no GPU/network/API key.
+- Full offline suite: **662 tests green (+1 skip)**, no GPU/network/API key
+  (incl. the PR5 tier-3 shell-golden suite: production-path command echo,
+  routing behavioral replay, map/watchdog/push parity).
 - New pinned families: run-lifecycle (14), testing substrate (~75, incl.
   identity/laundering races each with a dedicated regression test), phase-1
   cluster (~40 incl. `test_phase1_partial_e2e` chaining guard → wheel pick →

@@ -91,15 +91,40 @@ produce an empty set — compare against the parent's recorded run instead.
 
 ## 6. PR5 golden-capture sweep corrections (DECIDED in place)
 
-The one-time capture surfaced three adapter-data drifts, all fixed in the
-PR5 commit and pinned by `test_shell_golden.py`:
+The one-time capture surfaced adapter-data drifts, all fixed in the PR5
+commits and pinned by `test_shell_golden.py`:
 
 - `watchdog_patterns.yaml` was missing the parent's post-PR1 noise entry
   `"Released CuMem memory pool during shutdown"` (inventory bijection now
   enforced per tier, with the documented POSIX-class/escape translation).
-- `modules.input_output.test_paths` and `modules.online_serving.test_paths`
-  carried unrecorded supersets (`tests/engine/`, `tests/e2e/online_serving/`)
-  vs the parent's live MODULE_TEST_MAP — trimmed to parent-verbatim (the
-  sanctioned union applies to `local_paths` only, entry 2).
 - `modules.*.import_check` (parent MODULE_IMPORT_CHECK per-module smoke
   snippets) was absent from the manifest — added parent-verbatim.
+- **THE ROUTING FLAVOR IS ITS OWN MAP.** `test_paths` carried two entries
+  beyond §11 (`tests/engine/`, `tests/e2e/online_serving/`); a first
+  attempt to trim them to §11-verbatim broke job→module ROUTING — the
+  parent's `_assign_modules` scores against its OWN inline map (a third
+  flavor whose broad prefixes are load-bearing: without
+  `tests/e2e/online_serving/`, `platform`'s `tests/` swallowed 37/54 live
+  jobs). Final resolution (reverses PR4c's "third copy unified onto the
+  operational flavor"): the assignment map lives as its own adapter datum,
+  `rebase.test_manifest.assignment_paths` (parent test_manifest.py inline
+  map VERBATIM); `modules.*.test_paths` is §11-verbatim for shell test
+  selection; the two flavors are never merged — merging in either
+  direction changes scores. Pinned three ways: `assignment_paths` ==
+  golden `assignment_map` (bytes); routing over a golden-derived fixture
+  == the recorded behavioral replay (verified identical to the parent's
+  own `_assign_modules` output at capture time); and a histogram guard
+  that fails if `platform` ever swallows the set again.
+
+## 7. §10 `CI_TEST_MODULE` declared vs computed routing (parent-internal)
+
+The parent holds job→module in TWO places: §10's hand-maintained
+`CI_TEST_MODULE` (consumed by the shell's failure routing) and the
+computed `_assign_modules` output (consumed by module test plans). At
+capture time they DISAGREE on 13 of 28 comparable slugs (e.g. the
+`full_moon_*` doc/function suites: declared `online_serving`, computed
+`platform`; `tts_qwen3-tts_base_test`: declared `worker_runner`, computed
+`online_serving`). v3 reproduces the COMPUTED side (that is what fed
+module plans and prompts). PR6 consequence: when comparing per-module
+outcomes against parent artifacts that used the declared labels, map
+through the golden's `assignment_routing`, not `CI_TEST_MODULE`.
