@@ -191,7 +191,7 @@ implements the mode matrix.
 | PR4a | Engine core, unwired: agent loop, ToolDefs + opt-in dispatch scoping, substate, loop-scoped `RuntimeRegistry`, planner `requires` filter + `missing_capabilities()` for exact-repo playbooks | **DONE — GPT APPROVED** (5 finding rounds, 15 findings all fixed; see §6 items 15–17) |
 | PR4b | Adapter knowledge: templates + prompt/request-shape goldens, prompt_data (builder flavor; DRIFT_TRIAGE #1), hooks base + adapter hooks (HIGH-RISK `rebase` section), `imx-omni-pytest`, `module_rebase.py` + `phase1_steps.py` | **DONE — GPT APPROVED** (4 finding rounds, 9 findings all fixed; see §6 items 18–21) |
 | PR4c | Assembly: test/ci loops, v3 step set incl. `push_gate`, `resolve_effective_mode` + governance write-back (Rev 8 §2.1), transition-table wiring (Rev 8 §3.1), agent-shell scrub + model-download notification hook wiring, **manifest push-section update** (§5.3), v1 re-registered as `repo-rebase-native-v1` **with its four §4 obligations: guard_push authorization at phase-4 entry, explicit-`full`-only mode rejection, `locks/omni.lock` shared-lock participation, `REMOTE_ENABLED` forced off** | **DONE — GPT APPROVED** (5 finding rounds + 2 verification rounds; 51 findings all fixed with dedicated regression tests; final verdict "No findings" at cd93dcb; see §6 items 22–28) |
-| PR5 | Parity completion: tier-1 goldens, `shell_golden.json`, `DRIFT_TRIAGE.md` resolution, report-only dry path, timed rollback rehearsal | planned |
+| PR5 | Parity completion: tier-1 goldens, `shell_golden.json`, `DRIFT_TRIAGE.md` resolution, report-only dry path, timed rollback rehearsal | **implemented — in GPT review** (shell golden captured 2026-08-01 from the live parent config on this host — 49 §10 jobs, 8 module maps, 69 watchdog patterns, push bytes; tier-3 command-echo suite `test_shell_golden.py`; DRIFT #1/#4 decided + #6 sweep corrections; report-only dry path ran END-TO-END against the live checkout: 54 jobs, 310 test changes, done/exit-0; **timed rollback rehearsal deferred to the PR6 gate** — it needs the human + a runnable v1 backend session, recorded as a PR6 precondition, §8) |
 | EXT1 | External checkout: startup flock guard, pinned SHA | planned |
 | PR6 | Cutover (GPU box + human): §8 validation, playbook flip, `.env` arming | planned |
 | PR4d | Knowledge migration + runtime-dir cutover (post-validation; env-bridge deletion moved to PR7 per §2.9) | planned |
@@ -406,6 +406,18 @@ Controlled comparison (frozen SHAs, restored knowledge snapshots, isolated
 clones, separate validation branches); one external baseline run + one
 supervised v3 full validation run; gate = deterministic harness green + live
 outcome equivalence + 25% wall-clock bound + human-signed COMPARISON.md.
+**Comparison slug set (DRIFT #4 decision):** outcome equivalence is judged
+over the MANIFEST-BUILT slug set — the parent's §10 map is ~46% stale
+against the live pipelines and its "pass" on the 25 missing slugs is
+vacuous.
+
+**PR5 evidence on file:** the report-only dry path ran end-to-end against
+the live checkout (2026-08-01: 54 CI jobs, 310 upstream test changes,
+every mutating step when-gated off, RUN_REPORT written, exit 0) — its
+`test_manifest.json` is the seed for the stage-1 frozen-baseline diffs.
+**The timed rollback rehearsal (< 30 min to a running v1 backend) is NOT
+yet done** — it needs the owner attached and a live-runnable v1 session;
+it is a hard PR6 precondition, not a PR5 artifact.
 
 **Supervised-run count, unambiguous:** stage 3 (unsupervised push-capable
 `full`) requires **2 supervised clean full runs total, of which the PR6

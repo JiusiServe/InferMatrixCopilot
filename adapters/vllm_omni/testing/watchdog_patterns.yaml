@@ -88,6 +88,9 @@ noise:
   - "MultiprocWorkerMonitor: shutdown already initiated"
   - "gpu_lock.sh.*integer expression expected"
   - "KeyError: '/loky-"
+  # benign teardown line the parent added after the PR1 port — caught by the
+  # PR5 shell-golden inventory sweep
+  - "Released CuMem memory pool during shutdown"
 
 # Case-insensitive regex over the test name: error-passthrough tests whose
 # names mark intentional failure simulation.

@@ -961,6 +961,12 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
                                 output=outcome.log_file, infra=infra)
 
     def run_fn(slug: str) -> tl.TestRunResult:
+        # an empty command must NEVER read as a pass — bash -c "" exits 0
+        # (the parent's §10 false-pass mechanism, DRIFT_TRIAGE #4); the
+        # builder already drops command-less steps, so one arriving here
+        # is corruption and classifies STRUCTURAL
+        if not jobs_by_slug[slug].get("command", "").strip():
+            return tl.TestRunResult(rc=1, infra="empty command")
         # tests INHERIT the process env (Rev 8 §6: inherit-plus-overlay;
         # the credential scrub applies to agent shells only) with the
         # TARGET venv + CUDA + HF_HOME overlay — raw manifest commands

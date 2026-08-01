@@ -159,9 +159,13 @@ def _emit_modules_block(modules: Mapping[str, Mapping]) -> str:
                 lines.append(f"    {field}: [{items}]")
             else:
                 # dump as a one-key mapping to get a clean scalar rendering
-                # (a bare-scalar dump appends a `...` document-end marker)
+                # (a bare-scalar dump appends a `...` document-end marker);
+                # unbounded width — the emitter's line-wrap would shatter a
+                # long scalar (e.g. an import_check snippet) into invalid
+                # continuation lines inside our single-line field idiom
                 dumped = yaml.safe_dump({"k": value},
-                                        default_flow_style=True).strip()
+                                        default_flow_style=True,
+                                        width=1_000_000).strip()
                 lines.append(f"    {field}: {dumped[len('{k: '):-1]}")
         if not spec:
             lines[-1] += " {}"

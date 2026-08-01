@@ -208,6 +208,13 @@ def _extract_steps(steps_list: list, source: str,
                      if ln.strip().startswith("export ")]
         cmd_clean = "\n".join(ln for ln in cmd.split("\n")
                               if not ln.strip().startswith("export "))
+        if not cmd_clean.strip():
+            # a labeled step with no runnable command (block/wait/trigger
+            # steps, or export-only stubs) is NOT a test job — emitting it
+            # would hand the runner an empty command whose rc=0 reads as a
+            # pass (the parent's §10 false-pass mechanism, DRIFT_TRIAGE #4;
+            # the run side ALSO guards, fail-closed twice)
+            continue
         timeout_min = step.get("timeout_in_minutes", 30)
         agents = step.get("agents", {}) or {}
         queue = agents.get("queue", spec.default_queue)

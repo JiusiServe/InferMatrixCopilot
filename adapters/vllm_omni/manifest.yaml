@@ -53,44 +53,52 @@ modules:
     local_paths: [vllm_omni/worker/]
     upstream_paths: [vllm/v1/worker/]
     test_paths: [tests/worker/, tests/diffusion/test_diffusion_worker.py, tests/e2e/offline_inference/custom_pipeline/, tests/e2e/online_serving/test_qwen3_tts_base.py, tests/entrypoints/test_omni_sleep_mode.py]
+    import_check: "from vllm_omni.worker.gpu_model_runner import *; from vllm_omni.worker.gpu_generation_model_runner import *; from vllm_omni.worker.gpu_ar_model_runner import *; from vllm_omni.worker.gpu_ar_worker import *; print('Worker/Runner imports OK')"
     wave: 1
     risk: high
   model_executor:
     local_paths: [vllm_omni/model_executor/]
     upstream_paths: [vllm/model_executor/]
     test_paths: [tests/model_executor/, tests/diffusion/, tests/e2e/offline_inference/]
+    import_check: "from vllm_omni.model_executor.models.registry import *; print('Model Executor imports OK')"
     wave: 1
     risk: high
   input_output:
     local_paths: [vllm_omni/inputs/, vllm_omni/outputs/, vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/serialization.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/engine/stage_engine_core_client.py, vllm_omni/engine/output_processor.py, vllm_omni/request.py]
     upstream_paths: [vllm/inputs/, vllm/v1/engine/input_processor.py, vllm/v1/engine/output_processor.py, vllm/v1/request.py]
-    test_paths: [tests/entrypoints/test_omni_new_request_data.py, tests/engine/test_async_omni_engine_input.py, tests/test_outputs.py, tests/engine/]
+    test_paths: [tests/entrypoints/test_omni_new_request_data.py, tests/engine/test_async_omni_engine_input.py, tests/test_outputs.py]
+    import_check: "from vllm_omni.inputs.data import *; from vllm_omni.inputs.preprocess import *; from vllm_omni.engine.async_omni_engine import AsyncOmniEngine; from vllm_omni.engine.orchestrator import Orchestrator; from vllm_omni.engine.serialization import serialize_additional_information; print('Input/Output imports OK')"
     wave: 1
   scheduler:
     local_paths: [vllm_omni/core/]
     upstream_paths: [vllm/v1/core/sched/]
     test_paths: [tests/distributed/, tests/diffusion/distributed/test_ulysses_uaa_perf.py]
+    import_check: "from vllm_omni.core.sched.omni_ar_scheduler import *; from vllm_omni.core.sched.omni_generation_scheduler import *; print('Scheduler imports OK')"
     wave: 1
     risk: high
   online_serving:
     local_paths: [vllm_omni/entrypoints/]
     upstream_paths: [vllm/entrypoints/]
-    test_paths: [tests/entrypoints/test_async_omni.py, tests/entrypoints/test_async_omni_diffusion_config.py, tests/entrypoints/openai_api/, tests/e2e/online_serving/]
+    test_paths: [tests/entrypoints/test_async_omni.py, tests/entrypoints/test_async_omni_diffusion_config.py, tests/entrypoints/openai_api/]
+    import_check: "from vllm_omni.entrypoints.omni import Omni; from vllm_omni.entrypoints.async_omni import AsyncOmni; from vllm_omni.entrypoints.openai.api_server import omni_run_server; from vllm_omni.entrypoints.openai.serving_speech import ServingSpeech; from vllm_omni.entrypoints.cli.serve import OmniServeCommand; print('Online Serving imports OK')"
     wave: 1
   model_config:
     local_paths: [vllm_omni/config/, vllm_omni/engine/arg_utils.py]
     upstream_paths: [vllm/config/, vllm/engine/arg_utils.py]
     test_paths: [tests/entrypoints/test_stage_utils.py, tests/metrics/test_stats.py]
+    import_check: "from vllm_omni.config.model import OmniModelConfig; from vllm_omni.engine.arg_utils import OmniEngineArgs; print('Model Config imports OK')"
     wave: 1
   platform:
     local_paths: [vllm_omni/platforms/]
     upstream_paths: [vllm/platforms/]
     test_paths: [tests/]
+    import_check: "from vllm_omni.platforms.interface import OmniPlatform; from vllm_omni.platforms.cuda.platform import CudaOmniPlatform; print('Platform imports OK')"
     wave: 1
   benchmarks:
     local_paths: [benchmarks/, vllm_omni/benchmarks/, vllm_omni/entrypoints/cli/benchmark/]
     upstream_paths: [vllm/benchmarks/, vllm/entrypoints/cli/benchmark/]
     test_paths: [tests/benchmarks/test_serve_cli.py]
+    import_check: "from vllm_omni.benchmarks.serve import main; from vllm_omni.entrypoints.cli.benchmark.serve import OmniBenchmarkServingSubcommand; print('Benchmarks imports OK')"
     wave: 2
 
 # Phase-1 rebase machinery data (consumed by rebase_engine — repo specifics

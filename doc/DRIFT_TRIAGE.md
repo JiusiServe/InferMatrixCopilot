@@ -25,12 +25,14 @@ Where each lives now:
 - config.sh flavor → the manifest's `modules.*.{upstream_paths,test_paths}`
   (operational: commit assignment, path-sync, test selection).
 
-**Decision needed before PR6:** whether v3 prompts should keep the builder's
-(narrower) test lists for cache parity through validation and adopt the
-operational lists at cutover, or unify immediately after the validation run.
-Default recommendation: keep both flavors frozen through the §8 validation
-comparison (byte-parity evidence), unify to the operational flavor in the
-first post-cutover soak stage.
+**DECISION (PR5, recorded; owner may veto at the PR6 gate):** keep both
+flavors frozen through the §8 validation comparison — the prompt flavor is
+byte-parity EVIDENCE (goldens pin it against the parent builder's own
+output) and changing it mid-validation would invalidate the cache-parity
+claim. Operational truth is the manifest (now pinned byte-for-byte against
+the parent's LIVE §11 arrays by `test_shell_golden.py`). Unify: regenerate
+`prompt_data.yaml`'s maps from the manifest in the first post-cutover soak
+stage (PR7 cleanup), retiring the dual source.
 
 ## 2. `local_paths` granularity (PR2/PR4b audit — DECIDED)
 
@@ -49,13 +51,31 @@ The shell's character class also matched `\r` (CRLF Dockerfiles). The port
 uses `[ \t]`; unobservable on LF-normalized repos. Accepted; revisit only if
 a CRLF `docker/Dockerfile.ci` ever appears.
 
-## 4. config.sh §10 false-pass (pre-existing, from Rev 8)
+## 4. config.sh §10 false-pass (pre-existing, from Rev 8) — DECIDED (PR5)
 
 Manifest slug missing from config.sh §10 → empty command → rc=0 "pass" in
-the parent. The v3 substrate fails closed on empty commands; the
-shell-golden comparison in PR5 will enumerate any slugs affected so the
-cutover comparison isn't polluted by the parent's false passes. Decision at
-PR5.
+the parent. The PR5 shell-golden enumeration (live `.buildkite/cuda`
+pipelines vs the captured §10 arrays, 2026-08-01) quantified it:
+
+- live yaml builds **54** jobs; the parent's §10 defines **49**;
+- **25 live slugs are ABSENT from §10** — every one FALSE-PASSES in the
+  parent today (diffusion_batch/cache/cosmos3/distributed/gguf_plugin/
+  model/offloader tests, entrypoints_test, 10 `full_moon_*` suites,
+  tiny-model tests, tts_higgs-audio-v3/soulx-singer/voxcpm2, …);
+- **20 §10 entries are stale** (no longer in the live yaml);
+- 7 of the 29 intersecting slugs differ in command text (quoting churn
+  plus real drift: e.g. `distributed_test` gained an `and L4` marker
+  upstream; two multi-GPU X2I suites split their file lists).
+
+**DECISION:** the live-yaml manifest builder is the ONLY operational
+command source for v3 (the §10 static map is demonstrably ~46% stale).
+The false-pass mechanism is structurally dead here — the builder DROPS
+labeled steps with no runnable command and the run side classifies an
+empty command as an infrastructure failure (`test_empty_command_never_
+passes`). PR6 consequence: the §8 outcome-equivalence comparison must be
+run over the MANIFEST-BUILT slug set; the parent's "pass" on the 25
+missing slugs is vacuous and must not count as a baseline outcome.
+
 
 ## 5. Buildkite pipeline location: `.buildkite/cuda/` vs `.buildkite/` (PR4c)
 
@@ -68,3 +88,18 @@ would be empty. Our `yaml_dir` is adapter DATA
 layout; fixtures reproduce the nested layout. If the PR5 shell-golden
 capture runs the parent against the live tree, expect its manifest step to
 produce an empty set — compare against the parent's recorded run instead.
+
+## 6. PR5 golden-capture sweep corrections (DECIDED in place)
+
+The one-time capture surfaced three adapter-data drifts, all fixed in the
+PR5 commit and pinned by `test_shell_golden.py`:
+
+- `watchdog_patterns.yaml` was missing the parent's post-PR1 noise entry
+  `"Released CuMem memory pool during shutdown"` (inventory bijection now
+  enforced per tier, with the documented POSIX-class/escape translation).
+- `modules.input_output.test_paths` and `modules.online_serving.test_paths`
+  carried unrecorded supersets (`tests/engine/`, `tests/e2e/online_serving/`)
+  vs the parent's live MODULE_TEST_MAP — trimmed to parent-verbatim (the
+  sanctioned union applies to `local_paths` only, entry 2).
+- `modules.*.import_check` (parent MODULE_IMPORT_CHECK per-module smoke
+  snippets) was absent from the manifest — added parent-verbatim.
