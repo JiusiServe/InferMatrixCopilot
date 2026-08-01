@@ -30,7 +30,7 @@ class RuntimeError_(RuntimeError):
     """Runtime acquisition/teardown failed."""
 
 
-def _ensure_lock_dir_excluded(checkout: Path) -> None:
+def _ensure_lock_dir_excluded(checkout: Path) -> bool:
     """Mark `locks/` git-ignored via the LOCAL `.git/info/exclude` (never a
     committed file, never dirt itself). Without this the live lock file is
     an untracked entry, and any workspace-hygiene pass — the parent's
@@ -39,9 +39,17 @@ def _ensure_lock_dir_excluded(checkout: Path) -> None:
     `git add -A` staging — would delete or commit it. A `git clean`ed lock
     file leaves its holder flocking a DELETED inode while a new run locks
     a fresh one at the same path: mutual exclusion defeated. Ignored files
-    are exempt from status, non-`-x` clean, and `add -A`. Best-effort,
-    idempotent, worktree-aware."""
-    git = Path(checkout) / ".git"
+    are exempt from status, non-`-x` clean, and `add -A`.
+
+    Returns True when the exclusion is verifiably in place — or the
+    directory is not a git checkout (no git, no hygiene hazard). False
+    when the checkout IS git but the write failed: the caller FAILS
+    CLOSED. Idempotent; worktree-aware (a RELATIVE `gitdir:` pointer
+    resolves against the `.git` file's directory, as git does). Call only
+    while HOLDING the flock — the flock serializes writers, so a losing
+    contender never touches the file."""
+    checkout = Path(checkout)
+    git = checkout / ".git"
     if git.is_dir():
         info = git / "info"
     elif git.is_file():  # linked worktree: `gitdir: …/.git/worktrees/<n>`
@@ -49,11 +57,13 @@ def _ensure_lock_dir_excluded(checkout: Path) -> None:
             target = Path(git.read_text().strip()
                           .removeprefix("gitdir:").strip())
         except OSError:
-            return
+            return False
+        if not target.is_absolute():
+            target = (checkout / target).resolve()
         info = (target.parent.parent / "info"
                 if target.parent.name == "worktrees" else target / "info")
     else:
-        return
+        return True
     try:
         info.mkdir(parents=True, exist_ok=True)
         exclude = info / "exclude"
@@ -63,8 +73,9 @@ def _ensure_lock_dir_excluded(checkout: Path) -> None:
                 (text.rstrip("\n") + "\n" if text.strip() else "")
                 + "# rebase checkout flock — never dirt, never cleaned\n"
                   "locks/\n")
+        return "locks/" in exclude.read_text().split("\n")
     except OSError:
-        pass
+        return False
 
 
 class CheckoutLock:
@@ -82,13 +93,26 @@ class CheckoutLock:
             import fcntl
         except ImportError:  # pragma: no cover - Windows
             return True  # documented degradation: no fcntl, no exclusion
-        _ensure_lock_dir_excluded(self.checkout)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        fh = open(self.path, "w")
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            fh = open(self.path, "w")
+        except OSError:
+            return False
         flags = fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB)
         try:
             fcntl.flock(fh, flags)
         except OSError:
+            fh.close()
+            return False
+        # the hygiene shield is installed UNDER the flock (winner-only
+        # writer) and is a HARD prerequisite on git checkouts: an unignored
+        # lock file faces the guard/L2 `git clean` deletion path, so
+        # failing to shield it means failing to lock
+        if not _ensure_lock_dir_excluded(self.checkout):
+            try:
+                fcntl.flock(fh, fcntl.LOCK_UN)
+            except OSError:
+                pass
             fh.close()
             return False
         self._fh = fh

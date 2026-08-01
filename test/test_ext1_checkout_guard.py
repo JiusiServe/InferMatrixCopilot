@@ -28,6 +28,11 @@ _CANDIDATES = [
 
 
 def _external_guard():
+    """(module, root) for the first candidate checkout CARRYING the EXT1
+    guard — the presence of checkout_lock.py is what selects the root, so
+    every assertion in this file (including source-order checks) reads the
+    SAME checkout the guard came from (a stale sibling working copy
+    without EXT1 must never be inspected instead)."""
     for root in _CANDIDATES:
         if root and (Path(root) / "agent/lib/checkout_lock.py").is_file():
             spec = importlib.util.spec_from_file_location(
@@ -35,11 +40,11 @@ def _external_guard():
                 Path(root) / "agent/lib/checkout_lock.py")
             mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(mod)
-            return mod
-    return None
+            return mod, Path(root)
+    return None, None
 
 
-guard = _external_guard()
+guard, GUARD_ROOT = _external_guard()
 pytestmark = pytest.mark.skipif(
     guard is None, reason="external vllm-omni-rebase-agent checkout (with "
                           "the EXT1 guard) not present on this machine")
@@ -77,6 +82,99 @@ def test_release_leaves_the_file(tmp_path):
     assert guard.acquire_checkout_lock(checkout) is True
     guard.release_checkout_lock()
     assert (checkout / "locks" / "omni.lock").exists()
+
+
+def test_exclusion_failure_fails_closed(tmp_path):
+    """Round-2 P1: on a GIT checkout where the hygiene shield cannot be
+    installed, acquisition must FAIL (an unignored lock file faces the
+    guard/L2 deletion path) — and must not leave the flock held."""
+    import subprocess
+    for side in ("external", "copilot"):
+        checkout = tmp_path / f"omni-{side}"
+        checkout.mkdir()
+        subprocess.run(["git", "init", "-q"], cwd=checkout, check=True)
+        # make `.git/info` an unwritable location: a FILE where the dir
+        # must go -> mkdir raises, the shield cannot install
+        import shutil
+        shutil.rmtree(checkout / ".git" / "info", ignore_errors=True)
+        (checkout / ".git" / "info").write_text("not a dir")
+        if side == "external":
+            assert guard.acquire_checkout_lock(checkout) is False
+        else:
+            assert CheckoutLock(checkout, "omni").acquire(
+                blocking=False) is False
+        # the failed acquisition released the flock
+        probe = CheckoutLock(tmp_path / "clean", "omni")
+        (tmp_path / "clean").mkdir(exist_ok=True)
+        import fcntl
+        with open(checkout / "locks" / "omni.lock") as fh:
+            fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)  # acquirable
+            fcntl.flock(fh, fcntl.LOCK_UN)
+
+
+def test_losing_contender_never_touches_exclude(tmp_path):
+    """Round-2 P1: the exclusion write happens UNDER the flock — a losing
+    contender must not read-modify-write (and possibly truncate)
+    `info/exclude` while the winner is active."""
+    import subprocess
+    checkout = tmp_path / "omni"
+    checkout.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=checkout, check=True)
+    winner = CheckoutLock(checkout, "omni")
+    assert winner.acquire(blocking=False) is True
+    exclude = checkout / ".git" / "info" / "exclude"
+    before = exclude.read_bytes()
+    sentinel = before + b"# sentinel: losers must not rewrite this file\n"
+    exclude.write_bytes(sentinel)
+    # both kinds of loser are refused BEFORE any exclude write
+    assert guard.acquire_checkout_lock(checkout) is False
+    assert CheckoutLock(checkout, "omni").acquire(blocking=False) is False
+    assert exclude.read_bytes() == sentinel
+    winner.release()
+
+
+def test_relative_gitdir_resolves_against_dotgit_file(tmp_path):
+    """Round-2 P2: a RELATIVE `gitdir:` pointer resolves against the
+    directory containing the `.git` file (as git does), never our cwd —
+    otherwise a valid worktree layout shields the wrong repository."""
+    main_repo = tmp_path / "main"
+    (main_repo / ".git" / "worktrees" / "wt").mkdir(parents=True)
+    wt = tmp_path / "wt"
+    wt.mkdir()
+    (wt / ".git").write_text("gitdir: ../main/.git/worktrees/wt\n")
+    assert guard.acquire_checkout_lock(wt) is True
+    guard.release_checkout_lock()
+    common_exclude = main_repo / ".git" / "info" / "exclude"
+    assert common_exclude.exists()
+    assert "locks/" in common_exclude.read_text().split("\n")
+    # the copilot side resolves identically
+    wt2 = tmp_path / "wt2"
+    wt2.mkdir()
+    (wt2 / ".git").write_text("gitdir: ../main/.git/worktrees/wt\n")
+    lock = CheckoutLock(wt2, "omni")
+    assert lock.acquire(blocking=False) is True
+    lock.release()
+
+
+def test_orchestrator_main_ordering():
+    """Round-2 P2: the guard is taken AFTER the dry-run exit and BEFORE
+    both baseline detection (checkout READS must not capture another
+    holder's intermediate state) and resume detection (the first
+    mutation). Pinned against the external main() source and the v1
+    runtime builder."""
+    src = (GUARD_ROOT / "agent/orchestrator.py").read_text()
+    main_src = src[src.index("async def main("):]
+    order = [main_src.index("if args.dry_run:"),
+             main_src.index("acquire_checkout_lock("),
+             main_src.index("settings = detect_baseline(settings)"),
+             main_src.index("# Resume detection")]
+    assert order == sorted(order), order
+    # v1: the in-process backend orders identically
+    from infermatrix_copilot.engine.steps import rebase_native
+    v1_src = Path(rebase_native.__file__).read_text()
+    build_src = v1_src[v1_src.index("def _ensure_runtime("):]
+    assert build_src.index("_ensure_omni_lock(ctx, settings)") \
+        < build_src.index("orch.detect_baseline(settings)")
 
 
 def test_lock_survives_workspace_hygiene(tmp_path):

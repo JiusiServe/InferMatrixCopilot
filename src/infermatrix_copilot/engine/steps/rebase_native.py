@@ -123,6 +123,13 @@ def _ensure_runtime(ctx: StepContext) -> dict | StepResult:
     ctx.trace.record("env_exported", added_or_changed=env_delta[:60],
                      count=len(env_delta))
 
+    # the SHARED checkout flock comes BEFORE baseline detection: detection
+    # READS the checkout's branch/Dockerfile, and an unlocked read could
+    # capture another holder's intermediate state (same ordering as the
+    # external orchestrator's EXT1 guard)
+    blocked = _ensure_omni_lock(ctx, settings)
+    if blocked is not None:
+        return blocked
     settings = orch.detect_baseline(settings)
     state = dict(orch.make_initial_state(settings))
 
@@ -166,16 +173,18 @@ def _ensure_runtime(ctx: StepContext) -> dict | StepResult:
     if head:
         os.environ["REBASE_VLLM_COMMIT"] = head
 
+    # the lock was acquired above and lives in _RUNTIME — it must SURVIVE
+    # the rebuild clear (dropping the object would GC the fd and release
+    # the flock mid-run)
+    held_lock = _RUNTIME.get("omni_lock")
     _RUNTIME.clear()
     _RUNTIME.update({"run_id": state["run_id"], "settings": settings,
-                     "state": state, "orch": orch, "log_dir": log_dir})
+                     "state": state, "orch": orch, "log_dir": log_dir,
+                     **({"omni_lock": held_lock} if held_lock else {})})
     ctx.state["rebase_state"] = state
     ctx.state["rebase_run_id"] = state["run_id"]
     ctx.state["parent_log_dir"] = str(log_dir)
     ctx.state["repo_path"] = str(settings.omni_path)
-    blocked = _ensure_omni_lock(ctx, settings)
-    if blocked is not None:
-        return blocked
     return _RUNTIME
 
 
