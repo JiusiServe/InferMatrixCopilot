@@ -76,6 +76,8 @@ Use InferMatrixCopilot in Direct mode to review this PR.
 ```text
 /imreview https://github.com/vllm-project/vllm-omni/pull/5172
 /imreview
+或者说
+“帮我审核一下这个pr xxxx，用知识库”
 ```
 
 - 传 PR URL：读取该 PR 的当前 head、diff、CI 和 mergeability。
@@ -109,6 +111,10 @@ Agent 会先确认 PR 版本和 CI 状态，再继续读代码。审查结果只
 # 仓库名或别名
 /imupdate vllm-omni
 /imupdate vllmomni
+
+或者直接说
+
+帮我更新一下 vllmomni仓库最新到知识库
 
 # URL；可选指定目标 tag 或 SHA
 /imupdate https://github.com/vllm-project/vllm-omni v0.26.0rc1
