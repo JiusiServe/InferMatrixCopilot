@@ -1,10 +1,10 @@
 ---
 title: "Serving 规则"
 created: 2026-07-20
-updated: 2026-07-31
+updated: 2026-08-04
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #3576", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5157", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/metrics/prometheus.py]
+sources: ["PR #3576", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5157", "PR #5647", "PR #5691", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/metrics/prometheus.py]
 confidence: high
 ---
 
@@ -19,7 +19,9 @@ confidence: high
 
 | PR 描述在做什么 | 精确规则组 | 第一批 live 源码 |
 |---|---|---|
-| `extra_body`、flattened/nested/canonical/legacy 输入、alias、`negative_prompt`、diffusion request extras | `request-contract`：`SERV-4a`–`4h` | `vllm_omni/entrypoints/openai/diffusion_request_utils.py::{normalize_diffusion_request_args,apply_normalized_diffusion_request_extra_args}` → `serving_chat.py::{OmniOpenAIServingChat._preprocess_chat,OmniOpenAIServingChat.generate_diffusion_images}` |
+| `extra_body`、flattened/nested/canonical/legacy 输入、alias、`negative_prompt`、diffusion request extras | `request-contract`：`SERV-4a`–`4i` | `vllm_omni/entrypoints/openai/diffusion_request_utils.py::{normalize_diffusion_request_args,apply_normalized_diffusion_request_extra_args}` → `serving_chat.py::{OmniOpenAIServingChat._preprocess_chat,OmniOpenAIServingChat.generate_diffusion_images}` |
+| multipart `UploadFile`、重复 media、临时文件、413、sync/async cleanup | `upload-lifecycle`：`SERV-4b`, `SERV-4c`, `SERV-4d`, `SERV-4i` | `vllm_omni/entrypoints/openai/api_server.py::{_parse_video_form,_persist_uploaded_video_references,_run_video_generation_job,create_video_sync}` → 模型 owner 的 task/source matrix |
+| serve flag 删除/改名、Helm value、headless forwarding、内部兼容字段 | `public-cli-contract`：`SERV-6a`, `SERV-6b` | `vllm_omni/entrypoints/cli/serve.py::{OmniServeCommand.subparser_init,run_headless}` → public wrappers/charts → `entrypoints/utils.py::load_and_resolve_stage_configs` |
 | `chat_template_kwargs`、raw HTTP/SDK `extra_body`、text/audio modalities、choices、空音频 | `chat-multimodal-contract`：`SERV-4c` + 命中模型规则 | upstream `ChatCompletionRequest` → `serving_chat.py::{OmniOpenAIServingChat._preprocess_chat,OmniOpenAIServingChat.chat_completion_full_generator,OmniOpenAIServingChat._create_text_choice,OmniOpenAIServingChat._create_audio_choice}` |
 | endpoint restriction、unsupported route、capability、completions/chat/speech 400 | `endpoint-capability`：`SERV-4c`, `SERV-4d` | `config/endpoint_policy.py::{OmniServingCapability,shutdown_unsupported_routes}` → `config/config_factory.py::StageConfigFactory.get_pipeline_endpoint_restrictions` → `engine/async_omni_engine.py::AsyncOmniEngine.__init__` → `entrypoints/openai/api_server.py::build_app` |
 | sleep/wake、partial stage/tag、idempotency、ACK、generation admission | `engine-lifecycle`：`SERV-5a`, `SERV-5b` | `entrypoints/async_omni.py::{AsyncOmni.sleep,AsyncOmni.wake_up,AsyncOmni.generate}` → `worker/base.py::{handle_sleep_task,handle_wake_task}` / `diffusion/worker/diffusion_worker.py` |
@@ -36,7 +38,9 @@ confidence: high
 | `chat-multimodal-contract` | chat template kwargs、SDK flatten、text/audio response shape | `SERV-4c` + 命中模型规则 |
 | `endpoint-capability` | endpoint restriction、unsupported route、公开 400 | `SERV-4c`, `SERV-4d` |
 | `engine-lifecycle` | sleep/wake、partial stage/tag、ACK、generation admission | `SERV-5a`, `SERV-5b` |
-| `request-contract` | 请求字段、来源、冲突、dispatcher、consumer view | `SERV-4a`, `SERV-4b`, `SERV-4c`, `SERV-4d`, `SERV-4e`, `SERV-4f`, `SERV-4g`, `SERV-4h` |
+| `upload-lifecycle` | multipart media、临时 artifact、大小限制、后台任务 cleanup | `SERV-4b`, `SERV-4c`, `SERV-4d`, `SERV-4i` |
+| `public-cli-contract` | serve flag、wrapper/chart key、headless、公开/内部兼容边界 | `SERV-6a`, `SERV-6b` |
+| `request-contract` | 请求字段、来源、冲突、dispatcher、consumer view | `SERV-4a`, `SERV-4b`, `SERV-4c`, `SERV-4d`, `SERV-4e`, `SERV-4f`, `SERV-4g`, `SERV-4h`, `SERV-4i` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `SERV-0a`, `SERV-0b` |
 
 ## SERV-1a — 所有可预判错误在第一个 streaming chunk 前返回
@@ -171,6 +175,19 @@ confidence: high
 - 禁止：继续堆 helper、compatibility branch 或 reviewer-specific patch。
 - 验收：恢复编码前 owner、consumer、删除项和 diff 预算都有可检查记录。
 
+### SERV-4i — multipart artifact 在 I/O 前验合同、在所有终态释放
+
+- 触发：公开请求接收一个或多个 `UploadFile`、URL media，或把输入物化后交给后台任务。
+- 强制：在 read/download/persist/decode 前完成 dispatcher、模型 capability 与
+  source/task matrix 校验；流式执行 count、per-file 和 aggregate byte 上限，超限返回
+  413；只清理由当前请求创建的 artifact，并保留输入顺序直到最终 consumer 完成。
+- 禁止：把无限 multipart 先复制到临时目录再校验；让非法组合进入 engine 后变成 sync
+  500 或 async failed job；只在成功路径或 audio 分支 cleanup。
+- 验收：sync/async 都覆盖冲突 400、超限中途 413、setup 失败、generation 失败、timeout、
+  cancellation、missing-job/early-return 与成功；无效请求未调用持久化或 engine，所有已创建
+  路径在每个终态消失，用户提供的非 owned 路径不被删除。MiniMax H3 的具体矩阵见
+  [MiniMax H3 规则](../../models/minimax-h3/rules.md)。 ^[PR #5691]
+
 ## Engine 生命周期合同
 
 ### SERV-5a — sleep/wake 状态必须保留 stage 和 tag 作用域
@@ -191,6 +208,31 @@ confidence: high
 - 验收：失败 ACK 保留 sleeping 状态；支持 level-2 的 diffusion 路径仍能
   sleep → wake → generate，不支持的 stage 在调用 worker 前明确拒绝。
   ^[PR #4834] ^[PR #4905] ^[PR #4912]
+
+## Public CLI 兼容边界
+
+### SERV-6a — 公开 serve 入口退役必须在所有 producer 上 fail closed
+
+- 触发：删除或改名 serve CLI option、wrapper/chart key 或公开配置文件入口。
+- 强制：parser、headless builder、脚本、chart、测试和公开 serving 文档在同一批迁移到
+  canonical replacement；已删除的外部 key 必须显式拒绝并给出迁移目标。当前 serve
+  部署 YAML 的唯一公开 flag 是 `--deploy-config`。
+- 禁止：删除是有意 breaking change 时又加静默 alias/fallback；wrapper 接受但忽略旧值；
+  留下仍会发出旧 flag 的可运行命令。
+- 验收：replacement 可解析且到达最终 consumer，旧 option parser 失败；standard/headless
+  发出同一 canonical 值，wrapper/chart 同时有正向与旧 key 拒绝测试，公开 serve 调用扫描
+  不再命中退役 flag。 ^[PR #5647]
+
+### SERV-6b — 兼容性按 ingress 分类，不能按同名 symbol 推断
+
+- 触发：公开 CLI 已移除，但 Python/direct API、offline example 或 resolver 仍保留同名字段。
+- 强制：分别列出 public CLI、wrapper/chart、offline example、Python/direct 和内部 resolver；
+  public 行为由 Serving owner 决定，仍保留的 loader/schema 语义交给
+  [Configuration rules](../configuration/rules.md) 并记录明确 follow-up 边界。
+- 禁止：因为仓库仍出现 `stage_configs_path` 就恢复公开 serve flag；也不能因为 public parser
+  已删除就宣称所有内部兼容路径已移除。
+- 验收：公开 rejection 与 canonical forwarding 测试通过；每个暂留内部/direct 路径有独立
+  compatibility test，直到后续迁移显式删除。 ^[PR #5647]
 
 请求到 engine 的边界见 [Serving architecture](architecture.md)；公开协议通用检查见
 [review contracts](../../../../general/review/guides/reviewer-lens-contracts.md)。
