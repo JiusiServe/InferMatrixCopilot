@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -22,6 +23,7 @@ PACKAGE = (
     "git+https://github.com/JiusiServe/InferMatrixCopilot.git@main"
 )
 SERVER_COMMAND = ["uvx", "--from", PACKAGE, "infermatrix-copilot-mcp"]
+CODEX_STARTUP_TIMEOUT_SEC = 120
 STRICT_CONFIG_DIR = ".infermatrix-copilot"
 STRICT_CONFIG_FILE = ".env"
 DEFAULT_REPO_FULL_NAME = "vllm-project/vllm-omni"
@@ -154,6 +156,59 @@ def _install_skills(destination_root: Path) -> None:
                 )
 
 
+def _set_codex_startup_timeout(config_path: Path) -> None:
+    """Give uvx enough time to create its environment on first startup."""
+    if not config_path.is_file():
+        raise InstallError(f"Codex config was not created: {config_path}")
+
+    text = config_path.read_text(encoding="utf-8")
+    lines = text.splitlines()
+    table = re.compile(
+        rf'^\s*\[mcp_servers\.(?:{re.escape(SERVER_NAME)}|'
+        rf'"{re.escape(SERVER_NAME)}"|\'{re.escape(SERVER_NAME)}\')\]\s*$'
+    )
+    start = next(
+        (index for index, line in enumerate(lines) if table.match(line)),
+        None,
+    )
+    if start is None:
+        raise InstallError(
+            f"Codex MCP config for {SERVER_NAME} was not created: {config_path}"
+        )
+
+    end = next(
+        (
+            index
+            for index in range(start + 1, len(lines))
+            if lines[index].lstrip().startswith("[")
+        ),
+        len(lines),
+    )
+    setting = f"startup_timeout_sec = {CODEX_STARTUP_TIMEOUT_SEC}"
+    timeout_lines = [
+        index
+        for index in range(start + 1, end)
+        if re.match(r"^\s*startup_timeout_(?:sec|ms)\s*=", lines[index])
+    ]
+    if timeout_lines:
+        lines[timeout_lines[0]] = setting
+        for index in reversed(timeout_lines[1:]):
+            del lines[index]
+    else:
+        lines.insert(end, setting)
+
+    config_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _codex_config_path(config_root: Path) -> Path:
+    codex_home = os.environ.get("CODEX_HOME")
+    return (
+        Path(codex_home).expanduser()
+        if codex_home
+        else config_root / ".codex"
+    ) / "config.toml"
+
+
 def _install_codex(config_root: Path) -> None:
     codex = shutil.which("codex")
     if codex is None:
@@ -163,7 +218,8 @@ def _install_codex(config_root: Path) -> None:
         [codex, "mcp", "add", SERVER_NAME, "--", *SERVER_COMMAND],
         "Codex MCP registration failed.",
     )
-    _install_skills(config_root / ".codex" / "skills")
+    _set_codex_startup_timeout(_codex_config_path(config_root))
+    _install_skills(config_root / ".agents" / "skills")
 
 
 def _install_claude(config_root: Path) -> None:
@@ -342,7 +398,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     print(f"Strict config: {strict_config}")
     print("Set ANTHROPIC_API_KEY or OPENAI_API_KEY there before Strict mode.")
-    print("Restart your Agent, then run: /imreview <PR URL> or /imupdate <repository>")
+    if "codex" in agents:
+        print("Codex: restart, then run: $imreview <PR URL> or $imupdate <repository>")
+    if any(agent != "codex" for agent in agents):
+        print("Claude/Cursor: restart, then run: /imreview <PR URL> or /imupdate <repository>")
     return 0
 
 

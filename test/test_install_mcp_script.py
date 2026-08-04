@@ -100,3 +100,50 @@ def test_cursor_install_preserves_existing_config(tmp_path):
     text = update_skill.read_text(encoding="utf-8")
     assert "{{INFERMATRIX_COPILOT_ROOT}}" not in text
     assert str(ROOT) in text
+
+
+def test_codex_install_sets_timeout_and_installs_current_skill_location(
+    monkeypatch, tmp_path
+):
+    installer = _load_installer()
+    monkeypatch.delenv("CODEX_HOME", raising=False)
+    config_path = tmp_path / ".codex" / "config.toml"
+    config_path.parent.mkdir()
+    config_path.write_text(
+        "[mcp_servers.infermatrix-copilot]\n"
+        'command = "uvx"\n'
+        "startup_timeout_sec = 30\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(installer.shutil, "which", lambda command: command)
+    monkeypatch.setattr(installer, "_run", lambda command, message: None)
+    monkeypatch.setattr(installer, "_run_quiet", lambda command: None)
+
+    installer._install_codex(tmp_path)
+
+    text = config_path.read_text(encoding="utf-8")
+    assert "startup_timeout_sec = 120" in text
+    assert text.count("startup_timeout_") == 1
+    assert (tmp_path / ".agents" / "skills" / "imreview" / "SKILL.md").is_file()
+
+
+def test_codex_timeout_supports_quoted_server_table(tmp_path):
+    installer = _load_installer()
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        '[mcp_servers."infermatrix-copilot"]\ncommand = "uvx"\n',
+        encoding="utf-8",
+    )
+
+    installer._set_codex_startup_timeout(config_path)
+
+    text = config_path.read_text(encoding="utf-8")
+    assert "startup_timeout_sec = 120" in text
+
+
+def test_codex_config_path_honors_codex_home(monkeypatch, tmp_path):
+    installer = _load_installer()
+    custom_home = tmp_path / "custom-codex"
+    monkeypatch.setenv("CODEX_HOME", str(custom_home))
+
+    assert installer._codex_config_path(tmp_path) == custom_home / "config.toml"

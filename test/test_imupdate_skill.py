@@ -30,8 +30,8 @@ def test_installer_and_docs_expose_imupdate() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
     assert "SKILLS_SOURCE" in installer
-    assert '_install_skills(config_root / ".codex" / "skills")' in installer
+    assert '_install_skills(config_root / ".agents" / "skills")' in installer
     assert '_install_skills(config_root / ".claude" / "skills")' in installer
     assert '_install_skills(cursor_root / "skills")' in installer
-    assert "/imupdate D:\\path\\to\\vllm-omni" in readme
-    assert "/imupdate vllmomni" in readme
+    assert "$imupdate D:\\path\\to\\vllm-omni" in readme
+    assert "$imupdate vllmomni" in readme

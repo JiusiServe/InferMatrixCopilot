@@ -5,9 +5,9 @@
 
 它主要解决两个问题：
 
-- `/imreview`：审查 PR 或本地改动时，让 Agent 知道相关模型、组件和维护者规则，
+- `imreview`：审查 PR 或本地改动时，让 Agent 知道相关模型、组件和维护者规则，
   不只做一遍通用代码检查。
-- `/imupdate`：vLLM-Omni 发版或目录变化后，对比新旧版本，更新
+- `imupdate`：vLLM-Omni 发版或目录变化后，对比新旧版本，更新
   InferMatrixCopilot 中容易过期的模型清单、registry、deploy、路径路由和 source pin。
 
 默认使用 **Direct 模式**：代码仍由你当前 Agent 的模型读取和判断；
@@ -40,6 +40,10 @@ install.cmd --repo-path D:\path\to\vllm-omni
 `imupdate` Skill。未识别到已知 Agent 时，会生成标准
 `infermatrix-copilot.mcp.json` 供其他 MCP 客户端导入。
 
+Codex 重启后用 `$imreview` / `$imupdate`，也可以先运行 `/skills` 查找；
+`/imreview` 不是 Codex 的 Slash Command。Claude Code 和 Cursor 仍使用
+`/imreview` / `/imupdate`。
+
 安装器还会创建 `~/.infermatrix-copilot/.env`。Direct 不需要模型密钥；使用
 Strict 时，任选一种填写：
 
@@ -71,11 +75,15 @@ codex mcp list
 Use InferMatrixCopilot in Direct mode to review this PR.
 ```
 
-## 审查代码：`/imreview`
+## 审查代码：`imreview`
 
 ```text
+# Codex
+$imreview https://github.com/vllm-project/vllm-omni/pull/5172
+$imreview
+
+# Claude Code / Cursor
 /imreview https://github.com/vllm-project/vllm-omni/pull/5172
-/imreview
 或者说
 “帮我审核一下这个pr xxxx，用知识库”
 ```
@@ -87,7 +95,7 @@ Use InferMatrixCopilot in Direct mode to review this PR.
 工作过程：
 
 ```text
-你发起 /imreview
+你发起 imreview
   → Agent 固定 PR 快照并在当前对话报告 head、CI 和 mergeability
   → Agent 把 title、body 和 changed files 传给 review(..., mode="direct")
   → MCP 返回至多 3 个相关知识入口及精简 quick map
@@ -98,26 +106,26 @@ Use InferMatrixCopilot in Direct mode to review this PR.
 Agent 会先确认 PR 版本和 CI 状态，再继续读代码。审查结果只显示在当前对话，
 不会自动发到 GitHub。
 
-## 更新知识：`/imupdate`
+## 更新知识：`imupdate`
 
-上游仓库会不断增加模型、调整 registry、移动文件或修改 deploy。`/imupdate`
+上游仓库会不断增加模型、调整 registry、移动文件或修改 deploy。`imupdate`
 用于把这些**结构事实**同步到 InferMatrixCopilot，避免以后按旧路径和旧清单审查。
 它更新的是 InferMatrixCopilot 知识，不会修改传入的 vLLM-Omni 仓库。
 
 ```text
-# 本地 checkout：baseline 对比当前 HEAD
-/imupdate D:\path\to\vllm-omni
+# Codex：本地 checkout，baseline 对比当前 HEAD
+$imupdate D:\path\to\vllm-omni
 
 # 仓库名或别名
-/imupdate vllm-omni
-/imupdate vllmomni
+$imupdate vllm-omni
+$imupdate vllmomni
 
 或者直接说
 
 帮我更新一下 vllmomni仓库最新到知识库
 
 # URL；可选指定目标 tag 或 SHA
-/imupdate https://github.com/vllm-project/vllm-omni v0.26.0rc1
+$imupdate https://github.com/vllm-project/vllm-omni v0.26.0rc1
 ```
 
 它接受本地 Git 路径、仓库名、别名或 URL，第二个参数可选填目标 tag 或 SHA。
@@ -141,13 +149,13 @@ release_baseline.yaml 的 audited_sha
   → 无法运行机器审计时，只做有来源的模型分析，并明确标记验证不完整
 ```
 
-`/imupdate` 不会根据一次 diff 自动编造 owner 规则，也不会自动 commit、push 或开 PR。
+`imupdate` 不会根据一次 diff 自动编造 owner 规则，也不会自动 commit、push 或开 PR。
 详细的审计项和底层命令见
 [`doc/VLLM_OMNI_RELEASE_MAINTENANCE.md`](doc/VLLM_OMNI_RELEASE_MAINTENANCE.md)。
 
 ## Skill 命令和 MCP 接口不是一回事
 
-平时直接用 `/imreview` 和 `/imupdate` 即可，下面的接口由 Agent 调用：
+平时直接用 `imreview` 和 `imupdate` 即可，下面的接口由 Agent 调用：
 
 - `review(target, repo="vllm-omni", mode="direct", post=false,
   review_depth="", title="", body="", changed_files=[], repo_path="")`：
@@ -161,13 +169,13 @@ release_baseline.yaml 的 audited_sha
 - `get_review_result(run_id, offset=0)`：轮询 Strict 结果；报告较长时按
   `next_offset` 继续读取。
 - `update_knowledge(repo="vllm-omni")`：只返回知识贡献入口
-  `knowledge/CONTRIBUTING.md`。它不是 `/imupdate` 的发版审计器。
+  `knowledge/CONTRIBUTING.md`。它不是 `imupdate` 的发版审计器。
 - `doc_search(query, repo="vllm-omni", limit=20)`：搜索模型或组件知识。
 - `doc_read(path, repo="vllm-omni", offset=0)`：读取搜索到的知识页面。
 
 ## Direct 和 Strict 是同一个 MCP
 
-`/imreview` 默认使用 Direct；需要完整后台工作流时，可以明确要求 Strict。
+`imreview` 默认使用 Direct；需要完整后台工作流时，可以明确要求 Strict。
 两者都通过同一个 `infermatrix-copilot-mcp` 的 `review` 接口调用，不需要再安装一个
 Strict MCP。
 
@@ -189,7 +197,7 @@ Strict 会返回 `run_id`，Agent 再用 `get_review_status` 查看进度，并�
 
 ## 独立执行器
 
-Autonomous workflow 不是 `/imreview` 的第三种模式，而是同一工作流引擎的独立
+Autonomous workflow 不是 `imreview` 的第三种模式，而是同一工作流引擎的独立
 CLI/MCP 入口。默认安装器不会注册它；只有需要独立执行 issue、CI、rebase 等任务时
 才需要阅读
 [`docs/autonomous-workflow.md`](docs/autonomous-workflow.md)。
