@@ -38,6 +38,11 @@ install.cmd --repo-path D:\path\to\vllm-omni
 在 Agent 的插件市场搜索 `infermatrix-copilot` 并点击安装，然后直接运行：
 
 ```text
+# Codex
+$imreview <PR URL>
+$imupdate <local path, repository name, alias, or URL>
+
+# Claude Code / Cursor
 /imreview <PR URL>
 /imupdate <local path, repository name, alias, or URL>
 ```
@@ -79,9 +84,10 @@ plugins/infermatrix-copilot/skills/imupdate/SKILL.md
 ## 使用
 
 ```text
-/imreview https://github.com/vllm-project/vllm-omni/pull/5172
-/imupdate D:\path\to\vllm-omni
-/imupdate vllmomni
+# Codex
+$imreview https://github.com/vllm-project/vllm-omni/pull/5172
+$imupdate D:\path\to\vllm-omni
+$imupdate vllmomni
 ```
 
 默认 Direct 模式只提供知识库，由 Agent 当前模型完成审查；不会自动评论或推送代码。
