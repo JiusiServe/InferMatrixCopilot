@@ -7,8 +7,8 @@ import re
 import signal
 import sys
 from pathlib import Path
-from typing import Optional
 
+from .adapters import AdapterError, AdapterRegistry, RepoAdapter
 from .config import Settings
 from .intent import resolve_repo_alias
 from .knowledge_docs import KnowledgeDocs, KnowledgeDocsError
@@ -40,8 +40,10 @@ _PR_URL = re.compile(
     re.IGNORECASE,
 )
 _PR_NUMBER = re.compile(r"^(?:pr\s*#?\s*)?(\d+)$", re.IGNORECASE)
+_ADAPTERS = _ROOT / "adapters"
 _REPO_ALIASES = {
     "vllm-project/vllm-omni": "vllm-omni",
+    "vllm-project/afd-plugin": "afd-plugin",
 }
 _DIRECT_OWNER_ROUTES = (
     {
@@ -209,7 +211,17 @@ _SUBTRACTION_SIGNALS = {"none", "triggered"}
 
 def _normalize_repo(repo: str) -> str:
     selected = str(repo or "vllm-omni").strip()
-    return _REPO_ALIASES.get(selected.casefold(), selected)
+    alias = _REPO_ALIASES.get(selected.casefold())
+    if alias:
+        return alias
+    adapter = _adapter_for_repo(selected)
+    if adapter is not None:
+        repo_subdir = str(
+            (adapter.manifest.get("knowledge") or {}).get("repo_subdir") or "")
+        if repo_subdir.startswith("repos/"):
+            return repo_subdir.removeprefix("repos/").strip("/")
+        return adapter.name.replace("_", "-")
+    return selected.replace("_", "-")
 
 
 def _supported_repos() -> list[str]:
@@ -219,6 +231,13 @@ def _supported_repos() -> list[str]:
         path.name for path in (_KNOWLEDGE / "repos").iterdir()
         if path.is_dir() and (path / "_index.md").is_file()
     )
+
+
+def _adapter_for_repo(repo: str) -> RepoAdapter | None:
+    try:
+        return AdapterRegistry(_ADAPTERS).resolve(name=repo)
+    except AdapterError:
+        return None
 
 
 def _docs(repo: str) -> KnowledgeDocs:
@@ -232,7 +251,8 @@ def _docs(repo: str) -> KnowledgeDocs:
 def _guard(fn):
     try:
         return fn()
-    except (KnowledgeDocsError, FileNotFoundError, PolicyError, ValueError) as exc:
+    except (KnowledgeDocsError, FileNotFoundError, PolicyError, TypeError,
+            ValueError) as exc:
         return {"error": str(exc)}
 
 
@@ -241,6 +261,94 @@ def _knowledge_entry(name: str) -> str:
     if not path.is_file():
         raise FileNotFoundError(f"knowledge entry is missing: {path}")
     return str(path)
+
+
+def _adapter_changed_file_routes(
+    repo: str,
+    changed_files: list[str],
+) -> tuple[list[dict[str, object]], list[str]]:
+    selected_repo = _normalize_repo(repo)
+    adapter = _adapter_for_repo(selected_repo)
+    if adapter is None:
+        return [], [str(path).replace("\\", "/") for path in changed_files]
+    routed: list[dict[str, object]] = []
+    unmatched: list[str] = []
+    for changed_file in changed_files:
+        path = str(changed_file).replace("\\", "/")
+        folded = path.casefold()
+        hits = []
+        for route in adapter.review_routes:
+            prefix = str(route.get("prefix", "")).replace("\\", "/").casefold()
+            doc = str(route.get("doc", ""))
+            if prefix and doc and folded.startswith(prefix):
+                hits.append({
+                    "owner": route.get("owner") or prefix.rstrip("/"),
+                    "doc": doc,
+                })
+        if not hits:
+            unmatched.append(path)
+            continue
+        for hit in hits:
+            doc = str(hit["doc"])
+            doc_path = _knowledge_path(doc)
+            routed.append({
+                "owner": str(hit["owner"]),
+                "path": doc_path,
+                "relative_path": doc,
+                "reason": f"changed file: {path}",
+                "changed_file": path,
+                "repo": selected_repo,
+                "quick_map": _direct_quick_map(doc_path),
+                "read_required": False,
+            })
+    return routed, unmatched
+
+
+def _review_knowledge(repo: str, changed_files: list[str]) -> list[dict]:
+    """Return adapter-backed review knowledge for smoke tests and strict hosts."""
+    selected_repo = _normalize_repo(repo)
+    docs = _docs(selected_repo)
+    routed, unmatched = _adapter_changed_file_routes(selected_repo, changed_files)
+    paths = [
+        "general/review/_index.md",
+        f"repos/{selected_repo}/rules.md",
+        f"repos/{selected_repo}/_index.md",
+    ]
+    adapter = _adapter_for_repo(selected_repo)
+    if adapter is not None:
+        knowledge = adapter.manifest.get("knowledge") or {}
+        paths.extend(knowledge.get("briefing_docs") or [])
+        paths.extend(knowledge.get("briefing_docs_extra") or [])
+    paths.extend(str(route["relative_path"]) for route in routed)
+    entries = []
+    if changed_files:
+        lines = ["# Changed-file routing", "", f"repo: {selected_repo}", ""]
+        if routed:
+            lines.append("## Routed")
+            for route in routed:
+                lines.append(
+                    f"- `{route['changed_file']}` -> {route['owner']} -> "
+                    f"`{route['relative_path']}`")
+            lines.append("")
+        if unmatched:
+            lines.append("## Unmatched")
+            for path in unmatched:
+                lines.append(f"- `{path}`")
+            lines.append("")
+            lines.append(
+                "Unmatched changed paths remain reviewer-visible and must not "
+                "be treated as covered.")
+        entries.append({
+            "path": "changed-file-routing",
+            "content": "\n".join(lines).strip(),
+            "next_offset": None,
+        })
+    for path in dict.fromkeys(paths):
+        try:
+            entries.append(docs.read(path, limit=24_000))
+        except FileNotFoundError:
+            continue
+    return entries
 
 
 def _knowledge_path(relative_path: str) -> str:
@@ -329,7 +437,7 @@ def _direct_knowledge_routes(
     *,
     title: str = "",
     body: str = "",
-    changed_files: Optional[list[str]] = None,
+    changed_files: list[str] | None = None,
 ) -> dict:
     """Select bounded Direct knowledge routes from PR intent.
 
@@ -354,6 +462,24 @@ def _direct_knowledge_routes(
             "scope_validation": [],
         }
     if selected_repo != "vllm-omni":
+        routes, unmatched = _adapter_changed_file_routes(
+            selected_repo, changed_files)
+        if routes or unmatched:
+            return {
+                "status": "ready" if routes else "description_unrouted",
+                "selected_by": "adapter_changed_files",
+                "changed_files_role": "route_and_scope_validation",
+                "routes": routes[:3],
+                "scope_validation": [{
+                    "owner": route["owner"],
+                    "changed_files": [route["changed_file"]],
+                    "selected_from_description": False,
+                } for route in routes],
+                "unmatched_changed_files": unmatched,
+                "unmatched_policy": (
+                    "Unmatched changed paths remain reviewer-visible and must "
+                    "not be treated as covered."),
+            }
         return {
             "status": "unsupported_exact_router",
             "selected_by": "title_body",
@@ -429,8 +555,8 @@ def _direct_knowledge_routes(
 
 def _direct_completion_result(
     subtraction_signal: str = "",
-    subtraction: Optional[list[dict[str, str]]] = None,
-    minimality_proof: Optional[dict[str, str]] = None,
+    subtraction: list[dict[str, str]] | None = None,
+    minimality_proof: dict[str, str] | None = None,
     final_comment_count: int = 1,
 ) -> dict:
     """Mechanically gate Direct completion on subtraction classification.
@@ -532,7 +658,7 @@ def _strict_review_request(
     if not target:
         raise ValueError("target must not be empty")
     if not isinstance(post, bool):
-        raise ValueError("post must be a boolean")
+        raise TypeError("post must be a boolean")
 
     match = _PR_URL.search(target)
     if match:
@@ -564,8 +690,8 @@ def _strict_review_request(
 
 
 def build_mcp(
-    settings: Optional[Settings] = None,
-    core: Optional[CopilotMCP] = None,
+    settings: Settings | None = None,
+    core: CopilotMCP | None = None,
 ):
     from mcp.server.fastmcp import FastMCP
 
@@ -607,7 +733,7 @@ def build_mcp(
         review_depth: str = "",
         title: str = "",
         body: str = "",
-        changed_files: Optional[list[str]] = None,
+        changed_files: list[str] | None = None,
         repo_path: str = "",
     ) -> dict:
         """Begin a Direct or Strict review.
@@ -700,8 +826,8 @@ def build_mcp(
     @mcp.tool()
     def validate_direct_review(
         subtraction_signal: str = "",
-        subtraction: Optional[list[dict[str, str]]] = None,
-        minimality_proof: Optional[dict[str, str]] = None,
+        subtraction: list[dict[str, str]] | None = None,
+        minimality_proof: dict[str, str] | None = None,
         final_comment_count: int = 1,
     ) -> dict:
         """Validate the Direct completion gate before the only final comment.
@@ -764,6 +890,11 @@ def build_mcp(
                 "query": query,
                 "repo": selected_repo,
                 "matches": matches,
+                **({"hint": (
+                    "No literal text match. For review routing, call review. "
+                    "For knowledge edits, call update_knowledge and read its "
+                    "knowledge_entry."
+                )} if not matches else {}),
             }
 
         return _guard(run)

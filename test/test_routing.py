@@ -9,7 +9,6 @@ import pytest
 from infermatrix_copilot.intent import (
     parse_intent,
     parse_intents,
-    pre_parse,
     resolve_repo_alias,
     validate_spec,
 )
@@ -56,6 +55,15 @@ def test_url_routes_with_full_identity(rsettings):
     r = parse_intent(f"review {URL}", llm=NeverLLM(), settings=rsettings)
     s = r.spec
     assert s and s.kind == "pr_review" and s.pr == 5156 and s.repo == "vllm-omni"
+
+
+def test_afd_url_routes_by_configured_canonical_identity(rsettings):
+    rsettings.repo_paths["afd-plugin"] = "/nonexistent/afd-plugin"
+    rsettings.repo_full_names["afd-plugin"] = "vllm-project/afd-plugin"
+    r = parse_intent("review https://github.com/vllm-project/afd-plugin/pull/196",
+                     llm=NeverLLM(), settings=rsettings)
+    s = r.spec
+    assert s and s.kind == "pr_review" and s.pr == 196 and s.repo == "afd-plugin"
 
 
 def test_url_owner_mismatch_is_rejected_not_defaulted(rsettings):
