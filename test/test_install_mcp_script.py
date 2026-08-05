@@ -97,6 +97,7 @@ def test_cursor_install_preserves_existing_config(tmp_path):
     assert (cursor_root / "skills" / "imreview" / "SKILL.md").is_file()
     update_skill = cursor_root / "skills" / "imupdate" / "SKILL.md"
     assert update_skill.is_file()
+    assert (cursor_root / "skills" / "imdesign" / "SKILL.md").is_file()
     text = update_skill.read_text(encoding="utf-8")
     assert "{{INFERMATRIX_COPILOT_ROOT}}" not in text
     assert str(ROOT) in text
@@ -125,6 +126,7 @@ def test_codex_install_sets_timeout_and_installs_current_skill_location(
     assert "startup_timeout_sec = 120" in text
     assert text.count("startup_timeout_") == 1
     assert (tmp_path / ".agents" / "skills" / "imreview" / "SKILL.md").is_file()
+    assert (tmp_path / ".agents" / "skills" / "imdesign" / "SKILL.md").is_file()
 
 
 def test_codex_timeout_supports_quoted_server_table(tmp_path):

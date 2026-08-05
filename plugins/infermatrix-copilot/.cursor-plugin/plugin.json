@@ -2,7 +2,7 @@
   "name": "infermatrix-copilot",
   "displayName": "InferMatrixCopilot",
   "version": "0.1.0",
-  "description": "Maintainer-grounded vLLM-Omni review and release knowledge updates.",
+  "description": "Maintainer-grounded vLLM-Omni review, co-design, and release knowledge updates.",
   "author": {
     "name": "JiusiServe"
   },
@@ -12,6 +12,7 @@
   "keywords": [
     "vllm-omni",
     "code-review",
+    "co-design",
     "mcp"
   ],
   "category": "developer-tools",
