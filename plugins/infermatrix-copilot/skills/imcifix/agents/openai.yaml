@@ -1,0 +1,4 @@
+interface:
+  display_name: "InferMatrix Issue Fix"
+  short_description: "Fix a GitHub issue with repository-grounded context"
+  default_prompt: "Use $imcifix to fix the target issue locally, then report validation."

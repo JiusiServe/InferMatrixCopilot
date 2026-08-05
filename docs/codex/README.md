@@ -23,13 +23,23 @@ Use InferMatrixCopilot to review
 https://github.com/vllm-project/vllm-omni/pull/5172.
 ```
 
-The plugin also adds the `imreview` skill, so the short form is:
+The plugin also adds the `imreview`, `imdesign`, `imcifix`, and `imupdate`
+skills, so the short review form is:
 
 ```text
 $imreview https://github.com/vllm-project/vllm-omni/pull/5172
 ```
 
 Codex skills use `$name`, not `/name`; run `/skills` if the skill is not shown.
+For issue fixes, use:
+
+```text
+$imcifix https://github.com/vllm-project/vllm-omni/issues/5023
+```
+
+`imcifix` is a host-agent local patch workflow. It does not imply that the MCP
+server exposes an `issue_fix` background tool, and it does not commit, push,
+open a PR, or post comments unless explicitly asked.
 
 Codex calls `review`, receives the local `knowledge/AGENTS.md` path plus a
 compact first-review checklist, and follows that document's routing map itself.
@@ -132,8 +142,8 @@ Strict never posts implicitly. Posting still requires both an explicit
 `post=true` tool argument and server-side `ALLOW_POST=1`.
 
 Restart Codex after installation. Use `/mcp` or `codex mcp list` to confirm that
-`infermatrix-copilot` is connected, and `/skills` to confirm that `imreview` and
-`imupdate` are available.
+`infermatrix-copilot` is connected, and `/skills` to confirm that `imreview`,
+`imdesign`, `imcifix`, and `imupdate` are available.
 
 ## What the default MCP exposes
 
