@@ -61,7 +61,7 @@ sources: [vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_talker.p
 
 ## 怎样验证功能、精度和性能
 
-- 单元：`tests/unit/higgs_audio_v3/test_higgs_audio_v3.py`（无 GPU,AC-1..10:
+- 单元：`tests/model_executor/models/higgs_audio_v3/test_higgs_audio_v3.py`（无 GPU,AC-1..10:
   config/prompt/融合模块/delay/stage processor/registry）。
 - e2e：v2 `tests/e2e/{offline_inference,online_serving}/test_higgs_audio_v2_expansion.py`;
   v3 `tests/e2e/online_serving/test_higgs_audio_v3.py`;perf

@@ -1,15 +1,15 @@
 ---
 title: "Scheduler 共享架构"
 created: 2026-07-16
-updated: 2026-07-16
+updated: 2026-08-05
 type: architecture
 tags: [vllm-omni, components, scheduler]
-sources: [docs/design/module/ar_module.md, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/prefix_cache.py, vllm_omni/worker/gpu_ar_model_runner.py]
+sources: [docs/design/module/ar_module.md, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/prefix_cache.py, vllm_omni/worker/gpu_ar_model_runner.py]
 ---
 
 # Scheduler 共享架构
 
-以下事实在 `main @ 5c390096` 复核；官方叙述见
+以下事实在 `v0.26.0 @ a4ea67a2` 复核；官方叙述见
 `docs/design/module/ar_module.md`（含继承 classDiagram 与请求流转 flowchart）。
 
 ## 继承链（对 vLLM 的扩展方式）
@@ -52,6 +52,13 @@ token，前缀行从缓存重建后拼入跨 stage payload。消费端合同：
 `requires_full_prefix_cached_hidden_states`（默认 True；`qwen3_tts_talker.py:311`、
 `higgs_audio_v3_talker.py:236` 显式声明 False）。该机制的失败模式与硬规则见
 [rules](rules.md) 的 `SCHED-1a`。
+
+在目标版本，`OmniGenerationScheduler` 还区分
+`retains_state_across_chunks`：等待 connector chunk 的 request 仍占用 model-runner
+capacity，并在 full-payload chunk 到达后重新进入可调度队列。AR scheduler 在消费
+sampled-token logprobs 前完成 request-local 合同校验；stage-0-final 的普通请求可以
+跳过下游 KV，但 companion 等显式带 `omni_force_kv_transfer` 的请求不能走该 shortcut。
+这些跨层语义分别见 [scheduler rules](rules.md) 的 `SCHED-5a`–`SCHED-5c`。
 
 ## 与 orchestrator 的边界
 

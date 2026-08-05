@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-08-23
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5543", "PR #5848", "PR #5872", "PR #5981", "PR #6094", "PR #6102", "PR #6279", "PR #6385", "PR #6445", vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/distributed/hsdp.py]
+sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5543", "PR #5848", "PR #5872", "PR #5981", "PR #6094", "PR #6102", "PR #6279", "PR #6385", "PR #6445", vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/offloader/]
 confidence: high
 ---
 
@@ -20,7 +20,7 @@ confidence: high
 
 | PR 描述在做什么 | 精确规则组 | 第一批 live 源码 |
 |---|---|---|
-| CUDA Graph、compile、fused solver、eager parity、tensor dtype/device | `execution-parity`：`DIFF-1a`–`1c` | `compile.py::regionally_compile` → runner batch → model denoise/solver |
+| CUDA Graph、compile、fused solver、eager parity、tensor dtype/device、async output | `execution-parity`：`DIFF-1a`–`1d` | `compile.py::regionally_compile` → runner batch → model denoise/solver/output pump |
 | seed、request-local generator、guidance=0、并发 RNG、batched generators | `execution-parity`：`DIFF-1b` | `inputs/data.py::OmniDiffusionSamplingParams` → runner `_initialize_generator` → request-batch generator collate |
 | ModelOpt/checkpoint adapter、weight/scale remap、unknown tensor、resolution path | `checkpoint-distributed`：`DIFF-2a` | `diffusers_loader.py::{_get_checkpoint_adapter,load_weights}` → `modelopt.py::{_resolve_target_and_output_names,adapt}` |
 | host-weight artifact、source identity、layout/dtype、warm restore | `checkpoint-distributed`：`DIFF-2d` | `model_loader/host_weights/{source_identity,contracts,identity_adapter}.py` → policy/restorer |
@@ -32,8 +32,8 @@ confidence: high
 
 | 审查组 | 什么时候触发 | 规则 ID |
 |---|---|---|
-| `core` | 每次共享 diffusion 审查 | `DIFF-1a`, `DIFF-1b`, `DIFF-1c` |
-| `execution-parity` | graph/eager、solver、RNG、generator、tensor dtype/device | `DIFF-1a`, `DIFF-1b`, `DIFF-1c` |
+| `core` | 每次共享 diffusion 审查 | `DIFF-1a`, `DIFF-1b`, `DIFF-1c`, `DIFF-1d` |
+| `execution-parity` | graph/eager、solver、RNG、generator、tensor dtype/device、async output readiness | `DIFF-1a`, `DIFF-1b`, `DIFF-1c`, `DIFF-1d` |
 | `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP、artifact identity | `DIFF-2a`, `DIFF-2b`, `DIFF-2c`, `DIFF-2d` |
 | `quality-evidence` | 质量阈值、offload、A/B case | `DIFF-3a` |
 | `system-runtime` | cache/预算、native/backend/platform、attention layout、异常与并发 | `DIFF-4a`–`4f` |
@@ -69,6 +69,19 @@ confidence: high
 - 禁止：依赖 process 默认 fp32/CPU 或隐式 cast/move；只测 shape 而不执行 BF16 consumer。
 - 验收：BF16、错长、batch reorder 和 graph/eager 用例断言 consumer 收到相同 device/dtype、
   alias 与结果。 ^[PR #5067] ^[PR #5068] ^[PR #5174] ^[PR #5981]
+### DIFF-1d — async output 的 compute 与 output-ready 必须分成两个可观察阶段
+
+- 触发：把 diffusion D2H/SHM packing 移到 worker 后台线程，或修改
+  `ResultPumpThread`、`collective_rpc`、batch output split。
+- 强制：GPU compute 完成只释放下一次 forward；最终输出必须等 side-stream event、D2H
+  和 SHM packing 完成后再 resolve。`result_mq` 由唯一 pump reader 分发，batch 结果按
+  request 映射拆分；step-mode 保留同步路径。
+- 禁止：在 compute-done 时把未完成的 device tensor 当成最终 artifact；让多个线程同时
+  消费 result queue；用同步 `.cpu()` 掩盖 stream ordering 或让下一 step 重写源 buffer。
+- 验收：分别覆盖 compute-done、output-ready、RPC error、batch split 和 queue cleanup；
+  在非 CUDA/step-mode 下证明同步 fallback 仍可构造。首批测试看
+  `tests/diffusion/test_async_output_worker.py`、`test_result_pump.py` 和
+  `tests/diffusion/test_ipc_async.py`。
 
 ## Checkpoint 与分布式加载
 
@@ -116,6 +129,18 @@ confidence: high
 - 验收：第二种 synthetic representation 复用共享 identity/restorer；任意本地十六进制命名
   symlink 在同大小内容被替换后产生不同 identity；合法 Hub snapshot→blob 拓扑仍走受控快捷路径。
   ^[PR #6445]
+
+### DIFF-2e — distributed layerwise offload 只能选择一个一致的权重分片合同
+
+- 触发：新增 `enable_distributed_layerwise_offload`、`dlo_use_allgather`、模型
+  `OffloadPlan` 或 block discovery。
+- 强制：明确 rank 本地 CPU shard、固定双 GPU buffer、H2D/AllGather stream 和模型
+  block list 的 owner；`dlo_use_allgather=false` 走每 rank full-weight 路径，开启
+  AllGather 时不得再叠加已 DTensor-sharded 的 HSDP 参数。
+- 禁止：用 heuristic 找不到 block 时静默假装 offload 已启用；对 HSDP 参数二次分片；
+  把 CPU 内存、AllGather 同步和设备显存开销隐藏在一个泛化的 `enable_cpu_offload` 开关。
+- 验收：CPU/Gloo 单 rank 覆盖 DTensor wrapper、shard padding、双 buffer 和 disable
+  cleanup；配置测试覆盖 AllGather+HSDP 的明确失败及 no-AllGather 的允许路径。
 
 ## 质量阈值与资源辅助
 

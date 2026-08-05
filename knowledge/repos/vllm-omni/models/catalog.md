@@ -1,7 +1,7 @@
 ---
 title: "模型代码入口与 registry 快照"
 created: 2026-07-16
-updated: 2026-07-31
+updated: 2026-08-05
 type: guide
 tags: [vllm-omni, models]
 sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/registry.py, vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/]
@@ -9,8 +9,8 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 
 # 模型代码入口与 registry 快照
 
-本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数仍是
-`v0.26.0rc1 @ 807db6ef`（2026-07-28）快照，数字会漂移，不能凭它断言“不支持”。
+本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
+`v0.26.0 @ a4ea67a2`（2026-08-03）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -35,36 +35,38 @@ adapter。已有专属知识 owner 可从 [models index](_index.md) 按名称进
 
 | 注册点 | 位置 | 计数 |
 |---|---|---|
-| AR/omni 架构 | `model_executor/models/registry.py` `_OMNI_MODELS` | 72 个架构名 / 26 个模型族目录 |
-| Diffusion pipeline | `diffusion/registry.py` `_DIFFUSION_MODELS` | 61 条 pipeline / 37 个模型族目录 |
-| Pipeline（model_type） | `config/pipeline_registry.py` `OMNI_PIPELINES` | 46 个 key |
-| Deploy YAML | `vllm_omni/deploy/*.yaml` | 71 份 |
+| AR/omni 架构 | `model_executor/models/registry.py` `_OMNI_MODELS` | 77 个架构名 / 27 个模型族目录 |
+| Diffusion pipeline | `diffusion/registry.py` `_DIFFUSION_MODELS` | 58 条 pipeline / 38 个模型族目录 |
+| Pipeline（model_type） | `config/pipeline_registry.py` `OMNI_PIPELINES` | 51 个 key |
+| Deploy YAML | `vllm_omni/deploy/*.yaml` | 79 份 |
 
-对比上一审计快照（`5d44868e`,2026-07-21）：AR 架构 69→72，diffusion
-pipeline 59→61，OMNI_PIPELINES 保持 46，deploy 65→71。新增 diffusion
-家族是 `boogu_image` 和 `lingbot_video`；AR 新增项属于已有的
-`mammoth_moda2` 与 `minicpmo_4_5` 家族。
+对比上一审计快照（`807db6ef`）：AR 架构 72→77，diffusion pipeline 61→58，
+OMNI_PIPELINES 46→51，deploy 71→79。新增 AR 家族是 `audex`；diffusion 新增
+`minimax_h3`，同时 LTX-2/LTX-2.3 的五个旧 registry names 合并为两个入口。新增
+pipeline keys 是四个 Audex 模式和 `nemotron_labs_audex` alias；deploy 新增八个
+Audex files 与 `qwen3_omni_moe_thinking.yaml`，删除 `minicpmo_4_5_batching.yaml`。
 
-## AR/omni 模型族（26）
+## AR/omni 模型族（27）
 
-aura_omni、bagel、cosyvoice3、covo_audio、dynin_omni、fish_speech、glm_image、
+aura_omni、audex、bagel、cosyvoice3、covo_audio、dynin_omni、fish_speech、glm_image、
 glm_tts、higgs_audio_v2、higgs_audio_v3、hunyuan_image3、indextts2、
 mammoth_moda2、mimo_audio、ming_flash_omni、ming_tts、minicpmo_4_5、moss_tts、
 moss_tts_nano、omnivoice、qwen2_5_omni、qwen3_omni、qwen3_tts、step_audio2、
 voxcpm2、voxtral_tts
 
-## Diffusion 模型族（37）
+## Diffusion 模型族（38）
 
 audiox、bagel、boogu_image、cosmos3、diffusers_adapter（通用 diffusers 桥）、dreamid_omni、
 dreamzero、ernie_image、flux、flux2、flux2_klein、glm_image、gr00t、helios、
 hidream_image、hunyuan_image3、hunyuan_video、internvla_a1、krea2、lance、
 lingbot_video、longcat_image、ltx2、magi_human、ming_flash_omni、nextstep_1_1、omnigen2、
 omnivoice、ovis_image、qwen_image、sd3、sdxl、sensenova_u1、soulx_singer、
-stable_audio、wan2_2、z_image
+stable_audio、wan2_2、z_image、minimax_h3
 
-## OMNI_PIPELINES key（46）
+## OMNI_PIPELINES key（51）
 
-Gr00tN1d7（注意:唯一 CamelCase key）、aura_omni、bagel、bagel_single_stage、
+Gr00tN1d7（注意:唯一 CamelCase key）、aura_omni、audex_s2s、audex_thinker_only、
+audex_tta、audex_tts、bagel、bagel_single_stage、
 bagel_think、cosyvoice3、covo_audio、dreamzero、dynin_omni、fish_qwen3_omni、
 glm_image、glm_tts、higgs_audio_v2、higgs_multimodal_qwen3、hunyuan_image3_ar、
 hunyuan_image3_dit、hunyuan_image_3_moe、hunyuan_video_15、indextts2、lance、
@@ -74,7 +76,7 @@ ming_tts、ming_tts_moe、minicpmo_4_5、moss_tts_delay、moss_tts_local、
 moss_tts_nano、moss_tts_realtime、omnivoice、qwen2_5_omni、
 qwen2_5_omni_thinker_only、qwen3_omni_moe（resolver）、qwen3_tts、
 soulxsinger_svc、soulxsinger_svs、step_audio_2、step_audio_2_asr、voxcpm2、
-voxtral_tts、wan2_2_ti2v
+voxtral_tts、wan2_2_ti2v、nemotron_labs_audex
 
 注意：单 stage diffusion 模型**多数不在** `OMNI_PIPELINES`（引擎为它们生成
 默认 diffusion stage 配置,见 [Config 组件](../components/configuration/architecture.md)）;
@@ -85,8 +87,8 @@ voxtral_tts、wan2_2_ti2v
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from 5d44868e \
-  --to v0.26.0rc1 \
+  --from 807db6ef \
+  --to a4ea67a2 \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```

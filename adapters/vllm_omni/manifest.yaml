@@ -72,7 +72,7 @@ modules:
     wave: 1
     risk: high
   model_executor:
-    local_paths: [vllm_omni/model_executor/]
+    local_paths: [vllm_omni/model_executor/, vllm_omni/experimental/, vllm_omni/model_extras/]
     upstream_paths: [vllm/model_executor/]
     test_paths: [tests/model_executor/, tests/diffusion/, tests/e2e/offline_inference/]
     import_check: "from vllm_omni.model_executor.models.registry import *; print('Model Executor imports OK')"
@@ -92,13 +92,13 @@ modules:
     wave: 1
     risk: high
   online_serving:
-    local_paths: [vllm_omni/entrypoints/]
+    local_paths: [vllm_omni/entrypoints/, vllm_omni/engine/]
     upstream_paths: [vllm/entrypoints/]
     test_paths: [tests/entrypoints/test_async_omni.py, tests/entrypoints/test_async_omni_diffusion_config.py, tests/entrypoints/openai_api/]
     import_check: "from vllm_omni.entrypoints.omni import Omni; from vllm_omni.entrypoints.async_omni import AsyncOmni; from vllm_omni.entrypoints.openai.api_server import omni_run_server; from vllm_omni.entrypoints.openai.serving_speech import ServingSpeech; from vllm_omni.entrypoints.cli.serve import OmniServeCommand; print('Online Serving imports OK')"
     wave: 1
   model_config:
-    local_paths: [vllm_omni/config/, vllm_omni/engine/arg_utils.py]
+    local_paths: [vllm_omni/config/, vllm_omni/deploy/, vllm_omni/engine/arg_utils.py]
     upstream_paths: [vllm/config/, vllm/engine/arg_utils.py]
     test_paths: [tests/entrypoints/test_stage_utils.py, tests/metrics/test_stats.py]
     import_check: "from vllm_omni.config.model import OmniModelConfig; from vllm_omni.engine.arg_utils import OmniEngineArgs; print('Model Config imports OK')"

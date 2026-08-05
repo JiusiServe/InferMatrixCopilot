@@ -31,4 +31,6 @@ sources: ["claude-workflow-starter-private@296ea45"]
 - 不要再依赖或推荐已不存在的 `nullify_stage_engine_defaults`。
 - 增加或移动字段时，先决定它属于 orchestrator、shared 还是 per-stage engine，再修改唯一 owner 集合。
 - 至少覆盖：普通 parent field 被丢弃并对非默认值告警、no-warn field 被丢弃但不告警、allowlisted field 被保留、orchestrator-only field 不泄漏、stage-local 显式值覆盖顶层 fallback。
-- 真实行为以当前 checkout 的 `tests/engine/test_arg_utils.py` 和 `tests/test_config_factory.py` 为最低回归入口；如果 example 仍引用旧 helper，只能视为待清理调用点，不能作为现行合同。
+- 真实行为以当前 checkout 的 `tests/engine/test_arg_utils.py` 和
+  `tests/config/test_config_factory.py` 为最低回归入口；如果 example 仍引用旧 helper，
+  只能视为待清理调用点，不能作为现行合同。

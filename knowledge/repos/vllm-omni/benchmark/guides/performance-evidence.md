@@ -50,7 +50,7 @@ sources: ["PR #5052"]
 
 **PR Test Result 规范**：
 - 表格标题必须带输入口径，例如 `Official IT2I performance comparison`，不要只写 `Performance`。
-- 精度表必须写 reference，例如 `against tests/e2e/accuracy/assets/hunyuan_image_ref.png`。
+- 精度表必须写 reference，例如 `against tests/assets/hunyuan/hunyuan_image_ref.png`。
 - 速度表必须写 `model initialization excluded/included`。
 - 如果同一 PR 同时有 smoke 和 official e2e，smoke 放在最后，且标题写 `Compatibility smoke`。
 

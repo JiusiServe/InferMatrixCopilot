@@ -1,10 +1,10 @@
 ---
 title: "Scheduler 规则"
 created: 2026-07-16
-updated: 2026-07-31
+updated: 2026-08-05
 type: rule
 tags: [vllm-omni, components, scheduler]
-sources: ["vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, "PR #4106"]
+sources: ["vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, "PR #4106"]
 ---
 
 # Scheduler 规则
@@ -24,6 +24,8 @@ PR 描述先命中下表，再打开对应规则组和首批源码；changed fil
 | `max_num_batched_tokens`、prefill throttle、低预算 GPU hang | SCHED-2a | `core/sched/omni_ar_scheduler.py::OmniARScheduler.schedule`；`core/sched/omni_generation_scheduler.py::OmniGenerationScheduler.schedule`；触发它的 deploy/test 配置 |
 | vLLM bump、scheduler rebase、KV connector stats | SCHED-3a | 两个 scheduler 的 `schedule` / `update_from_output` 与 live upstream `vllm/v1/core/sched/` |
 | side-stream D2H、pinned host tensor、源 buffer 复用 | SCHED-4a/4b | `worker/gpu_ar_model_runner.py::_copy_tensor_payload_to_cpu`、`_get_or_create_omni_payload_copy_stream`；`core/prefix_cache.py` 的 async copy 路径 |
+| sampled-token logprobs、spec decode trim、request-local output error | SCHED-5a | `core/sched/omni_ar_scheduler.py::_slice_sampled_logprobs`、`update_from_output` |
+| stateful async chunk、full-payload input、KV cleanup | SCHED-5b/5c | `core/sched/omni_generation_scheduler.py`、`omni_scheduling_coordinator.py`、`omni_ar_scheduler.py::_free_request` |
 
 若描述只写模型症状，先从模型 owner 找到 payload producer/consumer；只有实际断点落在调度、
 prefix cache 或 copy lifetime 时才把 Scheduler 加为 owner。
@@ -145,6 +147,52 @@ modules=[online_serving, worker_runner]，status=active，run_count=38，2026-06
 - 禁止：先无条件构造 pinned tensor，失败后才关闭 async path。
 - 验收：CPU-only 环境能构造并走同步 fallback；CUDA 环境仍使用 pinned + async，两个
   分支产生相同内容。 ^[PR #4106]
+
+## SCHED-5a — sampled-token logprobs 先校验再修改 request
+
+- 触发：AR scheduler 消费 model-runner sampled tokens 和 `num_logprobs`，尤其是
+  spec-decode 或 batched output slicing。
+- 强制：按 request 切出 logprob rows，校验二维 shape、行数、第一 token 对齐和有限值；
+  失败只将当前 request 置为 `FINISHED_ERROR`，不能先 append token 或污染同批 request。
+  stop/EOS 截断后再按最终 emitted token 数重新 slice。
+- 禁止：`logprobs` 缺失时静默跳过；用 truthiness 判断合法空输出；把 runner 的错位
+  row 当作用户请求成功。
+- 验收：覆盖 missing、wrong shape/count、token misalignment、NaN、spec-decode trim
+  和同批健康 request 继续完成。
+
+## SCHED-5b — stateful async-chunk request 必须占用调度容量
+
+- 触发：模型在等待下一 chunk 时保留 runner state，或 full-payload connector 负责把下
+  一段重新送入 generation stage。
+- 强制：`retains_state_across_chunks` 为真时，把 connector 中等待 chunk 的 request
+  计入 `max_num_seqs`；full-payload consumer 在 chunk 到达时重新进入 waiting queue，
+  不要被 base scheduler 提前停放。
+- 禁止：只按 `running` list 计数导致超额 admission；把 connector-fed chunk 当成 API
+  streaming update；仅在 abort 路径释放 receiver。
+- 验收：mixed batch 覆盖等待 chunk 的容量上限、full-payload requeue、normal finish
+  的 receiver cleanup 和 abort/replica-loss cleanup。
+
+## SCHED-5c — stage-0 final request 的 KV transfer 例外必须显式标记
+
+- 触发：stage-0 的 text/final 输出通常不需要下游 KV，但 CFG companion 或其他终端
+  payload 仍需要复用该 cache。
+- 强制：用 `omni_force_kv_transfer` 等 request metadata 明确覆盖“final stage=0”的
+  shortcut；scheduler、engine 和 companion tracker 使用同一个标记语义。
+- 禁止：按 final stage id 静默跳过所有 stage-0 KV；只在 companion 的 producer 设置
+  标记而不测试 scheduler 的 transfer decision。
+- 验收：普通 stage-0-final request 不传 KV，标记 request 传 KV，且 metadata 在
+  `OmniARScheduler._request_omits_kv_transfer_to_next_stage` 中可读回。
+
+## SCHED-5d — CFG companion 必须成对推进，缺失时有限降级并终止等待
+
+- 触发：Audex/扩散 CFG companion、双 waiting queue、不同 chunk 进度或 companion
+  abort/split。
+- 强制：不完整 pair 暂存并按 parent/companion 对齐进度；完成时一起收敛，缺失或拆分
+  的 companion 只能走显式、有界的 fallback，并清理两侧状态。
+- 禁止：只推进 parent 让 companion 永久停在 waiting；把缺 companion 当普通 batch
+  请求静默放行；用无限等待掩盖 replica loss 或 abort。
+- 验收：覆盖完整 pair、不同进度、missing/split、parent abort 和 companion abort，
+  断言请求不会挂死、错误归属保持 request-local、队列和 connector state 都释放。
 
 ## 相关
 

@@ -61,7 +61,7 @@ sources: [vllm_omni/diffusion/models/gr00t/pipeline_gr00t.py, vllm_omni/diffusio
 pin 上有**位级回归**（对 Isaac-GR00T ZMQ 参考值 max_diff=0.0)——这是行为
 正确性 gate;无性能 gate;examples 缺失。
 
-- e2e：`tests/e2e/online_serving/test_gr00t_openpi.py`
+- e2e：`tests/e2e/online_serving/test_gr00t_openpi_expansion.py`
   （`GR00T_NOISE_SEED=42`,init 1200 s/stage 900 s,缺 `websockets`+
   `openpi_client` 即跳过）;测试客户端 `tests/gr00t/openpi_client_helper.py`;
   单测 `tests/diffusion/models/gr00t/test_pipeline.py`（stub policy,观测

@@ -1,7 +1,7 @@
 ---
 title: "测试分级（L1–L5）与 pytest markers"
 created: 2026-07-16
-updated: 2026-07-31
+updated: 2026-08-05
 type: guide
 tags: [vllm-omni, ci]
 sources: [docs/contributing/ci/test_system_overview.md, docs/contributing/ci/test_writing_guide.md]
@@ -10,7 +10,7 @@ sources: [docs/contributing/ci/test_system_overview.md, docs/contributing/ci/tes
 # 测试分级（L1–L5）与 pytest markers
 
 官方 spec：`docs/contributing/ci/test_system_overview.md` +
-`test_writing_guide.md`（`main @ 807db6ef` 复核）。测试金字塔五级 + Common 规范
+`test_writing_guide.md`（`v0.26.0 @ a4ea67a2` 复核）。测试金字塔五级 + Common 规范
 （PR 模板/checklist 与 CI 失败说明）。
 
 ## 五级定义

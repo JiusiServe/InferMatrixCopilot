@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-07-16
 type: guide
 tags: [general, ci]
-sources: ["#3297", "tests/e2e/accuracy/test_gebench_h100_smoke.py", "tests/e2e/accuracy/test_hunyuan_image3.py"]
+sources: ["#3297", "tests/e2e/accuracy/test_hunyuan_image3.py", "tests/e2e/accuracy/conftest.py"]
 ---
 
 # 规则：先看现有代码，再谈方案
@@ -16,13 +16,11 @@ sources: ["#3297", "tests/e2e/accuracy/test_gebench_h100_smoke.py", "tests/e2e/a
 - 讨论"用 CLIP-score 替代"、"改 GenBench 砍 it2i"、"采集 9 小时 baseline"
 - 写了 300 行方案对比文档
 
-结果用户直接去看仓库：
-```
-tests/e2e/accuracy/test_gebench_h100_smoke.py
-```
-**已经存在**，跑的就是 type3/type4 T2I，用 `/v1/images/generations`，judge 是 VLM-as-judge（Qwen2.5-VL-7B-Instruct），**零 mmdet/mmcv 依赖**。
-
-`--gebench-model` 还是 CLI 参数。加一行 `--gebench-model Tencent/HunyuanImage-3.0-Instruct` 就能跑。
+结果用户直接去看当前 target 的 `tests/e2e/accuracy/`：旧记录中的
+`test_gebench_h100_smoke.py` 和 `test_gedit_bench_h100_smoke.py` 已经删除；当前
+HunyuanImage3 的入口是 `tests/e2e/accuracy/test_hunyuan_image3.py`，并由
+`tests/e2e/accuracy/conftest.py` 提供仍然存在的 accuracy fixtures。旧的
+`--gebench-model` 路径不能再当作现行合同。
 
 我前面所有工作（踩 mmcv 坑、建 Py3.10 venv、写 GenEval 集成代码）全部白做。
 
@@ -45,23 +43,23 @@ tests/e2e/accuracy/test_gebench_h100_smoke.py
 | 目录 | 内容 |
 |---|---|
 | `tests/e2e/accuracy/` | 所有精度 CI 入口 |
-| `tests/e2e/accuracy/conftest.py` | fixture 和 CLI option（`--gebench-model`, `--gedit-model`, `--accuracy-judge-model` 等） |
-| `tests/e2e/accuracy/test_gebench_h100_smoke.py` | T2I 精度（type3/type4）用 VLM judge |
-| `tests/e2e/accuracy/test_gedit_bench_h100_smoke.py` | IT2I 精度，同款 judge 路径 |
+| `tests/e2e/accuracy/conftest.py` | 当前仍存在的 Wan2.2/HunyuanVideo accuracy fixtures 和 CLI options |
+| `tests/e2e/accuracy/test_hunyuan_image3.py` | HunyuanImage3 IT2I/COT 对齐入口 |
+| `tests/e2e/accuracy/test_hunyuan_image3_pixel_accuracy.py` | HunyuanImage3 像素精度入口 |
 | `tests/e2e/accuracy/helpers.py` | `reset_artifact_dir` 等 |
-| `vllm_omni/benchmarks/accuracy/text_to_image/gbench.py` | GEBench 实现（type3/type4 走 `/v1/images/generations`，type1/2/5 走 `/v1/images/edits`） |
 
 ## 下一次做新模型精度 CI
 
-抄 `test_gebench_h100_smoke.py`，改 `--gebench-model` 参数。完成。
-**除非有强理由**（比如新模型 T2I endpoint 不同、判据不同），否则不要考虑 GenEval / CLIP-score / 自研评分器。
+先从当前 `tests/e2e/accuracy/` 选择语义最接近的幸存者，读取它的 fixture、CLI
+选项和运行方式，再决定复用还是新增；不要假设历史 GEBench 文件或参数仍存在。
 
 ## 判据模板
 
 用户问"做 XX 精度 CI"时，先回答 3 个问题再提方案：
 1. 团队现有类似测试文件？叫什么名字？
 2. 它的 fixture 和 CLI option 我的模型能复用吗？
-3. 跑一下 `pytest --gebench-model <my-model>` 会发生什么？报错才说明需要改，没报错就结束了
+3. 跑一下当前幸存者的最小 pytest 入口会发生什么？只有现行路径的采集或运行错误
+   才说明需要改，不要为已删除的 slug 重建测试文件。
 
 ## HunyuanImage3 现成 IT2I accuracy pytest（2026-06-02）
 
