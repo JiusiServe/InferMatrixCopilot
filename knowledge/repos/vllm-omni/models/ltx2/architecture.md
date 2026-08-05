@@ -1,15 +1,15 @@
 ---
 title: "LTX-2/2.3 模型架构与证据索引"
 created: 2026-07-16
-updated: 2026-07-16
+updated: 2026-08-05
 type: architecture
 tags: [vllm-omni, models, ltx2]
-sources: [recipes/LTX/LTX-2.3.md, vllm_omni/diffusion/registry.py, "#4381", "#4464"]
+sources: [recipes/LTX/LTX-2.md, vllm_omni/diffusion/registry.py, "#4381", "#4464"]
 ---
 
 # LTX-2/2.3 模型架构与证据索引
 
-以下事实在 `main @ 5c390096` 复核（recipe 与 registry）。
+以下事实在 `v0.26.0 @ a4ea67a2` 复核（合并后的 recipe 与 live registry）。
 
 ## 结构与 serving
 
@@ -17,12 +17,15 @@ sources: [recipes/LTX/LTX-2.3.md, vllm_omni/diffusion/registry.py, "#4381", "#44
   T2V 与 I2V 皆可，输出带 48kHz 同步音频。验证建议从 96GB 级 GPU 起步
   （recipe 原文）。
 - serving 入口（LTX-2.3）：
-  `vllm serve dg845/LTX-2.3-Diffusers --omni --model-class-name LTX23Pipeline
-  --stage-init-timeout 600`；需要 `diffusers >= 0.38.0`（git 安装）。
-- pipeline 变体：常规单段（`LTX2Pipeline`/`LTX23Pipeline`）、I2V
-  （`*ImageToVideoPipeline`）、两段式（`LTX2TwoStagesPipeline`）与 DMD2 蒸馏
-  （`LTX2T2VDMD2Pipeline`/`LTX2I2VDMD2Pipeline`）；LTX-2.3 后处理复用 ltx2 的
-  `get_ltx2_post_process_func`。
+  `vllm serve diffusers/LTX-2.3-Diffusers --omni --stage-init-timeout 600`；统一
+  `LTX2Pipeline` 由 checkpoint metadata 选择 LTX-2 或 LTX-2.3 profile。
+- pipeline 变体：one-stage 使用 `LTX2Pipeline`，distilled two-stage 使用
+  `LTX2DistilledPipeline`，DMD2 使用 `LTX2T2VDMD2Pipeline`/
+  `LTX2I2VDMD2Pipeline`；T2V/I2V 通过是否提供 `image=` 选择，不再使用单独的
+  `*ImageToVideoPipeline` registry names。
+- Python `forward` 只允许 `req` 作为 positional argument，其他参数必须 keyword-only；
+  这对直接调用者和显式 `--model-class-name` 覆盖是 breaking change，CLI/HTTP recipe
+  已按 named fields 调用。
 - 单段 diffusion 模型不在 `OMNI_PIPELINES` registry（走
   `async_omni_engine.py` 的默认 diffusion stage 兜底），deploy 语义见
   [Config 组件](../../components/configuration/architecture.md)。

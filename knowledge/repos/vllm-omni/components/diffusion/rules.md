@@ -1,10 +1,10 @@
 ---
 title: "Diffusion 共享规则"
 created: 2026-07-20
-updated: 2026-07-31
+updated: 2026-08-05
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/distributed/hsdp.py]
+sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/offloader/]
 confidence: high
 ---
 
@@ -57,6 +57,20 @@ confidence: high
   到达 consumer。Cosmos3 的落地约束见
   [Cosmos3 规则](../../models/cosmos3/rules.md)。 ^[PR #5001]
 
+### DIFF-1c — async output 的 compute 与 output-ready 必须分成两个可观察阶段
+
+- 触发：把 diffusion D2H/SHM packing 移到 worker 后台线程，或修改
+  `ResultPumpThread`、`collective_rpc`、batch output split。
+- 强制：GPU compute 完成只释放下一次 forward；最终输出必须等 side-stream event、D2H
+  和 SHM packing 完成后再 resolve。`result_mq` 由唯一 pump reader 分发，batch 结果按
+  request 映射拆分；step-mode 保留同步路径。
+- 禁止：在 compute-done 时把未完成的 device tensor 当成最终 artifact；让多个线程同时
+  消费 result queue；用同步 `.cpu()` 掩盖 stream ordering 或让下一 step 重写源 buffer。
+- 验收：分别覆盖 compute-done、output-ready、RPC error、batch split 和 queue cleanup；
+  在非 CUDA/step-mode 下证明同步 fallback 仍可构造。首批测试看
+  `tests/diffusion/test_async_output_worker.py`、`test_result_pump.py` 和
+  `tests/diffusion/test_ipc_async.py`。
+
 ## Checkpoint 与分布式加载
 
 ### DIFF-2a — checkpoint remap 必须追到已注册且真实消费的目标
@@ -88,6 +102,18 @@ confidence: high
 - 验收：至少覆盖“只量化一个组件、其他组件保持 BF16”的真实构造与加载，逐层断言
   命中/排除集合，并验证 meta-device parameter 不会被提前 move。FLUX.2 的具体边界见
   [FLUX.2 规则](../../models/flux2/rules.md)。 ^[PR #5136]
+
+### DIFF-2d — distributed layerwise offload 只能选择一个一致的权重分片合同
+
+- 触发：新增 `enable_distributed_layerwise_offload`、`dlo_use_allgather`、模型
+  `OffloadPlan` 或 block discovery。
+- 强制：明确 rank 本地 CPU shard、固定双 GPU buffer、H2D/AllGather stream 和模型
+  block list 的 owner；`dlo_use_allgather=false` 走每 rank full-weight 路径，开启
+  AllGather 时不得再叠加已 DTensor-sharded 的 HSDP 参数。
+- 禁止：用 heuristic 找不到 block 时静默假装 offload 已启用；对 HSDP 参数二次分片；
+  把 CPU 内存、AllGather 同步和设备显存开销隐藏在一个泛化的 `enable_cpu_offload` 开关。
+- 验收：CPU/Gloo 单 rank 覆盖 DTensor wrapper、shard padding、双 buffer 和 disable
+  cleanup；配置测试覆盖 AllGather+HSDP 的明确失败及 no-AllGather 的允许路径。
 
 ## 质量阈值与资源辅助
 

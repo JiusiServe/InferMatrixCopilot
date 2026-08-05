@@ -41,8 +41,8 @@ extensions merely because they are absent from the common source.
   (per-file upstream created/updated dates, captured before the submodule's git
   history was removed — used for page frontmatter).
 - **Code-mirror pin:** the `knowledge/repos/vllm-omni/components/` source maps
-  are verified against vllm-omni `main @
-  807db6efd70ff2e9b55a63d6e1b0530e2b74f8f2`. The canonical machine baseline
+  are verified against vllm-omni `v0.26.0 @
+  a4ea67a21b20054dacc6e83952f9bd407e8ee4e7`. The canonical machine baseline
   is `adapters/vllm_omni/release_baseline.yaml`.
 
 ## Layout: general vs repo-specific

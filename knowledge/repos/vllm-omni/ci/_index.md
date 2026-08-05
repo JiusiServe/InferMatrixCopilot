@@ -1,10 +1,10 @@
 ---
 title: "vLLM-Omni CI"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-08-05
 type: index
 tags: [vllm-omni, ci]
-sources: []
+sources: [.buildkite/cuda/pipeline.yml, docs/contributing/ci/test_system_overview.md]
 ---
 
 # vLLM-Omni CI

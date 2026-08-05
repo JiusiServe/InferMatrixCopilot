@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni deploy YAML 实操"
 created: 2026-07-16
-updated: 2026-07-29
+updated: 2026-08-05
 type: guide
 tags: [vllm-omni, components, config]
 sources: ["claude-workflow-starter-private@296ea45", vllm_omni/deploy/]
@@ -11,7 +11,7 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/deploy/]
 
 面向"要给模型写/改部署配置"的场景；schema 语义 owner 是
 [Configuration](architecture.md)（本页不复制字段表）。
-`main @ 5c390096` 复核。
+`v0.26.0 @ a4ea67a2` 复核。
 
 ## 何时需要 YAML，何时 CLI 就够
 
@@ -34,13 +34,16 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/deploy/]
 - KV 记账外分配的模型考虑 `kv_cache_memory_bytes` pin（[CONF-2a](rules.md)）。
 - 争议以展开后最终配置为准（[CONF-3a](rules.md)）。
 
-## 代表样例（58 份 YAML 中的三类拓扑）
+## 代表样例（79 份 YAML 中的三类拓扑）
 
 - 单 stage diffusion：不进 `OMNI_PIPELINES`，通常无需 YAML（引擎默认兜底），需要
   固化参数时才写。
 - AR+DiT 两 stage：`glm_image.yaml`、`hunyuan_image3_{ar,dit,_moe}.yaml`。
 - thinker/talker(+code2wav) 多 stage：`qwen2_5_omni.yaml`（1×H100 验证）、
   `qwen3_omni_moe.yaml`（2×H100 验证）、`qwen3_tts.yaml`（+ 高并发/对齐器变体）。
+- Audex 四模式各有 2B/30B YAML：`audex_{tts,tta,thinker_only,s2s}{,_30b}.yaml`；
+  TTS/S2S 使用 streaming codec handoff，TTA 使用同步 full-payload XCodec，30B
+  必须显式选择 `_30b` 资源配置。
 
 ## 相关
 

@@ -59,7 +59,7 @@ sources: [vllm_omni/diffusion/models/soulx_singer/, vllm_omni/model_executor/mod
 - extra-body 面在 pipeline 类的 ClassVar（无 model_extras 文件）：SVS 收
   metadata/语言/control/max_merge_duration…出 `f0_shift`;SVC 收 wav/F0 路径
   出 `pitch_shift`（`auto_shift` 支持,SVC 移调 = `pitch_shift×5` 粗 F0 bin）。
-- 自动化测试仅见离线 e2e（`test_soulxsinger.py`）;本次调查未发现在线示例
+- 自动化测试仅见离线 e2e（`test_soulxsinger_expansion.py`）;本次调查未发现在线示例
   的 CI 覆盖。
 
 ## 什么时候查这里

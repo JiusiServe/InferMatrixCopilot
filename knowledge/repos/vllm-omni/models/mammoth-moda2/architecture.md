@@ -75,7 +75,7 @@ pin 上只有**功能/config 面**的验证入口,没有专门的精度基线或
 
 - e2e：`tests/e2e/offline_inference/test_mammoth_moda2_expansion.py`
   （t2i + AR）;config 单测
-  `tests/unit/mammoth_moda2/test_mammoth_moda2_config.py`;AR 图像理解示例
+  `tests/model_executor/models/mammoth_moda2/test_mammoth_moda2_config.py`;AR 图像理解示例
   `examples/offline_inference/mammothmodal2_preview/`。
 - 已知未决：runner 侧把 hidden 打进 `multimodal_output["latent"]` 的确切
   代码位、`Mammoth2DecoderLayer` 每层 moe 布线、DiT 去噪逐步数学——分析时

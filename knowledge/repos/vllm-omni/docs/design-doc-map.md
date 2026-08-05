@@ -1,7 +1,7 @@
 ---
 title: "官方设计文档地图（docs/design/**）"
 created: 2026-07-16
-updated: 2026-07-16
+updated: 2026-08-05
 type: guide
 tags: [vllm-omni, docs]
 sources: [docs/design/index.md, docs/design/architecture_overview.md]
@@ -9,7 +9,7 @@ sources: [docs/design/index.md, docs/design/architecture_overview.md]
 
 # 官方设计文档地图（docs/design/**）
 
-`main @ 5c390096` 复核。注意：官方 `docs/design/index.md` 只列了子集（Architecture
+`v0.26.0 @ a4ea67a2` 复核。注意：官方 `docs/design/index.md` 只列了子集（Architecture
 Overview、5 篇 feature、metrics、3 篇 module）；**完整树比索引大得多**——
 `feature/` 下还有 async_chunk、cache_dit、teacache、prefix_caching、7 篇并行策略、
 `omni_connectors/` 逐后端 spec 等未入索引的文档，找 spec 时直接 `ls docs/design/feature/`。

@@ -1,7 +1,7 @@
 ---
 title: "Scheduler（AR/生成请求调度）"
 created: 2026-07-16
-updated: 2026-07-31
+updated: 2026-08-05
 type: index
 tags: [vllm-omni, components, scheduler]
 sources: [vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/prefix_cache.py, docs/design/module/ar_module.md]
@@ -11,7 +11,7 @@ sources: [vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/prefix_cache
 
 - 源码入口：`vllm_omni/core/sched/`（`omni_ar_scheduler.py`、`omni_generation_scheduler.py`、
   `omni_scheduler_mixin.py`、`omni_scheduling_coordinator.py`）和 `vllm_omni/core/prefix_cache.py`
-- 源码校验：以上路径与下列类均已在 `main @ 807db6ef` 验证存在：`OmniARScheduler`（:50）、
+- 源码校验：以上路径与下列类均已在 `v0.26.0 @ a4ea67a2` 验证存在：`OmniARScheduler`（:50）、
   `OmniARAsyncScheduler`（:928）、`KVCacheTransferData`（:40）、`OmniGenerationScheduler`（:42）、
   `OmniSchedulerMixin`（:40）、`OmniTensorPrefixCache`（prefix_cache.py:33）
 - 官方设计文档：`docs/design/module/ar_module.md`（继承关系、请求流转图）

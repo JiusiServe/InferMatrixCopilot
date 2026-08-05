@@ -1,22 +1,22 @@
 ---
 title: "Rebase 工作流：分支、波次与失败路由"
 created: 2026-07-16
-updated: 2026-07-16
+updated: 2026-08-05
 type: guide
 tags: [vllm-omni, rebase]
-sources: ["vllm-omni-rebase-agent@122a9468:agent/config.py", "vllm-omni-rebase-agent@122a9468:config.sh", ".buildkite/rebase-pipeline.yaml"]
+sources: ["vllm-omni-rebase-agent@122a9468:agent/config.py", "vllm-omni-rebase-agent@122a9468:config.sh", ".buildkite/cuda/rebase-pipeline.yml"]
 ---
 
 # Rebase 工作流：分支、波次与失败路由
 
 运营事实来自 rebase-agent 配置快照（@122a9468，**可能漂移**）；仓库侧事实在
-`main @ 5c390096` 复核。运营系统以 rebase-agent 仓库为准，本页是知识树快照
+`v0.26.0 @ a4ea67a2` 复核。运营系统以 rebase-agent 仓库为准，本页是知识树快照
 （2026-07-16）。
 
 ## 分支与管线
 
 - 对齐分支 `dev/vllm-align`（目标合回 `main`）；专用 Buildkite 管线
-  `.buildkite/rebase-pipeline.yaml`（仓库侧）+ 运营管线 `vllm-omni-rebase`
+  `.buildkite/cuda/rebase-pipeline.yml`（仓库侧）+ 运营管线 `vllm-omni-rebase`
   （nightly 与 main CI）、`vllm-omni-release`（CI），org `vllm`；wheel 变体
   `cu130`；上次 rebase 的 vLLM 提交 pin
   `1acd67a795ebccdf9b9db7697ae9082058301657`。
