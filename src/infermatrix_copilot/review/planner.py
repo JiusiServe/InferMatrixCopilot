@@ -31,6 +31,10 @@ DEFAULT_STANDARD_LENSES = ("logic", "behavior")  # fail-safe pair, priority orde
 _DOC_SUFFIXES = (".md", ".rst", ".txt", ".adoc")
 _CONFIG_SUFFIXES = (".yaml", ".yml", ".toml", ".ini", ".cfg", ".json")
 _CONFIG_BASENAMES = ("dockerfile", "pyproject.toml", "setup.py", "setup.cfg")
+_ASSET_SUFFIXES = (
+    ".bmp", ".gif", ".ico", ".jpeg", ".jpg", ".mp3", ".mp4", ".pdf", ".png",
+    ".svg", ".webm", ".webp", ".wav",
+)
 _TEST_FILE = re.compile(r"(?:^|/)(?:test_[^/]*\.py|[^/]*_test\.py|conftest\.py)$")
 # header forms — `diff --git` is the ONLY header on binary/empty/mode-only
 # changes, so it must be parsed too or such files evade classification
@@ -54,6 +58,8 @@ def _unquote(path: str) -> str:
 def _classify_path(path: str) -> str:
     p = path.lower()
     base = p.rsplit("/", 1)[-1]
+    if p.endswith(_ASSET_SUFFIXES):
+        return "asset"
     if _TEST_FILE.search(p) or p.startswith(("test/", "tests/")) \
             or "/test/" in p or "/tests/" in p:
         return "test"
@@ -73,10 +79,13 @@ class DiffSignals:
     doc_files: tuple[str, ...] = ()
     test_files: tuple[str, ...] = ()
     config_files: tuple[str, ...] = ()
+    asset_files: tuple[str, ...] = ()
     code_files: tuple[str, ...] = ()
     high_risk_files: tuple[str, ...] = ()
     api_change_hints: tuple[str, ...] = ()   # `-` lines: changed/removed surface
     api_added: int = 0                        # `+` def/class/const: new surface
+    code_insertions: int = 0
+    code_deletions: int = 0
 
     @property
     def lines_changed(self) -> int:
@@ -86,12 +95,18 @@ class DiffSignals:
     def docs_only(self) -> bool:
         return bool(self.files) and len(self.doc_files) == len(self.files)
 
+    @property
+    def code_lines_changed(self) -> int:
+        return self.code_insertions + self.code_deletions
+
     def as_dict(self) -> dict:
         return {"files": len(self.files), "insertions": self.insertions,
                 "deletions": self.deletions, "code_files": len(self.code_files),
+                "code_lines_changed": self.code_lines_changed,
                 "test_files": len(self.test_files),
                 "doc_files": len(self.doc_files),
                 "config_files": len(self.config_files),
+                "asset_files": len(self.asset_files),
                 "high_risk_files": list(self.high_risk_files),
                 "api_change_hints": len(self.api_change_hints),
                 "api_added": self.api_added}
@@ -129,6 +144,7 @@ def diff_signals(diff_text: str,
     deletions, renames, binary and mode-only changes all count."""
     files: dict[str, str] = {}
     insertions = deletions = 0
+    code_insertions = code_deletions = 0
     api_hints: list[str] = []
     api_added = 0
     current_path = ""
@@ -164,8 +180,12 @@ def diff_signals(diff_text: str,
             continue
         if raw[0] == "+":
             insertions += 1
+            if current_kind == "code":
+                code_insertions += 1
         else:
             deletions += 1
+            if current_kind == "code":
+                code_deletions += 1
         if current_kind == "code" and _API_LINE.match(raw):
             if raw[0] == "-":
                 api_hints.append(f"{current_path}: `{raw[:120].strip()}`")
@@ -173,7 +193,7 @@ def diff_signals(diff_text: str,
                 api_added += 1
 
     by_kind: dict[str, list[str]] = {"doc": [], "test": [], "config": [],
-                                     "code": []}
+                                     "asset": [], "code": []}
     for path, kind in files.items():
         by_kind[kind].append(path)
     risky = tuple(sorted(p for p in files
@@ -181,9 +201,12 @@ def diff_signals(diff_text: str,
     return DiffSignals(
         files=tuple(files), insertions=insertions, deletions=deletions,
         doc_files=tuple(by_kind["doc"]), test_files=tuple(by_kind["test"]),
-        config_files=tuple(by_kind["config"]), code_files=tuple(by_kind["code"]),
+        config_files=tuple(by_kind["config"]),
+        asset_files=tuple(by_kind["asset"]),
+        code_files=tuple(by_kind["code"]),
         high_risk_files=risky, api_change_hints=tuple(api_hints),
-        api_added=api_added)
+        api_added=api_added, code_insertions=code_insertions,
+        code_deletions=code_deletions)
 
 
 def classify(sig: DiffSignals, settings: Any) -> tuple[str, str] | None:
@@ -192,10 +215,10 @@ def classify(sig: DiffSignals, settings: Any) -> tuple[str, str] | None:
     misparse degrades toward more review, never toward light."""
     if sig.docs_only:
         return "light", "docs-only diff"
-    if sig.lines_changed > settings.large_diff_lines \
-            or len(sig.files) > settings.large_diff_files:
-        return "full", (f"large diff: {sig.lines_changed} lines / "
-                        f"{len(sig.files)} files")
+    if sig.code_lines_changed > settings.large_diff_lines \
+            or len(sig.code_files) > settings.large_diff_files:
+        return "full", (f"large code diff: {sig.code_lines_changed} code "
+                        f"lines / {len(sig.code_files)} code files")
     if sig.high_risk_files:
         return "full", ("touches high-risk module paths: "
                         f"{list(sig.high_risk_files)}")

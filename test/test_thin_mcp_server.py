@@ -95,6 +95,7 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
         "first_review_checklist",
         "progress_update",
         "completion_gate",
+        "diagnostics",
     }
     assert review["mode"] == "direct"
     assert core.requests == []
@@ -160,6 +161,11 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
         ],
         "final_comment_count": 1,
         "if_missing": "partial_review",
+    }
+    assert set(review["diagnostics"]["timing_ms"]) == {
+        "routing",
+        "execution_budget",
+        "total",
     }
 
     update = mcp.tools["update_knowledge"](repo="owner/repo")
@@ -429,12 +435,14 @@ def test_strict_maps_to_old_eco_request_and_preserves_explicit_post(monkeypatch)
         review_depth="full",
     )
 
+    diagnostics = result.pop("diagnostics")
     assert result == {
         "run_id": "run-20260730-120000-abc123",
         "mode": "strict",
         "execution_mode": "eco",
         "post": True,
     }
+    assert set(diagnostics["timing_ms"]) == {"start_strict_review", "total"}
     assert core.requests == [{
         "kind": "pr_review",
         "repo": "vllm-omni",

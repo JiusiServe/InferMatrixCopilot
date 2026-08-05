@@ -123,6 +123,46 @@ def _local_diff_fallback(repo: Path, pr: int) -> tuple[str, str]:
 
 _LINKED_ISSUE = re.compile(r"(?:fix(?:es|ed)?|close[sd]?|resolve[sd]?)\s*:?\s*#(\d+)",
                            re.IGNORECASE)
+_BINARY_PATCH_SIZE = re.compile(r"^(literal|delta)\s+(\d+)\s*$")
+
+
+def _strip_binary_patches(diff_text: str) -> tuple[str, list[dict[str, object]]]:
+    """Replace bulky `GIT binary patch` bodies with a one-line summary.
+
+    GitHub's patch stream can inline multi-megabyte binary literals for assets.
+    Review agents need the file identity and byte sizes, not the encoded body.
+    """
+    lines = str(diff_text or "").splitlines(keepends=True)
+    out: list[str] = []
+    summaries: list[dict[str, object]] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if line.strip() != "GIT binary patch":
+            out.append(line)
+            i += 1
+            continue
+
+        sizes: list[dict[str, int | str]] = []
+        omitted_lines = 1
+        i += 1
+        while i < len(lines) and not lines[i].startswith("diff --git "):
+            m = _BINARY_PATCH_SIZE.match(lines[i].strip())
+            if m:
+                sizes.append({"kind": m.group(1), "bytes": int(m.group(2))})
+            omitted_lines += 1
+            i += 1
+
+        summaries.append({"sizes": sizes, "omitted_lines": omitted_lines})
+        size_text = ", ".join(
+            f"{item['kind']} {item['bytes']} bytes" for item in sizes
+        ) or f"{omitted_lines} lines"
+        out.append(
+            f"[BINARY PATCH OMITTED: {size_text}; "
+            f"{omitted_lines} diff lines]\n"
+        )
+
+    return "".join(out), summaries
 
 
 def _repo_full_name(ctx: StepContext, repo: str) -> str:
@@ -252,6 +292,18 @@ async def _pr_fetch_diff(ctx: StepContext) -> StepResult:
         ctx.trace.record("diff_fallback", pr=int(pr), detail=detail,
                          gh_error=gh_err[:200])
         diff_note = f" via {detail}"
+    raw_chars = len(out)
+    out, binary_summaries = _strip_binary_patches(out)
+    if binary_summaries:
+        ctx.trace.record(
+            "diff_binary_patches_omitted",
+            pr=int(pr),
+            count=len(binary_summaries),
+            raw_chars=raw_chars,
+            sanitized_chars=len(out),
+            summaries=binary_summaries[:10],
+        )
+        diff_note += f"; omitted {len(binary_summaries)} binary patches"
     ctx.state["diff_text"] = out
     # PR context bundle (design W1): description + discussion + linked issues —
     # the recall evidence a diff-only review structurally lacks. Degrades to a
