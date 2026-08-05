@@ -65,6 +65,7 @@ def test_signals_counts_and_classes():
     assert sig.test_files == ("tests/test_mod.py",)
     assert sig.doc_files == ("docs/guide.md",)
     assert sig.config_files == ("deploy/stage.yaml",)
+    assert sig.asset_files == ()
     assert not sig.docs_only
 
 
@@ -153,6 +154,20 @@ def test_rules_full_on_large_diff(settings):
     sig = diff_signals(_diff(*(f"src/f{i}.py" for i in range(9)),
                              lines_per_file=1))
     assert classify(sig, settings)[0] == "full"
+
+
+def test_rules_test_asset_heavy_diff_goes_gray_not_full(settings):
+    diff = (
+        _diff("src/a.py", "src/b.py", "src/c.py", lines_per_file=70)
+        + _diff("tests/test_a.py", "tests/test_b.py", lines_per_file=120)
+        + _diff("tests/assets/ref.txt", lines_per_file=160)
+        + _diff("tests/assets/ref.png", lines_per_file=1)
+    )
+    sig = diff_signals(diff)
+    assert sig.lines_changed > settings.large_diff_lines
+    assert len(sig.files) > settings.large_diff_files or sig.lines_changed > 400
+    assert sig.code_lines_changed <= settings.large_diff_lines
+    assert classify(sig, settings) is None
 
 
 def test_rules_full_on_high_risk_and_name_fallback(settings):

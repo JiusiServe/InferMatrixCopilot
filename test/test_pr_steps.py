@@ -366,6 +366,37 @@ def test_worktree_at_creates_and_reuses(git_repo, tmp_path):
     assert not ok and "failed" in detail
 
 
+def test_strip_binary_patches_preserves_headers_and_omits_body():
+    from infermatrix_copilot.engine.steps.pr.fetch import _strip_binary_patches
+
+    diff = (
+        "diff --git a/tests/ref.png b/tests/ref.png\n"
+        "new file mode 100644\n"
+        "GIT binary patch\n"
+        "literal 1771357\n"
+        "zcmW)ndpwi>`^S+qr_8D55JoF=Y7>RzF\n"
+        "literal 0\n"
+        "HcmV?d00001\n"
+        "diff --git a/src/a.py b/src/a.py\n"
+        "--- a/src/a.py\n+++ b/src/a.py\n"
+        "+code\n"
+    )
+
+    stripped, summaries = _strip_binary_patches(diff)
+
+    assert "diff --git a/tests/ref.png b/tests/ref.png" in stripped
+    assert "[BINARY PATCH OMITTED: literal 1771357 bytes, literal 0 bytes;" in stripped
+    assert "zcmW)" not in stripped
+    assert "+code" in stripped
+    assert summaries == [{
+        "sizes": [
+            {"kind": "literal", "bytes": 1771357},
+            {"kind": "literal", "bytes": 0},
+        ],
+        "omitted_lines": 5,
+    }]
+
+
 def test_fetch_diff_pins_pr_time_checkout(settings, trace, tmp_path, git_repo,
                                           monkeypatch):
     """pr.fetch_diff publishes repo_path pinned to the PR head (injected sha in

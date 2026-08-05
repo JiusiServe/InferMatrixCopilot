@@ -6,6 +6,7 @@ import os
 import re
 import signal
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -620,24 +621,32 @@ def build_mcp(
         requires explicit intent and server-side ``ALLOW_POST=1``.
         """
         def run() -> dict:
+            started = time.perf_counter()
             if not str(target).strip():
                 raise ValueError("target must not be empty")
             selected_mode = str(mode).strip().casefold() or "direct"
             if selected_mode not in {"direct", "strict"}:
                 raise ValueError("mode must be 'direct' or 'strict'")
             if selected_mode == "direct":
+                route_started = time.perf_counter()
                 routing = _direct_knowledge_routes(
                     repo,
                     title=title,
                     body=body,
                     changed_files=changed_files,
                 )
+                route_ms = int((time.perf_counter() - route_started) * 1000)
                 knowledge_routes = routing["routes"]
                 knowledge_entry = (
                     knowledge_routes[0]["path"]
                     if knowledge_routes
                     else _knowledge_entry("AGENTS.md")
                 )
+                budget_started = time.perf_counter()
+                execution_budget = _direct_execution_budget(
+                    changed_files or []
+                )
+                budget_ms = int((time.perf_counter() - budget_started) * 1000)
                 return {
                     "mode": "direct",
                     "knowledge_entry": knowledge_entry,
@@ -654,9 +663,7 @@ def build_mcp(
                         "stop_after_routes": True,
                         "fallback_entry": _knowledge_entry("AGENTS.md"),
                     },
-                    "execution_budget": _direct_execution_budget(
-                        changed_files or []
-                    ),
+                    "execution_budget": execution_budget,
                     "first_review_checklist": list(_DIRECT_REVIEW_CHECKLIST),
                     "progress_update": {
                         **_DIRECT_PROGRESS_UPDATE,
@@ -677,8 +684,18 @@ def build_mcp(
                         "final_comment_count": 1,
                         "if_missing": "partial_review",
                     },
+                    "diagnostics": {
+                        "timing_ms": {
+                            "routing": route_ms,
+                            "execution_budget": budget_ms,
+                            "total": int(
+                                (time.perf_counter() - started) * 1000
+                            ),
+                        }
+                    },
                 }
 
+            strict_started = time.perf_counter()
             request = _strict_review_request(
                 target, repo, post=post, review_depth=review_depth,
                 settings=core.settings)
@@ -693,6 +710,16 @@ def build_mcp(
                 "mode": "strict",
                 "execution_mode": "eco",
                 "post": request["post"],
+                "diagnostics": {
+                    "timing_ms": {
+                        "start_strict_review": int(
+                            (time.perf_counter() - strict_started) * 1000
+                        ),
+                        "total": int(
+                            (time.perf_counter() - started) * 1000
+                        ),
+                    }
+                },
             }
 
         return _guard(run)
@@ -712,28 +739,49 @@ def build_mcp(
         items or concrete minimality evidence. A ``partial_review`` result is
         not a completed Direct review.
         """
-        return _direct_completion_result(
+        started = time.perf_counter()
+        result = _direct_completion_result(
             subtraction_signal=subtraction_signal,
             subtraction=subtraction,
             minimality_proof=minimality_proof,
             final_comment_count=final_comment_count,
         )
+        result.setdefault("diagnostics", {})["timing_ms"] = {
+            "validate_direct_review": int(
+                (time.perf_counter() - started) * 1000
+            )
+        }
+        return result
 
     @mcp.tool()
     def get_review_result(run_id: str, offset: int = 0) -> dict:
         """Poll a Strict run and page its final report with ``next_offset``."""
-        return _guard(lambda: {
-            "mode": "strict",
-            **core.get_result(run_id, offset),
-        })
+        def run() -> dict:
+            started = time.perf_counter()
+            out = {"mode": "strict", **core.get_result(run_id, offset)}
+            out.setdefault("diagnostics", {})["timing_ms"] = {
+                "get_review_result": int(
+                    (time.perf_counter() - started) * 1000
+                )
+            }
+            return out
+
+        return _guard(run)
 
     @mcp.tool()
     def get_review_status(run_id: str) -> dict:
         """Return a Strict run's durable status and step progress."""
-        return _guard(lambda: {
-            "mode": "strict",
-            **core.get_status(run_id),
-        })
+        def run() -> dict:
+            started = time.perf_counter()
+            out = {"mode": "strict", **core.get_status(run_id)}
+            out.setdefault("diagnostics", {})["timing_ms"] = {
+                "get_review_status": int(
+                    (time.perf_counter() - started) * 1000
+                )
+            }
+            return out
+
+        return _guard(run)
 
     @mcp.tool()
     def update_knowledge(repo: str = "vllm-omni") -> dict:
