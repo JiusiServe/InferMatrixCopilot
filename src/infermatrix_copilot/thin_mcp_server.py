@@ -9,20 +9,14 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from .adapters import AdapterError, AdapterRegistry, RepoAdapter
 from .knowledge_docs import KnowledgeDocs, KnowledgeDocsError
 
 _ROOT = Path(__file__).resolve().parents[2]
 _KNOWLEDGE = _ROOT / "knowledge"
+_ADAPTERS = _ROOT / "adapters"
 _RUN_ROOT = Path.home() / ".infermatrix-copilot" / "host-review-runs"
 _STAGES = ("evidence", "gates", "review", "verify", "complete")
-_ROUTES = {
-    "vllm_omni/config/": "repos/vllm-omni/components/config/rules.md",
-    "vllm_omni/core/": "repos/vllm-omni/components/scheduler/rules.md",
-    "vllm_omni/entrypoints/": "repos/vllm-omni/components/serving/rules.md",
-    "vllm_omni/model_executor/": "repos/vllm-omni/components/model-executor/rules.md",
-    "vllm_omni/models/": "repos/vllm-omni/models/_index.md",
-    "vllm_omni/diffusion/": "repos/vllm-omni/components/diffusion/rules.md",
-}
 
 
 def _supported_repos() -> list[str]:
@@ -34,11 +28,32 @@ def _supported_repos() -> list[str]:
     )
 
 
-def _docs(repo: str) -> KnowledgeDocs:
+def _adapter_for_repo(repo: str) -> RepoAdapter | None:
+    try:
+        return AdapterRegistry(_ADAPTERS).resolve(name=repo)
+    except AdapterError:
+        return None
+
+
+def _repo_scope(repo: str) -> tuple[str, RepoAdapter | None]:
     repo = (repo or "vllm-omni").strip()
+    adapter = _adapter_for_repo(repo)
+    if adapter is not None:
+        repo_subdir = str(
+            (adapter.manifest.get("knowledge") or {}).get("repo_subdir") or "")
+        if repo_subdir.startswith("repos/"):
+            repo = repo_subdir.removeprefix("repos/").strip("/")
+    repo = repo.replace("_", "-")
     repo_dir = _KNOWLEDGE / "repos" / repo
     if not repo_dir.is_dir():
-        raise KnowledgeDocsError(f"unsupported knowledge repo: {repo}")
+        supported = ", ".join(_supported_repos()) or "(none)"
+        raise KnowledgeDocsError(
+            f"unsupported knowledge repo: {repo}. Supported: {supported}")
+    return repo, adapter
+
+
+def _docs(repo: str) -> KnowledgeDocs:
+    repo, _adapter = _repo_scope(repo)
     return KnowledgeDocs(_KNOWLEDGE, f"repos/{repo}")
 
 
@@ -57,20 +72,64 @@ def _knowledge_entry(name: str) -> str:
 
 
 def _review_knowledge(repo: str, changed_files: list[str]) -> list[dict]:
+    repo, adapter = _repo_scope(repo)
     docs = _docs(repo)
     paths = [
         "general/review/_index.md",
         f"repos/{repo}/rules.md",
+        f"repos/{repo}/_index.md",
         f"repos/{repo}/review/_index.md",
         f"repos/{repo}/review/guides/maintainer-pattern-routing.md",
     ]
-    if repo == "vllm-omni":
-        folded_files = [str(path).replace("\\", "/").casefold()
-                        for path in changed_files]
-        for prefix, doc in _ROUTES.items():
-            if any(prefix in path for path in folded_files):
+    if adapter is not None:
+        knowledge = adapter.manifest.get("knowledge") or {}
+        paths.extend(knowledge.get("briefing_docs") or [])
+        paths.extend(knowledge.get("briefing_docs_extra") or [])
+        routes = adapter.review_routes
+    else:
+        routes = []
+    routed: list[dict] = []
+    unmatched: list[str] = []
+    for changed_file in changed_files:
+        path = str(changed_file).replace("\\", "/")
+        folded = path.casefold()
+        hits = []
+        for route in routes:
+            prefix = str(route.get("prefix", "")).replace("\\", "/").casefold()
+            doc = str(route.get("doc", ""))
+            if prefix and doc and folded.startswith(prefix):
                 paths.append(doc)
+                hits.append({
+                    "path": path,
+                    "owner": route.get("owner") or prefix.rstrip("/"),
+                    "doc": doc,
+                })
+        if hits:
+            routed.extend(hits)
+        else:
+            unmatched.append(path)
     entries = []
+    if changed_files:
+        lines = ["# Changed-file routing", "", f"repo: {repo}", ""]
+        if routed:
+            lines.append("## Routed")
+            for item in routed:
+                lines.append(
+                    f"- `{item['path']}` -> {item['owner']} -> `{item['doc']}`")
+            lines.append("")
+        if unmatched:
+            lines.append("## Unmatched")
+            for path in unmatched:
+                lines.append(f"- `{path}`")
+            lines.append("")
+            lines.append(
+                "Unmatched changed paths remain reviewer-visible and must not "
+                "be treated as covered.")
+        entries.append({
+            "path": "changed-file-routing",
+            "content": "\n".join(lines).strip(),
+            "next_offset": None,
+        })
     for path in dict.fromkeys(paths):
         try:
             entries.append(docs.read(path, limit=24_000))
@@ -102,7 +161,7 @@ def _save_run(run: dict) -> None:
 
 def _require(artifact: dict, fields: tuple[str, ...]) -> None:
     if not isinstance(artifact, dict):
-        raise ValueError("artifact must be an object")
+        raise TypeError("artifact must be an object")
     missing = [name for name in fields
                if name not in artifact or artifact[name] is None
                or (isinstance(artifact[name], str) and not artifact[name].strip())]
@@ -311,18 +370,9 @@ def build_mcp():
                    limit: int = 20) -> dict:
         """Literal text search over knowledge; use entries for task routing."""
         def run() -> dict:
-            repo_dir = _KNOWLEDGE / "repos" / (repo or "vllm-omni").strip()
-            if not repo_dir.is_dir():
-                supported = ", ".join(_supported_repos()) or "(none)"
-                return {
-                    "error": (
-                        f"unsupported knowledge repo: {repo}. "
-                        f"Supported: {supported}. The repo argument selects a "
-                        "knowledge scope; put search terms in query."
-                    )
-                }
+            selected_repo, _adapter = _repo_scope(repo)
             matches = _docs(repo).search(query, limit=limit)
-            result = {"query": query, "repo": repo, "matches": matches}
+            result = {"query": query, "repo": selected_repo, "matches": matches}
             if not matches:
                 result["hint"] = (
                     "No literal text match. For review routing, call review and "

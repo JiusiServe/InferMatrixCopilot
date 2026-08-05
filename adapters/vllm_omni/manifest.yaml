@@ -11,6 +11,8 @@ repo:
   # takes precedence; this is only the fallback when no .env is in reach. Never
   # hardcode a machine-specific absolute path in this committed file.
   path: ${VLLM_OMNI_REPO}
+  full_name: vllm-project/vllm-omni
+  aliases: [vllm-omni, vllm_omni]
   default_branch: main
   rebase_branch: dev/vllm-align
   language: python
@@ -65,6 +67,26 @@ modules:
   benchmarks:
     local_paths: [benchmarks/]
     wave: 2
+
+review_routes:
+- prefix: vllm_omni/config/
+  owner: config
+  doc: repos/vllm-omni/components/configuration/rules.md
+- prefix: vllm_omni/core/
+  owner: scheduler
+  doc: repos/vllm-omni/components/scheduler/rules.md
+- prefix: vllm_omni/entrypoints/
+  owner: serving
+  doc: repos/vllm-omni/components/serving/rules.md
+- prefix: vllm_omni/model_executor/
+  owner: model-executor
+  doc: repos/vllm-omni/components/model-executor/rules.md
+- prefix: vllm_omni/models/
+  owner: models
+  doc: repos/vllm-omni/models/_index.md
+- prefix: vllm_omni/diffusion/
+  owner: diffusion
+  doc: repos/vllm-omni/components/diffusion/rules.md
 
 validation:
   test_manifest_sources: [.buildkite/]

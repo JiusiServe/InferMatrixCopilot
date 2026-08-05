@@ -109,6 +109,25 @@ class RepoAdapter:
         return expand_path(self.manifest.get("repo", {}).get("path", ""))
 
     @property
+    def aliases(self) -> set[str]:
+        """Names that may identify this adapter at the boundary.
+
+        The manifest's canonical `name` remains the primary id, but callers may
+        receive dashed aliases, GitHub `owner/repo` strings, or explicit aliases
+        declared in `repo.aliases`. Matching is case-insensitive.
+        """
+        repo = self.manifest.get("repo", {}) or {}
+        values = {self.name, self.name.replace("_", "-")}
+        values.update(str(alias) for alias in repo.get("aliases", []) or [])
+        if repo.get("full_name"):
+            values.add(str(repo["full_name"]))
+        return {value.casefold() for value in values if value}
+
+    def matches_name(self, name: str) -> bool:
+        """Return true when `name` is this adapter's canonical name or alias."""
+        return str(name).casefold() in self.aliases
+
+    @property
     def protected_branches(self) -> list[str]:
         """Branches a push may never target (defaults to `["main"]`) — read by the
         push authorization gate."""
@@ -128,6 +147,15 @@ class RepoAdapter:
                 if path.startswith(pattern.rstrip("*").rstrip("/")):
                     return module
         return None
+
+    @property
+    def review_routes(self) -> list[dict]:
+        """Changed-file review routes declared by the manifest.
+
+        Each item is data only, typically `{prefix, doc, owner}`. Runtime code
+        validates scope before reading the referenced docs.
+        """
+        return list(self.manifest.get("review_routes") or [])
 
     @property
     def high_risk_modules(self) -> list[str]:
@@ -284,7 +312,7 @@ class AdapterRegistry:
         adapters = self.all()
         if name:
             for p in adapters:
-                if p.name == name:
+                if p.matches_name(name):
                     return p
             raise AdapterError(f"no adapter named {name!r}")
         if repo_path:
@@ -301,7 +329,8 @@ def _git(repo: Path, *args: str) -> str:
     """Run `git <args>` in `repo` and return its stripped stdout — the read-only
     git helper the deterministic fingerprint uses."""
     out = subprocess.run(["git", *args], cwd=str(repo), capture_output=True,
-                         text=True, encoding="utf-8", errors="replace", timeout=30)
+                         text=True, encoding="utf-8", errors="replace", timeout=30,
+                         check=False)
     return out.stdout.strip()
 
 

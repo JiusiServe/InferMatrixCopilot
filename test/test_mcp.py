@@ -14,7 +14,7 @@ import pytest
 from infermatrix_copilot import run_status as rs
 from infermatrix_copilot.cli.copilot import Copilot
 from infermatrix_copilot.mcp_policy import PolicyError, enforce_mcp_policy
-from infermatrix_copilot.task_spec import READ_ONLY_KINDS, TaskSpec
+from infermatrix_copilot.task_spec import TaskSpec
 
 ALLOW = ["vllm-omni"]
 
@@ -261,6 +261,36 @@ def test_mcp_docs_are_repo_scoped(settings, tmp_path):
     assert "REPO SEARCH" in core.doc_read("repos/vllm-omni/rules.md")["content"]
     with pytest.raises(ValueError, match="outside the selected"):
         core.doc_read("repos/other/secret.md")
+    core.close()
+
+
+def test_mcp_docs_support_afd_plugin_scope(settings, tmp_path):
+    k = tmp_path / "knowledge"
+    (k / "general").mkdir(parents=True)
+    (k / "general" / "guide.md").write_text("GENERAL", encoding="utf-8")
+    (k / "repos" / "afd-plugin").mkdir(parents=True)
+    (k / "repos" / "afd-plugin" / "rules.md").write_text(
+        "AFD ONLY NEEDLE", encoding="utf-8")
+    (k / "repos" / "vllm-omni").mkdir(parents=True)
+    (k / "repos" / "vllm-omni" / "rules.md").write_text(
+        "OMNI SECRET", encoding="utf-8")
+    adapter = settings.adapters_dir / "afd_plugin"
+    adapter.mkdir(parents=True)
+    (adapter / "manifest.yaml").write_text(json.dumps({
+        "name": "afd_plugin",
+        "repo": {"path": str(tmp_path / "repo"),
+                 "aliases": ["afd-plugin"],
+                 "full_name": "vllm-project/afd-plugin"},
+        "knowledge": {"repo_subdir": "repos/afd-plugin"},
+    }), encoding="utf-8")
+    settings.knowledge_dir = k
+    settings.mcp_repo_allowlist = ["afd-plugin"]
+    core = _core(settings)
+    assert core.doc_search("AFD NEEDLE", repo="afd-plugin")["matches"]
+    assert "AFD ONLY" in core.doc_read("repos/afd-plugin/rules.md",
+                                       repo="afd-plugin")["content"]
+    with pytest.raises(ValueError, match="outside the selected"):
+        core.doc_read("repos/vllm-omni/rules.md", repo="afd-plugin")
     core.close()
 
 
