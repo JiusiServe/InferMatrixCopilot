@@ -1,0 +1,95 @@
+# Human-reviewed adapter for vllm-project/afd-plugin.
+name: afd_plugin
+status: active
+created_by: human
+schema_version: 1
+capabilities: [orchestrator.external]
+
+repo:
+  path: ${AFD_PLUGIN_REPO}
+  full_name: vllm-project/afd-plugin
+  aliases: [afd-plugin, afd_plugin, vllm-project/afd-plugin]
+  default_branch: main
+  language: python
+
+knowledge:
+  source: vllm-project/afd-plugin
+  repo_subdir: repos/afd-plugin
+  briefing_docs:
+  - repos/afd-plugin/rules.md
+  - repos/afd-plugin/_index.md
+
+modules:
+  compat:
+    local_paths: [afd_plugin/compat/]
+    wave: 1
+    risk: high
+  config_validation:
+    local_paths: [afd_plugin/config.py, afd_plugin/validation.py, afd_plugin/config_utils.py]
+    wave: 1
+    risk: high
+  connectors_distributed:
+    local_paths: [afd_plugin/connectors/, afd_plugin/distributed/]
+    wave: 1
+    risk: high
+  workers_runners:
+    local_paths: [afd_plugin/v1/worker/, afd_plugin/model_executor/]
+    wave: 1
+    risk: high
+  native_backends:
+    local_paths: [csrc/gpu/, csrc/npu/]
+    wave: 1
+    risk: high
+  tests:
+    local_paths: [tests/unit/, tests/e2e/]
+    wave: 2
+
+review_routes:
+- prefix: afd_plugin/compat/
+  owner: compat
+  doc: repos/afd-plugin/rules.md
+- prefix: afd_plugin/config.py
+  owner: config-validation
+  doc: repos/afd-plugin/rules.md
+- prefix: afd_plugin/validation.py
+  owner: config-validation
+  doc: repos/afd-plugin/rules.md
+- prefix: afd_plugin/config_utils.py
+  owner: config-validation
+  doc: repos/afd-plugin/rules.md
+- prefix: afd_plugin/connectors/
+  owner: connectors-distributed
+  doc: repos/afd-plugin/rules.md
+- prefix: afd_plugin/distributed/
+  owner: connectors-distributed
+  doc: repos/afd-plugin/rules.md
+- prefix: afd_plugin/v1/worker/
+  owner: workers-runners
+  doc: repos/afd-plugin/rules.md
+- prefix: afd_plugin/model_executor/
+  owner: workers-runners
+  doc: repos/afd-plugin/rules.md
+- prefix: csrc/gpu/
+  owner: native-backends
+  doc: repos/afd-plugin/rules.md
+- prefix: csrc/npu/
+  owner: native-backends
+  doc: repos/afd-plugin/rules.md
+- prefix: tests/unit/
+  owner: tests
+  doc: repos/afd-plugin/rules.md
+- prefix: tests/e2e/
+  owner: tests
+  doc: repos/afd-plugin/rules.md
+
+validation:
+  test_manifest_sources: [.github/workflows/]
+  precommit: true
+
+ci:
+  provider: github_actions
+
+push:
+  default_remote: origin
+  protected_branches: [main, master]
+  allowed: false

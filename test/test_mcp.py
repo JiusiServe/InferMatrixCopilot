@@ -329,6 +329,36 @@ def test_mcp_docs_are_repo_scoped(settings, tmp_path):
     core.close()
 
 
+def test_mcp_docs_support_afd_plugin_scope(settings, tmp_path):
+    k = tmp_path / "knowledge"
+    (k / "general").mkdir(parents=True)
+    (k / "general" / "guide.md").write_text("GENERAL", encoding="utf-8")
+    (k / "repos" / "afd-plugin").mkdir(parents=True)
+    (k / "repos" / "afd-plugin" / "rules.md").write_text(
+        "AFD ONLY NEEDLE", encoding="utf-8")
+    (k / "repos" / "vllm-omni").mkdir(parents=True)
+    (k / "repos" / "vllm-omni" / "rules.md").write_text(
+        "OMNI SECRET", encoding="utf-8")
+    adapter = settings.adapters_dir / "afd_plugin"
+    adapter.mkdir(parents=True)
+    (adapter / "manifest.yaml").write_text(json.dumps({
+        "name": "afd_plugin",
+        "repo": {"path": str(tmp_path / "repo"),
+                 "aliases": ["afd-plugin"],
+                 "full_name": "vllm-project/afd-plugin"},
+        "knowledge": {"repo_subdir": "repos/afd-plugin"},
+    }), encoding="utf-8")
+    settings.knowledge_dir = k
+    settings.mcp_repo_allowlist = ["afd-plugin"]
+    core = _core(settings)
+    assert core.doc_search("AFD NEEDLE", repo="afd-plugin")["matches"]
+    assert "AFD ONLY" in core.doc_read("repos/afd-plugin/rules.md",
+                                       repo="afd-plugin")["content"]
+    with pytest.raises(ValueError, match="outside the selected"):
+        core.doc_read("repos/vllm-omni/rules.md", repo="afd-plugin")
+    core.close()
+
+
 def test_exposed_tools_are_read_only_only(settings):
     pytest.importorskip("mcp")
     from infermatrix_copilot.mcp_server import build_mcp
