@@ -35,3 +35,5 @@ def test_installer_and_docs_expose_imupdate() -> None:
     assert '_install_skills(cursor_root / "skills")' in installer
     assert "$imupdate D:\\path\\to\\vllm-omni" in readme
     assert "$imupdate vllmomni" in readme
+    assert "$imdesign https://github.com/JiusiServe/InferMatrixCopilot/issues/46" in readme
+    assert "/imdesign <goal-or-issue-or-pr>" in readme

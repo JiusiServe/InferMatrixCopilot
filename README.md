@@ -7,6 +7,7 @@
 
 - `imreview`：审查 PR 或本地改动时，让 Agent 知道相关模型、组件和维护者规则，
   不只做一遍通用代码检查。
+- `imdesign`：写代码前先围绕 issue、PR 或粗略需求做协同设计，产出方案、边界和验证计划。
 - `imupdate`：vLLM-Omni 发版或目录变化后，对比新旧版本，更新
   InferMatrixCopilot 中容易过期的模型清单、registry、deploy、路径路由和 source pin。
 
@@ -36,13 +37,13 @@ install.cmd --repo-path D:\path\to\vllm-omni
 ./install-mcp.sh --repo-path /path/to/vllm-omni
 ```
 
-安装器会识别本机的 Codex、Claude Code 和 Cursor，并安装 MCP、`imreview` 和
-`imupdate` Skill。未识别到已知 Agent 时，会生成标准
+安装器会识别本机的 Codex、Claude Code 和 Cursor，并安装 MCP、`imreview`、
+`imdesign` 和 `imupdate` Skill。未识别到已知 Agent 时，会生成标准
 `infermatrix-copilot.mcp.json` 供其他 MCP 客户端导入。
 
-Codex 重启后用 `$imreview` / `$imupdate`，也可以先运行 `/skills` 查找；
+Codex 重启后用 `$imreview` / `$imdesign` / `$imupdate`，也可以先运行 `/skills` 查找；
 `/imreview` 不是 Codex 的 Slash Command。Claude Code 和 Cursor 仍使用
-`/imreview` / `/imupdate`。
+`/imreview` / `/imdesign` / `/imupdate`。
 
 安装器还会创建 `~/.infermatrix-copilot/.env`。Direct 不需要模型密钥；使用
 Strict 时，任选一种填写：
@@ -105,6 +106,21 @@ $imreview
 
 Agent 会先确认 PR 版本和 CI 状态，再继续读代码。审查结果只显示在当前对话，
 不会自动发到 GitHub。
+
+## 协同设计：`imdesign`
+
+```text
+# Codex
+$imdesign https://github.com/JiusiServe/InferMatrixCopilot/issues/46
+$imdesign 支持 co-design skill，并提供便捷入口
+
+# Claude Code / Cursor
+/imdesign <goal-or-issue-or-pr>
+```
+
+`imdesign` 会先读取 issue、PR 或本地相关代码，只产出协同设计包：问题、现状、
+方案、接口或配置变化、实施步骤、验证计划和风险。它不自动改代码；确认方案后再让
+Agent 继续实现。
 
 ## 更新知识：`imupdate`
 

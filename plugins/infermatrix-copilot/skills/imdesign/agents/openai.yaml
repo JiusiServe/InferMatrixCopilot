@@ -1,0 +1,4 @@
+interface:
+  display_name: "InferMatrix Design"
+  short_description: "Co-design a repository-grounded change before coding"
+  default_prompt: "Use $imdesign to co-design this change with repository context."
