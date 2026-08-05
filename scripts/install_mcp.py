@@ -399,9 +399,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print(f"Strict config: {strict_config}")
     print("Set ANTHROPIC_API_KEY or OPENAI_API_KEY there before Strict mode.")
     if "codex" in agents:
-        print("Codex: restart, then run: $imreview <PR URL> or $imupdate <repository>")
+        print(
+            "Codex: restart, then run: $imreview <PR URL>, "
+            "$imcifix <issue URL>, or $imupdate <repository>"
+        )
     if any(agent != "codex" for agent in agents):
-        print("Claude/Cursor: restart, then run: /imreview <PR URL> or /imupdate <repository>")
+        print(
+            "Claude/Cursor: restart, then run: /imreview <PR URL>, "
+            "/imcifix <issue URL>, or /imupdate <repository>"
+        )
     return 0
 
 
