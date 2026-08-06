@@ -13,74 +13,205 @@ repo:
   language: python
 
 knowledge:
-  source: vllm-project/afd-plugin
+  source: vllm-project/afd-plugin@a432692
   repo_subdir: repos/afd-plugin
   briefing_docs:
   - repos/afd-plugin/rules.md
   - repos/afd-plugin/_index.md
 
 modules:
-  compat:
-    local_paths: [afd_plugin/compat/]
+  plugin_boundary:
+    local_paths:
+    - afd_plugin/__init__.py
+    - afd_plugin/config.py
+    - afd_plugin/config_utils.py
+    - afd_plugin/envs.py
+    - afd_plugin/validation.py
+    - afd_plugin/py.typed
+    - afd_plugin/v1/__init__.py
+    - afd_plugin/v1/worker/__init__.py
+    - afd_plugin/v1/worker/npu/__init__.py
+    - pyproject.toml
     wave: 1
     risk: high
-  config_validation:
-    local_paths: [afd_plugin/config.py, afd_plugin/validation.py, afd_plugin/config_utils.py]
+  attention_runtime:
+    local_paths:
+    - afd_plugin/v1/worker/attention_model_runner.py
+    - afd_plugin/v1/worker/attention_worker.py
+    - afd_plugin/v1/worker/ubatch_wrapper.py
+    - afd_plugin/v1/worker/npu/attention_model_runner.py
+    - afd_plugin/v1/worker/npu/attention_worker.py
     wave: 1
     risk: high
-  connectors_distributed:
+  ffn_runtime:
+    local_paths:
+    - afd_plugin/v1/worker/ffn_model_runner.py
+    - afd_plugin/v1/worker/ffn_worker.py
+    - afd_plugin/v1/worker/npu/ffn_model_runner.py
+    - afd_plugin/v1/worker/npu/ffn_worker.py
+    wave: 1
+    risk: high
+  connectors:
     local_paths: [afd_plugin/connectors/, afd_plugin/distributed/]
     wave: 1
     risk: high
-  workers_runners:
-    local_paths: [afd_plugin/v1/worker/, afd_plugin/model_executor/]
+  model_integration:
+    local_paths: [afd_plugin/model_executor/]
     wave: 1
     risk: high
-  native_backends:
-    local_paths: [csrc/gpu/, csrc/npu/]
+  execution_platforms:
+    local_paths:
+    - afd_plugin/compat/profiler.py
+    - afd_plugin/compat/npu/forward_context.py
+    - afd_plugin/compat/npu/ops.py
+    - afd_plugin/compat/npu/profiler.py
+    - afd_plugin/v1/worker/cuda_graph.py
+    - afd_plugin/v1/worker/dbo.py
+    - afd_plugin/v1/worker/npu/forward_context.py
+    - afd_plugin/v1/worker/npu/mla_graph.py
+    - afd_plugin/v1/worker/npu/npu_ubatch_wrapper.py
+    - afd_plugin/v1/worker/npu/ubatch_utils.py
+    - afd_plugin/v1/worker/npu/ubatching.py
+    - csrc/
+    - setup.py
+    - MANIFEST.in
     wave: 1
     risk: high
-  tests:
-    local_paths: [tests/unit/, tests/e2e/]
-    wave: 2
+  compatibility:
+    local_paths: [afd_plugin/compat/]
+    wave: 1
+    risk: high
 
 review_routes:
-- prefix: afd_plugin/compat/
-  owner: compat
-  doc: repos/afd-plugin/rules.md
+- prefix: afd_plugin/__init__.py
+  owner: plugin-boundary
+  doc: repos/afd-plugin/components/plugin-boundary/rules.md
 - prefix: afd_plugin/config.py
-  owner: config-validation
-  doc: repos/afd-plugin/rules.md
+  owner: plugin-boundary
+  doc: repos/afd-plugin/components/plugin-boundary/rules.md
 - prefix: afd_plugin/validation.py
-  owner: config-validation
-  doc: repos/afd-plugin/rules.md
+  owner: plugin-boundary
+  doc: repos/afd-plugin/components/plugin-boundary/rules.md
 - prefix: afd_plugin/config_utils.py
-  owner: config-validation
-  doc: repos/afd-plugin/rules.md
+  owner: plugin-boundary
+  doc: repos/afd-plugin/components/plugin-boundary/rules.md
+- prefix: afd_plugin/envs.py
+  owner: plugin-boundary
+  doc: repos/afd-plugin/components/plugin-boundary/rules.md
+- prefix: afd_plugin/py.typed
+  owner: plugin-boundary
+  doc: repos/afd-plugin/components/plugin-boundary/rules.md
+- prefix: afd_plugin/v1/__init__.py
+  owner: plugin-boundary
+  doc: repos/afd-plugin/components/plugin-boundary/rules.md
+- prefix: afd_plugin/v1/worker/__init__.py
+  owner: plugin-boundary
+  doc: repos/afd-plugin/components/plugin-boundary/rules.md
+- prefix: afd_plugin/v1/worker/npu/__init__.py
+  owner: plugin-boundary
+  doc: repos/afd-plugin/components/plugin-boundary/rules.md
+- prefix: pyproject.toml
+  owner: plugin-boundary
+  doc: repos/afd-plugin/components/plugin-boundary/rules.md
+- prefix: afd_plugin/v1/worker/attention_model_runner.py
+  owner: attention-runtime
+  doc: repos/afd-plugin/components/attention-runtime/architecture.md
+- prefix: afd_plugin/v1/worker/attention_worker.py
+  owner: attention-runtime
+  doc: repos/afd-plugin/components/attention-runtime/architecture.md
+- prefix: afd_plugin/v1/worker/ubatch_wrapper.py
+  owner: attention-runtime
+  doc: repos/afd-plugin/components/attention-runtime/architecture.md
+- prefix: afd_plugin/v1/worker/npu/attention_model_runner.py
+  owner: attention-runtime
+  doc: repos/afd-plugin/components/attention-runtime/architecture.md
+- prefix: afd_plugin/v1/worker/npu/attention_worker.py
+  owner: attention-runtime
+  doc: repos/afd-plugin/components/attention-runtime/architecture.md
+- prefix: afd_plugin/v1/worker/ffn_model_runner.py
+  owner: ffn-runtime
+  doc: repos/afd-plugin/components/ffn-runtime/architecture.md
+- prefix: afd_plugin/v1/worker/ffn_worker.py
+  owner: ffn-runtime
+  doc: repos/afd-plugin/components/ffn-runtime/architecture.md
+- prefix: afd_plugin/v1/worker/npu/ffn_model_runner.py
+  owner: ffn-runtime
+  doc: repos/afd-plugin/components/ffn-runtime/architecture.md
+- prefix: afd_plugin/v1/worker/npu/ffn_worker.py
+  owner: ffn-runtime
+  doc: repos/afd-plugin/components/ffn-runtime/architecture.md
 - prefix: afd_plugin/connectors/
-  owner: connectors-distributed
-  doc: repos/afd-plugin/rules.md
+  owner: connectors
+  doc: repos/afd-plugin/components/connectors/architecture.md
 - prefix: afd_plugin/distributed/
-  owner: connectors-distributed
-  doc: repos/afd-plugin/rules.md
-- prefix: afd_plugin/v1/worker/
-  owner: workers-runners
-  doc: repos/afd-plugin/rules.md
+  owner: connectors
+  doc: repos/afd-plugin/components/connectors/architecture.md
 - prefix: afd_plugin/model_executor/
-  owner: workers-runners
-  doc: repos/afd-plugin/rules.md
-- prefix: csrc/gpu/
-  owner: native-backends
-  doc: repos/afd-plugin/rules.md
-- prefix: csrc/npu/
-  owner: native-backends
-  doc: repos/afd-plugin/rules.md
-- prefix: tests/unit/
-  owner: tests
-  doc: repos/afd-plugin/rules.md
-- prefix: tests/e2e/
-  owner: tests
-  doc: repos/afd-plugin/rules.md
+  owner: model-integration
+  doc: repos/afd-plugin/components/model-integration/architecture.md
+- prefix: afd_plugin/compat/profiler.py
+  owner: execution-platforms
+  doc: repos/afd-plugin/components/execution-platforms/architecture.md
+- prefix: afd_plugin/compat/npu/forward_context.py
+  owner: execution-platforms
+  doc: repos/afd-plugin/components/execution-platforms/architecture.md
+- prefix: afd_plugin/compat/npu/ops.py
+  owner: execution-platforms
+  doc: repos/afd-plugin/components/execution-platforms/architecture.md
+- prefix: afd_plugin/compat/npu/profiler.py
+  owner: execution-platforms
+  doc: repos/afd-plugin/components/execution-platforms/architecture.md
+- prefix: afd_plugin/v1/worker/cuda_graph.py
+  owner: execution-platforms
+  doc: repos/afd-plugin/components/execution-platforms/architecture.md
+- prefix: afd_plugin/v1/worker/dbo.py
+  owner: execution-platforms
+  doc: repos/afd-plugin/components/execution-platforms/architecture.md
+- prefix: afd_plugin/v1/worker/npu/forward_context.py
+  owner: execution-platforms
+  doc: repos/afd-plugin/components/execution-platforms/architecture.md
+- prefix: afd_plugin/v1/worker/npu/mla_graph.py
+  owner: execution-platforms
+  doc: repos/afd-plugin/components/execution-platforms/architecture.md
+- prefix: afd_plugin/v1/worker/npu/npu_ubatch_wrapper.py
+  owner: execution-platforms
+  doc: repos/afd-plugin/components/execution-platforms/architecture.md
+- prefix: afd_plugin/v1/worker/npu/ubatch_utils.py
+  owner: execution-platforms
+  doc: repos/afd-plugin/components/execution-platforms/architecture.md
+- prefix: afd_plugin/v1/worker/npu/ubatching.py
+  owner: execution-platforms
+  doc: repos/afd-plugin/components/execution-platforms/architecture.md
+- prefix: csrc/
+  owner: execution-platforms
+  doc: repos/afd-plugin/components/execution-platforms/architecture.md
+- prefix: setup.py
+  owner: execution-platforms
+  doc: repos/afd-plugin/components/execution-platforms/architecture.md
+- prefix: MANIFEST.in
+  owner: execution-platforms
+  doc: repos/afd-plugin/components/execution-platforms/architecture.md
+- prefix: afd_plugin/compat/patches/
+  owner: compatibility
+  doc: repos/afd-plugin/components/compatibility/rules.md
+- prefix: afd_plugin/compat/__init__.py
+  owner: compatibility
+  doc: repos/afd-plugin/components/compatibility/rules.md
+- prefix: afd_plugin/compat/vllm.py
+  owner: compatibility
+  doc: repos/afd-plugin/components/compatibility/rules.md
+- prefix: afd_plugin/compat/npu/__init__.py
+  owner: compatibility
+  doc: repos/afd-plugin/components/compatibility/rules.md
+- prefix: afd_plugin/compat/npu/feature_validation.py
+  owner: compatibility
+  doc: repos/afd-plugin/components/compatibility/rules.md
+- prefix: afd_plugin/compat/npu/runtime.py
+  owner: compatibility
+  doc: repos/afd-plugin/components/compatibility/rules.md
+- prefix: afd_plugin/compat/npu/runtime_config.py
+  owner: compatibility
+  doc: repos/afd-plugin/components/compatibility/rules.md
 
 validation:
   test_manifest_sources: [.github/workflows/]

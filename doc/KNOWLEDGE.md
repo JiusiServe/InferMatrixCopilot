@@ -44,6 +44,10 @@ extensions merely because they are absent from the common source.
   are verified against vllm-omni `main @
   807db6efd70ff2e9b55a63d6e1b0530e2b74f8f2`. The canonical machine baseline
   is `adapters/vllm_omni/release_baseline.yaml`.
+- **AFD code-mirror pin:** the `knowledge/repos/afd-plugin/components/` owner
+  maps and architecture summaries are verified against
+  `vllm-project/afd-plugin` `main @
+  a432692ed7d5dd6437a4755b530ee7aaf2685dad` (vLLM 0.26.0 baseline).
 
 ## Layout: general vs repo-specific
 The knowledge base separates the two, and so do we — the whole tree is **shared**,

@@ -2,7 +2,6 @@ from pathlib import Path
 
 from infermatrix_copilot.config import Settings
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -29,6 +28,7 @@ def test_source_runtime_defaults_have_strict_resources() -> None:
     assert (
         settings.adapters_dir / "vllm_omni" / "manifest.yaml"
     ).is_file()
+    assert (settings.adapters_dir / "afd_plugin" / "manifest.yaml").is_file()
     assert (
         settings.skills_dir / "code-quality-review" / "SKILL.md"
     ).is_file()
