@@ -1,7 +1,7 @@
 ---
 title: "BAGEL（统一模型多形态部署参照）"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-08-06
 type: index
 tags: [vllm-omni, models, diffusion]
 sources: [vllm_omni/model_executor/models/bagel/, vllm_omni/diffusion/models/bagel/, vllm_omni/deploy/bagel.yaml]
@@ -44,6 +44,7 @@ sources: [vllm_omni/model_executor/models/bagel/, vllm_omni/diffusion/models/bag
 | 遇到什么 | 查看哪里 | 说明 |
 |---|---|---|
 | KV 桥接、3 路 CFG、MoT、变体拓扑 | [architecture](architecture.md) | AR→DiT 数据流与 reviewer 陷阱 |
+| CFG position IDs、1-D/2-D multimodal RoPE、Lance 继承回归 | [rules](rules.md) | 可审计规则与验收条件 |
 
 ## 配置与 checkpoint 差异
 

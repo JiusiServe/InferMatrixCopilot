@@ -2,25 +2,25 @@ schema_version: 1
 
 upstream:
   repository: vllm-project/vllm-omni
-  previous_audited_sha: 5d44868e918ecf9d3a6f1158c45acfad5989e1a7
-  audited_ref: v0.26.0rc1
-  audited_sha: 807db6efd70ff2e9b55a63d6e1b0530e2b74f8f2
+  previous_audited_sha: 807db6efd70ff2e9b55a63d6e1b0530e2b74f8f2
+  audited_ref: v0.26.0
+  audited_sha: a4ea67a21b20054dacc6e83952f9bd407e8ee4e7
 
 # These fingerprints are generated from sorted registry/deploy inventories.
 # They make the baseline exact without duplicating hundreds of entries here.
 inventories:
   autoregressive:
-    count: 72
-    sha256: 79afac742125003b8d65a02e0e6b53398c4fc5f1c6e765fa8e1eb31f74871195
+    count: 77
+    sha256: 10e7850b0c7804f23ddffeb7cf5f2ad83c616d3977ec3b67eabab5c121564a49
   diffusion:
-    count: 61
-    sha256: f5c0b782cb98f20a9c7c77b696fda620a12d0899fd9e8abc9ccb696fe0c457e1
+    count: 58
+    sha256: 7dc6a5a373ca33a31a44961c1422008327cede3b364577fa095fd37c05ea2085
   pipelines:
-    count: 46
-    sha256: ce4f6edb8748e030f04bf7a6fe038231453cd1cd75f64311c898acff8c14b14b
+    count: 51
+    sha256: 8f567368a2a958fee2f89e4bce3ec20ec2e7a420bbdbab2fef9d65fb604e3ae8
   deploy_yamls:
-    count: 71
-    sha256: fb4c591580262a2dc8d03dd8c7fd681d98486f31007696d56adf349c24c25147
+    count: 79
+    sha256: fb75633eeeaadc4f421fd4d2ec62b03b04d9a9f48e959297d88ae51c20d51bc5
 
 # Structural review owners for changed upstream paths. This is deliberately
 # separate from manifest.modules: changing that runtime map alters rebase fan-out.
@@ -32,6 +32,8 @@ path_owners:
   - .buildkite/
   - .github/
   - docker/
+  comfyui:
+  - apps/ComfyUI-vLLM-Omni/
   configuration:
   - vllm_omni/config/
   - vllm_omni/deploy/
@@ -44,7 +46,6 @@ path_owners:
   - docs/
   - examples/
   - recipes/
-  - realtime_video_prompt_interaction_protocol.md
   model-executor:
   - vllm_omni/attention/
   - vllm_omni/experimental/
@@ -86,13 +87,16 @@ owner_documents:
   - knowledge/repos/vllm-omni/benchmark/_index.md
   ci:
   - knowledge/repos/vllm-omni/ci/_index.md
+  comfyui:
+  - knowledge/repos/vllm-omni/components/comfyui/rules.md
   configuration:
   - knowledge/repos/vllm-omni/components/configuration/rules.md
   diffusion:
   - knowledge/repos/vllm-omni/components/diffusion/rules.md
   distributed:
-  - knowledge/repos/vllm-omni/components/distributed/_index.md
+  - knowledge/repos/vllm-omni/components/distributed/rules.md
   documentation:
+  - knowledge/repos/vllm-omni/docs/rules.md
   - knowledge/general/docs/_index.md
   model-executor:
   - knowledge/repos/vllm-omni/components/model-executor/rules.md
@@ -124,6 +128,8 @@ ignored_paths:
   reason: legal metadata
 - pattern: README.md
   reason: repository overview
+- pattern: realtime_video_prompt_interaction_protocol.md
+  reason: deleted upstream documentation artifact
 - pattern: SECURITY.md
   reason: community metadata
 - pattern: setup.py
@@ -137,6 +143,7 @@ pin_documents:
 - doc/KNOWLEDGE.md
 - knowledge/repos/vllm-omni/models/catalog.md
 - knowledge/repos/vllm-omni/components/configuration/_index.md
+- knowledge/repos/vllm-omni/components/comfyui/_index.md
 - knowledge/repos/vllm-omni/components/diffusion/_index.md
 - knowledge/repos/vllm-omni/components/distributed/_index.md
 - knowledge/repos/vllm-omni/components/model-executor/_index.md

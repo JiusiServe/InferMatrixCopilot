@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni 文档"
 created: 2026-07-10
-updated: 2026-07-16
+updated: 2026-08-06
 type: index
 tags: [vllm-omni, docs]
 sources: []
@@ -21,5 +21,6 @@ sources: []
 
 | 遇到什么 | 查看哪里 |
 |---|---|
+| 发布版本、compatibility、CUDA/NPU pin 与支持声明同步 | [rules](rules.md) |
 | 判断 RFC 是否仍在进行 | [RFC status](rfcs/_index.md) |
 | 找上游官方设计文档与其知识树 owner | [design-doc map](design-doc-map.md) |

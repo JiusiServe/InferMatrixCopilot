@@ -45,7 +45,7 @@ modules:
     wave: 1
     risk: high
   model_executor:
-    local_paths: [vllm_omni/model_executor/]
+    local_paths: [vllm_omni/model_executor/, vllm_omni/experimental/, vllm_omni/model_extras/]
     wave: 1
     risk: high
   input_output:
@@ -56,17 +56,25 @@ modules:
     wave: 1
     risk: high
   online_serving:
-    local_paths: [vllm_omni/entrypoints/]
+    local_paths: [vllm_omni/entrypoints/, vllm_omni/engine/]
     wave: 1
   model_config:
-    local_paths: [vllm_omni/config/]
+    local_paths: [vllm_omni/config/, vllm_omni/deploy/]
     wave: 1
   platform:
     local_paths: [vllm_omni/platforms/]
     wave: 1
   benchmarks:
-    local_paths: [benchmarks/]
+    local_paths: [benchmarks/, vllm_omni/benchmarks/]
     wave: 2
+  diffusion:
+    local_paths: [vllm_omni/diffusion/]
+    wave: 1
+    risk: high
+  distributed:
+    local_paths: [vllm_omni/distributed/]
+    wave: 1
+    risk: high
 
 review_routes:
 - prefix: vllm_omni/config/

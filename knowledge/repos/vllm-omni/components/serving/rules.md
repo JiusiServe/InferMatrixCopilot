@@ -1,10 +1,10 @@
 ---
 title: "Serving 规则"
 created: 2026-07-20
-updated: 2026-07-31
+updated: 2026-08-05
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #3576", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5157", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/metrics/prometheus.py]
+sources: ["PR #3576", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5157", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/cfg_companion_tracker.py, vllm_omni/metrics/prometheus.py]
 confidence: high
 ---
 
@@ -36,6 +36,7 @@ confidence: high
 | `chat-multimodal-contract` | chat template kwargs、SDK flatten、text/audio response shape | `SERV-4c` + 命中模型规则 |
 | `endpoint-capability` | endpoint restriction、unsupported route、公开 400 | `SERV-4c`, `SERV-4d` |
 | `engine-lifecycle` | sleep/wake、partial stage/tag、ACK、generation admission | `SERV-5a`, `SERV-5b` |
+| `full-duplex` | duplex opt-in、stage prewarm/fence、async-chunk、CFG companion lifecycle | `SERV-6a`–`SERV-6c` |
 | `request-contract` | 请求字段、来源、冲突、dispatcher、consumer view | `SERV-4a`, `SERV-4b`, `SERV-4c`, `SERV-4d`, `SERV-4e`, `SERV-4f`, `SERV-4g`, `SERV-4h` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `SERV-0a`, `SERV-0b` |
 
@@ -191,6 +192,43 @@ confidence: high
 - 验收：失败 ACK 保留 sleeping 状态；支持 level-2 的 diffusion 路径仍能
   sleep → wake → generate，不支持的 stage 在调用 worker 前明确拒绝。
   ^[PR #4834] ^[PR #4905] ^[PR #4912]
+
+## Full-duplex 与 CFG companion 生命周期
+
+### SERV-6a — full-duplex 首次 stage submit 必须预热 async-chunk topology
+
+- 触发：full-duplex stage port、双工会话、async-chunk 或 stage fence 发生变化。
+- 强制：stage-0 的首次 `submit_initial` 在 async-chunk 开启时预热后续 stage 的
+  runtime/pool；每个 stage 保留自己的 fence、submit timestamp 和 request state。
+- 禁止：等到 duplex audio/control 事件真正抵达才首次启动下游 stage；用一个全局 fence
+  表示多 stage readiness；prewarm 失败后仍发布 generation-ready。
+- 验收：覆盖首次 stage-0 submit、后续 stage submit、重复 update 和 prewarm failure；
+  CPU/mock 测试必须证明 request state 与 stage pool 生命周期一致。
+
+### SERV-6b — CFG companion 输出要非破坏性聚合并在所有 teardown 路径清理
+
+- 触发：CFG companion、deferred parent、streaming terminal update、abort、stage error
+  或 replica loss。
+- 强制：parent re-submit 前 companion outputs 可重复读取；parent 只在全部 companion
+  完成后释放；companion error/abort 必须给 deferred parent 发送结构化错误，并由统一
+  cleanup 路径清理 parent、companion、tracker 和 stage-pool binding。
+- 禁止：用 destructive `pop` 让第二次 terminal update 丢 companion；只清 parent 不清
+  companion；companion 永久等待时静默挂起 parent。
+- 验收：覆盖正常全量完成、重复读取、companion error、parent abort、companion abort
+  和 replica loss，断言没有遗留 tracker state 或未完成的 deferred parent。
+
+### SERV-6c — duplex capability gate 必须区分未启用与配置失败
+
+- 触发：`session_mode=duplex`、`/v1/realtime?duplex=true`、runtime extension 或
+  duplex deploy configuration 发生变化。
+- 强制：入口只在明确的 duplex opt-in 下建立 handler；能力检查必须保留结构化配置
+  错误与“不支持该模式”的区别，session、request、stage fence、lease 和 ordered
+  mailbox 的生命周期必须在 disconnect、abort、expiry 与 replica loss 时一起终止。
+- 禁止：把所有 config-load exception 折叠成 `duplex unavailable`；用普通 streaming
+  handler 冒充持久 session；用全局 fence 或无界 pending input 替代 per-session bound。
+- 验收：覆盖未 opt-in、有效 opt-in、malformed config、stale fence、lease expiry、
+  disconnect 和 terminal response ordering；控制消息中的 dataclass/enum/tensor 必须
+  在发送前变成 JSON-safe 值。
 
 请求到 engine 的边界见 [Serving architecture](architecture.md)；公开协议通用检查见
 [review contracts](../../../../general/review/guides/reviewer-lens-contracts.md)。

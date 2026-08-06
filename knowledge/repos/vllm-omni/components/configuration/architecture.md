@@ -1,10 +1,10 @@
 ---
 title: "vLLM-Omni 配置构造架构"
 created: 2026-07-16
-updated: 2026-07-29
+updated: 2026-08-05
 type: architecture
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/stage_config.py, vllm_omni/diffusion/data.py]
+sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/diffusion/data.py]
 ---
 
 # vLLM-Omni 配置构造架构
@@ -90,7 +90,7 @@ structured 与 legacy 可以有不同的最终对象，但不能有不同的字�
 
 ## PipelineConfig 与 deploy YAML 的具体结构
 
-以下事实曾在 `main @ 5c390096` 复核；源码会变化，动手前仍须刷新 live 版本。
+以下事实在 `v0.26.0 @ a4ea67a2` 复核；源码会变化，动手前仍须刷新 live 版本。
 
 - **`PipelineConfig`**（模型的冻结 stage 拓扑）由模型的 `pipeline.py` 注册；
   **deploy YAML**（`vllm_omni/deploy/*.yaml`）只描述“这些 stage 怎么跑”。
