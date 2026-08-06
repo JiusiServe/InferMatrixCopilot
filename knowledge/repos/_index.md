@@ -1,7 +1,7 @@
 ---
 title: "仓库经验入口"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-08-06
 type: index
 tags: [vllm-omni, afd-plugin]
 sources: []

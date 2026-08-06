@@ -16,14 +16,23 @@ def test_thin_mcp_routes_afd_changed_files_and_keeps_unmatched_visible():
     ])
 
     routing = _entry(entries, "changed-file-routing")["content"]
-    assert "compat" in routing
-    assert "connectors-distributed" in routing
-    assert "workers-runners" in routing
-    assert "native-backends" in routing
-    assert "tests" in routing
+    assert "compatibility" in routing
+    assert "connectors" in routing
+    assert "attention-runtime" in routing
+    assert "execution-platforms" in routing
+    assert "tests/e2e/features/test_serving_npu.py" in routing
     assert "docs/design/module/index.md" in routing
     assert "must not be treated as covered" in routing
     assert any(item["path"] == "repos/afd-plugin/rules.md" for item in entries)
+    assert any(
+        item["path"] == "repos/afd-plugin/components/compatibility/rules.md"
+        for item in entries
+    )
+    assert any(
+        item["path"]
+        == "repos/afd-plugin/components/execution-platforms/architecture.md"
+        for item in entries
+    )
 
 
 def test_thin_mcp_routes_vllm_omni_from_manifest_not_core_branch():

@@ -1,15 +1,22 @@
 ---
-title: "afd-plugin 硬门禁"
+title: "AFD plugin 仓库规则"
 created: 2026-08-05
-updated: 2026-08-05
+updated: 2026-08-06
 type: rule
 tags: [afd-plugin, review, config, distributed, model-executor]
-sources: ["vllm-project/afd-plugin:AGENTS.md", "vllm-project/afd-plugin:README.md", "vllm-project/afd-plugin:pyproject.toml", "vllm-project/afd-plugin:.github/workflows/cpu-only-ci.yml", "vllm-project/afd-plugin:.agents/skills/run-e2e/SKILL.md"]
+sources:
+  - "afd-plugin@a432692:AGENTS.md"
+  - "afd-plugin@a432692:README.md"
+  - "afd-plugin@a432692:pyproject.toml"
+  - "afd-plugin@a432692:afd_plugin/v1/worker/npu/mla_graph.py"
+  - "afd-plugin@a432692:tests/unit/v1/worker/test_npu_mla_graph.py"
+  - "afd-plugin@a432692:.github/workflows/cpu-only-ci.yml"
+  - "afd-plugin@a432692:.agents/skills/run-e2e/SKILL.md"
 ---
 
-# afd-plugin 硬门禁
+# AFD plugin 仓库规则
 
-只在当前任务明确属于 `vllm-project/afd-plugin` 时应用本页。先按 [afd-plugin 入口](_index.md) 确认仓库身份，再结合 [通用 review 入口](../../general/review/_index.md) 做常规审查。
+只在当前任务明确属于 `vllm-project/afd-plugin` 时应用本页。先按 [AFD 入口](_index.md) 确认仓库身份，再结合 [组件 owner](components/_index.md) 读取最近专项页面。插件入口与 patch 的细化规则已分别路由到 [plugin-boundary rules](components/plugin-boundary/rules.md) 和 [compatibility rules](components/compatibility/rules.md)。
 
 ## 1. 仓库身份和权威来源
 
@@ -17,20 +24,20 @@ sources: ["vllm-project/afd-plugin:AGENTS.md", "vllm-project/afd-plugin:README.m
 - AFD-1b：AFD 仓库自己的 `AGENTS.md`、`CLAUDE.md`、`.agents/skills/run-e2e/SKILL.md`、CI workflow 和仓库脚本是权威来源；InferMatrixCopilot 只做只读路由、提示和证据组织。
 - AFD-1c：默认路径保持只读；不能自动发 PR 评论、push、改 protected branch，不能要求 AFD runtime 行为因为本 adapter 初始化而改变。
 
-## 2. 兼容范围和插件边界
+## 2. 上游兼容和历史证据边界
 
-- AFD-2a：兼容结论必须精确写当前声明的 runtime：vLLM `0.19.1`；Ascend NPU baseline 是 vLLM-Ascend `0.19.1rc1`、CANN/NNAL `8.5.1`、torch/torch-npu `2.9.0`。不得推断更宽版本范围。
-- AFD-2b：AFD 通过 `vllm.general_plugins` entry point、`VLLM_PLUGINS`、`additional_config["afd"]`、自动 worker 选择、plugin-owned model wrapper 和窄 compatibility shim 生效；不得建议新增独立 `--afd-config` 之类的公开入口。
-- AFD-2c：`additional_config["afd"]` 之外的 connector 私有字段必须进入 `connector_extra_config`，并由对应 connector parser 校验；未知 AFD 顶层字段应暴露为错误，而不是静默透传。
-- AFD-2d：没有 `additional_config["afd"]` 时必须保持非 AFD 路径隔离；非 AFD 请求、worker、模型和上游 vLLM 行为不能被 AFD patch 或自动选择污染。
+- AFD-2a：兼容结论必须精确写当前声明的 runtime：vLLM `0.26.0`；Ascend NPU 以 vLLM-Ascend source commit `80d8c194f` 及与该 snapshot 匹配的 CANN/torch/torch-npu 环境为证据。仓库未声明 released vLLM-Ascend v0.26 package/container，不得推断更宽版本范围。
+- AFD-2e：当前 DeepSeek-V3.2 NPU PCP8 recipe 是 `v0.19.1rc1` 历史实验，不是 v0.26 启动样例；不得把旧 recipe、旧镜像或 PCP 部署当作 v0.26 model-runner-v1 支持证据。
 
-## 3. Patch、connector 和 worker review
+## 3. Connector、worker 和平台 review
 
-- AFD-3a：`afd_plugin/compat/` patch 必须 upstream-first：复制目标 tag 的上游函数，保持函数签名和返回类型，使用 `# ### PATCH START` / `# ### PATCH END` 标出 AFD 差异，并写清 patch reason、功能变化和移除或 upstream 计划。
-- AFD-3b：不得用宽泛 `getattr`、`hasattr`、`Any`、`object` 或 `_original_*` delegation 掩盖上游 API 漂移；只有 AGENTS 明确允许的例外才可使用，并必须在 patch 注释说明原因。
 - AFD-3c：`afd_plugin/connectors/`、`afd_plugin/distributed/` 改动必须审 rank 布局、attention/ffn 数量约束、同步/异步语义、端口/host、进程组生命周期、资源 cleanup 和跨 role 同步失败路径。
 - AFD-3d：`afd_plugin/v1/worker/`、`afd_plugin/model_executor/` 改动必须审自动 worker 选择、role-specific runner、Attention/FFN 组件加载边界、scheduler-driven FFN fail-fast、CUDA/ACL graph 模式和 DBO/ubatch 条件。
 - AFD-3e：`csrc/gpu/`、`csrc/npu/` 改动必须区分 CUDA 与 Ascend CANN/ACLNN toolchain；NPU op 构建只能在明确 Ascend 环境或显式 `AFD_BUILD_ASCEND_OPS=1` 下作为证据。
+- AFD-3f：CUDA `P2pNcclAFDConnector` 只允许 eager 或 `FULL_DECODE_ONLY` CUDA Graph；原生 DBO 只允许两个 ubatch。改 graph/DBO 路径时必须证明 Attention 控制面先传 stage metadata、FFN graph key/cache 与 connector state 在 capture/replay 中一致，其他组合必须在运行前拒绝。
+- AFD-3g：Ascend `CAMP2pAFDConnector` 只允许 eager 或 `FULL_DECODE_ONLY` ACL Graph；原生 DBO 只允许两个 ubatch，common 和 connector-local `compute_gate_on_attention` 都必须为 `false`，`quant_mode` 必须为 `0`，并且运行前必须存在 plugin CANN ops。
+- AFD-3h：Ascend `CAMAsyncAFDConnector` 只支持 eager prefill；必须拒绝 vLLM 原生 DBO。可选 `async_moe_ubatching` 是独立的两阶段 request-boundary pipeline，不得当作原生 DBO；当前 v0.26 硬件声明只覆盖 no-PCP `2A2F` DeepSeek-V2-Lite，且要求 `async=true`、common `compute_gate_on_attention=true`、`dynamicQuant` 为 `0` 或 `1`。
+- AFD-3i：Ascend MLA + 原生 DBO Full Graph 修改必须同时保持两个 ubatch、`FULL_DECODE_ONLY` 和禁用 speculative decoding 的门禁；每个 stage 独立捕获 `GraphParams`，回放前按 layer-major/stage-minor 合并，AFD 上下文外必须回退到上游 resolver。
 
 ## 4. 验证和证据
 

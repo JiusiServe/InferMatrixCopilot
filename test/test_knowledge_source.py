@@ -160,3 +160,27 @@ def test_real_setup_separates_general_and_repo_specific():
     repo = adapter.briefing(s.knowledge_dir)
     assert repo and "zuiho-kai" in repo
     assert not (Path(s.adapters_dir) / "vllm_omni" / "profile").exists()
+
+
+def test_real_afd_setup_loads_only_its_repo_slice(monkeypatch, tmp_path):
+    from infermatrix_copilot.adapters.base import load_adapter
+    from infermatrix_copilot.config import Settings
+
+    monkeypatch.setenv("AFD_PLUGIN_REPO", str(tmp_path))
+    s = Settings(_env_file=None)
+    if not (s.knowledge_dir / "repos" / "afd-plugin").exists():
+        pytest.skip("AFD knowledge slice not checked out")
+
+    adapter = load_adapter(Path(s.adapters_dir) / "afd_plugin")
+    assert adapter.manifest["knowledge"]["repo_subdir"] == "repos/afd-plugin"
+    briefing = adapter.briefing(s.knowledge_dir)
+    assert "AFD-1a" in briefing
+    assert "AFD plugin 仓库知识入口" in briefing
+
+    tools = _repo_docs_tool(_ctx(s.knowledge_dir), adapter)
+    assert "AFD-2b" in tools["doc_read"].handler(
+        path="repos/afd-plugin/components/plugin-boundary/rules.md"
+    )
+    assert "outside the selected" in tools["doc_read"].handler(
+        path="repos/vllm-omni/rules.md"
+    )
