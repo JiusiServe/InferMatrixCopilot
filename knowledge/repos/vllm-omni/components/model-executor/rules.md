@@ -1,10 +1,10 @@
 ---
 title: "Model Executor 规则"
 created: 2026-07-10
-updated: 2026-08-05
+updated: 2026-08-06
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/engine/stage_init_utils.py, tests/worker/test_omni_gpu_model_runner.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/experimental/fullduplex/, tests/e2e/features/fullduplex/, "PR #3642", "PR #4730", "claude-workflow-starter-private@09dca46"]
+sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, vllm_omni/engine/stage_init_utils.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_omni_connector_mixin.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/experimental/fullduplex/, tests/e2e/features/fullduplex/, docs/design/feature/omni_async_output_materialization.md, "PR #3642", "PR #4730", "PR #5610", "PR #5744", "claude-workflow-starter-private@09dca46"]
 ---
 
 # Model Executor 规则
@@ -21,6 +21,8 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 | stage TP/PP/DP、devices、replica、visible devices、worker 启动、容量 fail-fast | `stage-runtime`：本页“Stage 并行度和设备容量必须一起验收” | `vllm_omni/config/stage_config.py::build_stage_runtime_overrides` → `vllm_omni/engine/stage_runtime.py::{StageRuntime.initialize,StageRuntime._resolve_replica_physical_devices}` → `stage_engine_startup.py::{launch_stage_replica,get_headless_replica_devices}` |
 | `runtime_info`、`OmniOutput`、multimodal payload、跨 stage bridge、batch 串线 | `bridge-batch`：`EXEC-1a`, `EXEC-1b` | `vllm_omni/worker/gpu_model_runner.py::{extract_multimodal_outputs,_gather_runtime_additional_information,_build_model_kwargs_extra}` → `vllm_omni/model_executor/stage_input_processors/<命中模型>` |
 | loader dtype、只取 checkpoint config、避免整仓权重下载 | `loader-contract`：`EXEC-2a` | `vllm_omni/model_executor/model_loader/weight_utils.py::download_weights_from_hf_specific` → `vllm_omni/model_executor/models/<命中模型>` loader |
+| payload connector、KV-only sender、`custom_process_next_stage_input_func` | `payload-connector-ownership`：`EXEC-5a` | `vllm_omni/worker/omni_connector_model_runner_mixin.py::{_should_create_payload_connector,initialize_omni_connector}` → payload I/O callers |
+| async output、output builder、step snapshot、connector signal drain | `async-output-materialization`：`EXEC-5b` | `vllm_omni/worker/gpu_ar_model_runner.py::{_should_use_async_omni_output,execute_model,_build_omni_output}` |
 
 | 审查组 | 什么时候触发 | 规则 ID |
 |---|---|---|
@@ -28,6 +30,8 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 | `strict-stage-config` | stage schema、projection、known fields | `EXEC-3a` |
 | `bridge-batch` | runtime info、跨 stage payload、batch | `EXEC-1a`, `EXEC-1b` |
 | `loader-contract` | dtype、checkpoint config 获取、loader | `EXEC-2a` |
+| `payload-connector-ownership` | payload connector、KV-only sender、next-stage hook | `EXEC-5a` |
+| `async-output-materialization` | async output、snapshot、connector signal drain | `EXEC-5b` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `EXEC-0a`, `EXEC-0b` |
 
 ## 严格配置校验
@@ -76,6 +80,33 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
   generic runner policy 替换 MiniCPM/Audex 等模型自己的 native policy。
 - 验收：覆盖 blank override、多子目录 checkpoint、hook 调用顺序和 mixed-batch
   request-local metadata；初始化失败必须在 scheduler/worker 继续运行前暴露。
+
+### EXEC-5a — payload connector 的 ownership 与 KV transfer 角色分开判定
+
+- 触发：runner 初始化 payload connector，修改 sender/receiver 角色、KV transfer 配置，
+  或设置 `custom_process_next_stage_input_func`。
+- 强制：receiver 始终拥有 payload connector；sender 只有在配置了非空的
+  `custom_process_next_stage_input_func` 时才拥有它。connector 的构造、启动、发送、接收
+  和清理必须复用同一 ownership 判定，缺失 connector 的路径显式保持 no-op。
+- 禁止：因为 stage 是 KV sender 就顺带构造 payload connector；让 KV-only sender 启动
+  payload I/O；只在初始化处加条件、下游调用仍无条件解引用 connector。
+- 验收：参数化覆盖 receiver/无 hook、sender/无 hook、sender/有 hook 三种组合，分别断言
+  ownership 和 payload I/O 调用次数；KV-only sender 不创建 connector，receiver 和带 hook
+  的 sender 保持原行为。 ^[PR #5744]
+
+### EXEC-5b — deferred Omni output 必须先冻结 step 状态并唯一消费 connector 信号
+
+- 触发：AR runner 把 Omni output materialization 推迟到后台 builder，或修改 async-output
+  feature gate、输出累积与 connector signal 的交接时序。
+- 强制：提交后台任务前复制本 step 拥有的 scheduler output、request IDs/映射、token 和
+  logprob 等可变容器；builder 是该 cycle 唯一 drain connector signal 的 owner，并在输出
+  累积完成后消费。只在 async scheduling、`async_chunk` 和模型 opt-in 同时成立，且未启用
+  prefix cache、spec decode、routed experts 或不兼容 postprocess 时启用异步路径。
+- 禁止：后台任务读取下一 step 会复用或原地修改的 runner 容器；同步路径和 builder 对同一
+  signal 各 drain 一次；把 GPU runner 的 feature gate 泛化成 NPU 或其他未走该调用链的
+  平台支持声明。
+- 验收：提交后原地修改 runner 状态不改变已排队输出；connector signal 在累积后恰好消费
+  一次；逐项翻转每个 guard 都回退到同步路径，NPU 覆盖仍保持同步。 ^[PR #5610]
 
 ## Runner 到模型的预处理合同
 

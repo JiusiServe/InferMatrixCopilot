@@ -1,7 +1,7 @@
 ---
 title: "MiniMax H3"
 created: 2026-08-05
-updated: 2026-08-05
+updated: 2026-08-06
 type: index
 tags: [vllm-omni, models, diffusion]
 sources: [vllm_omni/diffusion/models/minimax_h3/, vllm_omni/diffusion/registry.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, tests/diffusion/models/minimax_h3/, vllm_omni/entrypoints/openai/video_api_utils.py]
@@ -38,3 +38,9 @@ confidence: high
 硬件 recipe 只记录已验证的 GPU/NPU 形状；性能数字不能从 recipe 的配置示例泛化为全硬件
 保证。共享 offloader、并行和请求合同分别归 [Diffusion](../../components/diffusion/_index.md)、
 [Configuration](../../components/configuration/_index.md) 和 [Serving](../../components/serving/_index.md)。
+
+## 目录内容
+
+| 遇到什么 | 查看哪里 |
+|---|---|
+| online FP8 scope、ignored layers、QKV/gate-up loader 顺序 | [rules](rules.md) |

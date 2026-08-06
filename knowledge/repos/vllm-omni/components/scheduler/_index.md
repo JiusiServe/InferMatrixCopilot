@@ -1,7 +1,7 @@
 ---
 title: "Scheduler（AR/生成请求调度）"
 created: 2026-07-16
-updated: 2026-08-05
+updated: 2026-08-06
 type: index
 tags: [vllm-omni, components, scheduler]
 sources: [vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/prefix_cache.py, docs/design/module/ar_module.md]
@@ -16,8 +16,9 @@ sources: [vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/prefix_cache
   `OmniSchedulerMixin`（:40）、`OmniTensorPrefixCache`（prefix_cache.py:33）
 - 官方设计文档：`docs/design/module/ar_module.md`（继承关系、请求流转图）
 - 测试入口：`tests/core/`
-- 主要职责：AR/生成 stage 的请求调度（继承 vLLM Scheduler）、跨 stage KV transfer 的调度面、
-  chunk/full-payload 输入等待状态机、omni tensor prefix cache
+- 主要职责：AR/生成 stage 的请求调度（继承 vLLM Scheduler）、两类 scheduler 的共享
+  lifecycle contract、跨 stage KV transfer 的调度面、chunk/full-payload 输入等待状态机、
+  omni tensor prefix cache
 
 ## 什么时候查这里
 
@@ -35,4 +36,4 @@ sources: [vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/prefix_cache
 | 遇到什么 | 查看哪里 |
 |---|---|
 | 理解调度器继承链、KV transfer 与 prefix cache 语义 | [architecture](architecture.md) |
-| 按 PR 描述直达 prefix cache、token budget、upstream 接口或 side-stream 首批源码 | [rules / Direct 代码快速入口](rules.md#direct-代码快速入口) |
+| 按 PR 描述直达 prefix cache、token budget、upstream 接口、shared lifecycle 或 side-stream 首批源码 | [rules / Direct 代码快速入口](rules.md#direct-代码快速入口) |

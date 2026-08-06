@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni 组件 owner"
 created: 2026-07-10
-updated: 2026-07-31
+updated: 2026-08-06
 type: index
 tags: [vllm-omni, components]
 sources: []
@@ -15,6 +15,7 @@ sources: []
 | Owner | 负责范围 | 直接入口 |
 |---|---|---|
 | [Configuration](configuration/_index.md) | deploy YAML、PipelineConfig、registry、字段归属、default 和 endpoint policy | [rules](configuration/rules.md) |
+| [ComfyUI](comfyui/_index.md) | ComfyUI video node/client、T2VA/FL2VA/Ref2VA 路由和 multipart 字段 | [rules](comfyui/rules.md) |
 | [Serving](serving/_index.md) | 用户请求、OpenAI API、响应、AsyncOmni engine 生命周期 | [rules](serving/rules.md) |
 | [Model Executor](model-executor/_index.md) | stage config/input、模型加载、worker、跨 stage 数据桥 | [rules](model-executor/rules.md) |
 | [Diffusion](diffusion/_index.md) | diffusion pipeline、denoise、VAE/DiT、并行和 cache | [rules](diffusion/rules.md) |

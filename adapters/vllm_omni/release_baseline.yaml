@@ -32,6 +32,8 @@ path_owners:
   - .buildkite/
   - .github/
   - docker/
+  comfyui:
+  - apps/ComfyUI-vLLM-Omni/
   configuration:
   - vllm_omni/config/
   - vllm_omni/deploy/
@@ -73,7 +75,6 @@ path_owners:
   - tests/
   tooling:
   - tools/
-  - apps/ComfyUI-vLLM-Omni/
   runtime-core:
   - vllm_omni/__init__.py
   - vllm_omni/data_entry_keys.py
@@ -86,6 +87,8 @@ owner_documents:
   - knowledge/repos/vllm-omni/benchmark/_index.md
   ci:
   - knowledge/repos/vllm-omni/ci/_index.md
+  comfyui:
+  - knowledge/repos/vllm-omni/components/comfyui/rules.md
   configuration:
   - knowledge/repos/vllm-omni/components/configuration/rules.md
   diffusion:
@@ -93,6 +96,7 @@ owner_documents:
   distributed:
   - knowledge/repos/vllm-omni/components/distributed/rules.md
   documentation:
+  - knowledge/repos/vllm-omni/docs/rules.md
   - knowledge/general/docs/_index.md
   model-executor:
   - knowledge/repos/vllm-omni/components/model-executor/rules.md
@@ -139,6 +143,7 @@ pin_documents:
 - doc/KNOWLEDGE.md
 - knowledge/repos/vllm-omni/models/catalog.md
 - knowledge/repos/vllm-omni/components/configuration/_index.md
+- knowledge/repos/vllm-omni/components/comfyui/_index.md
 - knowledge/repos/vllm-omni/components/diffusion/_index.md
 - knowledge/repos/vllm-omni/components/distributed/_index.md
 - knowledge/repos/vllm-omni/components/model-executor/_index.md
