@@ -1,10 +1,10 @@
 ---
 title: "Diffusion 共享规则"
 created: 2026-07-20
-updated: 2026-07-31
+updated: 2026-08-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/distributed/hsdp.py]
+sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5691", vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/ring/ring_selector.py]
 confidence: high
 ---
 
@@ -22,6 +22,8 @@ confidence: high
 |---|---|---|
 | CUDA Graph、compile、fused scheduler/solver、cache path、eager parity | `execution-parity`：`DIFF-1a` | `vllm_omni/diffusion/compile.py::regionally_compile` → `vllm_omni/diffusion/worker/diffusion_model_runner.py::{DiffusionModelRunner.execute_model,execute_model_batch}` → 命中模型的 denoise/solver consumer |
 | seed、request-local generator、guidance=0、并发 RNG、batched generators | `execution-parity`：`DIFF-1b` | `vllm_omni/inputs/data.py::OmniDiffusionSamplingParams` → `diffusion_model_runner.py::DiffusionModelRunner._initialize_generator` → `request_batch.py::DiffusionRequestBatch.collate_sampling_param_generators` |
+| FA4/FA3/FA2、optional import/ABI、CUDA capability、Ring LSE/window | `attention-backend`：`DIFF-1c` | `diffusion/attention/backends/utils/fa.py` → `ring/ring_selector.py::select_flash_attn_impl` → local/ring wrapper |
+| packed varlen、`cu_seqlens_*`、padding boundary、Ring/Ulysses parity | `attention-backend`：`DIFF-1d` | metadata producer → `attention/backends/flash_attn.py::FlashAttentionImpl.forward` → `attention/layer.py::{_run_local_attention,_run_ring_attention}` |
 | ModelOpt/checkpoint adapter、weight/scale remap、unknown tensor、resolution path | `checkpoint-distributed`：`DIFF-2a` | `vllm_omni/diffusion/model_loader/diffusers_loader.py::{DiffusersPipelineLoader._get_checkpoint_adapter,load_weights}` → `checkpoint_adapters/modelopt.py::{ModelOptFp8CheckpointAdapter._resolve_target_and_output_names,adapt}` |
 | HSDP/FSDP、`fully_shard`、DeviceMesh、packed/scalar parameter、FP8 | `checkpoint-distributed`：`DIFF-2b` | `vllm_omni/diffusion/distributed/hsdp.py::{apply_hsdp_to_model,shard_model}` → `model_loader/diffusers_loader.py::DiffusersPipelineLoader._load_model_with_hsdp` → `quantization/hsdp_fp8.py::prepare_fp8_layers_for_fsdp` |
 | component quantization、text encoder/transformer/VAE 独立配置、owner prefix、meta/offload | `checkpoint-distributed`：`DIFF-2c` | `vllm_omni/diffusion/data.py::OmniDiffusionConfig._propagate_quantization_from_tf_config` → `model_loader/diffusers_loader.py::{DiffusersPipelineLoader._get_weight_sources,_process_weights_after_loading}` → 命中 component 的真实 linear consumer |
@@ -31,6 +33,7 @@ confidence: high
 |---|---|---|
 | `core` | 每次共享 diffusion 审查 | `DIFF-1a`, `DIFF-1b` |
 | `execution-parity` | graph/eager、solver、RNG、generator、zero/default | `DIFF-1a`, `DIFF-1b` |
+| `attention-backend` | Flash backend selection、packed varlen、Ring/Ulysses、padding boundary | `DIFF-1c`, `DIFF-1d` |
 | `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP | `DIFF-2a`, `DIFF-2b`, `DIFF-2c` |
 | `quality-evidence` | 质量阈值、offload、A/B case | `DIFF-3a` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `DIFF-0a`, `DIFF-0b` |
@@ -56,6 +59,31 @@ confidence: high
 - 验收：两个并发请求用不同 generator 可重复且互不影响，`0.0` 从 request 构造一路
   到达 consumer。Cosmos3 的落地约束见
   [Cosmos3 规则](../../models/cosmos3/rules.md)。 ^[PR #5001]
+
+### DIFF-1c — 可选 attention backend 的选择、包装和 Ring 语义必须一致
+
+- 触发：增加或修改 FA4/FA3/FA2 discovery、optional extra、CUDA capability selector、
+  local/Ring wrapper、window 或 LSE 返回值。
+- 强制：同时验证硬件 capability 与目标 symbol 可用性；import/ABI 失败只能降级到下一条
+  已支持路径并留下可见原因；local 与 Ring 对 window、softmax scale、causal 和 LSE 的
+  约定必须一致。
+- 禁止：只按 GPU 名称或已安装 package 选择 backend；显式请求不可用实现后静默换成语义
+  不同的 kernel；Ring wrapper 丢弃上层需要的 LSE 或改变 unlimited-window sentinel。
+- 验收：用 capability × FA4/FA3/FA2 可用性矩阵验证选择优先级和显式失败；local/Ring wrapper
+  参数与返回值测试对齐，并至少运行一次真实 backend smoke，证明 packaging extra、文档命令
+  和 runtime import 指向同一实现。 ^[PR #5691]
+
+### DIFF-1d — packed varlen 边界是原子合同，所有并行路径都必须保留
+
+- 触发：producer 或 backend 读写 `cu_seqlens_q`、`cu_seqlens_k`、`max_seqlen_q`、
+  `max_seqlen_k`，或把带 padding 的 packed 输入送入 Ring/Ulysses/hybrid attention。
+- 强制：四个字段一起生产、转发和消费；每条启用的 parallel/backend 路径必须把相同
+  sequence boundary 交给 kernel，无法表达时在执行前明确拒绝。
+- 禁止：只提供部分 metadata；在 Ring 路径丢弃边界；假设已分配但 backend 忽略的
+  `attn_mask` 能阻止真实 token 关注 padding 或下一条 packed sequence。
+- 验收：缺任一字段立即失败；两个不同长度样本的 packed 结果分别与独立运行对齐且无
+  cross-sequence attention；local 与每个声明支持的 Ring/Ulysses 组合做数值 parity，
+  不支持的组合有 fail-fast 测试。 ^[PR #5691]
 
 ## Checkpoint 与分布式加载
 
