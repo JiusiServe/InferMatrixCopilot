@@ -172,6 +172,7 @@ _DIRECT_OWNER_ROUTES = (
 )
 _DIRECT_REVIEW_CHECKLIST = [
     "Freeze one base/head snapshot and collect PR intent, diff, mergeability, and CI once.",
+    "Read every source file cited as evidence at the frozen head SHA; when the local checkout does not contain that commit, fetch the PR head ref or read files by ref instead of trusting the working tree.",
     "Immediately after snapshot metadata returns, report head SHA, CI, mergeability, and preliminary findings in the host conversation; do this before reading knowledge, searching source, or running tests.",
     "Call Direct once with the collected title, body, and changed_files; read only the returned knowledge_routes and stop knowledge navigation.",
     "After the progress update, run independent knowledge/source and validation tracks concurrently.",
@@ -208,6 +209,7 @@ _DIRECT_PROGRESS_UPDATE = {
 }
 _SUBTRACTION_ACTIONS = {"DELETE", "DEFER", "INLINE", "MERGE", "MOVE"}
 _SUBTRACTION_SIGNALS = {"none", "triggered"}
+_EVIDENCE_HEAD_SHA = re.compile(r"[0-9a-f]{7,40}")
 
 
 def _normalize_repo(repo: str) -> str:
@@ -559,6 +561,7 @@ def _direct_completion_result(
     subtraction: list[dict[str, str]] | None = None,
     minimality_proof: dict[str, str] | None = None,
     final_comment_count: int = 1,
+    evidence_head_sha: str = "",
 ) -> dict:
     """Mechanically gate Direct completion on subtraction classification.
 
@@ -566,10 +569,14 @@ def _direct_completion_result(
     true. A diff without a subtraction trigger can finish after explicitly
     declaring ``none``. Triggered diffs still need actionable subtraction or
     concrete evidence that the inspected scope is already minimal.
+    ``evidence_head_sha`` forces an explicit declaration that every cited
+    source file and validation result was read at the frozen head commit,
+    not at whatever revision the local working tree happened to hold.
     """
     subtraction_signal = str(subtraction_signal).strip().casefold()
     subtraction = subtraction or []
     minimality_proof = minimality_proof or {}
+    evidence_head_sha = str(evidence_head_sha).strip().casefold()
     missing: list[str] = []
 
     if final_comment_count != 1:
@@ -577,6 +584,13 @@ def _direct_completion_result(
 
     if subtraction_signal not in _SUBTRACTION_SIGNALS:
         missing.append("subtraction_signal must be 'none' or 'triggered'")
+
+    if not _EVIDENCE_HEAD_SHA.fullmatch(evidence_head_sha):
+        missing.append(
+            "evidence_head_sha must be the frozen head commit SHA "
+            "(7-40 hex characters) that every cited source file and "
+            "validation result was read at"
+        )
 
     malformed_subtractions: list[int] = []
     for index, item in enumerate(subtraction):
@@ -633,6 +647,7 @@ def _direct_completion_result(
         "status": "complete" if complete else "partial_review",
         "publish_ready": complete,
         "final_comment_count": final_comment_count,
+        "evidence_head_sha": evidence_head_sha,
         "subtraction_signal": subtraction_signal,
         "subtraction_required": subtraction_signal == "triggered",
         "subtraction_items": len(subtraction),
@@ -712,9 +727,12 @@ def build_mcp(
             "verdict at the limit. Extend it once by the returned allowance "
             "only for a stated unresolved P1/high-risk contract. Continue "
             "reviewing without "
-            "posting an early GitHub comment. Before treating a Direct review as "
-            "complete or posting its only final comment, call "
-            "validate_direct_review. Mark subtraction_signal=none when the diff "
+            "posting an early GitHub comment. Read every source file cited as "
+            "evidence at the frozen head SHA; fetch the PR head ref when the "
+            "local checkout holds another revision. Before treating a Direct "
+            "review as complete or posting its only final comment, call "
+            "validate_direct_review with that evidence_head_sha. Mark "
+            "subtraction_signal=none when the diff "
             "does not add or expand a helper, class, fallback, compatibility "
             "branch, or public behavior. Only subtraction_signal=triggered "
             "requires subtraction evidence. "
@@ -799,6 +817,7 @@ def build_mcp(
                     },
                     "completion_gate": {
                         "tool": "validate_direct_review",
+                        "evidence_head_sha": "Required: the frozen head commit SHA every cited source file and validation result was read at; fetch the PR head ref when the local checkout holds another revision.",
                         "subtraction_signal": {
                             "none": "No helper/class/fallback/compatibility/public-behavior expansion; no subtraction evidence required.",
                             "triggered": "Require subtraction items or minimality_proof.",
@@ -856,14 +875,17 @@ def build_mcp(
         subtraction: list[dict[str, str]] | None = None,
         minimality_proof: dict[str, str] | None = None,
         final_comment_count: int = 1,
+        evidence_head_sha: str = "",
     ) -> dict:
         """Validate the Direct completion gate before the only final comment.
 
         Use ``subtraction_signal='none'`` when the diff does not add or expand a
         helper, class, fallback, compatibility branch, or public behavior. Use
         ``'triggered'`` for those diffs, then supply actionable subtraction
-        items or concrete minimality evidence. A ``partial_review`` result is
-        not a completed Direct review.
+        items or concrete minimality evidence. Pass ``evidence_head_sha`` as
+        the frozen head commit every cited source file and validation result
+        was read at; a review whose evidence came from another revision is not
+        complete. A ``partial_review`` result is not a completed Direct review.
         """
         started = time.perf_counter()
         result = _direct_completion_result(
@@ -871,6 +893,7 @@ def build_mcp(
             subtraction=subtraction,
             minimality_proof=minimality_proof,
             final_comment_count=final_comment_count,
+            evidence_head_sha=evidence_head_sha,
         )
         result.setdefault("diagnostics", {})["timing_ms"] = {
             "validate_direct_review": int(
