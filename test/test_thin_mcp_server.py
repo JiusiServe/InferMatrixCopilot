@@ -127,6 +127,11 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
         and "environment fingerprint" in item
         for item in review["first_review_checklist"]
     )
+    assert any(
+        "at the frozen head SHA" in item
+        and "fetch the PR head ref" in item
+        for item in review["first_review_checklist"]
+    )
     assert review["progress_update"] == {
         "deadline_seconds": 60,
         "channel": "host_conversation",
@@ -151,6 +156,7 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
     }
     assert review["completion_gate"] == {
         "tool": "validate_direct_review",
+        "evidence_head_sha": "Required: the frozen head commit SHA every cited source file and validation result was read at; fetch the PR head ref when the local checkout holds another revision.",
         "subtraction_signal": {
             "none": "No helper/class/fallback/compatibility/public-behavior expansion; no subtraction evidence required.",
             "triggered": "Require subtraction items or minimality_proof.",
@@ -294,8 +300,11 @@ def test_direct_routes_model_rules_without_index_navigation():
     assert all(route["quick_map"] for route in routing["routes"])
 
 
+_HEAD_SHA = "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b"
+
+
 def test_direct_completion_requires_subtraction_signal_classification():
-    result = _direct_completion_result()
+    result = _direct_completion_result(evidence_head_sha=_HEAD_SHA)
 
     assert result["status"] == "partial_review"
     assert result["publish_ready"] is False
@@ -304,17 +313,46 @@ def test_direct_completion_requires_subtraction_signal_classification():
     ]
 
 
-def test_small_fix_accepts_no_subtraction_signal_without_full_proof():
+def test_direct_completion_requires_evidence_head_sha():
     result = _direct_completion_result(subtraction_signal="none")
+
+    assert result["status"] == "partial_review"
+    assert result["publish_ready"] is False
+    assert result["missing"] == [
+        "evidence_head_sha must be the frozen head commit SHA "
+        "(7-40 hex characters) that every cited source file and "
+        "validation result was read at"
+    ]
+
+
+def test_direct_completion_rejects_non_commit_evidence_reference():
+    result = _direct_completion_result(
+        subtraction_signal="none",
+        evidence_head_sha="main",
+    )
+
+    assert result["status"] == "partial_review"
+    assert result["publish_ready"] is False
+
+
+def test_small_fix_accepts_no_subtraction_signal_without_full_proof():
+    result = _direct_completion_result(
+        subtraction_signal="none",
+        evidence_head_sha=_HEAD_SHA,
+    )
 
     assert result["status"] == "complete"
     assert result["publish_ready"] is True
     assert result["subtraction_required"] is False
     assert result["subtraction_items"] == 0
+    assert result["evidence_head_sha"] == _HEAD_SHA
 
 
 def test_triggered_subtraction_requires_evidence():
-    result = _direct_completion_result(subtraction_signal="triggered")
+    result = _direct_completion_result(
+        subtraction_signal="triggered",
+        evidence_head_sha=_HEAD_SHA,
+    )
 
     assert result["status"] == "partial_review"
     assert result["publish_ready"] is False
@@ -329,6 +367,7 @@ def test_triggered_subtraction_requires_evidence():
 def test_issue_5559_trigger_accepts_single_comment_with_subtractions():
     result = _direct_completion_result(
         subtraction_signal="triggered",
+        evidence_head_sha=_HEAD_SHA,
         subtraction=[
             {
                 "anchor": "examples/offline_inference/text_to_image/text_to_image.py:358",
@@ -353,6 +392,7 @@ def test_issue_5559_trigger_accepts_single_comment_with_subtractions():
 def test_direct_completion_accepts_concrete_minimality_proof():
     result = _direct_completion_result(
         subtraction_signal="triggered",
+        evidence_head_sha=_HEAD_SHA,
         minimality_proof={
             "scope_ledger": "Every changed production file maps to the requested API fix.",
             "abstraction_census": "No new helper, class, projection, fallback, or compatibility branch.",
@@ -368,6 +408,7 @@ def test_direct_completion_accepts_concrete_minimality_proof():
 def test_direct_completion_rejects_malformed_subtraction_and_two_comments():
     result = _direct_completion_result(
         subtraction_signal="triggered",
+        evidence_head_sha=_HEAD_SHA,
         subtraction=[{
             "anchor": "examples/task.py:120",
             "action": "",
@@ -384,6 +425,7 @@ def test_direct_completion_rejects_malformed_subtraction_and_two_comments():
 def test_direct_completion_does_not_count_bug_fixes_as_subtraction():
     result = _direct_completion_result(
         subtraction_signal="triggered",
+        evidence_head_sha=_HEAD_SHA,
         subtraction=[{
             "anchor": "src/adapter.py:42",
             "action": "FIX the incorrect default value",
@@ -398,6 +440,7 @@ def test_direct_completion_does_not_count_bug_fixes_as_subtraction():
 def test_no_signal_rejects_contradictory_subtraction_evidence():
     result = _direct_completion_result(
         subtraction_signal="none",
+        evidence_head_sha=_HEAD_SHA,
         subtraction=[{
             "anchor": "src/adapter.py:42",
             "action": "DELETE unused compatibility branch",

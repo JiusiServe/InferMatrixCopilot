@@ -36,3 +36,7 @@ def test_imreview_returns_github_style_findings(prompt_path: Path) -> None:
     assert "bounded `rg` searches" in prompt
     assert "import/version compatibility preflight" in prompt
     assert "head SHA and an environment fingerprint" in prompt
+    assert "at the pinned head SHA" in prompt
+    assert "fetch the PR head ref" in prompt
+    assert "never cite the working tree as evidence" in prompt
+    assert "`evidence_head_sha`" in prompt

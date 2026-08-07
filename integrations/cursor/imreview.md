@@ -10,8 +10,11 @@ call `review` once with
 `quick_map` in each returned `knowledge_routes` item. Do not open the full route
 file unless a concrete ambiguity blocks source review, and do not walk
 `AGENTS.md`, `CLAUDE.md`, repository indexes, or model catalogs. Inspect the
-live target and return only evidence-backed findings with file and line
-references.
+target at the pinned head SHA and return only evidence-backed findings with
+file and line references. Read every file cited as evidence at that commit;
+when the local checkout does not contain it, fetch the PR head ref or read
+files by ref, and never cite the working tree as evidence for a different
+revision.
 Follow the returned `execution_budget`. Extend it once only when a concrete
 unresolved P1/high-risk contract remains, and state that question before
 extending.
@@ -35,7 +38,8 @@ Do not wait for CI completion or resolved mergeability before the progress
 update. Mark early findings as preliminary and continue the review. This update
 is not a GitHub comment; do not post an interim review.
 
-Before finalizing, classify `subtraction_signal`. Use `none` without a
+Before finalizing, call `validate_direct_review` with the pinned head SHA as
+`evidence_head_sha` and classify `subtraction_signal`. Use `none` without a
 minimality proof when the diff does not add or expand a helper, class, fallback,
 compatibility branch, or public behavior. Use `triggered` for those changes and
 only then provide subtraction evidence.
