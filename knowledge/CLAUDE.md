@@ -52,6 +52,7 @@
 | 写文档、RFC 和用户可见说明 | [general/docs](general/docs/_index.md) | `repos/<仓库>/docs/_index.md` |
 | Git、commit、rebase 和 PR | [general/git](general/git/_index.md) | `repos/<仓库>/git/_index.md` |
 | 调试和根因收敛 | [general/debug](general/debug/_index.md) | `repos/<仓库>/debug/_index.md` |
+| Bug 定级与 DI / SLO 计算 | [general/bug](general/bug/_index.md) | 通常没有仓库补充 |
 | benchmark 和性能证据 | [general/benchmark](general/benchmark/_index.md) | `repos/<仓库>/benchmark/_index.md` |
 | Windows、WSL、编码和本地工具 | [general/environment](general/environment/_index.md) | 通常没有仓库补充 |
 | SSH、容器、GPU 和远端长跑 | [general/remote](general/remote/_index.md) | `repos/<仓库>/remote/_index.md` |

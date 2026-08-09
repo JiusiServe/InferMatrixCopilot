@@ -1,7 +1,7 @@
 ---
 title: "通用经验入口"
 created: 2026-07-10
-updated: 2026-07-16
+updated: 2026-08-07
 type: index
 tags: [general]
 sources: []
@@ -28,6 +28,7 @@ sources: []
 | 编写和维护文档 | [docs](docs/_index.md) | 文档来源、链接和验收 |
 | Git 分支、提交和变基 | [git](git/_index.md) | 通用 Git 工作方法 |
 | 定位问题和收敛原因 | [debug](debug/_index.md) | 通用调试方法 |
+| Bug 定级与 DI / SLO 计算 | [bug](bug/_index.md) | 通用缺陷强度计算 |
 | 设计或核验性能测试 | [benchmark](benchmark/_index.md) | 通用 benchmark 方法 |
 | Windows、WSL、编码和本地工具 | [environment](environment/_index.md) | 开发环境问题 |
 | SSH、容器和远端长跑任务 | [remote](remote/_index.md) | 通用远端操作方法 |
