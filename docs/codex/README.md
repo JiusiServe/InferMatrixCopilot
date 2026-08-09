@@ -159,7 +159,10 @@ Restart Codex after installation. Use `/mcp` or `codex mcp list` to confirm that
   Strict starts the packaged workflow and accepts `review_depth` plus an
   optional local checkout override through `repo_path`.
 - `validate_direct_review(subtraction_signal, subtraction?, minimality_proof?,
-  final_comment_count=1)`: `none` completes an ordinary small fix without a
+  final_comment_count=1, evidence_head_sha)`: `evidence_head_sha` must be the
+  frozen head commit every cited source file and validation result was read
+  at; evidence read from another local revision does not complete the review.
+  `none` completes an ordinary small fix without a
   minimality proof. `triggered` requires anchored subtraction actions or
   concrete evidence that the inspected scope is already minimal.
 - `update_knowledge(repo?)`: keeps `repo` only for call compatibility and

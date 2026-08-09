@@ -193,7 +193,9 @@ release_baseline.yaml 的 audited_sha
   Direct 根据 PR 描述返回至多 3 个精确知识路由和审查门禁；Strict 返回
   `run_id`。`repo_path` 可临时指定 Strict 使用的本地 checkout。
 - `validate_direct_review(subtraction_signal, subtraction?,
-  minimality_proof?, final_comment_count=1)`：Direct 最终输出前的完成检查。
+  minimality_proof?, final_comment_count=1, evidence_head_sha)`：Direct 最终
+  输出前的完成检查。`evidence_head_sha` 必须是本次审查固定的 head 提交，
+  证明引用的源码和验证结果都读取自该版本而非本地工作区的其他分支。
   普通小修改传 `subtraction_signal="none"`；存在新增或扩张结构时传
   `"triggered"`，并提供减法项或最小性证明。
 - `get_review_status(run_id)`：查看 Strict 后台任务的步骤和进度。
