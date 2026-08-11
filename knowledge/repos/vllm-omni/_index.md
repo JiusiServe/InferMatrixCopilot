@@ -41,3 +41,4 @@ owner 仍不明确时才看 [components 职责表](components/_index.md)；模�
 | Git、PR、rebase | [git](git/_index.md)、[upstream rebase](rebase/_index.md) |
 | benchmark / profiling | [benchmark](benchmark/_index.md) |
 | 远端验证 | [remote](remote/_index.md) |
+| 关键模型与负责人 | [owners](owners/_index.md) |
