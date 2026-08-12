@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.65,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y independently rediscovers RuixiangMa's confirmed 'flash_attn_varlen_func may be None → crash' bug almost exactly, plus flags real duplication and a plausible test-coverage gap, giving it meaningful recall against ground truth; X's three findings (step=0 edge case, duplication, get_device_capability without device arg) are all valid but none overlap with any reviewer concern, so its recall is near zero. Y loses some precision by confidently asserting the integer version= arg is a bug via an unverified PEP-440 claim that the maintainer's actual reply contradicts (version ints map to git branches, working as intended), but this is one flawed finding among several solid ones. Both are well-anchored to file/line with concrete fixes, so actionability is comparable and high for each.",
+  "_cost_usd": 0.27037790000000006,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "fc41d2b0c5b03ab9c77d83b95c2363994388e87dfbf3934071267d13b6ce265f",
+    "judge_rep": 3
+  }
+}

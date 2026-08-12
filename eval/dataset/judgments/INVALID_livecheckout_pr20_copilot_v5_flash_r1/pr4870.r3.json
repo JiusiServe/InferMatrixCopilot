@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.45,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.8,
+    "actionability": 0.6,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both catch the residual async_chunk default-value inconsistency (matching the ground-truth Low comment), and neither surfaces the amy-why design question, so recall is comparable. X's precision is undermined by two fabricated/contradicted claims: it asserts the PR's E2E evidence was 'stream=False only' when the ground-truth review explicitly describes a stream=True vs stream=False comparison, and it cites a 'red' buildkite CI gate with no supporting evidence in the provided data. Y's findings are all accurately grounded, including a well-reasoned note that the splitting logic drops hidden-shape alignment in favor of scheduled-token alignment — directly touching the latent multi-axis gap later fixed by PR #4910, which X never raises. X is more concretely actionable (specific tests to add, file:line evidence), but Y's higher trustworthiness and gap detection outweigh that.",
+  "_cost_usd": 0.22317900000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "7e8eecd14717eab5803e155edf615922c6fba9be031408d8b21da1ef25fcf558",
+    "judge_rep": 3
+  }
+}

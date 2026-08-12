@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.98,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.97,
+    "actionability": 0.98,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates cover the human concerns and explicitly identify the latent over-strict level-2 guard and its CI impact. Y is more focused and consistently grounded, while X adds several plausible but lower-confidence or tangential findings and proposes one unsafe state-reset alternative.",
+  "_usage": {
+    "input": 3,
+    "output": 1387
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "direct_opus5_r1"
+  },
+  "_roles": {
+    "arm": "direct_opus5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/direct_opus5_r1",
+    "arm_a_sha256": "612325b52f2d275f158900530f7b4b275f22526624936046d14b60ea0cc20f3f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "05ba88edbe75596d53ffc0adcf76df898385eb4f6f271110f37f19da2cac4adf",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y independently reconstructs the reviewer's core insight (codes.audio write/read mismatch since #4527) and its first non-blocking comment substantively overlaps ground truth's concern about the containment fallback silently loosening the strict contract for all callers, backed by a concrete verified failure example. X's sole finding (test double completeness via __new__) is well-grounded and actionable but doesn't overlap any ground-truth concern, so recall is near zero. Neither flags the legacy-vs-nested check ordering issue, and neither has a LATENT GAP CHECK section.",
+  "_cost_usd": 0.1318609,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "445e481fed1f00f1b3a9684873c931f2b5babee1815824e4d096577202fa6ac5",
+    "judge_rep": 1
+  }
+}

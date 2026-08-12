@@ -1,0 +1,48 @@
+{
+  "calls": 25,
+  "input_tokens": 922303,
+  "output_tokens": 22311,
+  "cost_usd": 1.5608485,
+  "is_error": false,
+  "terminal_reason": "completed",
+  "split": "train",
+  "head": "3b2d87c9c3bc6de90acab52b72fa4ec848452fdd",
+  "base": "ca0ae7269ca3e9487645cf66088fdfc338951da9",
+  "resolved_model": "claude-opus-5",
+  "snapshot_sha256": "3f34bf24e9cf2ffc1d98f5757e2b70745bd56336799461dfad735e9554a45b53",
+  "validation_commands": [
+    "git rev-parse HEAD && git diff --stat ca0ae7269ca3e9487645cf66088fdfc338951da9 HEAD",
+    "git diff ca0ae7269ca3e9487645cf66088fdfc338951da9 HEAD",
+    "rg -n \"talker_mtp_graph_safe|_capture_talker_mtp_graphs|talker_mtp_accepts_per_row_generators|_init_talker_mtp\" --glob '!*.md' | head -60",
+    "rg -n \"use_async_omni_output|eager_omni_postprocess_before_async_output|omni_pooler_payload_include_hidden\" --glob '!*.md' | head -40",
+    "rg -n \"def talker_mtp\" -A 60 vllm_omni/model_executor/models/qwen3_tts/qwen3_tts_talker.py | head -90",
+    "rg -n \"use_cuda_graphs\" vllm_omni/model_executor/models/common/qwen3_code_predictor.py",
+    "rg -n \"compilation_config\" vllm_omni/config/stage_config.py | head -30; echo ---; rg -n \"class StageDeployConfig\" -A 60 vllm_omni/config/stage_config.py | rg -n \"compilation_config|extra|model_config = |Config\\(\" | head",
+    "sed -n '460,570p' vllm_omni/model_executor/models/common/qwen3_code_predictor.py",
+    "rg -n \"omni_prefix_cache\\s*=\" vllm_omni/worker/*.py | head -10; echo \"--- npu init_talker_mtp ---\"; sed -n '35,60p' vllm_omni/platforms/npu/worker/npu_model_runner.py; echo \"--- npu capture gate ---\"; sed -n '125,150p' vllm_omni/platforms/npu/worker/npu_ar_model_runner.py",
+    "timeout 300 python -c \"\nimport vllm, torch; print('vllm', vllm.__version__, 'torch', torch.__version__)\nfrom vllm.config import CompilationConfig\nfrom vllm.config.compilation import CUDAGraphMode\nc=CompilationConfig()\nprint('default cudagraph_mode', c.cudagraph_mode, 'has_full', c.cudagraph_mode.has",
+    "rg -n \"_subtalker_sampling_params\" vllm_omni/model_executor/models/qwen3_tts/qwen3_tts_talker.py | head"
+  ],
+  "ran_validation": true,
+  "claude_md_seen": {
+    "/data/zhoutaichang/CLAUDE.md": "4ff5b2a69ed0abc2"
+  },
+  "recorded_at": "2026-08-11T16:38:08",
+  "arm": "direct_opus5",
+  "wall_s": 333.9,
+  "audit_ok": true,
+  "audit_violations": [],
+  "audit_blocked_attempts": [],
+  "artifact_chars": 7610,
+  "completion_gate_ok": true,
+  "mcp_review_calls": 1,
+  "mcp_review_calls_ok": 1,
+  "mcp_validate_calls": 2,
+  "mcp_validate_calls_ok": 2,
+  "validate_status_sequence": [
+    "partial_review",
+    "complete"
+  ],
+  "validate_final_status": "complete",
+  "audit_rule": "worktree + installed dependencies + copilot knowledge"
+}

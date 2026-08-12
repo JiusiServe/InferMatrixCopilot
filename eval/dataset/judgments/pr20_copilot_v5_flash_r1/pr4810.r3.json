@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.7,
+    "actionability": 0.65,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both catch the real latent gap (hunyuan_image3_transformer.py still calling the removed API), but X repeats the identical finding five times near-verbatim as separate 'comments', which reads as a malfunction and clutters actionability even though the content is valid. Y is tightly written, verifies the design against actual upstream vLLM source (AutoWeightsLoader, fp8.py mapper) rather than just static grep, matches the ground truth's approve-with-nonblocking-notes tone, and adds a genuinely sharp finding (the new test never proves the outer AutoWeightsLoader performs the rename) plus explicit acknowledgment of the #4808/DiT coordination point the human reviewer raised. X's second distinct finding (0-dim vs shaped scale tensors) is a decent catch but the redundant spam drags down precision/actionability relative to Y's cleaner, more verified review.",
+  "_cost_usd": 0.08541370000000001,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "34f7e921ce8596623c66221b40b616ca8d43e09223d4cedd916b2d1b5896f7ef",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.55,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both miss the bulk of ground-truth concerns, which center on the test file (markers, skipif, try/except-masks-CI-failures) and docs (kernel version requirements) — Y ignores the test file and docs entirely, giving it lower recall than X, which at least gestures at test-rigor weaknesses and the version=1/2/default confusion. However X's headline finding (integer `version=` silently no-oping) contradicts the PR author's own explanation that version=1/2 are valid branch-version selectors, making it likely a fabricated/unverified claim presented as a confident 'Medium correctness' bug — a real precision hit on X's most prominent item. Y's four findings (narrow except ImportError, unguarded final get_kernel fallback ×2, FA2/FA3 class duplication) are all directly verifiable against the diff and delivered with precise anchored before/after snippets, giving it markedly higher precision and slightly better actionability. Net effect is a close call that favors Y for grounded correctness over X's broader but partly speculative coverage.",
+  "_cost_usd": 0.19909920000000003,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "87f20959b05160f3cf23407fa6ef1d7eee984aaadc6c4d06edcf39a52e6ec421",
+    "judge_rep": 2
+  }
+}

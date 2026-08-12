@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates correctly validate the core codes.audio fix, but Y's non-blocking comments are more substantive: it identifies the real behavioral consequence GT's docstring-staleness comment was gesturing at (containment fallback now applies unconditionally to all callers, with a concrete failure example) and catches a genuine logic quirk in the min()-based short_text guard, neither fabricated. X's four findings are grounded but mostly low-value nits (undocumented thresholds, wording clarity, get/pop asymmetry) that only loosely brush GT's two comments without matching their substance, and X's COMMENT verdict diverges from GT's APPROVED while Y's APPROVE aligns.",
+  "_cost_usd": 0.1812186,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "2e048b59ad10dcbd0bf79a35e0f7ce102136c5ea3c845fec09c751adafa82303",
+    "judge_rep": 1
+  }
+}

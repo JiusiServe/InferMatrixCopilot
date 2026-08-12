@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.75,
+    "precision": 0.85,
+    "actionability": 0.95,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.7,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both reviews are grounded and well-evidenced, cover the enum/test-coverage points implicit in the ground truth, and add plausible unique findings (concurrency race in X, default-level footgun in Y). X's blocker finding is a near-exact match to the real historical incident: it names the five specific pre-existing hardware tests (with line numbers) that sleep(level=2) then wake_up() and would now hit the new NotImplementedError, which is precisely the over-strictness that broke merge CI per issue #4905 — a direct gap_hit. Y's related finding (default level=2 bricking the common path) is adjacent but frames it as a default-parameter footgun rather than identifying that existing tests/CI already exercise and would break on the newly guarded path, so it only partially reaches the gap. X's citations (grep line numbers, worker-side implementation contradicting the blanket ban) are also more concretely actionable.",
+  "_cost_usd": 0.1848022,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "39ed57c53f9591680fe1fa6a6cf4d2912b188fc1c0285c9e653ba68085d84a62",
+    "judge_rep": 3
+  }
+}

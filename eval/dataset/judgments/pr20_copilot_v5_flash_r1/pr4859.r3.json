@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.45,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both catch roughly half of the real reviewer threads (X gets the language/dialect drop and the config-mutation question; Y gets the config-mutation question and the min_stop_step+2 tightening), but X asserts the audio_vae config-aliasing issue is an 'unambiguous regression' requiring a fix, whereas the actual PR thread (LHXuuu) confirms it matches the vendor implementation and is not a functional bug — Y's phrasing on this exact point almost mirrors the real reviewer's caveat precisely and correctly treats it as non-blocking. X also pads its findings with a near-duplicate (2620/2621 are the same language-drop point twice) and speculative 'major' severity on the intentional stochastic-sampling fix, hurting precision despite strong per-line actionability. Y is more calibrated and grounded but misses the language-drop concern entirely, marking 'Breaking Changes: PASS' on a field that a real reviewer flagged as a live compatibility question.",
+  "_cost_usd": 0.2486042,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "91f9f3c62b83312098ea7c3397859f6eb10a31e81e979e768fc2bf5d911b6d06",
+    "judge_rep": 3
+  }
+}

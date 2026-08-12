@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.7,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The ground-truth's substantive concern is Gaohan123's question about whether source_outputs[0] is reliably the parent output and whether a check/comment is warranted. Candidate X explicitly investigates and resolves exactly this (citing orchestrator.py's [output, *companion_outputs] construction), mirroring the actual author response, and also verifies CFG-companion handling and cross-checks against the sibling GLM-Image bridge with concrete code citations. Candidate Y never touches this concern at all, instead raising two speculative, lower-value findings (an unguarded empty-outputs IndexError and a logging traceability nit) that, while grounded in the diff and presented with clean actionable diffs, don't overlap with what reviewers actually flagged. Y's suggestions are more mechanically actionable (line-anchored diff snippets), but X's recall on the actual reviewer concern and depth of grounded verification make it the stronger review overall.",
+  "_cost_usd": 0.1484989,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "6dccef89ec9b0407207941cdf9498c79d12eb6083912b49943cd30cef80d5a31",
+    "judge_rep": 1
+  }
+}

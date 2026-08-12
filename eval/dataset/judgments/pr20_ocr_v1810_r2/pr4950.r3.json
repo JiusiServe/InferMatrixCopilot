@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Ground truth shows a trivial, uncontested docs PR (LGTM/approve, no inline concerns), so the bar is mainly 'did the reviewer verify correctness without fabricating issues.' X actually read the code, verified each factual claim in the diff against source with file/line citations, and correctly concluded no blockers, matching the ground-truth outcome with concrete, grounded reasoning. Y's tool skipped the file entirely due to a markdown-extension filter and produced zero review content, providing no recall, no verifiable precision, and no actionable output whatsoever.",
+  "_cost_usd": 0.04298249999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "38e263e1b5697d8bec36d8dbacedc6666dbea5003329be6212bbfd0d3d210fb6",
+    "judge_rep": 3
+  }
+}

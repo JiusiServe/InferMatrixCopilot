@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.9,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.9,
+    "actionability": 0.8
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X substantively engages the two dominant ground-truth threads — the global-scope-vs-Qwen-only validation concern (citing the FLUX A/B evidence that resolved it) and the perf/accuracy comparison ask — plus independently spots that the new test's CompilationMode parametrization is now vacuous, echoing the reviewer's ask for meaningful compiled/non-compiled coverage. Y never addresses the scope or accuracy-comparison concerns at all, though it does land one precise, literal hit (the pytest mark issue matching Gaohan123's comment) and a valid but narrower backend-coverage gap. Both are well-grounded in the actual diff/code with no fabrication and give file:line-anchored notes, but X's broader concern coverage gives it materially higher recall for comparable precision and actionability.",
+  "_cost_usd": 0.20117520000000005,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "a4a2080260dae95bfc512b00845050b34423e0a993a711dc75a9b14a7d8e8a8e",
+    "judge_rep": 1
+  }
+}

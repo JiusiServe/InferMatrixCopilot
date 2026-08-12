@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth shows no substantive reviewer concerns (just LGTM/approve), so both candidates correctly find no blockers and both verify the PR's technical claims against source with plausible, specific line citations. X goes further by surfacing two concrete, actionable follow-ups (a regression test to guard the untested extra_body/root distinction, and a stale cross-reference in examples/online_serving/minicpmo/README.md) with precise file:line targets and rationale, while Y's single comment is hedged and non-actionable ('worth a sanity check... but if you observed silent WAV directly, keep the current wording'). Both are similarly grounded and neither has a gap-check section, but X's suggestions are more concrete and useful to a maintainer.",
+  "_cost_usd": 0.11007619999999999,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "d4cfb9bb969d06a16fbf47f28984a22894b7fd1614f24566608f8e03fd73772e",
+    "judge_rep": 1
+  }
+}

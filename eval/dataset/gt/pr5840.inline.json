@@ -1,0 +1,26 @@
+[
+  {
+    "author": "hsliuustc0106",
+    "body": "Current `main` added the required `packed_total` argument and forwards `video_token_layout` as `video_layout`, but this duplicate block call passes neither. I reproduced `TypeError: MiniMaxH3DiTBlock.forward() missing 1 required keyword-only argument: 'packed_total'` locally after applying this PR onto current `main`. Please mirror or share the native block-call contract here.",
+    "line": 1358,
+    "path": "vllm_omni/diffusion/cache/teacache/extractors.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "These new tests fail on current `main` before exercising TeaCache: `_run_packed_attention` reads `self.attention.attn_backend.supports_prefix_kv_slicing`, but this fake has no `attn_backend` (6 failed, 1 passed locally). Please make the fake contract-complete or reuse a shared attention test helper.",
+    "line": 487,
+    "path": "tests/diffusion/cache/test_teacache_extractors.py"
+  },
+  {
+    "author": "dpeng123",
+    "body": "@hsliuustc0106 Thanks for reviewing the PR! Just addressed the review comment, and updated PR description with the test result, could you check?",
+    "line": 1358,
+    "path": "vllm_omni/diffusion/cache/teacache/extractors.py"
+  },
+  {
+    "author": "dpeng123",
+    "body": "Just addressed the review comment and run test again, test passed, could you check?",
+    "line": 487,
+    "path": "tests/diffusion/cache/test_teacache_extractors.py"
+  }
+]

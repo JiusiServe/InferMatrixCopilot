@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 1.0,
+    "actionability": 0.95
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.9,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly flag the audio_vae.py config.num_hidden_layers mutation (the PR's main substantive review thread), but Y's treatment is more calibrated (notes the encoder is already constructed before mutation, matching the vendor-aligned clarification the ground truth reviewers gave) and Y additionally catches the min_stop_step+1→+2 tightening as a deliberate-but-notable behavior change, matching a second ground-truth discussion thread. X stops at one finding, so despite being clean and well-anchored it covers far less ground. Neither surfaces the dialect/language-removal question that ground truth reviewers explicitly raised, and neither has a LATENT GAP CHECK section.",
+  "_cost_usd": 0.2152615,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "9b58faf9f7b9f5f2585a91ccf17bdbca3666e27c787210ecf450b83ed40dbe83",
+    "judge_rep": 3
+  }
+}

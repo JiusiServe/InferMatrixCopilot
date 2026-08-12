@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.95,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "X catches the shared-config mutation bug in audio_vae.py (matching the ground-truth amy-why-3459 comment) and adds a legitimate, diff-grounded bonus observation about the encode_latent path becoming stochastic, plus notes the decode-window tightening — giving it broader coverage than Y, which surfaces only the config-mutation issue. However X's narrative cites specific WER benchmark numbers (1.83% vs 2.02%, 1088 utterances) that are not present anywhere in the diff, which reads as fabricated/unverifiable evidence and dents its precision; it also fails to flag the serving_speech.py dialect-removal change as a question, unlike ground truth's amy-why-3459 comment. Y's single finding is precise, fully grounded, and highly actionable with an exact code-level suggestion, but its recall is very limited since it ignores the other three diff areas entirely.",
+  "_cost_usd": 0.20178190000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "9b58faf9f7b9f5f2585a91ccf17bdbca3666e27c787210ecf450b83ed40dbe83",
+    "judge_rep": 1
+  }
+}

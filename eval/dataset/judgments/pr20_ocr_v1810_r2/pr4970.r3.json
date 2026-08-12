@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.5,
+    "actionability": 0.05,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Ground truth has no substantive concerns (just an unrelated VoxCPM2 ask and an LGTM approval), so there's little to recall for either candidate. X does a genuine, code-grounded investigation confirming the seed removal restores the batched fast path, reaches the same APPROVE verdict as the human reviewer, and adds two specific, non-fabricated, file:line-anchored suggestions (guard comment against reintroducing the seed; noting the stage-1 removal was inert). Y is an empty OCR pass-through reporting zero findings with no visible analysis or evidence it engaged with the diff, offering nothing actionable beyond a bare 'no issues' that happens to coincide with the LGTM outcome by luck rather than demonstrated reasoning.",
+  "_cost_usd": 0.08922290000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "328122fe4b392627a25677e42da358bb8e46e29a267034220c85b8dd7fe1c37b",
+    "judge_rep": 3
+  }
+}

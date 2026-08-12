@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.7,
+    "precision": 0.7,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.8,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently arrive at the same core technical justification as the ground-truth inline comment (both submit_initial/submit_update reject list prompts identically, so gating the unwrap on already_submitted was the bug), and both correctly validate the DiffusionOutput fix. X is more actionable with concrete test-writing instructions but overstates severity (major/FOLLOW-UP REQUIRED) for missing tests despite both real reviewers approving with LGTM and no such demand, hurting precision/calibration. Y's APPROVE verdict and non-blocking framing of the same test gap matches the actual reviewer outcome more faithfully while still surfacing the same substantive points.",
+  "_cost_usd": 0.1232094,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "dbe9d33fec2425c0be443c2294c4cd95e3e4e11020939e303b8ba42a67eda7ec",
+    "judge_rep": 2
+  }
+}

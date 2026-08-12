@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.8,
+    "actionability": 0.55
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.65,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently verify the parent-first ordering contract (matching the Gaohan123/Celeste-jq exchange) and both surface the amd-ci/npu-ci CI failures, but neither flags the 'please fix precommit' ask, and X actively asserts pre-commit is green, which conflicts with the ground-truth reviewer's request. Y goes further toward Bounty-hunter's ask for an explicit e2e/accuracy test run and adds concrete file:line, testable directives (IndexError guard, silent-truncation footgun, downstream pipeline consumer check), giving it better recall and actionability, though its 'FOLLOW-UP REQUIRED' verdict and speculative pipeline_hunyuan_image3.py claim overstate severity relative to the PR's clean LGTM/approve outcome, hurting precision somewhat. X is safer and more precise but thinner on concrete asks.",
+  "_cost_usd": 0.19356620000000002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "ac4980c54d331c1c795a00790179254eac8bd4a7dbf430b5aacc7e54ae61e569",
+    "judge_rep": 1
+  }
+}

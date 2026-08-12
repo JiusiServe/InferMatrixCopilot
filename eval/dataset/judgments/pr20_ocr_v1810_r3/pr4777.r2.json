@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.1,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive reviewer concerns (just LGTM approvals and a verification comment confirming the shown 4-file diff works), so recall is trivially satisfied by both candidates. X correctly reports no issues but adds no analytical value. Y verifies the actual diff correctly (range consistency, both entrypoints, pipeline symbolic-layers logic) and additionally flags two reliability-suite test files outside the diff still hardcoding the old '3' bound, with exact snippets and fixes — specific and highly actionable, though unverifiable from the diff alone, warranting a modest precision discount.",
+  "_cost_usd": 0.10031230000000001,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "98ab4ff849017fa22d9228e23f56166fbbf07fb1eecaef4381d5f2a9aa32d4c9",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "The only substantive ground-truth concern is Codex's P2 flag about a trust_remote_code kwarg breaking on locked kernels<0.15.0; Candidate X reports zero findings and misses it entirely, providing no value. Candidate Y independently verified fallback-order/cache correctness, correctly identified the lock-held-across-network-IO tradeoff with concrete file:line refs, and even surfaced a description/diff mismatch around trust_remote_code — touching the same topic as the ground truth, though it concludes the kwarg is absent rather than flagging its version-compat risk, so it only partially captures the real concern. Y is clearly the more grounded, actionable, and useful review.",
+  "_cost_usd": 0.155323,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "04a616ffc26488e05c7f984b3cb01c2960f06d44aee596e96c09b6203c05a29d",
+    "judge_rep": 3
+  }
+}

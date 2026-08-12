@@ -1,0 +1,26 @@
+[
+  {
+    "author": "gcanlin",
+    "body": "Why not directly replace `torch.cuda.device` by `current_omni_platform.device`?",
+    "line": 218,
+    "path": "vllm_omni/diffusion/models/minimax_h3/vae.py"
+  },
+  {
+    "author": "gcanlin",
+    "body": "And I think we can reduce the UT for modeling. The E2E test have already covered it.",
+    "line": 4,
+    "path": "tests/diffusion/models/minimax_h3/test_minimax_h3_vae.py"
+  },
+  {
+    "author": "yeahdongcn",
+    "body": "Sure, let me drop this file.",
+    "line": 4,
+    "path": "tests/diffusion/models/minimax_h3/test_minimax_h3_vae.py"
+  },
+  {
+    "author": "yeahdongcn",
+    "body": "The main reason for this change is not only replacing `torch.cuda.device`.\r\n\r\nThe existing `device.type == \"cuda\"` check is a hard CUDA-only allowlist. I kept the CUDA behavior and added MUSA only after validating deterministic RNG behavior on real MUSA hardware. Other accelerator types still use the CPU-only fallback because their device RNG semantics have not been validated.",
+    "line": 218,
+    "path": "vllm_omni/diffusion/models/minimax_h3/vae.py"
+  }
+]

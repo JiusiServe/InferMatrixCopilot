@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.4,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.8
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y stays grounded in the shown diff (stale header comments, duplicate `omni_pooler_payload_include_hidden`, NPU PIECEWISE question) and directly echoes the actual reviewer thread's biggest ask — a full before/after benchmark, since perf gains were suspected to be partly from the unrelated seed-yaml removal. X is more exhaustive and technically deep but its flagship 'major' finding directly contradicts the PR's own documented behavior (claims seeding is NOT dropped, when the PR body/inline comments confirm it is), and several other findings cite files/CI-gate state not present in the given diff, which cannot be verified as grounded and reads as fabricated. Neither candidate surfaces the actual top ground-truth concern (why `cudagraph_mode` is read in modeling vs. runner), but Y's remaining findings are more reliably real.",
+  "_cost_usd": 0.13196980000000003,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "db8c75d12f81e4c19240ea14e21a1d73a253e458a58347b7e2472b0800f329b7",
+    "judge_rep": 3
+  }
+}

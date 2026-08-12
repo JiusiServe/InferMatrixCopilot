@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 1.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 1.0,
+    "actionability": 1.0,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "X reports no findings and misses all reviewer concerns. Y identifies the global containment behavior underlying the main concern and provides concrete lines and fixes, though it misses the documentation mismatch and legacy-fallback concern; its additional findings are grounded in the diff.",
+  "_usage": {
+    "input": 3,
+    "output": 1014
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "ocr_v1810_r1",
+    "Y": "claudecode_opus48"
+  },
+  "_roles": {
+    "arm": "ocr_v1810_r1",
+    "baseline": "claudecode_opus48"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "d3edf64fb7ce4963cdf18cefb16c5e952b007f1f61cfac0da15bc3505d92982b",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus48",
+    "arm_b_sha256": "57b6d7c71689531e493af8c872b3e4ade613637bb140ed6bdbd5f3db565a777d",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

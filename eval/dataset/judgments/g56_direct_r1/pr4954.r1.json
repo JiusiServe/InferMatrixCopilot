@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.88,
+    "precision": 0.86,
+    "actionability": 0.97,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.94,
+    "precision": 0.76,
+    "actionability": 0.97,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both cover the global containment relaxation and question the legacy fallback, with concrete fixes and tests. Y has slightly better recall but dilutes precision with speculative or overstated findings about payload shape, list handling, and prefill behavior. X is more focused, though its nested-state persistence analysis is partly speculative.",
+  "_usage": {
+    "input": 3,
+    "output": 3540
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "direct_opus5_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "direct_opus5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/direct_opus5_r1",
+    "arm_a_sha256": "15d237aef63200af65f867943a3d78d7e4e0875a25583fa0ff42adb943fdb648",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "876219c8b0b10edabcc0c302eb8ce6951e35bdecf6437bbb6247e39bc44276e3",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

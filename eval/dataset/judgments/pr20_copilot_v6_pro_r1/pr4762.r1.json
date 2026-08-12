@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.7,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates catch the trust_remote_code default-flip concern that the ground truth flags. Y additionally matches yuanheng-zhao's exact concern about positional-arg binding risk in the changed create_from_model signature, and independently surfaces a well-evidenced regression (missing try/except around load_deploy_config in the new _get_deploy_override_pipe_config, verifiable against the visible diff) that no human reviewer caught. X's findings (status_code fallback, else-branch route skipping) reference code outside the visible diff and are plausible but less rigorously grounded, and X misses the positional-arg and try/except issues entirely. Y's structured evidence citations also make it marginally more actionable.",
+  "_cost_usd": 0.2977698,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "6b029027391ffca15cd3043ca09efdab689d704a58dfe733544474ba90a718bd",
+    "judge_rep": 1
+  }
+}

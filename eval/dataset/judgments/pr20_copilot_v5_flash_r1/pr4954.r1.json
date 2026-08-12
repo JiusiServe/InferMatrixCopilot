@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.75,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates touch the ground-truth's core doc/behavior-contract concern (containment fallback silently loosening the 'strict unless opt-in' promise). X goes further, independently investigating the legacy-audio-producer question GT raised and catching a genuine, well-grounded substring-matching bug (expected 'hi' matching inside 'this') with a concrete word-boundary fix — high actionability. Y is cleaner and equally well-grounded but narrower, missing the legacy-fallback/producer angle entirely. X's precision is dragged down by one speculative, hard-to-verify claim about issue #4949's five failing tests presented with high confidence, which Y avoids by staying tightly scoped to verifiable diff logic.",
+  "_cost_usd": 0.1917302,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "78ba7c7adf2f6dabb1dc365332b38d48250c9afc7852ad5a8b51e2519c514742",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.5,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates correctly validated the core boundary-value change and explored beyond the diff into pipeline/API call sites, and both exceed the (essentially empty, LGTM-only) ground truth in depth. X's headline 'blocking' findings rest on three specific file/line claims (tests/dfx/reliability/invalid_param_test/...) that appear nowhere in the diff and directly conflict with Y's own repo-wide grep sweep for stale '3 and 10 inclusive'/'3-10' strings, which explicitly found nothing — this is a real fabrication risk that undermines precision on X's most consequential claims. Y's findings are more conservative, tied to visible diff hunks, and transparent about its verification methodology (including a caveat about a spurious grep miss), giving it materially higher precision at similar actionability and recall.",
+  "_cost_usd": 0.0843661,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "d2ade8b2f7541d6e36447c8489a4aa4e4f4b125310747ac9c75d41923b37d84b",
+    "judge_rep": 1
+  }
+}

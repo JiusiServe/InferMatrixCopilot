@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.63,
+    "precision": 0.68,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.78,
+    "precision": 0.48,
+    "actionability": 0.88,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Y covers more documented concerns but pads its review with stale or hypothetical test and documentation findings. X includes speculative streaming claims contradicted by human verification, yet offers more valid, concrete analysis of padding, related NPU logic, and regression-test weaknesses. Neither explicitly checks multi-axis splitting.",
+  "_usage": {
+    "input": 3,
+    "output": 2240
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v4_pr20_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v4_pr20_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "14c03c556f05798ae0db3e30ae148e0343e840290dab95f4d7bdf38b9a310a46",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "03d7423c3a91e45838083e2025e3dea932f1d9448ba923b1d6ca1a0373899ea1",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

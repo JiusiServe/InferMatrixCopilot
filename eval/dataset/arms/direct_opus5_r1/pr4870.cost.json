@@ -1,0 +1,53 @@
+{
+  "calls": 33,
+  "input_tokens": 1662934,
+  "output_tokens": 23719,
+  "cost_usd": 2.141702,
+  "is_error": false,
+  "terminal_reason": "completed",
+  "split": "train",
+  "head": "231b3ddb97c177e6cee50f16be5ab8e9dee9228c",
+  "base": "0798b0bf03cb6e7c4dc40ee58fe12ce492ce255f",
+  "resolved_model": "claude-opus-5",
+  "snapshot_sha256": "ce068efd87cd13bc9cb2eb08b56da3cf9cbf886882b8833df7146905056d986b",
+  "validation_commands": [
+    "git log -1 --format='%H %s' && echo \"--- FILES ---\" && git diff --stat 0798b0bf03cb6e7c4dc40ee58fe12ce492ce255f HEAD",
+    "git diff 0798b0bf03cb6e7c4dc40ee58fe12ce492ce255f HEAD",
+    "echo \"=== callers of _build_omni_model_runner_output_from_snapshot ===\" && rg -n \"_build_omni_model_runner_output_from_snapshot\" --glob '!tests/**' -C2 | head -60 && echo \"=== seq_len= in gpu_ar_model_runner ===\" && rg -n \"seq_len\" vllm_omni/worker/gpu_ar_model_runner.py | head -40",
+    "rg -n \"def to_payload_element\" -A 60 vllm_omni/ | head -80",
+    "echo \"=== model_config attr on serving class ===\" && rg -n \"self\\.model_config\" vllm_omni/entrypoints/openai/serving_speech.py | head -20 && echo \"=== _tts_model_type assignment ===\" && rg -n \"_tts_model_type\\s*=\" vllm_omni/entrypoints/openai/serving_speech.py | head -10 && echo \"=== is_streaming_re",
+    "python3 -c \"\nimport inspect, vllm.entrypoints.openai.serving_engine as m\nsrc=inspect.getsource(m.OpenAIServing.__init__)\nprint(src[:2000])\n\" 2>&1 | head -40",
+    "python3 -c \"import vllm,sys;print(vllm.__version__, sys.version)\" 2>&1 | tail -3; echo \"--- which pythons ---\"; ls /home/admin/miniconda3/bin/python3 2>/dev/null; /home/admin/miniconda3/bin/python3 -c \"import vllm;print('vllm',vllm.__version__)\" 2>&1 | tail -2",
+    "/home/admin/miniconda3/bin/python3 -c \"import vllm, sys; print('vllm', vllm.__version__); import vllm_omni; print('omni ok')\" 2>&1 | tail -5",
+    "rg -n \"self.model_config\" /home/admin/miniconda3/lib/python3*/site-packages/vllm/entrypoints/openai/serving_engine.py 2>/dev/null | head -5",
+    "rg -n \"def qwen3_tts_server|def voxtral_server\" -A 40 tests/entrypoints/openai_api/test_serving_speech.py | rg -n \"model_config|OmniOpenAIServingSpeech|def qwen3_tts_server|def voxtral_server|_tts_model_type|async_chunk\" | head -30",
+    "rg -n \"def coerce_param_message_types\" -A 30 vllm_omni/ | head -40",
+    "rg -n \"_prepare_speech_generation\\(\" vllm_omni/entrypoints/openai/serving_speech.py",
+    "rg -n \"async def _generate_audio_chunks\" -A 120 vllm_omni/entrypoints/openai/serving_speech.py | head -140",
+    "rg -n \"def _validate_speech_streaming_request\" -A 45 vllm_omni/entrypoints/openai/serving_speech.py | head -55",
+    "rg -n \"\\\"codes\\\"|'codes'\" vllm_omni/model_executor/models/qwen3_tts/*.py | head -20",
+    "rg -n \"_generate_audio_chunks\\(\" vllm_omni/entrypoints/openai/serving_speech.py"
+  ],
+  "ran_validation": true,
+  "claude_md_seen": {
+    "/data/zhoutaichang/CLAUDE.md": "4ff5b2a69ed0abc2"
+  },
+  "recorded_at": "2026-08-11T16:45:13",
+  "arm": "direct_opus5",
+  "wall_s": 351.1,
+  "audit_ok": true,
+  "audit_violations": [],
+  "audit_blocked_attempts": [],
+  "artifact_chars": 7078,
+  "completion_gate_ok": true,
+  "mcp_review_calls": 1,
+  "mcp_review_calls_ok": 1,
+  "mcp_validate_calls": 2,
+  "mcp_validate_calls_ok": 2,
+  "validate_status_sequence": [
+    "partial_review",
+    "complete"
+  ],
+  "validate_final_status": "complete",
+  "audit_rule": "worktree + installed dependencies + copilot knowledge"
+}

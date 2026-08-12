@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Candidate X returns zero findings and zero explanation of what was checked, so it contributes nothing comparable to the ground-truth concerns about override scope, test coverage of the inductor/oink branches, and perf/accuracy evidence. Candidate Y engages substantively with those same themes — it explains why the global platform-default change is safe (mirroring the scope concern hsliuustc0106/NumberWan debated, citing the override hook and FLUX.1-dev A/B evidence), and independently spots that the new regression test's CompilationMode parametrization is now vacuous since the code no longer branches on it, which echoes the reviewers' push for meaningful inductor/oink test coverage. Y's findings cite specific files and lines and read as grounded in actual code inspection rather than boilerplate, giving it solid precision and actionability, though it frames most items as resolved/non-blocking rather than raising them as open asks, so recall against the raw comment list is only moderate. Y is the clear winner since X provides no usable signal at all.",
+  "_cost_usd": 0.1815334,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "d8324d7bb719fdb217adc945d73f46a22a7626ec42cef97db81c8294a0b4a516",
+    "judge_rep": 2
+  }
+}

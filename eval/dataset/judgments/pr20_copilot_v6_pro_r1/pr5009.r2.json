@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y engages with the central, most-discussed ground-truth concern (global scope of the platform-default change, validated only on Qwen-Image, and whether FLUX/perf/accuracy evidence justifies it) and explicitly cross-checks the accuracy/perf evidence bar reviewers demanded; X never mentions scope at all. X's sole strong hit is catching Gaohan123's verbatim 'pytest mark is not complete' concern with precise, actionable evidence, which Y completely misses, but this is a single narrow item against Y's broader coverage. Both sets of findings are grounded in the actual diff/code (no fabrication) and reasonably actionable with file/line references, so precision and actionability are close, but Y's recall advantage on the PR's dominant concern decides it.",
+  "_cost_usd": 0.19445520000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "a4a2080260dae95bfc512b00845050b34423e0a993a711dc75a9b14a7d8e8a8e",
+    "judge_rep": 2
+  }
+}

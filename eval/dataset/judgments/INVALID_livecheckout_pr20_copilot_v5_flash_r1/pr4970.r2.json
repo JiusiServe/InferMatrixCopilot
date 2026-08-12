@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.55,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "The PR is a trivial 2-line seed removal that was approved with a plain 'LGTM' and no inline concerns, so there's little to recall for either side. X manufactures four hedged 'minor' findings (test-claim contradiction, unverifiable WER-json gating, ask-for-verification directives) and lands on COMMENT, which is poorly calibrated against how trivial this change actually was and how much of it rests on unverifiable claims about nightly harness behavior. Y reaches the same core mechanism understanding more efficiently, correctly recommends APPROVE (matching the real outcome), and gives two crisp, concrete, low-risk suggestions (add a guard comment, note stage-1 removal is inert) that are easier to act on. Y is the better-calibrated, more grounded review overall.",
+  "_cost_usd": 0.1289144,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "df4bc3e6ba34f38ec92c8a9bd1113ac4d9a0c47450c720ad1225b2839be68c97",
+    "judge_rep": 2
+  }
+}

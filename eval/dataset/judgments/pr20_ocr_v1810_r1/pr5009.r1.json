@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Candidate X performs genuine code verification, correctly surfaces the global-scope risk of the platform default change and cross-checks it against the actual FLUX.1-dev evidence and override hooks mentioned in ground truth, and flags a real (if minor) issue that the new test's mode parametrization is now vacuous since the code no longer branches on compilation mode. It misses the 'pytest mark incomplete' nit but is otherwise well-grounded, specific with file:line citations, and actionable. Candidate Y produces zero findings and adds no value at all.",
+  "_cost_usd": 0.1556834,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "d8324d7bb719fdb217adc945d73f46a22a7626ec42cef97db81c8294a0b4a516",
+    "judge_rep": 1
+  }
+}

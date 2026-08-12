@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.7,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.8,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X's major finding (global CUDA default now unconditionally vllm_c-preferring, validated only on Qwen-Image/FLUX diffusion, with a concrete fix suggestion to scope via the per-pipeline ir_op_priority_func hook) closely mirrors hsliuustc0106's actual top concern and cites real evidence (diffusion_worker.py:175, rocm/xpu platform.py). X's second finding pushing to wire the accuracy regression test into CI also echoes hsliuustc0106's ask for an accuracy comparison alongside latency. Y reaches APPROVE and actively argues the scope concern away via the Cosmos3 override, missing what real reviewers treated as a substantive ask requiring extra A/B evidence; Y's three notes (vacuous parametrization, ROCm drift, upstream divergence) are accurate but tangential to what ground-truth reviewers actually flagged. X's AR-impact extension is partly speculative (self-flagged as assumption), slightly hurting precision, but its core claims are well-grounded and far more actionable than Y's soft 'non-blocking' notes.",
+  "_cost_usd": 0.1322822,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "9e2ad20ccd2742ddd81f953b12bfdefa5e0207f9d0ae75d84c186880f0f1a830",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.8,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X delivers a substantive, diff-grounded review: it correctly validates the unet-scan change, flags a real design concern about hardcoded component lists (conceptually echoing dsocek's point about centralizing naming/mapping logic rather than ad hoc lists) with specific file/line pointers, and raises a plausible follow-up (text-encoder LoRA no-op) with concrete actionability. Y is an empty OCR pass reporting zero findings, missing every ground-truth concern and providing no actionable content at all. X clearly wins on recall, precision, and actionability.",
+  "_cost_usd": 0.0543238,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "48a927d3f79c2089de5158c5686a3464c85acdaa23d77bf628197982374b87e9",
+    "judge_rep": 2
+  }
+}

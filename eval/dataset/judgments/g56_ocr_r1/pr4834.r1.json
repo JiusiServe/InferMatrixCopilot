@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.67,
+    "precision": 0.62,
+    "actionability": 0.95,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X identifies the latent over-strict level-2 guard and gives concrete locations and remedies; it also discusses regression coverage and tag enums. Its precision is reduced by numerous claims relying on context outside the supplied diff and by attributing the reported CI failure to this PR despite the human clarification that the remaining failure was unrelated. Y reports no findings and misses both the documented concerns and latent gap.",
+  "_usage": {
+    "input": 3,
+    "output": 586
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "ocr_v1810_r1"
+  },
+  "_roles": {
+    "arm": "ocr_v1810_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "548f2909eab0dea5f674754beaa204919fcc62e4ee75923f7f33f13ab7c49da0",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "05ba88edbe75596d53ffc0adcf76df898385eb4f6f271110f37f19da2cac4adf",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

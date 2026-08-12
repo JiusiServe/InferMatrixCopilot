@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.5,
+    "actionability": 0.3,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X's design comment about deriving denoiser components from existing per-pipeline declarations (_dit_modules) instead of a growing hardcoded list closely parallels dsocek's ground-truth concern about driving the mapping from stacked_params_mapping instead of ad hoc lists, and X also correctly notes the validation-results exchange with xuechendi. Y's single finding is a trivial PR-description nitpick with no line grounding (line 0) and misses every substantive thread in the ground truth. X is far more grounded, specific, and actionable.",
+  "_cost_usd": 0.044674599999999995,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "57eb90f679bbd91ab348eec29e20cd2a123609b3d55f8401d1f61754eb298472",
+    "judge_rep": 2
+  }
+}

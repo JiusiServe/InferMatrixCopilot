@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.64,
+    "precision": 0.56,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.48,
+    "actionability": 0.88,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X best captures the global diffusion-model blast radius, need for representative A/B evidence, and per-model scoping option. Y covers similar evidence concerns but incorrectly expands the hook to AR/LLM stages. Both miss the incomplete pytest marking concern and include several speculative or peripheral findings.",
+  "_usage": {
+    "input": 3,
+    "output": 1163
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "direct_opus5_r1"
+  },
+  "_roles": {
+    "arm": "direct_opus5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/direct_opus5_r1",
+    "arm_a_sha256": "ab1dd13f8136f439e6f6d16f7a7bc9e957d4859182348b7a13bec83080e45928",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "97e45909dc2469db55da15b6e8d6a525549029c219aefca76123ec8b801fd1bf",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

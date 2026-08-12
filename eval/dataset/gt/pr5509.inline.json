@@ -1,0 +1,26 @@
+[
+  {
+    "author": "david6666666",
+    "body": "These new kwargs are passed even when quantization is disabled. On older supported FlashInfer builds where this function lacks the SAGE parameters, the existing dense TRTLLM_ATTN path will now raise TypeError. Please only pass them when the SAGE kernel API is available, or update the dependency globally.",
+    "line": 318,
+    "path": "vllm_omni/diffusion/attention/backends/trtllm_attn.py"
+  },
+  {
+    "author": "bobboli",
+    "body": "`FLASHINFER_ATTN` does not consume `backend_kwargs`, so its `quant` config is silently ignored and dense attention still runs. Please restrict `quant` to `TRTLLM_ATTN` in this PR.",
+    "line": 1418,
+    "path": "vllm_omni/diffusion/data.py"
+  },
+  {
+    "author": "david6666666",
+    "body": "The conditional kwargs and updated dense-path coverage address this. Looks good now.",
+    "line": 318,
+    "path": "vllm_omni/diffusion/attention/backends/trtllm_attn.py"
+  },
+  {
+    "author": "xrq-phys",
+    "body": "#5344 will start consuming the these options. I think we can make adaptations on the FLASHINFER side rather than restricting it to TRTLLM?",
+    "line": 1418,
+    "path": "vllm_omni/diffusion/data.py"
+  }
+]

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 1.0,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "The core human concern was whether source_outputs[0] is reliably the parent (Gaohan123's inline comment); Y directly investigates and verifies this exact assumption against the orchestrator's construction order, engaging with the real substance of the review even though it concludes no code change is needed. X never touches this concern at all, instead flagging a narrow, pre-existing (not diff-introduced) IndexError edge case that, while valid and crisply actionable with a concrete line/patch, has no overlap with what reviewers actually raised. Y's other notes (dead param, CI-red caveat, one test-coverage gap) are also grounded and specific, though delivered in prose/audit style rather than X's tight diff-style suggestion, giving X a slight actionability edge per-finding. Neither candidate surfaces the precommit-fix or benchmark-script requests, which are process asks not really inferable from the diff alone.",
+  "_cost_usd": 0.1609109,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "1b2836ec6070bb5aa222d8a0be9c26ef4da635f02df21b43c35e2baec9f9736c",
+    "judge_rep": 2
+  }
+}

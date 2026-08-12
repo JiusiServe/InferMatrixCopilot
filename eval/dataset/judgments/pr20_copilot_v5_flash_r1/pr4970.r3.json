@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.75,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has essentially no substantive findings (LGTM plus an unrelated request to split out a VoxCPM2 fix into a separate PR); neither candidate explicitly addresses that scope request, so recall is low for both. Both candidates independently traced the same real mechanism (stage-0 seed → tts_local_seed → per-row generator slow path) with grounded file:line evidence and proposed the same core guard-comment fix, giving comparable precision/actionability. Y edges out X by doing broader verification (docs, tests, and explicitly confirming voxcpm2.yaml is untouched/out of scope, which echoes the ground-truth's VoxCPM2 concern) and slightly more concrete, evidence-tagged suggestions, though it pads with one redundant comment and lands on COMMENT rather than the actual LGTM/APPROVE outcome.",
+  "_cost_usd": 0.1268602,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "c53f9f9a84db01a9bd01378c9676e44fa0f3bc8b9466156a7e031a94f2ba502d",
+    "judge_rep": 3
+  }
+}

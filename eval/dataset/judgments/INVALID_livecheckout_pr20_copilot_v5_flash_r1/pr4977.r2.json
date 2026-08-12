@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 1.0,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.95,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently noticed the same core discrepancy relevant to the ground-truth concern (PR description claims trust_remote_code=True but it's absent from the diff), giving each partial, roughly equal recall against the single GT comment. Both sets of findings are grounded in the actual diff (lock scope, cache correctness, fallback-order preservation) with no fabrication, so precision is high for both. Y edges ahead on actionability and coverage by also flagging the real gap that the new caching/fallback logic has zero test coverage, plus a concrete double-checked-locking fix and precise line-anchored directives, while X is slightly tighter and cleaner but covers less ground.",
+  "_cost_usd": 0.14238240000000002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "4c1444c426037ea11508eb06ecded42c16c30eb7678afc83e33297a06da92ce7",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.5,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both miss the ground-truth reviewer's actual asks (explicit comment/check on parent-first ordering, running the specific benchmark test, fixing precommit), so recall is low and roughly tied. X piles on speculative/alarmist findings (treating red buildkite npu/amd CI as a 'major' merge-blocker, hypothetical pipeline.py:555 dict/list mismatch, silent-truncation footgun) that aren't corroborated by the diff or the actual outcome (the PR was approved and merged with only a precommit nit), hurting precision despite being very actionable with concrete pytest commands. Y reaches the same verified conclusions (parent-first ordering confirmed via orchestrator, dict|None contract compatible with all consumers) but calibrates its verdict to APPROVE with balanced non-blocking notes, which better matches the ground-truth reviewers' actual LGTM outcome, giving it higher precision at a small actionability cost.",
+  "_cost_usd": 0.16842620000000003,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "ac4980c54d331c1c795a00790179254eac8bd4a7dbf430b5aacc7e54ae61e569",
+    "judge_rep": 2
+  }
+}

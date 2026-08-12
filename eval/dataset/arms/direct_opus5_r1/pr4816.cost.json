@@ -1,0 +1,50 @@
+{
+  "calls": 29,
+  "input_tokens": 1029100,
+  "output_tokens": 14086,
+  "cost_usd": 1.322093,
+  "is_error": false,
+  "terminal_reason": "completed",
+  "split": "val",
+  "head": "e1dac23ac02cda81909af4633e85d7ff846f1032",
+  "base": "a560ed184d9197855f1cccf46cb1cac87b0a7138",
+  "resolved_model": "claude-opus-5",
+  "snapshot_sha256": "c07899b51303537a49b839899e414518f6345da4e40459b8695ce35b06ca49bb",
+  "validation_commands": [
+    "git log -1 --format='%H %s' && echo \"---FILES---\" && git diff --stat a560ed184d9197855f1cccf46cb1cac87b0a7138 HEAD",
+    "git diff a560ed184d9197855f1cccf46cb1cac87b0a7138 HEAD",
+    "rg -n \"openai_serving_tokenization|serving_tokenization\" --glob '!*.pyc' | head -60",
+    "python -c \"import vllm, os; print(vllm.__version__); print(os.path.dirname(vllm.__file__))\" 2>&1 | tail -3",
+    "cd /usr/local/lib/python3.12/dist-packages/vllm && rg -n \"openai_serving_tokenization|serving_tokenization\" --glob '*.py' | head -40; echo \"=== basic.py ===\"; ls entrypoints/serve/instrumentator/ 2>/dev/null || echo \"NO instrumentator dir\"",
+    "rg -n \"^\\s+state\\.\\w+ = \" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py | sed -n '1,80p'",
+    "rg -n \"_create_speech_error_json_response|^from vllm.entrypoints.serve.instrumentator|import base|_patch_api_server_base\" /data/zhoutaichang/.infermatrix-copilot/worktrees/vllm-omni-pr4816/vllm_omni/entrypoints/openai/api_server.py /data/zhoutaichang/.infermatrix-copilot/worktrees/vllm-omni-pr4816/t",
+    "rg -n \"^def Omnispeech|^def Omnichat|^def OmniAudioGenerate\" -A4 /data/zhoutaichang/.infermatrix-copilot/worktrees/vllm-omni-pr4816/vllm_omni/entrypoints/openai/api_server.py",
+    "python -c \"import vllm; from vllm.entrypoints.serve.instrumentator.basic import base, tokenization; import vllm_omni; print('preflight ok', vllm.__version__)\" 2>&1 | tail -5",
+    "rg -n \"vllm\" /data/zhoutaichang/.infermatrix-copilot/worktrees/vllm-omni-pr4816/requirements/*.txt 2>/dev/null | rg -i \"==|>=|@|git\" | head -20; rg -rn \"VLLM_TARGET_VERSION|vllm_version|0\\.2[0-9]\\.[0-9]\" /data/zhoutaichang/.infermatrix-copilot/worktrees/vllm-omni-pr4816/vllm_omni/version.py /data/zh",
+    "rg -n \"REQUIRED|VLLM|version\" /data/zhoutaichang/.infermatrix-copilot/worktrees/vllm-omni-pr4816/vllm_omni/version.py | head -20",
+    "timeout 900 python -m pytest tests/entrypoints/openai_api/test_serving_speech.py -k \"without_handler_returns_404 or without_speech_handler\" -q 2>&1 | tail -15",
+    "timeout 900 python -m pytest tests/entrypoints/openai_api/test_serving_speech.py -q --collect-only 2>&1 | rg -A12 \"ERROR|Error\" | head -30",
+    "rg -n \"state\\.openai_serving_render\\s*=\" /data/zhoutaichang/.infermatrix-copilot/worktrees/vllm-omni-pr4816/vllm_omni/entrypoints/openai/api_server.py"
+  ],
+  "ran_validation": true,
+  "claude_md_seen": {
+    "/data/zhoutaichang/CLAUDE.md": "4ff5b2a69ed0abc2"
+  },
+  "recorded_at": "2026-08-11T17:13:23",
+  "arm": "direct_opus5",
+  "wall_s": 266.5,
+  "audit_ok": true,
+  "audit_violations": [],
+  "audit_blocked_attempts": [],
+  "artifact_chars": 5580,
+  "completion_gate_ok": true,
+  "mcp_review_calls": 1,
+  "mcp_review_calls_ok": 1,
+  "mcp_validate_calls": 1,
+  "mcp_validate_calls_ok": 1,
+  "validate_status_sequence": [
+    "complete"
+  ],
+  "validate_final_status": "complete",
+  "audit_rule": "worktree + installed dependencies + copilot knowledge"
+}

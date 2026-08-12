@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.67,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.62,
+    "actionability": 0.92,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y directly identifies the older-kernels keyword incompatibility underlying the ground-truth concern, while X only conditionally gestures at API support and could encourage reintroducing the regression. Y adds several useful, actionable observations, though speculative or out-of-scope claims about unsupported kernels versions and CI reduce precision.",
+  "_usage": {
+    "input": 3,
+    "output": 884
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "copilot_v4_pr20_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v4_pr20_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "f617724ad6b14212a0081ebcad7859972857606d0aa8211c0ebaa748c24de3a1",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "589a8ff13cb3893b76dd0d5220ad632d82f46cc0edd9083528ebb2466be7c8a7",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

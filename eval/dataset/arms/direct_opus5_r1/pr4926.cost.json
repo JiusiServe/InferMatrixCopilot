@@ -1,0 +1,45 @@
+{
+  "calls": 23,
+  "input_tokens": 829875,
+  "output_tokens": 21921,
+  "cost_usd": 1.4684135000000003,
+  "is_error": false,
+  "terminal_reason": "completed",
+  "split": "train",
+  "head": "35aa741e1962ba8210b75f0028e048fbaf2cc59a",
+  "base": "5c51782c6bec3c7976c528e5899e89452278c448",
+  "resolved_model": "claude-opus-5",
+  "snapshot_sha256": "68c5b42b331ff9521941eb37d117f40d72291ba257d16c732c437341ac0b2940",
+  "validation_commands": [
+    "git rev-parse HEAD && echo \"---FILES---\" && git diff --stat 5c51782c6bec3c7976c528e5899e89452278c448 HEAD",
+    "git diff 5c51782c6bec3c7976c528e5899e89452278c448 HEAD -- vllm_omni/platforms/ vllm_omni/diffusion/attention/backends/registry.py",
+    "python -c \"\nimport kernels, inspect\nprint('kernels', kernels.__version__)\nprint(inspect.signature(kernels.get_kernel))\n\" 2>&1 | head -20",
+    "python - <<'EOF' 2>&1 | head -40\nimport inspect, kernels\nsrc = inspect.getsource(kernels.get_kernel)\nprint(src[:1500])\nprint(\"--- cached?\", hasattr(kernels.get_kernel, 'cache_info'))\nEOF",
+    "python -c \"\nimport inspect, kernels\nf = kernels.get_kernel\nprint('cache_info:', hasattr(f,'cache_info'))\nsrc = inspect.getsource(f)\nprint(src[:1600])\n\" 2>&1 | head -45",
+    "python -c \"\nimport inspect, kernels\nsrc = inspect.getsource(kernels.get_kernel)\ni = src.find('\\\"\\\"\\\"', src.find('\\\"\\\"\\\"')+3)\nprint(src[i+3:i+1200])\n\" 2>&1 | head -40",
+    "git diff 5c51782c6bec3c7976c528e5899e89452278c448 HEAD -- docs/user_guide/diffusion/attention_backends.md | head -60",
+    "grep -rn \"^kernels\\|kernels==\\|kernels>=\" requirements/ pyproject.toml setup.py 2>/dev/null | head -10; echo \"EXIT=$?\""
+  ],
+  "ran_validation": true,
+  "claude_md_seen": {
+    "/data/zhoutaichang/CLAUDE.md": "4ff5b2a69ed0abc2"
+  },
+  "recorded_at": "2026-08-11T16:52:49",
+  "arm": "direct_opus5",
+  "wall_s": 305.4,
+  "audit_ok": true,
+  "audit_violations": [],
+  "audit_blocked_attempts": [],
+  "artifact_chars": 11359,
+  "completion_gate_ok": true,
+  "mcp_review_calls": 1,
+  "mcp_review_calls_ok": 1,
+  "mcp_validate_calls": 2,
+  "mcp_validate_calls_ok": 2,
+  "validate_status_sequence": [
+    "partial_review",
+    "complete"
+  ],
+  "validate_final_status": "complete",
+  "audit_rule": "worktree + installed dependencies + copilot knowledge"
+}

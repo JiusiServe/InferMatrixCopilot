@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.03,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Candidate X returned zero findings despite the diff containing verifiable, non-trivial content to check (already-applied qwen3_tts scoping, async_chunk default handling, seq_len removal), so it earns no credit anywhere. Candidate Y did real investigation, confirmed the streaming-scoping fix is correct, caught a genuine residual inconsistency in the async_chunk default value with file/line specificity, and explicitly flagged the risk that the split now depends solely on scheduled-token count rather than hidden-state shape — directly anticipating the dual-batch-axis issue later fixed in PR #4910. Y's findings are grounded in the actual diff and actionable; X contributes nothing.",
+  "_cost_usd": 0.2535839,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "7c3a64ea1a0912c52d6a87b94201588b52a24e23de0c7c1fee78732c41f7c9f6",
+    "judge_rep": 2
+  }
+}

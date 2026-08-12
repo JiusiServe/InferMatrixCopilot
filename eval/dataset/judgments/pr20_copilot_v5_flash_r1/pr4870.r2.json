@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.5,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both catch the async_chunk default-value inconsistency (matching the ground-truth Low note), but X's verdict (FOLLOW-UP REQUIRED, multiple 'major' tags) is poorly calibrated: it raises a 'major' test-identity concern that Y actually investigated and disproved (self.model_config is the same object), and duplicates the streaming-verification concern across two separate 'major' findings, overstating risk on a change the human reviewer already e2e-validated as streaming cleanly. Y investigates rather than speculates (confirms is_streaming_request only feeds coercion, confirms object identity), lands on a verdict matching the actual outcome (approved/merged with non-blocking nits), and its comment on the split now keying solely on total_num_scheduled_tokens directly surfaces the dual-batch-axis gap later fixed by PR #4910, even while (reasonably) not blocking on it.",
+  "_cost_usd": 0.27545430000000004,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "8099d56e98610d2cf2e3bec7cf0b9f5dacc8f8796358850f0ae16db3532aefa7",
+    "judge_rep": 2
+  }
+}

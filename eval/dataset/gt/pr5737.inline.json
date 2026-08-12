@@ -1,0 +1,26 @@
+[
+  {
+    "author": "lishunyang12",
+    "body": "This only validates video quality, but H3's FP8 DiT also generates audio. Could we add at least an audio validity/quality check?",
+    "line": 214,
+    "path": "tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Please document that H3 FP8 is currently incompatible with layerwise offload; otherwise users will hit the flattened-weight stride failure.",
+    "line": 96,
+    "path": "docs/user_guide/quantization/fp8.md"
+  },
+  {
+    "author": "mglyn",
+    "body": "Added. The quality test now checks the 32 kHz audio output using multi-resolution spectral cosine and RMS ratio. The latest BF16/FP8 A/B achieved 0.9589 cosine and 0.9342x RMS ratio.",
+    "line": 214,
+    "path": "tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py"
+  },
+  {
+    "author": "mglyn",
+    "body": "Documented in both the FP8 support matrix and the H3 recipe. H3 online FP8 is currently incompatible with layerwise offload due to the flattened-weight stride rejected by the Cutlass kernel.",
+    "line": 96,
+    "path": "docs/user_guide/quantization/fp8.md"
+  }
+]

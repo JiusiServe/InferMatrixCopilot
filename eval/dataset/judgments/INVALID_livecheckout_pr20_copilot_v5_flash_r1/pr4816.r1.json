@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.95,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.45,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The PR is a mechanical attribute rename across 2 files, matched by real reviewers with a plain 'lgtm' — nothing substantive to recall for either candidate. X correctly scopes its review to the diff, verifies rename completeness and alignment with upstream naming, and reaches the correct APPROVE verdict with high-confidence, grounded claims. Y produces an elaborate COMMENT-verdict review speculating about untested error paths and a 'pre-existing' diffusion-mode bug that reaches well beyond the diff's actual content (citing line numbers/functions not shown in the diff, e.g. _create_speech_error_json_response, upload_voice handlers), with several claims explicitly hedged as unverified — this inflates apparent thoroughness but lowers grounded precision and contradicts the real reviewer's clean approval of this trivial rename PR.",
+  "_cost_usd": 0.1320294,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "ee3acd6f40484c26642684973445d43ce01089239726e85fa76eb55fad4e1c32",
+    "judge_rep": 1
+  }
+}

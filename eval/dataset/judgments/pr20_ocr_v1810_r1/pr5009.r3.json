@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "X returned zero findings, so it misses every ground-truth thread (blast-radius scope of the platform-wide default change, the P1+P2/non-Qwen perf-accuracy justification, UT adequacy) and offers nothing actionable. Y independently surfaces and validates the scope-expansion risk with concrete code evidence (mirroring NumberWan's actual FLUX.1-dev justification), notes the perf/accuracy evidence quality mirroring the Gaohan123 ask, and adds a sharp, grounded observation that the new test's CompilationMode parametrization is now vacuous since the code no longer branches on it — all anchored to specific files/lines. Y misses the 'pytest mark incomplete' nit but is otherwise well-grounded and far more useful.",
+  "_cost_usd": 0.1773934,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "d8324d7bb719fdb217adc945d73f46a22a7626ec42cef97db81c8294a0b4a516",
+    "judge_rep": 3
+  }
+}

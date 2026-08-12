@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.25,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "X returned zero findings, missing the only ground-truth concern (trust_remote_code/kernels version compatibility) entirely and offering nothing actionable. Y actually engaged with that exact area of the code, correctly noting (grounded in the diff) that the PR description's claimed trust_remote_code addition is absent, plus a valid, well-explained observation about the lock serializing FA2/FA3 loads — both findings are accurate, non-fabricated, and cite specific lines with concrete suggested actions. Y doesn't land the precise ground-truth framing (version-gated kwarg breakage) so recall is only partial, but it is unambiguously the stronger, more useful review.",
+  "_cost_usd": 0.08718500000000001,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "04a616ffc26488e05c7f984b3cb01c2960f06d44aee596e96c09b6203c05a29d",
+    "judge_rep": 3
+  }
+}

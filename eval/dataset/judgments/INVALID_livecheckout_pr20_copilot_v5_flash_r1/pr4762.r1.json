@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.6,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Y independently rediscovers and extends the single most significant ground-truth-confirmed bug (endpoint restrictions resolved from a pipeline that may not match the final deploy-overridden pipeline), while X actually asserts this is already fixed and 'can't diverge' — a precision miss given the ground truth shows this was a real, author-acknowledged bug. Both catch the trust_remote_code default-flip issue, but Y reports it three near-duplicate times, hurting its precision/cleanliness despite each instance being technically grounded. X's review is cleaner and well-organized but shallower, missing most ground-truth concerns (positional-arg signature risk, error-builder suggestion, hf_config mutability) that Y also misses but partially compensates for with its caching test-isolation finding.",
+  "_cost_usd": 0.2822234,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "f9328fb7768ce1d7084497f847a5438f6650e2b73c2dece162483b0bed558574",
+    "judge_rep": 1
+  }
+}

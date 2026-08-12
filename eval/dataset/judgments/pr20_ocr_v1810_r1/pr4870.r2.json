@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "X's OCR run terminated partial with zero findings, surfacing none of the ground-truth concerns and providing nothing actionable. Y independently verified the already-fixed qwen3 scoping, caught a real remaining inconsistency in the async_chunk getattr default (echoing the ground-truth Low concern with concrete file:line and a fix suggestion), and explicitly flagged that the split now keys solely on scheduled-token count while dropping the prior hidden-shape alignment for other batch axes — precisely the dual-batch-axis gap that surfaced later in follow-up PR #4910, satisfying the latent gap check. Y's findings are well-grounded and concrete, giving it a decisive edge.",
+  "_cost_usd": 0.1894359,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "1abcc012bdb380840928d69f6e5ed79b82f1086c4e558915fa91b5714f9ef757",
+    "judge_rep": 2
+  }
+}

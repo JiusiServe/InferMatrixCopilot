@@ -1,10 +1,10 @@
 {
- "head": "c1fcd654f18e6a54335b2330c5206f249da2beea",
- "tracked_diff_sha256": "3382954f3b31c37c87886a6f7a4671e1c68748890c780156ad3398b2b9f1368d",
- "untracked_source_sha256": "852634482ff43f49ac7cc151d9a0a10286151cbddec3a8f98ea020bc7382c403",
+ "head": "8b6d03f26c79337fa72e786db97ba156e9f9b802",
+ "tracked_diff_sha256": "5c152868c0b30ad7cf1315b8121964f44a1372584c87708fae0fe753c56db7d0",
+ "untracked_source_sha256": "29c3f7795a053e1106033f89063ba7f7416f8336d2dba9790588d5c019c0e24c",
  "tier_models": {
   "eco": "deepseek-v4-pro[1m]",
-  "performance": "claude-opus-4-8[1m]"
+  "performance": "(unconfigured: TierNotConfiguredError)"
  },
  "moa_members": [
   "mimo-v2.5@token-plan-cn.xiaomimimo.com",
@@ -69,9 +69,9 @@
   ]
  ],
  "knobs": {
-  "MOA_WHEN": "off",
-  "PR_CONTEXT_MODE": "no_discussion",
-  "REVIEW_DEPTH": "auto",
+  "MOA_WHEN": "(default)",
+  "PR_CONTEXT_MODE": "(default)",
+  "REVIEW_DEPTH": "(default)",
   "ECO_MODEL": "(default)",
   "PERFORMANCE_MODEL": "(default)",
   "AGENT_MODEL": "(default)",
@@ -79,10 +79,10 @@
   "MOA_MAX_USD": "(default)",
   "MOA_MAX_MEMBERS": "(default)",
   "REVIEW_ENSEMBLE": "(default)",
-  "AGENT_TRACE": "1",
-  "AGENT_TRACE_IO": "1",
-  "AGENT_TRACE_IO_FULL": "1",
+  "AGENT_TRACE": "(default)",
+  "AGENT_TRACE_IO": "(default)",
+  "AGENT_TRACE_IO_FULL": "(default)",
   "AGENT_TRACE_IO_MAX": "(default)"
  },
- "pip_freeze_sha256": "dd4438edf0137370eec111692747274a41ad2889884b9bdc5ed3dd22eb9e81bf"
+ "pip_freeze_sha256": "56ddba09a495cef9d89091acaea1148907cc99a4471ffeb4150fc7d451a08dca"
 }

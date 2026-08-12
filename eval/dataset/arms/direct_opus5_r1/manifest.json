@@ -1,0 +1,58 @@
+{
+  "arm": "direct_opus5_r1",
+  "mode": "direct \u2014 the host agent reviews; the copilot makes zero LLM calls",
+  "measures": "the Direct integration as a whole (MCP + imreview skill + protocol prompt), NOT knowledge routing in isolation",
+  "model_requested": "claude-opus-5",
+  "resolved_models": [
+    "claude-opus-5"
+  ],
+  "mcp_server": "/data/zhoutaichang/copilot/InferMatrixCopilot/.venv/bin/infermatrix-copilot-mcp",
+  "mcp_pinned_to": "this checkout's venv, not plugins/.mcp.json (git+@main)",
+  "harness": "claude -p --output-format stream-json --verbose",
+  "isolation": {
+    "setting_sources": "",
+    "skills": "disabled on BOTH arms (--disable-slash-commands); enabling them would have added 16 bundled skills incl. a built-in code-review that the baseline lacks",
+    "mcp": "infermatrix-copilot",
+    "home": "isolated, credentials only"
+  },
+  "imreview_protocol": "inlined into the prompt from the shipped SKILL.md (read at run time, not copied)",
+  "imreview_skill_sha256": "3aeab749cde14586817a0c69fa151871a8303ff6f8a6095d3542d48854346741",
+  "allowed_tools": [
+    "Read",
+    "Grep",
+    "Glob",
+    "LS",
+    "TodoWrite",
+    "Task",
+    "Bash(gh pr diff:*)",
+    "Bash(git diff:*)",
+    "Bash(git log:*)",
+    "Bash(git show:*)",
+    "Bash(python -c:*)",
+    "Bash(python3 -c:*)",
+    "Bash(python -m pytest:*)",
+    "Bash(python3 -m pytest:*)",
+    "Bash(python -m ruff:*)",
+    "Bash(python3 -m ruff:*)",
+    "Bash(python -m compileall:*)",
+    "Bash(python3 -m compileall:*)",
+    "Bash(ruff:*)",
+    "Bash(rg:*)",
+    "mcp__infermatrix-copilot__review",
+    "mcp__infermatrix-copilot__validate_direct_review",
+    "mcp__infermatrix-copilot__get_review_status",
+    "mcp__infermatrix-copilot__get_review_result",
+    "mcp__infermatrix-copilot__doc_read",
+    "mcp__infermatrix-copilot__doc_search"
+  ],
+  "pr_context": "frozen snapshot (no_discussion), byte-identical to the pinned baseline's",
+  "completion_gate": "exactly one successful review(mode=direct) + a successful validate_direct_review, read from events",
+  "dataset": "vllm_omni_dataset.yaml",
+  "splits": [
+    "test",
+    "train",
+    "val"
+  ],
+  "n_items": 16,
+  "concurrency": 2
+}

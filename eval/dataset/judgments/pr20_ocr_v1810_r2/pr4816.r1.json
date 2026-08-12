@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.3,
+    "actionability": 0.1,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Both candidates reach the same 'no blockers' conclusion that matches the ground truth's lgtm approval, but X substantiates it with concrete, diff-grounded verification (enumerates all 9 renamed sites, confirms the constructor is untouched, cross-checks against upstream vLLM's naming, and flags a specific non-blocking test-mocking limitation). Y is a bare tool-log stub ('0 findings') with no evidence of actually reasoning about the diff, so its precision and actionability are essentially vacuous despite reaching the correct verdict by default. Since ground truth carries no substantive reviewer concerns, recall is near-ceiling for both, but X demonstrates far more grounded, useful engagement with the actual change.",
+  "_cost_usd": 0.09990189999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "2fdb68b17d7d75cae71ffdd0b95e36e1c3e22481bf8899a5f9df4940e2cc7bc1",
+    "judge_rep": 1
+  }
+}

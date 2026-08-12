@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive reviewer concerns (just an LGTM approval), so both trivially achieve full recall. X is tightly scoped and safely grounded, verifying diff claims against source with specific line refs and one appropriately hedged, low-risk comment, but offers little actionable follow-up. Y is more ambitious, surfacing a genuinely relevant sibling-doc inconsistency (README.md:59), a missing regression test, and an index-collision nit, each with concrete file/line targets and suggested fixes — more actionable, though its broader net of claims (extending into files/tests outside the diff) carries more unverified risk, pulling precision down slightly relative to X's narrower, safer approach.",
+  "_cost_usd": 0.0475441,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "0f6735db1e1a4059b111ce3d65ad98a645e583b036127bb1bd613ffa1d575c9c",
+    "judge_rep": 3
+  }
+}

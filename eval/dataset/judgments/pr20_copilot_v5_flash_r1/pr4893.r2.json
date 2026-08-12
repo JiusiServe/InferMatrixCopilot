@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.6,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.85,
+    "actionability": 0.4
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth is sparse (mostly procedural comments plus one inline nit questioning whether the test's reduce_scatter kwarg needs explicit verification); X's dead-code finding on the same test fake's `if reduce_scatter is not None` conditional loosely echoes that concern, while Y never touches the test file at all. X also surfaces a plausible, well-evidenced major bug (dp_metadata staleness across denoise steps with differing token counts) that Y's caching analysis explicitly considers but dismisses without checking the cross-call reuse scenario — a real miss for an APPROVE verdict. X's findings are concrete with file/line citations and proposed fixes, though one (the vllm/model_executor/models/hunyuan_image.py:0 claim) looks shaky/fabricated, dragging down precision. Y is cleaner and mostly accurate but contributes almost nothing actionable beyond a soft non-blocking note.",
+  "_cost_usd": 0.10457559999999999,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "d4d69bb2b468538d90777fa9fd2c0c3abc7f912eab883eab5b2655d34cc74fc5",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "calls": 22,
+  "input_tokens": 745746,
+  "output_tokens": 14815,
+  "cost_usd": 1.1782890000000001,
+  "is_error": false,
+  "terminal_reason": "completed",
+  "split": "val",
+  "head": "78cc4dcbb161d23a95722f70bd13d60e502caf8c",
+  "base": "431a7c71ac15fc824edfe9dd59c10f7566bde2ed",
+  "resolved_model": "claude-opus-5",
+  "snapshot_sha256": "fe10fd62196c7c2836fa886866124ab5109b54580c60cda5386ef33f17197627",
+  "validation_commands": [
+    "git rev-parse HEAD && echo \"---STAT---\" && git diff --stat 431a7c71ac15fc824edfe9dd59c10f7566bde2ed HEAD",
+    "git diff 431a7c71ac15fc824edfe9dd59c10f7566bde2ed HEAD",
+    "git log --oneline -3 -- vllm_omni/diffusion/models/z_image/pipeline_z_image.py && echo \"---ming---\" && git log --oneline -3 -- vllm_omni/diffusion/models/ming_flash_omni/pipeline_ming_imagegen.py",
+    "git show 1b0de21c --stat | head -20; echo \"=== forward sig diff ===\"; git show 1b0de21c -- vllm_omni/diffusion/models/z_image/pipeline_z_image.py | head -80",
+    "awk 'NR>=1100 && NR<=1300 && /^    async def |^    def /' vllm_omni/engine/orchestrator.py; echo \"=== enclosing def line ===\"; awk 'NR<=1290 && /^    (async )?def /{l=NR\": \"$0} END{}{ } END{print l}' vllm_omni/engine/orchestrator.py; echo \"=== callers ===\"; grep -n \"_route_to_next_stage\\|_forward_to"
+  ],
+  "ran_validation": false,
+  "claude_md_seen": {
+    "/data/zhoutaichang/CLAUDE.md": "4ff5b2a69ed0abc2"
+  },
+  "recorded_at": "2026-08-11T17:08:57",
+  "arm": "direct_opus5",
+  "wall_s": 212.6,
+  "audit_ok": true,
+  "audit_violations": [],
+  "audit_blocked_attempts": [],
+  "artifact_chars": 6680,
+  "completion_gate_ok": true,
+  "mcp_review_calls": 1,
+  "mcp_review_calls_ok": 1,
+  "mcp_validate_calls": 1,
+  "mcp_validate_calls_ok": 1,
+  "validate_status_sequence": [
+    "complete"
+  ],
+  "validate_final_status": "complete",
+  "audit_rule": "worktree + installed dependencies + copilot knowledge"
+}

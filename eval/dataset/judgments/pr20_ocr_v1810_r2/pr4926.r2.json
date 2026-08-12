@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.45,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X finds a real, still-present bug (masked/varlen paths call flash_attn_varlen_func unconditionally when only one of the two funcs is guaranteed non-None) that matches the same root-cause category RuixiangMa flagged in ground truth, plus valid duplication/redundancy nits, all with concrete file/line/fix. Y's four findings collapse to two distinct claims: a minor assert-vs-raise nit and a sys.modules critique that is factually wrong (CPython raises ModuleNotFoundError when sys.modules[name] is None, so the original test technique was already correct, and Y's own duplicate-entry, high-severity 'fix' would actually break the test if kernels is installed) — plus a duplicated entry, none of which overlap any ground-truth reviewer concern. Neither review reproduces the docs/version-requirements, test-marker, or version=1/2/default-semantics threads that dominated the actual review, so recall is low for both, but X is grounded and useful while Y's headline finding is actively incorrect.",
+  "_cost_usd": 0.3345499,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "4a299a929cdd3e3774bc0432a380b442f218ae7e1fa6a984c0fc4b1fb5a0945c",
+    "judge_rep": 2
+  }
+}

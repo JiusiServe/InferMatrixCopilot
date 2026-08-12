@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.78,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.5,
+    "actionability": 0.75
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Neither candidate surfaced the actual headline findings from the ground-truth reviewers (the High-severity stream-slot leak on abort, the cumulative/delta silent-rewind bug, the ceil-division/input_lengths bug in audio_tokenizer_v2.py:949, or the legacy-checkpoint/v2-tokenizer collision), so recall is low and near-equal for both. X's findings (missing tests for the new streaming processor/vendored tokenizer/req_infos path, the max_new_frames robustness regression, the stop_token_ids hardcode) are novel relative to ground truth but grounded in real greps/code reads with no false claims. Y makes the same test-coverage and max_new_frames points but also asserts two things that are demonstrably false per ground truth — that slot-leak cleanup is 'handled' (contradicting linyueqian's confirmed High-severity leak that gcanlin later fixed) and that vendored files already carry proper attribution headers (contradicting linyueqian's note asking for one) — which hurts precision by presenting incorrect validation as fact. Both are similarly actionable with concrete file/line citations and suggested fixes.",
+  "_cost_usd": 0.2459252,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "3e2d84d162ec9c0cf79f7010cb16a31e77a1a67c7b5a726b72ab38bc2a763f4a",
+    "judge_rep": 1
+  }
+}

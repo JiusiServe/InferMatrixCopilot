@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.9,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.15,
+    "actionability": 0.4
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X independently surfaces two of the three substantive concerns ground-truth reviewers raised (the audio_vae.py num_hidden_layers config-mutation issue, and the patch_emission.py min_stop_step+2 window-tightening), with reasoning that matches the resolutions given in the actual thread (encoder built before mutation, change matches vendor). Y's single finding — flagging encode_latent's reparameterization as wrong for inference and suggesting reverting to mean-only — is not just absent from ground truth but actively wrong: it misattributes the @torch.inference_mode() decorator (which decorates the following method, not encode_latent) and its 'fix' would undo the PR's actual WER-improving change. X also misses the serving_speech.py language-dropping concern (it explicitly dismisses it as clean rather than flagging it), but overall is far better grounded and useful than Y.",
+  "_cost_usd": 0.17488690000000004,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "013bdd18a8cb5671403efd0adb58af9512a7f644f43ef5d28f3d2692223da3df",
+    "judge_rep": 1
+  }
+}

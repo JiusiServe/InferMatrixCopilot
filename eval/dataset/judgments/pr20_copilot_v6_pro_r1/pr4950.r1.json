@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.4,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (just LGTM/approvals), so both trivially satisfy recall. Both did thorough diff verification against source, but X surfaced one concrete, grounded, actionable finding (stale extra_body pattern in examples/online_serving/minicpmo/README.md:58) with a specific file/line and suggested fix. Y's only additional comment is a hedge/musing ('worth a sanity check... but if you observed silent WAV directly, keep the current wording') that requests no concrete action and adds little value beyond confirming the diff is correct.",
+  "_cost_usd": 0.10198359999999998,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "be6ca2d0579d4841689f7488f8a9ba14c128aa0e73df5be19a58f55d283927a0",
+    "judge_rep": 1
+  }
+}

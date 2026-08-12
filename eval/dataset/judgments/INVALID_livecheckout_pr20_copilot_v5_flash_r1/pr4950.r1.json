@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (just LGTM approvals), so both trivially achieve full recall. X's findings are well-grounded and concrete — notably catching that examples/online_serving/minicpmo/README.md:59 still documents the buggy nested extra_body form this PR fixes elsewhere, a genuine, actionable inconsistency the human reviewers missed. Y's verification is tight and correctly lands on APPROVE matching the real outcome, but its lone comment is hedgy ('worth a sanity check... but if you observed silent WAV directly, keep the current wording') rather than a concrete ask. X edges out on actionability and finding real value beyond the diff, at a small cost to precision from more speculative suggestions (e.g., recommending new unit tests for a docs-only PR).",
+  "_cost_usd": 0.11392240000000001,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "0f6735db1e1a4059b111ce3d65ad98a645e583b036127bb1bd613ffa1d575c9c",
+    "judge_rep": 1
+  }
+}

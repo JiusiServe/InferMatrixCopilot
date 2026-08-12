@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.75,
+    "actionability": 0.7
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.8
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y independently reproduces two confirmed ground-truth findings almost verbatim (the ceil/floor division bug at audio_tokenizer_v2.py:949, and the stale docstring defaults in configuration_moss_audio_tokenizer_v2.py), which X entirely misses. X instead spends most of its review validating areas (seed rename, slot lifecycle, chunk threshold) as correct, several of which directly contradict the real High-severity concerns raised in the human review (slot leak, legacy tokenizer routing). Both candidates converge independently on an unlisted but plausible max_new_frames scalar-indexing bug, lending it credibility. Y's per-finding anchored/suggested diff format is more consistently actionable, though one finding (put_req_chunk) has an identical anchored/suggested block, undermining that single item.",
+  "_cost_usd": 0.23676960000000002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "773867cac71022904cc79b81c755e4e5627771c4a47a0cae2d54efdfd111e2aa",
+    "judge_rep": 3
+  }
+}

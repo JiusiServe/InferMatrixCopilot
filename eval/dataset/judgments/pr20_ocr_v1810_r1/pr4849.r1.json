@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.9,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 1.0,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The central human-reviewer concern (Gaohan123 questioning whether source_outputs[0] is reliably the parent request) is directly investigated and resolved by X, which traces the orchestrator's [output, *companions] construction to confirm the invariant — Y never engages with this issue at all. Y's sole finding (missing guard on empty ar_output.outputs) is valid, grounded, and highly actionable, but it's a self-generated concern absent from the ground truth, giving Y zero recall. X's broader validation notes are less concretely actionable (approve-with-notes rather than change requests) but are specific and well-grounded, so precision stays high for both.",
+  "_cost_usd": 0.18758119999999998,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "1b2836ec6070bb5aa222d8a0be9c26ef4da635f02df21b43c35e2baec9f9736c",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.55,
+    "actionability": 0.6
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.85,
+    "actionability": 0.7
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "X's 10 findings almost entirely miss the ground-truth concerns (slot-leak on abort, cumulative/delta rewind bug, ceil/floor length truncation, legacy-checkpoint v2 misinstantiation, WER PCM fallback risk, stale docstrings, missing vendor headers, amy's questions) — none are hit directly. Worse, X's 'emitted_any always False' claim in moss_tts.py is directly contradicted by Y's traced investigation (it's a framework-managed counter shared with qwen3/fish paths), and one of X's suggested-fix blocks is a verbatim copy of the original code (no actual fix), hurting both precision and actionability. Y engages more with actual ground-truth threads (slot-leak lifecycle, vendored attribution, legacy-checkpoint fallback fragility) even where it reaches a different conclusion, and its 3 independently-raised bugs (max_new_frames subscript, dead ref-codes output, hardcoded audio sampling params) are cross-validated by X itself, giving strong confidence they're real and grounded. Y's comments are somewhat less code-diff-concrete than X's but still cite specific file/line and clear next steps.",
+  "_cost_usd": 0.3075959,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "3db38af2695ffd2d1babcbf643988fbaa12cd76079eb52e62bf385d8189dbe05",
+    "judge_rep": 1
+  }
+}

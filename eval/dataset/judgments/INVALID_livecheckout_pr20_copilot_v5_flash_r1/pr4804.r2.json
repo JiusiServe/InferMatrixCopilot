@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.12,
+    "precision": 0.45,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.55,
+    "actionability": 0.78,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both miss the two most significant confirmed bugs (High-severity slot leak, Medium-latent ceil-division bug), and neither surfaces the hsliuustc0106 legacy-checkpoint model_type collision cleanly. X actively asserts the slot-leak is 'handled' via on_requests_finished — a confidently false claim that directly contradicts a ground-truth-confirmed, author-fixed High bug, which is a real precision problem. Y is more evidence-driven, citing concrete greps for its top findings (e.g., put_req_chunk never incremented, directly tied to the new initial_codec_chunk_frames feature visible in the diff) and gives explicit fix suggestions, though it also contains a self-contradictory/mislocated finding on max_new_frames and one vague unverified claim. Y's rigor and explicit fix guidance make it slightly more trustworthy and actionable overall.",
+  "_cost_usd": 0.26171740000000004,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "87963725ec0c9dd4e07f0006a3dec0334b0b4210e0e420c0f409c05e66bea602",
+    "judge_rep": 2
+  }
+}

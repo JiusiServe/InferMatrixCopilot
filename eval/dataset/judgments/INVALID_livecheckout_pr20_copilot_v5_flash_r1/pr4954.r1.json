@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.65,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.8
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates catch the core ground-truth concern (the new containment fallback silently weakens/bypasses the opt-in escalation guarantee, contradicting the docstring) with concrete evidence and fixes. X goes further with more findings (dead branch, word-delta magic numbers, test-coverage gaps) and deeper mechanistic analysis, but one major finding leans on unverifiable external claims about issue #4949's failing test list that can't be checked against the provided diff, hurting precision. Y is tighter, all claims are grounded directly in the diff/code, and it surfaces a genuinely sharp additional catch (the `min()` in `short_text` making the 'short clip' gate nearly vacuous) that X missed. Neither candidate addresses the ground truth's minor point about legacy-vs-nested check ordering.",
+  "_cost_usd": 0.1882184,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "d7ef5f510b82b03b09704de6ac8adacb35e2bd4913ff4aa5062d2af869344b04",
+    "judge_rep": 1
+  }
+}

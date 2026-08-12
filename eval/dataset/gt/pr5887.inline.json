@@ -1,0 +1,38 @@
+[
+  {
+    "author": "david6666666",
+    "body": "Small heads-up: this flag only reaches the dense `flash_attn_func` branch here — the varlen/packed/masked paths (and `forward_xpu`/`forward_npu`) never see it. Fine for Qwen-Image (dense, unmasked), but anyone enabling `VLLM_OMNI_FA_DETERMINISTIC=1` on a model that takes a varlen/masked path would get no determinism, silently. A debug log when the flag is set on a non-dense path would make that visible.",
+    "line": 323,
+    "path": "vllm_omni/diffusion/attention/backends/flash_attn.py"
+  },
+  {
+    "author": "david6666666",
+    "body": "Nit: the comment says \"Explicit config True wins\", but as written `VLLM_OMNI_FA_DETERMINISTIC=1` always forces `True` over a config `False` (and can't disable an explicit `True` either). Maybe \"env can only enable, never disable\" reads closer to what it does.",
+    "line": 1033,
+    "path": "vllm_omni/diffusion/data.py"
+  },
+  {
+    "author": "fhfuih",
+    "body": "If this is after all an env var injection, what do you think if we directly read env var from attention backend's `__init__`, instead of maintaining a second variable in od_config?\n\nIf you choose to present the field in od_config, I would assume is it intended to be a user-aware toggle (instead of hidden and secretly used by CI). In this case, I think you should let CI pass an extra server_arg (to be forwarded to od_config), not setting an env var.",
+    "line": 1,
+    "path": "vllm_omni/diffusion/attention/backends/flash_attn.py"
+  },
+  {
+    "author": "NumberWan",
+    "body": "Qwen-Image uses the dense unmasked path, so the accuracy test is covered. Added a warning_once when fa_deterministic=True but the call takes piecewise / packed / masked / varlen-fallback paths, so enabling the flag on those models isn’t silent.",
+    "line": 323,
+    "path": "vllm_omni/diffusion/attention/backends/flash_attn.py"
+  },
+  {
+    "author": "NumberWan",
+    "body": "That comment is gone with the env avoided.",
+    "line": 1033,
+    "path": "vllm_omni/diffusion/data.py"
+  },
+  {
+    "author": "NumberWan",
+    "body": "Applied with the second option. Kept fa_deterministic on OmniDiffusionConfig as a user-facing toggle and wired CLI --fa-deterministic → config; the accuracy test passes it as a server_arg. No env injection in the attention backend.",
+    "line": 1,
+    "path": "vllm_omni/diffusion/attention/backends/flash_attn.py"
+  }
+]

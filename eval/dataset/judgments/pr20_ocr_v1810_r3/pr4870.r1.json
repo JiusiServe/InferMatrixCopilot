@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X did real investigation: it confirmed the qwen3_tts scoping fix, independently rediscovered the ground truth's Low concern (async_chunk getattr defaulting to True, inconsistent with the rest of the file), verified the seq_len cleanup, and explicitly flagged that the split logic only handles the scheduled-token axis and not the hidden-shape axis — directly hitting the latent multi-axis gap later fixed by PR #4910. Y is an empty OCR pass with zero findings, contributing no recall, precision, or actionability.",
+  "_cost_usd": 0.17574090000000003,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "7c3a64ea1a0912c52d6a87b94201588b52a24e23de0c7c1fee78732c41f7c9f6",
+    "judge_rep": 1
+  }
+}

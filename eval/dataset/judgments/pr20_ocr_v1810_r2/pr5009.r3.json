@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "X is a zero-finding OCR pass that surfaces nothing from the ground truth (missing the scope concern, test-coverage gaps, and regression-test rationale entirely), so it offers no recall or actionable value. Y independently reconstructs the core reviewer concerns — flags the vacuous CompilationMode parametrization (echoing hsliuustc0106's test-coverage ask), reasons through the global-scope risk citing cosmos3's override and FLUX A/B numbers that match the ground-truth's actual resolution data (26.9%/-14.1% latency), and calls out the missing upstream #4964 regression guard — all with concrete file:line references. It misses the minor 'pytest mark incomplete' comment, capping recall short of full credit.",
+  "_cost_usd": 0.2576161,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "d8324d7bb719fdb217adc945d73f46a22a7626ec42cef97db81c8294a0b4a516",
+    "judge_rep": 3
+  }
+}

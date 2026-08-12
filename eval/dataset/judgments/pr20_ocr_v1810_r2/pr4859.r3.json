@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.35,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.9,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y independently surfaces the audio_vae.py:141 config-mutation issue almost identically to amy-why-3459's real ground-truth comment, and separately flags the patch_emission.py stop-step tightening and the stochastic-sampling change with correct context (noting it matches the HF path rather than wrongly recommending reversion). X's sole finding argues to revert the mean+std*randn sampling back to deterministic mean-only encoding, which contradicts the PR's actual purpose (matching vendor behavior to improve WER) and matches none of the ground-truth reviewer concerns, giving it near-zero recall and shaky precision despite being well-anchored to a diff line.",
+  "_cost_usd": 0.1756769,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "013bdd18a8cb5671403efd0adb58af9512a7f644f43ef5d28f3d2692223da3df",
+    "judge_rep": 3
+  }
+}

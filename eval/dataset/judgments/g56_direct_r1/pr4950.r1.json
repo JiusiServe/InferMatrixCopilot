@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.68,
+    "actionability": 0.92,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.42,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The ground truth contains no substantive concerns, so both have full recall. X adds one well-grounded response-selection warning and a valid minor duplication note, though its untraced sibling-doc concern weakens precision; Y is highly actionable but its central claim that missing TTS causes a 500 contradicts the documented behavior, and several other comments are scope expansion rather than PR defects.",
+  "_usage": {
+    "input": 3,
+    "output": 665
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "direct_opus5_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "direct_opus5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/direct_opus5_r1",
+    "arm_a_sha256": "2fd1f44e2b9a871cd3ead4fde2180e84e0eadbf3f3f49a588c3a473d30e8458b",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5a2e689fc33efd67adbf119f1e4cf034841928ad70fea2d99f142a727ca8ea18",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

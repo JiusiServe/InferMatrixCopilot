@@ -1,0 +1,14 @@
+[
+  {
+    "author": "Copilot",
+    "body": "Removing `vllm_omni/deploy/minicpmo_4_5_batching.yaml` is a breaking change for any existing users/scripts referencing that deploy-config path. To preserve backward compatibility, re-add `minicpmo_4_5_batching.yaml` as a thin alias (e.g., `base_config: minicpmo_4_5_2gpu.yaml`) rather than deleting it entirely.",
+    "line": 6,
+    "path": "vllm_omni/deploy/minicpmo_4_5_2gpu.yaml"
+  },
+  {
+    "author": "Copilot",
+    "body": "This PR is described as an OOM workaround by reducing batching pressure, but this change increases stage-1 `max_tokens` (512 → 1024), which can increase KV/cache memory and runtime in CI e2e. If this increase is required, please document the rationale in the PR description; otherwise consider keeping the lower value to align with the OOM-mitigation goal.",
+    "line": 24,
+    "path": "tests/e2e/online_serving/test_minicpmo_4_5.py"
+  }
+]

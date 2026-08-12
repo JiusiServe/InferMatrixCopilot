@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.1,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns (two LGTMs and a verification comment confirming the change works), so X's zero-finding review technically doesn't contradict it but adds no analytical value or evidence of what was checked. Y correctly and specifically validates the actual diff (range change, error-message derivation, both entrypoints, pipeline semantics) and additionally flags two out-of-diff reliability test files that likely still encode the stale lower bound of 3 — a plausible, well-reasoned, highly actionable catch (exact file/line/snippet/fix) that only a bit less certain since those files aren't in the provided diff. Y is substantially more useful and grounded despite the unmerged-diff findings carrying some verification risk.",
+  "_cost_usd": 0.1959886,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "98ab4ff849017fa22d9228e23f56166fbbf07fb1eecaef4381d5f2a9aa32d4c9",
+    "judge_rep": 3
+  }
+}

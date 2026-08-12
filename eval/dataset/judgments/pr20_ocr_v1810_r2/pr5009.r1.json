@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.7,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X delivers a deeply grounded review with accurate line references and even reproduces exact PR metrics (26.9%/14.1% latency figures) matching the real discussion, substantively covering the UT-added, perf-comparison, and global-scope-vs-Qwen-only concerns raised by reviewers, though it misses the minor 'pytest mark incomplete' nitpick. Y returns zero findings, providing no recall, no actionable content, and no value despite the PR having several legitimate, confirmed review concerns.",
+  "_cost_usd": 0.1833534,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "d8324d7bb719fdb217adc945d73f46a22a7626ec42cef97db81c8294a0b4a516",
+    "judge_rep": 1
+  }
+}

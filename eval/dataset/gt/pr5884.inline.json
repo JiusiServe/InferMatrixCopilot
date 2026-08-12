@@ -1,0 +1,26 @@
+[
+  {
+    "author": "fhfuih",
+    "body": "If I understand it correctly, the main edit is the `_dit_module_names()`'s return clause. The rest `attrgetter` parts seems unnecessary. `attrgetter(attr_name)(obj)` is the same as `getattr(obj, attr_name)` unless you define one getter with one fixed name and use it multiple times. (But in your case, name is dynamic and for-looped)\n\nCorrect me if I am wrong, or I suggest removing the usage of `attrgetter` 🤔 ",
+    "line": 1,
+    "path": "vllm_omni/diffusion/cache/cachedit/backend.py"
+  },
+  {
+    "author": "david6666666",
+    "body": "For flat names they're equivalent, but this PR is really about the dotted case: `getattr(pipeline, \"language_model.model\")` raises AttributeError and is treated as missing, while `attrgetter` walks the chain — that's why Bagel's nested DiT was silently dropped. The getter factory and `cache_summary` keep the same resolution so enable/summary stay consistent for multi-level names.",
+    "line": 1,
+    "path": "vllm_omni/diffusion/cache/cachedit/backend.py"
+  },
+  {
+    "author": "david6666666",
+    "body": "Nice — this mirrors `vllm_omni/diffusion/offloader/module_collector.py`, which already resolves dotted `_dit_modules` paths via `attrgetter` (same try/except AttributeError, skip missing). If you ever want to dedupe, a tiny shared \"resolve module path or None\" helper would keep cache-dit and the offloader from drifting.",
+    "line": 48,
+    "path": "vllm_omni/diffusion/cache/cachedit/backend.py"
+  },
+  {
+    "author": "fhfuih",
+    "body": "Ohhh \r\n\r\n<img width=\"220\" height=\"165\" alt=\"ohh\" src=\"https://github.com/user-attachments/assets/54ae1647-d63a-4d16-89e1-9fd75397dc36\" />\r\n",
+    "line": 1,
+    "path": "vllm_omni/diffusion/cache/cachedit/backend.py"
+  }
+]

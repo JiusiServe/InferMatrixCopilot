@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "The only substantive ground-truth concern (dsocek's suggestion to stop hardcoding the component list and instead derive it from an existing structured source like stacked_params_mapping/_packed_modules_mapping, to future-proof against naming conflicts) is closely echoed by Candidate X's point 1 (derive from _dit_modules instead of growing the hardcoded tuple), giving X a real recall hit that Y entirely misses. Y is more rigorously evidenced (concrete greps, line citations, CI check) and highly actionable, but its findings (test target_modules gap, CI flakiness, stale comment wording) don't overlap with what human reviewers actually flagged, so its recall is low despite strong precision/actionability. Neither has a LATENT GAP CHECK section.",
+  "_cost_usd": 0.06442,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "651e181f4a6173811cc769702492d0bc7df5a834cdc912dfe74360540323bf80",
+    "judge_rep": 2
+  }
+}

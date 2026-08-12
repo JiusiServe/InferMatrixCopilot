@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.5,
+    "actionability": 0.05
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Ground truth has no substantive concerns (empty inline comments, only 'thanks'/Codex-limit noise), so recall is trivially satisfied by both. X does real, verifiable work grounded in the diff: it correctly explains the >=10→==10 fix, confirms the _is_blackwell→_is_quack_capable rename is consistent, checks the truthy/falsy override logic against the new tests, verifies doc and test coverage, and raises one appropriately hedged nitpick (sm_110a/cc 11.x) with a concrete file:line. Y is a bare 'OCR reviewed... 0 issues' output with zero evidence of investigation, no findings, and nothing actionable.",
+  "_cost_usd": 0.1241629,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "b8632c495c1c917353d2e53bfc783c4df825a753492ef3e5e2fd20a4e93e9c16",
+    "judge_rep": 1
+  }
+}

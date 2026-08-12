@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.2,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Ground truth has no substantive concerns (just an 'lgtm' approval and a bot message about exhausted credits), so both candidates reach the correct verdict of no blockers. But X does real, grounded verification — greps confirming all 9 rename sites are consistent, cross-checks against the upstream vllm checkout with specific file/line references, and a structured blocker scan — while Y is a near-empty stub reporting '0 issues' with no demonstrated analysis. X's actionability and diligence make it far more useful despite the unverifiable upstream-specific claims.",
+  "_cost_usd": 0.0566692,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "2fdb68b17d7d75cae71ffdd0b95e36e1c3e22481bf8899a5f9df4940e2cc7bc1",
+    "judge_rep": 2
+  }
+}

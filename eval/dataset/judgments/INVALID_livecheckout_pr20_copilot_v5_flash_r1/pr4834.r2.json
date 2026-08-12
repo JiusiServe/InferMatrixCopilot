@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.72,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "X covers more of the thin ground truth (explicitly critiques the CuMemTag enum usage per Gaohan123's ask, notes a CI lane issue, and engages with test coverage), while Y omits the enum entirely and doesn't address the noted CI failure. Both hit the latent gap by flagging that the hardware-gated tests give the new guard zero CPU/CI coverage, but X's finding that sleep() defaults to level=2 (so the strict NotImplementedError guard bricks the default sleep/wake cycle) is a sharper, more actionable match to the real post-merge relaxation than Y's docs-mismatch framing. Y does contribute one strong unique catch (global vs per-stage _sleeping_tags) and a correct dead-code observation, but its two near-duplicate/contradictory docs findings (line 25 vs 56) slightly dent precision.",
+  "_cost_usd": 0.1738057,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "965d507eda1744de5bea3de9e1402b0c9aa5ad0d739c01160fe94c82f5c553de",
+    "judge_rep": 2
+  }
+}

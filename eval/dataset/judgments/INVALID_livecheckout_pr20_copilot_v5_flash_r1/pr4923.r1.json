@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.4,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.75,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates surface the two real reviewer threads (cudagraph_mode belonging in the runner not the model, and the mtp-seed-under-full-cudagraphs consequence), and Y additionally echoes the benchmark/evidence concern that dominated the human thread. X piles on many extra findings with hyper-specific cross-file line citations (e.g. serving_speech.py:3235, qwen3_tts_high_concurrency.yaml:14, test_310p_patches.py:437) that are implausible or unverifiable against the shown diff, which is a real fabrication risk and drags precision down despite superficial rigor. Y's comments stay tightly grounded in the actual diff hunks (stale YAML comments, duplicate flag assignment, missing test/accuracy evidence) and are equally concrete and actionable. Both are reasonably actionable with file/line anchors, but Y is the more trustworthy review.",
+  "_cost_usd": 0.22600320000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "db8c75d12f81e4c19240ea14e21a1d73a253e458a58347b7e2472b0800f329b7",
+    "judge_rep": 1
+  }
+}

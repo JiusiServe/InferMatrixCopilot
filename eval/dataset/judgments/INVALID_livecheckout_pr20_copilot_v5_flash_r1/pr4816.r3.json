@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.35,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.65,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (bot hit rate limits, human just said 'lgtm'), so recall is vacuous for both. X delivers a clean, well-grounded approve that correctly verifies the rename is complete and consistent with upstream, but offers little beyond confirming the diff is correct. Y digs deeper with specific line-referenced findings — noting the updated tests only pin the getattr soft-fallback path and never exercise the actual base()/_create_speech_error_json_response route described in the PR's own bug report — which is a plausible, actionable, and PR-relevant gap; its second finding about diffusion-mode None is weaker since that behavior predates this PR. Y's specificity and concrete suggested regression test give it an edge in actionability despite being wordier and slightly overreaching in spots.",
+  "_cost_usd": 0.0604466,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "ee3acd6f40484c26642684973445d43ce01089239726e85fa76eb55fad4e1c32",
+    "judge_rep": 3
+  }
+}

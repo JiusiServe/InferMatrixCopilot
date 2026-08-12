@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.55,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both miss most GT concerns since the shown diff already incorporates the reviewers' fixes (shared _run_varlen_dense helper, FA3 major>=9 gate), so neither can 'recall' issues that no longer exist; both instead surface plausible adjacent issues (duplication, weak FA3 test coverage) that echo the GT's spirit. X's headline, most confidently-stated finding (version=1/2 int args are invalid PEP440 specifiers) is contradicted by the author's own clarification that these are valid branch identifiers, and X also overclaims that the piecewise path crashes on missing varlen_func when that path is actually protected by the None-check in _flash_wrapper. Y is more rigorous: it explicitly validates and rules out the piecewise false lead, and its novel findings (diffusers_adapter match statement silently ignoring the new backend names, GQA/num_kv_heads never checked against the Hq==Hkv kernel requirement, FLASH_ATTN_HUB skipping the compute-capability gate) are concretely grounded with cross-file evidence and file:line citations, giving it materially higher precision and actionability.",
+  "_cost_usd": 0.2043656,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "34a521cb0e7a817faa8f500dd47e011d0cce9dd716818dd2cc1a62a8f2717593",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "X returned zero findings, missing every ground-truth concern (scope of the global default change, test coverage, perf/accuracy evidence) with no actionable content. Y correctly surfaces the central scope risk (global CUDA default vs. Qwen-Image-only validation) and cross-checks it against the PR's FLUX.1-dev evidence, verifies the new regression test's oink/monkeypatch wiring, and notes the test's parametrization is now vacuous given the code path no longer branches on compilation mode — all backed by concrete file:line citations. It misses the 'pytest mark incomplete' nitpick and doesn't explicitly request scoping via _DIFFUSION_IR_OP_PRIORITY_FUNCS, but is far more grounded and useful than X's empty output.",
+  "_cost_usd": 0.121195,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "d8324d7bb719fdb217adc945d73f46a22a7626ec42cef97db81c8294a0b4a516",
+    "judge_rep": 3
+  }
+}

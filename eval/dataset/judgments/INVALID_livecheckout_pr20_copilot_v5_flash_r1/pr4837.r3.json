@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates correctly reconstruct the ground-truth reviewer's core point — that dropping `already_submitted` is safe because both submit_initial and submit_update reject list prompts identically — and both verify the DiffusionOutput fix is a genuine bugfix, not a regression. X's APPROVE verdict matches the actual outcome (two LGTM approvals) while flagging the missing-test gap only as non-blocking commentary, which is well-calibrated and grounded. Y does deeper extra-diff investigation (cross-pipeline blast radius, issue cross-reference) and gives a more concrete test-design ask, but its 'major'/'FOLLOW-UP REQUIRED' verdict overstates severity relative to what actually happened (merged on approval), slightly hurting precision/usefulness.",
+  "_cost_usd": 0.11589939999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "dbe9d33fec2425c0be443c2294c4cd95e3e4e11020939e303b8ba42a67eda7ec",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.9,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.55,
+    "actionability": 0.85
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Neither candidate reproduces the ground-truth P2 concern (trust_remote_code compatibility with pinned kernels<0.15), but X at least surfaces the trust_remote_code discrepancy (noting it's promised in the PR description but absent from the code), giving it partial recall credit that Y lacks entirely. Both independently flag the same valid lock-contention issue with concrete file/line refs and fixes, but Y's second finding (unbounded dict growth for a static 2-key cache) is speculative and low-value, dragging down its precision versus X's tighter, better-grounded pair of findings. Actionability is comparably strong on both sides with specific line anchors and suggested fixes.",
+  "_cost_usd": 0.16329159999999998,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "248805b088459cae98f8bea6d463e40bdb6b8cc08d7b229ccc104d6ab29a6a14",
+    "judge_rep": 2
+  }
+}

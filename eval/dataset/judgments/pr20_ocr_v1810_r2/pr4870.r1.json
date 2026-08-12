@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.95,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X does real investigation grounded in the diff: confirms the qwen3_tts scoping fix and seq_len cleanup are correct, flags a genuine residual inconsistency in the getattr default (True vs the file's own False convention elsewhere), and — most notably — independently surfaces the exact dual-batch-axis risk in the payload-splitting logic that the latent gap check is probing for, tracing it to the later generalization on main. It misses the 'move model-specific var into the model' question from amy-why-3459, so recall isn't perfect, but precision and actionability are both high (specific file:line, concrete fixes suggested, honest about unverified E2E claims). Y is an empty OCR pass with zero findings, providing no recall, precision, or actionability value at all.",
+  "_cost_usd": 0.18839990000000004,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "7c3a64ea1a0912c52d6a87b94201588b52a24e23de0c7c1fee78732c41f7c9f6",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.45,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.72,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth carries no substantive concerns (plain LGTM approve), so recall is trivially satisfied by both. X delivers a clean, well-grounded verification (grep for stale names, consistency check) but stops at confirming the mechanical rename, offering little beyond 'approve.' Y does the same grounding work plus surfaces concrete, file/line-anchored follow-ups (untested error-response path, latent diffusion-mode None dereference, stale comment) with specific suggested fixes, though the diffusion-mode nit is scope creep on a pre-existing issue and the fallback-comment claim is unverifiable from the given diff, slightly denting precision. Net, Y's findings are more actionable and diff-grounded despite being noisier.",
+  "_cost_usd": 0.07105170000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "bd82bf05eace8d7b54063bc4575c470fe9a48eebf5a8375cff622bc631be8bff",
+    "judge_rep": 2
+  }
+}

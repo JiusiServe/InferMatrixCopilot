@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.62,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X engages with themes close to the real reviewer thread (the NPU cudagraph_mode fix, and the seed-reproducibility caveat baked into the TODO comment) and lands one clearly diff-grounded finding (the now-contradictory prefix-caching comment) plus the same redundant-assignment catch Y makes independently, giving it far more useful surface area. X's credibility is dented by claims that cite specific files/line numbers entirely outside the shown diff and an invented-looking statistic ('21.88%' continuity rate) with no basis in the provided materials, so precision is only moderate rather than high. Y is safe but nearly empty: its single finding is valid and actionable but shares zero overlap with any of the ground-truth reviewer concerns, so recall is essentially nil. Neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.24680589999999997,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "1ad04bf9a1890b2add733c8ace0f526c8522e756269237263e7ce92b1d62d118",
+    "judge_rep": 2
+  }
+}

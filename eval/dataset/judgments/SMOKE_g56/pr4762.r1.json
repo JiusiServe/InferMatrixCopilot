@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 1.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X identifies the trust_remote_code behavior change, caching risks, deploy-override correctness, and endpoint-policy details with concrete locations and remedies. It misses several human concerns, including positional-argument compatibility, logging scope, CI failures, and broader endpoint auditing, while some extra findings are only weakly supported by the truncated diff. Y reports nothing, yielding zero recall and actionability despite having no false positives.",
+  "_usage": {
+    "input": 3,
+    "output": 647
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus48",
+    "Y": "ocr_v1810_r1"
+  },
+  "_roles": {
+    "arm": "ocr_v1810_r1",
+    "baseline": "claudecode_opus48"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "5bea7986a5d4aef59a347d431501e2d1d8025a948bf711404ab61b855f114fa3",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus48",
+    "arm_b_sha256": "8791f5ce881ee211c1beaa524248850803f0ccc626f1f18e2e3618a8ac7f1e1f",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

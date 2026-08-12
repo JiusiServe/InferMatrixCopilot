@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.7,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both cover similar ground (enum underutilization, dead getattr guards, generate() guard correctness) and both hit the latent gap by questioning whether the new NotImplementedError guard is exercised/too strict for existing paths. X's hit is more abstract (default level=2 bricks the engine; hardware-gated tests don't run in CI), while Y's is concrete and directly evidences the real-world failure mode (#4905): it names specific existing tests that call sleep(level=2) then wake_up() and would now crash under the new guard, plus a genuinely new bug (sleep(level=1) after sleep(level=2) fails to clear _level2_sleeping) and a stale _is_sleeping reference in another test file via grep verification. Both are actionable with file:line fixes; Y's findings are slightly more precise and verified via actual investigation rather than plausible-but-speculative reasoning (X's tag-pool and state-desync points are weaker).",
+  "_cost_usd": 0.1425998,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "30ca9bb2c654dfe6c1c39aa0b599c949438189ee2cb85c73d12c800f0739ad8f",
+    "judge_rep": 2
+  }
+}

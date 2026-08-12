@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.75,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly validate the core codes.audio fix, but neither flags the human reviewer's stale-docstring point. Y goes further by tracing the containment-fallback-vs-escalation interaction with a concrete live consumer (test_higgs_audio_v3.py) and investigating the legacy-vs-nested precedence question the human reviewer raised, giving it better recall; it also finds a genuine dead-code branch and magic-number duplication. X's two findings (unconditional containment loosening, vacuous short_text check) are solid and slightly more cleanly grounded, but Y's extra claims about issue #4949's specific failing tests/transcripts are unverifiable from the diff and drag its precision down somewhat. Both are concrete and file/line-anchored, with Y marginally more actionable given its specific code-level fixes.",
+  "_cost_usd": 0.2077374,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "d7ef5f510b82b03b09704de6ac8adacb35e2bd4913ff4aa5062d2af869344b04",
+    "judge_rep": 3
+  }
+}

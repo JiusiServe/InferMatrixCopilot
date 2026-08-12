@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.25,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.6,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth here is essentially trivial (a maintainer asked for a separate PR on an unrelated VoxCPM2 regression and approved) — neither candidate covers that, so recall is near-zero for both. Candidate X's grounded findings are undercut by a fabricated/incorrect claim (asserting the PR description says 'no test references the deploy-level seed' contradicts a test, when in fact Y shows this framing is closer to correct — X's own quoted 'contradiction' rests on describing test_serving_speech.py:3614 as disproving a claim that isn't actually false), and it spends significant space on a speculative WER/CI gating concern it admits it cannot verify, weakening precision. Candidate Y's analysis of the propagation/consumption mechanism is concise, accurate, and its two inline comments (guard comment for seed re-add, noting stage 1's removal was inert) are correct, grounded, and actionable. Y is tighter, more accurate, and equally actionable, so it wins on precision despite similar (near-zero) recall against the actual ground truth.",
+  "_cost_usd": 0.0823284,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "df4bc3e6ba34f38ec92c8a9bd1113ac4d9a0c47450c720ad1225b2839be68c97",
+    "judge_rep": 1
+  }
+}

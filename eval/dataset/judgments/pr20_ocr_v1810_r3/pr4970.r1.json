@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.1,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive inline concerns (just LGTM/approve plus an unrelated VoxCPM2 note), so both candidates technically 'recall' everything relevant. X is a bare boilerplate '0 findings' with no visible reasoning or evidence it traced the seed's actual effect, making it non-actionable. Y independently traces the seed-propagation mechanism through serving_speech.py and gpu_model_runner.py, correctly explains why removing it restores the batched fast path, and adds two grounded, file:line-anchored non-blocking suggestions (guard comment against reintroducing the seed; noting the second removal is inert) — all consistent with the diff and the reviewers' eventual approval.",
+  "_cost_usd": 0.0943889,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "328122fe4b392627a25677e42da358bb8e46e29a267034220c85b8dd7fe1c37b",
+    "judge_rep": 1
+  }
+}

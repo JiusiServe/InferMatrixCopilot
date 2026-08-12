@@ -1,0 +1,19 @@
+{
+  "comments": [
+    {
+      "author": "david6666666",
+      "body": "@gcanlin ptal thx"
+    },
+    {
+      "author": "yeahdongcn",
+      "body": "Just rebased to resolve merge conflicts."
+    }
+  ],
+  "reviews": [
+    {
+      "author": "gcanlin",
+      "body": "LGTM, thanks",
+      "state": "APPROVED"
+    }
+  ]
+}

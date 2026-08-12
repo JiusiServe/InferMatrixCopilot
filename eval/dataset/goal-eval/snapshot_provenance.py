@@ -86,9 +86,18 @@ def _settings_view() -> dict:
 
     s = Settings()
     import os
+
+    def _tier(mode: str) -> str:
+        """An unconfigured tier is a valid deferred state (doctor reports it as
+        such), so record it instead of aborting the whole provenance snapshot."""
+        try:
+            return s.model_for(mode)
+        except Exception as exc:
+            return f"(unconfigured: {type(exc).__name__})"
+
     return {
-        "tier_models": {"eco": s.model_for("eco"),
-                        "performance": s.model_for("performance")},
+        "tier_models": {"eco": _tier("eco"),
+                        "performance": _tier("performance")},
         "moa_members": [m.label() for m in resolve_members(s)],  # no keys ever
         "model_prices": json.loads(json.dumps(MODEL_PRICES)),  # tuple->list normalize
         "knobs": {k: os.environ.get(k, "(default)") for k in _KNOB_ALLOWLIST},

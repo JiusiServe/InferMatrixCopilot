@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.5,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.75,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y demonstrates deeper grounding: it explicitly recognizes the deploy-override pipeline-restriction fix (the reviewers' top concern) via the new regression test, engages accurately with the trust_remote_code default change by correctly reading it as an intentional (likely security) fix worth confirming rather than reverting, and surfaces a plausible new gap (else-branch skipping UNSUPPORTED_ROUTES) with honest severity calibration. X's top 'major' finding recommends reverting the trust_remote_code default to True, directly contradicting the author's own stated rationale in the ground truth ('we should never have trust_remote_code as a default'), which is a real precision problem, and its try/except finding is unverifiable against the truncated diff. Both are similarly actionable with concrete file/line references, but Y's findings are more accurate and calibrated overall.",
+  "_cost_usd": 0.2406986,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "6b029027391ffca15cd3043ca09efdab689d704a58dfe733544474ba90a718bd",
+    "judge_rep": 3
+  }
+}

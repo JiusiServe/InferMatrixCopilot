@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.0
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Ground truth contains no substantive reviewer concerns to recall, so neither candidate misses anything. Candidate X does real verification work (confirms the >=10→==10 gate logic, checks rename consistency, validates test coverage against the bug, and flags a hedged, low-confidence edge case about sm_110a with a concrete file:line), giving actionable and grounded output. Candidate Y is a null review with zero findings and zero analysis, providing no value despite technically not fabricating anything.",
+  "_cost_usd": 0.045008,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "b8632c495c1c917353d2e53bfc783c4df825a753492ef3e5e2fd20a4e93e9c16",
+    "judge_rep": 2
+  }
+}

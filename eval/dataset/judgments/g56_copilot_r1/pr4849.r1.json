@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.55,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.6,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both cover the parent-output ordering concern but miss the precommit failure. Y more directly requests relevant end-to-end GPU validation, while X substitutes broader CI analysis and adds several weak or out-of-scope follow-ups; neither requests the exact benchmark command.",
+  "_usage": {
+    "input": 3,
+    "output": 1158
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v4_pr20_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v4_pr20_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "dbc0fe0703fa4fcfd6358710be414406d23b63ccdd5c6aa18b412be897c34d56",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5eabb9c2ecaee56109ca8916c98f608c63cff4946702c512694924d4704baea8",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

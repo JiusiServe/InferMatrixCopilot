@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.6,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.7,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently rediscover the Low/default-inconsistency concern (async_chunk defaulting True vs False elsewhere), but neither surfaces the Med blast-radius discussion or amy's architecture question from ground truth, capping recall for both. X piles on five 'major/minor' findings (untested streaming path, CI e2e not re-run, docstring staleness, missing accumulate-branch test) that are plausible but inflated in severity and partly speculative (e.g. asserting a CI gate is red), hurting precision despite strong file:line actionability and concrete suggested tests. Y is more restrained, verifies its claims carefully (e.g. confirming is_streaming_request's actual blast radius), lands on an APPROVE verdict that matches the real merged outcome, and uniquely flags that the split now keys on a single batch axis while noting downstream generalization — directly hitting the latent multi-axis gap PR #4910 later fixed.",
+  "_cost_usd": 0.2287554,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "7e8eecd14717eab5803e155edf615922c6fba9be031408d8b21da1ef25fcf558",
+    "judge_rep": 2
+  }
+}

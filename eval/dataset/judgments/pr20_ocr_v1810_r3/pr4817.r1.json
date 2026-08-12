@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.5,
+    "actionability": 0.05,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Ground truth has no substantive reviewer concerns to recall, so both trivially satisfy recall, but X does real, mostly-accurate work: it correctly verifies the >=10→==10 gate logic, checks the rename for dangling references, validates the truthy/falsy override tests, and flags a grounded (if minor) edge case about sm_110a with a specific file:line and hedged severity. Y's output is a content-free 'no issues found' stub with zero findings, no file/line grounding, and no actionable suggestions, making it far less useful despite not being factually wrong.",
+  "_cost_usd": 0.1171889,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "b8632c495c1c917353d2e53bfc783c4df825a753492ef3e5e2fd20a4e93e9c16",
+    "judge_rep": 1
+  }
+}

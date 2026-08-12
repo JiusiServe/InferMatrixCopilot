@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.7,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.6,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "X correctly reproduces the RuixiangMa-confirmed varlen_func-None crash and hedges its riskiest claim (the get_kernel version=int semantics), which ground truth reveals is actually intentional (git-branch tags), so X's top finding is honestly flagged as unverified rather than asserted as fact. Y's marquee 'major' finding (Hub FA kernels silently breaking GQA/MQA because Hq==Hkv is required) borrows an unrelated SageAttention3 constraint and is likely factually wrong, since flash-attn natively supports GQA — a confidently-stated fabrication that hurts precision despite Y's otherwise strong, well-evidenced diffusers_adapter and CUDA-fallback findings. Both are highly actionable with concrete file:line fixes; neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.30644219999999994,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "34a521cb0e7a817faa8f500dd47e011d0cce9dd716818dd2cc1a62a8f2717593",
+    "judge_rep": 2
+  }
+}

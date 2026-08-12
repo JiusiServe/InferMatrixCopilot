@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive reviewer concerns (just 'thanks'/'.' and bot noise), so neither candidate misses anything real, giving both full recall. X returns zero findings with no evidence of verification work, so it's trivially precise but provides no actionable value. Y does verifiable, diff-grounded work (confirms the >=10→==10 gate logic, checks the rename is applied consistently, validates the truthy/falsy override against the tests) and raises one concrete, appropriately-hedged edge case with a file:line anchor and suggested fix, making it far more useful despite the thin ground truth.",
+  "_cost_usd": 0.10312690000000001,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "b8632c495c1c917353d2e53bfc783c4df825a753492ef3e5e2fd20a4e93e9c16",
+    "judge_rep": 3
+  }
+}

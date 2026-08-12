@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.82,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.58,
+    "precision": 0.78,
+    "actionability": 0.96,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y covers several central concerns: abort-related slot leakage, legacy checkpoints being misclassified as v2, invalid raw-PCM fallback, stale codec documentation, and likely NPU dummy-run breakage. X is concrete and mostly grounded, but misses or contradicts the key slot-lifecycle concern and omits the cumulative-waveform and tokenizer-length defects. Both add numerous plausible findings beyond the ground truth, with Y carrying slightly more speculative or low-value material.",
+  "_usage": {
+    "input": 3,
+    "output": 1935
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "direct_opus5_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "direct_opus5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/direct_opus5_r1",
+    "arm_a_sha256": "a61f62ee1c66d5a7f3cce0591d85e3170628ad99e2aef3c02229eaee036ae798",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "18986f2736f812d8c896b12152ebcbf1d5319e9e1f79042f5fa16f1dd6272542",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

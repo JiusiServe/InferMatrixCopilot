@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.55,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth shows this PR had no real concerns (human reviewer just said 'lgtm'), so a clean, verified approve like X's is the accurate call — X grounds every claim in actual greps and an upstream checkout comparison. Y is more actionable (concrete file/line fix suggestions) but manufactures three 'minor/nit' findings on a trivial rename PR, including a claim about an import comment at api_server.py:65 that falls entirely outside the provided diff and cannot be verified, plus a pre-existing diffusion-mode edge case Y itself admits isn't a regression — this scope creep and unverifiable claim drag down precision relative to X's tightly grounded review.",
+  "_cost_usd": 0.1350002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "bd82bf05eace8d7b54063bc4575c470fe9a48eebf5a8375cff622bc631be8bff",
+    "judge_rep": 1
+  }
+}

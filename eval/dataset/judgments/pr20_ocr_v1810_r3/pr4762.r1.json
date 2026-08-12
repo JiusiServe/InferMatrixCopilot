@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.6,
+    "actionability": 0.85
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X directly engages with the PR's most heavily-discussed ground-truth issue (deploy-override endpoint-restriction resolution ordering), correctly recognizing it's now resolved via the added regression test — Y never mentions it at all. Both flag the trust_remote_code default flip, but Y recommends reverting it to True, contradicting the author's own stated intent that a True default was itself the bug, which is a real correctness flaw in an otherwise well-anchored finding. Y's findings are formatted with more precise line-level diffs (higher actionability), but X's set of findings is more consistently grounded and covers more of what reviewers actually cared about.",
+  "_cost_usd": 0.3712966,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "65abe577d876252e62008ed5272e757b49ad43c383a865f71a23d5dad3989303",
+    "judge_rep": 1
+  }
+}

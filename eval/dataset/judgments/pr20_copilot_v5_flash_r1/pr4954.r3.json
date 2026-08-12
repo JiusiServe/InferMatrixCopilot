@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly validate the core codes.audio fix and add valid, grounded non-blocking findings (X: unconditional containment fallback loosening, misleading min() short_text guard). Y goes further: it explicitly confirms the ground-truth reviewer's two concerns (docstrings were indeed updated to describe the fallback, and greps confirm no live producer still emits legacy top-level audio, directly answering the 'worth confirming' ask), and it uncovers a materially more serious bug X misses — expected_clean in transcript_clean is raw substring matching that can match inside unrelated words (e.g. 'hi' in 'this'), undermining the fallback's own 'still rejects unrelated transcripts' claim. Y's e2e coverage-gap finding and CI-status caveats are appropriately hedged rather than overclaimed. Both are actionable with file/line citations, but Y's fixes and directives (exact pytest commands, word-boundary containment code) are more concrete.",
+  "_cost_usd": 0.1262147,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "78ba7c7adf2f6dabb1dc365332b38d48250c9afc7852ad5a8b51e2519c514742",
+    "judge_rep": 3
+  }
+}

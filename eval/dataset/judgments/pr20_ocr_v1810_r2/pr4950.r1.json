@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Ground truth contains no substantive concerns (just LGTM/approval), so the bar is whether a candidate produces grounded, useful analysis without fabricating issues. X performed no review at all (markdown files fell outside its supported-extension filter), yielding zero findings and zero actionable content. Y independently verified every technical claim in the diff against source (request-field handling, extra_body flattening, two-choices behavior, silent-vs-text-only audio) with specific file/line citations, reached the same approve outcome as the human reviewers, and added one well-reasoned non-blocking suggestion with a concrete line reference.",
+  "_cost_usd": 0.1375304,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "38e263e1b5697d8bec36d8dbacedc6666dbea5003329be6212bbfd0d3d210fb6",
+    "judge_rep": 1
+  }
+}

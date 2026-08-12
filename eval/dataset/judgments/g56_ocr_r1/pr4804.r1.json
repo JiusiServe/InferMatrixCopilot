@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.23,
+    "precision": 0.52,
+    "actionability": 0.92,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.62,
+    "precision": 0.84,
+    "actionability": 0.96,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Y captures the major slot-lifecycle leak, legacy-codec misclassification, invalid PCM fallback, stale documentation, and missing concurrency tests with concrete locations and fixes. X catches the ceil-division and documentation issues, but misses most high-impact concerns and includes several speculative or low-value findings.",
+  "_usage": {
+    "input": 3,
+    "output": 1166
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "ocr_v1810_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "ocr_v1810_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "2ebe6d7abfd0f4073f2ba8b59ea204b30326a379fcbc687c30d2f482e19fc378",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "18986f2736f812d8c896b12152ebcbf1d5319e9e1f79042f5fa16f1dd6272542",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

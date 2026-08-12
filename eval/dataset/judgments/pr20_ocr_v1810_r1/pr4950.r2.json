@@ -1,0 +1,29 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.95,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0
+  },
+  "gap_hit": {
+    "x": false,
+    "y": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Ground truth shows a docs-only PR that was simply approved with no substantive concerns; Candidate X actually engaged with the diff, cross-verified every technical claim against source (serving_chat.py, minicpmo_4_5_omni_tts.py) and correctly reached the same approve conclusion, with one clearly-labeled low-confidence nitpick tied to a specific line. Candidate Y produced no review at all — the tool skipped the markdown file due to extension filtering and returned zero analysis, providing no grounded findings, no verification, and nothing actionable. X is unambiguously superior across all dimensions.",
+  "_cost_usd": 0.09288089999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "38e263e1b5697d8bec36d8dbacedc6666dbea5003329be6212bbfd0d3d210fb6",
+    "judge_rep": 2
+  }
+}

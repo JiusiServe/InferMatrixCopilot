@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.05,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.8,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "X reports zero findings and never engages with the two things human reviewers actually flagged (need for regression tests, need for a tags enum) despite both being visible as freshly-added code in the diff, so it adds no value. Y is deeply grounded, cites specific files/lines, and independently surfaces that the hardware-gated tests don't run in standard CI (echoing SamitHuang's test concern) and that the CuMemTag enum is only half-used (echoing Gaohan123's enum concern); critically, Y's #1 finding flags that the strict NotImplementedError guard on level-2 wake can permanently brick the engine on the default path — exactly the over-strictness that later caused issue #4905/#4912, satisfying the latent gap check that human review missed.",
+  "_cost_usd": 0.15710290000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "548f2909eab0dea5f674754beaa204919fcc62e4ee75923f7f33f13ab7c49da0",
+    "judge_rep": 3
+  }
+}

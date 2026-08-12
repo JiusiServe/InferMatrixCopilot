@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.5,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Y independently rediscovers RuixiangMa's confirmed real bug (varlen_func being None when only flash_attn_func is provided crashes masked/piecewise paths) almost verbatim, plus flags genuine, diff-grounded issues (version=int vs PEP440 string, class duplication, redundant if/elif, weak test coverage of the core numerical-parity claim) with appropriate hedging on uncertain claims. X repeats the exact same assert-vs-ValueError finding twice and its one 'high' severity claim (sys.modules=None doesn't simulate ImportError) is factually wrong — CPython raises ModuleNotFoundError when a sys.modules entry is None — while completely missing every confirmed bug thread from the ground-truth reviewers.",
+  "_cost_usd": 0.34819930000000004,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "4a299a929cdd3e3774bc0432a380b442f218ae7e1fa6a984c0fc4b1fb5a0945c",
+    "judge_rep": 3
+  }
+}

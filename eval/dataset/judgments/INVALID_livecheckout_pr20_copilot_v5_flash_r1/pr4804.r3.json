@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.3,
+    "actionability": 0.65
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.55,
+    "actionability": 0.75
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both miss nearly all confirmed ground-truth bugs (slot leak, cumulative/delta flip, ceil-division, legacy-checkpoint v2 routing); X even asserts the slot-leak area is 'handled' and vendor headers are 'proper,' both contradicted by the ground truth, hurting its precision. Y grounds its claims in explicit grep evidence, distinguishes validated vs. speculative findings, and flags its own uncertainty (e.g. 'could not verify from truncated diff'), and its put_req_chunk/emitted_any finding is specific and actionable with a concrete fix, though one file attribution (max_new_frames) is mislabeled. Neither surfaces the actual High/Medium reviewer concerns, but Y's methodology is more rigorous and less overconfident than X's incorrect reassurances.",
+  "_cost_usd": 0.1122065,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "87963725ec0c9dd4e07f0006a3dec0334b0b4210e0e420c0f409c05e66bea602",
+    "judge_rep": 3
+  }
+}

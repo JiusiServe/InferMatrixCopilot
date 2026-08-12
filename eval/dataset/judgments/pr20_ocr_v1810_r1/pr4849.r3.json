@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.7,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.65,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Y directly investigates and substantiates the ground-truth reviewer's central question (whether source_outputs[0] is reliably the parent), citing orchestrator.py construction of [output, *companion_outputs] — the same issue Gaohan123/Celeste-jq discussed. X's single finding (missing guard for empty ar_output.outputs) is grounded and highly actionable but addresses a pre-existing edge case never raised by any human reviewer, giving it near-zero recall. Y's broader claims (CI check failures, sibling-file comparisons) are less anchored to the diff itself and mostly confirmatory rather than actionable, so its precision/actionability take a hit, but its coverage of the actual review discussion tips the balance.",
+  "_cost_usd": 0.0910243,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "1b2836ec6070bb5aa222d8a0be9c26ef4da635f02df21b43c35e2baec9f9736c",
+    "judge_rep": 3
+  }
+}

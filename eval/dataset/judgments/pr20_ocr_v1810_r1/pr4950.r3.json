@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Ground truth has no substantive concerns (just LGTM/approvals), so neither candidate misses anything material. Candidate X performs an actual, diff-grounded review, cross-checking each doc claim (root-level chat_template_kwargs, two-choices response, TTS trigger semantics) against source line references and offers one concrete, low-confidence follow-up comment. Candidate Y's tool skipped the file entirely (markdown unsupported) and produced no findings or actionable content at all, providing zero review value.",
+  "_cost_usd": 0.0459765,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "38e263e1b5697d8bec36d8dbacedc6666dbea5003329be6212bbfd0d3d210fb6",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.5,
+    "actionability": 0.1,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns (bot noise + a plain 'lgtm' approval, no inline comments), so both candidates trivially achieve full recall by approving. Candidate X does real verification work — confirms all 9 rename sites, cross-checks against the upstream vLLM source for the exact attribute name and traceback line, and calls out specific test lines as regression coverage — all grounded in the diff and plausible given the PR's stated upstream-realignment motive. Candidate Y is a content-free boilerplate 'no issues found' output with zero evidence of engagement, no line references, and nothing actionable, making it far less useful despite reaching the same verdict.",
+  "_cost_usd": 0.050974200000000004,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "2fdb68b17d7d75cae71ffdd0b95e36e1c3e22481bf8899a5f9df4940e2cc7bc1",
+    "judge_rep": 3
+  }
+}

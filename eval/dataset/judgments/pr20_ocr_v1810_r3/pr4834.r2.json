@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.75,
+    "precision": 0.8,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Candidate X delivers a substantive, well-grounded review that independently surfaces both ground-truth concerns (test coverage gap mirrors SamitHuang's regression-test ask; finding #5 echoes Gaohan123's enum-consolidation point) with concrete file:line citations and fixes. Its top finding — that the default sleep(level=2) permanently bricks generate()/wake_up() via the new strict guard, combined with the observation that the regression tests are hardware-gated and never run in standard CI — directly hits the latent gap about the guard being too strict for existing callers and untested in CI. Candidate Y returned zero findings ('no issues'), providing no recall, no actionable content, and missing the latent gap entirely.",
+  "_cost_usd": 0.0524457,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "548f2909eab0dea5f674754beaa204919fcc62e4ee75923f7f33f13ab7c49da0",
+    "judge_rep": 2
+  }
+}

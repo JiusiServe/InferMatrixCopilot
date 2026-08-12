@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.8,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X performs a substantive investigation, directly engaging the parent-first-output assumption that Gaohan123 flagged (even if concluding no runtime check is needed rather than recommending one), and grounds its analysis in specific caller/orchestrator behavior with concrete file:line references. It misses the precommit-fix and benchmark-run requests entirely, capping recall. Y is a null report ('no issues found') that covers none of the ground-truth concerns and offers zero actionable content, making it strictly worse across every dimension.",
+  "_cost_usd": 0.14966190000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "f9ab5e4daede03335df99f46121e70e9d1d3d89f9a645a043486979cce9f1de8",
+    "judge_rep": 1
+  }
+}

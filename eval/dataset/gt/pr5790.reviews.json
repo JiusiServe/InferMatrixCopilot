@@ -1,0 +1,9 @@
+{
+  "comments": [
+    {
+      "author": "amy-why-3459",
+      "body": "Capping max_num_seqs to 4 works as a temporary fix, but this should be a short-term workaround. The underlying issue is that exact-shape batching in Stage 2 can form batches that exceed residual GPU memory even at concurrency 8. Reducing max_num_seqs limits throughput globally — we should find the root cause (e.g. unbounded Code2Wav activation peaks, missing memory budget enforcement at batch formation) and fix it properly."
+    }
+  ],
+  "reviews": []
+}

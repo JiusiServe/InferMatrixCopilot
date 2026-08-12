@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "The dominant ground-truth thread is the scoping risk of making vllm_c the global CUDA default when only validated on Qwen-Image/H200 (hsliuustc0106's main comment, plus NumberWan's FLUX.1-dev justification) — Y directly engages this, correctly traces the per-model override safety net (cosmos3) and cites the same FLUX.1-dev evidence reviewers demanded, while X never mentions scoping at all. X's two findings (stale pytest.mark.core_model, backend-agnostic test gap) are valid and concretely actionable, matching Gaohan123's 'pytest mark is not complete' comment, but that's a narrower slice of the ground truth. Both reviews are well-grounded in the diff with no fabrication; X is slightly more surgically actionable per-line, but Y's higher recall on the PR's central concern outweighs that.",
+  "_cost_usd": 0.17522020000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "a4a2080260dae95bfc512b00845050b34423e0a993a711dc75a9b14a7d8e8a8e",
+    "judge_rep": 3
+  }
+}

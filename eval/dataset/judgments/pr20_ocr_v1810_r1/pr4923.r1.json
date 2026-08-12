@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.6,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.65,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "X surfaces only a single trivial redundant-assignment nit that overlaps with none of the ground-truth reviewer threads (layering concern, seed-reproducibility caveat, NPU compilation_config fix, benchmark evidence request). Y independently flags the exact seed-reproducibility regression under full cudagraphs that gcanlin raised inline, validates the TODO added in response to the layering/R2-Y concerns, questions the NPU PIECEWISE addition, and catches two real stale-comment inconsistencies in the yaml diff (prefix-caching rationale, batch-size header) plus requests missing accuracy evidence akin to Sy0307's benchmark ask. Both give concrete file/line-anchored comments, but Y's coverage of actual reviewer concerns is far broader and better grounded in the visible diff.",
+  "_cost_usd": 0.31361249999999996,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "0a37d51916c1dc3616defbd9c287370b9445f0ecffa42795878aca07cafd36ea",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,14 @@
+[
+  {
+    "author": "Gaohan123",
+    "body": "Could we keep the degenerate payload in the same wire format as the normal full-payload path?\n\n`talker2code2wav_full_payload` normally emits a 1-D, codebook-major flattened token stream, but this fallback currently returns a 2-D `[1, _NUM_QUANTIZERS_DEFAULT]` tensor. If the connector or Code2Wav consumer assumes `codes.audio` is always flat, the degenerate request may still be rejected or decoded incorrectly.\n\nPlease flatten the placeholder before returning it (e.g. `torch.ones(_NUM_QUANTIZERS_DEFAULT, dtype=torch.long)`) and add a regression assertion that the fallback payload is 1-D with exactly `_NUM_QUANTIZERS_DEFAULT` tokens.",
+    "line": 52,
+    "path": "vllm_omni/model_executor/stage_input_processors/qwen3_tts.py"
+  },
+  {
+    "author": "henryj",
+    "body": "Done in 21158e1d: the placeholder is now emitted flat (`torch.ones(_NUM_QUANTIZERS_DEFAULT)`), and the regression test asserts the wire format (1-D, exactly `_NUM_QUANTIZERS_DEFAULT` tokens) on top of the filter-validity check.\n\nFor the record: our production soak ran the 2-D variant, which behaved identically because the scheduling coordinator flattens nested payload values before sizing the prompt (`_flatten_prompt_token_ids`). But the flat form is what every normal take already ships, so matching it is clearly the right contract. Re-ran the full test file against the 0.24 wheel after the change: 102 passed.",
+    "line": 52,
+    "path": "vllm_omni/model_executor/stage_input_processors/qwen3_tts.py"
+  }
+]

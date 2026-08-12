@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.75,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X delivers a deeply grounded review with specific file:line findings, correctly flags that the new hardware-gated tests never run in standard CI and that the default sleep(level=2) makes the new NotImplementedError guard permanently brick the engine — directly hitting the latent gap about the guard being too strict/under-tested. It also engages substantively with both resolved ground-truth threads (test adequacy, enum usage). Y returns zero findings, missing everything and scoring no recall, precision, or actionability.",
+  "_cost_usd": 0.1646416,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "548f2909eab0dea5f674754beaa204919fcc62e4ee75923f7f33f13ab7c49da0",
+    "judge_rep": 1
+  }
+}

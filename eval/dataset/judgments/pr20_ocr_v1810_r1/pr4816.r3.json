@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.65
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.7,
+    "actionability": 0.1
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns (Codex hit usage limits, human reviewer just said 'lgtm'), so both trivially achieve full recall with nothing to miss. Candidate X does real, grounded verification work — confirms the rename tracks the upstream vLLM refactor, checks all call sites for consistency, and cites specific files/lines, giving a maintainer concrete reasons to trust the approval. Candidate Y is a bare 'no issues found' report with zero evidence of investigation, offering no actionable insight or confidence-building detail despite being technically not wrong.",
+  "_cost_usd": 0.0532072,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "2fdb68b17d7d75cae71ffdd0b95e36e1c3e22481bf8899a5f9df4940e2cc7bc1",
+    "judge_rep": 3
+  }
+}

@@ -11,3 +11,19 @@
 {"kind": "reserve", "rid": "judge-r3", "hard_max_usd": 18.0, "note": "judge copilot_v4_pr20_r3", "ts": "2026-07-22T22:38:57"}
 {"kind": "settle", "rid": "judge-r3", "usd": 11.580331800000002, "note": "judge copilot_v4_pr20_r3 n=60", "ts": "2026-07-22T23:07:57"}
 {"kind": "settle", "rid": "judge-r3-fix", "usd": 0.0551, "note": "re-judge 1 malformed verdict (lowercase winner) pr4816.r2", "ts": "2026-07-22T23:09:23"}
+{"kind": "reserve", "rid": "gen-r1", "hard_max_usd": 24.0, "note": "generate copilot_v5_flash_r1", "ts": "2026-08-05T10:53:27"}
+{"kind": "settle", "rid": "gen-r1", "usd": 0.0, "note": "gen copilot_v5_flash_r1", "ts": "2026-08-05T10:53:36"}
+{"kind": "reserve", "rid": "gen-r1", "hard_max_usd": 24.0, "note": "generate copilot_v5_flash_r1", "ts": "2026-08-05T10:54:11"}
+{"kind": "settle", "rid": "gen-r1", "usd": 4.9582, "note": "gen copilot_v5_flash_r1", "ts": "2026-08-05T12:05:54"}
+{"kind": "reserve", "rid": "judge-r1", "hard_max_usd": 18.0, "note": "judge copilot_v5_flash_r1", "ts": "2026-08-05T12:06:35"}
+{"kind": "settle", "rid": "judge-r1", "usd": 9.728209000000003, "note": "judge copilot_v5_flash_r1 n=60", "ts": "2026-08-05T12:29:02"}
+{"kind": "reserve", "rid": "gen-r1", "hard_max_usd": 24.0, "note": "generate copilot_v5_flash_r1", "ts": "2026-08-05T12:32:21"}
+{"kind": "settle", "rid": "gen-r1", "usd": 4.4867, "note": "gen copilot_v5_flash_r1", "ts": "2026-08-05T13:44:42"}
+{"kind": "reserve", "rid": "gen-r1", "hard_max_usd": 24.0, "note": "generate copilot_v5_flash_r1", "ts": "2026-08-05T13:45:28"}
+{"kind": "settle", "rid": "gen-r1", "usd": 4.7279, "note": "gen copilot_v5_flash_r1", "ts": "2026-08-05T13:56:28"}
+{"kind": "reserve", "rid": "judge-r1", "hard_max_usd": 18.0, "note": "judge copilot_v5_flash_r1", "ts": "2026-08-05T13:56:51"}
+{"kind": "settle", "rid": "judge-r1", "usd": 9.477588700000002, "note": "judge copilot_v5_flash_r1 n=60", "ts": "2026-08-05T14:17:42"}
+{"kind": "reserve", "rid": "gen-r1", "hard_max_usd": 24.0, "note": "generate copilot_v6_pro_r1", "ts": "2026-08-05T14:26:51"}
+{"kind": "settle", "rid": "gen-r1", "usd": 3.8437, "note": "gen copilot_v6_pro_r1", "ts": "2026-08-05T15:51:19"}
+{"kind": "reserve", "rid": "judge-r1", "hard_max_usd": 18.0, "note": "judge copilot_v6_pro_r1", "ts": "2026-08-05T15:51:57"}
+{"kind": "settle", "rid": "judge-r1", "usd": 8.9338711, "note": "judge copilot_v6_pro_r1 n=60", "ts": "2026-08-05T16:09:46"}

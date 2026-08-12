@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.5,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth shows this was a trivial, uncontroversial LGTM/approve with no substantive concerns, so recall is a wash for both. X correctly diagnoses the mechanism, reaches the matching APPROVE verdict, and offers two concise, grounded, actionable suggestions (add a guard comment at a specific line). Y is padded with four 'minor' findings that mostly relitigate whether the PR description's claims are technically accurate (test coverage wording, nightly WER gating it admits it 'could not verify') rather than flagging real diff defects, and lands on COMMENT despite the change being a clean, already-approved 2-line removal — lower precision and weaker signal-to-noise than X.",
+  "_cost_usd": 0.1083794,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "df4bc3e6ba34f38ec92c8a9bd1113ac4d9a0c47450c720ad1225b2839be68c97",
+    "judge_rep": 3
+  }
+}

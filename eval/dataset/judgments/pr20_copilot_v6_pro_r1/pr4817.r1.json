@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth carries no substantive concerns, so recall is trivially satisfied by both. Both reviews correctly validate the core `== 10` fix and the rename cleanup; X raises one soft, hedged point about sm_110a and otherwise reads as a PASS checklist, while Y surfaces three concrete, file/line-anchored findings (missing (10,1) test case, docstring gap on future sm_110, stale pyproject.toml comment) with specific suggested edits, making it more actionable and slightly more thorough without sacrificing grounding.",
+  "_cost_usd": 0.11595060000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "5b3806345c5923d38ae7770cbdba3dd453eb8492579b72d95f16a82ec2783e90",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.7,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X correctly explains the core read/write mismatch fix (matching the GT reviewer's rationale) and independently surfaces a real, verifiable looseness in the new containment fallback (concrete counterexample 'hello' vs 'hello world goodbye' passing) that overlaps with GT's concern about the fallback applying to all callers, even though it frames it as a behavior issue rather than stale docs. Y ignores the production fix and the significant assertions.py behavior change entirely, instead raising a single speculative, self-admittedly-not-currently-a-problem nitpick about test stub fragility that matches none of the ground-truth concerns. X's findings are all accurate and actionable with specific lines and fixes; Y's is grounded but low-value and covers almost none of the reviewer's actual concerns.",
+  "_cost_usd": 0.1625359,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "445e481fed1f00f1b3a9684873c931f2b5babee1815824e4d096577202fa6ac5",
+    "judge_rep": 2
+  }
+}

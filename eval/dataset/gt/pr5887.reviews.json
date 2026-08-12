@@ -1,0 +1,36 @@
+{
+  "comments": [
+    {
+      "author": "NumberWan",
+      "body": "@yenuo26 PTAL"
+    },
+    {
+      "author": "david6666666",
+      "body": "please avoid ENV "
+    },
+    {
+      "author": "NumberWan",
+      "body": "> can we avoid env variable\r\n\r\nThanks — Dropped the env var and switched to a CLI flag --fa-deterministic that forwards into OmniDiffusionConfig.fa_deterministic. The accuracy test enables it via OmniServer server_args."
+    },
+    {
+      "author": "NumberWan",
+      "body": "> please avoid ENV\r\n\r\nThanks — Dropped the env var and switched to a CLI flag --fa-deterministic that forwards into OmniDiffusionConfig.fa_deterministic. The accuracy test enables it via OmniServer server_args."
+    },
+    {
+      "author": "yenuo26",
+      "body": "https://buildkite.com/vllm/vllm-omni/builds/13321/canvas?sid=019fe28b-f393-49ea-bf70-635e913ef58d&tab=output\r\nHowever, in practice, the SSIM can still drop to 0.958. @NumberWan "
+    }
+  ],
+  "reviews": [
+    {
+      "author": "hsliuustc0106",
+      "body": "can we avoid env variable",
+      "state": "COMMENTED"
+    },
+    {
+      "author": "david6666666",
+      "body": "LGTM now",
+      "state": "COMMENTED"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.45,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.7,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Neither candidate surfaces the ground truth's confirmed high-severity bugs (stream-slot leak on abort, cumulative/delta chunk flip, ceil-division length bug, v2-tokenizer model_type collision), so both have low recall, with Y marginally ahead by touching the same files (audio_tokenizer_v2.py, modeling_moss_tts_codec.py stream session) via test-coverage findings. X's precision is hurt by an incorrect claim that slot-leak-on-abort is 'handled/complete' (contradicting the real fixed bug) and by citing specific WER/RTF/TTFP benchmark numbers not grounded in any visible diff or PR text — likely fabricated. Y's findings are consistently backed by explicit grep/line evidence and cross-validate with X on one shared finding (max_new_frames robustness), making it more trustworthy and comparably or more actionable with concrete remediation and test-writing instructions.",
+  "_cost_usd": 0.2651152,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "3e2d84d162ec9c0cf79f7010cb16a31e77a1a67c7b5a726b72ab38bc2a763f4a",
+    "judge_rep": 2
+  }
+}

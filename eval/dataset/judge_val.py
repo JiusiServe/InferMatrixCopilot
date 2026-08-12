@@ -17,8 +17,10 @@ from __future__ import annotations
 import json
 import os
 import random
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -28,11 +30,26 @@ GT = HERE / "gt"
 # ARM_A_DIR/JUDGE_OUT select the copilot arm + output dir (default T0). T1:
 #   ARM_A_DIR=arms/copilot_v2_t1 JUDGE_OUT=judgments/val_t1 judge_val.py
 ARM_A = HERE / os.environ.get("ARM_A_DIR", "arms/copilot_v2")
-ARM_B = HERE / "baselines" / "claudecode_opus48"  # Opus baseline
+# ARM_B_DIR selects the reference. Default is the historical Opus 4.8 baseline so
+# existing judgments stay reproducible; the gpt-5.6 campaign points it at
+# baselines/claudecode_opus5, which is a NEW reference and not comparable to it.
+ARM_B = HERE / os.environ.get("ARM_B_DIR", "baselines/claudecode_opus48")
 OUT = HERE / os.environ.get("JUDGE_OUT", "judgments/val")
-JUDGE_MODEL = "claude-sonnet-5"
-REPLICATES = 3
+# Backend/model/replicates default to what every existing verdict on disk was produced
+# with, so re-running this script over old judgment dirs reproduces them rather than
+# silently re-scoring them under a different judge.
+JUDGE_BACKEND = os.environ.get("JUDGE_BACKEND", "claude")   # claude | cursor
+JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "claude-sonnet-5")
+REPLICATES = int(os.environ.get("REPLICATES", "3"))
 CAP = 24_000  # chars per candidate / per GT block
+
+# Provenance labels. The blinding map used to carry the literal `copilot_v2` whatever
+# arm actually ran; with three arms and two possible baselines in play that is no
+# longer a harmless generic label, it is a way to average two campaigns together
+# without noticing. Both sides are now named for real, and `_roles` records which
+# label held which slot so scoring never has to guess from the name.
+ARM_A_LABEL = ARM_A.name
+ARM_B_LABEL = ARM_B.name
 
 # SPLIT=val (default) or test — selects items; test items stay untouched
 # until the frozen final evaluation.
@@ -53,6 +70,12 @@ _SPLITS = {
 _SPLIT = os.environ.get("SPLIT", "val")
 PR_ITEMS = _SPLITS[_SPLIT]["prs"]
 ISSUE_ITEMS = _SPLITS[_SPLIT]["issues"]
+# ONLY_ITEMS=4762,4834 restricts the run to those numbers — for smoke-testing a judge
+# backend on two items before committing a whole campaign to it.
+if os.environ.get("ONLY_ITEMS"):
+    _only = {int(x) for x in os.environ["ONLY_ITEMS"].split(",") if x.strip()}
+    PR_ITEMS = [n for n in PR_ITEMS if n in _only]
+    ISSUE_ITEMS = [n for n in ISSUE_ITEMS if n in _only]
 GAP_NOTES = {
     4870: ("LATENT GAP CHECK: history proves human review missed a dual-batch-"
            "axis case in this PR's payload splitting, fixed later by follow-up "
@@ -81,6 +104,14 @@ ISSUE_SCHEMA = ('{"x": {"correctness": 0.0, "grounding": 0.0, "completeness": 0.
                 '"margin": "slight|clear|decisive", "rationale": "2-4 sentences"}')
 
 
+def _extract(text: str) -> dict:
+    """The verdict JSON out of a model's prose, by brace matching."""
+    start, end = text.find("{"), text.rfind("}")
+    if start < 0 or end <= start:
+        raise ValueError(f"no JSON object in judge output: {text[:200]!r}")
+    return json.loads(text[start:end + 1])
+
+
 def _cc_judge(prompt: str) -> dict:
     env = {k: v for k, v in os.environ.items()
            if not k.startswith(("ANTHROPIC", "CLAUDE_CODE"))}
@@ -92,11 +123,94 @@ def _cc_judge(prompt: str) -> dict:
          "--allowedTools", "", "--model", JUDGE_MODEL],
         capture_output=True, text=True, timeout=600, env=env, cwd=str(OUT))
     data = json.loads(out.stdout)
-    text = str(data.get("result") or "")
-    start, end = text.find("{"), text.rfind("}")
-    verdict = json.loads(text[start:end + 1])
+    verdict = _extract(str(data.get("result") or ""))
     verdict["_cost_usd"] = data.get("total_cost_usd")
+    verdict["_judge_resolved_model"] = JUDGE_MODEL
     return verdict
+
+
+def _cursor_judge(prompt: str) -> dict:
+    """gpt-5.6 via cursor-agent, made blind by construction rather than by instruction.
+
+    `cursor-agent` has no `--allowedTools` equivalent, and `--mode ask` buys read-only,
+    not tool-less — a read-only judge can still open `gt/` and stop being blind. Both
+    candidate reviews and the ground truth are already inlined in the prompt, so the
+    judge has no legitimate use for a filesystem at all. Hence:
+
+    * a **fresh empty directory** as both workspace and cwd, so there is nothing to
+      read even if it tries (this is also why `--trust` is safe here — the thing being
+      trusted is an empty temp dir);
+    * `--mode ask` (read-only), and `--force`/`--yolo`/`--approve-mcps` never passed;
+    * **any tool call in the stream fails the verdict.** That assertion is what
+      actually carries the guarantee; the flags only make violations unlikely.
+
+    `--sandbox enabled` was intended as a fourth layer and is NOT used: it needs kernel
+    v6.2+ and this host runs 5.10, where passing it makes cursor-agent exit without
+    producing a verdict at all. Stating that plainly rather than leaving a flag in the
+    command line that silently does nothing — the empty workspace and the zero-tool
+    assertion are what hold here.
+    """
+    ws = Path(tempfile.mkdtemp(prefix="judge-ws-"))
+    ws.chmod(0o700)
+    try:
+        out = subprocess.run(
+            ["cursor-agent", "--print", "--output-format", "stream-json",
+             "--model", JUDGE_MODEL, "--mode", "ask",
+             "--trust", "--workspace", str(ws), prompt],
+            capture_output=True, text=True, timeout=900, cwd=str(ws))
+        events = []
+        for line in out.stdout.splitlines():
+            line = line.strip()
+            if line.startswith("{"):
+                try:
+                    events.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+        used = _judge_tool_calls(events)
+        if used:
+            raise RuntimeError(f"judge attempted tool calls {used} — verdict discarded "
+                               "(a judge with filesystem access is not blind)")
+        res = next((e for e in reversed(events) if e.get("type") == "result"), {})
+        if not events:
+            raise RuntimeError("cursor-agent produced no events: "
+                               f"rc={out.returncode} {(out.stderr or out.stdout)[:300]}")
+        if res.get("is_error"):
+            raise RuntimeError(f"cursor judge errored: {str(res.get('result'))[:200]}")
+        verdict = _extract(str(res.get("result") or ""))
+        u = res.get("usage") or {}
+        verdict["_usage"] = {"input": u.get("inputTokens"), "output": u.get("outputTokens")}
+        init = next((e for e in events if e.get("subtype") == "init"), {})
+        verdict["_judge_resolved_model"] = init.get("model") or JUDGE_MODEL
+        return verdict
+    finally:
+        shutil.rmtree(ws, ignore_errors=True)
+
+
+def _judge_tool_calls(events: list[dict]) -> list[str]:
+    """Any sign the judge reached outside the prompt. Deliberately over-broad: an
+    unrecognised event type that mentions a tool should fail loudly, not pass."""
+    used = []
+    for e in events:
+        if "tool" in str(e.get("type", "")).lower():
+            used.append(str(e.get("type")))
+            continue
+        msg = e.get("message") or {}
+        for b in (msg.get("content") or []) if isinstance(msg, dict) else []:
+            if isinstance(b, dict) and b.get("type") not in (None, "text"):
+                used.append(str(b.get("type")))
+    return sorted(set(used))
+
+
+_JUDGES = {"claude": _cc_judge, "cursor": _cursor_judge}
+
+
+def judge_call(prompt: str) -> dict:
+    try:
+        fn = _JUDGES[JUDGE_BACKEND]
+    except KeyError:
+        raise SystemExit(f"unknown JUDGE_BACKEND={JUDGE_BACKEND!r}; "
+                         f"expected one of {sorted(_JUDGES)}")
+    return fn(prompt)
 
 
 def _pr_packet(n: int) -> str:
@@ -151,15 +265,22 @@ def judge_one(kind: str, n: int, rep: int) -> str:
         f"Score honestly; do not reward verbosity — reward being right, "
         f"grounded, and useful. Output ONLY minified JSON exactly matching: "
         f"{schema}")
-    v = _cc_judge(prompt)
-    v["_blinding"] = {"X": "copilot_v2" if x_is_a else "opus_baseline",
-                      "Y": "opus_baseline" if x_is_a else "copilot_v2"}
-    # metadata-only (goal-eval plan round-4 fix): record WHICH arm dir + its
-    # content hash so validation can detect a wrong ARM_A_DIR; scoring
-    # logic untouched — the generic copilot_v2 label above stays as-is.
+    v = judge_call(prompt)
+    v["_blinding"] = {"X": ARM_A_LABEL if x_is_a else ARM_B_LABEL,
+                      "Y": ARM_B_LABEL if x_is_a else ARM_A_LABEL}
+    # Which label held which slot. Scoring used to infer the baseline side by string-
+    # matching the literal "opus_baseline"; with a second baseline in play that would
+    # quietly mis-assign every verdict in this campaign, so the roles are recorded
+    # explicitly and readers key on these rather than on the names.
+    v["_roles"] = {"arm": ARM_A_LABEL, "baseline": ARM_B_LABEL}
     import hashlib as _hl
     v["_arm_meta"] = {"arm_a_dir": str(ARM_A),
                       "arm_a_sha256": _hl.sha256(a_text.encode()).hexdigest(),
+                      "arm_b_dir": str(ARM_B),
+                      "arm_b_sha256": _hl.sha256(b_text.encode()).hexdigest(),
+                      "judge_backend": JUDGE_BACKEND,
+                      "judge_model": JUDGE_MODEL,
+                      "judge_resolved_model": v.get("_judge_resolved_model"),
                       "judge_rep": rep}
     outf.write_text(json.dumps(v, indent=2, ensure_ascii=False))
     w = v.get("winner", "?")
@@ -167,30 +288,56 @@ def judge_one(kind: str, n: int, rep: int) -> str:
     return f"done {stem}.r{rep} winner={real} ({v.get('margin','')})"
 
 
-def main() -> None:
+def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     jobs = [(k, n, r) for k, ns in (("pr", PR_ITEMS), ("issue", ISSUE_ITEMS))
             for n in ns for r in range(1, REPLICATES + 1)]
-    print(f"[judge] {len(jobs)} judgments -> {OUT}", flush=True)
+    print(f"[judge] {len(jobs)} judgments -> {OUT} "
+          f"(backend={JUDGE_BACKEND} model={JUDGE_MODEL}, "
+          f"arm={ARM_A_LABEL} vs baseline={ARM_B_LABEL})", flush=True)
+    failures = []
     with ThreadPoolExecutor(max_workers=3) as ex:
         futs = {ex.submit(judge_one, *j): j for j in jobs}
         for f in as_completed(futs):
             try:
                 print(f"[judge] {f.result()}", flush=True)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 — one bad call must not lose the rest
+                failures.append(f"{futs[f]}: {e}")
                 print(f"[judge] FAIL {futs[f]}: {e}", flush=True)
     aggregate()
+    # A silently-short campaign is how the previous run nearly reported on 179 verdicts
+    # instead of 180. Re-running is cheap and resumable; a wrong denominator is not.
+    if failures:
+        print(f"[judge] {len(failures)} FAILED judgment(s) — the campaign is "
+              f"INCOMPLETE; re-run to fill them in:", flush=True)
+        for f in failures:
+            print(f"  {f}", flush=True)
+        return 1
     print("[judge] complete", flush=True)
+    return 0
 
 
 def aggregate() -> None:
+    """Report what actually ran. Every label, count and title below is derived from
+    the verdicts on disk — the previous version hardcoded the arm name, the baseline
+    name, the judge and a "10 items" count into the report text, which meant a report
+    could describe a campaign that never happened."""
     import statistics as st
     per_arm: dict[str, dict[str, list[float]]] = {}
-    wins: dict[str, float] = {"copilot_v2": 0, "opus_baseline": 0, "tie": 0}
+    wins: dict[str, float] = {"tie": 0}
     rows = []
+    seen_roles: set[tuple[str, str]] = set()
+    seen_judges: set[str] = set()
     for f in sorted(OUT.glob("*.r*.json")):
         v = json.loads(f.read_text())
         bl = v["_blinding"]
+        roles = v.get("_roles") or {}
+        # legacy verdicts predate _roles: their blinding literally said copilot_v2 /
+        # opus_baseline, which is exactly the role pair they had
+        seen_roles.add((roles.get("arm", "copilot_v2"),
+                        roles.get("baseline", "opus_baseline")))
+        seen_judges.add(str((v.get("_arm_meta") or {}).get("judge_model")
+                            or "claude-sonnet-5"))
         real_winner = bl.get(v.get("winner"), "tie")
         wins[real_winner] = wins.get(real_winner, 0) + 1
         for side in ("x", "y"):
@@ -202,12 +349,27 @@ def aggregate() -> None:
                     per_arm.setdefault(arm, {}).setdefault(dim, []).append(float(val))
         rows.append((f.stem, real_winner, v.get("margin", ""),
                      (v.get("rationale") or "")[:200]))
-    lines = ["# Val-split judgment: copilot_v2 (DeepSeek) vs claudecode_opus48 (Opus 4.8)",
-             "", f"Judge: {JUDGE_MODEL} (blind, randomized order, "
-             f"{REPLICATES} replicates x 10 items = {sum(wins.values()):.0f} verdicts)", "",
-             f"## Wins\n- copilot_v2: {wins['copilot_v2']}\n"
-             f"- opus_baseline: {wins['opus_baseline']}\n- tie: {wins['tie']}", "",
-             "## Mean rubric scores", "",
+    if len(seen_roles) > 1:
+        raise SystemExit(f"{OUT.name}: verdicts mix arm/baseline pairs "
+                         f"{sorted(seen_roles)} — refusing to aggregate two campaigns "
+                         "into one report")
+    if len(seen_judges) > 1:
+        raise SystemExit(f"{OUT.name}: verdicts mix judges {sorted(seen_judges)} — "
+                         "refusing to aggregate")
+    arm_label, base_label = (seen_roles.pop() if seen_roles
+                             else (ARM_A_LABEL, ARM_B_LABEL))
+    judge = seen_judges.pop() if seen_judges else JUDGE_MODEL
+    n_items = len({r[0].split(".r")[0] for r in rows})
+    n_reps = max((int(r[0].rsplit(".r", 1)[1]) for r in rows
+                  if ".r" in r[0]), default=0)
+    lines = [f"# Judgment: {arm_label} vs {base_label}",
+             "", f"Judge: {judge} (blind, randomized order, "
+             f"{n_reps} replicate(s) x {n_items} item(s) = "
+             f"{sum(wins.values()):.0f} verdicts)", "",
+             "## Wins", ""]
+    lines += [f"- {k}: {wins.get(k, 0):.0f}"
+              for k in (arm_label, base_label, "tie")]
+    lines += ["", "## Mean rubric scores", "",
              "| arm | " + " | ".join(sorted({d for a in per_arm.values() for d in a})) + " |",
              "|---|" + "---|" * len({d for a in per_arm.values() for d in a})]
     dims = sorted({d for a in per_arm.values() for d in a})
@@ -224,4 +386,4 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "aggregate":
         aggregate()
     else:
-        main()
+        raise SystemExit(main())

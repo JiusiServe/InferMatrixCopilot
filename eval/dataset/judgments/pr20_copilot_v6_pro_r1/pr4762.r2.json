@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.55,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.8,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y correctly identifies and reasons through the PR's central controversy (endpoint restrictions resolving from the correct post-override pipeline) and the trust_remote_code default flip, judging the latter's direction correctly as a safety improvement matching vLLM convention — X misses the endpoint-restriction issue entirely (the single most-discussed GT concern with its own regression test) and gets the trust_remote_code flip backwards, framing the safer False default as a regression to fix. X's findings (missing try/except, unbounded cache, circular import) are plausible but speculative/minor and don't overlap much with GT's actual concerns, while Y's else-branch UNSUPPORTED_ROUTES gap and cache-fixture-scope points are both grounded and closer to reviewer-flagged themes (auditing other endpoints, caching risk). Both have comparable actionability with specific file/line citations, but Y's grounding and directional correctness give it materially better precision and recall.",
+  "_cost_usd": 0.2380526,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "6b029027391ffca15cd3043ca09efdab689d704a58dfe733544474ba90a718bd",
+    "judge_rep": 2
+  }
+}

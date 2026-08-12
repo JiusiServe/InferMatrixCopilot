@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.8,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Ground truth here is thin (two LGTM approvals plus one inline comment from yJader explaining why the already_submitted-gated unwrap should be dropped since both submit_initial/submit_update reject list prompts identically). Candidate Y independently verifies exactly this reasoning with concrete file/line citations (stage_pool.py:951, 1022) and correctly validates both the orchestrator fix and the DiffusionOutput fix, plus offers grounded, actionable non-blocking suggestions (regression test). Candidate X returns zero findings and provides no grounded analysis at all, missing the reasoning entirely and offering nothing actionable.",
+  "_cost_usd": 0.0810679,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "7f2afd26dda2d3aadd1daf911f7f06ad8fe7cddedff58d0fc704997ffab0f2a0",
+    "judge_rep": 2
+  }
+}

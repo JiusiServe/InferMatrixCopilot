@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Y is a null review reporting zero findings, so it earns no recall, precision, or actionability credit. X performs genuine grounded analysis (verifies fallback-order equivalence, non-caching of failures, thread-safety), and its description/diff-mismatch note on trust_remote_code touches the same specific mechanism as the sole ground-truth concern, giving it partial recall even though its framing differs from the ground truth's compatibility-regression angle. X's comments are file/line-anchored with concrete suggested actions, making it clearly more useful than Y's empty output.",
+  "_cost_usd": 0.14502489999999998,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "04a616ffc26488e05c7f984b3cb01c2960f06d44aee596e96c09b6203c05a29d",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "X returned zero findings on a diff whose visible state actually still invites scrutiny, providing no recall, precision, or actionability. Y did substantive verification (confirmed the streaming-scope fix and seq_len cleanup are correct), surfaced a new grounded finding about an inconsistent getattr default at a cited line, and — critically — explicitly questioned whether the split-by-scheduled-tokens fix drops hidden-shape alignment for other multimodal tensors, directly anticipating the dual-batch-axis gap later fixed in PR #4910.",
+  "_cost_usd": 0.2720819,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "7c3a64ea1a0912c52d6a87b94201588b52a24e23de0c7c1fee78732c41f7c9f6",
+    "judge_rep": 2
+  }
+}

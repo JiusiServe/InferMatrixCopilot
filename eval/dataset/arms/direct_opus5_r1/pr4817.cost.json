@@ -1,0 +1,47 @@
+{
+  "calls": 17,
+  "input_tokens": 525795,
+  "output_tokens": 10284,
+  "cost_usd": 0.8466085,
+  "is_error": false,
+  "terminal_reason": "completed",
+  "split": "train",
+  "head": "fc423e5a9e86029f6f4db9353bde28ac6884790b",
+  "base": "e7b281799ec80cabc1493f3c8a623589a95cf1de",
+  "resolved_model": "claude-opus-5",
+  "snapshot_sha256": "b98eae994ed06876fca186553f467e5df2fde874d4445dba671e8ec39115b46d",
+  "validation_commands": [
+    "git log -1 --format='%H %s' && echo \"--- FILES ---\" && git diff --stat e7b281799ec80cabc1493f3c8a623589a95cf1de HEAD && echo \"--- NAMES ---\" && git diff --name-only e7b281799ec80cabc1493f3c8a623589a95cf1de HEAD",
+    "git diff e7b281799ec80cabc1493f3c8a623589a95cf1de HEAD -- vllm_omni/quantization/quack_fp8.py docs/user_guide/quantization/fp8.md",
+    "rg -n \"warmup_quack_fp8|install_quack_fp8_patch|quack_enabled|_is_blackwell|_is_quack_capable|VLLM_OMNI_USE_QUACK_FP8\" --glob '!docs/**' -g '!*.lock' . | head -40",
+    "sed -n 400,420p vllm_omni/patch.py; echo \"=== DOCS warmup section ===\"; sed -n 40,90p docs/user_guide/quantization/fp8.md",
+    "python -c \"import torch,pytest;print('torch',torch.__version__,'pytest',pytest.__version__,'cuda',torch.cuda.is_available())\" 2>&1 | tail -3",
+    "python -m pytest tests/quantization/test_quack_fp8_gate.py -q 2>&1 | tail -15",
+    "rg -n \"quantization\" .buildkite/ 2>/dev/null | head -20; ls .buildkite 2>/dev/null",
+    "ls tests/quantization/ 2>&1; echo \"=== is tests/quantization referenced in any CI lane? ===\"; rg -n \"tests/quantization\" .buildkite/ | head; echo \"(end)\"",
+    "rg -n \"pytest[^|]*tests/?( |$)|pytest -[a-z]* tests\\b\" .buildkite/*.yml .buildkite/*.yaml | head -20; echo \"=== existing sibling location ===\"; ls tests/diffusion/quantization/ | head -20",
+    "head -25 tests/diffusion/quantization/test_fp8_config.py; echo \"=== auto-marker in conftest? ===\"; rg -n \"add_marker|core_model|pytest_collection_modifyitems\" tests/conftest.py conftest.py 2>/dev/null | head -15",
+    "grep -n \"warmup_quack_fp8\\|VLLM_OMNI_USE_QUACK_FP8\" docs/user_guide/quantization/fp8.md"
+  ],
+  "ran_validation": true,
+  "claude_md_seen": {
+    "/data/zhoutaichang/CLAUDE.md": "4ff5b2a69ed0abc2"
+  },
+  "recorded_at": "2026-08-11T16:47:43",
+  "arm": "direct_opus5",
+  "wall_s": 171.3,
+  "audit_ok": true,
+  "audit_violations": [],
+  "audit_blocked_attempts": [],
+  "artifact_chars": 5319,
+  "completion_gate_ok": true,
+  "mcp_review_calls": 1,
+  "mcp_review_calls_ok": 1,
+  "mcp_validate_calls": 1,
+  "mcp_validate_calls_ok": 1,
+  "validate_status_sequence": [
+    "complete"
+  ],
+  "validate_final_status": "complete",
+  "audit_rule": "worktree + installed dependencies + copilot knowledge"
+}

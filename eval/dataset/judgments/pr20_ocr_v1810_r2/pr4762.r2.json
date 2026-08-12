@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.6,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.75,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y independently surfaces the trust_remote_code default-flip (near-verbatim match to the ground-truth inline comment) and correctly validates that the deploy-override pipeline-resolution bug was fixed via the dedicated regression test — showing real engagement with the two most substantive threads in the human review. X's three findings (dedup precedence, dynamic-import fragility, cls-vs-classname call) are technically coherent and well-formatted with concrete diffs, but none overlap any human-raised concern, one relies on a speculative/unverified claim about FastAPI route-override order, and X terminated early (partial run, skipped async_omni_engine.py) without reaching the areas reviewers actually flagged. X edges out slightly on raw actionability (literal before/after code snippets vs. Y's narrative asks), but Y's much higher grounded recall decides it.",
+  "_cost_usd": 0.37409889999999996,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "e38a7462ebb4712dd7e824e13714c32645aec1ac7ca673e494b7566d694fda8e",
+    "judge_rep": 2
+  }
+}

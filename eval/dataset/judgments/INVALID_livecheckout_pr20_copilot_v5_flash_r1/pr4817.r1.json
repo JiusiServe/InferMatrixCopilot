@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.95,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (bot noise + 'thanks'), so both reviews are essentially graded on grounded thoroughness rather than recall. X is a competent, accurate pass/fail table with one well-reasoned edge-case comment (sm_110/cc 11.x) but stays mostly at a summary level. Y does deeper investigation (repo-wide greps for stale symbol/env references, caller chains, import-safety checks) and surfaces several concrete, file:line-anchored doc/metadata inconsistencies (fp8.md hardware table, section heading, pyproject.toml description) plus a defensible fail-closed suggestion mirroring an existing pattern in platform.py, all with explicit evidence trails — more actionable even if a couple of findings (e.g. requesting benchmark logs) are lower-value nitpicks.",
+  "_cost_usd": 0.1348714,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "fb170283cf766460c3a8b7ea3bbb768c475189c02373e819158200994d1e6ad4",
+    "judge_rep": 1
+  }
+}

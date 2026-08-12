@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.6,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.6
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns to recall, so both score fully there. X is thorough (greps, reads) and gives concrete file:line/edit suggestions, but several findings (hardware-table wording, pyproject.toml description, demanding server-log artifacts for an already-tested small bugfix) are marginal nitpicks or process overreach that dilute precision. Y is tighter and better calibrated: its pass/fail scan is accurate, its single comment (sm_110a future-proofing) is genuinely grounded in the PR's own stated rationale and honestly flagged as low-signal, and its APPROVE recommendation matches the actual scope/quality of a clean, well-tested bugfix — though it is less concretely actionable than X's specific line-edit suggestions.",
+  "_cost_usd": 0.13948639999999998,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "fb170283cf766460c3a8b7ea3bbb768c475189c02373e819158200994d1e6ad4",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 1.0,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 1.0,
+    "actionability": 0.3,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates correctly and accurately trace the seed→tts_local_seed→batched-multinomial mechanism with grounded file/line citations and reach the same APPROVE verdict as the human reviewer (LGTM); neither surfaces the human's only substantive concern (the unrelated VoxCPM2 regression request), which isn't visible in the shown diff anyway. X is more actionable, offering concrete follow-up suggestions (a guard comment against reintroducing seed, noting stage-1 removal was inert) whereas Y is a pure validation/sweep report with no concrete suggested edits. Precision is equal and high for both — no fabricated claims in either.",
+  "_cost_usd": 0.0927526,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "3a583dcf1c49709816487e749e90444bccf4bbea725c264532b2ff2fe993495e",
+    "judge_rep": 3
+  }
+}

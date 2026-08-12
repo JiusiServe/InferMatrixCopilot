@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.7,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Ground truth for this PR contains no substantive concerns (just LGTM approvals and a verification comment confirming the change works), so recall is trivially satisfied by both. Candidate X does thorough, diff-grounded validation (range/message consistency, both API entrypoints, symbolic pipeline support for layers=2) and adds specific, actionable follow-up findings about stale reliability-test files elsewhere in the repo with exact snippets and fixes — plausible and well-reasoned even if unverifiable from the truncated diff alone. Candidate Y is a bare 'no issues found' report with zero engagement or actionable content, contributing nothing beyond trivially avoiding false claims.",
+  "_cost_usd": 0.1562089,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "98ab4ff849017fa22d9228e23f56166fbbf07fb1eecaef4381d5f2a9aa32d4c9",
+    "judge_rep": 1
+  }
+}

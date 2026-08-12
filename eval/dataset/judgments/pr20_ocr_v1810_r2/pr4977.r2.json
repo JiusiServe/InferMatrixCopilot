@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Candidate X performed a substantive, grounded review: it correctly verified the fallback-order and cache-safety semantics, flagged a real (if minor) lock-contention point, and independently surfaced a trust_remote_code discrepancy between the PR description and the code — the same topic area as the ground-truth Codex P2 comment, though framed differently (missing kwarg vs. version-compat guard) so it only partially recalls the concern. Candidate Y produced zero findings, missing the only ground-truth concern entirely and offering no actionable content. X's findings are all traceable to the diff with concrete file/line references, giving it strong precision and actionability versus Y's empty, unhelpful output.",
+  "_cost_usd": 0.1509009,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "04a616ffc26488e05c7f984b3cb01c2960f06d44aee596e96c09b6203c05a29d",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X does real diff-grounded investigation: verifies the qwen3_tts scoping fix and its guarding test (matching the ground-truth Med concern's resolution), flags the async_chunk default inconsistency echoing the Low robustness note, confirms the seq_len cleanup, and—critically—explicitly calls out that the split now keys solely on total_num_scheduled_tokens and drops hidden-shape alignment, correctly anticipating the dual-batch-axis fix later merged in #4910 (clear gap_hit). Y is an OCR tool run that terminated early, reviewed only 3/4 files, and reported zero findings, contributing no recall, precision, or actionable content.",
+  "_cost_usd": 0.2033609,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "1abcc012bdb380840928d69f6e5ed79b82f1086c4e558915fa91b5714f9ef757",
+    "judge_rep": 1
+  }
+}

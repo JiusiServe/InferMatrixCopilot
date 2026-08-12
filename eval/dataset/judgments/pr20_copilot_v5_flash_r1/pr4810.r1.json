@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.8,
+    "actionability": 0.65,
+    "gap_hit": true
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently rediscover the exact latent gap (hunyuan_image3_transformer.py:2238 still calling the removed get_cache_scale API, excluded from _STALE_API_FILES) with solid, grounded evidence, and both echo the ground-truth reviewer's point that the fake-param test doesn't prove real checkpoint scale names resolve to registered params. X delivers this concisely with a clear APPROVE-with-notes verdict matching the human review's tone, making it immediately actionable. Y's analysis is technically deeper (adds a plausible new finding about untested tensor-dim squeezing) but the same DiT-gap finding is duplicated nearly verbatim five times as separate 'major' items, which is redundant, confusing, and undercuts practical usability despite each instance being individually valid.",
+  "_cost_usd": 0.20034020000000002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "34f7e921ce8596623c66221b40b616ca8d43e09223d4cedd916b2d1b5896f7ef",
+    "judge_rep": 1
+  }
+}

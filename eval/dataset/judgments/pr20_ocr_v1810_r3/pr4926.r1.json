@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.6,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "X's top-billed finding (integer version= silently no-ops) is directly contradicted by the author's own follow-up comment explaining version=1/2 are valid git-branch refs, hurting its precision, but X's #3 (varlen_func called unconditionally when only flash_attn_func is guaranteed) is a real, ungrounded-fixed bug in the same family as RuixiangMa's GT4 finding, giving it the only meaningful recall hit either candidate scores. Y's four findings (broaden except clause, wrap default get_kernel call, class duplication) are all technically accurate and well-anchored, giving it higher precision, but none overlap with the nine actual reviewer concerns (version docs, skipif markers, SM90 gating, strict-vs-try/except test validation) and two of them (wanting more exception wrapping) actually cut against what real reviewers wanted (less silent swallowing). Both are concrete and file/line-anchored with similar actionability; X edges out on being more useful/grounded overall despite the flawed headline claim.",
+  "_cost_usd": 0.2931319,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "87f20959b05160f3cf23407fa6ef1d7eee984aaadc6c4d06edcf39a52e6ec421",
+    "judge_rep": 1
+  }
+}

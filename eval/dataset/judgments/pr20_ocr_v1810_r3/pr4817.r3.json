@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive reviewer concerns, so recall is trivially satisfied by both. Candidate X returns zero findings with no analysis shown, so it makes no false claims (precision 1.0) but offers nothing actionable. Candidate Y provides a grounded, diff-verified correctness/test/doc check (the >=10→==10 fix, env-override semantics, new regression test, docs update all check out against the diff) plus one specific, appropriately-hedged file:line comment about the sm_110a edge case — concrete and useful even though that detail can't be verified from the truncated diff alone, slightly dinging precision. Y is clearly more useful and thorough.",
+  "_cost_usd": 0.12987390000000001,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "b8632c495c1c917353d2e53bfc783c4df825a753492ef3e5e2fd20a4e93e9c16",
+    "judge_rep": 3
+  }
+}

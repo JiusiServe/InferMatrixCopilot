@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.45,
+    "actionability": 0.4
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "X finds two minor but genuinely grounded issues (unchecked ar_output.outputs[0] indexing, hardcoded 'Request 0' log) with concrete file/line suggested-diff fixes, but misses the reviewers' central concern about the parent-output ordering assumption. Y explicitly engages that ordering question and does deep, plausible caller-compatibility analysis, giving it better recall, but it asserts unverifiable specifics (buildkite NPU/AMD failures, 'pre-commit green') that aren't grounded in the diff and directly conflict with the human reviewer's 'please fix precommit' comment, and its output is mostly narrative approval rather than concrete actionable line-item fixes.",
+  "_cost_usd": 0.1976056,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "6dccef89ec9b0407207941cdf9498c79d12eb6083912b49943cd30cef80d5a31",
+    "judge_rep": 3
+  }
+}

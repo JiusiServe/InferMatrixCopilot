@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.15,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X independently surfaces the same core concern the ground-truth reviewer raised about audio_vae.py:141 (config.num_hidden_layers mutation affecting introspection), with nearly identical reasoning about build order, and also verifies the include_language removal and notes the decode-window tightening — real, grounded findings. Y's single finding misattributes the @torch.inference_mode() decorator (which actually applies to the next method, not encode_latent) and recommends reverting the stochastic VAE sampling that was the PR's intentional, validated fix (driving the WER improvement), making it both factually inaccurate and substantively wrong. Neither candidate flags the language-dropout risk as a question the way the human reviewer did, and neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.0833161,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "013bdd18a8cb5671403efd0adb58af9512a7f644f43ef5d28f3d2692223da3df",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.4,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates validate the seq_len removal and the qwen3_tts scoping correctly, but X's 'new' findings are mostly three redundant restatements of the same async_chunk-default concern plus a trivial int()-cast nit, and it leaves the model_config aliasing question unresolved ('please verify') rather than checking it. Y investigates that same aliasing question and resolves it, pins the Low ground-truth concern precisely by citing the sibling default (line 3823) and the real OmniModelConfig default, and explicitly questions whether the split logic (keyed solely on total_num_scheduled_tokens) handles tensors aligned to a different batch axis — directly hitting the latent dual-axis gap later fixed in PR #4910. Y's findings are fewer but higher-precision, better investigated, and more actionable.",
+  "_cost_usd": 0.2635994,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "9b74fc100b838e4dad1ed43cde6abd555456b43bca513d95f17770bf4c7bce3a",
+    "judge_rep": 2
+  }
+}

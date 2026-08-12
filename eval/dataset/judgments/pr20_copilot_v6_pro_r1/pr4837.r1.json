@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.8,
+    "precision": 0.9,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.7,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates correctly reconstruct the core regression story and explicitly verify that removing the `already_submitted` gate is safe because both submit_initial and submit_update reject list prompts — closely mirroring the human reviewer's inline rationale. X's claims are tightly grounded (traced actual ValueError messages, DiffusionOutput dataclass shape) and it explicitly flags the len>1 case as intentional rather than a gap, whereas Y raises a redundant 'add an assert for len>1' suggestion that contradicts the already-established deliberate design, slightly hurting precision. Y is more verbose with concrete file/line suggestions (dead variable, missing tests, hasattr fallback) giving it an edge in actionability, but several findings are hedged/speculative ('if confirmed safe') rather than verified like X's.",
+  "_cost_usd": 0.1202486,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "cbf8771ce468155cb530048cda52258c6f6e1e21e3f03218461d5fc2e6e423d5",
+    "judge_rep": 1
+  }
+}

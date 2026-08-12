@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.5,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Ground truth has no substantive reviewer concerns, so recall is trivially satisfied by both. Candidate X delivers a grounded, accurate review (correctly explains the >=10→==10 fix, verifies the rename and env-override semantics against the diff, confirms the test regression-guards the bug) plus one clearly-hedged, non-fabricated observation about sm_110a with a specific file:line and concrete phrasing suggestion. Candidate Y returns zero findings with no analysis, providing no actionable value despite a real (if narrow) diff to review.",
+  "_cost_usd": 0.046966999999999995,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "b8632c495c1c917353d2e53bfc783c4df825a753492ef3e5e2fd20a4e93e9c16",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "x": {
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Candidate X returned zero findings, missing the one substantive ground-truth concern (whether source_outputs[0] is reliably the parent AR output) entirely and offering nothing actionable. Candidate Y independently traced the orchestrator code and directly validated that exact concern (parent-first ordering, [output, *companions]), matching what Celeste-jq confirmed in the PR thread, and backed it with concrete file:line evidence and a clear verdict; it missed the minor procedural asks (run the benchmark script, precommit status) but its findings are grounded and specific enough to be useful to a maintainer.",
+  "_cost_usd": 0.1432919,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "f9ab5e4daede03335df99f46121e70e9d1d3d89f9a645a043486979cce9f1de8",
+    "judge_rep": 2
+  }
+}

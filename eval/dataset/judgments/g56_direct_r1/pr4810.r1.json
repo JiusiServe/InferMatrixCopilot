@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.76,
+    "actionability": 0.96,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.68,
+    "actionability": 0.96,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly identify the missed diffusion-loader caller and provide concrete fixes. Y uniquely captures the human concern about lacking a real quantized-checkpoint smoke test, while X only discusses adjacent fake-test limitations. X has better precision; Y's claims about the real mapper not handling output_scale and MiMo silently dropping prefixed scales are insufficiently grounded or likely incorrect.",
+  "_usage": {
+    "input": 3,
+    "output": 2559
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "direct_opus5_r1"
+  },
+  "_roles": {
+    "arm": "direct_opus5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/direct_opus5_r1",
+    "arm_a_sha256": "94b4c026c8182996677c402fef741409db8d4e61d008c1e5cb7beda60478b1c6",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "62ede4acd697d051f739a163828672d894ec4150b7b17c941bb4b33f4b81409e",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

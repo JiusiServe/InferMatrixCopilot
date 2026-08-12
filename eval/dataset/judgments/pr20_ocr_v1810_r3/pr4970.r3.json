@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.5,
+    "actionability": 0.1,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Ground truth is a trivial clean-approve PR (LGTM, no inline comments), so the bar is low, but X still does real work: it traces the seed-propagation mechanism through named files/lines, correctly reaches APPROVE matching the human verdict, and offers concrete non-blocking file:line suggestions grounded in the actual diff. Y is a bare 'no issues found' tool report with zero reasoning, zero engagement with the diff's content, and no actionable output — it happens to land on 'no blockers' but demonstrates no verification. X's unverifiable cross-file claims slightly dent precision, but it is far more grounded and useful than Y's empty result.",
+  "_cost_usd": 0.0932939,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "328122fe4b392627a25677e42da358bb8e46e29a267034220c85b8dd7fe1c37b",
+    "judge_rep": 3
+  }
+}

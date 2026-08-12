@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.8,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.6,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y independently surfaces the two threads that dominate the actual PR discussion — the mtp-seed-reproducibility tradeoff under full cudagraphs (matching gcanlin's inline comment) and the demand for full before/after benchmark evidence (matching Sy0307/amy-why-3459's thread) — plus a plausible NPU stage-1 question tied to Wallbreazzz's fix, giving it materially higher recall. X's findings (missing test coverage for async output/graph wrapping, docstring staleness) are well-grounded in the diff with concrete evidence citations but don't overlap with any actual reviewer concern, so its recall is low even though its precision is solid. Y's precision is dragged down by a stale-header claim (yaml lines 6-8) and specific benchmark numbers not present in the provided diff/PR context, which look fabricated or unverifiable. Both are similarly actionable with concrete file/line asks, but Y's better alignment with ground-truth concerns makes it the stronger review overall.",
+  "_cost_usd": 0.2091192,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "314e5c4091fdcf81e96005f06e5dd40ea5ba4c4ce94214df5710ba5269dfae43",
+    "judge_rep": 1
+  }
+}

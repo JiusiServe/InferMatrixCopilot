@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.9,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.9,
+    "actionability": 0.8
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Neither candidate surfaces the ground-truth concern (trust_remote_code kwarg incompatible with locked kernels<0.15.0 installs) since the visible diff doesn't contain that kwarg, so recall is low and roughly equal for both. X digs deeper into the actual core change (the new process-global cache/lock/fallback loop), correctly identifies it has zero direct unit-test coverage, and gives a concrete test-writing recipe plus a cache-reset suggestion — all grounded in specific file/line evidence. Y is well-calibrated and honest (correctly notes failures aren't cached, catches a real but minor lock-scope-across-repos issue) but is less thorough, waving off the test-coverage gap it itself observed rather than flagging it as actionable.",
+  "_cost_usd": 0.0891887,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "f5d632fe362e5dbf8c4bda2f6ac314786f89a0bfb93256158b4c47f0a7d62372",
+    "judge_rep": 3
+  }
+}

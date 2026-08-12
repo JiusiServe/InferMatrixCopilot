@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.94,
+    "actionability": 0.96,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.86,
+    "actionability": 0.98,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Y directly covers the benchmark justification, model/runner ownership, seeded MTP behavior, and NPU graph-safety concerns, with concrete fixes and locations. X is more precise but misses the core architecture and NPU concerns, focusing mainly on tests and stale comments. Y loses some precision for speculative performance and CI assertions.",
+  "_usage": {
+    "input": 3,
+    "output": 1609
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "copilot_v4_pr20_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v4_pr20_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "9c468aa836407346dead6212974934c8ff4bbb59684c20425f658394a1b9477f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9da2d20c4c6f3ebd76201601229ebe30caa5b10534567d559eab79d6e55fdaba",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

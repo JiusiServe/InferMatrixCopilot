@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.7,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "X's finding at hunyuan_image3.py:125 (recommend a comment/assert about extras being intentionally ignored near the parent-index access) partially overlaps the ground-truth reviewer's core concern about documenting the parent-first assumption, while Y validates the same code path and treats it as fully resolved without suggesting any documentation, missing that concern entirely. X is more actionable (specific pytest commands, file/line directives) and mostly grounded, though one finding (pipeline_hunyuan_image3.py:555 dict-vs-list regression) is hedged speculation and its 'major' CI-failure severity is inconsistent with the PR's actual clean approval, dragging down precision. Y is cleaner and higher-precision but is essentially a rubber-stamp approval that captures almost none of the human reviewer's actual concerns (parent-first documentation ask, benchmark re-run request).",
+  "_cost_usd": 0.1004611,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "ac4980c54d331c1c795a00790179254eac8bd4a7dbf430b5aacc7e54ae61e569",
+    "judge_rep": 3
+  }
+}

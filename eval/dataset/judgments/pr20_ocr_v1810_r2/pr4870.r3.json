@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "X returned zero findings, missing everything including the subtleties still live in the diff. Y did substantive grounded analysis: correctly traced is_streaming_request's scope, verified the seq_len removal, flagged a real inconsistency in the async_chunk getattr default (echoing the spirit of the ground-truth Low concern), and explicitly called out that the payload split now keys on a single batch axis while noting main later generalized to handle both — directly hitting the latent dual-axis gap check. Y's findings are file/line-anchored and actionable; X offers nothing to act on.",
+  "_cost_usd": 0.11424500000000001,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "7c3a64ea1a0912c52d6a87b94201588b52a24e23de0c7c1fee78732c41f7c9f6",
+    "judge_rep": 3
+  }
+}

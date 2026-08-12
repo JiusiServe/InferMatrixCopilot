@@ -1,0 +1,33 @@
+{
+  "wall_s": 157.4,
+  "split": "train",
+  "rc": 0,
+  "input_tokens": 112605,
+  "output_tokens": 10773,
+  "attempt_usd_total": 0.011862,
+  "engine": "ocr",
+  "terminal_state": "complete",
+  "head": "fc423e5a9e86029f6f4db9353bde28ac6884790b",
+  "base": "e7b281799ec80cabc1493f3c8a623589a95cf1de",
+  "cached_input_tokens": 96000,
+  "fresh_input_tokens": 16605,
+  "raw_total_tokens": 123378,
+  "coverage": {
+    "selected": 2,
+    "completed": 2,
+    "reused": 0,
+    "failed": 0,
+    "waived": 0
+  },
+  "findings": 0,
+  "tool_calls": 12,
+  "structural_skip": false,
+  "artifact_chars": 360,
+  "identity": {
+    "repository": "36e5fba7e3c6d5c0921b67ab04b0df4e998df3ea58c59772fa27b05dc1915435",
+    "source_artifact": "b55fafc7e9ad2e0caeb4e75b3b70625948b0bc82e6a633947bb3a146a1b4eed9",
+    "rule_config": "522c67f777c45cca176379b80a0a691664825d8c8eae359c9e77cab49c91e92a",
+    "runtime_config": "0630a41b6fcf0e13af6a64141b0c670ea4cafe44fc361af81a3a9de46cdeb842"
+  },
+  "recorded_at": "2026-08-10T17:56:47"
+}

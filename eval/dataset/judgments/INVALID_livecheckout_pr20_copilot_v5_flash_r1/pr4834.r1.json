@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.75,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.7,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "X covers both substantive ground-truth threads (the regression-test ask and the enum suggestion, both visible in the inline comments) and its top finding — default sleep() level=2 permanently bricking wake/generate — lines up almost exactly with the real post-merge relaxation (#4905/#4912), giving a strong gap_hit with a concrete, correct fix. Y misses the enum point entirely and duplicates its docs finding with inconsistent line citations (weakening precision), but partially redeems itself with a genuinely sharp, diff-verifiable catch (global _sleeping_tags vs per-stage sleep/wake causing a reintroduced Repro-B-class crash) and a correct unreachable-code catch that X didn't find — narrowing the gap to a slight rather than clear win for X.",
+  "_cost_usd": 0.24616540000000003,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "965d507eda1744de5bea3de9e1402b0c9aa5ad0d739c01160fe94c82f5c553de",
+    "judge_rep": 1
+  }
+}

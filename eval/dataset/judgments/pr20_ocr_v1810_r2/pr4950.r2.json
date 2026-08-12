@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Ground truth is trivial (all approvals, no substantive concerns), so the bar is really 'engage credibly and don't invent problems.' X does real work: it verifies every technical claim in the docs diff against actual source (serving_chat.py, minicpmo_4_5_omni_tts.py) with specific file:line citations, correctly concludes no blocking issues (matching the ground-truth approve), and offers one clearly-flagged non-blocking, low-confidence comment with a concrete location. Y's tool skipped the PR entirely because Markdown files aren't a supported extension, producing zero review content — it neither confirms correctness nor raises any grounded or actionable findings, a capability failure rather than a judgment.",
+  "_cost_usd": 0.0990469,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "38e263e1b5697d8bec36d8dbacedc6666dbea5003329be6212bbfd0d3d210fb6",
+    "judge_rep": 2
+  }
+}
