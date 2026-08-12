@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 1.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.45,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y directly identifies that the reduce_scatter assertions merely validate mock setup and proposes concrete assertions against the actual initializer parameters, fully covering the sole ground-truth concern. However, many additional findings are speculative, peripheral, or unsupported by the supplied diff, substantially lowering precision. X reports nothing and therefore misses the concern entirely.",
+  "_usage": {
+    "input": 3,
+    "output": 1007
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "ocr_v1810_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "ocr_v1810_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "4c74470d7ab5810e1ec6f79a85f46ba6b877d14ebcde70c97cdb4a04976b7bf3",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0d4ddd4027e23f1f32216e748289588ea9a0e74ee8e599fa34b9d50f503d2f0d",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.9,
+    "actionability": 0.45,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.75,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y independently surfaces both substantive ground-truth concerns — the parent-is-first assumption (matching Gaohan123's exact question, going further to propose a concrete assert) and a request to validate with the diffusion benchmark test (echoing Bounty-hunter's ask) — with file:line specificity and concrete fixes. X mostly validates the diff as correct and approves, implicitly touching the parent-ordering question but never framing it as something needing a check, and never mentions benchmark verification, giving it much lower recall despite being well-grounded and safe. Y's CI/issue-tracker claims are more speculative and slightly reduce precision, but its findings are overall still grounded in the diff and orchestrator code it read.",
+  "_cost_usd": 0.1714244,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "e4c7b3b5e126665737707fdc2dcc6b0765e7be43662ff7d0994e58aa46fbe179",
+    "judge_rep": 1
+  }
+}

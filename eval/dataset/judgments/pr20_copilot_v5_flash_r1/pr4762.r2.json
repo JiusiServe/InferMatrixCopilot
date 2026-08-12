@@ -1,0 +1,26 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.5,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.7,
+    "actionability": 0.65
+  },
+  "gap_hit": false,
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently surface the trust_remote_code default flip (True→False), which matches the ground-truth's confirmed bug (author: 'this looks like a bug'). X repeats this single finding five times with increasingly speculative specifics (exact line numbers in async_omni_engine.py, a file not shown in the diff), inflating apparent finding-count while diluting precision, and never engages with the second major ground-truth thread (endpoint restrictions resolved from the wrong/pre-override pipeline) at all. Y covers the trust_remote_code issue once, explicitly credits the deploy-override regression test as addressing the pipeline-resolution concern, and adds two additional plausible, hedged findings (functools.cache staleness relating to the ground-truth's HF-config mutability concern, and an else-branch that may skip UNSUPPORTED_ROUTES) with appropriate uncertainty framing rather than false confidence. Neither candidate addresses the signature/positional-arg risk, debug-message scope, or endpoint-audit follow-up from the ground truth, keeping recall low for both, but Y's broader, better-hedged coverage and higher grounding edge out X's repetitive, overconfident single-issue focus.",
+  "_cost_usd": 0.22832719999999998,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "0dda532192424a9256c66b766a6b22580d65743f1d09a49cf3d1ea30344885ef",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.5,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.5,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Ground truth is essentially two LGTM approvals plus a manual verification comment confirming boundary validation, unit tests, and L4 regression passed — no substantive defects exist to recall. Candidate X mirrors exactly what the human verifier checked (boundary logic, both entrypoints, pipeline layers-generic behavior, no stale docs) and adds specific, actionable follow-up findings with file/line/code, though its central claim about two untouched 'dfx/reliability' test files is unverifiable against the provided diff and carries real fabrication risk, capping its precision. Candidate Y is a bare 'engine ran, 0 findings' stub with zero engagement, zero validation of the actual change, and zero actionable content, making it far less useful even though it doesn't state anything false.",
+  "_cost_usd": 0.1420649,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "98ab4ff849017fa22d9228e23f56166fbbf07fb1eecaef4381d5f2a9aa32d4c9",
+    "judge_rep": 1
+  }
+}

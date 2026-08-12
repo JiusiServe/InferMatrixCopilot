@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.1,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive reviewer concerns, so both trivially achieve full recall and X's zero-finding output is not 'wrong.' But X provides essentially no review substance (a bare 'no issues found'), while Y does real verification work (confirms the rename is applied consistently, checks truthy/falsy override logic against the tests, confirms the regression test actually guards the bug) and surfaces one concrete, diff-grounded, actionable observation (quack_fp8.py:32, the `==10` gate would also exclude a hypothetical sm_110a/cc 11.x part) with a specific fix suggestion. Y's one claim about the PR body mentioning sm_110a can't be fully verified from the truncated diff, slightly denting precision, but the underlying code observation is sound and non-fabricated.",
+  "_cost_usd": 0.10513789999999999,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "b8632c495c1c917353d2e53bfc783c4df825a753492ef3e5e2fd20a4e93e9c16",
+    "judge_rep": 3
+  }
+}

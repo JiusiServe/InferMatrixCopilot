@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.8,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.75,
+    "actionability": 0.75
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Neither candidate reproduces the ground-truth codex concern (trust_remote_code kwarg breaking on locked kernels<0.15.0) since the diff they saw shows no such kwarg being added; both instead independently note the PR-description/diff mismatch on trust_remote_code, which is topically related but not the same claim. X does deeper, more specific verification (reads the actual test file line ranges, distinguishes CPU vs GPU test coverage, flags lock-held-across-I/O and cache-reset-for-tests issues) and gives concrete directives with file:line anchors, edging out Y's shorter, more conclusory review which asserts 'existing coverage is adequate' without the same rigor. Y's overall APPROVE verdict is arguably better calibrated to the actual outcome (human LGTM/approve), but X's findings are individually well-grounded and more actionable.",
+  "_cost_usd": 0.09612930000000001,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "4c1444c426037ea11508eb06ecded42c16c30eb7678afc83e33297a06da92ce7",
+    "judge_rep": 3
+  }
+}

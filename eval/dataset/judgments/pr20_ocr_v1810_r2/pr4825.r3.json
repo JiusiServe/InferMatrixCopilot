@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.7,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Candidate X's top comment (drive component discovery from a single source of truth instead of a hardcoded list) closely mirrors the one substantive ground-truth concern (dsocek's note about deriving from _packed_modules_mapping/stacked_params_mapping to cover naming-conflict cases generically), and it's delivered with concrete file:line references and actionable suggestions, plus a plausible follow-on finding about text-encoder LoRA being a silent no-op. Candidate Y produced zero findings, so it has no recall, no actionable content, and nothing to assess for precision. Neither review includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.048332799999999995,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "48a927d3f79c2089de5158c5686a3464c85acdaa23d77bf628197982374b87e9",
+    "judge_rep": 3
+  }
+}

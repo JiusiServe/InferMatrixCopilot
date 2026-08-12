@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.65,
+    "actionability": 0.7
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.7,
+    "actionability": 0.75
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates miss nearly all ground-truth concerns (slot-leak on abort, cumulative/delta rewind bug, floor/ceil latent bug, WER PCM fallback, docstring drift, missing vendor header, amy-why's cleanup/generalizability comments); X hits none of them while Y's load_weights fragility note partially overlaps hsliuustc0106's High-severity legacy-checkpoint finding. Y is undercut by an explicit false claim that slot-leak cleanup is 'handled' and lifecycle 'looks complete,' directly contradicting the confirmed High bug — a confident wrong assertion, not just an omission. X pads its findings list with two near-duplicate 'hardcoded audio params' entries inflating apparent finding count. Both are well-grounded in the diff and give concrete file/line targets, with Y's code-snippet citations slightly more actionable.",
+  "_cost_usd": 0.29503340000000006,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "91523a710f88cc047c2f1e1b5657b842a6ad152217f3371d8650cffa833baaff",
+    "judge_rep": 1
+  }
+}

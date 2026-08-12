@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.75,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.6,
+    "actionability": 0.65
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Neither candidate surfaces the ground-truth concern (trust_remote_code kwarg breaking on locked kernels<0.15.0), so recall is 0 for both. X's lock-contention finding is solid and grounded, with concrete before/after code; its dict-growth finding is weak/speculative but not wrong. Y also correctly flags the lock-across-I/O issue (more calibrated as optional), but its lead finding — claiming trust_remote_code is absent from the diff/file — directly contradicts what the ground-truth reviewer describes as present, making it a likely factual error rather than a grounded observation, and its actionability is lower (no concrete patch, vaguer anchoring).",
+  "_cost_usd": 0.1161727,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "248805b088459cae98f8bea6d463e40bdb6b8cc08d7b229ccc104d6ab29a6a14",
+    "judge_rep": 3
+  }
+}

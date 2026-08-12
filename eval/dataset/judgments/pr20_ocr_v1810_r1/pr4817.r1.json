@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.4,
+    "actionability": 0.05,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Ground truth contains no substantive reviewer concerns, so recall is trivially satisfied by both. Candidate X gives a thorough, technically accurate walkthrough grounded in the diff (correctly explains the >=10→==10 gate fix, rename consistency, test coverage, doc update) with one clearly-hedged speculative point (sm_110a) and a concrete file:line comment plus a clear verdict. Candidate Y is a content-free 'no issues found' stub with no evidence of actual engagement with the diff, offering nothing actionable or verifiable.",
+  "_cost_usd": 0.1102769,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "b8632c495c1c917353d2e53bfc783c4df825a753492ef3e5e2fd20a4e93e9c16",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.7,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates surface the ground-truth themes (regression tests already added, CuMemTag enum underused/half-utilized), so recall is similar and modest since the human thread was thin and already resolved. Y is more precise and actionable: it finds a genuine bug the diff introduces (sleep(level=1) after a prior level=2 never clears _level2_sleeping, permanently blocking wake_up), flags a stale mock (_is_sleeping) left over from the removed attribute, and — critically — explicitly identifies that existing tests calling sleep(level=2)+wake_up() will now crash under the new NotImplementedError guard, directly hitting the latent gap about the guard being too strict for existing callers. X is thorough and well-organized (good default-level=2 footgun catch) but stays at the design-tradeoff level rather than pinpointing concrete broken call sites, and doesn't connect its concerns to existing tests/CI exercising the guarded path, so it misses the gap.",
+  "_cost_usd": 0.17469659999999998,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "30ca9bb2c654dfe6c1c39aa0b599c949438189ee2cb85c73d12c800f0739ad8f",
+    "judge_rep": 1
+  }
+}

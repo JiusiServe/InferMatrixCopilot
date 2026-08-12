@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.75,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X independently surfaces essentially the same substantive concern as the ground-truth inline comment (dsocek's point about hardcoded component lists vs. driving discovery from existing mapping/declarations), and grounds it with specific file/line references and a concrete refactor suggestion, plus a second plausible, diff-grounded finding about silent text-encoder no-ops. Y is an empty OCR run that reports zero findings, missing the one real concern reviewers raised and providing no actionable content at all.",
+  "_cost_usd": 0.0876759,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "48a927d3f79c2089de5158c5686a3464c85acdaa23d77bf628197982374b87e9",
+    "judge_rep": 1
+  }
+}

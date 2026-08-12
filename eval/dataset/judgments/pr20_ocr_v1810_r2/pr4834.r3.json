@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 1.0,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.8,
+    "precision": 0.85,
+    "actionability": 0.95,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "X surfaces one accurate but trivial logging nitpick and misses both substantive ground-truth threads (the regression-test ask and the enum-extraction ask), while Y explicitly engages both (finding #2 on hardware-gated tests, finding #5 on the CuMemTag enum) plus several well-grounded, actionable findings with concrete file/line/severity. Critically, Y's finding #1 (default sleep level=2 makes wake_up/generate permanently fail with no recovery path) directly anticipates the real post-merge over-strictness bug (#4905/#4912) described in the latent gap check, while X never questions whether the new guard is too strict or whether CI exercises it.",
+  "_cost_usd": 0.20836100000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "dd41f26f9fb51901ed4aff381c2b17445600b0252705a5a9efcf4cc41469edbd",
+    "judge_rep": 3
+  }
+}

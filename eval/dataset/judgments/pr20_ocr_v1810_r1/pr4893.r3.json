@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.85,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.2,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Neither candidate surfaces the sole ground-truth concern (yenuo26's suggestion to more rigorously verify reduce_scatter behavior beyond hasattr), so recall is 0 for both. Candidate X performs substantive, technically grounded verification (DPMetadata construction validity, use_device_communicator semantics, group cleanup/destroy correctness, the cfg_parallel_size condition change) and offers one concrete, file/line-anchored non-blocking observation, making it genuinely useful and actionable. Candidate Y is an empty pass-through report ('0 issues found') with no analysis, evidence, or actionable content, offering essentially no reviewing value.",
+  "_cost_usd": 0.13000889999999998,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "4c74470d7ab5810e1ec6f79a85f46ba6b877d14ebcde70c97cdb4a04976b7bf3",
+    "judge_rep": 3
+  }
+}

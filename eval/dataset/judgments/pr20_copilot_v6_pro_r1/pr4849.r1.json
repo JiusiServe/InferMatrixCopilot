@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Neither candidate surfaces the ground-truth procedural asks (precommit fix, benchmark run request), and both independently validate the parent-first ordering question that Gaohan123 raised (already resolved via the docstring in this diff), so recall is low and roughly equal. X's precision edges ahead because its core findings (orchestrator handles dict/list/None safely, CFG companion data is preserved via KV rather than dropped, docstring contract matches actual orchestrator ordering) are the highest-value, most load-bearing correctness checks for this exact refactor. Y is broader and catches one genuinely useful edge case (unguarded ar_output.outputs[0] indexing) but pads with several very minor nitpicks (negative test assertions, extra test variants) that add volume more than value, and its actionability is slightly higher due to more granular line-level evidence throughout.",
+  "_cost_usd": 0.1688066,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "0b8c0840de5cbae302bbf4843c73802bdb8e382e1ee241e809c1d06bb7274ea8",
+    "judge_rep": 1
+  }
+}

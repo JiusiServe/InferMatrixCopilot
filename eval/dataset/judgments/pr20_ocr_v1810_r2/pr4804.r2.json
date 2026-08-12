@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.75,
+    "actionability": 0.7
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.8,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y independently reproduces two confirmed ground-truth bugs with exact line matches (the audio_tokenizer_v2.py:949 ceil/floor division bug, and the configuration docstring defaults mismatch), each with concrete anchored diffs. X finds almost none of the ground-truth-confirmed issues and actively asserts two of them are non-issues (claims slot-leak cleanup 'is handled' and vendored files 'carry a proper... header', both contradicting confirmed bugs/gaps from the real reviewers), which is a serious grounding failure even if not itself a 'finding'. Y has one likely false-positive (the put_req_chunk claim, plausibly rebutted by X's own more specific counter-investigation) and one unverified numeric claim, but its sheer volume of concrete, diff-anchored, correctly-grounded findings gives it materially better recall and actionability than X's shorter, more hedged, partly-wrong review.",
+  "_cost_usd": 0.45898589999999995,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "773867cac71022904cc79b81c755e4e5627771c4a47a0cae2d54efdfd111e2aa",
+    "judge_rep": 2
+  }
+}

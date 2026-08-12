@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.3,
+    "actionability": 0.05,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Ground truth has no substantive concerns (empty inline comments, single 'lgtm' approval), so both trivially achieve full recall. Candidate X still delivers real value: it verifies the rename is applied consistently across all sites in the diff, cross-checks against the upstream naming convention that motivates the fix, cites specific files/lines, and gives a reasoned APPROVE with a non-blocking observation about test-mock limitations. Candidate Y is a bare 'complete, 0 findings' stub with no evidence of actual analysis, no file/line grounding, and no explanation of what was checked, making it far less actionable and useful despite technically not being 'wrong'.",
+  "_cost_usd": 0.045408199999999996,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "2fdb68b17d7d75cae71ffdd0b95e36e1c3e22481bf8899a5f9df4940e2cc7bc1",
+    "judge_rep": 2
+  }
+}

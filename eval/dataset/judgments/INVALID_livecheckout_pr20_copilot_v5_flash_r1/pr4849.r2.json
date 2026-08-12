@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.7,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The ground truth's central concern (Gaohan123: is source_outputs[0] reliably the parent, and should there be a check/comment) is exactly what X surfaces as an actionable finding, complete with a concrete fix (add an assert/guard at line 119) and correct grounding in orchestrator.py's construction order. Y investigates the same question but concludes the docstring is sufficient and approves outright, effectively dismissing the human reviewer's actual ask rather than recalling it as a concern. Neither candidate mentions the specific benchmark command Bounty-hunter requested or the precommit fix, capping recall for both, but X's CI-evidence and type-narrowing findings add further grounded, actionable value that Y's softer 'worth a one-line confirmation' notes lack.",
+  "_cost_usd": 0.1507944,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "e4c7b3b5e126665737707fdc2dcc6b0765e7be43662ff7d0994e58aa46fbe179",
+    "judge_rep": 2
+  }
+}

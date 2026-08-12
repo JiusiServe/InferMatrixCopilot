@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X delivers a substantive, evidence-grounded review that verifies the design against the actual upstream vLLM source, and its note 2 explicitly flags that the diffusion-loader file (hunyuan_image3_transformer.py) was dropped from the PR's own stale-API list and shipped unfixed — directly hitting the latent gap later filed as #4891. Its test-coverage critique (note 1) echoes, though doesn't exactly match, the human reviewer's concern about tests not proving real checkpoint resolution. Y is an empty 'no issues found' report that provides zero recall, precision, or actionability and misses the gap entirely.",
+  "_cost_usd": 0.1858333,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "853006c9610fd1c588cb4a51a3a27a868b4f0483b92fbeba8a9a2ea9d2f54f7d",
+    "judge_rep": 1
+  }
+}

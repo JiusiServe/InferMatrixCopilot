@@ -1,0 +1,26 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 1.0,
+    "actionability": 0.1
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.8,
+    "actionability": 0.95
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Ground truth is essentially an unqualified LGTM with a verification comment confirming boundary validation, unit tests, and L4 regression all passed — X's zero-finding output trivially matches that surface outcome but offers no evidence of actually checking consistency across the four touched files, so it earns no actionability credit. Y independently confirms the same three things the human verifier checked (boundary logic, unit tests, L4 regression) and additionally surfaces a specific, plausible, well-grounded gap — two untouched reliability-suite test files that still hardcode the old '3' lower bound — with exact file/line locations and concrete diffs to apply. Even with some uncertainty about whether those exact files exist as described, the finding is far more substantive and actionable than X's rubber-stamp result.",
+  "gap_hit": false,
+  "_cost_usd": 0.1328739,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "98ab4ff849017fa22d9228e23f56166fbbf07fb1eecaef4381d5f2a9aa32d4c9",
+    "judge_rep": 2
+  }
+}

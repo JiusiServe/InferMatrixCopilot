@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.48,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.62,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y explicitly identifies the sole ground-truth concern: older kernels versions reject trust_remote_code, causing every fallback to fail. X discusses removing that argument only as a supply-chain issue, missing the compatibility regression. Both add several speculative or non-blocking findings, though their comments are generally concrete and actionable.",
+  "_usage": {
+    "input": 3,
+    "output": 1068
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "direct_opus5_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "direct_opus5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/direct_opus5_r1",
+    "arm_a_sha256": "00c6ff4f51712d68ef00351742bd88e6d936a784d6133766972fc3cbe70da88f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "589a8ff13cb3893b76dd0d5220ad632d82f46cc0edd9083528ebb2466be7c8a7",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

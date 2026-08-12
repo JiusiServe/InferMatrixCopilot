@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.7,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth centers on three threads: reviewers questioning why the model reads cudagraph_mode (a runner concern), demands for full before/after benchmark evidence, and the NPU PIECEWISE yaml fix plus the seed-reproducibility follow-up note. Y directly engages the benchmark gap (explicitly asks for accuracy A/B given the seed-reproducibility change, cites the PR's own RTF/TTFP numbers) and discusses the NPU yaml addition's intentionality, giving it meaningfully higher recall against actual reviewer concerns. X's findings are grounded and well-evidenced but almost entirely about missing test coverage for the new async/graph flags — a real but different concern that none of the human reviewers raised, so it scores much lower on recall despite being accurate. Both are concrete with file/line references and actionable asks, so actionability is comparable; precision is similar since neither fabricates claims.",
+  "_cost_usd": 0.07298009999999999,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "314e5c4091fdcf81e96005f06e5dd40ea5ba4c4ce94214df5710ba5269dfae43",
+    "judge_rep": 3
+  }
+}

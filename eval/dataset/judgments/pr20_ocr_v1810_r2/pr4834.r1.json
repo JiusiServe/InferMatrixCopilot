@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 1.0,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X delivers a thorough, diff-grounded review that touches both ground-truth threads (the enum suggestion in finding #5, and test-coverage concerns in finding #2 responding to the regression-test ask) and, critically, its finding #1 (default sleep level=2 permanently bricking wake_up via the new NotImplementedError guard) plus finding #2 (guard logic untested outside hardware CI) directly hit the latent gap check about the guard being too strict for existing callers/CI. Y is precise but trivial — a single low-severity log-wording nit that misses every substantive ground-truth concern and never questions the guard's strictness or CI coverage, so it whiffs the gap check entirely.",
+  "_cost_usd": 0.18398609999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "dd41f26f9fb51901ed4aff381c2b17445600b0252705a5a9efcf4cc41469edbd",
+    "judge_rep": 1
+  }
+}

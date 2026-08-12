@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.6,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.72,
+    "actionability": 0.8
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates miss nearly all of the ground-truth's real findings — the confirmed High-severity slot-leak-on-abort bug, the High-severity legacy-tokenizer-misload bug, the cumulative/delta chunk flip bug, the ceil-division off-by-one, and the WER fallback resampling gap all go unfound by both. Worse, X actively asserts in its 'validated' section that 'Slot-leak cleanup is handled... Lifecycle looks complete,' which directly contradicts the confirmed High-severity bug linyueqian raised and gcanlin fixed — a confident false claim rather than a silent omission. Y avoids that error and independently surfaces a plausible, well-evidenced test gap (untested req_infos routing branch) alongside overlapping legitimate findings shared with X (unused talker_mtp sampling params, dead ref-codes emission, untested streaming processor). Both are low-recall and similarly actionable with concrete file/line citations, but Y's higher precision (no confidently wrong claims) tips it ahead.",
+  "_cost_usd": 0.1023458,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "91523a710f88cc047c2f1e1b5657b842a6ad152217f3371d8650cffa833baaff",
+    "judge_rep": 3
+  }
+}

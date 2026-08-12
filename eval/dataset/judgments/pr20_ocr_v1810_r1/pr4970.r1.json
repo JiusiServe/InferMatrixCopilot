@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.1,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive inline concerns (just an approval and an unrelated ask for a separate VoxCPM2 PR), so neither candidate misses anything material — recall is trivially satisfied by both. X returns zero findings with no explanation of why the change is safe, offering no actionable value beyond a bare pass. Y traces the actual seed-propagation mechanism through serving_speech.py and gpu_model_runner.py, verifies the fix's correctness, and gives concrete, grounded, line-anchored suggestions (a guard comment to prevent regression, noting stage 1's removal is inert) that go beyond the diff without fabricating problems.",
+  "_cost_usd": 0.0898319,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "328122fe4b392627a25677e42da358bb8e46e29a267034220c85b8dd7fe1c37b",
+    "judge_rep": 1
+  }
+}

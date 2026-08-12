@@ -15,6 +15,10 @@ runs/
 eval/raw/*.diff
 eval/raw/cc_workdir/
 eval/dataset/arms/*/runs/
+# Raw, unscrubbed arm streams stay local. The durable record is the path-scrubbed,
+# losslessly packed <stem>.trace.json.gz that trace_pack.py writes beside them — which
+# IS committed, so no arm can become unexplainable by outliving one machine again.
+eval/dataset/**/*.events.jsonl
 adapters/*/repo_map/
 eval/dataset/arms/copilot_v2_test_*/
 eval/dataset/judgments/test_r*/

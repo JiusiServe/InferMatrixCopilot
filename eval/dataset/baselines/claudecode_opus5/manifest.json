@@ -1,0 +1,46 @@
+{
+  "arm": "claudecode_opus5",
+  "role": "common reference for the gpt-5.6 campaign; supersedes claudecode_opus48 and is NOT comparable to it",
+  "model_requested": "claude-opus-5",
+  "resolved_models": [
+    "claude-opus-5"
+  ],
+  "harness": "claude -p --output-format stream-json --verbose",
+  "isolation": {
+    "setting_sources": "",
+    "skills": "disabled (--disable-slash-commands)",
+    "mcp": "empty config (--strict-mcp-config)",
+    "home": "isolated, credentials only"
+  },
+  "allowed_tools": [
+    "Read",
+    "Grep",
+    "Glob",
+    "LS",
+    "TodoWrite",
+    "Task",
+    "Bash(gh pr diff:*)",
+    "Bash(git diff:*)",
+    "Bash(git log:*)",
+    "Bash(git show:*)",
+    "Bash(python -c:*)",
+    "Bash(python3 -c:*)",
+    "Bash(python -m pytest:*)",
+    "Bash(python3 -m pytest:*)",
+    "Bash(python -m ruff:*)",
+    "Bash(python3 -m ruff:*)",
+    "Bash(python -m compileall:*)",
+    "Bash(python3 -m compileall:*)",
+    "Bash(ruff:*)",
+    "Bash(rg:*)"
+  ],
+  "pr_context": "frozen snapshot (no_discussion); gh pr view and gh pr checks removed from the allowlist",
+  "dataset": "vllm_omni_dataset.yaml",
+  "splits": [
+    "test",
+    "train",
+    "val"
+  ],
+  "n_items": 12,
+  "concurrency": 3
+}

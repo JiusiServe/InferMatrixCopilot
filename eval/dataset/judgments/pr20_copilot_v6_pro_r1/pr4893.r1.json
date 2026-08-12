@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.9,
+    "actionability": 0.45,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Neither candidate surfaces the one substantive ground-truth concern (reduce_scatter test coverage), which appears already resolved in this diff anyway, so recall is weak for both. X offers several concrete, file/line-anchored, grounded suggestions (test ordering brittleness, missing comment/test for the cfg=1 DP path, potential redundant all_gather in non-MoE mode) that are mostly plausible even if minor/nitpicky. Y does deeper correctness verification of vLLM APIs and correctly lands on APPROVE (matching the actual reviewer outcome), but produces only one vague, low-actionability comment, offering less concrete value to an implementer.",
+  "_cost_usd": 0.08096,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "f2e10e1a316c345057363d54ac26e7f0d18339858b82d40e2012a83e10cb9e3c",
+    "judge_rep": 1
+  }
+}

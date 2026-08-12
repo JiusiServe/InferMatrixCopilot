@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.55,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Neither candidate surfaces the ground truth's core findings (slot-leak on abort, cumulative/delta re-slice bug, ceil-division length bug, legacy-checkpoint v2-tokenizer ambiguity, missing vendored-header, stale docstrings, WER-fallback raw-bytes skew), so recall is low and roughly tied. X spends much of its review asserting things are 'validated'/'handled' (e.g. claiming the vendored files already carry proper provenance headers), which directly contradicts a ground-truth reviewer's still-open comment and undermines trust in its other unverifiable claims. Y produces more, and more concrete, findings with exact anchors and suggested diffs, most of which are plausible and independently corroborated by X on two items (max_new_frames subscript, dead codes['ref'] extraction), giving it better precision and materially better actionability despite one contested finding (emitted_any/put_req_chunk) that X explicitly argues against.",
+  "_cost_usd": 0.23064979999999996,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "3db38af2695ffd2d1babcbf643988fbaa12cd76079eb52e62bf385d8189dbe05",
+    "judge_rep": 3
+  }
+}

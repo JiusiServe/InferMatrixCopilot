@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 1.0,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Y engages the actual substantive review thread — it validates the TODO addressing gcanlin's/R2-Y's cudagraph_mode-in-modeling concern, explicitly flags the seed-reproducibility loss for decode batch>1 (matching gcanlin's follow-up), and sanity-checks the NPU compilation_config addition — while also surfacing diff-grounded findings absent from ground truth (stale enable_prefix_caching rationale comment, contradictory batched-tokens header) with concrete file/line and clear asks. X surfaces only one minor, plausible duplicate-assignment nit and misses the entire design/correctness/evidence discussion that dominated the real PR review, so its recall is far lower despite perfect precision on its single claim.",
+  "_cost_usd": 0.23524639999999997,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "8e361cd8ea0aecb7c7838d4f1de3fa59c40fd666bda80b1e511fb026c3d98c1f",
+    "judge_rep": 3
+  }
+}

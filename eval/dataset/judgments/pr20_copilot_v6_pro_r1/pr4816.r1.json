@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.6,
+    "actionability": 0.4,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns (just an approval), so both correctly land on no-blockers; recall is trivially satisfied by both. X's verification claims specific external upstream PR/line numbers and cites test line numbers (2638/2651/2720) that don't match the diff's actual hunk positions (~2533/2546/2615 per the shown diff context), suggesting sloppy or hallucinated grounding despite confident framing. Y's citations (api_server.py:754,1017,1157,1248,1286,1329) align with the diff's hunk headers, it appropriately caveats the unrelated CI failures, and it surfaces a genuine, specific, actionable latent issue (None-state crash in pure-diffusion mode via `_create_speech_error_json_response`/`base()`) with file:line and a concrete fix suggestion, which neither ground truth nor X caught.",
+  "_cost_usd": 0.06612309999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "f69d77c1ae9cb13422566bb96d07863e1fe993b39aa94328bbb3e4f384ede022",
+    "judge_rep": 1
+  }
+}

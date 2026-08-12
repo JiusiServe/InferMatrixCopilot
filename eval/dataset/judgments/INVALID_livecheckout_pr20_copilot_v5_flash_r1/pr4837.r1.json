@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.68,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently verify the same core fact set as the ground truth's sole inline comment (already_submitted is redundant since both submit paths reject list prompts), and both correctly diagnose the DiffusionOutput fix. X lands on APPROVE with non-blocking suggestions, matching the actual outcome (two LGTM approvals, no requested changes). Y reaches the same technical understanding but escalates to a 'major'/FOLLOW-UP-REQUIRED verdict demanding tests as a blocker, which the real reviewers didn't require, and pads its findings with unverifiable claims (other pipeline files, an external issue #4839 comment, a caveated 'head fetch failed' checkout) that lower grounded precision relative to the diff shown.",
+  "_cost_usd": 0.1120234,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "dbe9d33fec2425c0be443c2294c4cd95e3e4e11020939e303b8ba42a67eda7ec",
+    "judge_rep": 1
+  }
+}

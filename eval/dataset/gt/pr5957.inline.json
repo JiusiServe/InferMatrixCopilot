@@ -1,0 +1,50 @@
+[
+  {
+    "author": "linyueqian",
+    "body": "[suggestion] This now says native speed control may accept speed adjustment, and the serving layer honors that for raw and SSE. The WebSocket sibling was left on the old contract: `StreamingSpeechSessionConfig` still documents \"Speed adjustment is not supported when streaming\" (line 533) and still hard raises \"Speed adjustment is not supported when stream_audio=true\" (line 557) without consulting the adapter.\n\nSo the same model answers differently depending on transport: IndexTTS 2.5 over HTTP `stream_format=\"audio\"` with `speed=1.5` works (I verified 200 with exactly scaled audio), while the same model over WebSocket `stream_audio=true` is rejected at session config parse time.\n\nTo be clear this is not a regression from this PR, since that validator is pre-existing and untouched here. It is the asymmetry that the new capability introduces. If WebSocket parity is out of scope for this PR that seems reasonable, but it would help to say so explicitly, and line 533 is worth updating either way so the two docstrings do not contradict each other.",
+    "line": 85,
+    "path": "vllm_omni/entrypoints/openai/protocol/audio.py"
+  },
+  {
+    "author": "linyueqian",
+    "body": "[suggestion] Raising from inside the talker means a direct library caller (`omni.generate` with `additional_information.duration_factor`) surfaces this as a stage worker exception rather than a validation error. The HTTP path is already guarded by `IndexTTS25Adapter.validate` and both examples guard in argparse, so this raise only fires for callers that bypass all of those. Worth confirming that is the intended failure surface for the library API.",
+    "line": 569,
+    "path": "vllm_omni/model_executor/models/indextts2/indextts2_talker.py"
+  },
+  {
+    "author": "linyueqian",
+    "body": "[suggestion] This accepts any finite positive factor, while the talker at `indextts2_talker.py:563` enforces `[0.5, 2.0]`, so the same value has two different contracts depending on which stage validates it. If that is deliberate defense in depth then it is fine as is, but matching the bound (or sharing one constant with the talker and the adapter) would make the intent clearer to the next reader.",
+    "line": 671,
+    "path": "vllm_omni/model_executor/models/indextts2/indextts2_s2mel_decoder.py"
+  },
+  {
+    "author": "linyueqian",
+    "body": "[suggestion] The `[0.5, 2.0]` range and its message are duplicated in four non-test files: here, `indextts2_talker.py:563`, `examples/offline_inference/text_to_speech/indextts2/end2end.py`, and `examples/online_serving/text_to_speech/indextts2/speech_client.py`, plus the recipe prose. A single module level constant and one shared message would keep them from drifting if the supported range is ever retuned.",
+    "line": 279,
+    "path": "vllm_omni/entrypoints/openai/tts_adapters/indextts2.py"
+  },
+  {
+    "author": "Sy0307",
+    "body": "Added shared IndexTTS 2.5 duration-factor bounds in the model configuration and reused them in the serving adapter, talker, and S2Mel decoder. Context-specific error messages remain local. Standalone recipe and example validation stays independent so those scripts do not need to import vLLM-Omni internals.",
+    "line": 279,
+    "path": "vllm_omni/entrypoints/openai/tts_adapters/indextts2.py"
+  },
+  {
+    "author": "Sy0307",
+    "body": "Confirmed this is intentional for direct Omni.generate callers, which bypass serving adapters. I retained the model-side check as the final fail-fast validation layer and added a comment documenting that responsibility.",
+    "line": 569,
+    "path": "vllm_omni/model_executor/models/indextts2/indextts2_talker.py"
+  },
+  {
+    "author": "Sy0307",
+    "body": "Clarified the current scope in the request schema: native speed control is supported for HTTP streaming, while WebSocket streaming still requires speed=1.0. The WebSocket validation now returns that explicit guidance and has a regression test. Adapter-aware WebSocket parity remains a follow-up rather than expanding this model PR.",
+    "line": 85,
+    "path": "vllm_omni/entrypoints/openai/protocol/audio.py"
+  },
+  {
+    "author": "Sy0307",
+    "body": "Aligned the S2Mel decoder with the same finite range from 0.5 through 2.0 used by the adapter and talker. Added tests for both accepted endpoints plus NaN, infinities, and out-of-range values.",
+    "line": 671,
+    "path": "vllm_omni/model_executor/models/indextts2/indextts2_s2mel_decoder.py"
+  }
+]

@@ -1,0 +1,26 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.65,
+    "actionability": 0.55
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns (just LGTM/approval plus a manual verification comment), so both candidates are graded mostly on precision/actionability of self-found issues. X's two findings are minor stylistic nits (missing positive test, missing docstring range) that are valid but low-value, and X explicitly claims a repo-wide sweep found 'zero matches' for stale '3'-bound references — a claim contradicted by Y, who located two reliability test files (test_invalid_image_generation.py, test_invalid_image_editing.py) still hardcoding the old layers=2/3 boundary with exact line numbers and code snippets, mirroring the exact pattern the PR itself fixed elsewhere. X's own stated grep patterns ('3-10', 'range.*3.*11') would not have caught Y's tuple-style literal, which explains the miss and lends credibility to Y's finding. Y's review is more actionable (precise diffs/fixes proposed) and higher-value overall.",
+  "gap_hit": false,
+  "_cost_usd": 0.1552767,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "d7c16694fccb67994248a6d0715c6631568d2e5cd795ce5bd0a5047d0578d9a3",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates converge on a similar theme to the one substantive ground-truth design concern (dsocek's push to avoid duplicated hardcoded component lists), with X proposing to read pipeline._dit_modules and Y independently surfacing the same _dit_modules precedent plus two other duplicate lists (registry.py, module_collector.py) — neither captures dsocek's more specific _packed_modules_mapping/naming-conflict angle. Y is more grounded, citing specific greps and line numbers to validate that only SDXL exposes a top-level unet attribute and that sdxl_unet uses real vLLM linear layers, and its findings (parametrize duplicated test, commit an E2E LoRA-diff check, consolidate hardcoded lists) are more concretely actionable than X's softer 'worth a note'/non-blocking framing. X is more concise and its text-encoder no-op point is a reasonable but more speculative addition. Neither review includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.0927925,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "d737771f1b72c6fe2c0a324274dd8866359c7bd0d4997d82b0af27b53aeffb44",
+    "judge_rep": 2
+  }
+}

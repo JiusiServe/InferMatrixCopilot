@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 1.0,
+    "actionability": 0.1,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth for this trivial seed-removal PR is essentially 'LGTM' with no substantive concerns, so neither candidate missed real issues (recall is near-vacuous for both). X returns a bare zero-finding report with no visible investigation or evidence, which is safe but adds no value. Y traces the actual seed-propagation mechanism through source (serving_speech.py, gpu_model_runner.py), confirms the fix is correct, reaches the same approve verdict as the human reviewer, and adds a concrete non-blocking file/line suggestion (guard comment against regression) — more grounded effort and far more actionable, at some cost to verifiability of unshown-file specifics.",
+  "_cost_usd": 0.1017029,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "328122fe4b392627a25677e42da358bb8e46e29a267034220c85b8dd7fe1c37b",
+    "judge_rep": 1
+  }
+}

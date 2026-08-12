@@ -1,8 +1,9 @@
-# Val-split judgment: copilot_v2 (DeepSeek) vs claudecode_opus48 (Opus 4.8)
+# Judgment: copilot_v2 vs opus_baseline
 
-Judge: claude-sonnet-5 (blind, randomized order, 3 replicates x 10 items = 60 verdicts)
+Judge: claude-sonnet-5 (blind, randomized order, 3 replicate(s) x 20 item(s) = 60 verdicts)
 
 ## Wins
+
 - copilot_v2: 26
 - opus_baseline: 33
 - tie: 1

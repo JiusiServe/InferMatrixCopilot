@@ -1,0 +1,839 @@
+diff --git a/tests/diffusion/diffusion_kv/test_metadata.py b/tests/diffusion/diffusion_kv/test_metadata.py
+new file mode 100644
+index 00000000000..9d4da30a42c
+--- /dev/null
++++ b/tests/diffusion/diffusion_kv/test_metadata.py
+@@ -0,0 +1,110 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++
++import pytest
++
++from vllm_omni.diffusion.diffusion_kv.metadata import (
++    DiffusionKVContextMetadata,
++    DiffusionKVMetadata,
++    DiffusionKVSequenceMetadata,
++)
++
++pytestmark = [pytest.mark.diffusion, pytest.mark.core_model, pytest.mark.cpu]
++
++
++def test_diffusion_kv_metadata_uses_native_cache_group_block_ids() -> None:
++    context = DiffusionKVContextMetadata(
++        context_id="text",
++        cache_role="cross_attention",
++        num_tokens=3,
++        block_ids=([7], [11]),
++    )
++    sequence = DiffusionKVSequenceMetadata(
++        sequence_id=1,
++        prefix_len=4,
++        target_len=2,
++        seq_len=8,
++        block_ids=([1, 2], [5, 6]),
++        context_ids=(context.context_id,),
++    )
++    metadata = DiffusionKVMetadata(
++        request_id="req-0",
++        allocation_generation=3,
++        sequences=(sequence,),
++        contexts=(context,),
++    )
++
++    assert metadata.sequences[0].block_ids == ([1, 2], [5, 6])
++    assert metadata.contexts[0].block_ids == ([7], [11])
++
++
++def test_cfg_sequences_can_share_one_request_context() -> None:
++    shared_context = DiffusionKVContextMetadata(
++        context_id="shared-text",
++        cache_role="cross_attention",
++        num_tokens=3,
++        block_ids=([7], [11]),
++    )
++    sequences = tuple(
++        DiffusionKVSequenceMetadata(
++            sequence_id=sequence_id,
++            prefix_len=4,
++            target_len=2,
++            seq_len=8,
++            block_ids=([sequence_id + 1],),
++            context_ids=(shared_context.context_id,),
++        )
++        for sequence_id in range(2)
++    )
++
++    metadata = DiffusionKVMetadata(
++        request_id="req-shared-context",
++        allocation_generation=1,
++        sequences=sequences,
++        contexts=(shared_context,),
++    )
++
++    assert metadata.contexts == (shared_context,)
++    assert metadata.sequences[0].context_ids == (shared_context.context_id,)
++    assert metadata.sequences[1].context_ids == (shared_context.context_id,)
++
++
++def test_cfg_sequences_can_reference_branch_specific_contexts() -> None:
++    conditional_context = DiffusionKVContextMetadata(
++        context_id="conditional-text",
++        cache_role="cross_attention",
++        num_tokens=3,
++        block_ids=([7], [11]),
++    )
++    unconditional_context = DiffusionKVContextMetadata(
++        context_id="unconditional-text",
++        cache_role="cross_attention",
++        num_tokens=3,
++        block_ids=([8], [12]),
++    )
++    metadata = DiffusionKVMetadata(
++        request_id="req-branch-contexts",
++        allocation_generation=1,
++        sequences=(
++            DiffusionKVSequenceMetadata(
++                sequence_id=0,
++                prefix_len=4,
++                target_len=2,
++                seq_len=8,
++                block_ids=([1],),
++                context_ids=(conditional_context.context_id,),
++            ),
++            DiffusionKVSequenceMetadata(
++                sequence_id=1,
++                prefix_len=4,
++                target_len=2,
++                seq_len=8,
++                block_ids=([2],),
++                context_ids=(unconditional_context.context_id,),
++            ),
++        ),
++        contexts=(conditional_context, unconditional_context),
++    )
++
++    assert metadata.sequences[0].context_ids == (conditional_context.context_id,)
++    assert metadata.sequences[1].context_ids == (unconditional_context.context_id,)
+diff --git a/tests/diffusion/diffusion_kv/test_worker_contract.py b/tests/diffusion/diffusion_kv/test_worker_contract.py
+new file mode 100644
+index 00000000000..0c78abbaf1c
+--- /dev/null
++++ b/tests/diffusion/diffusion_kv/test_worker_contract.py
+@@ -0,0 +1,290 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++
++from types import SimpleNamespace
++from unittest.mock import Mock
++
++import pytest
++
++from vllm_omni.diffusion.data import DiffusionOutput
++from vllm_omni.diffusion.diffusion_kv.config import DiffusionKVCacheMode
++from vllm_omni.diffusion.diffusion_kv.metadata import (
++    DiffusionKVMetadata,
++    DiffusionKVSequenceMetadata,
++)
++from vllm_omni.diffusion.executor.multiproc_executor import MultiprocDiffusionExecutor
++from vllm_omni.diffusion.sched.interface import (
++    CachedRequestData,
++    DiffusionSchedulerOutput,
++    NewRequestData,
++)
++from vllm_omni.diffusion.worker.diffusion_model_runner import DiffusionModelRunner
++from vllm_omni.diffusion.worker.diffusion_worker import DiffusionWorker, WorkerWrapperBase
++
++pytestmark = [pytest.mark.diffusion, pytest.mark.core_model, pytest.mark.cpu]
++
++
++def make_metadata(request_id: str = "req-0") -> DiffusionKVMetadata:
++    return DiffusionKVMetadata(
++        request_id=request_id,
++        allocation_generation=1,
++        sequences=(
++            DiffusionKVSequenceMetadata(
++                sequence_id=0,
++                prefix_len=4,
++                target_len=2,
++                seq_len=8,
++                block_ids=([1, 2],),
++            ),
++        ),
++    )
++
++
++def make_runner(mode: DiffusionKVCacheMode) -> DiffusionModelRunner:
++    runner = object.__new__(DiffusionModelRunner)
++    runner.od_config = SimpleNamespace(diffusion_kv_mode=mode)
++    return runner
++
++
++def make_scheduler_output(*new_reqs: NewRequestData) -> DiffusionSchedulerOutput:
++    return DiffusionSchedulerOutput(
++        step_id=0,
++        scheduled_new_reqs=list(new_reqs),
++        scheduled_cached_reqs=CachedRequestData.make_empty(),
++        finished_req_ids=set(),
++        num_running_reqs=len(new_reqs),
++        num_waiting_reqs=0,
++    )
++
++
++def make_executor() -> tuple[MultiprocDiffusionExecutor, list[tuple]]:
++    executor = object.__new__(MultiprocDiffusionExecutor)
++    executor.od_config = SimpleNamespace(
++        enable_distributed_layerwise_offload=False,
++        dlo_use_allgather=True,
++    )
++    executor._ensure_open = lambda: None
++    calls: list[tuple] = []
++
++    def collective_rpc(method, *, args, unique_reply_rank, exec_all_ranks):
++        calls.append((method, args, unique_reply_rank, exec_all_ranks))
++        return DiffusionOutput(output=None)
++
++    executor.collective_rpc = collective_rpc
++    return executor, calls
++
++
++def test_new_request_data_carries_scheduler_allocation_atomically() -> None:
++    req = SimpleNamespace(request_id="req-0")
++    state = SimpleNamespace(request_id="req-0", req=req)
++    metadata = make_metadata()
++
++    new_req = NewRequestData.from_state(state, diffusion_kv_metadata=metadata)
++
++    assert new_req.req is req
++    assert new_req.diffusion_kv_metadata is metadata
++
++
++def test_paged_request_without_metadata_reaches_request_forward() -> None:
++    runner = make_runner(DiffusionKVCacheMode.PAGED_SCHEDULER)
++    expected_output = DiffusionOutput(output=None)
++    runner._execute_request_list = Mock(
++        return_value=SimpleNamespace(
++            runner_outputs=[SimpleNamespace(result=expected_output)],
++        )
++    )
++    req = SimpleNamespace(request_id="req-0")
++
++    assert runner.execute_model(req) is expected_output
++
++    runner._execute_request_list.assert_called_once()
++
++
++def test_dense_request_rejects_metadata_before_request_forward() -> None:
++    runner = make_runner(DiffusionKVCacheMode.DENSE_LEGACY)
++    runner._execute_request_list = Mock()
++
++    with pytest.raises(ValueError, match="dense_legacy.*must not carry"):
++        runner.execute_model(
++            SimpleNamespace(request_id="req-0"),
++            diffusion_kv_metadata=make_metadata(),
++        )
++
++    runner._execute_request_list.assert_not_called()
++
++
++def test_paged_request_rejects_mismatched_metadata_identity() -> None:
++    runner = make_runner(DiffusionKVCacheMode.PAGED_SCHEDULER)
++    runner._execute_request_list = Mock()
++
++    with pytest.raises(ValueError, match="request mismatch"):
++        runner.execute_model(
++            SimpleNamespace(request_id="req-0"),
++            diffusion_kv_metadata=make_metadata("stale"),
++        )
++
++    runner._execute_request_list.assert_not_called()
++
++
++def test_request_rpc_rejects_envelope_request_identity_mismatch() -> None:
++    executor, calls = make_executor()
++    req = SimpleNamespace(request_id="actual-request-id")
++    new_req = NewRequestData(
++        request_id="envelope-id",
++        req=req,
++        diffusion_kv_metadata=make_metadata("envelope-id"),
++    )
++
++    with pytest.raises(ValueError, match="request identity mismatch"):
++        executor.execute_request(make_scheduler_output(new_req))
++
++    assert calls == []
++
++
++def test_batch_path_allows_missing_metadata_before_forward() -> None:
++    runner = make_runner(DiffusionKVCacheMode.PAGED_SCHEDULER)
++    expected_output = object()
++    runner._execute_request_list = Mock(return_value=expected_output)
++    new_req = NewRequestData(
++        request_id="req-0",
++        req=SimpleNamespace(request_id="req-0"),
++    )
++
++    assert runner.execute_model_batch(make_scheduler_output(new_req), runner.od_config) is expected_output
++
++    runner._execute_request_list.assert_called_once()
++
++
++def test_batch_path_rejects_envelope_request_identity_mismatch() -> None:
++    runner = make_runner(DiffusionKVCacheMode.PAGED_SCHEDULER)
++    runner._execute_request_list = Mock()
++    new_req = NewRequestData(
++        request_id="envelope-id",
++        req=SimpleNamespace(request_id="actual-request-id"),
++        diffusion_kv_metadata=make_metadata("envelope-id"),
++    )
++
++    with pytest.raises(ValueError, match="request identity mismatch"):
++        runner.execute_model_batch(make_scheduler_output(new_req), runner.od_config)
++
++    runner._execute_request_list.assert_not_called()
++
++
++def test_step_path_allows_missing_metadata_before_step_support_check() -> None:
++    runner = make_runner(DiffusionKVCacheMode.PAGED_SCHEDULER)
++    runner.pipeline = object()
++    runner._supports_step_mode = Mock(return_value=False)
++    new_req = NewRequestData(
++        request_id="req-0",
++        req=SimpleNamespace(request_id="req-0"),
++    )
++
++    with pytest.raises(ValueError, match="does not support step execution"):
++        runner.execute_stepwise(make_scheduler_output(new_req))
++
++    runner._supports_step_mode.assert_called_once()
++
++
++def test_step_path_rejects_envelope_request_identity_mismatch() -> None:
++    runner = make_runner(DiffusionKVCacheMode.PAGED_SCHEDULER)
++    runner.pipeline = object()
++    runner._supports_step_mode = Mock()
++    new_req = NewRequestData(
++        request_id="envelope-id",
++        req=SimpleNamespace(request_id="actual-request-id"),
++        diffusion_kv_metadata=make_metadata("envelope-id"),
++    )
++
++    with pytest.raises(ValueError, match="request identity mismatch"):
++        runner.execute_stepwise(make_scheduler_output(new_req))
++
++    runner._supports_step_mode.assert_not_called()
++
++
++def test_dense_request_rpc_keeps_legacy_positional_shape() -> None:
++    executor, calls = make_executor()
++    prepared_layout = object()
++    req = SimpleNamespace(request_id="req-0", prepared_layout=prepared_layout)
++    new_req = NewRequestData(request_id="req-0", req=req)
++
++    result = executor.execute_request(make_scheduler_output(new_req))
++
++    assert result.request_ids == ["req-0"]
++    assert calls == [
++        (
++            "execute_model",
++            (req, executor.od_config, None),
++            0,
++            True,
++        )
++    ]
++    assert calls[0][1][0].prepared_layout is prepared_layout
++
++
++def test_request_rpc_sends_attached_metadata_for_only_that_request() -> None:
++    executor, calls = make_executor()
++    req_0 = SimpleNamespace(request_id="req-0")
++    req_1 = SimpleNamespace(request_id="req-1")
++    metadata_0 = make_metadata("req-0")
++    metadata_1 = make_metadata("req-1")
++    new_reqs = (
++        NewRequestData(request_id="req-0", req=req_0, diffusion_kv_metadata=metadata_0),
++        NewRequestData(request_id="req-1", req=req_1, diffusion_kv_metadata=metadata_1),
++    )
++
++    result = executor.execute_request(make_scheduler_output(*new_reqs))
++
++    assert result.request_ids == ["req-0", "req-1"]
++    assert [call[1] for call in calls] == [
++        (req_0, executor.od_config, None, metadata_0),
++        (req_1, executor.od_config, None, metadata_1),
++    ]
++
++
++def test_worker_wrapper_only_extends_paged_request_rpc() -> None:
++    calls: list[tuple] = []
++
++    class Worker:
++        def execute_model(self, req, od_config, **kwargs):
++            calls.append((req, od_config, kwargs))
++            return DiffusionOutput(output=None)
++
++    wrapper = object.__new__(WorkerWrapperBase)
++    wrapper.worker = Worker()
++    req = SimpleNamespace(request_id="req-0")
++    od_config = SimpleNamespace()
++    metadata = make_metadata()
++
++    wrapper.execute_model(req, od_config)
++    wrapper.execute_model(req, od_config, diffusion_kv_metadata=metadata)
++
++    assert calls == [
++        (req, od_config, {"kv_prefetch_job": None}),
++        (
++            req,
++            od_config,
++            {
++                "kv_prefetch_job": None,
++                "diffusion_kv_metadata": metadata,
++            },
++        ),
++    ]
++
++
++def test_dense_worker_call_does_not_extend_model_runner_signature() -> None:
++    calls: list[tuple] = []
++
++    class DenseModelRunner:
++        def execute_model(self, req, kv_prefetch_job=None):
++            calls.append((req, kv_prefetch_job))
++            return DiffusionOutput(output=None)
++
++    worker = object.__new__(DiffusionWorker)
++    worker.model_runner = DenseModelRunner()
++    worker.lora_manager = None
++    worker._get_profiler = lambda: None
++    req = SimpleNamespace(request_id="req-0")
++
++    worker.execute_model(req, SimpleNamespace())
++
++    assert calls == [(req, None)]
+diff --git a/tests/diffusion/test_diffusion_engine_cleanup.py b/tests/diffusion/test_diffusion_engine_cleanup.py
+index b7a9a345f84..fb8858a486e 100644
+--- a/tests/diffusion/test_diffusion_engine_cleanup.py
++++ b/tests/diffusion/test_diffusion_engine_cleanup.py
+@@ -123,6 +123,47 @@ def test_init_accepts_custom_scheduler(monkeypatch: pytest.MonkeyPatch) -> None:
+     assert engine.scheduler is custom_scheduler
+ 
+ 
++def test_scheduler_initialization_failure_closes_scheduler_and_executor(monkeypatch: pytest.MonkeyPatch) -> None:
++    od_config = SimpleNamespace(
++        custom_pipeline_args=None,
++        model_class_name="SchedulerInitializationFailurePipeline",
++        streaming_output=False,
++    )
++    initialization_error = RuntimeError("Scheduler initialization failed")
++    custom_scheduler = SimpleNamespace(
++        initialize=Mock(side_effect=initialization_error),
++        close=Mock(),
++    )
++    fake_executor = SimpleNamespace(
++        shutdown=Mock(),
++    )
++
++    monkeypatch.setattr(
++        "vllm_omni.diffusion.diffusion_engine.get_diffusion_post_process_func",
++        lambda *args, **kwargs: None,
++    )
++    monkeypatch.setattr(
++        "vllm_omni.diffusion.diffusion_engine.get_diffusion_pre_process_func",
++        lambda *args, **kwargs: None,
++    )
++    monkeypatch.setattr(
++        "vllm_omni.diffusion.diffusion_engine.DiffusionExecutor.get_class",
++        lambda *args, **kwargs: Mock(return_value=fake_executor),
++    )
++    monkeypatch.setattr(
++        "vllm_omni.diffusion.diffusion_engine.supports_request_batch",
++        lambda *args, **kwargs: False,
++    )
++
++    with pytest.raises(RuntimeError) as exc_info:
++        DiffusionEngine(od_config, scheduler=custom_scheduler)
++
++    assert exc_info.value is initialization_error
++    custom_scheduler.initialize.assert_called_once_with(od_config)
++    custom_scheduler.close.assert_called_once_with()
++    fake_executor.shutdown.assert_called_once_with()
++
++
+ @pytest.mark.asyncio
+ async def test_step_compatibility_wrapper_returns_final_batch() -> None:
+     engine = _make_engine()
+diff --git a/tests/diffusion/test_diffusion_model_runner.py b/tests/diffusion/test_diffusion_model_runner.py
+index a1f8440e3ca..665196ad92f 100644
+--- a/tests/diffusion/test_diffusion_model_runner.py
++++ b/tests/diffusion/test_diffusion_model_runner.py
+@@ -341,7 +341,7 @@ def test_execute_stepwise_streaming_returns_chunks_at_boundaries(monkeypatch):
+     monkeypatch.setattr(model_runner_module.current_omni_platform, "max_memory_allocated", lambda: 0)
+     scheduler_output = SimpleNamespace(
+         finished_req_ids=set(),
+-        scheduled_new_reqs=[SimpleNamespace(request_id="req", req=req)],
++        scheduled_new_reqs=[SimpleNamespace(request_id="req", req=req, diffusion_kv_metadata=None)],
+         scheduled_cached_reqs=SimpleNamespace(request_ids=[]),
+     )
+ 
+@@ -381,7 +381,7 @@ def test_execute_stepwise_streaming_decodes_final_only_pipeline(monkeypatch):
+     monkeypatch.setattr(model_runner_module.current_omni_platform, "max_memory_allocated", lambda: 0)
+     scheduler_output = SimpleNamespace(
+         finished_req_ids=set(),
+-        scheduled_new_reqs=[SimpleNamespace(request_id="req", req=req)],
++        scheduled_new_reqs=[SimpleNamespace(request_id="req", req=req, diffusion_kv_metadata=None)],
+         scheduled_cached_reqs=SimpleNamespace(request_ids=[]),
+     )
+ 
+@@ -561,7 +561,11 @@ def _make_scheduler_output(num_reqs: int):
+     reqs = [_make_request() for _ in range(num_reqs)]
+     for i, req in enumerate(reqs):
+         req.request_id = f"req-{i}"
+-    return SimpleNamespace(scheduled_new_reqs=[SimpleNamespace(req=req) for req in reqs])
++    return SimpleNamespace(
++        scheduled_new_reqs=[
++            SimpleNamespace(request_id=req.request_id, req=req, diffusion_kv_metadata=None) for req in reqs
++        ],
++    )
+ 
+ 
+ @pytest.mark.core_model
+diff --git a/vllm_omni/diffusion/diffusion_engine.py b/vllm_omni/diffusion/diffusion_engine.py
+index c9b4bd72f6e..08218122ea5 100644
+--- a/vllm_omni/diffusion/diffusion_engine.py
++++ b/vllm_omni/diffusion/diffusion_engine.py
+@@ -188,10 +188,24 @@ def __init__(
+         self._init_process_hooks(od_config)
+         self.execution_mode = self._resolve_execution_mode(od_config)
+         self._init_executor(od_config)
+-        self._init_scheduler(od_config, scheduler)
+-        self._init_runtime_state()
+-        self._init_execute_fn()
+-        self._log_execution_mode(od_config)
++        try:
++            self._init_scheduler(od_config, scheduler)
++            self._init_runtime_state()
++            self._init_execute_fn()
++            self._log_execution_mode(od_config)
++        except Exception:
++            # close() cannot be used because runtime synchronization state may not exist yet.
++            scheduler_to_close = getattr(self, "scheduler", None)
++            if scheduler_to_close is not None:
++                try:
++                    scheduler_to_close.close()
++                except Exception:
++                    logger.exception("Failed to close Scheduler after DiffusionEngine initialization failed")
++            try:
++                self.executor.shutdown()
++            except Exception:
++                logger.exception("Failed to shut down Executor after DiffusionEngine initialization failed")
++            raise
+ 
+     def _init_process_hooks(self, od_config: OmniDiffusionConfig) -> None:
+         self.post_process_func = get_diffusion_post_process_func(od_config)
+diff --git a/vllm_omni/diffusion/diffusion_kv/metadata.py b/vllm_omni/diffusion/diffusion_kv/metadata.py
+new file mode 100644
+index 00000000000..db6cb54ec6d
+--- /dev/null
++++ b/vllm_omni/diffusion/diffusion_kv/metadata.py
+@@ -0,0 +1,57 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++
++"""Scheduler-to-Worker allocation payloads for diffusion KV.
++
++Like native vLLM's SchedulerOutput DTOs, these classes carry trusted internal
++Scheduler results. Cache geometry and block-table validation stay with the
++native cache builders and Worker installation path.
++"""
++
++from __future__ import annotations
++
++from dataclasses import dataclass
++
++
++@dataclass
++class DiffusionKVContextMetadata:
++    """Request-scoped Worker allocation for an independent K/V context.
++
++    ``context_id`` identifies this allocation within the enclosing
++    :class:`DiffusionKVMetadata`.
++    """
++
++    context_id: str
++    cache_role: str
++    num_tokens: int
++    block_ids: tuple[list[int], ...]
++
++
++@dataclass
++class DiffusionKVSequenceMetadata:
++    """Worker allocation for one Scheduler-owned diffusion sequence.
++
++    ``context_ids`` reference request-scoped context allocations from the
++    enclosing :class:`DiffusionKVMetadata`.
++    """
++
++    sequence_id: int
++    prefix_len: int
++    target_len: int
++    seq_len: int
++    block_ids: tuple[list[int], ...]
++    context_ids: tuple[str, ...] = ()
++
++
++@dataclass
++class DiffusionKVMetadata:
++    """Scheduler allocation sent with a newly scheduled public request.
++
++    Independent contexts live once at request scope so multiple sequences can
++    reference the same allocation.
++    """
++
++    request_id: str
++    allocation_generation: int
++    sequences: tuple[DiffusionKVSequenceMetadata, ...]
++    contexts: tuple[DiffusionKVContextMetadata, ...] = ()
+diff --git a/vllm_omni/diffusion/executor/multiproc_executor.py b/vllm_omni/diffusion/executor/multiproc_executor.py
+index 5fa11b63d41..7de46b5cf85 100644
+--- a/vllm_omni/diffusion/executor/multiproc_executor.py
++++ b/vllm_omni/diffusion/executor/multiproc_executor.py
+@@ -451,6 +451,16 @@ def execute_request(self, scheduler_output: DiffusionSchedulerOutput) -> BaseRun
+         new_reqs = scheduler_output.scheduled_new_reqs
+         runner_outputs: list[RunnerOutput] = []
+ 
++        # Validate every envelope before selecting a dispatch path. In
++        # particular, keep identity errors outside the RPC error wrapper so an
++        # invalid request cannot be forwarded or converted into a worker output.
++        from vllm_omni.diffusion.sched.interface import validate_new_request_data_identity
++
++        for new_req in new_reqs:
++            validate_new_request_data_identity(new_req)
++
++        has_diffusion_kv_metadata = any(new_req.diffusion_kv_metadata is not None for new_req in new_reqs)
++
+         # DP multi-concurrency: when DLO+AllGather is active and multiple
+         # requests are scheduled, send ALL requests in one broadcast RPC.
+         # Each rank picks req[rank % len(reqs)] and computes independently.
+@@ -458,6 +468,7 @@ def execute_request(self, scheduler_output: DiffusionSchedulerOutput) -> BaseRun
+         # responses and match by dp_rank.
+         if (
+             len(new_reqs) > 1
++            and not has_diffusion_kv_metadata
+             and getattr(self.od_config, "enable_distributed_layerwise_offload", False)
+             and getattr(self.od_config, "dlo_use_allgather", True)
+         ):
+@@ -530,9 +541,12 @@ def execute_request(self, scheduler_output: DiffusionSchedulerOutput) -> BaseRun
+         for new_req in new_reqs:
+             req = new_req.req
+             try:
++                args: tuple = (req, self.od_config, scheduler_output.kv_prefetch_job)
++                if new_req.diffusion_kv_metadata is not None:
++                    args += (new_req.diffusion_kv_metadata,)
+                 result = self.collective_rpc(
+                     "execute_model",
+-                    args=(req, self.od_config, scheduler_output.kv_prefetch_job),
++                    args=args,
+                     unique_reply_rank=0,
+                     exec_all_ranks=True,
+                 )
+diff --git a/vllm_omni/diffusion/sched/interface.py b/vllm_omni/diffusion/sched/interface.py
+index eecd53556a5..8fb36f405de 100644
+--- a/vllm_omni/diffusion/sched/interface.py
++++ b/vllm_omni/diffusion/sched/interface.py
+@@ -8,6 +8,7 @@
+ from functools import cached_property
+ from typing import TYPE_CHECKING, Any, TypedDict
+ 
++from vllm_omni.diffusion.diffusion_kv.metadata import DiffusionKVMetadata
+ from vllm_omni.diffusion.request import OmniDiffusionRequest
+ 
+ if TYPE_CHECKING:
+@@ -161,10 +162,39 @@ class NewRequestData:
+ 
+     request_id: str
+     req: OmniDiffusionRequest
++    diffusion_kv_metadata: DiffusionKVMetadata | None = None
+ 
+     @classmethod
+-    def from_state(cls, state: SchedulerRequestState) -> NewRequestData:
+-        return cls(request_id=state.request_id, req=state.req)
++    def from_state(
++        cls,
++        state: SchedulerRequestState,
++        *,
++        diffusion_kv_metadata: DiffusionKVMetadata | None = None,
++    ) -> NewRequestData:
++        return cls(
++            request_id=state.request_id,
++            req=state.req,
++            diffusion_kv_metadata=diffusion_kv_metadata,
++        )
++
++
++def validate_new_request_data_identity(new_req: NewRequestData) -> None:
++    """Ensure an envelope and its forwarded request describe the same request."""
++    forwarded_request_id = new_req.req.request_id
++    if new_req.request_id != forwarded_request_id:
++        raise ValueError(
++            "Diffusion request identity mismatch: "
++            f"envelope request_id={new_req.request_id!r}, "
++            f"forwarded request_id={forwarded_request_id!r}"
++        )
++
++    metadata = new_req.diffusion_kv_metadata
++    if metadata is not None and metadata.request_id != forwarded_request_id:
++        raise ValueError(
++            "Diffusion request identity mismatch: "
++            f"metadata request_id={metadata.request_id!r}, "
++            f"forwarded request_id={forwarded_request_id!r}"
++        )
+ 
+ 
+ @dataclass
+diff --git a/vllm_omni/diffusion/worker/diffusion_model_runner.py b/vllm_omni/diffusion/worker/diffusion_model_runner.py
+index 52c2c646d0b..d118a98338d 100644
+--- a/vllm_omni/diffusion/worker/diffusion_model_runner.py
++++ b/vllm_omni/diffusion/worker/diffusion_model_runner.py
+@@ -30,6 +30,8 @@
+ from vllm_omni.diffusion.cache.selector import get_cache_backend
+ from vllm_omni.diffusion.compile import regionally_compile
+ from vllm_omni.diffusion.data import DiffusionOutput, OmniDiffusionConfig
++from vllm_omni.diffusion.diffusion_kv.config import DiffusionKVCacheMode
++from vllm_omni.diffusion.diffusion_kv.metadata import DiffusionKVMetadata
+ from vllm_omni.diffusion.forward_context import set_forward_context
+ from vllm_omni.diffusion.model_loader.diffusers_loader import DiffusersPipelineLoader
+ from vllm_omni.diffusion.models.interface import (
+@@ -42,7 +44,11 @@
+ from vllm_omni.diffusion.offloader import get_offload_backend
+ from vllm_omni.diffusion.registry import _NO_CACHE_ACCELERATION
+ from vllm_omni.diffusion.request import OmniDiffusionRequest
+-from vllm_omni.diffusion.sched.interface import DiffusionSchedulerOutput, KVPrefetchJob
++from vllm_omni.diffusion.sched.interface import (
++    DiffusionSchedulerOutput,
++    KVPrefetchJob,
++    validate_new_request_data_identity,
++)
+ from vllm_omni.diffusion.worker.input_batch import InputBatch, scatter_latents
+ from vllm_omni.diffusion.worker.request_batch import DiffusionRequestBatch
+ from vllm_omni.diffusion.worker.utils import (
+@@ -154,6 +160,23 @@ def __init__(
+     def _target_device(self) -> torch.device | None:
+         return getattr(self.pipeline, "device", None)
+ 
++    def _validate_diffusion_kv_metadata(
++        self,
++        *,
++        request_id: str,
++        metadata: DiffusionKVMetadata | None,
++    ) -> None:
++        cache_mode = getattr(self.od_config, "diffusion_kv_mode", DiffusionKVCacheMode.DENSE_LEGACY)
++        # W0 does not wire the Scheduler allocator or Worker installer yet, so
++        # validate an allocation snapshot when present without requiring one.
++        if cache_mode is not DiffusionKVCacheMode.PAGED_SCHEDULER and metadata is not None:
++            raise ValueError(f"{cache_mode.value} request {request_id!r} must not carry Diffusion KV metadata")
++
++        if metadata is not None and metadata.request_id != request_id:
++            raise ValueError(
++                f"Diffusion KV metadata request mismatch: expected={request_id!r}, got={metadata.request_id!r}"
++            )
++
+     def _compile_transformer(self, attr_name: str) -> None:
+         """Compile a transformer attribute on the pipeline with torch.compile."""
+         model = getattr(self.pipeline, attr_name, None)
+@@ -566,6 +589,7 @@ def execute_model(
+         self,
+         req: OmniDiffusionRequest,
+         kv_prefetch_job: KVPrefetchJob | None = None,
++        diffusion_kv_metadata: DiffusionKVMetadata | None = None,
+     ) -> DiffusionOutput:
+         """
+         Execute a forward pass for the given requests.
+@@ -582,6 +606,10 @@ def execute_model(
+             not track. For non-HSDP inference, we use torch.inference_mode() for better
+             performance.
+         """
++        self._validate_diffusion_kv_metadata(
++            request_id=req.request_id,
++            metadata=diffusion_kv_metadata,
++        )
+         runner_output = self._execute_request_list(
+             [req],
+             od_config=self.od_config,
+@@ -605,6 +633,12 @@ def execute_model_batch(
+         per-request setup, and calls ``pipeline.forward(batch)``. The pipeline
+         must declare ``supports_request_batch = True``.
+         """
++        for new_req in scheduler_output.scheduled_new_reqs:
++            validate_new_request_data_identity(new_req)
++            self._validate_diffusion_kv_metadata(
++                request_id=new_req.req.request_id,
++                metadata=new_req.diffusion_kv_metadata,
++            )
+         reqs = [nr.req for nr in scheduler_output.scheduled_new_reqs]
+         return self._execute_request_list(
+             reqs,
+@@ -713,6 +747,12 @@ def _update_states_after(
+     def execute_stepwise(self, scheduler_output: DiffusionSchedulerOutput) -> BatchRunnerOutput:
+         """Execute one step for one scheduled request and return runner output."""
+         assert self.pipeline is not None, "Model not loaded. Call load_model() first."
++        for new_req in scheduler_output.scheduled_new_reqs:
++            validate_new_request_data_identity(new_req)
++            self._validate_diffusion_kv_metadata(
++                request_id=new_req.req.request_id,
++                metadata=new_req.diffusion_kv_metadata,
++            )
+         if not self._supports_step_mode():
+             raise ValueError("Current pipeline does not support step execution.")
+         # Stepwise mode only supports the basic state-driven denoise path for now.
+diff --git a/vllm_omni/diffusion/worker/diffusion_worker.py b/vllm_omni/diffusion/worker/diffusion_worker.py
+index a3d1c791f88..2b927ce377b 100644
+--- a/vllm_omni/diffusion/worker/diffusion_worker.py
++++ b/vllm_omni/diffusion/worker/diffusion_worker.py
+@@ -41,6 +41,7 @@
+     OmniSleepTask,
+     OmniWakeTask,
+ )
++from vllm_omni.diffusion.diffusion_kv.metadata import DiffusionKVMetadata
+ from vllm_omni.diffusion.distributed.parallel_state import (
+     destroy_distributed_env,
+     init_distributed_environment,
+@@ -422,6 +423,7 @@ def execute_model(
+         req: OmniDiffusionRequest | list[OmniDiffusionRequest],
+         od_config: OmniDiffusionConfig,
+         kv_prefetch_job: KVPrefetchJob | None = None,
++        diffusion_kv_metadata: DiffusionKVMetadata | None = None,
+     ) -> DiffusionOutput:
+         """Execute a forward pass by delegating to the model runner.
+ 
+@@ -457,7 +459,10 @@ def execute_model(
+         profiler = self._get_profiler()
+         ctx = profiler.annotate_context_manager("diffusion_forward") if profiler else nullcontext()
+         with ctx:
+-            output = self.model_runner.execute_model(req, kv_prefetch_job=kv_prefetch_job)
++            kwargs: dict[str, Any] = {"kv_prefetch_job": kv_prefetch_job}
++            if diffusion_kv_metadata is not None:
++                kwargs["diffusion_kv_metadata"] = diffusion_kv_metadata
++            output = self.model_runner.execute_model(req, **kwargs)
+         if profiler:
+             profiler.step()
+ 
+@@ -1350,6 +1355,7 @@ def execute_model(
+         req: OmniDiffusionRequest,
+         od_config: OmniDiffusionConfig,
+         kv_prefetch_job: KVPrefetchJob | None = None,
++        diffusion_kv_metadata: DiffusionKVMetadata | None = None,
+     ) -> DiffusionOutput:
+         """
+         Execute a forward pass.
+@@ -1362,7 +1368,10 @@ def execute_model(
+         Returns:
+             DiffusionOutput with generated results
+         """
+-        return self.worker.execute_model(req, od_config, kv_prefetch_job=kv_prefetch_job)
++        kwargs: dict[str, Any] = {"kv_prefetch_job": kv_prefetch_job}
++        if diffusion_kv_metadata is not None:
++            kwargs["diffusion_kv_metadata"] = diffusion_kv_metadata
++        return self.worker.execute_model(req, od_config, **kwargs)
+ 
+     def execute_stepwise(self, scheduler_output: DiffusionSchedulerOutput) -> BaseRunnerOutput:
+         """Execute one diffusion step."""

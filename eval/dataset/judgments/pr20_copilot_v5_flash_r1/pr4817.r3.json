@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns to recall, so both score full recall trivially. X's findings are more thorough and grounded in specific file:line evidence (docstring/heading/test overclaims, sm_110a gap) with concrete proposed edits, while Y surfaces essentially the same sm_110a observation but hedges it into a non-actionable aside it ultimately recommends omitting. X's extra doc-consistency catches (fp8.md:31 heading, fp8.md:54 override caveat) are valid and actionable, giving it a clear edge in both precision and actionability.",
+  "_cost_usd": 0.1335142,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "42f5bc375d9b4f66ea1466442378066eef4865413280541c674e038a078a6167",
+    "judge_rep": 3
+  }
+}

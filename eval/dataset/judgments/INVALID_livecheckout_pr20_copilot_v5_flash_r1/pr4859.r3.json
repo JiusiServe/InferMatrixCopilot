@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.55,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "X catches the serving_speech.py language/dialect removal — a substantial ground-truth thread with real reviewer debate — and correctly flags the audio_vae.py config-mutation hazard, both with concrete file/line fixes; Y completely omits the language/dialect issue and rubber-stamps an APPROVE. However X's 'major' claim that the patch_emission.py +1→+2 change is an unresolved bug directly contradicts the ground truth, where two reviewers confirmed it matches the vendor implementation exactly — Y correctly identifies this same change as intentional and consistent, which is a real precision win for Y. Neither surfaces the minor definitions.py 'refactor next release' note or the removed audio_format.py docs comment.",
+  "_cost_usd": 0.20904340000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "482f6e27d99ddb36852454d3ce931aa8975dbbade143ba2d12dec4994d5ab787",
+    "judge_rep": 3
+  }
+}

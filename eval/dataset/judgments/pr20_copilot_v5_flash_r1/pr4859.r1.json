@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.5,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates independently converge on the two real discussion points from the PR (audio_vae.py config mutation and the dialect/language drop in serving_speech.py), but X frames them as calibrated non-blocking observations — which matches how the ground-truth thread actually resolved (both were confirmed intentional/vendor-matched by maintainers). Y raises the same two points but escalates them to duplicate [major] blockers demanding code changes, contradicting the actual resolution, and pads the report with unverifiable claims (README/client file contents, seed/RNG assumptions) that hurt precision. Neither candidate catches the patch_emission.py min_stop_step+2 vendor-alignment question or the minor definitions.py 'refactor next release' nit, capping recall for both similarly.",
+  "_cost_usd": 0.2088992,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "91f9f3c62b83312098ea7c3397859f6eb10a31e81e979e768fc2bf5d911b6d06",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.8,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Candidate X engages substantively with both threads the human reviewers raised (regression-test adequacy and the enum suggestion), and independently surfaces the exact latent gap: it flags that sleep() defaulting to level=2 makes wake_up() always throw the new NotImplementedError, bricking the engine on the common path — precisely the over-strictness that later required issue #4905/#4912 to relax, and it also questions whether the hardware-gated tests actually exercise the guarded logic in CI. Findings are concrete with file/line citations and clear fixes. Candidate Y returns zero findings ('no issues'), missing every ground-truth concern and the latent gap entirely, providing no grounded or actionable content.",
+  "_cost_usd": 0.0858537,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "548f2909eab0dea5f674754beaa204919fcc62e4ee75923f7f33f13ab7c49da0",
+    "judge_rep": 2
+  }
+}

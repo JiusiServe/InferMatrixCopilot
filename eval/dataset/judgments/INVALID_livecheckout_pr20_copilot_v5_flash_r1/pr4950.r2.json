@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.92,
+    "actionability": 0.55
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive reviewer concerns (just LGTM/approve), so both trivially achieve full recall. X gives a tight, well-evidenced verification of the diff's three claims with specific file:line citations and correctly recommends approval, but offers only one soft, low-confidence comment — thin on actionable follow-up. Y verifies the same core claims with comparable rigor and additionally surfaces a genuinely useful, grounded issue outside the diff (the sibling gradio README still documents the buggy nested extra_body form, which could re-confuse users right after this fix) plus a concrete index-collision nit on the new two-choices behavior, both with specific file:line evidence and suggested edits — more actionable, though the unit-test ask stretches scope for a docs-only PR. Overall Y edges out on actionability and thoroughness without sacrificing grounding.",
+  "_cost_usd": 0.1238774,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "0f6735db1e1a4059b111ce3d65ad98a645e583b036127bb1bd613ffa1d575c9c",
+    "judge_rep": 2
+  }
+}

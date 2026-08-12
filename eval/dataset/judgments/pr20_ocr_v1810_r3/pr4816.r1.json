@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.5,
+    "actionability": 0.1,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns (Codex hit its limit, human reviewer just said 'lgtm'), so both candidates trivially satisfy recall by reaching the same approve conclusion. Candidate X earns its verdict with specific, diff-consistent reasoning (traces the rename to the upstream ServingTokenization refactor, checks all call sites, notes updated test coverage) — concrete and useful even though unblocking. Candidate Y is a bare 'terminal state: complete, 0 findings' with no evidence of what was checked or why it's safe, giving it essentially no actionability or demonstrated grounding despite reaching the correct outcome.",
+  "_cost_usd": 0.09874789999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "2fdb68b17d7d75cae71ffdd0b95e36e1c3e22481bf8899a5f9df4940e2cc7bc1",
+    "judge_rep": 1
+  }
+}

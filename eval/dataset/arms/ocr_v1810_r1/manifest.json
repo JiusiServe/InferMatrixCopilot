@@ -1,0 +1,14 @@
+{
+  "arm": "ocr_v1810_r1",
+  "engine": "open-code-review (/tmp/claude-2005/-data-zhoutaichang-copilot/b8650813-4d4a-451c-a316-7ffabf8b27ab/scratchpad/ocr-test/node_modules/.bin/ocr) \u2014 `ocr review`, agent audience",
+  "llm": "deepseek-v4-pro[1m] @ https://api.deepseek.com/anthropic (same endpoint as the copilot arms)",
+  "dataset": "vllm_omni_dataset.yaml",
+  "splits": [
+    "test",
+    "train",
+    "val"
+  ],
+  "n_items": 20,
+  "concurrency": 3,
+  "notes": "PR-time worktrees shared with the copilot arms; head pinned to expected_pr_heads.json; range validated against declared file counts. structural_skip marks PRs OCR filtered out entirely."
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.6,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Neither candidate surfaces the ground truth's core technical bugs (stream-slot leak on abort, cumulative/delta rewind, ceil-division length bug, legacy-checkpoint v2-tokenizer mismatch), so recall is low for both. Y is more rigorously grounded, backing nearly every claim with concrete grep evidence and line numbers, and independently catches a genuinely subtle bug (pipeline.py:97 hardcoded stop_token_ids duplicating a config default) plus three well-evidenced test-coverage gaps that echo reviewers' implicit concern about untested new streaming machinery. X makes some unverified 'already handled' claims (slot-leak cleanup, vendored headers) that read as assertions rather than grep-verified facts, slightly undercutting its precision relative to Y's evidence-heavy style.",
+  "_cost_usd": 0.12535280000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "3e2d84d162ec9c0cf79f7010cb16a31e77a1a67c7b5a726b72ab38bc2a763f4a",
+    "judge_rep": 3
+  }
+}

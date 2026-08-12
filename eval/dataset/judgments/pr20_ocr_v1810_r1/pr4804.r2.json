@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y independently rediscovers two of the ground truth's most specific findings almost verbatim: the ceil-vs-floor division latent bug at audio_tokenizer_v2.py:949 (linyueqian's exact line and fix) and the docstring-vs-signature default mismatch in configuration_moss_audio_tokenizer_v2.py. X's findings are plausible and well-argued but hit none of the human reviewers' concerns, and X's confident claim that vendored files 'carry a proper... attribution header' directly contradicts a ground-truth complaint. Both are highly actionable with file/line anchors and suggested diffs; Y has one likely false positive (put_req_chunk increment) that X's own investigation contradicts, slightly denting its precision, but its much higher recall on verifiable, high-value bugs decides it.",
+  "_cost_usd": 0.40421799999999997,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "2ebe6d7abfd0f4073f2ba8b59ea204b30326a379fcbc687c30d2f482e19fc378",
+    "judge_rep": 2
+  }
+}

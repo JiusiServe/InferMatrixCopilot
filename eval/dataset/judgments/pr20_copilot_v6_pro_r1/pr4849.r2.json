@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates correctly validate the parent-first-ordering assumption that Gaohan123 flagged inline, with Y giving crisper line-cited evidence. But X better tracks the human thread's actual asks: it explicitly requests confirmation/coverage of the e2e alignment test (mirroring Bounty-hunter's ask to run test_hunyuan_image3.py) and flags the CI/precommit failure as unresolved (mirroring Gaohan123's 'please fix precommit'), whereas Y treats both as already satisfied based on the PR author's unverified claims, which understates real open items. X's extra findings (unused param, missing IndexError guard/test) are minor but valid and grounded, giving it a slight recall edge at modest precision cost.",
+  "_cost_usd": 0.1967947,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "0b8c0840de5cbae302bbf4843c73802bdb8e382e1ee241e809c1d06bb7274ea8",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.6,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.7,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Neither candidate surfaces the ground truth's core confirmed bugs (slot leak, cumulative/delta chunk re-slice, ceil/floor length bug, v2-tokenizer/legacy-checkpoint collision), so recall is low for both; X gets marginal credit for touching the legacy-checkpoint theme via a load_weights tangent, Y for landing in the same chunk-emission subsystem reviewers scrutinized. Critically, X explicitly asserts the slot-leak issue is 'handled' and lifecycle 'looks complete,' directly contradicting the PR's confirmed high-severity bug — a false-assurance claim that actively undermines trust rather than just omitting it. Y's 10 findings are uniformly anchored with file:line, exact snippets, and concrete suggested diffs (three of which — max_new_frames TypeError, hardcoded audio sampling params, dead ref-codes path — are independently corroborated by X, lending real credibility), giving Y a clear edge in actionability and overall precision despite similarly weak recall.",
+  "_cost_usd": 0.38453590000000004,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "3db38af2695ffd2d1babcbf643988fbaa12cd76079eb52e62bf385d8189dbe05",
+    "judge_rep": 2
+  }
+}

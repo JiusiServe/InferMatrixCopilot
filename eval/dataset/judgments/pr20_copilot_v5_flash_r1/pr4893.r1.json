@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.55,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.8,
+    "actionability": 0.45
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "X is the only candidate that touches the sole substantive human concern (verifying the reduce_scatter test parameter), flagging the dead conditional in the fake-group constructor, and it surfaces a plausible unverified-in-diff issue (tp2_sp2 dp world_size=1 never populating dp_metadata) with concrete file/line fixes. However X's biggest 'major' finding (stale dp_metadata across denoise steps) is internally contradictory (claims the ForwardContext is fresh per step, which would actually prevent the staleness it alleges) and one finding cites a suspicious 'line:0' reference, hurting precision. Y is cleaner and better-grounded on what it does verify (DPMetadata construction, GroupCoordinator API, cleanup) but stays shallow, offers almost no actionable line-level asks, and never engages the actual reviewer concern about reduce_scatter test coverage, so its recall is weak despite good precision.",
+  "_cost_usd": 0.18102520000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "d4d69bb2b468538d90777fa9fd2c0c3abc7f912eab883eab5b2655d34cc74fc5",
+    "judge_rep": 1
+  }
+}

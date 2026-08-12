@@ -1,0 +1,26 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X's top finding (hardcoded default_components list drifts from per-pipeline _dit_modules/registry declarations, so other denoisers like soulx still won't be covered) closely mirrors the actual human concern (dsocek: hardcoded naming lists may miss cases, consider deriving from stacked_params_mapping instead), which Y never touches. Y's findings (missing target_modules in the new test, CI failures on AMD/NPU, a stale comment) are grounded and concrete but tangential to the substantive design point reviewers actually raised. Both are well-grounded and cite specific lines/evidence, but X captures the real reviewer intent while Y misses it entirely, giving X the clear recall edge despite Y's slightly crisper actionability.",
+  "_cost_usd": 0.053965,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "651e181f4a6173811cc769702492d0bc7df5a834cdc912dfe74360540323bf80",
+    "judge_rep": 3
+  }
+}

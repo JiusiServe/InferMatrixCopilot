@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.8,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 1.0,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X substantively engages with the two dominant threads of the real review — the talker_mtp cudagraph gating correctness and the seed-reproducibility consequence under full cudagraphs (near-verbatim overlap with gcanlin's inline comment), plus raises the NPU stage-1 compilation_config question and asks for benchmark/accuracy evidence, echoing Sy0307's request. Y's entire review is a single redundant-assignment nit (also flagged by X as its comment 3) that matches nothing in the ground-truth human comments, so despite being technically valid it captures almost none of what reviewers actually cared about. Both are concrete and file/line-anchored, but X's broader, grounded coverage makes it the clear winner despite a lower per-finding precision than Y's single-for-single hit rate.",
+  "_cost_usd": 0.21286089999999996,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "0a37d51916c1dc3616defbd9c287370b9445f0ecffa42795878aca07cafd36ea",
+    "judge_rep": 2
+  }
+}

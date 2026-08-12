@@ -1,0 +1,1105 @@
+diff --git a/.buildkite/cuda/test-nightly.yml b/.buildkite/cuda/test-nightly.yml
+index dd52dcd99c2..8695e8b5f73 100644
+--- a/.buildkite/cuda/test-nightly.yml
++++ b/.buildkite/cuda/test-nightly.yml
+@@ -477,12 +477,18 @@ steps:
+           - pytest -sv tests/diffusion/offloader -m "full_model and cuda"
+         mirror_hardwares: l4_1
+ 
+-      - label: ":full_moon: Diffusion · Quantization Test with H100"
++      - label: ":full_moon: Diffusion · Quantization Test with H100 · Single-GPU"
+         timeout_in_minutes: 60
+         commands:
+           - pytest -sv tests/diffusion/quantization -m 'full_model and cuda and H100' --run-level "full_model"
+         mirror_hardwares: h100_1
+ 
++      - label: ":full_moon: Diffusion · MiniMax H3 FP8 Quality Test with H100 · 2-GPU"
++        timeout_in_minutes: 60
++        commands:
++          - pytest -sv tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py -m 'full_model and cuda and H100' --run-level "full_model"
++        mirror_hardwares: h100_2
++
+       - label: ":full_moon: Diffusion · Quantization Test with L4"
+         timeout_in_minutes: 60
+         commands:
+diff --git a/docs/user_guide/quantization/fp8.md b/docs/user_guide/quantization/fp8.md
+index c76cfd32e52..ddca3ea196f 100644
+--- a/docs/user_guide/quantization/fp8.md
++++ b/docs/user_guide/quantization/fp8.md
+@@ -93,6 +93,7 @@ warmup_quack_fp8([(14040, 2048, 6144), (14040, 2048, 2048)])
+ | HunyuanImage-3.0 | `tencent/HunyuanImage-3.0`, `tencent/HunyuanImage-3.0-Instruct` | Yes | Yes | All layers; use the Hunyuan stage config for multi-stage runs | None | |
+ | HunyuanVideo-1.5 | `hunyuanvideo-community/HunyuanVideo-1.5-Diffusers-480p_t2v`, `720p_t2v`, `480p_i2v` | Yes | Yes | All layers | None | |
+ | Cosmos3 | `nvidia/Cosmos3-Nano`, `nvidia/Cosmos3-Super` | Yes | Not validated | All layers | None | |
++| MiniMax H3 | `MiniMaxAI/MiniMax-H3` | Yes | Not validated | DiT linears except patch, timestep, and final projections; not compatible with layerwise offload | None | |
+ 
+ ### Multi-Stage Omni/TTS Model (Qwen3-Omni, Qwen3-TTS)
+ 
+diff --git a/recipes/MiniMaxAI/MiniMax-H3.md b/recipes/MiniMaxAI/MiniMax-H3.md
+index e94d2fb3446..016c39991ca 100644
+--- a/recipes/MiniMaxAI/MiniMax-H3.md
++++ b/recipes/MiniMaxAI/MiniMax-H3.md
+@@ -164,6 +164,42 @@ command with:
+ export MODEL="${MODEL_ROOT}/Ref2VA"
+ ```
+ 
++### Online FP8 quantization
++
++MiniMax H3 supports load-time FP8 quantization of the DiT. The checkpoint
++remains BF16 on disk; vLLM-Omni quantizes eligible weights while loading and
++uses dynamic activation scaling during inference. By default, attention and
++MLP linears in the token refiner and main DiT blocks, the condition
++projection, and all AdaLN projections use FP8. Patch, timestep, and final
++projections remain FP32; the text encoder and VAEs are unchanged.
++
++Add this option to an existing H3 server command:
++
++```bash
++--quantization fp8
++```
++
++Use `ignored_layers` to keep any otherwise eligible linear in BF16. H3
++resolves the `transformer` component before constructing the DiT, so names do
++not start with `transformer.`. Entries are exact runtime linear prefixes; a
++parent name such as `blocks.0.attn` does not exclude its children.
++
++Eligible names are the `attn.qkv_proj`, `attn.out_proj`, `mlp.fc1`, and
++`mlp.fc2` children under `token_refiner.blocks.<0-1>` or `blocks.<0-49>`.
++The other eligible names are `condition_proj`,
++`blocks.<0-49>.adaln_proj.linear`, and `final_layer.adaln_proj.linear`.
++For example, keep the first main block's attention projections in BF16 with:
++
++```bash
++--diffusion-quantization-config \
++  '{"transformer":{"method":"fp8","ignored_layers":["blocks.0.attn.qkv_proj","blocks.0.attn.out_proj"]}}'
++```
++
++The structured option replaces `--quantization fp8`. Online FP8 is currently
++incompatible with H3 layerwise offload because the offload path produces a
++weight stride rejected by the Cutlass FP8 kernel. Use resident FP8 with tensor
++parallelism and VAE tiling instead.
++
+ ## HTTP API examples
+ 
+ The following requests use the synchronous endpoint so the returned body can
+@@ -310,12 +346,21 @@ throughput guarantee. Multi-video Ref2VA is much slower because the two
+ reference videos expand both the Qwen3-VL vision sequence and the packed DiT
+ attention sequence.
+ 
++## Validated FP8 evidence
++
++With eager DiT/text-encoder TP2 and VAE tiling, the 384x672, 107-frame,
++10-step quality case measured LPIPS 0.1156 (limit 0.20), PSNR 23.6316 dB,
++audio spectral cosine 0.9589 (minimum 0.80), and audio RMS ratio 0.9342. The
++resident per-GPU peak was 68.52 GiB for BF16 and 53.51 GiB for FP8, a 22%
++reduction.
++
+ ## Known limitations
+ 
+ - Each server process loads only one checkpoint partition.
+ - H3 currently executes one generation request per diffusion batch.
+ - The first regional-compile request is a warmup and should not be included in
+   steady-state performance measurements.
++- Online FP8 is not compatible with layerwise offload.
+ - Image+audio Ref2VA accepts exactly one image and one audio reference.
+ - Video Ref2VA accepts one or more video files, but not an additional standalone
+   audio reference.
+diff --git a/tests/diffusion/models/minimax_h3/test_minimax_h3_e2e.py b/tests/diffusion/models/minimax_h3/test_minimax_h3_e2e.py
+index 59b720df492..5dd4d67df42 100644
+--- a/tests/diffusion/models/minimax_h3/test_minimax_h3_e2e.py
++++ b/tests/diffusion/models/minimax_h3/test_minimax_h3_e2e.py
+@@ -16,6 +16,17 @@
+ MODEL_ENV = "VLLM_TEST_MINIMAX_H3_FL2VA_MODEL"
+ 
+ 
++def _assert_joint_output(outputs):
++    assert len(outputs) == 1
++    frames = np.asarray(outputs[0].images[0])
++    assert frames.shape == (39, 256, 448, 3)
++    multimodal = outputs[0].multimodal_output
++    assert multimodal is not None
++    assert np.asarray(multimodal["audio"]).shape[1] == 2
++    assert multimodal["audio_sample_rate"] == 32000
++    assert multimodal["fps"] == 24
++
++
+ @pytest.mark.skipif(
+     not os.environ.get(MODEL_ENV),
+     reason=f"set {MODEL_ENV} to an authorized FL2VA checkpoint path",
+@@ -59,11 +70,56 @@ def test_minimax_h3_t2va_ulysses8_smoke():
+     finally:
+         engine.close()
+ 
+-    assert len(outputs) == 1
+-    frames = np.asarray(outputs[0].images[0])
+-    assert frames.shape == (39, 256, 448, 3)
+-    multimodal = outputs[0].multimodal_output
+-    assert multimodal is not None
+-    assert np.asarray(multimodal["audio"]).shape[1] == 2
+-    assert multimodal["audio_sample_rate"] == 32000
+-    assert multimodal["fps"] == 24
++    _assert_joint_output(outputs)
++
++
++@pytest.mark.skipif(
++    not os.environ.get(MODEL_ENV),
++    reason=f"set {MODEL_ENV} to an authorized FL2VA checkpoint path",
++)
++def test_minimax_h3_t2va_fp8_single_gpu_smoke():
++    import torch
++
++    from vllm_omni.diffusion.data import DiffusionParallelConfig
++    from vllm_omni.entrypoints.omni import Omni
++    from vllm_omni.inputs.data import OmniDiffusionSamplingParams
++
++    if torch.accelerator.device_count() < 1:
++        pytest.skip("MiniMax H3 FP8 smoke requires a CUDA device")
++
++    engine = Omni(
++        model=os.environ[MODEL_ENV],
++        quantization_config={
++            "transformer": {"method": "fp8"},
++            "text_encoder": None,
++            "video_vae": None,
++            "audio_vae": None,
++        },
++        parallel_config=DiffusionParallelConfig(ulysses_degree=1),
++        trust_remote_code=True,
++        enable_cpu_offload=True,
++        enforce_eager=True,
++    )
++    try:
++        outputs = engine.generate(
++            "A quiet cinematic night scene with matching ambient sound.",
++            OmniDiffusionSamplingParams(
++                height=256,
++                width=448,
++                num_frames=29,
++                fps=24,
++                num_inference_steps=2,
++                seed=42,
++                output_type="np",
++                extra_args={
++                    "task": "t2va",
++                    "flow_shift": 12.0,
++                    "audio_flow_shift": 3.0,
++                },
++            ),
++            use_tqdm=False,
++        )
++    finally:
++        engine.close()
++
++    _assert_joint_output(outputs)
+diff --git a/tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py b/tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py
+new file mode 100644
+index 00000000000..b9ae3335cab
+--- /dev/null
++++ b/tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py
+@@ -0,0 +1,213 @@
++# SPDX-License-Identifier: Apache-2.0
++
++from types import SimpleNamespace
++from unittest.mock import Mock
++
++import pytest
++import torch
++import torch.nn as nn
++
++pytestmark = [pytest.mark.core_model, pytest.mark.cpu, pytest.mark.diffusion]
++
++
++class _FakeLinear(nn.Module):
++    def __init__(
++        self,
++        *args,
++        bias=False,
++        params_dtype=None,
++        quant_config=None,
++        prefix="",
++        total_num_heads=None,
++        total_num_kv_heads=None,
++        **kwargs,
++    ):
++        del args, kwargs
++        super().__init__()
++        self.prefix = prefix
++        self.quant_config = quant_config
++        self.weight = nn.Parameter(torch.empty(1, dtype=params_dtype))
++        if bias:
++            self.bias = nn.Parameter(torch.empty(1, dtype=params_dtype))
++        else:
++            self.register_parameter("bias", None)
++        self.num_heads = total_num_heads
++        self.num_kv_heads = total_num_kv_heads
++
++
++class _FakeAttention(nn.Module):
++    def __init__(self, **kwargs):
++        del kwargs
++        super().__init__()
++
++
++def _small_od_config():
++    arch = {
++        "num_layers": 1,
++        "token_refiner_num_layers": 1,
++        "hidden_size": 8,
++        "num_attention_heads": 2,
++        "attention_head_dim": 4,
++        "ffn_hidden_size": 16,
++        "latents_dim": 2,
++        "audio_latents_dim": 2,
++        "patch_size": (1, 2, 2),
++        "text_dim": 6,
++        "timestep_input_dim": 4,
++        "time_embed_hidden_size": 8,
++        "time_embed_dim": 4,
++        "adaln_out_features": 18 * 8,
++        "final_adaln_out_features": 2 * 8,
++        "rope_inv_freq_len": 2,
++    }
++    return SimpleNamespace(
++        tf_model_config=arch,
++        parallel_config=SimpleNamespace(ulysses_degree=1),
++    )
++
++
++def test_fp8_scope_and_prefix_propagation(monkeypatch):
++    from vllm.model_executor.layers.linear import LinearBase, UnquantizedLinearMethod
++    from vllm.model_executor.layers.quantization.fp8 import Fp8Config
++    from vllm.model_executor.layers.quantization.utils.quant_utils import (
++        is_layer_skipped,
++    )
++
++    from vllm_omni.diffusion.models.minimax_h3 import minimax_h3_transformer as h3
++
++    monkeypatch.setattr(h3, "ColumnParallelLinear", _FakeLinear)
++    monkeypatch.setattr(h3, "MergedColumnParallelLinear", _FakeLinear)
++    monkeypatch.setattr(h3, "QKVParallelLinear", _FakeLinear)
++    monkeypatch.setattr(h3, "RowParallelLinear", _FakeLinear)
++    monkeypatch.setattr(h3, "Attention", _FakeAttention)
++    monkeypatch.setattr(h3, "get_tensor_model_parallel_world_size", lambda: 1)
++
++    ignored_layers = {
++        "token_refiner.blocks.0.mlp.fc2",
++        "blocks.0.attn.qkv_proj",
++        "condition_proj",
++        "blocks.0.adaln_proj.linear",
++        "final_layer.adaln_proj.linear",
++    }
++    fp8_config = Fp8Config(ignored_layers=sorted(ignored_layers))
++    model = h3.MiniMaxH3DiTModel(
++        _small_od_config(),
++        quant_config=fp8_config,
++    )
++    linears = {module.prefix: module.quant_config for module in model.modules() if isinstance(module, _FakeLinear)}
++
++    quantized = {
++        "token_refiner.blocks.0.attn.qkv_proj",
++        "token_refiner.blocks.0.attn.out_proj",
++        "token_refiner.blocks.0.mlp.fc1",
++        "token_refiner.blocks.0.mlp.fc2",
++        "blocks.0.attn.qkv_proj",
++        "blocks.0.attn.out_proj",
++        "blocks.0.mlp.fc1",
++        "blocks.0.mlp.fc2",
++        "condition_proj",
++        "blocks.0.adaln_proj.linear",
++        "final_layer.adaln_proj.linear",
++    }
++    full_precision = {
++        "video_patch_proj",
++        "audio_patch_proj",
++        "time_embedder.proj_in",
++        "time_embedder.proj_out",
++        "final_layer.video_out",
++        "final_layer.audio_out",
++    }
++
++    assert quantized <= linears.keys()
++    assert full_precision <= linears.keys()
++    assert all(linears[prefix] is fp8_config for prefix in quantized)
++    assert all(linears[prefix] is None for prefix in full_precision)
++    assert {prefix for prefix in quantized if is_layer_skipped(prefix, fp8_config.ignored_layers)} == ignored_layers
++    linear = Mock(spec=LinearBase)
++    assert all(
++        isinstance(
++            fp8_config.get_quant_method(linear, prefix),
++            UnquantizedLinearMethod,
++        )
++        for prefix in ignored_layers
++    )
++
++
++class _WeightTarget(nn.Module):
++    def __init__(self, loader):
++        super().__init__()
++        self.weight = nn.Parameter(torch.empty(1))
++        self.weight.weight_loader = loader
++
++
++def test_model_load_weights_transforms_before_calling_vllm_loader():
++    from vllm_omni.diffusion.models.minimax_h3.minimax_h3_transformer import (
++        MiniMaxH3DiTArchConfig,
++        MiniMaxH3DiTModel,
++    )
++
++    qkv_calls = []
++    fc1_calls = []
++
++    def qkv_loader(param, loaded_weight):
++        del param
++        qkv_calls.append(loaded_weight.clone())
++
++    def fc1_loader(param, loaded_weight, shard_id):
++        del param
++        fc1_calls.append((shard_id, loaded_weight.clone()))
++
++    model = object.__new__(MiniMaxH3DiTModel)
++    nn.Module.__init__(model)
++    model.arch = MiniMaxH3DiTArchConfig(
++        hidden_size=1,
++        num_attention_heads=2,
++        attention_head_dim=1,
++        ffn_hidden_size=2,
++    )
++    model.blocks = nn.ModuleList([nn.Module()])
++    model.blocks[0].attn = nn.Module()
++    model.blocks[0].attn.qkv_proj = _WeightTarget(qkv_loader)
++    model.blocks[0].mlp = nn.Module()
++    model.blocks[0].mlp.fc1 = _WeightTarget(fc1_loader)
++
++    qkv = torch.arange(6, dtype=torch.float32).reshape(6, 1)
++    fc1 = torch.arange(4, dtype=torch.float32).reshape(4, 1)
++    loaded = model.load_weights(
++        [
++            ("blocks.0.attn.qkv_proj.weight", qkv),
++            ("blocks.0.mlp.fc1.weight", fc1),
++        ]
++    )
++
++    assert loaded == {
++        "blocks.0.attn.qkv_proj.weight",
++        "blocks.0.mlp.fc1.weight",
++    }
++    assert qkv_calls[0][:, 0].tolist() == [0, 3, 1, 4, 2, 5]
++    assert [(shard_id, tensor[:, 0].tolist()) for shard_id, tensor in fc1_calls] == [
++        (0, [0, 1]),
++        (1, [2, 3]),
++    ]
++
++
++def test_pipeline_resolves_transformer_component_quant_config():
++    from vllm_omni.diffusion.models.minimax_h3.pipeline_minimax_h3 import (
++        _resolve_component_quant_config,
++    )
++    from vllm_omni.quantization import build_quant_config
++
++    ignored_layers = ["blocks.0.attn.qkv_proj"]
++    component_config = build_quant_config(
++        {
++            "transformer": {
++                "method": "fp8",
++                "ignored_layers": ignored_layers,
++            }
++        }
++    )
++    transformer_config = component_config.resolve("transformer")
++
++    assert transformer_config.ignored_layers == ignored_layers
++    assert _resolve_component_quant_config(component_config, "transformer") is transformer_config
++    assert _resolve_component_quant_config(transformer_config, "transformer") is transformer_config
+diff --git a/tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py b/tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py
+new file mode 100644
+index 00000000000..d93b1c9f870
+--- /dev/null
++++ b/tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py
+@@ -0,0 +1,297 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++
++from pathlib import Path
++
++import numpy as np
++import pytest
++import torch
++
++from tests.diffusion.quantization.test_quantization_quality import (
++    _OUTPUT_DIR,
++    QualityTestConfig,
++    _compute_lpips,
++    _compute_psnr_and_mae,
++    _free_gpu_memory,
++    _maybe_save_output,
++)
++from tests.helpers.mark import hardware_marks
++
++_MINIMAX_H3_REPO = "MiniMaxAI/MiniMax-H3"
++_MINIMAX_H3_REVISION = "48d93ede732756e404a3b1b2f3b3a9b5a22f6cfc"
++_MINIMAX_H3_AUDIO_SAMPLE_RATE = 32000
++_MIN_AUDIO_SPECTRAL_COSINE = 0.80
++_MIN_AUDIO_RMS_RATIO = 0.50
++_MAX_AUDIO_RMS_RATIO = 2.00
++
++_QUALITY_CONFIG = QualityTestConfig(
++    id="fp8_minimax_h3_fl2va",
++    model=_MINIMAX_H3_REPO,
++    quantization={"transformer": {"method": "fp8"}},
++    task="t2v",
++    prompt=(
++        "A bright daytime cinematic tracking shot of a golden retriever running through a sunlit meadow "
++        "filled with colorful wildflowers, vivid blue sky, crisp natural colors."
++    ),
++    max_lpips=0.20,
++    height=384,
++    width=672,
++    num_frames=107,
++    num_inference_steps=10,
++)
++
++
++def _resolve_fl2va_model_ref() -> str:
++    from huggingface_hub import snapshot_download
++
++    repo_root = Path(
++        snapshot_download(
++            repo_id=_MINIMAX_H3_REPO,
++            revision=_MINIMAX_H3_REVISION,
++            allow_patterns=["FL2VA/**"],
++        )
++    )
++    fl2va_root = repo_root / "FL2VA"
++    if not (fl2va_root / "model_index.json").is_file():
++        raise FileNotFoundError(f"MiniMax H3 FL2VA model_index.json not found under {repo_root}")
++    return str(fl2va_root)
++
++
++def _canonical_audio(audio: object) -> np.ndarray:
++    """Return H3 audio as float32 [channels, samples]."""
++    array = np.asarray(audio, dtype=np.float32)
++    while array.ndim > 2 and array.shape[0] == 1:
++        array = array[0]
++    if array.ndim == 1:
++        array = array[None, :]
++    if array.ndim != 2:
++        raise ValueError(f"Expected mono/stereo audio, got shape {array.shape}")
++    if array.shape[0] > array.shape[1] and array.shape[1] <= 8:
++        array = array.T
++    if not 1 <= array.shape[0] <= 8:
++        raise ValueError(f"Expected channel-first audio, got shape {array.shape}")
++    if not np.isfinite(array).all():
++        raise ValueError("Audio contains non-finite samples")
++    return np.ascontiguousarray(array)
++
++
++def _audio_quality_metrics(baseline: object, quantized: object) -> tuple[float, float]:
++    """Compare phase-tolerant spectral structure and overall signal energy."""
++    baseline_array = _canonical_audio(baseline)
++    quantized_array = _canonical_audio(quantized)
++    if baseline_array.shape != quantized_array.shape:
++        raise ValueError(
++            "Audio shapes do not match for metric computation: "
++            f"baseline={baseline_array.shape}, quantized={quantized_array.shape}"
++        )
++
++    baseline_tensor = torch.from_numpy(baseline_array)
++    quantized_tensor = torch.from_numpy(quantized_array)
++    similarities: list[float] = []
++    for n_fft in (512, 1024, 2048):
++        window = torch.hann_window(n_fft)
++        baseline_magnitude = torch.stft(
++            baseline_tensor,
++            n_fft=n_fft,
++            hop_length=n_fft // 4,
++            window=window,
++            return_complex=True,
++        ).abs()
++        quantized_magnitude = torch.stft(
++            quantized_tensor,
++            n_fft=n_fft,
++            hop_length=n_fft // 4,
++            window=window,
++            return_complex=True,
++        ).abs()
++        cosine = torch.nn.functional.cosine_similarity(
++            baseline_magnitude.flatten(1),
++            quantized_magnitude.flatten(1),
++            dim=1,
++            eps=1e-12,
++        )
++        similarities.extend(float(value) for value in cosine)
++
++    baseline_rms = float(torch.sqrt(torch.mean(baseline_tensor.square())))
++    quantized_rms = float(torch.sqrt(torch.mean(quantized_tensor.square())))
++    rms_ratio = quantized_rms / max(baseline_rms, 1e-12)
++    return float(np.mean(similarities)), rms_ratio
++
++
++def _generate_joint_output(omni, config: QualityTestConfig):
++    """Generate H3 video/audio, returning both payloads and peak GPU memory."""
++    from vllm_omni.inputs.data import OmniDiffusionSamplingParams
++    from vllm_omni.platforms import current_omni_platform
++
++    generator = torch.Generator(device=current_omni_platform.device_type).manual_seed(config.seed)
++    torch.accelerator.reset_peak_memory_stats()
++    outputs = omni.generate(
++        {"prompt": config.prompt, "negative_prompt": config.negative_prompt},
++        OmniDiffusionSamplingParams(
++            height=config.height,
++            width=config.width,
++            generator=generator,
++            num_inference_steps=config.num_inference_steps,
++            num_frames=config.num_frames,
++            guidance_scale=config.guidance_scale,
++            sigmas=config.sigmas,
++        ),
++    )
++    main_process_peak_mem = torch.accelerator.max_memory_allocated() / (1024**3)
++
++    first = outputs[0]
++    worker_peak_memory_mb = float(getattr(first, "peak_memory_mb", 0.0) or 0.0)
++    if hasattr(first, "request_output") and isinstance(first.request_output, list):
++        first = first.request_output[0]
++        worker_peak_memory_mb = max(
++            worker_peak_memory_mb,
++            float(getattr(first, "peak_memory_mb", 0.0) or 0.0),
++        )
++    if not hasattr(first, "images") or not first.images:
++        raise ValueError("Could not extract video frames from H3 output")
++    frames = first.images[0]
++    if isinstance(frames, torch.Tensor):
++        frames = frames.detach().cpu()
++        if frames.dim() == 5:
++            frames = frames[0]
++        if frames.dim() == 4 and frames.shape[0] in (3, 4):
++            frames = frames.permute(1, 2, 3, 0)
++        if frames.is_floating_point():
++            frames = frames.clamp(-1, 1) * 0.5 + 0.5
++        video = frames.float().numpy()
++    else:
++        video = np.asarray(frames)
++        if video.ndim == 5:
++            video = video[0]
++
++    multimodal = getattr(first, "multimodal_output", None)
++    if not multimodal or "audio" not in multimodal:
++        raise ValueError("Could not extract audio from H3 output")
++    sample_rate = int(multimodal.get("audio_sample_rate", 0))
++    peak_mem = worker_peak_memory_mb / 1024 if worker_peak_memory_mb > 0 else main_process_peak_mem
++    return video, _canonical_audio(multimodal["audio"]), sample_rate, peak_mem
++
++
++@pytest.mark.full_model
++@pytest.mark.diffusion
++@pytest.mark.parametrize(
++    "config",
++    [
++        pytest.param(
++            _QUALITY_CONFIG,
++            id=_QUALITY_CONFIG.id,
++            marks=hardware_marks(res={"cuda": _QUALITY_CONFIG.gpu}, num_cards=2),
++        )
++    ],
++)
++def test_minimax_h3_quantization_quality(config: QualityTestConfig):
++    from vllm_omni.entrypoints.omni import Omni
++
++    model_ref = _resolve_fl2va_model_ref()
++    common_kwargs = {
++        "model": model_ref,
++        "enforce_eager": True,
++        "tensor_parallel_size": 2,
++        "text_encoder_tp_size": 2,
++        "vae_use_tiling": True,
++    }
++
++    omni_bl = Omni(**common_kwargs)
++    baseline_out, baseline_audio, baseline_sample_rate, bl_mem = _generate_joint_output(omni_bl, config)
++    omni_bl.shutdown()
++    del omni_bl
++    _free_gpu_memory()
++    _maybe_save_output(_OUTPUT_DIR, config, "baseline", baseline_out)
++
++    quantization = config.quantization_ref()
++    omni_qt = Omni(**common_kwargs, quantization_config=quantization)
++    quant_out, quant_audio, quant_sample_rate, qt_mem = _generate_joint_output(omni_qt, config)
++    omni_qt.shutdown()
++    del omni_qt
++    _free_gpu_memory()
++    _maybe_save_output(_OUTPUT_DIR, config, "quantized", quant_out)
++
++    lpips_score = _compute_lpips(baseline_out, quant_out, config.task)
++    psnr_score, mae_score = _compute_psnr_and_mae(baseline_out, quant_out, config.task)
++    if baseline_sample_rate != _MINIMAX_H3_AUDIO_SAMPLE_RATE or quant_sample_rate != baseline_sample_rate:
++        raise AssertionError(
++            f"Unexpected H3 audio sample rate: baseline={baseline_sample_rate}, quantized={quant_sample_rate}"
++        )
++    audio_spectral_cosine, audio_rms_ratio = _audio_quality_metrics(baseline_audio, quant_audio)
++    assert lpips_score <= config.max_lpips, (
++        f"LPIPS {lpips_score:.4f} exceeds threshold {config.max_lpips} "
++        f"for {config.quantization_ref()} on {config.quantized_ref()}"
++    )
++    assert audio_spectral_cosine >= _MIN_AUDIO_SPECTRAL_COSINE, (
++        f"Audio spectral cosine {audio_spectral_cosine:.4f} is below threshold "
++        f"{_MIN_AUDIO_SPECTRAL_COSINE} for {config.id}"
++    )
++    assert _MIN_AUDIO_RMS_RATIO <= audio_rms_ratio <= _MAX_AUDIO_RMS_RATIO, (
++        f"Audio RMS ratio {audio_rms_ratio:.4f} is outside "
++        f"[{_MIN_AUDIO_RMS_RATIO}, {_MAX_AUDIO_RMS_RATIO}] for {config.id}"
++    )
++
++    mem_reduction = (bl_mem - qt_mem) / bl_mem * 100 if bl_mem > 0 else 0
++    print(f"\n{'=' * 60}")
++    print(f"Quantization Quality: {config.id}")
++    print(f"{'=' * 60}")
++    print(f"  Baseline:      {config.baseline_ref()}")
++    print(f"  Quantized:     {config.quantized_ref()}")
++    print(f"  Method:        {config.quantization_ref()}")
++    print(f"  LPIPS:         {lpips_score:.4f}  (threshold: {config.max_lpips})")
++    print(f"  PSNR:          {psnr_score:.4f} dB  (higher is better)")
++    print(f"  MAE:           {mae_score:.6f}  (lower is better)")
++    print(f"  Audio cosine:  {audio_spectral_cosine:.4f}  (threshold: {_MIN_AUDIO_SPECTRAL_COSINE})")
++    print(f"  Audio RMS:     {audio_rms_ratio:.4f}x  (range: {_MIN_AUDIO_RMS_RATIO}-{_MAX_AUDIO_RMS_RATIO})")
++    print(f"  BF16 memory:   {bl_mem:.2f} GiB")
++    print(f"  Quant memory:  {qt_mem:.2f} GiB  ({mem_reduction:.0f}% reduction)")
++    print("  Result:        PASS")
++    print(f"{'=' * 60}\n")
++
++    assert np.isfinite(psnr_score) or np.isinf(psnr_score), f"PSNR is invalid for {config.id}: {psnr_score}"
++    assert np.isfinite(mae_score), f"MAE is not finite for {config.id}: {mae_score}"
++
++
++def test_resolve_fl2va_model_ref(tmp_path, monkeypatch):
++    fl2va_root = tmp_path / "FL2VA"
++    fl2va_root.mkdir()
++    (fl2va_root / "model_index.json").write_text("{}", encoding="utf-8")
++
++    def fake_snapshot_download(*, repo_id, revision, allow_patterns):
++        assert repo_id == _MINIMAX_H3_REPO
++        assert revision == _MINIMAX_H3_REVISION
++        assert allow_patterns == ["FL2VA/**"]
++        return str(tmp_path)
++
++    monkeypatch.setattr("huggingface_hub.snapshot_download", fake_snapshot_download)
++    assert _resolve_fl2va_model_ref() == str(fl2va_root)
++
++
++def test_audio_quality_metrics_ignore_phase_but_reject_spectral_drift():
++    sample_rate = _MINIMAX_H3_AUDIO_SAMPLE_RATE
++    time = np.arange(sample_rate, dtype=np.float32) / sample_rate
++    baseline = np.stack(
++        [
++            np.sin(2 * np.pi * 440 * time),
++            np.sin(2 * np.pi * 880 * time),
++        ]
++    )
++    phase_shifted = np.stack(
++        [
++            np.sin(2 * np.pi * 440 * time + np.pi / 2),
++            np.sin(2 * np.pi * 880 * time + np.pi / 2),
++        ]
++    )
++    different = np.stack(
++        [
++            np.sin(2 * np.pi * 3000 * time),
++            np.sin(2 * np.pi * 4000 * time),
++        ]
++    )
++
++    phase_cosine, phase_rms_ratio = _audio_quality_metrics(baseline, phase_shifted)
++    different_cosine, _ = _audio_quality_metrics(baseline, different)
++
++    assert phase_cosine >= _MIN_AUDIO_SPECTRAL_COSINE
++    assert phase_rms_ratio == pytest.approx(1.0, abs=1e-5)
++    assert different_cosine < _MIN_AUDIO_SPECTRAL_COSINE
+diff --git a/vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py b/vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py
+index 522ac2e8c40..fd5ca67e9c5 100644
+--- a/vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py
++++ b/vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py
+@@ -248,7 +248,8 @@ class MiniMaxH3TimeEmbedder(nn.Module):
+     def __init__(
+         self,
+         arch: MiniMaxH3DiTArchConfig,
+-        quant_config: QuantizationConfig | None,
++        *,
++        prefix: str,
+     ) -> None:
+         super().__init__()
+         self.frequency_embedding_size = arch.timestep_input_dim
+@@ -258,7 +259,8 @@ def __init__(
+             bias=True,
+             gather_output=True,
+             params_dtype=_FP32_DTYPE,
+-            quant_config=quant_config,
++            quant_config=None,
++            prefix=f"{prefix}.proj_in",
+         )
+         self.proj_out = RowParallelLinear(
+             arch.time_embed_hidden_size,
+@@ -266,7 +268,8 @@ def __init__(
+             bias=True,
+             input_is_parallel=False,
+             params_dtype=_FP32_DTYPE,
+-            quant_config=quant_config,
++            quant_config=None,
++            prefix=f"{prefix}.proj_out",
+         )
+ 
+     def forward(self, t: torch.Tensor) -> torch.Tensor:
+@@ -323,6 +326,7 @@ def __init__(
+         arch: MiniMaxH3DiTArchConfig,
+         quant_config: QuantizationConfig | None,
+         *,
++        prefix: str,
+         skip_sequence_parallel: bool = False,
+     ) -> None:
+         super().__init__()
+@@ -338,11 +342,11 @@ def __init__(
+             bias=False,
+             params_dtype=_BF16_DTYPE,
+             quant_config=quant_config,
++            prefix=f"{prefix}.qkv_proj",
+             return_bias=True,
+         )
+         self.num_heads = self.qkv_proj.num_heads
+         self.num_kv_heads = self.qkv_proj.num_kv_heads
+-        self._install_qkv_weight_loader(arch)
+         self.q_norm = _norm(arch.attention_head_dim, eps=arch.qk_norm_eps)
+         self.k_norm = _norm(arch.attention_head_dim, eps=arch.qk_norm_eps)
+         self.out_proj = RowParallelLinear(
+@@ -352,6 +356,7 @@ def __init__(
+             input_is_parallel=True,
+             params_dtype=_BF16_DTYPE,
+             quant_config=quant_config,
++            prefix=f"{prefix}.out_proj",
+         )
+         self.attention = Attention(
+             num_heads=self.num_heads,
+@@ -362,24 +367,6 @@ def __init__(
+             skip_sequence_parallel=skip_sequence_parallel,
+         )
+ 
+-    def _install_qkv_weight_loader(self, arch: MiniMaxH3DiTArchConfig) -> None:
+-        base_loader = self.qkv_proj.weight.weight_loader
+-
+-        def _weight_loader(param: torch.Tensor, loaded_weight: torch.Tensor) -> None:
+-            # The grouped checkpoint layout is
+-            # [num_query_groups, q_per_group + k + v] before splitting.
+-            # MiniMax H3 uses MHA, so checkpoint rows are per-head [q, k, v],
+-            # while qkv_proj expects [q_all, k_all, v_all].
+-            reordered = _reorder_grouped_qkv_to_qkv(
+-                loaded_weight,
+-                num_query_groups=arch.num_attention_heads,
+-                heads_per_group=1,
+-                head_dim=arch.attention_head_dim,
+-            )
+-            base_loader(param, reordered)
+-
+-        self.qkv_proj.weight.weight_loader = _weight_loader
+-
+     @torch.compiler.disable
+     def _run_packed_attention(
+         self,
+@@ -472,6 +459,8 @@ def __init__(
+         self,
+         arch: MiniMaxH3DiTArchConfig,
+         quant_config: QuantizationConfig | None,
++        *,
++        prefix: str,
+     ) -> None:
+         super().__init__()
+         self.fc1 = MergedColumnParallelLinear(
+@@ -481,8 +470,8 @@ def __init__(
+             gather_output=False,
+             params_dtype=_BF16_DTYPE,
+             quant_config=quant_config,
++            prefix=f"{prefix}.fc1",
+         )
+-        self._install_fc1_weight_loader()
+         # Chunk the fused fc1 output as [gate, up], then compute
+         # silu(gate) * up.
+         self.fc2 = RowParallelLinear(
+@@ -492,23 +481,9 @@ def __init__(
+             input_is_parallel=True,
+             params_dtype=_BF16_DTYPE,
+             quant_config=quant_config,
++            prefix=f"{prefix}.fc2",
+         )
+ 
+-    def _install_fc1_weight_loader(self) -> None:
+-        base_loader = self.fc1.weight.weight_loader
+-
+-        def _weight_loader(param: torch.Tensor, loaded_weight: torch.Tensor) -> None:
+-            if loaded_weight.shape[0] % 2:
+-                raise ValueError(
+-                    "MiniMax H3 fc1 checkpoint rows must split evenly into "
+-                    f"gate/up matrices, got {tuple(loaded_weight.shape)}"
+-                )
+-            gate, up = loaded_weight.chunk(2, dim=0)
+-            base_loader(param, gate, 0)
+-            base_loader(param, up, 1)
+-
+-        self.fc1.weight.weight_loader = _weight_loader
+-
+     def forward(self, x: torch.Tensor) -> torch.Tensor:
+         hidden, _ = self.fc1(x)
+         gate, up = hidden.chunk(2, dim=-1)
+@@ -534,6 +509,7 @@ def __init__(
+         *,
+         expand_ratio: int,
+         modality_num: int,
++        prefix: str,
+     ) -> None:
+         super().__init__()
+         if out_features != expand_ratio * arch.hidden_size * modality_num:
+@@ -550,12 +526,13 @@ def __init__(
+             gather_output=True,
+             params_dtype=_BF16_DTYPE,
+             quant_config=quant_config,
++            prefix=f"{prefix}.linear",
+         )
+ 
+     def forward(self, t_emb: torch.Tensor) -> tuple[torch.Tensor, ...]:
+         """t_emb: [M, t_dim] -> expand_ratio tensors of [M*modality_num, H]."""
+         x = nn.functional.silu(t_emb)
+-        x, _ = self.linear(x.to(self.linear.weight.dtype))
++        x, _ = self.linear(x.to(_BF16_DTYPE))
+         m = x.shape[0]
+         x = x.view(m * self.modality_num, self.expand_ratio * self.hidden_size)
+         return tuple(x.chunk(self.expand_ratio, dim=-1))
+@@ -568,6 +545,8 @@ def __init__(
+         self,
+         arch: MiniMaxH3DiTArchConfig,
+         quant_config: QuantizationConfig | None,
++        *,
++        prefix: str,
+     ) -> None:
+         super().__init__()
+         self.norm1 = _norm(arch.hidden_size, eps=arch.norm_eps)
+@@ -578,9 +557,14 @@ def __init__(
+         self.attn = MiniMaxH3Attention(
+             arch,
+             quant_config,
++            prefix=f"{prefix}.attn",
+             skip_sequence_parallel=True,
+         )
+-        self.mlp = MiniMaxH3MLP(arch, quant_config)
++        self.mlp = MiniMaxH3MLP(
++            arch,
++            quant_config,
++            prefix=f"{prefix}.mlp",
++        )
+ 
+     def forward(
+         self,
+@@ -604,10 +588,19 @@ def __init__(
+         self,
+         arch: MiniMaxH3DiTArchConfig,
+         quant_config: QuantizationConfig | None,
++        *,
++        prefix: str,
+     ) -> None:
+         super().__init__()
+         self.blocks = nn.ModuleList(
+-            [MiniMaxH3TokenRefinerBlock(arch, quant_config) for _ in range(arch.token_refiner_num_layers)]
++            [
++                MiniMaxH3TokenRefinerBlock(
++                    arch,
++                    quant_config,
++                    prefix=f"{prefix}.blocks.{i}",
++                )
++                for i in range(arch.token_refiner_num_layers)
++            ]
+         )
+         self.final_norm = _norm(arch.hidden_size, eps=arch.final_norm_eps)
+ 
+@@ -628,18 +621,29 @@ def __init__(
+         self,
+         arch: MiniMaxH3DiTArchConfig,
+         quant_config: QuantizationConfig | None,
++        *,
++        prefix: str,
+     ) -> None:
+         super().__init__()
+         self.norm1 = _norm(arch.hidden_size, eps=arch.norm_eps)
+         self.norm2 = _norm(arch.hidden_size, eps=arch.norm_eps)
+-        self.attn = MiniMaxH3Attention(arch, quant_config)
+-        self.mlp = MiniMaxH3MLP(arch, quant_config)
++        self.attn = MiniMaxH3Attention(
++            arch,
++            quant_config,
++            prefix=f"{prefix}.attn",
++        )
++        self.mlp = MiniMaxH3MLP(
++            arch,
++            quant_config,
++            prefix=f"{prefix}.mlp",
++        )
+         self.adaln_proj = MiniMaxH3AdalnProj(
+             arch,
+             arch.adaln_out_features,
+             quant_config,
+             expand_ratio=6,
+             modality_num=MINIMAX_H3_ADALN_MODALITY_NUM,
++            prefix=f"{prefix}.adaln_proj",
+         )
+ 
+     def forward(
+@@ -693,6 +697,8 @@ def __init__(
+         self,
+         arch: MiniMaxH3DiTArchConfig,
+         quant_config: QuantizationConfig | None,
++        *,
++        prefix: str,
+     ) -> None:
+         super().__init__()
+         video_patch_dim = arch.latents_dim * arch.patch_size[0] * arch.patch_size[1] * arch.patch_size[2]
+@@ -703,6 +709,7 @@ def __init__(
+             quant_config,
+             expand_ratio=2,
+             modality_num=1,
++            prefix=f"{prefix}.adaln_proj",
+         )
+         self.video_out = ColumnParallelLinear(
+             arch.hidden_size,
+@@ -710,7 +717,8 @@ def __init__(
+             bias=True,
+             gather_output=True,
+             params_dtype=_FP32_DTYPE,
+-            quant_config=quant_config,
++            quant_config=None,
++            prefix=f"{prefix}.video_out",
+         )
+         self.audio_out = ColumnParallelLinear(
+             arch.hidden_size,
+@@ -718,7 +726,8 @@ def __init__(
+             bias=True,
+             gather_output=True,
+             params_dtype=_FP32_DTYPE,
+-            quant_config=quant_config,
++            quant_config=None,
++            prefix=f"{prefix}.audio_out",
+         )
+ 
+     def forward(
+@@ -864,7 +873,8 @@ def __init__(
+             bias=True,
+             gather_output=True,
+             params_dtype=_FP32_DTYPE,
+-            quant_config=quant_config,
++            quant_config=None,
++            prefix="video_patch_proj",
+         )
+         self.audio_patch_proj = ColumnParallelLinear(
+             arch.audio_latents_dim,
+@@ -872,7 +882,8 @@ def __init__(
+             bias=True,
+             gather_output=True,
+             params_dtype=_FP32_DTYPE,
+-            quant_config=quant_config,
++            quant_config=None,
++            prefix="audio_patch_proj",
+         )
+         self.condition_proj = ColumnParallelLinear(
+             arch.text_dim,
+@@ -881,14 +892,35 @@ def __init__(
+             gather_output=True,
+             params_dtype=_BF16_DTYPE,
+             quant_config=quant_config,
++            prefix="condition_proj",
++        )
++        self.time_embedder = MiniMaxH3TimeEmbedder(
++            arch,
++            prefix="time_embedder",
+         )
+-        self.time_embedder = MiniMaxH3TimeEmbedder(arch, quant_config)
+         self.rope = MiniMaxH3Rope(arch.rope_inv_freq_len)
+-        self.token_refiner = MiniMaxH3TokenRefiner(arch, quant_config)
+-        self.blocks = nn.ModuleList([MiniMaxH3DiTBlock(arch, quant_config) for _ in range(arch.num_layers)])
++        self.token_refiner = MiniMaxH3TokenRefiner(
++            arch,
++            quant_config,
++            prefix="token_refiner",
++        )
++        self.blocks = nn.ModuleList(
++            [
++                MiniMaxH3DiTBlock(
++                    arch,
++                    quant_config,
++                    prefix=f"blocks.{i}",
++                )
++                for i in range(arch.num_layers)
++            ]
++        )
+         self.sp_prepare = MiniMaxH3SPPrepare()
+         self.sp_gather = MiniMaxH3SPGather()
+-        self.final_layer = MiniMaxH3FinalLayer(arch, quant_config)
++        self.final_layer = MiniMaxH3FinalLayer(
++            arch,
++            quant_config,
++            prefix="final_layer",
++        )
+         self._mark_missing_params_required()
+ 
+     def _mark_missing_params_required(self) -> None:
+@@ -917,7 +949,27 @@ def load_weights(
+                 logger.warning("Skipping MiniMax H3 weight not present in model: %s", name)
+                 continue
+             weight_loader = getattr(param, "weight_loader", default_weight_loader)
+-            weight_loader(param, loaded_weight)
++            if name.endswith(".attn.qkv_proj.weight"):
++                # Transform checkpoint layout before entering vLLM's loader so
++                # online FP8 can keep ``online_process_loader`` outermost.
++                loaded_weight = _reorder_grouped_qkv_to_qkv(
++                    loaded_weight,
++                    num_query_groups=self.arch.num_attention_heads,
++                    heads_per_group=1,
++                    head_dim=self.arch.attention_head_dim,
++                )
++                weight_loader(param, loaded_weight)
++            elif name.endswith(".mlp.fc1.weight"):
++                if loaded_weight.shape[0] % 2:
++                    raise ValueError(
++                        "MiniMax H3 fc1 checkpoint rows must split evenly into "
++                        f"gate/up matrices, got {tuple(loaded_weight.shape)}"
++                    )
++                gate, up = loaded_weight.chunk(2, dim=0)
++                weight_loader(param, gate, 0)
++                weight_loader(param, up, 1)
++            else:
++                weight_loader(param, loaded_weight)
+             loaded.add(name)
+         return loaded
+ 
+diff --git a/vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py b/vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py
+index b3b7b81eeb4..344b105d673 100644
+--- a/vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py
++++ b/vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py
+@@ -88,6 +88,12 @@
+ MINIMAX_H3_REFERENCE_IMAGE_MULTIPLE = 32
+ 
+ 
++def _resolve_component_quant_config(quant_config, component: str):
++    if hasattr(quant_config, "resolve"):
++        return quant_config.resolve(component)
++    return quant_config
++
++
+ def _minimax_h3_post_process(output, output_type: str = "np"):
+     """Convert the joint video/audio output without capturing worker state.
+ 
+@@ -293,9 +299,13 @@ def __init__(
+                 fall_back_to_pt=False,
+             )
+         ]
++        transformer_quant_config = _resolve_component_quant_config(
++            od_config.quantization_config,
++            "transformer",
++        )
+         self.transformer = MiniMaxH3DiTModel(
+             od_config,
+-            quant_config=od_config.quantization_config,
++            quant_config=transformer_quant_config,
+         )
+ 
+         self.tokenizer = Qwen2TokenizerFast.from_pretrained(

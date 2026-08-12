@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.8,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "X surfaces only one nit (likely real, since Y independently reports the identical duplicate-assignment at the same lines) but it matches none of the actual reviewer thread (cudagraph-in-modeling architecture question, seed-reproducibility follow-up, NPU compile-config fix, benchmark confound), so recall is near zero. Y independently verifies the core mechanism against the actual runner code with concrete file:line citations, explicitly engages the seed-reproducibility/full-cudagraph tradeoff and the NPU PIECEWISE addition (both central to the human thread), and also flags the same duplicate-assignment nit X found plus two grounded stale-comment issues, giving it much higher recall at comparable precision and actionability.",
+  "_cost_usd": 0.2339579,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "1ad04bf9a1890b2add733c8ace0f526c8522e756269237263e7ce92b1d62d118",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X correctly validates the core fix with precise line references and independently surfaces the substance of the ground truth's main non-blocking point (the containment fallback silently loosens all callers, not just opt-in ones), plus a second valid, grounded observation about the min() logic in short_text. It misses the ground truth's minor point about check ordering/legacy producer liveness. Y (OCR) returned zero findings, providing no recall, no actionable content, and nothing to assess precision on despite claiming to have reviewed all files.",
+  "_cost_usd": 0.04182759999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "d3edf64fb7ce4963cdf18cefb16c5e952b007f1f61cfac0da15bc3505d92982b",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly verify the diff's core technical claims (root-level chat_template_kwargs, SDK flattening, two-choices response, silent-vs-text-only) with plausible code citations, and ground truth offers no substantive concerns to recall against. Y goes further with concrete, actionable follow-ups: a specific regression-test suggestion tied to an existing test that mocks the relevant function, and a genuinely useful catch that a sibling README still documents the broken nested extra_body pattern with suggested fix text. X's sole comment is hedged and largely defers back to the author ('if you observed silent WAV directly, keep the current wording'), making it far less actionable than Y's concrete asks.",
+  "_cost_usd": 0.10168719999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "d4cfb9bb969d06a16fbf47f28984a22894b7fd1614f24566608f8e03fd73772e",
+    "judge_rep": 2
+  }
+}

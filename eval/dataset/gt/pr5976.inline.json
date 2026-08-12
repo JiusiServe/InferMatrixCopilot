@@ -1,0 +1,56 @@
+[
+  {
+    "author": "Gaohan123",
+    "body": "It seems the modification in the file is unrelated to rebase",
+    "line": 1694,
+    "path": "vllm_omni/benchmarks/patch/patch.py"
+  },
+  {
+    "author": "Gaohan123",
+    "body": "I think we can set all2all explicitly here rather than wrap it in kwargs",
+    "line": 545,
+    "path": "vllm_omni/diffusion/distributed/parallel_state.py"
+  },
+  {
+    "author": "Gaohan123",
+    "body": "Please move it to utils",
+    "line": 278,
+    "path": "vllm_omni/entrypoints/openai/api_server.py"
+  },
+  {
+    "author": "Gaohan123",
+    "body": "Please move it to utils",
+    "line": 61,
+    "path": "vllm_omni/model_executor/models/mammoth_moda2/mammoth_moda2.py"
+  },
+  {
+    "author": "tzhouam",
+    "body": "This hunk is rebase alignment, although it doesn't look like it at first glance: `vllm_omni/benchmarks/patch/patch.py` is our patched copy of upstream `vllm/benchmarks/serve.py`, and upstream **v0.27.0 added the `probe_request_rate` probe loop to that file** (`serve.py:798,987,995` at the v0.27.0 tag; absent in 0.26). The change ports the new upstream feature into the patched copy so it stays in sync with its 0.27 base — dropping it would make the patched bench diverge from the file it patches. Added a provenance comment on the hunk in 24dbef7e.",
+    "line": 1694,
+    "path": "vllm_omni/benchmarks/patch/patch.py"
+  },
+  {
+    "author": "tzhouam",
+    "body": "The kwargs indirection is the version guard rather than a style choice: pre-0.27 vLLM's `init_model_parallel_group` doesn't accept `use_all2all`, so passing it as an explicit argument raises `TypeError` there. The `inspect.signature` check forwards it only when the running vLLM supports it (0.27's MoE oracle requires it; older vLLM has neither the kwarg nor the requirement). If you'd prefer it explicit, I can split into two literal calls — `init_model_parallel_group(..., use_all2all=True)` in the supported branch and the bare call otherwise — at the cost of duplicating the call site; or, if this branch is fine requiring vLLM ≥ 0.27, drop the guard and pass it explicitly everywhere. Which do you prefer?",
+    "line": 545,
+    "path": "vllm_omni/diffusion/distributed/parallel_state.py"
+  },
+  {
+    "author": "tzhouam",
+    "body": "Done in 24dbef7e — moved to `vllm_omni/entrypoints/utils.py` as `PureDiffusionLauncherAdapter`, keeping its docstring about the vLLM 0.27 launcher-shutdown path.",
+    "line": 278,
+    "path": "vllm_omni/entrypoints/openai/api_server.py"
+  },
+  {
+    "author": "tzhouam",
+    "body": "Done in 24dbef7e — moved to `vllm_omni/model_executor/models/utils.py` as a public `is_interleaved`, keeping the note that it replicates the helper upstream removed in 26d725c334 so other models hitting the same removal can reuse it.",
+    "line": 61,
+    "path": "vllm_omni/model_executor/models/mammoth_moda2/mammoth_moda2.py"
+  },
+  {
+    "author": "Gaohan123",
+    "body": "just align with upstream",
+    "line": 545,
+    "path": "vllm_omni/diffusion/distributed/parallel_state.py"
+  }
+]

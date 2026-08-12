@@ -1,0 +1,74 @@
+[
+  {
+    "author": "hsliuustc0106",
+    "body": "this svg need some polishment to illustrate what's inside each block, e.g., which stage and what operations...",
+    "line": 80,
+    "path": "docs/design/feature/omni_async_output_materialization.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "Please make the platform scope explicit. A bundled profile is not sufficient on NPU: `NPUARModelRunner.sample_tokens()` fully constructs `OmniModelRunnerOutput` and calls `get_omni_connector_output()` before wrapping it in `AsyncGPUModelRunnerOutput`, so Omni materialization is still synchronous. If this page describes only CUDA/ROCm, say so here and in the compatibility table; if NPU is intended, runtime support/guards are missing. Scoping the docs is the smaller fix for this PR.",
+    "line": 210,
+    "path": "docs/design/feature/omni_async_output_materialization.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "`Omni connector output state` is not snapshotted by the current implementation. `_build_omni_model_runner_output_from_snapshot()` calls `get_omni_connector_output()` in the background, and that method drains live per-step signal sets; the builder also reads `self.requests` during full-payload accumulation. Please remove it from this list and document these live-state ownership/synchronization requirements, or move the connector drain into a synchronous, step-owned snapshot.",
+    "line": 169,
+    "path": "docs/design/feature/omni_async_output_materialization.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "With MkDocs directory URLs, this resolves to `/design/source/...`, while the asset is emitted at `/source/architecture/...`, so Figure 1 404s. Please use `../../../source/architecture/qwen3-omni-async-output-step-gap.svg` so it remains safe under the `/vllm-omni/` base path.",
+    "line": 68,
+    "path": "docs/design/feature/omni_async_output_materialization.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "This is not an enforced platform condition: `_should_use_async_omni_output()` has no platform check, XPU inherits `GPUARModelRunner`, and MUSA selects `GPUARWorker`. They can take the background path when the remaining conditions pass. Please describe CUDA/ROCm as validation scope only, or add a guard; otherwise the fallback promise is incorrect.",
+    "line": 323,
+    "path": "docs/design/feature/omni_async_output_materialization.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "The enabled async path cannot perform full-payload accumulation: async output requires `async_chunk`, while `should_accumulate_full_payload_output()` returns false whenever `async_chunk` is enabled. Please replace this with the streaming payload handoff, or label it as synchronous-only.",
+    "line": 108,
+    "path": "docs/source/architecture/qwen3-omni-async-output-step-gap.svg"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "could this work with prefix cache?",
+    "line": 269,
+    "path": "docs/design/feature/omni_async_output_materialization.md"
+  },
+  {
+    "author": "fake0fan",
+    "body": "Fixed in `50126edf`. The image source now uses `../../../source/architecture/qwen3-omni-async-output-step-gap.svg`. A clean-worktree `mkdocs build --strict` passed, and I also verified that the SVG is emitted under `site/source/architecture/` and that the rendered page contains the corrected path.",
+    "line": 68,
+    "path": "docs/design/feature/omni_async_output_materialization.md"
+  },
+  {
+    "author": "fake0fan",
+    "body": "Fixed in `50126edf`. I removed CUDA/ROCm from the runtime-requirements table and now describe them only as the validated scope. The text explicitly notes that XPU inherits `GPUARModelRunner` and MUSA selects `GPUARWorker`, so either may enter this path when the actual runtime guards pass, although this optimization is not yet validated on those backends. Ascend NPU remains documented separately as the synchronous `NPUARModelRunner` path.",
+    "line": 323,
+    "path": "docs/design/feature/omni_async_output_materialization.md"
+  },
+  {
+    "author": "fake0fan",
+    "body": "Fixed in `50126edf`. I replaced full-payload accumulation in both SVG lanes and the accessibility description with the async-chunk streaming payload handoff and connector-signal drain. The architecture section now explains that the shared full-payload branch reads `self.requests` but is unreachable for this feature because async Omni output requires `async_chunk`, which makes `should_accumulate_full_payload_output()` return `False`; the enabled path partitions each step into streaming inter-stage and client handoffs.",
+    "line": 108,
+    "path": "docs/source/architecture/qwen3-omni-async-output-step-gap.svg"
+  },
+  {
+    "author": "fake0fan",
+    "body": "Not currently. I made this explicit in `50126edf`: `_should_use_async_omni_output()` returns `False` whenever `self.omni_prefix_cache` is present, so enabling Omni prefix caching selects synchronous output materialization. Supporting both requires snapshotting or otherwise synchronizing prefix-cache merge and update state before the background builder can consume it safely.",
+    "line": 269,
+    "path": "docs/design/feature/omni_async_output_materialization.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "OK, please mark it and we will make them compatible in follow-up PRs",
+    "line": 269,
+    "path": "docs/design/feature/omni_async_output_materialization.md"
+  }
+]

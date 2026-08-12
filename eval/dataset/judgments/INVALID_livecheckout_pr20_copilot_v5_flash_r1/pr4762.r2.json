@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.5,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.62,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X independently rediscovers both of the GT's heaviest-weighted concerns — the trust_remote_code default flip (author: 'this looks like a bug') and the endpoint-restrictions-resolved-from-wrong-pipeline issue that was the PR's main review thread — with concrete file:line evidence and even flags a plausible residual gap (default deploy/<model_type>.yaml swap not covered by the new test) that the GT thread implies was still being worked out. X's downside is redundancy (the trust_remote_code point is restated three times as separate 'findings'), hurting precision. Y is better organized and finds one good original issue (else-branch skipping UNSUPPORTED_ROUTES) but treats the core pipeline-mismatch issue as fully resolved — an overconfident claim given GT shows this required an explicit author fix — and its 'APPROVE, no blockers' verdict undersells a concern GT treats as a real bug. Neither candidate touches several GT items (mutable-config caching risk, positional-arg signature risk, CI failures, 500-error exposure, batched-completions audit), keeping recall moderate for both.",
+  "_cost_usd": 0.2542434,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "f9328fb7768ce1d7084497f847a5438f6650e2b73c2dece162483b0bed558574",
+    "judge_rep": 2
+  }
+}

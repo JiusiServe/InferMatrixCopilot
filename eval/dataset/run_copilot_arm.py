@@ -38,6 +38,9 @@ _last_start = [0.0]
 
 import yaml
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import trace_pack  # noqa: E402
+
 HERE = Path(__file__).parent
 DATASET = HERE / "vllm_omni_dataset.yaml"
 # ARM_OUT selects the arm directory (default T0). For the post-learning T1 pass:
@@ -176,8 +179,25 @@ def one(kind: str, n: int, split: str) -> str:
                 cost["metrics"] = json.loads(mfile.read_text())
             except Exception:
                 pass
-    md.write_text(report, encoding="utf-8")
+    # Pack the run directory into the committed trace BEFORE the resume key is written.
+    # `runs/` is gitignored and has historically lived on machines that no longer exist
+    # (the wave-1 arm's run_dir points at a vanished /rebase path), so the packed trace
+    # is the only durable record of how Strict actually reviewed anything. `md` is the
+    # resume predicate and is therefore written LAST: a crash mid-write leaves the item
+    # looking unfinished and it re-runs, instead of being accepted with no trace.
+    trace_note = {}
+    try:
+        packed = trace_pack.pack_copilot_item(OUT, stem, private_root, {
+            "arm": OUT.name, "stem": stem, "split": split, "backfilled": False,
+            "rc": proc.returncode, "recorded_at": cost["recorded_at"],
+        })
+        trace_note = {"trace": packed.name,
+                      "trace_bytes": packed.stat().st_size}
+    except Exception as exc:  # noqa: BLE001 — recorded, never fatal to a paid item
+        trace_note = {"trace": None, "trace_error": repr(exc)[:300]}
+    cost.update(trace_note)
     cj.write_text(json.dumps(cost, indent=2))
+    md.write_text(report, encoding="utf-8")
     status = "done" if run_dir and proc.returncode == 0 else "DONE-WITH-ISSUES"
     return (f"{status} {stem} [{split}] {wall}s rc={proc.returncode} "
             f"tok_out={cost.get('output_tokens', '?')}")
@@ -218,8 +238,16 @@ def main() -> None:
                 print(f"[copilot-arm] {f.result()}", flush=True)
             except Exception as e:  # noqa: BLE001 — keep the sweep going
                 print(f"[copilot-arm] FAIL {futs[f]}: {e}", flush=True)
+    # Trace gate: an arm that cannot be explained later is not a finished arm. This is
+    # the arm the gate exists for — wave 1's Strict traces were lost silently and its
+    # coverage shortfall is now permanently unexplainable.
+    problems, checked = trace_pack.verify_arm(OUT)
+    print(f"[copilot-arm] trace gate: {checked} packed trace(s) verified", flush=True)
+    for p in problems:
+        print(f"[copilot-arm]   {p}", flush=True)
     print("[copilot-arm] sweep complete", flush=True)
+    return 1 if problems else 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

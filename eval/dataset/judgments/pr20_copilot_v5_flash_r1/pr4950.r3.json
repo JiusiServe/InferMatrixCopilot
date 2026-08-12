@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.45,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates verify the PR's technical claims against the code with specific file:line citations and reach consistent, plausible conclusions; since the ground-truth review contains no substantive concerns, recall is trivially high for both. X's sole extra comment is hedgy and non-actionable ('defer to your test, keep current wording either way'), while Y offers two concrete, evidence-backed suggestions (add a regression test guarding the extra_body/root distinction; update the sibling README with the same curl caveat) with specific proposed text — making Y more useful despite similar grounding quality.",
+  "_cost_usd": 0.0434048,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "d4cfb9bb969d06a16fbf47f28984a22894b7fd1614f24566608f8e03fd73772e",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.48,
+    "precision": 0.76,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.44,
+    "precision": 0.71,
+    "actionability": 0.96,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both cover the SM90 gating, kernel-version ambiguity, and nullable varlen-function risks, but neither captures the reviewers’ strict-test/marker concerns and both recommend skipping failures, contrary to the ground truth. X more directly addresses version requirements and fallback documentation, while Y includes more speculative or internally uncertain claims about version resolution and the documented package version.",
+  "_usage": {
+    "input": 3,
+    "output": 2731
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "direct_opus5_r1"
+  },
+  "_roles": {
+    "arm": "direct_opus5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/direct_opus5_r1",
+    "arm_a_sha256": "093d3e125c1aff6c5de776ff05ea75468185d20f5962ef3a4f16bcd829410795",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0639263265995e00edcd06c6242ac0a6a3647a980509c282af885c86ce6930e0",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

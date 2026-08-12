@@ -1,0 +1,111 @@
+{
+  "wall_s": 369.6,
+  "split": "test",
+  "rc": 0,
+  "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1/runs/pr4777/run-20260805-154512-fdf4e4",
+  "recorded_at": "2026-08-05T15:51:19",
+  "attempts": [
+    {
+      "invocation_id": "inv-de68f7b8",
+      "outcome": "run:run-20260805-154512-fdf4e4",
+      "rc": 0,
+      "pre_run": null
+    },
+    {
+      "run_dir": "run-20260805-154512-fdf4e4",
+      "llm_calls": 41,
+      "input_tokens": 590805,
+      "output_tokens": 28427,
+      "usd": 0.240913,
+      "source": "spans"
+    }
+  ],
+  "attempt_usd_total": 0.240913,
+  "llm_calls": 41,
+  "input_tokens": 590805,
+  "output_tokens": 28427,
+  "usd": 0.240913,
+  "source": "spans",
+  "metrics": {
+    "schema": 1,
+    "run": "run-20260805-154512-fdf4e4",
+    "task_kind": "pr_review",
+    "status": "done",
+    "quality": {
+      "q": null,
+      "weight_coverage": 0.0,
+      "partial": true,
+      "abstained": false,
+      "components": {
+        "recall_w": null,
+        "precision_v": null,
+        "useful": null,
+        "calib": null,
+        "decision": null
+      }
+    },
+    "cost": {
+      "usd": 0.2409,
+      "minutes": 6.12,
+      "ci_minutes": 0,
+      "input_tokens": 590805,
+      "output_tokens": 28427,
+      "tool_calls": 81,
+      "usd_ref": 1.0,
+      "min_ref": 10.0,
+      "cost_index": 1.3205,
+      "cost_partial": false,
+      "unpriced_calls": 0,
+      "source": "spans",
+      "llm_calls": 41,
+      "by_role": {
+        "planner": {
+          "usd": 0.000879,
+          "input_tokens": 1626,
+          "output_tokens": 400,
+          "calls": 1
+        },
+        "agent": {
+          "usd": 0.234814,
+          "input_tokens": 585602,
+          "output_tokens": 24175,
+          "calls": 39
+        },
+        "reducer": {
+          "usd": 0.00522,
+          "input_tokens": 3577,
+          "output_tokens": 3852,
+          "calls": 1
+        }
+      },
+      "cache_read_tokens": 1856512,
+      "cache_creation_tokens": 0
+    },
+    "timings": {
+      "steps": {
+        "fetch": 3.77,
+        "gate": 0.33,
+        "review": 362.85,
+        "report": 0.03
+      },
+      "time_to_first_result_s": 366.98
+    },
+    "risk": {
+      "incidents": {
+        "catastrophic": 0,
+        "severe": 0,
+        "moderate": 0,
+        "minor": 0
+      },
+      "safety_multiplier": 1.0
+    },
+    "catq": null,
+    "tus": null,
+    "signals": {
+      "escalations": 0,
+      "pushes": 0,
+      "posted": 0,
+      "steps_completed": 4
+    }
+  }
+}

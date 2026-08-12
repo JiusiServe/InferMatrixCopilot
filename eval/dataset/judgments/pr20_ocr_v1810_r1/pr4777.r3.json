@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth shows no substantive reviewer concerns (just LGTM approvals and a bot verification confirming the fix works), so both candidates trivially achieve full recall. Candidate X reports zero findings with no rationale or verification detail, contributing nothing actionable. Candidate Y does real diligence — traces the range change through error-message generation, both API entrypoints, and the pipeline internals to confirm correctness — then flags two untouched reliability-test files with specific line numbers and exact string fixes needed, a plausible and well-reasoned gap (though unverifiable against the actual repo here, slightly tempering precision).",
+  "_cost_usd": 0.1466266,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "98ab4ff849017fa22d9228e23f56166fbbf07fb1eecaef4381d5f2a9aa32d4c9",
+    "judge_rep": 3
+  }
+}

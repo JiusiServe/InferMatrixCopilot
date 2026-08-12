@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Candidate X delivers a substantive, well-grounded review: its top comment (reuse the pipeline's declared denoiser like _dit_modules instead of a hardcoded list, noting drift risk) closely mirrors the actual reviewer concern from dsocek about the hardcoded-list approach and the desire for a single source of truth, which the author explicitly pushed back on. It also correctly validates the core change with specific file/line reasoning and flags a plausible related gap (text-encoder LoRA no-op). Candidate Y returns zero findings, providing no recall, no actionable content, and no grounding whatsoever.",
+  "_cost_usd": 0.040591800000000004,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "48a927d3f79c2089de5158c5686a3464c85acdaa23d77bf628197982374b87e9",
+    "judge_rep": 3
+  }
+}

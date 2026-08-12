@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates surfaced the same PR-description/trust_remote_code discrepancy but neither caught the actual ground-truth concern (kernels version incompatibility with the trust_remote_code kwarg), so recall is low and roughly tied. X offers more findings (docstrings, broad except, missing cache test) but several are minor nitpicks that inflate an overly strict 'FOLLOW-UP REQUIRED' verdict for a clean refactor. Y is more concise, adds a genuinely sharp observation (lock held across network I/O serializing FA2/FA3 loads) that X missed entirely, and its calibrated APPROVE-with-notes verdict better matches the actual reviewer outcome (LGTM/approved).",
+  "_cost_usd": 0.1430846,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "c6bdadcfdcb7635424f28783699aeb58398eba9483d1ca5070f66528eddc91b4",
+    "judge_rep": 1
+  }
+}

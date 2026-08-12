@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.65,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "X returned zero findings, contributing no recall, precision, or actionable content whatsoever. Y engaged substantively with the diff, correctly flagged the intentional trust_remote_code default flip (matching the ground-truth author's own bug admission) and raised a reasonable functools.cache invalidation concern grounded in the visible test fixture, plus touched tangentially on endpoint-restriction resolution correctness and error-response conventions. However Y missed several named ground-truth concerns (mutable PretrainedConfig caching risk, positional-arg signature footgun, out-of-scope debug message, CI async-engine failures, auditing other endpoints) and a couple of its findings referenced code (api_server.py) not present in the truncated diff, making them unverifiable though plausible given apparent repo access.",
+  "_cost_usd": 0.11145139999999999,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "5bea7986a5d4aef59a347d431501e2d1d8025a948bf711404ab61b855f114fa3",
+    "judge_rep": 3
+  }
+}

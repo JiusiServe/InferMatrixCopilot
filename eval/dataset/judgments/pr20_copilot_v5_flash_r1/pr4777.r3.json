@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.75,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates converge on the same real, high-value gap the human reviewers (who only said LGTM) missed: two reliability test files (test_invalid_image_generation.py, test_invalid_image_editing.py) still encode the old layers=3 boundary and old error-message substrings, which will now fail. Both also correctly validate the core 4-file diff is internally consistent. Y presents the finding more cleanly with exact before/after code snippets and crisper 'update to X' actions, and its secondary note about confirming the H100 layers=2 run is appropriately hedged as non-blocking; X's parallel finding on this point leans on an unverifiable 'gate_report FAILURE' claim and adds a scope-creep suggestion (add a new positive test) that isn't really a defect. Recall is capped for both since ground truth contains essentially no substantive concerns to recall against.",
+  "_cost_usd": 0.10527579999999999,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "1a42300dd29f70532bfe8c9f5a0bd15423eb865544d49e47ff3393dbc75e1b98",
+    "judge_rep": 3
+  }
+}

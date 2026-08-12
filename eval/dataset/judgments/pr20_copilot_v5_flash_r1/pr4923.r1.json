@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.55,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.8,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y directly hits several ground-truth threads: the exact NPU PIECEWISE fix Wallbreazzz requested, the seed-reproducibility caveat gcanlin flagged, and the benchmark/accuracy evidence gap Sy0307 pushed for — all with precise, verifiable line citations. X's five findings are heavier on speculative/unverifiable claims (an asserted 'buildkite AMD/NPU CI failing' state with no visible evidence, plus three overlapping 'no test coverage' findings on the same underlying change) and its one novel technical claim (nested cudagraph capture on NPU) isn't corroborated by the ground truth. Both are concrete and file/line-anchored, but Y's findings are more grounded in the actual diff and closer to what real reviewers raised.",
+  "_cost_usd": 0.24598420000000004,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "5283942ef49fc0842dcd2bdd93d792fbcef8c489f498b5c274f4e8d2042f7fbb",
+    "judge_rep": 1
+  }
+}

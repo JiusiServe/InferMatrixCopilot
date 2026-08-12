@@ -1,0 +1,17 @@
+{
+  "comments": [
+    {
+      "author": "hsliuustc0106",
+      "body": "Please complete the target-hardware validation before this recipe is merged. The section is still entirely `<TODO>`, and it says the recorded run was a five-step profiling validation while the 50-step request immediately below is followed by 4-minute and 10-minute latency claims.\n\nPlease identify the exact workload those timings came from and report the validated host topology, CUDA/driver/PyTorch versions, device order, warmup method, and per-GPU peak HBM. Fill the measured 2/4/8-GPU entries, or clearly label configurations that were derived but not tested. If the timings came from the five-step run, do not attribute them to the 50-step example; if they came from the shown 50-step request, update the validation text accordingly."
+    },
+    {
+      "author": "yiminghub2024",
+      "body": "> Please complete the target-hardware validation before this recipe is merged. The section is still entirely `<TODO>`, and it says the recorded run was a five-step profiling validation while the 50-step request immediately below is followed by 4-minute and 10-minute latency claims.\r\n> \r\n> Please identify the exact workload those timings came from and report the validated host topology, CUDA/driver/PyTorch versions, device order, warmup method, and per-GPU peak HBM. Fill the measured 2/4/8-GPU entries, or clearly label configurations that were derived but not tested. If the timings came from the five-step run, do not attribute them to the 50-step example; if they came from the shown 50-step request, update the validation text accordingly.\r\n\r\nfixed  , please take a look ,thanks @hsliuustc0106 "
+    },
+    {
+      "author": "yiminghub2024",
+      "body": "updated all t2va data  2x 4x 8x  @hsliuustc0106 @lishunyang12 "
+    }
+  ],
+  "reviews": []
+}

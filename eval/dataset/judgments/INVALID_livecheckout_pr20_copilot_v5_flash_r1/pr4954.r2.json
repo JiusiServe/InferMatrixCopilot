@@ -1,0 +1,26 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.8,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates correctly validate the core codes.audio fix, but Y more precisely reproduces the ground-truth reviewer's central non-blocking concern — that the containment fallback silently weakens the escalation guarantee for all callers, not just opt-in ones — backing it with a concrete grep for the one live escalation consumer and a quoted docstring contradiction, whereas X raises a similar but vaguer point without engaging the docstring/escalation-interaction specifically. Y also surfaces an additional, verifiably correct dead-code bug (the unreachable transcript_words/expected_words guard) and a legitimate test-coverage gap (only one of six flagged regression tests was re-run), giving it broader coverage and more concrete, line-anchored directives; X's review is cleaner but shallower and misses the docstring-staleness angle GT emphasized.",
+  "_cost_usd": 0.17879340000000005,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "d7ef5f510b82b03b09704de6ac8adacb35e2bd4913ff4aa5062d2af869344b04",
+    "judge_rep": 2
+  }
+}

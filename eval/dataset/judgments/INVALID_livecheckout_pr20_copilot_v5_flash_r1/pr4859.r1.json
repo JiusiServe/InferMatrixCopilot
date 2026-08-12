@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.8,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y independently surfaces the serving_speech.py language/方言 removal concern that amy-why-3459 and LHXuuu discussed at length in ground truth, plus the audio_vae.py config-mutation issue also raised there — X entirely misses the language-field concern. Y's evidence is deeper (greps, cross-file citations to README/client docs/constants.py) and its suggestions include concrete test additions, though its 'major' framing of the patch_emission.py window change slightly overstates a change both GT reviewers confirmed as intentional/correct. X is cleaner and equally grounded but has lower recall of GT's actual concerns despite reaching the same correct overall verdict.",
+  "_cost_usd": 0.17941839999999998,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "482f6e27d99ddb36852454d3ce931aa8975dbbade143ba2d12dec4994d5ab787",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.7
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.5,
+    "actionability": 0.1
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns (empty inline comments, just an 'lgtm' approval), so both candidates trivially achieve full recall by reaching the correct APPROVE verdict. Candidate X gives a grounded, diff-accurate explanation (correctly ties the rename to the getattr fallback pattern used in error routing, notes the 3 updated tests, and performs concrete verification of consistency), making it genuinely useful even though no action is needed. Candidate Y is a bare tool-log stub ('0 findings') with zero analysis or grounding, providing no evidence of actual review and no actionable content.",
+  "_cost_usd": 0.1161709,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "2fdb68b17d7d75cae71ffdd0b95e36e1c3e22481bf8899a5f9df4940e2cc7bc1",
+    "judge_rep": 1
+  }
+}

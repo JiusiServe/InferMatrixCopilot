@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.75,
+    "actionability": 0.75
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y surfaces the two concerns that actually mattered most to human reviewers — the trust_remote_code default flip (flagged as 'looks like a bug' inline) and the endpoint-restrictions-must-follow-final-pipeline issue (explicitly validates the fix/test for it) — plus plausible secondary findings on caching and error-code handling. X's three findings (dedup ordering, fragile dynamic import, cls vs StageConfigFactory polymorphism) are well-grounded and highly actionable with concrete diffs, but none overlap with any ground-truth concern, giving it very low recall, and the review itself terminated as 'partial' with one section unreviewed. X edges out on precision/actionability due to crisper, diff-ready suggestions, but Y's much higher recall on the issues that genuinely drove the PR discussion makes it the more useful review overall.",
+  "_cost_usd": 0.16529500000000003,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "e38a7462ebb4712dd7e824e13714c32645aec1ac7ca673e494b7566d694fda8e",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.1
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Ground truth contains no substantive concerns (two LGTM approvals, a bot verification comment confirming the boundary change works), so recall is trivially satisfied by both. Candidate X reports zero findings with no investigation shown, which is technically consistent with the outcome but adds no value and has no actionable content. Candidate Y verifies the core diff correctness in depth (single-source-of-truth range, both entrypoints, pipeline layers-generic behavior) and additionally surfaces two specific, plausible, well-grounded stale-test issues in reliability test files with exact file/line/code references and concrete fixes — going beyond what the diff shows but directly caused by it, and far more actionable than X's empty review.",
+  "_cost_usd": 0.14637460000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "98ab4ff849017fa22d9228e23f56166fbbf07fb1eecaef4381d5f2a9aa32d4c9",
+    "judge_rep": 3
+  }
+}

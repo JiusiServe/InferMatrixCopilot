@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.6,
+    "actionability": 0.7
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.8,
+    "actionability": 0.65
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y explicitly addresses and verifies the single most important ground-truth finding (endpoint restrictions must resolve from the final, deploy-override pipeline, not the auto-detected one) plus the trust_remote_code default flip that the author independently called 'a bug'; X misses the pipeline-resolution issue entirely and its own trust_remote_code finding recommends reverting to True, the opposite of the author's actual intentional fix. Both miss several minor threads (debug-msg scope, positional-arg risk, CI errors, error-response reuse), but Y's findings are better grounded and hedged (e.g. flags cache-invalidation and UNSUPPORTED_ROUTES risk) versus X's frozenset/set annotation claim which isn't corroborated anywhere in the diff or ground truth. X is slightly more mechanically actionable with exact diff suggestions, but that's outweighed by its much lower recall and one incorrect suggested fix.",
+  "_cost_usd": 0.14716970000000001,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "65abe577d876252e62008ed5272e757b49ad43c383a865f71a23d5dad3989303",
+    "judge_rep": 3
+  }
+}

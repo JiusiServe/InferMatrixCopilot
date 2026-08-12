@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.55,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.7,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "X surfaces only one minor, unverifiable duplicate-assignment nit and misses every substantive theme from the human thread (the cudagraph_mode/modeling-boundary TODO, the seed-reproducibility consequence, the NPU compilation_config fix, and the repeated benchmark-evidence asks). Y independently reconstructs and validates the same TODO/seed-reproducibility concern, flags a real diff-grounded contradiction (stale 'prefix caching should stay on' comment vs. the new enable_prefix_caching: false), asks for accuracy evidence mirroring Sy0307/amy's benchmark requests, questions the NPU stage-1 cudagraph_mode addition, and also catches the same duplicate-line nit X found — all with concrete file/line pointers and suggested edits. Neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.31302110000000005,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "8e361cd8ea0aecb7c7838d4f1de3fa59c40fd666bda80b1e511fb026c3d98c1f",
+    "judge_rep": 1
+  }
+}

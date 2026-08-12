@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.72,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.78,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X surfaces both real open questions from the GT thread (the audio_vae config.num_hidden_layers mutation and the serving_speech.py dropped language/方言 field, the latter mirroring amy-why-3459's exact ask for a test+doc), while Y completely omits the language-field removal despite it being a substantive reviewer concern. Y's findings (config mutation, stochastic VAE, decode-window tightening) are accurate and well-calibrated with GT's eventual 'intentional' resolutions, giving it slightly higher precision, but its blanket APPROVE with no mention of the language change is a real recall gap. X is more verbose with some redundant/overstated entries (two overlapping audio_vae findings, 'major' tag on the intentional VAE sampling change) hurting precision somewhat, but its suggestions are concrete and file/line-anchored throughout.",
+  "_cost_usd": 0.19089360000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "996aff1f76b3633016846da2db9a3c4d3f7d7996838f504dbefc47288c2f2612",
+    "judge_rep": 3
+  }
+}

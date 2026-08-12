@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.5,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.75,
+    "actionability": 0.75
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y directly engages the ground truth's central concern (scope risk requiring non-Qwen validation) by verifying and citing the FLUX.1-dev A/B numbers that actually resolved it, and its 'vacuous parametrization' note echoes the reviewer's ask for meaningful regression coverage; its verdict (APPROVE) also matches the real outcome. X produces more raw findings but its flagship 'major' finding hinges on an external, unverifiable 'gate_report' and self-contradicts about whether the fix is already in the working tree, undermining precision, and it never engages the scope-justification concern that dominated the actual review thread. Both lack a LATENT GAP CHECK section.",
+  "_cost_usd": 0.1178395,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "9c98dabe5fe1ae8c70bd4ced1b6ba217bce3d6ab6e1a511fc590519a48df64be",
+    "judge_rep": 3
+  }
+}

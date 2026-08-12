@@ -1,0 +1,26 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.7,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.55,
+    "actionability": 0.7
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Neither candidate surfaces the ground-truth concern (trust_remote_code causing regressions against unpinned kernels<0.15.0); both instead claim trust_remote_code is absent from the diff, which is likely a fabricated/incorrect read of PR-time state given the ground-truth reviewer explicitly saw it added. X does substantially more grounded, evidence-backed investigation (reads the actual test file and shows line-by-line that the claimed test never exercises the new cache/fallback code, flags lock contention across concurrent repo loads, and flags an unreset global cache as a latent test-isolation hazard), all with concrete line numbers and directives. Y is cleaner and well-organized but asserts 'Test Coverage: PASS' without the supporting evidence X provides, which is a weaker, less-grounded claim, and offers fewer substantive findings overall.",
+  "gap_hit": false,
+  "_cost_usd": 0.2002987,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "4c1444c426037ea11508eb06ecded42c16c30eb7678afc83e33297a06da92ce7",
+    "judge_rep": 1
+  }
+}

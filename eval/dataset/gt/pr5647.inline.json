@@ -1,0 +1,38 @@
+[
+  {
+    "author": "Copilot",
+    "body": "This Helm chart change renames the values key from `omniArgs.stageConfigsPath` to `omniArgs.deployConfigPath`. As written, existing user-provided values files using the old key will silently stop setting any config path, potentially breaking upgrades. Consider keeping backward compatibility by accepting `stageConfigsPath` as a fallback and still emitting `--deploy-config`.",
+    "line": 36,
+    "path": "examples/online_serving/chart-helm/templates/_helpers.tpl"
+  },
+  {
+    "author": "Copilot",
+    "body": "The serve CLI no longer supports `--stage-configs-path`, but multiple docs pages still instruct users to pass that flag (e.g. `docs/cli/serve.md` and `docs/configuration/stage_configs.md`). After this change, those instructions will fail at runtime (argparse will reject the flag), so the docs should be updated in the same PR or this PR should clearly call out a docs follow-up.",
+    "line": 248,
+    "path": "vllm_omni/entrypoints/cli/serve.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "The parser now rejects `--stage-configs-path`, but `docs/cli/serve.md`, `docs/configuration/stage_configs.md`, and the Qwen2.5 online-serving guide still tell users to invoke it. Please update or remove those public serving examples in this PR; otherwise the documented commands fail with an unrecognized argument.",
+    "line": 247,
+    "path": "vllm_omni/entrypoints/cli/serve.py"
+  },
+  {
+    "author": "zwhzzz0821",
+    "body": "Fixed in 61a0c6eb. I updated docs/cli/serve.md, docs/configuration/stage_configs.md, the Qwen2.5 online-serving guides, and the other public serving examples to consistently use --deploy-config. The documented serve commands no longer reference the removed flag.",
+    "line": 247,
+    "path": "vllm_omni/entrypoints/cli/serve.py"
+  },
+  {
+    "author": "zwhzzz0821",
+    "body": "Fixed",
+    "line": 248,
+    "path": "vllm_omni/entrypoints/cli/serve.py"
+  },
+  {
+    "author": "zwhzzz0821",
+    "body": "The removal is intentional as part of #5266, so we do not want to preserve stageConfigsPath as another compatibility entry point for the legacy stage-config contract. Existing values should migrate to deployConfigPath. \r\n\r\nTo avoid silently ignoring the removed key, the chart now fails fast with a clear migration message when a non-empty stageConfigsPath is provided. I also added Helm tests covering the new deployConfigPath mapping and rejection of the removed key.",
+    "line": 36,
+    "path": "examples/online_serving/chart-helm/templates/_helpers.tpl"
+  }
+]

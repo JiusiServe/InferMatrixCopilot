@@ -1,0 +1,26 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.8,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth's only substantive technical concern is dsocek's point that the hardcoded component list should instead be driven from the model's existing packed/stacked-params mapping so fused-projection renames are covered automatically. X's comment 1 (reuse pipeline._dit_modules / avoid a fourth hardcoded list) closely mirrors that exact concern; Y never raises it at all, instead focusing entirely on test-rigor and CI-status nits that, while plausible and well-cited, aren't grounded in what the actual reviewers flagged. Both candidates are reasonably precise and grounded in the diff (Y is slightly more line-specific and concrete), but X's higher recall on the one point the human reviewers actually cared about is decisive.",
+  "_cost_usd": 0.1163872,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "651e181f4a6173811cc769702492d0bc7df5a834cdc912dfe74360540323bf80",
+    "judge_rep": 1
+  }
+}

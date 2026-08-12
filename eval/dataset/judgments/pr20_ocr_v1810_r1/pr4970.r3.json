@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.6,
+    "actionability": 0.1,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns (just LGTM plus an unrelated ask), so both candidates trivially match the correct 'no blocker' outcome, but X actually demonstrates the reasoning: it traces the seed→tts_local_seed→per-row-generator mechanism that explains why dropping the seed restores batched sampling, ties it to the PR's stated perf goal, and adds two concrete, file/line-anchored non-blocking suggestions (a guard comment, noting the stage-1 removal is inert). Y merely emits a boilerplate '0 findings' with no evidence of engagement, so while it isn't wrong, it offers essentially no actionable or verifiable content. X's specific claims about other files (serving_speech.py, gpu_model_runner.py) can't be verified from the truncated diff alone, which caps its precision, but its reasoning is well-grounded in the PR's own description.",
+  "_cost_usd": 0.09763190000000001,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "328122fe4b392627a25677e42da358bb8e46e29a267034220c85b8dd7fe1c37b",
+    "judge_rep": 3
+  }
+}

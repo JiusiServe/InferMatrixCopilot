@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.8,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.78,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Neither candidate surfaces the ground-truth reviewer's core concern (whether source_outputs[0] is reliably the parent, and whether a check/comment should guard that) as an actionable ask — both instead validate it as already correct, and neither mentions the requested benchmark run or the precommit fix, so recall is low for both. Precision is comparable and reasonably grounded on both sides, but X delivers concrete, individually actionable file/line findings (unused param, missing IndexError guard, specific test gaps) in a scannable format, while Y is mostly a prose validation narrative with softer 'optional'/'worth confirming' suggestions and a possibly stale claim that precommit is green despite the ground truth explicitly flagging it as broken.",
+  "_cost_usd": 0.18276659999999997,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "0b8c0840de5cbae302bbf4843c73802bdb8e382e1ee241e809c1d06bb7274ea8",
+    "judge_rep": 3
+  }
+}

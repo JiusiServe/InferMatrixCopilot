@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 1.0,
+    "actionability": 1.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.45,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Neither candidate captures the only substantive human concern: keeping the VoxCPM2 regression fix in a separate PR. X appropriately reports no defect in this LGTM diff, while Y adds numerous highly actionable but mostly ungrounded or out-of-scope demands unsupported by the provided diff and ground truth.",
+  "_usage": {
+    "input": 3,
+    "output": 714
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "ocr_v1810_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "ocr_v1810_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "328122fe4b392627a25677e42da358bb8e46e29a267034220c85b8dd7fe1c37b",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "410634f22ac0d9a55948ec0dfc9caa6557a8995e24766ff507dbe677d6dd37dc",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

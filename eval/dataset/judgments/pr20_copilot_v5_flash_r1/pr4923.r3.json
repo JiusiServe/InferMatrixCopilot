@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.45,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y catches two genuinely valid, verifiable doc-staleness issues (stale max_num_batched_tokens/prefix-caching comments), the duplicate omni_pooler_payload_include_hidden assignment, and explicitly surfaces the seeding-reproducibility/accuracy-evidence gap and the NPU stage-1 PIECEWISE rationale — echoing the real reviewer threads (Wallbreazzz's NPU fix, the seed-failure TODO) without overreaching. X's core finding (NPU nested-graph-capture hazard) is self-flagged as unverified speculation, its CI-failure claim is an unverifiable factual assertion, and three of its five 'major' findings are redundant restatements of 'no test coverage' that inflate finding count without matching what actual reviewers cared about (mostly benchmark evidence and TODO placement, both already resolved in this diff). Both are concrete and file/line-anchored, but Y's claims are more reliably grounded and less padded.",
+  "_cost_usd": 0.2245642,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "5283942ef49fc0842dcd2bdd93d792fbcef8c489f498b5c274f4e8d2042f7fbb",
+    "judge_rep": 3
+  }
+}

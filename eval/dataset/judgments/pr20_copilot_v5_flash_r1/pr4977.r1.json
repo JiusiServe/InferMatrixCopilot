@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.75
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently flag the trust_remote_code/description mismatch, which is the closest overlap with the ground-truth Codex comment (though neither reproduces its actual technical concern about kernels<0.15.0 compatibility, since the reviewed diff here lacks the kwarg entirely). X is more thorough and evidence-grounded, citing specific test file lines and providing concrete replacement test code, though its 'major' zero-coverage claim somewhat overstates severity since the hardware-gated test does exercise the new path. Y is more concise and its APPROVE verdict better matches the actual outcome (LGTM), and its lock-granularity finding is a valid, well-grounded addition, but its blanket 'test coverage: PASS' claim is less rigorously justified than X's investigation.",
+  "_cost_usd": 0.15297719999999998,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "f5d632fe362e5dbf8c4bda2f6ac314786f89a0bfb93256158b4c47f0a7d62372",
+    "judge_rep": 1
+  }
+}

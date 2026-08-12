@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.7,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.65,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X's major finding (platform-wide default extrapolated from single-model evidence) closely mirrors hsliuustc0106's core scoping concern and gives concrete actionable remediation (scope via ir_op_priority_func hook or supply AR A/B), though the AR-model angle is admittedly speculative. Y instead dismisses the same scoping risk as 'safe' based only on the Cosmos3 override, missing that several other diffusion models (Wan, Hunyuan, SD3, etc.) lack such overrides — weaker, less-grounded reasoning that undercuts precision, and Y's APPROVE verdict with soft 'non-blocking' notes is less actionable than X's explicit follow-up requests. Neither candidate flags Gaohan123's 'pytest mark is not complete' comment. Neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.2133932,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "9e2ad20ccd2742ddd81f953b12bfdefa5e0207f9d0ae75d84c186880f0f1a830",
+    "judge_rep": 3
+  }
+}

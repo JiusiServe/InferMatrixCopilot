@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.9,
+    "actionability": 0.65,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates correctly verify the seq_len removal and the qwen3 scoping fix, and both independently flag the async_chunk default (True vs the codebase's established False) as an inconsistency, echoing the ground truth's robustness note; Y's version is more forceful and cites concrete sibling defaults, giving it better actionability and slightly better recall. However X uniquely surfaces the exact latent dual-batch-axis issue in the payload-splitting fix (noting the split now only matches scheduled-token length and that main later generalized to_payload_element to match either axis) — this is the one thing even the human reviewers missed, later fixed in follow-up PR #4910, so X hits the gap check and Y does not. Y's extra findings (untested streaming path, CI gate status, docstring, accumulate branch) are mostly grounded but include an unverifiable claim about buildkite being red, denting precision slightly; X's tighter, fully-verified findings plus the gap catch edge it out.",
+  "_cost_usd": 0.2411104,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "7e8eecd14717eab5803e155edf615922c6fba9be031408d8b21da1ef25fcf558",
+    "judge_rep": 1
+  }
+}

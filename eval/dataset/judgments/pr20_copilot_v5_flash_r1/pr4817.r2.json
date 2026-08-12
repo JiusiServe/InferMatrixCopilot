@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive reviewer concerns, so recall is trivially satisfied by both. Both candidates independently surface the same real latent gap (cc 11.x/sm_110a excluded by the `==10` gate) without fabricating issues, but Y is more actionable — it gives precise file:line locations, concrete suggested doc/test edits, and backs claims with grep/caller evidence (rename cleanliness, invocation path, test-coverage mapping). Y also catches an extra grounded nit (stale 'Blackwell' section heading now inconsistent with the datacenter-only doc body) that X misses. X is clean and correct but its single finding is softer/less actionable ('worth a one-line comment').",
+  "_cost_usd": 0.0618478,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "42f5bc375d9b4f66ea1466442378066eef4865413280541c674e038a078a6167",
+    "judge_rep": 2
+  }
+}

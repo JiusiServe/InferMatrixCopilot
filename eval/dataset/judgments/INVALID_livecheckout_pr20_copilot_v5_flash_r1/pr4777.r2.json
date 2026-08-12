@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth contains no substantive reviewer concerns (just approvals and bot noise), so recall is trivially satisfied by both. Both candidates go beyond the diff with well-evidenced, file/line-grounded findings and concrete fixes (X: missing positive layers=2 test, unverified H100 L2 run, DRY error-string suggestion; Y: two stale reliability-suite test files still encoding the old layers=3 boundary that would break on the next full-suite run). Y's central finding, if grounded, identifies an actual functional test regression the PR left behind rather than stylistic nits, making it marginally more valuable and actionable than X's mostly minor/nit-level suggestions, though it carries some unverifiable specificity risk since those files aren't in the diff.",
+  "_cost_usd": 0.1737565,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "d2ade8b2f7541d6e36447c8489a4aa4e4f4b125310747ac9c75d41923b37d84b",
+    "judge_rep": 2
+  }
+}

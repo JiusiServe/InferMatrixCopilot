@@ -19,6 +19,7 @@ Usage: make_pr20_report.py [out.md]
 from __future__ import annotations
 
 import json
+import os
 import statistics as st
 import subprocess
 import sys
@@ -30,9 +31,12 @@ DS = HERE.parent
 ROOT = DS.parent.parent
 PY = sys.executable
 
-ARM = "copilot_v4_pr20"
-PREFIX = "pr20"
-REPS = (1, 2, 3)
+# Same override contract as run_pr20_campaign.py: a re-measurement (model swap)
+# reports from its OWN arm dirs. Defaults keep existing invocations identical.
+ARM = os.environ.get("PR20_ARM", "copilot_v4_pr20")
+PREFIX = os.environ.get("PR20_JUDGE_PREFIX", "pr20")
+REPS = tuple(int(r) for r in
+             (os.environ.get("PR20_REPS") or "1,2,3").split(","))
 DIMS = ("recall", "precision", "actionability")
 GOLD = {"pr4870": "train", "pr4810": "val", "pr4834": "test"}
 # A1 = the arm whose val numbers doc/EVAL-goal-report.md records (MoA off),

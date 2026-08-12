@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 1.0,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 1.0,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Neither candidate hits the two specific ground-truth nitpicks (stale docstring wording, legacy-vs-nested check order), so recall is 0 for both. Both candidates' findings are valid and diff-grounded (precision 1.0): X correctly verifies the core voxtral_tts.py fix and finds two real test-logic issues (unconditional containment fallback with a concrete counterexample, and a near-vacuous min()-based short_text gate), while Y inspects only the test helper and surfaces one legitimate but narrow word-boundary substring bug, complete with a literal patch, but never engages with the PR's main production change. X's slightly broader, still-precise coverage edges out Y's single sharper fix.",
+  "_cost_usd": 0.2086929,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "dfb43d02ba9cab6c8a60d56eeeefe7fbca17a37148d52fa1038443f071a0b763",
+    "judge_rep": 2
+  }
+}

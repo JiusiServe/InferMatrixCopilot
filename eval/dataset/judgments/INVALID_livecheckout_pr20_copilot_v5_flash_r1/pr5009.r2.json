@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.8,
+    "actionability": 0.55
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates converge on similar defensible verdicts and touch the scope-of-change and test-coverage themes from the ground truth, but neither explicitly reproduces the reviewers' core asks (scope override via _DIFFUSION_IR_OP_PRIORITY_FUNCS, oink+compiled/non-compiled coverage for both norm ops, pixelwise accuracy comparison, incomplete pytest mark), so recall is modest for both. X is more actionable, giving four concrete, line-anchored findings with specific fixes (add platform skip guard, pin VLLM_USE_OINK_OPS=False, align ROCm/XPU, add an isinstance regression test) each backed by cross-file evidence (registry.py, cosmos3 pipeline, rocm/xpu platform files). Y's notes are valid and grounded but mostly descriptive/narrative ('worth a tracked follow-up', 'worth flagging') rather than concrete change requests, making it less actionable despite a cleaner overall verdict.",
+  "_cost_usd": 0.20347920000000003,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "9c98dabe5fe1ae8c70bd4ced1b6ba217bce3d6ab6e1a511fc590519a48df64be",
+    "judge_rep": 2
+  }
+}

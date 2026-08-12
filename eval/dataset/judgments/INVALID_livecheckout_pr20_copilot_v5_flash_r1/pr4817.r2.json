@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.6,
+    "actionability": 0.45,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns (just Codex quota noise and 'thanks'), so recall is vacuous for both. X offers a mostly PASS scan plus one speculative, hedged nit (sm_110a) that isn't grounded in the shown diff and X admits is 'almost certainly fine.' Y does deeper repo-wide verification (greps for stale symbol names, cross-checks pyproject.toml and the doc's heading/table against the new datacenter-only scope) and surfaces multiple concrete, file:line, propose-the-exact-fix findings (stale 'SM 100+' table row, stale pyproject description, stale doc heading, and a sharper (major,minor) whitelist suggestion backed by a precedent in platform.py) that are actionable and plausible, though the e2e-verification-artifact ask is more process nag than code finding. Y is more thorough and grounded overall.",
+  "_cost_usd": 0.0650273,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "fb170283cf766460c3a8b7ea3bbb768c475189c02373e819158200994d1e6ad4",
+    "judge_rep": 2
+  }
+}

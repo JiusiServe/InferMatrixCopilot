@@ -1,0 +1,49 @@
+{
+  "calls": 19,
+  "input_tokens": 639481,
+  "output_tokens": 18906,
+  "cost_usd": 1.226778,
+  "is_error": false,
+  "terminal_reason": "completed",
+  "split": "train",
+  "head": "9947f41430aa2c7a45b17b1f396bf90b92433c45",
+  "base": "b7d08fe5f6b1306eee44172c6589e3225de6897e",
+  "resolved_model": "claude-opus-5",
+  "snapshot_sha256": "7d15e2e5e6877087cd448912635a29ba177c8c8256bc842600b6a299f4e1a58c",
+  "validation_commands": [
+    "git rev-parse HEAD && git diff --stat b7d08fe5f6b1306eee44172c6589e3225de6897e HEAD",
+    "git diff b7d08fe5f6b1306eee44172c6589e3225de6897e HEAD",
+    "ls tests/diffusion/attention/ 2>/dev/null; echo \"---\"; grep -rn \"flash_attn_hub\\|FLASH_ATTN_HUB\\|FLASH_ATTN_3_HUB\\|_get_hub_module\" --include=*.py -l . | head -30",
+    "grep -rn \"FLASH_ATTN_HUB\\|FLASH_ATTN_3_HUB\\|FlashAttentionHubBackend\\|FlashAttention3HubBackend\" --include=\"*.py\" . | head -40",
+    "sed -n 100,160p vllm_omni/platforms/cuda/platform.py; echo \"=== NPU ===\"; sed -n 100,125p vllm_omni/platforms/npu/platform.py",
+    "python -c \"import kernels,inspect;print(kernels.__version__);print(inspect.signature(kernels.get_kernel))\" 2>&1 | tail -5; echo \"=== log ===\"; git log --oneline -6 -- vllm_omni/diffusion/attention/backends/flash_attn_hub.py",
+    "python -c \"\nimport inspect, kernels\nsrc=inspect.getsource(kernels.get_kernel); print(src[:1200])\n\" 2>&1 | head -40",
+    "timeout 600 python -m pytest tests/diffusion/attention/test_kernels_hub.py::test_kernels_hub_platform_fallback -q 2>&1 | tail -8; echo \"=== ruff ===\"; ruff check vllm_omni/diffusion/attention/backends/flash_attn_hub.py 2>&1 | tail -5",
+    "python - <<'EOF' 2>&1 | tail -30\nimport inspect, kernels\nsrc = inspect.getsource(kernels.get_kernel)\nprint(src[src.index('\"\"\"', src.index('\"\"\"')+3)+3:][:1500])\nEOF",
+    "python -c \"\nimport inspect, kernels\nsrc = inspect.getsource(kernels.get_kernel)\ni = src.index(chr(34)*3, src.index(chr(34)*3)+3)\nprint(src[i+3:][:1400])\nprint('--- load_kernel sig ---')\nprint(inspect.signature(kernels.load_kernel) if hasattr(kernels,'load_kernel') else 'n/a')\n\"",
+    "python -c \"\nimport inspect\nfrom kernels import utils as u\n\" 2>/dev/null; python -c \"\nimport inspect, kernels\nfrom kernels.utils import _check_trust_remote_code, select_revision_or_version\nprint(inspect.getsource(_check_trust_remote_code))\nprint('=== select_revision_or_version ===')\nprint(inspect.get",
+    "python -c \"\nimport inspect\nfrom kernels.utils import _check_trust_remote_code\nprint(inspect.getsource(_check_trust_remote_code)[:900])\n\""
+  ],
+  "ran_validation": true,
+  "claude_md_seen": {
+    "/data/zhoutaichang/CLAUDE.md": "4ff5b2a69ed0abc2"
+  },
+  "recorded_at": "2026-08-11T16:50:12",
+  "arm": "direct_opus5",
+  "wall_s": 299.3,
+  "audit_ok": true,
+  "audit_violations": [],
+  "audit_blocked_attempts": [],
+  "artifact_chars": 7102,
+  "completion_gate_ok": true,
+  "mcp_review_calls": 1,
+  "mcp_review_calls_ok": 1,
+  "mcp_validate_calls": 2,
+  "mcp_validate_calls_ok": 2,
+  "validate_status_sequence": [
+    "partial_review",
+    "complete"
+  ],
+  "validate_final_status": "complete",
+  "audit_rule": "worktree + installed dependencies + copilot knowledge"
+}

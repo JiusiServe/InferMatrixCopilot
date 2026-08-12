@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.25,
+    "precision": 0.7,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X independently surfaces both the confirmed varlen_func-None crash (RuixiangMa's actual finding, albeit mirrored to the masked path) and the swallowed-exception version-cascade issue that echoes the reviewers' version=1/2 confusion and the CI false-pass concern, giving it much better recall of the real ground-truth concerns. Y's findings (FA2 duplication, missing sm_80 gate for FA2, L4-always-skips-FA3, broad ImportError catch) are all plausible and well-grounded but largely novel rather than matching what human reviewers flagged, it pads the list with a near-duplicate finding, and it explicitly dismisses the varlen_func-None crash as 'ok' in its sweep rather than escalating it. Both are grounded in the diff with concrete file/line directives, so precision and actionability are close, but X's superior recall of the actual confirmed bugs makes it the stronger review.",
+  "_cost_usd": 0.3040654,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "ce46ebe7e34dc170edb4ed7605a24ca79088fa1936683b2b97cf3a5c8a799618",
+    "judge_rep": 2
+  }
+}

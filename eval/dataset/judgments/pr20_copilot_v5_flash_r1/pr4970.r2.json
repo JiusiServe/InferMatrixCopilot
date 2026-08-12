@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.7,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.75,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Neither candidate surfaces the one real reviewer concern (the VoxCPM2 regression follow-up ask), so recall is ~0 for both; both did solid, well-grounded tracing of the seed→tts_local_seed→per-row-generator mechanism. Y's APPROVE verdict and non-blocking framing better match the actual outcome (a plain LGTM), and it correctly flags the stage-1 seed removal as harmless/inert rather than treating it as an equal finding like X does. X is more actionable with concrete suggested comment text and a specific test-file line, but its COMMENT verdict and three separate 'add a comment/test' asks overstate what this trivial, already-correct 2-line diff warranted.",
+  "_cost_usd": 0.058920600000000004,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "c53f9f9a84db01a9bd01378c9676e44fa0f3bc8b9466156a7e031a94f2ba502d",
+    "judge_rep": 2
+  }
+}

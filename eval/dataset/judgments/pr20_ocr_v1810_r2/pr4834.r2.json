@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.75,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X substantively engages both real reviewer threads (test-coverage adequacy and the enum-for-tags request) by critiquing the quality of the fixes rather than just noting they exist, and independently surfaces the exact latent-gap issue — the level-2 NotImplementedError guard defaulting on and permanently bricking wake, plus the guarded logic never running in standard (non-hardware) CI — which mirrors the real #4905/#4912 over-strictness incident. Y contributes a single grounded but low-value cosmetic log-message nit and never touches the enum, test-coverage, or over-strictness threads, so it has almost no recall and no gap hit despite being technically clean.",
+  "_cost_usd": 0.1309894,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "dd41f26f9fb51901ed4aff381c2b17445600b0252705a5a9efcf4cc41469edbd",
+    "judge_rep": 2
+  }
+}

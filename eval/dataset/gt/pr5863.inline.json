@@ -1,0 +1,32 @@
+[
+  {
+    "author": "hsliuustc0106",
+    "body": "any update?",
+    "line": 242,
+    "path": "recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md"
+  },
+  {
+    "author": "yiminghub2024",
+    "body": "updated",
+    "line": 242,
+    "path": "recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "have you tested the ref2va mode?",
+    "line": 304,
+    "path": "recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md"
+  },
+  {
+    "author": "yiminghub2024",
+    "body": "It’s have bug https://github.com/vllm-project/vllm-omni/issues/5901 @hsliuustc0106 ",
+    "line": 304,
+    "path": "recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md"
+  },
+  {
+    "author": "yiminghub2024",
+    "body": "its work now , after update to main \r\n\r\nhttps://github.com/user-attachments/assets/e1d05d72-d805-4684-808d-f92c42e98b53\r\n\r\n@hsliuustc0106 ",
+    "line": 304,
+    "path": "recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md"
+  }
+]

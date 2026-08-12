@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both reviews are solid and both substantively hit the latent gap (guard-too-strict theme): X finds that the _level2_sleeping flag can never be cleared once set (wake_up always raises before reaching the clearing code, a bug provable purely from the shown diff) and predicts three pre-existing tests will now crash under the new NotImplementedError guard — both directly foreshadowing the real #4905/#4912 over-strictness incident. Y independently flags the same theme via the level=2 default bricking the engine and notes the new guards are hardware-gated so core logic never runs in standard CI, which is also a strong, precisely-worded gap hit. Neither candidate meaningfully engages the actual ground-truth review thread (enum/test suggestions, both already resolved in the diff, plus the unrelated-CI-failure exchange), so recall is modest for both, with Y slightly ahead for explicitly noting the CI lane status. X edges out on precision/actionability because its blocker findings are more concretely diff-provable and higher-severity (permanent brick, not just a footgun default).",
+  "_cost_usd": 0.2894185,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "30ca9bb2c654dfe6c1c39aa0b599c949438189ee2cb85c73d12c800f0739ad8f",
+    "judge_rep": 3
+  }
+}

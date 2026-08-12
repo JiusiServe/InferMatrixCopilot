@@ -1,0 +1,758 @@
+diff --git a/docs/cli/README.md b/docs/cli/README.md
+index 9e3240de444..40858ca1a18 100644
+--- a/docs/cli/README.md
++++ b/docs/cli/README.md
+@@ -18,18 +18,12 @@ Specify the port:
+ vllm serve Qwen/Qwen2.5-Omni-7B --omni --port 8091
+ ```
+ 
+-For a migrated model, load a custom deploy configuration with `--deploy-config`:
++Load a custom deploy configuration with `--deploy-config`:
+ 
+ ```bash
+ vllm serve Qwen/Qwen2.5-Omni-7B --omni --deploy-config /path/to/deploy_config.yaml
+ ```
+ 
+-The deprecated `--stage-configs-path` flag is retained for models that still use the legacy `stage_args` schema:
+-
+-```bash
+-vllm serve ByteDance-Seed/BAGEL-7B-MoT --omni --stage-configs-path /path/to/legacy_stage_config.yaml
+-```
+-
+ ## bench
+ 
+ Run benchmark tests for online serving throughput.
+diff --git a/docs/cli/serve.md b/docs/cli/serve.md
+index ff9e561e046..cf3d068a62c 100644
+--- a/docs/cli/serve.md
++++ b/docs/cli/serve.md
+@@ -8,7 +8,6 @@ The stage-based CLI is designed for deployments that require launching each pipe
+ - For **migrated models** that utilize the bundled deployment YAML configurations located in
+   `vllm_omni/deploy/`, the `--deploy-config` flag is only required to override the default configuration. By default, executing `vllm serve MODEL --omni ...`
+   automatically loads the bundled deployment configuration.
+-- For custom legacy `stage_args` YAMLs, pass the file with `--stage-configs-path`.
+ 
+ Example: Initializing Stage 0 (Orchestrator and API Server):
+ The commands below show a common device mapping where Stage 0 uses GPU 0 and
+@@ -32,7 +31,7 @@ CUDA_VISIBLE_DEVICES=1 vllm serve Qwen/Qwen3-Omni-30B-A3B-Instruct --omni \
+     --omni-master-port 26000
+ ```
+ 
+-When utilizing a custom deployment YAML based on the new schema, append `--deploy-config /path/to/override.yaml` to each command execution. Conversely, for legacy models, substitute this parameter with `--stage-configs-path /path/to/stage_configs.yaml`.
++When utilizing a custom deployment YAML, append `--deploy-config /path/to/override.yaml` to each command execution.
+ 
+ In the standard execution paradigm, the `--stage-overrides` argument is utilized to apply stage-specific configurations from a single CLI command.
+ However, under the **stage-based CLI** paradigm, where each process strictly encapsulates a single stage, it is recommended to specify tuning parameters directly via discrete command-line flags for the respective stage, rather than constructing a composite `--stage-overrides` JSON string.
+diff --git a/docs/configuration/composable_parallel.md b/docs/configuration/composable_parallel.md
+index a456de843e8..473605c69cb 100644
+--- a/docs/configuration/composable_parallel.md
++++ b/docs/configuration/composable_parallel.md
+@@ -34,12 +34,8 @@ Two additional `StrategySpec` slots — `layer_hook_specs` and `kernel_specs` 
+ | Flag | Description |
+ |------|-------------|
+ | `--strategy-config PATH` | Path to a `strategy.yaml`. Only takes effect on registry-based deploy paths (`--deploy-config` or the bundled default deploy YAML). Its derived sizing is overlaid onto the merged stages *before* CLI overrides. |
+-| `--stage-configs-path PATH` | **Legacy.** Loads the old `stage_args` YAML schema for un-migrated models. Passing `--strategy-config` together with this path is silently inapplicable — vLLM-Omni emits a warning and the strategy is ignored (see `vllm_omni/entrypoints/utils.py`, lines 372–380). |
+ | `--omni-lb-policy POLICY` | Orchestrator-wide load-balancer policy. Strategy-derived from any `stage_replica` axis; an explicit CLI value wins and must match the derived one or `AsyncOmniEngine` raises `Conflicting load-balancer policy` at construction. |
+ 
+-!!! warning
+-    `--strategy-config` cannot be used with `--stage-configs-path` (the legacy deploy path). If your model has not been migrated to the registry-based pipeline yet, the strategy is silently dropped with a warning. Migrate to a registry-based model or use `--deploy-config` to apply a strategy.
+-
+ ## Sub-schemas
+ 
+ ### `axis`
+@@ -216,17 +212,6 @@ Strategy keys MUST be `model_stage` *names* (strings), the same labels stage con
+ !!! warning "Mixing CLI overrides with a strategy on the same axis"
+     A strategy is meant to be the single writer for the axes it declares. If a CLI override (`--tensor-parallel-size 2`, `--stage-overrides '{"0": {"tensor_parallel_size": 2}}'`) sets the same axis, the **CLI value wins** and a warning is emitted from `_reconcile_strategy_with_cli`. The device-layout guard then re-runs against the effective layout, so a CLI override that breaks `tp * dp * pp * num_replicas` will still fail fast at config time.
+ 
+-!!! warning "Passing `--strategy-config` against the legacy `--stage-configs-path`"
+-    Composable parallel only applies on the registry-based deploy path. If a model still resolves through the legacy `stage_args` YAML (loaded via `--stage-configs-path`), `--strategy-config` is silently inapplicable and emits:
+-
+-    ```text
+-    --strategy-config (<path>) was provided but model '<model>' resolves via the
+-    legacy stage_configs YAML path, which does not support composable-parallel
+-    strategies; the strategy is ignored. Use a registry-based model to apply it.
+-    ```
+-
+-    Migrate the model to the new deploy schema (see `configuration/stage_configs.md`) before applying a strategy.
+-
+ !!! warning "Conflicting `omni_lb_policy` across stages"
+     `omni_lb_policy` is a single pipeline-wide knob. If two `stage_replica` axes in different stages derive different policies, `apply_strategy_specs` raises:
+ 
+diff --git a/docs/configuration/pd_disaggregation.md b/docs/configuration/pd_disaggregation.md
+index 7deb0443ade..93c623ebd57 100644
+--- a/docs/configuration/pd_disaggregation.md
++++ b/docs/configuration/pd_disaggregation.md
+@@ -158,7 +158,7 @@ runtime:
+ 
+ ```bash
+ vllm serve Qwen/Qwen3-Omni-30B-A3B-Instruct --omni --port 8091 \
+-    --stage-configs-path /path/to/qwen3_omni_pd.yaml
++    --deploy-config /path/to/qwen3_omni_pd.yaml
+ ```
+ 
+ ## Operational Notes
+diff --git a/docs/configuration/stage_configs.md b/docs/configuration/stage_configs.md
+index 15cee746a2a..bdcce41cc9c 100644
+--- a/docs/configuration/stage_configs.md
++++ b/docs/configuration/stage_configs.md
+@@ -1,9 +1,9 @@
+-# Deploy and legacy stage configurations
++# Pipeline and deploy configurations
+ 
+-In vLLM-Omni, a model's `PipelineConfig` defines its fixed stage topology, while a deploy configuration controls how those stages run. Models that have not migrated to this split still use legacy stage configurations with a `stage_args` schema.
++In vLLM-Omni, a model's `PipelineConfig` defines its fixed stage topology, while a deploy configuration controls how those stages run.
+ 
+ !!! note
+-    Default deploy config YAMLs (for example, `vllm_omni/deploy/qwen2_5_omni.yaml`, `vllm_omni/deploy/qwen3_omni_moe.yaml`, and `vllm_omni/deploy/qwen3_tts.yaml`) are bundled and loaded automatically when neither `--stage-configs-path` nor `--deploy-config` is provided — the model registry resolves the right pipeline + deploy YAML by `model_type`. Custom legacy `stage_args` YAMLs are still accepted via `--stage-configs-path`.
++    Default deploy config YAMLs (for example, `vllm_omni/deploy/qwen2_5_omni.yaml`, `vllm_omni/deploy/qwen3_omni_moe.yaml`, and `vllm_omni/deploy/qwen3_tts.yaml`) are bundled and loaded automatically when `--deploy-config` is omitted. The model registry resolves the right pipeline and deploy YAML by `model_type`.
+ 
+ ## Deploy configuration schema
+ 
+@@ -86,10 +86,9 @@ stages:
+ 
+ | Flag | Description |
+ |------|-------------|
+-| `--deploy-config PATH` | Load a new-schema deploy YAML. It is mutually exclusive with `--stage-configs-path`. **Optional** — when omitted, the bundled `vllm_omni/deploy/<model_type>.yaml` is auto-loaded by the model registry. |
++| `--deploy-config PATH` | Load a deploy YAML. **Optional** — when omitted, the bundled `vllm_omni/deploy/<model_type>.yaml` is auto-loaded by the model registry. |
+ | `--stage-overrides JSON` | Per-stage JSON overrides, e.g. `'{"0":{"gpu_memory_utilization":0.5}}'`. Per-stage values always win over global flags. |
+ | `--async-chunk` / `--no-async-chunk` | Flip the deploy YAML's `async_chunk:` bool. Unset (default) leaves the YAML value in force. |
+-| `--stage-configs-path` | **Deprecated.** Load a legacy `stage_args` YAML. New-schema YAMLs passed to this flag are auto-detected for compatibility, but should use `--deploy-config`. It is mutually exclusive with `--deploy-config` and will be removed in a future release. |
+ 
+ ### Stage-Based CLI Paradigm
+ 
+@@ -119,8 +118,7 @@ CUDA_VISIBLE_DEVICES=1 vllm serve Qwen/Qwen3-Omni-30B-A3B-Instruct --omni \
+     --omni-master-port 26000
+ ```
+ 
+-When instantiating a custom deployment YAML conforming to the updated schema, append the `--deploy-config /path/to/override.yaml` directive
+-to all node invocations. For legacy architectures (e.g., BAGEL) configured via deprecated `stage_args:` schemas, continue to specify the relevant configuration via `--stage-configs-path /path/to/config.yaml`.
++When instantiating a custom deployment YAML, append the `--deploy-config /path/to/override.yaml` directive to all node invocations.
+ 
+ In the context of standard initialization architectures, utilizing the `--stage-overrides` parameter operates as the optimal methodology
+ for delineating stage-specific tuning from the CLI interface:
+@@ -220,8 +218,7 @@ Therefore, as a core part of vLLM-Omni, a model's pipeline and deployment config
+ 
+ To override specific parameters, explicitly inject the customized configuration schema
+ in both online and offline instantiation flows. Use the `--deploy-config` flag
+-when loading a deploy configuration, reserving the `--stage-configs-path` parameter
+-exclusively to maintain compatibility with legacy `stage_args` YAML constructs.
++when loading a deploy configuration.
+ 
+ Examples:
+ 
+@@ -236,11 +233,6 @@ For online serving:
+ vllm serve Qwen/Qwen2.5-Omni-7B --omni --port 8091 --deploy-config /path/to/deploy_config.yaml
+ ```
+ 
+-Legacy online serving:
+-
+-```bash
+-vllm serve ByteDance-Seed/BAGEL-7B-MoT --omni --port 8091 --stage-configs-path /path/to/stage_configs_file
+-```
+ !!! important
+     We are actively iterating on the definition of deployment configurations, and we welcome feedback from users and developers.
+ 
+diff --git a/docs/contributing/model/adding_diffusion_model.md b/docs/contributing/model/adding_diffusion_model.md
+index 7a8d6177fd0..4c01db41322 100644
+--- a/docs/contributing/model/adding_diffusion_model.md
++++ b/docs/contributing/model/adding_diffusion_model.md
+@@ -653,7 +653,7 @@ python end2end.py --model your-org/your-model-name --modality text2img --prompts
+ Mirror BAGEL’s online serving setup:
+ 
+ - Server launcher: `examples/online_serving/your_model_name/run_server.sh`
+-  - Wrap `vllm serve ... --omni --port ...` (and `--stage-configs-path ...` if needed)
++  - Wrap `vllm serve ... --omni --port ...` (and `--deploy-config ...` if needed)
+ - Client: `examples/online_serving/your_model_name/openai_chat_client.py`
+   - Send requests to `POST /v1/chat/completions`
+   - Support multimodal inputs (e.g., base64 image) if your model needs it
+diff --git a/docs/contributing/model/adding_omni_model.md b/docs/contributing/model/adding_omni_model.md
+index 1aeed0b5105..4698caf9ccc 100644
+--- a/docs/contributing/model/adding_omni_model.md
++++ b/docs/contributing/model/adding_omni_model.md
+@@ -48,8 +48,8 @@ vllm_omni/deploy/
+ ```
+ 
+ New in-tree models should register their `PipelineConfig` in
+-`vllm_omni/config/pipeline_registry.py`; use `--stage-configs-path` only for
+-custom legacy `stage_args` YAMLs.
++`vllm_omni/config/pipeline_registry.py`; use `--deploy-config` for custom
++deployment YAMLs.
+ 
+ ## Step-by-Step Implementation
+ 
+diff --git a/docs/contributing/model/adding_tts_model.md b/docs/contributing/model/adding_tts_model.md
+index 7d0968d80dc..6b70fdb1efa 100644
+--- a/docs/contributing/model/adding_tts_model.md
++++ b/docs/contributing/model/adding_tts_model.md
+@@ -449,9 +449,8 @@ Key configuration fields:
+ !!! note
+     New in-tree models should define frozen topology in `models/<model>/pipeline.py`,
+     register it in `vllm_omni/config/pipeline_registry.py`, and put deployment
+-    knobs in `vllm_omni/deploy/<model>.yaml`. Legacy `stage_args` YAMLs are still
+-    accepted for custom configs via `--stage-configs-path`, but should not be used
+-    for new bundled defaults.
++    knobs in `vllm_omni/deploy/<model>.yaml`. Use `--deploy-config` to load a
++    custom deployment YAML.
+ 
+ ### Batch mode
+ 
+diff --git a/docs/design/qwen3_omni_tts_performance_optimization.md b/docs/design/qwen3_omni_tts_performance_optimization.md
+index e4548a17c69..bc1e29a7ff1 100644
+--- a/docs/design/qwen3_omni_tts_performance_optimization.md
++++ b/docs/design/qwen3_omni_tts_performance_optimization.md
+@@ -419,8 +419,7 @@ Notes:
+ ```bash
+ vllm serve Qwen/Qwen3-Omni-30B-A3B-Instruct \
+   --omni \
+-  --port 8091 \
+-  --stage-configs-path vllm_omni/model_executor/stage_configs/qwen3_omni_moe_async_chunk.yaml
++  --port 8091
+ ```
+ 
+ #### 3) Key config knobs
+@@ -494,7 +493,7 @@ The default config (`qwen3_tts.yaml`) enables the full optimization stack:
+ vllm-omni serve Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice \
+   --omni \
+   --port 8000 \
+-  --stage-configs-path vllm_omni/model_executor/stage_configs/qwen3_tts_no_async_chunk.yaml
++  --no-async-chunk
+ ```
+ 
+ #### 3) Key config knobs
+diff --git a/docs/user_guide/examples/online_serving/bagel.md b/docs/user_guide/examples/online_serving/bagel.md
+index aa8b33de802..4b5c6dde646 100644
+--- a/docs/user_guide/examples/online_serving/bagel.md
++++ b/docs/user_guide/examples/online_serving/bagel.md
+@@ -40,7 +40,7 @@ bash run_server_stage_cli.sh --stage 0
+ bash run_server_stage_cli.sh --stage 1
+ ```
+ 
+-To use a custom deploy YAML (note: `--stage-configs-path` is deprecated in favor of `--deploy-config`):
++To use a custom deploy YAML:
+ 
+ ```bash
+ vllm serve ByteDance-Seed/BAGEL-7B-MoT --omni --port 8091 \
+diff --git a/docs/user_guide/examples/online_serving/glm_image.md b/docs/user_guide/examples/online_serving/glm_image.md
+index ea404faa913..8d41b26fd89 100644
+--- a/docs/user_guide/examples/online_serving/glm_image.md
++++ b/docs/user_guide/examples/online_serving/glm_image.md
+@@ -11,8 +11,8 @@ memory, sampling params) live in `vllm_omni/deploy/glm_image.yaml`.
+ vllm serve zai-org/GLM-Image --omni --port 8091
+ ```
+ 
+-The config system auto-detects the pipeline from the model's `model_index.json` — no
+-manual `--stage-configs-path` or `--deploy-config` needed.
++The config system auto-detects the pipeline from the model's `model_index.json`, so
++no manual `--deploy-config` is needed.
+ 
+ By default, stage 0 (AR) runs on GPU 0 and stage 1 (Diffusion) on GPU 1. To colocate
+ both stages on a single GPU, override per stage:
+diff --git a/docs/user_guide/examples/online_serving/qwen2_5_omni.md b/docs/user_guide/examples/online_serving/qwen2_5_omni.md
+index d8c48a403b5..a06e6d7a069 100644
+--- a/docs/user_guide/examples/online_serving/qwen2_5_omni.md
++++ b/docs/user_guide/examples/online_serving/qwen2_5_omni.md
+@@ -15,9 +15,9 @@ Please refer to [README.md](https://github.com/vllm-project/vllm-omni/tree/main/
+ vllm serve Qwen/Qwen2.5-Omni-7B --omni --port 8091
+ ```
+ 
+-If you have custom stage configs file, launch the server with command below
++To use a custom deploy config, launch the server with the command below:
+ ```bash
+-vllm serve Qwen/Qwen2.5-Omni-7B --omni --port 8091 --stage-configs-path /path/to/stage_configs_file
++vllm serve Qwen/Qwen2.5-Omni-7B --omni --port 8091 --deploy-config /path/to/deploy_config.yaml
+ ```
+ 
+ ### Send Multi-modal Request
+@@ -182,7 +182,7 @@ The script supports the following arguments:
+ - `--model`: Model name/path (default: Qwen/Qwen2.5-Omni-7B)
+ - `--server-port`: Port for vLLM server (default: 8091)
+ - `--gradio-port`: Port for Gradio demo (default: 7861)
+-- `--stage-configs-path`: Path to custom stage configs YAML file (optional)
++- `--deploy-config`: Path to a custom deploy config YAML file (optional)
+ - `--server-host`: Host for vLLM server (default: 0.0.0.0)
+ - `--gradio-ip`: IP for Gradio demo (default: 127.0.0.1)
+ - `--share`: Share Gradio demo publicly (creates a public link)
+@@ -195,9 +195,9 @@ The script supports the following arguments:
+ vllm serve Qwen/Qwen2.5-Omni-7B --omni --port 8091
+ ```
+ 
+-If you have custom stage configs file:
++To use a custom deploy config:
+ ```bash
+-vllm serve Qwen/Qwen2.5-Omni-7B --omni --port 8091 --stage-configs-path /path/to/stage_configs_file
++vllm serve Qwen/Qwen2.5-Omni-7B --omni --port 8091 --deploy-config /path/to/deploy_config.yaml
+ ```
+ 
+ **Step 2: Run the Gradio demo**
+diff --git a/docs/user_guide/fault_injection_reliability_matrix.md b/docs/user_guide/fault_injection_reliability_matrix.md
+index 5e5122bfce9..28271affaa6 100644
+--- a/docs/user_guide/fault_injection_reliability_matrix.md
++++ b/docs/user_guide/fault_injection_reliability_matrix.md
+@@ -69,19 +69,19 @@ The behaviors and conclusions above are summarized from current fault injection
+ 
+ ### Example: `SIGTERM` fault injection log (Qwen3-Omni)
+ 
+-The following full log is from a real run where a `SIGTERM` signal was sent to the serve root process.
++The following log is based on a real run where a `SIGTERM` signal was sent to the serve root process. Its command line has been normalized to the current `--deploy-config` option.
+ 
+ ```text
+-Launching OmniServer with: /workspace/.venv/bin/python3 -m vllm_omni.entrypoints.cli.main serve Qwen/Qwen3-Omni-30B-A3B-Instruct --host 127.0.0.1 --port 60675 --omni --async-chunk --stage-init-timeout 600 --init-timeout 900 --log-stats --stage-configs-path vllm-omni/vllm_omni/deploy/qwen3_omni_moe.yaml
++Launching OmniServer with: /workspace/.venv/bin/python3 -m vllm_omni.entrypoints.cli.main serve Qwen/Qwen3-Omni-30B-A3B-Instruct --host 127.0.0.1 --port 60675 --omni --async-chunk --stage-init-timeout 600 --init-timeout 900 --log-stats --deploy-config vllm-omni/vllm_omni/deploy/qwen3_omni_moe.yaml
+ Server ready on 127.0.0.1:60675 (OmniServer startup took 206.023s)
+ OmniServer started successfully
+-[reliability][process-kill] current_server_proc pid=556855 name=python3 cmdline=/workspace/.venv/bin/python3 -m vllm_omni.entrypoints.cli.main serve Qwen/Qwen3-Omni-30B-A3B-Instruct --host 127.0.0.1 --port 60675 --omni --async-chunk --stage-init-timeout 600 --init-timeout 900 --log-stats --stage-configs-path vllm-omni/vllm_omni/deploy/qwen3_omni_moe.yaml
++[reliability][process-kill] current_server_proc pid=556855 name=python3 cmdline=/workspace/.venv/bin/python3 -m vllm_omni.entrypoints.cli.main serve Qwen/Qwen3-Omni-30B-A3B-Instruct --host 127.0.0.1 --port 60675 --omni --async-chunk --stage-init-timeout 600 --init-timeout 900 --log-stats --deploy-config vllm-omni/vllm_omni/deploy/qwen3_omni_moe.yaml
+ [reliability][process-kill] current_server_proc pid=557118 name=python3 cmdline=/workspace/.venv/bin/python3 -c from multiprocessing.resource_tracker import main;main(57)
+ [reliability][process-kill] current_server_proc pid=557119 name=VLLM::StageEngineCoreProc_noid_replica0_DP0 cmdline=VLLM::StageEngineCoreProc_noid_replica0_DP0
+ [reliability][process-kill] current_server_proc pid=557122 name=VLLM::StageEngineCoreProc_noid_replica0_DP0 cmdline=VLLM::StageEngineCoreProc_noid_replica0_DP0
+ [reliability][process-kill] current_server_proc pid=558201 name=VLLM::StageEngineCoreProc_noid_replica0_DP0 cmdline=VLLM::StageEngineCoreProc_noid_replica0_DP0
+ 
+-[reliability][process-kill] root-kill pid=556855 name=python3 signal=SIGTERM cmdline=/workspace/.venv/bin/python3 -m vllm_omni.entrypoints.cli.main serve Qwen/Qwen3-Omni-30B-A3B-Instruct --host 127.0.0.1 --port 60675 --omni --async-chunk --stage-init-timeout 600 --init-timeout 900 --log-stats --stage-configs-path vllm-omni/vllm_omni/deploy/qwen3_omni_moe.yaml
++[reliability][process-kill] root-kill pid=556855 name=python3 signal=SIGTERM cmdline=/workspace/.venv/bin/python3 -m vllm_omni.entrypoints.cli.main serve Qwen/Qwen3-Omni-30B-A3B-Instruct --host 127.0.0.1 --port 60675 --omni --async-chunk --stage-init-timeout 600 --init-timeout 900 --log-stats --deploy-config vllm-omni/vllm_omni/deploy/qwen3_omni_moe.yaml
+ [0;36m(APIServer pid=556855)[0;0m INFO 05-19 12:24:51 [omni_base.py:463] [AsyncOmni] Shutting down
+ [0;36m(APIServer pid=556855)[0;0m INFO 05-19 12:24:51 [async_omni_engine.py:2397] [AsyncOmniEngine] Shutting down Orchestrator
+ [0;36m(APIServer pid=556855)[0;0m INFO 05-19 12:24:51 [orchestrator.py:351] [Orchestrator] Received shutdown signal
+diff --git a/examples/online_serving/audex/run_server.sh b/examples/online_serving/audex/run_server.sh
+index 6236151614b..042a1c985ff 100755
+--- a/examples/online_serving/audex/run_server.sh
++++ b/examples/online_serving/audex/run_server.sh
+@@ -53,5 +53,5 @@ vllm-omni serve "$MODEL" \
+     --host 0.0.0.0 \
+     --port "$PORT" \
+     --trust-remote-code \
+-    --stage-configs-path "$DEPLOY_YAML" \
++    --deploy-config "$DEPLOY_YAML" \
+     --omni
+diff --git a/examples/online_serving/chart-helm/templates/_helpers.tpl b/examples/online_serving/chart-helm/templates/_helpers.tpl
+index 00f407baba0..cbb03596bfd 100644
+--- a/examples/online_serving/chart-helm/templates/_helpers.tpl
++++ b/examples/online_serving/chart-helm/templates/_helpers.tpl
+@@ -28,8 +28,11 @@ If image.command is set, uses that as a full override.
+ - {{ .Values.omniArgs.numGpus | quote }}
+ {{- end }}
+ {{- if .Values.omniArgs.stageConfigsPath }}
+-- "--stage-configs-path"
+-- {{ .Values.omniArgs.stageConfigsPath | quote }}
++{{- fail "omniArgs.stageConfigsPath has been removed; use omniArgs.deployConfigPath" }}
++{{- end }}
++{{- if .Values.omniArgs.deployConfigPath }}
++- "--deploy-config"
++- {{ .Values.omniArgs.deployConfigPath | quote }}
+ {{- end }}
+ {{- if and .Values.omniArgs.cacheBackend (ne .Values.omniArgs.cacheBackend "none") }}
+ - "--cache-backend"
+diff --git a/examples/online_serving/chart-helm/tests/deployment_test.yaml b/examples/online_serving/chart-helm/tests/deployment_test.yaml
+index e2c7b32c4b4..d068891fc70 100644
+--- a/examples/online_serving/chart-helm/tests/deployment_test.yaml
++++ b/examples/online_serving/chart-helm/tests/deployment_test.yaml
+@@ -78,6 +78,26 @@ tests:
+           path: spec.template.spec.containers[0].command
+           content: "--enable-layerwise-offload"
+ 
++  - it: should include deploy config in command
++    set:
++      omniArgs:
++        deployConfigPath: "/configs/deploy.yaml"
++    asserts:
++      - equal:
++          path: spec.template.spec.containers[0].command[8]
++          value: "--deploy-config"
++      - equal:
++          path: spec.template.spec.containers[0].command[9]
++          value: "/configs/deploy.yaml"
++
++  - it: should reject removed stage config value
++    set:
++      omniArgs:
++        stageConfigsPath: "/configs/legacy.yaml"
++    asserts:
++      - failedTemplate:
++          errorMessage: "omniArgs.stageConfigsPath has been removed; use omniArgs.deployConfigPath"
++
+   - it: should use full command override when image.command is set
+     set:
+       image:
+diff --git a/examples/online_serving/chart-helm/values.yaml b/examples/online_serving/chart-helm/values.yaml
+index 52c5bacbdb1..57b3d041a91 100644
+--- a/examples/online_serving/chart-helm/values.yaml
++++ b/examples/online_serving/chart-helm/values.yaml
+@@ -67,8 +67,8 @@ omniArgs:
+   enableCpuOffload: false
+   # -- Number of GPUs for diffusion inference (empty = auto)
+   numGpus:
+-  # -- Path to stage configs file (empty = auto-detected from model)
+-  stageConfigsPath:
++  # -- Path to deploy config file (empty = auto-detected from model)
++  deployConfigPath:
+   # -- Cache backend: none, tea_cache, or cache_dit
+   cacheBackend: "none"
+   # -- Default sampling params as a JSON string
+diff --git a/examples/online_serving/minicpmo/run_gradio_demo.sh b/examples/online_serving/minicpmo/run_gradio_demo.sh
+index 22cc9f182b9..2126e436346 100755
+--- a/examples/online_serving/minicpmo/run_gradio_demo.sh
++++ b/examples/online_serving/minicpmo/run_gradio_demo.sh
+@@ -3,7 +3,7 @@
+ #
+ # Prereq:
+ #   Start a vllm-omni OpenAI server for MiniCPM-o 4.5 on :8099 (see the
+-#   8x4090 stage config under vllm_omni/model_executor/stage_configs).
++#   8x4090 deploy config at vllm_omni/deploy/minicpmo_4_5_8x4090.yaml).
+ set -e
+ 
+ HERE="$(cd "$(dirname "$0")" && pwd)"
+diff --git a/examples/online_serving/qwen2_5_omni/README.md b/examples/online_serving/qwen2_5_omni/README.md
+index 48406003d98..8d30fd31490 100644
+--- a/examples/online_serving/qwen2_5_omni/README.md
++++ b/examples/online_serving/qwen2_5_omni/README.md
+@@ -12,9 +12,9 @@ Please refer to [README.md](../../../README.md)
+ vllm serve Qwen/Qwen2.5-Omni-7B --omni --port 8091
+ ```
+ 
+-If you have custom stage configs file, launch the server with command below
++To use a custom deploy config, launch the server with the command below:
+ ```bash
+-vllm serve Qwen/Qwen2.5-Omni-7B --omni --port 8091 --stage-configs-path /path/to/stage_configs_file
++vllm serve Qwen/Qwen2.5-Omni-7B --omni --port 8091 --deploy-config /path/to/deploy_config.yaml
+ ```
+ 
+ ### Send Multi-modal Request
+@@ -173,7 +173,7 @@ The script supports the following arguments:
+ - `--model`: Model name/path (default: Qwen/Qwen2.5-Omni-7B)
+ - `--server-port`: Port for vLLM server (default: 8091)
+ - `--gradio-port`: Port for Gradio demo (default: 7861)
+-- `--stage-configs-path`: Path to custom stage configs YAML file (optional)
++- `--deploy-config`: Path to a custom deploy config YAML file (optional)
+ - `--server-host`: Host for vLLM server (default: 0.0.0.0)
+ - `--gradio-ip`: IP for Gradio demo (default: 127.0.0.1)
+ - `--share`: Share Gradio demo publicly (creates a public link)
+@@ -186,9 +186,9 @@ The script supports the following arguments:
+ vllm serve Qwen/Qwen2.5-Omni-7B --omni --port 8091
+ ```
+ 
+-If you have custom stage configs file:
++To use a custom deploy config:
+ ```bash
+-vllm serve Qwen/Qwen2.5-Omni-7B --omni --port 8091 --stage-configs-path /path/to/stage_configs_file
++vllm serve Qwen/Qwen2.5-Omni-7B --omni --port 8091 --deploy-config /path/to/deploy_config.yaml
+ ```
+ 
+ **Step 2: Run the Gradio demo**
+diff --git a/examples/online_serving/qwen2_5_omni/run_gradio_demo.sh b/examples/online_serving/qwen2_5_omni/run_gradio_demo.sh
+index 296cc7fa523..da6232ce189 100755
+--- a/examples/online_serving/qwen2_5_omni/run_gradio_demo.sh
++++ b/examples/online_serving/qwen2_5_omni/run_gradio_demo.sh
+@@ -13,7 +13,7 @@ set -e
+ MODEL="Qwen/Qwen2.5-Omni-7B"
+ SERVER_PORT=8091
+ GRADIO_PORT=7861
+-STAGE_CONFIGS_PATH=""
++DEPLOY_CONFIG_PATH=""
+ SERVER_HOST="0.0.0.0"
+ GRADIO_IP="127.0.0.1"
+ GRADIO_SHARE=false
+@@ -33,8 +33,8 @@ while [[ $# -gt 0 ]]; do
+             GRADIO_PORT="$2"
+             shift 2
+             ;;
+-        --stage-configs-path)
+-            STAGE_CONFIGS_PATH="$2"
++        --deploy-config)
++            DEPLOY_CONFIG_PATH="$2"
+             shift 2
+             ;;
+         --server-host)
+@@ -56,7 +56,7 @@ while [[ $# -gt 0 ]]; do
+             echo "  --model MODEL                 Model name/path (default: Qwen/Qwen2.5-Omni-7B)"
+             echo "  --server-port PORT            Port for vLLM server (default: 8091)"
+             echo "  --gradio-port PORT            Port for Gradio demo (default: 7861)"
+-            echo "  --stage-configs-path PATH     Path to custom stage configs YAML file (optional)"
++            echo "  --deploy-config PATH          Path to custom deploy config YAML file (optional)"
+             echo "  --server-host HOST            Host for vLLM server (default: 0.0.0.0)"
+             echo "  --gradio-ip IP                IP for Gradio demo (default: 127.0.0.1)"
+             echo "  --share                       Share Gradio demo publicly"
+@@ -87,8 +87,8 @@ echo "=========================================="
+ 
+ # Build vLLM server command
+ SERVER_CMD=("vllm" "serve" "$MODEL" "--omni" "--port" "$SERVER_PORT" "--host" "$SERVER_HOST")
+-if [ -n "$STAGE_CONFIGS_PATH" ]; then
+-    SERVER_CMD+=("--stage-configs-path" "$STAGE_CONFIGS_PATH")
++if [ -n "$DEPLOY_CONFIG_PATH" ]; then
++    SERVER_CMD+=("--deploy-config" "$DEPLOY_CONFIG_PATH")
+ fi
+ 
+ # Function to cleanup on exit
+diff --git a/examples/online_serving/text_to_speech/README.md b/examples/online_serving/text_to_speech/README.md
+index 7db0a18449c..b331966b312 100644
+--- a/examples/online_serving/text_to_speech/README.md
++++ b/examples/online_serving/text_to_speech/README.md
+@@ -336,7 +336,7 @@ vllm serve OpenMOSS-Team/MOSS-TTS-Nano --omni --port 8091
+ # or:
+ ./moss_tts_nano/run_server.sh
+ ```
+-The deploy config at `vllm_omni/deploy/moss_tts_nano.yaml` auto-loads; no `--stage-configs-path`, `--trust-remote-code`, or `--enforce-eager` flags are needed.
++The deploy config at `vllm_omni/deploy/moss_tts_nano.yaml` auto-loads; no `--deploy-config`, `--trust-remote-code`, or `--enforce-eager` flags are needed.
+ 
+ ### Sending requests
+ ```bash
+diff --git a/tests/dfx/reliability/test_reliability_qwen3_omni.py b/tests/dfx/reliability/test_reliability_qwen3_omni.py
+index 28e8dedf7cb..4283236386a 100644
+--- a/tests/dfx/reliability/test_reliability_qwen3_omni.py
++++ b/tests/dfx/reliability/test_reliability_qwen3_omni.py
+@@ -241,12 +241,12 @@ def _fault_keywords_match_response(*, status: int, body: bytes) -> bool:
+     return any(key in text for key in body_fault_hints)
+ 
+ 
+-def _stage_config_path_from_omni_server(omni_server: _HasServeArgs) -> str | None:
++def _deploy_config_path_from_omni_server(omni_server: _HasServeArgs) -> str | None:
+     args: list[str] = omni_server.serve_args
+     for i, arg in enumerate(args):
+-        if arg == "--stage-configs-path" and i + 1 < len(args):
++        if arg == "--deploy-config" and i + 1 < len(args):
+             return args[i + 1]
+-        if arg.startswith("--stage-configs-path="):
++        if arg.startswith("--deploy-config="):
+             return arg.split("=", 1)[1]
+     return None
+ 
+@@ -331,7 +331,7 @@ def test_reliability_fault_gpu_oom_error_contract_consistent_chat_speech(
+     """
+     device_spec = resolve_oom_device_spec(
+         OOM_INJECTION_CONFIG,
+-        _stage_config_path_from_omni_server(omni_server_function),
++        _deploy_config_path_from_omni_server(omni_server_function),
+     )
+     handle = inject_gpu_oom(
+         device=device_spec,
+@@ -394,7 +394,7 @@ def test_reliability_fault_gpu_oom_error_contract_consistent_chat_speech(
+ def test_reliability_fault_gpu_oom_chat_large_payload_failure(omni_server_function, openai_client_function) -> None:
+     device_spec = resolve_oom_device_spec(
+         OOM_INJECTION_CONFIG,
+-        _stage_config_path_from_omni_server(omni_server_function),
++        _deploy_config_path_from_omni_server(omni_server_function),
+     )
+     handle = inject_gpu_oom(
+         device=device_spec,
+@@ -437,7 +437,7 @@ def test_reliability_fault_gpu_oom_chat_large_payload_failure(omni_server_functi
+ def test_reliability_fault_gpu_oom_concurrent_pressure_failure(omni_server_function, openai_client_function) -> None:
+     device_spec = resolve_oom_device_spec(
+         OOM_INJECTION_CONFIG,
+-        _stage_config_path_from_omni_server(omni_server_function),
++        _deploy_config_path_from_omni_server(omni_server_function),
+     )
+     handle = inject_gpu_oom(
+         device=device_spec,
+@@ -791,7 +791,7 @@ def test_reliability_fault_gpu_oom_state_converges_after_fault_removed(
+     """
+     device_spec = resolve_oom_device_spec(
+         OOM_RECOVER_INJECTION_CONFIG,
+-        _stage_config_path_from_omni_server(omni_server_function),
++        _deploy_config_path_from_omni_server(omni_server_function),
+     )
+     handle = inject_gpu_oom(
+         device=device_spec,
+diff --git a/tests/e2e/accuracy/helpers.py b/tests/e2e/accuracy/helpers.py
+index f3816136ce5..99880fc73da 100644
+--- a/tests/e2e/accuracy/helpers.py
++++ b/tests/e2e/accuracy/helpers.py
+@@ -696,7 +696,7 @@ def _dreamzero_omni_server_from_params(params):
+ 
+     server_args = list(params.server_args or [])
+     if params.stage_config_path is not None:
+-        server_args += ["--stage-configs-path", params.stage_config_path]
++        server_args += ["--deploy-config", params.stage_config_path]
+     return OmniServer(
+         params.model,
+         server_args,
+diff --git a/tests/e2e/accuracy/test_hunyuan_image3.py b/tests/e2e/accuracy/test_hunyuan_image3.py
+index 8c4570fe3b1..f28ac16b9b6 100644
+--- a/tests/e2e/accuracy/test_hunyuan_image3.py
++++ b/tests/e2e/accuracy/test_hunyuan_image3.py
+@@ -359,12 +359,12 @@ def _run_offline(deploy_config_path: str, output_path: Path) -> tuple[Image.Imag
+     return image, cot_text, elapsed
+ 
+ 
+-def _run_online(stage_configs_path: str, output_path: Path) -> tuple[Image.Image, str, float]:
++def _run_online(deploy_config_path: str, output_path: Path) -> tuple[Image.Image, str, float]:
+     from benchmarks.accuracy.common import decode_base64_image, pil_to_png_bytes
+ 
+     server_args = [
+-        "--stage-configs-path",
+-        stage_configs_path,
++        "--deploy-config",
++        deploy_config_path,
+         "--stage-init-timeout",
+         "300",
+         "--init-timeout",
+diff --git a/tests/entrypoints/test_serve.py b/tests/entrypoints/test_serve.py
+index 2606723f81e..04a29edd1a0 100644
+--- a/tests/entrypoints/test_serve.py
++++ b/tests/entrypoints/test_serve.py
+@@ -46,6 +46,26 @@ def test_serve_parser_accepts_strategy_config() -> None:
+     assert args.get_explicit_kwargs_dict()["strategy_config"] == "/tmp/strategy.yaml"
+ 
+ 
++def test_serve_parser_accepts_deploy_config() -> None:
++    parser = TrackingArgumentParser()
++    subparsers = parser.add_subparsers(dest="subcommand")
++    OmniServeCommand().subparser_init(subparsers)
++
++    args = parser.parse_args(["serve", "fake-model", "--omni", "--deploy-config", "/tmp/deploy.yaml"])
++
++    assert args.deploy_config == "/tmp/deploy.yaml"
++    assert args.get_explicit_kwargs_dict()["deploy_config"] == "/tmp/deploy.yaml"
++
++
++def test_serve_parser_rejects_stage_configs_path() -> None:
++    parser = TrackingArgumentParser()
++    subparsers = parser.add_subparsers(dest="subcommand")
++    OmniServeCommand().subparser_init(subparsers)
++
++    with pytest.raises(SystemExit):
++        parser.parse_args(["serve", "fake-model", "--omni", "--stage-configs-path", "/tmp/stages.yaml"])
++
++
+ def test_serve_parser_accepts_four_way_cfg_parallelism() -> None:
+     parser = TrackingArgumentParser()
+     subparsers = parser.add_subparsers(dest="subcommand")
+@@ -66,7 +86,6 @@ def _make_headless_args(**kwargs) -> TrackingNamespace:
+         "omni_replica_address": None,
+         "omni_dp_size_local": 1,
+         "worker_backend": "multi_process",
+-        "stage_configs_path": None,
+         "deploy_config": None,
+         "log_stats": False,
+         "disable_log_stats": False,
+@@ -154,6 +173,7 @@ def test_run_headless_parses_and_forwards_stage_overrides(mocker: MockerFixture)
+     captured: dict = {}
+ 
+     def _fake_resolve(*args, **kwargs):
++        captured["args"] = args
+         captured.update(kwargs)
+         # Return a stage that does NOT match stage_id=0 so run_headless stops
+         # right after the resolver call (we only care about how it was called).
+@@ -166,12 +186,15 @@ def _fake_resolve(*args, **kwargs):
+ 
+     args = _make_headless_args(
+         stage_id=0,
++        deploy_config="/tmp/deploy.yaml",
+         strategy_config="/tmp/strategy.yaml",
+         stage_overrides='{"0": {"devices": "0,1"}, "1": {"devices": "2"}}',
+     )
+     with pytest.raises(ValueError, match="No stage config found for stage_id=0"):
+         run_headless(args)
+ 
++    assert captured["args"][1] is None
++    assert captured["deploy_config_path"] == "/tmp/deploy.yaml"
+     assert captured["stage_overrides"] == {"0": {"devices": "0,1"}, "1": {"devices": "2"}}
+     assert captured["strategy_config_path"] == "/tmp/strategy.yaml"
+ 
+diff --git a/tests/helpers/runtime.py b/tests/helpers/runtime.py
+index f8a5416e42c..5c1601cd093 100644
+--- a/tests/helpers/runtime.py
++++ b/tests/helpers/runtime.py
+@@ -598,7 +598,7 @@ def _build_stage_cmd(self, stage_id: int, *, headless: bool, replica_id: int = 0
+             "serve",
+             self.model,
+             "--omni",
+-            "--stage-configs-path",
++            "--deploy-config",
+             self.stage_config_path,
+             "--stage-id",
+             str(stage_id),
+@@ -3135,7 +3135,7 @@ def iter_omni_server(
+                 raise ValueError("omni_server with use_stage_cli=True requires use_omni=True")
+             if stage_config_path is None:
+                 raise ValueError("omni_server with use_stage_cli=True requires a stage_config_path")
+-            server_args += ["--stage-configs-path", stage_config_path]
++            server_args += ["--deploy-config", stage_config_path]
+ 
+             with OmniServerStageCli(
+                 model,
+@@ -3151,7 +3151,7 @@ def iter_omni_server(
+                 print("OmniServer stopping...")
+         else:
+             if stage_config_path is not None:
+-                server_args += ["--stage-configs-path", stage_config_path]
++                server_args += ["--deploy-config", stage_config_path]
+ 
+             with (
+                 OmniServer(
+diff --git a/tests/helpers/tests/test_runtime_stage_cli.py b/tests/helpers/tests/test_runtime_stage_cli.py
+index b127eac1305..5a2ab5d6821 100644
+--- a/tests/helpers/tests/test_runtime_stage_cli.py
++++ b/tests/helpers/tests/test_runtime_stage_cli.py
+@@ -35,7 +35,7 @@ def test_stage_cli_builds_headless_replica_cmd(tmp_path: Path) -> None:
+     assert "--headless" in cmd
+     assert cmd[cmd.index("--stage-id") + 1] == "1"
+     assert cmd[cmd.index("--replica-id") + 1] == "2"
+-    assert cmd[cmd.index("--stage-configs-path") + 1] == server.stage_config_path
++    assert cmd[cmd.index("--deploy-config") + 1] == server.stage_config_path
+ 
+ 
+ def test_stage_cli_splits_devices_per_replica(tmp_path: Path) -> None:
+diff --git a/vllm_omni/deploy/audex_tts_30b.yaml b/vllm_omni/deploy/audex_tts_30b.yaml
+index 7e89e9d5b05..a4aa2d4cc01 100644
+--- a/vllm_omni/deploy/audex_tts_30b.yaml
++++ b/vllm_omni/deploy/audex_tts_30b.yaml
+@@ -17,7 +17,7 @@
+ #     measured 0.79% here. The serving layer currently injects 0.05 for
+ #     guided requests on all sizes; acceptable (still within the anchor
+ #     +2pp standing gate) but a size-aware refinement is a known follow-up.
+-# ALWAYS pass this yaml explicitly (--stage-configs-path): bare serve of the
++# ALWAYS pass this yaml explicitly (--deploy-config): bare serve of the
+ # 30B repo auto-detects the shared model_type and lands on the 2B-tuned yaml.
+ pipeline: audex_tts
+ async_chunk: true
+diff --git a/vllm_omni/entrypoints/cli/serve.py b/vllm_omni/entrypoints/cli/serve.py
+index 2d014891e0f..e0f88491d87 100644
+--- a/vllm_omni/entrypoints/cli/serve.py
++++ b/vllm_omni/entrypoints/cli/serve.py
+@@ -147,7 +147,7 @@ def validate(self, args: argparse.Namespace) -> None:
+                 raise ValueError(
+                     "The following CLI args are not supported under --omni: "
+                     f"{', '.join(offenders)}. Configure parallelism through the "
+-                    "per-stage YAML (`--deploy-config` / `--stage-configs-path`) "
++                    "per-stage YAML (`--deploy-config`) "
+                     "and replica count via the per-stage `num_replicas` config field "
+                     "(single-runtime) or `--omni-dp-size-local` (headless / multi-runtime)."
+                 )
+@@ -240,20 +240,11 @@ def subparser_init(self, subparsers: argparse._SubParsersAction) -> TrackingArgu
+                 "flag, when set, overrides the YAML model field."
+             ),
+         )
+-        # TODO(@lishunyang12): deprecate once all models migrate to --deploy-config
+-        omni_config_group.add_argument(
+-            "--stage-configs-path",
+-            type=str,
+-            default=None,
+-            help="[Deprecated — will be removed in a future release] Path to a legacy "
+-            "stage configs YAML (stage_args format). Prefer --deploy-config for new-format deploy YAMLs.",
+-        )
+         omni_config_group.add_argument(
+             "--deploy-config",
+             type=str,
+             default=None,
+-            help="Path to a deploy config YAML (new format with stages/engine_args). "
+-            "Mutually exclusive with --stage-configs-path.",
++            help="Path to a deploy config YAML (new format with stages/engine_args).",
+         )
+         omni_config_group.add_argument(
+             "--strategy-config",
+@@ -837,7 +828,6 @@ def run_headless(args: TrackingNamespace) -> None:
+     omni_master_address: str | None = args.omni_master_address
+     omni_master_port: int | None = args.omni_master_port
+     worker_backend: str | None = args.worker_backend
+-    stage_configs_path: str | None = args.stage_configs_path
+     omni_replica_address: str | None = getattr(args, "omni_replica_address", None)
+     omni_dp_size_local: int = max(1, int(getattr(args, "omni_dp_size_local", 1) or 1))
+ 
+@@ -873,7 +863,8 @@ def run_headless(args: TrackingNamespace) -> None:
+ 
+     config_path, stage_configs, _ = load_and_resolve_stage_configs(
+         model,
+-        stage_configs_path,
++        # The serve CLI no longer accepts legacy stage_args YAMLs.
++        None,
+         args_dict,
+         # store_true cannot express an explicit False: absent maps to None
+         # ("not specified") so the deploy yaml's per-stage value applies.

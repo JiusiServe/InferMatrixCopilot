@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.55,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth shows this PR was a trivial, uncontroversial rename with an outright 'lgtm' approval — nothing substantive to recall, so both score full recall. X's approval is tightly grounded (grep verification, upstream cross-check) and matches the ground-truth verdict with high-confidence, low-risk claims. Y is more actionable with concrete file:line suggestions, but several of its 'sweep' findings (test-coverage gap through an unseen helper, diffusion-mode AttributeError flagged as PR-scope despite admitting it's pre-existing, a nit about a comment) are speculative extrapolations beyond the diff that don't survive scrutiny given the actual outcome was a clean approve, dragging down precision.",
+  "_cost_usd": 0.0542817,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "bd82bf05eace8d7b54063bc4575c470fe9a48eebf5a8375cff622bc631be8bff",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.8,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X engages substantively with the diff and surfaces a concern that closely mirrors dsocek's real ground-truth comment — the hardcoded component-name list is a maintenance/drift risk and could instead be derived from an existing per-pipeline source of truth (dsocek suggested driving it from _packed_modules_mapping/stacked_params_mapping; X suggested _dit_modules) — plus a plausible related gap (text-encoder LoRA silently matching zero layers), both delivered with concrete file:line references and suggested fixes. Y produced zero findings, so it captures none of the ground-truth reviewer concerns and offers nothing actionable.",
+  "_cost_usd": 0.1062729,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "48a927d3f79c2089de5158c5686a3464c85acdaa23d77bf628197982374b87e9",
+    "judge_rep": 1
+  }
+}

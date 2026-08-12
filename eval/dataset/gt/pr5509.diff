@@ -1,0 +1,532 @@
+diff --git a/docs/user_guide/diffusion/attention_backends.md b/docs/user_guide/diffusion/attention_backends.md
+index e54955c046a..63cba58e525 100644
+--- a/docs/user_guide/diffusion/attention_backends.md
++++ b/docs/user_guide/diffusion/attention_backends.md
+@@ -14,7 +14,7 @@ The full set of backends and their platform defaults is in the **Backend Options
+ 
+ | Value | Notes |
+ |---|---|
+-| `TRTLLM_ATTN` | FlashInfer's trtllm-gen FMHA (TensorRT-LLM's generated kernels, vendored by FlashInfer). BF16, GQA native, `head_dim=128`. Datacenter Blackwell only (sm_100 / sm_103). Supports **Skip-Softmax** sparse attention — see below. Requires `flashinfer`. |
++| `TRTLLM_ATTN` | FlashInfer's trtllm-gen FMHA (TensorRT-LLM's generated kernels, vendored by FlashInfer). BF16, GQA native, `head_dim=128`. Datacenter Blackwell only (sm_100 / sm_103). Supports **Skip-Softmax** sparse attention and **SAGE** quantized attention — see below. Requires `flashinfer`. |
+ | `FLASH_ATTN` | Wraps FlashAttention 2. Default on Hopper / Ada / Ampere when `flash-attn` is installed. |
+ | `CUDNN_ATTN` | Pins `sdpa_kernel([CUDNN_ATTENTION])`. Default on Blackwell (sm_10x / sm_12x) with cuDNN ≥ 9.5. Wins on mask-heavy DiTs (HunyuanVideo-1.5: 2× e2e vs SDPA). |
+ | `FLASHINFER_ATTN` | Calls FlashInfer's dense `single_prefill_with_kv_cache` directly with `custom_mask` for non-causal masked attention. Used as Blackwell fallback when cuDNN is unavailable. Requires `flashinfer`. |
+@@ -167,6 +167,48 @@ sequence length, since Skip-Softmax only accelerates attention. Dense BF16 is `T
+ Requires datacenter Blackwell with `head_dim == 128`; elsewhere, or without FlashInfer, selecting
+ `TRTLLM_ATTN` raises rather than silently degrading.
+ 
++## TRTLLM_ATTN SAGE Quantization
++
++On top of dense/Skip-Softmax, `TRTLLM_ATTN` can run **SAGE** (SageAttention) — the trtllm-gen
++FMHA kernel with per-block quantized Q/K and per-channel fp8 V, so the two attention matmuls run
++in low precision. Enable it through the typed `quant` block on the attention spec:
++
++| Key | Valid values | Meaning |
++|---|---|---|
++| `dtype_qk` | `int8`, `fp8_e4m3` | Quantization dtype for Q and K. Absent ⇒ dense (SAGE off). |
++| `q_block_size` | `1`, `4`, `16` | Per-token block size for Q scales (default `1`). |
++| `k_block_size` | `1`, `4`, `16` | Per-token block size for K scales (default `16`). |
++
++V is always quantized per-channel to fp8_e4m3 and K-smoothing is applied inside the routine, so
++neither is a user knob. Only block sizes `1`, `4`, `16` have compiled kernels.
++
++The `quant` block is a shared `AttnQuantSpec` consumed by more than one backend; each reads the
++fields that apply and rejects the rest. `TRTLLM_ATTN` (SAGE) reads `dtype_qk` (`int8` / `fp8_e4m3`),
++`q_block_size`, and `k_block_size`; `FLASHINFER_ATTN` reads `dtype_qk` (`float16` / `bfloat16`),
++`dtype_vo`, and `flashinfer_backend` (see its section). A `dtype_qk` from the wrong set raises.
++
++```bash
++vllm-omni serve Wan-AI/Wan2.2-T2V-A14B-Diffusers \
++  --diffusion-attention-config '{"default": {"backend": "TRTLLM_ATTN",
++      "quant": {"dtype_qk": "fp8_e4m3", "q_block_size": 1, "k_block_size": 16}}}'
++```
++
++```python
++from vllm_omni.diffusion.data import AttentionConfig, AttentionSpec, AttnQuantSpec
++
++AttentionConfig(
++    default=AttentionSpec(
++        backend="TRTLLM_ATTN",
++        quant=AttnQuantSpec(dtype_qk="fp8_e4m3", q_block_size=1, k_block_size=16),
++    ),
++)
++```
++
++
++**Requirements.** Needs FlashInfer ≥ 0.6.16rc1. Kernel
++availability is arch-dependent: `fp8_e4m3` QK has kernels on both **SM100** (B200) and **SM103**
++(B300); `int8` QK kernels are compiled for **SM100 only**.
++
+ ## End-to-End Benchmark (BF16, sm_120 RTX Pro 6000 Blackwell)
+ 
+ Same prompt and seed across runs. `Total generation time` from `text_to_video.py` / `text_to_image.py`.
+@@ -180,22 +222,6 @@ Same prompt and seed across runs. `Total generation time` from `text_to_video.py
+ 
+ Pattern: mask-heavy DiTs (HV-1.5, Qwen-Image) favor `CUDNN_ATTN`; lighter-mask DiTs and TP-saturated configs (Wan 2.2, FLUX.2 TP=2) tie within noise.
+ 
+-## Known Limitations
+-
+-### LTX-2.0: `CUDNN_ATTN` crashes under torch.compile
+-
+-LTX-2's audio attention has a symbolic head_dim under torch.compile tracing. cuDNN's SDPA backend selector rejects symbolic dims and Dynamo aborts compilation. Tracked in [#3121](https://github.com/vllm-project/vllm-omni/issues/3121).
+-
+-**Workaround**: explicitly select `FLASHINFER_ATTN` or `TORCH_SDPA` for LTX-2.0:
+-
+-```bash
+-DIFFUSION_ATTENTION_BACKEND=FLASHINFER_ATTN python examples/offline_inference/text_to_video/text_to_video.py \
+-    --model Lightricks/LTX-2 ...
+-```
+-
+-### FA4 not yet integrated
+-
+-FlashAttention-4 (released March 2026) targets Blackwell natively and reportedly beats cuDNN by ~20% on B200. As of this writing the `flash-attn-4 4.0.0b10` wheel crashes with `AttributeError: 'NoneType' object has no attribute '_trait'` during JIT on sm_120. Not yet wired into vLLM-Omni; revisit when stable lands.
+ 
+ ## Choosing a Backend Manually
+ 
+@@ -353,64 +379,3 @@ DIFFUSION_ATTENTION_BACKEND=SAGE_ATTN_3 python examples/offline_inference/text_t
+     --tensor-parallel-size 2 \
+     --output outputs/hv15_sage3.mp4
+ ```
+-
+-### Mixed backends across roles
+-
+-Use `FLASH_ATTN` for self-attention and `TORCH_SDPA` for cross-attention:
+-
+-```bash
+-python examples/offline_inference/text_to_video/text_to_video.py \
+-    --model Wan-AI/Wan2.2-TI2V-5B-Diffusers \
+-    --prompt "A dog running across a field of golden wheat." \
+-    --diffusion-attention-config.per_role.self.backend FLASH_ATTN \
+-    --diffusion-attention-config.per_role.cross.backend TORCH_SDPA \
+-    --tensor-parallel-size 2 \
+-    --output outputs/wan22_mixed.mp4
+-```
+-
+-### Compare against FlashAttention
+-
+-Unset the backend override, or explicitly use `FLASH_ATTN`:
+-
+-```bash
+-python examples/offline_inference/text_to_video/text_to_video.py \
+-    --model Wan-AI/Wan2.2-TI2V-5B-Diffusers \
+-    --prompt "A dog running across a field of golden wheat." \
+-    --height 704 --width 1280 --num-frames 49 \
+-    --num-inference-steps 30 --seed 42 --guidance-scale 5.0 \
+-    --tensor-parallel-size 2 \
+-    --output outputs/wan22_fa3.mp4
+-```
+-
+-## Validation Guidance
+-
+-Don't assume a faster attention backend is numerically interchangeable with `TORCH_SDPA`.
+-
+-Always compare:
+-
+-- End-to-end runtime
+-- Diffusion-stage runtime (`add_req_and_wait` line in DiffusionEngine.step breakdown)
+-- Output quality against a known-good baseline (CLIP similarity, frame-level diff, or visual review)
+-
+-At minimum, keep the same:
+-
+-- model
+-- prompt
+-- seed
+-- resolution
+-- frame count / step count
+-- parallel config (TP / CFG-parallel / Ulysses degrees)
+-
+-## Reproducing the Benchmark Table
+-
+-The end-to-end numbers above were collected by running `text_to_video.py` /
+-`text_to_image.py` with the same prompt and seed while varying
+-`DIFFUSION_ATTENTION_BACKEND`. For a quick kernel-level comparison of the
+-backends without loading a model:
+-
+-```bash
+-python benchmarks/diffusion/bench_attention_backends.py --preset hv15
+-```
+-
+-It runs all three BF16 backends on representative DiT attention shapes and
+-prints a ranking table at the end.
+diff --git a/tests/diffusion/attention/test_attention_config.py b/tests/diffusion/attention/test_attention_config.py
+index adf13d51cc7..72b409de570 100644
+--- a/tests/diffusion/attention/test_attention_config.py
++++ b/tests/diffusion/attention/test_attention_config.py
+@@ -52,6 +52,44 @@ def test_skip_softmax_rejected_on_non_trtllm(self):
+         with pytest.raises(ValueError, match="only supported by the TRTLLM_ATTN"):
+             AttentionSpec(backend="TORCH_SDPA", skip_softmax={"target_sparsity": 0.5})
+ 
++    def test_quant_serialized_with_defaults_and_overrides(self):
++        assert AttentionSpec(backend="TRTLLM_ATTN", quant={"dtype_qk": "fp8_e4m3"}).backend_kwargs()["quant"] == {
++            "dtype_qk": "fp8_e4m3",
++            "q_block_size": 1,
++            "k_block_size": 16,
++        }
++        assert AttentionSpec(
++            backend="TRTLLM_ATTN", quant={"dtype_qk": "int8", "q_block_size": 4, "k_block_size": 16}
++        ).backend_kwargs()["quant"] == {"dtype_qk": "int8", "q_block_size": 4, "k_block_size": 16}
++
++    def test_quant_superset_fields_passed_through(self):
++        # FLASHINFER_ATTN-style config (dtype_vo / flashinfer_backend) round-trips on the shared spec.
++        bk = AttentionSpec(
++            backend="FLASHINFER_ATTN",
++            quant={"dtype_qk": "bfloat16", "dtype_vo": "fp8_e4m3", "flashinfer_backend": "trtllm-gen"},
++        ).backend_kwargs()["quant"]
++        assert bk["dtype_qk"] == "bfloat16"
++        assert bk["dtype_vo"] == "fp8_e4m3"
++        assert bk["flashinfer_backend"] == "trtllm-gen"
++
++    def test_quant_and_skip_softmax_coexist(self):
++        bk = AttentionSpec(
++            backend="TRTLLM_ATTN", quant={"dtype_qk": "int8"}, skip_softmax={"target_sparsity": 0.5}
++        ).backend_kwargs()
++        assert bk["target_sparsity"] == 0.5 and bk["quant"]["dtype_qk"] == "int8"
++
++    @pytest.mark.parametrize(
++        "spec, match",
++        [
++            ({"backend": "TORCH_SDPA", "quant": {"dtype_qk": "int8"}}, "only supported by the TRTLLM_ATTN"),
++            ({"backend": "TRTLLM_ATTN", "quant": {"dtype_qk": "int4"}}, "quant.dtype_qk"),
++            ({"backend": "TRTLLM_ATTN", "quant": {"dtype_qk": "int8", "k_block_size": 8}}, "quant.k_block_size"),
++        ],
++    )
++    def test_quant_validation_rejects(self, spec, match):
++        with pytest.raises(ValueError, match=match):
++            AttentionSpec(**spec)
++
+ 
+ class TestAttentionConfig:
+     def test_empty_config(self):
+diff --git a/tests/diffusion/attention/test_trtllm_attn.py b/tests/diffusion/attention/test_trtllm_attn.py
+index 75d04c2b8a8..a2f855596f3 100644
+--- a/tests/diffusion/attention/test_trtllm_attn.py
++++ b/tests/diffusion/attention/test_trtllm_attn.py
+@@ -47,6 +47,44 @@ def test_skip_config_pure_resolution():
+     assert cfg.resolve_factor(4096, timestep=None) == pytest.approx(0.01 * 4096)
+ 
+ 
++def test_quant_config_from_backend_kwargs():
++    from vllm_omni.diffusion.attention.backends.trtllm_attn import QuantConfig
++
++    assert not QuantConfig.from_backend_kwargs(None).enabled
++    assert not QuantConfig.from_backend_kwargs({}).enabled
++    assert QuantConfig.from_backend_kwargs({"quant": {"dtype_qk": "fp8_e4m3"}}) == QuantConfig("fp8_e4m3", 1, 16)
++    qc = QuantConfig.from_backend_kwargs({"quant": {"dtype_qk": "int8", "q_block_size": 4, "k_block_size": 16}})
++    assert qc.enabled and (qc.dtype_qk, qc.q_block_size, qc.k_block_size) == ("int8", 4, 16)
++
++
++def test_quant_rejects_non_sage_dtype():
++    with pytest.raises(RuntimeError, match="supports dtype_qk"):
++        _impl(quant={"dtype_qk": "bfloat16"})
++
++
++def test_quant_quantize_requires_flashinfer_routine(monkeypatch):
++    import vllm_omni.diffusion.attention.backends.trtllm_attn as mod
++
++    monkeypatch.setattr(mod, "_sage_kernel_available", lambda: True)
++    monkeypatch.setattr(mod, "_sage_quantize_fn", lambda: None)
++    with pytest.raises(RuntimeError, match="trtllm_sage_attention_quantize"):
++        _impl(quant={"dtype_qk": "int8"})
++
++
++def test_quant_quantize_calls_routine_and_shapes_sfs():
++    from vllm_omni.diffusion.attention.backends.trtllm_attn import QuantConfig
++
++    captured = {}
++
++    def fake_quantize(q, k, v, q_block_size, k_block_size, qk_quant_dtype):
++        captured.update(q_block_size=q_block_size, k_block_size=k_block_size, qk_quant_dtype=qk_quant_dtype)
++        return "qq", "kq", "vq", "qsfs", "ksfs", "vsfs"
++
++    q_q, k_q, v_q, sfs, blk = QuantConfig(dtype_qk="int8").quantize(object(), object(), object(), fake_quantize)
++    assert (q_q, k_q, v_q, sfs, blk) == ("qq", "kq", "vq", ("qsfs", "ksfs", None, "vsfs"), (1, 16, 0, 1))
++    assert captured == {"q_block_size": 1, "k_block_size": 16, "qk_quant_dtype": torch.int8}
++
++
+ def test_skip_factor_none_without_curve():
+     assert _impl(target_sparsity=0.5)._resolve_skip_factor(4096) is None
+ 
+@@ -257,6 +295,32 @@ def test_bf16_dense_matches_sdpa():
+     assert rel < 0.01, f"BF16 dense rel err {rel:.4f} too high"
+ 
+ 
++requires_sage = pytest.mark.skipif(
++    not (_has_trtllm_attn() and tg._sage_quantize_fn() is not None),
++    reason="requires Blackwell SM100+ GPU with flashinfer >= 0.6.16rc1 (trtllm_sage_attention_quantize)",
++)
++
++
++@requires_sage
++@pytest.mark.parametrize("dtype_qk", ["fp8_e4m3", "int8"])
++def test_sage_quant_matches_sdpa(dtype_qk):
++    torch.manual_seed(0)
++    B, S, H, D = 2, 256, 8, 128
++    scale = 1.0 / math.sqrt(D)
++    q, k, v = (torch.randn(B, S, H, D, device="cuda", dtype=torch.bfloat16) for _ in range(3))
++    impl = _impl(quant={"dtype_qk": dtype_qk, "q_block_size": 1, "k_block_size": 16})
++    try:
++        out = impl.forward_cuda(q, k, v, None)
++    except RuntimeError as e:  # pragma: no cover - arch-dependent (int8 is SM100-only)
++        if "Missing TRTLLM-GEN kernel" in str(e):
++            pytest.skip(f"no trtllm-gen SAGE kernel for dtype_qk={dtype_qk} on this GPU arch")
++        raise
++    assert out.shape == (B, S, H, D) and torch.isfinite(out).all()
++    ref = _sdpa_ref(q, k, v, scale)
++    rel = (out.float() - ref).abs().mean() / ref.abs().mean()
++    assert rel < 0.1, f"SAGE({dtype_qk}) rel err {rel:.4f} too high"
++
++
+ @requires_trtllm_attn
+ def test_skip_tiny_threshold_matches_dense():
+     torch.manual_seed(0)
+diff --git a/vllm_omni/diffusion/attention/backends/trtllm_attn.py b/vllm_omni/diffusion/attention/backends/trtllm_attn.py
+index 9e3b305f170..718484a590b 100644
+--- a/vllm_omni/diffusion/attention/backends/trtllm_attn.py
++++ b/vllm_omni/diffusion/attention/backends/trtllm_attn.py
+@@ -1,6 +1,8 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
++import functools
++import inspect
+ import math
+ from dataclasses import dataclass, replace
+ 
+@@ -83,6 +85,66 @@ def resolve_factor(self, seqlen: int, timestep: float | None) -> float | None:
+     )
+ 
+ 
++@functools.lru_cache(maxsize=1)
++def _sage_kernel_available() -> bool:
++    if not HAS_FLASHINFER:
++        return False
++    try:
++        return "sage_attn_sfs" in inspect.signature(trtllm_ragged_attention_deepseek).parameters
++    except (TypeError, ValueError):
++        return False
++
++
++@functools.lru_cache(maxsize=1)
++def _sage_quantize_fn():
++    try:
++        from flashinfer import trtllm_sage_attention_quantize
++
++        return trtllm_sage_attention_quantize
++    except Exception:  # pragma: no cover
++        return None
++
++
++_QK_QUANT_DTYPES = {
++    "int8": torch.int8,
++    "fp8_e4m3": torch.float8_e4m3fn,
++}
++
++
++@dataclass(frozen=True)
++class QuantConfig:
++    dtype_qk: str | None = None
++    q_block_size: int = 1
++    k_block_size: int = 16
++
++    @classmethod
++    def from_backend_kwargs(cls, backend_kwargs: dict | None) -> "QuantConfig":
++        q = (backend_kwargs or {}).get("quant") or {}
++        return cls(
++            dtype_qk=q.get("dtype_qk"),
++            q_block_size=int(q.get("q_block_size", 1) or 1),
++            k_block_size=int(q.get("k_block_size", 16) or 16),
++        )
++
++    @property
++    def enabled(self) -> bool:
++        return self.dtype_qk is not None
++
++    def quantize(self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, quantize_fn):
++        qk_quant_dtype = _QK_QUANT_DTYPES[self.dtype_qk]
++        q_q, k_q, v_q, q_sfs, k_sfs, v_sfs = quantize_fn(
++            q,
++            k,
++            v,
++            q_block_size=self.q_block_size,
++            k_block_size=self.k_block_size,
++            qk_quant_dtype=qk_quant_dtype,
++        )
++        sage_attn_sfs = (q_sfs, k_sfs, None, v_sfs)
++        num_elts_per_sage_attn_blk = (self.q_block_size, self.k_block_size, 0, 1)
++        return q_q, k_q, v_q, sage_attn_sfs, num_elts_per_sage_attn_blk
++
++
+ def _workspace_bytes() -> int:
+     import vllm.envs as envs
+ 
+@@ -129,6 +191,30 @@ def __init__(
+         self.skip = SkipSoftmaxConfig.from_backend_kwargs(backend_kwargs)
+         self._warned_missing_timestep = False
+ 
++        self.quant = QuantConfig.from_backend_kwargs(backend_kwargs)
++        # Resolve the SAGE quantize fn once at init so the compiled forward path never calls the
++        # lru_cache-wrapped getter (which triggers a Dynamo graph break every step).
++        self._sage_quantize_fn = None
++        if self.quant.enabled:
++            if self.quant.dtype_qk not in _QK_QUANT_DTYPES:
++                raise RuntimeError(
++                    f"TRTLLM_ATTN quant (SAGE) supports dtype_qk in {sorted(_QK_QUANT_DTYPES)}, got "
++                    f"{self.quant.dtype_qk!r}. FLASHINFER_ATTN dtypes (float16/bfloat16) are not SAGE."
++                )
++            if not _sage_kernel_available():
++                raise RuntimeError(
++                    "TRTLLM_ATTN quant (SAGE) was requested but this FlashInfer build does not "
++                    "expose the trtllm-gen sage_attn_sfs kernel path. Install a FlashInfer build "
++                    "that provides it, or remove the quant config."
++                )
++            self._sage_quantize_fn = _sage_quantize_fn()
++            if self._sage_quantize_fn is None:
++                raise RuntimeError(
++                    "TRTLLM_ATTN quant (SAGE) was requested but this FlashInfer build lacks "
++                    "trtllm_sage_attention_quantize (added in flashinfer >= 0.6.16rc1). Upgrade "
++                    "FlashInfer, or remove the quant config."
++                )
++
+     def set_layer_calibration(self, a: float, b: float) -> None:
+         self.skip = replace(self.skip, a=a, b=b)
+ 
+@@ -203,6 +289,15 @@ def forward_cuda(
+ 
+         _skip_factor = self._resolve_skip_factor(kv_len)
+ 
++        # SAGE kwargs are only understood by newer FlashInfer builds; pass them exclusively when
++        # SAGE quant is active (which already requires the kernel, checked at init) so the dense
++        # path stays compatible with older builds that lack these parameters.
++        sage_kwargs: dict = {}
++        if self.quant.enabled:
++            q, k, v, sage_attn_sfs, sage_block_sizes = self.quant.quantize(q, k, v, self._sage_quantize_fn)
++            sage_kwargs["sage_attn_sfs"] = sage_attn_sfs
++            sage_kwargs["num_elts_per_sage_attn_blk"] = sage_block_sizes
++
+         out = trtllm_ragged_attention_deepseek(
+             query=q,
+             key=k,
+@@ -222,5 +317,6 @@ def forward_cuda(
+             is_causal=self.causal,
+             return_lse=False,
+             skip_softmax_threshold_scale_factor=_skip_factor,
++            **sage_kwargs,
+         )
+         return out.reshape(batch, q_len, num_q_heads, head_dim)
+diff --git a/vllm_omni/diffusion/data.py b/vllm_omni/diffusion/data.py
+index b97ffc311e7..8a1c84ed07a 100644
+--- a/vllm_omni/diffusion/data.py
++++ b/vllm_omni/diffusion/data.py
+@@ -1399,44 +1399,88 @@ def __post_init__(self) -> None:
+             raise ValueError("skip_softmax: set either target_sparsity or threshold, not both.")
+ 
+ 
++@dataclass
++class AttnQuantSpec:
++    dtype_qk: str | None = None
++    dtype_vo: str | None = None
++    q_block_size: int = 1
++    k_block_size: int = 16
++    flashinfer_backend: str | None = None
++
++    _VALID_DTYPES = frozenset({"float16", "bfloat16", "int8", "fp8_e4m3"})
++    _VALID_BLOCK_SIZES = frozenset({1, 4, 16})
++
++    def __post_init__(self) -> None:
++        for name, v in (("dtype_qk", self.dtype_qk), ("dtype_vo", self.dtype_vo)):
++            if v is not None and v not in self._VALID_DTYPES:
++                raise ValueError(f"quant.{name}={v!r} unsupported; use one of {sorted(self._VALID_DTYPES)}.")
++        for name, v in (("q_block_size", self.q_block_size), ("k_block_size", self.k_block_size)):
++            if v not in self._VALID_BLOCK_SIZES:
++                raise ValueError(
++                    f"quant.{name}={v!r} unsupported; kernels exist only for {sorted(self._VALID_BLOCK_SIZES)}."
++                )
++
++    @property
++    def enabled(self) -> bool:
++        return self.dtype_qk is not None or self.dtype_vo is not None
++
++
+ @dataclass
+ class AttentionSpec:
+     """Specifies a backend and its typed backend-specific config for one attention role."""
+ 
+     backend: str
+     skip_softmax: SkipSoftmaxSpec | None = None
++    quant: AttnQuantSpec | None = None
+     skip_calibration: dict | None = field(default=None, repr=False)
+ 
+     def __post_init__(self) -> None:
+         if not isinstance(self.backend, str):
+             raise TypeError(f"Expected str for AttentionSpec.backend, got {type(self.backend)!r}")
+-        self.skip_softmax = self._coerce_skip_softmax(self.skip_softmax)
++        self.skip_softmax = self._coerce(self.skip_softmax, SkipSoftmaxSpec, "skip_softmax")
++        self.quant = self._coerce(self.quant, AttnQuantSpec, "quant")
+         if self.skip_softmax is not None and self.backend.upper() != "TRTLLM_ATTN":
+             raise ValueError(
+                 f"skip_softmax is only supported by the TRTLLM_ATTN backend, but backend={self.backend!r}. "
+-                f"Remove skip_softmax or set backend to TRTLLM_ATTN."
++                "Remove skip_softmax or set backend to TRTLLM_ATTN."
++            )
++        if self.quant is not None and self.backend.upper() not in ("TRTLLM_ATTN", "FLASHINFER_ATTN"):
++            raise ValueError(
++                f"quant is only supported by the TRTLLM_ATTN and FLASHINFER_ATTN backends, but "
++                f"backend={self.backend!r}. Remove quant or set a supported backend."
+             )
+ 
+     @staticmethod
+-    def _coerce_skip_softmax(value: Any) -> SkipSoftmaxSpec | None:
+-        if value is None or isinstance(value, SkipSoftmaxSpec):
++    def _coerce(value: Any, cls: type, field_name: str) -> Any:
++        if value is None or isinstance(value, cls):
+             return value
+         if isinstance(value, Mapping):
+-            return SkipSoftmaxSpec(**dict(value))
+-        raise TypeError(f"Expected dict or SkipSoftmaxSpec for skip_softmax, got {type(value)!r}")
++            return cls(**dict(value))
++        raise TypeError(f"Expected dict or {cls.__name__} for {field_name}, got {type(value)!r}")
+ 
+     def backend_kwargs(self) -> dict[str, Any] | None:
+         """Serialize typed backend config into the kwargs dict the backend impl consumes."""
+-        if self.skip_softmax is None:
+-            return None
+-        ss = self.skip_softmax
+         kw: dict[str, Any] = {}
+-        if ss.threshold is not None:
+-            kw["skip_softmax_threshold"] = ss.threshold
+-        if ss.target_sparsity is not None:
+-            kw["target_sparsity"] = ss.target_sparsity
+-        if ss.disabled_until_timestep:
+-            kw["disabled_until_timestep"] = ss.disabled_until_timestep
++        if self.skip_softmax is not None:
++            ss = self.skip_softmax
++            if ss.threshold is not None:
++                kw["skip_softmax_threshold"] = ss.threshold
++            if ss.target_sparsity is not None:
++                kw["target_sparsity"] = ss.target_sparsity
++            if ss.disabled_until_timestep:
++                kw["disabled_until_timestep"] = ss.disabled_until_timestep
++        if self.quant is not None and self.quant.enabled:
++            q = self.quant
++            quant_kw: dict[str, Any] = {
++                "dtype_qk": q.dtype_qk,
++                "q_block_size": q.q_block_size,
++                "k_block_size": q.k_block_size,
++            }
++            if q.dtype_vo is not None:
++                quant_kw["dtype_vo"] = q.dtype_vo
++            if q.flashinfer_backend is not None:
++                quant_kw["flashinfer_backend"] = q.flashinfer_backend
++            kw["quant"] = quant_kw
+         return kw or None
+ 
+ 
+@@ -1506,7 +1550,7 @@ def _flatten_per_role_entry(
+             normalized[role] = node
+             return
+ 
+-        spec_keys = {"backend", "skip_softmax"}
++        spec_keys = {"backend", "skip_softmax", "quant"}
+         node_dict = dict(node)
+         node_keys = set(node_dict)
+         if node_keys & spec_keys:

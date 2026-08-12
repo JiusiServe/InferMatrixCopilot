@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.8,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.08,
+    "precision": 0.5,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X independently found the exact latent bug a human reviewer flagged (ceil-vs-floor division at audio_tokenizer_v2.py:949, matching file/line/reasoning) plus the docstring-defaults mismatch also raised in GT, giving it real recall; its findings are mostly concrete with file:line anchors and suggested diffs, though two (put_req_chunk increment/cleanup) are likely false positives per Y's own investigation. Y's narrative is well-organized but recall is near zero on the actual GT concerns, and critically it confidently asserts 'slot-leak cleanup is handled' — directly contradicting the confirmed High-severity bug that GT shows was actually fixed — a costly precision failure that undermines the rest of its validation claims.",
+  "_cost_usd": 0.3117899,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "2ebe6d7abfd0f4073f2ba8b59ea204b30326a379fcbc687c30d2f482e19fc378",
+    "judge_rep": 1
+  }
+}

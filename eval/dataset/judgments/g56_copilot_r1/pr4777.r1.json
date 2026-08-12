@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.35,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "There were no ground-truth concerns, so recall is complete for both. Y offers one grounded, concrete test-strengthening suggestion, while X overstates multiple unsupported problems and incorrectly claims the layers=2 acceptance path was not run despite the recorded successful L4 regression.",
+  "_usage": {
+    "input": 3,
+    "output": 498
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v4_pr20_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v4_pr20_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v4_pr20_r1",
+    "arm_a_sha256": "a0c07f8fb30d8d376782d2c74fae4bc3959ac053e10760a7dfe2fed87231469a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "2ca1b51d7d415cbacfbfc4d8071f275707165b25374e82be3eaeccc99c7b0891",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

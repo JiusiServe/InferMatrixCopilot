@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.5,
+    "actionability": 0.7
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "X correctly frames the config-mutation and stop-step changes as intentional/benign (matching the actual PR resolution where LHXuuu confirms both align with vendor code), staying well-calibrated even though it misses the language-drop concern entirely. Y has broader recall (catches the language-drop issue matching amy-why-3459's real GT comment, plus a genuine WAV-save inconsistency) but asserts the config mutation is an 'unambiguous regression' requiring a fix — a confident claim contradicted by the actual PR discussion — and duplicates the language-drop finding verbatim across two entries (2620/2621), hurting precision and quality. Both are reasonably actionable with concrete file:line references.",
+  "_cost_usd": 0.1159813,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "91f9f3c62b83312098ea7c3397859f6eb10a31e81e979e768fc2bf5d911b6d06",
+    "judge_rep": 2
+  }
+}

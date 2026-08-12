@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.2,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "The only substantive ground-truth concern is yJader's inline comment explaining why the already_submitted gate should be dropped since both submit_initial and submit_update reject list prompts identically; Y independently derives and states this exact reasoning with concrete line references (stage_pool.py:951-955, 1022-1026), plus correctly verifies the pipeline_ming_imagegen.py fix and flags a reasonable non-blocking test-coverage gap. X returns zero findings and zero engagement with the diff, missing the ground-truth insight entirely and offering nothing actionable, though it also asserts nothing false.",
+  "_cost_usd": 0.1390787,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "7f2afd26dda2d3aadd1daf911f7f06ad8fe7cddedff58d0fc704997ffab0f2a0",
+    "judge_rep": 2
+  }
+}

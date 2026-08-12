@@ -1,0 +1,26 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.75,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.4,
+    "actionability": 0.65
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X's findings (stale yaml header comments, redundant field assignment, missing accuracy/benchmark evidence, seeding-reproducibility gap) are grounded in the actual diff and echo real ground-truth threads (benchmark requests from Sy0307/amy-why, the acknowledged seed-reproducibility tradeoff). Y raises many 'major' findings but several rest on unverifiable or self-contradictory premises (claims a CI gate report showing AMD/NPU failures with no such data in context, and asserts grep finds zero tts_local_seed matches while treating the same concept as real in another finding), which undercuts precision and recall against the actual reviewer conversation (which centered on the cudagraph_mode-in-modeling design question and the NPU yaml fix, both already resolved in the diff). Both are actionable with file/line specificity, but X's claims are more trustworthy.",
+  "gap_hit": false,
+  "_cost_usd": 0.1793102,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "5283942ef49fc0842dcd2bdd93d792fbcef8c489f498b5c274f4e8d2042f7fbb",
+    "judge_rep": 2
+  }
+}

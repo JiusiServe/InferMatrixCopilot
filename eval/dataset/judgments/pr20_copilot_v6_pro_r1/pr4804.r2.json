@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.5,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.7,
+    "actionability": 0.8
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Neither candidate surfaced the ground-truth's substantive bugs (stream-slot leak on abort, cumulative/delta chunk_np rewind, floor/ceil division in audio_tokenizer_v2, legacy MOSS-Audio-Tokenizer model_type collision, WER-fallback 48kHz/stereo skew, docstring/provenance gaps), so recall is near-zero for both. X actively asserts the slot-leak issue is 'handled' and lifecycle 'looks complete' — a confident, wrong validation that directly contradicts a confirmed High-severity bug the author later fixed, which is worse than silence. Y avoids false claims, converges independently with X on the real (if minor) talker_mtp hardcoded-params finding, and backs its test-gap findings with more specific evidence and reproduction detail, giving it a modest precision/actionability edge.",
+  "_cost_usd": 0.2467496,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "91523a710f88cc047c2f1e1b5657b842a6ad152217f3371d8650cffa833baaff",
+    "judge_rep": 2
+  }
+}

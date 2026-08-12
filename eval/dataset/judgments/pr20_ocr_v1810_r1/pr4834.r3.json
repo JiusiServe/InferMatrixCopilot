@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "X returned zero findings, missing both threads the human reviewers actually raised (tests, tag enum) and the latent over-strictness gap entirely. Y engages substantively with both review threads (test coverage gating, half-used CuMemTag enum) and, critically, its top finding independently identifies that sleep()'s level=2 default combined with the new strict NotImplementedError guard would brick the default sleep/wake cycle — precisely the over-strictness issue that historically caused issue #4905/#4912, making it a clear gap_hit with concrete file/line and a specific fix recommendation.",
+  "_cost_usd": 0.14610089999999998,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "548f2909eab0dea5f674754beaa204919fcc62e4ee75923f7f33f13ab7c49da0",
+    "judge_rep": 3
+  }
+}

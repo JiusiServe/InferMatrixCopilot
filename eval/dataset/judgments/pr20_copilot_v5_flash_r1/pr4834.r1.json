@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.78,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both reviews are grounded and actionable, covering the enum/test-coverage themes from the human thread and adding solid original findings (X's default-level footgun, Y's concurrency race and tag-validation gaps). The deciding factor is the latent gap check: Y explicitly names five existing hardware tests that already do sleep(level=2)+wake_up and will now hit the new NotImplementedError, directly matching the real-world outcome (issue #4905/#4912) that the strict guard was too strict and had to be relaxed — X's related finding (default level=2 'bricks' fresh usage) is adjacent but frames it as an ergonomics footgun rather than identifying it breaks pre-existing tests/CI, so it doesn't clearly hit the gap. Y's deeper cross-file verification (diffusion_worker.py level-2 restore path, docs) also gives it a modest recall/actionability edge.",
+  "_cost_usd": 0.23914380000000002,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "39ed57c53f9591680fe1fa6a6cf4d2912b188fc1c0285c9e653ba68085d84a62",
+    "judge_rep": 1
+  }
+}

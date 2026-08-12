@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X correctly confirms the core fix (codes.audio vs legacy audio, matching tts_postprocess and repo convention) and raises two grounded, actionable non-blocking issues with file:line references, though it misses the ground truth's minor point about the legacy-fallback check order. Y is a no-op OCR run that reports zero findings, providing no coverage, no grounded claims, and nothing actionable.",
+  "_cost_usd": 0.13843189999999997,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "d3edf64fb7ce4963cdf18cefb16c5e952b007f1f61cfac0da15bc3505d92982b",
+    "judge_rep": 2
+  }
+}

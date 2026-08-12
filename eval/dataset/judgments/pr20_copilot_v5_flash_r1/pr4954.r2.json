@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly validate the core codes.audio fix and both flag the containment-fallback interacting with the opt-in escalation contract, mirroring GT's approval-with-caveats stance. Y goes further and catches a genuine, verifiable bug X and GT both missed: `expected_clean in transcript_clean` is a raw substring test with no word-boundary check, so short expected words can spuriously match inside unrelated transcript words (e.g. 'cat' in 'category'), undermining the new test's own claim of rejecting unrelated transcripts. Y also more thoroughly chases GT's minor point about the legacy `audio` fallback's live producer (confirms via grep) and flags a real edge case where `codes` could be a non-Mapping msgspec struct, silently reintroducing the original bug. Y's findings are more concrete and independently verified with code evidence, though its unverifiable e2e-coverage claim about issue #4949 is a mild precision risk.",
+  "_cost_usd": 0.2100752,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "78ba7c7adf2f6dabb1dc365332b38d48250c9afc7852ad5a8b51e2519c514742",
+    "judge_rep": 2
+  }
+}

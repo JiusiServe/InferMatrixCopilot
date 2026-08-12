@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.95,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X correctly verifies the core codes.audio/legacy-audio fix (matching GT's main point) and independently surfaces that the new containment fallback applies unconditionally to all callers of _assert_transcript_matches with a concrete false-positive repro — substantively the same underlying issue GT flagged as stale documentation, plus a second grounded, well-localized finding about the always-true short_text check. Y's single finding (test bypasses __init__ via __new__) is valid and grounded but speculative/low-value and matches none of GT's actual concerns (core-fix verification, unconditional fallback behavior, check-ordering), so its recall against the human review is very low despite reasonable precision and actionability.",
+  "_cost_usd": 0.1243006,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "445e481fed1f00f1b3a9684873c931f2b5babee1815824e4d096577202fa6ac5",
+    "judge_rep": 3
+  }
+}

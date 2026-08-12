@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "The lone ground-truth inline comment explains why removing the `already_submitted` gate is safe (both submit_initial and submit_update reject list prompts for diffusion), and Candidate X independently verifies and cites this exact fact with file:line evidence (stage_pool.py:951, 1022), plus gives a thorough, well-grounded, actionable review with concrete follow-up suggestions. Candidate Y is an empty OCR report with zero findings, providing no coverage, no grounded claims, and no actionable content.",
+  "_cost_usd": 0.0649656,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "7f2afd26dda2d3aadd1daf911f7f06ad8fe7cddedff58d0fc704997ffab0f2a0",
+    "judge_rep": 3
+  }
+}

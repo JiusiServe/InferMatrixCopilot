@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (just LGTM approvals), so both candidates trivially achieve full recall and both correctly verify every diff claim against source with no fabrication, landing on an approve/comment verdict consistent with the actual outcome. Y edges ahead on actionability by surfacing a concrete, grounded consumer-check finding (examples/online_serving/minicpmo/README.md:58 still has the pre-fix extra_body pattern with no curl caveat) with a specific file:line and suggested remedy, whereas X's sole comment is a hedged, low-confidence aside that mostly defers to the author's own test rather than proposing a concrete change.",
+  "_cost_usd": 0.12076019999999998,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "be6ca2d0579d4841689f7488f8a9ba14c128aa0e73df5be19a58f55d283927a0",
+    "judge_rep": 2
+  }
+}

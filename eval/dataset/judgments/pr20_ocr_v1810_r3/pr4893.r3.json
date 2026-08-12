@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X performs genuine code-level analysis (verifying DPMetadata construction, device_communicator semantics, group cleanup, and the CFG/DP gating change) and grounds its one non-blocking comment in a specific file/line, though it misses the ground-truth reviewer's specific question about reduce_scatter test coverage. Y is a content-free stub ('0 issues found') with no engagement with the diff, no claims to verify, and nothing actionable, so it earns essentially zero on every axis.",
+  "_cost_usd": 0.13421589999999997,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "4c74470d7ab5810e1ec6f79a85f46ba6b877d14ebcde70c97cdb4a04976b7bf3",
+    "judge_rep": 3
+  }
+}

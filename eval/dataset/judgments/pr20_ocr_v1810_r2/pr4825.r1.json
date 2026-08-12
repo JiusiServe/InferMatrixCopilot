@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X delivers a substantive, line-grounded review that echoes the one real ground-truth concern (dsocek's point that this is a narrow hardcoded-list patch that should instead derive from a single source of truth, mirrored by X's suggestion to read pipeline._dit_modules) and adds a plausible, diff-grounded follow-up about text-encoder LoRA being a similar silent no-op. Y is a stub OCR report claiming zero findings, contributing nothing actionable or grounded despite the PR having a known reviewer-flagged design concern, so it scores zero on all axes.",
+  "_cost_usd": 0.1009419,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "48a927d3f79c2089de5158c5686a3464c85acdaa23d77bf628197982374b87e9",
+    "judge_rep": 1
+  }
+}

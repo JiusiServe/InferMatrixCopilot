@@ -152,3 +152,71 @@ issue_answer:
   - {issue: 4802, split: test, state: closed, title: "[RFC]: vLLM-Omni KV Cache Efficiency and Attribution Metrics",
      author: Ronnie-Rui, n_comments: 8, modules: [scheduler, online_serving], class: rfc-design,
      note: "RFC-class item — answer quality judged on design engagement, not a bugfix"}
+
+
+# ============================================================
+# wave 2 — 10 recent PRs, ALL frozen holdout (added 2026-08-12)
+#
+# Wave 1 above is untouched: the 3-arm gpt-5.6 campaign run against it stays a
+# valid measurement. These items are a pure holdout — no train, no val — because
+# wave 1 already supplies 10 train items while only 5 frozen test items, and the
+# frozen set is the half that limits what can be claimed.
+#
+# Selection (reproducible; see goal-eval/provenance_wave2.json):
+#   eligible = merged >= 2026-07-11, >= 2 human inline
+#              comments, never reviewed by our own vllm-omni-review-bot,
+#              not already in wave 1
+#   draw     = seeded stratified sample over changed-file bands, seed
+#              'vllm-omni-wave2-2026-08-12', proportional to the eligible pool
+#
+# READ BEFORE COMPARING WAVES:
+#   * Wave 2 skews larger and better-reviewed than wave 1 (pool median 8 changed
+#     files vs 3; median 6 human inline comments vs 2). Arm-vs-arm WITHIN wave 2
+#     is clean; a wave-1-vs-wave-2 delta is confounded by size and is NOT a
+#     staleness measurement.
+#   * No GOLD latent-gap items: those need history proving human review missed
+#     something plus a later PR that fixed it, which recent PRs lack.
+#   * Ground truth here is HUMAN-ONLY. Wave 1's GT includes AI reviewers (chatgpt-codex-
+#     connector authors 14% of it and is its most frequent single author; four
+#     wave-1 PRs have no human GT at all). Wave 2 filters them out.
+pr_review_wave2:
+  - {pr: 5509, split: holdout, wave: "2026-08", title: "[Kernel] Add typed SAGE for TRTLLM_ATTN",
+     author: lishunyang12, merged: "2026-07-31", modules: [diffusion, docs, tests],
+     size: {files: 5, add: 301, del: 94}, review_comments: 4,
+     class: other}
+  - {pr: 5550, split: holdout, wave: "2026-08", title: "[Diffusion] Add Worker contracts and RPC plumbing for Scheduler-managed paged KV cache",
+     author: Acerak01-fy, merged: "2026-08-11", modules: [diffusion, tests],
+     size: {files: 10, add: 622, del: 13}, review_comments: 23,
+     class: other}
+  - {pr: 5610, split: holdout, wave: "2026-08", title: "[Doc] Document async Omni output materialization",
+     author: fake0fan, merged: "2026-08-04", modules: [docs],
+     size: {files: 4, add: 538, del: 0}, review_comments: 12,
+     class: docs}
+  - {pr: 5703, split: holdout, wave: "2026-08", title: "[Hardware][MUSA] Make MiniMax H3 conditioned VAE RNG device-aware",
+     author: yeahdongcn, merged: "2026-08-05", modules: [diffusion],
+     size: {files: 3, add: 156, del: 7}, review_comments: 4,
+     class: other}
+  - {pr: 5715, split: holdout, wave: "2026-08", title: "[Doc] Update README and installation docs for v0.26.0",
+     author: hsliuustc0106, merged: "2026-08-04", modules: [docs],
+     size: {files: 6, add: 22, del: 17}, review_comments: 4,
+     class: docs}
+  - {pr: 5840, split: holdout, wave: "2026-08", title: "[MiniMax-H3] TeaCache support and Cache-DiT validation",
+     author: dpeng123, merged: "2026-08-09", modules: [diffusion, docs, tests],
+     size: {files: 10, add: 669, del: 15}, review_comments: 4,
+     class: other}
+  - {pr: 5863, split: holdout, wave: "2026-08", title: "[doc]Add recipe for MiniMax-H3 on RTX PRO 6000",
+     author: yiminghub2024, merged: "2026-08-09", modules: [misc],
+     size: {files: 1, add: 346, del: 0}, review_comments: 5,
+     class: docs}
+  - {pr: 5884, split: holdout, wave: "2026-08", title: "[bugfix][CI] Fix Cache-DiT nested module discovery [issue 5879]",
+     author: natureofnature, merged: "2026-08-07", modules: [diffusion, tests],
+     size: {files: 2, add: 62, del: 3}, review_comments: 4,
+     class: bugfix}
+  - {pr: 5957, split: holdout, wave: "2026-08", title: "[New Model] Support IndexTTS 2.5",
+     author: Sy0307, merged: "2026-08-11", modules: [benchmarks, ci, config, core],
+     size: {files: 77, add: 7128, del: 524}, review_comments: 8,
+     class: model}
+  - {pr: 5976, split: holdout, wave: "2026-08", title: "[Rebase] Rebase to vllm 0.27.0",
+     author: tzhouam, merged: "2026-08-11", modules: [benchmarks, ci, core, diffusion],
+     size: {files: 55, add: 1335, del: 93}, review_comments: 9,
+     class: rebase}

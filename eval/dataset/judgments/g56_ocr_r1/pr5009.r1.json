@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.75,
+    "precision": 0.65,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X directly identifies the global CUDA blast radius, benchmark-justification gap, and need for regression coverage, with concrete file references and remedies. It misses the incomplete pytest-mark concern and dilutes precision with speculative or pre-existing issues such as ROCm parity and the user escape hatch. Y reports no findings and therefore covers none of the reviewer concerns.",
+  "_usage": {
+    "input": 3,
+    "output": 1100
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "ocr_v1810_r1"
+  },
+  "_roles": {
+    "arm": "ocr_v1810_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "d8324d7bb719fdb217adc945d73f46a22a7626ec42cef97db81c8294a0b4a516",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "97e45909dc2469db55da15b6e8d6a525549029c219aefca76123ec8b801fd1bf",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

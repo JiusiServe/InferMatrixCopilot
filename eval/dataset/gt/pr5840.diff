@@ -1,0 +1,871 @@
+diff --git a/docs/user_guide/diffusion_features.md b/docs/user_guide/diffusion_features.md
+index 83bc3643e34..d5741a3212a 100644
+--- a/docs/user_guide/diffusion_features.md
++++ b/docs/user_guide/diffusion_features.md
+@@ -159,7 +159,7 @@ The following tables show which models support each feature:
+ | **HunyuanVideo-1.5 T2V I2V** |     ❌     |     ✅      |           ✅           |       ✅        |         ✅         |         ❌         |   ✅    |             ✅             |  ✅ (encode/decode)   |       ✅        |        ❌         |
+ | **DreamID-Omni**             |     ❌     |     ❌      |           ❌           |       ✅        |         ❌         |         ❌         |   ✅    |             ✅             |          ❌           |       ❌        |        ❌         |
+ | **Cosmos3**                  |     ❌     |     ✅      |           ✅           |       ✅        |         ✅         |         ❌         |   ✅    |             ✅             |  ✅ (encode/decode)   |       ✅        |        ❌         |
+-| **MiniMax-H3**               |     ❌     |     ✅      |           ✅           |       ❌        |       ✅ (DiT/TE)  |         ❌         |   ✅    |             ✅             |       ✅ (tile)       |      ✅ (DiT)      |        ❌         |
++| **MiniMax-H3**               | ✅ (FL2VA) |     ✅      |           ✅           |       ❌        |       ✅ (DiT/TE)  |         ❌         |   ✅    |             ✅             |       ✅ (tile)       |      ✅ (DiT)      |        ❌         |
+ 
+ **Frame Interpolation Support**
+ 
+diff --git a/recipes/MiniMaxAI/MiniMax-H3.md b/recipes/MiniMaxAI/MiniMax-H3.md
+index 01785fbbc7d..11435234303 100644
+--- a/recipes/MiniMaxAI/MiniMax-H3.md
++++ b/recipes/MiniMaxAI/MiniMax-H3.md
+@@ -750,8 +750,73 @@ audio spectral cosine 0.9589 (minimum 0.80), and audio RMS ratio 0.9342. The
+ resident per-GPU peak was 68.52 GiB for BF16 and 53.51 GiB for FP8, a 22%
+ reduction.
+ 
++## TeaCache acceleration
++
++TeaCache reuses DiT block residuals across denoising steps when consecutive
++timestep embeddings are similar. MiniMax-H3 TeaCache is currently calibrated
++only for the FL2VA partition. In combined serving, FL2VA requests use TeaCache
++while Ref2VA requests run uncached; Ref2VA-only serving rejects TeaCache.
++
++TeaCache and Cache-DiT are mutually exclusive; pick one cache backend per server.
++
++The model-specific default and examples use `rel_l1_thresh=0.17`, which
++provided the best conservative speed/quality balance in the validated 107-frame
++T2VA workload. Lower values
++may produce few or no cache hits, while higher values can improve performance
++at the cost of output quality. Validate the threshold on representative
++prompts and generation settings before changing it.
++
++### Offline (Python API)
++
++Export the directory containing the `FL2VA` and `Ref2VA` subdirectories before
++running the Python example, for example `export MODEL_ROOT=/models/MiniMax-H3`.
++
++```python
++import os
++
++from vllm_omni import Omni
++from vllm_omni.inputs.data import OmniDiffusionSamplingParams
++
++omni = Omni(
++    model=os.path.join(os.environ["MODEL_ROOT"], "FL2VA"),
++    cache_backend="tea_cache",
++    cache_config={"rel_l1_thresh": 0.17},
++    trust_remote_code=True,
++    enable_cpu_offload=True,
++)
++outputs = omni.generate(
++    "A quiet cinematic night scene with matching ambient sound.",
++    OmniDiffusionSamplingParams(
++        height=256,
++        width=448,
++        num_frames=29,
++        fps=24,
++        num_inference_steps=50,
++        seed=42,
++        extra_args={
++            "task": "t2va",
++            "duration": 4.0,
++            "aspect_ratio": "16:9",
++            "flow_shift": 12.0,
++            "audio_flow_shift": 3.0,
++        },
++    ),
++)
++```
++
++### Online serving
++
++```bash
++vllm serve "${MODEL_ROOT}/FL2VA" \
++  --omni \
++  --trust-remote-code \
++  --cache-backend tea_cache \
++  --cache-config '{"rel_l1_thresh":0.17}'
++```
++
+ ## Known limitations
+ 
++- TeaCache is calibrated for FL2VA only; Ref2VA requests run uncached.
+ - Combined serving requires sibling `FL2VA` and `Ref2VA` directories, loads
+   both task-specific DiTs, and loads shared components once from `FL2VA`.
+ - H3 currently executes one generation request per diffusion batch.
+@@ -770,6 +835,10 @@ reduction.
+ - A U2 x Ring2 hybrid currently fails with an attention-mask length mismatch; use
+   pure Ulysses.
+ - Online FP8 is not compatible with layerwise offload.
++- TeaCache and Cache-DiT cannot be enabled on the same server.
++- Image+audio Ref2VA accepts exactly one image and one audio reference.
++- Video Ref2VA accepts one or more video files, but not an additional standalone
++  audio reference.
+ - Pure Ulysses still replicates the full DiT on every rank, so smaller-memory GPUs
+   cannot use `--usp N --tp 1` as a resident capacity path. Use DiT tensor parallelism
+   or model-level CPU offload; text-encoder TP alone is not sufficient.
+diff --git a/tests/diffusion/cache/test_cache_backends.py b/tests/diffusion/cache/test_cache_backends.py
+index 2a2ce111313..fb912b08e18 100644
+--- a/tests/diffusion/cache/test_cache_backends.py
++++ b/tests/diffusion/cache/test_cache_backends.py
+@@ -471,6 +471,66 @@ def test_enable(self, mock_apply_hook):
+         assert backend.enabled is True
+         mock_apply_hook.assert_called_once()
+ 
++    @patch("vllm_omni.diffusion.cache.teacache.backend.apply_teacache_hook")
++    def test_enable_uses_generic_default_threshold(self, mock_apply_hook):
++        pipeline = Mock()
++        pipeline.__class__.__name__ = "QwenImagePipeline"
++        pipeline.transformer = Mock()
++        pipeline.transformer.__class__.__name__ = "QwenImageTransformer2DModel"
++
++        TeaCacheBackend(DiffusionCacheConfig()).enable(pipeline)
++        assert mock_apply_hook.call_args.args[1].rel_l1_thresh == 0.2
++
++    @pytest.mark.parametrize("partition", ["fl2va", "combined"])
++    @pytest.mark.parametrize(
++        ("configured_threshold", "expected_threshold"),
++        [(None, 0.17), (0.2, 0.2)],
++    )
++    @patch("vllm_omni.diffusion.cache.teacache.backend.apply_teacache_hook")
++    def test_minimax_h3_only_enables_fl2va_teacache(
++        self,
++        mock_apply_hook,
++        partition,
++        configured_threshold,
++        expected_threshold,
++    ):
++        pipeline = Mock()
++        pipeline.__class__.__name__ = "MiniMaxH3Pipeline"
++        pipeline.partition = partition
++        pipeline.transformer = Mock()
++        pipeline.transformer.__class__.__name__ = "MiniMaxH3DiTModel"
++        pipeline.transformers_ref = Mock()
++
++        config = (
++            DiffusionCacheConfig()
++            if configured_threshold is None
++            else DiffusionCacheConfig(rel_l1_thresh=configured_threshold)
++        )
++        backend = TeaCacheBackend(config)
++        backend.enable(pipeline)
++
++        mock_apply_hook.assert_called_once()
++        transformer, teacache_config = mock_apply_hook.call_args.args
++        assert transformer is pipeline.transformer
++        assert transformer is not pipeline.transformers_ref
++        assert teacache_config.rel_l1_thresh == expected_threshold
++
++    @patch("vllm_omni.diffusion.cache.teacache.backend.apply_teacache_hook")
++    def test_minimax_h3_rejects_ref2va_teacache(self, mock_apply_hook):
++        pipeline = Mock()
++        pipeline.__class__.__name__ = "MiniMaxH3Pipeline"
++        pipeline.partition = "ref2va"
++        pipeline.transformer = Mock()
++        pipeline.transformer.__class__.__name__ = "MiniMaxH3DiTModel"
++
++        backend = TeaCacheBackend(DiffusionCacheConfig())
++
++        with pytest.raises(ValueError, match="only supports the MiniMax-H3 FL2VA partition"):
++            backend.enable(pipeline)
++
++        assert backend.enabled is False
++        mock_apply_hook.assert_not_called()
++
+     @patch("vllm_omni.diffusion.cache.teacache.backend.apply_teacache_hook")
+     def test_enable_with_coefficients(self, mock_apply_hook):
+         """Test enabling TeaCache with custom coefficients."""
+diff --git a/tests/diffusion/cache/test_teacache_extractors.py b/tests/diffusion/cache/test_teacache_extractors.py
+index ab71d186a87..db2ee733248 100644
+--- a/tests/diffusion/cache/test_teacache_extractors.py
++++ b/tests/diffusion/cache/test_teacache_extractors.py
+@@ -15,19 +15,23 @@
+ - TestFlux2KleinExtractor: Flux2Klein model extractor
+ - TestFlux2Extractor: Flux2 model extractor
+ - TestFluxExtractor: Flux model extractor
++- TestMiniMaxH3Extractor: MiniMaxH3DiTModel extractor
+ """
+ 
+ from abc import ABC, abstractmethod
++from types import SimpleNamespace
+ from unittest.mock import MagicMock, Mock, patch
+ 
+ import pytest
+ import torch
++import torch.nn as nn
+ 
+ from tests.helpers.mark import hardware_test
+ from vllm_omni.diffusion.cache.teacache.extractors import (
+     extract_flux2_context,
+     extract_flux2_klein_context,
+     extract_flux_context,
++    extract_minimax_h3_context,
+ )
+ from vllm_omni.diffusion.models.flux.flux_transformer import FluxTransformer2DModel
+ from vllm_omni.diffusion.models.flux2_klein.flux2_klein_transformer import (
+@@ -423,3 +427,280 @@ def test_invalid_module_raises_error(self):
+                 img_ids=torch.randint(0, 64, (1, 16, 3)),
+                 txt_ids=torch.randint(0, 64, (1, 8, 3)),
+             )
++
++
++class _MiniMaxH3FakeLinear(nn.Module):
++    def __init__(
++        self,
++        in_features,
++        out_features,
++        *,
++        bias=False,
++        params_dtype=None,
++        quant_config=None,
++        prefix="",
++        total_num_heads=None,
++        total_num_kv_heads=None,
++        **kwargs,
++    ):
++        del kwargs
++        super().__init__()
++        self.prefix = prefix
++        self.quant_config = quant_config
++        self.weight = nn.Parameter(torch.randn(out_features, in_features, dtype=params_dtype or torch.float32))
++        if bias:
++            self.bias = nn.Parameter(torch.zeros(out_features, dtype=params_dtype or torch.float32))
++        else:
++            self.register_parameter("bias", None)
++        self.num_heads = total_num_heads
++        self.num_kv_heads = total_num_kv_heads
++
++    def forward(self, x):
++        return torch.nn.functional.linear(x, self.weight, self.bias), None
++
++
++class _MiniMaxH3FakeMergedLinear(_MiniMaxH3FakeLinear):
++    def __init__(self, in_features, out_features, **kwargs):
++        super().__init__(in_features, sum(out_features), **kwargs)
++
++
++class _MiniMaxH3FakeQKVLinear(_MiniMaxH3FakeLinear):
++    def __init__(
++        self,
++        *,
++        hidden_size,
++        head_size,
++        total_num_heads,
++        total_num_kv_heads,
++        **kwargs,
++    ):
++        qkv_features = (total_num_heads + 2 * total_num_kv_heads) * head_size
++        super().__init__(
++            hidden_size,
++            qkv_features,
++            total_num_heads=total_num_heads,
++            total_num_kv_heads=total_num_kv_heads,
++            **kwargs,
++        )
++
++
++class _MiniMaxH3FakeAttention(nn.Module):
++    class FakeBackend:
++        supports_prefix_kv_slicing = False
++
++    def __init__(self, **kwargs):
++        del kwargs
++        super().__init__()
++        self.attn_backend = self.FakeBackend
++        self.use_ring = False
++
++    def forward(self, q, k, v, metadata=None):
++        del k, v, metadata
++        return q
++
++
++def _minimax_h3_small_od_config():
++    arch = {
++        "num_layers": 1,
++        "token_refiner_num_layers": 1,
++        "hidden_size": 8,
++        "num_attention_heads": 1,
++        "attention_head_dim": 8,
++        "ffn_hidden_size": 16,
++        "latents_dim": 2,
++        "audio_latents_dim": 2,
++        "patch_size": (1, 2, 2),
++        "text_dim": 6,
++        "timestep_input_dim": 4,
++        "time_embed_hidden_size": 8,
++        "time_embed_dim": 4,
++        "adaln_out_features": 18 * 8,
++        "final_adaln_out_features": 2 * 8,
++        "rope_inv_freq_len": 1,
++    }
++    return SimpleNamespace(
++        tf_model_config=arch,
++        parallel_config=SimpleNamespace(ulysses_degree=1),
++    )
++
++
++def _minimax_h3_sample_kwargs(*, seq_len: int = 8, device: torch.device | str = "cpu") -> dict:
++    video_row_dim = 2 * 1 * 2 * 2
++    audio_row_dim = 2
++    text_len = 2
++    img_rows = 2
++
++    img_pos = torch.tensor([2, 3], dtype=torch.long, device=device)
++    audio_pos = torch.tensor([4, 5], dtype=torch.long, device=device)
++    text_pos = torch.tensor([0, 1], dtype=torch.long, device=device)
++    infer_out_pos = img_pos.clone()
++
++    token_tags = torch.full((seq_len,), -1, dtype=torch.long, device=device)
++    token_tags[text_pos] = 1
++    token_tags[img_pos] = 0
++    token_tags[audio_pos] = 2
++
++    inverse_indices = torch.zeros(seq_len, dtype=torch.long, device=device)
++
++    return {
++        "x": torch.randn(1, seq_len, video_row_dim, device=device),
++        "audio_x": torch.randn(1, seq_len, audio_row_dim, device=device),
++        "img_position_ids": torch.zeros(1, seq_len, 3, dtype=torch.float64, device=device),
++        "unique_timesteps": torch.tensor([0.5], dtype=torch.float32, device=device),
++        "inverse_indices": inverse_indices,
++        "update_mask": torch.ones(img_rows, dtype=torch.bool, device=device),
++        "token_tags": token_tags,
++        "prompt_embeds": torch.randn(text_len, 6, device=device),
++        "img_pos_info": {"position_ids": img_pos},
++        "audio_pos_info": {"position_ids": audio_pos},
++        "text_pos_info": {"position_ids": text_pos},
++        "img_pos_for_infer_output_info": {"position_ids": infer_out_pos},
++        "packed_seq_params": {
++            "cu_seqlens_q": torch.tensor([0, seq_len], dtype=torch.int32, device=device),
++            "max_seqlen_q": seq_len,
++        },
++        "refiner_packed_seq_params": {
++            "cu_seqlens_q": torch.tensor([0, text_len], dtype=torch.int32, device=device),
++            "max_seqlen_q": text_len,
++        },
++    }
++
++
++@pytest.mark.cpu
++class TestMiniMaxH3Extractor(BaseExtractorTest):
++    """Test extract_minimax_h3_context function."""
++
++    def get_extractor(self):
++        return extract_minimax_h3_context
++
++    @pytest.fixture
++    def minimax_h3_module(self, monkeypatch):
++        """Create a minimal MiniMaxH3DiTModel with fake parallel linears for CPU tests."""
++        from vllm_omni.diffusion.models.minimax_h3 import minimax_h3_transformer as h3
++
++        monkeypatch.setattr(h3, "ColumnParallelLinear", _MiniMaxH3FakeLinear)
++        monkeypatch.setattr(h3, "MergedColumnParallelLinear", _MiniMaxH3FakeMergedLinear)
++        monkeypatch.setattr(h3, "QKVParallelLinear", _MiniMaxH3FakeQKVLinear)
++        monkeypatch.setattr(h3, "RowParallelLinear", _MiniMaxH3FakeLinear)
++        monkeypatch.setattr(h3, "Attention", _MiniMaxH3FakeAttention)
++        monkeypatch.setattr(h3, "get_tensor_model_parallel_world_size", lambda: 1)
++
++        model = h3.MiniMaxH3DiTModel(_minimax_h3_small_od_config(), quant_config=None)
++        for submodule in model.modules():
++            if isinstance(submodule, h3.MiniMaxH3Attention):
++                submodule.rope._forward_method = submodule.rope.forward_native
++        model.eval()
++        return model
++
++    def get_module(self, minimax_h3_module):
++        return minimax_h3_module
++
++    @pytest.fixture
++    def sample_inputs(self):
++        """Create sample packed forward kwargs for MiniMaxH3DiTModel."""
++        return _minimax_h3_sample_kwargs(seq_len=8)
++
++    def get_sample_inputs(self, sample_inputs):
++        return sample_inputs
++
++    def test_modulated_input_shape(self, minimax_h3_module, sample_inputs):
++        """Test that modulated_input matches packed sequence shape [T, H]."""
++        context = extract_minimax_h3_context(minimax_h3_module, **sample_inputs)
++
++        seq_len = sample_inputs["x"].shape[1]
++        assert context.modulated_input.shape == (seq_len, minimax_h3_module.hidden_size)
++
++    def test_run_transformer_blocks_callable(self, minimax_h3_module, sample_inputs):
++        """Test that run_transformer_blocks is callable."""
++        context = extract_minimax_h3_context(minimax_h3_module, **sample_inputs)
++        assert callable(context.run_transformer_blocks)
++
++    def test_postprocess_callable(self, minimax_h3_module, sample_inputs):
++        """Test that postprocess is callable."""
++        context = extract_minimax_h3_context(minimax_h3_module, **sample_inputs)
++        assert callable(context.postprocess)
++
++    def test_postprocess_output_shape(self, minimax_h3_module, sample_inputs):
++        """Test that postprocess returns video/audio logits for infer rows."""
++        context = extract_minimax_h3_context(minimax_h3_module, **sample_inputs)
++        (hidden,) = context.run_transformer_blocks()
++        video_logits, audio_logits = context.postprocess(hidden)
++
++        num_video_rows = sample_inputs["img_pos_info"]["position_ids"].shape[0]
++        num_audio_rows = sample_inputs["audio_pos_info"]["position_ids"].shape[0]
++        assert video_logits.shape[0] == num_video_rows
++        assert audio_logits.shape[0] == num_audio_rows
++
++    def test_extractor_matches_native_forward(self, minimax_h3_module, sample_inputs):
++        """The uncached extractor path must preserve the model's forward result."""
++        expected_video, expected_audio = minimax_h3_module(**sample_inputs)
++
++        context = extract_minimax_h3_context(minimax_h3_module, **sample_inputs)
++        (hidden,) = context.run_transformer_blocks()
++        actual_video, actual_audio = context.postprocess(hidden)
++
++        torch.testing.assert_close(actual_video, expected_video)
++        torch.testing.assert_close(actual_audio, expected_audio)
++
++    def test_run_transformer_blocks_forwards_packed_layout(
++        self,
++        minimax_h3_module,
++        sample_inputs,
++        monkeypatch,
++    ):
++        """The extractor block call must mirror the native packed contract."""
++        from vllm_omni.diffusion.attention.backends.abstract import VideoTokenLayout
++
++        video_layout = VideoTokenLayout(prefix_len=2, latent_grid=(1, 1, 2))
++        inputs = {**sample_inputs, "video_token_layout": video_layout}
++        block = minimax_h3_module.blocks[0]
++        original_forward = block.forward
++        received: list[tuple[int, VideoTokenLayout | None]] = []
++
++        def capture_forward(*args, **kwargs):
++            received.append((kwargs["packed_total"], kwargs["video_layout"]))
++            return original_forward(*args, **kwargs)
++
++        monkeypatch.setattr(block, "forward", capture_forward)
++        context = extract_minimax_h3_context(minimax_h3_module, **inputs)
++        context.run_transformer_blocks()
++
++        assert received == [(sample_inputs["x"].shape[1], video_layout)]
++
++    def test_teacache_reuses_h3_block_residual(self, minimax_h3_module, sample_inputs, monkeypatch):
++        """A guaranteed cache hit must skip the H3 transformer block."""
++        from vllm_omni.diffusion.cache.teacache.config import TeaCacheConfig
++        from vllm_omni.diffusion.cache.teacache.hook import TeaCacheHook
++
++        block = minimax_h3_module.blocks[0]
++        original_forward = block.forward
++        block_calls = 0
++
++        def counted_forward(*args, **kwargs):
++            nonlocal block_calls
++            block_calls += 1
++            return original_forward(*args, **kwargs)
++
++        monkeypatch.setattr(block, "forward", counted_forward)
++        hook = TeaCacheHook(
++            TeaCacheConfig(
++                transformer_type="MiniMaxH3DiTModel",
++                rel_l1_thresh=0.3,
++            )
++        )
++        hook.initialize_hook(minimax_h3_module)
++
++        hook.new_forward(minimax_h3_module, **sample_inputs)
++        video_logits, audio_logits = hook.new_forward(minimax_h3_module, **sample_inputs)
++
++        assert block_calls == 1
++        assert video_logits.shape[0] == sample_inputs["img_pos_info"]["position_ids"].shape[0]
++        assert audio_logits.shape[0] == sample_inputs["audio_pos_info"]["position_ids"].shape[0]
++
++    def test_invalid_module_raises_error(self):
++        """Test that invalid module without blocks raises ValueError."""
++        invalid_module = Mock()
++        invalid_module.blocks = []
++
++        with pytest.raises(ValueError, match="Module must have blocks"):
++            extract_minimax_h3_context(invalid_module, **_minimax_h3_sample_kwargs())
+diff --git a/tests/diffusion/models/minimax_h3/test_minimax_h3_e2e.py b/tests/diffusion/models/minimax_h3/test_minimax_h3_e2e.py
+index ec9d378ff32..b3019668c80 100644
+--- a/tests/diffusion/models/minimax_h3/test_minimax_h3_e2e.py
++++ b/tests/diffusion/models/minimax_h3/test_minimax_h3_e2e.py
+@@ -19,7 +19,7 @@
+ def _assert_joint_output(outputs):
+     assert len(outputs) == 1
+     frames = np.asarray(outputs[0].images[0])
+-    assert frames.shape == (39, 256, 448, 3)
++    assert frames.shape == (107, 256, 448, 3)
+     multimodal = outputs[0].multimodal_output
+     assert multimodal is not None
+     assert np.asarray(multimodal["audio"]).shape[1] == 2
+@@ -122,6 +122,58 @@ def test_minimax_h3_t2va_fp8_single_gpu_smoke():
+                 output_type="np",
+                 extra_args={
+                     "task": "t2va",
++                    "duration": 4.0,
++                    "aspect_ratio": "16:9",
++                    "flow_shift": 12.0,
++                    "audio_flow_shift": 3.0,
++                },
++            ),
++            use_tqdm=False,
++        )
++    finally:
++        engine.close()
++
++    _assert_joint_output(outputs)
++
++
++@pytest.mark.skipif(
++    not os.environ.get(MODEL_ENV),
++    reason=f"set {MODEL_ENV} to an authorized FL2VA checkpoint path",
++)
++def test_minimax_h3_t2va_teacache_single_gpu_smoke():
++    import torch
++
++    from vllm_omni.diffusion.data import DiffusionParallelConfig
++    from vllm_omni.entrypoints.omni import Omni
++    from vllm_omni.inputs.data import OmniDiffusionSamplingParams
++
++    if torch.accelerator.device_count() < 1:
++        pytest.skip("MiniMax H3 TeaCache smoke requires a CUDA device")
++
++    engine = Omni(
++        model=os.environ[MODEL_ENV],
++        cache_backend="tea_cache",
++        cache_config={"rel_l1_thresh": 0.17},
++        parallel_config=DiffusionParallelConfig(ulysses_degree=1),
++        trust_remote_code=True,
++        enable_cpu_offload=True,
++        enforce_eager=True,
++    )
++    try:
++        outputs = engine.generate(
++            "A quiet cinematic night scene with matching ambient sound.",
++            OmniDiffusionSamplingParams(
++                height=256,
++                width=448,
++                num_frames=29,
++                fps=24,
++                num_inference_steps=2,
++                seed=42,
++                output_type="np",
++                extra_args={
++                    "task": "t2va",
++                    "duration": 4.0,
++                    "aspect_ratio": "16:9",
+                     "flow_shift": 12.0,
+                     "audio_flow_shift": 3.0,
+                 },
+diff --git a/vllm_omni/diffusion/cache/teacache/backend.py b/vllm_omni/diffusion/cache/teacache/backend.py
+index f6f9db88dc4..508d63eec34 100644
+--- a/vllm_omni/diffusion/cache/teacache/backend.py
++++ b/vllm_omni/diffusion/cache/teacache/backend.py
+@@ -73,6 +73,34 @@ def enable_sensenova_u1_teacache(pipeline: Any, config: DiffusionCacheConfig) ->
+     )
+ 
+ 
++def enable_minimax_h3_teacache(pipeline: Any, config: DiffusionCacheConfig) -> None:
++    """Enable TeaCache for the calibrated MiniMax-H3 FL2VA partition."""
++    partition = getattr(pipeline, "partition", None)
++    if partition == "ref2va":
++        raise ValueError(
++            "TeaCache only supports the MiniMax-H3 FL2VA partition; Ref2VA TeaCache has not been calibrated"
++        )
++    if partition not in {"fl2va", "combined"}:
++        raise ValueError(f"Unsupported MiniMax-H3 partition for TeaCache: {partition!r}")
++
++    teacache_config = TeaCacheConfig(
++        transformer_type="MiniMaxH3DiTModel",
++        rel_l1_thresh=config.rel_l1_thresh,
++        coefficients=config.coefficients,
++    )
++    apply_teacache_hook(pipeline.transformer, teacache_config)
++
++    if partition == "combined":
++        logger.warning(
++            "TeaCache is enabled only for MiniMax-H3 FL2VA; "
++            "Ref2VA requests on this combined pipeline will run without TeaCache"
++        )
++    logger.info(
++        f"TeaCache applied with rel_l1_thresh={teacache_config.rel_l1_thresh}, "
++        "transformer_class=MiniMaxH3DiTModel, partition=FL2VA"
++    )
++
++
+ def enable_flux2_klein_teacache(pipeline: Any, config: DiffusionCacheConfig) -> None:
+     """
+     Enable TeaCache for Flux2 Klein model.
+@@ -96,6 +124,7 @@ def enable_flux2_klein_teacache(pipeline: Any, config: DiffusionCacheConfig) ->
+     "BagelPipeline": enable_bagel_teacache,
+     "Flux2KleinPipeline": enable_flux2_klein_teacache,
+     "HunyuanImage3Pipeline": enable_hunyuan_image3_teacache,
++    "MiniMaxH3Pipeline": enable_minimax_h3_teacache,
+     "SenseNovaU1Pipeline": enable_sensenova_u1_teacache,
+ }
+ 
+@@ -145,7 +174,6 @@ def enable(self, pipeline: Any) -> None:
+ 
+             # Create TeaCacheConfig from DiffusionCacheConfig with transformer_type
+             # Access parameters via attribute access: config.rel_l1_thresh
+-            # rel_l1_thresh already has a default value of 0.2 in DiffusionCacheConfig
+             try:
+                 teacache_config = TeaCacheConfig(
+                     transformer_type=transformer_type,
+diff --git a/vllm_omni/diffusion/cache/teacache/config.py b/vllm_omni/diffusion/cache/teacache/config.py
+index bcf2d3fe4a1..b83f600d6e7 100644
+--- a/vllm_omni/diffusion/cache/teacache/config.py
++++ b/vllm_omni/diffusion/cache/teacache/config.py
+@@ -83,6 +83,19 @@
+     ],
+     # LongCat Image transformer coefficients
+     "LongCatImageTransformer2DModel": [652.5980, -424.1615, 84.5526, -4.5923, 0.1694],
++    # MiniMax-H3 FL2VA coefficients.
++    "MiniMaxH3DiTModel": [
++        2.283704065852778e03,
++        -7.775977277886368e02,
++        9.408414741359490e01,
++        -4.232669906169421e00,
++        2.173782527946167e-01,
++    ],
++}
++
++_DEFAULT_REL_L1_THRESH = 0.2
++_MODEL_DEFAULT_REL_L1_THRESH = {
++    "MiniMaxH3DiTModel": 0.17,
+ }
+ 
+ 
+@@ -97,10 +110,8 @@ class TeaCacheConfig:
+ 
+     Args:
+         rel_l1_thresh: Threshold for accumulated relative L1 distance. When below threshold,
+-            cached residual is reused. Values in [0.1, 0.3] work best:
+-            - 0.2: ~1.5x speedup with minimal quality loss
+-            - 0.4: ~1.8x speedup with slight quality loss
+-            - 0.6: ~2.0x speedup with noticeable quality loss
++            cached residual is reused. If None, uses the model-specific default or 0.2
++            when no model-specific default is registered.
+         coefficients: Polynomial coefficients for rescaling L1 distance. If None, uses
+             model-specific defaults based on transformer_type.
+         transformer_type: Transformer class name (e.g., "QwenImageTransformer2DModel").
+@@ -108,14 +119,18 @@ class TeaCacheConfig:
+             Defaults to "QwenImageTransformer2DModel".
+     """
+ 
+-    rel_l1_thresh: float = 0.2
++    rel_l1_thresh: float | None = None
+     coefficients: list[float] | None = None
+     transformer_type: str = "QwenImageTransformer2DModel"
+ 
+     def __post_init__(self) -> None:
+         """Validate and set default coefficients."""
+-        if self.rel_l1_thresh <= 0:
+-            raise ValueError(f"rel_l1_thresh must be positive, got {self.rel_l1_thresh}")
++        threshold = self.rel_l1_thresh
++        if threshold is None:
++            threshold = _MODEL_DEFAULT_REL_L1_THRESH.get(self.transformer_type, _DEFAULT_REL_L1_THRESH)
++        if threshold <= 0:
++            raise ValueError(f"rel_l1_thresh must be positive, got {threshold}")
++        self.rel_l1_thresh = threshold
+ 
+         if self.coefficients is None:
+             # Use model-specific coefficients, explicitly check if the type exists or not
+diff --git a/vllm_omni/diffusion/cache/teacache/extractors.py b/vllm_omni/diffusion/cache/teacache/extractors.py
+index b0bd58bc8d4..5f1ca1d2260 100644
+--- a/vllm_omni/diffusion/cache/teacache/extractors.py
++++ b/vllm_omni/diffusion/cache/teacache/extractors.py
+@@ -1249,6 +1249,152 @@ def postprocess(h: torch.Tensor) -> SenseNovaU1CausalLMOutput:
+     )
+ 
+ 
++def extract_minimax_h3_context(
++    module: nn.Module,
++    **kwargs: Any,
++) -> CacheContext:
++    """Extract cache context for MiniMaxH3DiTModel.
++
++    Mirrors the packed multimodal forward in ``MiniMaxH3DiTModel.forward``:
++    preprocessing via ``_embed``, cacheable ``blocks`` loop, and
++    ``final_layer`` postprocessing with row selection and update masks.
++    """
++    from vllm_omni.diffusion.models.minimax_h3.minimax_h3_transformer import (
++        _BF16_DTYPE,
++        _FORWARD_SUPPORTED_KWARGS,
++        MINIMAX_H3_ADALN_MODALITY_NUM,
++        _modulate_scale_shift,
++        _required_kwarg,
++    )
++
++    if not hasattr(module, "blocks") or len(module.blocks) == 0:
++        raise ValueError("Module must have blocks")
++
++    unexpected = sorted(set(kwargs) - _FORWARD_SUPPORTED_KWARGS)
++    if unexpected:
++        raise TypeError(
++            "MiniMaxH3DiTModel.forward received unexpected kwargs: "
++            f"{unexpected}; supported kwargs: "
++            f"{sorted(_FORWARD_SUPPORTED_KWARGS)}"
++        )
++
++    x = _required_kwarg(kwargs, "x")
++    audio_x = _required_kwarg(kwargs, "audio_x")
++    img_position_ids = _required_kwarg(kwargs, "img_position_ids")
++    unique_timesteps = _required_kwarg(kwargs, "unique_timesteps")
++    inverse_indices = _required_kwarg(kwargs, "inverse_indices").view(-1).to(torch.long)
++    update_mask = _required_kwarg(kwargs, "update_mask")
++    token_tags = _required_kwarg(kwargs, "token_tags").view(-1).to(torch.long)
++    skip_mask_out_condition = bool(kwargs.get("skip_mask_out_condition", False))
++    update_audio_mask = kwargs.get("update_audio_mask")
++
++    text_selected = _required_kwarg(kwargs, "prompt_embeds")
++
++    img_pos = module._pos_ids(_required_kwarg(kwargs, "img_pos_info"), "img_pos_info")
++    audio_pos = module._pos_ids(_required_kwarg(kwargs, "audio_pos_info"), "audio_pos_info")
++    text_pos = module._pos_ids(
++        _required_kwarg(kwargs, "text_pos_info"),
++        "text_pos_info",
++    )
++    infer_out_pos = module._pos_ids(
++        _required_kwarg(kwargs, "img_pos_for_infer_output_info"),
++        "img_pos_for_infer_output_info",
++    )
++
++    psp = _required_kwarg(kwargs, "packed_seq_params")
++    cu_seqlens = module._psp_field(psp, "packed_seq_params", "cu_seqlens_q").to(torch.int32)
++    max_seqlen = int(module._psp_field(psp, "packed_seq_params", "max_seqlen_q"))
++    refiner_psp = _required_kwarg(kwargs, "refiner_packed_seq_params")
++    refiner_cu = module._psp_field(refiner_psp, "refiner_packed_seq_params", "cu_seqlens_q").to(torch.int32)
++    refiner_max = int(module._psp_field(refiner_psp, "refiner_packed_seq_params", "max_seqlen_q"))
++    video_layout = kwargs.get("video_token_layout")
++
++    if x.dim() != 3 or x.shape[0] != 1:
++        raise ValueError(f"x must be [1, S, C], got {list(x.shape)}")
++    seq_len = int(x.shape[1])
++    if token_tags.shape[0] != seq_len:
++        raise ValueError(f"token_tags must cover the full packed sequence ({seq_len}), got {token_tags.shape[0]}.")
++    if inverse_indices.shape[0] != seq_len:
++        raise ValueError(f"inverse_indices must be [{seq_len}], got {list(inverse_indices.shape)}")
++    device = x.device
++
++    rope_freqs = module.rope(img_position_ids).to(device)
++
++    decoder_input, t_emb = module._embed(
++        x=x,
++        audio_x=audio_x,
++        text_embeddings_selected=text_selected,
++        unique_timesteps=unique_timesteps.view(-1).to(device),
++        img_pos=img_pos.to(device),
++        audio_pos=audio_pos.to(device),
++        text_pos=text_pos.to(device),
++        refiner_cu_seqlens=refiner_cu.to(device),
++        refiner_max_seqlen=refiner_max,
++        seq_len=seq_len,
++        device=device,
++    )
++
++    combined_indices = (inverse_indices * MINIMAX_H3_ADALN_MODALITY_NUM + token_tags.clamp(min=0)).to(device)
++    inverse_indices = inverse_indices.to(device)
++    cu_seqlens = cu_seqlens.to(device)
++
++    shift_msa, scale_msa, *_ = module.blocks[0].adaln_proj(t_emb)
++    modulated_hidden = module.blocks[0].norm1(decoder_input)
++    modulated_input = _modulate_scale_shift(
++        modulated_hidden,
++        shift_msa,
++        scale_msa,
++        combined_indices,
++        dtype=_BF16_DTYPE,
++    )
++
++    def run_transformer_blocks() -> tuple[torch.Tensor, ...]:
++        hidden, block_rope, block_combined = module.sp_prepare(
++            decoder_input,
++            rope_freqs,
++            combined_indices,
++        )
++        for block in module.blocks:
++            hidden = block(
++                hidden,
++                t_emb=t_emb,
++                combined_indices=block_combined,
++                rope_freqs=block_rope,
++                cu_seqlens=cu_seqlens,
++                max_seqlen=max_seqlen,
++                packed_total=seq_len,
++                video_layout=video_layout,
++            )
++        hidden = module.sp_gather(hidden)
++        return (hidden,)
++
++    def postprocess(hidden: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
++        video_logits, audio_logits = module.final_layer(
++            hidden,
++            t_emb=t_emb,
++            inverse_indices=inverse_indices,
++        )
++        video_logits = video_logits.index_select(0, infer_out_pos.to(device))
++        audio_logits = audio_logits.index_select(0, audio_pos.to(device))
++        if not skip_mask_out_condition:
++            mask = update_mask.view(-1).to(device)
++            if mask.shape[0] != video_logits.shape[0]:
++                raise ValueError(f"update_mask length mismatch: {mask.shape[0]} != {video_logits.shape[0]}")
++            video_logits = video_logits * mask.unsqueeze(-1)
++            if update_audio_mask is not None:
++                audio_logits = audio_logits * update_audio_mask.view(-1).unsqueeze(-1)
++        return video_logits, audio_logits
++
++    return CacheContext(
++        modulated_input=modulated_input,
++        hidden_states=decoder_input,
++        encoder_hidden_states=None,
++        temb=t_emb,
++        run_transformer_blocks=run_transformer_blocks,
++        postprocess=postprocess,
++    )
++
++
+ # Registry for model-specific extractors
+ # Key: Transformer class name
+ # Value: extractor function with signature (module, *args, **kwargs) -> CacheContext
+@@ -1265,6 +1411,7 @@ def postprocess(h: torch.Tensor) -> SenseNovaU1CausalLMOutput:
+     "LongCatImageTransformer2DModel": extract_longcat_context,
+     "FluxTransformer2DModel": extract_flux_context,
+     "SenseNovaU1ForCausalLM": extract_sensenova_u1_context,
++    "MiniMaxH3DiTModel": extract_minimax_h3_context,
+     # Future models:
+     # "CogVideoXTransformer3DModel": extract_cogvideox_context,
+ }
+diff --git a/vllm_omni/diffusion/cache/teacache/hook.py b/vllm_omni/diffusion/cache/teacache/hook.py
+index d38148366e0..85a42adbb5b 100644
+--- a/vllm_omni/diffusion/cache/teacache/hook.py
++++ b/vllm_omni/diffusion/cache/teacache/hook.py
+@@ -231,7 +231,9 @@ def _should_compute_full_transformer(self, state: TeaCacheState, modulated_inp:
+         state.accumulated_rel_l1_distance += abs(rescaled_distance)
+ 
+         # Decision: below threshold = cache, above = compute
+-        if state.accumulated_rel_l1_distance < self.config.rel_l1_thresh:
++        rel_l1_thresh = self.config.rel_l1_thresh
++        assert rel_l1_thresh is not None
++        if state.accumulated_rel_l1_distance < rel_l1_thresh:
+             return False  # Use cache
+         else:
+             state.accumulated_rel_l1_distance = 0.0  # Reset accumulator
+diff --git a/vllm_omni/diffusion/data.py b/vllm_omni/diffusion/data.py
+index 1396b7318e4..9ffb484a1d4 100644
+--- a/vllm_omni/diffusion/data.py
++++ b/vllm_omni/diffusion/data.py
+@@ -412,14 +412,14 @@ class DiffusionCacheConfig:
+         >>> # Access via attribute
+         >>> print(config.rel_l1_thresh)  # 0.3 (from dict)
+         >>> print(config.Fn_compute_blocks)  # 8 (default)
+-        >>> # Empty dict uses all defaults
++        >>> # Empty dict defers model-specific defaults to the TeaCache backend
+         >>> default_config = DiffusionCacheConfig.from_dict({})
+-        >>> print(config.rel_l1_thresh)  # 0.2 (default)
++        >>> print(default_config.rel_l1_thresh)  # None
+     """
+ 
+     # TeaCache parameters [tea_cache only]
+-    # Default: 0.2 provides ~1.5x speedup with minimal quality loss (optimal balance)
+-    rel_l1_thresh: float = 0.2
++    # None defers to the model-specific TeaCache default (0.2 fallback).
++    rel_l1_thresh: float | None = None
+     coefficients: list[float] | None = None  # Uses model-specific defaults if None
+ 
+     # MagCache parameters [mag_cache only]

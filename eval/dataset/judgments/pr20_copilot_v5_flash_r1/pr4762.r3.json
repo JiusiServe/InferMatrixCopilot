@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.55,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates catch the trust_remote_code default-flip issue (matching the ground-truth inline comment where the author admits 'this looks like a bug'), but X repeats this single finding four times in near-identical form and misses nearly everything else the human reviewers raised (hf_config cache mutability, positional-arg signature risk, create_error_response reuse, UNSUPPORTED_ROUTES coverage). Y covers more distinct, diff-grounded areas (endpoint_policy.py status_code handling near the same line the human flagged for create_error_response, the else-branch skipping UNSUPPORTED_ROUTES, and cache-invalidation scope), giving it better recall and precision despite being less exhaustively evidenced than X's verbose single-issue writeups.",
+  "_cost_usd": 0.24061120000000003,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "0dda532192424a9256c66b766a6b22580d65743f1d09a49cf3d1ea30344885ef",
+    "judge_rep": 3
+  }
+}

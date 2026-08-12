@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Candidate X delivers a substantive, evidence-based review that verifies each of the PR's technical claims against source (file:line citations for chat_template_kwargs handling, the two-choices behavior, and the silent-vs-text-only TTS distinction), reaches a verdict consistent with the ground truth (approve/LGTM), and adds one well-hedged non-blocking wording comment. Candidate Y is not a review at all — the OCR tool filtered out the only changed file (a Markdown doc) before dispatch and returned zero findings, providing no grounded content, no verdict, and no actionable feedback. Since the ground-truth comments contain no substantive reviewer concerns to recall, X still wins decisively on precision and actionability given Y produced nothing to evaluate.",
+  "_cost_usd": 0.09798789999999999,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "38e263e1b5697d8bec36d8dbacedc6666dbea5003329be6212bbfd0d3d210fb6",
+    "judge_rep": 2
+  }
+}

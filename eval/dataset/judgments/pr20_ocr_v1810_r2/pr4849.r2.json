@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.9,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "The central substantive ground-truth concern (whether source_outputs[0] is reliably the parent request) is directly investigated and resolved by Y via concrete orchestrator code references, while X never touches it and instead raises two minor, largely pre-existing/speculative issues (IndexError guard, log request-id) that no ground-truth reviewer flagged. Neither candidate covers the precommit-fix or benchmark-rerun asks, capping both recalls. X's findings are more actionable with concrete before/after diffs, but Y's broader, well-grounded investigation (caller compatibility, CFG-companion handling, GLM-Image parity) yields higher precision and better overlap with what the real reviewers cared about.",
+  "_cost_usd": 0.2069947,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "6dccef89ec9b0407207941cdf9498c79d12eb6083912b49943cd30cef80d5a31",
+    "judge_rep": 2
+  }
+}

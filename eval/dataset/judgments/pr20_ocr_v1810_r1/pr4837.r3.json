@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.95,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X delivers a grounded, verified analysis that independently confirms the exact reasoning behind the human inline comment (both submit_initial and submit_update reject list prompts in diffusion StagePool, so gating the unwrap on already_submitted was the bug), citing concrete file/line evidence and correctly reaching the same APPROVE/LGTM verdict as the human reviewers. Y produced zero findings and explicitly failed to review one of the two changed files due to hitting a tool-round budget, offering no coverage, no grounded claims, and nothing actionable.",
+  "_cost_usd": 0.0414085,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "72e57f6b2aa7e106bc6530e4d0a79d6722f38fdbfea3ad062fb5180918712aaf",
+    "judge_rep": 3
+  }
+}

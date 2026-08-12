@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.55,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "The one substantive ground-truth concern (yJader's inline comment) is that removing `already_submitted` is correct because both `submit_initial` and `submit_update` already reject list prompts in StagePool. Y independently verifies this exact claim with concrete line citations (stage_pool.py:951, 1022), closely mirroring the reviewer's actual reasoning and correctly landing on APPROVE, matching the real outcome (two LGTMs). X gestures at the same idea but leans on the PR description rather than code verification, then elevates a speculative 'add a regression test' ask to [major] severity and adds a low-value PR-description nit, diverging from the actual low-friction review and hurting precision. Both candidates are reasonably actionable with file/line references, but Y's findings are more tightly grounded and its verdict better reflects ground truth.",
+  "_cost_usd": 0.1167332,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1",
+    "arm_a_sha256": "33be39ca9b4e0e4f5a72daee159f7defb69bc381f997cbd4703d92e5cc649d58",
+    "judge_rep": 2
+  }
+}

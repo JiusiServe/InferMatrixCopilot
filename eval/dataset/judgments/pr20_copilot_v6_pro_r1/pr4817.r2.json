@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns, so recall is trivially satisfied by both. X offers one hedged, ultimately dismissed nit (sm_110a exclusion) and a clean approve. Y surfaces three concrete, file:line-anchored suggestions (missing sm_101a test case, docstring gap on sm_110a, and a stale 'Blackwell-only' comment in pyproject.toml found via repo-wide grep beyond the diff) — the pyproject.toml catch shows deeper investigation and all three are plausible and actionable even if minor. Y edges out on actionability and thoroughness without sacrificing grounding.",
+  "_cost_usd": 0.0489224,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "5b3806345c5923d38ae7770cbdba3dd453eb8492579b72d95f16a82ec2783e90",
+    "judge_rep": 2
+  }
+}

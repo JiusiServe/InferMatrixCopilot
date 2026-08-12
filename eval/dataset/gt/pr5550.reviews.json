@@ -1,0 +1,48 @@
+{
+  "comments": [
+    {
+      "author": "Acerak01-fy",
+      "body": "> @Acerak01-fy Thanks for your contribution! I left a few minor nits\r\n\r\nThanks! I've fixed it."
+    },
+    {
+      "author": "Acerak01-fy",
+      "body": "> Inline findings from the joint review with #5541.\r\n\r\nThanks! I have already fixed the issues mentioned."
+    },
+    {
+      "author": "asukaqaq-s",
+      "body": "What functionality is this PR intended to implement, and where is its scope boundary?\r\n\r\nFrom what I can see, #5550 does not use the following parts of the native vLLM KV-cache initialization and execution flow:\r\n\r\n* Worker `get_kv_cache_spec()`\r\n* `determine_available_memory()`\r\n* Engine `get_kv_cache_configs()`\r\n* `generate_scheduler_kv_cache_config()`\r\n* Worker `initialize_from_config()`\r\n* native `BlockTable` / `slot_mapping`\r\n* connector `register_kv_caches()`\r\n\r\nWithout these pieces, it is not clear to me whether this PR is intended to establish only the control-plane contracts and request-planning abstractions, or whether it is expected to provide a partially functional paged-KV path.\r\n\r\nCould you clarify which end-to-end capability this PR is expected to complete, and which parts are intentionally deferred to follow-up PRs?\r\n"
+    },
+    {
+      "author": "asukaqaq-s",
+      "body": "There seem to be too many `RuntimeError` paths and validation checks in the current implementation, and the same facts are being derived repeatedly across multiple layers.\r\n\r\nFor example, in request mode, the Executor first performs the metadata/digest exact-set validation in `multiproc_executor.py:327`, and then the Runner performs essentially the same validation again in `diffusion_model_runner.py:194`. The physical configuration is also fully traversed and reconstructed in both the Executor and every Runner, while the resulting values are compared again at both the Worker and Executor layers.\r\n\r\nIt still makes sense to retain both driver-side preflight validation and receiver-side acceptance validation, especially to avoid a situation where some ranks have already accepted the request before another rank fails. However, both sides should call the same typed envelope and canonical validator, rather than maintaining separate maps and separate missing/unexpected-key loops.\r\n\r\nThe exception types could also be consolidated according to ownership:\r\n\r\n* Use `ValueError` for user configuration or schema errors.\r\n* Use `RuntimeError` for cross-process generation or domain mismatches.\r\n* Preserve the existing assertions or fail-fast behavior for internal invariants owned by native builders and attention backends.\r\n\r\nI would suggest retaining only three categories of validation:\r\n\r\n1. **Local construction-time invariants**：Non-empty IDs、Positive generation values、Valid enum values、Unique branch IDs\r\n\r\n2. **Cross-owner acceptance validation for `StageKVMetadata`**、 Request, domain, and generation matching、Exact branch and group sets、 Block ID ranges、Null-block validation、 Explicit aliasing and unique-writer rules\r\n\r\n3. **Real validation during native Worker initialization**、Rank-local layer coverage、Allocation size in bytes、Whether the backend-specific shape, stride, and tensor view can actually be created\r\n\r\n"
+    },
+    {
+      "author": "Acerak01-fy",
+      "body": "> What functionality is this PR intended to implement, and where is its scope boundary?\r\n> \r\n> From what I can see, #5550 does not use the following parts of the native vLLM KV-cache initialization and execution flow:\r\n> \r\n> * Worker `get_kv_cache_spec()`\r\n> * `determine_available_memory()`\r\n> * Engine `get_kv_cache_configs()`\r\n> * `generate_scheduler_kv_cache_config()`\r\n> * Worker `initialize_from_config()`\r\n> * native `BlockTable` / `slot_mapping`\r\n> * connector `register_kv_caches()`\r\n> \r\n> Without these pieces, it is not clear to me whether this PR is intended to establish only the control-plane contracts and request-planning abstractions, or whether it is expected to provide a partially functional paged-KV path.\r\n> \r\n> Could you clarify which end-to-end capability this PR is expected to complete, and which parts are intentionally deferred to follow-up PRs?\r\n\r\nThanks, this is a valid concern.\r\n\r\n  After discussing this with the author of #5541, we agree that the final initialization ownership should follow the native vLLM flow:\r\n\r\n  Worker KV-cache specs and available memory\r\n    -> Engine generates the canonical KVCacheConfig\r\n    -> the same config is consumed by both the Worker physical cache initialization and the Scheduler KVCacheManager.\r\n\r\n  Therefore, the current Scheduler-produced get_stage_kv_worker_init_config() flow should not be treated as the final\r\n  architecture. We will align #5541 first and update #5550 before merge so that this PR does not establish a Scheduler-first configuration contract that would immediately need to be replaced.\r\n\r\n  The scope of #5550 will remain the control-plane and request-metadata\r\n  boundary:\r\n\r\n  - Engine/Executor/Worker initialization plumbing for the shared config;\r\n  - request-local StageKVMetadata and layout-digest delivery;\r\n  - receiver-side validation before model forward;\r\n  - unchanged dense-KV behavior.\r\n\r\n  Physical KV tensors, native BlockTables/slot_mapping, model consumption,paged attention, and connector register_kv_caches() will remain in follow-up PRs.\r\n\r\n  I will also update the PR description with an explicit scope/ownership table after the shared initialization contract is aligned.\r\n"
+    },
+    {
+      "author": "hsliuustc0106",
+      "body": "The PR description and test plan still describe the old `StageKVWorkerInitConfig/Result`, physical-layout/fingerprint validation, all-Worker initialization RPC, and `install_stage_kv_metadata()` implementation at `9832c66c`; none of those symbols exist at current head `4ab8466a`. Please either restore that advertised initialization contract, or rewrite the title/body/tests for the narrower DTO/RPC-only scope and defer metadata requiredness until the missing producer/installer lands."
+    },
+    {
+      "author": "Acerak01-fy",
+      "body": "> The PR description and test plan still describe the old `StageKVWorkerInitConfig/Result`, physical-layout/fingerprint validation, all-Worker initialization RPC, and `install_stage_kv_metadata()` implementation at `9832c66c`; none of those symbols exist at current head `4ab8466a`. Please either restore that advertised initialization contract, or rewrite the title/body/tests for the narrower DTO/RPC-only scope and defer metadata requiredness until the missing producer/installer lands.\r\n\r\nDone."
+    },
+    {
+      "author": "hsliuustc0106",
+      "body": "```\r\n\r\n[2026-08-10T14:14:45Z] FAILED tests/diffusion/cache/test_teacache_extractors.py::TestMiniMaxH3Extractor::test_modulated_input_shape - AttributeError: type object 'FakeBackend' has no attribute 'supports_packed_mask_free'\r\n--\r\n  | [2026-08-10T14:14:45Z] FAILED tests/diffusion/cache/test_teacache_extractors.py::TestMiniMaxH3Extractor::test_run_transformer_blocks_callable - AttributeError: type object 'FakeBackend' has no attribute 'supports_packed_mask_free'\r\n  | [2026-08-10T14:14:45Z] FAILED tests/diffusion/cache/test_teacache_extractors.py::TestMiniMaxH3Extractor::test_postprocess_callable - AttributeError: type object 'FakeBackend' has no attribute 'supports_packed_mask_free'\r\n  | [2026-08-10T14:14:45Z] FAILED tests/diffusion/cache/test_teacache_extractors.py::TestMiniMaxH3Extractor::test_postprocess_output_shape - AttributeError: type object 'FakeBackend' has no attribute 'supports_packed_mask_free'\r\n  | [2026-08-10T14:14:45Z] FAILED tests/diffusion/cache/test_teacache_extractors.py::TestMiniMaxH3Extractor::test_extractor_matches_native_forward - AttributeError: type object 'FakeBackend' has no attribute 'supports_packed_mask_free'\r\n  | [2026-08-10T14:14:45Z] FAILED tests/diffusion/cache/test_teacache_extractors.py::TestMiniMaxH3Extractor::test_run_transformer_blocks_forwards_packed_layout - AttributeError: type object 'FakeBackend' has no attribute 'supports_packed_mask_free'\r\n  | [2026-08-10T14:14:45Z] FAILED tests/diffusion/cache/test_teacache_extractors.py::TestMiniMaxH3Extractor::test_teacache_reuses_h3_block_residual - AttributeError: type object 'FakeBackend' has no attribute 'supports_packed_mask_free'\r\n  | [2026-08-10T14:14:45Z] = 7 failed, 2710 passed, 30 skipped, 366 deselected, 31 warnings in 463.86s (0:07:43) =\r\n  | [2026-08-10T14:14:49Z] /usr/lib/python3.12/multiprocessing/resource_tracker.py:279: UserWarning: resource_tracker: There appear to be 1 leaked shared_memory objects to clean up at shutdown\r\n  | [2026-08-10T14:14:49Z]   warnings.warn('resource_tracker: There appear to be %d '\r\n  | [2026-08-10T14:14:52Z] 🚨 Error: The command exited with status 1\r\n  | [2026-08-10T14:14:52Z] user command error: The plugin docker command hook exited with status 1\r\n\r\n\r\n```"
+    }
+  ],
+  "reviews": [
+    {
+      "author": "RuixiangMa",
+      "body": "@Acerak01-fy Thanks for your contribution!  I left a few minor nits",
+      "state": "COMMENTED"
+    },
+    {
+      "author": "hsliuustc0106",
+      "body": "Inline findings from the joint review with #5541.",
+      "state": "COMMENTED"
+    }
+  ]
+}

@@ -1,0 +1,121 @@
+diff --git a/tests/diffusion/cache/test_cache_backends.py b/tests/diffusion/cache/test_cache_backends.py
+index 1137cfbc09f..5827d88e0a1 100644
+--- a/tests/diffusion/cache/test_cache_backends.py
++++ b/tests/diffusion/cache/test_cache_backends.py
+@@ -11,6 +11,7 @@
+ - DiffusionCacheConfig: configuration dataclass
+ """
+ 
++from types import SimpleNamespace
+ from unittest.mock import Mock, patch
+ 
+ import cache_dit
+@@ -21,6 +22,7 @@
+     CacheDiTAdapterConfig,
+     CacheDiTBackend,
+     CacheDiTConfig,
++    cache_summary,
+ )
+ from vllm_omni.diffusion.cache.magcache import MagCacheBackend
+ from vllm_omni.diffusion.cache.selector import get_cache_backend
+@@ -115,6 +117,49 @@ def test_enable_and_refresh_every_declared_dit(self, mock_cache_dit, mock_block_
+             pipeline.transformers_ref,
+         }
+ 
++    @patch("vllm_omni.diffusion.cache.cachedit.backend.cache_dit")
++    def test_summary_skips_uncached_nested_dit(self, mock_cache_dit):
++        """Only DiT modules with an active Cache-DiT context are summarized."""
++        language_model = Mock()
++        language_model._is_cached = False
++        transformer = Mock()
++        transformer._is_cached = True
++        transformer.language_model = language_model
++        pipeline = SimpleNamespace(
++            _dit_modules=["transformer.language_model", "transformer"],
++            transformer=transformer,
++        )
++
++        cache_summary(pipeline)
++
++        mock_cache_dit.summary.assert_called_once_with(transformer, details=True)
++
++    @patch("vllm_omni.diffusion.cache.cachedit.backend.BlockAdapter")
++    @patch("vllm_omni.diffusion.cache.cachedit.backend.cache_dit")
++    def test_enable_and_refresh_nested_declared_dit(self, mock_cache_dit, mock_block_adapter):
++        """Dotted component paths resolve to their nested DiT module."""
++        transformer = Mock()
++        transformer._cache_dit_adapter_config = CacheDiTAdapterConfig(
++            block_forward_patterns={"blocks": ForwardPattern.Pattern_3}
++        )
++        pipeline = SimpleNamespace(
++            _dit_modules=["language_model.model"],
++            language_model=SimpleNamespace(model=transformer),
++        )
++
++        backend = CacheDiTBackend({"Fn_compute_blocks": 2})
++        backend.enable(pipeline)
++        backend.refresh(pipeline, num_inference_steps=20)
++
++        cache_summary(pipeline)
++        mock_cache_dit.enable_cache.assert_called_once()
++        mock_cache_dit.refresh_context.assert_called_once_with(
++            transformer,
++            num_inference_steps=20,
++            verbose=True,
++        )
++        mock_cache_dit.summary.assert_called_once_with(transformer, details=True)
++
+     @patch("vllm_omni.diffusion.cache.cachedit.backend.logger")
+     @patch("vllm_omni.diffusion.cache.cachedit.backend.cache_dit")
+     def test_enable_without_model_adapter_uses_cache_dit_registry(self, mock_cache_dit, mock_logger):
+diff --git a/vllm_omni/diffusion/cache/cachedit/backend.py b/vllm_omni/diffusion/cache/cachedit/backend.py
+index c30a888a863..03bd674a27e 100644
+--- a/vllm_omni/diffusion/cache/cachedit/backend.py
++++ b/vllm_omni/diffusion/cache/cachedit/backend.py
+@@ -6,6 +6,7 @@
+ from __future__ import annotations
+ 
+ from collections.abc import Callable
++from operator import attrgetter
+ from typing import TYPE_CHECKING, Any, TypeAlias, cast
+ 
+ import cache_dit
+@@ -38,14 +39,27 @@ def _dit_module_names(pipeline: SupportsComponentDiscovery) -> tuple[str, ...]:
+     names = getattr(pipeline, "_dit_modules", None)
+     if not isinstance(names, (list, tuple)):
+         names = ("transformer",)
+-    return tuple(name for name in names if isinstance(name, str) and getattr(pipeline, name, None) is not None)
++
++    resolved_names = []
++    for name in names:
++        if not isinstance(name, str):
++            continue
++        try:
++            module = attrgetter(name)(pipeline)
++        except AttributeError:
++            continue
++        if module is not None:
++            resolved_names.append(name)
++    return tuple(resolved_names)
+ 
+ 
+ def cache_summary(pipeline: SupportsComponentDiscovery, details: bool = True) -> None:
+     """Log Cache-DiT statistics for every transformer on the pipeline."""
+ 
+-    transformers = [getattr(pipeline, name) for name in _dit_module_names(pipeline)]
++    transformers = [attrgetter(name)(pipeline) for name in _dit_module_names(pipeline)]
+     for transformer in transformers:
++        if not BlockAdapter.is_cached(transformer):
++            continue
+         cache_dit.summary(transformer, details=details)
+ 
+     if not transformers:
+@@ -64,7 +78,7 @@ def _make_pipeline_transformer_getter(
+     def get_pipeline_transformer(
+         pipeline: SupportsComponentDiscovery,
+     ) -> nn.Module:
+-        return cast(nn.Module, getattr(pipeline, name))
++        return cast(nn.Module, attrgetter(name)(pipeline))
+ 
+     return get_pipeline_transformer
+ 

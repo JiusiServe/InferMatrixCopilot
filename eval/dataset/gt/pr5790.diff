@@ -1,0 +1,434 @@
+diff --git a/examples/offline_inference/minicpmo/README.md b/examples/offline_inference/minicpmo/README.md
+index b80fc0aa67b..31120773c7f 100644
+--- a/examples/offline_inference/minicpmo/README.md
++++ b/examples/offline_inference/minicpmo/README.md
+@@ -1,8 +1,9 @@
+ # MiniCPM-o 4.5: Offline inference
+ 
+-Two-stage pipeline: **thinker** (multimodal understanding) → **talker + Token2Wav**
++Three-stage pipeline: **Thinker** → **Talker** (codec) → **Code2Wav**
+ (24 kHz speech). Deploy config auto-loads from
+-`vllm_omni/deploy/minicpmo_4_5.yaml` (2-GPU default).
++`vllm_omni/deploy/minicpmo_4_5.yaml` (single-GPU default). For higher
++throughput, pass `--deploy-config vllm_omni/deploy/minicpmo_4_5_2gpu.yaml`.
+ 
+ ## Setup
+ 
+@@ -72,7 +73,7 @@ Supported `--query-type` values:
+ 
+ ```bash
+ python end2end.py --query-type text \
+-    --deploy-config /path/to/vllm_omni/deploy/minicpmo_4_5_8x4090.yaml
++    --deploy-config /path/to/vllm_omni/deploy/minicpmo_4_5_2gpu.yaml
+ ```
+ 
+ ## Notes
+@@ -83,7 +84,8 @@ python end2end.py --query-type text \
+ - Output WAV is **24 kHz mono**.
+ - Placeholders in the prompt are MiniCPM-style:
+   `(<image>./</image>)`, `(<audio>./</audio>)`, `(<video>./</video>)`.
+-- Default layout needs **2 GPUs**. Async chunking is off in the bundled YAMLs.
++- Default layout needs **1 GPU**. Use `minicpmo_4_5_2gpu.yaml` for the
++  recommended two-GPU continuous-batching layout.
+ 
+ ## Online serving
+ 
+diff --git a/examples/online_serving/minicpmo/README.md b/examples/online_serving/minicpmo/README.md
+index 2f9929b2661..5a9fd2be086 100644
+--- a/examples/online_serving/minicpmo/README.md
++++ b/examples/online_serving/minicpmo/README.md
+@@ -23,17 +23,17 @@ including `librosa`.
+ 
+ The deploy config auto-loads via `--omni`.
+ The default `vllm_omni/deploy/minicpmo_4_5.yaml` keeps all three stages on
+-logical device 0 with memory budgets of 55%, 22%, and 22%. The profile admits
+-at most four sequences per stage and bounds startup video profiling to 32
+-frames per video. For throughput, `minicpmo_4_5_batching.yaml` gives the Thinker
+-GPU 0 (90%) and colocates the Talker (55%) and Code2Wav (35%) on GPU 1. That
+-profile admits at most four concurrent sequences per stage.
++logical device 0 with memory budgets of 55%, 15%, and 18%, leaving headroom
++for runtime kernels such as the HiFi-GAN vocoder's cuDNN workspace. The
++profile admits at most four sequences per stage. For throughput,
++`minicpmo_4_5_2gpu.yaml` gives the Thinker GPU 0 (90%) and colocates the
++Talker (55%) and Code2Wav (35%) on GPU 1. That profile admits at most four
++concurrent sequences per stage.
+ 
+ | deploy config | GPUs | Notes |
+ |---|---|---|
+ | `minicpmo_4_5.yaml` (default) | 1 | Memory-constrained compatibility layout. |
+-| `minicpmo_4_5_batching.yaml` | 2 | Recommended continuous-batching layout; Talker and Code2Wav share GPU 1. |
+-| `minicpmo_4_5_2gpu.yaml` | 2 | Backward-compatible alias for `minicpmo_4_5_batching.yaml`. |
++| `minicpmo_4_5_2gpu.yaml` | 2 | Recommended continuous-batching layout; Talker and Code2Wav share GPU 1. |
+ | `minicpmo_4_5_3gpu.yaml` | 3 | One GPU per stage. |
+ | `minicpmo_4_5_8x4090.yaml` | 8 | Full 8x4090 layout. |
+ | `minicpmo_4_5_duplex.yaml` | 1 | Experimental native full-duplex overlay. |
+diff --git a/recipes/OpenBMB/MiniCPM-o-4_5.md b/recipes/OpenBMB/MiniCPM-o-4_5.md
+index d34376b9ca8..c643bc2251f 100644
+--- a/recipes/OpenBMB/MiniCPM-o-4_5.md
++++ b/recipes/OpenBMB/MiniCPM-o-4_5.md
+@@ -31,9 +31,7 @@ also provided.
+   - Default single-GPU compatibility layout (auto-loaded):
+     [`vllm_omni/deploy/minicpmo_4_5.yaml`](../../vllm_omni/deploy/minicpmo_4_5.yaml)
+   - Recommended 2-GPU continuous-batching layout:
+-    [`vllm_omni/deploy/minicpmo_4_5_batching.yaml`](../../vllm_omni/deploy/minicpmo_4_5_batching.yaml)
+-  - 2-GPU and 3-GPU layouts:
+-    [`vllm_omni/deploy/minicpmo_4_5_2gpu.yaml`](../../vllm_omni/deploy/minicpmo_4_5_2gpu.yaml),
++    [`vllm_omni/deploy/minicpmo_4_5_2gpu.yaml`](../../vllm_omni/deploy/minicpmo_4_5_2gpu.yaml)
+   - 3-GPU layout:
+     [`vllm_omni/deploy/minicpmo_4_5_3gpu.yaml`](../../vllm_omni/deploy/minicpmo_4_5_3gpu.yaml)
+   - 8x RTX 4090 layout:
+@@ -69,8 +67,8 @@ Code2Wav consumes them through a shared-memory async connector.
+ MiniCPM-o 4.5 now requires the three-stage topology: the Talker owns
+ request-local codec generation and Code2Wav owns waveform state and
+ reference-voice prompt features. `minicpmo_4_5.yaml` remains the stable
+-single-GPU entry point; `minicpmo_4_5_batching.yaml` is the recommended
+-two-GPU profile. The removed fused two-stage implementation is not retained as
++single-GPU entry point; `minicpmo_4_5_2gpu.yaml` is the recommended
++two-GPU continuous-batching profile. The removed fused two-stage implementation is not retained as
+ a fallback because it would duplicate state machines and correctness paths.
+ 
+ ## GPU
+@@ -80,9 +78,9 @@ a fallback because it would duplicate state machines and correctness paths.
+ The default
+ [`vllm_omni/deploy/minicpmo_4_5.yaml`](../../vllm_omni/deploy/minicpmo_4_5.yaml)
+ co-locates Thinker, codec-only Talker, and Code2Wav on GPU 0. Their
+-`gpu_memory_utilization` budgets are 0.55, 0.22, and 0.22. All stages admit
+-up to four sequences. Startup video profiling is bounded to 32 frames per
+-video. Use the two-GPU profile for production throughput.
++`gpu_memory_utilization` budgets are 0.55, 0.15, and 0.18 so concurrent
++Code2Wav activations keep residual headroom. All stages admit up to four
++sequences. Use the two-GPU profile for production throughput.
+ 
+ #### Environment
+ 
+@@ -106,7 +104,7 @@ The deploy config is auto-loaded by the model registry — no
+ For the recommended two-GPU layout, add:
+ 
+ ```bash
+---deploy-config vllm_omni/deploy/minicpmo_4_5_batching.yaml
++--deploy-config vllm_omni/deploy/minicpmo_4_5_2gpu.yaml
+ ```
+ 
+ #### Performance comparison
+@@ -205,8 +203,8 @@ speech output (TTS)"** checkbox on / off.
+ 
+ #### Notes
+ 
+-- Memory budget: Thinker, Talker, and Code2Wav reserve 0.55, 0.22, and
+-  0.22 of GPU 0. The larger Thinker share protects its multimodal KV cache;
++- Memory budget: Thinker, Talker, and Code2Wav reserve 0.55, 0.15, and
++  0.18 of GPU 0 so concurrent Code2Wav activations keep residual headroom;
+   all three model processes still share one CUDA device.
+ - `--trust-remote-code` is required — the HF repo ships a custom
+   `MiniCPMO` config / model class.
+@@ -217,14 +215,13 @@ speech output (TTS)"** checkbox on / off.
+   contention. Talker AR
+   state and Code2Wav caches are request-owned; Code2Wav batches only
+   exact-shape-compatible chunks and does not fall back to serial decode.
+-- `limit_mm_per_prompt.video.num_frames: 32` bounds startup dummy profiling,
+-  not runtime media decoding. Use `media_io_kwargs.video.num_frames` when a
+-  matching URL/file video sampling limit is required.
++- Stage 0 pins `interleave_mm_strings=true` and
++  `media_io_kwargs.video={fps:1,num_frames:128}` for Daily-Omni MiniCPM packs.
+ - `StageRequestStats.batch_size` is a request-scoped placeholder, not the
+   scheduler's execution batch.
+ - Single-GPU co-location trades throughput for hardware density: Stage 0/1
+   CUDA Graph replay and eager Stage 2 vocoder kernels compete across three
+-  CUDA contexts. Use the 8x4090 config or a custom multi-GPU mapping for
++  CUDA contexts. Use `minicpmo_4_5_2gpu.yaml` or a custom multi-GPU mapping for
+   throughput-sensitive serving.
+ 
+ ### 8 x RTX 4090 24GB (consumer-GPU layout)
+diff --git a/tests/dfx/reliability/invalid_param_test/test_invalid_minicpmo_4_5_omni.py b/tests/dfx/reliability/invalid_param_test/test_invalid_minicpmo_4_5_omni.py
+index c37b0b26aff..df67b992249 100644
+--- a/tests/dfx/reliability/invalid_param_test/test_invalid_minicpmo_4_5_omni.py
++++ b/tests/dfx/reliability/invalid_param_test/test_invalid_minicpmo_4_5_omni.py
+@@ -14,7 +14,7 @@
+ 
+ pytestmark = [pytest.mark.slow, pytest.mark.omni, pytest.mark.full_model]
+ 
+-_MINICPMO_DEPLOY = get_deploy_config_path("minicpmo_4_5_batching.yaml")
++_MINICPMO_DEPLOY = get_deploy_config_path("minicpmo_4_5_2gpu.yaml")
+ 
+ _MINICPMO_SERVER = [
+     pytest.param(
+diff --git a/tests/e2e/online_serving/test_minicpmo_4_5.py b/tests/e2e/online_serving/test_minicpmo_4_5.py
+index e19ab6a09ec..f8b65fd0e26 100644
+--- a/tests/e2e/online_serving/test_minicpmo_4_5.py
++++ b/tests/e2e/online_serving/test_minicpmo_4_5.py
+@@ -19,7 +19,7 @@
+ _CI_DEPLOY = modify_stage_config(
+     get_deploy_config_path("minicpmo_4_5.yaml"),
+     updates={
+-        "stages": {0: {"default_sampling_params.max_tokens": 128}, 1: {"default_sampling_params.max_tokens": 512}}
++        "stages": {0: {"default_sampling_params.max_tokens": 128}, 1: {"default_sampling_params.max_tokens": 1024}}
+     },
+ )
+ 
+diff --git a/tests/model_executor/models/minicpmo_4_5/test_pipeline.py b/tests/model_executor/models/minicpmo_4_5/test_pipeline.py
+index bce016d672b..ae121b118b1 100644
+--- a/tests/model_executor/models/minicpmo_4_5/test_pipeline.py
++++ b/tests/model_executor/models/minicpmo_4_5/test_pipeline.py
+@@ -34,7 +34,6 @@
+ _DEPLOY_DIR = Path(__file__).resolve().parents[4] / "vllm_omni" / "deploy"
+ _DEPLOY_LAYOUTS = {
+     "minicpmo_4_5.yaml": ["0", "0", "0"],
+-    "minicpmo_4_5_batching.yaml": ["0", "1", "1"],
+     "minicpmo_4_5_2gpu.yaml": ["0", "1", "1"],
+     "minicpmo_4_5_3gpu.yaml": ["0", "1", "2"],
+     "minicpmo_4_5_8x4090.yaml": ["0,1,2,3", "4", "5"],
+diff --git a/tests/test_config_factory.py b/tests/test_config_factory.py
+index 1f7b1045d44..78436eb1db8 100644
+--- a/tests/test_config_factory.py
++++ b/tests/test_config_factory.py
+@@ -2191,6 +2191,16 @@ def test_minicpmo_4_5_cuda_caps_talker_kv_cache(self):
+             replica_stages = merge_pipeline_deploy(pipeline, replica)
+             assert "kv_cache_memory_bytes" not in replica_stages[1].yaml_engine_args
+ 
++    def test_minicpmo_4_5_single_gpu_admits_four_sequences(self):
++        """Single-GPU shares leave room for Code2Wav peak activations at bs<=4."""
++        deploy = load_deploy_config(Path(get_deploy_config_path("minicpmo_4_5.yaml")))
++        assert [stage.max_num_seqs for stage in deploy.stages] == [4, 4, 4]
++        assert [stage.gpu_memory_utilization for stage in deploy.stages] == [
++            0.55,
++            0.15,
++            0.18,
++        ]
++
+     def test_npu_overrides(self):
+         deploy_path = Path(__file__).parent.parent / "vllm_omni" / "deploy" / "qwen3_omni_moe.yaml"
+         if not deploy_path.exists():
+diff --git a/vllm_omni/deploy/minicpmo_4_5.yaml b/vllm_omni/deploy/minicpmo_4_5.yaml
+index ab79c37ca51..fbc2853dfec 100644
+--- a/vllm_omni/deploy/minicpmo_4_5.yaml
++++ b/vllm_omni/deploy/minicpmo_4_5.yaml
+@@ -17,7 +17,9 @@ connectors:
+ 
+ stages:
+   - stage_id: 0
+-    max_num_seqs: 16
++    # Four-way concurrency matches the single-GPU memory shares below;
++    # larger batches make Code2Wav activations OOM on one H100.
++    max_num_seqs: 4
+     # Leave headroom on the shared GPU for Talker KV + concurrent Code2Wav.
+     gpu_memory_utilization: 0.55
+     enforce_eager: false
+@@ -48,7 +50,7 @@ stages:
+       repetition_penalty: 1.0
+ 
+   - stage_id: 1
+-    max_num_seqs: 16
++    max_num_seqs: 4
+     gpu_memory_utilization: 0.15
+     enforce_eager: false
+     max_num_batched_tokens: 8192
+@@ -70,7 +72,7 @@ stages:
+       detokenize: false
+ 
+   - stage_id: 2
+-    max_num_seqs: 16
++    max_num_seqs: 4
+     gpu_memory_utilization: 0.18
+     enforce_eager: true
+     enable_chunked_prefill: false
+diff --git a/vllm_omni/deploy/minicpmo_4_5_2gpu.yaml b/vllm_omni/deploy/minicpmo_4_5_2gpu.yaml
+index eddfd0877b5..1929e5fd145 100644
+--- a/vllm_omni/deploy/minicpmo_4_5_2gpu.yaml
++++ b/vllm_omni/deploy/minicpmo_4_5_2gpu.yaml
+@@ -1,2 +1,95 @@
+-# Backward-compatible name for the canonical two-GPU batching profile.
+-base_config: minicpmo_4_5_batching.yaml
++# MiniCPM-o 4.5 two-GPU continuous-batching layout.
++#
++# Thinker owns GPU 0. Talker and Code2Wav share GPU 1, keeping text decoding
++# isolated from codec/vocoder contention while preserving stage-2 batching.
++pipeline: minicpmo_4_5
++async_chunk: true
++
++trust_remote_code: true
++enable_prefix_caching: false
++
++connectors:
++  connector_of_shared_memory:
++    name: SharedMemoryConnector
++    extra:
++      connector_get_sleep_s: 0.01
++      connector_get_max_wait_first_chunk: 3000
++      connector_get_max_wait: 300
++      codec_chunk_frames: 25
++      codec_left_context_frames: 3
++
++stages:
++  - stage_id: 0
++    max_num_seqs: 4
++    gpu_memory_utilization: 0.9
++    enforce_eager: false
++    tensor_parallel_size: 1
++    max_num_batched_tokens: 16384
++    devices: "0"
++    interleave_mm_strings: true
++    media_io_kwargs:
++      video:
++        fps: 1
++        num_frames: 128
++    limit_mm_per_prompt:
++      video: 1
++    default_sampling_params:
++      temperature: 0.0
++      top_p: 1.0
++      top_k: -1
++      max_tokens: 2048
++      seed: 42
++      detokenize: true
++      repetition_penalty: 1.1
++
++  - stage_id: 1
++    max_num_seqs: 4
++    gpu_memory_utilization: 0.55
++    enforce_eager: false
++    max_num_batched_tokens: 8192
++    # Talker context is 4096 (tts_config.max_position_embeddings).
++    max_model_len: 4096
++    devices: "1"
++    output_connectors:
++      to_stage_2: connector_of_shared_memory
++    # Codec sampling is model-owned by the checkpoint's tts_config (defaults:
++    # T=0.8, top-k=25, top-p=0.85, repetition penalty=1.05, seed=42).
++    # These parameters only govern vLLM's binary continue/stop token.
++    default_sampling_params:
++      temperature: 0.0
++      top_p: 1.0
++      top_k: -1
++      min_tokens: 50
++      max_tokens: 2048
++      stop_token_ids: [1]
++      seed: 42
++      detokenize: false
++
++  - stage_id: 2
++    max_num_seqs: 4
++    gpu_memory_utilization: 0.35
++    enforce_eager: true
++    enable_chunked_prefill: false
++    max_num_batched_tokens: 65536
++    max_model_len: 65536
++    devices: "1"
++    input_connectors:
++      from_stage_1: connector_of_shared_memory
++    default_sampling_params:
++      temperature: 0.0
++      top_p: 1.0
++      top_k: -1
++      max_tokens: 65536
++      detokenize: true
++
++platforms:
++  npu:
++    stages:
++      - stage_id: 0
++        max_num_batched_tokens: 8192
++        compilation_config:
++          cudagraph_mode: PIECEWISE
++      - stage_id: 1
++        max_num_batched_tokens: 8192
++        compilation_config:
++          cudagraph_mode: PIECEWISE
+diff --git a/vllm_omni/deploy/minicpmo_4_5_batching.yaml b/vllm_omni/deploy/minicpmo_4_5_batching.yaml
+deleted file mode 100644
+index 41ee72a39bc..00000000000
+--- a/vllm_omni/deploy/minicpmo_4_5_batching.yaml
++++ /dev/null
+@@ -1,93 +0,0 @@
+-# MiniCPM-o 4.5 two-GPU continuous-batching layout.
+-#
+-# Thinker owns GPU 0. Talker and Code2Wav share GPU 1, keeping text decoding
+-# isolated from codec/vocoder contention while preserving stage-2 batching.
+-pipeline: minicpmo_4_5
+-async_chunk: true
+-
+-trust_remote_code: true
+-enable_prefix_caching: false
+-
+-connectors:
+-  connector_of_shared_memory:
+-    name: SharedMemoryConnector
+-    extra:
+-      connector_get_sleep_s: 0.01
+-      connector_get_max_wait_first_chunk: 3000
+-      connector_get_max_wait: 300
+-      codec_chunk_frames: 25
+-      codec_left_context_frames: 3
+-
+-stages:
+-  - stage_id: 0
+-    max_num_seqs: 4
+-    gpu_memory_utilization: 0.9
+-    enforce_eager: false
+-    tensor_parallel_size: 1
+-    max_num_batched_tokens: 16384
+-    devices: "0"
+-    interleave_mm_strings: true
+-    media_io_kwargs:
+-      video:
+-        fps: 1
+-        num_frames: 128
+-    limit_mm_per_prompt:
+-      video: 1
+-    default_sampling_params:
+-      temperature: 0.0
+-      top_p: 1.0
+-      top_k: -1
+-      max_tokens: 2048
+-      seed: 42
+-      detokenize: true
+-      repetition_penalty: 1.1
+-
+-  - stage_id: 1
+-    max_num_seqs: 4
+-    gpu_memory_utilization: 0.55
+-    enforce_eager: false
+-    max_num_batched_tokens: 8192
+-    devices: "1"
+-    output_connectors:
+-      to_stage_2: connector_of_shared_memory
+-    # Codec sampling is model-owned by the checkpoint's tts_config (defaults:
+-    # T=0.8, top-k=25, top-p=0.85, repetition penalty=1.05, seed=42).
+-    # These parameters only govern vLLM's binary continue/stop token.
+-    default_sampling_params:
+-      temperature: 0.0
+-      top_p: 1.0
+-      top_k: -1
+-      min_tokens: 50
+-      max_tokens: 2048
+-      stop_token_ids: [1]
+-      seed: 42
+-      detokenize: false
+-
+-  - stage_id: 2
+-    max_num_seqs: 4
+-    gpu_memory_utilization: 0.35
+-    enforce_eager: true
+-    enable_chunked_prefill: false
+-    max_num_batched_tokens: 65536
+-    max_model_len: 65536
+-    devices: "1"
+-    input_connectors:
+-      from_stage_1: connector_of_shared_memory
+-    default_sampling_params:
+-      temperature: 0.0
+-      top_p: 1.0
+-      top_k: -1
+-      max_tokens: 65536
+-      detokenize: true
+-
+-platforms:
+-  npu:
+-    stages:
+-      - stage_id: 0
+-        max_num_batched_tokens: 8192
+-        compilation_config:
+-          cudagraph_mode: PIECEWISE
+-      - stage_id: 1
+-        max_num_batched_tokens: 8192
+-        compilation_config:
+-          cudagraph_mode: PIECEWISE

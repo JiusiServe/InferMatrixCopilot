@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.45,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.7,
+    "precision": 0.8,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "The sole substantive ground-truth concern (yJader's inline comment explaining why the already_submitted gate should be dropped because both submit paths converge to identical diffusion semantics) is directly and accurately reproduced by Y, which explicitly verifies via stage_pool.py:951/1022 that both submit_initial and submit_update reject lists — matching the reviewer's actual reasoning. X touches the same code region but misreads the situation, proposing an assert for the len>1 case that the ground truth implies is unnecessary, and its other findings (hasattr fallback speculation, verbose 'sweep' scratchpad entries) are hedged or low-value. Y's findings are more consistently grounded in verified source (e.g., confirming DiffusionOutput lacks __getitem__, correctly explaining the old outputs[0] would have crashed) and its APPROVE verdict matches the actual outcome (two LGTM approvals), whereas X's COMMENT verdict misjudges the PR's actual risk profile.",
+  "_cost_usd": 0.1142586,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "cbf8771ce468155cb530048cda52258c6f6e1e21e3f03218461d5fc2e6e423d5",
+    "judge_rep": 2
+  }
+}

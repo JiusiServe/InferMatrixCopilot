@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "X returned zero findings, missing the ground truth's sole substantive concern (trust_remote_code/kernels version compatibility) entirely and offering nothing actionable. Y did real diff-grounded analysis, surfacing two valid non-blocking issues (lock serializing FA2/FA3 loads, description claiming a trust_remote_code kwarg that isn't in the visible diff) with precise file/line citations and concrete suggestions; it even names trust_remote_code directly but concludes it's absent rather than flagging the version-compatibility risk the ground truth raises, so recall credit stays low despite the topical overlap.",
+  "_cost_usd": 0.14230489999999998,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "04a616ffc26488e05c7f984b3cb01c2960f06d44aee596e96c09b6203c05a29d",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.25,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both catch the single confirmed major bug (varlen_func=None crash on masked path, matching RuixiangMa's comment) with good detail, but neither surfaces the doc/version-requirements question, test-marker requests, or the false-pass-via-try/except CI concern that reviewers actually raised. X reviewed a post-merge tree that had diverged from the PR diff (self-disclosed), weakening strict groundedness, and its version=int claim, while plausible, is speculative and unverified. Y's extra finding (unguarded default get_kernel call making the RuntimeError dead code) is sharply grounded in the exact diff shown and independently verifiable, giving it a precision edge despite similar recall and actionability.",
+  "_cost_usd": 0.1647925,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "1a67d2feaf6e508b6880e1f94c57398503ca356f223aa65d043dfb0b4c213641",
+    "judge_rep": 2
+  }
+}

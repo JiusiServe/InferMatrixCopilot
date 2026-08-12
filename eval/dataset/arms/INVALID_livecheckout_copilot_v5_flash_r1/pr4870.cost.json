@@ -1,0 +1,105 @@
+{
+  "wall_s": 430.1,
+  "split": "train",
+  "rc": 0,
+  "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1/runs/pr4870/run-20260805-111954-5e291b",
+  "recorded_at": "2026-08-05T11:26:56",
+  "attempts": [
+    {
+      "invocation_id": "inv-67b74c1e",
+      "outcome": "run:run-20260805-111954-5e291b",
+      "rc": 0,
+      "pre_run": null
+    },
+    {
+      "run_dir": "run-20260805-111954-5e291b",
+      "llm_calls": 44,
+      "input_tokens": 563199,
+      "output_tokens": 115083,
+      "usd": 0.326804,
+      "source": "spans"
+    }
+  ],
+  "attempt_usd_total": 0.326804,
+  "llm_calls": 44,
+  "input_tokens": 563199,
+  "output_tokens": 115083,
+  "usd": 0.326804,
+  "source": "spans",
+  "metrics": {
+    "schema": 1,
+    "run": "run-20260805-111954-5e291b",
+    "task_kind": "pr_review",
+    "status": "done",
+    "quality": {
+      "q": null,
+      "weight_coverage": 0.0,
+      "partial": true,
+      "abstained": false,
+      "components": {
+        "recall_w": null,
+        "precision_v": null,
+        "useful": null,
+        "calib": null,
+        "decision": null
+      }
+    },
+    "cost": {
+      "usd": 0.3268,
+      "minutes": 7.04,
+      "ci_minutes": 0,
+      "input_tokens": 563199,
+      "output_tokens": 115083,
+      "tool_calls": 80,
+      "usd_ref": 1.0,
+      "min_ref": 10.0,
+      "cost_index": 1.3827,
+      "cost_partial": false,
+      "unpriced_calls": 0,
+      "source": "spans",
+      "llm_calls": 44,
+      "by_role": {
+        "agent": {
+          "usd": 0.309596,
+          "input_tokens": 554732,
+          "output_tokens": 101533,
+          "calls": 43
+        },
+        "reducer": {
+          "usd": 0.017208,
+          "input_tokens": 8467,
+          "output_tokens": 13550,
+          "calls": 1
+        }
+      },
+      "cache_read_tokens": 1783296,
+      "cache_creation_tokens": 0
+    },
+    "timings": {
+      "steps": {
+        "fetch": 49.19,
+        "gate": 2.05,
+        "review": 371.12,
+        "report": 0.04
+      },
+      "time_to_first_result_s": 422.4
+    },
+    "risk": {
+      "incidents": {
+        "catastrophic": 0,
+        "severe": 0,
+        "moderate": 0,
+        "minor": 0
+      },
+      "safety_multiplier": 1.0
+    },
+    "catq": null,
+    "tus": null,
+    "signals": {
+      "escalations": 0,
+      "pushes": 0,
+      "posted": 0,
+      "steps_completed": 4
+    }
+  }
+}

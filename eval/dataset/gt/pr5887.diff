@@ -1,0 +1,181 @@
+diff --git a/tests/e2e/accuracy/test_qwen_image.py b/tests/e2e/accuracy/test_qwen_image.py
+index 7495bf08f1f..df7290d7586 100644
+--- a/tests/e2e/accuracy/test_qwen_image.py
++++ b/tests/e2e/accuracy/test_qwen_image.py
+@@ -29,7 +29,7 @@
+ NUM_INFERENCE_STEPS = 20
+ TRUE_CFG_SCALE = 4.0
+ SEED = 42
+-SSIM_THRESHOLD = 0.94
++SSIM_THRESHOLD = 0.97
+ PSNR_THRESHOLD = 30.0
+ 
+ MODEL_2512_ID = "Qwen/Qwen-Image-2512"
+@@ -69,7 +69,15 @@ def _local_files_only(model: str) -> bool:
+ 
+ 
+ def _run_vllm_omni_qwen_image(*, model: str, output_path: Path) -> Image.Image:
+-    server_args = ["--num-gpus", "1", "--stage-init-timeout", "300", "--init-timeout", "900"]
++    server_args = [
++        "--num-gpus",
++        "1",
++        "--stage-init-timeout",
++        "300",
++        "--init-timeout",
++        "900",
++        "--fa-deterministic",
++    ]
+     with OmniServer(model, server_args, use_omni=True) as omni_server:
+         response = requests.post(
+             f"http://{omni_server.host}:{omni_server.port}/v1/images/generations",
+diff --git a/vllm_omni/config/stage_config.py b/vllm_omni/config/stage_config.py
+index 602ca1e20e9..5b6b9a01a5a 100644
+--- a/vllm_omni/config/stage_config.py
++++ b/vllm_omni/config/stage_config.py
+@@ -394,6 +394,7 @@ class StageDeployConfig:
+     # Diffusion execution, cache, and VAE behavior.
+     diffusion_compile_granularity: str | None = None
+     diffusion_compile_dynamic: bool | None = None
++    fa_deterministic: bool | None = None
+     cache_backend: str | None = None
+     cache_config: dict[str, Any] | None = None
+     enable_cache_dit_summary: bool | None = None
+diff --git a/vllm_omni/diffusion/attention/backends/flash_attn.py b/vllm_omni/diffusion/attention/backends/flash_attn.py
+index 467a9ad164d..facb1ace5bf 100644
+--- a/vllm_omni/diffusion/attention/backends/flash_attn.py
++++ b/vllm_omni/diffusion/attention/backends/flash_attn.py
+@@ -15,6 +15,7 @@
+ from vllm_omni.diffusion.attention.backends.utils.piecewise_attn import (
+     piecewise_attn,
+ )
++from vllm_omni.diffusion.config import get_current_diffusion_config_or_none
+ 
+ logger = init_logger(__name__)
+ 
+@@ -71,9 +72,20 @@ def __init__(
+         self.causal = causal
+         self.softmax_scale = softmax_scale
+         self.qkv_layout = qkv_layout
++        cfg = get_current_diffusion_config_or_none()
++        self.fa_deterministic = bool(getattr(cfg, "fa_deterministic", False)) if cfg is not None else False
+         if backend_kwargs:
+             logger.warning("FlashAttentionImpl ignoring backend_kwargs: %s", list(backend_kwargs.keys()))
+ 
++    def _warn_fa_deterministic_non_dense(self, path: str) -> None:
++        if not self.fa_deterministic:
++            return
++        logger.warning_once(
++            "fa_deterministic=True is ignored on the %s FlashAttention path; "
++            "only the dense flash_attn_func path passes deterministic=True.",
++            path,
++        )
++
+     @staticmethod
+     def _unwrap_flash_output(out: torch.Tensor | tuple[torch.Tensor, ...]) -> torch.Tensor:
+         # FA3 may return (out, lse), FA2 returns out
+@@ -250,6 +262,7 @@ def forward_cuda(
+ 
+         # Try piecewise attention
+         if full_attn_spans is not None:
++            self._warn_fa_deterministic_non_dense("piecewise")
+             logger.debug("Using piecewise Flash Attention for mixed causal/full mask")
+             if flash_attn_func is not None:
+                 attn_func = partial(
+@@ -280,6 +293,7 @@ def forward_cuda(
+             if len(present_packed_keys) != len(packed_keys):
+                 missing = sorted(set(packed_keys) - set(present_packed_keys))
+                 raise ValueError(f"Incomplete packed FlashAttention metadata; missing {missing}")
++            self._warn_fa_deterministic_non_dense("packed-varlen")
+             return self._forward_varlen_packed(
+                 query,
+                 key,
+@@ -291,6 +305,7 @@ def forward_cuda(
+             )
+ 
+         if attention_mask is not None and torch.any(~attention_mask):
++            self._warn_fa_deterministic_non_dense("masked-varlen")
+             return self._forward_varlen_masked(
+                 query,
+                 key,
+@@ -299,15 +314,16 @@ def forward_cuda(
+             )
+ 
+         if flash_attn_func is not None:
+-            out = flash_attn_func(
+-                query,
+-                key,
+-                value,
+-                causal=self.causal,
+-                softmax_scale=self.softmax_scale,
+-            )
++            fa_kwargs = {
++                "causal": self.causal,
++                "softmax_scale": self.softmax_scale,
++            }
++            if self.fa_deterministic:
++                fa_kwargs["deterministic"] = True
++            out = flash_attn_func(query, key, value, **fa_kwargs)
+             return self._unwrap_flash_output(out)
+ 
++        self._warn_fa_deterministic_non_dense("dense-varlen-fallback")
+         return self._forward_varlen_dense(
+             query,
+             key,
+diff --git a/vllm_omni/diffusion/data.py b/vllm_omni/diffusion/data.py
+index b0ef2a74a4d..1396b7318e4 100644
+--- a/vllm_omni/diffusion/data.py
++++ b/vllm_omni/diffusion/data.py
+@@ -613,6 +613,7 @@ class OmniDiffusionConfig:
+ 
+     # Attention
+     diffusion_attention_config: "AttentionConfig" = field(default_factory=lambda: AttentionConfig())
++    fa_deterministic: bool = False
+ 
+     # Running mode
+     # mode: ExecutionMode = ExecutionMode.INFERENCE
+diff --git a/vllm_omni/engine/arg_utils.py b/vllm_omni/engine/arg_utils.py
+index 633eec4366b..02ec3587b38 100644
+--- a/vllm_omni/engine/arg_utils.py
++++ b/vllm_omni/engine/arg_utils.py
+@@ -188,6 +188,7 @@ class OmniEngineArgs(EngineArgs):
+     omni: bool = False
+     # Diffusion request-mode batch admission (forwarded to OmniDiffusionConfig).
+     request_batch_max_wait_ms: float = 0.0
++    fa_deterministic: bool = False
+ 
+     @classmethod
+     def _add_omni_specific_args(cls, parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+diff --git a/vllm_omni/engine/async_omni_engine.py b/vllm_omni/engine/async_omni_engine.py
+index c938d0757b6..5a8642d59d4 100644
+--- a/vllm_omni/engine/async_omni_engine.py
++++ b/vllm_omni/engine/async_omni_engine.py
+@@ -1043,6 +1043,7 @@ def _create_default_diffusion_stage_cfg(kwargs: dict[str, Any]) -> list:
+             "diffusion_compile_dynamic": (
+                 True if kwargs.get("diffusion_compile_dynamic") is None else kwargs["diffusion_compile_dynamic"]
+             ),
++            "fa_deterministic": bool(kwargs.get("fa_deterministic", False)),
+             "boundary_ratio": kwargs.get("boundary_ratio", None),
+             "flow_shift": kwargs.get("flow_shift", None),
+             "diffusion_load_format": kwargs.get("diffusion_load_format", "default"),
+diff --git a/vllm_omni/entrypoints/cli/serve.py b/vllm_omni/entrypoints/cli/serve.py
+index 51db3e1e423..1e379867bd1 100644
+--- a/vllm_omni/entrypoints/cli/serve.py
++++ b/vllm_omni/entrypoints/cli/serve.py
+@@ -434,6 +434,17 @@ def subparser_init(self, subparsers: argparse._SubParsersAction) -> TrackingArgu
+                 "Disable for fixed-shape workloads with --no-diffusion-compile-dynamic."
+             ),
+         )
++        omni_config_group.add_argument(
++            "--fa-deterministic",
++            dest="fa_deterministic",
++            action="store_true",
++            default=False,
++            help=(
++                "Request FlashAttention deterministic=True on the local FLASH_ATTN dense path. "
++                "Slower than the library default deterministic=False; intended for accuracy CI. "
++                "Serving default remains non-deterministic."
++            ),
++        )
+         omni_config_group.add_argument(
+             "--diffusers-load-kwargs",
+             dest="diffusers_load_kwargs",

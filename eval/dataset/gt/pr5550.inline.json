@@ -1,0 +1,140 @@
+[
+  {
+    "author": "RuixiangMa",
+    "body": "DiffusionSchedulerOutput now has stage_kv_metadata as a proper field with field(default_factory=dict), so it always exists. The getattr fallback is dead code. Can be simplified to direct access. If the defensive programming against non-DiffusionSchedulerOutput objects is intentional, a comment explaining why would help.",
+    "line": 331,
+    "path": "vllm_omni/diffusion/executor/multiproc_executor.py"
+  },
+  {
+    "author": "RuixiangMa",
+    "body": "If FullAttentionSpec lacks head_size_v (e.g., a future vLLM API change), this raises AttributeError instead of a clear validation error. Consider getattr(spec, \"head_size_v\", spec.head_size) for forward compatibility.",
+    "line": 169,
+    "path": "vllm_omni/diffusion/stage_kv/interface.py"
+  },
+  {
+    "author": "RuixiangMa",
+    "body": "Both DiffusionExecutor.initialize_stage_kv (abstract.py) and DiffusionEngine._initialize_stage_kv_workers (diffusion_engine.py) call validate_stage_kv_worker_init_result(config, result). The engine-side call is redundant. Consider removing it, or if kept as a defensive boundary, add a comment explaining why.",
+    "line": 234,
+    "path": "vllm_omni/diffusion/diffusion_engine.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "[P1] Validate the physical tensor geometry\n\nThis accepts `KVCacheTensor(size=1, offset=123, block_stride=456)` even though `BLOCK_KV_TOKEN_HEAD_DIM_V1` declares a separate contiguous layout. Upstream allocates from `tensor.size` and treats a positive `block_stride` as packed storage, so W1 can allocate or reshape incompatible memory. Require the exact size implied by `num_blocks * spec.page_size_bytes`, plus the V1 offset/stride semantics, and add negative tests.",
+    "line": 184,
+    "path": "vllm_omni/diffusion/stage_kv/interface.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "[P1] Bind metadata to the expected request layout\n\n`request_layout_digest` is currently write-only: #5541 computes it, but this validator has no independently trusted digest to compare against, and `allocation_id` is not tracked either. Stale metadata for a reused request ID can pass when its cache fingerprint and counts match. Pass the expected digest or request generation into this boundary and reject mismatches before model forward.",
+    "line": 236,
+    "path": "vllm_omni/diffusion/stage_kv/interface.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "[P1] Validate block count from the planner's `seq_len`\n\n#5541 defines the full first-step `seq_len` as the allocation basis, but this uses `stable_len + current_len`. For block size 4, stable=3, current=1, seq_len=5, the Scheduler correctly allocates 2 blocks and this rejects it as expecting 1. Carry `seq_len` into `StageKVBranchMetadata` and add this boundary case to the combined contract tests.",
+    "line": 247,
+    "path": "vllm_omni/diffusion/stage_kv/interface.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "[P1] Reject vLLM's reserved null block\n\nUpstream `BlockPool` removes block ID 0 from the free queue and reserves it as the null/padding block; worker block tables also use 0 for unused rows. This range check currently accepts 0, so W1 could install a padding block as a real allocation. If this contract reuses upstream `BlockPool`/`BlockTable`, require `0 < block_id < num_blocks` and cover it with a negative test.",
+    "line": 253,
+    "path": "vllm_omni/diffusion/stage_kv/interface.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "The expected-digest comparison fixes the write-only part, but the combined contract is still not bound to #5541's retained `StageKVRequirement`. This validator accepts whatever branch set and lengths the metadata self-describes: a focused union probe accepted one metadata branch for a two-branch requirement when given the same expected digest. `allocation_id` is also only checked for positivity, so request-ID reuse is not generation-bound. Please validate against the exact trusted requirement plus a Scheduler-issued allocation/generation identity, with missing-branch and request-reuse negative tests.",
+    "line": 236,
+    "path": "vllm_omni/diffusion/stage_kv/interface.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "[P1] Shut down the executor when Stage KV bootstrap fails\n\n`self.executor` has already launched workers before this call. If config, worker, or acknowledgement validation raises here, `DiffusionEngine.__init__` exits without `close()` or `shutdown()`, while the multiprocess monitor thread keeps the executor alive. This leaves worker processes and GPU allocations behind after failed engine construction. Wrap post-executor initialization in exception cleanup (close an initialized Scheduler and call `executor.shutdown()`), and add a failure-path test.",
+    "line": 232,
+    "path": "vllm_omni/diffusion/diffusion_engine.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "[P2] Validate the full metadata key set before per-request filtering\n\nThese `.get()` calls discard extra request IDs before `DiffusionModelRunner.install_stage_kv_metadata()` can enforce its exact-set check. Batch and step modes forward the full maps, so request mode accepts malformed Scheduler output that they reject. A focused probe with scheduled `req-0` plus `stale` metadata still executed one RPC. Compare both map key sets with the scheduled request IDs before this loop and add an extra-key parity test.",
+    "line": 331,
+    "path": "vllm_omni/diffusion/executor/multiproc_executor.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "[P2] Validate initialization acknowledgements from every rank\n\nAll ranks execute this RPC, but the gathered rank statuses contain only success/error state and this validates only rank 0’s `StageKVWorkerInitResult`. A successful nonzero rank can return a different physical layout, block count, or fingerprint without failing initialization. Gather and validate a compact acknowledgement from every rank, or compare it locally before gathering success, and add a divergent-rank test.",
+    "line": 107,
+    "path": "vllm_omni/diffusion/executor/abstract.py"
+  },
+  {
+    "author": "Acerak01-fy",
+    "body": "Fixed.",
+    "line": 107,
+    "path": "vllm_omni/diffusion/executor/abstract.py"
+  },
+  {
+    "author": "Acerak01-fy",
+    "body": "fixed.",
+    "line": 232,
+    "path": "vllm_omni/diffusion/diffusion_engine.py"
+  },
+  {
+    "author": "Acerak01-fy",
+    "body": "Fixed.",
+    "line": 331,
+    "path": "vllm_omni/diffusion/executor/multiproc_executor.py"
+  },
+  {
+    "author": "asukaqaq-s",
+    "body": "What does this mean? vLLM FlashAttention uses a logical KV-cache shape of [B, H, N, 2D], while the stride changes depending on whether the physical layout is NHD or HND, as shown in vllm/vllm/v1/attention/backends/flash_attn.py:131. What exactly does physical_layout represent here?",
+    "line": 38,
+    "path": "vllm_omni/diffusion/stage_kv/interface.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "[P1] This makes the combined paged mode unusable. #5541's `BaseScheduler` still constructs `NewRequestData.from_state(state)` without allocation metadata, so every new request reaches this branch with `None` and fails before request, batch, or step forward. I reproduced that on the merged heads. Keep metadata optional until the Scheduler allocator and Worker installer land behind an explicit initialized capability, then add a Scheduler-to-Runner integration test; placeholder metadata would be wrong because no blocks exist yet.",
+    "line": 160,
+    "path": "vllm_omni/diffusion/worker/diffusion_model_runner.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "[P2] Validate against the request that is actually forwarded. This compares `metadata.request_id` with `new_req.request_id`, but the batch path then forwards `new_req.req`; the step path has the same split. A focused probe with envelope/metadata ID `envelope-id` and `req.request_id='actual-request-id'` was accepted and forwarded the latter. Require all three IDs to agree before model work, and add batch/step mismatch tests.",
+    "line": 614,
+    "path": "vllm_omni/diffusion/worker/diffusion_model_runner.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "[P2] The current PR body promises strict request, group, and block validation, but these DTOs plus `_validate_diffusion_kv_metadata()` enforce only mode and the top-level request ID. A vLLM 0.25 probe accepted negative allocation/sequence/block IDs and `prefix_len + target_len > seq_len`. Validate the logical invariants and exact sequence/context set against #5541's Scheduler-owned requests; before consumption, also validate native group count, block-table lengths, and ID ranges. If this PR is intentionally DTO-only now, update the body and do not require the payload yet.",
+    "line": 31,
+    "path": "vllm_omni/diffusion/diffusion_kv/metadata.py"
+  },
+  {
+    "author": "Acerak01-fy",
+    "body": "fixed.",
+    "line": 160,
+    "path": "vllm_omni/diffusion/worker/diffusion_model_runner.py"
+  },
+  {
+    "author": "Acerak01-fy",
+    "body": "fixed.",
+    "line": 614,
+    "path": "vllm_omni/diffusion/worker/diffusion_model_runner.py"
+  },
+  {
+    "author": "Acerak01-fy",
+    "body": "fixed.",
+    "line": 31,
+    "path": "vllm_omni/diffusion/diffusion_kv/metadata.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "do we have seperate arg for CFGs?",
+    "line": 47,
+    "path": "vllm_omni/diffusion/diffusion_kv/metadata.py"
+  },
+  {
+    "author": "Acerak01-fy",
+    "body": "The current design has already taken CFGs into account.",
+    "line": 47,
+    "path": "vllm_omni/diffusion/diffusion_kv/metadata.py"
+  }
+]

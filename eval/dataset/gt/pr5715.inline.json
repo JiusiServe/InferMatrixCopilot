@@ -1,0 +1,26 @@
+[
+  {
+    "author": "hsliuustc0106",
+    "body": "do not change this",
+    "line": 31,
+    "path": "docs/getting_started/installation/gpu/musa.inc.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "@FayeSpica PTAL",
+    "line": 56,
+    "path": "docs/getting_started/installation/npu/npu.inc.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "do not change this",
+    "line": 35,
+    "path": "docs/getting_started/quickstart.md"
+  },
+  {
+    "author": "FayeSpica",
+    "body": "LGTM",
+    "line": 56,
+    "path": "docs/getting_started/installation/npu/npu.inc.md"
+  }
+]

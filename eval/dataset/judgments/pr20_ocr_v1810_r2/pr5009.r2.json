@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "X returned zero findings, missing every ground-truth concern (scope of the global default change, missing regression coverage for the #4964 inductor case, incomplete pytest mark, perf/accuracy comparison requests) — it contributes nothing. Y independently surfaces the platform-wide scope risk (matching hsliuustc0106's core concern, even if it resolves it more optimistically via the override-hook mechanism), correctly flags that the new parametrized test is now vacuous since the code no longer reads compilation_config (directly verifiable from the diff), and explicitly notes the test exists to guard against a future upstream rebase silently reintroducing the #4964 regression — closely echoing a ground-truth inline comment. Y misses the 'pytest mark is not complete' nit but is otherwise well-grounded, specific (file:line), and actionable as follow-ups.",
+  "_cost_usd": 0.18423840000000002,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "d8324d7bb719fdb217adc945d73f46a22a7626ec42cef97db81c8294a0b4a516",
+    "judge_rep": 2
+  }
+}

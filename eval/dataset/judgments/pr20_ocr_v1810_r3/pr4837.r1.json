@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X independently verifies both hunks against actual call sites (stage_pool.py submit_initial/submit_update both reject list prompts), arriving at the same conclusion as yJader's inline comment — that gating the singleton-unwrap on already_submitted was inconsistent and removing it is correct — plus flags a concrete, grounded gap (no regression test) with specific file/line pointers. Y is a template stub reporting zero findings with no evidence of engaging the diff, so it covers none of the ground truth's reasoning and offers nothing actionable.",
+  "_cost_usd": 0.0891729,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r3",
+    "arm_a_sha256": "7f2afd26dda2d3aadd1daf911f7f06ad8fe7cddedff58d0fc704997ffab0f2a0",
+    "judge_rep": 1
+  }
+}

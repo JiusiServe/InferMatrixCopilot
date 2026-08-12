@@ -61,8 +61,12 @@ import campaign_ledger as ledger              # noqa: E402
 from snapshot_provenance import campaign_prs, freeze_heads, snapshot  # noqa: E402
 from validate_replicate import validate       # noqa: E402
 
-ARM = "copilot_v4_pr20"
-JUDGE_PREFIX = "pr20"
+# Arm identity is env-overridable so a re-measurement (e.g. a model swap) writes
+# to its OWN arm/judgment dirs. Without this, `gen <r>` silently overwrites the
+# recorded arm it is supposed to be compared against — the defaults below keep
+# every existing invocation byte-identical.
+ARM = os.environ.get("PR20_ARM", "copilot_v4_pr20")
+JUDGE_PREFIX = os.environ.get("PR20_JUDGE_PREFIX", "pr20")
 REPLICATES = (1, 2, 3)
 
 # Request-level hard maxima (not estimates), same derivation as the val

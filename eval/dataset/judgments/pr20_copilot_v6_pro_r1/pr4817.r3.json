@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive reviewer concerns, so both trivially achieve full recall. Both candidates correctly validate the core fix and tests without fabricating blockers, converging on the same sm_110a observation independently (suggesting it's grounded in real PR context). X goes further with three concrete, file/line-anchored suggestions (missing (10,1) test case, docstring gap, stale pyproject.toml comment) that are specific and actionable even if minor, while Y's single comment is heavily hedged ('almost certainly fine', 'low-signal enough to omit') and reads more as a passing thought than an actionable ask.",
+  "_cost_usd": 0.1193106,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "5b3806345c5923d38ae7770cbdba3dd453eb8492579b72d95f16a82ec2783e90",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.8,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.88,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly verify the rename is complete/consistent and tests updated appropriately; ground truth offers nothing substantive to miss, so recall is near-full for both. X leans on unverifiable external claims (specific upstream line numbers in a checkout not shown in the diff) and ends in a pure approve with no concrete asks. Y grounds its sweep line numbers accurately in the visible diff and surfaces one genuine, well-reasoned edge case (potential None-dereference in the pure-diffusion path via base(raw_request)) with a specific file:line and suggested follow-up, making it more actionable despite being correctly framed as non-blocking.",
+  "_cost_usd": 0.1072176,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "f69d77c1ae9cb13422566bb96d07863e1fe993b39aa94328bbb3e4f384ede022",
+    "judge_rep": 2
+  }
+}

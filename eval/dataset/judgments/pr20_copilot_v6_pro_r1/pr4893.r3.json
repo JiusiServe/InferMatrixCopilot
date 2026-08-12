@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.9,
+    "actionability": 0.35,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth is thin (mostly an approval and a tangential reduce_scatter test-coverage suggestion already incorporated into the diff), so neither candidate scores high recall. X is a careful, high-precision verification pass (DPMetadata construction, group cleanup, device_communicator semantics) but yields only one soft, non-actionable comment, functioning more as an approval writeup than a review. Y surfaces several concrete, file/line-anchored findings with specific code/test suggestions (ordering brittleness, unguarded cfg=1 remap, redundant all_gather when non-MoE, error message content, missing version guard) that are mostly grounded, though a couple (the 'leaks' framing, the line-816 diffusion-alias claim) are speculative or overstated, slightly hurting precision. Y's much higher actionability offsets its precision deficit for a slight overall edge.",
+  "_cost_usd": 0.1702996,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v6_pro_r1",
+    "arm_a_sha256": "f2e10e1a316c345057363d54ac26e7f0d18339858b82d40e2012a83e10cb9e3c",
+    "judge_rep": 3
+  }
+}

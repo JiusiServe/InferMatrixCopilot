@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "X returned zero findings, missing the core-fix confirmation and both reviewer comments entirely — no recall, no actionable content, nothing to assess for precision beyond vacuous. Y correctly confirms the core codes.audio/tts_postprocess alignment fix (matching the ground-truth reviewer's main point), and independently flags the same code region as the reviewer's doc-staleness comment (the unconditional containment fallback), backing it with a concrete failure example, plus a valid bonus finding about the near-useless short_text min() check. Y misses the minor legacy-producer-order nit but that was explicitly marked 'feel free to ignore' in the ground truth. Y's comments are all grounded, file/line-cited, and concretely actionable.",
+  "_cost_usd": 0.13215689999999997,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r1",
+    "arm_a_sha256": "d3edf64fb7ce4963cdf18cefb16c5e952b007f1f61cfac0da15bc3505d92982b",
+    "judge_rep": 1
+  }
+}

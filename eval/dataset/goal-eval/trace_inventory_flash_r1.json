@@ -1,0 +1,636 @@
+{
+ "arms": {
+  "copilot_v5_flash_r1": [
+   {
+    "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1/runs/pr4762/run-20260805-132234-d1f48b",
+    "errors": [],
+    "run_trace_events": 108,
+    "bytes": {
+     "trace.jsonl": 19583,
+     "events.jsonl": 12693159,
+     "run_trace.jsonl": 26730
+    },
+    "llm_spans": 43,
+    "llm_requests": 43,
+    "llm_responses": 43,
+    "spans_total": 48,
+    "tokens": {
+     "spans": {
+      "in": 810539,
+      "out": 170564
+     },
+     "events": {
+      "in": 810539,
+      "out": 170564
+     },
+     "metrics": {
+      "in": 810539,
+      "out": 170564
+     }
+    },
+    "usd": 0.4768,
+    "stem": "pr4762"
+   },
+   {
+    "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1/runs/pr4777/run-20260805-133907-21cc0a",
+    "errors": [],
+    "run_trace_events": 64,
+    "bytes": {
+     "trace.jsonl": 10665,
+     "events.jsonl": 4894225,
+     "run_trace.jsonl": 16197
+    },
+    "llm_spans": 22,
+    "llm_requests": 22,
+    "llm_responses": 22,
+    "spans_total": 27,
+    "tokens": {
+     "spans": {
+      "in": 405206,
+      "out": 44159
+     },
+     "events": {
+      "in": 405206,
+      "out": 44159
+     },
+     "metrics": {
+      "in": 405206,
+      "out": 44159
+     }
+    },
+    "usd": 0.1816,
+    "stem": "pr4777"
+   },
+   {
+    "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1/runs/pr4804/run-20260805-125240-5fab46",
+    "errors": [],
+    "run_trace_events": 137,
+    "bytes": {
+     "trace.jsonl": 19185,
+     "events.jsonl": 14900669,
+     "run_trace.jsonl": 34548
+    },
+    "llm_spans": 42,
+    "llm_requests": 42,
+    "llm_responses": 42,
+    "spans_total": 47,
+    "tokens": {
+     "spans": {
+      "in": 789441,
+      "out": 168984
+     },
+     "events": {
+      "in": 789441,
+      "out": 168984
+     },
+     "metrics": {
+      "in": 789441,
+      "out": 168984
+     }
+    },
+    "usd": 0.4896,
+    "stem": "pr4804"
+   },
+   {
+    "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1/runs/pr4810/run-20260805-123224-2ab738",
+    "errors": [],
+    "run_trace_events": 123,
+    "bytes": {
+     "trace.jsonl": 17052,
+     "events.jsonl": 10862207,
+     "run_trace.jsonl": 32639
+    },
+    "llm_spans": 37,
+    "llm_requests": 37,
+    "llm_responses": 37,
+    "spans_total": 42,
+    "tokens": {
+     "spans": {
+      "in": 688132,
+      "out": 166381
+     },
+     "events": {
+      "in": 688132,
+      "out": 166381
+     },
+     "metrics": {
+      "in": 688132,
+      "out": 166381
+     }
+    },
+    "usd": 0.4334,
+    "stem": "pr4810"
+   },
+   {
+    "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1/runs/pr4816/run-20260805-124458-ccf62d",
+    "errors": [],
+    "run_trace_events": 28,
+    "bytes": {
+     "trace.jsonl": 6386,
+     "events.jsonl": 2942440,
+     "run_trace.jsonl": 7679
+    },
+    "llm_spans": 12,
+    "llm_requests": 12,
+    "llm_responses": 12,
+    "spans_total": 17,
+    "tokens": {
+     "spans": {
+      "in": 204377,
+      "out": 15992
+     },
+     "events": {
+      "in": 204377,
+      "out": 15992
+     },
+     "metrics": {
+      "in": 204377,
+      "out": 15992
+     }
+    },
+    "usd": 0.0878,
+    "stem": "pr4816"
+   },
+   {
+    "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1/runs/pr4817/run-20260805-130312-d65119",
+    "errors": [],
+    "run_trace_events": 50,
+    "bytes": {
+     "trace.jsonl": 9387,
+     "events.jsonl": 1443439,
+     "run_trace.jsonl": 12270
+    },
+    "llm_spans": 19,
+    "llm_requests": 19,
+    "llm_responses": 19,
+    "spans_total": 24,
+    "tokens": {
+     "spans": {
+      "in": 57675,
+      "out": 45949
+     },
+     "events": {
+      "in": 57675,
+      "out": 45949
+     },
+     "metrics": {
+      "in": 57675,
+      "out": 45949
+     }
+    },
+    "usd": 0.0782,
+    "stem": "pr4817"
+   },
+   {
+    "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1/runs/pr4825/run-20260805-124120-7f4f22",
+    "errors": [],
+    "run_trace_events": 28,
+    "bytes": {
+     "trace.jsonl": 5120,
+     "events.jsonl": 1240095,
+     "run_trace.jsonl": 7353
+    },
+    "llm_spans": 9,
+    "llm_requests": 9,
+    "llm_responses": 9,
+    "spans_total": 14,
+    "tokens": {
+     "spans": {
+      "in": 38422,
+      "out": 18023
+     },
+     "events": {
+      "in": 38422,
+      "out": 18023
+     },
+     "metrics": {
+      "in": 38422,
+      "out": 18023
+     }
+    },
+    "usd": 0.0392,
+    "stem": "pr4825"
+   },
+   {
+    "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1/runs/pr4834/run-20260805-132453-a2868d",
+    "errors": [],
+    "run_trace_events": 61,
+    "bytes": {
+     "trace.jsonl": 10676,
+     "events.jsonl": 4756882,
+     "run_trace.jsonl": 14973
+    },
+    "llm_spans": 22,
+    "llm_requests": 22,
+    "llm_responses": 22,
+    "spans_total": 27,
+    "tokens": {
+     "spans": {
+      "in": 337123,
+      "out": 78170
+     },
+     "events": {
+      "in": 337123,
+      "out": 78170
+     },
+     "metrics": {
+      "in": 337123,
+      "out": 78170
+     }
+    },
+    "usd": 0.2013,
+    "stem": "pr4834"
+   },
+   {
+    "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1/runs/pr4837/run-20260805-124227-fa6814",
+    "errors": [],
+    "run_trace_events": 30,
+    "bytes": {
+     "trace.jsonl": 6385,
+     "events.jsonl": 2691646,
+     "run_trace.jsonl": 8264
+    },
+    "llm_spans": 12,
+    "llm_requests": 12,
+    "llm_responses": 12,
+    "spans_total": 17,
+    "tokens": {
+     "spans": {
+      "in": 139471,
+      "out": 23152
+     },
+     "events": {
+      "in": 139471,
+      "out": 23152
+     },
+     "metrics": {
+      "in": 139471,
+      "out": 23152
+     }
+    },
+    "usd": 0.0772,
+    "stem": "pr4837"
+   },
+   {
+    "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1/runs/pr4849/run-20260805-133152-3d171b",
+    "errors": [],
+    "run_trace_events": 90,
+    "bytes": {
+     "trace.jsonl": 18262,
+     "events.jsonl": 7753207,
+     "run_trace.jsonl": 23264
+    },
+    "llm_spans": 40,
+    "llm_requests": 40,
+    "llm_responses": 40,
+    "spans_total": 45,
+    "tokens": {
+     "spans": {
+      "in": 450654,
+      "out": 94985
+     },
+     "events": {
+      "in": 450654,
+      "out": 94985
+     },
+     "metrics": {
+      "in": 450654,
+      "out": 94985
+     }
+    },
+    "usd": 0.2687,
+    "stem": "pr4849"
+   },
+   {
+    "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1/runs/pr4859/run-20260805-131133-ecc57e",
+    "errors": [],
+    "run_trace_events": 148,
+    "bytes": {
+     "trace.jsonl": 19560,
+     "events.jsonl": 8959061,
+     "run_trace.jsonl": 35612
+    },
+    "llm_spans": 43,
+    "llm_requests": 43,
+    "llm_responses": 43,
+    "spans_total": 48,
+    "tokens": {
+     "spans": {
+      "in": 626921,
+      "out": 136561
+     },
+     "events": {
+      "in": 626921,
+      "out": 136561
+     },
+     "metrics": {
+      "in": 626921,
+      "out": 136561
+     }
+    },
+    "usd": 0.3738,
+    "stem": "pr4859"
+   },
+   {
+    "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1/runs/pr4870/run-20260805-125821-5e7a6a",
+    "errors": [],
+    "run_trace_events": 106,
+    "bytes": {
+     "trace.jsonl": 19966,
+     "events.jsonl": 11386223,
+     "run_trace.jsonl": 27181
+    },
+    "llm_spans": 44,
+    "llm_requests": 44,
+    "llm_responses": 44,
+    "spans_total": 49,
+    "tokens": {
+     "spans": {
+      "in": 633347,
+      "out": 130613
+     },
+     "events": {
+      "in": 633347,
+      "out": 130613
+     },
+     "metrics": {
+      "in": 633347,
+      "out": 130613
+     }
+    },
+    "usd": 0.3778,
+    "stem": "pr4870"
+   },
+   {
+    "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1/runs/pr4893/run-20260805-123224-fe8749",
+    "errors": [],
+    "run_trace_events": 55,
+    "bytes": {
+     "trace.jsonl": 10666,
+     "events.jsonl": 2838504,
+     "run_trace.jsonl": 12649
+    },
+    "llm_spans": 22,
+    "llm_requests": 22,
+    "llm_responses": 22,
+    "spans_total": 27,
+    "tokens": {
+     "spans": {
+      "in": 203308,
+      "out": 81151
+     },
+     "events": {
+      "in": 203308,
+      "out": 81151
+     },
+     "metrics": {
+      "in": 203308,
+      "out": 81151
+     }
+    },
+    "usd": 0.1629,
+    "stem": "pr4893"
+   },
+   {
+    "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1/runs/pr4893/run-20260805-134530-07155a",
+    "errors": [],
+    "run_trace_events": 69,
+    "bytes": {
+     "trace.jsonl": 11112,
+     "events.jsonl": 4956525,
+     "run_trace.jsonl": 16992
+    },
+    "llm_spans": 23,
+    "llm_requests": 23,
+    "llm_responses": 23,
+    "spans_total": 28,
+    "tokens": {
+     "spans": {
+      "in": 359205,
+      "out": 102382
+     },
+     "events": {
+      "in": 359205,
+      "out": 102382
+     },
+     "metrics": {
+      "in": 359205,
+      "out": 102382
+     }
+    },
+    "usd": 0.2412,
+    "stem": "pr4893"
+   },
+   {
+    "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1/runs/pr4923/run-20260805-124822-271583",
+    "errors": [],
+    "run_trace_events": 134,
+    "bytes": {
+     "trace.jsonl": 20423,
+     "events.jsonl": 9001049,
+     "run_trace.jsonl": 32503
+    },
+    "llm_spans": 45,
+    "llm_requests": 45,
+    "llm_responses": 45,
+    "spans_total": 50,
+    "tokens": {
+     "spans": {
+      "in": 670753,
+      "out": 139212
+     },
+     "events": {
+      "in": 670753,
+      "out": 139212
+     },
+     "metrics": {
+      "in": 670753,
+      "out": 139212
+     }
+    },
+    "usd": 0.3803,
+    "stem": "pr4923"
+   },
+   {
+    "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1/runs/pr4926/run-20260805-130850-10b670",
+    "errors": [],
+    "run_trace_events": 111,
+    "bytes": {
+     "trace.jsonl": 18710,
+     "events.jsonl": 6930697,
+     "run_trace.jsonl": 27871
+    },
+    "llm_spans": 41,
+    "llm_requests": 41,
+    "llm_responses": 41,
+    "spans_total": 46,
+    "tokens": {
+     "spans": {
+      "in": 438747,
+      "out": 135538
+     },
+     "events": {
+      "in": 438747,
+      "out": 135538
+     },
+     "metrics": {
+      "in": 438747,
+      "out": 135538
+     }
+    },
+    "usd": 0.3109,
+    "stem": "pr4926"
+   },
+   {
+    "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1/runs/pr4950/run-20260805-132055-f673fd",
+    "errors": [],
+    "run_trace_events": 36,
+    "bytes": {
+     "trace.jsonl": 6391,
+     "events.jsonl": 2111588,
+     "run_trace.jsonl": 9472
+    },
+    "llm_spans": 12,
+    "llm_requests": 12,
+    "llm_responses": 12,
+    "spans_total": 17,
+    "tokens": {
+     "spans": {
+      "in": 143907,
+      "out": 21835
+     },
+     "events": {
+      "in": 143907,
+      "out": 21835
+     },
+     "metrics": {
+      "in": 143907,
+      "out": 21835
+     }
+    },
+    "usd": 0.0756,
+    "stem": "pr4950"
+   },
+   {
+    "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1/runs/pr4954/run-20260805-133343-2b83a0",
+    "errors": [],
+    "run_trace_events": 95,
+    "bytes": {
+     "trace.jsonl": 17018,
+     "events.jsonl": 6772023,
+     "run_trace.jsonl": 24217
+    },
+    "llm_spans": 37,
+    "llm_requests": 37,
+    "llm_responses": 37,
+    "spans_total": 42,
+    "tokens": {
+     "spans": {
+      "in": 315404,
+      "out": 133193
+     },
+     "events": {
+      "in": 315404,
+      "out": 133193
+     },
+     "metrics": {
+      "in": 315404,
+      "out": 133193
+     }
+    },
+    "usd": 0.2788,
+    "stem": "pr4954"
+   },
+   {
+    "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1/runs/pr4970/run-20260805-131808-ab8063",
+    "errors": [],
+    "run_trace_events": 36,
+    "bytes": {
+     "trace.jsonl": 6393,
+     "events.jsonl": 2879851,
+     "run_trace.jsonl": 9174
+    },
+    "llm_spans": 12,
+    "llm_requests": 12,
+    "llm_responses": 12,
+    "spans_total": 17,
+    "tokens": {
+     "spans": {
+      "in": 192388,
+      "out": 22907
+     },
+     "events": {
+      "in": 192388,
+      "out": 22907
+     },
+     "metrics": {
+      "in": 192388,
+      "out": 22907
+     }
+    },
+    "usd": 0.0926,
+    "stem": "pr4970"
+   },
+   {
+    "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1/runs/pr4977/run-20260805-130833-35cb06",
+    "errors": [],
+    "run_trace_events": 27,
+    "bytes": {
+     "trace.jsonl": 5959,
+     "events.jsonl": 781486,
+     "run_trace.jsonl": 7229
+    },
+    "llm_spans": 11,
+    "llm_requests": 11,
+    "llm_responses": 11,
+    "spans_total": 16,
+    "tokens": {
+     "spans": {
+      "in": 18060,
+      "out": 15003
+     },
+     "events": {
+      "in": 18060,
+      "out": 15003
+     },
+     "metrics": {
+      "in": 18060,
+      "out": 15003
+     }
+    },
+    "usd": 0.0277,
+    "stem": "pr4977"
+   },
+   {
+    "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1/runs/pr5009/run-20260805-124642-e093c2",
+    "errors": [],
+    "run_trace_events": 37,
+    "bytes": {
+     "trace.jsonl": 5977,
+     "events.jsonl": 2060470,
+     "run_trace.jsonl": 9424
+    },
+    "llm_spans": 11,
+    "llm_requests": 11,
+    "llm_responses": 11,
+    "spans_total": 16,
+    "tokens": {
+     "spans": {
+      "in": 74489,
+      "out": 32032
+     },
+     "events": {
+      "in": 74489,
+      "out": 32032
+     },
+     "metrics": {
+      "in": 74489,
+      "out": 32032
+     }
+    },
+    "usd": 0.0725,
+    "stem": "pr5009"
+   }
+  ]
+ }
+}

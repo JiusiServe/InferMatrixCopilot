@@ -1,0 +1,25 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.8,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.9,
+    "actionability": 0.7
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X substantively engages the PR's core technical change: it validates the cudagraph_mode gating logic, explicitly flags the seed-reproducibility consequence for decode batch>1 (matching gcanlin's ground-truth concern), catches a diff-grounded contradiction (stale prefix-caching comment vs the flipped value), and raises benchmark-evidence and NPU-intentionality questions that echo Sy0307's and the NPU thread's concerns. Y's OCR tool surfaces only one trivial duplicate-assignment nit that overlaps with none of the ground-truth reviewer concerns, giving it near-zero recall despite being technically valid and actionable.",
+  "_cost_usd": 0.3088006,
+  "_blinding": {
+    "X": "opus_baseline",
+    "Y": "copilot_v2"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "8e361cd8ea0aecb7c7838d4f1de3fa59c40fd666bda80b1e511fb026c3d98c1f",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "x": {
+    "recall": 0.08,
+    "precision": 0.9,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Y verifies the fix against actual upstream vLLM source, echoes the ground truth's direct-vs-delegated-loader reasoning and its concern about the test only proving the mapper is 'called' rather than functionally correct, and explicitly flags that hunyuan_image3_transformer.py (DiT loader) was left unswept — directly hitting the latent gap that later became issue #4891. X's single finding is a valid but trivial style nitpick on the regression test's string-match robustness, missing nearly everything of substance in the human review and never touching the missed-caller gap.",
+  "_cost_usd": 0.1266959,
+  "_blinding": {
+    "X": "copilot_v2",
+    "Y": "opus_baseline"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/ocr_v1810_r2",
+    "arm_a_sha256": "1db0d30d23db631a0fa3b11b8653d7512dcb070a3e03b67112311700966704ed",
+    "judge_rep": 2
+  }
+}

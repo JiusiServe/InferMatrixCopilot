@@ -1,0 +1,99 @@
+{
+  "wall_s": 277.6,
+  "split": "val",
+  "rc": 0,
+  "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v5_flash_r1/runs/pr4837/run-20260805-110259-ee56da",
+  "recorded_at": "2026-08-05T11:07:35",
+  "attempts": [
+    {
+      "invocation_id": "inv-8dde0f33",
+      "outcome": "run:run-20260805-110259-ee56da",
+      "rc": 0,
+      "pre_run": null
+    },
+    {
+      "run_dir": "run-20260805-110259-ee56da",
+      "llm_calls": 12,
+      "input_tokens": 195894,
+      "output_tokens": 31238,
+      "usd": 0.106901,
+      "source": "spans"
+    }
+  ],
+  "attempt_usd_total": 0.106901,
+  "llm_calls": 12,
+  "input_tokens": 195894,
+  "output_tokens": 31238,
+  "usd": 0.106901,
+  "source": "spans",
+  "metrics": {
+    "schema": 1,
+    "run": "run-20260805-110259-ee56da",
+    "task_kind": "pr_review",
+    "status": "done",
+    "quality": {
+      "q": null,
+      "weight_coverage": 0.0,
+      "partial": true,
+      "abstained": false,
+      "components": {
+        "recall_w": null,
+        "precision_v": null,
+        "useful": null,
+        "calib": null,
+        "decision": null
+      }
+    },
+    "cost": {
+      "usd": 0.1069,
+      "minutes": 4.59,
+      "ci_minutes": 0,
+      "input_tokens": 195894,
+      "output_tokens": 31238,
+      "tool_calls": 24,
+      "usd_ref": 1.0,
+      "min_ref": 10.0,
+      "cost_index": 1.2154,
+      "cost_partial": false,
+      "unpriced_calls": 0,
+      "source": "spans",
+      "llm_calls": 12,
+      "by_role": {
+        "agent": {
+          "usd": 0.106901,
+          "input_tokens": 195894,
+          "output_tokens": 31238,
+          "calls": 12
+        }
+      },
+      "cache_read_tokens": 727680,
+      "cache_creation_tokens": 0
+    },
+    "timings": {
+      "steps": {
+        "fetch": 4.06,
+        "gate": 2.05,
+        "review": 269.21,
+        "report": 0.04
+      },
+      "time_to_first_result_s": 275.35
+    },
+    "risk": {
+      "incidents": {
+        "catastrophic": 0,
+        "severe": 0,
+        "moderate": 0,
+        "minor": 0
+      },
+      "safety_multiplier": 1.0
+    },
+    "catq": null,
+    "tus": null,
+    "signals": {
+      "escalations": 0,
+      "pushes": 0,
+      "posted": 0,
+      "steps_completed": 4
+    }
+  }
+}

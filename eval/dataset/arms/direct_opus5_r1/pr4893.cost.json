@@ -1,0 +1,44 @@
+{
+  "calls": 30,
+  "input_tokens": 1646601,
+  "output_tokens": 30695,
+  "cost_usd": 2.2585699999999997,
+  "is_error": false,
+  "terminal_reason": "completed",
+  "split": "val",
+  "head": "0128660809e150d5cc5546f7d9604e79dcb7fc2b",
+  "base": "ddba6de2ab658a0fdb6f3f72cac9d2c3e2c19aea",
+  "resolved_model": "claude-opus-5",
+  "snapshot_sha256": "934d48c2afef170d488f33cc5e620417b24afdf9ba4425d64850c21ea2825b65",
+  "validation_commands": [
+    "git log -1 --format='%H %s' && echo \"---FILES---\" && git diff --name-status ddba6de2ab658a0fdb6f3f72cac9d2c3e2c19aea HEAD && echo \"---STAT---\" && git diff --stat ddba6de2ab658a0fdb6f3f72cac9d2c3e2c19aea HEAD",
+    "git diff ddba6de2ab658a0fdb6f3f72cac9d2c3e2c19aea HEAD -- vllm_omni/",
+    "python -c \"import vllm, inspect, vllm.forward_context as fc; print(vllm.__version__); print(inspect.getsourcefile(fc))\" 2>&1 | tail -5",
+    "cd /usr/local/lib/python3.12/dist-packages/vllm && sed -n '1,120p' forward_context.py | grep -n \"class DPMetadata\" -A 60 ",
+    "python - <<'EOF'\nimport inspect, vllm.distributed.parallel_state as ps\nprint(inspect.signature(ps.init_model_parallel_group))\nimport vllm.forward_context as fc\nprint(\"DPMeta fields:\", [f.name for f in __import__('dataclasses').fields(fc.DPMetadata)])\nprint(\"has is_forward_context_available:\", hasatt",
+    "git diff ddba6de2ab658a0fdb6f3f72cac9d2c3e2c19aea HEAD -- tests/",
+    "python -m pytest -q tests/diffusion/distributed/test_expert_parallel_layout.py tests/diffusion/models/hunyuan_image3/test_hunyuan_fused_moe.py 2>&1 | tail -20"
+  ],
+  "ran_validation": true,
+  "claude_md_seen": {
+    "/data/zhoutaichang/CLAUDE.md": "4ff5b2a69ed0abc2"
+  },
+  "recorded_at": "2026-08-11T17:05:24",
+  "arm": "direct_opus5",
+  "wall_s": 486.0,
+  "audit_ok": true,
+  "audit_violations": [],
+  "audit_blocked_attempts": [],
+  "artifact_chars": 7578,
+  "completion_gate_ok": true,
+  "mcp_review_calls": 1,
+  "mcp_review_calls_ok": 1,
+  "mcp_validate_calls": 2,
+  "mcp_validate_calls_ok": 2,
+  "validate_status_sequence": [
+    "partial_review",
+    "complete"
+  ],
+  "validate_final_status": "complete",
+  "audit_rule": "worktree + installed dependencies + copilot knowledge"
+}
