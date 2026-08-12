@@ -94,6 +94,18 @@ python -m build --wheel
 确认 wheel 中包含 `knowledge/`、`_runtime/playbooks/`、`_runtime/adapters/` 和
 `_runtime/skills/`，不能只验证源码 checkout。
 
+## CI
+
+`.github/workflows/test.yml` 在每次 push 与 PR 上跑上面这些检查：整套 pytest、
+`--help` / `doctor` 冒烟、把 wheel 装进干净 venv 验证四棵数据树确实随包发布
+（`test_packaged_runtime.py` 只断言 pyproject 的**文本**，证明不了这件事），
+以及两个知识树 linter。
+
+**它目前只是信号，不是合并门禁。** 要让它真正挡住合并，需要在
+Settings → Branches（或 repository ruleset）里把 `suite` 这个 job 设为
+required status check —— 这是仓库设置，任何一次提交都做不到。<!-- TODO(maintainer) -->
+
+
 ## 三条边界
 
 - Direct 使用宿主 Agent 的模型，不在 MCP 内再次调用模型。

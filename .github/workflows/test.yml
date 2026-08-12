@@ -1,0 +1,83 @@
+name: tests
+
+# The suite is ~485 offline cases with no network and no paid LLM calls, so it can
+# run on every push. Until this existed it ran only when someone remembered to type
+# `pytest` (doc/CODE_TOUR.md documents it as a manual step) — tests that nothing runs
+# protect nothing.
+#
+# NOTE: this workflow is a SIGNAL, not a merge gate. Making it blocking needs a branch
+# protection rule / ruleset naming the `suite` job as a required status check, which is
+# a repository setting and cannot be done from a commit.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # pytest lives in the `dev` extra; `mcp` is needed for the MCP server tests.
+      - name: Install
+        run: pip install -e ".[dev,mcp]"
+
+      - name: Unit tests
+        run: pytest -q
+
+      - name: CLI smoke
+        run: infermatrix-copilot --help
+
+      # doctor exits 1 when credentials are absent, which is the expected state in CI.
+      # The claim under test is "it runs and emits valid JSON", not "it is configured",
+      # so tolerate 0/1 explicitly rather than piping into a parser — steps run under
+      # `pipefail`, where the expected exit 1 would fail the step.
+      - name: doctor emits valid JSON
+        run: |
+          infermatrix-copilot doctor --json > doctor.json || [ $? -le 1 ]
+          python -c "import json; json.load(open('doctor.json'))"
+
+      # test_packaged_runtime.py asserts on pyproject's TEXT, so nothing else proves the
+      # force-include data trees actually ship. Build the artifact and import it from a
+      # clean venv, where a missing tree cannot be masked by the source checkout.
+      - name: Wheel ships its runtime data
+        run: |
+          pip install build
+          python -m build --wheel
+          python -m venv /tmp/clean
+          /tmp/clean/bin/pip install --quiet dist/*.whl
+          cd /tmp   # import the INSTALLED package, never the source checkout
+          /tmp/clean/bin/python - <<'PY'
+          import sys
+          from infermatrix_copilot.config import _resource_dir, _RESOURCE_MARKERS
+          # resolve through the production probe and require its marker to exist:
+          # a present-but-empty directory would satisfy a bare is_dir() check
+          bad = []
+          for name, marker in _RESOURCE_MARKERS.items():
+              d = _resource_dir(name)
+              if not d.is_dir():
+                  bad.append(f"{name}: {d} missing")
+              elif not any(m.is_file() for m in d.glob(marker)):
+                  bad.append(f"{name}: {d} has no {marker}")
+          if bad:
+              sys.exit("wheel runtime data broken: " + "; ".join(bad))
+          print("packaged runtime data resolves via _resource_dir:",
+                ", ".join(_RESOURCE_MARKERS))
+          PY
+
+      # Written, tested, and until now invoked only from prose (AGENTS.md, DEVELOPMENT.md).
+      - name: Knowledge linters
+        run: |
+          python knowledge/tools/check_knowledge_tree.py
+          python knowledge/tools/check_wiki_lint.py
+          pytest -q knowledge/tools/test_check_knowledge_tree.py \
+                    knowledge/tools/test_check_review_report.py
