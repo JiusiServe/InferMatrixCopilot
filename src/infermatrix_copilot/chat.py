@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Callable
 
 from .run_trace import RunTrace
 from .task_spec import TaskSpec
+from .tools import GREP_EXCLUDE_DIRS, bounded
 from .ui import make_ui
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -27,6 +28,15 @@ if TYPE_CHECKING:  # pragma: no cover
 
 _MAX_HISTORY_MESSAGES = 60
 _MAX_TOOL_ROUNDS = 8
+
+# Every model-visible bound in this file, named so the disclosure and the cut can
+# never disagree. `_TOOL_RESULT_CHARS` is the outermost one: it re-caps every tool
+# result in `turn()`, so any inner marker has to survive it.
+_REPORT_CHARS = 8_000
+_REPO_READ_CHARS = 20_000
+_REPO_GREP_CHARS = 15_000
+_ESCALATION_CHARS = 1_500
+_TOOL_RESULT_CHARS = 20_000
 
 SYSTEM_PROMPT = """You are infermatrix-copilot, a conversational repo-maintenance assistant for the \
 {repo} project, running in a terminal session (similar to Claude Code).
@@ -117,15 +127,23 @@ TOOL_DEFS: list[dict] = [
                        "to read a specific line range.",
         "input_schema": {"type": "object",
                          "properties": {"path": {"type": "string"},
-                                        "offset": {"type": "integer",
+                                        # null is accepted and means "omitted"; the
+                                        # schema has to say so rather than promise
+                                        # integer-only and then tolerate more
+                                        "offset": {"type": ["integer", "null"],
+                                                   "minimum": 1,
                                                    "description": "1-based start line"},
-                                        "limit": {"type": "integer",
+                                        "limit": {"type": ["integer", "null"],
+                                                  "minimum": 1,
                                                   "description": "number of lines"}},
                          "required": ["path"]},
     },
     {
         "name": "repo_grep",
-        "description": "Recursive text search inside a configured repository.",
+        "description": ("Recursive text search inside a configured repository. The "
+                        "pattern is matched LITERALLY, not as a regex — brackets, "
+                        "dots and parentheses need no escaping, and regex syntax "
+                        f"will not work. Skips {', '.join(GREP_EXCLUDE_DIRS)}."),
         "input_schema": {"type": "object",
                          "properties": {"pattern": {"type": "string"},
                                         "path": {"type": "string"}},
@@ -267,7 +285,9 @@ class ChatSession:
             for f in ("RUN_REPORT.md", "ESCALATION.md", "COMPARISON.md"):
                 p = Path(run_dir) / f
                 if p.exists():
-                    parts.append(f"## {f}\n{p.read_text(encoding='utf-8', errors='replace')[:8_000]}")
+                    parts.append(f"## {f}\n" + bounded(
+                        p.read_text(encoding="utf-8", errors="replace"),
+                        _REPORT_CHARS, f"{f} report"))
             return "\n\n".join(parts) or "no reports in this run"
         if name == "repo_read":
             path = self._resolve_path(args["path"])
@@ -276,14 +296,30 @@ class ChatSession:
                 return err
             text = path.read_text(encoding="utf-8", errors="replace")
             offset, limit = args.get("offset"), args.get("limit")
+            # Both are 1-based counts. Unvalidated they fail silently and wrongly:
+            # offset=-3 normalizes to line 1, limit=-1 slices backwards, and
+            # limit=0 is falsy so it becomes the 200-line default. Same
+            # silent-wrong-answer class as a negative read_file offset.
+            # `int(value)` would coerce True to 1 and 1.9 to 1 and hand back the
+            # wrong window; a real integer is required (bool subclasses int, so it
+            # is excluded explicitly).
+            for label, value in (("offset", offset), ("limit", limit)):
+                if value is None:
+                    continue
+                if isinstance(value, bool) or not isinstance(value, int):
+                    return f"{label} must be an integer >= 1, got {value!r}"
+                if value < 1:
+                    return f"{label} must be >= 1, got {value}"
             if offset or limit:
                 lines = text.splitlines()
                 start = max(0, int(offset or 1) - 1)
                 end = start + int(limit or 200)
                 numbered = [f"{i + 1}: {line}" for i, line in
                             enumerate(lines[start:end], start=start)]
-                return "\n".join(numbered)[:20_000] or "(past end of file)"
-            return text[:20_000]
+                return bounded("\n".join(numbered), _REPO_READ_CHARS,
+                               "repo_read") or "(past end of file)"
+            return bounded(text, _REPO_READ_CHARS, "repo_read",
+                           hint="re-read with offset/limit to page")
         if name == "repo_grep":
             root = args.get("path") or next(
                 iter(self.copilot.settings.repo_paths.values()), "")
@@ -292,10 +328,25 @@ class ChatSession:
             if err:
                 return err
             import subprocess
-            out = subprocess.run(["grep", "-rn", "-e", args["pattern"], root],
-                                 capture_output=True, text=True, encoding="utf-8",
-                                 errors="replace", timeout=60)
-            return out.stdout[:15_000] or "(no matches)"
+            # literal by default and no regex opt-in: this is the human-facing REPL,
+            # where the smaller surface beats the flexibility. Same reasoning as
+            # tools._grep — a bracketed expression must not silently become a
+            # character class. Exit codes are the contract there too: a failed
+            # search must not be reported as an empty one.
+            out = subprocess.run(
+                ["grep", "-rn", "-F",
+                 *(f"--exclude-dir={d}" for d in GREP_EXCLUDE_DIRS),
+                 "-e", args["pattern"], root],
+                capture_output=True, text=True, encoding="utf-8",
+                errors="replace", timeout=60)
+            if out.returncode not in (0, 1):
+                return (f"grep failed (exit {out.returncode}): "
+                        + (bounded(out.stderr.strip(), 500, "grep stderr")
+                           or "no stderr"))
+            if out.returncode == 1:
+                return "(no matches)"
+            return bounded(out.stdout, _REPO_GREP_CHARS, "repo_grep",
+                           hint="narrow the pattern or search a subdirectory")
         return f"unknown tool: {name}"
 
     def _run_outcome(self, code: int) -> str:
@@ -312,7 +363,9 @@ class ChatSession:
                 summary.append(f"completed_steps={done}")
             esc = Path(self.copilot.last_run_dir) / "ESCALATION.md"
             if esc.exists() and code != 0:
-                summary.append("escalation:\n" + esc.read_text(encoding="utf-8", errors="replace")[:1_500])
+                summary.append("escalation:\n" + bounded(
+                    esc.read_text(encoding="utf-8", errors="replace"),
+                    _ESCALATION_CHARS, "escalation"))
         return "; ".join(summary[:3]) + ("\n" + summary[3] if len(summary) > 3 else "")
 
     # -- one conversational turn -----------------------------------------------
@@ -361,8 +414,12 @@ class ChatSession:
                 self.trace.record("tool_result", tool=use.name,
                                   result=str(result)[:500])
                 self.ui.tool_result(str(result)[:110].replace("\n", " · "))
+                # the OUTERMOST bound: every handler's result is re-capped here, so a
+                # plain slice would shear off the truncation marker a handler just
+                # added and hand the model a clipped result that looks complete
                 results.append({"type": "tool_result", "tool_use_id": use.id,
-                                "content": str(result)[:20_000]})
+                                "content": bounded(str(result), _TOOL_RESULT_CHARS,
+                                                   f"{use.name} result")})
             self.messages.append({"role": "user", "content": results})
         if not ended:
             self.ui.stream_end("")
