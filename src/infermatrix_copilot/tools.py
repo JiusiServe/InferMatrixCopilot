@@ -16,6 +16,97 @@ from typing import Any, Callable
 from .run_trace import RunTrace
 from .scopes import ToolScope
 
+# Every bound on a tool result is declared here rather than inline, so the tool
+# DESCRIPTIONS can interpolate the real number instead of restating it. Hand-copied
+# cap text drifts from its emitter — that is a live defect in the reference
+# implementation we studied, in two separate places.
+READ_MAX_BYTES = 48_000
+GREP_MAX_CHARS = 20_000
+SHELL_STDOUT_CHARS = 10_000
+SHELL_STDERR_CHARS = 5_000
+
+# Directories a repo-wide search must never descend into: `.git` alone can add
+# megabytes of pack objects, which both drowns the signal and burns the cap below.
+GREP_EXCLUDE_DIRS = (".git", "node_modules", "__pycache__", ".venv")
+
+
+def bounded(text: str, limit: int, what: str,
+            keep: str = "head",
+            hint: str | Callable[[int], str] = "") -> str:
+    """Return `text` cut to `limit` chars INCLUDING its marker, or unchanged if it fits.
+
+    A bounded result must say it was bounded. A consumer that cannot tell a complete
+    result from a clipped one will report a sweep it never finished — and nothing in
+    the trace contradicts it.
+
+    The marker is budgeted *inside* `limit` rather than appended past it, so a later
+    slice at the same limit cannot shear the disclosure back off. That is not
+    hypothetical: the chat turn loop caps every tool result a second time. The
+    return value never exceeds `limit`; a limit too small for the full marker falls
+    back to a compact `[+N]` form, and one too small even for that raises.
+
+    keep="head"  drop the end; marker appended     (searches, file windows)
+    keep="tail"  drop the start; marker prepended  (command output — the diagnostic
+                 signal sits at the end, so the tail is the part worth keeping)
+    hint         continuation advice folded into the marker; a callable receives the
+                 number of chars actually kept, so paging offsets stay exact.
+    """
+    total = len(text)
+    if total <= limit:
+        return text
+
+    def render(kept: int) -> str:
+        advice = hint(kept) if callable(hint) else hint
+        tail = f" — {advice}" if advice else ""
+        if keep == "tail":
+            return f"[{what}: head dropped, kept last {kept} of {total} chars{tail}]\n"
+        return f"\n...[{what}: truncated at {kept} of {total} chars{tail}]"
+
+    def compact(kept: int) -> str:
+        """Last-resort disclosure for a limit too small for the full marker."""
+        return f"[+{total - kept}]\n" if keep == "tail" else f"\n[+{total - kept}]"
+
+    # The marker's own length depends on `kept`, which depends on the marker's
+    # length, so `kept` has to be solved for rather than estimated. Two failure
+    # modes were measured while getting here: a single-pass estimate overshot the
+    # cap by 197 chars (`hint` is caller-supplied, so its length need not shrink
+    # with `kept`), and chasing the fixed point iteratively settled on a low local
+    # one, throwing away most of a usable budget.
+    #
+    # Binary search on "does a window of this size still fit its own marker?"
+    # avoids both: it never returns an unsafe value, it terminates in log2(total)
+    # steps, and for a marker that grows monotonically with `kept` — which is every
+    # hint in this codebase, all of them constant or a decimal offset — it finds
+    # the exact largest safe window.
+    def largest_fit(mark: Callable[[int], str]) -> int:
+        lo, hi, best = 0, total, -1
+        while lo <= hi:
+            mid = (lo + hi) // 2
+            if mid + len(mark(mid)) <= limit:
+                best, lo = mid, mid + 1
+            else:
+                hi = mid - 1
+        return best
+
+    marker_of = render
+    kept = largest_fit(render)
+    if kept < 0:
+        # `limit` cannot hold even a zero-length window plus the full marker. Fall
+        # back to a compact disclosure rather than either slicing the marker into
+        # something unreadable or silently blowing the cap.
+        marker_of = compact
+        kept = largest_fit(compact)
+    if kept < 0:
+        # Not even "[+N]" fits. That is a caller misconfiguration, not a runtime
+        # condition — every real cap here is >= 500 — and silently returning
+        # something wrong is the failure this whole function exists to prevent.
+        raise ValueError(
+            f"bounded(): limit {limit} is too small to hold any disclosure "
+            f"for {what!r}")
+    marker = marker_of(kept)
+    return marker + text[total - kept:] if keep == "tail" else text[:kept] + marker
+
+
 # which arg of each builtin tool names a filesystem path — used to resolve a
 # RELATIVE path against the scope's repo root (so an agent's repo-relative
 # path reaches a per-PR worktree, not the process cwd)
@@ -53,20 +144,36 @@ class ToolDef:
     write_path_arg: str | None = None  # arg holding the path a write lands on
 
 
-def _read_file(path: str, max_bytes: int = 48_000, offset: int = 0,
+def _read_file(path: str, max_bytes: int = READ_MAX_BYTES, offset: int = 0,
                **_: Any) -> str:
     """Read `path` as UTF-8 (undecodable bytes replaced), returning a bounded
     window of `max_bytes` chars starting at char `offset`. Unbounded reads
     ballooned agent histories (a 50k-token file ingested whole per lens both
     multiplies uncached tokens and pushes conversations past the provider's
-    reliable prompt-cache range) — read in windows and page with `offset`."""
+    reliable prompt-cache range) — read in windows and page with `offset`.
+
+    An `offset` past EOF returns an explicit empty-window notice rather than `""`:
+    a bare empty string arrives as a successful tool result carrying no signal, and
+    the model cannot tell "nothing there" from "read did nothing"."""
     data = Path(path).read_text(encoding="utf-8", errors="replace")
-    window = data[offset:offset + max_bytes]
-    if offset + max_bytes < len(data):
-        window += (f"\n...[truncated at char {offset + max_bytes} of "
-                   f"{len(data)} — call read_file again with "
-                   f"offset={offset + max_bytes} for more]")
-    return window
+    # A model supplies these, so neither the type nor the sign can be assumed. A
+    # negative offset would index from the end and make the paging hint count
+    # backwards; True would silently mean 1; a float would blow up in the slice.
+    # bool is checked first because it subclasses int.
+    for label, value in (("offset", offset), ("max_bytes", max_bytes)):
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError(f"{label} must be an integer, got {value!r}")
+    if offset < 0:
+        raise ValueError(f"offset must be >= 0, got {offset}")
+    if max_bytes <= 0:
+        raise ValueError(f"max_bytes must be > 0, got {max_bytes}")
+    if offset and offset >= len(data):
+        return (f"[empty: offset {offset} is past end of file "
+                f"({len(data)} chars)]")
+    # the paging hint is computed from chars ACTUALLY kept — the marker reserves
+    # part of the budget, so `offset + max_bytes` would skip whatever it displaced
+    return bounded(data[offset:], max_bytes, "read_file",
+                   hint=lambda kept: f"call read_file again with offset={offset + kept}")
 
 
 def _write_file(path: str, content: str, **_: Any) -> str:
@@ -99,25 +206,56 @@ def _list_dir(path: str, **_: Any) -> str:
     return "\n".join(sorted(x.name + ("/" if x.is_dir() else "") for x in Path(path).iterdir()))
 
 
-def _grep(pattern: str, path: str, **_: Any) -> str:
-    """Recursively search `path` for `pattern` (`grep -rn`), returning matching
-    `file:line:text` lines capped at 20k chars, or "(no matches)"."""
+def _grep(pattern: str, path: str, regex: bool = False, **_: Any) -> str:
+    """Recursively search `path` for `pattern`, returning `file:line:text` matches.
+
+    `pattern` is a LITERAL string unless `regex=True`. The default matters: this
+    tool is handed patterns like `items[0]` — `_sweep_targets` extracts exactly that
+    shape and the contracts lens is told to find each one's consumers. Under a regex
+    default, `xs[0]` is a character class, so searching it returns the line `b = xs0`
+    and NOT `a = xs[0]`: a plausible wrong line, offered as evidence. Literal is
+    therefore the safe default and regex the opt-in, not the reverse.
+
+    `regex=True` selects POSIX extended regex (`-E`), which is portable across the
+    grep implementations this may shell out to (GNU, BSD, ugrep). PCRE (`-P`) is not
+    — BSD grep has none — so it is deliberately not offered here.
+
+    Exit codes are the contract: 0 matches, 1 no matches, anything else a real
+    failure that RAISES. Previously every non-zero code produced empty stdout and
+    was reported as "(no matches)", so a bad path or malformed pattern told the
+    caller a search succeeded and found nothing."""
     out = subprocess.run(
-        ["grep", "-rn", "--include=*", "-e", pattern, path],
+        ["grep", "-rn", "-E" if regex else "-F",
+         *(f"--exclude-dir={d}" for d in GREP_EXCLUDE_DIRS),
+         "-e", pattern, path],
         capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60,
     )
-    return out.stdout[:20_000] or "(no matches)"
+    # membership, not `> 1`: subprocess reports signal death as a NEGATIVE code
+    # (SIGKILL -> -9), which no `> 1` guard catches
+    if out.returncode not in (0, 1):
+        # the stderr is the whole diagnostic here, so bound it the same way as any
+        # other model-visible cut rather than with a bare slice
+        raise RuntimeError(
+            f"grep failed (exit {out.returncode}): "
+            f"{bounded(out.stderr.strip(), 500, 'grep stderr') or 'no stderr'}")
+    if out.returncode == 1:
+        return "(no matches)"
+    return bounded(out.stdout, GREP_MAX_CHARS, "grep",
+                   hint="narrow the pattern or search a subdirectory")
 
 
 def _run_shell(cmd: str, cwd: str | None = None, timeout: int = 600, **_: Any) -> str:
     """Run `cmd` in a shell (optionally in `cwd`, bounded by `timeout`).
     Returns the exit code with the tail of stdout (10k) and stderr (5k) — tails
-    because the signal is usually at the end of long build/test output."""
+    because the signal is usually at the end of long build/test output, and each
+    tail says so when it dropped a head, so a clipped log is not read as a whole one."""
     out = subprocess.run(
         cmd, shell=True, cwd=cwd, capture_output=True, text=True,
         encoding="utf-8", errors="replace", timeout=timeout
     )
-    return f"exit={out.returncode}\n{out.stdout[-10_000:]}\n{out.stderr[-5_000:]}"
+    stdout = bounded(out.stdout, SHELL_STDOUT_CHARS, "stdout", keep="tail")
+    stderr = bounded(out.stderr, SHELL_STDERR_CHARS, "stderr", keep="tail")
+    return f"exit={out.returncode}\n{stdout}\n{stderr}"
 
 
 def _schema(props: dict, required: list[str]) -> dict:
@@ -131,8 +269,8 @@ TOOLS: dict[str, ToolDef] = {
     t.name: t
     for t in [
         ToolDef("read_file",
-                "Read a text file (windowed: 48k chars per call; page with "
-                "offset).",
+                f"Read a text file (windowed: {READ_MAX_BYTES:,} chars per call; "
+                "page with offset).",
                 _schema({"path": _S, "offset": {"type": "integer"}}, ["path"]),
                 _read_file),
         ToolDef("write_file", "Write/overwrite a file.",
@@ -140,9 +278,17 @@ TOOLS: dict[str, ToolDef] = {
         ToolDef("edit_file", "Replace exactly-once-matching text in a file.",
                 _schema({"path": _S, "old": _S, "new": _S}, ["path", "old", "new"]), _edit_file, "path"),
         ToolDef("list_dir", "List a directory.", _schema({"path": _S}, ["path"]), _list_dir),
-        ToolDef("grep", "Recursive text search.",
-                _schema({"pattern": _S, "path": _S}, ["pattern", "path"]), _grep),
-        ToolDef("run_shell", "Run a shell command.",
+        ToolDef("grep",
+                "Recursive text search. The pattern is matched LITERALLY — pass "
+                "regex:true for POSIX extended regex. Search a literal expression "
+                "like items[0] with the default; brackets, dots and parentheses "
+                f"need no escaping. Skips {', '.join(GREP_EXCLUDE_DIRS)}. Results "
+                f"capped at {GREP_MAX_CHARS:,} chars.",
+                _schema({"pattern": _S, "path": _S,
+                         "regex": {"type": "boolean"}}, ["pattern", "path"]), _grep),
+        ToolDef("run_shell",
+                f"Run a shell command. Returns the last {SHELL_STDOUT_CHARS:,} chars "
+                f"of stdout and {SHELL_STDERR_CHARS:,} of stderr.",
                 _schema({"cmd": _S, "cwd": _S}, ["cmd"]), _run_shell),
     ]
 }
