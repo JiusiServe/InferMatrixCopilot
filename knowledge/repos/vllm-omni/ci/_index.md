@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni CI"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-08-04
 type: index
 tags: [vllm-omni, ci]
 sources: []
@@ -21,5 +21,6 @@ sources: []
 
 | 遇到什么 | 查看哪里 |
 |---|---|
+| 修改 Buildkite 选择器、pytest marker、硬件队列、golden 或质量阈值 | [CI 规则](rules.md) |
 | 查看仓库特有 CI 陷阱 | [CI guides](guides/_index.md) |
 | 调查历史 CI 失败 | [CI incidents](incidents/_index.md) |
