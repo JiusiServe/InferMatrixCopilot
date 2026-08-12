@@ -66,6 +66,12 @@ docstring fix, a missing assert, a missing verification run).
 Then emit review_comments per the output contract:
 - Each comment: file, line, severity, WHAT to change and WHY (directive), and the \
 evidence you checked.
+- ANCHORING: also give anchor_snippet — the offending line(s) copied VERBATIM from the \
+diff, without the leading +/- marker. The snippet is what positions the comment; the \
+line number is only a fallback. Copy it exactly or omit the field entirely: a snippet \
+that does not match the diff verbatim, or that quotes code being REMOVED, costs the \
+comment its inline position — worse than giving no snippet at all. One or two lines is \
+ideal; enough to be unique within the file, no more.
 - EVIDENCE-GROUNDING: every comment must be verifiable from the diff or from repo \
 evidence you actually gathered and NAME in the comment (the file you read or grep you \
 ran, and what it showed). The comment's FIRST sentence must state the concrete change \
@@ -91,6 +97,38 @@ with a one-line summary."""
 # first finding anchors (e.g. all-doc-nits), while unions across runs hit 5/8
 # ground-truth issues. Lenses run concurrently, so a finer decomposition costs
 # tokens but no wall-clock.
+# The `light` tier is one pass with no lenses, and measurement showed that pass
+# was the weakest thing the reviewer does: on a 20-PR arm the seven light items
+# produced 3.1 anchored findings on average where a *structured* single pass by
+# the same model on the same PRs produced 10.4 — at an almost identical tool
+# budget (22.4 calls vs 23.6). The gap was not effort and not the missing
+# ensemble; it was that light ran with no protocol at all while every other
+# reviewer surface had one. This is that protocol, kept repo-neutral: what the
+# repo *is* still arrives only through the adapter briefing and profile
+# `review.md` (design §V2.2.1-2).
+_REVIEW_LIGHT_PROTOCOL = """
+
+## Single-pass protocol
+
+You get one pass, so spend it in this order and do not wander:
+
+1. Enumerate every changed semantic path in the diff FIRST — each behavior a
+   caller could observe differently after this change. Write that list before
+   opening any file; it is your coverage target.
+2. Build ONE evidence packet and reuse it: the files you opened, the searches
+   you ran and their results, the callers you found. Never re-open a file or
+   re-run a search you already have.
+3. For each enumerated path, reach either a supported finding or an explicit
+   no-issue conclusion. A path you did not resolve is a gap you must name, not
+   one to leave silent.
+4. Stop when every path is resolved. Do not spend remaining budget on searches
+   that only raise your confidence in a conclusion you already support.
+5. Deliver exactly one consolidated review, with every finding anchored to a
+   real file and line you actually read. No finding without evidence you can
+   point at; if you found nothing, say so plainly and name any path you could
+   not verify.
+"""
+
 _REVIEW_LENSES = [
     {"name": "logic",
      "focus": "Checklist items 1, 2 and 4, as a MECHANICAL SWEEP OF THE DIFF: "

@@ -221,6 +221,12 @@ class Settings(BaseSettings):
     review_light_max_files: int = 3   # light ceiling (with lines below):
     review_light_max_lines: int = 80  #   at/under, with no API/default or
                                       #   risk signals -> one-pass review
+    # A light pass that finds nothing buys one standard pass rather than
+    # shipping silence (same reflex as ensemble_zero_yield_retry, one tier up).
+    # Measured on a 20-PR arm: the light tier held 7 items and produced 3.1
+    # anchored findings on average where a structured single pass by the same
+    # model on the same PRs produced 10.4 — one of them shipped zero.
+    review_light_zero_yield_escalate: bool = True
     review_light_max_iters: int = 12  # light-pass tool budget — the token
                                       #   bound for small PRs. The solo pass
                                       #   sweeps the WHOLE checklist that four
