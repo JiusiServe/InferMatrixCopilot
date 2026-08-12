@@ -101,7 +101,11 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
     assert core.requests == []
     assert Path(review["knowledge_entry"]).parts[-2:] == ("knowledge", "AGENTS.md")
     assert review["knowledge_routes"] == []
-    assert review["routing"]["status"] == "needs_pr_context"
+    # `owner/repo` is not a served repo. This used to report `needs_pr_context`
+    # because the empty-description guard ran before the repo guard — misleading,
+    # since no description would make an unserved repo routable, and unsafe once
+    # the unrouted path started deriving routes from changed files.
+    assert review["routing"]["status"] == "unsupported_exact_router"
     assert review["navigation_policy"]["progress_before_knowledge"] is True
     assert review["navigation_policy"]["use_embedded_quick_maps"] is True
     assert review["navigation_policy"]["stop_after_routes"] is True
@@ -125,6 +129,17 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
     assert any(
         "compatibility preflight" in item
         and "environment fingerprint" in item
+        for item in review["first_review_checklist"]
+    )
+    # Two failure classes the wave-1 arm missed and the unassisted baseline caught.
+    # Neither belongs to a component owner, so no knowledge route can carry them and
+    # the checklist is the only channel that reaches every Direct review.
+    assert any(
+        "fixture, mock, or fake injected" in item
+        for item in review["first_review_checklist"]
+    )
+    assert any(
+        "lowest version the project's own constraints still permit" in item
         for item in review["first_review_checklist"]
     )
     assert any(
@@ -211,19 +226,25 @@ def test_direct_routes_title_body_before_changed_files(monkeypatch):
         Path(route["path"]).is_file()
         for route in review["knowledge_routes"]
     )
-    assert all(
-        "## Direct" in route["quick_map"]
-        and len(route["quick_map"]) <= 3500
-        and route["read_required"] is False
-        for route in review["knowledge_routes"]
-    )
+    # read_required tracks whether the embedded map is COMPLETE, not merely present:
+    # the serving section exceeds the 3500 cap, so its map is clipped and the host is
+    # told to open the page (with a budgeted read) instead of trusting a partial map.
+    for route in review["knowledge_routes"]:
+        assert "## Direct" in route["quick_map"]
+        assert len(route["quick_map"]) <= 3500
+        assert route["quick_map_status"] in {"ok", "truncated"}
+        assert route["read_required"] is (route["quick_map_status"] != "ok")
+    assert review["execution_budget"]["knowledge_file_reads"] == len(
+        [r for r in review["knowledge_routes"] if r["read_required"]])
     scope = {
         item["owner"]: item
         for item in review["routing"]["scope_validation"]
     }
     assert scope["model-executor"]["selected_from_description"] is False
     assert review["execution_budget"]["profile"] == "code"
-    assert review["execution_budget"]["knowledge_file_reads"] == 0
+    # was 0 unconditionally; the budget now grants exactly one read per route whose
+    # map is not fully deliverable, so it cannot contradict read_required
+    assert review["execution_budget"]["knowledge_file_reads"] == 1
 
 
 def test_direct_docs_only_budget_stays_small(monkeypatch):
@@ -526,3 +547,201 @@ def test_strict_reports_setup_gaps_before_starting(monkeypatch):
         )
     }
     assert core.requests == []
+
+
+# -- Direct's deliverable must never be silently empty -------------------------
+
+
+def test_every_routed_page_yields_a_quick_map():
+    """Direct's product IS the embedded map. A rule page whose Direct heading is
+    renamed hands the host an empty map plus "don't open this", and nothing today
+    notices. Calls the PRODUCTION extractor so this gate cannot drift from the
+    server the way a second copy of the heading regex would."""
+    from pathlib import Path
+
+    from infermatrix_copilot.thin_mcp_server import (
+        _DIRECT_OWNER_ROUTES, _KNOWLEDGE, _direct_quick_map, _knowledge_path,
+    )
+
+    pages = [_knowledge_path(str(r["path"])) for r in _DIRECT_OWNER_ROUTES]
+    pages += [str(p) for p in
+              sorted((_KNOWLEDGE / "repos" / "vllm-omni" / "models").glob("*/rules.md"))]
+    assert pages, "no routed pages found — the enumeration itself is broken"
+
+    # Pages whose Direct section exceeds the 3500-char cap. They still behave
+    # correctly (status=truncated -> read_required, budget grants the read), but a
+    # shipped page that ALWAYS forces a file read defeats the point of an embedded
+    # map, so this is recorded debt that must not grow. Fix by trimming the section,
+    # not by widening the list or the cap.
+    known_truncated = {"components/serving/rules.md"}
+
+    broken, newly_truncated = [], []
+    for page in pages:
+        if not Path(page).is_file():
+            broken.append(f"{page}: missing")
+            continue
+        text, status = _direct_quick_map(page)
+        if status == "unavailable" or not text.strip():
+            broken.append(f"{page}: {status}")
+        elif status == "truncated" and not any(
+                page.endswith(k) for k in known_truncated):
+            newly_truncated.append(page)
+    assert not broken, (
+        "routed pages with no deliverable Direct quick map — the host receives an "
+        f"empty map: {broken}")
+    assert not newly_truncated, (
+        "routed pages whose Direct section grew past the cap, so the host now gets a "
+        f"clipped map and must open the file: {newly_truncated}")
+
+
+def test_missing_quick_map_fails_closed_at_runtime(tmp_path, monkeypatch):
+    """The conformance test above only covers the shipped tree.
+    INFERMATRIX_KNOWLEDGE_DIR can point anywhere, so the runtime must degrade to
+    "open the page" rather than emit an empty map."""
+    from infermatrix_copilot import thin_mcp_server as tms
+
+    page = tmp_path / "rules.md"
+    page.write_text("## 开发快速入口\n\nno Direct heading here\n", encoding="utf-8")
+    route = tms._direct_route("owner", str(page), "test")
+    assert route["quick_map_status"] == "unavailable"
+    assert route["read_required"] is True
+
+    ok = tmp_path / "good.md"
+    ok.write_text("## Direct code map\n\n- entry\n", encoding="utf-8")
+    good = tms._direct_route("owner", str(ok), "test")
+    assert good["quick_map_status"] == "ok" and good["read_required"] is False
+
+
+def test_budget_allows_exactly_the_reads_the_routes_require(monkeypatch):
+    """`read_required: True` next to `knowledge_file_reads: 0` is an instruction the
+    host cannot satisfy. Normal routes must stay at 0."""
+    from infermatrix_copilot.thin_mcp_server import _direct_execution_budget
+
+    assert _direct_execution_budget(["a.py"])["knowledge_file_reads"] == 0
+    assert _direct_execution_budget(
+        ["a.py"], knowledge_file_reads=2)["knowledge_file_reads"] == 2
+
+
+# -- scope fallback ------------------------------------------------------------
+
+
+def _routes(title="", body="", files=None, repo="vllm-omni"):
+    from infermatrix_copilot.thin_mcp_server import _direct_knowledge_routes
+    return _direct_knowledge_routes(repo, title=title, body=body,
+                                    changed_files=files or [])
+
+
+SERVING = "vllm_omni/entrypoints/openai/serving_speech.py"
+EXEC1 = "vllm_omni/model_executor/models/ming_tts/patch_emission.py"
+EXEC2 = "vllm_omni/model_executor/models/common/ming/audio_vae.py"
+
+
+def test_unsupported_repo_never_routes_regardless_of_description():
+    """The repo guard must run before anything derives routes from changed files,
+    or an unserved repo gets this repo's owner knowledge."""
+    for title, body in (("", ""), ("qwen3-tts payload fix", "serving change")):
+        out = _routes(title, body, [SERVING], repo="some/other-repo")
+        assert out["status"] == "unsupported_exact_router"
+        assert out["routes"] == []
+
+
+def test_fallback_fills_the_void_when_description_routes_nothing():
+    out = _routes("Update WeChat QR code", "no routable vocabulary", [SERVING])
+    assert out["status"] == "scope_fallback"
+    assert [r["owner"] for r in out["routes"]] == ["serving"]
+    assert out["selected_by"] == "title_body+changed_files"
+    assert out["changed_files_role"] == "selected_fallback_routes"
+    assert out["routes"][0]["reason"].startswith("changed files:")
+
+
+def test_fallback_when_no_description_at_all():
+    """needs_pr_context used to return zero routes even with changed files in hand."""
+    out = _routes("", "", [SERVING])
+    assert out["status"] == "scope_fallback"
+    assert [r["owner"] for r in out["routes"]] == ["serving"]
+
+
+def test_no_description_and_no_scope_still_asks_for_context():
+    out = _routes("", "", [])
+    assert out["status"] == "needs_pr_context"
+    assert out["routes"] == [] and "required" in out
+
+
+def test_agreeing_description_route_suppresses_fallback_and_changes_nothing():
+    out = _routes("[Bugfix] serving endpoint request handling",
+                  "openai endpoint", [SERVING])
+    assert out["status"] == "ready"
+    assert "serving" in [r["owner"] for r in out["routes"]]
+    assert out["selected_by"] == "title_body"
+    assert out["changed_files_role"] == "scope_validation_only"
+
+
+def test_competing_scope_owners_are_ordered_by_evidence():
+    """Two model-executor files vs one serving file — the higher match count wins the
+    slot, deterministically, not whichever appears first in the route table."""
+    out = _routes("Update WeChat QR code", "", [SERVING, EXEC1, EXEC2])
+    assert out["status"] == "scope_fallback"
+    assert out["routes"][0]["owner"] == "model-executor"
+
+
+def test_fallback_displaces_the_weakest_route_at_a_full_cap():
+    """Exercises the routes.pop() branch: three description routes already fill the
+    cap and none matches the changed-file owner, so the weakest is displaced."""
+    out = _routes(
+        "[Perf] qwen3-tts deploy yaml endpoint scheduler batch",
+        "config deploy openai endpoint request scheduler batch sampling",
+        [EXEC1, EXEC2])
+    owners = [r["owner"] for r in out["routes"]]
+    assert len(owners) == 3, owners
+    assert out["status"] == "scope_fallback"
+    assert "model-executor" in owners  # the changed-file owner got in
+
+
+def test_precap_match_dropped_by_the_cap_still_triggers_fallback():
+    """`selected_from_description` reports the PRE-cap fact. If agreement were judged
+    on it, an owner displaced by [:3] would suppress the fallback while never
+    reaching the host."""
+    out = _routes(
+        "[Perf] qwen3-tts deploy yaml endpoint scheduler batch",
+        "config deploy openai endpoint request scheduler batch sampling",
+        [EXEC1, EXEC2])
+    scope = {s["owner"]: s for s in out["scope_validation"]}
+    assert "model-executor" in scope
+    delivered = [r["owner"] for r in out["routes"]]
+    # whatever the pre-cap flag says, the owner the diff implies IS delivered
+    assert "model-executor" in delivered
+
+
+def test_unavailable_quick_map_wires_through_review_end_to_end(monkeypatch, tmp_path):
+    """The helper-level budget test does not prove the count reaches the response."""
+    mcp, _core = _fake_mcp(monkeypatch)
+    from infermatrix_copilot import thin_mcp_server as tms
+
+    real = tms._direct_route
+
+    def blind(owner, path, reason):
+        route = real(owner, path, reason)
+        route.update(quick_map="", quick_map_status="unavailable", read_required=True)
+        return route
+
+    monkeypatch.setattr(tms, "_direct_route", blind)
+    review = mcp.tools["review"](
+        target="https://github.com/vllm-project/vllm-omni/pull/1",
+        repo="vllm-project/vllm-omni", mode="direct",
+        title="[Bugfix] serving endpoint request handling", body="openai endpoint",
+        changed_files=[SERVING])
+    n = len([r for r in review["knowledge_routes"] if r["read_required"]])
+    assert n >= 1
+    assert review["execution_budget"]["knowledge_file_reads"] == n
+    assert "unavailable" in review["navigation_policy"]["open_route_file_when"]
+
+
+def test_heading_only_section_is_not_a_usable_quick_map(tmp_path):
+    """The extract includes its own heading, so `## Direct ...` with nothing under it
+    is truthy while carrying no map — it must not pass as ok."""
+    from infermatrix_copilot import thin_mcp_server as tms
+    page = tmp_path / "r.md"
+    page.write_text("## Direct code map\n\n## next section\n", encoding="utf-8")
+    route = tms._direct_route("owner", str(page), "test")
+    assert route["quick_map_status"] == "unavailable"
+    assert route["read_required"] is True

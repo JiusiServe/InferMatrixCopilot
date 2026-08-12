@@ -181,6 +181,11 @@ _DIRECT_REVIEW_CHECKLIST = [
     "For docs-only changes, skip dependency preflight and pytest; use diff hygiene plus bounded checks of the referenced live contract.",
     "Before pytest, run a short import/version compatibility preflight; bind commands and results to head SHA and an environment fingerprint.",
     "After preflight passes, run targeted tests and low-cost static checks alongside source review.",
+    # Two failure classes measured on the wave-1 arm: both were single-concern PRs the
+    # unassisted baseline caught and Direct missed, and neither belongs to any component
+    # owner, so no knowledge route will surface them.
+    "When the diff adds or changes a test, check the assertions bind to real behavior and not to values the fixture, mock, or fake injected.",
+    "When the diff passes a new argument to a dependency, check it against the lowest version the project's own constraints still permit, not the version installed here.",
     "Stop investigating when every changed semantic path has a supported finding or explicit no-issue conclusion; do not add searches only for confidence.",
     "Run subtraction only when the diff adds or expands a helper, class, fallback, compatibility branch, or public behavior; otherwise mark no subtraction signal.",
     "Plan exactly one consolidated final review comment.",
@@ -382,8 +387,18 @@ def _signal_matches(text: str, signal: str) -> bool:
     )
 
 
-def _direct_quick_map(path: str, max_chars: int = 3500) -> str:
-    """Return only the embedded Direct code map, never the whole rule page."""
+def _direct_quick_map(path: str, max_chars: int = 3500) -> tuple[str, str]:
+    """Return the embedded Direct code map and its status, never the whole page.
+
+    Status is ``ok`` / ``truncated`` / ``unavailable``. The last two both mean the
+    host cannot rely on the excerpt alone.
+
+    ``truncated`` is not cosmetic. The served `serving` page's section is 3754 chars
+    against this 3500 cap, so 335 characters — including its request-contract rows —
+    were being dropped with no marker, while the route said `read_required: False`.
+    A partial map presented as whole is the same lie as a missing one, just harder
+    to notice.
+    """
     lines = Path(path).read_text(encoding="utf-8").splitlines()
     start = next(
         (
@@ -393,7 +408,7 @@ def _direct_quick_map(path: str, max_chars: int = 3500) -> str:
         None,
     )
     if start is None:
-        return ""
+        return "", "unavailable"
     end = next(
         (
             index for index in range(start + 1, len(lines))
@@ -402,12 +417,54 @@ def _direct_quick_map(path: str, max_chars: int = 3500) -> str:
         len(lines),
     )
     excerpt = "\n".join(lines[start:end]).strip()
+    # the extract INCLUDES its own heading, so a section that is nothing but
+    # `## Direct ...` is truthy while carrying no map at all
+    if not "\n".join(excerpt.splitlines()[1:]).strip():
+        return "", "unavailable"
     if len(excerpt) <= max_chars:
-        return excerpt
-    return excerpt[:max_chars].rsplit("\n", 1)[0].rstrip()
+        return excerpt, "ok"
+    # two passes so the marker reports the ACTUAL retained length: reserving room for
+    # the note and rounding back to a line boundary both cut further than max_chars,
+    # and a marker naming the cap would overstate what the host received
+    probe = f"\n\n...[quick map truncated at {max_chars} of {len(excerpt)} chars]"
+    kept = excerpt[:max_chars - len(probe)].rsplit("\n", 1)[0].rstrip()
+    note = f"\n\n...[quick map truncated at {len(kept)} of {len(excerpt)} chars]"
+    return kept + note, "truncated"
 
 
-def _direct_execution_budget(changed_files: list[str]) -> dict:
+def _direct_route(owner: str, path: str, reason: str) -> dict:
+    """One knowledge route, failing CLOSED when its quick map cannot be extracted.
+
+    A rule page whose Direct heading is renamed used to yield ``quick_map: ""`` next to
+    ``read_required: False`` — an empty map plus an instruction not to open the page,
+    in the mode where the route *is* the deliverable. Degrading to "open it yourself"
+    is a real fallback; handing over nothing and forbidding a look is not. The
+    conformance test keeps the shipped tree honest; this keeps every other tree
+    (``INFERMATRIX_KNOWLEDGE_DIR`` points wherever an operator says) honest too.
+    """
+    quick_map, status = _direct_quick_map(path)
+    return {
+        "owner": owner,
+        "path": path,
+        "reason": reason,
+        "quick_map": quick_map,
+        "quick_map_status": status,
+        # a truncated map is as unreliable as a missing one for the rows that fell
+        # off the end, so both send the host to the page
+        "read_required": status != "ok",
+    }
+
+
+def _direct_execution_budget(changed_files: list[str], *,
+                             knowledge_file_reads: int = 0) -> dict:
+    """Bounded budget for one Direct review.
+
+    `knowledge_file_reads` is normally 0 — the whole point of the embedded quick maps
+    is that the host never opens a rule page. It is raised only by the count of routes
+    whose quick map could not be extracted (bounded by the three-route cap): telling a
+    host `read_required: True` while the budget forbids every knowledge read would be
+    an unsatisfiable instruction, and unsatisfiable instructions get ignored wholesale.
+    """
     normalized = [path.replace("\\", "/").casefold() for path in changed_files]
     docs_only = bool(normalized) and all(
         path.startswith(("docs/", "doc/", "recipes/"))
@@ -416,7 +473,7 @@ def _direct_execution_budget(changed_files: list[str]) -> dict:
     )
     return {
         "profile": "docs_only" if docs_only else "code",
-        "knowledge_file_reads": 0,
+        "knowledge_file_reads": knowledge_file_reads,
         "initial_source_files": 6,
         "search_matches_per_query": 40,
         "command_output_chars": 12000,
@@ -444,8 +501,18 @@ def _direct_knowledge_routes(
 ) -> dict:
     """Select bounded Direct knowledge routes from PR intent.
 
-    Title/body select owners. Changed files only report whether the frozen diff
-    supports or contradicts that selection; they never silently replace it.
+    Title/body select owners, and changed files report whether the frozen diff
+    supports or contradicts that selection — they never silently *replace* a
+    selection that reached the host.
+
+    They do select as a LAST RESORT: when no route surviving the three-route cap
+    matches an owner the changed files imply, scope-derived routes are added (the
+    weakest description route is displaced if the cap is full). That case is never
+    silent — ``status`` becomes ``scope_fallback``, ``selected_by`` becomes
+    ``title_body+changed_files``, ``changed_files_role`` becomes
+    ``selected_fallback_routes``, and each such route says ``changed files: ...`` in
+    its reason. Handing the host nothing while holding the answer was the worse
+    option: the owners were already computed and then discarded.
     """
     selected_repo = _normalize_repo(repo)
     changed_files = changed_files or []
@@ -454,17 +521,25 @@ def _direct_knowledge_routes(
     ):
         raise ValueError("changed_files must be a list of paths")
 
-    intent = _route_text(f"{title}\n{body}")
-    if not intent:
-        return {
-            "status": "needs_pr_context",
-            "selected_by": "title_body",
-            "required": ["title", "body", "changed_files"],
-            "changed_files_role": "scope_validation_only",
-            "routes": [],
-            "scope_validation": [],
-        }
+    # The repo guard runs FIRST. It used to sit below the empty-intent return, so a
+    # description-less PR on an unsupported repo fell through to the generic path —
+    # and once that path started deriving routes from changed files, it would have
+    # served this repo's owner knowledge for a repo we do not serve.
     if selected_repo != "vllm-omni":
+        # Adapter presence decides which non-default-repo case this is. Without the
+        # gate, a repo we do not serve at all fell into the adapter path, whose
+        # helper returns every changed file as "unmatched" when there is no
+        # adapter — so garbage repos were reported as description_unrouted (a
+        # served-repo status) instead of unsupported_exact_router, and the guard
+        # this comment describes was silently lost for them.
+        if _adapter_for_repo(selected_repo) is None:
+            return {
+                "status": "unsupported_exact_router",
+                "selected_by": "title_body",
+                "changed_files_role": "scope_validation_only",
+                "routes": [],
+                "scope_validation": [],
+            }
         routes, unmatched = _adapter_changed_file_routes(
             selected_repo, changed_files)
         if routes or unmatched:
@@ -491,44 +566,40 @@ def _direct_knowledge_routes(
             "scope_validation": [],
         }
 
+    intent = _route_text(f"{title}\n{body}")
+
     owner_routes: list[dict[str, object]] = []
-    for route in _DIRECT_OWNER_ROUTES:
-        matched = [
-            signal for signal in route["signals"]
-            if _signal_matches(intent, signal)
-        ]
-        if matched:
-            path = _knowledge_path(str(route["path"]))
-            owner_routes.append({
-                "owner": str(route["owner"]),
-                "path": path,
-                "reason": f"title/body: {', '.join(matched[:3])}",
-                "quick_map": _direct_quick_map(path),
-                "read_required": False,
-            })
+    if intent:
+        for route in _DIRECT_OWNER_ROUTES:
+            matched = [
+                signal for signal in route["signals"]
+                if _signal_matches(intent, signal)
+            ]
+            if matched:
+                owner_routes.append(_direct_route(
+                    str(route["owner"]), _knowledge_path(str(route["path"])),
+                    f"title/body: {', '.join(matched[:3])}"))
 
     model_routes: list[dict[str, object]] = []
     model_root = _KNOWLEDGE / "repos" / "vllm-omni" / "models"
-    for model_dir in sorted(model_root.iterdir(), key=lambda path: -len(path.name)):
-        rules = model_dir / "rules.md"
-        if not rules.is_file():
-            continue
-        model_name = _route_text(model_dir.name)
-        compact_name = re.sub(r"[^a-z0-9]", "", model_name)
-        compact_intent = re.sub(r"[^a-z0-9]", "", intent)
-        exact_match = _signal_matches(intent, model_name)
-        compact_match = len(compact_name) >= 8 and compact_name in compact_intent
-        if exact_match or compact_match:
-            path = str(rules.resolve())
-            model_routes.append({
-                "owner": f"model:{model_dir.name}",
-                "path": path,
-                "reason": f"title/body model: {model_dir.name}",
-                "quick_map": _direct_quick_map(path),
-                "read_required": False,
-            })
+    if intent:
+        for model_dir in sorted(model_root.iterdir(), key=lambda path: -len(path.name)):
+            rules = model_dir / "rules.md"
+            if not rules.is_file():
+                continue
+            model_name = _route_text(model_dir.name)
+            compact_name = re.sub(r"[^a-z0-9]", "", model_name)
+            compact_intent = re.sub(r"[^a-z0-9]", "", intent)
+            exact_match = _signal_matches(intent, model_name)
+            compact_match = len(compact_name) >= 8 and compact_name in compact_intent
+            if exact_match or compact_match:
+                model_routes.append(_direct_route(
+                    f"model:{model_dir.name}", str(rules.resolve()),
+                    f"title/body model: {model_dir.name}"))
 
     routes = (model_routes + owner_routes)[:3]
+
+    scope_hits: dict[str, list[str]] = {}
     scope_validation = []
     for route in _DIRECT_OWNER_ROUTES:
         hits = sorted({
@@ -539,21 +610,68 @@ def _direct_knowledge_routes(
             )
         })
         if hits:
+            scope_hits[str(route["owner"])] = hits
             scope_validation.append({
                 "owner": route["owner"],
                 "changed_files": hits,
+                # reports the PRE-cap fact, which is what this field is for
                 "selected_from_description": any(
                     item["owner"] == route["owner"] for item in owner_routes
                 ),
             })
 
-    return {
-        "status": "ready" if routes else "description_unrouted",
-        "selected_by": "title_body",
-        "changed_files_role": "scope_validation_only",
+    # Fallback: the frozen diff already tells us which owners this PR touches, and
+    # today that answer is computed and thrown away whenever the description picked
+    # something else — or nothing. Measured over 60 merged PRs: 10 gain an owner they
+    # previously dropped, 50 are unchanged.
+    #
+    # It does NOT rescue the separately-measured 6/60 that route to nothing at all:
+    # those touch CODEOWNERS, docs/, recipes/, apps/ and tests/, which match no owner
+    # prefix, so there is no owner to derive. Inventing one to move that number would
+    # be worse than the gap. Those need a language-level default floor instead.
+    #
+    # Agreement is judged against the routes that SURVIVE the cap, not the pre-cap
+    # owner list: an owner that matched the description but was displaced by
+    # `[:3]` never reaches the host, so it must not suppress the fallback.
+    surviving = {str(item["owner"]) for item in routes}
+    fallback_used = False
+    if scope_hits and not (surviving & set(scope_hits)):
+        by_owner = {str(r["owner"]): r for r in _DIRECT_OWNER_ROUTES}
+        # most changed files first, then owner name — the choice reflects evidence
+        # rather than the declaration order of _DIRECT_OWNER_ROUTES
+        candidates = sorted(scope_hits, key=lambda o: (-len(scope_hits[o]), o))
+        for owner in candidates:
+            if len(routes) >= 3:
+                if fallback_used:
+                    break
+                routes.pop()  # displace the weakest description route, cap stays 3
+            spec = by_owner[owner]
+            routes.append(_direct_route(
+                owner, _knowledge_path(str(spec["path"])),
+                f"changed files: {', '.join(scope_hits[owner][:3])}"))
+            fallback_used = True
+
+    if fallback_used:
+        status = "scope_fallback"
+    elif routes:
+        status = "ready"
+    elif intent:
+        status = "description_unrouted"
+    else:
+        status = "needs_pr_context"
+
+    result: dict[str, object] = {
+        "status": status,
+        # both fields would be false statements once changed files pick a route
+        "selected_by": "title_body+changed_files" if fallback_used else "title_body",
+        "changed_files_role": ("selected_fallback_routes" if fallback_used
+                               else "scope_validation_only"),
         "routes": routes,
         "scope_validation": scope_validation,
     }
+    if status == "needs_pr_context":
+        result["required"] = ["title", "body", "changed_files"]
+    return result
 
 
 def _direct_completion_result(
@@ -759,10 +877,15 @@ def build_mcp(
 
         For Direct, first collect the frozen PR title, body, and changed files,
         publish the host progress update, then pass that context here. Direct
-        returns at most three exact owner/model routes; changed files only
-        validate scope. Strict runs the packaged PR-review workflow and accepts
-        an optional local checkout through ``repo_path``. ``post`` still
-        requires explicit intent and server-side ``ALLOW_POST=1``.
+        returns at most three exact owner/model routes. Title/body normally select
+        them and changed files validate scope; if none of the selected routes match
+        an owner the changed files imply, the changed files select the routes
+        instead and the response says so (``status: scope_fallback``). Any route whose
+        ``quick_map_status`` is not ``"ok"`` — ``"unavailable"`` (no embedded map) or
+        ``"truncated"`` (only part of one) — must be opened, and the budget grants a
+        read for each. Strict runs the packaged PR-review
+        workflow and accepts an optional local checkout through ``repo_path``.
+        ``post`` still requires explicit intent and server-side ``ALLOW_POST=1``.
         """
         def run() -> dict:
             started = time.perf_counter()
@@ -786,9 +909,16 @@ def build_mcp(
                     if knowledge_routes
                     else _knowledge_entry("AGENTS.md")
                 )
+                # A route that could not supply a quick map asks the host to open the
+                # page, so the navigation policy and the budget have to permit exactly
+                # that many reads. Otherwise the response contradicts itself: "read
+                # this" next to "never open a rule page" next to "0 knowledge reads".
+                unavailable = [r for r in knowledge_routes
+                               if r.get("quick_map_status") != "ok"]
                 budget_started = time.perf_counter()
                 execution_budget = _direct_execution_budget(
-                    changed_files or []
+                    changed_files or [],
+                    knowledge_file_reads=len(unavailable),
                 )
                 budget_ms = int((time.perf_counter() - budget_started) * 1000)
                 return {
@@ -803,6 +933,12 @@ def build_mcp(
                         "progress_before_knowledge": True,
                         "use_embedded_quick_maps": True,
                         "open_route_file_only_for_concrete_ambiguity": True,
+                        "open_route_file_when": (
+                            'quick_map_status != "ok" — that route carries no embedded '
+                            "map (unavailable) or only part of one (truncated), so "
+                            "opening its page IS the concrete ambiguity the rule above "
+                            "allows for"
+                        ),
                         "max_routes": 3,
                         "stop_after_routes": True,
                         "fallback_entry": _knowledge_entry("AGENTS.md"),
