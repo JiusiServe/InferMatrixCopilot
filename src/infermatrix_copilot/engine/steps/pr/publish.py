@@ -14,6 +14,8 @@ import subprocess
 
 from ....push import PushPolicy, guard_push
 from ...step import FailureKind, StepContext, StepResult, StepSpec
+from ..review.anchor import diff_index
+from ..review.anchor import normalize_path as _normalize_path
 from ..review.utils import _review_verdict
 from .._common import gh as _gh
 from .._common import register_step, step
@@ -53,45 +55,73 @@ async def _push(ctx: StepContext) -> StepResult:
     return StepResult(True, summary=f"pushed {policy.remote} HEAD:{policy.branch}")
 
 
-_HUNK = re.compile(
-    r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@"
-)
+# Why a finding could not be attached. The distinction matters because two of these
+# are statements about OUR input and only the third is about the finding.
+_WHY_CLIPPED = ("the fetched diff for this file was clipped mid-hunk, so its line "
+                "could not be confirmed against the full changed range")
+_WHY_ABSENT = ("this file does not appear in the diff we fetched, so its line could "
+               "not be checked at all")
+_WHY_OUTSIDE = ("their line falls outside the changed lines in the fetched diff "
+                "(no clipping detected in that file)")
+_WHY_NO_LOCATION = "the finding did not carry a usable file and line"
+_WHY_UNVERIFIED = ("the finding quoted a code snippet that could not be matched to a "
+                   "unique changed line, so its declared line could not be corroborated")
+
+
+def _as_line_number(value: object) -> int:
+    """Return `value` as a 1-based line number, or 0 if it is not one.
+
+    `int()` is far too permissive for a value that becomes a PUBLISHED anchor:
+    `int(1.9)` and `int(True)` are both 1, so a malformed line silently lands on
+    line 1 and gets posted there if line 1 happens to be addressable. Conversely
+    `str.isdigit()` is too permissive as a guard — `"²".isdigit()` is True while
+    `int("²")` raises, which would crash payload construction — so digit strings
+    must also be ASCII. bool is excluded explicitly because it subclasses int.
+    """
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        text = value.strip()
+        if text.isascii() and text.isdigit():
+            try:
+                return int(text)
+            except ValueError:
+                # even an all-ASCII digit string can refuse to convert: CPython caps
+                # int(str) at sys.get_int_max_str_digits() (4300), and letting that
+                # escape would abort the whole payload over one absurd finding
+                return 0
+    return 0
+
+
 _FULL_REPO = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
 
-def _normalize_path(path: object) -> str:
-    value = str(path or "").strip().replace("\\", "/")
-    while value.startswith("./"):
-        value = value[2:]
-    return value[2:] if value.startswith("b/") else value
+def _right_side_diff_lines(diff: str) -> dict[str, tuple[set[int], str]]:
+    """RIGHT-side line numbers addressable by GitHub's review API, per path, with a
+    state saying how much that inventory can be trusted.
 
+    A projection over ``anchor.diff_index`` — one walk serves both this validator and
+    the snippet resolver, because two parsers would have to agree forever on what
+    counts as a right-side line and would drift.
 
-def _right_side_diff_lines(diff: str) -> dict[str, set[int]]:
-    """Return RIGHT-side line numbers addressable by GitHub's review API."""
-    lines: dict[str, set[int]] = {}
-    path = ""
-    new_line: int | None = None
-    for raw in str(diff or "").splitlines():
-        if raw.startswith("diff --git "):
-            path, new_line = "", None
-        elif new_line is None and raw.startswith("+++ "):
-            candidate = raw[4:].strip()
-            path = "" if candidate == "/dev/null" else _normalize_path(candidate)
-            if path:
-                lines.setdefault(path, set())
-            new_line = None
-        elif raw.startswith("@@"):
-            match = _HUNK.match(raw)
-            new_line = int(match.group(1)) if match and path else None
-        elif path and new_line is not None:
-            if raw.startswith("-") and not raw.startswith("---"):
-                continue
-            if raw.startswith("\\"):
-                continue
-            # Added and context lines both exist on the RIGHT side.
-            lines[path].add(new_line)
-            new_line += 1
-    return lines
+    Paths present map to ``(lines, "no_clipping_detected" | "incomplete")``; a path
+    ABSENT from the mapping is *unknown*, never "complete" — the caller must not read
+    a missing key as proof the file was unchanged.
+
+    What the state does and does not prove: comparing a hunk's declared new-side count
+    against the lines actually observed detects a clip INSIDE a hunk. It cannot detect
+    an omitted file, an omitted whole hunk, a clip exactly on a hunk boundary, or a
+    truncated final line — each is indistinguishable from a well-formed shorter diff.
+    So ``no_clipping_detected`` means exactly that, and deliberately is not named
+    ``complete``: the strongest honest claim is "we found no evidence of clipping in
+    this file", and a future reader should not be able to inflate the name into more.
+    """
+    return {
+        path: ({num for segment in index.right for num, _ in segment}, index.state)
+        for path, index in diff_index(diff).items()
+    }
 
 
 def _inline_comment(comment: dict) -> dict:
@@ -112,7 +142,7 @@ def _partition_comments(
     comments: list[dict], diff: str,
 ) -> tuple[list[dict], list[dict]]:
     """Split findings into API-addressable comments and body fallbacks."""
-    addressable = _right_side_diff_lines(diff)
+    inventory = _right_side_diff_lines(diff)
     inline: list[dict] = []
     downgraded: list[dict] = []
     for raw in comments:
@@ -120,39 +150,80 @@ def _partition_comments(
             "comment": str(raw), "file": "", "line": None,
         }
         path = _normalize_path(comment.get("file"))
-        try:
-            line = int(comment.get("line"))
-        except (TypeError, ValueError):
-            line = 0
-        if path and line > 0 and line in addressable.get(path, set()):
+        # `int()` is too permissive for a value that becomes a published anchor:
+        # int(1.9) and int(True) are both 1, so a malformed line silently lands on
+        # line 1 and, if line 1 happens to be addressable, gets POSTED there. Only a
+        # real integer (bool is an int subclass, hence the explicit exclusion) or a
+        # digit string is a location; everything else is malformed.
+        line = _as_line_number(comment.get("line"))
+        entry = inventory.get(path) if path else None
+        # A snippet was supplied and could not be resolved. Do NOT fall back to the
+        # declared line even when it is addressable: we looked for corroboration and
+        # failed to find it, which is weaker evidence than never having looked. An
+        # addressable line is not the same thing as the intended anchor.
+        unverified = bool(comment.pop("_anchor_unverified", False))
+        if entry and line > 0 and line in entry[0] and not unverified:
             comment["file"], comment["line"] = path, line
             inline.append(_inline_comment(comment))
         else:
             comment["file"], comment["line"] = path, line or "?"
+            # each finding carries the reason for ITS OWN demotion: a single review
+            # can hold all of these at once, and one blanket sentence mislabels the rest.
+            # Malformed location is checked FIRST — otherwise a finding that named no
+            # usable line at all gets blamed on our diff being clipped, which is the
+            # opposite of the truth.
+            # unverified is checked FIRST: the resolver clears `line` when a snippet
+            # could not be corroborated, so the no-location branch would otherwise
+            # claim the model never gave a location when in fact we rejected it
+            if unverified:
+                comment["_why"] = _WHY_UNVERIFIED
+            elif not path or line <= 0:
+                comment["_why"] = _WHY_NO_LOCATION
+            elif entry is None:
+                comment["_why"] = _WHY_ABSENT
+            elif entry[1] == "incomplete":
+                comment["_why"] = _WHY_CLIPPED
+            else:
+                comment["_why"] = _WHY_OUTSIDE
             downgraded.append(comment)
     return inline, downgraded
 
 
 def _fallback_section(comments: list[dict], reason: str = "") -> str:
+    """Render demoted findings, grouped by WHY each was demoted.
+
+    A single `reason` still applies to the whole set for the stale-head case, where
+    one fact genuinely covers every finding. Otherwise each finding brings its own
+    `_why`, because a review can simultaneously contain findings whose file was
+    clipped, whose file was absent, and whose line was simply outside the diff — and
+    a blanket sentence would misattribute two of the three, blaming the reviewer for
+    a gap in our own input.
+    """
     if not comments:
         return ""
-    lines = [
-        "### Findings without a valid current diff anchor",
-        "",
-        reason or (
-            "These findings are preserved in the review body because their "
-            "file/line could not be mapped to the fetched PR diff."
-        ),
-        "",
-    ]
-    for comment in comments:
+
+    def render(comment: dict) -> str:
         location = f"{comment.get('file') or '?'}:{comment.get('line') or '?'}"
         severity = str(comment.get("severity") or "minor").lower()
         text = str(comment.get("comment") or "").strip()
         evidence = str(comment.get("evidence") or "").strip()
         suffix = f" Evidence: {evidence}" if evidence else ""
-        lines.append(f"- `{location}` [{severity}] — {text}{suffix}")
-    return "\n".join(lines)
+        return f"- `{location}` [{severity}] — {text}{suffix}"
+
+    lines = ["### Findings without a valid current diff anchor", ""]
+    if reason:
+        lines += [reason, ""]
+        lines += [render(comment) for comment in comments]
+        return "\n".join(lines)
+
+    grouped: dict[str, list[dict]] = {}
+    for comment in comments:
+        grouped.setdefault(str(comment.get("_why") or _WHY_OUTSIDE), []).append(comment)
+    for why, group in grouped.items():
+        lines += [f"These findings are preserved here because {why}:", ""]
+        lines += [render(comment) for comment in group]
+        lines.append("")
+    return "\n".join(lines).rstrip()
 
 
 def _event_for_review(comments: list[dict], pr_state: str = "",

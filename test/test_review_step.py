@@ -157,3 +157,42 @@ def test_review_salvaged_when_agent_escalates_with_comments(settings, trace,
     assert "salvaged" in result.summary
     assert "removed-API survivor" in state["review_text"]
     assert state["review_text"].rstrip().endswith("**Verdict:** REQUEST CHANGES")
+
+
+def test_anchor_snippet_fixes_the_line_in_both_body_and_comments(
+        settings, trace, tmp_path, git_repo):
+    """End to end: the model quotes the code and gets the line wrong. The derived
+    line must appear in BOTH surfaces — `_render_review_md` prints `file:line` into
+    the body, so resolving later (at publish) would show one position in the body and
+    anchor the inline thread at another."""
+    diff = ("diff --git a/mod_a.py b/mod_a.py\n--- a/mod_a.py\n+++ b/mod_a.py\n"
+            "@@ -1,1 +1,3 @@\n A = 1\n+B = items[0]\n+C = 3\n")
+    llm = ScriptedLLM([_contract_reply([
+        {"file": "mod_a.py", "line": 87, "anchor_snippet": "B = items[0]",
+         "severity": "major", "comment": "unguarded index",
+         "evidence": "read mod_a.py"},
+    ])])
+    state = {"diff_text": diff, "task_spec": {"pr": 9}, "repo_path": str(git_repo)}
+    result = asyncio.run(_registry().get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+    assert result.ok
+    comment = result.outputs["review_comments"][0]
+    assert comment["line"] == 2, "declared line 87 should have been replaced"
+    assert "mod_a.py:2" in result.outputs["review_text"]
+    assert "mod_a.py:87" not in result.outputs["review_text"]
+
+
+def test_review_without_snippets_is_untouched(settings, trace, tmp_path, git_repo):
+    """The compatibility path: no snippet means the declared line stands, exactly as
+    before this feature existed."""
+    diff = ("diff --git a/mod_a.py b/mod_a.py\n--- a/mod_a.py\n+++ b/mod_a.py\n"
+            "@@ -1,1 +1,2 @@\n A = 1\n+B = 2\n")
+    llm = ScriptedLLM([_contract_reply([
+        {"file": "mod_a.py", "line": 2, "severity": "nit", "comment": "c",
+         "evidence": "e"},
+    ])])
+    state = {"diff_text": diff, "task_spec": {"pr": 9}, "repo_path": str(git_repo)}
+    result = asyncio.run(_registry().get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+    comment = result.outputs["review_comments"][0]
+    assert comment["line"] == 2 and "_anchor_unverified" not in comment

@@ -14,16 +14,23 @@ from __future__ import annotations
 
 import asyncio
 import subprocess
+from dataclasses import replace
 
 from ....review.diff_summary import build_diff_summary
-from ....review.planner import DEPTHS, plan_review
+from ....review.planner import DEFAULT_STANDARD_LENSES, DEPTHS, plan_review
 from ....review.reviewer import run_patch_review
 from ....review.triggers import evaluate_triggers
 from ...step import FailureKind, StepContext, StepResult
 from .._common import gh_read_tools as _gh_read_tools
 from .._common import repo_path as _repo_path
 from .._common import step
-from .prompts import _REVIEW_LENSES, _REVIEW_MERGE, _REVIEW_SYSTEM
+from .anchor import resolve_review_comments
+from .prompts import (
+    _REVIEW_LENSES,
+    _REVIEW_LIGHT_PROTOCOL,
+    _REVIEW_MERGE,
+    _REVIEW_SYSTEM,
+)
 from .utils import (
     _SEVERITY_ORDER,
     _render_review_md,
@@ -127,15 +134,15 @@ async def _review_diff(ctx: StepContext) -> StepResult:
         purpose=f"Review PR #{spec.get('pr')} like an engaged maintainer: "
                 "grounded, specific, useful findings.",
         guidance=guidance,
-        expected="review_comments with file/line/severity/comment/evidence; "
-                 "APPROVE-equivalent = empty review_comments with a summary.",
+        expected="review_comments with file/line/anchor_snippet/severity/comment/"
+                 "evidence; APPROVE-equivalent = empty review_comments with a summary.",
         evidence={"pr_diff": str(diff),
                   "pr_context": ctx.state.get("pr_context", ""),
                   "gate_report": ctx.state.get("gate_report", ""),
                   "sweep_targets": _sweep_targets(str(diff), language)},
         output_extension={"review_comments":
-                          "list of {file, line, severity: blocker|major|minor|nit, "
-                          "comment, evidence}"},
+                          "list of {file, line, anchor_snippet, severity: "
+                          "blocker|major|minor|nit, comment, evidence}"},
         extra_tools=_gh_read_tools(_repo_path(ctx)),
     )
     plan = None
@@ -168,9 +175,24 @@ async def _review_diff(ctx: StepContext) -> StepResult:
             input_tokens=plan.input_tokens, output_tokens=plan.output_tokens)
         ctx.state["_review_depth"] = plan.depth  # MoA eligibility signal (W6)
         if plan.depth == "light":
+            # the light tier is the only reviewer surface that ran with no
+            # protocol; measured, that cost it ~70% of its anchored findings
             result, output = await run_agent_step(
-                ctx, max_iters=ctx.settings.review_light_max_iters, **common)
-        else:
+                ctx, max_iters=ctx.settings.review_light_max_iters,
+                **{**common, "guidance": guidance + _REVIEW_LIGHT_PROTOCOL})
+            if ctx.settings.review_light_zero_yield_escalate \
+                    and not (output.get("review_comments") or []):
+                # Silence from the cheapest tier is the one result it is least
+                # entitled to. Buy one standard pass rather than ship it — the
+                # same reflex as re-asking a zero-yield lens, one tier up.
+                ctx.trace.record("review_depth_escalated", step="agent.review_diff",
+                                 depth_from="light", depth_to="standard",
+                                 reason="light pass returned no findings")
+                plan = replace(plan, depth="standard",
+                               lens_names=DEFAULT_STANDARD_LENSES,
+                               reason=plan.reason + "; escalated: light found nothing")
+                ctx.state["_review_depth"] = plan.depth
+        if plan.depth != "light":
             lenses = [l for l in _REVIEW_LENSES
                       if l["name"] in plan.lens_names] or list(_REVIEW_LENSES)
             result, output = await run_agent_step_ensemble(
@@ -200,6 +222,14 @@ async def _review_diff(ctx: StepContext) -> StepResult:
                                          "planner": plan.planner,
                                          "reason": plan.reason}
     if result.ok:
+        # Derive each finding's line from its quoted snippet BEFORE rendering: the
+        # review body prints `file:line` too, so resolving later (at publish) would
+        # show one position in the body and anchor the inline thread at another.
+        if output.get("review_comments"):
+            resolved, anchor_stats = resolve_review_comments(
+                output["review_comments"], str(ctx.state.get("diff_text") or ""))
+            output["review_comments"] = resolved
+            ctx.trace.record("anchor_resolution", **anchor_stats)
         review_md = _render_review_md(output,
                                       pr_state=str(ctx.state.get("pr_state", "")))
         review_summary = _render_review_summary(

@@ -234,20 +234,42 @@ async def run_agent_step_ensemble(
     # where findings silently died in live runs): it returns one verdict PER
     # NUMBERED CANDIDATE and code assembles the result deterministically —
     # any candidate it fails to mention is KEPT (fail-open per item)
-    reduce_contract = {
-        "verdicts": ('list of {"i": candidate index, "action": '
-                     '"keep"|"drop"|"dup", "of": null | index this '
-                     'duplicates, "severity": optional corrected severity, '
-                     '"comment": optional self-contained rewrite, '
-                     '"why": one line}'),
-        "summary": "one-paragraph merged outcome",
-    }
+    def _reduce_contract(verdicts_only: bool) -> dict:
+        """The verdict schema, optionally without the free-text rewrite field.
+
+        `comment` is nominally optional, but models emit it for every survivor, which
+        makes the reducer's output grow with candidate count times comment length —
+        unbounded, while `max_tokens` is fixed. Dropping the field is what makes the
+        retry below fit: ~50 tokens per candidate instead of ~800.
+        """
+        verdict = ('list of {"i": candidate index, "action": '
+                   '"keep"|"drop"|"dup", "of": null | index this '
+                   'duplicates, "severity": optional corrected severity, ')
+        if not verdicts_only:
+            verdict += '"comment": optional self-contained rewrite, '
+        return {"verdicts": verdict + '"why": one line}',
+                "summary": "one-paragraph merged outcome"}
+
+    reduce_contract = _reduce_contract(False)
     # the reducer verifies against the evidence, so it needs far more of it
     # than the per-lens dispatch cap (the lenses had tools; the reducer has none)
     capped, _ = _build_evidence(ctx, evidence,
                                 cap=ctx.settings.ensemble_merge_evidence_chars)
     ev_text = "\n\n".join(f"### {k}\n{v}" for k, v in capped.items())
-    merge_system = (
+    _merge_rule3 = (
+        "3. action=keep otherwise; use 'comment' to rewrite the item so it "
+        "is self-contained and verifiable: FIRST the concrete fact from the "
+        "evidence it is grounded in, THEN the directive (what to change, "
+        "where, why). Fix line numbers to lines actually visible in the "
+        "evidence. Unmentioned candidates are kept unchanged.\n")
+    _merge_rule3_verdicts_only = (
+        "3. action=keep otherwise. Do NOT rewrite any text: omit 'comment' "
+        "entirely and the original wording is reused verbatim. Emit ONLY the "
+        "verdict fields — your previous reply was cut off by the output limit, "
+        "so brevity per verdict is what lets every candidate be judged. "
+        "Unmentioned candidates are kept unchanged.\n")
+
+    _MERGE_SYSTEM_HEAD = (
         "You are the verify-and-merge reducer for an ensemble of independent "
         "agent samples of the same step. You receive their NUMBERED candidate "
         "items (tagged with the lens(es) that produced each and a consensus "
@@ -266,15 +288,17 @@ async def run_agent_step_ensemble(
         "item is never dropped just for low severity.\n"
         "2. action=dup with of=<index> when two candidates report the same "
         "underlying issue — rewrite the surviving index with the most "
-        "precise phrasing and the highest severity of the pair.\n"
-        "3. action=keep otherwise; use 'comment' to rewrite the item so it "
-        "is self-contained and verifiable: FIRST the concrete fact from the "
-        "evidence it is grounded in, THEN the directive (what to change, "
-        "where, why). Fix line numbers to lines actually visible in the "
-        "evidence. Unmentioned candidates are kept unchanged.\n"
-        + (f"4. {merge_guidance}\n" if merge_guidance else "")
-        + "\nYour FINAL message must be a single JSON object with exactly "
-        "these fields:\n" + json.dumps(reduce_contract, ensure_ascii=False))
+        "precise phrasing and the highest severity of the pair.\n")
+
+    def _merge_system(verdicts_only: bool = False) -> str:
+        return (_MERGE_SYSTEM_HEAD
+                + (_merge_rule3_verdicts_only if verdicts_only else _merge_rule3)
+                + (f"4. {merge_guidance}\n" if merge_guidance else "")
+                + "\nYour FINAL message must be a single JSON object with exactly "
+                "these fields:\n"
+                + json.dumps(_reduce_contract(verdicts_only), ensure_ascii=False))
+
+    merge_system = _merge_system()
     numbered = [{"i": i, **c} for i, c in enumerate(candidates)]
     # single untooled reduction call: a tool-looped reducer measurably
     # over-dropped (reviews shrank to 1-2 comments, starving recall and
@@ -300,17 +324,41 @@ async def run_agent_step_ensemble(
     reply_text = reply.text
     reduce_in = (reply.usage or {}).get("input_tokens", 0)
     reduce_out = (reply.usage or {}).get("output_tokens", 0)
-    try:  # archive the reduction exchange — reducer failures are hard to debug
-        ctx.run_dir.mkdir(parents=True, exist_ok=True)
-        (ctx.run_dir / f"ensemble_{step_name.replace('/', '_')}.json").write_text(
-            json.dumps({"candidates": numbered, "reply": reply_text},
-                       ensure_ascii=False, indent=1), encoding="utf-8")
-    except OSError:
-        pass
+    # `max_tokens` means the JSON was cut mid-object, which is a different failure
+    # from a model that answered in prose — and the only one the repair round below
+    # cannot fix, since it re-sends the oversized draft asking to keep all substance
+    # under the same ceiling. Measured on a live arm: 11 of 14 reductions stopped at
+    # exactly llm_max_tokens, none parsed, and every non-truncated reply parsed fine.
+    truncated = str(getattr(reply, "stop_reason", "")) == "max_tokens"
+    retry_text = None
+
+    def _ok(obj) -> bool:
+        return isinstance(obj, dict) and isinstance(obj.get("verdicts"), list)
+
     reduced = parse_json_reply(reply_text or "")
-    if not (isinstance(reduced, dict) and isinstance(reduced.get("verdicts"), list)):
+    if not _ok(reduced):
         reduced = None
-        if (reply_text or "").strip():  # one repair round (never on empty text)
+        if truncated:
+            # Retry the WHOLE reduction with the rewrite field removed rather than
+            # repairing the fragment: verdicts must be judged against every candidate
+            # at once (a `dup` verdict names another index), so batching the
+            # candidates to fit would silently break duplicate detection instead.
+            ctx.trace.record(
+                "lens_reduce_truncated", step=step_name,
+                candidates=len(candidates),
+                output_tokens=(reply.usage or {}).get("output_tokens", 0))
+            retry = await asyncio.to_thread(
+                reducer_llm.create, system=_merge_system(verdicts_only=True),
+                messages=[{"role": "user", "content": merge_prompt}],
+                model=tier_model, role="reducer",
+                max_tokens=max(6000, ctx.settings.llm_max_tokens))
+            retry_text = retry.text
+            reduce_in += (retry.usage or {}).get("input_tokens", 0)
+            reduce_out += (retry.usage or {}).get("output_tokens", 0)
+            obj = parse_json_reply(retry_text or "")
+            if _ok(obj):
+                reduced = obj
+        elif (reply_text or "").strip():  # one repair round (never on empty text)
             fix = reducer_llm.create(
                 system=("Convert the draft into a single JSON object matching "
                         "this contract exactly (keep all substance):\n"
@@ -321,8 +369,16 @@ async def run_agent_step_ensemble(
             reduce_in += (fix.usage or {}).get("input_tokens", 0)
             reduce_out += (fix.usage or {}).get("output_tokens", 0)
             obj = parse_json_reply(fix.text)
-            if isinstance(obj, dict) and isinstance(obj.get("verdicts"), list):
+            if _ok(obj):
                 reduced = obj
+    try:  # archive the reduction exchange — reducer failures are hard to debug
+        ctx.run_dir.mkdir(parents=True, exist_ok=True)
+        (ctx.run_dir / f"ensemble_{step_name.replace('/', '_')}.json").write_text(
+            json.dumps({"candidates": numbered, "reply": reply_text,
+                        "truncated": truncated, "retry_reply": retry_text},
+                       ensure_ascii=False, indent=1), encoding="utf-8")
+    except OSError:
+        pass
     verified = reduced is not None
     kept: dict[int, dict] = {i: dict(c) for i, c in enumerate(candidates)}
     dropped: list[str] = []

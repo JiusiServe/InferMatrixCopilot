@@ -491,3 +491,219 @@ def test_zero_yield_lens_gets_one_retry(settings, trace, tmp_path):
     assert result.ok
     assert any(True for _ in trace.events("lens_zero_yield_retry"))
     assert {i["name"] for i in output["items"]} == {"late-find", "from-b"}
+
+
+def test_reducer_keeps_each_survivor_anchor_snippet(settings, trace, tmp_path):
+    """`anchor_snippet` is bound to its candidate. The reducer drops, dup-merges and
+    rewrites text in place, but never constructs a candidate — so a survivor must keep
+    its OWN snippet, never inherit one from the item merged into it. If that ever
+    changed, a comment would be anchored at another finding's code."""
+    settings.review_ensemble = True
+    a = {"file": "m.py", "line": 1, "anchor_snippet": "alpha = 1", "comment": "A"}
+    b = {"file": "m.py", "line": 9, "anchor_snippet": "beta = 2", "comment": "B"}
+    llm = ScriptedLLM([
+        contract(items=[dict(a)]),
+        contract(items=[dict(b)]),
+        # keep both; rewrite the first's text — its location is unchanged
+        verdicts_reply({"i": 0, "action": "keep", "comment": "A, reworded"},
+                       {"i": 1, "action": "keep"}),
+    ])
+    out = _run(_ctx(settings, trace, tmp_path, llm=llm))
+    items = {i["comment"][0]: i for i in out[1]["items"]}
+    assert items["A"]["anchor_snippet"] == "alpha = 1"
+    assert items["B"]["anchor_snippet"] == "beta = 2"
+
+
+def test_dup_merge_does_not_move_a_snippet_onto_the_survivor(settings, trace, tmp_path):
+    settings.review_ensemble = True
+    llm = ScriptedLLM([
+        contract(items=[{"file": "m.py", "line": 1, "anchor_snippet": "keep = 1",
+                         "comment": "survivor"}]),
+        contract(items=[{"file": "m.py", "line": 40, "anchor_snippet": "gone = 2",
+                         "comment": "duplicate"}]),
+        verdicts_reply({"i": 0, "action": "keep"},
+                       {"i": 1, "action": "dup", "of": 0}),
+    ])
+    out = _run(_ctx(settings, trace, tmp_path, llm=llm))
+    items = out[1]["items"]
+    assert len(items) == 1
+    assert items[0]["anchor_snippet"] == "keep = 1"   # not the dup's
+
+
+def _truncated(text="{\"verdicts\": [{\"i\": 0, \"action\": \"ke"):
+    """A reducer reply cut off mid-JSON by the output ceiling."""
+    return Reply(blocks=[Block(type="text", text=text)], stop_reason="max_tokens")
+
+
+def test_truncated_reducer_retries_verdict_only_instead_of_repairing(
+        settings, trace, tmp_path):
+    """A reply cut off at max_tokens is re-asked WITHOUT the rewrite field.
+
+    The generic repair round cannot fix truncation — it re-sends the oversized draft
+    asking to keep all substance under the same ceiling — so truncation must take a
+    different path: drop `comment` from the contract so every candidate still gets a
+    verdict. Measured live: 11 of 14 reductions died exactly here.
+    """
+    settings.review_ensemble = True
+    llm = ScriptedLLM([
+        contract(items=[{"name": "x"}, {"name": "y"}]),
+        contract(items=[{"name": "z"}]),
+        _truncated(),
+        verdicts_reply({"i": 0, "action": "keep"},
+                       {"i": 1, "action": "drop", "why": "misread"},
+                       {"i": 2, "action": "keep"}),
+    ])
+    result, output = _run(_ctx(settings, trace, tmp_path, llm=llm))
+    assert result.ok
+    # the drop verdict was applied — i.e. adjudication survived the truncation
+    assert [i["name"] for i in output["items"]] == ["x", "z"]
+    assert "unverified union" not in output["summary"]
+    assert next(trace.events("agent_ensemble"))["verified"] is True
+    # the retry asked for verdicts only, and never ran the doomed repair round
+    retry_system = llm.calls[-1]["system"]
+    assert "optional self-contained rewrite" not in retry_system
+    assert "Do NOT rewrite any text" in retry_system
+    assert not any("Convert the draft" in c["system"] for c in llm.calls)
+
+
+def test_truncated_reducer_is_traced_with_its_candidate_count(
+        settings, trace, tmp_path):
+    settings.review_ensemble = True
+    llm = ScriptedLLM([
+        contract(items=[{"name": "x"}, {"name": "y"}]),
+        contract(items=[{"name": "z"}]),
+        _truncated(),
+        verdicts_reply({"i": 0, "action": "keep"}),
+    ])
+    _run(_ctx(settings, trace, tmp_path, llm=llm))
+    event = next(trace.events("lens_reduce_truncated"))
+    assert event["candidates"] == 3
+
+
+def test_truncated_reducer_still_falls_open_when_the_retry_also_fails(
+        settings, trace, tmp_path):
+    """The retry is an extra chance, not a new way to lose findings."""
+    settings.review_ensemble = True
+    llm = ScriptedLLM([
+        contract(items=[{"name": "x"}, {"name": "y"}]),
+        contract(items=[{"name": "z"}]),
+        _truncated(),
+        _truncated("still cut off"),
+    ])
+    result, output = _run(_ctx(settings, trace, tmp_path, llm=llm))
+    assert result.ok
+    assert [i["name"] for i in output["items"]] == ["x", "y", "z"]
+    assert "unverified union" in output["summary"]
+    assert next(trace.events("agent_ensemble"))["verified"] is False
+
+
+def test_unparseable_but_complete_reply_still_uses_the_repair_round(
+        settings, trace, tmp_path):
+    """Only truncation takes the retry path; prose still gets the original repair."""
+    settings.review_ensemble = True
+    llm = ScriptedLLM([
+        contract(items=[{"name": "x"}]),
+        contract(items=[{"name": "y"}]),
+        Reply(blocks=[Block(type="text", text="prose, not JSON")]),
+        verdicts_reply({"i": 0, "action": "keep"}, {"i": 1, "action": "keep"}),
+    ])
+    result, _ = _run(_ctx(settings, trace, tmp_path, llm=llm))
+    assert result.ok
+    assert any("Convert the draft" in c["system"] for c in llm.calls)
+    assert not any(e for e in trace.events("lens_reduce_truncated"))
+
+
+def test_reduction_archive_records_truncation_and_the_retry(
+        settings, trace, tmp_path):
+    """The archive is the only durable evidence of a reducer failure."""
+    settings.review_ensemble = True
+    llm = ScriptedLLM([
+        contract(items=[{"name": "x"}]),
+        contract(items=[{"name": "y"}]),
+        _truncated(),
+        verdicts_reply({"i": 0, "action": "keep"}, {"i": 1, "action": "keep"}),
+    ])
+    ctx = _ctx(settings, trace, tmp_path, llm=llm)
+    _run(ctx)
+    archive = json.loads((ctx.run_dir / "ensemble_t.step.json").read_text())
+    assert archive["truncated"] is True
+    assert archive["retry_reply"] is not None
+    assert len(archive["candidates"]) == 2
+
+
+def test_light_pass_carries_the_single_pass_protocol(settings, trace, tmp_path,
+                                                     git_repo):
+    """Light was the only reviewer surface running with no protocol at all, and
+    measurement put that at ~70% of its anchored findings. The protocol is
+    repo-neutral, so it rides the system guidance, not the evidence."""
+    settings.review_ensemble = True
+    llm = ScriptedLLM([contract(review_comments=[
+        {"file": "mod_a.py", "line": 1, "severity": "minor",
+         "comment": "c", "evidence": "hunk"}])])
+    state = {"diff_text": "diff --git a/mod_a.py b/mod_a.py\n"
+                          "--- a/mod_a.py\n+++ b/mod_a.py\n+x = 1",
+             "task_spec": {"pr": 9}, "repo_path": str(git_repo)}
+    registry = register_builtin_steps(StepRegistry())
+    asyncio.run(registry.get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+    rendered = json.dumps(llm.calls[0]["messages"])
+    assert "Single-pass protocol" in rendered
+    assert "Enumerate every changed semantic path" in rendered
+    assert "exactly one consolidated review" in rendered.lower()
+
+
+def test_zero_yield_light_pass_escalates_once_to_standard(settings, trace,
+                                                          tmp_path, git_repo):
+    """Silence is the one result the cheapest tier is least entitled to."""
+    settings.review_ensemble = True
+    found = [{"file": "mod_a.py", "line": 1, "severity": "major",
+              "comment": "real finding", "evidence": "hunk"}]
+    llm = ScriptedLLM([
+        contract(review_comments=[]),        # light pass: nothing
+        contract(review_comments=found),     # standard lens 1
+        contract(review_comments=found),     # standard lens 2
+        verdicts_reply({"i": 0, "action": "keep"}),
+    ])
+    state = {"diff_text": "diff --git a/mod_a.py b/mod_a.py\n"
+                          "--- a/mod_a.py\n+++ b/mod_a.py\n+x = 1",
+             "task_spec": {"pr": 9}, "repo_path": str(git_repo)}
+    registry = register_builtin_steps(StepRegistry())
+    result = asyncio.run(registry.get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+    event = next(trace.events("review_depth_escalated"))
+    assert (event["depth_from"], event["depth_to"]) == ("light", "standard")
+    assert list(trace.events("agent_ensemble"))          # the ensemble did run
+    assert result.outputs["review_plan"]["depth"] == "standard"
+    assert [c["comment"] for c in result.outputs["review_comments"]] \
+        == ["real finding"]
+
+
+def test_light_pass_with_findings_does_not_escalate(settings, trace, tmp_path,
+                                                    git_repo):
+    settings.review_ensemble = True
+    llm = ScriptedLLM([contract(review_comments=[
+        {"file": "mod_a.py", "line": 1, "severity": "minor",
+         "comment": "c", "evidence": "hunk"}])])
+    state = {"diff_text": "diff --git a/mod_a.py b/mod_a.py\n"
+                          "--- a/mod_a.py\n+++ b/mod_a.py\n+x = 1",
+             "task_spec": {"pr": 9}, "repo_path": str(git_repo)}
+    registry = register_builtin_steps(StepRegistry())
+    result = asyncio.run(registry.get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+    assert not list(trace.events("review_depth_escalated"))
+    assert result.outputs["review_plan"]["depth"] == "light"
+
+
+def test_zero_yield_escalation_can_be_switched_off(settings, trace, tmp_path,
+                                                   git_repo):
+    settings.review_ensemble = True
+    settings.review_light_zero_yield_escalate = False
+    llm = ScriptedLLM([contract(review_comments=[])])
+    state = {"diff_text": "diff --git a/mod_a.py b/mod_a.py\n"
+                          "--- a/mod_a.py\n+++ b/mod_a.py\n+x = 1",
+             "task_spec": {"pr": 9}, "repo_path": str(git_repo)}
+    registry = register_builtin_steps(StepRegistry())
+    result = asyncio.run(registry.get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+    assert not list(trace.events("review_depth_escalated"))
+    assert result.outputs["review_plan"]["depth"] == "light"
