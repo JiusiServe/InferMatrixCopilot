@@ -13,11 +13,15 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 _PACKAGE_ROOT = Path(__file__).resolve().parent
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _USER_CONFIG = Path.home() / ".infermatrix-copilot" / ".env"
+# Glob patterns, not fixed paths: the adapters probe must not name a specific repo
+# (the core stays repo-neutral — DESIGN §V2.2.1), so it asks "is there ANY adapter
+# directory here?" rather than naming one. A plain filename globs to itself, so one
+# mechanism covers every entry.
 _RESOURCE_MARKERS = {
-    "knowledge": Path("AGENTS.md"),
-    "playbooks": Path("pr-review.yaml"),
-    "adapters": Path("vllm_omni") / "manifest.yaml",
-    "skills": Path("code-quality-review") / "SKILL.md",
+    "knowledge": "AGENTS.md",
+    "playbooks": "pr-review.yaml",
+    "adapters": "*/manifest.yaml",
+    "skills": "code-quality-review/SKILL.md",
 }
 
 
@@ -30,7 +34,9 @@ def _resource_dir(name: str) -> Path:
         _PACKAGE_ROOT / name,
     )
     for candidate in candidates:
-        if (candidate / marker).is_file():
+        # .is_file() is load-bearing: a glob can match a directory, and accepting one
+        # would resolve the resource dir to the wrong candidate
+        if any(match.is_file() for match in candidate.glob(marker)):
             return candidate
     return candidates[0]
 

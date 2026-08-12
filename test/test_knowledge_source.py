@@ -184,3 +184,34 @@ def test_real_afd_setup_loads_only_its_repo_slice(monkeypatch, tmp_path):
     assert "outside the selected" in tools["doc_read"].handler(
         path="repos/vllm-omni/rules.md"
     )
+
+
+def test_intra_knowledge_anchor_links_resolve():
+    """Heading renames silently break `file.md#anchor` links, and neither knowledge
+    linter checks fragments — renaming one quick-map heading broke a live link in
+    the same directory before this existed. 38 such links today, 0 broken."""
+    import re
+    from pathlib import Path
+
+    from infermatrix_copilot.thin_mcp_server import _KNOWLEDGE
+
+    def slug(heading: str) -> str:
+        s = re.sub(r"[^\w一-鿿\s-]", "", heading.strip().lower())
+        return re.sub(r"\s+", "-", s).strip("-")
+
+    broken = []
+    for md in Path(_KNOWLEDGE).rglob("*.md"):
+        text = md.read_text(encoding="utf-8", errors="replace")
+        for target, frag in re.findall(r"\]\(([^)#\s]+\.md)#([^)\s]+)\)", text):
+            dest = (md.parent / target).resolve()
+            if not dest.is_file():
+                broken.append(f"{md.name} -> {target} (missing file)")
+                continue
+            headings = {
+                slug(line.lstrip("#").strip())
+                for line in dest.read_text(encoding="utf-8", errors="replace").splitlines()
+                if line.startswith("#")
+            }
+            if frag not in headings:
+                broken.append(f"{md.name} -> {target}#{frag} (no such heading)")
+    assert not broken, "dead anchor links:\n  " + "\n  ".join(broken)

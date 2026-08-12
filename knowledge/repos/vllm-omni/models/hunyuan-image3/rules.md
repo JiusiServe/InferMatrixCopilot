@@ -11,7 +11,7 @@ sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/dif
 
 这些规则适用于 HunyuanImage3 的生成、编辑、prompt、AR 采样、AR→DiT 交接、条件图处理和公开入口。只有加粗项目或表格第一列中的 `HY3-数字字母` 是可审计规则 ID；章节标题只是分组，不计入 ID，解释性文字和链接也不计。
 
-## 开发快速入口
+## Direct 开发快速入口
 
 - **HY3-0a — 开发阶段按任务选规则。** 开发者只合并下表命中的规则和源码入口，不在编码前手工枚举整页；Direct review 先用 PR title/body 的声明目标选择表格行，再用 pinned diff 验证真实命中范围。任务命中多行时必须取规则与源码并集，不能只选看起来最接近的一行。PR 描述只负责导航，不能作为 finding 证据；独立 reviewer 仍按当前完整 diff 审计 `core` 和所有真实命中组。
 

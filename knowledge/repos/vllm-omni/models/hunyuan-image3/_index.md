@@ -24,7 +24,7 @@ sources: []
 
 | 遇到什么 | 查看哪里 |
 |---|---|
-| 修改公开入口、prompt、AR→DiT、`model_extras`、shared task examples、条件图、size 或 seed | [开发快速入口和 rules](rules.md#开发快速入口) |
+| 修改公开入口、prompt、AR→DiT、`model_extras`、shared task examples、条件图、size 或 seed | [开发快速入口和 rules](rules.md#direct-开发快速入口) |
 | 理解模型和 vLLM-Omni 代码地图 | [architecture](architecture.md) |
 | HF 接入常见偏差 | [HF alignment pitfalls](hf-alignment-pitfalls.md) |
 | 运行 HF baseline | [HF baseline runbook](hf-baseline-runbook.md) |

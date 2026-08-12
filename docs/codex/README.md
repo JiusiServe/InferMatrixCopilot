@@ -151,8 +151,13 @@ Restart Codex after installation. Use `/mcp` or `codex mcp list` to confirm that
   changed_files=[], review_depth="", repo_path="")`: after the host progress
   update, Direct uses title/body to
   return at most three exact owner/model routes with compact embedded
-  `quick_map` excerpts. Changed files only validate scope. The host does not
-  open full rule files unless a concrete ambiguity blocks source review and
+  `quick_map` excerpts. Changed files normally only validate scope, but when no
+  returned route matches an owner they imply they select the routes instead and
+  the response says so (`status: scope_fallback`). The host does not open full
+  rule files unless a concrete ambiguity blocks source review — any route whose
+  `quick_map_status` is not `ok` (`unavailable`, or `truncated` when the section
+  exceeds the excerpt cap) is exactly that case, and the budget grants a read for
+  each — and
   treats the returned docs/code `execution_budget` as a hard ceiling. A single
   bounded extension is reserved for one stated unresolved P1/high-risk
   contract.
