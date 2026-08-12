@@ -32,7 +32,7 @@ jobs:
         run: pip install -e ".[dev,mcp]"
 
       - name: Unit tests
-        run: pytest -q
+        run: python -m pytest -q
 
       - name: CLI smoke
         run: infermatrix-copilot --help
@@ -79,5 +79,5 @@ jobs:
         run: |
           python knowledge/tools/check_knowledge_tree.py
           python knowledge/tools/check_wiki_lint.py
-          pytest -q knowledge/tools/test_check_knowledge_tree.py \
+          python -m pytest -q knowledge/tools/test_check_knowledge_tree.py \
                     knowledge/tools/test_check_review_report.py
