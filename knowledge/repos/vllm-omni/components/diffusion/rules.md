@@ -1,10 +1,10 @@
 ---
 title: "Diffusion 共享规则"
 created: 2026-07-20
-updated: 2026-07-31
+updated: 2026-08-13
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/distributed/hsdp.py]
+sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #6094", vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/distributed/hsdp.py]
 confidence: high
 ---
 
@@ -26,6 +26,7 @@ confidence: high
 | HSDP/FSDP、`fully_shard`、DeviceMesh、packed/scalar parameter、FP8 | `checkpoint-distributed`：`DIFF-2b` | `vllm_omni/diffusion/distributed/hsdp.py::{apply_hsdp_to_model,shard_model}` → `model_loader/diffusers_loader.py::DiffusersPipelineLoader._load_model_with_hsdp` → `quantization/hsdp_fp8.py::prepare_fp8_layers_for_fsdp` |
 | component quantization、text encoder/transformer/VAE 独立配置、owner prefix、meta/offload | `checkpoint-distributed`：`DIFF-2c` | `vllm_omni/diffusion/data.py::OmniDiffusionConfig._propagate_quantization_from_tf_config` → `model_loader/diffusers_loader.py::{DiffusersPipelineLoader._get_weight_sources,_process_weights_after_loading}` → 命中 component 的真实 linear consumer |
 | LPIPS/PSNR/相似度阈值、CPU offload、量化质量证据 | `quality-evidence`：`DIFF-3a` | changed quality test 的 exact case → `vllm_omni/diffusion/worker/diffusion_model_runner.py::DiffusionModelRunner.execute_model` → 命中 pipeline；baseline/candidate 必须复用同一路径 |
+| paged KV/cache、block manager、显存预算、warmup/profile、scheduler admission | `system-runtime`：`DIFF-4a`, `DIFF-4b`, `DIFF-4c` | `diffusion_engine.py` 初始化顺序 → `diffusion_kv/initialization.py` → `worker/diffusion_worker.py::determine_available_kv_memory` → native config/allocator → `sched/base_scheduler.py` 的 enabled 请求、异常和清理路径 |
 
 | 审查组 | 什么时候触发 | 规则 ID |
 |---|---|---|
@@ -33,6 +34,7 @@ confidence: high
 | `execution-parity` | graph/eager、solver、RNG、generator、zero/default | `DIFF-1a`, `DIFF-1b` |
 | `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP | `DIFF-2a`, `DIFF-2b`, `DIFF-2c` |
 | `quality-evidence` | 质量阈值、offload、A/B case | `DIFF-3a` |
+| `system-runtime` | cache/资源预算、native 边界、feature gate、异常或并发调度 | `DIFF-4a`, `DIFF-4b`, `DIFF-4c` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `DIFF-0a`, `DIFF-0b` |
 
 ## 优化路径与 eager 的等价合同
@@ -100,6 +102,43 @@ confidence: high
   是资源前提还是功能行为。
 - 验收：运行测试文件中的 exact case，并在规则/配置旁保留最短资源原因；对称 baseline
   证明质量差异来自目标量化变量。 ^[PR #5136]
+
+## Paged cache、资源预算与系统运行时
+
+### DIFF-4a — 容量预算必须在影响峰值的初始化完成后测量
+
+- 触发：新增或修改 KV/cache block 数、GPU/CPU memory budget、auto-fit、warmup/profile、
+  dummy run 或物理 cache 分配。
+- 强制：写出并核对 `model load → activation warmup/profile → available-memory measurement
+  → logical config → physical allocation → first real request` 的真实顺序；预算必须包含真实
+  activation/graph/lazy-kernel 峰值及明确 headroom。若当前阶段故意只建逻辑控制面，必须使用
+  显式固定预算或把最终容量决定推迟到数据面 profile 之后。
+- 禁止：用 warmup 前的当前 free/process residency 推导可用 cache，再在之后执行会常驻或抬高
+  峰值的 dummy/profile；也不能用 native auto-fit 或 allocator 成功证明预算来源正确。
+- 验收：enabled 路径在真实初始化顺序下记录测量前后峰值，低显存/最大合法请求不会因漏算
+  activation 在首次或后续执行 OOM；显式预算分支和自动预算分支各有测试。 ^[PR #6094]
+
+### DIFF-4b — 复用 native 组件仍须审计 caller/adapter 契约
+
+- 触发：diffusion adapter 调用 vLLM 的 cache spec/config/manager、scheduler 或其他版本化 API。
+- 强制：按仓库 pin 的精确 vLLM 版本核对 property/method、签名、sentinel、block-size 单位、
+  max-length/capacity 前提、返回失败语义和 free/rollback 责任；分别证明 adapter 输入、调用时序、
+  输出解释和 native 内部算法。
+- 禁止：把“委托给 native vLLM”当作端到端正确性证明；native manager 不负责验证 Omni 在何时
+  测量预算、是否漏算其他显存、是否正确传播失败，也不保证 adapter 模拟对象符合真实属性合同。
+- 验收：真实 pin 的 contract test 覆盖正常值、边界/sentinel、容量不足、property 访问和清理；
+  fake 不能把真实 property 改成同名 method 或跳过 native precondition。 ^[PR #6094]
+
+### DIFF-4c — Feature gate 只限制影响范围，enabled 路径必须独立闭环
+
+- 触发：新增或修改 `dense_legacy`/paged、eager/optimized 或其他默认关闭的 diffusion 路径。
+- 强制：分别审计 disabled/default 与 enabled；enabled 至少覆盖单请求、并发/多 rank、低资源、
+  partial allocation、执行异常、取消、timeout、shutdown 和重复释放。异常必须到达终端请求或
+  engine 信号并唤醒 waiter，所有已分配资源由明确 owner 回收。
+- 禁止：用“默认路径有 gate”“dense 未回归”或单请求 smoke 推导新路径正确；也不能让 scheduler/
+  busy-loop 异常逃逸后留下永远等待的 stream。
+- 验收：path/lifecycle matrix 每行有 production-path 测试或明确 `MISSING_EVIDENCE`；enabled
+  关键行缺失时审查只能是 partial，不能输出 clean/no findings。 ^[PR #6094]
 
 相关执行流见 [Diffusion architecture](architecture.md)；benchmark 证据合同见
 [performance evidence](../../benchmark/guides/performance-evidence.md)。
