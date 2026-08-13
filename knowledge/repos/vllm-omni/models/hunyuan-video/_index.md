@@ -29,7 +29,7 @@ diffusion 视频,AR registry 无入口;image3 的结构见该页）。
   **I2V 不在 OMNI_PIPELINES**（走单 stage diffusion 兜底）。pipeline
   config **无 `default_deploy_config_name`**——`hunyuan_video_15.yaml` 不会
   自动加载;显式传裸文件名时按 `_DEPLOY_DIR` 解析（pin 上仅
-  `tests/test_config_factory.py` 按名加载它）。
+  `tests/config/test_config_factory.py` 按名加载它）。
 - T2V vs I2V 差异速览：I2V 加 SigLIP 图像编码器 + 图像预处理（从
   `max_area` 推 H/W）+ 首帧 VAE 条件 latent/掩码;T2V 供零 image_embeds、
   零 cond_latents、零 mask。

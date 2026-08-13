@@ -59,7 +59,7 @@ sources: [vllm_omni/diffusion/models/soulx_singer/pipeline_soulx_singer_base.py,
 自动化测试仅覆盖离线 e2e,另有一个可复跑基准;本次调查未发现在线链路的
 CI 覆盖——精度/性能结论需另行实测。
 
-- e2e：`tests/e2e/offline_inference/test_soulxsinger.py`（快照双仓、建
+- e2e：`tests/e2e/offline_inference/test_soulxsinger_expansion.py`（快照双仓、建
   SVS/SVC view 目录、校验 phone_set.json;资产
   `tests/assets/soulxsinger/`）;示例
   `examples/offline_inference/text_to_speech/soulxsinger/end2end.py` 与

@@ -1,10 +1,10 @@
 ---
 title: "Model Executor 规则"
 created: 2026-07-10
-updated: 2026-07-31
+updated: 2026-08-06
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: [vllm_omni/worker/gpu_model_runner.py, tests/worker/test_omni_gpu_model_runner.py, vllm_omni/config/stage_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, "PR #3642", "PR #4730", "claude-workflow-starter-private@09dca46"]
+sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, vllm_omni/engine/stage_init_utils.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_omni_connector_mixin.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/experimental/fullduplex/, tests/e2e/features/fullduplex/, docs/design/feature/omni_async_output_materialization.md, "PR #3642", "PR #4730", "PR #5610", "PR #5744", "claude-workflow-starter-private@09dca46"]
 ---
 
 # Model Executor 规则
@@ -21,6 +21,8 @@ sources: [vllm_omni/worker/gpu_model_runner.py, tests/worker/test_omni_gpu_model
 | stage TP/PP/DP、devices、replica、visible devices、worker 启动、容量 fail-fast | `stage-runtime`：本页“Stage 并行度和设备容量必须一起验收” | `vllm_omni/config/stage_config.py::build_stage_runtime_overrides` → `vllm_omni/engine/stage_runtime.py::{StageRuntime.initialize,StageRuntime._resolve_replica_physical_devices}` → `stage_engine_startup.py::{launch_stage_replica,get_headless_replica_devices}` |
 | `runtime_info`、`OmniOutput`、multimodal payload、跨 stage bridge、batch 串线 | `bridge-batch`：`EXEC-1a`, `EXEC-1b` | `vllm_omni/worker/gpu_model_runner.py::{extract_multimodal_outputs,_gather_runtime_additional_information,_build_model_kwargs_extra}` → `vllm_omni/model_executor/stage_input_processors/<命中模型>` |
 | loader dtype、只取 checkpoint config、避免整仓权重下载 | `loader-contract`：`EXEC-2a` | `vllm_omni/model_executor/model_loader/weight_utils.py::download_weights_from_hf_specific` → `vllm_omni/model_executor/models/<命中模型>` loader |
+| payload connector、KV-only sender、`custom_process_next_stage_input_func` | `payload-connector-ownership`：`EXEC-5a` | `vllm_omni/worker/omni_connector_model_runner_mixin.py::{_should_create_payload_connector,initialize_omni_connector}` → payload I/O callers |
+| async output、output builder、step snapshot、connector signal drain | `async-output-materialization`：`EXEC-5b` | `vllm_omni/worker/gpu_ar_model_runner.py::{_should_use_async_omni_output,execute_model,_build_omni_output}` |
 
 | 审查组 | 什么时候触发 | 规则 ID |
 |---|---|---|
@@ -28,6 +30,8 @@ sources: [vllm_omni/worker/gpu_model_runner.py, tests/worker/test_omni_gpu_model
 | `strict-stage-config` | stage schema、projection、known fields | `EXEC-3a` |
 | `bridge-batch` | runtime info、跨 stage payload、batch | `EXEC-1a`, `EXEC-1b` |
 | `loader-contract` | dtype、checkpoint config 获取、loader | `EXEC-2a` |
+| `payload-connector-ownership` | payload connector、KV-only sender、next-stage hook | `EXEC-5a` |
+| `async-output-materialization` | async output、snapshot、connector signal drain | `EXEC-5b` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `EXEC-0a`, `EXEC-0b` |
 
 ## 严格配置校验
@@ -38,6 +42,71 @@ sources: [vllm_omni/worker/gpu_model_runner.py, tests/worker/test_omni_gpu_model
 - 必须做：先冻结 PR 基线，逐个枚举相对基线新增的可接受字段；对每个字段写清公开 producer、入口归一化、唯一 canonical owner 和最终 runtime consumer。CLI/legacy 别名只允许在入口转换，转换后不得继续出现在核心 schema；service-only 字段必须交给 service owner，不能混入 stage runtime config。直接 constructor、结构化 YAML 和真实 startup builder 必须使用同一组最小正负样例核对。
 - 禁止：不能因为严格校验开始报错，就把报错字段加入核心 dataclass、projection、known-fields 或专门白名单；不能接受字段后在分区时丢弃；不能为同一语义新增两个核心字段再补优先级；不能用“构造成功”“字段不在最终 payload”或只有测试 fixture 使用来证明字段必要。
 - 验收：每个新增可接受字段都必须有 PR 前已存在或本次明确新增的真实 consumer，并有从公开入口到 consumer 的正向断言；无 consumer 或 owner 不在 stage runtime 的字段必须在入口报错；别名与 canonical 同时出现必须报冲突。最终 diff 中新增的 schema 字段数量应与 producer-consumer 表逐项一致。
+
+### EXEC-3b — stage loader metadata 与 stateful chunk 能力必须一同到达 consumer
+
+- 触发：新增 per-stage `model_subdir`/`tokenizer_subdir`、模型 architecture override，
+  或模型在 async chunk 间保留执行状态。
+- 强制：从 `PipelineConfig`/deploy 合并结果把 checkpoint/tokenizer 子目录和
+  `retains_state_across_chunks` 传入最终 `OmniStageModelConfig`/runner；空的
+  `model_arch` 表示使用 checkpoint 自带 architectures，而不是一个空 override。
+  Stateful chunk 必须与 scheduler 的容量计数和 connector requeue 合同一起审查。
+- 禁止：只在 legacy YAML 或 model helper 中记录子目录；用空字符串覆盖 checkpoint
+  architecture；让 scheduler 看不到仍占用 runner slot 的 parked request。
+- 验收：structured 与 legacy stage config 都能读回子目录/状态字段；Audex 等多子目录
+  checkpoint 做 loader smoke；stateful async-chunk 测试证明容量上限、requeue 和 cleanup。
+
+### EXEC-4a — full-duplex chunk metadata 必须按 span 隔离且可安全序列化
+
+- 触发：`experimental/fullduplex` 修改 PCM/audio span、force-listen、rollback、
+  resumable append、runtime-control 或 silence continuation。
+- 强制：把 speech/PCM metadata 与 rollback 状态绑定到具体 span；resumable append 重新
+  arm 所需 EOS 但不得重复 turn EOS；runtime-control 输出先转换 dataclass/enum 等为
+  JSON-safe 值，并在等待后重新检查 session/request 是否仍然有效。
+- 禁止：用上一 chunk 的 force-listen 或 speech marker 污染不规则下一 chunk；把 stale
+  session 的 silence continuation 继续发送；直接把 Python runtime object 放进控制消息。
+- 验收：覆盖不规则 PCM span、rollback、resumable append、stale continuation 和控制
+  redaction；首批测试看 `tests/e2e/features/fullduplex/` 下的 input、runtime adapter
+  boundary 与 runtime-control redaction。
+
+### EXEC-4b — shared runner 必须保留 resolved model architecture 与 model-owned hooks
+
+- 触发：模型 architecture override 为空、checkpoint 含多个子目录，或模型实现拥有
+  native duplex/sampling policy。
+- 强制：空 `model_arch` 回退到 checkpoint architectures；loader 先按 resolved
+  architecture 解析 connector/checkpoint 子目录；共享 runner 只提供 typed rows 和
+  hook seam，真正的 model-owned sampling/turn-boundary policy 由模型 consumer 执行。
+- 禁止：用空 override 覆盖 checkpoint metadata；只按默认架构初始化 connector；用
+  generic runner policy 替换 MiniCPM/Audex 等模型自己的 native policy。
+- 验收：覆盖 blank override、多子目录 checkpoint、hook 调用顺序和 mixed-batch
+  request-local metadata；初始化失败必须在 scheduler/worker 继续运行前暴露。
+
+### EXEC-5a — payload connector 的 ownership 与 KV transfer 角色分开判定
+
+- 触发：runner 初始化 payload connector，修改 sender/receiver 角色、KV transfer 配置，
+  或设置 `custom_process_next_stage_input_func`。
+- 强制：receiver 始终拥有 payload connector；sender 只有在配置了非空的
+  `custom_process_next_stage_input_func` 时才拥有它。connector 的构造、启动、发送、接收
+  和清理必须复用同一 ownership 判定，缺失 connector 的路径显式保持 no-op。
+- 禁止：因为 stage 是 KV sender 就顺带构造 payload connector；让 KV-only sender 启动
+  payload I/O；只在初始化处加条件、下游调用仍无条件解引用 connector。
+- 验收：参数化覆盖 receiver/无 hook、sender/无 hook、sender/有 hook 三种组合，分别断言
+  ownership 和 payload I/O 调用次数；KV-only sender 不创建 connector，receiver 和带 hook
+  的 sender 保持原行为。 ^[PR #5744]
+
+### EXEC-5b — deferred Omni output 必须先冻结 step 状态并唯一消费 connector 信号
+
+- 触发：AR runner 把 Omni output materialization 推迟到后台 builder，或修改 async-output
+  feature gate、输出累积与 connector signal 的交接时序。
+- 强制：提交后台任务前复制本 step 拥有的 scheduler output、request IDs/映射、token 和
+  logprob 等可变容器；builder 是该 cycle 唯一 drain connector signal 的 owner，并在输出
+  累积完成后消费。只在 async scheduling、`async_chunk` 和模型 opt-in 同时成立，且未启用
+  prefix cache、spec decode、routed experts 或不兼容 postprocess 时启用异步路径。
+- 禁止：后台任务读取下一 step 会复用或原地修改的 runner 容器；同步路径和 builder 对同一
+  signal 各 drain 一次；把 GPU runner 的 feature gate 泛化成 NPU 或其他未走该调用链的
+  平台支持声明。
+- 验收：提交后原地修改 runner 状态不改变已排队输出；connector signal 在累积后恰好消费
+  一次；逐项翻转每个 guard 都回退到同步路径，NPU 覆盖仍保持同步。 ^[PR #5610]
 
 ## Runner 到模型的预处理合同
 

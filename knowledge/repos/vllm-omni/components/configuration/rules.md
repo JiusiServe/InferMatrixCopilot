@@ -1,10 +1,10 @@
 ---
 title: "vLLM-Omni 配置开发门禁"
 created: 2026-07-16
-updated: 2026-07-31
+updated: 2026-08-05
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py]
+sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/]
 ---
 
 # vLLM-Omni 配置开发门禁
@@ -86,6 +86,42 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "zu
   可漂移的 stage index 作为长期 identity。
 - 验收：每个公开 axis 都有 spec → translator → final stage config 的正向测试和
   unsupported fail-fast 测试；stage 使用稳定名称。
+
+### CONF-4c — 新并行轴必须进入最终拓扑并由 consumer 校验
+
+- 触发：新增 diffusion parallel axis、text-encoder TP、CFG/patch parallel 或把
+  `strategy-config` 的声明映射到 stage runtime。
+- 强制：从 strategy spec/CLI 到 `OmniStageDiffusionParallelConfig` 和最终 process
+  group 展开完整链路；记录 `data × cfg × sequence × pipeline × tensor` 的设备乘积，
+  并由实际 consumer 校验 rank/head divisibility、模型不支持的组合和可见设备容量。
+- 禁止：parser 接受字段后在 projection、engine kwargs 或 worker 初始化时丢失；用一个
+  generic upper bound 替代模型自己的约束；用 recipe 示例或单纯 dataclass 构造代替真实
+  topology/consumer 证据。
+- 验收：正向测试断言新值可从最终 stage config 读回；负向测试覆盖不整除的 head/rank、
+  `cfg_parallel_size` 不适用的模型和设备不足，并在 worker 创建前失败。
+
+### CONF-4d — strategy、CLI 与 pipeline-wide load balancing 必须保留唯一 owner
+
+- 触发：`strategy_config`、legacy YAML、`--omni-lb-policy` 或 stage replica/load
+  balancing 同时提供策略。
+- 强制：registry-backed strategy 才进入 translator；legacy 路径明确 warning 并保持
+  原语义；合并顺序固定为 deploy/pipeline → strategy → CLI，CLI 的显式冲突必须可见，
+  pipeline-wide load-balancer 只由 orchestrator 拥有并传入各 stage。
+- 禁止：接受 legacy `strategy_config` 后静默声称已生效；把 CLI 的默认值误当显式覆盖；
+  每个 stage 各自构造一个相互冲突的全局 load balancer。
+- 验收：覆盖 registry、legacy、CLI 非默认值和冲突值，断言最终拓扑、设备乘积和单一
+  load-balancer consumer；策略生效前若设备不足必须 fail fast。
+
+### CONF-5b — `trust_remote_code` 的未指定值必须保留 deploy 优先级
+
+- 触发：CLI、structured factory、legacy stage factory 或 deploy YAML 同时提供
+  `trust_remote_code`。
+- 强制：调用方显式 `True`/`False` 才覆盖 per-stage deploy 值；未指定用 `None` 表示并
+  保留 YAML 值，HF config resolution 才把 `None` 收敛为安全的实际 bool。
+- 禁止：把 `store_true` 的 absent-False 当成显式 False 无条件写入 override；structured
+  与 legacy 各自实现 precedence；在末端用默认值静默覆盖用户明确的 False。
+- 验收：覆盖“未指定、显式 True、显式 False”三态，并从 structured/legacy 两条路径
+  断言最终 stage config；`with_trust_remote_code_override` 是唯一合并入口。
 
 ### CONF-4b — 标准与 headless 启动必须解析出同一拓扑
 

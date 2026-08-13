@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni Configuration"
 created: 2026-07-16
-updated: 2026-07-31
+updated: 2026-08-05
 type: index
 tags: [vllm-omni, components, config]
 sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
@@ -11,10 +11,11 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/]
 
 - 主要源码：`vllm_omni/config/`
 - 跨边界入口：`vllm_omni/diffusion/data.py`、`vllm_omni/engine/arg_utils.py`、`vllm_omni/engine/stage_init_utils.py`、`vllm_omni/engine/async_omni_engine.py`
-- 主要测试：`tests/config/`、`tests/test_config_factory.py`、`tests/test_diffusion_config_propagation.py`，以及各公开入口附近的配置测试
+- 主要测试：`tests/config/`、`tests/config/test_config_factory.py`、
+  `tests/diffusion/test_diffusion_config_propagation.py`，以及各公开入口附近的配置测试
 - 部署配置：`vllm_omni/deploy/*.yaml`，以及 `pipeline_registry.py`、
   `endpoint_policy.py`、`server_settings.py`、`yaml_util.py`、`composable_parallel/`
-- 源码校验：以上路径在 `main @ 807db6ef` 验证存在；机器基线见
+- 源码校验：以上路径在 `v0.26.0 @ a4ea67a2` 验证存在；机器基线见
   `adapters/vllm_omni/release_baseline.yaml`
 
 ## 什么时候查这里

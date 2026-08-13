@@ -33,7 +33,7 @@ modules=[scheduler]，status=active，run_count=20，2026-06-15 创建 / 07-11 �
   `use_harmony: bool = False` 作类属性；被删方法在 `OmniOpenAIServingChat`
   恢复为本地副本；核对 `vllm.entrypoints.openai.parser.harmony_utils` 的 import
   ——`parse_chat_output` 若从该模块移除则内联。回归：`tests/entrypoints/test_stream_finish_reason.py`
-  + `tests/comfyui/test_comfyui_integration.py::test_understanding_node`；
+  + `tests/e2e/features/comfyui/test_comfyui_integration.py::test_understanding_node`；
   pre-commit（ruff format 可能内联被删 import）。
   ^[SK-fix-omni-serving-chat-upstream-harmony-refactor]
 - 细化实例（debug-memory #184，key=`missing_should_check_unstreamed_tool_arg_tokens`，
@@ -192,8 +192,9 @@ modules=[online_serving, model_executor]，status=active，run_count=6，
 - 验证：`cd /rebase/vllm-omni && /rebase/.venv/bin/python -m pytest
   --collect-only -q <corrected-path>` → rc=0 且 `N tests collected`；重跑
   pipeline 测试进入执行。
-- 禁止：为满足陈旧配置**重造上游已删除的测试文件**（曾手写
-  `tests/e2e/online_serving/test_hunyuan_video_15.py`——恢复上游有意删除的覆盖、与幸存者重复、以后每次
+- 禁止：为满足陈旧配置**重造上游已删除的测试文件**（旧的
+  `tests/e2e/online_serving/test_hunyuan_video_15.py` 已由
+  `tests/e2e/accuracy/hunyuanvideo15_{i2v,t2v}/` 幸存者取代；恢复旧路径会与幸存者重复、以后每次
   rebase 都冲突）；把 rc=4/5 当 OOM 在 GPU 上重试——**结果永远不会改变**，只白烧 3 次重试并硬停；盲目放宽 marker 把 `slow`/`full_model`
   幸存者塞进 merge job（改变上游的 CI 成本/分层意图）。
   ^[SK-fix-stale-test-path-collection-error-after-rename]
