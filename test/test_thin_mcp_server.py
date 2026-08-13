@@ -247,6 +247,43 @@ def test_direct_routes_title_body_before_changed_files(monkeypatch):
     assert review["execution_budget"]["knowledge_file_reads"] == 1
 
 
+def test_direct_ranks_diffusion_owner_for_scheduler_managed_kv_pr(monkeypatch):
+    mcp, _core = _fake_mcp(monkeypatch)
+    review = mcp.tools["review"](
+        target="https://github.com/vllm-project/vllm-omni/pull/6094",
+        repo="vllm-project/vllm-omni",
+        mode="direct",
+        title=(
+            "[Diffusion] Add native KV cache initialization and "
+            "Scheduler-managed block allocation"
+        ),
+        body=(
+            "Discover KV geometry, calculate available memory, initialize "
+            "paged_scheduler allocation, and keep dense_legacy gated. "
+            "HunyuanImage3 is the first consumer."
+        ),
+        changed_files=[
+            "vllm_omni/config/omni_config.py",
+            "vllm_omni/diffusion/diffusion_engine.py",
+            "vllm_omni/diffusion/diffusion_kv/manager.py",
+            "vllm_omni/diffusion/sched/base_scheduler.py",
+            "vllm_omni/diffusion/worker/diffusion_worker.py",
+            (
+                "vllm_omni/diffusion/models/hunyuan_image3/"
+                "hunyuan_image3_transformer.py"
+            ),
+        ],
+    )
+
+    owners = [route["owner"] for route in review["knowledge_routes"]]
+    assert owners[:2] == ["model:hunyuan-image3", "diffusion"]
+    assert "serving" not in owners
+    assert any(
+        "resource or cache changes" in item
+        for item in review["first_review_checklist"]
+    )
+
+
 def test_direct_docs_only_budget_stays_small(monkeypatch):
     mcp, _core = _fake_mcp(monkeypatch)
     review = mcp.tools["review"](

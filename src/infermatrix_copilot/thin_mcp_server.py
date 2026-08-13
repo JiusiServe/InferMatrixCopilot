@@ -166,7 +166,6 @@ _DIRECT_OWNER_ROUTES = (
         ),
         "scope_prefixes": (
             "vllm_omni/core/sched/",
-            "vllm_omni/diffusion/sched/",
         ),
     },
 )
@@ -186,6 +185,10 @@ _DIRECT_REVIEW_CHECKLIST = [
     # owner, so no knowledge route will surface them.
     "When the diff adds or changes a test, check the assertions bind to real behavior and not to values the fixture, mock, or fake injected.",
     "When the diff passes a new argument to a dependency, check it against the lowest version the project's own constraints still permit, not the version installed here.",
+    "For resource or cache changes, trace budget measurement through reservation and physical consumption, including warmup/profile/activation ordering and low-resource behavior.",
+    "For runtime changes, trace exception propagation, partial-allocation cleanup, cancellation, timeout, shutdown, and concurrent scheduling to the terminal user-visible signal.",
+    "At native dependency boundaries, verify the pinned API contract and caller inputs; native reuse does not prove the caller's budget, ordering, adapter, or lifecycle correctness.",
+    "For feature-gated behavior, audit the enabled path independently; a safe disabled/default path limits blast radius but does not prove the new path correct.",
     "Stop investigating when every changed semantic path has a supported finding or explicit no-issue conclusion; do not add searches only for confidence.",
     "Run subtraction only when the diff adds or expands a helper, class, fallback, compatibility branch, or public behavior; otherwise mark no subtraction signal.",
     "Plan exactly one consolidated final review comment.",

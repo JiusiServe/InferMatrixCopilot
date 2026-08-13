@@ -1,7 +1,7 @@
 ---
 title: "Diffusion"
 created: 2026-07-10
-updated: 2026-07-31
+updated: 2026-08-13
 type: index
 tags: [vllm-omni, components, diffusion]
 sources: []
@@ -28,7 +28,7 @@ sources: []
 | 遇到什么 | 查看哪里 |
 |---|---|
 | 理解共享职责和数据流 | [architecture](architecture.md) |
-| 根据 PR 描述直达 execution parity、checkpoint/distributed 或 quality evidence 的规则组与第一批源码 | [rules 与代码地图](rules.md) |
+| 根据 PR 描述直达 execution parity、checkpoint/distributed、quality evidence 或 paged-cache system-runtime 规则组与第一批源码 | [rules 与代码地图](rules.md) |
 | diffusion step 与 request/continuous batching | [step and batching](step-and-batching.md) |
 | Cache-DiT、TeaCache 和 prefix cache | [cache acceleration](cache-acceleration.md) |
 | TP/PP/SP/CFG/VAE/HSDP 等并行策略 | [parallelism](parallelism.md) |
