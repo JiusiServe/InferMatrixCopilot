@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.95,
+    "actionability": 0.98,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.86,
+    "actionability": 0.96,
+    "gap_hit": true
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates catch the latent over-strict level-2 guard, missing CI coverage, global state, and unchecked error ACKs. X stays more tightly grounded in concrete paths and behavior, while Y adds several speculative or unsafe recommendations, including clearing sleep state despite discarded weights and tangential upstream-layer critiques.",
+  "_usage": {
+    "input": 3,
+    "output": 649
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "copilot_v13_proof_test",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_proof_test",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_proof_test",
+    "arm_a_sha256": "b2e9e7f194924e5a699b414eb116e6078eb4a4f20ab5696c304cf093a4259cc0",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "05ba88edbe75596d53ffc0adcf76df898385eb4f6f271110f37f19da2cac4adf",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 3
+  }
+}

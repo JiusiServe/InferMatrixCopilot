@@ -209,8 +209,14 @@ class Settings(BaseSettings):
                                       # results — uncached tokens x n_lenses;
                                       # evidence lives ONCE in the shared
                                       # cached prefix instead
-    evidence_caps: dict[str, int] = {"pr_diff": 120_000, "issue_text": 30_000,
+    evidence_caps: dict[str, int] = {"pr_diff": 260_000, "issue_text": 30_000,
                                      "pr_context": 15_000}     # per-item cap; full text archived to run dir
+                                     # pr_diff 120k->260k: a 170k-char diff
+                                     # (pr4804) lost ~30% of its hunks to the
+                                     # cap and review recall collapsed to 0.16
+                                     # — the cap must clear real large PRs;
+                                     # the diff sits in the shared cached
+                                     # prefix so the cost is one lens's worth
     # PR context bundle (W1): description/discussion/linked issues fed to the
     # reviewer. "no_discussion" excludes comments/review threads — REQUIRED for
     # eval arms (the frozen dataset's ground truth IS the review discussion;
@@ -229,14 +235,39 @@ class Settings(BaseSettings):
     ensemble_stagger_seconds: float = 8.0  # head start for lens 0 so the
                                         # shared prompt prefix is cached
                                         # before sibling lenses send it
-    ensemble_lens_max_iters: int = 10  # rounds are ~3x cheaper with windowed
+    ensemble_lens_max_iters: int = 14  # rounds are ~3x cheaper with windowed
                                        # reads; 6 starved lenses into paging
-                                       # death (and 38/40 truncated at T0)    # per-lens tool budget — replicate means
-                                        # dropped when this was cut to 4 (recall
-                                        # starvation); 6 is the measured setting
-    ensemble_merge_evidence_chars: int = 60_000  # must fit the pr_diff — a
+                                       # death (and 38/40 truncated at T0).
+                                       # 10→14 with the official v4-pro: the
+                                       # judged deficit vs the agentic
+                                       # baseline is per-finding reading
+                                       # depth, and the baseline reads
+                                       # 3-10x more code per finding
+    ensemble_merge_evidence_chars: int = 280_000  # must fit the pr_diff — a
                                         # reducer that can't see the diff
-                                        # can't verify (T3 forensics #5)
+                                        # can't verify (T3 forensics #5);
+                                        # raised with evidence_caps.pr_diff
+                                        # (60k saw ~35% of a 170k diff)
+
+    # Per-comment agentic verification (val-gate lesson: with recall at
+    # parity the arm lost on per-comment grounding — precision .54-.56 vs
+    # .65). Every merged draft comment gets one small tool-loop that must
+    # anchor and re-derive its claim on the PR-time tree before the budget.
+    review_verify_comments: bool = True
+    review_verify_max_iters: int = 4    # tiny loop: read anchor, one grep,
+                                        # one consumer read, conclude
+    review_verify_concurrency: int = 6  # verify calls share the pr_diff
+                                        # cache prefix; modest fan-out
+
+    # Deep-investigation engine (official-model rethink): replace the four
+    # narrow lenses with one long free investigation pass (+ an independent
+    # adversary pass at full depth). The lens templates were variance
+    # scaffolding for a weak generator; a strong generator produces its best
+    # work in the agentic-investigation shape the winning baseline uses.
+    review_deep_engine: bool = True
+    review_deep_max_iters: int = 32     # investigation budget per pass —
+                                        # the baseline reads 3-10x more code
+                                        # per finding than a 14-iter lens
 
     # Adaptive review depth (hybrid planner, review/planner.py): deterministic
     # rules decide the clear cases in pure code; only the gray middle zone

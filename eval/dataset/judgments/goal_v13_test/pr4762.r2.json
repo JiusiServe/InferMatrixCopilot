@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.63,
+    "precision": 0.7,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.78,
+    "actionability": 0.96,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y covers more ground-truth concerns, including trust-remote-code propagation, mutable caching, positional compatibility, final-pipeline resolution, CI, and unsupported endpoint paths. Both include lower-value speculative findings, but Y's primary findings are more concrete and technically grounded.",
+  "_usage": {
+    "input": 3,
+    "output": 1979
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "copilot_v13_proof_test",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_proof_test",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_proof_test",
+    "arm_a_sha256": "6b0172f07026db6023636a8b271947c48c883bb6a04a698a4c7cc81627c36489",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "c615f14501463b018880cd05f5661edb7f27b80dd2a94250edda06d342b8df34",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 2
+  }
+}

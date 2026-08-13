@@ -301,21 +301,24 @@ def test_ensemble_samples_per_lens_union(settings, trace, tmp_path):
 
 def test_review_step_caps_comments_deterministically(settings, trace, tmp_path,
                                                      git_repo):
-    """The comment budget is enforced in code (severity-ordered, cap 5) — the
-    low-signal nit tail goes first. Reducers ignored a prompted cap."""
+    """The comment budget is enforced in code (severity-ordered, cap 8) — the
+    low-signal nit tail goes first; on a review that is not evidence-rich
+    (<2 major findings) the overflow tail does not render at all (val gate:
+    a thin-GT item rendering 12 findings lost 3/3 on noise). Reducers
+    ignored a prompted cap."""
     settings.review_ensemble = True
     settings.review_depth = "full"  # pin: this test exercises ensemble mechanics
     many = ([{"file": "m.py", "line": i, "severity": "nit",
-              "comment": f"n{i}", "evidence": "hunk"} for i in range(4)]
+              "comment": f"n{i}", "evidence": "hunk"} for i in range(6)]
             + [{"file": "m.py", "line": 9, "severity": "major",
                 "comment": "big", "evidence": "hunk"}]
             + [{"file": "m.py", "line": 20 + i, "severity": "minor",
-                "comment": f"m{i}", "evidence": "hunk"} for i in range(3)])
+                "comment": f"m{i}", "evidence": "hunk"} for i in range(5)])
     from infermatrix_copilot.engine.steps import register_builtin_steps
     llm = ScriptedLLM(
         [contract(review_comments=many)]
         + [contract(review_comments=[])] * (len(_REVIEW_LENSES) - 1)
-        + [verdicts_reply()])   # reducer silent -> all 8 kept, then capped
+        + [verdicts_reply()])   # reducer silent -> all 12 kept, then capped
     state = {"diff_text": "diff --git a/m.py b/m.py\n+A = 1",
              "task_spec": {"pr": 9}, "repo_path": str(git_repo)}
     registry = register_builtin_steps(StepRegistry())
@@ -323,10 +326,212 @@ def test_review_step_caps_comments_deterministically(settings, trace, tmp_path,
         _ctx(settings, trace, tmp_path, state, llm=llm)))
     assert result.ok, result.summary
     kept = result.outputs["review_comments"]
-    assert len(kept) == 5
+    assert len(kept) == 8
     sevs = [c["severity"] for c in kept]
-    assert sevs == ["major", "minor", "minor", "minor", "nit"]
+    assert sevs == ["major", "minor", "minor", "minor", "minor", "minor",
+                    "nit", "nit"]
+    # 1 major < the rich threshold: the overflow tail does not render
+    assert "Additional observations" not in state["review_text"]
     assert state["review_text"].endswith("**Verdict:** REQUEST CHANGES")
+
+
+def test_review_overflow_renders_reducer_kept_minors(settings, trace, tmp_path,
+                                                     git_repo):
+    """On an evidence-rich review (≥2 major findings), minor-and-above
+    findings past the cap render as one-line observations (the pr4859 class:
+    reducer-kept ground-truth minors must stay visible); nits past the cap
+    are dropped silently."""
+    settings.review_ensemble = True
+    settings.review_depth = "full"
+    many = ([{"file": "m.py", "line": i, "severity": "major",
+              "comment": f"maj{i}", "evidence": "hunk"} for i in range(8)]
+            + [{"file": "m.py", "line": 30, "severity": "minor",
+                "comment": "gt-minor-survives", "evidence": "hunk"}]
+            + [{"file": "m.py", "line": 40, "severity": "nit",
+                "comment": "nit-vanishes", "evidence": "hunk"}])
+    from infermatrix_copilot.engine.steps import register_builtin_steps
+    llm = ScriptedLLM(
+        [contract(review_comments=many)]
+        + [contract(review_comments=[])] * (len(_REVIEW_LENSES) - 1)
+        + [verdicts_reply()])
+    state = {"diff_text": "diff --git a/m.py b/m.py\n+A = 1",
+             "task_spec": {"pr": 9}, "repo_path": str(git_repo)}
+    registry = register_builtin_steps(StepRegistry())
+    result = asyncio.run(registry.get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+    assert result.ok, result.summary
+    assert len(result.outputs["review_comments"]) == 8
+    assert "Additional observations" in state["review_text"]
+    assert "gt-minor-survives" in state["review_text"]
+    assert "nit-vanishes" not in state["review_text"]
+
+
+def test_cross_lens_corroboration_ranks_first_at_the_cap(settings, trace,
+                                                         tmp_path, git_repo):
+    """Two lenses independently flagging the same file within a few lines is
+    the strongest signal in the ensemble; under the comment budget those
+    findings outrank same-severity singletons (which previously survived on
+    list order while corroborated ground-truth concerns were cut)."""
+    settings.review_ensemble = True
+    settings.review_depth = "full"
+    settings.ensemble_zero_yield_retry = False
+    corro_a = {"file": "hot.py", "line": 10, "severity": "minor",
+               "comment": "shared concern", "evidence": "hunk"}
+    corro_b = {"file": "hot.py", "line": 12, "severity": "minor",
+               "comment": "shared concern, other wording", "evidence": "hunk"}
+    singles = [{"file": f"s{i}.py", "line": 1, "severity": "minor",
+                "comment": f"single {i}", "evidence": "hunk"}
+               for i in range(8)]
+    llm = ScriptedLLM([
+        contract(review_comments=[corro_a] + singles),   # lens 1
+        contract(review_comments=[corro_b]),             # lens 2
+        contract(review_comments=[]),                    # lens 3
+        contract(review_comments=[]),                    # lens 4
+        verdicts_reply(),                                # reducer silent: keep all
+    ])
+    state = {"diff_text": "diff --git a/hot.py b/hot.py\n+A = 1",
+             "task_spec": {"pr": 9}, "repo_path": str(git_repo)}
+    registry = register_builtin_steps(StepRegistry())
+    result = asyncio.run(registry.get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+    assert result.ok, result.summary
+    kept = result.outputs["review_comments"]
+    assert len(kept) == 8
+    assert {kept[0]["file"], kept[1]["file"]} == {"hot.py"}
+    assert all("corroborated_by" not in c for c in kept)
+
+
+def test_coverage_promotion_converts_findings_to_comments(settings, trace,
+                                                          tmp_path, git_repo):
+    """A maintainer-relevant concern that a lens recorded in `findings` but
+    never emitted as a comment is promoted (grounded in the recorded line) by
+    the post-budget coverage pass; a scripted no-addition reply leaves the
+    review untouched."""
+    settings.review_ensemble = True
+    settings.review_depth = "full"
+    settings.ensemble_zero_yield_retry = False
+    base = {"file": "m.py", "line": 1, "severity": "major",
+            "comment": "real defect", "evidence": "hunk"}
+    lens1 = contract(review_comments=[base],
+                     findings=["[sweep] linked issue #99 reports two "
+                               "regressions; this PR fixes only one"])
+    promotion = Reply(blocks=[Block(type="text", text=json.dumps({
+        "additions": [{"file": "m.py", "line": 2, "severity": "minor",
+                       "comment": "issue #99's second regression remains "
+                                  "unfixed — track or split it",
+                       "evidence": "[sweep] linked issue #99 reports two "
+                                   "regressions; this PR fixes only one"}]}))])
+    llm = ScriptedLLM([
+        lens1,
+        contract(review_comments=[]),   # lens 2
+        contract(review_comments=[]),   # lens 3
+        contract(review_comments=[]),   # lens 4
+        verdicts_reply({"i": 0, "action": "keep"}),
+        promotion,
+    ])
+    state = {"diff_text": "diff --git a/m.py b/m.py\n+A = 1",
+             "task_spec": {"pr": 9}, "repo_path": str(git_repo)}
+    registry = register_builtin_steps(StepRegistry())
+    result = asyncio.run(registry.get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+    assert result.ok, result.summary
+    kept = result.outputs["review_comments"]
+    assert len(kept) == 2
+    assert "remains unfixed" in kept[1]["comment"]
+    assert next(trace.events("review_coverage_promoted"))["added"] == 1
+    assert not llm._replies
+
+
+def test_deep_engine_runs_investigator_plus_adversary(settings, trace,
+                                                      tmp_path, git_repo):
+    """review_deep_engine runs the hybrid pass set: full depth = deep
+    investigator + adversary plus the behavior + verification breadth
+    lenses (4 dispatches); standard = investigator + behavior. Depth still
+    comes from the planner."""
+    settings.review_ensemble = True
+    settings.review_deep_engine = True
+    settings.review_depth = "full"
+    settings.ensemble_zero_yield_retry = False
+    c1 = [{"file": "a.py", "line": 1, "severity": "major",
+           "comment": "central-change defect", "evidence": "read a.py"}]
+    c2 = [{"file": "b.py", "line": 2, "severity": "minor",
+           "comment": "blast radius question", "evidence": "read b.py"}]
+    llm = ScriptedLLM([
+        contract(review_comments=c1),                 # investigator
+        contract(review_comments=c2),                 # adversary
+        contract(review_comments=[]),                 # behavior
+        contract(review_comments=[]),                 # verification
+        verdicts_reply({"i": 0, "action": "keep"},
+                       {"i": 1, "action": "keep"}),
+    ])
+    state = {"diff_text": "diff --git a/a.py b/a.py\n+A = 1",
+             "task_spec": {"pr": 9}, "repo_path": str(git_repo)}
+    registry = register_builtin_steps(StepRegistry())
+    result = asyncio.run(registry.get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+    assert result.ok, result.summary
+    steps_run = [e["step"] for e in trace.events("agent_dispatch")]
+    assert steps_run == ["agent.review_diff#investigator",
+                         "agent.review_diff#adversary",
+                         "agent.review_diff#behavior",
+                         "agent.review_diff#verification"]
+    ens = next(trace.events("agent_ensemble"))
+    assert ens["lenses"] == ["investigator", "adversary",
+                             "behavior", "verification"]
+    assert len(result.outputs["review_comments"]) == 2
+    assert not llm._replies
+
+
+def test_verify_pass_drops_refuted_demotes_unverifiable(settings, trace,
+                                                        tmp_path, git_repo):
+    """Per-comment verification: refuted comments drop, unverifiable ones
+    keep but demote one severity step, confirmed ones may be tightened; a
+    garbage verdict fails open (comment kept unchanged)."""
+    settings.review_ensemble = True
+    settings.review_depth = "full"
+    settings.ensemble_zero_yield_retry = False
+    settings.review_verify_comments = True
+    settings.review_verify_concurrency = 1  # ordered ScriptedLLM needs determinism
+    cs = [
+        {"file": "a.py", "line": 1, "severity": "major",
+         "comment": "refute me", "evidence": "hunk"},
+        {"file": "b.py", "line": 2, "severity": "major",
+         "comment": "confirm me", "evidence": "hunk"},
+        {"file": "c.py", "line": 3, "severity": "major",
+         "comment": "unverifiable claim", "evidence": "hunk"},
+        {"file": "d.py", "line": 4, "severity": "minor",
+         "comment": "garbage verdict for me", "evidence": "hunk"},
+    ]
+    llm = ScriptedLLM([
+        contract(review_comments=cs),                 # lens 1
+        contract(review_comments=[]),                 # lenses 2-4
+        contract(review_comments=[]),
+        contract(review_comments=[]),
+        verdicts_reply({"i": 0, "action": "keep"},    # reducer keeps all
+                       {"i": 1, "action": "keep"},
+                       {"i": 2, "action": "keep"},
+                       {"i": 3, "action": "keep"}),
+        contract(verdict="refuted"),                              # verify c0
+        contract(verdict="confirmed", review_comments=[],
+                 comment="tightened: verified against b.py"),     # verify c1
+        contract(verdict="unverifiable"),                         # verify c2
+        contract(verdict="banana"),                               # verify c3
+    ])
+    state = {"diff_text": "diff --git a/a.py b/a.py\n+A = 1",
+             "task_spec": {"pr": 9}, "repo_path": str(git_repo)}
+    registry = register_builtin_steps(StepRegistry())
+    result = asyncio.run(registry.get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+    assert result.ok, result.summary
+    kept = result.outputs["review_comments"]
+    by_file = {c["file"]: c for c in kept}
+    assert "a.py" not in by_file                       # refuted → dropped
+    assert by_file["b.py"]["comment"].startswith("tightened:")
+    assert by_file["c.py"]["severity"] == "minor"      # major demoted
+    assert by_file["d.py"]["comment"] == "garbage verdict for me"  # fail-open
+    ev = next(trace.events("review_comments_verified"))
+    assert (ev["total"], ev["dropped"], ev["demoted"]) == (4, 1, 1)
+    assert not llm._replies
 
 
 def test_render_verdict_calibration():
@@ -425,7 +630,9 @@ def test_review_step_invalid_override_blocks_before_any_llm(settings, trace,
 def test_review_step_gray_zone_falls_back_to_standard(settings, trace,
                                                       tmp_path, git_repo):
     """Mid-size diff + unparseable planner reply → deterministic standard
-    (logic+behavior): 1 garbage planner call, 2 lens passes, 1 reducer."""
+    (logic+behavior+verification): 1 garbage planner call, 3 lens passes,
+    1 reducer. Verification rides the fallback so the test-integrity class
+    is never silently skipped on planner failure."""
     settings.review_ensemble = True
     body = "\n".join(f"+line {i}" for i in range(60))
     state = {"diff_text": "\n".join(
@@ -436,12 +643,16 @@ def test_review_step_gray_zone_falls_back_to_standard(settings, trace,
            "comment": "breaks the consumer contract", "evidence": "hunk"}]
     c2 = [{"file": "src/f1.py", "line": 2, "severity": "minor",
            "comment": "stale docstring", "evidence": "hunk"}]
+    c3 = [{"file": "src/f2.py", "line": 3, "severity": "minor",
+           "comment": "changed path has no test", "evidence": "hunk"}]
     llm = ScriptedLLM([
         Reply(blocks=[Block(type="text", text="prose, not json")]),  # planner
         contract(review_comments=c1),                                # lens 1
         contract(review_comments=c2),                                # lens 2
+        contract(review_comments=c3),                                # lens 3
         verdicts_reply({"i": 0, "action": "keep"},                   # reducer
-                       {"i": 1, "action": "keep"}),
+                       {"i": 1, "action": "keep"},
+                       {"i": 2, "action": "keep"}),
     ])
     registry = register_builtin_steps(StepRegistry())
     result = asyncio.run(registry.get("agent.review_diff").handler(
@@ -449,18 +660,18 @@ def test_review_step_gray_zone_falls_back_to_standard(settings, trace,
     assert result.ok, result.summary
     plan_ev = next(trace.events("review_plan"))
     assert plan_ev["planner"] == "llm-fallback"
-    assert plan_ev["lenses"] == ["logic", "behavior"]
-    assert len(list(trace.events("agent_dispatch"))) == 2
+    assert plan_ev["lenses"] == ["logic", "behavior", "verification"]
+    assert len(list(trace.events("agent_dispatch"))) == 3
     assert not llm._replies  # the whole script was consumed
 
 
 def test_review_step_cap_applies_to_light_path(settings, trace, tmp_path,
                                                git_repo):
-    """The 5-comment severity-ordered budget is a product cap, not ensemble
+    """The 8-comment severity-ordered budget is a product cap, not ensemble
     mechanics — it applies to the light single pass too."""
     settings.review_ensemble = True
     many = ([{"file": "m.py", "line": i, "severity": "nit", "comment": f"n{i}",
-              "evidence": "hunk"} for i in range(6)]
+              "evidence": "hunk"} for i in range(9)]
             + [{"file": "m.py", "line": 9, "severity": "major",
                 "comment": "big", "evidence": "hunk"}])
     llm = ScriptedLLM([contract(review_comments=many)])
@@ -472,7 +683,7 @@ def test_review_step_cap_applies_to_light_path(settings, trace, tmp_path,
         _ctx(settings, trace, tmp_path, state, llm=llm)))
     assert result.ok, result.summary
     kept = result.outputs["review_comments"]
-    assert len(kept) == 5 and kept[0]["severity"] == "major"
+    assert len(kept) == 8 and kept[0]["severity"] == "major"
 
 
 def test_zero_yield_lens_gets_one_retry(settings, trace, tmp_path):
@@ -662,6 +873,7 @@ def test_zero_yield_light_pass_escalates_once_to_standard(settings, trace,
         contract(review_comments=[]),        # light pass: nothing
         contract(review_comments=found),     # standard lens 1
         contract(review_comments=found),     # standard lens 2
+        contract(review_comments=found),     # standard lens 3
         verdicts_reply({"i": 0, "action": "keep"}),
     ])
     state = {"diff_text": "diff --git a/mod_a.py b/mod_a.py\n"

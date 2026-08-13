@@ -26,6 +26,9 @@ def settings(tmp_path: Path) -> Settings:
         ensemble_samples_per_lens=1,  # sampling tests opt in explicitly
         ensemble_stagger_seconds=0,  # tests never sleep for cache warm-up
         ensemble_zero_yield_retry=False,  # scripted fakes opt in explicitly
+        review_verify_comments=False,  # verify-pass tests opt in explicitly
+        review_deep_engine=False,  # deep-pass tests opt in explicitly; the
+                                   # legacy scripted fakes assume 4 lenses
     )
 
 

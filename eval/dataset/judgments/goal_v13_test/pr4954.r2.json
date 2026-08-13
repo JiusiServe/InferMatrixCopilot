@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.75,
+    "precision": 0.72,
+    "actionability": 0.91,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.7,
+    "actionability": 0.78,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X covers the shared-helper behavioral concern and directly questions whether the legacy fallback has a live producer, though it overstates several speculative risks and misses the exact documentation request. Y identifies valid CI-marker, containment, and tensor-shape issues, but largely misses the ground-truth documentation and legacy-path concerns while repeating findings multiple times.",
+  "_usage": {
+    "input": 3,
+    "output": 1339
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_proof_test"
+  },
+  "_roles": {
+    "arm": "copilot_v13_proof_test",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_proof_test",
+    "arm_a_sha256": "9c0bc66cc0ec8c5b6746a9b3f7c1f0737dcd37bc9280b775127e2be759f2a9f4",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "876219c8b0b10edabcc0c302eb8ce6951e35bdecf6437bbb6247e39bc44276e3",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 2
+  }
+}

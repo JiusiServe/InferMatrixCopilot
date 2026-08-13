@@ -187,6 +187,26 @@ async def run_agent_step_ensemble(
                 by_sig[sig] = tagged
                 candidates.append(tagged)
 
+    # near-duplicate corroboration across lenses: the same concern surfaces at
+    # slightly different lines/wording, which exact-signature dedup cannot see
+    # — consensus stays 1 and the reducer treats independent agreement as
+    # noise (a 2-lens candidate was dropped as "unlikely" in a live run whose
+    # ground truth confirmed it). Tag file/line-proximate agreement so the
+    # reducer's drop rule can weigh it.
+    for i, a in enumerate(candidates):
+        fa, la = str(a.get("file", "")), a.get("line")
+        if not fa or not isinstance(la, int):
+            continue
+        others = {name
+                  for j, b in enumerate(candidates) if j != i
+                  for name in b.get("lenses") or []
+                  if str(b.get("file", "")) == fa
+                  and isinstance(b.get("line"), int)
+                  and abs(b["line"] - la) <= 8
+                  and name not in (a.get("lenses") or [])}
+        if others:
+            a["corroborated_by"] = sorted(others)
+
     def _dedup_union(key: str) -> list:
         """Union the list-valued `key` across all samples, dropping exact
         duplicates (dict/list items compared by canonical JSON, scalars by str),
@@ -221,6 +241,8 @@ async def run_agent_step_ensemble(
         # reducer's latency. A single-lens singleton does NOT qualify: an
         # unreplicated claim must still face verification (a hallucinated
         # blocker once sailed through here and became the entire review)
+        # `corroborated_by` survives into the merged items: downstream comment
+        # budgeting ranks independently-corroborated findings above singletons
         merged[merge_key] = [
             {k: v for k, v in c.items() if k not in ("lenses", "consensus")}
             for c in candidates]

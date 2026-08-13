@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.68,
+    "actionability": 0.94,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.62,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y covers the parent-first ordering concern, explicitly requests the missing benchmark, and flags failing CI that may explain the precommit concern. X is technically detailed but misses the requested benchmark and adds several speculative, pre-existing, or out-of-scope findings.",
+  "_usage": {
+    "input": 3,
+    "output": 1157
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_proof_test"
+  },
+  "_roles": {
+    "arm": "copilot_v13_proof_test",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_proof_test",
+    "arm_a_sha256": "ce0266983c595171c18dd5c48c208bbb2687522be8a7c7e913135ac8252e59df",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5eabb9c2ecaee56109ca8916c98f608c63cff4946702c512694924d4704baea8",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

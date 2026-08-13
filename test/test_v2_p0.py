@@ -283,8 +283,13 @@ def test_high_risk_modules_from_adapter_override():
 def test_adapter_zero_declares_risk_tiers():
     from infermatrix_copilot.adapters.base import load_adapter
     adapter = load_adapter(REPO_ROOT / "adapters" / "vllm_omni")
-    assert set(adapter.high_risk_modules) == {"worker_runner", "model_executor",
-                                             "scheduler"}
+    assert set(adapter.high_risk_modules) == {
+        "worker_runner", "model_executor", "scheduler",
+        # extended from review-campaign forensics: platform code sets
+        # process-wide defaults, diffusion is multi-model shared code, and
+        # distributed owns cross-stage transport — small diffs there still
+        # need the full review ensemble
+        "platform", "diffusion", "distributed"}
 
 
 # -- repo-neutral core guard (§V2.2.1) -------------------------------------------

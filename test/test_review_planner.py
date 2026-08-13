@@ -198,6 +198,43 @@ def test_rules_api_change_disqualifies_light(settings):
     assert classify(diff_signals(diff), settings) is None  # gray, not light
 
 
+def test_rules_value_flip_disqualifies_light(settings):
+    # a tiny diff that flips an existing assignment's value (default lists,
+    # flags, thresholds) can have repo-wide blast radius — it must go gray,
+    # never light, even though no def/class/CONST shape changed
+    diff = ("diff --git a/src/platform.py b/src/platform.py\n"
+            "--- a/src/platform.py\n+++ b/src/platform.py\n"
+            '-        default = ["native"] if using_inductor else ["c", "native"]\n'
+            '+        default = ["c", "native"]\n')
+    sig = diff_signals(diff)
+    assert sig.value_flips == ('src/platform.py: `default`',)
+    assert classify(sig, settings) is None  # gray, not light
+
+
+def test_signals_code_motion_is_not_a_value_flip(settings):
+    # same LHS, same RHS: the assignment merely moved — still light
+    diff = ("diff --git a/src/mod.py b/src/mod.py\n"
+            "--- a/src/mod.py\n+++ b/src/mod.py\n"
+            "-    limit = 10\n"
+            "+    limit = 10\n")
+    sig = diff_signals(diff)
+    assert sig.value_flips == ()
+    assert classify(sig, settings)[0] == "light"
+
+
+def test_signals_config_file_flip_stays_light(settings):
+    # the flip signal is code-file-only: a 2-line yaml value change keeps the
+    # light tier (config semantics are the config owner's checklist, and tiny
+    # config deletions measured as safe light items)
+    diff = ("diff --git a/deploy/a.yaml b/deploy/a.yaml\n"
+            "--- a/deploy/a.yaml\n+++ b/deploy/a.yaml\n"
+            "-timeout = 30\n"
+            "+timeout = 60\n")
+    sig = diff_signals(diff)
+    assert sig.value_flips == ()
+    assert classify(sig, settings)[0] == "light"
+
+
 # ---- plan_review: overrides and invariants ----------------------------------
 
 def test_override_wins_with_zero_llm_calls(settings):

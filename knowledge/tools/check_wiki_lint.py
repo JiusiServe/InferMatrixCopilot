@@ -30,6 +30,9 @@ ADAPTER_KNOWLEDGE_KEYS = {
     "briefing_docs",
     "briefing_docs_extra",
     "performance_briefing_docs",
+    # single knowledge page injected as the Strict reviewer's repo-specific
+    # checklist (first 4k chars); resolved relative to the knowledge root
+    "review_checklist",
 }
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 MARKDOWN_LINK = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
@@ -96,6 +99,19 @@ def check_adapter_briefings() -> None:
                 if set(Path(doc).parts) & RAW_PARTS:
                     errors.append(
                         f"adapter {field} 禁止加载原始证据层页面（{doc}）：{manifest}")
+        checklist = knowledge.get("review_checklist")
+        if checklist is not None:
+            if not isinstance(checklist, str):
+                errors.append(
+                    f"adapter review_checklist 必须是字符串：{manifest}")
+            elif set(Path(checklist).parts) & RAW_PARTS:
+                errors.append(
+                    f"adapter review_checklist 禁止加载原始证据层页面"
+                    f"（{checklist}）：{manifest}")
+            elif not (ROOT / checklist).is_file():
+                errors.append(
+                    f"adapter review_checklist 指向不存在的页面"
+                    f"（{checklist}）：{manifest}")
 
 
 def frontmatter(path: Path) -> dict | None:

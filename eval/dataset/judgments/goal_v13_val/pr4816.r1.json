@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.5,
+    "actionability": 0.94,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.58,
+    "actionability": 0.93,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "The ground truth contains no substantive reviewer concerns, so recall is vacuously complete for both. Both offer concrete, plausible comments, but several rely on unverifiable repository/CI details and speculative compatibility risks; Y is slightly more focused and avoids X's additional sibling-state speculation.",
+  "_usage": {
+    "input": 3,
+    "output": 1163
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_proof_val"
+  },
+  "_roles": {
+    "arm": "copilot_v13_proof_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_proof_val",
+    "arm_a_sha256": "db77e7acdd47554d47708715e1e68a9a2beb888bfe1661fb483733b01cf2f0cb",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b9fe4c00140a73cf5cc08ceded6d03eb8b8faea45f6c3b50e6f9753b9a1a1a01",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

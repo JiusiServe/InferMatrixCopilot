@@ -18,7 +18,11 @@ The `pr_context` evidence (when present) carries the PR description, discussion,
 linked issues: treat the description + linked issues as the acceptance criteria the \
 diff must satisfy (scope dropped from the description is a finding). DO NOT repeat \
 concerns maintainers already raised in the discussion — build on or extend them, or \
-stay silent on that point. For EVERY public symbol whose signature/default the diff \
+stay silent on that point. Verifying that a hunk does what it says is the FLOOR, not \
+the review: a hunk that narrows, gates, or fixes an earlier problem usually leaves \
+residual risk — interrogate the residual (other batch sizes, other platforms, other \
+launch paths, other models sharing the code) instead of recording the fix as \
+validated and moving on. For EVERY public symbol whose signature/default the diff \
 changes, grep the repo for its callers and name each one left stale. When the diff \
 ADDS a test, verify the test actually exercises the behavior it names (drive the \
 unmapped input through the real entry point) — a test asserting a pre-transformed \
@@ -53,12 +57,38 @@ docstring and doc paragraph in the touched files and check each still tells the 
 under the NEW behavior.
 7. Undocumented assumptions or invariants the change introduces or relies on (ordering, \
 "first element is X", implicit units/thresholds) — these deserve a comment or an assert.
-8. Scope: files touched beyond the PR's stated purpose.
+8. Scope, both directions: files touched beyond the PR's stated purpose, AND stated \
+purpose the diff does not deliver — if the description or a linked issue reports N \
+related problems and this diff fixes fewer, one comment must name what remains and ask \
+for tracking or a split.
+9. Blast radius of changed values: for EVERY changed default, flag, priority list, or \
+dispatch table, enumerate WHO INHERITS the new value (which models/configs/platforms \
+reach this code path) — if the PR validates only a subset, ask for scoping to that \
+subset or evidence on the rest. A one-line value flip in shared code is a repo-wide \
+behavior change until proven otherwise.
+10. Dependency compatibility: for EVERY new/changed call into an external library \
+(new kwarg, new API), check the declared version range (pyproject/requirements) — does \
+the OLDEST allowed version support it? A missing lower bound that admits versions \
+which reject the call is a breaking finding.
+11. Failure paths that fabricate: on except/fallback branches, is the produced value \
+semantically valid or merely type-valid (e.g. raw bytes standing in for decoded audio, \
+zeros standing in for real stats)? Silent plausible-but-wrong output is worse than an \
+exception.
+12. Resource lifecycle symmetry: for every acquire/register/allocate the diff adds or \
+moves, name the release path and WHO calls it on the abort/disconnect/early-exit routes \
+— not just the happy path.
+
+If the `gate_report` evidence lists failing CI checks AND the diff plausibly touches \
+what a failing lane tests, add ONE minor comment naming the check and asking whether \
+the failure is pre-existing on main or introduced here. Never speculate a red check \
+into a blocker — you cannot see whether main is also red, so attribution claims are \
+guesses and read as fabrication.
 
 Severity semantics (they drive the verdict, so assign them honestly):
 - blocker: merging as-is causes breakage or data loss.
-- major: a real defect, or a consumer/doc/test update this change requires but the diff \
-does not contain.
+- major: a real defect IN THE CHANGED CODE, or a consumer/doc/test update this change \
+requires but the diff does not contain. "Consider adding X" improvements are never \
+major — a maintainer would not block on them.
 - minor: a concrete improvement that belongs in THIS PR (a simplification, a stale \
 docstring fix, a missing assert, a missing verification run).
 - nit: optional polish; does NOT block approval.
@@ -73,8 +103,10 @@ that does not match the diff verbatim, or that quotes code being REMOVED, costs 
 comment its inline position — worse than giving no snippet at all. One or two lines is \
 ideal; enough to be unique within the file, no more.
 - EVIDENCE-GROUNDING: every comment must be verifiable from the diff or from repo \
-evidence you actually gathered and NAME in the comment (the file you read or grep you \
-ran, and what it showed). The comment's FIRST sentence must state the concrete change \
+evidence you actually gathered — and the `evidence` field must be SELF-CONTAINED \
+PROOF: QUOTE the decisive line(s) VERBATIM with their file:line, so a reader holding \
+only your review and the diff can check the claim without the repo. "I read X and it \
+shows Y" is narrative, not proof, and scores as speculation. The comment's FIRST sentence must state the concrete change \
 THIS DIFF makes (quote or paraphrase the hunk) — only then the repo-side consequence \
 and the directive; a reader holding only the diff must see immediately which change the \
 comment hangs on. For comments about diff code, `line` is a line the diff touches; for \
@@ -123,53 +155,135 @@ You get one pass, so spend it in this order and do not wander:
    one to leave silent.
 4. Stop when every path is resolved. Do not spend remaining budget on searches
    that only raise your confidence in a conclusion you already support.
-5. Deliver exactly one consolidated review, with every finding anchored to a
+5. Your job is to CHALLENGE the change, not to certify it: for each changed
+   value or gated behavior, ask who else inherits it (checklist item 9) and
+   what the failure paths fabricate (item 11) BEFORE concluding no-issue. A
+   pass that only validates the author's claims has not reviewed the PR.
+6. Deliver exactly one consolidated review, with every finding anchored to a
    real file and line you actually read. No finding without evidence you can
    point at; if you found nothing, say so plainly and name any path you could
-   not verify.
+   not verify — and even then, scope/follow-up observations (item 8) still
+   belong in review_comments, not in your private notes.
 """
 
 _REVIEW_LENSES = [
     {"name": "logic",
-     "focus": "Checklist items 1, 2 and 4, as a MECHANICAL SWEEP OF THE DIFF: "
-              "for EVERY hunk, in order, ask (a) can the new branches/"
+     "focus": "Checklist items 1, 2, 4 and 11, as a MECHANICAL SWEEP OF THE "
+              "DIFF: for EVERY hunk, in order, ask (a) can the new branches/"
               "conditions actually all occur — a branch for a case that "
               "cannot co-occur is a finding whose fix is REMOVE/simplify, "
               "never document; (b) does the new code re-derive by hand a "
               "value an existing helper provides (grep the repo for the "
               "computation before flagging); (c) None/empty handling, "
-              "off-by-one, error paths; (d) rebase/merge damage (duplicated "
-              "code, moved/renamed symbols). Work hunk by hunk; do not skip "
-              "any. Use repo tools only to CONFIRM a suspicion from the "
-              "diff."},
+              "off-by-one, error paths — and for every arithmetic hunk, does "
+              "the math match its own comment (floor where the comment says "
+              "ceil is a finding, and check downstream lengths/offsets are "
+              "updated consistently); (d) rebase/merge damage (duplicated "
+              "code, moved/renamed symbols); (e) except/fallback branches "
+              "that fabricate — is the fallback value semantically valid or "
+              "merely type-valid? Work hunk by hunk; do not skip any. Use "
+              "repo tools only to CONFIRM a suspicion from the diff."},
     {"name": "behavior",
-     "focus": "Checklist item 3, diff-first: for EVERY hunk that changes a "
-              "default, API, protocol or output format, list who depends on "
-              "the OLD behavior — grep the repo for in-repo consumers "
-              "(examples/, docs/, clients, tests, READMEs) — then check "
-              "whether THIS diff updates each one; name every consumer left "
-              "stale, quoting it. If the diff changes no default/API, say so "
+     "focus": "Checklist items 3 and 9, diff-first: for EVERY hunk that "
+              "changes a default, API, protocol or output format, list who "
+              "depends on the OLD behavior — grep the repo for in-repo "
+              "consumers (examples/, docs/, clients, tests, READMEs) — then "
+              "check whether THIS diff updates each one; name every consumer "
+              "left stale, quoting it. Then the blast radius: enumerate which "
+              "models/configs/platforms INHERIT each changed value (who else "
+              "reaches this code path) and compare against what the PR "
+              "actually validated — validated-on-one-model changes to shared "
+              "code get a scoping ask. Also ask what user-visible guarantee "
+              "(determinism, seeding, precision, streaming latency) is "
+              "silently weakened. If the diff changes no default/API, say so "
               "and report nothing for this item."},
     {"name": "contracts",
-     "focus": "Checklist items 6 and 7, as a MECHANICAL SWEEP OF THE TOUCHED "
-              "FILES: (a) enumerate EVERY docstring, inline comment, and "
-              "field description in each touched file that the change makes "
-              "stale or misleading — verify each still tells the truth under "
-              "the NEW behavior, quoting any that don't (stopping after the "
-              "first is the most common failure); (b) for EVERY indexed or "
-              "first-element access the diff adds (xs[0], 'first element is "
-              "X', ordering, implicit units/thresholds), state the "
-              "assumption it encodes and what guarantees it — if nothing "
-              "does, ask for an assert or comment."},
+     "focus": "Checklist items 6, 7 and 12, as a MECHANICAL SWEEP OF THE "
+              "TOUCHED FILES: (a) enumerate EVERY docstring, inline comment, "
+              "and field description in each touched file that the change "
+              "makes stale or misleading — verify each still tells the truth "
+              "under the NEW behavior, quoting any that don't (stopping "
+              "after the first is the most common failure); check every new "
+              "config/class docstring's stated defaults against the actual "
+              "signature defaults; (b) for EVERY indexed or first-element "
+              "access the diff adds (xs[0], 'first element is X', ordering, "
+              "implicit units/thresholds), state the assumption it encodes "
+              "and what guarantees it — if nothing does, ask for an assert "
+              "or comment; (c) for every acquire/register/allocate the diff "
+              "adds or moves, name the release path and who invokes it on "
+              "abort/disconnect/early-exit — an unreleased resource on a "
+              "non-happy path is a finding, not a nit."},
     {"name": "verification",
-     "focus": "Checklist item 5, diff-first: for EVERY behavior-changing "
-              "hunk, name the specific existing test or benchmark that "
-              "exercises the changed path (grep tests/, benchmarks/ for the "
-              "touched symbols). Behavior changed with no test change, a "
+     "focus": "Checklist items 5 and 10, diff-first: for EVERY behavior-"
+              "changing hunk, name the specific existing test or benchmark "
+              "that exercises the changed path (grep tests/, benchmarks/ for "
+              "the touched symbols). Behavior changed with no test change, a "
               "changed path no test exercises, new skips, or loosened "
-              "thresholds are findings. If the PR gives no sign the relevant "
-              "test/benchmark was run, ask for exactly that run/extension, "
-              "citing the concrete regression risk it guards."},
+              "thresholds are findings. TEST INTEGRITY outranks test "
+              "existence: a test that cannot fail (try/except-and-continue, "
+              "degenerate inputs, asserting the value it injected) and a "
+              "test CI never selects (check the added file's markers against "
+              "how CI selects tests, and hardware gates against what CI "
+              "hardware provides) are stronger findings than a missing test. "
+              "For hardware-capability gates, compare the gate expression "
+              "against the claimed support matrix (an open-ended >= admits "
+              "future arches the claim never covered). For perf/capacity/"
+              "kernel-provider changes, demand before/after evidence that "
+              "isolates EACH bundled change; for new external-library calls, "
+              "check the declared dependency range supports them. Do NOT "
+              "emit generic 'add a unit test' asks: every test finding names "
+              "the specific behavior at risk and the exact test to run or "
+              "extend."},
+]
+
+# Deep-investigation passes (review_deep_engine): the narrow-lens ensemble
+# was scaffolding for a weak generator — it compensated for variance by
+# forcing enumeration inside four templates, and with a strong generator the
+# same templates produce template-shaped, under-grounded output (the measured
+# residual loss driver after the recall fixes). A strong model wins in the
+# baseline's own shape: long free agentic investigation — so these passes
+# hand it that shape, plus everything the baseline does not have (PR-time
+# tree, repo checklist, consumer sweep, commit timeline, hunk locations).
+_REVIEW_DEEP_PASSES = [
+    {"name": "investigator",
+     "focus": "You are the PRIMARY reviewer. Work like the strongest human "
+              "maintainer: start from the PR's CENTRAL change (what the "
+              "title/description is about), read the changed code IN THE "
+              "TREE — not just the diff — then its consumers (the "
+              "changed_symbol_consumers evidence lists them), its tests, "
+              "and the siblings that share the code path, until you can "
+              "state with evidence what this PR breaks, weakens, or leaves "
+              "unfinished. The checklist is your PRIORITY LIST, not a form: "
+              "spend budget where the risk is, cover the central change "
+              "before anything peripheral. Every comment must be a claim "
+              "you VERIFIED by reading code — if you did not read it, do "
+              "not assert it. Depth over breadth: one verified major "
+              "outweighs five plausible minors. BUDGET DISCIPLINE: your "
+              "tool budget is fixed — track it, stop investigating while "
+              "you can still WRITE, and reserve your last two rounds for "
+              "emitting the full output contract; an investigation that "
+              "never files its review scores zero. Your comment allowance "
+              "is 10 (it overrides the general cap — the merge stage "
+              "unions only you and at most one peer)."},
+    {"name": "adversary",
+     "focus": "You are the SECOND reviewer and you assume the first missed "
+              "something important. Hunt specifically where reviews "
+              "systematically fail: blast radius of changed defaults/"
+              "shared values (enumerate who else inherits the code path), "
+              "resource lifecycle on abort/disconnect routes, test "
+              "integrity (a test that cannot fail, or that CI never "
+              "selects — check markers against the CI lane rules), "
+              "dependency version floors for new external calls, silently "
+              "weakened user-visible guarantees (determinism, seeding, "
+              "precision, streaming latency), and scope the description "
+              "promises but the diff does not deliver. Read the code that "
+              "decides each question before asserting. Emit only verified "
+              "claims — your job is the true misses, not volume. BUDGET "
+              "DISCIPLINE: your tool budget is fixed — pick the 3-4 most "
+              "dangerous questions FIRST, close each one, and reserve your "
+              "last two rounds for emitting the full output contract; an "
+              "investigation that never files its review scores zero. Your "
+              "comment allowance is 10 (it overrides the general cap)."},
 ]
 
 _REVIEW_MERGE = (
@@ -178,11 +292,36 @@ _REVIEW_MERGE = (
     "THIS PR; nit = optional polish. Severities above nit request changes — "
     "demote to nit anything genuinely optional; a VERIFIED but optional "
     "comment is demoted, not dropped. Drop comments whose evidence is "
-    "UNVERIFIED unless a second lens corroborates them. A candidate whose "
+    "UNVERIFIED unless a second lens corroborates them. Dropping a candidate "
+    "that two or more lenses produced independently (see its consensus/"
+    "corroboration tag) requires evidence that it is IMPOSSIBLE, not merely "
+    "that current callers happen to avoid it — when in doubt, demote to "
+    "minor instead of dropping. A candidate whose "
     "own text or evidence declares uncertainty (\'uncertain\', \'could not "
     "verify\', \'budget exhausted\') must be demoted to nit or rewritten as "
     "a question — NEVER kept at blocker/major (an uncertain claim cannot "
-    "block a merge). When you rewrite a "
+    "block a merge). CENTRALITY comes first: identify the PR's PRIMARY "
+    "change — the behavior the title/description is about — and make sure "
+    "the top comments engage IT or its direct consequences (correctness of "
+    "the changed logic, who else inherits the changed value, what evidence "
+    "supports it, what residual risk the fix leaves). A review whose kept "
+    "comments are all about secondary files' tests and docstrings has "
+    "missed the PR, whatever their individual merit. NEVER drop a verified "
+    "instance of these classes (they are what human maintainers actually "
+    "raise): blast-radius scoping of a changed default/shared value, "
+    "dependency-version compatibility, benchmark evidence for a perf/"
+    "capacity change, test-INTEGRITY (a test that cannot fail or is never "
+    "selected by CI), resource lifecycle on abort paths, and scope-split of "
+    "partially-fixed linked issues — demote to minor at most. Ranking "
+    "within a severity: behavioral and architecture/ownership findings "
+    "outrank test-gap asks; test-integrity outranks doc/duplication nits. "
+    "DO drop (not demote): 'consider adding/documenting X' polish on "
+    "secondary files, cross-platform observations about code this diff "
+    "does not change, and CI-lane attribution guesses — unless corroborated "
+    "or matching a protected class above. VERIFY the internal logic of "
+    "every kept claim (a degenerate-input or mathematical assertion that "
+    "is simply wrong — e.g. what an identity input implies — is an instant "
+    "drop, whatever lens agreement it has). When you rewrite a "
     "comment, its "
     "FIRST sentence must state the concrete change the diff makes (quote or "
     "paraphrase the hunk) — for repo-impact comments too, where the "

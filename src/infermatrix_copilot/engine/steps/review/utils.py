@@ -34,6 +34,7 @@ def _sweep_targets(diff: str, language: str = "python") -> str:
     branches: list[str] = []
     files: set[str] = set()
     test_files: set[str] = set()
+    regions: dict[str, list[int]] = {}
     for line in diff.splitlines():
         if line.startswith("+++ b/"):
             current = line[6:]
@@ -43,6 +44,8 @@ def _sweep_targets(diff: str, language: str = "python") -> str:
         elif line.startswith("@@"):
             m = re.search(r"\+(\d+)", line)
             new_line = int(m.group(1)) if m else 0
+            if current and m:
+                regions.setdefault(current, []).append(new_line)
         elif current and line.startswith("+") and not line.startswith("+++"):
             code = line[1:]
             stripped = code.strip()
@@ -68,9 +71,48 @@ def _sweep_targets(diff: str, language: str = "python") -> str:
         out.append("NON-TEST FILES TOUCHED — verification lens must name the "
                    "test/benchmark covering each changed path:")
         out += [f"- {f}" for f in non_test[:20]]
+    if regions:
+        # a windowed read starts at the file top; a hunk at line 3500 of a
+        # large file is otherwise never in view (measured: a ground-truth
+        # consumer bug sat exactly there). Hunk-start line numbers tell the
+        # lens where to page to.
+        out.append("DIFF HUNK LOCATIONS (file: new-file line numbers) — when "
+                   "you read one of these files, PAGE with `offset` until "
+                   "the listed lines are inside your window, and also read "
+                   "the surrounding in-file consumers of what changed; "
+                   "verifying a hunk you have not seen in situ is guesswork:")
+        out += [f"- {f}: lines {', '.join(str(n) for n in ns[:12])}"
+                for f, ns in sorted(regions.items())[:20]]
     out.append("TEST FILES TOUCHED IN THIS DIFF: "
                + (", ".join(sorted(test_files)) or "NONE"))
     return "\n".join(out)
+
+
+def _changed_symbols(diff: str) -> list[str]:
+    """Symbol names whose definition or value the diff touches — the seeds
+    for the consumer sweep. Deterministic and diff-only: function/class names
+    on ± def/class lines, plus enclosing-function names from hunk headers
+    (`@@ ... def f(...)`), deduped in first-seen order."""
+    import re
+
+    names: list[str] = []
+    seen: set[str] = set()
+
+    def add(name: str) -> None:
+        if name and name not in seen and not name.startswith("_" * 2):
+            seen.add(name)
+            names.append(name)
+
+    for line in diff.splitlines():
+        m = re.match(r"^[+-]\s*(?:async\s+)?def\s+(\w+)|^[+-]\s*class\s+(\w+)",
+                     line)
+        if m:
+            add(m.group(1) or m.group(2))
+            continue
+        m = re.match(r"^@@[^@]*@@.*?\bdef\s+(\w+)", line)
+        if m:
+            add(m.group(1))
+    return names
 
 
 _CATEGORY_RULES = (
@@ -134,7 +176,10 @@ def _review_summary_parts(output: dict) -> list[str]:
         )
     ][:8]
     counts: dict[str, int] = {}
-    for comment in comments:
+    # budget-cut overflow counts in the scan too — a capped finding was still
+    # found, and "no finding reported" over a category the lenses DID flag
+    # misrepresents the review's coverage
+    for comment in list(comments) + list(output.get("_review_overflow") or []):
         category = _category_of(comment)
         counts[category] = counts.get(category, 0) + 1
     scan = ["| Category | Result |", "|---|---|"]
@@ -189,5 +234,15 @@ def _render_review_md(output: dict, pr_state: str = "") -> str:
                      f"{c.get('comment', '')}{ev}")
     parts = _review_summary_parts(output)
     parts.append("\n\n".join(lines) if lines else output.get("summary", "No findings."))
+    overflow = output.get("_review_overflow") or []
+    if overflow:
+        # findings the comment budget cut — one line each, so a real (often
+        # minor) concern the reducer kept is visible instead of vanishing
+        parts.append("**Additional observations (beyond the comment budget):**\n"
+                     + "\n".join(
+                         f"- `{c.get('file', '?')}:{c.get('line', '?')}` "
+                         f"[{c.get('severity', 'minor')}] "
+                         f"{str(c.get('comment', '')).strip()[:220]}"
+                         for c in overflow))
     body = "\n\n".join(parts)
     return f"{body}\n\n**Verdict:** {_review_verdict(comments, pr_state)}"

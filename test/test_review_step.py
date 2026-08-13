@@ -100,6 +100,46 @@ def test_review_runtime_flow(settings, trace, tmp_path, git_repo):
     assert out_ev["status"] == "success" and out_ev["tool_calls"] == 1
 
 
+def test_review_checklist_resolves_from_adapter_knowledge(settings, trace,
+                                                          tmp_path, git_repo):
+    """`knowledge.review_checklist` in the adapter manifest injects the named
+    knowledge page (first 4k chars) into the reviewer guidance; a path that
+    escapes the knowledge root is ignored."""
+    kroot = tmp_path / "knowledge"
+    (kroot / "repos" / "repo_x").mkdir(parents=True)
+    (kroot / "repos" / "repo_x" / "checklist.md").write_text(
+        "REPO-X-CHECKLIST-MARKER: check the frobnicator")
+    settings.knowledge_dir = kroot
+    adir = settings.adapters_dir / "repo_x"
+    adir.mkdir(parents=True)
+    (adir / "manifest.yaml").write_text(
+        "name: repo_x\nstatus: active\n"
+        f"repo: {{path: {git_repo}}}\n"
+        "knowledge: {review_checklist: repos/repo_x/checklist.md}\n")
+    llm = ScriptedLLM([_contract_reply([])])
+    state = {"diff_text": "diff --git a/mod_a.py b/mod_a.py\n"
+                          "--- a/mod_a.py\n+++ b/mod_a.py\n+x = 1",
+             "task_spec": {"pr": 9, "repo": "repo-x"},
+             "repo_path": str(git_repo)}
+    result = asyncio.run(_registry().get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+    assert result.ok, result.summary
+    prompt = llm.calls[0]["messages"][0]["content"]
+    assert "REPO-X-CHECKLIST-MARKER" in prompt
+
+    # escape guard: a traversal path is ignored, not read
+    (adir / "manifest.yaml").write_text(
+        "name: repo_x\nstatus: active\n"
+        f"repo: {{path: {git_repo}}}\n"
+        "knowledge: {review_checklist: ../../../etc/passwd}\n")
+    llm2 = ScriptedLLM([_contract_reply([])])
+    state2 = dict(state, diff_text=state["diff_text"])
+    result2 = asyncio.run(_registry().get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state2, llm=llm2)))
+    assert result2.ok
+    assert "root:" not in llm2.calls[0]["messages"][0]["content"]
+
+
 def test_review_contract_repair_round(settings, trace, tmp_path, git_repo):
     """Prose final output triggers exactly one repair call that must yield JSON."""
     llm = ScriptedLLM([

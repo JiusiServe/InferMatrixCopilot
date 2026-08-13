@@ -231,7 +231,12 @@ def main() -> None:
         "pr_context_mode": _os.environ.get("PR_CONTEXT_MODE", "(default)"),
     }, indent=2))
     print(f"[copilot-arm] {len(items)} items -> {OUT}", flush=True)
-    with ThreadPoolExecutor(max_workers=2) as ex:
+    # ARM_JOBS: item-level concurrency. Historical default 2 predates knowing
+    # the endpoint's real limits (deepseek-v4-pro allows 500 concurrent
+    # requests; one item peaks at ~15 in-flight calls) — a full split can run
+    # wide. Item starts are already staggered; RUN_ROOT is private per item.
+    with ThreadPoolExecutor(
+            max_workers=int(_os.environ.get("ARM_JOBS", "2"))) as ex:
         futs = {ex.submit(one, *t): t for t in items}
         for f in as_completed(futs):
             try:
