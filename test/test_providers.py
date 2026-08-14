@@ -158,3 +158,36 @@ def test_run_harness_step_writes_bridge_spec_and_delegates(tmp_path, monkeypatch
     assert req.timeout_s == 42.0
     assert req.bridge_spec_path is not None and req.bridge_spec_path.is_file()
     assert req.bridge_spec_path.parent == tmp_path / "bridge"
+
+
+def test_run_harness_step_pins_explicit_provider_and_model(tmp_path, monkeypatch):
+    """The MoA harness-member path: provider_id/model select an explicit
+    transport and model, independent of the run's STRICT_BACKEND."""
+    from infermatrix_copilot.providers import registry as reg
+
+    transport = FakeTransport()
+    seen = {}
+
+    def fake_for_id(settings, provider_id):
+        seen["provider_id"] = provider_id
+        return transport
+
+    monkeypatch.setattr(reg, "transport_for_id", fake_for_id)
+    monkeypatch.setattr(
+        providers, "transport_for",
+        lambda s: (_ for _ in ()).throw(AssertionError(
+            "default transport must not be consulted when provider_id set")))
+    settings = _settings()  # api-backed run
+    ctx = SimpleNamespace(settings=settings,
+                          state={"task_spec": {"repo": "vllm-omni"}},
+                          run_dir=tmp_path, trace=None)
+    target = settings.tier_target("eco")
+
+    outcome = providers.run_harness_step(
+        ctx, target, step_name="agent.review_diff#lens1",
+        system="SYS", prompt="P", scope=read_only_scope(), max_iters=3,
+        provider_id="cursor", model="composer-2.5")
+
+    assert outcome.text == '{"status": "success"}'
+    assert seen["provider_id"] == "cursor"
+    assert transport.calls[0].model == "composer-2.5"

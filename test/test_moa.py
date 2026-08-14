@@ -155,3 +155,28 @@ def test_no_secret_material_in_trace_events(settings, trace, monkeypatch):
                  max_usd=1.5)
     dumped = json.dumps(list(trace.events("moa_dispatch")))
     assert "SECRET" not in dumped and "sk-" not in dumped
+
+
+# ---- harness members (provider registry) ------------------------------------
+
+def test_resolve_harness_member_skips_pricing_gate(settings):
+    settings.llm_mixture = {"members": [
+        {"model": "composer-2.5", "provider": "cursor"},
+        {"model": "deepseek-chat", "api_key": "sk-x"},
+    ]}
+    members = resolve_members(settings)
+    assert [(m.model, m.provider) for m in members] == [
+        ("composer-2.5", "cursor"), ("deepseek-chat", "")]
+    assert members[0].label() == "composer-2.5@cursor"
+    assert members[0].api_key == "" and members[0].base_url == ""
+
+
+def test_resolve_harness_member_rejects_unshipped_and_unknown(settings):
+    settings.llm_mixture = {"members": [
+        {"model": "opus", "provider": "claude-code"},   # M2 — unshipped
+        {"model": "x", "provider": "nonesuch"},          # unknown id
+        {"model": "composer-2.5", "provider": "cursor"},
+    ]}
+    members = resolve_members(settings)
+    assert [(m.model, m.provider) for m in members] == [
+        ("composer-2.5", "cursor")]

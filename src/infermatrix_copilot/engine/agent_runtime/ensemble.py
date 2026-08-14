@@ -92,6 +92,11 @@ async def run_agent_step_ensemble(
         if not moa_members:
             return {}
         m = moa_members[lens_i % len(moa_members)]
+        if m.provider:
+            # harness member: the vendor CLI owns this lens's tool loop (same
+            # bridge/audit path as a harness backend); no BudgetedLLM — there
+            # is no per-token spend to reserve, the session rides its timeout
+            return {"harness_member": m, "model_override": m.model}
         return {"llm_override": BudgetedLLM(
                     m, ctx.llm.for_member(m), moa_budget,
                     fallback=(fallback_llm, fallback_model)),

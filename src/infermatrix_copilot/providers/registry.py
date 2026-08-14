@@ -58,7 +58,17 @@ def transport_for(settings) -> HarnessTransport:
     """The harness transport for the selected provider. Raises ValueError for
     api (it has no harness transport) and NotImplementedError with the
     milestone for declared-but-unshipped harnesses."""
-    spec = resolve_provider(settings)
+    return transport_for_id(settings, resolve_provider(settings).id)
+
+
+def transport_for_id(settings, provider_id: str) -> HarnessTransport:
+    """The harness transport for an EXPLICIT provider id, independent of the
+    run's `STRICT_BACKEND` selection — the seam MoA harness members use to
+    ride a harness inside an api-backed run."""
+    spec = PROVIDERS.get(provider_id)
+    if spec is None:
+        raise ValueError(f"unknown provider {provider_id!r} — one of: "
+                         + ", ".join(sorted(PROVIDERS)))
     if spec.kind != "harness":
         raise ValueError("provider 'api' is not a harness — resolution stays "
                          "with Settings.tier_target/llm.LLM")

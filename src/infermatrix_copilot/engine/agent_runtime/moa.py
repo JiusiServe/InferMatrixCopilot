@@ -37,8 +37,11 @@ class Member:
     model: str
     base_url: str = ""
     api_key: str = ""      # resolved secret — NEVER rendered; see label()
+    provider: str = ""     # "" = raw API; else a harness provider id (cursor)
 
     def label(self) -> str:
+        if self.provider:
+            return f"{self.model}@{self.provider}"
         host = urlparse(self.base_url).netloc if self.base_url else "default"
         return f"{self.model}@{host}"
 
@@ -60,6 +63,25 @@ def resolve_members(settings: Any) -> list[Member]:
         if not isinstance(raw, dict) or not raw.get("model"):
             continue
         model = str(raw["model"])
+        provider = str(raw.get("provider") or "")
+        if provider:
+            # harness member (provider registry): rides a subscription CLI,
+            # so there is no per-token spend for the USD cap to govern —
+            # the cap covers API members only; sessions stay bounded by
+            # strict_backend_timeout_s. Reject unshipped/unknown ids here so
+            # a typo degrades to "member skipped", never a mid-run raise.
+            try:
+                from ...providers.registry import transport_for_id
+
+                transport_for_id(settings, provider)
+            except (ValueError, NotImplementedError) as exc:
+                log.warning("MoA member %s@%s rejected: %s",
+                            model, provider, exc)
+                continue
+            out.append(Member(model=model, provider=provider))
+            if len(out) >= int(getattr(settings, "moa_max_members", 4)):
+                break
+            continue
         # unpriced member -> cap unenforceable -> reject at parse (W6)
         if not has_override and not any(k in model.lower()
                                         for k, _ in MODEL_PRICES):
