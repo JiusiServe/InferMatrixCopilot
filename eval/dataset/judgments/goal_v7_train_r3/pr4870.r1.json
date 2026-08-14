@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.68,
+    "actionability": 0.92,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.7,
+    "precision": 0.38,
+    "actionability": 0.78,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X identifies the CI issue and several concrete, plausible payload-splitting risks, though its streaming-duplication claim conflicts with the documented probe and some assertions are speculative. Y covers more historical concerns but reports mostly low-value or invalid findings, including the contradictory claim that the narrowly qwen3-scoped condition affects all async_chunk=false models; neither candidate addresses multiple batch axes.",
+  "_usage": {
+    "input": 3,
+    "output": 1516
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v7_goal_r3"
+  },
+  "_roles": {
+    "arm": "copilot_v7_goal_r3",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v7_goal_r3",
+    "arm_a_sha256": "996136dfec9b584a4e7b56d8d68b24e52e6df38fbdbf55faac13d65a68d5c98a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "03d7423c3a91e45838083e2025e3dea932f1d9448ba923b1d6ca1a0373899ea1",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.78,
+    "precision": 0.62,
+    "actionability": 0.92,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.42,
+    "precision": 0.43,
+    "actionability": 0.72,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X covers the key blast-radius, cross-model evidence, performance-comparison, and regression-testing themes with concrete locations and remedies. Its precision is reduced by speculative or out-of-scope findings about ROCm, user overrides, and hardware CI. Y catches the global-default concern but misses the requested performance/accuracy evidence and offers several weak or misleading test nits.",
+  "_usage": {
+    "input": 3,
+    "output": 1760
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v7_goal_r4"
+  },
+  "_roles": {
+    "arm": "copilot_v7_goal_r4",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v7_goal_r4",
+    "arm_a_sha256": "32bcbc2c92dcd5ab54c99a5ee4ace722569f8e98fdd3111dbc2d7811be9476ba",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "97e45909dc2469db55da15b6e8d6a525549029c219aefca76123ec8b801fd1bf",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

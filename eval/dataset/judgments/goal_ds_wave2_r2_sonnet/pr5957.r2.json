@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.72,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.8,
+    "actionability": 0.78,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both miss the two most-repeated ground-truth threads (the WebSocket-vs-HTTP native-speed-control asymmetry and the request for profiler/VRAM/baseline validation evidence), so recall is low for both; X at least lands on the same file/line (indextts2_talker.py duration_factor check) that anchors three of the GT inline comments, though it draws a shallower conclusion (message wording) than GT's design/contract-mismatch points, giving it a marginal edge over Y which never touches that code path. Y's findings are more tightly evidence-quoted (verbatim code + exact line numbers for nearly every claim) and includes a genuinely sharp catch — that the PR's advertised fail-fast ValueError contract is actually swallowed by the connector's exception handling — which undercuts X's own praise of that same mechanism. X counters with more severe, well-reasoned correctness bugs (uninitialized mel_head.bias, concat-semantics bug under preemption) and ships concrete diff snippets for its top fixes, giving it a slight actionability edge. Overall the two are close in quality; X wins narrowly on breadth of severe findings and remediation concreteness.",
+  "_cost_usd": 0.39399270000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_ds_wave2_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_ds_wave2_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_ds_wave2_r2",
+    "arm_a_sha256": "10529fffec5896cfc836e5eba9cd3036ec543e30cf1b941a04422411c09019b3",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.8,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X engages far more deeply with the core ground-truth themes, especially the connector-output ownership/live-state issue (the second major reviewer concern), extending it with a specific counter-example citing three other call sites that drain the same connector state, plus a novel TP>1 collective-safety caveat in the same area. Y only explicitly hits the platform/NPU theme and the dependency-conflict theme (the latter a clean match X misses entirely), but never engages with the connector-ownership subtlety at all. Both candidates' findings are grounded and actionable with concrete file/line citations, but X's review is more thorough, better organized, and free of the leaked tool-narration text that clutters Y's output.",
+  "_cost_usd": 0.2880621,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "cursor_grok45"
+  },
+  "_roles": {
+    "arm": "cursor_grok45",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_grok45",
+    "arm_a_sha256": "f23a1f7edc54ea41da73a7cc65d05df2992461d60335adf212406513a280cbb5",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

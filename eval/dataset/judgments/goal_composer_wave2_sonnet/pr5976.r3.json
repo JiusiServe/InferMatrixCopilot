@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.5,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.65,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth is a rubber-stamp LGTM with four minor nits (two already resolved via 'move to utils'), which neither candidate hits directly, though X's nod to is_interleaved and Y's nod to PureDiffusionLauncherAdapter each loosely validate one already-fixed item. X's headline 'blocking' double-seed/engine-crash claim and its Qwen2.5-Omni breakage claim are unverifiable, unusually severe for a merged/approved PR guarded by a purpose-built four-case test suite, and read as overreach dressed as fact ('I reproduced it'). Y is more calibrated (Approve-with-follow-ups matches actual merge state) and both independently converge on the same real findings (dead async_tokens_to_discard writes, red non-CUDA CI gates, compile-cache isolation gaps), which corroborates those specific items and favors Y's more disciplined precision.",
+  "_cost_usd": 0.3197009,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "cursor_composer25"
+  },
+  "_roles": {
+    "arm": "cursor_composer25",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_composer25",
+    "arm_a_sha256": "417ad29df2eed31d034caf605e36b407c054d86f2c5e8dadaa62b0edb7bf806c",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4703d9c3f9a1a403af03ff17f62c2d816d9363ba7048d8dcee9a84a47834bc46",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

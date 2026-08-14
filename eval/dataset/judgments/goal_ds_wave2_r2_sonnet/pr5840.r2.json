@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.9,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently find the same core live issue (async_omni_engine hardcoding rel_l1_thresh=0.2, defeating the MiniMax-H3 0.17 model default) that matches the ground truth's most severe unresolved concern, with strong grounded evidence; the other three GT concerns (partition-specific enabler, offline example, packed_total bug) appear already fixed in this diff snapshot and neither candidate wrongly re-flags them. Y goes further with a rigorous quantitative analysis of the TeaCache coefficient polynomial (near-constant, non-monotone, computed floor) that substantively extends the GT's 'material quality loss' point, plus several additional well-grounded and actionable findings (memory retention, wasted RoPE compute, weak cache-hit test) and explicit correctness verification mirroring the human reviewer's own diligence. X's findings are also valid and grounded but comparatively more procedural (CI selection, doc wording) and less deep than Y's core technical insight.",
+  "_cost_usd": 0.448881,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v13_ds_wave2_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_ds_wave2_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_ds_wave2_r2",
+    "arm_a_sha256": "306dee20e29f24dbda086687a248cc00b4fe79898de435911fb82f5471b93f2e",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.55,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Ground truth centers on two locations: musa.inc.md:31 (do-not-change) and npu.inc.md's vllm-ascend branch pin (PTAL/LGTM). Y hits both directly and substantively — flagging the exact contradiction the new README note creates with musa.inc.md:31, and giving a well-evidenced critique of the releases/v0.26.0rc branch pin with cross-file verification (Dockerfiles, tags) and a concrete verification command. X only weakly gestures at the npu branch concern with a confused, self-contradictory comment (asks to confirm the branch, then claims it's 'verified as claimed') and never touches musa.inc.md at all. Y's other findings (cd/workdir anchor, config URL pinning, doc-site orphan feature) are all grounded with specific file:line evidence and concrete fixes, giving it much higher precision and actionability than X's thinner, partly out-of-scope findings.",
+  "_cost_usd": 0.15770330000000002,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v13_mimo_wave2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_mimo_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_mimo_wave2",
+    "arm_a_sha256": "5795f6e2f13badb930d4c8c4bfd7f77f280e57e3cf594377b685866e707d3244",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5866809cd7926f6bee88b473acf165652378865539411405c15a7c86c14e7466",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

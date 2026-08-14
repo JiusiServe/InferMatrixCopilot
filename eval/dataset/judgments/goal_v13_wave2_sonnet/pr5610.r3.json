@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X covers more ground-truth threads: it re-derives and extends the most substantive GT concern (connector-output live-state ownership, with specific alternate call-sites gpu_ar_model_runner.py:1104/1129/1920), verifies the prefix-cache and full-payload-branch fixes, and independently finds a real MkDocs-vs-GitHub path-resolution regression plus a TP>1 gap, all with concrete replacement text. Y misses the connector-ownership issue entirely and doesn't address SVG block-labeling, but does catch a genuine platform-compat gap (missing torch.cuda.Event alias on XPU/MUSA) that X's 'verified correct' claim glossed over, and it ties the dependency-conflict/mkdocs-build concern together well. Both are well-grounded with file/line evidence and low fabrication risk, but X's findings are more concrete/actionable ('replace with X') versus Y's more frequent 'please confirm' framing, giving X the edge on recall and actionability.",
+  "_cost_usd": 0.1972882,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_wave2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_wave2",
+    "arm_a_sha256": "2266c6a7b8adfdc368211ac36a6a88d34131c806d5edc2fb28d854a33ba0c673",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

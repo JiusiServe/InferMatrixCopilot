@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates correctly verified the doc-fixed claims (NPU sync, XPU/MUSA scope, full-payload-branch unreachability), but Y goes much deeper into the single most substantive ground-truth thread — the connector live-state ownership/snapshot claim — and shows the newly-added 'Live Runner State and Ownership' section still overstates the safety guarantee, citing concrete other call sites that drain connector output, which directly extends the original reviewer's concern rather than just confirming the fix. Y also independently surfaces a GitHub-rendering variant of the image-path issue, a plausible wrong blog host, and a TP>1 collective-call risk, all grounded with specific file:line citations, giving it far higher recall and comparable actionability. X's two findings (GitHub image URL, incomplete warning callout) are valid and concrete but comparatively shallow, missing the ownership/live-state and prefix-cache threads entirely.",
+  "_cost_usd": 0.41756440000000006,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "cursor_grok45",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "cursor_grok45",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_grok45",
+    "arm_a_sha256": "f23a1f7edc54ea41da73a7cc65d05df2992461d60335adf212406513a280cbb5",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

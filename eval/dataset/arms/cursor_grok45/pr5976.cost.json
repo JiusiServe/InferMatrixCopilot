@@ -1,0 +1,19 @@
+{
+  "arm": "cursor_cursorgrok4.5high",
+  "model_requested": "cursor-grok-4.5-high",
+  "head": "25b80bb995bdae8bbff8f332e4ebb53232415436",
+  "base": "06e733d3cd4400bb0029f8418e2207f1441a39c0",
+  "snapshot_sha256": "3ab56af68c00d7c83d8a00d2ed140e1e80497b21e484dfaed8a81d3d9cb15912",
+  "wall_s": 281.7,
+  "shell_commands": 13,
+  "file_reads": 21,
+  "cost_usd": null,
+  "audit_ok": false,
+  "audit_violations": [
+    "read outside worktree: /home/zhoutaichang/.claude/skills/imreview/SKILL.md",
+    "read outside worktree: /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/utils.py",
+    "read outside worktree: /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/utils.py"
+  ],
+  "artifact_chars": 5211,
+  "split": "holdout"
+}

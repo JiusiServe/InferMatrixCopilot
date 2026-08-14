@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.72,
+    "precision": 0.76,
+    "actionability": 0.96,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.43,
+    "precision": 0.94,
+    "actionability": 0.97,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X covers substantially more ground-truth concerns, including slot leakage, cumulative audio duplication, codec-version selection, NPU parity, invalid WER fallback, stale documentation, and missing provenance. Y is more disciplined and precise but misses several central reviewer findings. Both provide concrete locations and fixes; neither contains a LATENT GAP CHECK section.",
+  "_usage": {
+    "input": 3,
+    "output": 1006
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v11_deep_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v11_deep_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v11_deep_r2",
+    "arm_a_sha256": "cac961cade8c2d46c1b9768b0293e7312edff354f6d97ed0947e043a01bc4aae",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "18986f2736f812d8c896b12152ebcbf1d5319e9e1f79042f5fa16f1dd6272542",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 2
+  }
+}

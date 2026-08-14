@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.06,
+    "precision": 0.58,
+    "actionability": 0.91,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.18,
+    "precision": 0.72,
+    "actionability": 0.88,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both miss the unresolved profiling, VRAM, leak-check, and authoritative-baseline concern, as well as most inline concerns. Y at least examines the native-speed streaming and validation paths closely, while X largely raises unrelated or speculative issues. Y’s findings are generally better evidenced, though several are test-coverage or scope observations rather than demonstrated defects.",
+  "_usage": {
+    "input": 3,
+    "output": 1967
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_wave2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_wave2",
+    "arm_a_sha256": "1abf91997f1c41d82ffcf6abbef3a70713631606eac3eb542143b10d59b9082b",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.8,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.7,
+    "actionability": 0.75
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth is a near-empty review (LGTM plus a handful of already-resolved style nits about extracting helpers to utils and preferring explicit args over kwargs); neither candidate surfaces these specific points as open concerns, so recall is low and roughly tied for both. Both independently converge on the same substantive scheduler double-seed bug (num_stale_output_tokens seeded twice via omni_ar_scheduler.py and the mixin's _replace_streaming_session), lending it credibility. Beyond that, X's additional findings (Qwen2.5-Omni NamedTuple/forward-contract regression, dummy-input randomization still reachable via env var) are specific, well-reasoned, and actionable with concrete fix snippets, while Y's extra findings are lower-value nits and include a near-duplicate entry (async_tokens_to_discard dead-write flagged twice almost verbatim), diluting its precision and polish. X's structured Blocking/Should-fix/Minor writeup with code-level fixes is more directly actionable than Y's raw evidence-dump 'run report' format.",
+  "_cost_usd": 0.23808800000000002,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_mimo_wave2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_mimo_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_mimo_wave2",
+    "arm_a_sha256": "332aa7e09346908bf0246bdb2568741c284a2f9bc9041af234a909d6a87eab92",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4703d9c3f9a1a403af03ff17f62c2d816d9363ba7048d8dcee9a84a47834bc46",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

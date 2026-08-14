@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates independently found the live ground-truth blocker — the async engine hardcodes rel_l1_thresh=0.2, silencing the MiniMax-H3 model-specific 0.17 default — with equally rigorous code-path tracing and concrete fixes. X goes further: it explicitly verifies the partition/combined-pipeline gating (echoing GT concern #1) and independently surfaces that the E2E smoke test never asserts a real cache hit, nearly verbatim matching the human reviewer's own caveat ('does not assert that real denoising produces a cache hit'). X's extra findings (coefficient near-constancy/non-monotonicity, memory retention, eager RoPE, test staleness) show deeper investigative rigor mirroring the GT reviewer's own use of the PR's evaluation data. Y's supplementary findings (doc/help-text default mismatches, warning wording) are valid but more surface-level and less aligned with GT themes. Both are well-grounded and actionable with specific file/line fixes, but X's recall and depth edge out Y.",
+  "_cost_usd": 0.3172603,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_mimo_wave2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_mimo_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_mimo_wave2",
+    "arm_a_sha256": "3ecd233ed147f9a3508aee7b6d6e15773584cb230a572c0d82b63ae19e3a1373",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

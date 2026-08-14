@@ -1,0 +1,15 @@
+{
+  "arm": "cursor_composer2.5",
+  "model_requested": "composer-2.5",
+  "head": "19a6e513f28e42cd6c2dbda3c2adadfa68325f19",
+  "base": "1ff275346923cb5c9339bd38e0a594b9aaaa427b",
+  "snapshot_sha256": "66d2215178cbb937bf485c9e85471cf0a2538a81f91c29c1494b3cc50b75e6a2",
+  "wall_s": 251.0,
+  "shell_commands": 5,
+  "file_reads": 40,
+  "cost_usd": null,
+  "audit_ok": true,
+  "audit_violations": [],
+  "artifact_chars": 8434,
+  "split": "holdout"
+}

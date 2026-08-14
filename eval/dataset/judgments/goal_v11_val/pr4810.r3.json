@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.48,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.62,
+    "actionability": 0.94,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly identify the missed HunyuanImage3 diffusion caller. Y better covers the fake-test realism concern and offers concrete fixes, but its CI-wiring claim contradicts X's grounded pipeline evidence, and its mapper guard and collection-time claims are dubious. X is focused and actionable, but several secondary findings are speculative or invalid, especially scalar-shape handling.",
+  "_usage": {
+    "input": 3,
+    "output": 1862
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "copilot_v11_deep_val",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v11_deep_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v11_deep_val",
+    "arm_a_sha256": "69f9329829dcd9910c7259868d6439b7d5d3ceb6f2a233f21f6b8426d8d407b5",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "62ede4acd697d051f739a163828672d894ec4150b7b17c941bb4b33f4b81409e",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 3
+  }
+}

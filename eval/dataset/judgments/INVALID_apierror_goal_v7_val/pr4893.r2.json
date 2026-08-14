@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.45,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "X produced no review findings. Y directly captures the sole ground-truth concern in comment 6 and proposes a concrete test improvement, but many additional findings are speculative, tangential, or questionable, reducing precision.",
+  "_usage": {
+    "input": 3,
+    "output": 633
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "copilot_v7_goal_r7",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v7_goal_r7",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v7_goal_r7",
+    "arm_a_sha256": "b5e7421e8e6d038a71cc8542645e97500c5a4350ae10dbbe4b3677dc3a4885c9",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0d4ddd4027e23f1f32216e748289588ea9a0e74ee8e599fa34b9d50f503d2f0d",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 2
+  }
+}

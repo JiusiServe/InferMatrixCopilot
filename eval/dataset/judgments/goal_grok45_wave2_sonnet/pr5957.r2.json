@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.45,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.7,
+    "actionability": 0.8
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Neither candidate hits the specific ground-truth items (WebSocket speed-rejection asymmetry, S2Mel/talker duration_factor bound mismatch, duplicated range constants, missing profiler/VRAM evidence) — likely because they reviewed a later commit where several were already fixed, so recall is low and roughly tied. Y's two core findings (BigVGAN local-bundle fail-fast, scalar duration_factor silently ignored) are narrower but explicitly reproduced/tested, giving higher confidence they're real and grounded; X's much larger set of deep-internals claims (uninitialized bias, CONCAT semantics, prefix-caching interaction, renderer override) is plausible and well-formatted but unverified by any reproduction, so precision risk is higher despite one solidly-grounded scope observation about the bundled XPU/vLLM version changes.",
+  "_cost_usd": 0.4419934,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "cursor_grok45"
+  },
+  "_roles": {
+    "arm": "cursor_grok45",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_grok45",
+    "arm_a_sha256": "2e91674a83079f747fb00b6ada2e837c89202ddb22c705cbebf6d793aaf09f17",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

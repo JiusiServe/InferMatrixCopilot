@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.67,
+    "precision": 0.78,
+    "actionability": 0.94,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.44,
+    "precision": 0.52,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X covers substantially more ground-truth concerns, including live connector ownership, platform behavior, image resolution, full-payload reachability, and prefix-cache compatibility. Its findings are highly concrete, though the TP caveat and some nits are speculative. Y catches the dependency/build issue and platform nuance, but misses several central concerns and includes stale or weak findings about verification.",
+  "_usage": {
+    "input": 3,
+    "output": 1498
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_wave2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_wave2",
+    "arm_a_sha256": "2266c6a7b8adfdc368211ac36a6a88d34131c806d5edc2fb28d854a33ba0c673",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 3
+  }
+}

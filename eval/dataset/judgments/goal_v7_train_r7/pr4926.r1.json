@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.62,
+    "precision": 0.68,
+    "actionability": 0.94,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.66,
+    "actionability": 0.82,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X covers more ground-truth concerns, especially kernel version semantics, fallback behavior, hardware gating, and missing masked/piecewise tests, with highly concrete fixes. Both include speculative extras; Y additionally makes an incorrect GQA claim and falsely says Q=K=V produces uniform attention weights.",
+  "_usage": {
+    "input": 3,
+    "output": 2201
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v7_goal_r7"
+  },
+  "_roles": {
+    "arm": "copilot_v7_goal_r7",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v7_goal_r7",
+    "arm_a_sha256": "aee691660334f5b96983f818be71d4e22b5af164eea072317c7e50a613d7b41b",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0639263265995e00edcd06c6242ac0a6a3647a980509c282af885c86ce6930e0",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

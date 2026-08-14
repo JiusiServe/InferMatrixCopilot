@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.82,
+    "precision": 0.72,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.64,
+    "precision": 0.8,
+    "actionability": 0.86,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "X covers more human concerns, including CI, flag robustness, model scoping, and authoritative split length, with concrete locations and fixes. Its precision is reduced by speculative streaming claims contradicted by the successful stream=True probe. Y is more precise but misses CI and several model-specific concerns; neither identifies the dual-batch-axis gap.",
+  "_usage": {
+    "input": 3,
+    "output": 1478
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v7_goal_r4"
+  },
+  "_roles": {
+    "arm": "copilot_v7_goal_r4",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v7_goal_r4",
+    "arm_a_sha256": "681a3415ea854b7d8d3e4ffe3fb94c03e9fb1567baa56d909d548650eb510071",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "03d7423c3a91e45838083e2025e3dea932f1d9448ba923b1d6ca1a0373899ea1",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

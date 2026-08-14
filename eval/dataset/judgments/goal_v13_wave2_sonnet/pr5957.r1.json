@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.78,
+    "actionability": 0.82
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.75,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Neither candidate surfaced the ground truth's actual core concerns (missing profiler/VRAM/native-baseline evidence, the HTTP-vs-WebSocket native-speed validation asymmetry, or the S2Mel-decoder-vs-talker duration_factor bound mismatch/shared-constant ask), so recall is low for both. X's findings are well-evidenced but concentrate on CI/test-marker/version-bump nitpicks tangential to the PR's real risk surface; Y digs into cross-file correctness and consistency bugs (uninitialized mel_head.bias, payload concat semantics, prefix-caching failure mode, cross-model regression risk) that are closer in depth and spirit to the actual reviewers' concerns, giving it a slight edge in usefulness despite comparable grounding and actionability on both sides.",
+  "_cost_usd": 0.378469,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v13_wave2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_wave2",
+    "arm_a_sha256": "1abf91997f1c41d82ffcf6abbef3a70713631606eac3eb542143b10d59b9082b",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

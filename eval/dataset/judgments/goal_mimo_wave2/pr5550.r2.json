@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.08,
+    "precision": 0.86,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.27,
+    "precision": 0.76,
+    "actionability": 0.93,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y covers the duplicated validation concern, DTO-local invariants, and cleanup behavior, while X mostly reports minor documentation and test gaps absent from the ground truth. Y also provides concrete locations and fixes, though several findings are speculative or stylistic and it misses most core concerns around native initialization, trusted layout binding, geometry, null blocks, and rank-wide validation.",
+  "_usage": {
+    "input": 3,
+    "output": 1430
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "copilot_v13_mimo_wave2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_mimo_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_mimo_wave2",
+    "arm_a_sha256": "fc0b4d673aa092c5753cbf289097015c37d026e9427022b0a3f7aa0d35d8b7a0",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b6ae3b48c6859b0d16784163ab2044d7d85e3b3b32f4e60b559fa2a55186c64b",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 2
+  }
+}

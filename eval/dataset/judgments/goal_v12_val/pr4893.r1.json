@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.35,
+    "actionability": 0.82,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.42,
+    "actionability": 0.91,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y directly identifies the ground-truth weakness: the reduce_scatter/device-communicator assertions only test values injected by the fake, and recommends asserting the initialization argument. Both reviews contain several speculative or tangential findings, but Y achieves full recall with more concrete guidance.",
+  "_usage": {
+    "input": 3,
+    "output": 784
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "copilot_v12_hybrid_val",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v12_hybrid_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v12_hybrid_val",
+    "arm_a_sha256": "ebbe2ae4f7adc485056c17a1cabee9159c60b32445f7348576e6d60c334d1d87",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0d4ddd4027e23f1f32216e748289588ea9a0e74ee8e599fa34b9d50f503d2f0d",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.88,
+    "actionability": 0.96,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.72,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates fully cover the sole ground-truth concern and correctly explain why singleton normalization must apply to both submission paths. X provides stronger, concrete compatibility analysis, while Y adds several speculative or low-value findings, including unverified blast-radius concerns and redundant defensive checks. Both are actionable, but X is more precise and technically useful.",
+  "_usage": {
+    "input": 3,
+    "output": 455
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v12_hybrid_val"
+  },
+  "_roles": {
+    "arm": "copilot_v12_hybrid_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v12_hybrid_val",
+    "arm_a_sha256": "e911111793fc1c95e16fa182b6b722e0b006359e31d61f6164da9b559a3d6f9a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "bc98460632105aef812a50d392afd9f1bea66b3f783e8a9cd888456ce013cba3",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

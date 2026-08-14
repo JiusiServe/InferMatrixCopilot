@@ -1,0 +1,42 @@
+{
+  "calls": 38,
+  "input_tokens": 2307568,
+  "output_tokens": 22494,
+  "cost_usd": 2.4085164999999997,
+  "is_error": false,
+  "terminal_reason": "completed",
+  "split": "holdout",
+  "head": "20ca4b93de6e61b42544f2b4ba1101711e467986",
+  "base": "c4a14091c9b8fd61f4da46022f683adc1dc91550",
+  "resolved_model": "claude-opus-5",
+  "snapshot_sha256": "164875457cfa48b5dbdf9910ab1823eb23590cb709fe0dcf988c6e837f562a27",
+  "validation_commands": [
+    "git diff --stat c4a14091c9b8fd61f4da46022f683adc1dc91550 HEAD",
+    "git diff c4a14091c9b8fd61f4da46022f683adc1dc91550 HEAD -- vllm_omni/",
+    "ls vllm_omni/diffusion/executor/ vllm_omni/diffusion/diffusion_kv/ vllm_omni/diffusion/sched/",
+    "grep -rn \"diffusion_kv_mode\" --include=*.py vllm_omni/ | head -50",
+    "grep -n \"def close\\|def shutdown\" vllm_omni/diffusion/sched/base_scheduler.py vllm_omni/diffusion/sched/request_scheduler.py vllm_omni/diffusion/sched/step_scheduler.py vllm_omni/diffusion/executor/abstract.py vllm_omni/diffusion/executor/multiproc_executor.py",
+    "git diff c4a14091c9b8fd61f4da46022f683adc1dc91550 HEAD -- tests/diffusion/test_diffusion_engine_cleanup.py tests/diffusion/test_diffusion_model_runner.py",
+    "grep -rn \"def execute_model\" vllm_omni/ --include=\"*.py\" | head -30; echo ---; ls vllm_omni/diffusion/worker/",
+    "grep -n \"class .*ModelRunner\" vllm_omni/experimental/ar_diffusion/runner.py; grep -rn \"diffusion_model_runner_cls\\|default_diffusion_model_runner_cls\" vllm_omni/ --include=\"*.py\" | head -20",
+    "grep -rn \"get_diffusion_model_runner_cls\" vllm_omni/platforms/*.py vllm_omni/platforms/**/*.py 2>/dev/null | head; echo ---; grep -rn \"class .*(DiffusionModelRunner)\" vllm_omni/ --include=\"*.py\"",
+    "grep -n \"execute_fn\\|execute_request\\|execute_batch\\|def step\" vllm_omni/diffusion/diffusion_engine.py | head -40",
+    "sed -n 1,60p vllm_omni/diffusion/executor/multiproc_executor.py",
+    "grep -n \"^from\\|^import\" vllm_omni/diffusion/sched/request_scheduler.py | head -20",
+    "timeout 900 python -m pytest tests/diffusion/diffusion_kv/test_metadata.py tests/diffusion/diffusion_kv/test_worker_contract.py -q 2>&1 | tail -20",
+    "grep -n \"SchedulerRequestState(\" -A6 vllm_omni/diffusion/sched/*.py | head -40",
+    "grep -n \"from typing import\" vllm_omni/diffusion/worker/diffusion_worker.py; timeout 300 python -c \"\nimport vllm_omni.diffusion.worker.diffusion_worker as w\nimport inspect\nprint(inspect.signature(w.DiffusionWorker.execute_model))\nprint(inspect.signature(w.WorkerWrapperBase.execute_model))\n\" 2>&1 | t",
+    "grep -n \"diffusion_kv_metadata\" vllm_omni/diffusion/worker/diffusion_worker.py vllm_omni/diffusion/executor/multiproc_executor.py vllm_omni/diffusion/worker/diffusion_model_runner.py"
+  ],
+  "ran_validation": true,
+  "claude_md_seen": {
+    "/data/zhoutaichang/CLAUDE.md": "4ff5b2a69ed0abc2"
+  },
+  "recorded_at": "2026-08-13T18:00:07",
+  "arm": "baseline_opus5",
+  "wall_s": 387.7,
+  "audit_ok": true,
+  "audit_violations": [],
+  "audit_blocked_attempts": [],
+  "artifact_chars": 11331
+}

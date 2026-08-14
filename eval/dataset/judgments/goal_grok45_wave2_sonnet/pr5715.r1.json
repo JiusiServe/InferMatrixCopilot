@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.9,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.7,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "The visible diff omits musa.inc.md/quickstart.md and the ground truth shows reviewers explicitly wanted those untouched and flagged the npu.inc.md vllm-ascend RC pin for a second look (PTAL/LGTM) — Y independently verifies musa/quickstart are byte-identical to merge-base (matching 'do not change this') and flags the exact npu.inc.md RC-branch line as the one thing needing confirmation, directly echoing the real reviewer concerns; X treats that same NPU line as 'checked and clean' and never mentions musa/quickstart at all. Both candidates' findings are well-grounded in the actual tree (X's one nit is valid; Y's seven comments cite specific files/lines and mostly hold up), but Y is far more actionable with concrete suggested edits per finding. Neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.24451089999999998,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "cursor_grok45",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "cursor_grok45",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_grok45",
+    "arm_a_sha256": "972d7569cefc44c036e409433557e72c2ba66750f0c7b17de0481700eab828dd",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5866809cd7926f6bee88b473acf165652378865539411405c15a7c86c14e7466",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

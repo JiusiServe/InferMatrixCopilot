@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.62,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.48,
+    "actionability": 0.86,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both partially cover the device-abstraction concern but miss—and effectively contradict—the request to reduce redundant modeling unit tests. X is more technically useful because it catches the fork_rng device-type hazard and gives concrete fixes, while Y incorrectly validates that behavior; X still loses precision through speculative, pre-existing, and out-of-scope findings.",
+  "_usage": {
+    "input": 3,
+    "output": 1291
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_mimo_wave2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_mimo_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_mimo_wave2",
+    "arm_a_sha256": "2023a802a7cf281d9de01111133afdbc728c4bc4c5774a3fbfc911c4a6e50d1e",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "47c759a926d11580522c19149ea99a2b5e0137b0d44702c431e26d95d6161018",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

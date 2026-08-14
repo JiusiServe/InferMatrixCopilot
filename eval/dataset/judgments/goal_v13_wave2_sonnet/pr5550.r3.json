@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.9,
+    "actionability": 0.85
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Much of the ground-truth thread concerns code (stage_kv/interface.py: digest binding, null-block, tensor geometry) that appears to belong to an earlier/renamed revision not present in this diff, so neither candidate could plausibly find those. Of the concerns that are still applicable, X uniquely and closely matches asukaqaq-s's explicit ask for 'local construction-time invariants (non-empty IDs, positive generation, unique branch IDs)' via its DTO-invariant finding, and also echoes the cross-layer validation-duplication concern; Y's closest match (asymmetric identity validation across request/batch/step) is a weaker, inverted analog of the GT concern. Both independently and correctly catch the same real AR-diffusion-runner kwarg bug with solid evidence, keeping precision high for both, and both are concretely actionable with file/line pointers — X edges ahead by supplying ready-to-use fix code in more findings and covering more ground overall.",
+  "_cost_usd": 0.410526,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_wave2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_wave2",
+    "arm_a_sha256": "6dbf656049e08d7bf68f3e4049b47aaf36f48a76dd55f10c222b9ff0f5c75fb8",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b6ae3b48c6859b0d16784163ab2044d7d85e3b3b32f4e60b559fa2a55186c64b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

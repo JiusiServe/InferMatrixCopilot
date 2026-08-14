@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.78,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth is a near-rubber-stamp approval whose only substantive threads (a scope question on patch.py, a kwargs-vs-explicit design nit on parallel_state.py, two 'move to utils' asks) were already resolved in the tree both candidates reviewed, so neither surfaces them and recall is low for both. Both independently converge on the same two real bugs (double-seeded num_stale_output_tokens on the replace-streaming path, and qwen2.5-omni's forward() still returning an OmniOutput tuple that will crash profile_run) with concrete file:line evidence, which is strong cross-validated grounding and keeps precision comparable and high for both. X edges ahead on actionability: it gives a clear blocking/should-fix/minor triage, concrete patch-level fix suggestions, and reports actually running the new tests (105 passed) as empirical verification, whereas Y's tool-report format is thorough and well-cited but reads more as raw findings than a prioritized, ready-to-act review.",
+  "_cost_usd": 0.3031187,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_ds_wave2_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_ds_wave2_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_ds_wave2_r2",
+    "arm_a_sha256": "2f0871e14db005f97ebadf65052e26645353c40143a040c04cbbf1f5ae1cbfa2",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4703d9c3f9a1a403af03ff17f62c2d816d9363ba7048d8dcee9a84a47834bc46",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

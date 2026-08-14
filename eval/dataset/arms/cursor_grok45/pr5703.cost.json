@@ -1,0 +1,19 @@
+{
+  "arm": "cursor_cursorgrok4.5high",
+  "model_requested": "cursor-grok-4.5-high",
+  "head": "1c6ee28f627cef5e2659b3671fb3451e718562f6",
+  "base": "ae7bee0c43c780a8e21d0b5e4b92a7eaeaea8783",
+  "snapshot_sha256": "6959d8d9cb9a0f35dcd94367f9717276b8fe358f3147b030589ab34459a7564e",
+  "wall_s": 224.6,
+  "shell_commands": 9,
+  "file_reads": 9,
+  "cost_usd": null,
+  "audit_ok": false,
+  "audit_violations": [
+    "read outside worktree: /home/zhoutaichang/.claude/skills/imreview/SKILL.md",
+    "read outside worktree: /data/zhoutaichang/.cache/uv/archive-v0/b1YBuFePm-5r6QpFFv7bF/lib/python3.12/site-packages/infermatrix_copilot/knowledge/repos/vllm-omni/components/serving/rule",
+    "read outside worktree: /home/zhoutaichang/.cursor/projects/data-zhoutaichang-infermatrix-copilot-worktrees-vllm-omni-pr5703/terminals/191251.txt"
+  ],
+  "artifact_chars": 5399,
+  "split": "holdout"
+}

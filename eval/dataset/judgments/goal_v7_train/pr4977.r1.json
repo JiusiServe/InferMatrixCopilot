@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.2,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.65,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y explicitly identifies the older-kernels incompatibility with trust_remote_code, fully covering the sole ground-truth concern. X only notes that the argument was removed and the PR description is stale, without clearly connecting it to the compatibility regression; X also contains contradictory and largely peripheral test/CI findings, while Y's additional findings are generally better grounded and concrete.",
+  "_usage": {
+    "input": 3,
+    "output": 660
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "copilot_v7_goal_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v7_goal_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v7_goal_r1",
+    "arm_a_sha256": "d888c174c0def689a1c6ae1a310496e2c29b4629cbed70f24ef1d6c20ecf821c",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "589a8ff13cb3893b76dd0d5220ad632d82f46cc0edd9083528ebb2466be7c8a7",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

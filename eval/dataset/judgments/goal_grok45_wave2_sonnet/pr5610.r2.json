@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates correctly recognize the diff already incorporates fixes for most ground-truth concerns and verify them against live code with specific file:line citations, landing on an accurate 'approve' verdict. X recalls more of the substantive concerns (NPU/XPU/MUSA scope, connector-output ownership with a deeper follow-on critique, full-payload unreachability, prefix-cache note) and surfaces well-grounded novel findings (GitHub-vs-MkDocs relative path breakage, TP>1 connector collective, blog URL mismatch) with precise, actionable fixes. Y is accurate but thinner — it explicitly covers the docs-build dependency-conflict point that X misses, but omits the connector-ownership and prefix-cache concerns entirely and offers only two comments overall, giving it materially lower recall and actionability.",
+  "_cost_usd": 0.3163721,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "cursor_grok45"
+  },
+  "_roles": {
+    "arm": "cursor_grok45",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_grok45",
+    "arm_a_sha256": "f23a1f7edc54ea41da73a7cc65d05df2992461d60335adf212406513a280cbb5",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

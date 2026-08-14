@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.55,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.8,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth's core threads are the benchmark-harness redundancy, missing profiler/VRAM evidence, and the native-speed validation layering (talker vs adapter vs S2Mel vs WebSocket) — Y's validated checklist explicitly walks the same speed/duration_factor validation paths and confirms the adapter-level 0.5-2.0 enforcement and streaming fix, showing real overlap with what reviewers cared about, while X never touches streaming, WebSocket, or benchmarking at all. X's findings (uninitialized mel_head.bias, payload concat-accumulation bug, prefix-cache error message) are deeply specific and highly actionable with code snippets, but they are largely hypothetical 'what if' scenarios unconfirmed by any human comment, pulling precision down. Y's findings (missing pytestmark causing CI test-selector skip, tautological isinstance assertion, red AMD CI gate) are concrete, verifiable, and grounded directly in the diff/config, giving it higher precision despite being lower-drama than X's.",
+  "_cost_usd": 0.3435383,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_mimo_wave2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_mimo_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_mimo_wave2",
+    "arm_a_sha256": "e80f980ecc3f3ec97591b635a032c17715bc4075672176da84691fc5319dc47c",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

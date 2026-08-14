@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 1.0,
+    "actionability": 0.1,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.8,
+    "precision": 0.6,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y covers most ground-truth areas, including platform behavior, connector ownership, asset paths, full-payload reachability, and prefix-cache compatibility, with concrete file and line references. Its precision is reduced by speculative or low-value findings about the blog URL, TP validation, YAML omission, and formatting, while X raises no actionable concerns and misses most reviewer issues.",
+  "_usage": {
+    "input": 3,
+    "output": 1391
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "copilot_v13_mimo_wave2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_mimo_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_mimo_wave2",
+    "arm_a_sha256": "2bbccdbdc3f276ef9f8c46e710a8b638c6991adb95f9e3125ee2d6ba34fbd8ce",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

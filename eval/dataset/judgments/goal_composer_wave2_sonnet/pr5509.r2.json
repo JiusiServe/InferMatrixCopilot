@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.82,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently surface the two substantive ground-truth threads: the resolved sage-kwargs/older-FlashInfer compatibility fix (credited as a strength) and the unresolved FLASHINFER_ATTN quant silent-no-op (bobboli/xrq-phys thread), with concrete file:line fixes for each. X goes further with additional diff-grounded, verifiable defects (dtype_vo-only silent no-op reproduced with actual code output, large unrelated doc deletions enumerated, ring-SP guard gap with a drop-in patch) and shows live verification (test run output, REPL checks), though a few claims (FlashInfer internal prefill.py line citations for output-dtype behavior) go beyond the diff and are unverifiable here, slightly denting precision. Y covers the same core ground with clean writing and a useful test-coverage table but is shallower and includes at least one unverifiable claim of its own (a specific dangling doc line). Both are highly actionable with concrete file/line targets and suggested code.",
+  "_cost_usd": 0.2694301,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "cursor_composer25"
+  },
+  "_roles": {
+    "arm": "cursor_composer25",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_composer25",
+    "arm_a_sha256": "4741bc54274bd351ff6c98f1e2cfe4e9c04a51271505efaee1b29095cdddf523",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "703e9ad7d9901fc59d5ad8d20917e36993f445b09d3ecaaba356dbe9c900f660",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

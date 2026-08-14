@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.74,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.25,
+    "precision": 0.57,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X addresses the benchmark provenance and resolved is_interleaved move while providing several concrete, well-supported defects. Y covers the all2all compatibility rationale, but its broad model-registration claim appears incorrect and several findings are speculative test-gap questions rather than demonstrated defects. Neither covers the launcher-adapter move or includes a LATENT GAP CHECK section.",
+  "_usage": {
+    "input": 3,
+    "output": 1644
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_wave2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_wave2",
+    "arm_a_sha256": "10c2602a19281706645f1b6391ffdc87bc7bc4ee82e7440083fc87f2c76dd9b6",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4703d9c3f9a1a403af03ff17f62c2d816d9363ba7048d8dcee9a84a47834bc46",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

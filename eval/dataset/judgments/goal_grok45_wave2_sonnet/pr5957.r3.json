@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.65,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.8
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Neither candidate surfaces the ground truth's actual emphasized concerns (WebSocket native-speed rejection asymmetry, missing profiler/VRAM evidence, the talker-vs-s2mel_decoder duration_factor range mismatch, or the 4-file range duplication) — both instead find their own orthogonal issues in unseen parts of the diff, so recall is low for both. Y is more tightly grounded: its two findings quote exact code with line-range headers and are explicitly confirmed by running local tests/reproducing the bug, and one finding (talker.py 561-569 duration_factor silently ignored as a bare scalar) sits in the exact code region GT's reviewers flagged, showing closer thematic engagement even though it's a different specific bug. X offers broader, well-reasoned coverage (7 substantive findings plus scope/minor notes) and correctly calls out the visible XPU/Docker version-bump scope creep, but its claims about talker.py/2.0-regression behavior are less independently verified and slightly more speculative. Both are concretely actionable with file:line references and suggested fixes.",
+  "_cost_usd": 0.3954491,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "cursor_grok45"
+  },
+  "_roles": {
+    "arm": "cursor_grok45",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_grok45",
+    "arm_a_sha256": "2e91674a83079f747fb00b6ada2e837c89202ddb22c705cbebf6d793aaf09f17",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

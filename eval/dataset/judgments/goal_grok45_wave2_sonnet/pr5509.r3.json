@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.92,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.8,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently reproduce the one live ground-truth concern (FLASHINFER_ATTN silently ignoring `quant`) with executed code snippets, and both correctly note the sage_kwargs issue is already fixed in this diff. X is tighter and every finding is verifiable directly from the shown diff (dtype_vo no-op, doc/validation mismatch, unrelated doc deletions), giving it higher precision. Y is more thorough and more actionable (concrete patches, new test suggestions, honestly hedges the speculative sequence-boundary claim as a question rather than a bug), but several findings (ring-SP interaction, FlashInfer's internal output-dtype behavior) rely on files outside the provided diff and can't be verified here, slightly lowering confidence in precision.",
+  "_cost_usd": 0.41855420000000004,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "cursor_grok45",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "cursor_grok45",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_grok45",
+    "arm_a_sha256": "7979d5791377b1ba49851be431002532d708eef520f21a364aef2619f824508e",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "703e9ad7d9901fc59d5ad8d20917e36993f445b09d3ecaaba356dbe9c900f660",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.8,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Ground truth's real substance is the npu.inc.md RC-branch pin (flagged for extra review) and an implied musa.inc.md/quickstart.md 'do not touch' constraint; Y hits both — it gives the RC-branch issue rigorous, cross-referenced treatment and independently surfaces the exact musa.inc.md contradiction the human reviewer was protecting, while X only lightly touches the RC-branch point and misses the musa/quickstart thread entirely. Y's comments are also far more actionable, each with concrete suggested text or verification commands, versus X's shorter, more hedged notes.",
+  "_cost_usd": 0.30551449999999997,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v13_ds_wave2_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_ds_wave2_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_ds_wave2_r2",
+    "arm_a_sha256": "7c62fa19f05fd4a905614dd740d7d1f7a136a788c27f29571f5d67e8187fa264",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5866809cd7926f6bee88b473acf165652378865539411405c15a7c86c14e7466",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.68,
+    "actionability": 0.92,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.72,
+    "actionability": 0.84,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both recognize that trust_remote_code would break older kernels versions, but X states the exact failure mode most directly. X also provides concrete cache and test findings, though several follow-ups are speculative or low-impact; Y is somewhat more precise but its CI and docstring comments are less relevant.",
+  "_usage": {
+    "input": 3,
+    "output": 1335
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v11_deep_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v11_deep_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v11_deep_r2",
+    "arm_a_sha256": "248b4cf7a323c6d94ee49967767dfd38121ef135f303ce9b0a47d06eb287c6ff",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "589a8ff13cb3893b76dd0d5220ad632d82f46cc0edd9083528ebb2466be7c8a7",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 2
+  }
+}

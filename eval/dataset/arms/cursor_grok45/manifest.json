@@ -1,0 +1,13 @@
+{
+  "arm": "cursor_grok45",
+  "model_requested": "cursor-grok-4.5-high",
+  "harness": "cursor-agent --print --trust --force stream-json",
+  "leakage_control": "DETECTIVE, not preventive: gh auth stripped (empty GH_CONFIG_DIR, tokens removed) and every shell command/read audited post-run; items with violations are failed. cursor-agent has no tool allowlist, so prevention equivalent to the claude baseline is not available.",
+  "pr_context": "frozen snapshot (no_discussion), byte-identical to the other arms",
+  "dataset": "vllm_omni_dataset.yaml",
+  "splits": [
+    "holdout"
+  ],
+  "n_items": 1,
+  "concurrency": 3
+}

@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.64,
+    "precision": 0.78,
+    "actionability": 0.96,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.31,
+    "precision": 0.62,
+    "actionability": 0.82,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X covers the key slot-lifecycle, legacy-codec selection, invalid PCM fallback, stale documentation, and vendoring-provenance concerns with concrete fixes, though it misses the cumulative-audio and encode-length bugs and adds some speculative findings. Y captures codec selection and documentation issues but incorrectly validates slot cleanup, misses more core ground-truth concerns, and raises at least two weak or contradictory major findings.",
+  "_usage": {
+    "input": 3,
+    "output": 1041
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v7_goal_r4"
+  },
+  "_roles": {
+    "arm": "copilot_v7_goal_r4",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v7_goal_r4",
+    "arm_a_sha256": "c02f4904a427dd055b20c7b51723ce8fc19f4fbe184655efc580d595c7bef917",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "18986f2736f812d8c896b12152ebcbf1d5319e9e1f79042f5fa16f1dd6272542",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 2
+  }
+}

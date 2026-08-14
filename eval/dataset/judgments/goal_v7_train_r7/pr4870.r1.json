@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.7,
+    "precision": 0.52,
+    "actionability": 0.92,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.78,
+    "precision": 0.88,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y accurately recognizes the scoped Qwen3 gate, resolved seq_len cleanup, config-default concern, and useful test gaps with few unsupported claims. X is highly actionable but overstates serving risks contradicted by the documented streaming probe and includes several speculative or out-of-scope findings. Neither candidate identifies the latent multi-batch-axis splitting gap.",
+  "_usage": {
+    "input": 3,
+    "output": 1015
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v7_goal_r7"
+  },
+  "_roles": {
+    "arm": "copilot_v7_goal_r7",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v7_goal_r7",
+    "arm_a_sha256": "a1771c55baf039af0eec089dd5e05d844961bd213f916138638c10e76f3ba7df",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "03d7423c3a91e45838083e2025e3dea932f1d9448ba923b1d6ca1a0373899ea1",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

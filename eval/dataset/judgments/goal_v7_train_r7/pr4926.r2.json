@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.68,
+    "actionability": 0.92,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.25,
+    "precision": 0.55,
+    "actionability": 0.78,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X covers the kernel-version/fallback concerns thoroughly and gives concrete locations and fixes, though several additional findings are speculative or exceed the shown diff. Y catches the varlen-function risk and dependency-version mismatch, but misses more ground-truth concerns and includes incorrect claims such as Q=K=V producing uniform attention and GQA requiring an explicit configuration parameter.",
+  "_usage": {
+    "input": 3,
+    "output": 1056
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v7_goal_r7"
+  },
+  "_roles": {
+    "arm": "copilot_v7_goal_r7",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v7_goal_r7",
+    "arm_a_sha256": "aee691660334f5b96983f818be71d4e22b5af164eea072317c7e50a613d7b41b",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0639263265995e00edcd06c6242ac0a6a3647a980509c282af885c86ce6930e0",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 2
+  }
+}

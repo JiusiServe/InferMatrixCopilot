@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.62,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.88,
+    "precision": 0.7,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y directly captures the key performance-comparison and global-blast-radius concerns while giving concrete scoped alternatives and test guidance. X identifies the global scope and validates the added tests, but misses the requested P1/P2/main comparison and includes several low-value or speculative nits; Y also has some out-of-scope follow-ups, reducing precision.",
+  "_usage": {
+    "input": 3,
+    "output": 1175
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "copilot_v7_goal_r4",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v7_goal_r4",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v7_goal_r4",
+    "arm_a_sha256": "32bcbc2c92dcd5ab54c99a5ee4ace722569f8e98fdd3111dbc2d7811be9476ba",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "97e45909dc2469db55da15b6e8d6a525549029c219aefca76123ec8b801fd1bf",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 2
+  }
+}

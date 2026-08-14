@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.75,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.6,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Ground truth's core blockers are: (1) generic enabler hooks only pipeline.transformer, leaking Ref2VA-only pipelines to be hooked with FL2VA coefficients (X doesn't hit this exact framing but verifies partition gating; Y outright claims this is 'correctly' handled, missing that the merged code already added the MiniMax-H3-specific enabler — but crucially Y also misses the inline comment about the missing packed_total kwarg entirely); (2) the 0.2 default vs 0.17 threshold bug — both X and Y catch this precisely with code citations; (3) offline Python example unrunnable due to undefined MODEL_ROOT — neither candidate flags this, a shared miss. The critical inline comments (missing packed_total on duplicate block call causing a TypeError, and the fake attention module missing attn_backend causing 6 test failures) are NOT mentioned by either candidate, but X's deep-dive into extractor fidelity and RoPE/residual mechanics is far more consistent with actually having traced the code that would surface such issues, while Y's review reads as more surface-level and even asserts things ship-shape that the ground truth flags as bugs. X's findings are technically deep, grounded with concrete line numbers, verified via execution/citation, and highly actionable; Y is competent but shallower, with less rigor and one unverified claim praising code that reviewers actually found buggy.",
+  "_cost_usd": 0.19884010000000002,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "cursor_composer25"
+  },
+  "_roles": {
+    "arm": "cursor_composer25",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_composer25",
+    "arm_a_sha256": "ddd4ede1695a4f2ea79cc38f2b78f982a7cdbc203efae46a5e64c42aed61811e",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

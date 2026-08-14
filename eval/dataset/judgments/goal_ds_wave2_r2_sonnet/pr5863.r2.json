@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "The shown diff already resolves the ground truth's main concern (validation tables filled in), leaving the live thread as Ref2VA's untested status; Y directly engages this with grounded, code-cited findings (Ref2VA restart/download-path failure, two-GPU OOM risk) while X never touches the theme at all. Both candidates independently found the same real bugs (numactl flags misrepresented as server flags, undocumented audio_reference JSON schema, X-Peak-Memory-MB semantics), but Y additionally surfaces a genuinely valuable, mathematically-verified internal contradiction in the doc's memory-scaling model that neither X nor the human reviewers caught. Both are well-grounded with specific file/line evidence and concrete fixes, but Y's broader, deeper coverage gives it a decisive edge on recall without sacrificing much precision.",
+  "_cost_usd": 0.34557399999999994,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v13_ds_wave2_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_ds_wave2_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_ds_wave2_r2",
+    "arm_a_sha256": "06a4abb915e41a7cf5a39cf0b99a6fb78b69f709e6cdb4ceaf78fe6cc43994db",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "726725524751ffed003542c0fd4e00bb3f74ef77a200d776d40628016c5bdd21",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

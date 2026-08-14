@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.55
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.8,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates verified the doc against source code accurately and confirmed the fixes already present for the ground-truth threads (NPU scope, connector snapshot claim, full-payload-branch unreachability, prefix-cache note). Y goes further, re-scrutinizing those same 'fixed' claims and finding they're incomplete — the connector-drain 'only consumer' invariant is overstated (three other drain sites cited), the CUDA/ROCm scope still lacks a TP>1 caveat, and the image path still breaks on GitHub despite the mkdocs fix — directly extending the substance of the original reviewer's concerns with precise file/line evidence. X's additional findings (cross-links, stream naming, YAML nits) are accurate but surface-level polish that doesn't engage the deeper issues the human reviewer cared about. Both are actionable with concrete file/line pointers, but Y's are more consequential and better grounded.",
+  "_cost_usd": 0.37513569999999996,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "cursor_composer25",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "cursor_composer25",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_composer25",
+    "arm_a_sha256": "b57e089ca39ed97456611ca76cd78d3ac74d94bf0f8c59707f3b86a84f51d10d",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.6,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.8,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates miss the ground truth's dominant thread (speed/duration_factor validation asymmetry across HTTP/WebSocket/talker/decoder, and the blocking lack of profiler/VRAM/native-baseline evidence), so recall is low for both. X reads as a fluent, well-structured narrative review with concrete diff suggestions, but several flagship claims (uninitialized mel_head.bias, CONCAT-semantics accumulation bug, snapshot_mm_payload no-copy) are deep speculative inferences that are hard to verify and plausibly overreach. Y is more conservative and evidence-driven, quoting exact file:line content and explicitly ruling out hypotheses in a 'Validated' section before reporting only what it could ground, which yields higher precision; its test-marker/CI-coverage finding and version-bump/scope items also loosely echo the GT's 'insufficient validation evidence' and 'unrelated compat changes bundled in' themes. Both are actionable with concrete file/line asks, giving Y a slight overall edge.",
+  "_cost_usd": 0.46961500000000006,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_wave2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_wave2",
+    "arm_a_sha256": "1abf91997f1c41d82ffcf6abbef3a70713631606eac3eb542143b10d59b9082b",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

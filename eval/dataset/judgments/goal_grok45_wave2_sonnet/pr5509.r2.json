@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.95,
+    "precision": 0.82,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.82
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently surface the one ground-truth concern that still applies to this diff snapshot (bobboli's FLASHINFER_ATTN-allow-lists-quant-but-ignores-it issue), and both also independently catch the same real, diff-grounded AttnQuantSpec.enabled/QuantConfig.enabled mismatch and the unrelated large doc deletions — none of which appear in the ground truth but are clearly valid. X goes further with additional diff-grounded findings (missing dtype cast after SAGE quantization, no arch preflight for int8, untested kwarg-gating behavior, style/exception-type nits) that add real actionable value, at the cost of two claims (ring-SP interaction, FlashInfer internal line numbers) that reach outside the shown diff and can't be verified here, slightly denting precision. Y stays tightly within the diff, giving marginally higher precision but covering less ground overall.",
+  "_cost_usd": 0.3285396,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "cursor_grok45"
+  },
+  "_roles": {
+    "arm": "cursor_grok45",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_grok45",
+    "arm_a_sha256": "7979d5791377b1ba49851be431002532d708eef520f21a364aef2619f824508e",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "703e9ad7d9901fc59d5ad8d20917e36993f445b09d3ecaaba356dbe9c900f660",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

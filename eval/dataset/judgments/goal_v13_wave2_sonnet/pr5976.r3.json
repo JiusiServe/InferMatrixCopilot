@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.55,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.65,
+    "actionability": 0.8
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "The actual ground-truth concerns are narrow, organizational nits (move two helpers to utils, question whether a patch.py hunk is rebase-related, prefer explicit over kwargs-wrapped all2all) that neither candidate addresses — both instead run deep bug-hunting reviews, so recall is near-zero for both. They strongly converge on the same num_stale_output_tokens double-seed defect with matching file/line evidence, which is a good cross-validation signal for grounding, but Y is more precise: it correctly scopes the bug as AR-scheduler-specific (explicitly showing the generation scheduler is single-seeded and unaffected) where X's proposed fix muddles that distinction, and Y frames uncertain claims (patch.py test coverage, xpu default change) as clarifying questions rather than asserted bugs, backed by an explicit 'validated' verification pass across many other areas. X compensates with more concrete inline code-snippet fixes, giving it a slight actionability edge, but overall Y's tighter, better-qualified analysis wins narrowly.",
+  "_cost_usd": 0.1832553,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_wave2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_wave2",
+    "arm_a_sha256": "10c2602a19281706645f1b6391ffdc87bc7bc4ee82e7440083fc87f2c76dd9b6",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4703d9c3f9a1a403af03ff17f62c2d816d9363ba7048d8dcee9a84a47834bc46",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

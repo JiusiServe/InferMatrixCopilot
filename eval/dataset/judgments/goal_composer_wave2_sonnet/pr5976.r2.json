@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.5,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.6,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth is a light 'LGTM' approval with 4 minor style/organization comments (unrelated-hunk question, all2all kwargs-vs-explicit style, two move-to-utils asks); neither candidate explicitly surfaces any of these, so recall is low for both. X's review hinges on a dramatic, hard-to-verify 'reproduced' claim of a scheduler double-seeding bug and recommends blocking an already-approved, merged PR — a high-risk headline finding unsupported by the actual review/CI outcome and the PR's own targeted test suite for that exact scenario. Y's findings (headless compile-cache isolation gaps, dead async_tokens_to_discard writes — independently corroborated by X, lending it credibility) are more measured and verifiable via static reasoning, and its 'approve with follow-ups' verdict better matches the PR's real approved/merged status. Both reviews are comparably concrete and actionable with specific file/line citations and proposed fixes.",
+  "_cost_usd": 0.18943620000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "cursor_composer25"
+  },
+  "_roles": {
+    "arm": "cursor_composer25",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_composer25",
+    "arm_a_sha256": "417ad29df2eed31d034caf605e36b407c054d86f2c5e8dadaa62b0edb7bf806c",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4703d9c3f9a1a403af03ff17f62c2d816d9363ba7048d8dcee9a84a47834bc46",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

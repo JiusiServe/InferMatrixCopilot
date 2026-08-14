@@ -1,0 +1,7 @@
+{
+  "pr": 5863,
+  "sha256": "47a66ad1e1d54d29f2c36c5017a36f5772be207b0f2b908d2f94e64a343275a5",
+  "text": "## PR description\n### [doc]Add recipe for MiniMax-H3 on RTX PRO 6000  [labels: documentation, ready]\n[doc]Add recipe for MiniMax-H3 on RTX PRO 6000\r\n\r\ninclude config guide for 2x 4x 8x for 6000\r\n\r\nits only take 4 min to create video  when 8*6000 started\r\n\r\n\r\nhttps://github.com/user-attachments/assets/990c82fa-f4ff-4dbd-abd2-0a1bccdbe85c\n\n## Commit timeline (subjects only — the diff below is the squashed net change)\n- ba5cb572 Add recipe for MiniMax-H3 on RTX PRO 6000 GPUs\n- d2e008eb Update MiniMax-H3-RTX-PRO-6000.md\n- 937b404c Update MiniMax-H3-RTX-PRO-6000.md with validation details\n- 7c52a105 Update MiniMax-H3-RTX-PRO-6000.md\n- 9a15a61b Include ref2va request example in documentation\n- 64166c42 Update MiniMax-H3-RTX-PRO-6000.md\n- 9537c6c0 Corrected Client E2E measurement for four GPUs\n- 0a4c9615 Update MiniMax-H3-RTX-PRO-6000.md\n\n## PR state and gates\nPR state: MERGED\ngates clean (mergeable, no failing checks)",
+  "built_at": "2026-08-13T17:53:06",
+  "policy": "no_discussion — byte-equivalent to _pr_context_bundle (fetch.py:155) plus pr.gate_check (fetch.py:277); comments, reviews and inline review comments never requested"
+}

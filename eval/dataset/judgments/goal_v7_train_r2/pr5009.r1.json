@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.82,
+    "precision": 0.64,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.46,
+    "precision": 0.68,
+    "actionability": 0.84,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X directly covers the global blast-radius concern, requests appropriately separated performance evidence, and discusses regression-test coverage with concrete locations and fixes. It adds several weak or out-of-scope findings, reducing precision. Y is somewhat less noisy but misses the central performance-comparison concern and only notes the unvalidated global impact in passing.",
+  "_usage": {
+    "input": 3,
+    "output": 1689
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v7_goal_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v7_goal_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v7_goal_r2",
+    "arm_a_sha256": "4be367294b62108e741f5a6245add968b318c0e0af642947141768cc6effe396",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "97e45909dc2469db55da15b6e8d6a525549029c219aefca76123ec8b801fd1bf",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

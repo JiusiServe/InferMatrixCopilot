@@ -1,0 +1,17 @@
+{
+  "arm": "cursor_cursorgrok4.5high",
+  "model_requested": "cursor-grok-4.5-high",
+  "head": "765caa2a121aec024201936c4decb1151225991c",
+  "base": "7a2007cc17d63ce9070e1feefd29fcca8a93cf34",
+  "snapshot_sha256": "3723b9e637bb5d67daa30874435afe2848c3e1ee689c5b0501634fb0eba751d1",
+  "wall_s": 143.0,
+  "shell_commands": 4,
+  "file_reads": 9,
+  "cost_usd": null,
+  "audit_ok": false,
+  "audit_violations": [
+    "read outside worktree: /home/zhoutaichang/.claude/skills/imreview/SKILL.md"
+  ],
+  "artifact_chars": 3151,
+  "split": "holdout"
+}

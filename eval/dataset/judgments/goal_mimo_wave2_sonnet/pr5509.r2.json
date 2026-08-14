@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.8,
+    "precision": 0.65,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Both candidates caught the one substantive open ground-truth concern (FLASHINFER_ATTN silently ignoring `quant`, should be restricted to TRTLLM_ATTN), but X treats it as a blocking finding with the exact fix bobboli requested plus verified code evidence, while Y buries it as a 'minor' doc nit. X's other findings (dtype_vo-only silent no-op, ring-SP bypass, doc deletions) are precisely grounded in the diff with concrete line numbers and drop-in code fixes, and X shows real verification work (ran tests, executed snippets, grepped docs). Y's remaining findings are mostly trivial/self-admittedly non-issues (e.g. 'correct by design' lru_cache note) or duplicate the same dangling-doc-reference point twice, several with unresolved '?' line numbers that hurt actionability. X is clearly the stronger, more precise and actionable review.",
+  "_cost_usd": 0.3266966,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_mimo_wave2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_mimo_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_mimo_wave2",
+    "arm_a_sha256": "c68b60cb5de2b6988aef6b991f7591e75aaef240d08a6c887712d0179396b997",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "703e9ad7d9901fc59d5ad8d20917e36993f445b09d3ecaaba356dbe9c900f660",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

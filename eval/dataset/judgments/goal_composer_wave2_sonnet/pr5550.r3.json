@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.7
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both largely miss the ground truth's severity-P1 concerns (stage_kv/interface.py tensor-geometry validation, block-count-from-seq_len math, null-block rejection, digest binding) and the duplicate-validation/exception-taxonomy critique, so recall is low and roughly tied. X is more grounded and actionable: it verifies claims against actual code (confirms ARDiffusionModelRunner is the sole in-tree subclass and traces the exact TypeError propagation path, compares the new DTOs against sibling PR #5541's twins with concrete invariant-check code), while Y's parallel findings are more hedged and generic (e.g. unconfirmed 'custom runners... will break') and mostly defer fixes to 'W1' without proposing code. Both correctly flag the DLO/AllGather fallback gap and correctly credit the already-fixed engine-cleanup change, but X's investigation is deeper and its recommendations more concrete.",
+  "_cost_usd": 0.4646643,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "cursor_composer25"
+  },
+  "_roles": {
+    "arm": "cursor_composer25",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_composer25",
+    "arm_a_sha256": "ff1eb3b4971d4fc39f2f5b1af803d4fc110b9625dab29b4155145f74cd63743f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b6ae3b48c6859b0d16784163ab2044d7d85e3b3b32f4e60b559fa2a55186c64b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

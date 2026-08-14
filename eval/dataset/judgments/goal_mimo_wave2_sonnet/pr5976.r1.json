@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.78,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.68,
+    "actionability": 0.78,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both catch the central substantive bug (double-seeding of num_stale_output_tokens on the replace_streaming_prompt path) with specific file:line evidence; X additionally claims a concrete reproduction trace, which is stronger verification if honest. Neither candidate hits the sparse, mostly-resolved ground-truth concerns (already-fixed utils moves, the open use_all2all style question), so recall is low and roughly tied for both. X edges ahead on precision/clarity: it gives a single consistent verdict and two additional high-value, well-reasoned findings (Qwen2.5-Omni forward-contract regression, generation-stage randomize-dummy-ids escape hatch) that Y never raises. Y's report is also solid and well-cited but internally inconsistent (a 'validated: all three seed sites correct' bullet followed by a 'blocker: double-seed confirmed' on the same mechanism) and includes redundant near-duplicate dead-code findings, slightly hurting clarity and precision.",
+  "_cost_usd": 0.37559279999999995,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_mimo_wave2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_mimo_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_mimo_wave2",
+    "arm_a_sha256": "332aa7e09346908bf0246bdb2568741c284a2f9bc9041af234a909d6a87eab92",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4703d9c3f9a1a403af03ff17f62c2d816d9363ba7048d8dcee9a84a47834bc46",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

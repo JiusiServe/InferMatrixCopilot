@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.9,
+    "actionability": 0.88,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both reviews are well-grounded and avoid fabrication, but Y digs deeper into the actual repo state (git-tracing a revert commit, confirming musa.inc.md/quickstart.md are byte-identical to merge-base, and quoting the exact 'git checkout v0.18.0-dev' line in musa.inc.md:31) which closely mirrors the ground truth's 'do not change this' comment on that exact file/line — X only vaguely notes these files were untouched without explaining why. Y also engages more thoroughly with the NPU install block (the section that drew the PTAL/LGTM exchange), offering two distinct, code-block-backed fixes versus X's single more generic nit. Y's suggestions are consistently more concrete and copy-pasteable, giving it an actionability edge.",
+  "_cost_usd": 0.2566146,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "cursor_composer25",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "cursor_composer25",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_composer25",
+    "arm_a_sha256": "acbef00a1138d71fc553151e29989c56b3a42f74305651097f47969ecf336eee",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5866809cd7926f6bee88b473acf165652378865539411405c15a7c86c14e7466",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

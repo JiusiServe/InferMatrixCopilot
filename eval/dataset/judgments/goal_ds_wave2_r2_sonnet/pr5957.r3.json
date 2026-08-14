@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.6,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.7,
+    "actionability": 0.8
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both reviews largely miss the ground truth's core concerns (profiler/VRAM/baseline validation-evidence gap, WebSocket-vs-HTTP streaming speed asymmetry, talker-raise semantics for library callers, and the talker/S2Mel bounds duplication), so recall is low for both. Y's findings are more concretely grounded, with literal code quotes, an explicit verification/sweep trail, and checkable infra catches (missing pytestmark causing CI test deselection, missing torchaudio/tiktoken packaging deps). X is well-organized and highly actionable with inline code-fix suggestions, but leans on deeper, harder-to-verify internal-implementation claims (e.g. uninitialized bias tensor, CONCAT-semantics bug) without literal quoted evidence, carrying more fabrication risk.",
+  "_cost_usd": 0.5747658,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_ds_wave2_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_ds_wave2_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_ds_wave2_r2",
+    "arm_a_sha256": "10529fffec5896cfc836e5eba9cd3036ec543e30cf1b941a04422411c09019b3",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

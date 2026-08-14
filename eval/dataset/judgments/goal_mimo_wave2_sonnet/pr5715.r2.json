@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.75,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.55,
+    "actionability": 0.45
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Both candidates converge on the same real hotspot ground truth flags (the npu.inc.md vLLM-Ascend branch pin that got a PTAL/LGTM exchange, and the fact that musa.inc.md/quickstart.md were rightly left untouched), but X treats it with far more rigor: it cites the exact conflicting stable-vs-rc conventions elsewhere in the repo, gives a concrete verification command, and surfaces the MUSA 'do not touch' context organically as reasoning rather than a bare grep note. Y's parallel finding on the same branch is self-undermining (asks to 'confirm before merging' while its own evidence field claims it's 'verified as claimed'), and its only other finding is explicitly pre-existing/out-of-scope with no PR-relevant action. X's seven comments are concretely actionable (file/line, suggested replacement text, verification commands) versus Y's two thin, low-actionability items.",
+  "_cost_usd": 0.1709683,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_mimo_wave2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_mimo_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_mimo_wave2",
+    "arm_a_sha256": "5795f6e2f13badb930d4c8c4bfd7f77f280e57e3cf594377b685866e707d3244",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5866809cd7926f6bee88b473acf165652378865539411405c15a7c86c14e7466",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

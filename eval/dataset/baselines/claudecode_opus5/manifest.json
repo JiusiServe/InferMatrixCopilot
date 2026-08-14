@@ -37,10 +37,8 @@
   "pr_context": "frozen snapshot (no_discussion); gh pr view and gh pr checks removed from the allowlist",
   "dataset": "vllm_omni_dataset.yaml",
   "splits": [
-    "test",
-    "train",
-    "val"
+    "holdout"
   ],
-  "n_items": 12,
-  "concurrency": 3
+  "n_items": 8,
+  "concurrency": 5
 }

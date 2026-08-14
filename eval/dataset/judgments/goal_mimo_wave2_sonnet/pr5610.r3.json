@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.9,
+    "actionability": 0.15
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X directly engages the exact themes the human reviewer cared about (NPU/platform scope, connector-state ownership/live-state snapshot claims, the SVG image path, full-payload-branch reachability, prefix-cache incompatibility) both by validating that fixes hold and by pushing further with grounded, file:line-specific, actionable findings (GitHub-relative image path, TP>1 connector broadcast, ownership invariant overstatement). Y is essentially a validation checklist that dismisses its own sole candidate finding and lands on APPROVE with zero actionable findings, missing nearly all the substantive areas the ground-truth review focused on. Neither flags the mkdocs/qwen-asr dependency conflict, and neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.1832717,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_mimo_wave2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_mimo_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_mimo_wave2",
+    "arm_a_sha256": "2bbccdbdc3f276ef9f8c46e710a8b638c6991adb95f9e3125ee2d6ba34fbd8ce",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

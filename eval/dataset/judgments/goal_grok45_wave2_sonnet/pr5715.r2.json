@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.7,
+    "precision": 0.82,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.75
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X independently flags the exact npu.inc.md area the human reviewer routed to FayeSpica for a second look (the vllm-ascend RC branch pin) and, more notably, catches a real residual inconsistency left by the musa.inc.md revert (the new 'Omni 0.26.x requires vLLM 0.26.x' note contradicting the untouched MUSA page still pinned to 0.18) — directly explaining why that file was marked 'do not change this'. Y verifies the same files/links but explicitly clears the NPU RC-tag area as 'consistent,' missing the concern the ground-truth reviewer flagged there, and never surfaces the MUSA contradiction. Both sets of findings are grounded in the diff and reasonably actionable with concrete suggested edits, but X's are more numerous, more specific (file:line, verification commands, suggested rewrites), and cover more of the sparse ground truth than Y's single comment plus a clean-bill checklist. Neither review has a labeled LATENT GAP CHECK section.",
+  "_cost_usd": 0.2555539,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "cursor_grok45"
+  },
+  "_roles": {
+    "arm": "cursor_grok45",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_grok45",
+    "arm_a_sha256": "972d7569cefc44c036e409433557e72c2ba66750f0c7b17de0481700eab828dd",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5866809cd7926f6bee88b473acf165652378865539411405c15a7c86c14e7466",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

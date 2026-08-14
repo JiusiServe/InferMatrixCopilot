@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.82,
+    "actionability": 0.97,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.78,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates correctly explain why singleton normalization must apply to initial and update submissions, fully covering the ground-truth concern. X provides more complete and actionable analysis of the Ming pipeline incompatibility, while Y's suggested pass-only-z_req fix overlooks the additional sampling-parameter and embedding issues. Both lose precision for tangential pre-existing behavior and unverified CI findings.",
+  "_usage": {
+    "input": 3,
+    "output": 1395
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v8_official_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v8_official_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v8_official_r1",
+    "arm_a_sha256": "3a0a60749103483d92701ef05a5e3be2ed05126cdaf5e79a0f973ca6590e3463",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "bc98460632105aef812a50d392afd9f1bea66b3f783e8a9cd888456ce013cba3",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

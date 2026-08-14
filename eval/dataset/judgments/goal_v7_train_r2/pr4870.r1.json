@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.82,
+    "precision": 0.72,
+    "actionability": 0.94,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.68,
+    "precision": 0.58,
+    "actionability": 0.78,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X covers the key runner-length issue, padding scenario, CI concern, and serving/config risks with concrete locations and remedies, though its streaming alarm conflicts with the successful human probe. Y recognizes several resolved concerns but adds speculative or low-value findings, including contradictory async_chunk-default claims. Neither candidate identifies the latent multi-axis splitting gap.",
+  "_usage": {
+    "input": 3,
+    "output": 2412
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v7_goal_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v7_goal_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v7_goal_r2",
+    "arm_a_sha256": "87c7df74738e095af5519f726e5f85482940b0b84847ed9cc6139dfe5b9041e6",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "03d7423c3a91e45838083e2025e3dea932f1d9448ba923b1d6ca1a0373899ea1",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

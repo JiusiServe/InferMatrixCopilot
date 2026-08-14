@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.8,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates independently and correctly identify the same central live bug that matches the ground-truth's core surviving concern: the MiniMax-H3-specific rel_l1_thresh=0.17 default never reaches the engine because _get_default_cache_config hardcodes 0.2, with matching file/line citations. X goes considerably further, verifying the partition-gating fix (matching ground-truth concern 1) is correct, then adding well-grounded, concretely actionable findings on memory retention, wasted RoPE computation, weak E2E cache-hit assertions, a cache-hit test that can't catch stale conditioning, and a drive-by frame-count change — all with specific file:line references and suggested fixes. Y is tight and precise but covers only the one issue in depth, with a brief unelaborated confirmation of other areas. X's greater breadth of grounded, actionable findings outweighs its slightly lower precision from more speculative claims (e.g., the polynomial R² analysis).",
+  "_cost_usd": 0.38043910000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "cursor_grok45"
+  },
+  "_roles": {
+    "arm": "cursor_grok45",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_grok45",
+    "arm_a_sha256": "8f3fe23a7334fd0a0cb40a3683bb3b9b8e1a4b6633084f77cdfe50ff2e8fc68e",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}
