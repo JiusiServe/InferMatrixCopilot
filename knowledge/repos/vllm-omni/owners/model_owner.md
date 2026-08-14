@@ -28,14 +28,3 @@ benchmark 时快速路由到正确的人。模型清单以 [models 目录](../mo
 | Wan | bjf-frz | 白竞帆 |
 | MinimaxH3 | david6666666 | 陈炜青 |
 | Cosmos | fhfuih | 黄泽宇 |
-
-### 中优先级
-| 模型 | Owner | 备注 |
-|---|---|---|
-| Voxcpm2 |  |  |
-| higgs_audio_v3 | |  |
-| bagel |  |  |
-| GLM-Image |  |  |
-| Qwen-Image-Edit-2511 |  |  |
-| Qwen-Image-Layered |  | |
-| LTX2.3 |  |  |
