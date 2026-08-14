@@ -175,12 +175,33 @@ class CopilotMCP:
     def strict_readiness(self, repo: str) -> list[str]:
         """Return actionable setup gaps before reserving a Strict run."""
         missing = []
-        if not self.settings.shared_api_key:
+        # Backend selection is EXPLICIT for Strict (doc/RFC-provider-registry
+        # .md): unset refuses with the exact fix, never falls back silently.
+        backend = self.settings.strict_backend
+        if not backend:
             missing.append(
-                "model credential missing; set ANTHROPIC_API_KEY or "
-                "OPENAI_API_KEY in "
-                "~/.infermatrix-copilot/.env"
-            )
+                "STRICT_BACKEND not set; add STRICT_BACKEND=api (or cursor / "
+                "claude-code / codex) to ~/.infermatrix-copilot/.env")
+        elif backend == "api":
+            if not self.settings.shared_api_key:
+                missing.append(
+                    "model credential missing; set ANTHROPIC_API_KEY or "
+                    "OPENAI_API_KEY in "
+                    "~/.infermatrix-copilot/.env"
+                )
+        else:
+            from .providers import transport_for
+
+            try:
+                transport = transport_for(self.settings)
+            except NotImplementedError as exc:
+                missing.append(str(exc))
+            else:
+                if not transport.cli_path():
+                    missing.append(
+                        f"STRICT_BACKEND={backend} selected but its CLI is "
+                        "not installed; install it or set STRICT_BACKEND_CLI "
+                        "in ~/.infermatrix-copilot/.env")
         repo_path = self.copilot._resolve_repo_path(repo)
         if not repo_path or not Path(repo_path).is_dir():
             missing.append(

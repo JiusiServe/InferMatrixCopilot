@@ -68,7 +68,11 @@ class Copilot:
         configured dir, and the planner over both. `last_run_dir` starts unset
         and is filled by the first execution."""
         self.settings = settings or Settings()
-        self.llm = LLM(self.settings)
+        # provider-registry seam: a real llm.LLM under backend "api"
+        # (byte-identical), a HarnessLLM adapter under a harness backend
+        from ..providers import llm_for
+
+        self.llm = llm_for(self.settings)
         self.registry = register_builtin_steps(StepRegistry())
         self.store = PlaybookStore(self.settings.playbooks_dir, self.registry)
         self.planner = Planner(self.store, self.registry)

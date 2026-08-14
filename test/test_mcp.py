@@ -223,6 +223,7 @@ def _core(settings):
 
 
 def test_strict_readiness_reports_setup_gaps(settings):
+    settings.strict_backend = "api"
     core = _core(settings)
 
     missing = core.strict_readiness("vllm-omni")
@@ -232,11 +233,32 @@ def test_strict_readiness_reports_setup_gaps(settings):
     assert any("pr-review playbook missing" in item for item in missing)
 
 
+def test_strict_readiness_requires_explicit_backend(settings, monkeypatch):
+    # doc/RFC-provider-registry.md: selection is explicit — unset refuses
+    # with the exact fix, never a silent api fallback
+    missing = _core(settings).strict_readiness("vllm-omni")
+    assert any("STRICT_BACKEND not set" in item for item in missing)
+
+    # a harness backend without its CLI is a named gap, not a key complaint
+    monkeypatch.setattr("infermatrix_copilot.providers.base.shutil.which",
+                        lambda name: None)
+    settings.strict_backend = "cursor"
+    missing = _core(settings).strict_readiness("vllm-omni")
+    assert any("CLI is not installed" in item for item in missing)
+    assert not any("model credential" in item for item in missing)
+
+    # declared-but-unshipped backends point at their milestone
+    settings.strict_backend = "codex"
+    missing = _core(settings).strict_readiness("vllm-omni")
+    assert any("M3" in item for item in missing)
+
+
 def test_strict_readiness_accepts_packaged_runtime(settings, tmp_path):
     repo = tmp_path / "vllm-omni"
     (repo / ".git").mkdir(parents=True)
     settings.repo_paths = {"vllm-omni": str(repo)}
     settings.anthropic_api_key = "test-key"
+    settings.strict_backend = "api"
     settings.playbooks_dir.mkdir(parents=True)
     shutil.copy2(
         Path(__file__).resolve().parents[1] / "playbooks" / "pr-review.yaml",
@@ -252,6 +274,7 @@ def test_strict_readiness_accepts_openai_credential(settings, tmp_path):
     (repo / ".git").mkdir(parents=True)
     settings.repo_paths = {"vllm-omni": str(repo)}
     settings.openai_api_key = "test-key"
+    settings.strict_backend = "api"
     settings.playbooks_dir.mkdir(parents=True)
     shutil.copy2(
         Path(__file__).resolve().parents[1] / "playbooks" / "pr-review.yaml",

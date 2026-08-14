@@ -1,0 +1,88 @@
+"""Tool-bridge spec round-trip and the read-containment guard
+(doc/RFC-provider-registry.md — the `.env`-exfiltration case)."""
+
+from pathlib import Path
+
+import pytest
+
+from infermatrix_copilot.run_trace import RunTrace
+from infermatrix_copilot.scopes import ToolScope, read_only_scope
+from infermatrix_copilot.tool_bridge import (
+    load_bridge_spec,
+    make_dispatcher,
+    write_bridge_spec,
+)
+
+
+def _scoped(tmp_path: Path) -> tuple[ToolScope, Path, Path]:
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    scope = read_only_scope()
+    scope = type(scope)(name=scope.name, allowed_tools=scope.allowed_tools,
+                        read_only=True, root=str(worktree))
+    return scope, worktree, run_dir
+
+
+def test_bridge_spec_round_trips(tmp_path):
+    scope, _worktree, run_dir = _scoped(tmp_path)
+    spec_path = write_bridge_spec(run_dir=run_dir,
+                                  step_name="agent.review_diff#lens0",
+                                  scope=scope, repo="vllm-omni")
+    loaded, raw = load_bridge_spec(spec_path)
+    assert loaded == scope
+    assert raw["repo"] == "vllm-omni"
+    assert raw["run_dir"] == str(run_dir)
+    assert "lens0" in spec_path.name and "#" not in spec_path.name
+
+
+def test_bridged_read_inside_root_passes_and_relative_resolves(tmp_path):
+    scope, worktree, run_dir = _scoped(tmp_path)
+    (worktree / "mod.py").write_text("x = 1\n", encoding="utf-8")
+    trace = RunTrace(run_dir / "bridge_trace.jsonl")
+    call = make_dispatcher(scope, (str(worktree), str(run_dir)), trace)
+
+    assert call("read_file", {"path": str(worktree / "mod.py")}) == "x = 1\n"
+    # repo-relative paths resolve against the worktree, as in-process
+    assert call("read_file", {"path": "mod.py"}) == "x = 1\n"
+    assert any(e["tool"] == "read_file"
+               for e in trace.events("tool_call"))
+
+
+def test_bridged_read_outside_roots_is_refused_and_traced(tmp_path):
+    scope, worktree, run_dir = _scoped(tmp_path)
+    secret = tmp_path / "home" / ".infermatrix-copilot" / ".env"
+    secret.parent.mkdir(parents=True)
+    secret.write_text("ANTHROPIC_API_KEY=leak-me\n", encoding="utf-8")
+    trace = RunTrace(run_dir / "bridge_trace.jsonl")
+    call = make_dispatcher(scope, (str(worktree), str(run_dir)), trace)
+
+    with pytest.raises(RuntimeError, match="refused"):
+        call("read_file", {"path": str(secret)})
+    refusals = list(trace.events("tool_refused"))
+    assert refusals and "outside session roots" in refusals[0]["reason"]
+
+
+def test_scope_tool_allowlist_still_enforced(tmp_path):
+    scope, worktree, run_dir = _scoped(tmp_path)
+    trace = RunTrace(run_dir / "bridge_trace.jsonl")
+    call = make_dispatcher(scope, (str(worktree), str(run_dir)), trace)
+
+    # read_only_scope has no run_shell — dispatch refuses by tool name; the
+    # bridge surfaces it as an error, identically to the in-process loop
+    with pytest.raises(RuntimeError, match="not allowed"):
+        call("run_shell", {"cmd": "echo hi"})
+
+
+def test_bridged_write_refused_in_read_only_scope(tmp_path):
+    scope, worktree, run_dir = _scoped(tmp_path)
+    scope = type(scope)(name=scope.name,
+                        allowed_tools=scope.allowed_tools | {"write_file"},
+                        read_only=True, root=str(worktree))
+    trace = RunTrace(run_dir / "bridge_trace.jsonl")
+    call = make_dispatcher(scope, (str(worktree), str(run_dir)), trace)
+
+    with pytest.raises(RuntimeError, match="read-only"):
+        call("write_file", {"path": str(worktree / "a.txt"), "content": "x"})
+    assert not (worktree / "a.txt").exists()

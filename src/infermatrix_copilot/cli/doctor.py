@@ -28,11 +28,43 @@ def _check_deps() -> tuple[bool, str]:
 
 def _check_env(settings) -> tuple[bool, str]:
     if not settings.shared_api_key:
+        if settings.strict_backend not in ("", "api"):
+            # harness backends carry subscription auth in the vendor CLI —
+            # a missing API key is a valid state, not a failure
+            return True, (f"no API key (valid: STRICT_BACKEND="
+                          f"{settings.strict_backend} uses the vendor CLI's "
+                          "subscription auth)")
         return False, (
             "LLM credential is empty — set ANTHROPIC_API_KEY or "
             "OPENAI_API_KEY in ~/.infermatrix-copilot/.env "
             "(key names checked only; values never printed)")
     return True, f"{settings.resolved_llm_provider} credentials configured"
+
+
+def _check_strict_backend(settings) -> tuple[bool, str]:
+    """Provider-registry selection (doc/RFC-provider-registry.md). Unset is
+    reported but not failed here — CLI runs default to api; Strict runs
+    refuse at strict_readiness with the same fix line."""
+    backend = settings.strict_backend
+    if not backend:
+        return True, ("STRICT_BACKEND unset — CLI runs default to api; "
+                      "Strict runs REFUSE until it is set (fix: add "
+                      "STRICT_BACKEND=api or cursor to "
+                      "~/.infermatrix-copilot/.env)")
+    if backend == "api":
+        return True, "backend api (raw-API path; credentials checked above)"
+    from ..providers import transport_for
+
+    try:
+        transport = transport_for(settings)
+    except NotImplementedError as exc:
+        return False, str(exc)
+    cli = transport.cli_path()
+    if not cli:
+        return False, (f"backend {backend} selected but its CLI is missing — "
+                       "fix: install it or set STRICT_BACKEND_CLI=/path/to/"
+                       "cli in ~/.infermatrix-copilot/.env")
+    return True, f"backend {backend} via {cli}"
 
 
 def _check_gh() -> tuple[bool, str]:
@@ -218,6 +250,7 @@ def run_doctor(as_json: bool = False, probe: bool = False) -> int:
     checks = [
         ("deps", _check_deps()),
         ("env", _check_env(settings)),
+        ("backend", _check_strict_backend(settings)),
         ("gh", _check_gh()),
         ("repos", _check_repos(settings)),
         ("backends", _check_model_backends(settings)),
