@@ -1,16 +1,16 @@
-judgment_set,label,arm,judge,n_items,n_verdicts,arm_wins,baseline_wins,ties,arm_recall,base_recall,arm_precision,base_precision,arm_actionability,base_actionability,audit_failed_items
-goal_v13_val,v13 val (dev gate),copilot_v13_proof_val,GPT-5.6 Sol 272K High,5,15,8,7,0,0.857,0.889,0.555,0.589,0.9,0.934,
-goal_v13_test,v13 test,copilot_v13_proof_test,GPT-5.6 Sol 272K High,5,15,7,8,0,0.689,0.762,0.687,0.719,0.905,0.95,
-goal_v13_wave2,"DS v4-pro r1, wave-2 holdout",copilot_v13_wave2,GPT-5.6 Sol 272K High,10,30,14,16,0,0.492,0.651,0.748,0.672,0.92,0.936,
-goal_v13_wave2_sonnet,DS v4-pro r1 re-scored,copilot_v13_wave2,claude-sonnet-5,10,30,10,20,0,0.323,0.437,0.833,0.793,0.801,0.887,
-goal_ds_wave2_r2_sonnet,DS v4-pro r2 fresh gen,copilot_v13_ds_wave2_r2,claude-sonnet-5,10,30,3,27,0,0.278,0.509,0.804,0.816,0.779,0.878,
-goal_mimo_wave2,"MiMo-v2.5, wave-2",copilot_v13_mimo_wave2,GPT-5.6 Sol 272K High,10,29,2,27,0,0.481,0.639,0.595,0.697,0.731,0.939,
-goal_mimo_wave2_sonnet,MiMo-v2.5 re-scored,copilot_v13_mimo_wave2,claude-sonnet-5,10,27,2,25,0,0.27,0.474,0.732,0.808,0.59,0.883,
-goal_composer_wave2_sonnet,Composer-2.5 harness,cursor_composer25,claude-sonnet-5,10,30,4,26,0,0.381,0.507,0.751,0.799,0.773,0.883,pr5884
-goal_grok45_wave2_sonnet,Grok-4.5 harness,cursor_grok45,claude-sonnet-5,10,30,2,28,0,0.3,0.464,0.813,0.783,0.712,0.891,pr5509;pr5610;pr5703;pr5715;pr5840;pr5863;pr5884;pr5957;pr5976
-goal_cb_composer25_wave2_sonnet,"Composer-2.5, v13 via cursor backend",copilot_cb_composer25,claude-sonnet-5,10,30,4,25,1,0.318,0.432,0.729,0.783,0.709,0.882,
-goal_cb_grok45_wave2_sonnet,"Grok-4.5, v13 via cursor backend",copilot_cb_grok45,claude-sonnet-5,10,30,5,24,1,0.351,0.496,0.776,0.81,0.749,0.877,
-goal_cb_grok46_wave2_sonnet,Grok-4.6 cb r2 — TAINTED (skill leak),copilot_cb_grok46,claude-sonnet-5,7,21,3,17,1,0.325,0.552,0.81,0.807,0.75,0.882,
-goal_cb_grok46_r3_sonnet,"Grok-4.6, v13 via cursor backend (r3, canonical)",copilot_cb_grok46_r3,claude-sonnet-5,6,18,0,18,0,0.336,0.555,0.822,0.842,0.738,0.872,
-goal_v13moa_cgm_wave2_sonnet,"MoA composer+grok4.6+mimo r1, DS spine",copilot_v13_moa_cgm,claude-sonnet-5,10,30,5,24,1,0.292,0.415,0.799,0.791,0.756,0.877,
-goal_moa_cgm_wave2_sonnet,MoA composer+grok4.6+mimo r2 (peer session),copilot_moa_cgm,claude-sonnet-5,9,27,5,22,0,0.285,0.425,0.83,0.793,0.788,0.881,
+judgment_set,label,arm,judge,n_items,n_verdicts,arm_wins,baseline_wins,ties,win_share,arm_recall,base_recall,recall_ratio,arm_precision,base_precision,precision_ratio,arm_actionability,base_actionability,audit_failed_items
+goal_v13_val,v13 val (dev gate),copilot_v13_proof_val,GPT-5.6 Sol 272K High,5,15,8,7,0,0.533,0.857,0.889,0.96,0.555,0.589,0.94,0.9,0.934,
+goal_v13_test,v13 test,copilot_v13_proof_test,GPT-5.6 Sol 272K High,5,15,7,8,0,0.467,0.689,0.762,0.9,0.687,0.719,0.96,0.905,0.95,
+goal_v13_wave2,"DS v4-pro r1, wave-2 holdout",copilot_v13_wave2,GPT-5.6 Sol 272K High,10,30,14,16,0,0.467,0.492,0.651,0.76,0.748,0.672,1.11,0.92,0.936,
+goal_v13_wave2_sonnet,DS v4-pro r1 re-scored,copilot_v13_wave2,claude-sonnet-5,10,30,10,20,0,0.333,0.323,0.437,0.74,0.833,0.793,1.05,0.801,0.887,
+goal_ds_wave2_r2_sonnet,DS v4-pro r2 fresh gen,copilot_v13_ds_wave2_r2,claude-sonnet-5,10,30,3,27,0,0.1,0.278,0.509,0.55,0.804,0.816,0.99,0.779,0.878,
+goal_mimo_wave2,"MiMo-v2.5, wave-2",copilot_v13_mimo_wave2,GPT-5.6 Sol 272K High,10,29,2,27,0,0.069,0.481,0.639,0.75,0.595,0.697,0.85,0.731,0.939,
+goal_mimo_wave2_sonnet,MiMo-v2.5 re-scored,copilot_v13_mimo_wave2,claude-sonnet-5,10,27,2,25,0,0.074,0.27,0.474,0.57,0.732,0.808,0.91,0.59,0.883,
+goal_composer_wave2_sonnet,Composer-2.5 harness,cursor_composer25,claude-sonnet-5,10,30,4,26,0,0.133,0.381,0.507,0.75,0.751,0.799,0.94,0.773,0.883,pr5884
+goal_grok45_wave2_sonnet,Grok-4.5 harness,cursor_grok45,claude-sonnet-5,10,30,2,28,0,0.067,0.3,0.464,0.65,0.813,0.783,1.04,0.712,0.891,pr5509;pr5610;pr5703;pr5715;pr5840;pr5863;pr5884;pr5957;pr5976
+goal_cb_composer25_wave2_sonnet,"Composer-2.5, v13 via cursor backend",copilot_cb_composer25,claude-sonnet-5,10,30,4,25,1,0.15,0.318,0.432,0.74,0.729,0.783,0.93,0.709,0.882,
+goal_cb_grok45_wave2_sonnet,"Grok-4.5, v13 via cursor backend",copilot_cb_grok45,claude-sonnet-5,10,30,5,24,1,0.183,0.351,0.496,0.71,0.776,0.81,0.96,0.749,0.877,
+goal_cb_grok46_wave2_sonnet,Grok-4.6 cb r2 — TAINTED (skill leak),copilot_cb_grok46,claude-sonnet-5,7,21,3,17,1,0.167,0.325,0.552,0.59,0.81,0.807,1.0,0.75,0.882,
+goal_cb_grok46_r3_sonnet,"Grok-4.6, v13 via cursor backend (r3, canonical)",copilot_cb_grok46_r3,claude-sonnet-5,6,18,2,16,0,0.111,0.253,0.452,0.56,0.822,0.821,1.0,0.747,0.866,
+goal_v13moa_cgm_wave2_sonnet,"MoA composer+grok4.6+mimo r1, DS spine",copilot_v13_moa_cgm,claude-sonnet-5,10,30,5,24,1,0.183,0.292,0.415,0.7,0.799,0.791,1.01,0.756,0.877,
+goal_moa_cgm_wave2_sonnet,MoA composer+grok4.6+mimo r2 (peer session),copilot_moa_cgm,claude-sonnet-5,10,30,5,25,0,0.167,0.338,0.469,0.72,0.82,0.798,1.03,0.777,0.883,

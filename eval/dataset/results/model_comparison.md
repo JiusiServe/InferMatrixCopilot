@@ -41,6 +41,30 @@ Their agreement with r3 indicates the leak was not driving the numbers.
 ‡ Harness Grok-4.5 is 9/10 contamination-disqualified (clean-only 0—3);
 listed for the record.
 
+## Normalized view (each arm ÷ its own in-matchup baseline)
+
+The baseline's raw column wobbles across rows (independent judge calls,
+pairwise context, item subsets), so cross-row comparison uses ratios computed
+WITHIN each judgment set: `metric_arm / metric_baseline` over the same
+verdicts (1.00 = parity), plus a tie-adjusted win share (ties = ½ win).
+
+| arm | win share | recall index | precision index |
+|---|---|---|---|
+| DS v4-pro r1 (v13 api) | **0.33** | **0.74** | **1.05** |
+| DS v4-pro r2 (v13 api) | 0.10 | 0.55 | 0.99 |
+| MiMo-v2.5 (v13 api) | 0.07 | 0.57 | 0.91 |
+| Composer-2.5 (v13-cb) | 0.15 | 0.74 | 0.93 |
+| Grok-4.5 (v13-cb) | 0.18 | 0.71 | 0.96 |
+| Grok-4.6 r3 (v13-cb, partial) | 0.11 | 0.56 | 1.00 |
+| MoA r1 (mixture) | 0.18 | 0.70 | 1.01 |
+| MoA r2 (mixture, peer) | 0.17 | 0.72 | 1.03 |
+| Composer-2.5 (harness) | 0.13 | 0.75 | 0.94 |
+
+Normalization makes the pattern unambiguous: **every arm recalls 26–45% less
+than the baseline measured in its own matchup** (index 0.55–0.75), while
+precision is within ±9% of parity everywhere (several arms above it). The
+raw-score wobble was judging noise; the recall gap is not.
+
 ## Wave-2 holdout, MoA arms (composer-2.5 + cursor-grok-4.6-high + mimo-v2.5)
 
 Mixture proposers on the DS v4-pro spine (`MOA_WHEN=always`, reducer/merge on

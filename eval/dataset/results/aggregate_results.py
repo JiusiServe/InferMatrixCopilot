@@ -73,9 +73,21 @@ def tally(set_dir: Path) -> dict | None:
     mean = {a: {k: round(sum(v) / len(v), 3) for k, v in ks.items()}
             for a, ks in rubric.items()}
     items = sorted({v["item"] for v in verdicts})
+    # normalized view: each metric as arm/baseline WITHIN the same verdicts,
+    # cancelling judge-noise and item-subset variation in the baseline column;
+    # win_share counts a tie as half a win
+    normalized = {}
+    ra, rb = mean.get(arm, {}), mean.get(base, {})
+    for k in ra:
+        if k in rb and rb[k]:
+            normalized[k] = {"ratio": round(ra[k] / rb[k], 2),
+                             "delta": round(ra[k] - rb[k], 3)}
+    win_share = round((wins.get(arm, 0) + 0.5 * wins.get("tie", 0))
+                      / len(files), 3) if files else None
     return {"arm": arm, "baseline": base, "judge": judge,
             "n_items": len(items), "n_verdicts": len(files),
             "wins": dict(wins), "mean_rubric": mean,
+            "normalized": normalized, "win_share": win_share,
             "items": items, "verdicts": verdicts}
 
 
@@ -112,17 +124,23 @@ with (RESULTS / "model_comparison.csv").open("w", newline="") as fh:
     w = csv.writer(fh)
     w.writerow(["judgment_set", "label", "arm", "judge", "n_items",
                 "n_verdicts", "arm_wins", "baseline_wins", "ties",
-                "arm_recall", "base_recall", "arm_precision",
-                "base_precision", "arm_actionability", "base_actionability",
+                "win_share",
+                "arm_recall", "base_recall", "recall_ratio",
+                "arm_precision", "base_precision", "precision_ratio",
+                "arm_actionability", "base_actionability",
                 "audit_failed_items"])
     for name, t in results.items():
         a, b = t["arm"], t["baseline"]
         ra, rb = t["mean_rubric"].get(a, {}), t["mean_rubric"].get(b, {})
+        nz = t.get("normalized", {})
         w.writerow([name, t["label"], a, t["judge"], t["n_items"],
                     t["n_verdicts"], t["wins"].get(a, 0),
                     t["wins"].get(b, 0), t["wins"].get("tie", 0),
+                    t.get("win_share"),
                     ra.get("recall"), rb.get("recall"),
+                    nz.get("recall", {}).get("ratio"),
                     ra.get("precision"), rb.get("precision"),
+                    nz.get("precision", {}).get("ratio"),
                     ra.get("actionability"), rb.get("actionability"),
                     ";".join(t.get("audit_failed_items", []))])
 
