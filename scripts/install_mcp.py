@@ -209,8 +209,18 @@ def _codex_config_path(config_root: Path) -> Path:
     ) / "config.toml"
 
 
+def _codex_cli_path() -> Optional[str]:
+    """Resolve the usable Codex CLI, including the Desktop-provided path."""
+    desktop_cli = os.environ.get("CODEX_CLI_PATH")
+    if desktop_cli:
+        candidate = Path(desktop_cli).expanduser()
+        if candidate.is_file():
+            return str(candidate)
+    return shutil.which("codex")
+
+
 def _install_codex(config_root: Path) -> None:
-    codex = shutil.which("codex")
+    codex = _codex_cli_path()
     if codex is None:
         raise InstallError("Codex CLI is not on PATH.")
     _run_quiet([codex, "mcp", "remove", SERVER_NAME])

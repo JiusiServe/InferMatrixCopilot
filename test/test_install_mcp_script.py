@@ -149,3 +149,28 @@ def test_codex_config_path_honors_codex_home(monkeypatch, tmp_path):
     monkeypatch.setenv("CODEX_HOME", str(custom_home))
 
     assert installer._codex_config_path(tmp_path) == custom_home / "config.toml"
+
+
+def test_codex_cli_path_prefers_desktop_environment(monkeypatch, tmp_path):
+    installer = _load_installer()
+    desktop_cli = tmp_path / "codex.exe"
+    desktop_cli.touch()
+    monkeypatch.setenv("CODEX_CLI_PATH", str(desktop_cli))
+    monkeypatch.setattr(
+        installer.shutil,
+        "which",
+        lambda command: "C:/Program Files/WindowsApps/codex.exe",
+    )
+
+    assert installer._codex_cli_path() == str(desktop_cli)
+
+
+def test_codex_cli_path_falls_back_to_path(monkeypatch, tmp_path):
+    installer = _load_installer()
+    monkeypatch.setenv(
+        "CODEX_CLI_PATH",
+        str(tmp_path / "missing-codex.exe"),
+    )
+    monkeypatch.setattr(installer.shutil, "which", lambda command: "codex")
+
+    assert installer._codex_cli_path() == "codex"
