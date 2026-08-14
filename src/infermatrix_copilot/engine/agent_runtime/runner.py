@@ -167,12 +167,24 @@ async def run_agent_step(
     prompt = dispatch_ctx.render()
     if guidance:
         prompt += f"\n\n## STEP GUIDANCE\n{guidance}"
-    outcome = await asyncio.to_thread(
-        run_agent,
-        step_llm, system=system, prompt=prompt, scope=scope,
-        trace=ctx.trace, extra_tools=all_extra, max_iters=budget,
-        model=tier_model,
-    )
+    if target.kind == "harness" and llm_override is None:
+        # Harness backend (doc/RFC-provider-registry.md): the vendor CLI owns
+        # the tool loop for this whole step — same prompt bundle and output
+        # contract, builtin tools served back through the MCP bridge under
+        # this scope. MoA members (llm_override) are raw-API endpoints and
+        # keep the in-process loop even under a harness backend.
+        from ...providers import run_harness_step
+
+        outcome = await asyncio.to_thread(
+            run_harness_step, ctx, target, step_name=step_name,
+            system=system, prompt=prompt, scope=scope, max_iters=budget)
+    else:
+        outcome = await asyncio.to_thread(
+            run_agent,
+            step_llm, system=system, prompt=prompt, scope=scope,
+            trace=ctx.trace, extra_tools=all_extra, max_iters=budget,
+            model=tier_model,
+        )
     output = _coerce_output(outcome.text, ctx, contract)
     if output is not None:
         output.setdefault("_tools_used", outcome.tools_used[:40])

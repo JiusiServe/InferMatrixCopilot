@@ -62,10 +62,19 @@ class ResolvedTarget:
     api_key: str
     source: str
     provider: Literal["anthropic", "openai"] = "anthropic"
+    # Provider registry (doc/RFC-provider-registry.md): which registry entry
+    # serves this target and how. `api` keeps today's exact semantics;
+    # `harness` targets carry NO endpoint/credential here — subscription auth
+    # lives inside the vendor CLI and is never resolved by Settings.
+    provider_id: str = "api"
+    kind: Literal["api", "harness"] = "api"
 
     @property
     def host(self) -> str:
-        """Endpoint hostname for traces/echo lines."""
+        """Endpoint hostname for traces/echo lines (`cli:<provider>` for
+        harness targets, which have no HTTP endpoint of ours)."""
+        if self.kind == "harness":
+            return f"cli:{self.provider_id}"
         if self.base_url:
             return urlparse(self.base_url).netloc
         return ("api.openai.com" if self.provider == "openai"
@@ -140,6 +149,18 @@ class Settings(BaseSettings):
     # page so a report is never dumped unbounded over the stdio protocol.
     mcp_repo_allowlist: list[str] = []
     mcp_report_max_bytes: int = 65536
+
+    # Strict execution backend (doc/RFC-provider-registry.md): which provider
+    # powers runs. REQUIRED for Strict — `strict_readiness` names the exact
+    # fix when empty (decision: explicit selection, never a silent fallback);
+    # the CLI path treats empty as "api" so maintainer setups keep working.
+    # Harness ids (cursor / claude-code / codex) need no API key: the vendor
+    # CLI holds the subscription auth.
+    strict_backend: str = ""             # "" | api | cursor | claude-code | codex
+    strict_backend_model: str = ""       # model id INSIDE the harness (optional)
+    strict_backend_concurrency: int = 2  # concurrent harness sessions
+    strict_backend_cli: str = ""         # binary path override (else PATH)
+    strict_backend_timeout_s: float = 1800.0  # per-session wall-clock ceiling
 
     # Shared, human-curated knowledge base — vendored from the community docs
     # (see doc/KNOWLEDGE.md), organized as general/ (cross-repo experience) +
@@ -278,6 +299,18 @@ class Settings(BaseSettings):
                              "string->string equivalences")
         return obj
 
+    @field_validator("strict_backend")
+    @classmethod
+    def _validate_strict_backend(cls, v):
+        """Unknown backend ids fail at startup, not mid-run: the selection is
+        a routing decision and a typo must not silently mean 'api'."""
+        allowed = {"", "api", "cursor", "claude-code", "codex"}
+        if v not in allowed:
+            raise ValueError(
+                f"STRICT_BACKEND must be one of {sorted(allowed - {''})} "
+                f"(or unset), got {v!r}")
+        return v
+
     @model_validator(mode="after")
     def _validate_tier_atomicity(self):
         """Reject partial tier backends at startup: URL or key alone could pair
@@ -386,6 +419,16 @@ class Settings(BaseSettings):
         shared one); `performance` with no `performance_model` raises
         `TierNotConfiguredError` — failing upfront replaced the silent
         agent_model fallback that once mislabeled a whole run."""
+        backend = self.strict_backend
+        if backend not in ("", "api"):
+            # Harness target (doc/RFC-provider-registry.md): the vendor CLI
+            # holds the subscription credential, so base_url/api_key stay
+            # empty and per-tier API backends do not apply — the harness
+            # serves both modes (its model comes from STRICT_BACKEND_MODEL).
+            return ResolvedTarget(role, self.strict_backend_model, "", "",
+                                  f"backend:{backend}",
+                                  self.resolved_llm_provider,
+                                  provider_id=backend, kind="harness")
         if mode == "performance":
             if not self.performance_model:
                 raise TierNotConfiguredError(
