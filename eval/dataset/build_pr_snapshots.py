@@ -53,7 +53,8 @@ _LINKED_ISSUE = re.compile(r"(?:fix(?:es|ed)?|close[sd]?|resolve[sd]?)\s*:?\s*#(
 # Fields we are allowed to request. Anything carrying reviewer opinion — comments,
 # reviews, or the pulls/<n>/comments endpoint — is absent by construction, not by
 # filtering after the fact.
-_VIEW_FIELDS = "title,body,labels,headRefName,state,isDraft,mergeable,mergeStateStatus"
+_VIEW_FIELDS = ("title,body,labels,headRefName,state,isDraft,mergeable,"
+                "mergeStateStatus,commits")
 
 
 def _gh(args: list[str]) -> tuple[int, str]:
@@ -78,6 +79,18 @@ def _context_bundle(pr: int, data: dict) -> str:
                      + f"\n{_clip(data.get('body'), 4000)}")
     else:
         parts.append("(pr view unavailable — partial context)")
+    if data:
+        # commit timeline — reproduced from fetch.py `_pr_context_bundle`
+        # (added there for the squashed-diff add-then-revert class); the
+        # snapshot must carry it too or the copilot arm holds information
+        # the reference arms were never given
+        subjects = [
+            f"- {str(c.get('oid') or '')[:8]} "
+            f"{_clip((c.get('messageHeadline') or ''), 100)}"
+            for c in (data.get("commits") or [])[-20:]]
+        if subjects:
+            parts.append("## Commit timeline (subjects only — the diff below "
+                         "is the squashed net change)\n" + "\n".join(subjects))
     hay = f"{(data.get('body') or '')} {(data.get('headRefName') or '')}"
     for num in list(dict.fromkeys(_LINKED_ISSUE.findall(hay)))[:2]:
         code, out = _gh(["issue", "view", num, "--json", "title,body"])
@@ -142,7 +155,8 @@ def build(pr: int) -> tuple[str, str]:
 def main() -> int:
     splits = set((sys.argv[1] if len(sys.argv) > 1 else "train,val,test").split(","))
     ds = yaml.safe_load(DATASET.read_text(encoding="utf-8"))
-    items = [i for i in ds["pr_review"] if i.get("split") in splits]
+    items = [i for i in ds["pr_review"] + (ds.get("pr_review_wave2") or [])
+             if i.get("split") in splits]
     OUT.mkdir(parents=True, exist_ok=True)
 
     failures = []

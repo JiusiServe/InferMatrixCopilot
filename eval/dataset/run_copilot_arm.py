@@ -52,7 +52,7 @@ OUT = HERE / "arms" / _os.environ.get("ARM_OUT", "copilot_v2")
 RUN_ROOT = Path.home() / ".infermatrix-copilot" / "runs"
 CLI = _os.environ.get("OMNI_CLI") or _shutil.which("infermatrix-copilot") or "infermatrix-copilot"
 CWD = HERE.parent.parent  # repo root, where .env lives
-SPLIT_ORDER = {"val": 0, "train": 1, "test": 2}
+SPLIT_ORDER = {"val": 0, "train": 1, "test": 2, "holdout": 3}
 
 
 def _find_run_dir(private_root: Path, kind: str, n: int) -> Path | None:
@@ -214,6 +214,8 @@ def main() -> None:
     kinds = [k for k in (_os.environ.get("KINDS") or
                          "pr_review,issue_answer").split(",") if k]
     items = ([("pr_review", i["pr"], i["split"]) for i in d["pr_review"]]
+             + [("pr_review", i["pr"], i["split"])
+                for i in (d.get("pr_review_wave2") or [])]
              + [("issue_answer", i["issue"], i["split"]) for i in d["issue_answer"]])
     items = [t for t in items if t[2] in want and t[0] in kinds]
     if only:

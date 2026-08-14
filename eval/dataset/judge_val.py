@@ -66,6 +66,11 @@ _SPLITS = {
                        4893, 4810, 4825, 4837, 4816,            # val
                        4762, 4834, 4849, 4954, 4777],           # test
                "issues": []},
+    # Wave 2 (build_wave2.py): 10 recent PRs, pure frozen holdout — human-only
+    # GT, no GOLD gap items (recent PRs lack the history to prove one).
+    "holdout": {"prs": [5509, 5550, 5610, 5703, 5715, 5840, 5863, 5884,
+                        5957, 5976],
+                "issues": []},
 }
 _SPLIT = os.environ.get("SPLIT", "val")
 PR_ITEMS = _SPLITS[_SPLIT]["prs"]

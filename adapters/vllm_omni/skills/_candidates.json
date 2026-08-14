@@ -1,1 +1,16 @@
-{}
+{
+  "behavior-lens-device-rng-review": {
+    "name": "behavior-lens-device-rng-review",
+    "description": "Behavior lens for PRs that flip a device guard from ==cuda to !=cpu: enumerate platform inheritance and validate the claimed allowlist",
+    "body": "When a diff changes `device.type == \"cuda\"` to `device.type != \"cpu\"` (or similar) in shared model code, treat the PR's stated allowlist as a contract. Grep the platform plugin registry and recipes to enumerate every device type that reaches the path; if the PR validates only a subset, the finding is \"implement the explicit allowlist or validate the rest\". Also check whether a device module is captured once with no argument (`torch.get_device_module()`) instead of bound to the actual tensor device.",
+    "modules": [],
+    "proposed_at": 1786614914.8996305
+  },
+  "verification-lens-pytestmark-deselection": {
+    "name": "verification-lens-pytestmark-deselection",
+    "description": "PR review verification lens: new test files without pytestmark are silently deselected by marker-filtered CI; check CI selection command vs each added test file's markers.",
+    "body": "When reviewing a PR that adds test files, grep each added file for `pytestmark`. In vllm-omni, CI selects tests with `-m 'core_model and cpu'` (`.buildkite/cuda/test-ready.yml:13/23/28`, `.buildkite/amd/test-amd-ready.yml:19`) and the XPU lane with `-m 'core_model and xpu and B60'`. There is no `pytest_collection_modifyitems` hook that auto-adds `core_model`, so a new test file without `pytestmark = [pytest.mark.core_model, pytest.mark.cpu]` is silently deselected (green CI, zero execution). Test integrity outranks test existence: report it as major and ask for the module-level marker matching every sibling file in the directory.",
+    "modules": [],
+    "proposed_at": 1786692376.3324893
+  }
+}

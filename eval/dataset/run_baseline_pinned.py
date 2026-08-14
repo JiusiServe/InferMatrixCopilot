@@ -75,7 +75,8 @@ def main() -> int:
     only = sys.argv[2] if len(sys.argv) > 2 else ""
     ds = yaml.safe_load(DATASET.read_text(encoding="utf-8"))
     heads = json.loads(EXPECTED_HEADS.read_text(encoding="utf-8"))
-    items = [i for i in ds["pr_review"] if i.get("split") in splits]
+    items = [i for i in ds["pr_review"] + (ds.get("pr_review_wave2") or [])
+             if i.get("split") in splits]
     if only:
         items = [i for i in items if f"pr{i['pr']}" == only]
     OUT.mkdir(parents=True, exist_ok=True)
