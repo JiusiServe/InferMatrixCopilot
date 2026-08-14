@@ -33,13 +33,22 @@ preflight passes, run targeted tests and low-cost static checks alongside the
 source review.
 Stop when every changed semantic path has a supported finding or an explicit
 no-issue conclusion; do not add searches only for confidence.
+After source review independently verifies its candidate findings, fetch a
+bounded snapshot of existing PR conversation comments, review summaries, and
+thread-aware inline review threads. Do not use existing feedback to skip source
+paths. Classify every candidate as `new`, `duplicate`, `extends_existing`, or
+`resolved_or_outdated`; suppress duplicates, and point extensions to the
+existing thread instead of opening a parallel comment. If feedback cannot be
+read, report that validation gap. For local/worktree reviews, mark feedback as
+not applicable.
 
 Do not wait for CI completion or resolved mergeability before the progress
 update. Mark early findings as preliminary and continue the review. This update
 is not a GitHub comment; do not post an interim review.
 
 Before finalizing, call `validate_direct_review` with the pinned head SHA as
-`evidence_head_sha` and classify `subtraction_signal`. Use `none` without a
+`evidence_head_sha`, the feedback status and candidate dispositions, and
+classify `subtraction_signal`. Use `none` without a
 minimality proof when the diff does not add or expand a helper, class, fallback,
 compatibility branch, or public behavior. Use `triggered` for those changes and
 only then provide subtraction evidence.

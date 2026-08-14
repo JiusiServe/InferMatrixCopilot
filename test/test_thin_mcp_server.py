@@ -147,6 +147,14 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
         and "fetch the PR head ref" in item
         for item in review["first_review_checklist"]
     )
+    assert any(
+        "existing feedback is a final deduplication input" in item
+        for item in review["first_review_checklist"]
+    )
+    assert any(
+        "extends_existing" in item and "Suppress duplicates" in item
+        for item in review["first_review_checklist"]
+    )
     assert review["progress_update"] == {
         "deadline_seconds": 60,
         "channel": "host_conversation",
@@ -172,6 +180,12 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
     assert review["completion_gate"] == {
         "tool": "validate_direct_review",
         "evidence_head_sha": "Required: the frozen head commit SHA every cited source file and validation result was read at; fetch the PR head ref when the local checkout holds another revision.",
+        "existing_feedback_status": {
+            "checked": "PR feedback was fetched after independent source verification and every candidate was classified.",
+            "unavailable": "PR feedback could not be fetched; report this validation gap.",
+            "not_applicable": "The target is a local/worktree review without a PR.",
+        },
+        "finding_dispositions": "For checked PR reviews: [{anchor, disposition, existing_thread?}] where disposition is new, duplicate, extends_existing, or resolved_or_outdated.",
         "subtraction_signal": {
             "none": "No helper/class/fallback/compatibility/public-behavior expansion; no subtraction evidence required.",
             "triggered": "Require subtraction items or minimality_proof.",
@@ -404,6 +418,83 @@ def test_small_fix_accepts_no_subtraction_signal_without_full_proof():
     assert result["subtraction_required"] is False
     assert result["subtraction_items"] == 0
     assert result["evidence_head_sha"] == _HEAD_SHA
+
+
+def test_pr_review_requires_feedback_status():
+    result = _direct_completion_result(
+        subtraction_signal="none",
+        evidence_head_sha=_HEAD_SHA,
+        existing_feedback_status="",
+    )
+
+    assert result["status"] == "partial_review"
+    assert result["publish_ready"] is False
+    assert result["missing"] == [
+        (
+            "existing_feedback_status must be 'checked', 'unavailable', or "
+            "'not_applicable'"
+        )
+    ]
+
+
+def test_checked_feedback_counts_and_suppresses_duplicate_dispositions():
+    result = _direct_completion_result(
+        subtraction_signal="none",
+        evidence_head_sha=_HEAD_SHA,
+        existing_feedback_status="checked",
+        finding_dispositions=[
+            {
+                "anchor": "src/runtime.py:42",
+                "disposition": "duplicate",
+                "existing_thread": "PRRT_duplicate",
+            },
+            {
+                "anchor": "src/runtime.py:91",
+                "disposition": "extends_existing",
+                "existing_thread": "PRRT_extension",
+            },
+            {
+                "anchor": "src/config.py:12",
+                "disposition": "new",
+            },
+        ],
+    )
+
+    assert result["status"] == "complete"
+    assert result["finding_dispositions"] == 3
+    assert result["duplicate_findings_suppressed"] == 1
+
+
+def test_non_new_disposition_requires_existing_thread():
+    result = _direct_completion_result(
+        subtraction_signal="none",
+        evidence_head_sha=_HEAD_SHA,
+        existing_feedback_status="checked",
+        finding_dispositions=[{
+            "anchor": "src/runtime.py:42",
+            "disposition": "resolved_or_outdated",
+        }],
+    )
+
+    assert result["status"] == "partial_review"
+    assert "existing_thread" in result["missing"][0]
+
+
+def test_feedback_dispositions_require_checked_status():
+    result = _direct_completion_result(
+        subtraction_signal="none",
+        evidence_head_sha=_HEAD_SHA,
+        existing_feedback_status="unavailable",
+        finding_dispositions=[{
+            "anchor": "src/runtime.py:42",
+            "disposition": "new",
+        }],
+    )
+
+    assert result["status"] == "partial_review"
+    assert result["missing"] == [
+        "finding_dispositions require existing_feedback_status='checked'"
+    ]
 
 
 def test_triggered_subtraction_requires_evidence():

@@ -190,6 +190,8 @@ _DIRECT_REVIEW_CHECKLIST = [
     "At native dependency boundaries, verify the pinned API contract and caller inputs; native reuse does not prove the caller's budget, ordering, adapter, or lifecycle correctness.",
     "For feature-gated behavior, audit the enabled path independently; a safe disabled/default path limits blast radius but does not prove the new path correct.",
     "Stop investigating when every changed semantic path has a supported finding or explicit no-issue conclusion; do not add searches only for confidence.",
+    "After candidate findings are evidence-verified, for PR targets fetch bounded conversation comments, review summaries, and thread-aware review threads. Keep source discovery independent: existing feedback is a final deduplication input, not a reason to skip changed semantic paths.",
+    "Classify every candidate finding as new, duplicate, extends_existing, or resolved_or_outdated. Suppress duplicates; for extensions, point to the existing thread instead of opening a parallel inline comment. Record unavailable PR feedback as a validation gap; use not_applicable only for local/worktree reviews.",
     "Run subtraction only when the diff adds or expands a helper, class, fallback, compatibility branch, or public behavior; otherwise mark no subtraction signal.",
     "Plan exactly one consolidated final review comment.",
 ]
@@ -217,6 +219,13 @@ _DIRECT_PROGRESS_UPDATE = {
 }
 _SUBTRACTION_ACTIONS = {"DELETE", "DEFER", "INLINE", "MERGE", "MOVE"}
 _SUBTRACTION_SIGNALS = {"none", "triggered"}
+_FEEDBACK_STATUSES = {"checked", "unavailable", "not_applicable"}
+_FINDING_DISPOSITIONS = {
+    "new",
+    "duplicate",
+    "extends_existing",
+    "resolved_or_outdated",
+}
 _EVIDENCE_HEAD_SHA = re.compile(r"[0-9a-f]{7,40}")
 
 
@@ -683,6 +692,8 @@ def _direct_completion_result(
     minimality_proof: dict[str, str] | None = None,
     final_comment_count: int = 1,
     evidence_head_sha: str = "",
+    existing_feedback_status: str = "not_applicable",
+    finding_dispositions: list[dict[str, str]] | None = None,
 ) -> dict:
     """Mechanically gate Direct completion on subtraction classification.
 
@@ -698,6 +709,8 @@ def _direct_completion_result(
     subtraction = subtraction or []
     minimality_proof = minimality_proof or {}
     evidence_head_sha = str(evidence_head_sha).strip().casefold()
+    existing_feedback_status = str(existing_feedback_status).strip().casefold()
+    finding_dispositions = finding_dispositions or []
     missing: list[str] = []
 
     if final_comment_count != 1:
@@ -711,6 +724,43 @@ def _direct_completion_result(
             "evidence_head_sha must be the frozen head commit SHA "
             "(7-40 hex characters) that every cited source file and "
             "validation result was read at"
+        )
+
+    if existing_feedback_status not in _FEEDBACK_STATUSES:
+        missing.append(
+            "existing_feedback_status must be 'checked', 'unavailable', or "
+            "'not_applicable'"
+        )
+
+    malformed_dispositions: list[int] = []
+    for index, item in enumerate(finding_dispositions):
+        if not isinstance(item, dict):
+            malformed_dispositions.append(index)
+            continue
+        anchor = str(item.get("anchor", "")).strip()
+        disposition = str(item.get("disposition", "")).strip().casefold()
+        existing_thread = str(item.get("existing_thread", "")).strip()
+        needs_thread = disposition in {
+            "duplicate",
+            "extends_existing",
+            "resolved_or_outdated",
+        }
+        if (
+            ":" not in anchor
+            or disposition not in _FINDING_DISPOSITIONS
+            or (needs_thread and not existing_thread)
+        ):
+            malformed_dispositions.append(index)
+    if malformed_dispositions:
+        missing.append(
+            "each finding disposition needs a path:line anchor, a valid "
+            "new/duplicate/extends_existing/resolved_or_outdated disposition, "
+            "and existing_thread for every non-new item "
+            f"(invalid indexes: {malformed_dispositions})"
+        )
+    if existing_feedback_status != "checked" and finding_dispositions:
+        missing.append(
+            "finding_dispositions require existing_feedback_status='checked'"
         )
 
     malformed_subtractions: list[int] = []
@@ -773,9 +823,18 @@ def _direct_completion_result(
         "subtraction_required": subtraction_signal == "triggered",
         "subtraction_items": len(subtraction),
         "minimality_proof": has_minimality_proof,
+        "existing_feedback_status": existing_feedback_status,
+        "finding_dispositions": len(finding_dispositions),
+        "duplicate_findings_suppressed": sum(
+            1
+            for item in finding_dispositions
+            if isinstance(item, dict)
+            and str(item.get("disposition", "")).strip().casefold()
+            in {"duplicate", "resolved_or_outdated"}
+        ),
         "missing": missing,
         "next_action": (
-            "Return the single consolidated review comment."
+            "Return the single consolidated review comment with duplicate findings suppressed."
             if complete
             else "Classify the subtraction signal; only a triggered diff needs one bounded subtraction pass using the existing evidence packet."
         ),
@@ -852,7 +911,12 @@ def build_mcp(
             "evidence at the frozen head SHA; fetch the PR head ref when the "
             "local checkout holds another revision. Before treating a Direct "
             "review as complete or posting its only final comment, call "
-            "validate_direct_review with that evidence_head_sha. Mark "
+            "validate_direct_review with that evidence_head_sha. After source "
+            "findings are independently verified, fetch bounded PR discussion "
+            "and thread-aware review feedback, classify every candidate, and "
+            "suppress duplicates. Pass existing_feedback_status=checked for "
+            "that PR path, unavailable when the fetch fails, or not_applicable "
+            "only for local/worktree reviews. Mark "
             "subtraction_signal=none when the diff "
             "does not add or expand a helper, class, fallback, compatibility "
             "branch, or public behavior. Only subtraction_signal=triggered "
@@ -957,6 +1021,12 @@ def build_mcp(
                     "completion_gate": {
                         "tool": "validate_direct_review",
                         "evidence_head_sha": "Required: the frozen head commit SHA every cited source file and validation result was read at; fetch the PR head ref when the local checkout holds another revision.",
+                        "existing_feedback_status": {
+                            "checked": "PR feedback was fetched after independent source verification and every candidate was classified.",
+                            "unavailable": "PR feedback could not be fetched; report this validation gap.",
+                            "not_applicable": "The target is a local/worktree review without a PR.",
+                        },
+                        "finding_dispositions": "For checked PR reviews: [{anchor, disposition, existing_thread?}] where disposition is new, duplicate, extends_existing, or resolved_or_outdated.",
                         "subtraction_signal": {
                             "none": "No helper/class/fallback/compatibility/public-behavior expansion; no subtraction evidence required.",
                             "triggered": "Require subtraction items or minimality_proof.",
@@ -1015,6 +1085,8 @@ def build_mcp(
         minimality_proof: dict[str, str] | None = None,
         final_comment_count: int = 1,
         evidence_head_sha: str = "",
+        existing_feedback_status: str = "",
+        finding_dispositions: list[dict[str, str]] | None = None,
     ) -> dict:
         """Validate the Direct completion gate before the only final comment.
 
@@ -1025,6 +1097,11 @@ def build_mcp(
         the frozen head commit every cited source file and validation result
         was read at; a review whose evidence came from another revision is not
         complete. A ``partial_review`` result is not a completed Direct review.
+        For PR reviews, fetch existing feedback only after independently
+        verifying candidate findings, then pass ``existing_feedback_status``
+        and classify each candidate in ``finding_dispositions``. Duplicate and
+        resolved/outdated findings must identify the existing thread and must
+        not be emitted as new comments.
         """
         started = time.perf_counter()
         result = _direct_completion_result(
@@ -1033,6 +1110,8 @@ def build_mcp(
             minimality_proof=minimality_proof,
             final_comment_count=final_comment_count,
             evidence_head_sha=evidence_head_sha,
+            existing_feedback_status=existing_feedback_status,
+            finding_dispositions=finding_dispositions,
         )
         result.setdefault("diagnostics", {})["timing_ms"] = {
             "validate_direct_review": int(
