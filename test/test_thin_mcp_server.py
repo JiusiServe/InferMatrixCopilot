@@ -182,10 +182,11 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
         "evidence_head_sha": "Required: the frozen head commit SHA every cited source file and validation result was read at; fetch the PR head ref when the local checkout holds another revision.",
         "existing_feedback_status": {
             "checked": "PR feedback was fetched after independent source verification and every candidate was classified.",
+            "disabled": "PR_CONTEXT_MODE=no_discussion explicitly disabled feedback for evaluation.",
             "unavailable": "PR feedback could not be fetched; report this validation gap.",
             "not_applicable": "The target is a local/worktree review without a PR.",
         },
-        "finding_dispositions": "For checked PR reviews: [{anchor, disposition, existing_thread?}] where disposition is new, duplicate, extends_existing, or resolved_or_outdated.",
+        "finding_dispositions": "For checked PR reviews: [{anchor, disposition, existing_thread?, head_recheck?}] where disposition is new, duplicate, extends_existing, or resolved_or_outdated; resolved/outdated items require head_recheck=fixed or still_affected.",
         "subtraction_signal": {
             "none": "No helper/class/fallback/compatibility/public-behavior expansion; no subtraction evidence required.",
             "triggered": "Require subtraction items or minimality_proof.",
@@ -431,8 +432,8 @@ def test_pr_review_requires_feedback_status():
     assert result["publish_ready"] is False
     assert result["missing"] == [
         (
-            "existing_feedback_status must be 'checked', 'unavailable', or "
-            "'not_applicable'"
+            "existing_feedback_status must be 'checked', 'disabled', "
+            "'unavailable', or 'not_applicable'"
         )
     ]
 
@@ -495,6 +496,43 @@ def test_feedback_dispositions_require_checked_status():
     assert result["missing"] == [
         "finding_dispositions require existing_feedback_status='checked'"
     ]
+
+
+def test_no_discussion_evaluation_can_explicitly_disable_feedback():
+    result = _direct_completion_result(
+        subtraction_signal="none",
+        evidence_head_sha=_HEAD_SHA,
+        existing_feedback_status="disabled",
+    )
+
+    assert result["status"] == "complete"
+    assert result["existing_feedback_status"] == "disabled"
+
+
+def test_resolved_outdated_rechecks_the_pinned_head():
+    result = _direct_completion_result(
+        subtraction_signal="none",
+        evidence_head_sha=_HEAD_SHA,
+        existing_feedback_status="checked",
+        finding_dispositions=[
+            {
+                "anchor": "src/fixed.py:10",
+                "disposition": "resolved_or_outdated",
+                "existing_thread": "PRRT_fixed",
+                "head_recheck": "fixed",
+            },
+            {
+                "anchor": "src/live.py:20",
+                "disposition": "resolved_or_outdated",
+                "existing_thread": "PRRT_live",
+                "head_recheck": "still_affected",
+            },
+        ],
+    )
+
+    assert result["status"] == "complete"
+    assert result["duplicate_findings_suppressed"] == 1
+    assert result["resolved_or_outdated_still_affected"] == 1
 
 
 def test_triggered_subtraction_requires_evidence():
