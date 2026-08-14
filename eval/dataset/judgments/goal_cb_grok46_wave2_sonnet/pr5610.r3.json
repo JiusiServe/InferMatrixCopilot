@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.25,
+    "precision": 0.8,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X's review is far more comprehensive, touching most GT concern clusters (connector/live-state ownership invariant almost verbatim echoing the human reviewer's 'Synchronization of Live-State Data' point, platform-guard gaps for XPU/MUSA, prefix-cache and full-payload-branch claims explicitly validated) plus well-hedged, file/line-grounded novel findings (GitHub image rendering, TP>1 collective) and concrete fixes. Y is precise and deeply verified but delivers only a single substantive finding (the XPU/MUSA platform-predicate issue), leaving most GT concern areas (connector ownership, prefix cache, SVG clarity, image path) untouched, and its output includes irrelevant harness metadata ('skill candidates awaiting curation') that dilutes usefulness as a review artifact.",
+  "_cost_usd": 0.3393046,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok46"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46",
+    "arm_a_sha256": "3d67b11e6e2fbaee24300e96ea049e6f13d7804ce83a953221193af32b6d2380",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

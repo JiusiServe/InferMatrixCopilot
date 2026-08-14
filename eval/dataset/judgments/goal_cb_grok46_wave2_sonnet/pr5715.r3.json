@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently found the same well-grounded NPU vllm-ascend RC-branch-vs-stable-image inconsistency, which sits in the exact area of the ground truth's PTAL/LGTM thread on npu.inc.md:56. Y goes further by catching that the new blanket '0.26.x requires vLLM 0.26.x' note contradicts musa.inc.md's still-0.18-pinned MUSA install, directly touching the file the ground truth's 'do not change this' comment protects, and by confirming musa.inc.md/quickstart.md were left untouched (matching the ground-truth intent) rather than ignoring them entirely as X does. Y's comments are also more concrete, offering exact replacement text and verification commands, giving it higher actionability at a small cost to average precision from a couple of nitpicky/subjective items.",
+  "_cost_usd": 0.22502060000000002,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46",
+    "arm_a_sha256": "56439aaa087ae0fb4c50ab7b82f8a77d6ce6b2198b699c8190af43ba3cf57fc0",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5866809cd7926f6bee88b473acf165652378865539411405c15a7c86c14e7466",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

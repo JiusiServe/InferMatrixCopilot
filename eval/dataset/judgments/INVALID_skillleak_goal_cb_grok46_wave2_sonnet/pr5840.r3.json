@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.8,
+    "precision": 0.78,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.9,
+    "actionability": 0.88
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently rediscover the real, still-live bug that the model-specific 0.17 default never reaches the runtime because the engine injects 0.2 before TeaCacheConfig sees it — this is the closest match to the ground-truth's headline threshold concern, and both also flag that the E2E smoke test can't prove a cache hit occurred, echoing the reviewer's own validation note. Y is organized more like a professional review (blocking/should-fix/minor/verified-correct), adds several additional well-grounded findings (memory retention of two full packed tensors, wasted RoPE computation on cached steps, a drive-by shared-helper change that silently altered an unrelated FP8 test, and a design-consistency note on hard-fail vs. warn-and-disable) without overclaiming. X's polynomial-floor analysis is sharp but a couple of its items (the Cache-DiT table question, the open-ended CI gate question) are speculative rather than resolved findings, slightly denting precision relative to Y's more consistently grounded and actionable list.",
+  "_cost_usd": 0.5438049,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46",
+    "arm_a_sha256": "ed9a249e740bc02aca24ee3a7ae1cef54c280533611e748e9f825bac7536c28f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

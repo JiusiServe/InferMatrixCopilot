@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.55,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.7,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y directly hits several ground-truth threads with concrete evidence: it traces the exact native-speed-control/streaming validation machinery hsliuustc0106 flagged as blocking and finds a deeper variant (diffusion dispatcher bypasses the streaming+speed gate), and it flags the HTTP/WebSocket doc contradiction linyueqian raised inline. X's findings, though technically detailed and plausible, land entirely outside the space of concerns any human reviewer raised (checkpoint bias init, payload accumulation semantics, prefix caching, renderer selection) and cite internals without verbatim source evidence, making precision harder to trust. Both reviews are well file/line-anchored with concrete suggested changes, but Y's practice of quoting exact source lines as evidence for each claim gives it a grounding edge X lacks. Neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.4556043,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok46"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46",
+    "arm_a_sha256": "225d96a3db2d4b5856a870ec0a5a6cd75cefa43ad4cd9232274999727908d338",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

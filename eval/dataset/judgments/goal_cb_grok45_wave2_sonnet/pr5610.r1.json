@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.65,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates correctly recognize that most ground-truth concerns (platform scope, XPU/MUSA guard wording, full-payload-branch unreachability) are already resolved in this diff, but Y explicitly validates a broader slice of the ground-truth concern space (NPU/platform, guard table, full-payload branch, prefix-cache note) and then extends two of the same threads (connector-output ownership, image path) into new, well-grounded findings with specific file:line evidence. X validates fewer topics (platform/guard/full-payload only) and its own novel findings include a likely-fabricated nav.yml duplicate claim contradicted by the visible diff hunk, hurting precision. Both are concrete and actionable with file/line citations, but Y's suggested fixes are more specific and its coverage of the underlying concern space is markedly deeper.",
+  "_cost_usd": 0.3987926,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok45",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok45",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok45",
+    "arm_a_sha256": "79a6b6f040dfe3831ebebbb8736b6582ea30cb9700ed811b9596b0810770b831",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

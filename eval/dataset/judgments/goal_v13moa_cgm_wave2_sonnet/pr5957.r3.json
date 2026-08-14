@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.6,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.8,
+    "actionability": 0.75
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y's findings overlap meaningfully with ground truth — it independently surfaces the same WebSocket/HTTP streaming-speed asymmetry the top human inline comment flagged (via docs/serving/speech_api.md vs the fixed audio.py/serving_speech.py behavior), and validates the native-speed fix state, while backing every claim with verbatim evidence quotes and line numbers that are hard to fabricate. X produces a thorough, well-argued review but on an almost entirely disjoint set of concerns (checkpoint bias init, payload CONCAT semantics, snapshot copying, prefix-caching errors) that don't match any ground-truth comment, and its claims read as plausible but less verifiably grounded (speculative phrasing, no verbatim evidence). Both are reasonably actionable with concrete file/line targets, giving X a slight edge there, but Y wins clearly on recall and precision.",
+  "_cost_usd": 0.2609874,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_moa_cgm"
+  },
+  "_roles": {
+    "arm": "copilot_v13_moa_cgm",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_moa_cgm",
+    "arm_a_sha256": "510c9baf33573fe2b4c87a09f0acb68f3d2db76489969ea19bed869ab9b2bd9c",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

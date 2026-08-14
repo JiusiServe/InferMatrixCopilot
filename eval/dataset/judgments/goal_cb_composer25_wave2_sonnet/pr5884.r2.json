@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.75,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth is thin: mostly a resolved Q&A about whether attrgetter is redundant outside the dotted case, plus a suggestion to extract a shared 'resolve dotted path' helper mirroring module_collector.py. Neither candidate proposes that exact shared-helper refactor, but Y comes closer by explicitly recommending cache_summary adopt module_collector's warning-on-unresolved-path behavior, while X only cites the pattern as validation evidence. Both candidates go well beyond the ground truth with independently-sourced findings (unfixed getattr in diffusion_model_runner.py/lora manager.py, untested SoulX Singer activation); Y's version of that SoulX finding is materially deeper, tracing an actual sequence-length mismatch bug in DBCache buffers rather than just flagging it as untested, and Y also catches that the new is_cached guard doesn't do what the PR description claims — both show more causal rigor than X's more surface-level sweep/validation style. Y's suggestions are also more concrete (ready-to-drop-in code/logger snippets vs. X's more open-ended 'has this been triaged' questions), giving it an edge on actionability.",
+  "_cost_usd": 0.2499643,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_composer25",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_composer25",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_composer25",
+    "arm_a_sha256": "0edef385f14a6c9bc8c75fd87e4f4ca0a1c469a3faa79d3f6d8ffc21e816eba5",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "80debb7f8b9b3343eef7ae50f0618e17195384c354a466e33b4f3b71b6863ca2",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

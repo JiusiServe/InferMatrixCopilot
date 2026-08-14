@@ -1,0 +1,113 @@
+{
+  "wall_s": 1127.8,
+  "split": "holdout",
+  "rc": 0,
+  "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_moa_cgm/runs/pr5610/run-20260814-215045-d9ee3b",
+  "recorded_at": "2026-08-14T22:09:31",
+  "attempts": [
+    {
+      "invocation_id": "inv-d98a6f1f",
+      "outcome": "run:run-20260814-215045-d9ee3b",
+      "rc": 0,
+      "pre_run": null
+    },
+    {
+      "run_dir": "run-20260814-215045-d9ee3b",
+      "llm_calls": 38,
+      "input_tokens": 290948,
+      "output_tokens": 50364,
+      "usd": 0.233112,
+      "source": "spans"
+    }
+  ],
+  "attempt_usd_total": 0.233112,
+  "llm_calls": 38,
+  "input_tokens": 290948,
+  "output_tokens": 50364,
+  "usd": 0.233112,
+  "source": "spans",
+  "metrics": {
+    "schema": 1,
+    "run": "run-20260814-215045-d9ee3b",
+    "task_kind": "pr_review",
+    "status": "done",
+    "quality": {
+      "q": null,
+      "weight_coverage": 0.0,
+      "partial": true,
+      "abstained": false,
+      "components": {
+        "recall_w": null,
+        "precision_v": null,
+        "useful": null,
+        "calib": null,
+        "decision": null
+      }
+    },
+    "cost": {
+      "usd": 0.2331,
+      "minutes": 18.76,
+      "ci_minutes": 0,
+      "input_tokens": 290948,
+      "output_tokens": 50364,
+      "tool_calls": 183,
+      "usd_ref": 1.0,
+      "min_ref": 10.0,
+      "cost_index": 1.5915,
+      "cost_partial": false,
+      "unpriced_calls": 0,
+      "source": "spans",
+      "llm_calls": 38,
+      "by_role": {
+        "planner": {
+          "usd": 0.000524,
+          "input_tokens": 105,
+          "output_tokens": 400,
+          "calls": 1
+        },
+        "agent": {
+          "usd": 0.220837,
+          "input_tokens": 278629,
+          "output_tokens": 42310,
+          "calls": 35
+        },
+        "reducer": {
+          "usd": 0.011752,
+          "input_tokens": 12214,
+          "output_tokens": 7654,
+          "calls": 2
+        }
+      },
+      "cache_read_tokens": 3672448,
+      "cache_creation_tokens": 0
+    },
+    "timings": {
+      "steps": {
+        "fetch": 3.7,
+        "gate": 1.69,
+        "review": 1119.85,
+        "report": 0.07
+      },
+      "time_to_first_result_s": 1125.3
+    },
+    "risk": {
+      "incidents": {
+        "catastrophic": 0,
+        "severe": 0,
+        "moderate": 0,
+        "minor": 0
+      },
+      "safety_multiplier": 1.0
+    },
+    "catq": null,
+    "tus": null,
+    "signals": {
+      "escalations": 0,
+      "pushes": 0,
+      "posted": 0,
+      "steps_completed": 4
+    }
+  },
+  "trace": "pr5610.trace.json.gz",
+  "trace_bytes": 23956
+}

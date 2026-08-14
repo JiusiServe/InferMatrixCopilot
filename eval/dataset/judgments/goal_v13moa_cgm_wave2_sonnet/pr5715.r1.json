@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.9,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y directly hits the two substantive ground-truth signals: it explicitly confirms musa.inc.md and quickstart.md are unchanged from merge-base ('do not change this' honored) and independently flags the exact npu.inc.md vllm-ascend branch pin ('releases/v0.26.0rc') that the human reviewers PTAL'd/LGTM'd, with well-grounded cross-file evidence (Dockerfile.npu, Dockerfile.npu.ci, quay.io tags). X only partially engages the musa contradiction and misses the branch-pin concern entirely, though its two findings are valid and grounded. Both provide file/line-anchored, concrete suggestions, but Y's patches are more literal and its verification (mkdocs.yml, version.py, supported_models.md) is deeper.",
+  "_cost_usd": 0.1913376,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v13_moa_cgm",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_moa_cgm",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_moa_cgm",
+    "arm_a_sha256": "1689645e9948df820d2bb4029549ceec4ea1d9f9f40cb3f547acf0071905591f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5866809cd7926f6bee88b473acf165652378865539411405c15a7c86c14e7466",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

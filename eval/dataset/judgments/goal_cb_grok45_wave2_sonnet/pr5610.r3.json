@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.75,
+    "actionability": 0.78,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates ground their reviews in real code verification (guard table, opt-ins, platform inheritance, full-payload gating, prefix-cache guard all confirmed against source), largely reproducing the ground-truth resolution state rather than reopening fixed issues, and neither catches the qwen-asr/transformers dependency-conflict thread. X goes further: it surfaces a genuinely deeper version of the ground-truth 'connector ownership/live-state' concern (three other drain call-sites break the stated single-consumer invariant) plus a substantive new TP>1 collective-in-background-thread risk, both with precise file:line evidence and concrete fixes. Y's findings (overclaimed 'no output change', overclaimed bundled-profile coverage) are valid and well-evidenced, but its nav.yml duplicate-entry claim is unverifiable from the shown diff and its suggested fixes are vaguer ('qualify the sentence') than X's exact rewrites.",
+  "_cost_usd": 0.3409226,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok45"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok45",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok45",
+    "arm_a_sha256": "79a6b6f040dfe3831ebebbb8736b6582ea30cb9700ed811b9596b0810770b831",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

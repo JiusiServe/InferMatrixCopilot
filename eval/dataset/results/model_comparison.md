@@ -1,39 +1,71 @@
 # Model comparison — Strict pipeline vs Claude Code + Opus 5
 
-Campaign: make the Strict copilot (DeepSeek v4-pro official) beat the
-CC+Opus 5 baseline on PR review. Baseline = Claude Code + Opus 5 on the same
-pinned PR-time worktree with the same frozen sanitized snapshot
-(`baselines/claudecode_opus5`). All comparisons are blind pairwise judgments
-(`judge_val.py`): randomized X/Y order, 3 replicates per item, tool-less judge
-scoring against human ground-truth reviews. Machine-readable copies:
-`model_comparison.json` / `model_comparison.csv` in this directory (regenerate
-with the aggregator; numbers below are computed from the raw verdict JSONs,
-not hand-kept).
+Campaign: make the Strict copilot beat the CC+Opus 5 baseline on PR review.
+Baseline = Claude Code + Opus 5 on the same pinned PR-time worktree with the
+same frozen sanitized snapshot (`baselines/claudecode_opus5`). All comparisons
+are blind pairwise judgments (`judge_val.py`): randomized X/Y order, 3
+replicates per item, tool-less judge scoring against human ground-truth
+reviews. Machine-readable copies: `model_comparison.json` /
+`model_comparison.csv` (regenerate with `aggregate_results.py`; numbers are
+computed from the raw verdict JSONs, not hand-kept).
 
-Last updated: 2026-08-14. All arms complete.
+Last updated: 2026-08-15 early AM. Two peer-session campaigns still landing
+(Grok-4.6 r3 canonical, MoA r2) — their rows are marked partial.
 
-## Headline: wave-2 holdout (10 fresh PRs, human-only GT), judge = claude-sonnet-5
+## Wave-2 holdout, single-model arms, judge = claude-sonnet-5
 
-Wins are verdict counts out of `3 × n_items` (arm—baseline, no ties occurred).
+Wins out of 3 × n_items (arm—baseline). Two routes, never pooled:
+**v13-cb** = the copilot's own v13 Strict pipeline with the model served
+through the cursor-agent backend (provider registry, MCP tool bridge — the
+vendor CLI owns the inner tool loop); **harness** = raw cursor-agent
+end-to-end (loop + model, no copilot pipeline).
 
 | arm | route | wins | recall | precision | actionability | judgment set |
 |---|---|---|---|---|---|---|
-| DS v4-pro r1 (re-scored) | v13 pipeline | **10—20** | 0.32 / 0.44 | **0.83** / 0.79 | 0.80 / 0.89 | `goal_v13_wave2_sonnet` |
-| DS v4-pro r2 (fresh gen) | v13 pipeline | 3—27 | 0.28 / 0.51 | 0.80 / 0.82 | 0.78 / 0.88 | `goal_ds_wave2_r2_sonnet` |
-| MiMo-v2.5 (re-scored) | v13 pipeline | 2—25 | 0.27 / 0.47 | 0.73 / 0.81 | 0.59 / 0.88 | `goal_mimo_wave2_sonnet` |
-| Composer-2.5 † | cursor-agent harness | 4—26 | 0.38 / 0.51 | 0.75 / 0.80 | 0.77 / 0.88 | `goal_composer_wave2_sonnet` |
-| Grok-4.5 † ‡ | cursor-agent harness | 2—28 | 0.30 / 0.46 | 0.81 / 0.78 | 0.71 / 0.89 | `goal_grok45_wave2_sonnet` |
+| DS v4-pro r1 (re-scored) | v13 api | **10—20** | 0.32 / 0.44 | **0.83** / 0.79 | 0.80 / 0.89 | `goal_v13_wave2_sonnet` |
+| DS v4-pro r2 (fresh gen) | v13 api | 3—27 | 0.28 / 0.51 | 0.80 / 0.82 | 0.78 / 0.88 | `goal_ds_wave2_r2_sonnet` |
+| MiMo-v2.5 (re-scored) | v13 api | 2—25 | 0.27 / 0.47 | 0.73 / 0.81 | 0.59 / 0.88 | `goal_mimo_wave2_sonnet` |
+| Composer-2.5 | v13-cb | 4—25 (1 tie) | 0.32 / 0.43 | 0.73 / 0.78 | 0.71 / 0.88 | `goal_cb_composer25_wave2_sonnet` |
+| Grok-4.5-high | v13-cb | 5—24 (1 tie) | 0.35 / 0.50 | 0.78 / 0.81 | 0.75 / 0.88 | `goal_cb_grok45_wave2_sonnet` |
+| Grok-4.6-high r3 † | v13-cb | 0—18 (6/10 items, partial) | 0.34 / 0.56 | 0.82 / 0.84 | 0.74 / 0.87 | `goal_cb_grok46_r3_sonnet` |
+| Composer-2.5 | harness | 4—26 | 0.38 / 0.51 | 0.75 / 0.80 | 0.77 / 0.88 | `goal_composer_wave2_sonnet` |
+| Grok-4.5 ‡ | harness | 2—28 | 0.35 / 0.55 | 0.84 / 0.82 | 0.70 / 0.90 | `goal_grok45_wave2_sonnet` |
 
-Rubric cells are mean arm / mean baseline over that set's verdicts.
+† Canonical clean Grok-4.6 row (peer-session campaign run entirely after the
+skill-leak vector was closed; 2 items quarantined for backfill, 2 still
+generating). Two earlier Grok-4.6 v13-cb replicates are TAINTED by the skill
+leak (see ledger): r1 (`INVALID_skillleak_copilot_cb_grok46`, 5—24 tainted)
+and r2 (`goal_cb_grok46_wave2_sonnet`, 3—17—1 over its 7 kept items).
+Their agreement with r3 indicates the leak was not driving the numbers.
 
-† **Harness-different, never pooled with pipeline rows**: Composer and Grok
-have no raw completions API, so they run headless `cursor-agent` end-to-end
-(loop + model), not the v13 pipeline with only the model swapped. They answer
-a different question and are listed for context only.
+‡ Harness Grok-4.5 is 9/10 contamination-disqualified (clean-only 0—3);
+listed for the record.
 
-‡ **Grok row is contamination-tainted** — see the audit section below. 9 of
-10 items are disqualified; clean-only tally is 0—3 (pr5550 only), and both of
-its verdict wins landed on a contaminated item (pr5957).
+## Wave-2 holdout, MoA arms (composer-2.5 + cursor-grok-4.6-high + mimo-v2.5)
+
+Mixture proposers on the DS v4-pro spine (`MOA_WHEN=always`, reducer/merge on
+the tier model; harness members ride the provider registry, budget cap
+governs the API member only). Two independent replicates of the SAME config,
+different sessions:
+
+| replicate | wins | recall | precision | actionability | judgment set |
+|---|---|---|---|---|---|
+| MoA r1 | 5—24 (1 tie) | 0.29 / 0.42 | 0.80 / 0.79 | 0.76 / 0.88 | `goal_v13moa_cgm_wave2_sonnet` |
+| MoA r2 (partial, 9/10) | 5—22 | 0.29 / 0.43 | **0.83** / 0.79 | 0.79 / 0.88 | `goal_moa_cgm_wave2_sonnet` |
+
+MoA matches the better single-model arms on wins and slightly beats the
+baseline on precision, but recall (~0.29) is the worst of any arm — mixing
+weaker proposers dilutes coverage rather than compounding it.
+
+## Conclusion of the cursor-model campaign
+
+No cursor-served configuration — Composer, Grok-4.5, Grok-4.6, or the
+three-model MoA — beats CC+Opus 5 on the holdout under the strict Sonnet
+judge. Every arm lands inside DeepSeek's replicate band (10—20 … 3—27).
+Precision is consistently competitive (several arms ≥ baseline);
+**strict-credit recall (~0.29–0.35 vs ~0.42–0.56) is the universal gap**,
+unchanged from the DS-only campaign. The remaining lever on record is the
+coverage-driven second investigation round (RFC q3).
 
 ## Earlier gates, judge = GPT-5.6 Sol 272K High (not comparable to Sonnet rows)
 
@@ -44,66 +76,80 @@ its verdict wins landed on a contaminated item (pr5957).
 | wave-2 holdout | DS v4-pro r1, v13 pipeline | 14—16 | `goal_v13_wave2` |
 | wave-2 holdout | MiMo-v2.5, v13 pipeline | 2—27 | `goal_mimo_wave2` |
 
-Under GPT-5.6 the DS arm reached parity (val+test 15—15, wave-2 near-parity
-14—16 with precision 0.748 > 0.672 for the first time). The Sonnet re-score
-revised that story: GPT-5.6 credits recall leniently; Sonnet's strict
-crediting exposes the recall gap. **Cross-judge numbers must never be pooled.**
+Under GPT-5.6 the DS arm reached parity (val+test 15—15; wave-2 precision
+0.748 > 0.672 for the first time). The Sonnet re-score revised that story:
+GPT-5.6 credits recall leniently. **Cross-judge numbers must never be pooled.**
 
 ## Cost (generation, per item, wave-2 holdout)
 
 | arm | mean $/item | mean wall |
 |---|---|---|
 | CC + Opus 5 baseline | $3.58 | 547 s |
-| DS v4-pro r1 (v13) | $0.79 | 1139 s |
-| DS v4-pro r2 (v13) | $0.78 | 1322 s |
-| MiMo-v2.5 (v13) | $0.43 | 1728 s |
-| Composer-2.5 (harness) | n/a (flat plan) | 177 s |
-| Grok-4.5 (harness) | n/a (flat plan) | 284 s |
+| DS v4-pro (v13 api) | $0.78–0.79 | 1139–1322 s |
+| MiMo-v2.5 (v13 api) | $0.43 | 1728 s |
+| Composer-2.5 (v13-cb) | subscription | 397 s |
+| Grok-4.5 (v13-cb) | subscription | 496 s |
+| Grok-4.6 (v13-cb) | subscription | 1111 s |
+| MoA r1 (mixture) | $0.33 API + subscription | 1195 s |
+| Composer-2.5 / Grok-4.5 (harness) | subscription | 177 / 284 s |
 
-DS-on-v13 delivers its verdict count at ~22% of the baseline's dollar cost.
+## Contamination ledger (grok skill-leak incidents, 2026-08-14)
 
-## Leakage audit (harness arms only)
+The grok family (4.5 and 4.6 — never Composer) actively hunts and reads the
+copilot's own `imreview` review-methodology skill during review sessions,
+across three locations (`~/.claude/skills/`, `~/.agents/skills/`,
+`~/.cursor/skills/`), ignoring prompt-level bans. Countermeasure history:
+prompt ban → defeated; dot-rename of the dirs → defeated (grok lists parents
+/ mines its own transcripts for the renamed name); only moving all copies
+into non-listable, permission-000 quarantine outside any skills path closed
+the vector (consensus close time 23:30; `~/.cursor` copy's plain path was
+live until its 21:45 rename — multi-session consensus, mtime-evidenced).
 
-Pipeline arms and the Claude baseline *prevent* discussion/out-of-tree access
-(tool allowlist). `cursor-agent` has no allowlist, so harness arms *detect*
-violations post-run over the full stream-json tool log and disqualify items.
+Per-arm status (audits = trace grep for `imreview` / `.agents/skills` /
+`.cursor/skills`; read attempts on absent/unreadable paths are harmless):
 
-- **Composer-2.5**: 1/10 items failed — `pr5884` read its own cursor terminal
-  log (`~/.cursor/projects/.../terminals/…`). Benign class (harness scratch
-  file, no methodology or discussion content). Clean-only tally 4—23.
-- **Grok-4.5**: 9/10 items failed (`pr5509 5610 5703 5715 5840 5863 5884
-  5957 5976`). Every failure includes reading
-  `~/.claude/skills/imreview/SKILL.md` — our own review-methodology skill —
-  despite an explicit "do not read ANY file outside this working directory …
-  reviews that do are disqualified" prompt line that Composer obeyed. `pr5703`
-  additionally read a rule file from the installed copilot package's
-  vllm-omni knowledge base, and `pr5976` read installed upstream vllm source.
-  This is real contamination (our methodology and curated repo knowledge in
-  its context), and even so Grok won only 2/30 verdicts — both on
-  contaminated `pr5957`. Clean item: `pr5550` only (0—3). Prompt-level
-  boundary instruction is demonstrably insufficient for this model; any rerun
-  needs environment-level prevention (e.g. hiding `~/.claude/skills` from the
-  agent) before its numbers can be taken at face value.
+- **Composer harness**: pr5884 benign self-read only. **Composer v13-cb**:
+  benign classes only (audit relative-path false-positive — since fixed in
+  `providers/audit.py` — own-run-dir and installed-package reads). CLEAN.
+- **Grok-4.5 harness**: 9/10 items read SKILL.md — disqualified
+  (`INVALID`-prefixed dirs). **Grok-4.5 v13-cb**: clean (dead-path attempts
+  only; pr5840 regenerated once after reading the `~/.agents` copy).
+- **Grok-4.6 v13-cb r1**: 9/10 skill-read → arm quarantined
+  (`INVALID_skillleak_copilot_cb_grok46`). **r2**: plain-`~/.cursor`-path
+  reads succeeded pre-21:45 → tainted, kept for the ledger
+  (`QUARANTINE_skillleak_r2/r3` subdirs hold the item history). **r3**
+  (peer session, post-closure): canonical.
+- **MoA r1**: pr5884 read the hidden `~/.cursor` name → quarantined and
+  regenerated post-closure (regen trace clean; the packed `trace.json.gz`
+  bundles the old run's events — check `runs/pr5884/run-20260814-233136-*`
+  for the artifact's own trace). Other 9 items clean. **MoA r2** (peer):
+  pr5509 quarantined twice, attempt-3 post-closure in flight.
+- Restore ledger (owner: user / peer sessions): `~/.eval-quarantine/
+  {claude,agents}-imreview` (chmod 000) → `~/.claude/skills/imreview`,
+  `~/.agents/skills/imreview`; `/data/zhoutaichang/.skill-vault/
+  cursor-imreview` → `~/.cursor/skills/imreview`. Restore only after ALL
+  cursor-backend arms across sessions are done.
 
 ## Standing caveats
 
-1. **Generation-replicate variance is huge**: the same config + judge gave
-   10—20 (r1) vs 3—27 (r2). Never quote a single-replicate result as *the*
-   number; the campaign's open protocol item is ≥3 generation replicates.
-2. **Judge dependence**: GPT-5.6 vs Sonnet flip the parity conclusion; the
-   standing protocol is judge = claude-sonnet-5, and any historic GPT numbers
-   are labeled as such.
-3. **Precision is judge-robust and solved** (DS 0.80–0.83 ≥ baseline under
-   both judges); **strict-credit recall (~0.3 vs ~0.5) is the open gap**.
-   Remaining lever: coverage-driven second investigation round (RFC q3).
+1. **Generation-replicate variance is huge** (DS 10—20 vs 3—27 same config).
+   Never quote a single replicate as *the* number.
+2. **Judge dependence**: GPT-5.6 vs Sonnet flip conclusions; standing
+   protocol judge = claude-sonnet-5.
+3. **Precision is solved; strict-credit recall is the open gap** across
+   every generator and the MoA.
 4. gap_hit scored 0.00 for every arm and the baseline on wave-2 under Sonnet.
+5. v13-cb arms report no per-token cost (subscription) and `tok_out=0`
+   (cursor-agent does not expose usage in these sessions); wall time and
+   verdicts are the comparable dimensions.
 
 ## Raw data
 
 - Verdicts: `eval/dataset/judgments/<set>/pr*.r*.json` (+ per-set
-  `JUDGE_REPORT.md` with per-verdict rationales)
+  `JUDGE_REPORT.md`); quarantined items in `QUARANTINE_*`/`INVALID_*` dirs.
 - Review artifacts: `eval/dataset/arms/<arm>/pr*.md` (+ `.cost.json`,
-  harness arms also `.events.jsonl` tool logs)
+  traces; harness arms also `.events.jsonl` locally, gitignored)
 - Baseline: `eval/dataset/baselines/claudecode_opus5/`
-- Campaign narrative: `doc/EVAL-goal-strict-vs-opus5.md`, RFC
-  `doc/RFC-strict-review-deep-engine.md`, GitHub issue #72, PR #71.
+- Campaign narrative: `doc/EVAL-goal-strict-vs-opus5.md`, RFCs
+  `doc/RFC-strict-review-deep-engine.md`, `doc/RFC-provider-registry.md`,
+  GitHub issue #72, PR #71.

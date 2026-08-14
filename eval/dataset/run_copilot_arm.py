@@ -139,8 +139,12 @@ def one(kind: str, n: int, split: str) -> str:
             if gap < 0.5:
                 time.sleep(0.5 - gap)
             _last_start[0] = time.time()
+        # harness-backend runs chain many vendor-CLI sessions per item and can
+        # legitimately exceed the api-backend default — ARM_TIMEOUT_S raises it
         proc = subprocess.run([CLI, "-p", prompt, "--yes"], capture_output=True,
-                              text=True, timeout=3000, cwd=str(CWD), env=env)
+                              text=True,
+                              timeout=int(os.environ.get("ARM_TIMEOUT_S", "3000")),
+                              cwd=str(CWD), env=env)
         # the LLM-only intent parser occasionally returns a clarify instead of
         # a TaskSpec ("I couldn't parse that") — nondeterministic; retry.
         if "couldn't parse" in proc.stdout:

@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.75,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.8,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently rediscover the most consequential surviving GT issue (the 0.2 default threshold never actually resolving to MiniMax-H3's 0.17 in the real serving path) with strong file/line grounding, and both correctly confirm the FL2VA/Ref2VA partition-gating fix is now sound; neither catches the two deep inline rebase bugs (missing packed_total in the duplicate block call, and the extractor test's originally-missing attn_backend fake), which the diff shown already has fixed anyway. Precision and actionability are comparably high on both sides—dense, evidence-quoted, file:line-anchored findings with concrete suggested fixes. Y edges out slightly for clearer organization, an execution-verified reproduction of the threshold bug, and additional well-grounded production concerns (per-request tensor memory scaling, wasted RoPE computation on cached steps, TP-rank cache-decision consistency) that round out a more complete picture without sacrificing grounding.",
+  "_cost_usd": 0.489237,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46",
+    "arm_a_sha256": "3f56143a7aa03e2151b0e9e388ed67e67a1a813fd96e21f0f1870955ec5f1243",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

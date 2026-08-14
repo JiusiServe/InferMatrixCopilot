@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.9,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently rediscover the one ground-truth concern still live in this diff (the recipe's 0.17 default never reaches the runtime path because the engine injects 0.2 first), with equally rigorous, grounded evidence and concrete fixes; both also correctly validate that the partition-gating concern from the human review is already fixed. Y goes further with a more rigorous quantitative critique of the calibration polynomial (near-constant, non-monotone, explicit cache-hit floor) versus X's simpler p(0) observation, plus additional well-grounded findings (memory retention scaling, wasted RoPE compute, a drive-by test-coverage change, a stale-t_emb test gap) presented with clear blocking/should-fix/minor prioritization mirroring the human reviewer's own structure. X's findings are also solid and actionable but include two weaker, speculative items (CI-gate question, Cache-DiT validation ask) that dilute precision slightly. Neither includes a LATENT GAP CHECK section, so gap_hit is false for both.",
+  "_cost_usd": 0.44496389999999997,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46",
+    "arm_a_sha256": "ed9a249e740bc02aca24ee3a7ae1cef54c280533611e748e9f825bac7536c28f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

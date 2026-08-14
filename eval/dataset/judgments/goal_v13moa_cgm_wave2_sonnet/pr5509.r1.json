@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.7,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.8,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently found the one substantive unresolved ground-truth concern (FLASHINFER_ATTN allowlisted for quant but silently ignored) with high fidelity. Y edges ahead on precision and actionability: it backs several findings with actual executed code snippets showing the bug reproduced, ties the resolved sage_kwargs concern to a concrete test gap, and supplies ready-to-apply patches (ring-SP guard, dtype cast, unsupported-key rejection); X's review is comprehensive but padded with truncated 'additional observations' and a couple of speculative asks that dilute precision. Neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.38229880000000005,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v13_moa_cgm",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_moa_cgm",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_moa_cgm",
+    "arm_a_sha256": "93175cdd254a73489fd587a1aa3c157b8a2bc0d0829e902a807f274089bf4edd",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "703e9ad7d9901fc59d5ad8d20917e36993f445b09d3ecaaba356dbe9c900f660",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

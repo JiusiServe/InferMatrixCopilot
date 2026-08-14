@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.8,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.8,
+    "precision": 0.8,
+    "actionability": 0.85
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates correctly recognize that the GT's three top-level blockers (partition-aware enabler, unrunnable offline example) and both inline bugs (missing packed_total, missing attn_backend fake) are already resolved in this diff snapshot, and both independently rediscover the deeper live issue behind GT concern #2: the engine's hardcoded rel_l1_thresh=0.2 default silently defeats the new model-specific 0.17 default, so users never get the calibrated safe threshold — a strong, well-evidenced convergent find. X adds a sophisticated, well-grounded critique of the calibration polynomial itself (near-constant, non-monotone, R²=0.09) that questions whether the adaptive mechanism functions at all, which is a first-order concern with clear prescriptive fixes; Y contributes a novel, concretely-evidenced finding that quality=high can silently activate Cache-DiT alongside TeaCache despite the docs' 'mutually exclusive' claim. Both reviews are thorough, technically deep, and heavily cite specific code locations, but X's synthesis is more prioritized/narrative and its 'what I verified' section demonstrates deeper correctness verification of the packed-multimodal contract, giving it a slight edge in actionability and coherence.",
+  "_cost_usd": 0.49922770000000005,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_moa_cgm"
+  },
+  "_roles": {
+    "arm": "copilot_v13_moa_cgm",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_moa_cgm",
+    "arm_a_sha256": "3747c7c93f52b576bcdcadf91e1c582d47a457825c0d2176c3a0b94c8eb63b83",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

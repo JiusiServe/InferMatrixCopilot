@@ -1,0 +1,94 @@
+{
+  "wall_s": 476.7,
+  "split": "holdout",
+  "rc": 0,
+  "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46/runs/pr5863/run-20260814-190944-190616",
+  "recorded_at": "2026-08-14T19:17:41",
+  "attempts": [
+    {
+      "invocation_id": "inv-64bc57e5",
+      "outcome": "run:run-20260814-190944-190616",
+      "rc": 0,
+      "pre_run": null
+    },
+    {
+      "run_dir": "run-20260814-190944-190616",
+      "llm_calls": 0,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "usd": 0.0,
+      "source": "no-trace"
+    }
+  ],
+  "attempt_usd_total": 0.0,
+  "llm_calls": 0,
+  "input_tokens": 0,
+  "output_tokens": 0,
+  "usd": 0.0,
+  "source": "no-trace",
+  "metrics": {
+    "schema": 1,
+    "run": "run-20260814-190944-190616",
+    "task_kind": "pr_review",
+    "status": "done",
+    "quality": {
+      "q": null,
+      "weight_coverage": 0.0,
+      "partial": true,
+      "abstained": false,
+      "components": {
+        "recall_w": null,
+        "precision_v": null,
+        "useful": null,
+        "calib": null,
+        "decision": null
+      }
+    },
+    "cost": {
+      "usd": 0.0746,
+      "minutes": 7.94,
+      "ci_minutes": 0,
+      "input_tokens": 163213,
+      "output_tokens": 27782,
+      "tool_calls": 68,
+      "usd_ref": 1.0,
+      "min_ref": 10.0,
+      "cost_index": 1.2929,
+      "cost_partial": false,
+      "unpriced_calls": 0,
+      "source": "events",
+      "llm_calls": null,
+      "by_role": null,
+      "cache_read_tokens": null,
+      "cache_creation_tokens": null
+    },
+    "timings": {
+      "steps": {
+        "fetch": 3.74,
+        "gate": 1.72,
+        "review": 470.59,
+        "report": 0.06
+      },
+      "time_to_first_result_s": 476.1
+    },
+    "risk": {
+      "incidents": {
+        "catastrophic": 0,
+        "severe": 0,
+        "moderate": 0,
+        "minor": 0
+      },
+      "safety_multiplier": 1.0
+    },
+    "catq": null,
+    "tus": null,
+    "signals": {
+      "escalations": 0,
+      "pushes": 0,
+      "posted": 0,
+      "steps_completed": 4
+    }
+  },
+  "trace": "pr5863.trace.json.gz",
+  "trace_bytes": 15057
+}

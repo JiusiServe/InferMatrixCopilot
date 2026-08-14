@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.55,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.6,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "tie",
+  "margin": "slight",
+  "rationale": "Ground truth here is sparse (LGTM approval, four minor style/rebase-scope nits, all resolved in follow-up), and neither candidate hits those specific concerns — both instead dove into deep, largely non-overlapping-with-GT technical bugs (the num_stale_output_tokens double-seed, the Qwen2.5-Omni registry/NamedTuple mismatch, dead async_tokens_to_discard writes), which mutually corroborate and look genuinely grounded. X is more readable and prioritized (Blocking/Should-fix/Minor, concrete fix snippets, an explicit repro and test run), while Y's evidence-quote format is more directly verifiable line-by-line and surfaces one extra plausible finding (NPU randomize_inputs gap) but is denser and harder to action. The two directly contradict each other on the gpu_generation_model_runner randomize_inputs point (X calls it a live bug, Y calls the omission intentional), which caps precision confidence for both. Overall quality and risk are closely matched.",
+  "_cost_usd": 0.5099686,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok46"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46",
+    "arm_a_sha256": "990ec787332a2618b420feebfec5914f89e6858ff696bc1244371f0bc57c37d8",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4703d9c3f9a1a403af03ff17f62c2d816d9363ba7048d8dcee9a84a47834bc46",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.45,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.68,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y directly engages with and validates the ground truth's central threads — native speed control on HTTP streaming, the WebSocket speed=1.0 asymmetry, the talker's fail-fast raise for library callers, and the shared duration_factor bounds — matching almost every inline comment and the second blocking item from hsliuustc0106, while X's findings (mel_head.bias, payload snapshot semantics, prefix caching, renderer selection) never touch any of these specific concerns. Y's claims are also better grounded, each backed by literal quoted code/test lines ('self-proving evidence'), whereas X's equally confident, specific technical claims (e.g. torch.empty bias, accumulate_full_payload concat semantics) are asserted in prose without verifiable quotes, raising fabrication risk. Both are comparably actionable with concrete file/line change suggestions, but neither has a labeled LATENT GAP CHECK section.",
+  "_cost_usd": 0.4908138,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok46"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46",
+    "arm_a_sha256": "9ea27c39d00510461e17b35158e781eca09cf4844251897e31108719ba17e315",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

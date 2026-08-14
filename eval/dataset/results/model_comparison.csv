@@ -8,3 +8,9 @@ goal_mimo_wave2,"MiMo-v2.5, wave-2",copilot_v13_mimo_wave2,GPT-5.6 Sol 272K High
 goal_mimo_wave2_sonnet,MiMo-v2.5 re-scored,copilot_v13_mimo_wave2,claude-sonnet-5,10,27,2,25,0,0.27,0.474,0.732,0.808,0.59,0.883,
 goal_composer_wave2_sonnet,Composer-2.5 harness,cursor_composer25,claude-sonnet-5,10,30,4,26,0,0.381,0.507,0.751,0.799,0.773,0.883,pr5884
 goal_grok45_wave2_sonnet,Grok-4.5 harness,cursor_grok45,claude-sonnet-5,10,30,2,28,0,0.3,0.464,0.813,0.783,0.712,0.891,pr5509;pr5610;pr5703;pr5715;pr5840;pr5863;pr5884;pr5957;pr5976
+goal_cb_composer25_wave2_sonnet,"Composer-2.5, v13 via cursor backend",copilot_cb_composer25,claude-sonnet-5,10,30,4,25,1,0.318,0.432,0.729,0.783,0.709,0.882,
+goal_cb_grok45_wave2_sonnet,"Grok-4.5, v13 via cursor backend",copilot_cb_grok45,claude-sonnet-5,10,30,5,24,1,0.351,0.496,0.776,0.81,0.749,0.877,
+goal_cb_grok46_wave2_sonnet,Grok-4.6 cb r2 — TAINTED (skill leak),copilot_cb_grok46,claude-sonnet-5,7,21,3,17,1,0.325,0.552,0.81,0.807,0.75,0.882,
+goal_cb_grok46_r3_sonnet,"Grok-4.6, v13 via cursor backend (r3, canonical)",copilot_cb_grok46_r3,claude-sonnet-5,6,18,0,18,0,0.336,0.555,0.822,0.842,0.738,0.872,
+goal_v13moa_cgm_wave2_sonnet,"MoA composer+grok4.6+mimo r1, DS spine",copilot_v13_moa_cgm,claude-sonnet-5,10,30,5,24,1,0.292,0.415,0.799,0.791,0.756,0.877,
+goal_moa_cgm_wave2_sonnet,MoA composer+grok4.6+mimo r2 (peer session),copilot_moa_cgm,claude-sonnet-5,9,27,5,22,0,0.285,0.425,0.83,0.793,0.788,0.881,

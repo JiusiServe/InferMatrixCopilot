@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.62,
+    "precision": 0.8,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.22,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X engages with nearly every thread the human reviewer raised (NPU/XPU/MUSA platform scope, connector-state ownership extended with new drain sites, the image path, the full-payload-branch unreachability, and prefix-cache compatibility), either confirming the fix or extending it with new grounded evidence, plus adds several well-cited novel findings (TP broadcast on the background thread, YAML/ASCII nits) with concrete file:line fixes. Y is narrower: its single real finding (XPU/MUSA lacking the CUDA-only D2H machinery) is deep and well-evidenced, extending the same platform-scope concern, but it never touches the connector live-state/ownership issue, the SVG labeling ask, the full-payload branch, or prefix-cache compatibility, leaving most of the ground-truth concerns unaddressed.",
+  "_cost_usd": 0.33895959999999997,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok46"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46",
+    "arm_a_sha256": "3d67b11e6e2fbaee24300e96ea049e6f13d7804ce83a953221193af32b6d2380",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

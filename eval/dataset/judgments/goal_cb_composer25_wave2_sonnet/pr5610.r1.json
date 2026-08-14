@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.15,
+    "actionability": 0.5
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.8,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Most ground-truth concerns were already resolved in this final diff, so the bar was to verify the fixes and catch remaining gaps; X reports exactly one finding (the image-src path), and it's technically wrong — it recommends reverting the already-correct 3-level MkDocs-relative path back to a 2-level path that would actually break the site, contradicting the reviewer-approved fix. Y correctly analyzes the same image path (noting it's right for MkDocs but breaks on raw GitHub, a genuinely new nuance) and adds several well-evidenced, code-cited findings (connector-drain ownership overclaim, missed TP>1 collective caveat, YAML excerpt inconsistency, suspicious blog URL) that go meaningfully deeper than X's mostly-confirmatory validation pass. Both reviews are actionable in format (file/line, concrete suggestions), but Y's content is far more grounded and useful while X's single finding is a false positive.",
+  "_cost_usd": 0.3676321000000001,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_composer25",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_composer25",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_composer25",
+    "arm_a_sha256": "ce88fc7f88a354011ad71685fdd7f67b217a48cda581c056f64bb28b0ed91723",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

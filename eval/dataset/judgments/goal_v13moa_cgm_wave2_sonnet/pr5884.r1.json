@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.7,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y independently reconstructs almost exactly the reasoning ground-truth reviewer david6666666 gave (the dotted-path/Bagel regression rationale, plus the module_collector.py mirroring and its silent-failure logging gap), while X only loosely gestures at the module_collector alignment without engaging the 'why attrgetter' debate that dominates the actual thread. Both independently flag the same real risk (SoulX Singer's cache-dit path being silently activated and untested), which is a good precision signal for both, but Y's finding is backed by a much sharper technical trace (DBCache sequence-length mismatch across CFG branches) versus X's more hedged/self-contradictory Cosmos3 'if it ever runs' scenario. Both reviews are comparably actionable with concrete file:line citations and suggested fixes, but Y's closer alignment with the ground-truth reviewers' actual concerns gives it materially higher recall.",
+  "_cost_usd": 0.19197540000000002,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v13_moa_cgm",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_moa_cgm",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_moa_cgm",
+    "arm_a_sha256": "d2816f03bd44f5450f42e62f6a1c0e4089a1b5707305cff1181bca021ee40108",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "80debb7f8b9b3343eef7ae50f0618e17195384c354a466e33b4f3b71b6863ca2",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

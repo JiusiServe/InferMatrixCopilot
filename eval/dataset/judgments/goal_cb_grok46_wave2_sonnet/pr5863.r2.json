@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.9,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Ground truth centers on two threads: incomplete/inconsistent validation data (host topology, driver/CUDA/PyTorch versions, warmup method) and unresolved Ref2VA testing status. Y directly hits both — it explicitly demands the missing vLLM-Omni/PyTorch version pin (near-exact match to the ground-truth ask), scrutinizes the validation methodology (1Hz sampling undersampling, unidentifiable memory-model fit), and raises multiple concrete Ref2VA reliability gaps (broken restart command, OOM risk, missing warnings) — while X only tangentially touches these via the Ref2VA curl and peak-memory findings. Both candidates independently converge on the same Ref2VA curl-format bug and the dangling 'RTX PRO 5000' reference, which cross-validates precision for both, but Y's much larger finding set is still well-grounded and more actionable (specific line numbers, code citations, ready-to-use fixes), giving it a clear edge in recall and actionability with only a marginal precision cost from its greater volume.",
+  "_cost_usd": 0.165224,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46",
+    "arm_a_sha256": "b1bfa0538e1cefffd54eb3b3f400df66b296b427f07b0f0a03c8374af41529f1",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "726725524751ffed003542c0fd4e00bb3f74ef77a200d776d40628016c5bdd21",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

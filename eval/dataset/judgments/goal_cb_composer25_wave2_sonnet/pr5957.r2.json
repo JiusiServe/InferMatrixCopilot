@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.55,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.7,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Neither candidate hits the specific ground-truth threads (WebSocket streaming-speed asymmetry, duplicated duration_factor bounds across 4 files, benchmark-driver-vs-registry question, profiler/VRAM baseline gap for the new model) — recall is low for both. X produces detailed, plausible-sounding internal findings (uninitialized mel_head.bias, full-payload concat bug, snapshot_mm_payload view issue) but shows no grounding evidence/quotes from the actual repo, so precision is harder to trust despite strong code-level actionability (concrete diffs). Y grounds nearly every finding in quoted file:line evidence from an actual repo read (pytestmark CI-deselection bug, compute_fbank breaking change, Dockerfile/Test-Plan version mismatch), and its missing-e2e-coverage-for-2.5 finding is thematically the closest either candidate gets to the ground truth's 'incomplete validation evidence' blocking comment. Overall Y is somewhat more trustworthy and marginally closer to ground truth themes, though both reviews mostly surface valid-but-different issues rather than the reviewers' actual concerns.",
+  "_cost_usd": 0.31436430000000004,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_composer25"
+  },
+  "_roles": {
+    "arm": "copilot_cb_composer25",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_composer25",
+    "arm_a_sha256": "aa77526495c6b9d80c5341f8f919d82e24012796d7a3ed9e49182a3c4ad680c7",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

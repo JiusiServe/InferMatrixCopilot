@@ -22,6 +22,12 @@ SETS = {
     "goal_mimo_wave2_sonnet":  ("MiMo-v2.5 re-scored",),
     "goal_composer_wave2_sonnet": ("Composer-2.5 harness",),
     "goal_grok45_wave2_sonnet":   ("Grok-4.5 harness",),
+    "goal_cb_composer25_wave2_sonnet": ("Composer-2.5, v13 via cursor backend",),
+    "goal_cb_grok45_wave2_sonnet":     ("Grok-4.5, v13 via cursor backend",),
+    "goal_cb_grok46_wave2_sonnet":     ("Grok-4.6 cb r2 — TAINTED (skill leak)",),
+    "goal_cb_grok46_r3_sonnet":        ("Grok-4.6, v13 via cursor backend (r3, canonical)",),
+    "goal_v13moa_cgm_wave2_sonnet":    ("MoA composer+grok4.6+mimo r1, DS spine",),
+    "goal_moa_cgm_wave2_sonnet":       ("MoA composer+grok4.6+mimo r2 (peer session)",),
 }
 
 

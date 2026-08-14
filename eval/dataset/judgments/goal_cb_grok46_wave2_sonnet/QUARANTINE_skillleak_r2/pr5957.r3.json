@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.4,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.7,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y independently rediscovers and confirms the exact WebSocket-vs-HTTP native-speed streaming asymmetry central to the ground truth's hsliuustc0106/linyueqian threads, and its findings are backed by verbatim, cross-referenced code quotes that make them credible. X's review is elaborate but touches none of the seven ground-truth concerns (no mention of streaming-speed asymmetry, benchmark-script duplication, or missing profiling/VRAM evidence), and its central claims (unconditional mel_head bias flip, six silent IndexTTS-2 regressions) are unverifiable against the diff and were not flagged by any real reviewer, suggesting overreach. Both are concrete and file/line-anchored, but Y's grounding and topical overlap with actual reviewer concerns give it clearly higher recall and precision.",
+  "_cost_usd": 0.4312723,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok46"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46",
+    "arm_a_sha256": "dd411968aee3a10fdae703832fd793b9382989ea21ac1e3a2418a756036b72ef",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

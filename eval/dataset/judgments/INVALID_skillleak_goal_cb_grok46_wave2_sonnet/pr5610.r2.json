@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates did deep, well-grounded verification with specific file:line citations and largely avoided fabrication; both thoroughly re-examined the hardware/platform-compatibility thread that dominates the ground-truth discussion. X pulls ahead on recall because it also dug into the 'Live Runner State and Ownership' concern (ground truth's #2, ownership of connector-signal draining) and found a genuine gap in the fix (other call sites also drain get_omni_connector_output), whereas Y validated that section as correct but never probed it further. Y's XPU/MUSA device-type-gating and unscoped vllm-serve-example findings are excellent additions to the hardware-compat thread but don't cover new ground-truth territory the way X's ownership finding does. Neither candidate touches the dependency-conflict/mkdocs-build concern, capping both recalls similarly on that axis.",
+  "_cost_usd": 0.3573076,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok46"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46",
+    "arm_a_sha256": "e3b658ca25103fca5e1c98ab5a9fef018afd080bbe6f0eddc551ddb3fccc396b",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

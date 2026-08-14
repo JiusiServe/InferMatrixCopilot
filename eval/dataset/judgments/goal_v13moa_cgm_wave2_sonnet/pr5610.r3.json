@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.95,
+    "actionability": 0.7
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X explicitly engages with and validates more of the ground-truth concerns (full-payload-branch unreachability, connector drain ordering, NPU platform scope, XPU/MUSA guard gaps, prefix-cache note) and surfaces several new, well-grounded findings (broken GitHub image preview, TP>1 collective risk during async drain, a subtler connector-ownership gap, YAML excerpt drift, blog URL) with concrete file/line fixes. Y is tightly grounded but thin — its validated list is shorter and it produces only one actionable finding, the same GitHub image-path bug X also caught, so it adds little beyond X's coverage. Neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.2137742,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_moa_cgm"
+  },
+  "_roles": {
+    "arm": "copilot_v13_moa_cgm",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_moa_cgm",
+    "arm_a_sha256": "fd3cf1f0a4b036ac979c999f160bc96889303b867de6f4945bd03f760d54f537",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

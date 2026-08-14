@@ -1,0 +1,102 @@
+{
+  "wall_s": 1439.5,
+  "split": "holdout",
+  "rc": 0,
+  "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46/runs/pr5957/run-20260814-223327-5dee94",
+  "recorded_at": "2026-08-14T22:57:27",
+  "attempts": [
+    {
+      "invocation_id": "inv-9ebc292e",
+      "outcome": "run:run-20260814-223327-5dee94",
+      "rc": 0,
+      "pre_run": null
+    },
+    {
+      "run_dir": "run-20260814-210832-202771",
+      "llm_calls": 0,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "usd": 0.0,
+      "source": "no-trace"
+    },
+    {
+      "run_dir": "run-20260814-223327-5dee94",
+      "llm_calls": 0,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "usd": 0.0,
+      "source": "no-trace"
+    }
+  ],
+  "attempt_usd_total": 0.0,
+  "llm_calls": 0,
+  "input_tokens": 0,
+  "output_tokens": 0,
+  "usd": 0.0,
+  "source": "no-trace",
+  "metrics": {
+    "schema": 1,
+    "run": "run-20260814-223327-5dee94",
+    "task_kind": "pr_review",
+    "status": "done",
+    "quality": {
+      "q": null,
+      "weight_coverage": 0.0,
+      "partial": true,
+      "abstained": false,
+      "components": {
+        "recall_w": null,
+        "precision_v": null,
+        "useful": null,
+        "calib": null,
+        "decision": null
+      }
+    },
+    "cost": {
+      "usd": 0.8979,
+      "minutes": 23.98,
+      "ci_minutes": 0,
+      "input_tokens": 2463344,
+      "output_tokens": 211650,
+      "tool_calls": 441,
+      "usd_ref": 1.0,
+      "min_ref": 10.0,
+      "cost_index": 1.9574,
+      "cost_partial": false,
+      "unpriced_calls": 0,
+      "source": "events",
+      "llm_calls": null,
+      "by_role": null,
+      "cache_read_tokens": null,
+      "cache_creation_tokens": null
+    },
+    "timings": {
+      "steps": {
+        "fetch": 4.65,
+        "gate": 1.81,
+        "review": 1432.41,
+        "report": 0.06
+      },
+      "time_to_first_result_s": 1438.93
+    },
+    "risk": {
+      "incidents": {
+        "catastrophic": 0,
+        "severe": 0,
+        "moderate": 0,
+        "minor": 0
+      },
+      "safety_multiplier": 1.0
+    },
+    "catq": null,
+    "tus": null,
+    "signals": {
+      "escalations": 0,
+      "pushes": 0,
+      "posted": 0,
+      "steps_completed": 4
+    }
+  },
+  "trace": "pr5957.trace.json.gz",
+  "trace_bytes": 200208
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.25,
+    "precision": 0.85,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X's DTO-invariants finding (#2) closely mirrors asukaqaq-s's explicit ask for 'local construction-time invariants: non-empty IDs, positive generation values, valid enum values, unique branch IDs' applied to the new metadata classes, and its #7 directly echoes asukaqaq-s's complaint about duplicated validation across layers — the two most substantive ground-truth threads still applicable to this revised diff. Y independently corroborates several of X's findings (AR-runner kwarg gap, silent DLO fallback, weak dataclass-echo tests) and adds a genuinely useful catch (production never attaches metadata; batch/step paths skip identity validation that request mode has), giving it comparable grounding, but its output is a dense evidence-dump that's harder to act on and under-covers the validation-consolidation theme that dominates the human review. X's Required/Should-fix/Minor structure with concrete patch snippets is materially more actionable.",
+  "_cost_usd": 0.4188486,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok46"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46",
+    "arm_a_sha256": "34fe1b94c257aa5b6da1a59ef77c63f103e246cef060a17e78feee8f54093326",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b6ae3b48c6859b0d16784163ab2044d7d85e3b3b32f4e60b559fa2a55186c64b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}
