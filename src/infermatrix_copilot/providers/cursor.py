@@ -153,7 +153,7 @@ class CursorTransport(HarnessTransport):
                 else:
                     path.unlink(missing_ok=True)
         audit = audit_events(events, roots=(str(cwd), str(req.run_dir)),
-                             read_only=req.scope.read_only)
+                             read_only=req.scope.read_only, cwd=str(cwd))
         usage = self._usage(events)
         if req.trace is not None:
             req.trace.record(
