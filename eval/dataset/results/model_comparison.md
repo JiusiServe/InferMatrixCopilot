@@ -9,8 +9,10 @@ reviews. Machine-readable copies: `model_comparison.json` /
 `model_comparison.csv` (regenerate with `aggregate_results.py`; numbers are
 computed from the raw verdict JSONs, not hand-kept).
 
-Last updated: 2026-08-15 early AM. Two peer-session campaigns still landing
-(Grok-4.6 r3 canonical, MoA r2) — their rows are marked partial.
+**Status: INTERIM (2026-08-15 early AM).** The Grok-4.6 r3 canonical row is
+mid-backfill (4 items regenerating in a peer session after a
+parallel-pass-window audit finding); one final regeneration follows the
+peer's completion ping. Every other row is final.
 
 ## Wave-2 holdout, single-model arms, judge = claude-sonnet-5
 
@@ -27,13 +29,15 @@ end-to-end (loop + model, no copilot pipeline).
 | MiMo-v2.5 (re-scored) | v13 api | 2—25 | 0.27 / 0.47 | 0.73 / 0.81 | 0.59 / 0.88 | `goal_mimo_wave2_sonnet` |
 | Composer-2.5 | v13-cb | 4—25 (1 tie) | 0.32 / 0.43 | 0.73 / 0.78 | 0.71 / 0.88 | `goal_cb_composer25_wave2_sonnet` |
 | Grok-4.5-high | v13-cb | 5—24 (1 tie) | 0.35 / 0.50 | 0.78 / 0.81 | 0.75 / 0.88 | `goal_cb_grok45_wave2_sonnet` |
-| Grok-4.6-high r3 † | v13-cb | 0—18 (6/10 items, partial) | 0.34 / 0.56 | 0.82 / 0.84 | 0.74 / 0.87 | `goal_cb_grok46_r3_sonnet` |
+| Grok-4.6-high r3 † | v13-cb | 2—16 (6/10 items, INTERIM) | 0.34 / 0.56 | 0.82 / 0.84 | 0.74 / 0.87 | `goal_cb_grok46_r3_sonnet` |
 | Composer-2.5 | harness | 4—26 | 0.38 / 0.51 | 0.75 / 0.80 | 0.77 / 0.88 | `goal_composer_wave2_sonnet` |
 | Grok-4.5 ‡ | harness | 2—28 | 0.35 / 0.55 | 0.84 / 0.82 | 0.70 / 0.90 | `goal_grok45_wave2_sonnet` |
 
-† Canonical clean Grok-4.6 row (peer-session campaign run entirely after the
-skill-leak vector was closed; 2 items quarantined for backfill, 2 still
-generating). Two earlier Grok-4.6 v13-cb replicates are TAINTED by the skill
+† Canonical clean Grok-4.6 row (peer-session campaign run after the
+skill-leak vector was closed; 4 items in backfill — pr5509/5703 for
+hidden-path reads, pr5884/5957 after the parallel-pass-window audit finding
+that a session straddling the vault cutoff cannot be exonerated by its end
+timestamp). Two earlier Grok-4.6 v13-cb replicates are TAINTED by the skill
 leak (see ledger): r1 (`INVALID_skillleak_copilot_cb_grok46`, 5—24 tainted)
 and r2 (`goal_cb_grok46_wave2_sonnet`, 3—17—1 over its 7 kept items).
 Their agreement with r3 indicates the leak was not driving the numbers.
@@ -75,7 +79,7 @@ different sessions:
 | replicate | wins | recall | precision | actionability | judgment set |
 |---|---|---|---|---|---|
 | MoA r1 | 5—24 (1 tie) | 0.29 / 0.42 | 0.80 / 0.79 | 0.76 / 0.88 | `goal_v13moa_cgm_wave2_sonnet` |
-| MoA r2 (partial, 9/10) | 5—22 | 0.29 / 0.43 | **0.83** / 0.79 | 0.79 / 0.88 | `goal_moa_cgm_wave2_sonnet` |
+| MoA r2 (final, 30/30) | 5—25 | 0.29 / 0.43 | **0.83** / 0.79 | 0.79 / 0.88 | `goal_moa_cgm_wave2_sonnet` |
 
 MoA matches the better single-model arms on wins and slightly beats the
 baseline on precision, but recall (~0.29) is the worst of any arm — mixing
@@ -147,7 +151,8 @@ Per-arm status (audits = trace grep for `imreview` / `.agents/skills` /
   regenerated post-closure (regen trace clean; the packed `trace.json.gz`
   bundles the old run's events — check `runs/pr5884/run-20260814-233136-*`
   for the artifact's own trace). Other 9 items clean. **MoA r2** (peer):
-  pr5509 quarantined twice, attempt-3 post-closure in flight.
+  pr5509 quarantined twice; attempt-3 landed post-closure, verified clean
+  by its own run-dir trace — set complete at 30/30.
 - Restore ledger (owner: user / peer sessions): `~/.eval-quarantine/
   {claude,agents}-imreview` (chmod 000) → `~/.claude/skills/imreview`,
   `~/.agents/skills/imreview`; `/data/zhoutaichang/.skill-vault/
