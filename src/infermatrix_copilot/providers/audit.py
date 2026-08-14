@@ -18,7 +18,14 @@ dropped.
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, field
+
+# cursor-agent spools MCP tool RESULTS into its per-project state dir and the
+# model reads them back with its native read tool — that read-back is how
+# bridge output is consumed, not an exfiltration, so it is exempt from root
+# containment (live-smoke finding: every bridge-using session was flagged).
+_CLI_TOOL_SPOOL = re.compile(r"/\.cursor/projects/[^/]+/agent-tools/[^/]+$")
 
 
 @dataclass
@@ -57,41 +64,38 @@ def audit_events(events: list[dict], *, roots: tuple[str, ...],
                  read_only: bool = True) -> SessionAudit:
     """Audit a cursor-agent stream-json event list. Each tool_call event
     appears twice (issue + result); only the issue (no "result" key) is
-    counted so calls are not double-counted."""
+    counted so calls are not double-counted.
+
+    Containment is checked on EVERY native tool call that names a path —
+    read, grep, ls, glob, whatever the CLI grows next — not just reads: the
+    live smoke showed grepToolCall events sailing past a read-only audit."""
     audit = SessionAudit()
     for event in events:
         if event.get("type") != "tool_call":
             continue
         tc = event.get("tool_call") or {}
-        shell = tc.get("shellToolCall")
-        if shell is not None:
-            if "result" not in shell:
+        for key, call in tc.items():
+            if not isinstance(call, dict) or "result" in call:
+                continue
+            name = key.removesuffix("ToolCall")
+            audit.tools_used.append(name)
+            if name == "shell":
                 audit.shell_commands += 1
-                audit.tools_used.append("shell")
-            continue
-        read = tc.get("readToolCall")
-        if read is not None:
-            if "result" not in read:
-                audit.file_reads += 1
-                audit.tools_used.append("read")
-                path = str((read.get("args") or {}).get("path") or "")
-                if path and roots and not contained_in(path, roots):
-                    audit.violations.append(
-                        f"read outside session roots: {path[:160]}")
-            continue
-        write = tc.get("writeToolCall") or tc.get("editToolCall")
-        if write is not None:
-            if "result" not in write:
+                continue
+            if name in ("write", "edit"):
                 audit.writes += 1
-                audit.tools_used.append("write")
                 if read_only:
                     audit.violations.append(
                         "write attempted in a read-only session")
-            continue
-        # anything else (MCP bridge tools included) — count, name best-effort
-        for key, val in tc.items():
-            if isinstance(val, dict) and "result" not in val:
+                continue
+            if name == "read":
+                audit.file_reads += 1
+            else:
                 audit.other_tool_calls += 1
-                audit.tools_used.append(key.removesuffix("ToolCall"))
-                break
+            path = str((call.get("args") or {}).get("path") or "")
+            if (path and roots and not contained_in(path, roots)
+                    and not _CLI_TOOL_SPOOL.search(os.path.realpath(path))):
+                audit.violations.append(
+                    f"{name} outside session roots: {path[:160]}")
+            break
     return audit

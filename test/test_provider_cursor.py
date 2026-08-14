@@ -34,7 +34,7 @@ else:
         "args": {"path": os.path.join(os.getcwd(), "somefile.py")}}}}))
     print(json.dumps({"type": "result", "result": "REVIEW mcp=" + mcp,
                       "model": "composer-2.5",
-                      "usage": {"input_tokens": 10, "output_tokens": 5}}))
+                      "usage": {"inputTokens": 10, "outputTokens": 5}}))
 """
 
 
@@ -150,6 +150,36 @@ def test_complete_flattens_messages_and_runs_in_scratch_cwd(tmp_path):
     # one-shots run in an empty scratch dir, never in a repo
     assert "imc-cursor-oneshot-" in capture["cwd"]
     assert reply.usage["input_tokens"] == 10
+
+
+def test_audit_checks_paths_on_all_native_tools(tmp_path):
+    # live-smoke lesson: grep/ls/glob calls carry paths too — a read-only
+    # audit that checks only readToolCall lets an out-of-tree grep through
+    from infermatrix_copilot.providers.audit import audit_events
+
+    events = [
+        {"type": "tool_call", "tool_call": {"grepToolCall": {
+            "args": {"path": "/etc", "pattern": "key"}}}},
+        {"type": "tool_call", "tool_call": {"lsToolCall": {
+            "args": {"path": str(tmp_path)}}}},
+    ]
+    audit = audit_events(events, roots=(str(tmp_path),))
+    assert audit.other_tool_calls == 2
+    assert audit.violations == ["grep outside session roots: /etc"]
+    assert audit.tools_used == ["grep", "ls"]
+
+
+def test_audit_exempts_cli_mcp_result_spool(tmp_path):
+    # cursor-agent buffers MCP tool results under ~/.cursor/projects/<p>/
+    # agent-tools/ and reads them back — that is bridge-output consumption,
+    # not an out-of-tree read
+    from infermatrix_copilot.providers.audit import audit_events
+
+    spool = "/home/u/.cursor/projects/some-worktree/agent-tools/abc123.txt"
+    events = [{"type": "tool_call", "tool_call": {"readToolCall": {
+        "args": {"path": spool}}}}]
+    audit = audit_events(events, roots=(str(tmp_path),))
+    assert audit.ok and audit.file_reads == 1
 
 
 def test_cli_absence_is_a_named_error(tmp_path, monkeypatch):

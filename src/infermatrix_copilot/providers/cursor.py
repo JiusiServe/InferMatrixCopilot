@@ -51,7 +51,10 @@ class CursorTransport(HarnessTransport):
         """One CLI invocation → (parsed events, timed_out). A timeout kills
         the process but keeps the partial stream — a half-done investigation
         is salvage material, not garbage."""
-        cmd = [self.require_cli(), "--print", "--force",
+        # --approve-mcps is load-bearing: headless runs do not auto-approve
+        # configured MCP servers, and without it the tool bridge is silently
+        # ignored (found in the live smoke — session ran on native tools only)
+        cmd = [self.require_cli(), "--print", "--force", "--approve-mcps",
                "--output-format", "stream-json"]
         selected = model or self.settings.strict_backend_model
         if selected:
@@ -97,8 +100,12 @@ class CursorTransport(HarnessTransport):
                 usage.served_model = model
             raw = event.get("usage")
             if isinstance(raw, dict):
-                usage.input_tokens += int(raw.get("input_tokens") or 0)
-                usage.output_tokens += int(raw.get("output_tokens") or 0)
+                # live cursor-agent emits camelCase (inputTokens); accept
+                # snake_case too so a future rename does not zero the counts
+                usage.input_tokens += int(raw.get("inputTokens")
+                                          or raw.get("input_tokens") or 0)
+                usage.output_tokens += int(raw.get("outputTokens")
+                                           or raw.get("output_tokens") or 0)
         return usage
 
     # -- MCP bridge wiring ---------------------------------------------------
@@ -154,7 +161,7 @@ class CursorTransport(HarnessTransport):
                 audit_ok=audit.ok, audit_violations=audit.violations[:10],
                 shell_commands=audit.shell_commands,
                 file_reads=audit.file_reads, writes=audit.writes,
-                bridge_calls=audit.other_tool_calls, timed_out=timed_out,
+                other_tool_calls=audit.other_tool_calls, timed_out=timed_out,
                 served_model=usage.served_model)
         return AgentOutcome(
             text=self._final_text(events),
