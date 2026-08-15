@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import subprocess
 from dataclasses import replace
 from pathlib import Path
@@ -29,8 +30,10 @@ from .._common import gh_read_tools as _gh_read_tools
 from .._common import repo_path as _repo_path
 from .._common import step
 from .anchor import resolve_review_comments
+from .repo_tools import review_repo_tools
 from .prompts import (
     _REVIEW_DEEP_PASSES,
+    _REVIEW_DOCS_PASS,
     _REVIEW_LENSES,
     _REVIEW_LIGHT_PROTOCOL,
     _REVIEW_MERGE,
@@ -165,11 +168,25 @@ async def _promote_uncovered(ctx: StepContext, output: dict,
         "evidence for perf/capacity changes, test integrity (a test that "
         "cannot fail or is never selected), dependency-version "
         "compatibility, resource lifecycle on abort paths, scope explicitly "
-        "left unfixed (linked-issue remainder), red CI on the head. Rules: "
+        "left unfixed (linked-issue remainder), red CI on the head, "
+        "machinery duplicating a named existing helper (sibling contrast), "
+        "a refuted PR-body claim, and — MOST OFTEN MISSED — GUARANTEE-GAP "
+        "RESIDUE hiding in the [validated]/[claim-verified]/[sweep] lines: "
+        "any verified fact that records a WEAKER guarantee than the PR "
+        "needs (a mock that authors the very value the test asserts, a "
+        "single-variant validation of a multi-variant feature, a gate "
+        "relocated to a slower lane, 'proves route propagation only', "
+        "'covered by weekly only') is a FINDING wearing a validation "
+        "stamp — promote it as the pointed question or ask it implies. "
+        "Rules: "
         "(1) ONLY promote what the raw lines already state — no new claims, "
         "no re-investigation; quote the source line in `evidence`. (2) A "
-        "promoted validation line becomes a question or scoping ask, not an "
-        "invented defect. (3) severity: minor unless the raw line "
+        "promoted line KEEPS its directive force: a concern naming a "
+        "concrete defect, missing update, or duplicated machinery is "
+        "phrased as the change to make (name both files and the helper), "
+        "NEVER as a 'could you confirm…?' question; only a validation with "
+        "a genuinely unresolved residual becomes a scoping ask. (3) "
+        "severity: minor unless the raw line "
         "demonstrates breakage (then major). (4) If everything relevant is "
         "already covered, return no additions. Reply with exactly one JSON "
         'object: {"additions": [{"file": str, "line": int, "severity": '
@@ -205,6 +222,24 @@ async def _promote_uncovered(ctx: StepContext, output: dict,
         if not isinstance(a, dict) or not a.get("comment") \
                 or not a.get("evidence"):
             continue
+        # mechanical near-dup guard vs kept comments: the prompt's "NOT
+        # covered by any kept comment" rule was observed re-adding a
+        # merged-away duplicate (wave-3 pr6049 — the reducer collapsed two
+        # candidates, promotion re-added the merged-away variant, judges
+        # penalized the pair). Nearby anchor alone is not duplication (a
+        # linked-issue remainder often anchors beside the defect), so the
+        # guard also requires substantial text overlap.
+        def _words(c):
+            return set(str(c.get("comment") or "").lower().split())
+        aw = _words(a)
+        if aw and any(
+                str(a.get("file") or "") == str(c.get("file") or "")
+                and isinstance(a.get("line"), int)
+                and isinstance(c.get("line"), int)
+                and abs(a["line"] - c["line"]) <= 8
+                and len(aw & _words(c)) >= max(4, len(aw) // 2)
+                for c in comments):
+            continue
         kept.append({"file": str(a.get("file") or "?"),
                      "line": a.get("line"),
                      "severity": str(a.get("severity") or "minor").lower(),
@@ -228,6 +263,156 @@ async def _promote_uncovered(ctx: StepContext, output: dict,
     return output
 
 
+def _uncovered_hunks(diff: str, output: dict) -> list[str]:
+    """Hunk clusters with no comment anchored near them and no findings line
+    citing a nearby file:line — the second round's coverage seed, at the
+    granularity GT actually has. v14's file-level seed measured too coarse on
+    the wave-3 gate: one comment anywhere in a file marked the whole file
+    covered, while the human GT this is judged against is per-hunk inline
+    comments (the losses concentrated on multi-hunk files whose comments
+    clustered on one region). Test files included: an uncovered test hunk is
+    where test-integrity findings hide. Returns `path:start` entries."""
+    import re as _re
+
+    regions: dict[str, list[int]] = {}
+    current = None
+    for line in str(diff or "").splitlines():
+        if line.startswith("+++ b/"):
+            current = line[6:]
+        elif line.startswith("@@") and current:
+            m = _re.search(r"\+(\d+)", line)
+            if m:
+                regions.setdefault(current, []).append(int(m.group(1)))
+    comments = output.get("review_comments") or []
+    cited: dict[str, list[int]] = {}
+    for f in output.get("findings") or []:
+        # Only CLAIM/RESOLVED anchors count as coverage. Blanket
+        # [sweep]/[validated] stamps do not: wave-3 forensics found them to
+        # be false negatives on exactly the GT zones ("TP group build …
+        # verified" where the crash was), and their density suppressed the
+        # second round on every hunk it could have rescued (pr5678: skipped
+        # with four missed-GT hunks "covered" by self-issued stamps).
+        low = str(f).lstrip().lower()
+        if not low.startswith(("[claim-", "[resolved]")):
+            continue
+        for base, num in _re.findall(r"([\w.\-]+\.\w+):(\d+)", str(f)):
+            cited.setdefault(base, []).append(int(num))
+    out: list[str] = []
+    for path, starts in regions.items():
+        base = path.rsplit("/", 1)[-1]
+        file_comments = [c.get("line") for c in comments
+                         if str(c.get("file") or "").endswith(base)
+                         and isinstance(c.get("line"), int)]
+        file_cited = cited.get(base, [])
+        has_any_comment = any(str(c.get("file") or "").endswith(base)
+                              for c in comments)
+        for s in starts:
+            near = any(abs(n - s) <= 40 for n in file_comments + file_cited)
+            # a file-level comment (no line) covers a single-hunk file only
+            if not near and not (has_any_comment and len(starts) == 1):
+                out.append(f"{path}:{s}")
+    return out
+
+
+async def _second_round(ctx: StepContext, output: dict, common: dict,
+                        diff: str) -> dict:
+    """Coverage-driven second investigation round (RFC q3): one bounded pass
+    seeded by the run's own coverage holes, instead of a bigger fixed pass
+    count. Additions face the same verify pass as first-round comments."""
+    from ...agent_runtime import run_agent_step
+
+    if not ctx.settings.review_second_round:
+        return output
+    # 8 seeds, not 14: a 14-seed round-2 was measured producing finals too
+    # large to coerce on the wave-4 big items (both 14-seed runs failed,
+    # both sub-10-seed runs succeeded) — fewer, deeper hunk visits beat a
+    # sweep that never files
+    uncovered = _uncovered_hunks(diff, output)[:8]
+    claims_unchecked = "[claim-" not in " ".join(
+        str(f) for f in (output.get("findings") or []))
+    if len(uncovered) < ctx.settings.review_second_round_min_files \
+            and not claims_unchecked:
+        ctx.trace.record("review_second_round", step="agent.review_diff",
+                         skipped="no coverage holes", uncovered=0)
+        return output
+    kept = [{k: c.get(k) for k in ("file", "line", "severity", "comment")}
+            for c in (output.get("review_comments") or [])]
+    guidance = (
+        "You are the SECOND-ROUND reviewer. The first round produced the "
+        "KEPT COMMENTS in your evidence; your job is ONLY its coverage "
+        "holes — do not re-litigate or duplicate what is already covered.\n"
+        + (("These diff hunks (file:start-line) have NO comment and NO "
+            "recorded verification near them. Review each AT MAINTAINER "
+            "INLINE GRANULARITY: page to the hunk in situ, and either raise "
+            "one specific localized comment (the concrete ask a human "
+            "reviewer would leave on that hunk) or record a one-line "
+            "[validated]/[resolved] findings entry naming file:line — "
+            "silence on a changed hunk is not an option:\n"
+            + "\n".join(f"- {p}" for p in uncovered) + "\n")
+           if uncovered else "")
+        + (("The PR body's checkable claims were never verified (no "
+            "[claim-*] findings line exists). Build the claim ledger now: "
+            "verify or refute each checkable body claim (checklist 13).\n")
+           if claims_unchecked else "")
+        + "Every comment needs verbatim-quoted evidence with file:line. "
+          "Budget discipline: reserve your last round for the output "
+          "contract.")
+    # per-file diff slices for the seed files: on big PRs the shared pr_diff
+    # evidence is CAPPED and the tail files' hunks never reach any pass —
+    # wave-3 pr5691's round-2 read the right 10 files but held the same
+    # truncated diff blob, so the beyond-cap hunks stayed unreviewable. The
+    # slices come from the UNCAPPED diff text.
+    seed_paths = {p.rsplit(":", 1)[0] for p in uncovered}
+    slices: list[str] = []
+    for chunk in re.split(r"(?m)^(?=diff --git )", str(diff or "")):
+        m = re.search(r"^\+\+\+ b/(.+)$", chunk, re.M)
+        if m and m.group(1) in seed_paths:
+            slices.append(chunk)
+    hunk_evidence = "".join(slices)[:100_000]
+    result, extra = await run_agent_step(
+        ctx, **{**common, "step_name": "agent.review_diff#round2",
+                "guidance": common["guidance"] + "\n\n## SECOND ROUND\n"
+                + guidance,
+                "evidence": {**common["evidence"],
+                             "uncovered_hunk_diffs": hunk_evidence,
+                             "kept_comments": json.dumps(kept,
+                                                         ensure_ascii=False)}},
+        max_iters=ctx.settings.review_second_round_max_iters)
+    if not result.ok and not (extra or {}).get("review_comments"):
+        ctx.trace.record("review_second_round", step="agent.review_diff",
+                         uncovered=len(uncovered), added_comments=0,
+                         added_findings=0, failed=True)
+        return output
+    new_comments = []
+    for c in (extra or {}).get("review_comments") or []:
+        if not isinstance(c, dict) or not c.get("comment"):
+            continue
+        # near-dup guard: same file + line within 8 of an existing comment
+        dup = any(str(c.get("file") or "") == str(e.get("file") or "")
+                  and isinstance(c.get("line"), int)
+                  and isinstance(e.get("line"), int)
+                  and abs(c["line"] - e["line"]) <= 8
+                  for e in (output.get("review_comments") or []))
+        if not dup:
+            new_comments.append(c)
+    new_findings = [str(f) for f in (extra or {}).get("findings") or []
+                    if str(f).lstrip().lower().startswith(
+                        ("[validated]", "[resolved]", "[claim-", "[sweep]",
+                         "[upstream-verify]"))]
+    out2 = dict(output)
+    if new_comments:
+        out2["review_comments"] = list(
+            output.get("review_comments") or []) + new_comments
+    if new_findings:
+        out2["findings"] = list(output.get("findings") or []) + new_findings
+    ctx.trace.record("review_second_round", step="agent.review_diff",
+                     uncovered=len(uncovered),
+                     claims_unchecked=claims_unchecked,
+                     added_comments=len(new_comments),
+                     added_findings=len(new_findings))
+    return out2
+
+
 _VERIFY_GUIDANCE = """You verify ONE draft review comment against the PR-time tree.
 
 In order, with the minimum tool calls (your budget is small):
@@ -245,7 +430,12 @@ Verdicts:
   the decisive code line(s) QUOTED VERBATIM with their file:line, e.g.
   'serving_speech.py:3711 `extra_args["tts_local_seed"] = seed` — set for
   every model, no qwen3_tts gate'. A narrative like "read the file, claim
-  holds" is NOT proof and scores as speculation downstream. Optionally
+  holds" is NOT proof and scores as speculation downstream. When the
+  decisive code lies OUTSIDE the diff (a consumer, a sibling platform, a CI
+  lane rule), say so explicitly in the evidence — 'unchanged by this diff,
+  present in the PR-time tree: <file:line> `quote`' — a diff-only reader
+  must see why the quoted line is not in the diff, or the finding reads as
+  fabrication. Optionally
   return a tightened `comment` (sharper wording, exact file/line) — keep
   the substance, never soften a confirmed defect.
 - refuted: the code CONTRADICTS the claim (misread, already handled, wrong
@@ -316,6 +506,8 @@ async def _verify_comments(ctx: StepContext, output: dict,
             n_drop += 1
             continue
         if verdict == "confirmed":
+            c["_verified"] = True  # budget/overflow: a confirmed comment's
+            # tail placement is evidence, not noise — see the overflow gate
             if out.get("comment"):
                 c["comment"] = str(out["comment"])
             if isinstance(out.get("line"), int):
@@ -386,7 +578,7 @@ async def _review_diff(ctx: StepContext) -> StepResult:
             try:
                 if review_md.exists() and ctx.settings.profile_briefing_enabled:
                     guidance += ("\n\n## Repo-specific review checklist\n"
-                                 + review_md.read_text(encoding="utf-8")[:4_000])
+                                 + review_md.read_text(encoding="utf-8")[:7_000])
                     break
             except OSError:
                 continue
@@ -407,7 +599,8 @@ async def _review_diff(ctx: StepContext) -> StepResult:
         output_extension={"review_comments":
                           "list of {file, line, anchor_snippet, severity: "
                           "blocker|major|minor|nit, comment, evidence}"},
-        extra_tools=_gh_read_tools(_repo_path(ctx)),
+        extra_tools={**_gh_read_tools(_repo_path(ctx)),
+                     **review_repo_tools(_repo_path(ctx))},
     )
     plan = None
     if not ctx.settings.review_ensemble:   # legacy kill-switch: single pass
@@ -465,11 +658,25 @@ async def _review_diff(ctx: StepContext) -> StepResult:
                 # Full depth runs both shapes and lets the reducer/verify
                 # machinery arbitrate: investigator + adversary for depth,
                 # behavior + verification for coverage.
-                breadth = [l for l in _REVIEW_LENSES
-                           if l["name"] in ("behavior", "verification")]
-                passes = (list(_REVIEW_DEEP_PASSES) + breadth
-                          if plan.depth == "full"
-                          else list(_REVIEW_DEEP_PASSES[:1]) + breadth[:1])
+                # standard runs BOTH deep passes since v15: two campaigns
+                # measured the adversary's absence at standard depth as a
+                # named recall contributor (wave-2 pr5610; wave-3 gate-2's
+                # losses concentrated on standard items, e.g. 5713 at a
+                # third of the baseline's recall) — the claims/test-integrity
+                # hunting it owns is exactly what mid-size PRs' GT contains
+                if plan.signals is not None and plan.signals.docs_heavy:
+                    # docs PRs: the review surface is claims/journey/links,
+                    # not code behavior — the docs pass replaces the
+                    # code-shaped breadth lenses (wave-2: every generator at
+                    # ~half the baseline's recall on docs items, losses
+                    # entirely in claim-verification work no lens owned)
+                    passes = list(_REVIEW_DEEP_PASSES) + [_REVIEW_DOCS_PASS]
+                else:
+                    breadth = [l for l in _REVIEW_LENSES
+                               if l["name"] in ("behavior", "verification")]
+                    passes = (list(_REVIEW_DEEP_PASSES) + breadth
+                              if plan.depth == "full"
+                              else list(_REVIEW_DEEP_PASSES) + breadth[:1])
                 result, output = await run_agent_step_ensemble(
                     ctx, lenses=passes, merge_key="review_comments",
                     merge_guidance=_REVIEW_MERGE,
@@ -501,24 +708,32 @@ async def _review_diff(ctx: StepContext) -> StepResult:
         # the pass on exactly the GT-rich items it exists for) and BEFORE
         # the verify pass, so promoted items face the same scrutiny
         output = await _promote_uncovered(ctx, output, spec)
+        # coverage-driven second round (RFC q3): changed files nobody wrote a
+        # line about seed ONE bounded extra pass — BEFORE the verify pass, so
+        # second-round comments face the same scrutiny as first-round ones
+        output = await _second_round(ctx, output, common, str(diff))
+    if plan is not None and result.ok:
         # per-comment agentic verification: every surviving draft comment is
         # checked against the PR-time tree by a small tool-loop before the
         # budget — the measured loss driver after the recall fixes was
         # per-comment grounding (val: arm precision .54-.56 vs baseline
-        # .65 with recall at parity), which packaging cannot buy
+        # .65 with recall at parity), which packaging cannot buy. LIGHT
+        # depth verifies too (v14 train probe: the thin items where light
+        # runs were exactly where unverified marginal comments lost on
+        # precision — a wrong sibling-doc ask a verify probe would have
+        # refuted shipped unchecked); on ≤3 comments the pass costs cents
         output = await _verify_comments(ctx, output, common)
     # deterministic comment budget: severity-ordered, corroboration-aware,
-    # capped at 6 — the low-signal tail goes first (reducers ignored a
+    # capped at 8 — the low-signal tail goes first (reducers ignored a
     # prompted cap; the cap is a product budget, so it applies to every
     # depth). The old 5-comment, severity-only cut deleted reducer-KEPT
-    # findings that were literal maintainer concerns on large PRs, while
-    # 8 + nit-heavy overflow read as noise to the blind judge; 6 kept
-    # comments + the promotion pass's protected-class additions is the
-    # measured operating point. Within a severity, findings corroborated by
-    # more independent lenses go first; the minor-plus overflow tail
-    # renders ONLY on evidence-rich reviews (≥2 major/blocker findings) —
-    # a quiet PR stays terse (a thin-GT val item rendering 12 findings
-    # lost 3/3 on noise).
+    # findings that were literal maintainer concerns on large PRs, while a
+    # nit-heavy unconditional overflow read as noise to the blind judge.
+    # Within a severity, findings corroborated by more independent lenses go
+    # first; the overflow tail renders on evidence-rich reviews (≥2
+    # major/blocker) or for individually verify-confirmed cut comments — a
+    # quiet PR with an unverified tail stays terse (a thin-GT val item
+    # rendering 12 findings lost 3/3 on noise).
     comments = sorted(output.get("review_comments") or [],
                       key=lambda c: (_SEVERITY_ORDER.get(
                           str(c.get("severity", "minor")).lower(), 2),
@@ -529,10 +744,17 @@ async def _review_diff(ctx: StepContext) -> StepResult:
     rich = sum(1 for c in comments[:8]
                if _SEVERITY_ORDER.get(str(c.get("severity", "minor")).lower(),
                                       2) <= _SEVERITY_ORDER["major"]) >= 2
+    # Overflow renders on evidence-rich reviews (unchanged), and ALSO for any
+    # cut comment the verify pass individually CONFIRMED on the tree — wave-2
+    # forensics measured three verify-confirmed findings (one echoing the GT
+    # thread) silently dying here because the kept eight were minors and the
+    # rich gate never opened. A confirmed tail is evidence, not noise; the
+    # unverified tail still renders only on rich reviews.
     output["_review_overflow"] = [
         c for c in comments[8:]
         if _SEVERITY_ORDER.get(str(c.get("severity", "minor")).lower(), 2)
-        <= _SEVERITY_ORDER["minor"]][:4] if rich else []
+        <= _SEVERITY_ORDER["minor"]
+        and (rich or c.get("_verified"))][:4]
     if plan is not None:
         result.outputs["review_plan"] = {"depth": plan.depth,
                                          "planner": plan.planner,

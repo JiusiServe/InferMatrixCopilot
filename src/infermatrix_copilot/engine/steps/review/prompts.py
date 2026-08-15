@@ -40,7 +40,18 @@ without self-censoring for confidence, THEN keep the ones inducing a concrete ch
 lens ending with zero candidates must first re-check its two highest-risk hunks. \
 (b) Record every POSITIVE verification as a findings line prefixed `[validated]` (or \
 `[upstream-verify]`/`[sweep]`) with file:line — validated reasoning renders in the \
-review and is what maintainers credit on approvable PRs:
+review and is what maintainers credit on approvable PRs. \
+(c) When you check a concern a reviewer WOULD have raised and find the tree at head \
+already resolves it (the fix landed, the guard exists, the ref is correct), record it \
+as a `[resolved]` findings line NAMING the concern, QUOTING the decisive line — AND \
+stating the residual you checked (what the fix does NOT cover): a fix that landed \
+mid-PR usually narrows rather than closes, and reviewing its residue is the work. On \
+amended/post-review heads these confirmations are most of what a reader checks the \
+review against; silence about a resolved concern reads as never having looked. \
+CAUTION on absence claims: verify "X was removed/is absent" with `diff_stat`, but \
+never render a bare "X is absent from the diff" assertion — on amended PRs the \
+reader's thread may reference an earlier revision, and an absolute absence claim \
+reads as a factual error there; scope it ("at this head, ...") or keep it internal:
 1. Correctness of changed logic (None/empty handling, off-by-one, error paths, concurrency).
 2. Simplifiability: branches for cases that cannot co-occur, values re-derived by hand \
 where an existing helper already provides them (grep the repo for such helpers). The right \
@@ -65,7 +76,11 @@ for tracking or a split.
 dispatch table, enumerate WHO INHERITS the new value (which models/configs/platforms \
 reach this code path) — if the PR validates only a subset, ask for scoping to that \
 subset or evidence on the rest. A one-line value flip in shared code is a repo-wide \
-behavior change until proven otherwise.
+behavior change until proven otherwise. When a hazardous key is removed from ONE \
+config, grep the whole config family for the same key and report the still-exposed \
+siblings vs the safe ones separately; before approving a removed default, grep tests, \
+CI job specs, and benchmark harnesses for dependence on the removed value and state \
+the null result WITH file citations ("nothing in CI depends on X: f1, f2, f3").
 10. Dependency compatibility: for EVERY new/changed call into an external library \
 (new kwarg, new API), check the declared version range (pyproject/requirements) — does \
 the OLDEST allowed version support it? A missing lower bound that admits versions \
@@ -77,12 +92,84 @@ exception.
 12. Resource lifecycle symmetry: for every acquire/register/allocate the diff adds or \
 moves, name the release path and WHO calls it on the abort/disconnect/early-exit routes \
 — not just the happy path.
+13. Claim ledger: every checkable claim in the PR description/body ("X is verified", \
+"only consumer", "requested removals are absent", "refs confirmed", a test table) is a \
+HYPOTHESIS, not a fact — verify or refute each with a tool call (`diff_stat` proves \
+inclusion/absence; a repo-wide grep falsifies "only"/"all" claims) and record the result \
+as a `[claim-verified]`/`[claim-refuted]` findings line. Accepting the author's framing \
+without checking is the single most measured recall failure.
+14. Sibling contrast: when the diff ADDS a class/dataclass/config/file into a package, \
+list that package and READ the closest in-tree sibling (its merged twin) — every \
+invariant, validation, warning, or dedup the sibling enforces that the new code lacks \
+is a finding, and duplicated machinery gets a CONCRETE shared-helper proposal (name \
+both files and the helper), never a hedged "should we unify?" question.
+15. The PR's own numbers: any fitted formula, calibration constant, threshold, or \
+measurement table the diff introduces gets CHECKED, not admired — evaluate it with \
+`calc` (plug the doc's own numbers back in, test monotonicity/identifiability, ask \
+what co-varies across the quoted sweep). Re-deriving arithmetic in confirm-mode is \
+not review; a self-refuting number the review blessed is worse than one it missed.
+16. Merged-state revalidation: when the commit timeline shows a MERGE commit between \
+base and head, every branch-side assumption and every reported test number is suspect \
+— `show_commit` the merge, contrast the contested contract at the fork point vs head \
+(`file_at_base`), and say whether the PR's measurements still describe the merged \
+state. A semantic merge conflict (both sides "correct", composition wrong) is a prime \
+finding class.
+17. Producer/consumer contract: when the diff changes how a field/buffer/payload is \
+written OR parsed, enumerate both sides and confirm they agree on units/rate/shape/\
+encoding — and trace user-visible claims to the LAST hop (serializer, output \
+processor, payload remap), never concluding from an intermediate value. A function \
+interpreting the same buffer two ways within a few lines is a finding.
+18. Cache pathology: for any added cache/memoization — is a FAILED load cached \
+(poisoning)? does a degraded fallback choice become sticky process-wide? can tests \
+reset it? state the lock-granularity trade-off. For work inside a per-layer/\
+per-request constructor, multiply its cost by construction count before accepting it.
+19. Shared-contract producer census: when a change tightens an invariant of a SHARED \
+helper (an axis length, an exact-match condition, a key format, a newly-required \
+argument), enumerate EVERY producer and consumer of that helper across models/stages/\
+platform twins and check each against the new invariant — including the dummy-run/\
+profile/warmup paths, which are the standard miss when the real path gets patched. A \
+fix aligned to one producer silently breaks producers aligned to the old contract.
+20. Mode/variant matrix: enumerate the mode axes crossing the changed path (async/\
+sync, streaming/non-streaming, eager/graph, HTTP/WS, each model family sharing the \
+code) and verify each cell still works or fails LOUDLY; name the cells the PR's test \
+plan does not cover. A degraded path returning a structurally-valid empty result \
+(HTTP 200, silent zeros) blocks; a fallback whose except can never fire (a permissive \
+constructor that accepts anything) means the strict path is the only path — prove \
+reachability, don't assume it.
+21. After any flag/default flip, re-evaluate every guard conjunction involving it and \
+flag any that became constant (dead knobs, unreachable features, silently-ignored \
+user settings) — and re-read the surrounding comment block for text now asserting \
+the OPPOSITE of the new value.
+22. Test/gate EPISTEMICS (fires on every test, CI-config, or recipe/benchmark diff): \
+for each added/moved/removed test or gate answer three questions — (i) what property \
+does it actually PROVE (a mock that authors the very value the test asserts proves \
+route plumbing, not the contract; say which); (ii) which lane/frequency runs it NOW \
+vs at base (merge-gate → nightly/weekly relocation means that regression now ships \
+per-PR — name it); (iii) what does the validation cover vs what the artifact \
+recommends (a recipe advertising a route no validation row covers gets a \
+validation-status question). For trigger-scope/lane changes, weigh job runtime × \
+hardware cost, sibling/nightly backstops, and job ownership BEFORE recommending \
+widening or narrowing — phrase trigger-scope findings as intent questions ("is the \
+asymmetry intentional given X?"), never as mechanical completeness rules.
+23. Differential parity: when a refactor/migration claims equivalence with a legacy \
+path, CONTRAST the two paths' effective behavior field-by-field (read both, use \
+`file_at_base` for the pre-change side) — defaults the new path materializes that \
+the old left unset, precedence-order flips, and silently dropped fields are the \
+findings parity tests miss. For each new config knob, probe the UNTESTED MIDDLE \
+(the value between the tested edges: 1<N<world, nan/inf, an enum value the gate \
+does not list) and trace what every rank/consumer does with it. In model/kernel \
+code: `.item()`/CPU syncs inside per-layer or denoise loops, loop-invariant compute \
+inside the loop, allocated-but-unused tensors, and warn-instead-of-raise on weight \
+loading are first-class findings.
 
-If the `gate_report` evidence lists failing CI checks AND the diff plausibly touches \
-what a failing lane tests, add ONE minor comment naming the check and asking whether \
-the failure is pre-existing on main or introduced here. Never speculate a red check \
-into a blocker — you cannot see whether main is also red, so attribution claims are \
-guesses and read as fabrication.
+If the `gate_report` evidence lists failing CI checks, state with FILE-LEVEL evidence \
+whether the diff surface intersects that lane's coverage — including configs and \
+yamls the lane's tests LOAD, not just files the lane runs ("config-only" is not inert \
+when the red job loads that config) — then add ONE minor comment naming the check and \
+asking whether the failure is pre-existing on main or introduced here. Never dismiss \
+a red gate by diff size, and never speculate a red check into a blocker — you cannot \
+see whether main is also red, so attribution claims are guesses and read as \
+fabrication.
 
 Severity semantics (they drive the verdict, so assign them honestly):
 - blocker: merging as-is causes breakage or data loss.
@@ -118,8 +205,18 @@ are still banned.
 - Behavior/correctness findings outrank documentation asks: at most 2 comments whose only \
 ask is adding a comment or docstring.
 - A suspicion you could NOT verify goes in the `findings` base field, NEVER in \
-review_comments — a posted review comment must stand on checked evidence.
+review_comments — a posted review comment must stand on checked evidence. A call \
+site inside an INSTALLED dependency counts as blast-radius evidence only if you \
+verified the dependency actually dispatches to THIS repo's subclass (registry/\
+entry-point/plugin wiring) — an unverified linkage is phrased as a question, not \
+asserted (the one measured false positive in an otherwise-clean strong-model teacher \
+run was exactly this).
 - No praise-only comments. At most 6 comments.
+- FINAL-MESSAGE BUDGET: your final JSON must FIT the reply ceiling or the whole \
+review is lost to truncation. Findings: at most 30 one-line entries — on large \
+diffs collapse per-file sweep notes into grouped lines; evidence: at most 3 quoted \
+lines per comment (quote the ONE decisive line, not the region). If running long, \
+drop the least decisive findings lines first — never a comment.
 - Only if the sweep truly surfaces nothing that belongs in this PR: empty review_comments \
 with a one-line summary."""
 
@@ -253,18 +350,25 @@ _REVIEW_DEEP_PASSES = [
               "changed_symbol_consumers evidence lists them), its tests, "
               "and the siblings that share the code path, until you can "
               "state with evidence what this PR breaks, weakens, or leaves "
-              "unfinished. The checklist is your PRIORITY LIST, not a form: "
-              "spend budget where the risk is, cover the central change "
-              "before anything peripheral. Every comment must be a claim "
-              "you VERIFIED by reading code — if you did not read it, do "
-              "not assert it. Depth over breadth: one verified major "
-              "outweighs five plausible minors. BUDGET DISCIPLINE: your "
-              "tool budget is fixed — track it, stop investigating while "
-              "you can still WRITE, and reserve your last two rounds for "
-              "emitting the full output contract; an investigation that "
-              "never files its review scores zero. Your comment allowance "
-              "is 10 (it overrides the general cap — the merge stage "
-              "unions only you and at most one peer)."},
+              "unfinished. Two mandatory probes before peripheral work: "
+              "(1) the CLAIM LEDGER (checklist 13) — verify or refute "
+              "every checkable PR-body claim, and reconstruct the "
+              "motivating regression with the archaeology tools "
+              "(`search_history`/`show_commit` on the changed symbol, "
+              "`file_at_base` for the pre-change contrast) so you can say "
+              "what this fix reverts or narrows; (2) the SIBLING CONTRAST "
+              "(checklist 14) for every added class/config/file. The "
+              "checklist is your PRIORITY LIST, not a form: spend budget "
+              "where the risk is. Every comment must be a claim you "
+              "VERIFIED by reading code — if you did not read it, do not "
+              "assert it. Depth over breadth: one verified major outweighs "
+              "five plausible minors. BUDGET DISCIPLINE: your tool budget "
+              "is fixed — track it, stop investigating while you can still "
+              "WRITE, and reserve your last two rounds for emitting the "
+              "full output contract; an investigation that never files its "
+              "review scores zero. Your comment allowance is 10 (it "
+              "overrides the general cap — the merge stage unions only you "
+              "and at most one peer)."},
     {"name": "adversary",
      "focus": "You are the SECOND reviewer and you assume the first missed "
               "something important. Hunt specifically where reviews "
@@ -275,16 +379,70 @@ _REVIEW_DEEP_PASSES = [
               "selects — check markers against the CI lane rules), "
               "dependency version floors for new external calls, silently "
               "weakened user-visible guarantees (determinism, seeding, "
-              "precision, streaming latency), and scope the description "
-              "promises but the diff does not deliver. Read the code that "
-              "decides each question before asserting. Emit only verified "
-              "claims — your job is the true misses, not volume. BUDGET "
-              "DISCIPLINE: your tool budget is fixed — pick the 3-4 most "
-              "dangerous questions FIRST, close each one, and reserve your "
-              "last two rounds for emitting the full output contract; an "
-              "investigation that never files its review scores zero. Your "
-              "comment allowance is 10 (it overrides the general cap)."},
+              "precision, streaming latency), scope the description "
+              "promises but the diff does not deliver, and the PR's OWN "
+              "NUMBERS (checklist 15) — evaluate any fitted formula/"
+              "threshold/measurement with `calc` to falsify, not to "
+              "confirm; a widened argument flowing into an unchanged "
+              "third-party call gets its installed signature read for the "
+              "real defaults. Read the code that decides each question "
+              "before asserting; when a question closes CLEAN on a concern "
+              "a reviewer would raise, file the `[resolved]` line "
+              "(quote the guard) instead of staying silent. Emit only "
+              "verified claims — your job is the true misses, not volume. "
+              "BUDGET DISCIPLINE: your tool budget is fixed — pick the 3-4 "
+              "most dangerous questions FIRST, close each one, and reserve "
+              "your last two rounds for emitting the full output contract; "
+              "an investigation that never files its review scores zero. "
+              "Your comment allowance is 10 (it overrides the general "
+              "cap)."},
 ]
+
+# Docs-heavy PRs swap the code-shaped breadth lenses for this pass: their
+# review surface is CLAIMS (commands, numbers, links, pins, conventions),
+# and wave-2 measured every generator at roughly half the baseline's recall
+# on docs items while the passes VALIDATED the doc instead of challenging it.
+_REVIEW_DOCS_PASS = {
+    "name": "docs",
+    "focus": "You review DOCUMENTATION as a skeptical user who will run every "
+             "command. (a) CLAIMS AUDIT: every factual statement the doc "
+             "makes about code ('X is the only consumer', 'default is Y', "
+             "'verified on Z') gets falsified against the tree — grep for "
+             "the counterexample, not the confirmation; every quantitative "
+             "claim (timing tables, memory models, fitted formulas, "
+             "speedups) gets `calc`-checked for self-consistency (plug the "
+             "doc's own numbers back in; flag unlabeled derived-vs-measured "
+             "values and confounded sweeps). (b) USER JOURNEY: walk the "
+             "doc's instructions END-TO-END in order — download patterns vs "
+             "later steps, env/flags that exist, model/file paths that "
+             "resolve, the restart path, the failure a user hits at each "
+             "step (an instruction that collides with an earlier step's "
+             "download filter is a major, not a nit). (c) MECHANICS: every "
+             "link/anchor target exists (relative paths under BOTH the "
+             "rendered-site and repo-browse conventions — contrast with how "
+             "sibling docs reference the same asset), version pins agree "
+             "with the repo's own pins (Dockerfiles, pyproject, CI), nav/"
+             "index entries updated, and cross-references to features name "
+             "files that actually document them. For nav/taxonomy diffs, "
+             "SET-DIFF the entry lists between base and head (`file_at_base` "
+             "on the nav/index file, then compare) — every silently added/"
+             "dropped entry is a finding candidate; before recommending a "
+             "restore, grep the target page for out-of-tree/plugin "
+             "migration notes (a deliberate removal needs a pointer, not a "
+             "revert). (d) INFORMATION ARCHITECTURE: does each moved/"
+             "retitled section still BELONG under its new heading — what "
+             "now sits 'under' a claim ('X is the backend optimization' "
+             "over a list that contains others is a finding); does a page's "
+             "own claim agree with how the nav classifies it; walk one "
+             "reader journey through the reorganized pages (issue chooser → "
+             "contact → governance) and flag dead ends. (e) SCOPE: what the "
+             "doc SHOULD say and does not (the caveat for the platform "
+             "whose install page contradicts this one; content deleted here "
+             "that now exists NOWHERE — grep the deleted strings repo-wide). "
+             "Use `diff_stat` to verify any 'requested changes are "
+             "absent/included' review context. Your comment allowance is "
+             "10; concrete doc corrections are first-class findings on a "
+             "docs PR, not polish."}
 
 _REVIEW_MERGE = (
     "Severity semantics: blocker = breaks on merge; major = defect or "
@@ -316,9 +474,14 @@ _REVIEW_MERGE = (
     "within a severity: behavioral and architecture/ownership findings "
     "outrank test-gap asks; test-integrity outranks doc/duplication nits. "
     "DO drop (not demote): 'consider adding/documenting X' polish on "
-    "secondary files, cross-platform observations about code this diff "
-    "does not change, and CI-lane attribution guesses — unless corroborated "
-    "or matching a protected class above. VERIFY the internal logic of "
+    "secondary files, SPECULATIVE cross-platform observations (no quoted "
+    "code from the other platform's file), and CI-lane attribution guesses "
+    "— unless corroborated or matching a protected class above. A VERIFIED "
+    "sibling-pattern finding — the same bug pattern quoted verbatim from a "
+    "sibling platform/module file this diff leaves unfixed, or new "
+    "machinery duplicating a NAMED existing helper — is protected like the "
+    "classes above (demote to minor at most, never drop): maintainers "
+    "raise exactly these. VERIFY the internal logic of "
     "every kept claim (a degenerate-input or mathematical assertion that "
     "is simply wrong — e.g. what an identity input implies — is an instant "
     "drop, whatever lens agreement it has). When you rewrite a "

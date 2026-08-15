@@ -919,3 +919,172 @@ def test_zero_yield_escalation_can_be_switched_off(settings, trace, tmp_path,
         _ctx(settings, trace, tmp_path, state, llm=llm)))
     assert not list(trace.events("review_depth_escalated"))
     assert result.outputs["review_plan"]["depth"] == "light"
+
+
+def test_second_round_targets_uncovered_files(settings, trace, tmp_path,
+                                              git_repo):
+    """Coverage-driven second round (RFC q3): changed files with no comment
+    and no findings line seed one extra pass; its non-duplicate comments and
+    verification findings merge into the output."""
+    settings.review_ensemble = True
+    settings.review_deep_engine = True
+    settings.review_depth = "full"
+    settings.review_second_round = True
+    c1 = [{"file": "a.py", "line": 1, "severity": "major",
+           "comment": "central defect", "evidence": "a.py:1 `A = 1`"}]
+    round2 = [{"file": "a.py", "line": 3, "severity": "minor",
+               "comment": "duplicate-ish of the kept one",
+               "evidence": "a.py:1 `A = 1`"},
+              {"file": "c.py", "line": 7, "severity": "minor",
+               "comment": "uncovered-file finding",
+               "evidence": "c.py:7 `C = 1`"}]
+    llm = ScriptedLLM([
+        contract(review_comments=c1),                  # investigator
+        contract(review_comments=[]),                  # adversary
+        contract(review_comments=[]),                  # behavior
+        contract(review_comments=[]),                  # verification
+        verdicts_reply({"i": 0, "action": "keep"}),    # reduce
+        contract(review_comments=round2,               # second round
+                 findings=["[claim-verified] body claim holds: a.py:1"]),
+    ])
+    state = {"diff_text": ("diff --git a/a.py b/a.py\n+++ b/a.py\n"
+                           "@@ -1,0 +1,1 @@\n+A = 1\n"
+                           "diff --git a/c.py b/c.py\n+++ b/c.py\n"
+                           "@@ -7,0 +7,1 @@\n+C = 1"),
+             "task_spec": {"pr": 9}, "repo_path": str(git_repo)}
+    registry = register_builtin_steps(StepRegistry())
+    result = asyncio.run(registry.get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+    assert result.ok, result.summary
+    ev = next(trace.events("review_second_round"))
+    assert ev["uncovered"] == 1 and ev["added_comments"] == 1
+    files = [c["file"] for c in result.outputs["review_comments"]]
+    assert files.count("c.py") == 1
+    assert files.count("a.py") == 1        # near-dup was filtered
+    assert not llm._replies
+
+
+def test_second_round_skips_when_everything_covered(settings, trace, tmp_path,
+                                                    git_repo):
+    """Full coverage (every changed file mentioned, claims checked) skips the
+    round entirely — no extra LLM call."""
+    settings.review_ensemble = True
+    settings.review_deep_engine = True
+    settings.review_depth = "full"
+    settings.review_second_round = True
+    c1 = [{"file": "a.py", "line": 1, "severity": "major",
+           "comment": "covered", "evidence": "a.py:1 `A = 1`"}]
+    llm = ScriptedLLM([
+        contract(review_comments=c1,
+                 findings=["[claim-verified] the body claim checks out"]),
+        contract(review_comments=[]),
+        contract(review_comments=[]),
+        contract(review_comments=[]),
+        verdicts_reply({"i": 0, "action": "keep"}),
+    ])
+    state = {"diff_text": "diff --git a/a.py b/a.py\n+++ b/a.py\n+A = 1",
+             "task_spec": {"pr": 9}, "repo_path": str(git_repo)}
+    registry = register_builtin_steps(StepRegistry())
+    result = asyncio.run(registry.get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+    assert result.ok, result.summary
+    ev = next(trace.events("review_second_round"))
+    assert ev.get("skipped") == "no coverage holes"
+    assert not llm._replies
+
+
+def test_overflow_renders_verify_confirmed_tail_without_rich(settings, trace,
+                                                             tmp_path,
+                                                             git_repo):
+    """A budget-cut comment the verify pass CONFIRMED renders in the overflow
+    even when the review is not 'rich' (all minors) — wave-2 lost three
+    verified findings to the rich-only gate."""
+    settings.review_ensemble = True
+    settings.review_deep_engine = True
+    settings.review_depth = "standard"
+    settings.review_verify_comments = True
+    minors = [{"file": f"f{i}.py", "line": i + 1, "severity": "minor",
+               "comment": f"minor {i}", "evidence": f"f{i}.py:{i + 1} `x`"}
+              for i in range(9)]
+    llm = ScriptedLLM(
+        [contract(review_comments=minors),             # investigator
+         contract(review_comments=[]),                 # adversary (v15:
+                                                       # standard runs both
+                                                       # deep passes)
+         contract(review_comments=[]),                 # behavior
+         verdicts_reply(*[{"i": k, "action": "keep"} for k in range(9)])]
+        + [contract(verdict="confirmed")] * 9)         # verify fan-out
+    state = {"diff_text": "diff --git a/f0.py b/f0.py\n+++ b/f0.py\n+x = 1",
+             "task_spec": {"pr": 9}, "repo_path": str(git_repo)}
+    registry = register_builtin_steps(StepRegistry())
+    result = asyncio.run(registry.get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+    assert result.ok, result.summary
+    assert len(result.outputs["review_comments"]) == 8
+    assert "Additional observations" in result.outputs["review_text"]
+    assert not llm._replies
+
+
+def test_docs_heavy_diff_swaps_in_the_docs_pass(settings, trace, tmp_path,
+                                                git_repo):
+    """A mid-size docs-only diff plans standard depth and runs the docs
+    claims-audit pass instead of the code breadth lens."""
+    settings.review_ensemble = True
+    settings.review_deep_engine = True
+    body = "\n".join(f"+doc line {i}" for i in range(120))
+    diff = f"diff --git a/docs/big.md b/docs/big.md\n+++ b/docs/big.md\n{body}"
+    llm = ScriptedLLM([
+        contract(review_comments=[]),                  # investigator
+        contract(review_comments=[]),                  # adversary (v15)
+        contract(review_comments=[{"file": "docs/big.md", "line": 3,
+                                   "severity": "minor",
+                                   "comment": "claim does not hold",
+                                   "evidence": "docs/big.md:3 `doc line 1`"}]),
+        verdicts_reply({"i": 0, "action": "keep"}),
+    ])
+    state = {"diff_text": diff, "task_spec": {"pr": 9},
+             "repo_path": str(git_repo)}
+    registry = register_builtin_steps(StepRegistry())
+    result = asyncio.run(registry.get("agent.review_diff").handler(
+        _ctx(settings, trace, tmp_path, state, llm=llm)))
+    assert result.ok, result.summary
+    plan = next(trace.events("review_plan"))
+    assert plan["depth"] == "standard"
+    steps_run = [e["step"] for e in trace.events("agent_dispatch")]
+    assert steps_run == ["agent.review_diff#investigator",
+                         "agent.review_diff#adversary",
+                         "agent.review_diff#docs"]
+    assert not llm._replies
+
+
+def test_validated_ledger_ranks_resolved_and_claims_first():
+    """The rendered Validated section ranks [resolved]/[claim-*] confirmations
+    ahead of mechanics [sweep] notes and keeps up to 14 — arrival-order
+    truncation was cutting exactly the resolved-thread confirmations the
+    reader checks a post-fix review against."""
+    from infermatrix_copilot.engine.steps.review.utils import (
+        _review_summary_parts,
+    )
+    findings = ([f"[sweep] mechanics note {i}" for i in range(20)]
+                + ["[resolved] prior concern X: fixed at f.py:3 `guard`",
+                   "[claim-verified] body claim holds: g.py:9 `line`"])
+    parts = _review_summary_parts({"findings": findings, "review_comments": []})
+    validated = next(p for p in parts if p.startswith("**Validated:**"))
+    lines = validated.splitlines()[1:]
+    assert len(lines) == 14
+    assert "[resolved]" in lines[0]
+    assert "[claim-verified]" in lines[1]
+
+
+def test_render_falls_back_to_declared_line_for_unresolved_anchor():
+    """A repo-side comment whose anchor the diff index cannot corroborate
+    renders with its declared line marked approximate — `file:?` was measured
+    as a judge penalty on findings that were otherwise correct."""
+    from infermatrix_copilot.engine.steps.review.utils import (
+        _render_review_md,
+    )
+    md = _render_review_md({"review_comments": [
+        {"file": "ci.yml", "_declared_line": 19, "_anchor_unverified": True,
+         "severity": "minor", "comment": "lane duplicates a bucket",
+         "evidence": "ci.yml:19 `pytest ...`"}]})
+    assert "`ci.yml:~19`" in md

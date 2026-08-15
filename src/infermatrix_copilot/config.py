@@ -209,14 +209,22 @@ class Settings(BaseSettings):
                                       # results — uncached tokens x n_lenses;
                                       # evidence lives ONCE in the shared
                                       # cached prefix instead
-    evidence_caps: dict[str, int] = {"pr_diff": 260_000, "issue_text": 30_000,
-                                     "pr_context": 15_000}     # per-item cap; full text archived to run dir
+    evidence_caps: dict[str, int] = {"pr_diff": 340_000, "issue_text": 30_000,
+                                     "pr_context": 15_000,
+                                     # second-round per-file diff slices for
+                                     # its seed files (uncapped-diff extracts)
+                                     "uncovered_hunk_diffs": 100_000}
                                      # pr_diff 120k->260k: a 170k-char diff
                                      # (pr4804) lost ~30% of its hunks to the
                                      # cap and review recall collapsed to 0.16
                                      # — the cap must clear real large PRs;
                                      # the diff sits in the shared cached
-                                     # prefix so the cost is one lens's worth
+                                     # prefix so the cost is one lens's worth.
+                                     # 260k->340k (v15): wave-3's pr5691
+                                     # (316k chars) lost its tail 18% and
+                                     # arm recall on it was 0.06 vs 0.38 —
+                                     # ~85k tokens still fits the context
+                                     # with room for the scaffolding
     # PR context bundle (W1): description/discussion/linked issues fed to the
     # reviewer. "no_discussion" excludes comments/review threads — REQUIRED for
     # eval arms (the frozen dataset's ground truth IS the review discussion;
@@ -243,7 +251,7 @@ class Settings(BaseSettings):
                                        # baseline is per-finding reading
                                        # depth, and the baseline reads
                                        # 3-10x more code per finding
-    ensemble_merge_evidence_chars: int = 280_000  # must fit the pr_diff — a
+    ensemble_merge_evidence_chars: int = 360_000  # must fit the pr_diff — a
                                         # reducer that can't see the diff
                                         # can't verify (T3 forensics #5);
                                         # raised with evidence_caps.pr_diff
@@ -268,6 +276,18 @@ class Settings(BaseSettings):
     review_deep_max_iters: int = 32     # investigation budget per pass —
                                         # the baseline reads 3-10x more code
                                         # per finding than a 14-iter lens
+
+    # Coverage-driven second investigation round (RFC-strict-review-deep-
+    # engine open q3): after reduce+promote+verify, changed files with
+    # neither a comment nor a recorded verification line seed ONE bounded
+    # extra pass. Wave-2 forensics: on GT-rich items the passes' comments
+    # clustered on a few central files while GT concerns sat in files no
+    # pass ever wrote a line about — a fixed pass count cannot see its own
+    # coverage holes.
+    review_second_round: bool = True
+    review_second_round_max_iters: int = 16
+    review_second_round_min_files: int = 1   # uncovered-file count that
+                                             # triggers the round
 
     # Adaptive review depth (hybrid planner, review/planner.py): deterministic
     # rules decide the clear cases in pure code; only the gray middle zone

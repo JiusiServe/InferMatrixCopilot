@@ -374,9 +374,22 @@ async def run_agent_step_ensemble(
                 "lens_reduce_truncated", step=step_name,
                 candidates=len(candidates),
                 output_tokens=(reply.usage or {}).get("output_tokens", 0))
+            # candidates-only retry: re-sending the full evidence pack made
+            # the retry die at max_tokens exactly like the first attempt on a
+            # 19-candidate/316KB item (wave-3 pr5691 — both calls burned the
+            # whole ceiling reasoning over the evidence, the union shipped
+            # with duplicate findings, and precision collapsed). Dup/keep
+            # decisions are judged on candidate-text coherence alone here.
+            retry_prompt = (
+                f"## CANDIDATE ITEMS ({merge_key}, from {len(samples)} "
+                "samples)\n"
+                + json.dumps(numbered, ensure_ascii=False, indent=1)
+                + "\n\n(No evidence pack on this retry — judge duplicates "
+                "and internal coherence from the candidate texts alone; "
+                "drop only self-contradictory or vacuous items.)")
             retry = await asyncio.to_thread(
                 reducer_llm.create, system=_merge_system(verdicts_only=True),
-                messages=[{"role": "user", "content": merge_prompt}],
+                messages=[{"role": "user", "content": retry_prompt}],
                 model=tier_model, role="reducer",
                 max_tokens=max(6000, ctx.settings.llm_max_tokens))
             retry_text = retry.text
@@ -440,8 +453,14 @@ async def run_agent_step_ensemble(
                              "(merge reduction failed; unverified union)")
     # near-dup guard (W2): the reducer occasionally re-emits the same finding
     # (observed live: an identical dead-guard comment twice on PR 4810) — drop
-    # candidates identical on (file, line, normalized first-120-chars comment)
+    # candidates identical on (file, line, normalized first-120-chars comment).
+    # When the merge FAILED outright, collapse aggressively instead: same
+    # file within 8 lines = one finding (wave-3 pr5691: a failed merge
+    # shipped a raw union where 4 of the 8 rendered slots were two
+    # duplicated findings — in the failure path, losing a neighbor finding
+    # is cheaper than shipping duplicates).
     seen_sigs: set = set()
+    kept_lines: dict[str, list[int]] = {}
     deduped: list[int] = []
     for i in sorted(kept):
         c = kept[i]
@@ -452,6 +471,14 @@ async def run_agent_step_ensemble(
                " ".join(str(c.get("comment", "")).lower().split())[:120])
         if sig in seen_sigs:
             continue
+        if not verified:
+            fpath = str(c.get("file", ""))
+            line = c.get("line")
+            if isinstance(line, int) and any(
+                    abs(line - n) <= 8 for n in kept_lines.get(fpath, [])):
+                continue
+            if isinstance(line, int):
+                kept_lines.setdefault(fpath, []).append(line)
         seen_sigs.add(sig)
         deduped.append(i)
     merged[merge_key] = [

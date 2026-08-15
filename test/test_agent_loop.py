@@ -93,3 +93,68 @@ def test_final_round_nudge_follows_tool_results(trace):
     assert nudged, "nudge message missing"
     kinds = [b["type"] for b in nudged[0] if isinstance(b, dict)]
     assert kinds[0] == "tool_result" and kinds[-1] == "text"
+
+
+def test_empty_reply_after_tools_gets_one_nudge(tmp_path, trace):
+    """A model that stops with NO tools and NO text after investigating gets
+    exactly one loud nudge (measured: a 32-round adversary pass ended empty
+    and the whole sample was lost); the nudge saves the investigation."""
+    scope = pre_plan_scope(tmp_path / "plans")
+    llm = ScriptedLLM([
+        Reply(blocks=[Block(type="tool_use", id="t", name="read_file",
+                            input={"path": str(tmp_path / "nope.txt")})]),
+        Reply(blocks=[]),                                     # empty stop
+        Reply(blocks=[Block(type="text", text="salvaged answer")]),
+    ])
+    outcome = run_agent(llm, system="s", prompt="p", scope=scope, trace=trace)
+    assert outcome.text == "salvaged answer"
+    assert not llm._replies
+    nudge = llm.sent_messages[-1]
+    assert nudge["role"] == "user" and "EMPTY" in nudge["content"]
+
+
+def test_empty_reply_with_no_tool_calls_is_not_retried(tmp_path, trace):
+    """No investigation happened -> nothing to save; retrying every empty
+    would double spend on a degenerate endpoint."""
+    scope = pre_plan_scope(tmp_path / "plans")
+    llm = ScriptedLLM([Reply(blocks=[])])
+    outcome = run_agent(llm, system="s", prompt="p", scope=scope, trace=trace)
+    assert outcome.text == ""
+    assert not llm._replies                     # exactly one call was made
+
+
+def test_exhaustion_empty_final_gets_one_retry(tmp_path, trace):
+    """The forced budget-exhausted final coming back EMPTY discards the whole
+    investigation — it gets one explicit retry."""
+    scope = pre_plan_scope(tmp_path / "plans")
+    loop_reply = Reply(blocks=[Block(type="tool_use", id="t", name="read_file",
+                                     input={"path": str(tmp_path / "n.txt")})])
+    llm = ScriptedLLM([
+        loop_reply, loop_reply,
+        Reply(blocks=[]),                                     # empty forced final
+        Reply(blocks=[Block(type="text", text="second-try final")]),
+    ])
+    outcome = run_agent(llm, system="s", prompt="p", scope=scope, trace=trace,
+                        max_iters=2)
+    assert outcome.truncated
+    assert outcome.text == "second-try final"
+    assert not llm._replies
+
+
+def test_final_cut_at_token_ceiling_gets_tighten_retry(tmp_path, trace):
+    """A final reply with stop_reason=max_tokens is truncated mid-JSON; one
+    tighten-retry saves it (wave-3 gate: a docs pass emitted exactly the
+    16k ceiling and every candidate died)."""
+    scope = pre_plan_scope(tmp_path / "plans")
+    llm = ScriptedLLM([
+        Reply(blocks=[Block(type="tool_use", id="t", name="read_file",
+                            input={"path": str(tmp_path / "n.txt")})]),
+        Reply(blocks=[Block(type="text", text='{"status": "succ')],
+              stop_reason="max_tokens"),
+        Reply(blocks=[Block(type="text", text='{"status": "success"}')]),
+    ])
+    outcome = run_agent(llm, system="s", prompt="p", scope=scope, trace=trace)
+    assert outcome.text == '{"status": "success"}'
+    assert not llm._replies
+    nudge = llm.sent_messages[-1]
+    assert nudge["role"] == "user" and "CUT at the token ceiling" in nudge["content"]

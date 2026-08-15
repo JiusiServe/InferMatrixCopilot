@@ -158,7 +158,47 @@ def build_server(spec_path: Path):
             return _call("run_shell", {"cmd": cmd, "cwd": cwd or None})
 
     _register_doc_tools(mcp, spec, trace)
+    _register_repo_tools(mcp, scope, trace)
     return mcp
+
+
+def _register_repo_tools(mcp, scope: ToolScope, trace: RunTrace) -> None:
+    """Change-archaeology + calc tools (review/repo_tools.py), reconstructed
+    from `scope.root` — they need nothing from a live StepContext, so unlike
+    skill/memory retrieval they CAN cross the process boundary. Closes that
+    slice of the disclosed M1 extra-tools gap for harness sessions."""
+    from .engine.steps.review.repo_tools import review_repo_tools
+
+    root = Path(scope.root) if scope.root else None
+    tools = review_repo_tools(root if root and root.exists() else None)
+    if not tools:
+        return
+
+    def _call(name: str, args: dict) -> str:
+        out = dispatch(name, args, scope=scope, trace=trace, extra=tools)
+        if not out["ok"]:
+            raise RuntimeError(str(out.get("error") or "tool error"))
+        return str(out["result"])
+
+    @mcp.tool(description=tools["diff_stat"].description)
+    def diff_stat() -> str:
+        return _call("diff_stat", {})
+
+    @mcp.tool(description=tools["file_at_base"].description)
+    def file_at_base(path: str, offset: int = 0) -> str:
+        return _call("file_at_base", {"path": path, "offset": offset})
+
+    @mcp.tool(description=tools["show_commit"].description)
+    def show_commit(sha: str) -> str:
+        return _call("show_commit", {"sha": sha})
+
+    @mcp.tool(description=tools["search_history"].description)
+    def search_history(term: str, path: str = "") -> str:
+        return _call("search_history", {"term": term, "path": path})
+
+    @mcp.tool(description=tools["calc"].description)
+    def calc(expr: str) -> str:
+        return _call("calc", {"expr": expr})
 
 
 def _register_doc_tools(mcp, spec: dict, trace: RunTrace) -> None:

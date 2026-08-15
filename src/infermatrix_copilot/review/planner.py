@@ -110,6 +110,13 @@ class DiffSignals:
         return bool(self.files) and len(self.doc_files) == len(self.files)
 
     @property
+    def docs_heavy(self) -> bool:
+        """Docs are the substance: doc files present, zero code files (config/
+        asset riders allowed — a nav .yml or an image beside three .md files
+        does not make a docs PR a code PR)."""
+        return bool(self.doc_files) and not self.code_files
+
+    @property
     def code_lines_changed(self) -> int:
         return self.code_insertions + self.code_deletions
 
@@ -245,8 +252,22 @@ def classify(sig: DiffSignals, settings: Any) -> tuple[str, str] | None:
     """(depth, reason) for the CLEAR cases; None = gray zone. Light requires
     positive evidence — a diff that parses to zero files goes gray, so a
     misparse degrades toward more review, never toward light."""
-    if sig.docs_only:
-        return "light", "docs-only diff"
+    if sig.docs_only or sig.docs_heavy:
+        # Docs PRs are reviews of CLAIMS (commands, numbers, links, pins) —
+        # wave-2 measured the light tier's single pass at roughly half the
+        # baseline's recall on every docs item, with the judge crediting
+        # exactly the claim-verification work light has no budget for. Only
+        # a genuinely small docs diff stays light; the rest get the
+        # ensemble (steps.py swaps in the docs claims-audit pass set).
+        if sig.lines_changed <= settings.review_light_max_lines \
+                and len(sig.files) <= settings.review_light_max_files:
+            return "light", "docs-only diff (small)"
+        if sig.lines_changed > settings.large_diff_lines:
+            return "full", (f"large docs diff: {sig.lines_changed} lines / "
+                            f"{len(sig.doc_files)} doc files")
+        return "standard", (f"docs diff above the light threshold: "
+                            f"{sig.lines_changed} lines / "
+                            f"{len(sig.files)} files")
     if sig.code_lines_changed > settings.large_diff_lines \
             or len(sig.code_files) > settings.large_diff_files:
         return "full", (f"large code diff: {sig.code_lines_changed} code "
@@ -313,9 +334,16 @@ def _plan_llm(sig: DiffSignals, diff_text: str, lens_names: Sequence[str],
               f"## DIFF EXCERPT (untrusted)\n<untrusted_data>\n"
               f"{diff_text[:6_000]}\n</untrusted_data>")
     try:
+        # 8000, not 400: the official deepseek-v4-pro is a REASONING model —
+        # its thinking consumes the completion budget invisibly (measured on a
+        # real gray diff: 2000 tokens spent, ZERO text returned), so at 400
+        # the planner silently failed on every gray item across two campaigns
+        # (planner:"llm-fallback" on 5610/5713/6079) and the deliberate
+        # standard-fallback masked it. The call is one-shot and tiny either
+        # way; the generous ceiling only pays for what the model thinks.
         reply = llm.create(system=system,
                            messages=[{"role": "user", "content": prompt}],
-                           model=model, max_tokens=400, role="planner")
+                           model=model, max_tokens=8_000, role="planner")
     except Exception:
         return None
     obj = parse_json_reply(reply.text or "")

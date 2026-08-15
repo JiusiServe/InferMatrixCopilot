@@ -29,6 +29,8 @@ def settings(tmp_path: Path) -> Settings:
         review_verify_comments=False,  # verify-pass tests opt in explicitly
         review_deep_engine=False,  # deep-pass tests opt in explicitly; the
                                    # legacy scripted fakes assume 4 lenses
+        review_second_round=False,  # second-round tests opt in explicitly —
+                                    # scripted fakes budget exact call counts
     )
 
 
