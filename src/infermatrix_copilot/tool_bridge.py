@@ -157,7 +157,7 @@ def build_server(spec_path: Path):
         def run_shell(cmd: str, cwd: str = "") -> str:
             return _call("run_shell", {"cmd": cmd, "cwd": cwd or None})
 
-    _register_doc_tools(mcp, spec, trace)
+    _register_knowledge_tools(mcp, spec, scope, trace)
     _register_repo_tools(mcp, scope, trace)
     return mcp
 
@@ -201,18 +201,46 @@ def _register_repo_tools(mcp, scope: ToolScope, trace: RunTrace) -> None:
         return _call("calc", {"expr": expr})
 
 
-def _register_doc_tools(mcp, spec: dict, trace: RunTrace) -> None:
-    """Knowledge doc search/read — same read-only surface the thin MCP
-    exposes, scoped to general/ + this repo's slice. Absent knowledge root
-    (source checkout moved) degrades to not registering, never to a crash."""
-    from .config import Settings
-    from .knowledge_docs import KnowledgeDocs
+def _bridge_ctx(spec: dict, scope: ToolScope, trace: RunTrace):
+    """A minimal StepContext view for the agent-runtime knowledge factories:
+    they consume only settings / state / run_dir / trace, all of which the
+    bridge spec can reconstruct."""
+    from types import SimpleNamespace
 
+    from .config import Settings
+
+    return SimpleNamespace(
+        settings=Settings(),
+        state={"task_spec": {"repo": spec.get("repo", "")},
+               "repo_path": scope.root},
+        run_dir=Path(spec["run_dir"]),
+        trace=trace)
+
+
+def _register_knowledge_tools(mcp, spec: dict, scope: ToolScope,
+                              trace: RunTrace) -> None:
+    """Knowledge doc search/read + the on-demand repo_map — the same
+    read-only extra tools the in-process runtime hands agent steps, rebuilt
+    from the spec. Any piece that cannot be reconstructed degrades to not
+    registering (capability_gap traced), never to a crash. Still absent vs
+    in-process: skill_search / memory_search / candidate proposals (a
+    cross-process write surface deliberately not opened here)."""
     try:
-        settings = Settings()
-        docs = KnowledgeDocs(settings.knowledge_dir,
-                             repo_subdir=f"repos/{spec.get('repo', '')}"
-                             if spec.get("repo") else None)
+        from .engine.agent_runtime.knowledge import (
+            _repo_map_tool,
+            _resolve_adapter,
+        )
+        from .knowledge_docs import KnowledgeDocs
+
+        ctx = _bridge_ctx(spec, scope, trace)
+        adapter = _resolve_adapter(ctx)
+        repo_subdir = None
+        if adapter is not None:
+            repo_subdir = (adapter.manifest.get("knowledge")
+                           or {}).get("repo_subdir")
+        if not repo_subdir and spec.get("repo"):
+            repo_subdir = f"repos/{spec['repo']}"
+        docs = KnowledgeDocs(ctx.settings.knowledge_dir, repo_subdir)
     except Exception as exc:  # noqa: BLE001 — degrade, never crash the bridge
         trace.record("capability_gap", capability="bridge.knowledge_docs",
                      effect=f"doc tools unavailable: {type(exc).__name__}: {exc}")
@@ -225,7 +253,7 @@ def _register_doc_tools(mcp, spec: dict, trace: RunTrace) -> None:
                      out_of_scope=False, path=None)
         hits = docs.search(query, limit=limit)
         return "\n".join(
-            f"{h.get('path')}:{h.get('line')} — {str(h.get('snippet') or '').strip()}"
+            f"{h.get('path')}:{h.get('line')}:{str(h.get('text') or '').strip()}"
             for h in hits) or "(no matches)"
 
     @mcp.tool(description="Read a knowledge doc returned by doc_search "
@@ -237,6 +265,25 @@ def _register_doc_tools(mcp, spec: dict, trace: RunTrace) -> None:
         text = str(page.get("content") or "")
         nxt = page.get("next_offset")
         return text + (f"\n\n[continues — doc_read offset={nxt}]" if nxt else "")
+
+    try:
+        map_tools = _repo_map_tool(ctx, adapter)
+    except Exception as exc:  # noqa: BLE001 — optional; degrade loudly
+        trace.record("capability_gap", capability="bridge.repo_map",
+                     effect=f"repo_map unavailable: {type(exc).__name__}: {exc}")
+        return
+    if "repo_map" in map_tools:
+        tool = map_tools["repo_map"]
+
+        @mcp.tool(description=tool.description)
+        def repo_map(query: str) -> str:
+            # dispatch with extra= mirrors the in-process extra-tool path
+            # (traced, bypasses the builtin allowlist by design)
+            out = dispatch("repo_map", {"query": query}, scope=scope,
+                           trace=trace, extra=map_tools)
+            if not out["ok"]:
+                raise RuntimeError(str(out.get("error") or "tool error"))
+            return str(out["result"])
 
 
 def main(argv: list[str] | None = None) -> int:

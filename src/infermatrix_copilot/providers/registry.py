@@ -1,10 +1,10 @@
 """Provider registry — the one table of ways to reach a model.
 
-All four ids are declared so the config surface is stable from day one, but
-only implemented transports resolve: `transport_for` raises a milestone
-pointer for claude-code/codex (M2/M3, doc/RFC-provider-registry.md) so
-`strict_readiness`/doctor report "not yet shipped" instead of a run failing
-mid-flight.
+All four ids resolve to shipped transports (M1 cursor, M2 claude-code,
+M3 codex — doc/RFC-provider-registry.md). `_UNSHIPPED` remains the
+mechanism for declaring a future backend before its transport lands:
+`transport_for` raises its milestone pointer so `strict_readiness`/doctor
+report "not yet shipped" instead of a run failing mid-flight.
 """
 
 from __future__ import annotations
@@ -23,22 +23,23 @@ PROVIDERS: dict[str, ProviderSpec] = {
             capabilities=frozenset({"mcp_tools", "usage_reporting"})),
         ProviderSpec(
             id="claude-code", kind="harness",
-            display="Claude subscription via claude CLI (M2)",
+            display="Claude subscription via claude CLI",
             cli_names=("claude",),
             capabilities=frozenset({
                 "mcp_tools", "builtin_tools_off", "max_turns",
                 "system_prompt", "usage_reporting", "cost_reporting"})),
         ProviderSpec(
             id="codex", kind="harness",
-            display="ChatGPT subscription via codex CLI (M3)",
+            display="ChatGPT subscription via codex CLI",
             cli_names=("codex",),
-            capabilities=frozenset({"mcp_tools", "usage_reporting"})),
+            capabilities=frozenset({
+                "mcp_tools", "sandbox_read_only", "usage_reporting"})),
     )
 }
 
-# Registered but shipping in a later milestone — transport_for names the
+# Declared-but-unshipped backends (currently none) — transport_for names the
 # milestone instead of returning a transport that cannot work.
-_UNSHIPPED: dict[str, str] = {"claude-code": "M2", "codex": "M3"}
+_UNSHIPPED: dict[str, str] = {}
 
 
 def resolve_provider(settings) -> ProviderSpec:
@@ -76,7 +77,15 @@ def transport_for_id(settings, provider_id: str) -> HarnessTransport:
     if milestone:
         raise NotImplementedError(
             f"backend {spec.id!r} is declared but ships in {milestone} "
-            "(doc/RFC-provider-registry.md) — use cursor or api for now")
-    from .cursor import CursorTransport
+            "(doc/RFC-provider-registry.md)")
+    if spec.id == "cursor":
+        from .cursor import CursorTransport
 
-    return CursorTransport(settings)
+        return CursorTransport(settings)
+    if spec.id == "claude-code":
+        from .claude_code import ClaudeCodeTransport
+
+        return ClaudeCodeTransport(settings)
+    from .codex import CodexTransport
+
+    return CodexTransport(settings)

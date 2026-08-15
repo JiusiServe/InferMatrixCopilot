@@ -171,12 +171,14 @@ def test_resolve_harness_member_skips_pricing_gate(settings):
     assert members[0].api_key == "" and members[0].base_url == ""
 
 
-def test_resolve_harness_member_rejects_unshipped_and_unknown(settings):
+def test_resolve_harness_member_rejects_unknown_keeps_shipped(settings):
+    """claude-code shipped with M2, so its members now resolve; only unknown
+    provider ids are rejected."""
     settings.llm_mixture = {"members": [
-        {"model": "opus", "provider": "claude-code"},   # M2 — unshipped
-        {"model": "x", "provider": "nonesuch"},          # unknown id
+        {"model": "claude-fable-5", "provider": "claude-code"},  # M2 shipped
+        {"model": "x", "provider": "nonesuch"},                  # unknown id
         {"model": "composer-2.5", "provider": "cursor"},
     ]}
     members = resolve_members(settings)
     assert [(m.model, m.provider) for m in members] == [
-        ("composer-2.5", "cursor")]
+        ("claude-fable-5", "claude-code"), ("composer-2.5", "cursor")]

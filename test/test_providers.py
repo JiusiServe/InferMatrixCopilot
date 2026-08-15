@@ -52,10 +52,18 @@ def test_unknown_backend_rejected_at_startup():
         _settings(strict_backend="not-a-backend")
 
 
-def test_unshipped_backends_name_their_milestone():
-    with pytest.raises(NotImplementedError, match="M2"):
-        transport_for(_settings(strict_backend="claude-code"))
-    with pytest.raises(NotImplementedError, match="M3"):
+def test_every_harness_id_resolves_a_transport():
+    for backend in ("cursor", "claude-code", "codex"):
+        transport = transport_for(_settings(strict_backend=backend))
+        assert transport.spec.id == backend
+        assert transport.spec.kind == "harness"
+
+
+def test_unshipped_mechanism_names_the_milestone(monkeypatch):
+    from infermatrix_copilot.providers import registry
+
+    monkeypatch.setitem(registry._UNSHIPPED, "codex", "M9")
+    with pytest.raises(NotImplementedError, match="M9"):
         transport_for(_settings(strict_backend="codex"))
 
 
