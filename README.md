@@ -38,12 +38,12 @@ install.cmd --repo-path D:\path\to\vllm-omni
 ./install-mcp.sh --repo-path /path/to/vllm-omni
 ```
 
-安装器会识别本机的 Codex、Claude Code 和 Cursor，并安装 MCP、`imreview`、
+安装器会识别本机的 Codex、Claude Code、Cursor 和 ZCode，并安装 MCP、`imreview`、
 `imdesign`、`imcifix` 和 `imupdate` Skill。未识别到已知 Agent 时，会生成标准
 `infermatrix-copilot.mcp.json` 供其他 MCP 客户端导入。
 
 Codex 重启后用 `$imreview` / `$imdesign` / `$imcifix` / `$imupdate`，也可以先运行 `/skills` 查找；
-`/imreview` 不是 Codex 的 Slash Command。Claude Code 和 Cursor 仍使用
+`/imreview` 不是 Codex 的 Slash Command。Claude Code、Cursor 和 ZCode 仍使用
 `/imreview` / `/imdesign` / `/imcifix` / `/imupdate`。
 
 安装器还会创建 `~/.infermatrix-copilot/.env`。Direct 不需要模型密钥；使用
@@ -84,7 +84,7 @@ Use InferMatrixCopilot in Direct mode to review this PR.
 $imreview https://github.com/vllm-project/vllm-omni/pull/5172
 $imreview
 
-# Claude Code / Cursor
+# Claude Code / Cursor / ZCode
 /imreview https://github.com/vllm-project/vllm-omni/pull/5172
 或者说
 “帮我审核一下这个pr xxxx，用知识库”

@@ -24,8 +24,8 @@ install.cmd --repo-path D:\path\to\vllm-omni
 两个入口共用 `scripts/install_mcp.py`，但用户不需要安装或直接运行 Python：
 入口会自动安装 `uv`，再由 `uv` 提供隔离运行环境。安装器会：
 
-- 自动识别 Codex、Claude Code 和 Cursor，检测到几个就安装几个；
-- 保留 Cursor 已有配置并先备份；
+- 自动识别 Codex、Claude Code、Cursor 和 ZCode，检测到几个就安装几个；
+- 保留 Cursor / ZCode 已有配置并先备份；
 - 没识别到已知 Agent 时生成 `infermatrix-copilot.mcp.json`，不会直接失败。
 - 创建 `~/.infermatrix-copilot/.env` 作为 Strict 的稳定配置入口；安装时传入
   `--repo-path` 会写入本地 vLLM-Omni checkout。模型密钥不会自动复制，使用
@@ -42,7 +42,7 @@ install.cmd --repo-path D:\path\to\vllm-omni
 $imreview <PR URL>
 $imupdate <local path, repository name, alias, or URL>
 
-# Claude Code / Cursor
+# Claude Code / Cursor / ZCode
 /imreview <PR URL>
 /imupdate <local path, repository name, alias, or URL>
 ```
