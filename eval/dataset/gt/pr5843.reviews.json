@@ -1,0 +1,37 @@
+{
+  "comments": [
+    {
+      "author": "fhfuih",
+      "body": "CC @hsliuustc0106 @Gaohan123 @yJader "
+    },
+    {
+      "author": "yJader",
+      "body": "This change makes `test_diffusion_engine_rpc_routing.py` time out because its scheduler fixture does not provide `request_batch_max_wait_ms`. The new request-waiting logic reads this attribute unconditionally, which causes an `AttributeError` in the busy-loop thread. Please add `request_batch_max_wait_ms=0.0` to the fixture configuration."
+    },
+    {
+      "author": "hsliuustc0106",
+      "body": "Two input-boundary issues should be addressed:\n\n- `request_batch_max_wait_ms` needs a finiteness check before `RequestScheduler` builds the admission decision. Both the serve CLI and `OmniDiffusionConfig` currently accept `nan`/`inf`; with `nan`, the scheduler produces `deadline=nan`, and `Condition.wait(timeout=nan)` becomes a non-blocking poll. I reproduced 10,000 such waits completing in about 7 ms, so the engine hot-spins during the stability window. Please validate `math.isfinite(request_batch_max_wait_ms)` at the config boundary and add Python/CLI regression cases for `nan` and `inf`.\n\n- `AdmissionWaitDecision` is now re-exported from `vllm_omni.diffusion.sched`, so the scheduler-extension invariants should be explicit and enforced. A custom scheduler can currently return `deadline=nan`, a non-finite or negative `stable_window_s`, or `max_batch <= 0`, causing hot polling or immediate/incorrect admission termination. Please either keep this type private or validate in `__post_init__` that `deadline` is `None` or finite, the stable window is finite and non-negative, and `max_batch` is a positive integer.\n\nThe focused scheduler/engine suite passes (`85 passed`), but the current tests cover only negative wait values and integer normalization; they do not cover non-finite inputs or invalid decision invariants."
+    },
+    {
+      "author": "fhfuih",
+      "body": "> This change makes `test_diffusion_engine_rpc_routing.py` time out because its scheduler fixture does not provide `request_batch_max_wait_ms`. The new request-waiting logic reads this attribute unconditionally, which causes an `AttributeError` in the busy-loop thread. Please add `request_batch_max_wait_ms=0.0` to the fixture configuration.\r\n\r\nThanks for the reminder. Fixed"
+    },
+    {
+      "author": "fhfuih",
+      "body": "> Two input-boundary issues should be addressed:\r\n> \r\n> * `request_batch_max_wait_ms` needs a finiteness check before `RequestScheduler` builds the admission decision. Both the serve CLI and `OmniDiffusionConfig` currently accept `nan`/`inf`; with `nan`, the scheduler produces `deadline=nan`, and `Condition.wait(timeout=nan)` becomes a non-blocking poll. I reproduced 10,000 such waits completing in about 7 ms, so the engine hot-spins during the stability window. Please validate `math.isfinite(request_batch_max_wait_ms)` at the config boundary and add Python/CLI regression cases for `nan` and `inf`.\r\n> * `AdmissionWaitDecision` is now re-exported from `vllm_omni.diffusion.sched`, so the scheduler-extension invariants should be explicit and enforced. A custom scheduler can currently return `deadline=nan`, a non-finite or negative `stable_window_s`, or `max_batch <= 0`, causing hot polling or immediate/incorrect admission termination. Please either keep this type private or validate in `__post_init__` that `deadline` is `None` or finite, the stable window is finite and non-negative, and `max_batch` is a positive integer.\r\n> \r\n> The focused scheduler/engine suite passes (`85 passed`), but the current tests cover only negative wait values and integer normalization; they do not cover non-finite inputs or invalid decision invariants.\r\n\r\nOK done\r\n\r\n- added value validation in both CLI and `od_config.__post_init__` (this also involves a mkdoc hook change because a new helper function is added to the CLI entrypoint)\r\n- Made `AdmissionWaitDecision` private"
+    },
+    {
+      "author": "fhfuih",
+      "body": "The latest commit to this PR (https://github.com/vllm-project/vllm-omni/pull/5843/commits/c85bc140ef22d0333416a624f20424ef3606c6f8) is a pre-commit hook fix. It is blocking although seemingly unrelated. Before the latest commit, there is the following precommoit issue\r\n\r\n<img width=\"2110\" height=\"1100\" alt=\"image\" src=\"https://github.com/user-attachments/assets/b272aebf-7e90-412d-9bab-8e971abc1677\" />\r\n"
+    },
+    {
+      "author": "fhfuih",
+      "body": "> The latest commit to this PR ([c85bc14](https://github.com/vllm-project/vllm-omni/commit/c85bc140ef22d0333416a624f20424ef3606c6f8)) is a pre-commit hook fix. It is blocking although seemingly unrelated. Before the latest commit, there is the following precommoit issue\r\n\r\nCC @linyueqian "
+    },
+    {
+      "author": "fhfuih",
+      "body": "Further tried to fix the unrelated TTS CI issue. Now, I have rerun all TTS-related CPU tests on my side:\r\n\r\n\r\n```\r\ncd /home/h00965334/workspace/vllm-omni/refactor-diffusion-req-batch && ./.venv/bin/python -m pytest \\\r\n  tests/entrypoints/openai_api/test_tts_detection.py \\\r\n  tests/entrypoints/openai_api/test_tts_adapter.py \\\r\n  tests/entrypoints/openai_api/test_serving_speech.py \\\r\n  tests/entrypoints/openai_api/test_serving_speech_batch.py \\\r\n  tests/entrypoints/openai_api/test_serving_speech_stream.py \\\r\n  tests/entrypoints/openai_api/test_audex_serving_guards.py \\\r\n  tests/entrypoints/openai_api/test_qwen3_tts_websocket.py \\\r\n  tests/entrypoints/openai_api/test_qwen3_tts_speaker_embedding.py \\\r\n  tests/entrypoints/openai_api/test_speaker_metadata_persistence.py \\\r\n  tests/entrypoints/openai_api/test_openai_audio_list_endpoints.py \\\r\n  tests/tools/test_check_tts_adapter.py \\\r\n  tests/model_executor/models/voxtral_tts \\\r\n  tests/model_executor/models/moss_tts \\\r\n  tests/model_executor/models/ming_tts \\\r\n  tests/model_executor/models/higgs_audio_v3 \\\r\n  tests/examples/offline_inference/test_qwen3_tts_estimator.py \\\r\n  tests/benchmarks/test_bench_tts_cli.py \\\r\n  -m \"core_model and cpu\" -v --tb=line 2>&1 | tee /tmp/tts_cpu_tests.log | tail -80\r\n```\r\n\r\nAnd all passes\r\n\r\n\r\n```\r\n=============== 566 passed, 79 deselected, 17 warnings in 6.57s ================\r\n```"
+    }
+  ],
+  "reviews": []
+}

@@ -1,0 +1,14 @@
+[
+  {
+    "author": "david6666666",
+    "body": "This test fails as written: `torch.randn(11, 96)` is not tiled, but the fused path canonicalizes cos/sin to the half-dim layout (truncate to `[..., :48]` + block-tile via `_prepare_half_head_dim_cos_sin`/`apply_rotary_emb_torch`), while the reference below multiplies each of the 96 dims by its own cos/sin. For random freqs the two differ on the second half (up to ~5 abs diff), so `assert_close(atol=0, rtol=0)` fails; they only agree for tiled freqs like `MiniMaxH3Rope`'s `cat((half, half))`. Build freqs as `torch.cat((freqs, freqs), dim=-1)` or compute the reference from the half layout.",
+    "line": 76,
+    "path": "tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py"
+  },
+  {
+    "author": "fan2956",
+    "body": "Thanks for catching this. You are right: the test must use MiniMax-H3's tiled full-dimension frequency layout.\r\n\r\nI restored the coverage and now construct `freqs` as `cat((freqs_half, freqs_half), dim=-1)`, matching `MiniMaxH3Rope`. The reference and fused/native path now use the same RoPE semantics.",
+    "line": 76,
+    "path": "tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py"
+  }
+]

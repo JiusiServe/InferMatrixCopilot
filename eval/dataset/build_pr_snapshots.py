@@ -156,6 +156,8 @@ def main() -> int:
     splits = set((sys.argv[1] if len(sys.argv) > 1 else "train,val,test").split(","))
     ds = yaml.safe_load(DATASET.read_text(encoding="utf-8"))
     items = [i for i in ds["pr_review"] + (ds.get("pr_review_wave2") or [])
+             + (ds.get("pr_review_wave3") or [])
+             + (ds.get("pr_review_wave4") or [])
              if i.get("split") in splits]
     OUT.mkdir(parents=True, exist_ok=True)
 

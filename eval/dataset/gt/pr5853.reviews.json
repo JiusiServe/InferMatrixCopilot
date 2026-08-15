@@ -1,0 +1,28 @@
+{
+  "comments": [
+    {
+      "author": "mglyn",
+      "body": "I added the request-scoped Cache-DiT refresh hint in this PR (extra_params.force_refresh_step_hint, with an optional once/repeat policy). Keeping it together with the quality switch is intentional: both features control the same per-request Cache-DiT lifecycle and share the same policy/runtime path. The change remains H3-scoped, while other models retain their existing behavior by default."
+    },
+    {
+      "author": "david6666666",
+      "body": "Single-GPU sanity check (B300 x1, 1344x768, 5s/124 frames, 50 steps, seed 1101, FLASH_ATTN, eager, FL2VA t2va): main @ a874b8e0 vs PR head 7a94a444.\n\n| config | elapsed | vs lossless |\n|---|---|---|\n| main (reference, no cache) | 157.4s | -- |\n| quality=lossless (no cache) | 153.4s | -- |\n| quality=lossless (server started with cache_dit) | 158.8s | -- |\n| quality=omitted (cache_dit startup, generic profile) | 100.7s | -34% |\n| quality=high | 96.3s | -37% |\n\nPrecision:\n- lossless vs main baseline: frames + audio bit-identical (max diff 0) -- reference path is exactly aligned with main.\n- lossless on a cache_dit server vs plain lossless: bit-identical -- the uninstall path leaves no hooks behind.\n- high vs main: SSIM 0.778 / PSNR 21.7 dB on this single-GPU workload, lower than the 0.97 / 33-41 dB reported for 4xL20X SP4. The cache hits more aggressively here (~1.59x vs the claimed ~1.35x), so the quality/throughput tradeoff shifts with deployment.\n\nThe mechanism (routing + batch isolation + request-scoped lifecycle) checks out; the lossless path is a faithful reference and the perf gain is real. The high quality numbers look deployment-dependent rather than universal."
+    },
+    {
+      "author": "mglyn",
+      "body": "> Single-GPU sanity check (B300 x1, 1344x768, 5s/124 frames, 50 steps, seed 1101, FLASH_ATTN, eager, FL2VA t2va): main @ [a874b8e](https://github.com/vllm-project/vllm-omni/commit/a874b8e09bb5251bb16e3de8bc22edf3880eec09) vs PR head [7a94a44](https://github.com/vllm-project/vllm-omni/commit/7a94a44452b0e1e9311688efc31f3f36ae818662).\r\n> \r\n> config\telapsed\tvs lossless\r\n> main (reference, no cache)\t157.4s\t--\r\n> quality=lossless (no cache)\t153.4s\t--\r\n> quality=lossless (server started with cache_dit)\t158.8s\t--\r\n> quality=omitted (cache_dit startup, generic profile)\t100.7s\t-34%\r\n> quality=high\t96.3s\t-37%\r\n> Precision:\r\n> \r\n> * lossless vs main baseline: frames + audio bit-identical (max diff 0) -- reference path is exactly aligned with main.\r\n> * lossless on a cache_dit server vs plain lossless: bit-identical -- the uninstall path leaves no hooks behind.\r\n> * high vs main: SSIM 0.778 / PSNR 21.7 dB on this single-GPU workload, lower than the 0.97 / 33-41 dB reported for 4xL20X SP4. The cache hits more aggressively here (~1.59x vs the claimed ~1.35x), so the quality/throughput tradeoff shifts with deployment.\r\n> \r\n> The mechanism (routing + batch isolation + request-scoped lifecycle) checks out; the lossless path is a faithful reference and the perf gain is real. The high quality numbers look deployment-dependent rather than universal.\r\n\r\nOur high request selects a fixed Cache-DiT profile, but its actual hit rate and speed/quality tradeoff are deployment-dependent. We intentionally do not gate it by GPU, topology, or request shape; lossless remains the exact reference path. I updated the PR text to scope the reported metrics to our 4×L20X SP4 experiment and avoid a universal guarantee. Thanks for the additional validation."
+    }
+  ],
+  "reviews": [
+    {
+      "author": "david6666666",
+      "body": "you can add some usage on docs/user_guide/diffusion/cache_acceleration/cache_dit.md",
+      "state": "COMMENTED"
+    },
+    {
+      "author": "david6666666",
+      "body": "LGTM now.",
+      "state": "APPROVED"
+    }
+  ]
+}

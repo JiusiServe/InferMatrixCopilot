@@ -1,0 +1,68 @@
+[
+  {
+    "author": "hsliuustc0106",
+    "body": "This projects structured defaults that the legacy adapter leaves unset. For ming_flash_omni_image, legacy omits max_num_seqs (so OmniDiffusionConfig uses 1), but this emits 128 and startup rejects MingImagePipeline because it does not support request batching. The same mismatch changes the vLLM defaults for prefix caching, chunked prefill, hybrid-cache management, and GPU utilization. Please preserve the unset/backend state and compare effective parity in both directions.",
+    "line": 780,
+    "path": "vllm_omni/engine/stage_init_utils.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "This accepts inherited OmniEngineArgs options globally, but the later per-concern allowlists silently discard options without an owner. I reproduced revision, tokenizer_revision, code_revision, seed, and download_dir surviving the legacy AR path and disappearing from the typed path. Please make ownership exhaustive or reject unowned fields instead of accepting and dropping them.",
+    "line": 901,
+    "path": "vllm_omni/config/omni_config.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "The legacy builder lets stage engine_extras override topology model_subdir and tokenizer_subdir, but those keys never reach engine here, so this fallback restores the topology values. A direct reproduction selected /tmp/override-model through legacy and /tmp/top-model through typed. Please preserve deploy precedence and cover both subdirectory overrides.",
+    "line": 1354,
+    "path": "vllm_omni/config/omni_config.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "This reverses the legacy omni_kv_config precedence: legacy applies topology after stage extras, while this selects the stage value first. With topology need_recv_cache=True and deploy need_send_cache=True, legacy emits receive and typed emits send. Please keep the legacy ordering; if the precedence change is intentional, document and test it as a behavior change.",
+    "line": 1275,
+    "path": "vllm_omni/config/omni_config.py"
+  },
+  {
+    "author": "Acerak01-fy",
+    "body": "Done.",
+    "line": 1275,
+    "path": "vllm_omni/config/omni_config.py"
+  },
+  {
+    "author": "Acerak01-fy",
+    "body": "Done.",
+    "line": 1354,
+    "path": "vllm_omni/config/omni_config.py"
+  },
+  {
+    "author": "Acerak01-fy",
+    "body": "Done.",
+    "line": 901,
+    "path": "vllm_omni/config/omni_config.py"
+  },
+  {
+    "author": "Acerak01-fy",
+    "body": "Done.",
+    "line": 780,
+    "path": "vllm_omni/engine/stage_init_utils.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "This validates only CLI inputs and uses an all-stage union. Deploy `engine_extras` are never checked, and LLM validation accepts diffusion-only fields: deploy `enable_lora=True` becomes `False`, while LLM CLI `kv_cache_dtype=fp8` becomes `auto` through the typed path. Please validate the merged input against execution-type-specific owners before partitioning.",
+    "line": 838,
+    "path": "vllm_omni/config/omni_config.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "This only compares the six hard-coded deferred defaults. Adding typed-only `skip_tokenizer_init=True` still lets the parity tests pass. Please compare effective values across all backend fields, or reject unexpected typed-only keys.",
+    "line": 506,
+    "path": "tests/engine/test_stage_engine_args.py"
+  },
+  {
+    "author": "Acerak01-fy",
+    "body": "Done",
+    "line": 506,
+    "path": "tests/engine/test_stage_engine_args.py"
+  }
+]

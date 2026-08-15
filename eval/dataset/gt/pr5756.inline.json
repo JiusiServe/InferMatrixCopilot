@@ -1,0 +1,20 @@
+[
+  {
+    "author": "Copilot",
+    "body": "The MiniMax demo paths added here (e.g. `/path/to/MiniMax-H3/FL2VA`) won’t actually match the `MiniMax-H3(/FL2VA|/Ref2VA)?` spec with the current `lookup_model_spec()` logic because it only searches the final path component (\"FL2VA\"/\"Ref2VA\"). That means local FL2VA/Ref2VA model paths won’t use `params_builder` at runtime either. Consider updating `lookup_model_spec()` to match the last two path components when the suffix is `FL2VA`/`Ref2VA`.",
+    "line": 148,
+    "path": "apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/models.py"
+  },
+  {
+    "author": "Copilot",
+    "body": "This `params_builder` demonstration call uses an unsupported keyword argument (`task=`). `_minimaxh3_params_builder()` currently expects `extra_params=...`, so running this module directly will raise `TypeError`.",
+    "line": 167,
+    "path": "apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/models.py"
+  },
+  {
+    "author": "fhfuih",
+    "body": "Done",
+    "line": 148,
+    "path": "apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/models.py"
+  }
+]

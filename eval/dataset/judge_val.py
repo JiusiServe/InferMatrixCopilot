@@ -71,6 +71,17 @@ _SPLITS = {
     "holdout": {"prs": [5509, 5550, 5610, 5703, 5715, 5840, 5863, 5884,
                         5957, 5976],
                 "issues": []},
+    # Wave 3 (build_wave3.py): fresh frozen holdout for the post-wave-2
+    # iteration — wave 2 is spent (its GT/rationales were opened for tuning
+    # forensics after the cursor-model campaign).
+    "holdout3": {"prs": [5678, 5691, 5713, 5843, 5853, 5857, 6045, 6049,
+                         6079, 6141],
+                 "issues": []},
+    # Wave 4 (build_wave4.py): the clean gate after wave 3 was spent (two
+    # disclosed v14 gate attempts, then opened for tuning forensics).
+    "holdout4": {"prs": [5608, 5720, 5723, 5756, 5779, 5801, 5833, 5864,
+                         5958, 5978],
+                 "issues": []},
 }
 _SPLIT = os.environ.get("SPLIT", "val")
 PR_ITEMS = _SPLITS[_SPLIT]["prs"]

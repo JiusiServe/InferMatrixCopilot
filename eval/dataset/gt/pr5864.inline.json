@@ -1,0 +1,104 @@
+[
+  {
+    "author": "yuanheng-zhao",
+    "body": "Is this aiming for DLO scenarios or common cases",
+    "line": 933,
+    "path": "vllm_omni/diffusion/worker/diffusion_worker.py"
+  },
+  {
+    "author": "yuanheng-zhao",
+    "body": "This func quite similar to `_tensor_to_shm`. Better merge or adapt",
+    "line": 130,
+    "path": "vllm_omni/diffusion/ipc.py"
+  },
+  {
+    "author": "yuanheng-zhao",
+    "body": "Please check the impl and usage of `_tensor_from_shm`",
+    "line": 137,
+    "path": "vllm_omni/diffusion/ipc.py"
+  },
+  {
+    "author": "yuanheng-zhao",
+    "body": "nit: Better find a place to hold configs such like `XX_JOIN_TIMEOUT_S=XXX` rather than magic #`timeout=10` ",
+    "line": 938,
+    "path": "vllm_omni/diffusion/worker/diffusion_worker.py"
+  },
+  {
+    "author": "asukaqaq-s",
+    "body": "Currently, we only check step and extra_args. Do we also need to check CFG (= 1 or ≠ 1), which may cause the number of execution steps to differ? Another potential issue is that different shapes or token lengths may cause the batch to wait for the slowest sample._",
+    "line": 486,
+    "path": "vllm_omni/diffusion/executor/multiproc_executor.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Addressed in e55738af: the magic value is now the named module constant `_ASYNC_OUTPUT_THREAD_JOIN_TIMEOUT_S = 10.0`.",
+    "line": 938,
+    "path": "vllm_omni/diffusion/worker/diffusion_worker.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Addressed in e55738af. Tensor and NumPy serialization now share `_array_to_shm`; the tensor wrapper only normalizes the dtype marker. This removes the duplicated shared-memory allocation/copy/metadata logic.",
+    "line": 130,
+    "path": "vllm_omni/diffusion/ipc.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "This is common request-mode lifecycle cleanup, not DLO-only. In e55738af I named the join timeout (`_ASYNC_OUTPUT_THREAD_JOIN_TIMEOUT_S`) and added a real spawn-based per-worker result-queue regression. DLO/DP makes the lifecycle issue easier to trigger, but the shutdown path remains shared by all request-mode workers.",
+    "line": 933,
+    "path": "vllm_omni/diffusion/worker/diffusion_worker.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Addressed in e55738af. Both deserializers now use `_array_from_shm`, which attaches, copies, closes, and unlinks the segment in one place; `_tensor_from_shm` additionally restores the torch dtype. The new spawn-based test round-trips nested NumPy outputs through two worker-owned queues and verifies every SHM name is gone afterward.",
+    "line": 137,
+    "path": "vllm_omni/diffusion/ipc.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Addressed in e55738af by reusing the complete scheduler sampling-compatibility key before DP dispatch. It covers output shape, CFG mode/value, denoise steps/sigmas, output count, and LoRA, while `extra_args` is still checked separately. Different prompt token lengths remain valid: ranks execute independent requests and only need an identical collective schedule, not identical compute time. A bounded DP-wave timeout now fails closed if an unforeseen asymmetric path still occurs. Tests cover mismatched steps, CFG, and width being rejected before dispatch, plus valid shared defaults (`num_inference_steps=None`).",
+    "line": 486,
+    "path": "vllm_omni/diffusion/executor/multiproc_executor.py"
+  },
+  {
+    "author": "yuanheng-zhao",
+    "body": "nit: redundant terminates (another one in `self.shutdown()`)\n\nConsider letting `shutdown()` own termination and only setting `_is_failed` here.",
+    "line": 430,
+    "path": "vllm_omni/diffusion/executor/multiproc_executor.py"
+  },
+  {
+    "author": "yuanheng-zhao",
+    "body": "These two tests are nearly duplicated",
+    "line": 161,
+    "path": "tests/diffusion/test_ipc_async.py"
+  },
+  {
+    "author": "yuanheng-zhao",
+    "body": "I think this test is weak, for it already assumes and constructs the dp primary ranks are 0 and 2.",
+    "line": 329,
+    "path": "tests/diffusion/test_multiproc_engine_concurrency.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Yep, folded them into one parametrized test in 07fc831e.",
+    "line": 161,
+    "path": "tests/diffusion/test_ipc_async.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Good point — the test now makes every rank queue viable and checks multiple TP/SP/PP/CFG layouts in 07fc831e.",
+    "line": 329,
+    "path": "tests/diffusion/test_multiproc_engine_concurrency.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Good catch — fixed in 07fc831e, shutdown() owns worker termination now.",
+    "line": 430,
+    "path": "vllm_omni/diffusion/executor/multiproc_executor.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Good point. For a DLO+DP AllGather wave, the preflight now reuses `RequestBatchSamplingParamsKey`, so shape (height/width/frames), CFG/guidance values, denoise schedule, output count, LoRA, and `extra_args` must match exactly; prompt text/token length and seed/generator may differ. H3 is CFG-distilled and always runs one transformer forward per step, so CFG does not alter its collective count, while different token lengths are allowed and only add a straggler/perf cost because they do not change the DLO AllGather sequence.",
+    "line": 486,
+    "path": "vllm_omni/diffusion/executor/multiproc_executor.py"
+  }
+]

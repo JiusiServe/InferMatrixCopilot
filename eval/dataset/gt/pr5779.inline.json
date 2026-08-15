@@ -1,0 +1,32 @@
+[
+  {
+    "author": "hsliuustc0106",
+    "body": "[P1] This validation breaks H3 with AllGather-KV SP. `AllGatherKVParallelAttention` gathers K/V but leaves `extra[\"cu_seqlens_q\"]` global while Q remains rank-local. With `allgather_degree > 1`, this compares a global final offset against local Q tokens and raises; padded H3 inputs also retain a global 2-D mask. Please slice/rebase the packed Q metadata and mask for the local shard, or explicitly disable the H3 TRTLLM default for AllGather-KV.",
+    "line": 300,
+    "path": "vllm_omni/diffusion/attention/backends/trtllm_attn.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "[P2] Exactly aligned packed inputs silently disable SAGE. When `used == packed_total`, H3 still supplies a duplicate terminal boundary (`[0, used, used]`), so the derived lengths include a zero-length sequence and this `torch.all(...)` condition is false. The old dense path quantized these tokens. Please collapse trailing empty segments before deriving `seq_lens`, or add an explicit aligned-path rule and regression test so packed metadata does not turn SAGE off.",
+    "line": 364,
+    "path": "vllm_omni/diffusion/attention/backends/trtllm_attn.py"
+  },
+  {
+    "author": "bobboli",
+    "body": "Thanks, confirmed. TRTLLM's packed path currently assumes that Q/KV metadata cover their tensors symmetrically, which is incompatible with AllGather-KV's rank-local Q and global K/V layout.\n\nI pushed `fix(attention): reject TRTLLM AllGather-KV` to explicitly reject `TRTLLM_ATTN` with `allgather_degree > 1` during attention initialization. This covers both platform-default and explicitly selected TRTLLM backends. Full local-Q/global-KV packed metadata support can be handled separately.\n\nWhile tracing this, I noticed that H3's packed FA4 path also appears to receive the global `cu_seqlens_q` after AllGather-KV, even though Q is rank-local, and it does not explicitly validate or slice that metadata. Is FA4 + AllGather-KV expected to support this H3 packed layout elsewhere, or should we guard that combination as well until local Q metadata is rebuilt?",
+    "line": 300,
+    "path": "vllm_omni/diffusion/attention/backends/trtllm_attn.py"
+  },
+  {
+    "author": "bobboli",
+    "body": "Fixed in `fix(attention): trim empty packed suffixes`: TRTLLM now normalizes `[0, N, N]` to `[0, N]`, so an empty alignment suffix no longer disables SAGE.\n\nH3’s main DiT attention operates on the long packed multimodal sequence, while its token refiner attends only over the prompt tokens and can be shorter than SAGE’s 16-token K block requirement. Both previously used role `self`, causing the refiner to inherit the main DiT’s quantization and skip-softmax settings. The refiner now uses the dedicated role `minimax_h3.token_refiner`, so it can be configured independently without disabling these optimizations for the main DiT attention.\n\nIf SAGE quantization is configured but a runtime input is too short, TRTLLM falls back to unquantized attention and warns once from `forward`, including the affected role.",
+    "line": 364,
+    "path": "vllm_omni/diffusion/attention/backends/trtllm_attn.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Let's handle this compatiablility in the next pr, but i don't think all-gather kv is a optimized sol compared to ring-attn and ulysses as it require higher memory bandwidth and VRAM max usage, so we typically won't use all-gather kv. ",
+    "line": 300,
+    "path": "vllm_omni/diffusion/attention/backends/trtllm_attn.py"
+  }
+]

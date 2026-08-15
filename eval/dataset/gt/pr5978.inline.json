@@ -1,0 +1,38 @@
+[
+  {
+    "author": "yuanheng-zhao",
+    "body": "This probably causes a hang (e.g., rank 0 raises, other ranks blocks at \n\n```python\n        if world_size > 1:\n            dist.broadcast(lengths, src=0, group=group)\n```\n\nBetter move the check before the `rank == 0` branch",
+    "line": 1220,
+    "path": "vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py"
+  },
+  {
+    "author": "yuanheng-zhao",
+    "body": "This test seems to be weak and test itself, rather than impl logics",
+    "line": 1280,
+    "path": "tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py"
+  },
+  {
+    "author": "yuanheng-zhao",
+    "body": "nit: workdir dead arg",
+    "line": 1273,
+    "path": "tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py"
+  },
+  {
+    "author": "david6666666",
+    "body": "Fixed in the latest head. `max_duration_seconds` is now validated before entering the rank-0 branch, so invalid input raises on every rank before any collective. Added a regression test that exercises the non-zero-rank path.",
+    "line": 1220,
+    "path": "vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py"
+  },
+  {
+    "author": "david6666666",
+    "body": "Addressed. The sampling test now verifies the complete sampled frame arrays and block timestamps, while still asserting that the prepared video is decoded exactly once.",
+    "line": 1280,
+    "path": "tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py"
+  },
+  {
+    "author": "david6666666",
+    "body": "Addressed. Removed the unused `workdir` parameter from the sampling helper and all call sites.",
+    "line": 1273,
+    "path": "tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py"
+  }
+]

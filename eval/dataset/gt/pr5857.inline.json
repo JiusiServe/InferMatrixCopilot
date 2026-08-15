@@ -1,0 +1,20 @@
+[
+  {
+    "author": "hsliuustc0106",
+    "body": "add the measured time please",
+    "line": 1,
+    "path": "recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-5000.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "have we tested reference to va?",
+    "line": 167,
+    "path": "recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-5000.md"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "No, it should be fine. With the same setting we should be able to run ref2va properly as they have same encoder and decoder and same DiT size. ",
+    "line": 167,
+    "path": "recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-5000.md"
+  }
+]

@@ -1,0 +1,31 @@
+{
+  "comments": [
+    {
+      "author": "david6666666",
+      "body": "Validation update on commit `dec18b95`:\n\n- 4x NVIDIA B300 (physical devices 4-7), BF16, Ulysses 4, ring 1, HSDP shard size 4, tiled VAE, FlashAttention, 50 steps, seed 0.\n- T2VA: passed; SSIM `0.849060`, PSNR `21.403426 dB`.\n- I2VA: passed; SSIM `0.975190`, PSNR `35.981286 dB`.\n- Ref2VA: passed; SSIM `0.980567`, PSNR `42.649689 dB`.\n- All three outputs matched the official 1344x768, 24 FPS, AAC 32 kHz stereo container contract.\n\nThe accuracy module now collects three model-card regression cases and pins the official output/input assets with SHA-256 checks.\n"
+    },
+    {
+      "author": "david6666666",
+      "body": "Validation update on commit c875d7fd:\n\n- T2VA now sends the canonical model-card payload: task=t2va, conditions=[], target.short_edge=768, aspect_ratio=16:9, duration_seconds=10, seed=0.\n- T2VA gates are now SSIM >= 0.97 and PSNR >= 34 dB; the shared helper keeps the existing I2VA/Ref2VA gates unchanged.\n- 4x B300 validation on physical GPUs 4-7 completed successfully through generation and media-contract checks: 1344x768, 243 frames, 24 fps, 32 kHz audio.\n- The strict similarity gate currently fails with SSIM=0.875570 and PSNR=23.398015 dB. This is intentionally recorded as a failing accuracy result; T2VA is not yet aligned to the requested threshold.\n- py_compile, ruff, ruff format, git diff --check, and pre-commit passed."
+    },
+    {
+      "author": "david6666666",
+      "body": "Validation update on commit `ef0c0835`:\n\n- All three MiniMax H3 accuracy cases now share `SSIM_THRESHOLD = 0.97` and `PSNR_THRESHOLD = 34.0`.\n- T2VA uses the canonical model-card request: `task=t2va`, empty conditions, 768 short edge, 16:9, 10 seconds, and seed 0.\n- On 4x B300 (physical GPUs 4-7), the generated T2VA output passed the media contract. Against the official video: SSIM `0.847311`, PSNR `21.217689 dB`.\n- The independently generated reference output against the same official video measured SSIM `0.781898`, PSNR `18.498464 dB`; generated-vs-reference measured SSIM `0.752910`, PSNR `17.741266 dB`.\n- Therefore the requested strict T2VA gate is currently a real failing gate; this update does not claim T2VA accuracy alignment.\n- Targeted `py_compile`, Ruff, formatting, `git diff --check`, and pre-commit checks passed."
+    },
+    {
+      "author": "hsliuustc0106",
+      "body": "https://buildkite.com/vllm/vllm-omni/builds/13422/canvas?sid=019feea3-4aad-4b03-ae22-5f2ed18656fc&tab=output is this Linbot-world acc failure related or not?"
+    },
+    {
+      "author": "Gaohan123",
+      "body": "> https://buildkite.com/vllm/vllm-omni/builds/13422/canvas?sid=019feea3-4aad-4b03-ae22-5f2ed18656fc&tab=output is this Linbot-world acc failure related or not?\r\n\r\nAlso happened in the latest nightly CI: https://buildkite.com/vllm/vllm-omni/builds/13407/canvas?sid=019fecd9-14c2-476d-be9c-1f55634370e3&tab=output"
+    }
+  ],
+  "reviews": [
+    {
+      "author": "Gaohan123",
+      "body": "LGTM. Thanks",
+      "state": "APPROVED"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+[
+  {
+    "author": "Copilot",
+    "body": "This test name says \"without config\" but it actually verifies that admission waiting is disabled when `request_batch_max_wait_ms` is 0. Renaming it avoids confusion, and the re-initialize is redundant with `setup_method`.",
+    "line": 251,
+    "path": "tests/diffusion/test_diffusion_scheduler.py"
+  },
+  {
+    "author": "Copilot",
+    "body": "`get_admission_wait_decision` can return `should_wait=True` even when `max_num_running_reqs == 1` (serial execution). In that case, admission waiting cannot increase batch size and only adds latency; it should be disabled when `max_batch <= 1`.",
+    "line": 42,
+    "path": "vllm_omni/diffusion/sched/request_scheduler.py"
+  }
+]

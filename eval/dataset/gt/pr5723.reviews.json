@@ -1,0 +1,28 @@
+{
+  "comments": [
+    {
+      "author": "Xunzhuo",
+      "body": "MI300X validation data that may complement this recipe:\n\n- Image: `vllm/vllm-omni-rocm:minimax-h3@sha256:29d1946af9c69e3e0a7128c247bdc8c82437ead43fbc366fed443533cf6ce9e8`\n- 4x MI300X (gfx942), BF16, Ulysses 4, text-encoder TP4, VAE PP4 tile\n- `--diffusion-attention-backend FLASH_ATTN` resolves to AITER packed varlen attention and is functional on gfx942\n- T2VA, 50 steps, 209 frames, 1344x768: encode 0.09 s, denoise 244.04 s, decode 4.15 s, 267.42 s client E2E\n- FL2VA, same shape: encode 13.98 s, denoise 257.58 s, decode 4.11 s, 287.07 s client E2E\n- Both outputs validated as H.264 24 FPS with 32 kHz stereo AAC\n\nTwo image-version notes:\n\n1. The current `minimax-h3` ROCm tag is built from pre-merge #5691 commit `0eee3b186`, so T2VA/FL2VA work, but image+audio Ref2VA lacks #5699's soundfile fallback and fails without TorchCodec.\n2. Video-reference Ref2VA also needs ffmpeg, which is not bundled in that image. A `docker/Dockerfile.rocm` build from v0.26.0 completed both Ref2VA paths on MI300X.\n\nPlease avoid implying ROCm requires SDPA universally; gfx942 has a validated AITER path. It would also be useful for this support PR to update `docs/models/supported_models.md` for the hardware actually validated, while leaving MI325X/MI355X explicit until their respective evidence is included.\n\nExternal recipe evidence: https://github.com/vllm-project/recipes/pull/732"
+    },
+    {
+      "author": "amd-xiaoyu12",
+      "body": "> MI300X validation data that may complement this recipe:\r\n> \r\n> * Image: `vllm/vllm-omni-rocm:minimax-h3@sha256:29d1946af9c69e3e0a7128c247bdc8c82437ead43fbc366fed443533cf6ce9e8`\r\n> * 4x MI300X (gfx942), BF16, Ulysses 4, text-encoder TP4, VAE PP4 tile\r\n> * `--diffusion-attention-backend FLASH_ATTN` resolves to AITER packed varlen attention and is functional on gfx942\r\n> * T2VA, 50 steps, 209 frames, 1344x768: encode 0.09 s, denoise 244.04 s, decode 4.15 s, 267.42 s client E2E\r\n> * FL2VA, same shape: encode 13.98 s, denoise 257.58 s, decode 4.11 s, 287.07 s client E2E\r\n> * Both outputs validated as H.264 24 FPS with 32 kHz stereo AAC\r\n> \r\n> Two image-version notes:\r\n> \r\n> 1. The current `minimax-h3` ROCm tag is built from pre-merge [[Model] Add MiniMax H3 diffusion support #5691](https://github.com/vllm-project/vllm-omni/pull/5691) commit `0eee3b186`, so T2VA/FL2VA work, but image+audio Ref2VA lacks [[Model] [Ascend] Add soundfile fallback for MiniMax H3 audio loading for NPU support #5699](https://github.com/vllm-project/vllm-omni/pull/5699)'s soundfile fallback and fails without TorchCodec.\r\n> 2. Video-reference Ref2VA also needs ffmpeg, which is not bundled in that image. A `docker/Dockerfile.rocm` build from v0.26.0 completed both Ref2VA paths on MI300X.\r\n> \r\n> Please avoid implying ROCm requires SDPA universally; gfx942 has a validated AITER path. It would also be useful for this support PR to update `docs/models/supported_models.md` for the hardware actually validated, while leaving MI325X/MI355X explicit until their respective evidence is included.\r\n> \r\n> External recipe evidence: [vllm-project/recipes#732](https://github.com/vllm-project/recipes/pull/732)\r\n\r\nThanks, will update"
+    },
+    {
+      "author": "lishunyang12",
+      "body": "Please address doc building failure."
+    }
+  ],
+  "reviews": [
+    {
+      "author": "hsliuustc0106",
+      "body": "Please fix the docs build failure.",
+      "state": "CHANGES_REQUESTED"
+    },
+    {
+      "author": "hsliuustc0106",
+      "body": "a spereate minimax-h3-rocm.md is more preferred",
+      "state": "COMMENTED"
+    }
+  ]
+}

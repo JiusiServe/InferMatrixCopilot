@@ -47,7 +47,9 @@ DATASET = HERE / "vllm_omni_dataset.yaml"
 
 def expected_prs(splits: set[str]) -> list[int]:
     ds = yaml.safe_load(DATASET.read_text(encoding="utf-8"))
-    items = ds["pr_review"] + (ds.get("pr_review_wave2") or [])
+    items = (ds["pr_review"] + (ds.get("pr_review_wave2") or [])
+             + (ds.get("pr_review_wave3") or [])
+             + (ds.get("pr_review_wave4") or []))
     return [int(i["pr"]) for i in items if i.get("split") in splits]
 
 
@@ -85,8 +87,11 @@ def main() -> int:
             judge_cmd = os.environ.get("JUDGE_CMD")
             argv = (judge_cmd.split() + [str(pr)] if judge_cmd else
                     [sys.executable, str(HERE / "judge_val.py")])
-            env = dict(os.environ, SPLIT="all_pr" if "holdout" not in splits
-                       else "holdout", ONLY_ITEMS=str(pr),
+            env = dict(os.environ,
+                       SPLIT=("holdout4" if "holdout4" in splits else
+                              "holdout3" if "holdout3" in splits else
+                              "holdout" if "holdout" in splits else "all_pr"),
+                       ONLY_ITEMS=str(pr),
                        ARM_A_DIR=f"arms/{arm_out}",
                        JUDGE_OUT=judge_out, REPLICATES=str(reps))
             for attempt in range(1, 4):

@@ -1,0 +1,24 @@
+{
+  "comments": [
+    {
+      "author": "FayeSpica",
+      "body": "Benchmarked against the eager implemention. Results:\r\n\r\n| shape (b,h,s,d) | path | eager (ms) | fused (ms) | speedup |\r\n| --- | --- | ---: | ---: | ---: |\r\n| (1, 16, 4096, 128) | BNSD | 0.1051 | 0.0284 | 3.70x |\r\n| (1, 32, 2048, 128) | BNSD | 0.1051 | 0.0294 | 3.57x |\r\n| (4, 32, 1024, 128) | BNSD | 0.1681 | 0.0497 | 3.39x |\r\n| (16, 32, 8, 128) | BSND(fallback) | 0.0788 | 0.0458 | 1.72x |\r\n| (32, 16, 4, 64) | BSND(fallback) | 0.0774 | 0.0463 | 1.67x |\r\n| (64, 8, 2, 128) | BSND(fallback) | 0.0745 | 0.0446 | 1.67x |\r\n\r\n\r\n\r\nLGTM, @gcanlin PTAL, Thanks!"
+    },
+    {
+      "author": "gxxx-hum",
+      "body": "> How about the performance before?\r\n\r\nThis PR focuses on fixing the BNSD limitation encountered by customvoice under concurrency levels higher than 4 after enabling the codec_chunk_ramp feature. We resolve this issue by falling back from BNSD to BSND.\r\n\r\nWith this improvement, streaming scenarios can be effectively adopted in production environments. The following results show the performance without enabling codec_chunk_ramp. As shown below, the Streaming continuity OK rate for a single request has already dropped to 0.\r\n\r\n\r\nMetric | c=1 | c=4 | c=8 | c=16\r\n-- | -- | -- | -- | --\r\nMean E2EL (ms) | 2995.99 | 3327.22 | 3842.88 | 4995.87\r\nMedian E2EL (ms) | 2959.41 | 3280.86 | 3581.59 | 4472.01\r\nP99 E2EL (ms) | 5271.21 | 5628.47 | 7293.52 | 13205.34\r\nTotal audio duration (s) | 273.60 | 271.52 | 271.76 | 277.28\r\nAudio throughput (s/s) | 1.90 | 6.56 | 11.20 | 15.63\r\nStreaming continuity OK rate | 0.00% | 0.00% | 0.00% | 0.00%\r\nMean AUDIO_RTF | 0.53 | 0.59 | 0.68 | 0.88\r\nMedian AUDIO_RTF | 0.52 | 0.59 | 0.68 | 0.87\r\nP99 AUDIO_RTF | 0.70 | 0.63 | 0.74 | 1.02\r\nMean AUDIO_TTFP (ms) | 222.12 | 263.03 | 318.89 | 443.95\r\nMedian AUDIO_TTFP (ms) | 188.64 | 231.40 | 308.64 | 466.22\r\nP99 AUDIO_TTFP (ms) | 1009.79 | 498.34 | 443.29 | 597.63\r\nMean AUDIO_DURATION (s) | 5.70 | 5.66 | 5.66 | 5.78\r\nMedian AUDIO_DURATION (s) | 5.64 | 5.56 | 5.28 | 5.32\r\nP99 AUDIO_DURATION (s) | 10.26 | 9.76 | 11.14 | 16.61\r\nMean AUDIO_UNDERRUN (s) | 0.90 | 1.01 | 1.16 | 1.52\r\nMedian AUDIO_UNDERRUN (s) | 0.90 | 1.02 | 1.16 | 1.50\r\nP99 AUDIO_UNDERRUN (s) | 0.97 | 1.12 | 1.42 | 1.82\r\n\r\n"
+    }
+  ],
+  "reviews": [
+    {
+      "author": "FayeSpica",
+      "body": "Left some comments — PTAL.",
+      "state": "COMMENTED"
+    },
+    {
+      "author": "gcanlin",
+      "body": "How about the performance before?",
+      "state": "COMMENTED"
+    }
+  ]
+}

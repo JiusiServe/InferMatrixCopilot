@@ -1,0 +1,26 @@
+[
+  {
+    "author": "FayeSpica",
+    "body": "Could we add a small performance comparison before deciding on the approach? Ideally covering all three paths on real Qwen3-TTS shapes:\n\n1. BNSD fused (npu_rotary_mul, the supported-shape fast path)\n2. BSND fused (transpose + .contiguous() fallback, as in this PR)\n3. plain-torch (q*cos + rotate_half(q)*sin, no fused op)",
+    "line": 51,
+    "path": "vllm_omni/platforms/npu/models/qwen3_tts_tokenizer_v2.py"
+  },
+  {
+    "author": "FayeSpica",
+    "body": "I think this should become a model-independent NPU rotary op rather than living in a per-model tokenizer patch: extract it into a shared util.",
+    "line": 36,
+    "path": "vllm_omni/platforms/npu/models/qwen3_tts_tokenizer_v2.py"
+  },
+  {
+    "author": "gxxx-hum",
+    "body": "Thanks for the suggestion. To clarify, This is primarily a correctness fix. With codec_chunk_ramp enabled, the BNSD path crashes on real Code2Wav workloads at concurrency 4 or higher, so it is not a valid performance baseline for the failing shapes. This patch keeps BNSD for supported shapes and only falls back to BSND when necessary. \r\nWithout codec_chunk_ramp, streaming audio has obvious discontinuities and significant underrun time, making it unsuitable for production use.",
+    "line": 51,
+    "path": "vllm_omni/platforms/npu/models/qwen3_tts_tokenizer_v2.py"
+  },
+  {
+    "author": "gxxx-hum",
+    "body": "Thanks, I extracted the BNSD shape check and BSND fallback into a shared, model-independent NPU rotary helper.",
+    "line": 36,
+    "path": "vllm_omni/platforms/npu/models/qwen3_tts_tokenizer_v2.py"
+  }
+]

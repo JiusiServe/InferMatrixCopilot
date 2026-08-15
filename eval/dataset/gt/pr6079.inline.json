@@ -1,0 +1,44 @@
+[
+  {
+    "author": "yenuo26",
+    "body": "Actually, I'd suggest that changes to these test utilities shouldn't trigger this job. Even though they might cause this job to fail, nightly would already catch that. My understanding is that this job is mainly meant to guard against regressions in MiniCPM changes.",
+    "line": 234,
+    "path": ".buildkite/cuda/test-ready.yml"
+  },
+  {
+    "author": "yenuo26",
+    "body": "Also, could you evaluate whether we still need to keep the original functional test cases in the 'ready' pipeline, since we already have these performance test cases? At the 'ready' level, those functional tests are essentially just simple validations like checking if the request call succeeds.",
+    "line": 237,
+    "path": ".buildkite/cuda/test-ready.yml"
+  },
+  {
+    "author": "yenuo26",
+    "body": "Why does this performance test trigger much less frequently compared to the functional test? Was that intentionally designed?",
+    "line": 232,
+    "path": ".buildkite/cuda/test-ready.yml"
+  },
+  {
+    "author": "amy-why-3459",
+    "body": "Removed. run_benchmark.py and tests/dfx/conftest.py are shared perf infrastructure exercised by every perf config in nightly, so gating a MiniCPM-specific job on them only adds noise. The trigger set is now MiniCPM-owned only: the perf JSON, minicpmo_4_5.yaml, model_executor/models/minicpmo_4_5/, and stage_input_processors/minicpmo_4_5_omni.py.",
+    "line": 234,
+    "path": ".buildkite/cuda/test-ready.yml"
+  },
+  {
+    "author": "amy-why-3459",
+    "body": "> Also, could you evaluate whether we still need to keep the original functional test cases in the 'ready' pipeline, since we already have these performance test cases? At the 'ready' level, those functional tests are essentially just simple validations like checking if the request call succeeds.\r\n\r\nThe perf case isn't a superset of the functional ones. At -m core_model the online functional job runs test_text_to_text_001 (stream=False, asserts \"Beijing\" in the text) and test_mix_to_text_audio_001 (text+audio+video+image input), and the offline job covers the offline inference path. The perf case only sends seed-tts text prompts through /v1/chat/completions and asserts result[\"completed\"] == num_prompts — no multimodal ingestion, no non-stream path, no offline path, and no output-content assertion. So dropping the functional jobs would lose the image/video/audio input paths and the only correctness signal we have at ready level. If the goal is to cut ready cost, trimming the functional set looks like the better lever than removing it.",
+    "line": 237,
+    "path": ".buildkite/cuda/test-ready.yml"
+  },
+  {
+    "author": "amy-why-3459",
+    "body": "> Why does this performance test trigger much less frequently compared to the functional test? Was that intentionally designed?\r\n\r\nAfter dropping the two test-infra entries, the perf job triggers on a superset of the online functional job, which lists only test_minicpmo_4_5.py + minicpmo_4_5.yaml and notably not model_executor/models/minicpmo_4_5/. It is narrower than the duplex job, which additionally guards shared paths (core/sched/, engine/async_omni_engine.py, engine/stage_init_utils.py, entrypoints/cli/serve.py, outputs/multimodal_accumulation.py). That part was intentional: this is a 60-minute H100 job, and I'd rather not run it on every scheduler/engine touch when nightly already covers the cross-cutting surface. Happy to add those shared paths if you'd prefer perf to gate them too.\r\n\r\nSeparately, the online functional job not listing the MiniCPM model directory looks like a pre-existing gap — a change to the model code doesn't currently retrigger it. I can align that here or in a follow-up, whichever you prefer.",
+    "line": 232,
+    "path": ".buildkite/cuda/test-ready.yml"
+  },
+  {
+    "author": "yenuo26",
+    "body": "Regarding the trigger condition changes, I've already updated them in PR #5994 . If there are still any omissions, please feel free to point them out there.",
+    "line": 232,
+    "path": ".buildkite/cuda/test-ready.yml"
+  }
+]

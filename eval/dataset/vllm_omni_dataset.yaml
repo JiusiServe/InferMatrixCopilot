@@ -220,3 +220,101 @@ pr_review_wave2:
      author: tzhouam, merged: "2026-08-11", modules: [benchmarks, ci, core, diffusion],
      size: {files: 55, add: 1335, del: 93}, review_comments: 9,
      class: rebase}
+
+# ============================================================
+# wave 3 — 10 PRs, ALL frozen holdout (added 2026-08-15)
+#
+# Wave 2 is SPENT: opened for tuning forensics after the cursor-model campaign.
+# Wave 3 is the promotion gate for the post-wave-2 pipeline iteration. Same
+# eligibility and draw machinery as wave 2 (see build_wave3.py); exclusions
+# additionally cover the 6 never-drawn pool items whose GT was materialized
+# on disk during the wave-2 build (5472/5636/5647/5737/5790/5887).
+pr_review_wave3:
+  - {pr: 5678, split: holdout3, wave: "2026-08w3", title: "[Config] Read engine args from VllmOmniConfig",
+     author: Acerak01-fy, merged: "2026-08-07", modules: [config, engine, entrypoints, tests],
+     size: {files: 6, add: 1090, del: 72}, review_comments: 11,
+     class: other}
+  - {pr: 5691, split: holdout3, wave: "2026-08w3", title: "[Model] Add MiniMax H3 diffusion support",
+     author: Isotr0py, merged: "2026-08-03", modules: [config, diffusion, docs, engine],
+     size: {files: 45, add: 7356, del: 31}, review_comments: 11,
+     class: model}
+  - {pr: 5713, split: holdout3, wave: "2026-08w3", title: "[CI/Build] Speed up omni sleep-mode entrypoint tests with shared engines",
+     author: yenuo26, merged: "2026-08-05", modules: [tests],
+     size: {files: 3, add: 224, del: 213}, review_comments: 4,
+     class: ci}
+  - {pr: 5843, split: holdout3, wave: "2026-08w3", title: "[Core][Refactor][Diffusion] refactor request scheduler's admission wait policy",
+     author: fhfuih, merged: "2026-08-10", modules: [diffusion, docs, entrypoints, tests],
+     size: {files: 13, add: 252, del: 53}, review_comments: 2,
+     class: refactor}
+  - {pr: 5853, split: holdout3, wave: "2026-08w3", title: "[Model][Feat] Support Minimax-H3 quality grading requests through dynamic loading/unloading with Cache-DiT",
+     author: mglyn, merged: "2026-08-07", modules: [diffusion, docs, entrypoints, inputs],
+     size: {files: 28, add: 1183, del: 18}, review_comments: 8,
+     class: model}
+  - {pr: 5857, split: holdout3, wave: "2026-08w3", title: "[Docs] Add MiniMax-H3 recipe for RTX PRO 5000",
+     author: lishunyang12, merged: "2026-08-11", modules: [misc],
+     size: {files: 1, add: 198, del: 0}, review_comments: 3,
+     class: docs}
+  - {pr: 6045, split: holdout3, wave: "2026-08w3", title: "docs: align User Guide feature taxonomy",
+     author: hsliuustc0106, merged: "2026-08-11", modules: [docs],
+     size: {files: 5, add: 211, del: 118}, review_comments: 6,
+     class: feature}
+  - {pr: 6049, split: holdout3, wave: "2026-08w3", title: "[Misc] Build canonical image task prompts",
+     author: hsliuustc0106, merged: "2026-08-12", modules: [model_extras, tests],
+     size: {files: 14, add: 188, del: 266}, review_comments: 8,
+     class: misc}
+  - {pr: 6079, split: holdout3, wave: "2026-08w3", title: "[CI][MiniCPM-o] Add MiniCPM-o 4.5 perf coverage to the ready gate",
+     author: amy-why-3459, merged: "2026-08-12", modules: [ci, tests],
+     size: {files: 3, add: 101, del: 0}, review_comments: 7,
+     class: perf}
+  - {pr: 6141, split: holdout3, wave: "2026-08w3", title: "[Doc] Refresh community documentation",
+     author: hsliuustc0106, merged: "2026-08-13", modules: [docs],
+     size: {files: 9, add: 27, del: 45}, review_comments: 2,
+     class: docs}
+
+# ============================================================
+# wave 4 — 10 PRs, ALL frozen holdout (added 2026-08-15)
+#
+# Wave 3 is SPENT (two disclosed v14 gate attempts, then opened for
+# forensics). Wave 4 is the clean promotion gate; same machinery
+# (build_wave4.py), exclusions cover waves 1-3 + tainted extras.
+pr_review_wave4:
+  - {pr: 5608, split: holdout4, wave: "2026-08w4", title: "[Bugfix][NPU] Fallback to BSND RoPE when Qwen3-TTS short-seq BNSD li…",
+     author: gxxx-hum, merged: "2026-08-05", modules: [platforms, tests],
+     size: {files: 3, add: 74, del: 4}, review_comments: 4,
+     class: bugfix}
+  - {pr: 5720, split: holdout4, wave: "2026-08w4", title: "[Diffusion] Add Minimax-H3 modular pipeline support",
+     author: Isotr0py, merged: "2026-08-06", modules: [config, diffusion, engine, entrypoints],
+     size: {files: 25, add: 844, del: 178}, review_comments: 15,
+     class: other}
+  - {pr: 5723, split: holdout4, wave: "2026-08w4", title: "[Recipe] Document MiniMax H3 ROCm (gfx950) BF16 serving",
+     author: amd-xiaoyu12, merged: "2026-08-09", modules: [docs],
+     size: {files: 2, add: 121, del: 5}, review_comments: 5,
+     class: docs}
+  - {pr: 5756, split: holdout4, wave: "2026-08w4", title: "[Frontend] Add ComfyUI support for r2v (MiniMax H3 as example)",
+     author: fhfuih, merged: "2026-08-04", modules: [tests],
+     size: {files: 9, add: 413, del: 539}, review_comments: 3,
+     class: other}
+  - {pr: 5779, split: holdout4, wave: "2026-08w4", title: "[Attention] Refine TRTLLM attention support for MiniMax H3",
+     author: bobboli, merged: "2026-08-06", modules: [diffusion, docs, tests],
+     size: {files: 11, add: 371, del: 34}, review_comments: 5,
+     class: other}
+  - {pr: 5801, split: holdout4, wave: "2026-08w4", title: "[Perf] Minimax-H3 support fused RMSNorm and RoPE opt",
+     author: fan2956, merged: "2026-08-06", modules: [diffusion, tests],
+     size: {files: 6, add: 145, del: 39}, review_comments: 2,
+     class: perf}
+  - {pr: 5833, split: holdout4, wave: "2026-08w4", title: "docs: reorganize vLLM-Omni design navigation",
+     author: hsliuustc0106, merged: "2026-08-06", modules: [docs],
+     size: {files: 2, add: 91, del: 24}, review_comments: 2,
+     class: docs}
+  - {pr: 5864, split: holdout4, wave: "2026-08w4", title: "[Diffusion] Fix DLO DP concurrent request execution",
+     author: lishunyang12, merged: "2026-08-08", modules: [diffusion, tests],
+     size: {files: 14, add: 1148, del: 128}, review_comments: 17,
+     class: bugfix}
+  - {pr: 5958, split: holdout4, wave: "2026-08w4", title: "[Misc] Align CODEOWNERS with module/feature design docs",
+     author: hsliuustc0106, merged: "2026-08-10", modules: [ci, docs],
+     size: {files: 13, add: 141, del: 33}, review_comments: 20,
+     class: feature}
+  - {pr: 5978, split: holdout4, wave: "2026-08w4", title: "[CI] Align MiniMax H3 Ref2VA inputs and add I2VA/Ref2VA accuracy coverage",
+     author: david6666666, merged: "2026-08-11", modules: [ci, diffusion, tests],
+     size: {files: 8, add: 535, del: 262}, review_comments: 6,
+     class: ci}
