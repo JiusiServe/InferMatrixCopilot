@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 1.0,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.95,
+    "actionability": 0.92,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Neither candidate caught the ground truth's only substantive concern (the Yuanrong Store Connector naming nit), so recall is 0 for both. Both are highly precise and well-grounded — X's 4 findings and Y's ~8 overlap heavily and cross-validate each other (Quantization/Cache-DiT grouping bug, duplicate Quantization nav entry, Ray-based Execution H1 mismatch, orphaned ar_diffusion_pipeline_capability.md) — but Y additionally surfaces valid, diff-grounded issues X misses entirely, such as the omni_connectors directory-glob-to-hardcoded-list regression and the heading-case inconsistency (independently verifiable directly from the diff excerpt). Y's fixes are also more concrete (code snippets, explicit recommendations) while appropriately hedging the one less-certain claim (MkDocs page back-reference), giving it a clear edge in both precision-adjusted coverage and actionability.",
+  "_cost_usd": 0.34237560000000006,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "4b89fc2fddce9c033988f10b0c7eb46f645c3cd9ab3a9e8c6a7d121ccf8d6454",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b0a1251303a011617b813526a2859371e8ee289f04fcc197988c5b4d83dc8aca",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

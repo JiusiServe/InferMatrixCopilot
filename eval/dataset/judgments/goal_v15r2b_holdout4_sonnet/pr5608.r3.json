@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth is thin and mostly already resolved in this diff snapshot (shared-util extraction happened; perf table was supplied inline), so neither candidate hits the residual 'compare against plain-torch fallback' ask explicitly, capping recall for both. Both independently converge on the same strong, well-grounded core findings (unmigrated sibling BNSD call sites in qwen3_code_predictor.py and 310p patch, non-contiguous fallback output, and the test's head_dim=2 short-circuiting the B*N<=S*8 predicate it's meant to cover) which corroborates precision on both sides. Y edges ahead on precision and thoroughness via its evidence-cited scan methodology (validated/refuted claims with grep/config citations), catching additional well-grounded issues X misses (docstring/consumer mismatch, 310P fp16 arch-validation gap, and actually checking whether the red AMD CI lane even collects this test file rather than just asserting it looks unrelated). X is comparably actionable with a couple of concrete inline diffs but includes one more speculative 'confirmed via execution' correctness claim on an unreachable code path.",
+  "_cost_usd": 0.2825122,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15_holdout4_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "3807689a1265cfb72e45568c0f90416e43b81dc9c49c9fb3fc1b8a152ea111ca",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "400e2cdee23e452f67bea91295a8fd9f971ab290f37c9a61d27bec6c625cf76a",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

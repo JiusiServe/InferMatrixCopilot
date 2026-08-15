@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.8,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both independently found the same core code-grounded bugs (dangling AMD checkmark/footnote, false reference-count limitation, FL2VA-partition/MODEL_ROOT confusion), giving both solid precision. X pulls ahead on recall: it catches the mkdocs --strict docs-build failure (explicitly raised by two reviewers with CHANGES_REQUESTED and missed entirely by Y), engages with the prebuilt-image ffmpeg/TorchCodec bundling concern via the Dockerfile.rocm comparison, notes the MI350 vs MI350X naming issue, and even nods to the 'separate ROCm file' preference from the review thread. X's write-up is also more actionable, with concrete before/after text and clearer prioritization (Blocking/Should-fix/Nits) versus Y's denser audit-log format.",
+  "_cost_usd": 0.32675420000000005,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15_holdout4_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "f8688942ab7f6f19862624e90b12cac6bf7af29d2203a8a7a53f1fb929158556",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "cb201dcc2cdab115638b4f9fa9a4049589bf1e28f73d4bc1e3a3fbc1975ca7e7",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

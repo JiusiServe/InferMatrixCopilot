@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.72,
+    "actionability": 0.78
+  },
+  "y": {
+    "recall": 0.22,
+    "precision": 0.78,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates clearly hit only one solid ground-truth thread (the --task-type choices/validation regression, GT's P2 item), missing GT's core P1s about combined-mode Cache-DiT coverage, the modular-alias metadata contract, and Ref2VA's implicit task default, as well as all four SamitHuang code-quality nits. Y shows deeper, more concretely verified investigation in the same subsystem areas (cache-dit dotted-module handling, supported_tasks/Ref2VA edge cases, exception-guard removal) with actual reproductions (tracebacks, '104 passed' test run) and a clearer prioritized Blocking/Should-fix/Worth-considering structure plus a real CI-red catch, giving it a modest edge in recall, precision, and actionability. X is also well-evidenced and systematic but its extra findings (torch.compile default scope, weight-loader contiguity gaps) sit further from the ground-truth concerns and lack the same verification depth.",
+  "_cost_usd": 0.4518658,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16f_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout4_r1",
+    "arm_a_sha256": "7c8c5ddca510492244bb9e34711cb4dcf78fa49377a9e4bfbeddfc7dca51dcea",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "7d155ed781e729cb9d3a1c8ef3851789595fa7fa0c9c18281fbbf0c3a461d7e5",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

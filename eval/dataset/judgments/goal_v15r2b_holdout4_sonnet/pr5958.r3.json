@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.6,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.78,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently converge on the same core real issues (RuixiangMa missing from diffusion/models, LoRA narrowing mislabeled as 'preserved', offloader.md/PR-description mismatch on Isotr0py, plugins rule contradicting its cited doc, distributed/ broader than its doc), giving comparable recall against the ground-truth set (most of which was already resolved by the shown diff). X reads as more polished and gives richer prose fixes, but it asserts unverifiable specifics (precise per-directory blast-radius file counts, invented-looking commit SHAs/PR numbers) without evidence trails, which is a real fabrication risk and hurts precision. Y ties nearly every claim to a quoted file:line or tool output (gh_pr_view/gh_ci_read/file_at_base) and systematically cross-checks PR-body claims against the diff — closely mirroring the Copilot-style 'doc says X but file says Y' findings in the ground truth — though its 'Additional observations' section is marred by several sentences cut off mid-word, denting actionability there.",
+  "_cost_usd": 0.4327007,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15_holdout4_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "f80729ba8bb197f3121b8c9872274d5d7e285f3eea8809413ad12095052ea3fb",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a618d8fdfdd2a7671220fc3626c167412f101811b64319de0c1c201facd71448",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.55,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both independently surface the same core threads (audio_vae config mutation, patch_emission +2, serving_speech language drop, the seed_tts double-resample risk), but X's audio_vae finding asserts the encoder itself executes fewer layers with a fabricated-sounding 'verified locally' diff output, directly contradicted by the ground-truth maintainer's confirmation that encoder execution is unchanged (only introspection metadata drifts) — a real precision hit. Y's framing of that same issue matches the maintainer's actual resolution almost exactly, and Y backs its patch_emission concern with a concrete derived regression (short-utterance ValueError) plus line-quoted evidence from unchanged files, giving it stronger grounding. X is more polished and equally actionable, but Y's extra verified findings and closer alignment with how the ground-truth threads actually resolved edge it out on recall and precision.",
+  "_cost_usd": 0.38608899999999996,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16rs_train_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16rs_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16rs_train_r1",
+    "arm_a_sha256": "2a91ab50b9bbbf07f10b8489108ee8bab059214d54fec139fa66df69d4a89d90",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "264e453d996b4a5c483bf206cefb21e513e90d0d6bda5e49948434353154f4a5",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

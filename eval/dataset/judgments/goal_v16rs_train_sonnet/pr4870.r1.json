@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.7,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates independently corroborate two solid findings (NPU mirror bug, WebSocket streaming path), and both partially engage the ground-truth Med/Low concerns rather than hitting them verbatim (Y explicitly ties back to Med/Nit resolution status, X reframes them into new but related risks). X is tighter and more actionable, with crisp per-finding action items and no filler, while Y's report is padded with trivial 'validated' arithmetic checks and ends in two truncated, incomplete findings that hurt precision and usability. Only X's mm_outputs.py finding about the all-or-nothing exact-match split breaking under a second varying axis (span_len) plausibly foreshadows the dual-batch-axis gap later fixed by PR #4910; Y has no comparable content.",
+  "_cost_usd": 0.4720589,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16rs_train_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16rs_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16rs_train_r1",
+    "arm_a_sha256": "a991cc5170ed67d5068ca293d8842f801c276513dd68c6480ec9d7a6f9b86405",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "03d7423c3a91e45838083e2025e3dea932f1d9448ba923b1d6ca1a0373899ea1",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Neither candidate caught the ground-truth Yuanrong connector naming nitpick (recall ~0 for both, and that comment appears already resolved in the shown diff, making it effectively undetectable). Both independently found the same real issues (Quantization heading nesting bug, the pre-existing Quantization duplicate at .nav.yml:76, Ray-based Execution H1 mismatch) with solid diff-grounded evidence, giving X a slight edge in precision via its extensive validation trail. Y edges ahead on actionability and coverage: it structures findings by priority (must-fix/should-fix/nit), supplies literal before/after diffs, and adds legitimate extra catches (connector auto-discovery loss from replacing a directory glob, AsyncOmni Architecture H1 mismatch) while honestly hedging unverifiable claims.",
+  "_cost_usd": 0.3312578,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16f_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout4_r1",
+    "arm_a_sha256": "a86233bde63a25d0e2e0f6b2ab3b04c7041674bb87297fd58f7711622ac00e54",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b0a1251303a011617b813526a2859371e8ee289f04fcc197988c5b4d83dc8aca",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "The two ground-truth inline comments concern a Yuanrong connector naming fix that is already present in the shown diff, so neither candidate could plausibly surface it — recall is 0 for both. Both reviews independently and correctly find the real Quantization-heading-nesting bug in index.md and the Ray-based Execution/H1 mismatch, and both are well-grounded with file:line evidence and validated-link checklists. Y goes further with equally valid, well-grounded extras (the nav.yml duplicate-listing mkdocs mechanics with appropriate hedging about being unable to build-verify, the glob-to-hardcoded-list auto-discovery regression risk, the AsyncOmni H1 mismatch, and credit for fixing two previously nav-orphaned docs), and presents everything in a more actionable Must-fix/Should-fix/Nits structure with concrete replacement snippets.",
+  "_cost_usd": 0.1625161,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16f_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout4_r1",
+    "arm_a_sha256": "a86233bde63a25d0e2e0f6b2ab3b04c7041674bb87297fd58f7711622ac00e54",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b0a1251303a011617b813526a2859371e8ee289f04fcc197988c5b4d83dc8aca",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

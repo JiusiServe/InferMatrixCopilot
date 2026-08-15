@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.95
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.8
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns to recall, so both score full recall. Both candidates independently and correctly identify the same core defect (new test file lacks pytestmark and is silently deselected by the marker-filtered CI command) and the warmup_quack_fp8 gate-bypass issue, with solid diff-grounded evidence. X is more actionable — it verifies the CI-deselection claim by actually running pytest locally (proving 18/18 deselected vs 18/18 passing standalone) and supplies ready-to-apply code diffs for every blocking/should-fix item, plus a coherent blocking/should-fix/minor triage with a clear verdict. Y is comparably thorough and contributes one finding X misses (potential sm_110a exclusion per the PR body's own tcgen05 target list), but its output is cluttered with restated 'validated' bullets that aren't actionable findings, and it under-rates the warmup_quack_fp8 bypass as 'minor' despite the doc explicitly using it at image-build time.",
+  "_cost_usd": 0.2125279,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16rs_train_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16rs_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16rs_train_r1",
+    "arm_a_sha256": "ec578594ca1e49676b9cd863babd012d4b5877381c79bcf6c9579daf3f98f48c",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "de884ebeca54520b85a490b897397bd22bf362507bf9f7d4a833d74b390ae063",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

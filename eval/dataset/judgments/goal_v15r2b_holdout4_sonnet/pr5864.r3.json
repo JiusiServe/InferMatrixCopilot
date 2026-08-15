@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.75,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.8
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both reviews are detailed and line-grounded, and both independently catch the real request_batch_max_wait_ms=0 regression that silently serializes DP concurrency. But Y engages far more directly with the actual reviewer discourse: it explicitly re-verifies the human-flagged CFG/compatibility-key concern, the dp-primary-rank topology assumption and its 'weak test' critique (matching asukaqaq-s/yuanheng-zhao's inline comments almost exactly, including a residual gap after the fix), and the global 15s/5s shutdown-budget fix described by the author — plus it surfaces a nuanced residual shutdown-ordering bug that mirrors the orchestrator pre-mark issue from the PR's late discussion. X's findings (fault-isolation model, empty-prompt policy, wave timeout defaults, an unreachable-branch claim that conflicts with Y's contradictory analysis, output substitution) are well-argued and actionable but mostly orthogonal to what the actual reviewers raised, giving it lower recall. Neither includes a labeled LATENT GAP CHECK section.",
+  "_cost_usd": 0.42890269999999997,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15_holdout4_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "8b3b0b08e1a8defaac40e67c5a984066109aab2a4e178dd50d66ac13b0a37305",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5d107b26c5dd605248f4ff3bf7b26b48a886f95ed933ef7eb79692e052dcfc5a",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

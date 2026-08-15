@@ -1,0 +1,34 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.25,
+    "precision": 0.85,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "_cost_usd": 0.428665,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16f_holdout4_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout4_r1",
+    "arm_a_sha256": "5bfcfc992058476933051862d7f5ef81caac947da9c5344b50f0e5d57b17ec92",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4847f9bc7acb40b4a7467503f4eb812a8e50f5fe424e5df5f56f1ab2a3da3ee3",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

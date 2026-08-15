@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both reviews are exceptionally thorough and well-evidenced, and both independently catch GT's second-highest-severity finding (v2 codec silently swallowing legacy checkpoints via shared model_type) plus the WER PCM-fallback issue. But on GT's single highest-confidence finding — stream slots leaking because release is only reached via the finished/stream_finished payload path (confirmed and fixed by the author) — X explicitly asserts the abort-release path already works correctly, actively missing/contradicting it, while Y independently flags the same slot-leak failure mode (via an id-space mismatch in on_requests_finished) in the same function. Y also catches the docstring-staleness item GT calls out; X does not. Both are equally concrete and actionable with file:line evidence, so the gap is driven by recall on the marquee findings rather than precision or actionability.",
+  "_cost_usd": 0.4719617,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16f_train_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_train_r1",
+    "arm_a_sha256": "ff5551e5d105316ba4dc86b5757cf6b50310a48907eb54c68d5bf71515b37f8f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "18986f2736f812d8c896b12152ebcbf1d5319e9e1f79042f5fa16f1dd6272542",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

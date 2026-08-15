@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y catches more of the ground-truth P1 concerns in substance (combined-mode memory/perf-validation gap explicitly discussed with the 270GiB figure and MUSA caution quote; the TTS/generic task-type validation regression matches exactly; the cache-dit generalization issue is investigated in the same code area even if manifested differently via Bagel/SenseNova rather than the exact transformers_ref case). X matches only the task-type validation item and misses the modular-metadata bug, the Ref2VA default-task regression, the cache-dit combined-DiT gap, and the memory table — plus one of X's 'claim-verified' assertions (that DiffusionModelMetadata correctly duplicates admission limits) is actually contradicted by the ground truth, which found that exact metadata undersized. Both reports are well-evidenced with file/line citations and concrete fixes, so actionability and precision are comparably high, but Y's broader and more accurate coverage of real GT concerns gives it the edge.",
+  "_cost_usd": 0.3065974,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16f_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout4_r1",
+    "arm_a_sha256": "7c8c5ddca510492244bb9e34711cb4dcf78fa49377a9e4bfbeddfc7dca51dcea",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "7d155ed781e729cb9d3a1c8ef3851789595fa7fa0c9c18281fbbf0c3a461d7e5",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both independently converge on the same two highest-value findings (the 'shared' rotary helper has exactly one caller while structurally identical unguarded BNSD sites remain in qwen3_code_predictor.py and the 310P patch; the changed test only exercises the alignment clause, never the B*N<=S*8 threshold the PR is actually about) — strong cross-corroboration that these are real. Y additionally engages substantively with the performance-validation thread that dominates the actual GT discussion (gcanlin's 'how about performance before?' and gxxx-hum's benchmark reply), quoting the PR's own perf table to flag that c=16 isn't actually streaming-stable, and backs nearly every claim with grep-verified file:line evidence, giving it a modest recall/precision edge. X is more cleanly organized with concrete suggested diffs and a sharper worst-case (seq_len=2) analysis of the code-predictor risk, but never touches the performance-comparison concern at all and asserts several 'I verified/confirmed' claims without a visible evidence trail.",
+  "_cost_usd": 0.3268722,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15_holdout4_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "3807689a1265cfb72e45568c0f90416e43b81dc9c49c9fb3fc1b8a152ea111ca",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "400e2cdee23e452f67bea91295a8fd9f971ab290f37c9a61d27bec6c625cf76a",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

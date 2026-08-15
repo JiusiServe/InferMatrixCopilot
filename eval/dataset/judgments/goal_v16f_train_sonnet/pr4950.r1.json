@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.55,
+    "actionability": 0.15,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Ground truth has no substantive concerns (only approvals/thanks), so recall is trivially satisfied by both. Candidate X does solid code-grounded verification but terminates in an empty, contentless 'nit' line with no actual comment, leaving nothing actionable despite claiming a finding exists. Candidate Y produces four specific, line-referenced findings grounded in the actual diff text — including catching that the new doc's own 'silent audio' claim is technically inaccurate (traces to a 500 error instead) and that the extra_body rule is overstated relative to a sibling recipe — each with concrete rewording or verification-command suggestions.",
+  "_cost_usd": 0.1376026,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16f_train_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_train_r1",
+    "arm_a_sha256": "1172bb360c9b8811a910868fc34d187af1dfa45d3c332eb791b4aa2b76c5589a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5a2e689fc33efd67adbf119f1e4cf034841928ad70fea2d99f142a727ca8ea18",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

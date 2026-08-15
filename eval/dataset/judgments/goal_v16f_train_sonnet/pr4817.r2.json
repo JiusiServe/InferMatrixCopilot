@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.82,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (only codex rate-limit spam and 'thanks'), so recall is vacuous for both. Both independently converge on the same strong, well-evidenced core finding — the new test file has no pytestmark and is silently deselected by the marker-filtered CI job — plus the sticky-fallback/circuit-breaker suggestion and the cc-11.x (sm_110a) gate-vs-docstring inconsistency, giving both high grounding. X adds a genuinely high-value unique catch: warmup_quack_fp8() bypasses quack_enabled() entirely, meaning the documented public API still breaks on sm_120 exactly as the PR claims to fix, framed correctly as a blocker with a concrete patch. Y's unique finds (ROCm gfx10xx capability collision, import-time single-device probe) are also grounded but more speculative/edge-case in practical impact, and its answer format interleaves a long verification trail with findings, slightly diluting actionability versus X's cleanly prioritized Blocking/Should-fix/Minor structure with inline fix snippets.",
+  "_cost_usd": 0.11104359999999999,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16f_train_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_train_r1",
+    "arm_a_sha256": "1a445fa8ddc1b5d852cb6eefa10616e48b0f747fde459c5382f789d482f6a1e6",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "de884ebeca54520b85a490b897397bd22bf362507bf9f7d4a833d74b390ae063",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

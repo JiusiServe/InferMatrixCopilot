@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.32,
+    "precision": 0.78,
+    "actionability": 0.92,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.32,
+    "precision": 0.82,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently nail the two most significant GT-confirmed bugs (v2-tokenizer-swallows-legacy-checkpoint at modeling_moss_tts_codec.py, and the NPU dummy-run missing seq_token_counts) with precise, well-grounded line citations, and both partially but not exactly match linyueqian's High slot-leak-on-abort concern via different specific mechanisms. Both miss the ceil/floor latent bug, the cumulative/delta chunk_np re-slice bug, and the smaller cleanup/generalization questions, keeping recall roughly tied and modest for both. X edges ahead on usefulness: it reads as a coherent, prioritized human-style review (verdict/blocking/should-fix/minor/tests) with several additional well-reasoned, concretely actionable findings (hardcoded sampling retune, KV-cache memory-profiling timing, dead-code output dict, stop-token hardcoding) beyond the shared hits, while Y's more terse evidence-dump format, despite its useful self-verification of claims, is slightly less actionable as a reviewer artifact.",
+  "_cost_usd": 0.4099309,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16rs_train_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16rs_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16rs_train_r1",
+    "arm_a_sha256": "e047449392b1adb529516e4f792b289cccc0d7137a5f4da166e3f6cc1158fda5",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "18986f2736f812d8c896b12152ebcbf1d5319e9e1f79042f5fa16f1dd6272542",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

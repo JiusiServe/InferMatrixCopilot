@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.8,
+    "actionability": 0.6
+  },
+  "y": {
+    "recall": 0.7,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y covers more of the ground-truth inline concerns: it credits the workdir-arg cleanup, surfaces a real weakness in the qwen-sampling test (probe/decode index mismatch), and flags that both CI gates are red, whereas X mainly hits the validation-order/weak-test concern (well, via a precise note that the fix is correct but the regression test doesn't actually verify call order) but misses the workdir and sampling-test points. Both are well-grounded with file:line evidence and converge independently on the same high-value finding (audio truncation has no content-level accuracy gate) and the shared AAC-priming change, giving comparable precision, but Y is more actionable — concrete code snippets, prioritized numbered items, and claimed local verification runs — while X's bonus 'additional observations' are cut off mid-sentence, hurting usability.",
+  "_cost_usd": 0.49075579999999996,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "62453e52a1eee9446aa57588eb1342f77b34c65d22dba9b042b7fa227def189e",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4847f9bc7acb40b4a7467503f4eb812a8e50f5fe424e5df5f56f1ab2a3da3ee3",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

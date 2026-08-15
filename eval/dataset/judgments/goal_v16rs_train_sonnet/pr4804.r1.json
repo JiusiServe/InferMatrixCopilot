@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.8,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently converge on the two strongest confirmed ground-truth bugs (the v2-first codec gate mis-parsing legacy v1 checkpoints, flagged High by hsliuustc0106; and the WER-fallback silently feeding raw/wrong-format PCM into the eval, flagged by linyueqian), giving both solid precision on their headline findings. Neither covers the cumulative/delta re-slice bug, the ceil/floor padding bug, or the 'make this generalizable' comment from ground truth, capping recall for both. Y edges ahead because its slot-leak-on-abort finding (#4) matches the ground-truth High comment's framing and root-cause class more directly (finish hook / id-space mismatch), and its report is organized into a clear Blocking/Should-fix/Minor/Tests hierarchy with concrete, prioritized fixes, slightly improving actionability over X's denser, repetitive evidence-block format.",
+  "_cost_usd": 0.4492639,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16rs_train_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16rs_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16rs_train_r1",
+    "arm_a_sha256": "e047449392b1adb529516e4f792b289cccc0d7137a5f4da166e3f6cc1158fda5",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "18986f2736f812d8c896b12152ebcbf1d5319e9e1f79042f5fa16f1dd6272542",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

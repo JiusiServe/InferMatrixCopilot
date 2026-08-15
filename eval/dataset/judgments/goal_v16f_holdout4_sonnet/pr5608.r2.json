@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.88,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently converge on the same core substantive findings (test coverage gap that misses the actual B*N<=S*8 branch, sibling BNSD call sites not migrated to the new helper, uncited CANN constants, ndim!=4 fallback hazard, non-contiguous output, red AMD CI), all well-grounded with exact file:line evidence and no apparent fabrication. Neither hits the ground-truth ask for a 3-way eager/BNSD/BSND perf comparison, and the 'extract to shared util' ask is already resolved in-code, so recall is low and roughly tied. Y edges out on precision/actionability via a sharper, verdict-first argument (using the predicate's own math to show it's already violated elsewhere without crashes) and concrete verification claims, versus X's bulkier structure with many low-value 'validated/no issue' entries and approximate line references.",
+  "_cost_usd": 0.36074740000000005,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16f_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout4_r1",
+    "arm_a_sha256": "eddf104689a8429c09074423c96f993417d1eddb288cdb4428408426dd0e5984",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "400e2cdee23e452f67bea91295a8fd9f971ab290f37c9a61d27bec6c625cf76a",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

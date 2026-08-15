@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.87,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.78,
+    "actionability": 0.82
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates miss the literal GT asks (3-way perf benchmark, extract-to-shared-util) but independently converge on a deeper version of the shared-util concern by finding the 'shared' helper has only one caller while two identical BNSD sites remain unguarded, and both correctly diagnose that the changed test's shape is rejected by D-alignment rather than the B*N<=S*8 predicate it's meant to cover, plus the non-contiguous return. X backs its claims with denser, cross-checked evidence (e.g. validating its concurrency-threshold math against the PR's own stated 'concurrency>=4' trigger, and a careful CI-collection check before flagging the AMD failure) and adds two well-grounded extra findings (310P fp16 arch gating, AMD CI scope) that Y lacks. Y's parallel 'unmigrated call site' claim uses a first-AR-step scenario that would imply crashes at much lower concurrency than the PR's own passing benchmarks suggest, making it less internally consistent, though Y contributes one genuinely unique, solid finding (uncited/version-coupled CANN tiling constant) and slightly cleaner inline-diff actionability.",
+  "_cost_usd": 0.35772220000000005,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "3807689a1265cfb72e45568c0f90416e43b81dc9c49c9fb3fc1b8a152ea111ca",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "400e2cdee23e452f67bea91295a8fd9f971ab290f37c9a61d27bec6c625cf76a",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

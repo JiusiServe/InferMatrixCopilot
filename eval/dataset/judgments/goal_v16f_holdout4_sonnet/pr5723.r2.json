@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.72,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both independently find the orphaned <sup>H3</sup> footnote and the factually-wrong reference-count bullet, and both catch the FL2VA-only MODEL/undefined MODEL_ROOT bug — strong overlap on the diff's real code-contradicting claims. But the GT's single most emphasized concern (docs build failure, raised as CHANGES_REQUESTED twice plus an issue comment, with a specific mkdocs --strict / recipes.vllm.ai root cause) is only lightly touched by X (correctly, but demoted to a nit) and is missed and effectively contradicted by Y ('docs-only change, no CI lane loads these files'), which hurts Y's recall and precision. Y does uniquely catch a nonexistent `--tp` flag and investigates the separate-file suggestion, but its output is a dense, redundant research-log dump that is much harder to act on than X's cleanly tiered Blocking/Should-fix/Nits review with concrete replacement text.",
+  "_cost_usd": 0.36908669999999993,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16f_holdout4_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout4_r1",
+    "arm_a_sha256": "79ff20b8b7d99e6628f3c245100c5fc347c6a4543c4c4da04afb3bbc046aaf51",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "cb201dcc2cdab115638b4f9fa9a4049589bf1e28f73d4bc1e3a3fbc1975ca7e7",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

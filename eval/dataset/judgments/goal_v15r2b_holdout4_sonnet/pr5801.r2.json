@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.6,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.65,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth here is almost entirely process chatter (merge conflicts, readiness, a since-fixed test bug), so neither candidate scores well on recall; X edges ahead only by confirming the merge state is clean. On substance, Y catches a genuinely severe, diff-verifiable regression (norm.py's new dtype=torch.float32 default silently overriding the ambient/context dtype that other models relied on) that X explicitly mislabels as 'validated'/unchanged, a real miss. X's report is heavily padded with four near-duplicate 'percentage math' findings and leans on unverifiable tool-claims, while Y pairs strong diff-grounded structural findings (forward_npu missing batch normalization, silent half-dim duplication assumption, untested fused-CUDA path — several convergent with X) with concrete code-level fixes, though its precise microbenchmark numbers carry some fabrication risk. Both are actionable with file:line specificity, but Y's proposed patches are more directly usable.",
+  "_cost_usd": 0.3286097,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "448f662b91441ca1049ce32011e86d5039f86a6e8a4eafcdd84afae731915557",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0ac7a88b887a97acc40e7614e44e3692d3e06a3bd75c8cab12c4dc831b63d48b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

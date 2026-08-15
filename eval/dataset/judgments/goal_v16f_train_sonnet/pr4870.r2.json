@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y independently rederives the human second-pass reviewer's actual diagnostic reasoning — the dim-0 mismatch diverging specifically on graph-padded hidden states, and the cumulative-snapshot-list-vs-disjoint-chunks duplication mechanism behind the streaming probe — while X frames the runner bug via the PR's looser 'tail-only' description and never names padding. Both independently catch the NPU twin-bug and the async_chunk default inconsistency (echoing the ground-truth Low comment) and both flag the red AMD CI gate; X validates the Med/Nit resolutions explicitly (a modest recall edge there) but its report is noisier with many meta claim-verification entries and cuts off mid-sentence at the end, whereas Y is tighter, cites real pytest execution evidence, and traces applicability through the default deploy config. Neither candidate surfaces the multi-batch-axis latent gap.",
+  "_cost_usd": 0.3328816,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16f_train_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_train_r1",
+    "arm_a_sha256": "3fefc4081d5aa4b7f5dcce0d99a7867a1fa61fbc1439e38b4b34920ad51c1c03",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "03d7423c3a91e45838083e2025e3dea932f1d9448ba923b1d6ca1a0373899ea1",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

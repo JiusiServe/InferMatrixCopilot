@@ -1,0 +1,113 @@
+{
+  "wall_s": 1194.7,
+  "split": "holdout4",
+  "rc": 0,
+  "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout4_r1/runs/pr5958/run-20260815-175929-096d3e",
+  "recorded_at": "2026-08-15T18:19:21",
+  "attempts": [
+    {
+      "invocation_id": "inv-085f8489",
+      "outcome": "run:run-20260815-175929-096d3e",
+      "rc": 0,
+      "pre_run": null
+    },
+    {
+      "run_dir": "run-20260815-175929-096d3e",
+      "llm_calls": 87,
+      "input_tokens": 143950,
+      "output_tokens": 175674,
+      "usd": 0.317658,
+      "source": "spans"
+    }
+  ],
+  "attempt_usd_total": 0.317658,
+  "llm_calls": 87,
+  "input_tokens": 143950,
+  "output_tokens": 175674,
+  "usd": 0.317658,
+  "source": "spans",
+  "metrics": {
+    "schema": 1,
+    "run": "run-20260815-175929-096d3e",
+    "task_kind": "pr_review",
+    "status": "done",
+    "quality": {
+      "q": null,
+      "weight_coverage": 0.0,
+      "partial": true,
+      "abstained": false,
+      "components": {
+        "recall_w": null,
+        "precision_v": null,
+        "useful": null,
+        "calib": null,
+        "decision": null
+      }
+    },
+    "cost": {
+      "usd": 0.3177,
+      "minutes": 19.87,
+      "ci_minutes": 0,
+      "input_tokens": 143950,
+      "output_tokens": 175674,
+      "tool_calls": 231,
+      "usd_ref": 1.0,
+      "min_ref": 10.0,
+      "cost_index": 1.6519,
+      "cost_partial": false,
+      "unpriced_calls": 0,
+      "source": "spans",
+      "llm_calls": 87,
+      "by_role": {
+        "planner": {
+          "usd": 0.001325,
+          "input_tokens": 32,
+          "output_tokens": 1131,
+          "calls": 1
+        },
+        "agent": {
+          "usd": 0.270451,
+          "input_tokens": 123574,
+          "output_tokens": 137892,
+          "calls": 83
+        },
+        "reducer": {
+          "usd": 0.045882,
+          "input_tokens": 20344,
+          "output_tokens": 36651,
+          "calls": 3
+        }
+      },
+      "cache_read_tokens": 3168512,
+      "cache_creation_tokens": 0
+    },
+    "timings": {
+      "steps": {
+        "fetch": 3.32,
+        "gate": 1.99,
+        "review": 1186.61,
+        "report": 0.07
+      },
+      "time_to_first_result_s": 1191.96
+    },
+    "risk": {
+      "incidents": {
+        "catastrophic": 0,
+        "severe": 0,
+        "moderate": 0,
+        "minor": 0
+      },
+      "safety_multiplier": 1.0
+    },
+    "catq": null,
+    "tus": null,
+    "signals": {
+      "escalations": 0,
+      "pushes": 0,
+      "posted": 0,
+      "steps_completed": 4
+    }
+  },
+  "trace": "pr5958.trace.json.gz",
+  "trace_bytes": 30180
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both catch the headline ground-truth issue (AMD support claimed via footnote but the supported_models.md row's AMD cell stays empty) and independently converge on a second real bug (the reference-count bullet contradicting the pipeline's actual 9-image/3-video/3-audio limits), giving both strong precision. But X also substantively engages the mkdocs --strict link-breakage concern that drove two separate human reviewers' CHANGES_REQUESTED/'fix the docs build failure' comments, plus gestures at the 'separate ROCm file' structural preference — both entirely absent from Y. X's extra findings (FL2VA-partition MODEL issue, aiter fallback silence, VAE GroupNorm scope, gfx950 evidence reproducibility) are well-grounded with specific line/function citations and read as genuine, not padding. Y is tightly grounded and well-organized (its residual-overhead-in-evidence-table nit is comparatively weak/pedantic) but simply covers less of what the human reviewers actually flagged.",
+  "_cost_usd": 0.34496920000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15_holdout4_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "f8688942ab7f6f19862624e90b12cac6bf7af29d2203a8a7a53f1fb929158556",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "cb201dcc2cdab115638b4f9fa9a4049589bf1e28f73d4bc1e3a3fbc1975ca7e7",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

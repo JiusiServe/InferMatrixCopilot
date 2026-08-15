@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns to recall (only bot rate-limit noise and 'thanks'), so both trivially get recall=1.0. Both candidates independently converge on the same core, well-grounded findings (untested test file due to missing pytestmark, warmup_quack_fp8 bypassing the gate, stale docs language, unrelated CI failures, cc 11.x/sm_110a gap). X edges out on actionability by empirically running pytest to prove test deselection and supplying concrete code diffs, and organizes findings by clear priority (Blocking/Should-fix/Minor/Question); it also adds a genuinely useful design point (sticky-disable to bound failure cost) not present in Y. Y is thorough but pads its report with many low-value 'validated' background bullets and stretches scope with a speculative ask for a new sm_120 CI lane, slightly diluting precision.",
+  "_cost_usd": 0.0898843,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16rs_train_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16rs_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16rs_train_r1",
+    "arm_a_sha256": "ec578594ca1e49676b9cd863babd012d4b5877381c79bcf6c9579daf3f98f48c",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "de884ebeca54520b85a490b897397bd22bf362507bf9f7d4a833d74b390ae063",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

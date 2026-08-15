@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.8,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth carries no substantive findings to recall, so both score low there. X and Y independently converge on the same two strongest points (tombstone comment explaining the seed omission, confirm the red AMD/NPU gates are pre-existing) with roughly comparable grounding — X stays more conservatively anchored to in-repo evidence with a tagged verification trail, while Y reaches into vendored vLLM internals with harder-to-verify but still plausible claims. Y pulls ahead on actionability with ready-to-paste code (a regression test and a YAML comment) and one genuinely new, well-supported point that the PR description understates scope.",
+  "_cost_usd": 0.18288179999999998,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16f_train_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_train_r1",
+    "arm_a_sha256": "192ba34f8bd09b38ad7b41151893eba00dcdc81c274f017b362f947995138f75",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "410634f22ac0d9a55948ec0dfc9caa6557a8995e24766ff507dbe677d6dd37dc",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}
