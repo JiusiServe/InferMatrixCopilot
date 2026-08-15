@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.8,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Neither candidate hits the two specific ground-truth points (use existing current_omni_platform.device abstraction; drop/reduce the new UT file since E2E covers it) — both actually push the opposite direction by recommending new tests be added, so recall is low for both. Both independently converge on the same core, diff-grounded findings (the !=\"cpu\" widening risking unvalidated NPU/XPU paths, missing test coverage for the new device_module branch, the FL2VA/Ref2VA doc mismatch, stale audio-determinism scope), which is a strong signal of validity for shared findings. X edges ahead with one additional, more sophisticated technical catch (fork_rng's device_type kwarg defaulting to \"cuda\" even when non-cuda devices are forked) plus evidence of actual verification (ran pytest, reported real pass counts) and more concrete code-snippet fixes, giving it a slight precision/actionability advantage over Y's otherwise comparable but slightly more descriptive review.",
+  "_cost_usd": 0.3217062,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_moa_cgm"
+  },
+  "_roles": {
+    "arm": "copilot_moa_cgm",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_moa_cgm",
+    "arm_a_sha256": "099e6250178a7191fb82b71880b0879a111d3ab5b4c3d6c39f948b75bdec2418",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "47c759a926d11580522c19149ea99a2b5e0137b0d44702c431e26d95d6161018",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both reviews independently verify flags/arithmetic against the repo and catch the same headroom-math error, but only X substantively engages the ground-truth theme: it explicitly states 'validation was FL2VA-only' and flags the Ref2VA restart as risky, which is the same underlying fact the human reviewer's 'have we tested reference to va?' question targets. Y instead asserts the recipe 'reports FL2VA/Ref2VA results,' which is inaccurate (the validation table has no Ref2VA row) — a miss on precisely the point ground truth cares about. X also shows deeper independent reasoning (per-layer HBM math, PCIe/NUMA rank derivation, sync-timeout scaling) and better-organized, prioritized actionable fixes, while Y's findings, though grounded, skew toward documentation-completeness nits with some redundancy between its RAM-related findings.",
+  "_cost_usd": 0.2646335,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_holdout3_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r2",
+    "arm_a_sha256": "7451f066941eed1f4581ec161f799670050f6330dffd7016f3150722234ff164",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0c9521d957061cba9c0df8c76435b9ce67650296c5e211578db2b474c4668332",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

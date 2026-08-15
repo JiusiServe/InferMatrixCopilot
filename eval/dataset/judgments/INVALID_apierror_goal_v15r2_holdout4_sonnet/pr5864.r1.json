@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.75,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Candidate X crashed before producing any review content (API 402 error, rc=3), so it contributes zero recall, precision, and actionability. Candidate Y delivered a substantial, diff-grounded review with precise file:line citations and concrete fixes; while most literal ground-truth inline comments target code already fixed by the time of this diff (head 07fc831e), Y independently surfaced the same thematic core issue as asukaqaq-s's architectural concern (cross-DP-replica fault coupling/asynchronous request handling difficulty) via its fault-isolation finding, plus a genuinely weak/unreachable-branch test finding echoing the human reviewer's test-quality critiques. Y's claims are well-reasoned and specific though not all independently verifiable, so precision is good but not perfect.",
+  "_cost_usd": 0.2406686,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "27df62d56650b70ba992004895addfc1aad53a1d29a94d0ae7f36120412f5c62",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5d107b26c5dd605248f4ff3bf7b26b48a886f95ed933ef7eb79692e052dcfc5a",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

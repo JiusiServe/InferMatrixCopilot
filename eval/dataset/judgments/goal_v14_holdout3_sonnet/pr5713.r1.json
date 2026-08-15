@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y directly surfaces findings that mirror the ground-truth thread: its #4 (level-2 contract dropped from merge gate to weekly-only, mock test only proves route propagation not the engine contract) matches Gaohan123's P2 concern almost exactly and proposes a concrete fix, and its #9 independently verifies and resolves the P1 question about NotImplementedError→501 mapping via the upstream handler. X investigates the same underlying facts in its 'Validated' scan section but never elevates them into reviewer-facing findings, so it misses credit for the concerns that actually mattered in the human review. Both reviews substantially overlap on other solid, well-grounded findings (num_cards=1 on a 2-device fixture, core_model/H100 marker mismatch, dropped TP=2 diffusion coverage, red AMD CI gate), keeping precision high for both, but Y adds a high-value, deeply-verified new bug (vacuous VRAM assertions from measuring the wrong process) and consistently pairs every finding with a concrete 'Change:' fix and severity ranking, giving it an edge in actionability over X's denser, more repetitive evidence-dump format (X also duplicates its top finding across two entries).",
+  "_cost_usd": 0.4375675,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_holdout3_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r1",
+    "arm_a_sha256": "c146a37499cb8117391acedbaa86950ddda736f2f9ad45e89c6d5a92a01a638d",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "71074056acda5e0ea6abca91c25a41d0367def6a8dfe0c49371d616d13890f84",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

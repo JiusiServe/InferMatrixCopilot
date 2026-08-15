@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both reviews are well-evidenced and precise, and both independently surface the same major, real bug (ARDiffusionModelRunner.execute_model not updated for the new diffusion_kv_metadata param) that isn't in the ground truth. But the ground truth's substantive human concerns are architectural: consolidate duplicate validation/exception types across layers (asukaqaq-s), and enforce DTO-local invariants on the new metadata contracts (hsliuustc0106's P1 items on the old stage_kv/interface.py). Y directly engages both threads — collapsing overlapping identity checks, and a detailed proposal to restore invariants (uniqueness, referential integrity, frozen dataclasses) on the new DiffusionKVMetadata DTOs that the old StageKV DTOs enforced — while X's findings skew toward narrower test-coverage and docstring nitpicks that don't reach that architectural substance. Neither review has a LATENT GAP CHECK section, so gap_hit is false for both.",
+  "_cost_usd": 0.38370860000000007,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_moa_cgm",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_moa_cgm",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_moa_cgm",
+    "arm_a_sha256": "5647f31985b0727780070e6789353fbac046ac9e7d36beb5a69de722bd85a1f0",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b6ae3b48c6859b0d16784163ab2044d7d85e3b3b32f4e60b559fa2a55186c64b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

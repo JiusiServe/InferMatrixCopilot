@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.75,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.8,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "The only ground-truth concern (propose a separate PR for the VoxCPM2 regression, then LGTM) is not addressed by either candidate, so recall is 0 for both — the reviewers considered this diff trivial while both candidates treat it as a load-bearing perf fix worth deep scrutiny. Both are well-grounded and cross-corroborate on the same serving_speech.py:3696-3706 propagation logic and the same #4963 perf numbers, giving reasonable confidence neither is fabricating; both flag the same two real issues (missing explanatory comment, red AMD/NPU CI gates loading this config) with concrete file/line evidence. Y edges ahead on actionability (drop-in YAML comment and pytest regression-test snippets vs. X's paraphrased suggestions) and precision (adds a corroborated, non-obvious point about the diff also unseeding vLLM's native sampler path, deepening the analysis without contradicting X).",
+  "_cost_usd": 0.17819060000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_train_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_train_r1",
+    "arm_a_sha256": "a59f37b09215840705f88c3b7e1caa0c9ed7d6147c43e28dff478444f6612cc2",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "410634f22ac0d9a55948ec0dfc9caa6557a8995e24766ff507dbe677d6dd37dc",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

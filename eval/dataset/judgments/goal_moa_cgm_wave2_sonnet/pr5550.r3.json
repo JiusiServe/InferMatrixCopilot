@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.32,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.18,
+    "precision": 0.8,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both independently caught the same strong AR-diffusion runner bug, but X better echoes the ground truth's dominant theme (validation redundancy/consolidation across layers, and missing DTO-local invariants paralleling the sibling PR's stricter contract) plus ships concrete patch-level fixes. Y is thorough and self-verified but skews toward test-coverage/docstring nits and hedged 'please confirm' asks, several ground-truth P1 items (geometry, digest binding, block-count-via-seq_len, null-block) go unaddressed by both, capping recall for each.",
+  "_cost_usd": 0.5157134000000001,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_moa_cgm"
+  },
+  "_roles": {
+    "arm": "copilot_moa_cgm",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_moa_cgm",
+    "arm_a_sha256": "5647f31985b0727780070e6789353fbac046ac9e7d36beb5a69de722bd85a1f0",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b6ae3b48c6859b0d16784163ab2044d7d85e3b3b32f4e60b559fa2a55186c64b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

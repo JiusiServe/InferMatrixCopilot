@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.88,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y engages with nearly all ground-truth concerns (platform/NPU scope, connector-state ownership, full-payload-branch unreachability, prefix-cache incompatibility, and the image-path issue) either by validating the fix or extending it with a sharper follow-on (e.g. the GitHub-vs-MkDocs relative-path break, and three additional undocumented connector-drain call sites), while X only substantively covers platform-scope and full-payload-accumulation and is silent on the image path, SVG polish, and prefix-cache items. Both sets of novel findings are well-grounded with specific file/line evidence and plausible reasoning, but Y's suggested fixes include concrete replacement text/code making it more actionable, whereas X's are more advisory in phrasing.",
+  "_cost_usd": 0.47774590000000006,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46_r3",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r3",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r3",
+    "arm_a_sha256": "f936bd2d4bab75348059ec23f3a3f5664a013d4d2b7e50cb0df10dae0ef83fbd",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

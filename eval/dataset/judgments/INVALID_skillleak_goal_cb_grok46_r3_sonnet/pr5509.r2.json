@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.7,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.75
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently surface the ground-truth's core concern (quant allow-listed for FLASHINFER_ATTN but never consumed, silently falling back to dense) with correct file/line grounding matching the diff. X adds sharper, more actionable fixes (inline code patches, e.g. the ring-SP guard and the dtype cast) but weakens its own credibility with unverifiable/likely-fabricated specifics (invented commit hashes '0cb1d75e'/'e54759c2' for the doc deletion, deep FlashInfer-internals line citations that can't be checked against the diff). Y's findings are consistently backed by verbatim quotes tied to diff line numbers plus a systematic validated-sweep section, giving it higher precision, though its prose is denser and less immediately actionable than X's concrete patches. Neither review includes a labeled LATENT GAP CHECK section, so gap_hit is false for both.",
+  "_cost_usd": 0.3160345,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok46_r3"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r3",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r3",
+    "arm_a_sha256": "86b44ba696537ca43e58a1fe97839b0fd61db21370727ec43dec32ca98d0c0f0",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "703e9ad7d9901fc59d5ad8d20917e36993f445b09d3ecaaba356dbe9c900f660",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

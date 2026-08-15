@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.7,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X engages substantively with more of the ground-truth concern areas (NPU/XPU/MUSA platform scope, connector live-state ownership, full-payload unreachability, prefix-cache note) and additionally surfaces a genuinely valuable residual bug the 'fixed' image path still has on GitHub rendering, plus a TP-collective caveat, all with precise line-level grounding and concrete suggested rewrites. Y is also well-grounded and adds one novel valid catch (thinker-only pipeline scope), but with only two findings its coverage of ground-truth concerns is thinner, and its terse evidence-dump style is less actionable than X's clear prose and suggested fixes. Neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.3846366,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok46_r3"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r3",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r3",
+    "arm_a_sha256": "f936bd2d4bab75348059ec23f3a3f5664a013d4d2b7e50cb0df10dae0ef83fbd",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

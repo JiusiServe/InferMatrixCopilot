@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Neither candidate lands an exact hit on either ground-truth comment, but X's item 5 (governance.md loses its pointer to meeting info after the Meetings section is deleted) is thematically closer to the reviewer's 'move this to a meetings page' concern, and X's item 2 explicitly notes the sig-omni fallback re-introduces a public/Slack channel as the first step of reporting, closer to the Copilot inconsistency finding than Y's parallel maintainer-identification critique. Both candidates independently and correctly flag the AWQ/quantization-overview mismatch with solid evidence, and both are well-grounded and actionable, but X's broader sweep (7 findings vs Y's 2) covers more adjacent ground without fabricating anything, giving it a slight edge.",
+  "_cost_usd": 0.2022291,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_holdout3_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r1",
+    "arm_a_sha256": "55fb441b21f327813ade4fffc55928751d40ad1be7617ff25dbb11c450280ddb",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "672f8c68e1537f224e50a351c7f7828e2aa50a1d0b3a12720e3060da70662fd9",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

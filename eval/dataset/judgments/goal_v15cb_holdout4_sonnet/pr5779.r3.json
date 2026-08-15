@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.8,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both engage with the two headline ground-truth threads (AllGather-KV rank-local Q vs global cu_seqlens, and the exact-aligned packed-length case that can silently disable SAGE) and both independently flag the same real gap the ground truth also cares about — no end-to-end test exercising the timestep/sigma wiring. X goes further: it produces three well-reasoned, verified 'Required' bugs (all-False mask launching a zero-token kernel with SAGE still 'on', unvalidated max_seqlen_q/k, and a documented anti-pattern of per-call device syncs) with concrete repro traces and drop-in fixes, and its AllGather-KV critique targets the exact same code the human P1 comment concerns. Y is a thorough, well-grounded verification pass (heavy grep-cited evidence, no fabrication) but almost everything is tagged '[resolved]'/'[minor]', landing mostly as test-coverage or doc-wording suggestions rather than substantive new findings, which caps its actionability. Neither surfaces the 'non-negative threshold contract' or DCO-identity fix mentioned in the ground-truth follow-up.",
+  "_cost_usd": 0.49671250000000006,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15cb_holdout4_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v15cb_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15cb_holdout4_r1",
+    "arm_a_sha256": "ce352b3293900aa0f6cb0a92f360902cbfa5e1eb01dd5e86a46a2510d9c94a57",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "283d5ab54325426c21ff03640adaaf73eb89e801040f4baf619381200e657fb0",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

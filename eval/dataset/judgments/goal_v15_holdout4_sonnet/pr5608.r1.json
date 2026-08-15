@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.88,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Neither candidate directly echoes the ground-truth threads (request for a 3-way perf comparison; suggestion to extract into a shared util), but Y explicitly surfaces and validates both — noting the extraction commit (504fa8cb) and cross-checking the author's benchmark arithmetic — while X ignores this history entirely and focuses only on new engineering critique. Both independently found the same strong, diff-grounded major issue (sibling BNSD call sites in qwen3_code_predictor.py and the 310P patch left un-migrated) and the same test-coverage gap (fallback test only trips the alignment guard, not the B*N bound), with comparable actionability via specific file/line pointers and concrete fix suggestions. Y's evidence is marginally more rigorous (repo-wide grep confirmations, verbatim code citations, deploy-config cross-checks tying the crash threshold to the reported concurrency ramp), giving it a slight edge in grounding and recall.",
+  "_cost_usd": 0.358732,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15_holdout4_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r1",
+    "arm_a_sha256": "cccd15fae16dbe783a04136950ad460c0be927e9cc18a63827eee75f172e5db8",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "400e2cdee23e452f67bea91295a8fd9f971ab290f37c9a61d27bec6c625cf76a",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

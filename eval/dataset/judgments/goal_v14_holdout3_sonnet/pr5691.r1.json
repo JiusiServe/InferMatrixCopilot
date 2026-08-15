@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.42,
+    "precision": 0.82,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.13,
+    "precision": 0.78,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X independently rediscovers two of the ground truth's blocking issues almost exactly (the --text-encoder-tp-size GroupCoordinator crash and Ring attention silently ignoring packed padding boundaries, both matching hsliuustc0106's inline comments) plus a close match on the encoder weight-loading gap and upload-limit issue, giving it real recall against the human reviewers. Y is meticulously evidenced and finds plausible new bugs (FA4 dead branch, max_seqlen_q document-max bug), but almost none of its findings overlap with what the actual reviewers flagged — it only tangentially brushes the text-encoder-tp-size area via a test-coverage note without identifying the crash itself. Precision and actionability are comparably strong for both (specific file/line citations and concrete fixes), so the recall gap decides it.",
+  "_cost_usd": 0.32816510000000004,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_holdout3_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r1",
+    "arm_a_sha256": "26d47af1b90e02969b6d8ec86e197920594d0a991efd75ca1b80c3340dfe2f88",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "c373c75c65a506fb368faf2717d73d36a35ca93216c0c727d7c4e3100440e9f3",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.82,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "The ground truth's only substantive concerns are Gaohan123's P1 (does the live 501/message mapping for level-2 wake really hold, or does it contradict the PR's own '500' framing) and P2 (the CPU mock test only proves route propagation, not the real engine contract) — both later resolved via yenuo26's explanation of an upstream NotImplementedError→501 handler and an agreed rename. Y independently re-derives and confirms exactly that resolution (citing vLLM's app.exception_handler(NotImplementedError) and create_error_response mapping) and separately flags, almost verbatim, that the mocked test 'tests route propagation, not the engine contract' and proposes a stubbed-orchestrator unit test — matching the human thread closely. X only loosely brushes P1 (confirms the 501 mapping as an already-verified fact, without engaging the PR-description contradiction) and never raises P2 at all. Both candidates independently converge on several of the same non-ground-truth bugs (vacuous VRAM assertions, exception-swallowing _ensure_awake, AMD CI redness), cross-validating precision for both at a similar level; Y's findings are slightly more actionable, with explicit 'Change:' code-level fixes and verified command output (pytest --collect-only, local 16-passed run).",
+  "_cost_usd": 0.4015057,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_holdout3_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r2",
+    "arm_a_sha256": "63b877bcac823f581c771d021067b2b576d32d7cc4c7dd02aefc0a18eeb579cb",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "71074056acda5e0ea6abca91c25a41d0367def6a8dfe0c49371d616d13890f84",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

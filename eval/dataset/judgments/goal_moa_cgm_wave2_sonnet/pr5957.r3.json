@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth centers on: benchmark-harness architecture (dedicated script vs registry entry), missing profiling/VRAM/native-baseline evidence, WebSocket-vs-HTTP native-speed asymmetry, talker raising bypassing adapter validation for library callers, and duplicated/mismatched [0.5,2.0] duration_factor bounds across talker/s2mel/adapter. Neither candidate substantively hits these — X touches the same indextts2_talker.py:566-569 duration_factor line but flags a wording nit rather than the validation-bypass/bound-mismatch issues GT raises there; Y explicitly 'validates' the native-speed path as fine, missing the WebSocket gap entirely, and neither mentions benchmarks or VRAM evidence. Both reviews are otherwise well-grounded, specific (file:line, quoted code/grep evidence), and actionable, with independent cross-corroboration on scope-creep items (qwen2.5-omni XPU eager flip, _TokenOnlyRenderer, red AMD CI) lending confidence neither is fabricating. X edges ahead on recall via that partial overlap and offers a more complete PR-review structure (severity tiers, verdict, scope section, what's-good) versus Y's denser tool-report format.",
+  "_cost_usd": 0.3879952,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_moa_cgm"
+  },
+  "_roles": {
+    "arm": "copilot_moa_cgm",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_moa_cgm",
+    "arm_a_sha256": "1c352ff48c58e5fd4a2d16c00ec5550796a1868d462d67786646aad6fd56c95a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

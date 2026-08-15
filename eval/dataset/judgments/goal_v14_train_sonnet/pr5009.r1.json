@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.65,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both nail the PR's core still-live issue (unconditional vllm_c default validated only on Qwen-Image now leaking to ~10+ untested diffusion models, and that Part 2's nn.RMSNorm swap makes Part 1 a no-op for Qwen itself) with near-identical evidence, and both independently flag the ROCm/XPU sibling gap and the module-scope test import risk. Y edges ahead on precision: it grounds essentially every claim in file:line/grep citations, explicitly re-validates the pytest-mark and 'UT added' threads that match the ground-truth comment history almost exactly, and catches a genuine, independently-verifiable arithmetic error in the PR's own FLUX benchmark table. X's 'What I verified' section includes suspiciously over-specific runtime claims (exact tensor strides, GPU test pass counts) with no supporting trace, which is a fabrication risk that Y avoids by hedging honestly where it can't verify (e.g., the AMD-CI claim).",
+  "_cost_usd": 0.2951766,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_train_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v14_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_train_r1",
+    "arm_a_sha256": "8d2a3014f1936fe3b8735c8532e1400d8f71702976406455eed6d9681974c54f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "97e45909dc2469db55da15b6e8d6a525549029c219aefca76123ec8b801fd1bf",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

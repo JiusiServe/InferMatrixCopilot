@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.78,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.8,
+    "actionability": 0.87
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates correctly validate that the partition-specific enabler fix works and both independently rediscover the still-live core issue (rel_l1_thresh=0.2 default overriding the advertised 0.17 in normal serving), matching ground-truth concern #2 with strong, specific evidence chains; neither explicitly revisits the already-fixed offline-example or packed_total/attn_backend inline issues, which is reasonable since those are resolved in the shown diff. X adds a plausible extra major finding (Cache-DiT/TeaCache stacking via quality_policy.py) that Y misses entirely, but Y's root-cause quantitative analysis of the calibration polynomial (near-constant, non-monotone, tied directly to the PR's own reported quality-loss metrics) is deeper and more directly extends the ground truth's core complaint, plus Y adds concrete, well-evidenced memory-footprint and test-rigor findings. Both are highly actionable with file/line specificity and grounded evidence.",
+  "_cost_usd": 0.4387124,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_moa_cgm",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_moa_cgm",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_moa_cgm",
+    "arm_a_sha256": "28a5a4af2f1b37250cdecf507f4fc07a6638c6a52cf8125000e6a93e5dd58746",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

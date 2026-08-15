@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.75,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.7,
+    "precision": 0.75,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both independently rediscover the still-live GT concern (rel_l1_thresh=0.2 hardcoded in the engine defeats the new 0.17 model default) with strong grounding, and both echo the reviewer's closing point that the E2E smoke test never proves a cache hit occurred. X packages findings into a cleaner severity-tiered structure with explicit 'Change:' directives and a dedicated 'verified correct' section that builds trust and improves actionability. Y surfaces one genuinely valuable novel finding (TeaCache/Cache-DiT 'mutually exclusive' claim not actually enforced by quality_policy.py) but buries most recommendations inside dense evidence-quote paragraphs that are harder to act on directly, slightly hurting actionability and readability despite comparable technical depth.",
+  "_cost_usd": 0.37139869999999997,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok46_r2"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r2",
+    "arm_a_sha256": "33267e3b19d297d6800e80bc5d184a327dcaaa3a421b3f8b9b7c2b53d3d76cda",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

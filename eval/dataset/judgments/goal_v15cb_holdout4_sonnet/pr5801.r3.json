@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.75,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Ground truth is thin (a rebase/merge-conflict request, a blocked-by-#5703 status note, and one substantive inline comment about the new H3 rope test using untiled freqs vs. the tiled cos/sin layout the fused path assumes — already fixed in the shown diff). Neither candidate flags the merge conflict, but Y independently surfaces the exact same underlying mechanism the human reviewer caught (rope.py:124-127 'halving assumption is silent... feed a non-duplicated 96-wide freqs and the output diverges by 10.97 with no error'), while X's findings never touch this. X's list is grounded but mostly repetitive 'add a test for path X' suggestions with modest individual value. Y additionally catches a serious, independently-verifiable regression (norm.py's new `dtype: torch.dtype = torch.float32` default silently pins RMSNorm weights to fp32 for every non-H3 model instead of following ambient `set_default_torch_dtype`, breaking the fused kernel dispatch) with sound diff-level reasoning, plus a sharp catch that `half_head_dim=False` is a no-op on CUDA/HIP since `_prepare_half_head_dim_cos_sin` slices it back to half anyway — both well-grounded and highly actionable with concrete patches. Y's actionability and precision are higher due to concrete code fixes and deeper, verifiable reasoning versus X's more surface-level, less consequential nitpicks.",
+  "_cost_usd": 0.16433470000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15cb_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15cb_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15cb_holdout4_r1",
+    "arm_a_sha256": "90232f947a07c4fa9845de1f2e9270c35e3f25d5b5fd63e58097685c621e8cb1",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0ac7a88b887a97acc40e7614e44e3692d3e06a3bd75c8cab12c4dc831b63d48b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

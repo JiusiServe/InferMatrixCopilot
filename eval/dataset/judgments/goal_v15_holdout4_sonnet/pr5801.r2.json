@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.78,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.72,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth here is dominated by procedural/external items (merge-conflict rebase, readiness blocked on an unrelated NPU issue #5703) and a test bug that the diff shown already fixes, so neither candidate scores high on literal recall; both instead converge on the same underlying half-dim tiling invariant the human flagged. Y's standout catch is that norm.py's new `dtype: torch.dtype = torch.float32` default silently breaks every other model relying on the old ambient-dtype behavior via `torch.get_default_dtype()` — a genuinely critical, diff-grounded regression X misses entirely (X only validates the PR's own H3-scoped claim). X is more conservative and evidence-cited (greps, test citations) but pads its report with redundant PR-description percentage arithmetic that isn't about the code. Y's fixes are more directly actionable (inline proposed diffs) but its many precise microbenchmark numbers (µs timings, error deltas) read as unverifiable and possibly fabricated, which tempers its precision edge.",
+  "_cost_usd": 0.482567,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r1",
+    "arm_a_sha256": "14209938fd60c0169c5712e756f9e6ede813a74a3c65359cfee29fcf410fef26",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0ac7a88b887a97acc40e7614e44e3692d3e06a3bd75c8cab12c4dc831b63d48b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

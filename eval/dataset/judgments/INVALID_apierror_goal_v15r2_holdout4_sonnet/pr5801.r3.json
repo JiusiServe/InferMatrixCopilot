@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.7,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "X's review step crashed on an API billing error and produced zero review content, so every dimension scores at floor. Y delivered a deep, diff-grounded review — the norm.py fp32-default regression finding is well-reasoned and correctly derived from the diff, and several other findings (forward_npu batch-dim handling, half_head_dim reasoning) cite specific lines with concrete fixes — but the ground truth here is mostly process chatter (merge conflicts, readiness) plus a test bug already fixed in this diff snapshot, so little of Y's content actually overlaps with recoverable ground-truth concerns, and several suspiciously precise benchmark numbers look potentially fabricated, capping precision below full credit.",
+  "_cost_usd": 0.24358950000000001,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "8bc512c07308cadac206bb4e7fd540ffa23b9d921a1d91612c4dbe399e7387e7",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0ac7a88b887a97acc40e7614e44e3692d3e06a3bd75c8cab12c4dc831b63d48b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

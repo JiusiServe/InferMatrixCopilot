@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X surfaces a genuine subtle behavior-change bug (stable_since update-before-check reordering) and directly proposes __post_init__ invariant validation on _AdmissionWaitDecision plus flags the should_end_admission_wait base-class footgun — both closely mirroring hsliuustc0106's still-unresolved invariant-validation ask. Y is thorough and well-grounded (strong verification of the already-fixed finiteness/CLI/TTS paths) but its live findings are mostly minor test-coverage nitpicks and an unresolved CI-failure pointer, missing the deeper design/behavior issues X catches. Both are well-grounded with concrete file:line evidence (comparable precision), but X's findings are more novel, higher-value, and more concretely actionable.",
+  "_cost_usd": 0.44889560000000006,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_holdout3_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r1",
+    "arm_a_sha256": "7e3034c408c58b745e401401ea9ce312a578813c392393956c6ce5b7b554781c",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4ed51148204a106ed35fa7e1ae403167cdcd488aeedb89802a531a52e6684609",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

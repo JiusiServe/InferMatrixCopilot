@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.85,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.88,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both miss all four concrete, reproduced bugs the human reviewer pinpointed (max_num_seqs default crash, dropped revision/seed/download_dir fields, model_subdir/tokenizer_subdir fallback loss, omni_kv_config precedence flip), so recall is low for both. Y engages more substantively with the reviewer's top-level architectural worry (wrong owner sets, parity tests blind to drift) via its own well-reproduced findings — ownership validation rejecting ~226 legitimate args, a scheduler_cls divergence swept across 51 pipelines, and a demonstrated parity-test blind spot — backed by actually running the suite and tracing call sites. X is comparably well-grounded and cites precise evidence, but its findings are narrower/more scattered across many minor claim-verified bullets and connect less directly to what the human reviewer actually flagged.",
+  "_cost_usd": 0.5204072,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_holdout3_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r2",
+    "arm_a_sha256": "4f56627b6d958f69b671aefaf413e8df520e3e3feffea4aa79970860c060c8dd",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "629955d5b6f052975d79f02bc72365b49e78d8babba831bce0e73b172ff802a7",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.7,
+    "actionability": 0.88
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "The one substantive ground-truth inline concern (the RoPE test's dependence on a duplicated-half freq layout, already fixed in this diff snapshot) is echoed by both candidates via the shared rope.py duplicate-half-invariant finding, so recall is close and modest for both since GT is otherwise mostly process chatter (merge conflicts, readiness) that X alone investigated. X's findings are uniformly backed by explicit evidence citations (grep/CI/commit-diff tool output), making them easy to verify and low-fabrication-risk, whereas Y's review — while containing one genuinely valuable, correctly-triaged blocking finding (the RMSNorm default-dtype regression breaking other models) — leans on highly specific unverifiable GPU benchmark numbers presented with no shown provenance, raising real fabrication risk. Y's clearer blocking/perf/correctness triage and ready-to-apply fixes edge out X on actionability, but X's broader, better-grounded coverage narrowly wins overall.",
+  "_cost_usd": 0.34949680000000005,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r1",
+    "arm_a_sha256": "14209938fd60c0169c5712e756f9e6ede813a74a3c65359cfee29fcf410fef26",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0ac7a88b887a97acc40e7614e44e3692d3e06a3bd75c8cab12c4dc831b63d48b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

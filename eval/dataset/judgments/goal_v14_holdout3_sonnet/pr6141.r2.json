@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.12,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Neither candidate hits either ground-truth comment squarely, but Y's finding on governance.md losing its 'Meetings' pointer echoes hsliuustc0106's concern about preserving meeting info, and Y's contact_us.md critique at least engages the same public-vs-private tension the Copilot comment flags, whereas X's parallel finding only complains about missing Slack handles. Both candidates' own findings (AWQ/quantization mismatch, security-route gaps) are well-grounded and actionable with concrete file/line evidence, giving comparable precision and actionability, but Y's broader, better-structured coverage (nav.yml maintenance trap, issue-template gap, cadence loss) gives it the edge on recall.",
+  "_cost_usd": 0.3229143,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_holdout3_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r1",
+    "arm_a_sha256": "55fb441b21f327813ade4fffc55928751d40ad1be7617ff25dbb11c450280ddb",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "672f8c68e1537f224e50a351c7f7828e2aa50a1d0b3a12720e3060da70662fd9",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

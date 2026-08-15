@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.6,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.7,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both independently rediscovered the ground truth's most important surviving concern — the 0.17 model-specific default never reaching serving because the engine injects 0.2 first — with strong file:line grounding; neither surfaced the already-fixed partition/example issues or the merge-conflict-only inline bugs (packed_total, attn_backend), so recall is roughly tied. Y's findings stay tightly scoped to files the diff actually touches and are backed by concrete verification (executing the config resolution path, evaluating the calibration polynomial), whereas X's top 'major' finding reaches into quality_policy.py/pipeline_minimax_h3.py/runtime.py entirely outside the diff, which weakens precision despite a legitimate doc-vs-code tie-in. Y's prose is also more directly actionable than X's dense evidence-dump format.",
+  "_cost_usd": 0.1770134,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r2",
+    "arm_a_sha256": "33267e3b19d297d6800e80bc5d184a327dcaaa3a421b3f8b9b7c2b53d3d76cda",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

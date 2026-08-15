@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.9,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.9,
+    "actionability": 0.95
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Ground truth is sparse (two 'do not change this' reverts on musa.inc.md/quickstart.md and a PTAL/LGTM exchange on npu.inc.md:56, right where the diff swaps vLLM-Ascend to a v0.26.0rc branch). Both candidates independently flag that exact RC/stable pin mismatch, but Y goes further: it verifies musa.inc.md and quickstart.md are byte-identical to merge-base (confirming the revert) and then proactively surfaces that the new global 'vLLM 0.26.x requires vLLM 0.26.x' note contradicts MUSA's actual v0.18.0-dev pin — recovering the substance of the 'do not change this' concern even though those files aren't in the diff. Y's other findings (docs-site page missing for full-duplex, version-pinned config URL against repo convention, cd-anchor ambiguity) are all evidence-backed with file:line and concrete suggested text, giving higher recall and actionability at comparable precision to X's shorter two-finding review.",
+  "_cost_usd": 0.163204,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r2",
+    "arm_a_sha256": "d41956668af47318044d161972ca18ded622fac2d38cb66aaa0ad9949d6f9356",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5866809cd7926f6bee88b473acf165652378865539411405c15a7c86c14e7466",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

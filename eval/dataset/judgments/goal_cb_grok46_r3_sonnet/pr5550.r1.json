@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.78
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.88,
+    "actionability": 0.87
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth centers on architectural themes (scope-boundary clarity, too many duplicate validation/exception layers across Executor/Runner, and new metadata DTOs lacking invariants like digest binding, block-count checks, null-block rejection) that the given diff's earlier stage_kv incarnation exposed. Y directly hits the duplication-consolidation theme (#7) and the missing-DTO-invariants theme (#2, #3 on seq_len semantics) plus independently finds a real runtime-breaking bug (ARDiffusionModelRunner signature mismatch) also found by X. X's review, while exhaustively evidenced with exact line quotes, is almost entirely test-coverage-gap and narrow-edge-case findings that don't track what human reviewers actually flagged, so its recall against ground-truth themes is much lower despite comparable grounding. Both reviews are well-cited and concrete, but Y's structured Required/Should-fix/Minor format with fix snippets edges out X's dense evidence-dump paragraphs on actionability. Neither has a labeled latent-gap-check section.",
+  "_cost_usd": 0.5257636,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46_r3",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r3",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r3",
+    "arm_a_sha256": "586e51a03627e9b9964cc53c4cfd73eda239b6c007e32d32cc822a756abe9f0a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b6ae3b48c6859b0d16784163ab2044d7d85e3b3b32f4e60b559fa2a55186c64b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

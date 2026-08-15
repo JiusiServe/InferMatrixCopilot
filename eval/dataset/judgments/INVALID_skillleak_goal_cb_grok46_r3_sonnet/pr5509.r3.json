@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.7,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently converge on the one clearly-findable ground-truth issue (FLASHINFER_ATTN allow-listed for `quant` but never consumed, silently falling back to dense) and even echo bobboli's exact recommended fix. Y goes further: it explicitly ties into the already-resolved concern (unconditional SAGE kwargs breaking older FlashInfer builds) by naming the fixing commit and requesting a regression test, and it verifies multiple claims (dtype_vo no-op, FLASHINFER_ATTN drop) by actually executing the code rather than just quoting line references, which raises confidence the findings are grounded rather than fabricated. X's report is also well-evidenced but padded with more speculative/tangential items (CI marker deselection, dependency pinning) and has visible truncation artifacts, slightly diluting precision. Y's blocking/should-fix/nit triage and inline code-patch suggestions also make it marginally more actionable.",
+  "_cost_usd": 0.41239620000000005,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46_r3",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r3",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r3",
+    "arm_a_sha256": "86b44ba696537ca43e58a1fe97839b0fd61db21370727ec43dec32ca98d0c0f0",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "703e9ad7d9901fc59d5ad8d20917e36993f445b09d3ecaaba356dbe9c900f660",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

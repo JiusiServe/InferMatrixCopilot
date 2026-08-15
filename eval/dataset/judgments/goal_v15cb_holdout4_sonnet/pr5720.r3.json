@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.75,
+    "actionability": 0.7
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates largely miss the specific ground-truth items (Cache-DiT dual-DiT refresh, modular-alias metadata, Ref2VA task-default regression, and SamitHuang's four code-quality nits), so recall is low and roughly tied; most GT P1s appear already fixed in this diff snapshot per the 'Fixed in <sha>' replies. X compensates with a tighter, triaged review (Blocking/Should-fix/Worth-considering), reproduction output for its top claims, and a concrete, easily-verified doc regression (orphaned MODEL_ROOT reference). Y's findings are similarly grounded but the report is padded with many near-duplicate 'claim-verified' bullets and flattens everything to '[minor]', which hurts actionability and reads as automated-dump noise rather than prioritized guidance.",
+  "_cost_usd": 0.5895476000000001,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15cb_holdout4_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v15cb_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15cb_holdout4_r1",
+    "arm_a_sha256": "1e81c1cd28694d3d33d3cc296646f80d2b8a75bfe6edb659921e285ae845db9e",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "7d155ed781e729cb9d3a1c8ef3851789595fa7fa0c9c18281fbbf0c3a461d7e5",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

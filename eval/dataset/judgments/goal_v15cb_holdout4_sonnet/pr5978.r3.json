@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.8,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y independently surfaces the T2VA coverage-regression thread that dominates the human comments (three separate validation updates about the tightened/failing T2VA gate), credits the workdir-arg removal explicitly, and its frame-count-mismatch finding echoes the ground-truth 'test tests itself' critique — hitting more of what reviewers actually cared about. X is equally well-grounded and more rigorously validates the rank-0/hang fix precisely (matching the most severe inline comment) but otherwise misses the weak-test and dead-arg threads and treats the T2VA deletion as a neutral fact rather than a flagged concern. Both are highly actionable with concrete file:line evidence; Y's numbered fixes include runnable code snippets, giving it a slight actionability edge, while X's tighter evidentiary style gives it a precision edge that doesn't fully offset its lower recall.",
+  "_cost_usd": 0.2805655,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15cb_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15cb_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15cb_holdout4_r1",
+    "arm_a_sha256": "183106034cb7f1a50d92938529971903d49ee0c22020411e7d3b2bc275049329",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4847f9bc7acb40b4a7467503f4eb812a8e50f5fe424e5df5f56f1ab2a3da3ee3",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

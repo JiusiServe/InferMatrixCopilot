@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.6,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth is thin and discussion-based (trigger-scope resolution, functional-vs-perf redundancy question, trigger-frequency rationale), so neither candidate scores well on recall; Y's duplication-with-online-test point and NPU-gating finding brush against the GT themes slightly more than X. Both candidates share one major false claim — flagging the CUDA source_file_dependencies omission of run_benchmark.py/conftest.py as a bug — which the GT thread shows was an intentional, already-resolved exclusion, hurting precision for both, but it anchors X's entire verdict while it's just one of eleven well-grounded, independently-verified items in Y's review (missing artifact upload, unused --assert-baseline, mismatched baseline sweep points, ungated NPU step, etc.). Y is also more concretely actionable, citing exact nightly-pattern snippets to copy.",
+  "_cost_usd": 0.2970656,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_holdout3_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r1",
+    "arm_a_sha256": "239bab4d52baa190cede1ba77263d22ea54b565779f0a2900752934e7211dfc1",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "531e9b74603b37dafe7d3f1011779f043bc357b8d13b9e18c955eaf7ef9f3267",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

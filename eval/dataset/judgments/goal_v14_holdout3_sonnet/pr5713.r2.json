@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.8,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.88,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently caught several real, overlapping issues (num_cards=1/2-device fixture mismatch, core_model/H100 marker collision, dropped TP=2 diffusion coverage, unrelated red AMD check), giving each solid grounded precision. But the ground-truth reviewer concerns center on whether the level-2 wake/501 contract is genuinely tested versus just mock-authored/mismatched — X only 'validates' this as already-fine in a non-actionable bullet and never raises the coverage-gap theme, while Y explicitly verifies the 501 mapping end-to-end and raises a well-reasoned blocking finding that the real engine-level #4473 regression test was dropped to weekly-only, directly engaging the same underlying worry as the human P1/P2 comments. Y also surfaces a high-value, well-evidenced bug X entirely misses (the merged diffusion test's VRAM assertions are vacuous because they measure the wrong process), and its remediation steps are more concrete. X's review is solid but has a redundant duplicate finding (items 1/2) and stays more surface-level on the core contract-testing question.",
+  "_cost_usd": 0.4139135,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_holdout3_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r1",
+    "arm_a_sha256": "c146a37499cb8117391acedbaa86950ddda736f2f9ad45e89c6d5a92a01a638d",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "71074056acda5e0ea6abca91c25a41d0367def6a8dfe0c49371d616d13890f84",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

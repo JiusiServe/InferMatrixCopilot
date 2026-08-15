@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.92,
+    "actionability": 0.95
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns (bot spam + 'thanks'), so recall is vacuous for both. Both candidates independently find the same core defect (unmarked test file silently deselected by CI's marker-based selection) and both catch that warmup_quack_fp8() bypasses the new gate — but X correctly rates the warmup bypass as a hard blocker (it can raise an uncaught OpError on the exact GPUs the PR claims to protect) while Y buries it as a 'nit', a real severity miscalibration. X also adds two higher-value, well-reasoned findings absent from Y (a sticky-disable/circuit-breaker design fix for the per-GEMM retry amplifier, and a plausible warning_once dedup-by-exception-object defect), each with concrete code diffs. Y's extra volume is mostly lower-value padding (asking to mark PR-body benchmark numbers as 'vendor-provided', a missing sm_101 test permutation) and some redundancy (sm_110a exclusion raised twice), diluting its signal-to-noise versus X's tighter, more decisively actionable review.",
+  "_cost_usd": 0.2666626,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_train_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v14_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_train_r1",
+    "arm_a_sha256": "3a3e37c19f895a78fb6ab1381598815331923c73915164a2ea35b615239e3772",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "de884ebeca54520b85a490b897397bd22bf362507bf9f7d4a833d74b390ae063",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

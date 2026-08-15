@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently verify code/doc claims and land the GGUF nav-removal finding (matching two ground-truth comments) with strong evidence. Y additionally surfaces the design/index.md 'Attention optimization' heading problem (echoing the reviewer's 'do we have other attention backend?' question) and explicitly notes the BitsAndBytes remove/restore history via commit archaeology, directly addressing the ground-truth comment X never mentions. X's four findings are well-grounded but narrower in coverage of the human reviewer's actual concerns. Neither candidate addresses the quant-alignment (line 228) or 'diffusion only' (README:43) comments, and neither has a LATENT GAP CHECK section.",
+  "_cost_usd": 0.3343135,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_holdout3_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r2",
+    "arm_a_sha256": "9cd0c4d9cf5e19af82f988c41a4d1d15a8d5910edbc226b10a3bb8a37124d037",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "547e7dae328bb016f40e52ff9f47201f77c529d80a351e2defe03ab5d3f2b6e1",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.78,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.65,
+    "actionability": 0.72,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Y explicitly cross-references its findings against git history and lands on several exact ground-truth items (RuixiangMa missing from diffusion/models, offloader Isotr0py/david6666666 mismatch, LoRA narrowing contradiction, and resolution-tracking that matches the hsliuustc0106 worker/IO-engine/benchmark comments almost 1:1), giving it materially higher recall. X is more polished and rigorous (simulated last-match-wins, verified path existence, checked owner handles against git history) with fewer questionable claims, giving it an edge in precision and actionability, but it surfaces fewer of the specific concerns the human/Copilot reviewers actually raised. Both wrongly recommend reverting some intentional maintainer-approved narrowings (lora, plugins, model_extras), and Y's twice-repeated 'required_reviewers' field and garbled truncated 'additional observations' add some fabrication/completeness risk that slightly hurts its precision and actionability relative to X.",
+  "_cost_usd": 0.2738172,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15cb_holdout4_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v15cb_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15cb_holdout4_r1",
+    "arm_a_sha256": "657f89dbb48d35032b56839929ad73a016ec3f192340632d4a6dc99d38734da9",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a618d8fdfdd2a7671220fc3626c167412f101811b64319de0c1c201facd71448",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.7,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.75,
+    "actionability": 0.65
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X engages far more deeply with the actual code (specific file:line citations for guard logic, connector drain call sites, TP broadcast behavior) and surfaces a genuine residual issue — the 'sole consumer' connector-ownership claim is still overstated even after the documented fix — directly extending ground-truth concern #3. Y's review is mostly a shallow checklist ('rechecked at 50126edf and are fixed') with only two new findings, one of which (benchmark provenance) is a low-value nitpick; it does catch the dependency-conflict issue that X misses, but with far less evidence and actionable detail. Neither includes a labeled 'LATENT GAP CHECK' section.",
+  "_cost_usd": 0.4138679,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok46_r2"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r2",
+    "arm_a_sha256": "013be1ce97f44027f2876cd62e4bf6c267a8b7d4d5680b750ed34a20275260af",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

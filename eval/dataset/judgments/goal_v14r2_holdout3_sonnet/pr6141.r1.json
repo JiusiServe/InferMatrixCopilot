@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates independently found the same solid but non-ground-truth issue (AWQ FAQ pointing to a page with no AWQ content) and a related-but-not-identical version of the contact_us.md Slack-actionability concern; neither caught the Copilot reviewer's precise 'don't report via Slack but then suggests sig-omni Slack' contradiction. X additionally flagged the loss of meeting-cadence info from governance.md and proposed restoring a pointer/cadence line in both governance.md and meetings.md, which substantially overlaps with the human reviewer's 'move this part to meetings.md' concern — giving X real (partial) credit on that ground-truth item that Y entirely misses. X's findings are broader (7 substantive items vs Y's 3) and equally well-grounded with specific file/line evidence, and its fixes are more concrete (proposed exact rewordings, YAML snippets, nav ordering fix), edging out Y on actionability while precision is comparable for both.",
+  "_cost_usd": 0.18536850000000002,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_holdout3_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r2",
+    "arm_a_sha256": "41dd7b84973ca142dbe441910089c8671fced6ac9897fb77505f18ad4bd3f4c9",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "672f8c68e1537f224e50a351c7f7828e2aa50a1d0b3a12720e3060da70662fd9",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

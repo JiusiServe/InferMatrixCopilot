@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.82,
+    "actionability": 0.88
+  },
+  "y": {
+    "recall": 0.62,
+    "precision": 0.87,
+    "actionability": 0.82
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Most ground-truth human comments were already resolved by the shown head commit, and Y explicitly cross-checks against PR/commit history, confirming or refuting nearly every one of them (Gaohan123→worker, alex-jw-brooks→IO overrides, Bounty-hunter→benchmarks, offloader Isotr0py mismatch, lora narrowing, RuixiangMa gap), giving it much higher recall than X, which treats the diff as a flat regeneration task and only independently rediscovers a subset (RuixiangMa, lora, offloader, plugins/model_extras). Both reviews are well-grounded with specific file/line evidence and concrete fixes, but Y's evidence-tagged validate/refute framework gives slightly stronger precision confidence, while X's prose is marginally more scannable/actionable for a human reviewer.",
+  "_cost_usd": 0.43645849999999997,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15cb_holdout4_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v15cb_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15cb_holdout4_r1",
+    "arm_a_sha256": "657f89dbb48d35032b56839929ad73a016ec3f192340632d4a6dc99d38734da9",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a618d8fdfdd2a7671220fc3626c167412f101811b64319de0c1c201facd71448",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "calls": 17,
+  "input_tokens": 706342,
+  "output_tokens": 18396,
+  "cost_usd": 2.6867059999999996,
+  "is_error": false,
+  "terminal_reason": "completed",
+  "split": "train",
+  "head": "35aa741e1962ba8210b75f0028e048fbaf2cc59a",
+  "base": "5c51782c6bec3c7976c528e5899e89452278c448",
+  "resolved_model": "claude-fable-5",
+  "snapshot_sha256": "68c5b42b331ff9521941eb37d117f40d72291ba257d16c732c437341ac0b2940",
+  "validation_commands": [
+    "git diff --stat 5c51782c6bec3c7976c528e5899e89452278c448 HEAD",
+    "git diff 5c51782c6bec3c7976c528e5899e89452278c448 HEAD",
+    "pip show kernels 2>/dev/null | head -3; python -c \"import kernels, inspect; print(inspect.signature(kernels.get_kernel))\" 2>&1",
+    "python -c \"import kernels, inspect; print(kernels.__version__); print(inspect.signature(kernels.get_kernel))\" 2>&1",
+    "python - <<'EOF'\nimport inspect, kernels\nfrom kernels import utils\nsrc = inspect.getsource(kernels.get_kernel)\nprint(src)\nEOF",
+    "python -c \"\nimport inspect, kernels\nprint(inspect.getsource(kernels.get_kernel))\n\"",
+    "python -c \"\nimport inspect\nfrom kernels.utils import select_revision_or_version\nprint(inspect.getsource(select_revision_or_version))\n\"",
+    "python -c \"\nimport inspect\nfrom kernels.utils import resolve_version_spec_as_ref, _import_from_path\nprint(inspect.getsource(resolve_version_spec_as_ref))\nprint('----')\nprint(inspect.getsource(_import_from_path))\n\" 2>&1 | head -60",
+    "python -c \"\nimport inspect, kernels.utils as u\nimport kernels._versions as v\nprint(inspect.getsource(v))\n\" 2>&1 | head -80"
+  ],
+  "ran_validation": true,
+  "claude_md_seen": {
+    "/data/zhoutaichang/CLAUDE.md": "27ca8ea8056c231e"
+  },
+  "recorded_at": "2026-08-15T01:22:51",
+  "arm": "baseline_opus5",
+  "wall_s": 265.6,
+  "audit_ok": true,
+  "audit_violations": [],
+  "audit_blocked_attempts": [],
+  "artifact_chars": 7252
+}

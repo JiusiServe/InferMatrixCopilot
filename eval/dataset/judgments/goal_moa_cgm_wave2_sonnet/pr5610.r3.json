@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.8,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.82,
+    "actionability": 0.8
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both reviews are unusually thorough, cross-verifying nearly all the doc's technical claims (NPU/XPU/MUSA scope, prefix-cache incompatibility, full-payload-branch unreachability, guard table) against the code and correctly finding the diff already addresses most GT concerns. X edges ahead on recall by directly re-interrogating the single most substantive GT concern (connector-output ownership/snapshotting) and surfacing a plausible residual gap in the 'sole consumer' claim, plus a well-reasoned image-path/GitHub-rendering issue with a concrete suggested fix; its findings are also organized with clearer severity triage and actionable diffs. Y's findings (Thinker-only pipeline edge case, cross-doc optimization-stack inconsistency) are valuable and precisely evidenced but map less directly onto GT's specific concerns, and its validated-claims table appears to contradict X's connector-consumer finding, introducing some uncertainty. Neither surfaces the docs-build dependency-conflict issue from GT, and neither has a LATENT GAP CHECK section.",
+  "_cost_usd": 0.4998762,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_moa_cgm"
+  },
+  "_roles": {
+    "arm": "copilot_moa_cgm",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_moa_cgm",
+    "arm_a_sha256": "3040693d4eee144068b8d7f9d4f1e6e4bde4220fac4a2eae20060b84f1e1e1a3",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

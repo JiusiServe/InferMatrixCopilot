@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both reviews are well-grounded with specific file/line evidence and both independently catch the same GitHub-vs-MkDocs image-path issue. Y goes further by probing the exact area the original human reviewer flagged (connector output live-state ownership), finding that the newly-added 'single consumer' invariant is contradicted by three other drain call-sites, plus a novel TP-collective compatibility gap — both directly extending the spirit of the GT's core unresolved concern rather than just validating it. X delivers solid, valid cross-doc consistency findings (thinker-only pipeline edge case, sibling-doc contradiction) but stays at surface-level validation without surfacing comparable depth. Y's write-up is also more actionable, with concrete suggested fixes and clearer organization.",
+  "_cost_usd": 0.39473860000000005,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_moa_cgm",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_moa_cgm",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_moa_cgm",
+    "arm_a_sha256": "3040693d4eee144068b8d7f9d4f1e6e4bde4220fac4a2eae20060b84f1e1e1a3",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

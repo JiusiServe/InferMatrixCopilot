@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates miss the three most concrete, reproduced ground-truth bugs (max_num_seqs default divergence causing MingImagePipeline startup failure; model_subdir/tokenizer_subdir precedence loss; omni_kv_config precedence reversal), so recall is low for both. X's ownership-validation finding and parity-test critique are thematically adjacent to GT's ownership/parity concerns but manifest as opposite symptoms (hard-reject vs silent-drop) and different specifics; Y's deploy-engine_extras ownership gap and custom_voice_dir/non-backend-field parity-test gap align more precisely with GT's actual language (\"deploy engine_extras are never checked\", \"only compares hard-coded defaults\"). Both are well-evidenced with concrete file:line citations and reproductions, giving comparable precision and actionability; X offers broader coverage (9 findings vs 5) with clear prioritization, but Y's tighter alignment to the ground-truth reviewer's specific concerns gives it a slight recall edge.",
+  "_cost_usd": 0.5060806,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_holdout3_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r2",
+    "arm_a_sha256": "4f56627b6d958f69b671aefaf413e8df520e3e3feffea4aa79970860c060c8dd",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "629955d5b6f052975d79f02bc72365b49e78d8babba831bce0e73b172ff802a7",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

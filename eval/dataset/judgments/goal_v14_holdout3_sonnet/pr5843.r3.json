@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "X explicitly validates the finiteness/nan-inf boundary fix at both the CLI (_nonneg_finite_float) and config (math.isfinite) layers — the most detailed and consequential ground-truth concern, including the hot-spin reproduction — while Y never engages with that theme at all despite claiming to have run the relevant tests. Both independently catch the same subtle test-coverage gap around the max_num_running_reqs<=1 short-circuit (X's finding #1 covers both weak tests Y separately flags). Y's review is broader and includes a genuinely sharp independent catch (the stable_since check-then-update vs update-then-check reordering bug), keeping its precision/actionability competitive, but that added depth doesn't offset missing the core finiteness concern that dominated the human review thread.",
+  "_cost_usd": 0.6555754999999999,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_holdout3_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r1",
+    "arm_a_sha256": "7e3034c408c58b745e401401ea9ce312a578813c392393956c6ce5b7b554781c",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4ed51148204a106ed35fa7e1ae403167cdcd488aeedb89802a531a52e6684609",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

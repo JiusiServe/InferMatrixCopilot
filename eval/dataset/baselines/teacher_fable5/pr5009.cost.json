@@ -1,0 +1,42 @@
+{
+  "calls": 27,
+  "input_tokens": 766442,
+  "output_tokens": 17941,
+  "cost_usd": 2.441306,
+  "is_error": false,
+  "terminal_reason": "completed",
+  "split": "train",
+  "head": "7314f7e8102ab79f14564c7db101678480a837bd",
+  "base": "cbd3939c3d5099a805397f0cc29a41aa3e9c3235",
+  "resolved_model": "claude-fable-5",
+  "snapshot_sha256": "b755588562ecf6f29e63d1557d60f4c4061b9abdc69bf6c97169c4e46604690a",
+  "validation_commands": [
+    "git diff --stat cbd3939c3d5099a805397f0cc29a41aa3e9c3235 HEAD",
+    "git diff cbd3939c3d5099a805397f0cc29a41aa3e9c3235 HEAD",
+    "sed -n 230,300p vllm_omni/platforms/cuda/platform.py",
+    "git log --oneline -15 -- vllm_omni/diffusion/models/qwen_image/qwen_image_transformer.py",
+    "git show 99234881 --stat | head -30; git show 99234881 -- vllm_omni/diffusion/models/qwen_image/qwen_image_transformer.py | head -150",
+    "sed -n 160,200p vllm_omni/platforms/rocm/platform.py; echo ---; sed -n 100,125p vllm_omni/platforms/xpu/platform.py",
+    "ls tests/platforms/ 2>/dev/null; ls tests/ | head -30; sed -n 1,40p vllm_omni/platforms/cuda/platform.py",
+    "git log --oneline cbd3939c3d5099a805397f0cc29a41aa3e9c3235..HEAD; echo ---; git log --format='%h %s' -3 cbd3939c3d5099a805397f0cc29a41aa3e9c3235",
+    "cat tests/platforms/npu/*.py 2>/dev/null | head -40; ls tests/platforms/npu",
+    "timeout 550 python -m pytest tests/platforms/test_cuda_ir_op_priority.py -x -q 2>&1 | tail -15",
+    "grep -rn \"get_default_ir_op_priority\" /usr/local/lib/python3.12/dist-packages/vllm/ --include=*.py | grep -v platforms | head; echo ---; grep -rn -B3 -A8 \"get_default_ir_op_priority\" /usr/local/lib/python3.12/dist-packages/vllm/config/vllm.py 2>/dev/null | head -30",
+    "sed -n 255,300p /usr/local/lib/python3.12/dist-packages/vllm/config/kernel.py",
+    "sed -n 675,710p /usr/local/lib/python3.12/dist-packages/vllm/platforms/cuda.py",
+    "git show b73e0355 --stat; git show c016e367 --stat",
+    "git show 66bfd380 -- vllm_omni/platforms/cuda/platform.py | head -40",
+    "sed -n 605,626p vllm_omni/diffusion/models/cosmos3/pipeline_cosmos3.py"
+  ],
+  "ran_validation": true,
+  "claude_md_seen": {
+    "/data/zhoutaichang/CLAUDE.md": "27ca8ea8056c231e"
+  },
+  "recorded_at": "2026-08-15T01:14:46",
+  "arm": "baseline_opus5",
+  "wall_s": 275.5,
+  "audit_ok": true,
+  "audit_violations": [],
+  "audit_blocked_attempts": [],
+  "artifact_chars": 6534
+}

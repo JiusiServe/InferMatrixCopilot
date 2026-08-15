@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.9,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.9,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both catch the two clearest ground-truth issues (the 'Attention Optimization' heading swallowing unrelated bullets, and GGUF silently dropped from nav), with solid file/line evidence and concrete fixes. Y pulls ahead by also surfacing the BitsAndBytes nav-drop concern via cross-commit history (e63ae881→b112c7fd), which matches the ground-truth comment almost exactly even though it's resolved in the final diff, plus it structures each finding with an explicit 'Change:' action. Neither candidate addresses the quantization-scope/nav-alignment questions (GT diffusion_features.md:228 and features/README.md:43), so recall is capped for both; precision is comparably high since all findings in both reviews are grounded in real diff content.",
+  "_cost_usd": 0.4749508,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_holdout3_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r1",
+    "arm_a_sha256": "bf70eabeda4e654872c97be159302aafce32a19d40463979e455a633767b3f3f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "547e7dae328bb016f40e52ff9f47201f77c529d80a351e2defe03ab5d3f2b6e1",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

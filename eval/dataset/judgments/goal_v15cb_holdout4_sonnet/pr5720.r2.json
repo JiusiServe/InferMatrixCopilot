@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.08,
+    "precision": 0.75,
+    "actionability": 0.5
+  },
+  "y": {
+    "recall": 0.25,
+    "precision": 0.75,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y directly matches the ground-truth Qwen3-TTS task_type validation concern and touches the combined-mode resource-footprint and exception-handling areas the human reviewers flagged, while X's report largely re-confirms already-fixed code paths as 'resolved' and surfaces only tangential minor doc/test-coverage nits, missing every P1 item and all four SamitHuang code-quality comments. Both candidates are well-grounded with file:line evidence, but Y's blocking/should-fix/worth-considering triage with reproduction steps is more actionable than X's flat, hedge-heavy 'minor' list.",
+  "_cost_usd": 0.25744919999999993,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15cb_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15cb_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15cb_holdout4_r1",
+    "arm_a_sha256": "1e81c1cd28694d3d33d3cc296646f80d2b8a75bfe6edb659921e285ae845db9e",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "7d155ed781e729cb9d3a1c8ef3851789595fa7fa0c9c18281fbbf0c3a461d7e5",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

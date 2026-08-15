@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.55,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y directly recalls the ground truth's central theme — tests giving false CI confidence — with precise buildkite-lane evidence (test_kernels_hub_execution selected by no lane; the cpu-marked platform test is CUDA-only), and explicitly cross-checks against the already-fixed concerns (piecewise fallback, FA3 sm90 gate, strict assertions) matching the actual resolution history almost verbatim, which is strong grounding. X raises plausible but largely novel issues (perf, duplication, non-CUDA fallback) padded with unverifiable 'measured' timing numbers and Hub commit hashes, and incorrectly flags the major>=9 Blackwell routing as a bug when the ground truth confirms it's the intended design, hurting precision. Both are concretely actionable with file/line citations, but Y's claims are more consistently grounded in cited code versus X's speculative dynamic-testing flourishes.",
+  "_cost_usd": 0.4965667,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_train_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v14_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_train_r1",
+    "arm_a_sha256": "6eb01c184a6b7dc03edd52ac459cf51e917cb4ef60ff0a845f62a8c0dc484b13",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0639263265995e00edcd06c6242ac0a6a3647a980509c282af885c86ce6930e0",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

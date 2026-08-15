@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.6,
+    "actionability": 0.55
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Ground truth has no substantive concerns, so recall is trivially satisfied by both. X's two findings are grounded but marginal — the NPU-CI note is speculative/likely-unrelated, and its README suggestion is actually contradicted by evidence: that README documents SDK usage (which does flatten extra_body), so no curl-vs-root distinction is needed there, which Y explicitly and correctly verifies in its 'Checked, no change needed' section. Y instead directly interrogates the new diff text itself, catching a real inaccuracy (the added 'returns silent audio' claim vs. the traced error/500 path) with precise file:line code citations through three files, plus concrete, ready-to-apply fixes (scoped wording, an index-collision warning, a jq extraction snippet) — substantially deeper, better-grounded, and more actionable than X's review.",
+  "_cost_usd": 0.15874560000000001,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_train_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_train_r1",
+    "arm_a_sha256": "545c7ba115e5e2e7f2e69286356c4b296e65643b92250a1504099512337bfafb",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5a2e689fc33efd67adbf119f1e4cf034841928ad70fea2d99f142a727ca8ea18",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

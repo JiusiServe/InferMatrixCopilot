@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.55,
+    "actionability": 0.65
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.8,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Y independently rediscovers three of the ground truth's most severe inline findings almost exactly — the text-encoder-tp-size GroupCoordinator crash, ring SP silently ignoring packed cu_seqlens/attn_mask boundaries, and the encoder's loaded.add() masking missing weight shards — plus a related unbounded-upload/temp-file-cleanup issue, all with precise file:line citations and concrete fixes. X's findings (FA4 ring-guard reachability, ReferenceVideo.data type confusion, CI/test-lane coverage) are plausibly grounded but touch none of the 11 human-flagged concerns, and X pads its report with two pairs of near-duplicate 'major'/'minor' findings restating the same claim, hurting both precision and actionability. Both lack a labeled LATENT GAP CHECK section, so gap_hit is false for both.",
+  "_cost_usd": 0.33682750000000006,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_holdout3_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r2",
+    "arm_a_sha256": "88d154d4bae510b3374dae67c2b8e7ca6e7ca1bd3ca102e1a1d10e4f5ad8b8ba",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "c373c75c65a506fb368faf2717d73d36a35ca93216c0c727d7c4e3100440e9f3",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

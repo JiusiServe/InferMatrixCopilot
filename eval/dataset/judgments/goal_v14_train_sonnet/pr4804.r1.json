@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.65,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.75,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both independently rediscover the human reviewer's top High-severity finding (legacy v1 checkpoints mis-parsing as the v2 codec config), but Y also nails the exact root cause of linyueqian's other High comment (stream-slot leak on abort, correctly identifying the req_id vs external_req_id space mismatch) where X only finds a loosely related leak via a different, less precise mechanism. Y also correctly flags the Seed-TTS WER PCM-fallback issue that linyueqian explicitly raised as a real concern, whereas X explicitly asserts that same fallback is 'safe,' directly contradicting ground truth and hurting its precision. Both miss several human comments entirely (cumulative/delta rewind bug, ceil-division audio_codes_lengths truncation, cleanup-of-saved-audio and debug-log cleanup asks, generalizability/preprocess-function suggestions), and both are heavily loaded with speculative-but-plausible extra findings that inflate volume without matching ground truth. Both are highly actionable with concrete file:line citations and suggested fixes, but Y's better hit-rate on the two most severe human-flagged issues and its lack of a contradicted claim give it the edge.",
+  "_cost_usd": 0.44069879999999995,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_train_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_train_r1",
+    "arm_a_sha256": "38348c2569d06ee3702b5a0872fc704a0b9395ec0f24b0a9d6261cc694a6ce5e",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "18986f2736f812d8c896b12152ebcbf1d5319e9e1f79042f5fa16f1dd6272542",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

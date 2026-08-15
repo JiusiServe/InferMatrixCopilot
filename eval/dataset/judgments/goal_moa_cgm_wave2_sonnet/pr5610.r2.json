@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.7,
+    "precision": 0.92,
+    "actionability": 0.88
+  },
+  "y": {
+    "recall": 0.68,
+    "precision": 0.9,
+    "actionability": 0.78
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently verified nearly every technical claim in the doc and covered the same GT concern topics (platform scope, connector-state ownership, image path, full-payload branch, prefix cache) mostly by confirming they were already fixed, while neither addressed the SVG-block-labeling concern (GT item A). X edges ahead with a broader, well-organized set of findings including two deep technical catches (connector-drain ownership race, TP>1 collective on the background thread) that are more consequential than typical doc nits, plus a polished 'verified correct' section giving strong grounding. Y's findings (thinker-only pipeline gap, cross-doc optimization-stack contradiction, missing prefix-cache cross-reference) are also sharp and well-evidenced but fewer in number and delivered in a less actionable, tool-dump format.",
+  "_cost_usd": 0.536057,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_moa_cgm"
+  },
+  "_roles": {
+    "arm": "copilot_moa_cgm",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_moa_cgm",
+    "arm_a_sha256": "3040693d4eee144068b8d7f9d4f1e6e4bde4220fac4a2eae20060b84f1e1e1a3",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

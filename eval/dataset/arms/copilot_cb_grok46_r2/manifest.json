@@ -1,0 +1,20 @@
+{
+  "arm": "copilot_cb_grok46_r2",
+  "engine": "infermatrix-copilot CLI (shipped pipeline, pr-review@6 adaptive-depth ensemble; issue-answer dry-run)",
+  "llm": "per .env (DeepSeek-routed)",
+  "dataset": "vllm_omni_dataset.yaml",
+  "splits": [
+    "holdout"
+  ],
+  "kinds": [
+    "pr_review"
+  ],
+  "n_items": 10,
+  "trace": {
+    "AGENT_TRACE": "(default)",
+    "AGENT_TRACE_IO": "(default)",
+    "AGENT_TRACE_IO_FULL": "(default)"
+  },
+  "moa_when": "off",
+  "pr_context_mode": "(default)"
+}

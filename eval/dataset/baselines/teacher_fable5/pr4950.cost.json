@@ -1,0 +1,35 @@
+{
+  "calls": 38,
+  "input_tokens": 1921125,
+  "output_tokens": 18009,
+  "cost_usd": 4.206993,
+  "is_error": false,
+  "terminal_reason": "completed",
+  "split": "train",
+  "head": "48d4fd8a5e98ab56e7d1de11618956e9c342bf55",
+  "base": "4908b85731731da46c4560cbe2b567c94fb032a7",
+  "resolved_model": "claude-fable-5",
+  "snapshot_sha256": "b5043d2c7b6365537b1fdb3f4896d08b4025139bb5d34f912e2ec8c75ae631ab",
+  "validation_commands": [
+    "git diff --stat 4908b8573173 HEAD",
+    "git diff 4908b8573173 HEAD",
+    "ls /data/zhoutaichang/.infermatrix-copilot/worktrees/vllm-omni-pr4950",
+    "python -c \"import vllm, inspect; from vllm.entrypoints.openai.serving_chat import OpenAIServingChat; print(vllm.__version__); print(inspect.getsource(OpenAIServingChat._effective_chat_template_kwargs))\" 2>&1 | head -40",
+    "python - <<'EOF'\nimport vllm\nprint(vllm.__version__)\nimport subprocess, os\nbase = os.path.dirname(vllm.__file__)\nout = subprocess.run(['grep','-rn','_effective_chat_template_kwargs', base, '--include=*.py','-l'], capture_output=True, text=True)\nprint(out.stdout)\nEOF",
+    "python -c \"import vllm; print(vllm.__version__, vllm.__file__)\"",
+    "python -c \"\nfrom vllm.entrypoints.openai.protocol import ChatCompletionRequest, OpenAIBaseModel\nprint('chat_template_kwargs' in ChatCompletionRequest.model_fields)\nprint('extra_body' in ChatCompletionRequest.model_fields)\nprint(OpenAIBaseModel.model_config.get('extra'))\nr = ChatCompletionRequest(mes",
+    "python -c \"\nfrom vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest\nprint(ChatCompletionRequest.__module__)\n\" 2>&1; ls /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/ | head -30",
+    "ls /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/"
+  ],
+  "ran_validation": true,
+  "claude_md_seen": {
+    "/data/zhoutaichang/CLAUDE.md": "27ca8ea8056c231e"
+  },
+  "recorded_at": "2026-08-15T01:26:57",
+  "arm": "baseline_opus5",
+  "wall_s": 291.8,
+  "audit_ok": true,
+  "audit_violations": [],
+  "audit_blocked_attempts": [],
+  "artifact_chars": 5695
+}

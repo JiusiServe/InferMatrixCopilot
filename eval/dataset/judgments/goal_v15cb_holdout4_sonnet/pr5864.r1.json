@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.78,
+    "actionability": 0.6
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.82,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both reviews are well-grounded with specific file:line citations, but X spends most of its budget validating already-resolved PR-history items and flagging minor doc/test-coverage nits, missing the sharper ground-truth concerns (ipc.py duplicate-function cleanup, DP wave fault-isolation/topology risk, shutdown reentrancy). Y independently surfaces several high-severity, well-reasoned bugs (wave-wide failure from one bad request, silent cross-request output substitution, a dead code branch validated by a test of unreachable logic, shutdown-ordering races) and its ipc.py alias finding and shutdown-reentrancy note land close to the ground truth's _tensor_from_shm/premark concerns, giving it both better recall and more concrete, code-level remediation.",
+  "_cost_usd": 0.5480968,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15cb_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15cb_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15cb_holdout4_r1",
+    "arm_a_sha256": "3c657bd6dba4fc662fdcde392f33bd1d124aa5121a76677609d8d5fb6cb8eb9d",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5d107b26c5dd605248f4ff3bf7b26b48a886f95ed933ef7eb79692e052dcfc5a",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

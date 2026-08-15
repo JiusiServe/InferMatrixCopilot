@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.82,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.88,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently found the same core issues (vacuous max_num_running_reqs=1 test, stable_since reset-order behavior change, TTS ride-along scope, red AMD CI gate, private-type exposure) with strong file:line grounding and concrete fixes, so precision and actionability are close and high for both. Y edges ahead on recall: its assert/getattr finding explicitly traces to the same AttributeError blast radius that ground-truth reviewer yJader flagged (citing the exact fixture lines that had to grow the attribute), and its deadline=None/should_wait=True point echoes hsliuustc0106's unresolved ask to validate _AdmissionWaitDecision invariants — neither of which X connects to. X's unique omni_config.py projection-validation finding is valuable but doesn't offset Y's broader ground-truth overlap. Neither report has a labeled LATENT GAP CHECK section, so gap_hit is false for both.",
+  "_cost_usd": 0.3703155,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_holdout3_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r2",
+    "arm_a_sha256": "4e23b663fad98dbf2f67105bf5f59adf6105dfbb1ba094c5d89c6d10b3852fe9",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4ed51148204a106ed35fa7e1ae403167cdcd488aeedb89802a531a52e6684609",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.8,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Candidate X produced no review at all (API error, rc=3), so it contributes nothing on any axis. Candidate Y delivers a deeply grounded, diff-specific review — it correctly identifies the same code region as the ground-truth hang-risk concern (audio-duration guard placement relative to collective ops) and explicitly credits the workdir-arg cleanup the human reviewer had requested, though it doesn't restate the 'weak test' critique verbatim, so recall is only partial. Precision and actionability are high: findings cite exact files/lines/functions that verifiably exist in the diff, include concrete fixes/snippets, and one claim (AAC priming) is empirically verified by the reviewer.",
+  "_cost_usd": 0.35419979999999995,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "51ae40adf63f888b1fea254454b15587117ed5a11ed6b1d00767d2e88efe4be1",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4847f9bc7acb40b4a7467503f4eb812a8e50f5fe424e5df5f56f1ab2a3da3ee3",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

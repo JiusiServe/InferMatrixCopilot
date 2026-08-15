@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.8,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.25,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates miss the ground truth's most concrete, reproduced bugs (defaults regression at :780, model_subdir/tokenizer_subdir loss at :1354, omni_kv_config precedence flip at :1275); X's 'Validated' section actively asserts those exact spots are correct (precedence preserved, batch-default deferral works), directly contradicting the human reviewer's reproductions — a real accuracy problem even though it sits outside the scored findings list. Y independently converges on the same code regions as GT items 2/5/6 (ownership-validation gaps, parity-test blind spots) with its own live reproductions across dozens of pipelines, and explicitly ran the test suite and self-corrected a candidate finding as 'not a regression,' showing more disciplined verification. Both sets of findings are well-grounded and actionable with file/line citations and concrete fixes, but Y's higher thematic overlap with GT plus its reproduction rigor gives it a clear edge in recall and trustworthiness.",
+  "_cost_usd": 0.4202341,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_holdout3_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r1",
+    "arm_a_sha256": "5698b1ffe83673f753726a1904ba3c1997f79a26513b51e084adbf5adcf83ccb",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "629955d5b6f052975d79f02bc72365b49e78d8babba831bce0e73b172ff802a7",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

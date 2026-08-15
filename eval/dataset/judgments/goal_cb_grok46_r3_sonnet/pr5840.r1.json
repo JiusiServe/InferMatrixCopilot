@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.8,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently verify the same core unresolved ground-truth issue (the async engine's hardcoded 0.2 default silently overriding the new 0.17 MiniMax-H3 default) with strong, executed-code evidence, so recall and precision are comparable; the other three ground-truth items (partition-specific enabler, offline example fix, two inline test bugs) already appear resolved in the diff shown, so neither candidate needed to rediscover them. Y adds one genuinely valuable extra catch (quality_policy 'high' silently installing Cache-DiT even when tea_cache is configured, violating the PR's own new 'mutually exclusive' doc claim), but its output is a dense machine-report style with raw evidence dumps, a stray 'line: ?' citation, and an irrelevant 'skill candidates' appendix that hurts practical usefulness. X is organized into clear Blocking/Should-fix/Minor tiers with explicit 'Change:' instructions and a 'verified correct' section that builds confidence, making it noticeably more actionable for a human reviewer despite being roughly equally grounded.",
+  "_cost_usd": 0.4338446,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok46_r3"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r3",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r3",
+    "arm_a_sha256": "7eaa1c85cfd4d740b2cf2f9ec6a65dbaa6af5a02def0850258b60bda539749d9",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

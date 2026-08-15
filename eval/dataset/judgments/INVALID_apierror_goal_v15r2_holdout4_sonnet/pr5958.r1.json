@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.8,
+    "actionability": 0.95
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Y never produced a review — the run crashed on an API billing error before the review step executed, yielding zero substantive content. X delivered a deep, well-grounded review that correctly caught several of the same issues the ground-truth Copilot comments flag (offloader.md dropping @Isotr0py despite the PR description saying otherwise, the LoRA 'intentionally narrowed' contradiction, missing @RuixiangMa on diffusion/models), plus additional diff-internal inconsistencies (NickCao removal, plugins/model_extras owner mismatch) with precise file:line citations and concrete fixes. X misses most of the highly specific 'add @X' human annotations that require insider knowledge of intended final ownership rather than being derivable from the diff itself, capping its recall, but its findings are actionable and largely valid.",
+  "_cost_usd": 0.2457096,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15_holdout4_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "3238d6b2a851785e3e6f034a6bc3c59ac0b5cc2be4a2cae18cf4d9587179b7d3",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a618d8fdfdd2a7671220fc3626c167412f101811b64319de0c1c201facd71448",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

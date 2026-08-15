@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.55
+  },
+  "y": {
+    "recall": 0.32,
+    "precision": 0.8,
+    "actionability": 0.75
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth's highest-value items are P1 bugs in stage_kv/interface.py (physical tensor geometry, write-only layout digest, block-count-from-seq_len, reserved null block 0, rank-ack validation) and the meta-theme of duplicated/redundant validation across layers — neither candidate found the P1 bugs, but Y's findings (#2 DTO-local invariants matching asukaqaq-s's 'local construction-time invariants' category, #7 collapsing duplicate identity checks matching the duplication complaint, #13 correctly recognizing the executor-shutdown fix already in the diff with an added ownership nuance) track the ground truth's substance noticeably better than X's. X is exhaustively evidence-padded but its findings (DLO fallback, AR-runner kwarg gap, batch/step validation gap) mostly miss ground-truth concerns save one loose match, and its verbose 'confirm whether...' framing is less actionable than Y's prioritized Required/Should-fix structure with concrete code diffs.",
+  "_cost_usd": 0.4847586,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46_r3",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r3",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r3",
+    "arm_a_sha256": "586e51a03627e9b9964cc53c4cfd73eda239b6c007e32d32cc822a756abe9f0a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b6ae3b48c6859b0d16784163ab2044d7d85e3b3b32f4e60b559fa2a55186c64b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

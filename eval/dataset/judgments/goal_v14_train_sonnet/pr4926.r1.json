@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.5,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.7,
+    "actionability": 0.75
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y correctly validates against the actual repo head that the piecewise-crash and FA3-gating issues RuixiangMa raised were already fixed (matching SamitHuang's replies), and independently nails the ground truth's markers/CI-lane concern (wtomin's 'need markers for L1 inclusion', yenuo26's mark request) with concrete buildkite-yaml evidence, plus surfaces a plausible new real bug (LTX2 mask-shape mismatch). X raises more issues by volume but several (fabricated-looking kernel-load timing benchmarks, HF branch SHAs, a 'simulated' capability sweep) read as unverifiable/likely-hallucinated 'evidence', and it misses that the piecewise crash and FA3 gate were already resolved, instead re-flagging or reframing them — hurting both recall calibration and precision. Both are reasonably actionable with file:line pointers, but Y's grounding in cited head-state code makes its actionability more trustworthy.",
+  "_cost_usd": 0.3848526,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_train_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v14_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_train_r1",
+    "arm_a_sha256": "6eb01c184a6b7dc03edd52ac459cf51e917cb4ef60ff0a845f62a8c0dc484b13",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0639263265995e00edcd06c6242ac0a6a3647a980509c282af885c86ce6930e0",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

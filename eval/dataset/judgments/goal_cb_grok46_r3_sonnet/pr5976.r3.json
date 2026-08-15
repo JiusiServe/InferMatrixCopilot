@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.8,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "X's minor note on benchmarks/patch/patch.py (probe_task/asyncio.gather cleanup, flagged as 'intentional upstream parity') is the only real overlap with the ground truth's patch.py-relevance discussion; Y never touches that file at all. Both independently converge on the same core scheduler double-seed bug and the qwen2.5-omni registry/forward-contract gap, which lends plausibility to otherwise-unverifiable deep claims, and Y uniquely surfaces the generation-scheduler never-seeds asymmetry that X misses. X edges ahead on actionability with a clean blocking/should-fix/minor structure and concrete proposed diffs, versus Y's denser, harder-to-consume automated-evidence dump.",
+  "_cost_usd": 0.46371979999999996,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok46_r3"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r3",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r3",
+    "arm_a_sha256": "2ef6fb5f88569b41bdf4fff507fc5f317f37642f1f8304484e06eeaaf4c16cea",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4703d9c3f9a1a403af03ff17f62c2d816d9363ba7048d8dcee9a84a47834bc46",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

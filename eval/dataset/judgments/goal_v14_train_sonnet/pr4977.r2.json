@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently surface the substance of the single GT concern (trust_remote_code/kernels-version compatibility), correctly noting it was already fixed but the PR body is stale, and both flag the untested new caching path and the red NPU CI gate — strong convergent recall given GT is thin. Y's findings are more rigorously grounded, with exact file:line quotes for CI job definitions (CPU/CUDA/NPU lanes) and a transparent claim-verified/claim-refuted audit trail, making its major test-coverage finding more actionable and trustworthy. X contributes a couple of valid unique points (broad except-clause sticky-failure risk, a speculative kernels>=0.15 dead-code claim) but the latter is less verifiable and slightly weakens precision.",
+  "_cost_usd": 0.2864221,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_train_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v14_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_train_r1",
+    "arm_a_sha256": "89eb3674f279e2778619ed45f21688801a72e2c49d04f4d70f2a52745899883f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "589a8ff13cb3893b76dd0d5220ad632d82f46cc0edd9083528ebb2466be7c8a7",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.6,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.7,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both independently surface the same high-value, ground-truth-uncovered bug (double sample-rate conversion corrupting the WER number) with strong evidence, and both cover the audio_vae mutation, dropped language/dialect field, and the +2 decode-step change that the human thread discusses. X's top audio_vae finding fabricates a 'verified locally' experiment claiming the encoder actually executes only 4 layers at runtime, which directly contradicts the maintainer's confirmed resolution that the encoder's real layer count is unaffected — a serious grounding failure on one of its headline findings. Y frames the same issue accurately (stale config attribute / shared mutable object, not truncated execution) and backs nearly every claim with grep-verified evidence, plus catches a couple of additional real issues (stale 24kHz/mono WAV save path, cache-salt inconsistency) that X misses. Both are comparably actionable with concrete file/line fixes and test suggestions.",
+  "_cost_usd": 0.3851146999999999,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_train_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v14_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_train_r1",
+    "arm_a_sha256": "d4f310e6bab2b5c5f79e35f6d327c29f089af2e73164da4112236f81c8301401",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "264e453d996b4a5c483bf206cefb21e513e90d0d6bda5e49948434353154f4a5",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

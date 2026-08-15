@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.95
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Candidate Y's run crashed with an API billing error before producing any review content, so it contributes nothing to recall/precision/actionability. Candidate X delivered a thorough, diff-grounded review and independently rediscovered the same class of bug as the ground-truth Copilot comment on lookup_model_spec (X traced that 'MiniMax-H3/Ref2VA' fails to match under the new split logic, verifiably correct by tracing the code), plus several other well-cited, verifiable findings (image→frame silent breakage, dead image_2/audio_2 inputs, stale model_params['type'] comment) with concrete file:line references and suggested fixes. A few of X's claims lean on external server-side files not present in the visible diff, slightly tempering precision, but overall it is comprehensive and actionable.",
+  "_cost_usd": 0.2997826,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15_holdout4_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "3bdaf45b7c3d505aec96da3c1ac1037cab8562a01aecec4a4a34bc16e94d51f2",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5e297658ea0cb989e05b1860fc4dd4e2c45cf1fb82ba08b0a451b49c240fd935",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

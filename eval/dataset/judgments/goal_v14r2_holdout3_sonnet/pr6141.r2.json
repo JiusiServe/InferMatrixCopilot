@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Neither candidate hits the two ground-truth comments exactly, but Y comes much closer: its point on governance.md losing any pointer to the new meetings.md echoes the reviewer's 'move/preserve this content' concern, and its critique of the sig-omni Slack fallback touches the same contradiction the Copilot comment flags, whereas X's contact_us.md finding is about missing Slack handles, a different issue entirely. Both independently and correctly flag the AWQ/quantization-overview mismatch, a strong shared validated finding. Y also surfaces additional well-grounded, actionable issues (nav.yml glob-to-explicit-list maintenance trap, missing cadence info, ISSUE_TEMPLATE gap) with concrete diffs/snippets, giving it an edge in both recall and actionability, at a small cost to average precision from one borderline out-of-diff item.",
+  "_cost_usd": 0.2206935,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_holdout3_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r2",
+    "arm_a_sha256": "41dd7b84973ca142dbe441910089c8671fced6ac9897fb77505f18ad4bd3f4c9",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "672f8c68e1537f224e50a351c7f7828e2aa50a1d0b3a12720e3060da70662fd9",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

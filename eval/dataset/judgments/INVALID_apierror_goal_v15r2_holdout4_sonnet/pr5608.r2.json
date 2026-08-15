@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Candidate X produced no review content at all (blocked by an API balance error before the review step ran), so it has zero recall, precision, and actionability. Candidate Y delivers a deep, evidence-grounded review with file/line citations and concrete diffs: it engages with the PR's own benchmark table and the shared-helper extraction the ground truth reviewers pushed for, but doesn't explicitly restate the three-way perf-comparison ask, so recall is only moderate; its own findings (ndim conflation bug, uncited tiling formula, sibling call-site risk, non-contiguous output, weak test coverage) are specific, plausible, and actionable even though some reference files outside the shown diff and can't be fully diff-verified. Y wins decisively given X's total failure.",
+  "_cost_usd": 0.2078692,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "b446f8107e08e2ef816f08075e0e14db1d9a359dc75b6d4193803e960348ec22",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "400e2cdee23e452f67bea91295a8fd9f971ab290f37c9a61d27bec6c625cf76a",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

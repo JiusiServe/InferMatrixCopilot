@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.28,
+    "precision": 0.78,
+    "actionability": 0.88
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both are technically strong, well-grounded reviews with concrete file:line evidence, and both independently converge on the same real issue (removed 500ms DP batch-wait default) and the same dead-code branch in the DP-primary queue routing, which cross-validates precision for each. Y edges ahead on recall: its batch-wait finding matches david6666666's ground-truth comment almost exactly with base-commit diff evidence, and its critique of test_multiproc_engine_concurrency.py directly mirrors yuanheng-zhao's 'weak test assumes dp ranks 0 and 2' inline comment, whereas X's dozen findings are mostly novel/independent and don't map as cleanly onto what the human reviewers actually flagged. Y's systematic claim-verification (checking against merge-base, CI status) also gives it a precision edge. Both are highly actionable with specific line-level fix recommendations.",
+  "_cost_usd": 0.4727287,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15_holdout4_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r1",
+    "arm_a_sha256": "167d0385096c0b6f4a16a318ede8be2365527444a3abd90d9aaaf10dc35696aa",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5d107b26c5dd605248f4ff3bf7b26b48a886f95ed933ef7eb79692e052dcfc5a",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

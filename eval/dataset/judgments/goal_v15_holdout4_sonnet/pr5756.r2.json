@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.88,
+    "actionability": 0.85
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both GT concerns center on lookup_model_spec/params_builder demo-code fragility (models.py); X engages that exact function deeply, tests several path shapes, and surfaces a live variant of the same matching bug (e.g. 'MiniMax-H3/Ref2VA' still fails to match), while Y never mentions lookup_model_spec at all, giving X clearly higher recall on the sparse ground truth. Both reviews are otherwise comparably strong: well-grounded with file:line citations and cross-checks against server/pipeline code, both independently catch the fps=16-vs-24 hard-error and the dead model_params['type'] field, and both are highly actionable with concrete fixes. Y compensates with rigorous claim-verification framing and a few sharp unique catches (mocked tests hiding the fps=24 violation, missing t2va/fl2va coverage), keeping the overall gap small despite X's recall edge.",
+  "_cost_usd": 0.2333291,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15_holdout4_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r1",
+    "arm_a_sha256": "d22e833fd281a03baf775e380b91423987ce999d0c230d0b3d813bbf8f50dec2",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5e297658ea0cb989e05b1860fc4dd4e2c45cf1fb82ba08b0a451b49c240fd935",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

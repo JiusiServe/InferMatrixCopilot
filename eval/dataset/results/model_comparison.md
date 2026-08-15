@@ -1,5 +1,48 @@
 # Model comparison — Strict pipeline vs Claude Code + Opus 5
 
+## v14/v15 recall campaign (2026-08-15) — waves 3-4, judge = claude-sonnet-5
+
+Post-cursor-campaign iteration: teacher-trace distillation (Claude Fable 5 on
+the train split, `baselines/teacher_fable5/`) + wave-2 forensics produced the
+v14/v15 pipeline (doc/RFC-review-recall-v14.md): investigation duties
+(claim ledger, sibling contrast, PR-numbers falsification, merge audit,
+producer census, test/gate epistemics, differential parity), a docs
+claims-audit/IA pass, archaeology tools (diff_stat/file_at_base/show_commit/
+search_history/calc — bridged to harness backends), a coverage-driven
+second round (per-hunk seeds), ranked verification ledger, and machinery
+fixes (truncated-final retries, reducer failure-path collapse, gray-zone
+planner un-broken — its 400-token cap had silently failed on every gray
+item since the official reasoning model landed).
+
+Wave 3 (holdout3) hosted two DISCLOSED gate attempts, then was opened for
+forensics (spent). Wave 4 (holdout4, build_wave4.py) is the clean gate.
+All rows: DS v4-pro generator, 3 judge replicates, arm—baseline wins and
+rubric means (arm / baseline).
+
+| gate | arm | wins | recall | precision | note |
+|---|---|---|---|---|---|
+| wave-3 attempt 1 | v14 | 2—28 | .207 / .371 | .788 / .843 | INVALID as a design measure: pass finals died at the 16k token ceiling on 7/10 items; planner broken |
+| wave-3 attempt 2 | v14+fixes | 5—25 | .231 / .424 | .790 / .824 | machinery healthy; pr5853 swept 3-0 (r .65/.18); loss localized to duties-vs-GT mismatch → forensics |
+| **wave-4 (clean)** | **v15** | **10—20** | **.261 / .335** | **.816 / .787** | **precision ABOVE baseline on a fresh holdout; recall ratio .78 (v13/v14 fresh splits: .55–.75). Arm wins the GT-richest items (5864 GT=17, 5958 GT=20, 5608 swept)** |
+| wave-4 replicate 2 | v15 | INVALID | — | — | DeepSeek account 402 Insufficient Balance mid-sweep; stubs judged as empty; quarantined (`INVALID_apierror_goal_v15r2_holdout4_sonnet`) — replicate BLOCKED on recharge |
+
+| wave-4 (same gate) | v15 via cursor backend (Composer 2.5) | 4—24—2 | .283 / .364 | .765 / .810 | subscription; contamination sweep clean (0 skill refs, all traces); swept pr5958 (r .61/.33); recall ratio matches DS (.78), precision trails — the wave-2 pattern (Composer carries recall, DS carries precision) reproduces on the v15 pipeline |
+
+Cost on wave-4: v15 $0.97/item vs baseline $3.09/item (3.2× cheaper);
+cursor row on subscription. Baseline disclosure: pr5720/pr5864 carry a
+benign self-read audit flag (Claude Code's own large-tool-result spool;
+recorded in their cost.json). Judgments: `goal_v14_holdout3_sonnet`,
+`goal_v14r2_holdout3_sonnet`, `goal_v15_holdout4_sonnet`,
+`goal_v15cb_holdout4_sonnet`.
+
+Standing conclusion: the v15 duties moved precision above the baseline and
+closed most of the recall ratio on fresh human-GT holdouts, at a third of
+the cost; strictly-better-on-both-means is not yet demonstrated — the
+residual recall gap (−.07, ~1.5× measured judge drift) sits in mid-size
+items whose GT classes each fresh split partially renews.
+
+# Cursor-model campaign (2026-08-14/15) — wave-2
+
 Campaign: make the Strict copilot beat the CC+Opus 5 baseline on PR review.
 Baseline = Claude Code + Opus 5 on the same pinned PR-time worktree with the
 same frozen sanitized snapshot (`baselines/claudecode_opus5`). All comparisons
