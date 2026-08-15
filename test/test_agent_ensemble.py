@@ -1088,3 +1088,21 @@ def test_render_falls_back_to_declared_line_for_unresolved_anchor():
          "severity": "minor", "comment": "lane duplicates a bucket",
          "evidence": "ci.yml:19 `pytest ...`"}]})
     assert "`ci.yml:~19`" in md
+
+
+def test_lens_backend_member_parses_the_role_split_map(settings):
+    """review_lens_backends routes named passes to a harness provider;
+    unmapped passes return None (normal backend)."""
+    from infermatrix_copilot.engine.agent_runtime.ensemble import (
+        lens_backend_member,
+    )
+    settings.review_lens_backends = {"investigator": "cursor:composer-2.5",
+                                     "docs": "cursor"}
+    settings.strict_backend_model = "composer-2.5"
+    m = lens_backend_member(settings, "investigator")
+    assert m.provider == "cursor" and m.model == "composer-2.5"
+    m2 = lens_backend_member(settings, "docs")     # bare provider id
+    assert m2.provider == "cursor" and m2.model == "composer-2.5"
+    assert lens_backend_member(settings, "adversary") is None
+    settings.review_lens_backends = {}
+    assert lens_backend_member(settings, "investigator") is None

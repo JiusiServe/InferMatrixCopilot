@@ -208,7 +208,8 @@ async def _promote_uncovered(ctx: StepContext, output: dict,
         reply = await asyncio.to_thread(
             llm.create, system=system,
             messages=[{"role": "user", "content": prompt}],
-            model=_tt.model, role="reducer",
+            model=ctx.settings.review_promotion_model or _tt.model,
+            role="reducer",
             max_tokens=max(4096, ctx.settings.llm_max_tokens))
         obj = parse_json_reply(reply.text or "")
     except Exception as exc:  # never fail the review over the extra pass —
@@ -369,6 +370,11 @@ async def _second_round(ctx: StepContext, output: dict, common: dict,
         if m and m.group(1) in seed_paths:
             slices.append(chunk)
     hunk_evidence = "".join(slices)[:100_000]
+    from ...agent_runtime.ensemble import lens_backend_member
+
+    member = lens_backend_member(ctx.settings, "round2")
+    routing = ({"harness_member": member, "model_override": member.model}
+               if member is not None else {})
     result, extra = await run_agent_step(
         ctx, **{**common, "step_name": "agent.review_diff#round2",
                 "guidance": common["guidance"] + "\n\n## SECOND ROUND\n"
@@ -377,7 +383,7 @@ async def _second_round(ctx: StepContext, output: dict, common: dict,
                              "uncovered_hunk_diffs": hunk_evidence,
                              "kept_comments": json.dumps(kept,
                                                          ensure_ascii=False)}},
-        max_iters=ctx.settings.review_second_round_max_iters)
+        max_iters=ctx.settings.review_second_round_max_iters, **routing)
     if not result.ok and not (extra or {}).get("review_comments"):
         ctx.trace.record("review_second_round", step="agent.review_diff",
                          uncovered=len(uncovered), added_comments=0,

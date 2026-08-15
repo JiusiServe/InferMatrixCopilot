@@ -21,6 +21,29 @@ from .runner import run_agent_step
 from .utils import _build_evidence, _to_step_result
 
 
+def lens_backend_member(settings: Any, lens_name: str):
+    """The harness Member a pass/lens should ride per
+    `settings.review_lens_backends`, or None for the run's normal backend.
+
+    Map values are "provider:model" or a bare provider id (model then comes
+    from `strict_backend_model`). Role-split composition: breadth passes on a
+    subscription CLI, precision roles on the tier model — the measured
+    complementarity (Composer carries recall, DS carries precision) on the
+    same pipeline. MoA members take precedence at the call site (an explicit
+    mixture is a stronger instruction than the static map)."""
+    spec = (getattr(settings, "review_lens_backends", None) or {}).get(lens_name)
+    if not spec:
+        return None
+    from .moa import Member
+
+    provider, _, model = str(spec).partition(":")
+    provider = provider.strip()
+    model = model.strip() or str(getattr(settings, "strict_backend_model", ""))
+    if not provider or not model:
+        return None
+    return Member(model=model, provider=provider)
+
+
 async def run_agent_step_ensemble(
     ctx: StepContext,
     *,
@@ -88,19 +111,23 @@ async def run_agent_step_ensemble(
                             for i, lens in enumerate(lenses)},
                 max_usd=ctx.settings.moa_max_usd)  # NO token counts here (W7)
 
-    def _lens_overrides(lens_i: int) -> dict:
-        if not moa_members:
-            return {}
-        m = moa_members[lens_i % len(moa_members)]
-        if m.provider:
-            # harness member: the vendor CLI owns this lens's tool loop (same
-            # bridge/audit path as a harness backend); no BudgetedLLM — there
-            # is no per-token spend to reserve, the session rides its timeout
+    def _lens_overrides(lens_i: int, lens_name: str = "") -> dict:
+        if moa_members:
+            m = moa_members[lens_i % len(moa_members)]
+            if m.provider:
+                # harness member: the vendor CLI owns this lens's tool loop
+                # (same bridge/audit path as a harness backend); no
+                # BudgetedLLM — there is no per-token spend to reserve, the
+                # session rides its timeout
+                return {"harness_member": m, "model_override": m.model}
+            return {"llm_override": BudgetedLLM(
+                        m, ctx.llm.for_member(m), moa_budget,
+                        fallback=(fallback_llm, fallback_model)),
+                    "model_override": m.model}
+        m = lens_backend_member(ctx.settings, lens_name)
+        if m is not None:
             return {"harness_member": m, "model_override": m.model}
-        return {"llm_override": BudgetedLLM(
-                    m, ctx.llm.for_member(m), moa_budget,
-                    fallback=(fallback_llm, fallback_model)),
-                "model_override": m.model}
+        return {}
 
     async def _one_lens(lens: dict, j: int, idx: int = 0,
                         lens_i: int = 0) -> tuple[str, StepResult, dict]:
@@ -119,7 +146,7 @@ async def run_agent_step_ensemble(
             f"{lens['focus']}\nGo DEEP on this lens — it is your depth "
             "priority; report other issues only if they surface on the way. "
             "Peer agents cover the other lenses.")
-        overrides = _lens_overrides(lens_i)
+        overrides = _lens_overrides(lens_i, str(lens.get("name") or ""))
         try:
             result, output = await run_agent_step(
                 ctx, step_name=f"{step_name}#{lens['name']}{suffix}",

@@ -311,6 +311,25 @@ class Settings(BaseSettings):
                                       #   10-iter lenses split: 8 starved it
                                       #   into a forced block on a real 60-line
                                       #   PR (5156: cut at 11 tool calls)
+    # Per-pass backend routing (role-split composition, 2026-08-15): map a
+    # review pass/lens name (investigator, adversary, behavior, verification,
+    # docs, round2) to "provider:model" (e.g. "cursor:composer-2.5") or a bare
+    # provider id (model then comes from strict_backend_model). Unmapped
+    # passes ride the run's normal backend. Wave-2/4 measured Composer
+    # carrying recall and DS carrying precision on the SAME pipeline — this
+    # lets the breadth roles ride the subscription CLI while verify/reducer
+    # stay on the precision model. Member failures fall back per-lens to the
+    # tier model (existing MoA fallback path). Env: REVIEW_LENS_BACKENDS as
+    # JSON, e.g. '{"investigator": "cursor:composer-2.5"}'.
+    review_lens_backends: dict[str, str] = {}
+    review_promotion_model: str = ""  # coverage/residue promotion (tool-less
+                                      #   ledger mining); empty -> the run's
+                                      #   tier model. Owner direction
+                                      #   2026-08-15: cheap seats ride
+                                      #   v4-flash, precision roles (verify/
+                                      #   reducer/passes) stay on the tier
+                                      #   model — promoted items face the
+                                      #   verify pass either way
     review_planner_model: str = ""    # gray-zone planner; empty -> the run's
                                       #   tier model (model_for(mode))
 
