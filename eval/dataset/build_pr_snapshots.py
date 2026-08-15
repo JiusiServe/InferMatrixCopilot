@@ -158,6 +158,7 @@ def main() -> int:
     items = [i for i in ds["pr_review"] + (ds.get("pr_review_wave2") or [])
              + (ds.get("pr_review_wave3") or [])
              + (ds.get("pr_review_wave4") or [])
+             + (ds.get("pr_review_wave5") or [])
              if i.get("split") in splits]
     OUT.mkdir(parents=True, exist_ok=True)
 

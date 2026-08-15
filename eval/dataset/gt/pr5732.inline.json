@@ -1,0 +1,32 @@
+[
+  {
+    "author": "Copilot",
+    "body": "The RGBA-to-RGB detection uses `frame_shape[-1] == 4` without checking dimensionality. If a grayscale (2D) frame happens to have width 4 (or any non-(H,W,C) frame has a trailing dimension of 4), this will incorrectly drop data and change the output shape compared to the previous implementation (which only stripped alpha for stacked 4D videos). Consider gating alpha handling on `len(frame_shape) == 3` (H,W,C).\n\nThis issue also appears on line 439 of the same file.",
+    "line": 434,
+    "path": "vllm_omni/entrypoints/openai/video_api_utils.py"
+  },
+  {
+    "author": "david6666666",
+    "body": "np.stack previously promoted mixed-dtype frames before scaling, but this loop rounds each frame in its original dtype. A float16 frame can therefore produce a different uint8 value than the old path; can we normalize to one dtype before the loop to preserve the checksum contract?",
+    "line": 446,
+    "path": "vllm_omni/entrypoints/openai/video_api_utils.py"
+  },
+  {
+    "author": "Xunzhuo",
+    "body": "Fixed in 82a142ad by requiring a rank-3 `(H, W, C)` frame before treating a trailing 4 as RGBA. Added a regression proving a 2-D grayscale frame with width 4 keeps its full shape. Video utility suite: 13 passed on tw04.",
+    "line": 434,
+    "path": "vllm_omni/entrypoints/openai/video_api_utils.py"
+  },
+  {
+    "author": "Xunzhuo",
+    "body": "Fixed in 82a142ad. The converter computes the common dtype with `np.result_type` and casts each frame to it before scaling, preserving the old `np.stack` promotion semantics without allocating a full-video buffer. Added a mixed float16/float32 regression that compares against the legacy stacked result. Video utility suite: 13 passed on tw04.",
+    "line": 446,
+    "path": "vllm_omni/entrypoints/openai/video_api_utils.py"
+  },
+  {
+    "author": "david6666666",
+    "body": "Nit: Seems this branch is dead — `_coerce_video_to_frames()` normalizes integer frames to float32, so nothing reaches here as `uint8`.",
+    "line": 444,
+    "path": "vllm_omni/entrypoints/openai/video_api_utils.py"
+  }
+]

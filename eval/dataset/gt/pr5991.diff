@@ -1,0 +1,536 @@
+diff --git a/tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py b/tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py
+index 66fb52a5425..be8fd911d93 100644
+--- a/tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py
++++ b/tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py
+@@ -484,6 +484,182 @@ def test_shifted_sigma_schedule_matches_reference_values():
+     )
+ 
+ 
++def test_base_schedule_overrides_the_uniform_sigma_positions():
++    from vllm_omni.diffusion.models.minimax_h3.time_request import (
++        minimax_h3_time_shift_sigmas,
++    )
++
++    base_schedule = [1.0, 0.7, 0.4, 0.15, 0.0]
++
++    video = minimax_h3_time_shift_sigmas(
++        num_steps=len(base_schedule),
++        shift_scale=12.0,
++        base_schedule=base_schedule,
++    )
++    audio = minimax_h3_time_shift_sigmas(
++        num_steps=len(base_schedule),
++        shift_scale=3.0,
++        base_schedule=base_schedule,
++    )
++
++    assert video == pytest.approx([1.0, 0.9655172, 0.8888889, 0.6792453, 0.0], abs=1e-6)
++    assert audio == pytest.approx([1.0, 0.875, 0.6666667, 0.3461539, 0.0], abs=1e-6)
++    assert video != pytest.approx(
++        minimax_h3_time_shift_sigmas(num_steps=len(base_schedule), shift_scale=12.0),
++        abs=1e-6,
++    )
++
++
++@pytest.mark.parametrize(
++    "base_schedule",
++    [
++        [0.9, 0.5, 0.0],
++        [1.0, 0.5, 0.1],
++        [1.0, 0.5, 0.5, 0.0],
++        [1.0],
++        [],
++        [1.0, float("nan"), 0.4, 0.0],
++        [1.0, float("inf"), 0.4, 0.0],
++    ],
++)
++def test_base_schedule_rejects_malformed_positions(base_schedule):
++    from vllm_omni.diffusion.models.minimax_h3.time_request import (
++        minimax_h3_time_shift_sigmas,
++    )
++
++    with pytest.raises(ValueError):
++        minimax_h3_time_shift_sigmas(
++            num_steps=max(len(base_schedule), 1),
++            shift_scale=12.0,
++            base_schedule=base_schedule,
++        )
++
++
++def _distilled_pipeline(diffuse_calls, base_schedule_by_partition):
++    from vllm_omni.diffusion.models.minimax_h3 import MiniMaxH3Pipeline
++    from vllm_omni.diffusion.sched import DMD2SigmaSchedule
++
++    schedules = {
++        partition: None if positions is None else DMD2SigmaSchedule.from_positions(positions)
++        for partition, positions in base_schedule_by_partition.items()
++    }
++    pipeline = object.__new__(MiniMaxH3Pipeline)
++    torch.nn.Module.__init__(pipeline)
++    pipeline.partition = "combined"
++    pipeline.supported_tasks = frozenset({"t2va", "fl2va", "ref2va"})
++    pipeline.default_video_shift = 12.0
++    pipeline.default_audio_shift = 3.0
++    pipeline.device = torch.device("cpu")
++    pipeline.od_config = SimpleNamespace()
++    pipeline._base_schedule_by_partition = schedules
++    pipeline._quality_policy = Mock()
++    pipeline._quality_policy.resolve.return_value = SimpleNamespace(cache_dit=None)
++    pipeline._cache_dit_runtime = SimpleNamespace(prepare=lambda spec: None)
++    pipeline.encode_prompt = Mock(
++        return_value=(
++            torch.ones(1, 2),
++            torch.ones(1, dtype=torch.long),
++        )
++    )
++
++    def diffuse(**kwargs):
++        diffuse_calls.append(kwargs)
++        return torch.zeros(1), torch.zeros(1)
++
++    pipeline.diffuse = diffuse
++    pipeline.decode = Mock(return_value=(torch.zeros(1), torch.zeros(1)))
++    return pipeline
++
++
++def _t2va_batch(num_inference_steps=None):
++    from vllm_omni.diffusion.request import OmniDiffusionRequest
++    from vllm_omni.diffusion.worker.request_batch import DiffusionRequestBatch
++    from vllm_omni.inputs.data import OmniDiffusionSamplingParams
++
++    sampling = OmniDiffusionSamplingParams(
++        quality="lossless",
++        width=1344,
++        height=768,
++        fps=24,
++        num_frames=124,
++        num_inference_steps=num_inference_steps,
++        extra_args={"task": "t2va", "aspect_ratio": "16:9"},
++    )
++    return DiffusionRequestBatch(
++        [
++            OmniDiffusionRequest(
++                prompt="distilled schedule",
++                sampling_params=sampling,
++                request_id="distilled",
++            )
++        ]
++    )
++
++
++def test_base_schedule_is_scoped_to_the_serving_partition():
++    """A distilled FL2VA must not drag a regular Ref2VA onto its step count."""
++    distilled = [1.0, 0.7, 0.4, 0.15, 0.0]
++    pipeline = _distilled_pipeline([], {"fl2va": distilled, "ref2va": None})
++
++    assert pipeline._base_schedule_for_task("t2va").base_schedule == tuple(distilled)
++    assert pipeline._base_schedule_for_task("fl2va").base_schedule == tuple(distilled)
++    assert pipeline._base_schedule_for_task("ref2va") is None
++
++
++def test_partially_constructed_pipeline_falls_back_to_the_uniform_schedule():
++    from vllm_omni.diffusion.models.minimax_h3 import MiniMaxH3Pipeline
++
++    pipeline = object.__new__(MiniMaxH3Pipeline)
++
++    assert pipeline._base_schedule_for_task("t2va") is None
++
++
++def test_distilled_forward_reports_denoising_steps_not_sigma_boundaries():
++    diffuse_calls = []
++    base_schedule = [1.0, 0.7, 0.4, 0.15, 0.0]
++    pipeline = _distilled_pipeline(diffuse_calls, {"fl2va": base_schedule, "ref2va": None})
++
++    pipeline.forward(_t2va_batch())
++
++    assert diffuse_calls[0]["base_schedule"] == tuple(base_schedule)
++    # Five boundaries describe four denoising steps.
++    assert diffuse_calls[0]["num_steps"] == 4
++    pipeline._quality_policy.resolve.assert_called_once_with(
++        quality="lossless",
++        num_inference_steps=4,
++        extra_args={"task": "t2va", "aspect_ratio": "16:9"},
++    )
++
++
++def test_distilled_forward_accepts_the_matching_explicit_step_count():
++    diffuse_calls = []
++    pipeline = _distilled_pipeline(diffuse_calls, {"fl2va": [1.0, 0.7, 0.4, 0.15, 0.0], "ref2va": None})
++
++    pipeline.forward(_t2va_batch(num_inference_steps=4))
++
++    assert diffuse_calls[0]["num_steps"] == 4
++
++
++def test_distilled_forward_rejects_a_mismatched_explicit_step_count():
++    from vllm_omni.errors import OmniClientError
++
++    pipeline = _distilled_pipeline([], {"fl2va": [1.0, 0.7, 0.4, 0.15, 0.0], "ref2va": None})
++
++    with pytest.raises(OmniClientError, match="must be 4 or omitted"):
++        pipeline.forward(_t2va_batch(num_inference_steps=50))
++
++
++def test_absent_base_schedule_key_differs_from_an_empty_list():
++    from vllm_omni.diffusion.models.minimax_h3.pipeline_minimax_h3 import (
++        _read_base_schedule,
++    )
++
++    assert _read_base_schedule({}) is None
++    assert _read_base_schedule({"base_schedule": [1.0, 0.5, 0.0]}).base_schedule == (1.0, 0.5, 0.0)
++    with pytest.raises(ValueError):
++        _read_base_schedule({"base_schedule": []})
++
++
+ def test_cudnn_packed_attention_uses_python_length_without_padding_mask():
+     from vllm_omni.diffusion.models.minimax_h3.minimax_h3_transformer import (
+         MiniMaxH3Attention,
+diff --git a/tests/diffusion/sched/test_dmd2_sigma_schedule.py b/tests/diffusion/sched/test_dmd2_sigma_schedule.py
+new file mode 100644
+index 00000000000..108cbe68cc8
+--- /dev/null
++++ b/tests/diffusion/sched/test_dmd2_sigma_schedule.py
+@@ -0,0 +1,52 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++import pytest
++
++from vllm_omni.diffusion.sched import DMD2SigmaSchedule
++
++pytestmark = [pytest.mark.core_model, pytest.mark.cpu]
++
++
++def test_step_count_is_intervals_not_boundaries():
++    schedule = DMD2SigmaSchedule.from_positions([1.0, 0.7, 0.4, 0.15, 0.0])
++
++    assert schedule.num_inference_steps == 4
++
++
++@pytest.mark.parametrize(
++    "positions",
++    [
++        [],
++        [1.0],
++        [0.9, 0.5, 0.0],
++        [1.0, 0.5, 0.1],
++        [1.0, 0.4, 0.6, 0.0],
++        [1.0, 0.5, 0.5, 0.0],
++        [1.0, float("nan"), 0.4, 0.0],
++        [1.0, float("inf"), 0.4, 0.0],
++    ],
++)
++def test_malformed_positions_are_rejected(positions):
++    with pytest.raises(ValueError):
++        DMD2SigmaSchedule.from_positions(positions)
++
++
++def test_one_base_schedule_drives_several_shift_scales():
++    schedule = DMD2SigmaSchedule.from_positions([1.0, 0.7, 0.4, 0.15, 0.0])
++
++    assert schedule.shifted_sigmas(12.0) == pytest.approx([1.0, 0.9655172, 0.8888889, 0.6792453, 0.0], abs=1e-6)
++    assert schedule.shifted_sigmas(3.0) == pytest.approx([1.0, 0.875, 0.6666667, 0.3461539, 0.0], abs=1e-6)
++
++
++def test_non_positive_shift_scale_is_rejected():
++    schedule = DMD2SigmaSchedule.from_positions([1.0, 0.5, 0.0])
++
++    with pytest.raises(ValueError):
++        schedule.shifted_sigmas(0.0)
++
++
++def test_absent_metadata_key_means_undistilled_but_empty_is_malformed():
++    assert DMD2SigmaSchedule.from_metadata({}) is None
++    assert DMD2SigmaSchedule.from_metadata({"base_schedule": [1.0, 0.5, 0.0]}).base_schedule == (1.0, 0.5, 0.0)
++    with pytest.raises(ValueError):
++        DMD2SigmaSchedule.from_metadata({"base_schedule": []})
+diff --git a/vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py b/vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py
+index cac987d60df..34b5567e121 100644
+--- a/vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py
++++ b/vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py
+@@ -47,6 +47,7 @@
+ from vllm_omni.diffusion.profiler.diffusion_pipeline_profiler import (
+     DiffusionPipelineProfilerMixin,
+ )
++from vllm_omni.diffusion.sched.sigma_schedule import DMD2SigmaSchedule
+ from vllm_omni.diffusion.worker.request_batch import DiffusionRequestBatch
+ from vllm_omni.errors import OmniClientError
+ from vllm_omni.model_executor.model_loader.weight_utils import (
+@@ -169,6 +170,11 @@ def _resolve_minimax_h3_model_root(
+     )
+ 
+ 
++def _read_base_schedule(release: Mapping[str, Any]) -> DMD2SigmaSchedule | None:
++    """Read a partition's distilled schedule. An absent key means legacy uniform."""
++    return DMD2SigmaSchedule.from_metadata(release)
++
++
+ def _resolve_component_quant_config(quant_config, component: str):
+     if hasattr(quant_config, "resolve"):
+         return quant_config.resolve(component)
+@@ -542,6 +548,9 @@ class MiniMaxH3Pipeline(
+         "decode",
+     ]
+     dummy_run_num_frames: ClassVar[int] = 0
++    # Only distilled releases pin a schedule, so the default keeps the legacy
++    # uniform path available to partially constructed pipelines.
++    _base_schedule_by_partition: ClassVar[Mapping[str, DMD2SigmaSchedule | None]] = {}
+ 
+     def adopt_cache_dit_backend(self, backend: CacheDiTBackend) -> None:
+         """Adopt runner-installed generic Cache-DiT for request transitions."""
+@@ -605,6 +614,13 @@ def __init__(
+         shifts = release.get("sigma_shift_scales") or {}
+         self.default_video_shift = float(shifts.get("video", 12.0))
+         self.default_audio_shift = float(shifts.get("audio", 3.0))
++        # Distilled releases pin their own few-step rectified-flow positions; the
++        # uniform schedule derived from num_inference_steps does not match what
++        # such a checkpoint was trained on. Each partition carries its own
++        # contract, so a distilled FL2VA must not drag Ref2VA onto its schedule.
++        self._base_schedule_by_partition = {expected_partition: _read_base_schedule(release)}
++        if ref2va_model_path is not None:
++            self._base_schedule_by_partition["ref2va"] = _read_base_schedule(ref2va_release)
+ 
+         self.weights_sources = [
+             DiffusersPipelineLoader.ComponentSource(
+@@ -738,6 +754,11 @@ def _transformer_for_task(self, task: str) -> MiniMaxH3DiTModel:
+             return self.transformers_ref
+         return self.transformer
+ 
++    def _base_schedule_for_task(self, task: str) -> DMD2SigmaSchedule | None:
++        """Return the distilled schedule of the partition that serves ``task``."""
++        partition = "ref2va" if task == "ref2va" else "fl2va"
++        return self._base_schedule_by_partition.get(partition)
++
+     def _resolve_task(
+         self,
+         requested: str | None,
+@@ -1389,6 +1410,7 @@ def diffuse(
+         num_steps: int,
+         video_shift: float,
+         audio_shift: float,
++        base_schedule: Sequence[float] | None,
+         visual_condition: torch.Tensor | None,
+         visual_condition_shape: tuple[int, int, int] | None,
+         audio_condition: torch.Tensor | None,
+@@ -1490,10 +1512,12 @@ def diffuse(
+         video_sigmas = minimax_h3_time_shift_sigmas(
+             num_steps=num_steps,
+             shift_scale=video_shift,
++            base_schedule=base_schedule,
+         )
+         audio_sigmas = minimax_h3_time_shift_sigmas(
+             num_steps=num_steps,
+             shift_scale=audio_shift,
++            base_schedule=base_schedule,
+         )
+         transformer = self._transformer_for_task(task)
+         # The static DLO plan keeps leading blocks resident only for the
+@@ -1755,7 +1779,22 @@ def forward(self, request: DiffusionRequestBatch) -> DiffusionOutput:
+                     ref_audio_t = audio_lengths[0]
+ 
+         seed = int(sampling.seed if sampling.seed is not None else 42)
+-        num_steps = int(sampling.num_inference_steps or 50)
++        sigma_schedule = self._base_schedule_for_task(task)
++        if sigma_schedule is None:
++            base_schedule = None
++            num_steps = int(sampling.num_inference_steps or 50)
++        else:
++            # The schedule lists sigma boundaries; the denoise loop runs one
++            # step per interval, and that count is what requests and Cache-DiT
++            # speak in.
++            base_schedule = sigma_schedule.base_schedule
++            num_steps = sigma_schedule.num_inference_steps
++            requested_steps = sampling.num_inference_steps
++            if requested_steps is not None and int(requested_steps) != num_steps:
++                raise OmniClientError(
++                    "this MiniMax H3 checkpoint pins a distilled sigma schedule; num_inference_steps "
++                    f"must be {num_steps} or omitted, got {int(requested_steps)}"
++                )
+         video_shift = float(extra.get("flow_shift", self.default_video_shift))
+         audio_shift = float(extra.get("audio_flow_shift", self.default_audio_shift))
+         quality_plan = self._quality_policy.resolve(
+@@ -1781,6 +1820,7 @@ def forward(self, request: DiffusionRequestBatch) -> DiffusionOutput:
+                 num_steps=num_steps,
+                 video_shift=video_shift,
+                 audio_shift=audio_shift,
++                base_schedule=base_schedule,
+                 visual_condition=visual_condition,
+                 visual_condition_shape=visual_shape,
+                 audio_condition=audio_condition,
+diff --git a/vllm_omni/diffusion/models/minimax_h3/time_request.py b/vllm_omni/diffusion/models/minimax_h3/time_request.py
+index 08d8fdfcfa6..92f6b3b9224 100644
+--- a/vllm_omni/diffusion/models/minimax_h3/time_request.py
++++ b/vllm_omni/diffusion/models/minimax_h3/time_request.py
+@@ -1,6 +1,10 @@
+ # SPDX-License-Identifier: Apache-2.0
+ from __future__ import annotations
+ 
++from collections.abc import Sequence
++
++from vllm_omni.diffusion.sched.sigma_schedule import DMD2SigmaSchedule
++
+ 
+ def _align_frame_count(frame_count: int) -> int:
+     """Snap ``frame_count`` up to the MiniMax H3 17n+5 frame boundary."""
+@@ -35,14 +39,26 @@ def _time_shift_sigmas(
+     *,
+     num_steps: int = 50,
+     shift_scale: float = 6.0,
++    base_schedule: Sequence[float] | None = None,
+ ) -> list[float]:
++    """Build a shifted sigma schedule.
++
++    ``base_schedule`` supplies the rectified-flow positions explicitly and takes
++    precedence over ``num_steps``. Distilled checkpoints need it because their
++    few-step schedule is not the uniform one ``num_steps`` produces; validation
++    and the shift itself live in the shared :class:`DMD2SigmaSchedule`.
++    """
+     if shift_scale <= 0:
+         raise ValueError("MiniMax H3 shift_scale must be > 0")
+-    if num_steps <= 0:
+-        raise ValueError("MiniMax H3 num_steps must be > 0")
++
++    if base_schedule is not None:
++        return DMD2SigmaSchedule.from_positions(base_schedule).shifted_sigmas(shift_scale)
+ 
+     import torch
+ 
++    if num_steps <= 0:
++        raise ValueError("MiniMax H3 num_steps must be > 0")
++
+     # The rectified-flow sigma range is fixed at [1.0, 0.0].
+     base = torch.linspace(
+         1.0,
+@@ -81,10 +97,12 @@ def time_shift_sigmas(
+         *,
+         num_steps: int = 50,
+         shift_scale: float = 6.0,
++        base_schedule: Sequence[float] | None = None,
+     ) -> list[float]:
+         return _time_shift_sigmas(
+             num_steps=num_steps,
+             shift_scale=shift_scale,
++            base_schedule=base_schedule,
+         )
+ 
+ 
+@@ -103,8 +121,10 @@ def minimax_h3_time_shift_sigmas(
+     *,
+     num_steps: int = 50,
+     shift_scale: float = 6.0,
++    base_schedule: Sequence[float] | None = None,
+ ) -> list[float]:
+     return MINIMAX_H3_SHAPE_PLANNER.time_shift_sigmas(
+         num_steps=num_steps,
+         shift_scale=shift_scale,
++        base_schedule=base_schedule,
+     )
+diff --git a/vllm_omni/diffusion/sched/__init__.py b/vllm_omni/diffusion/sched/__init__.py
+index 29b9cc667b5..0a467dcf6b5 100644
+--- a/vllm_omni/diffusion/sched/__init__.py
++++ b/vllm_omni/diffusion/sched/__init__.py
+@@ -12,6 +12,7 @@
+     StepBatchSamplingParamsKey,
+ )
+ from vllm_omni.diffusion.sched.request_scheduler import RequestScheduler
++from vllm_omni.diffusion.sched.sigma_schedule import BASE_SCHEDULE_KEY, DMD2SigmaSchedule
+ from vllm_omni.diffusion.sched.step_scheduler import StepScheduler
+ 
+ Scheduler = RequestScheduler
+@@ -26,6 +27,8 @@
+     "BaseScheduler",
+     "SchedulerInterface",
+     "StepBatchSamplingParamsKey",
++    "BASE_SCHEDULE_KEY",
++    "DMD2SigmaSchedule",
+     "RequestScheduler",
+     "StepScheduler",
+     "Scheduler",
+diff --git a/vllm_omni/diffusion/sched/sigma_schedule.py b/vllm_omni/diffusion/sched/sigma_schedule.py
+new file mode 100644
+index 00000000000..bea6164d303
+--- /dev/null
++++ b/vllm_omni/diffusion/sched/sigma_schedule.py
+@@ -0,0 +1,83 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++
++from __future__ import annotations
++
++import math
++from collections.abc import Mapping, Sequence
++from dataclasses import dataclass
++from typing import Any
++
++BASE_SCHEDULE_KEY = "base_schedule"
++
++
++@dataclass(frozen=True)
++class DMD2SigmaSchedule:
++    """Continuous rectified-flow positions pinned by a distilled checkpoint.
++
++    A DMD2 student only ever sees the few noise levels it was trained on, so a
++    distilled release ships the exact positions instead of letting the server
++    derive a uniform schedule from ``num_inference_steps``.
++
++    This is deliberately distinct from
++    ``vllm_omni.diffusion.models.dmd2.DMD2Config.denoising_timesteps``, which
++    carries integer scheduler timesteps for scheduler-backed pipelines. Here the
++    entries are continuous positions in ``[0, 1]`` that still need a per-modality
++    time shift applied, which is what lets one schedule drive several coupled
++    modalities at different shift scales.
++    """
++
++    base_schedule: tuple[float, ...]
++
++    def __post_init__(self) -> None:
++        values = self.base_schedule
++        if len(values) < 2:
++            raise ValueError("DMD2 base_schedule needs at least 2 entries")
++        # Ordering comparisons are all false against NaN, so non-finite entries
++        # have to be rejected before the monotonicity check rather than after it.
++        if any(not math.isfinite(value) for value in values):
++            raise ValueError("DMD2 base_schedule entries must be finite")
++        if values[0] != 1.0 or values[-1] != 0.0:
++            raise ValueError("DMD2 base_schedule must start at 1.0 and end at 0.0")
++        if any(curr <= nxt for curr, nxt in zip(values, values[1:], strict=False)):
++            raise ValueError("DMD2 base_schedule must be strictly decreasing")
++
++    @classmethod
++    def from_positions(cls, base_schedule: Sequence[float]) -> DMD2SigmaSchedule:
++        return cls(base_schedule=tuple(float(value) for value in base_schedule))
++
++    @classmethod
++    def from_metadata(
++        cls,
++        metadata: Mapping[str, Any],
++        *,
++        key: str = BASE_SCHEDULE_KEY,
++    ) -> DMD2SigmaSchedule | None:
++        """Read a schedule from checkpoint metadata.
++
++        An absent key means the release is not distilled and keeps the legacy
++        uniform schedule. An explicitly empty value is a malformed contract and
++        is rejected rather than silently falling back.
++        """
++        raw = metadata.get(key)
++        if raw is None:
++            return None
++        return cls.from_positions(raw)
++
++    @property
++    def num_inference_steps(self) -> int:
++        """Denoising steps, i.e. one per interval between sigma boundaries."""
++        return len(self.base_schedule) - 1
++
++    def shifted_sigmas(self, shift_scale: float) -> list[float]:
++        """Apply the rectified-flow time shift for one modality."""
++        if shift_scale <= 0:
++            raise ValueError("DMD2 shift_scale must be > 0")
++        shift = float(shift_scale)
++        return [shift * u / (1 + (shift - 1) * u) for u in self.base_schedule]
++
++
++__all__ = [
++    "BASE_SCHEDULE_KEY",
++    "DMD2SigmaSchedule",
++]

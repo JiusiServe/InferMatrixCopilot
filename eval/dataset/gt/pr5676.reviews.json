@@ -1,0 +1,29 @@
+{
+  "comments": [
+    {
+      "author": "nagisa-kunhah",
+      "body": "Hi @SamitHuang , could you please take another look on this pr? Thanks!"
+    },
+    {
+      "author": "nagisa-kunhah",
+      "body": "Quick update:\r\nI ran experiments on an H20 with different concurrency and results as follow:\r\n\r\n| Item | Configuration |\r\n|---|---|\r\n| GPU | 1 × NVIDIA H20 |\r\n| GPU memory | 97,871 MiB |\r\n| Compute capability | `(9, 0)` |\r\n| PyTorch | `2.11.0+cu130` |\r\n| vLLM | `0.25.0` |\r\n| vLLM-Omni | `0.25.0rc2.dev44+g0d8c63268` |\r\n| Diffusers | `0.38.0` |\r\n| Transformers | `5.6.0` |\r\n| Dtype | BF16 |\r\n| Attention backend | FlashAttention |\r\n| Eager mode | Enabled |\r\n| PR head | `af2282dba92688be801a10f1c428ccabeefaf7ec` |\r\n| `main` baseline | `422d8fd8` in a detached worktree |\r\n| Model | `Wan-AI/Wan2.2-TI2V-5B-Diffusers` |\r\n| Model revision | `b8fff7315c768468a5333511427288870b2e9635` |\r\n\r\n| c | batch size | total requests | wall time (s) | requests/s | compare with c=1 | mean latency (s) | median latency (s) | peak memory (MiB) |\r\n|---:|---:|---:|---:|---:|---:|---:|---:|---:|\r\n| 1 | 1 | 8 | 1.6895 | 4.7351 | 1.000x | 0.2112 | 0.1876 | 23,650 |\r\n| 2 | 2 | 8 | 1.1183 | 7.1539 | 1.511x | 0.2790 | 0.2337 | 23,646 |\r\n| 4 | 4 | 4 | 0.5388 | 7.4237 | 1.568x | 0.5363 | 0.5364 | 23,902 |\r\n| 8 | 8 | 8 | 0.9197 | 8.6984 | 1.837x | 0.9146 | 0.9144 | 24,932 |\r\n| 16 | 16 | 16 | 1.6370 | 9.7739 | 2.064x | 1.6271 | 1.6270 | 26,720 |\r\n| 32 | 32 | 32 | 3.1582 | 10.1322 | 2.140x | 3.1429 | 3.1427 | 30,046 |\r\n\r\nFixed 1,088-request evaluation\r\n\r\n| `c` | main req/s | PR req/s | PR / main | PR / PR `c=1` | main wall (s) | PR wall (s) |\r\n|---:|---:|---:|---:|---:|---:|---:|\r\n| 1 | 5.6352 | 5.6486 | 1.002x | 1.000x | 193.073 | 192.616 |\r\n| 2 | 5.6937 | 8.7701 | 1.540x | 1.553x | 191.090 | 124.058 |\r\n| 4 | 5.7432 | 10.7292 | 1.868x | 1.899x | 189.440 | 101.406 |\r\n| 8 | 5.7444 | 11.2287 | 1.955x | 1.988x | 189.403 | 96.895 |\r\n| 16 | 5.7192 | 11.5349 | 2.017x | 2.042x | 190.237 | 94.322 |\r\n| 32 | 5.7275 | 11.1453 | 1.946x | 1.973x | 189.962 | 97.620 |\r\n| 64 | 5.7736 | 10.6556 | 1.846x | 1.886x | 188.445 | 102.106 |"
+    }
+  ],
+  "reviews": [
+    {
+      "author": "SamitHuang",
+      "body": "Minor fixes required",
+      "state": "COMMENTED"
+    },
+    {
+      "author": "SamitHuang",
+      "body": "add comments",
+      "state": "COMMENTED"
+    },
+    {
+      "author": "SamitHuang",
+      "body": "LGTM",
+      "state": "APPROVED"
+    }
+  ]
+}

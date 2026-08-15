@@ -1,0 +1,20 @@
+[
+  {
+    "author": "hsliuustc0106",
+    "body": "change the folder name to offloader\n\nchange model_level to cpu_offload\nchange layerwise to layerwise_offload\nchange distributed_layerwise to distributed_layerwise_offload\n\n",
+    "line": 1,
+    "path": "docs/user_guide/diffusion/offloader/cpu_offload.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "```suggestion\n1. `DISTRIBUTED_LAYERWISE`;\n```",
+    "line": 17,
+    "path": "docs/design/feature/offloader/README.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "```suggestion\n2. `LAYERWISE`;\n```",
+    "line": 18,
+    "path": "docs/design/feature/offloader/README.md"
+  }
+]

@@ -1,0 +1,50 @@
+[
+  {
+    "author": "fhfuih",
+    "body": "Do we need to document the new waiting & timeout behavior in `doc/design/feature/async_diffusion_output.md`?",
+    "line": 67,
+    "path": "vllm_omni/diffusion/worker/diffusion_worker.py"
+  },
+  {
+    "author": "yuanheng-zhao",
+    "body": "Shall we better keep it close to `_ASYNC_OUTPUT_TIMEOUT`? For now `_ASYNC_OUTPUT_DRAIN_TIMEOUT_S  = 60.0` is double `_ASYNC_OUTPUT_DRAIN_TIMEOUT_S `",
+    "line": 67,
+    "path": "vllm_omni/diffusion/worker/diffusion_worker.py"
+  },
+  {
+    "author": "yuanheng-zhao",
+    "body": "Wonder why we have a manual clamp here. It should be matching pairs I think",
+    "line": 980,
+    "path": "vllm_omni/diffusion/worker/diffusion_worker.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "how is this related to ASYNC_OUTPUT_TIMEOUT?",
+    "line": 68,
+    "path": "vllm_omni/diffusion/worker/diffusion_worker.py"
+  },
+  {
+    "author": "SamitHuang",
+    "body": "updated\r\n",
+    "line": 67,
+    "path": "vllm_omni/diffusion/worker/diffusion_worker.py"
+  },
+  {
+    "author": "SamitHuang",
+    "body": "reduced `_ASYNC_OUTPUT_DRAIN_TIMEOUT_S` down to `10.0s`, which is well below the engine's 30.0s `_ASYNC_OUTPUT_TIMEOUT`",
+    "line": 67,
+    "path": "vllm_omni/diffusion/worker/diffusion_worker.py"
+  },
+  {
+    "author": "SamitHuang",
+    "body": "it's a defensive safeguard for shutdown and test teardown paths, ensures the counter never underflows to negative values or desyncs the `wait_for` predicate",
+    "line": 980,
+    "path": "vllm_omni/diffusion/worker/diffusion_worker.py"
+  },
+  {
+    "author": "SamitHuang",
+    "body": "  They operate at two different layers of the lifecycle and protect against different failure modes:\r\n  ```text\r\n  [ Worker Process ]                                    [ Engine / Client Process ]\r\n  Worker finishes forward pass\r\n     │\r\n     ├──> Enqueues D2H/SHM task to background thread\r\n     │    and sends COMPUTE_DONE ──────────────────────> Engine waits for OUTPUT_READY\r\n     │                                                   (deadline: _ASYNC_OUTPUT_TIMEOUT = 30.0s)\r\n     │\r\n  Trainer/Engine invokes sleep/wake or memory release\r\n     │\r\n  Worker calls drain_async_outputs()\r\n  (deadline: _ASYNC_OUTPUT_DRAIN_TIMEOUT_S = 10.0s)\r\n     │\r\n     ├── Background thread finishes D2H/SHM (~10-50 ms)\r\n     └── Worker safely releases GPU memory\r\n  ```\r\n  | Parameter | Location | Scope & Role |\r\n  | :--- | :--- | :--- |\r\n  | **`_ASYNC_OUTPUT_TIMEOUT`** (`30.0s`) | **Engine** (`diffusion_engine.py`) | Total deadline for the engine/client to receive `OUTPUT_READY` (D2H transfer + SHM write + queue\r\n  delivery) after compute finishes. |\r\n  | **`_ASYNC_OUTPUT_DRAIN_TIMEOUT_S`** (`10.0s`) | **Worker** (`diffusion_worker.py`) | Barrier timeout when a worker is asked to sleep or release device memory. It waits for\r\n  already-enqueued background D2H/SHM tasks to finish so GPU tensors aren't freed while being read. |\r\n  ### Why `_ASYNC_OUTPUT_DRAIN_TIMEOUT_S` is set to 10.0s:\r\n  1. **Draining is fast**: Draining only waits for in-flight D2H memory copies and POSIX SHM writes, which typically complete in under 50–100 ms.\r\n  2. **Preventing timeout inversion**: If drain timeout were 60.0s (larger than the engine's 30.0s), a wedged worker background thread could hold the sleep RPC for 60s while the\r\n  engine already timed out at 30s, causing desynchronized aborts across processes. Keeping drain timeout at **10.0s** guarantees worker memory barriers complete well within the\r\n  engine's 30.0s wait window.",
+    "line": 68,
+    "path": "vllm_omni/diffusion/worker/diffusion_worker.py"
+  }
+]

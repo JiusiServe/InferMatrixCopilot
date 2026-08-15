@@ -1,0 +1,106 @@
+diff --git a/tests/entrypoints/openai_api/test_video_api_utils.py b/tests/entrypoints/openai_api/test_video_api_utils.py
+index 652adef4d7a..08d223c684b 100644
+--- a/tests/entrypoints/openai_api/test_video_api_utils.py
++++ b/tests/entrypoints/openai_api/test_video_api_utils.py
+@@ -48,6 +48,52 @@ def test_encode_video_bytes_exports_frames_without_interpolation(monkeypatch):
+     assert mux_calls[0]["audio"] is None
+ 
+ 
++def test_float_frames_are_converted_without_stacking_full_video(monkeypatch):
++    frame = np.array(
++        [
++            [[0.0, 0.5, 1.0, 0.2], [1.5, -0.5, 0.5, 0.8]],
++        ],
++        dtype=np.float32,
++    )
++    original = frame.copy()
++
++    def fail_stack(*args, **kwargs):
++        raise AssertionError("float video conversion must not stack all frames")
++
++    monkeypatch.setattr(video_api_utils.np, "stack", fail_stack)
++
++    frames = video_api_utils._coerce_video_to_uint8_frames([frame, frame])
++
++    expected = np.array([[[128, 191, 255], [255, 64, 191]]], dtype=np.uint8)
++    assert frames.flags.c_contiguous
++    np.testing.assert_array_equal(frames, np.array([expected, expected]))
++    np.testing.assert_array_equal(frame, original)
++
++
++def test_two_dimensional_width_four_frames_are_not_treated_as_rgba():
++    frame = np.arange(8, dtype=np.float32).reshape(2, 4) / 8
++
++    frames = video_api_utils._coerce_video_to_uint8_frames([frame, frame])
++
++    expected = np.rint(frame * 255).astype(np.uint8)
++    assert frames.shape == (2, 2, 4)
++    np.testing.assert_array_equal(frames, np.stack([expected, expected]))
++
++
++def test_mixed_float_dtypes_preserve_stacked_rounding_semantics():
++    frames = [
++        np.full((1, 1, 3), 0.1, dtype=np.float16),
++        np.full((1, 1, 3), 0.2, dtype=np.float32),
++    ]
++    stacked = np.stack(frames)
++    expected = np.rint(np.clip(stacked, 0.0, 1.0) * 255.0).astype(np.uint8)
++
++    actual = video_api_utils._coerce_video_to_uint8_frames(frames)
++
++    assert expected[0, 0, 0, 0] == 25
++    np.testing.assert_array_equal(actual, expected)
++
++
+ @pytest.mark.parametrize("frame_count", [3, 4])
+ def test_channel_last_video_tensor_preserves_channel_sized_frame_count(frame_count):
+     video = torch.arange(frame_count * 2 * 5 * 3, dtype=torch.uint8).reshape(frame_count, 2, 5, 3)
+diff --git a/vllm_omni/entrypoints/openai/video_api_utils.py b/vllm_omni/entrypoints/openai/video_api_utils.py
+index f0d2a59f2bb..2ef2689f1e3 100644
+--- a/vllm_omni/entrypoints/openai/video_api_utils.py
++++ b/vllm_omni/entrypoints/openai/video_api_utils.py
+@@ -428,18 +428,32 @@ def _coerce_video_to_uint8_frames(video: Any) -> np.ndarray:
+     if not frames:
+         raise ValueError("No frames found to encode.")
+ 
+-    frames_np = np.stack(frames, axis=0)
+-    if frames_np.ndim == 4 and frames_np.shape[-1] == 4:
+-        frames_np = frames_np[..., :3]
+-
+-    if frames_np.dtype == np.uint8:
+-        frames_u8 = frames_np
+-    else:
+-        frames_np = np.clip(frames_np, 0.0, 1.0)
+-        frames_np *= 255.0
+-        frames_u8 = np.round(frames_np).astype(np.uint8)
+-
+-    return np.ascontiguousarray(frames_u8)
++    frame_shape = frames[0].shape
++    has_alpha = len(frame_shape) == 3 and frame_shape[-1] == 4
++    output_shape = (*frame_shape[:-1], 3) if has_alpha else frame_shape
++    frames_u8 = np.empty((len(frames), *output_shape), dtype=np.uint8)
++    common_dtype = np.result_type(*(frame.dtype for frame in frames))
++
++    # Convert one frame at a time instead of stacking the normalized float
++    # payload first. Long videos can otherwise require another full-size
++    # float array plus conversion temporaries before encoding.
++    for index, frame in enumerate(frames):
++        if frame.shape != frame_shape:
++            raise ValueError("All video frames must have the same shape.")
++        frame = frame[..., :3] if has_alpha else frame
++        if frame.dtype == np.uint8:
++            frames_u8[index] = frame
++            continue
++
++        # np.stack(), used by the previous implementation, promoted mixed
++        # frame dtypes before scaling. Preserve those rounding semantics
++        # without allocating a full-video float buffer.
++        scaled = np.clip(frame.astype(common_dtype, copy=False), 0.0, 1.0)
++        scaled *= 255.0
++        np.rint(scaled, out=scaled)
++        frames_u8[index] = scaled
++
++    return frames_u8
+ 
+ 
+ def _encode_video_bytes(

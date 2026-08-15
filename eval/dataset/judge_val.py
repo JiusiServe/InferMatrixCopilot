@@ -82,6 +82,13 @@ _SPLITS = {
     "holdout4": {"prs": [5608, 5720, 5723, 5756, 5779, 5801, 5833, 5864,
                          5958, 5978],
                  "issues": []},
+    # Wave 5 (build_wave5.py): the power extension — wave 4 answered at
+    # n=10 items, which cannot resolve a .07 difference (needs ~32). Wave 5
+    # takes the fresh pool to 20 for the pre-registered pooled measurement
+    # in goal-eval/PREREG-wave5.md.
+    "holdout5": {"prs": [5676, 5732, 5752, 5871, 5946, 5983, 5991, 6023,
+                         6070, 6075],
+                 "issues": []},
 }
 _SPLIT = os.environ.get("SPLIT", "val")
 PR_ITEMS = _SPLITS[_SPLIT]["prs"]

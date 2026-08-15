@@ -1,0 +1,747 @@
+diff --git a/docs/design/feature/async_diffusion_output.md b/docs/design/feature/async_diffusion_output.md
+index a81ed681136..760e81adfad 100644
+--- a/docs/design/feature/async_diffusion_output.md
++++ b/docs/design/feature/async_diffusion_output.md
+@@ -117,7 +117,22 @@ After (async D2H):
+ 
+ ### Batch Split
+ 
+-When `execute_model_batch` returns a `COMPUTE_DONE` with a single `async_output_id` for the entire batch, the executor splits it into per-request `async_output_id`s (format `{batch_id}/{request_id}`) via `_batch_split_map`. When `OUTPUT_READY` arrives, the pump extracts per-request results from the batch output and resolves each request's output future independently.
++When `execute_model_batch` returns a `COMPUTE_DONE` with a single `async_output_id` for the entire batch, the executor splits it into per-request `async_output_id`s (format `{batch_id}/{request_id}`) via `_batch_split_map`. When `OUTPUT_READY` arrives, the pump extracts per-request results from the batch output and resolves each request's output future independently. If `OUTPUT_READY` arrives before `execute_batch` registers the split map, `execute_batch` directly adopts the early output.
++
++### Reliability, Lifecycle & Timeout Behavior
++
++1. **Drain Before Memory Release (`drain_async_outputs` / `_ASYNC_OUTPUT_DRAIN_TIMEOUT_S`)**:
++   When workers transition into sleep states (`handle_sleep_task`) or invoke memory-releasing methods, `WorkerProc.drain_async_outputs()` blocks up to `_ASYNC_OUTPUT_DRAIN_TIMEOUT_S` (10.0s) until all in-flight background D2H/SHM packing tasks finish. This acts as a synchronization barrier preventing worker sleep cycles from releasing device tensors while the side CUDA stream is still actively reading them. Draining typically completes within 10–50 ms under normal operation.
++
++2. **Timeout Diagnostics (`_ASYNC_OUTPUT_TIMEOUT`)**:
++   The engine waits for `wait_output_ready()` with a timeout of `_ASYNC_OUTPUT_TIMEOUT` (30.0s). If a timeout occurs, the executor logs detailed diagnostic bookkeeping (pending futures, cached outputs, and batch split maps) to identify whether the stall occurred in the worker, pump, or waiter.
++
++3. **Queue Serialization & Atomic Future Resolution**:
++   - `result_mq` writes are serialized with `_result_mq_lock` to protect the single-writer `MessageQueue` against concurrent writes from the worker main loop (`COMPUTE_DONE`) and background thread (`OUTPUT_READY`).
++   - `ResultPumpThread` unpacks shared-memory payloads first, and then atomically resolves waiting futures or populates `_completed_outputs` under `_futures_lock`, avoiding race conditions with concurrent `wait_output_ready()` invocations.
++
++4. **Storage-Aware IPC Packing**:
++   `pack_diffusion_output_shm()` evaluates `max(view_bytes, storage_bytes)` against `_SHM_TENSOR_THRESHOLD` (1 MB) to ensure that per-request slices sharing a large batch storage are moved to POSIX shared memory rather than serialized through pickle over the MessageQueue inline buffer.
+ 
+ ## Model Coverage
+ 
+@@ -131,6 +146,7 @@ All models running in request-mode (`step_execution=False`, the default) automat
+ |---|---|---|
+ | **HunyuanImage-3.0** | Image | `False` |
+ | **Qwen-Image** | Image | `True` |
++| **LTX-2.3** | Video / Audio | `False` |
+ 
+ Other models with `step_execution=False` are also supported but not yet verified.
+ 
+diff --git a/tests/diffusion/test_async_output_worker.py b/tests/diffusion/test_async_output_worker.py
+index da684a4f5b7..a4bff4625f5 100644
+--- a/tests/diffusion/test_async_output_worker.py
++++ b/tests/diffusion/test_async_output_worker.py
+@@ -3,6 +3,8 @@
+ """Unit tests for WorkerProc async output logic."""
+ 
+ import queue
++import threading
++import time
+ from unittest.mock import MagicMock
+ 
+ import pytest
+@@ -29,9 +31,59 @@ def _make_worker_proc(step_execution=False):
+     proc._running = True
+     proc._async_output_queue = queue.Queue() if not step_execution else None
+     proc._async_output_thread = None
++    proc._async_output_done = threading.Condition()
++    proc._async_output_pending = 0
++    proc._result_mq_lock = threading.Lock()
+     return proc
+ 
+ 
++class _OverlapDetectingQueue:
++    """Fails if two threads are inside enqueue() at the same time.
++
++    Mirrors vLLM's MessageQueue, whose acquire_write() reads current_idx,
++    writes that block, then advances it. Overlapping writers can target the
++    same ring block and silently drop a message.
++    """
++
++    def __init__(self):
++        self._active = 0
++        self._guard = threading.Lock()
++        self.overlaps = 0
++        self.messages = []
++
++    def enqueue(self, msg, timeout=None):
++        with self._guard:
++            self._active += 1
++            if self._active > 1:
++                self.overlaps += 1
++        time.sleep(0.001)  # widen the window a real ring-buffer write would have
++        with self._guard:
++            self.messages.append(msg)
++            self._active -= 1
++
++
++class TestResultQueueSingleWriter:
++    """Worker must serialize writes to the single-writer result queue."""
++
++    def test_concurrent_enqueues_do_not_overlap(self):
++        proc = _make_worker_proc(step_execution=False)
++        detector = _OverlapDetectingQueue()
++        proc.result_mq = detector
++
++        def writer(tag):
++            for i in range(20):
++                proc._enqueue_result(f"{tag}-{i}")
++
++        threads = [threading.Thread(target=writer, args=(tag,)) for tag in ("compute", "output")]
++        for t in threads:
++            t.start()
++        for t in threads:
++            t.join()
++
++        assert detector.overlaps == 0, f"{detector.overlaps} overlapping writes to result_mq"
++        assert len(detector.messages) == 40
++
++
+ class TestGenerateAsyncOutputId:
+     """Test _generate_async_output_id uniqueness."""
+ 
+@@ -192,6 +244,87 @@ def test_bg_thread_enqueues_output_ready_after_pack(self, mocker):
+         assert output_ready_enqueued, "Expected OUTPUT_READY with async_output_id='abc123' in enqueue calls"
+ 
+ 
++class TestDrainAsyncOutputs:
++    """Async outputs must finish packing before device memory is released."""
++
++    def test_drain_returns_immediately_when_nothing_in_flight(self):
++        proc = _make_worker_proc(step_execution=False)
++
++        assert proc.drain_async_outputs(timeout=0.01) is True
++
++    def test_return_result_keeps_output_pending_until_loop_completes(self, mocker):
++        """_return_result marks work pending; the bg loop clears it."""
++        proc = _make_worker_proc(step_execution=False)
++
++        mock_platform = mocker.MagicMock()
++        mock_platform.record_device_event.return_value = MagicMock()
++        mocker.patch(
++            "vllm_omni.diffusion.worker.diffusion_worker.current_omni_platform",
++            mock_platform,
++        )
++        mocker.patch("vllm_omni.diffusion.worker.diffusion_worker.pack_diffusion_output_shm")
++        mock_torch = mocker.MagicMock()
++        mock_torch.accelerator.current_accelerator.return_value.type = "cpu"
++        mocker.patch("vllm_omni.diffusion.worker.diffusion_worker.torch", mock_torch)
++
++        proc._return_result(DiffusionOutput(output="data"), rpc_id="1")
++
++        # Packing has not run yet, so a sleep here would free tensors in flight.
++        assert proc._async_output_pending == 1
++        assert proc.drain_async_outputs(timeout=0.05) is False
++
++        thread = threading.Thread(target=proc._async_output_loop, daemon=True)
++        thread.start()
++        try:
++            assert proc.drain_async_outputs(timeout=5.0) is True
++        finally:
++            proc._async_output_queue.put(None)
++            thread.join(timeout=2.0)
++
++    def test_sleep_rpc_drains_before_releasing_memory(self, mocker):
++        proc = _make_worker_proc(step_execution=False)
++        proc.worker = MagicMock()
++
++        call_order: list[str] = []
++        mocker.patch.object(
++            proc,
++            "drain_async_outputs",
++            side_effect=lambda *a, **kw: call_order.append("drain") or True,
++        )
++        proc.worker.execute_method.side_effect = lambda *a, **kw: call_order.append("sleep")
++
++        proc._execute_rpc(
++            {
++                "method": "handle_sleep_task",
++                "args": (),
++                "kwargs": {},
++                "output_rank": 0,
++                "exec_all_ranks": False,
++                "collect_rank_status": False,
++            }
++        )
++
++        assert call_order == ["drain", "sleep"]
++
++    def test_non_sleep_rpc_does_not_drain(self, mocker):
++        proc = _make_worker_proc(step_execution=False)
++        proc.worker = MagicMock()
++        drain = mocker.patch.object(proc, "drain_async_outputs", return_value=True)
++
++        proc._execute_rpc(
++            {
++                "method": "execute_model",
++                "args": (),
++                "kwargs": {},
++                "output_rank": 0,
++                "exec_all_ranks": False,
++                "collect_rank_status": False,
++            }
++        )
++
++        drain.assert_not_called()
++
++
+ class TestWorkerProcShutdown:
+     def test_shutdown_stops_async_thread_and_releases_queues(self):
+         import threading
+diff --git a/tests/diffusion/test_diffusion_ipc.py b/tests/diffusion/test_diffusion_ipc.py
+index 3e4c587f161..546aa11e7e2 100644
+--- a/tests/diffusion/test_diffusion_ipc.py
++++ b/tests/diffusion/test_diffusion_ipc.py
+@@ -305,6 +305,49 @@ def test_batch_runner_output_round_trips_nested_results_through_shm() -> None:
+     assert output["req-error"].result.error == "boom"
+ 
+ 
++def test_per_request_views_of_a_batch_tensor_do_not_ship_whole_storage() -> None:
++    """Regression: per-request slices used to pickle the whole batch storage.
++
++    Each view is under the packing threshold, but pickle writes the entire
++    shared storage per view, so a batch's message grew by the full batch
++    tensor once per request and overflowed the ring buffer.
++    """
++    import pickle
++
++    num_requests = 16
++    # Each row stays under the threshold; the shared storage is well over it.
++    row_numel = _SHM_TENSOR_THRESHOLD // (2 * torch.empty((), dtype=torch.float32).element_size())
++    batch = torch.arange(num_requests * row_numel, dtype=torch.float32).reshape(num_requests, row_numel)
++    per_request = batch[0]
++    assert per_request.nelement() * per_request.element_size() <= _SHM_TENSOR_THRESHOLD
++    assert per_request.untyped_storage().nbytes() > _SHM_TENSOR_THRESHOLD
++
++    output = BatchRunnerOutput.from_list(
++        [
++            RunnerOutput(
++                request_id=f"req-{i}",
++                finished=True,
++                result=DiffusionOutput(trajectory_latents=batch[i]),
++            )
++            for i in range(num_requests)
++        ]
++    )
++    unpacked_size = len(pickle.dumps(output, protocol=pickle.HIGHEST_PROTOCOL))
++
++    pack_diffusion_output_shm(output)
++    packed_size = len(pickle.dumps(output, protocol=pickle.HIGHEST_PROTOCOL))
++
++    assert output.runner_outputs[0].result.trajectory_latents["__tensor_shm__"] is True
++    # Whole storage per request before; handles only after.
++    storage_bytes = per_request.untyped_storage().nbytes()
++    assert unpacked_size > num_requests * storage_bytes / 2
++    assert packed_size < _SHM_TENSOR_THRESHOLD
++
++    unpack_diffusion_output_shm(output)
++    for i in range(num_requests):
++        torch.testing.assert_close(output[f"req-{i}"].result.trajectory_latents, batch[i])
++
++
+ def test_pack_value_keeps_tensor_at_threshold_inline() -> None:
+     tensor = torch.arange(
+         _SHM_TENSOR_THRESHOLD // torch.empty((), dtype=torch.float32).element_size(),
+diff --git a/tests/diffusion/test_result_pump.py b/tests/diffusion/test_result_pump.py
+index cf00cb6cc06..2f4a89ca138 100644
+--- a/tests/diffusion/test_result_pump.py
++++ b/tests/diffusion/test_result_pump.py
+@@ -6,6 +6,7 @@
+ import queue
+ import threading
+ import time
++from types import SimpleNamespace
+ from unittest.mock import MagicMock
+ 
+ import pytest
+@@ -264,6 +265,119 @@ def test_output_ready_caches_when_no_future_waiting(self):
+         fut = executor.wait_output_ready(async_output_id)
+         assert fut.done()
+         assert fut.result(timeout=1.0) is output
++        assert async_output_id not in executor._output_futures
++
++    def test_output_ready_atomic_resolution_when_future_already_waiting(self):
++        """When OUTPUT_READY arrives and a future is already waiting, resolve it directly."""
++        executor = _make_executor()
++        async_output_id = "abc123"
++        output = DiffusionOutput(output="waiting")
++        fut = executor.wait_output_ready(async_output_id)
++        assert not fut.done()
++
++        msg = AsyncDiffusionOutput(
++            kind=AsyncOutputKind.OUTPUT_READY,
++            async_output_id=async_output_id,
++            output=output,
++        )
++        _feed_one_msg_to_pump(executor, msg)
++
++        assert fut.done()
++        assert fut.result(timeout=1.0) is output
++        assert async_output_id not in executor._output_futures
++        assert async_output_id not in executor._completed_outputs
++
++
++class _FakeBatchOutput:
++    """Batch-level output exposing per-request results."""
++
++    def __init__(self, results):
++        self._results = results
++
++    def get_request_output(self, req_id):
++        result = self._results.get(req_id)
++        if result is None:
++            return None
++        return SimpleNamespace(result=result)
++
++
++def _make_scheduler_output(req_ids):
++    return SimpleNamespace(
++        scheduled_new_reqs=[SimpleNamespace(request_id=rid, req=SimpleNamespace()) for rid in req_ids]
++    )
++
++
++class TestBatchSplitDelivery:
++    """execute_batch must resolve per-request futures in either arrival order."""
++
++    @staticmethod
++    def _run(executor, req_ids, batch_id, deliver_early):
++        # Keep execute_batch on the fused request-batch path (not DLO DP).
++        executor.od_config.parallel_config.data_parallel_size = 1
++        executor.od_config.enable_distributed_layerwise_offload = False
++        executor._ensure_open = lambda: None
++
++        outputs = {rid: DiffusionOutput(output=f"img-{rid}") for rid in req_ids}
++        ready = AsyncDiffusionOutput(
++            kind=AsyncOutputKind.OUTPUT_READY,
++            async_output_id=batch_id,
++            output=_FakeBatchOutput(outputs),
++        )
++
++        def fake_collective_rpc(*args, **kwargs):
++            if deliver_early:
++                # Worker's background D2H/SHM thread wins the race: OUTPUT_READY
++                # is pumped before execute_batch registers the split map.
++                _feed_one_msg_to_pump(executor, ready)
++            return AsyncDiffusionOutput(
++                kind=AsyncOutputKind.COMPUTE_DONE,
++                rpc_id="1",
++                async_output_id=batch_id,
++            )
++
++        executor.collective_rpc = fake_collective_rpc
++        batch = executor.execute_batch(_make_scheduler_output(req_ids))
++        if not deliver_early:
++            _feed_one_msg_to_pump(executor, ready)
++        return batch, outputs
++
++    def test_output_ready_after_split_map(self):
++        executor = _make_executor()
++        req_ids = ["r0", "r1", "r2"]
++        _, outputs = self._run(executor, req_ids, "batch-1", deliver_early=False)
++
++        for rid in req_ids:
++            fut = executor.wait_output_ready(f"batch-1/{rid}")
++            assert fut.done()
++            assert fut.result(timeout=1.0) is outputs[rid]
++
++    def test_output_ready_before_split_map(self):
++        """Regression: the whole batch used to be lost, hanging every request."""
++        executor = _make_executor()
++        req_ids = ["r0", "r1", "r2"]
++        _, outputs = self._run(executor, req_ids, "batch-1", deliver_early=True)
++
++        for rid in req_ids:
++            fut = executor.wait_output_ready(f"batch-1/{rid}")
++            assert fut.done(), f"request {rid} never resolved"
++            assert fut.result(timeout=1.0) is outputs[rid]
++
++        # No stale batch-level state left behind.
++        assert executor._batch_split_map == {}
++        assert executor._completed_outputs == {}
++
++    def test_engine_waiter_before_output_is_resolved(self):
++        """Consumers already blocked in wait_output_ready must be woken."""
++        executor = _make_executor()
++        req_ids = ["r0", "r1"]
++        batch_id = "batch-2"
++        futures = {rid: executor.wait_output_ready(f"{batch_id}/{rid}") for rid in req_ids}
++
++        _, outputs = self._run(executor, req_ids, batch_id, deliver_early=True)
++
++        for rid in req_ids:
++            assert futures[rid].done(), f"request {rid} never resolved"
++            assert futures[rid].result(timeout=1.0) is outputs[rid]
+ 
+ 
+ class TestShutdownCleansUpFutures:
+diff --git a/tools/pre_commit/check_pickle_imports.py b/tools/pre_commit/check_pickle_imports.py
+index 819a7c8c3dd..f8f0ef8f2b0 100644
+--- a/tools/pre_commit/check_pickle_imports.py
++++ b/tools/pre_commit/check_pickle_imports.py
+@@ -19,6 +19,10 @@
+     "tests/helpers/process.py",
+     "vllm_omni/diffusion/distributed/group_coordinator.py",
+     "tests/diffusion/attention/test_attention_sp.py",
++    # Measures the wire size of diffusion outputs. The transport pickles them,
++    # and only pickle reproduces the per-view storage duplication under test
++    # (torch.save deduplicates shared storages). No untrusted data is loaded.
++    "tests/diffusion/test_diffusion_ipc.py",
+ }
+ 
+ PICKLE_RE = re.compile(
+diff --git a/vllm_omni/diffusion/diffusion_engine.py b/vllm_omni/diffusion/diffusion_engine.py
+index 08218122ea5..fe9ed5c8c97 100644
+--- a/vllm_omni/diffusion/diffusion_engine.py
++++ b/vllm_omni/diffusion/diffusion_engine.py
+@@ -339,7 +339,16 @@ async def step_streaming(self, request: OmniDiffusionRequest) -> AsyncGenerator[
+             # Async mode: wait for background D2H/SHM to complete.
+             if output.async_output_id:
+                 fut = self.executor.wait_output_ready(output.async_output_id)
+-                output = await asyncio.wait_for(asyncio.wrap_future(fut), timeout=_ASYNC_OUTPUT_TIMEOUT)
++                try:
++                    output = await asyncio.wait_for(asyncio.wrap_future(fut), timeout=_ASYNC_OUTPUT_TIMEOUT)
++                except (TimeoutError, asyncio.TimeoutError):
++                    describe = getattr(self.executor, "describe_pending_state", None)
++                    logger.error(
++                        "Timed out after %.0fs waiting for async output; executor state: %s",
++                        _ASYNC_OUTPUT_TIMEOUT,
++                        describe(output.async_output_id) if describe else "unavailable",
++                    )
++                    raise
+             postprocess_start_time = time.perf_counter()
+             formatted_outputs = self.postprocess_output(request, output)
+             postprocess_time = time.perf_counter() - postprocess_start_time
+diff --git a/vllm_omni/diffusion/executor/multiproc_executor.py b/vllm_omni/diffusion/executor/multiproc_executor.py
+index 7cc6488c1cb..74286dc9440 100644
+--- a/vllm_omni/diffusion/executor/multiproc_executor.py
++++ b/vllm_omni/diffusion/executor/multiproc_executor.py
+@@ -641,8 +641,23 @@ def execute_batch(self, scheduler_output: DiffusionSchedulerOutput) -> BaseRunne
+                         async_output_id=per_req_id,
+                     )
+                 )
++            # The worker's background D2H/SHM thread can publish OUTPUT_READY
++            # before this call returns. In that case the pump found no split
++            # map and cached the whole batch output under batch_id, so adopt it
++            # here instead of registering a map nothing will ever consume.
+             with self._futures_lock:
+-                self._batch_split_map[batch_id] = per_req_map
++                early = self._completed_outputs.pop(batch_id, None)
++                if early is None:
++                    self._batch_split_map[batch_id] = per_req_map
++            if early is not None:
++                logger.debug("Batch %s output arrived before split map; splitting now", batch_id)
++                try:
++                    batch_output = early.result()
++                    error = None
++                except Exception as exc:
++                    batch_output = None
++                    error = str(exc)
++                self._deliver_batch_split(per_req_map, batch_output, error)
+             return BatchRunnerOutput.from_list(runner_outputs)
+         if not isinstance(result, BatchRunnerOutput):
+             raise RuntimeError(f"Unexpected response type for execute_batch: {type(result)!r}")
+@@ -868,52 +883,76 @@ def _result_pump(self, result_mq: MessageQueue | None = None) -> None:
+                         unpack_diffusion_output_shm(msg.output)
+                     except Exception:
+                         logger.exception("SHM unpack failed for batch %s", batch_id)
+-                    batch_output = msg.output
+-                    for per_req_id, req_id in per_req_map.items():
+-                        req_output = batch_output.get_request_output(req_id)
+-                        per_req_result: DiffusionOutput
+-                        if req_output is not None and req_output.result is not None:
+-                            per_req_result = req_output.result
+-                        elif msg.error:
+-                            per_req_result = DiffusionOutput(error=msg.error)
+-                        else:
+-                            per_req_result = DiffusionOutput(error="No output result for batch request")
+-                        fut: concurrent.futures.Future = concurrent.futures.Future()
+-                        fut.set_result(per_req_result)
++                    self._deliver_batch_split(per_req_map, msg.output, msg.error)
++                else:
++                    # Single-request result: unpack SHM first, then resolve or cache atomically.
++                    output_result: DiffusionOutput | None = None
++                    exc: Exception | None = None
++                    if msg.error:
++                        exc = RuntimeError(msg.error)
++                    else:
++                        try:
++                            unpack_diffusion_output_shm(msg.output)
++                            output_result = msg.output
++                        except Exception as e:
++                            logger.exception("SHM unpack failed in result pump")
++                            exc = e
++
++                    if batch_id:
+                         with self._futures_lock:
+-                            pending = self._output_futures.pop(per_req_id, None)
++                            pending = self._output_futures.pop(batch_id, None)
+                             if pending is not None and not pending.done():
+-                                pending.set_result(per_req_result)
++                                if exc is not None:
++                                    pending.set_exception(exc)
++                                else:
++                                    pending.set_result(output_result)
+                             else:
+-                                self._completed_outputs[per_req_id] = fut
++                                fut = concurrent.futures.Future()
++                                if exc is not None:
++                                    fut.set_exception(exc)
++                                else:
++                                    fut.set_result(output_result)
++                                self._completed_outputs[batch_id] = fut
++
++    def _deliver_batch_split(
++        self,
++        per_req_map: dict[str, str],
++        batch_output: Any,
++        error: str | None = None,
++    ) -> None:
++        """Resolve per-request futures from one batch-level output."""
++        for per_req_id, req_id in per_req_map.items():
++            req_output = batch_output.get_request_output(req_id) if batch_output is not None else None
++            per_req_result: DiffusionOutput
++            if req_output is not None and req_output.result is not None:
++                per_req_result = req_output.result
++            elif error:
++                per_req_result = DiffusionOutput(error=error)
++            else:
++                per_req_result = DiffusionOutput(error="No output result for batch request")
++            with self._futures_lock:
++                pending = self._output_futures.pop(per_req_id, None)
++                if pending is not None and not pending.done():
++                    pending.set_result(per_req_result)
+                 else:
+-                    with self._futures_lock:
+-                        fut = self._output_futures.pop(batch_id, None) if batch_id else None
+-                    if fut is not None and not fut.done():
+-                        if msg.error:
+-                            fut.set_exception(RuntimeError(msg.error))
+-                        else:
+-                            try:
+-                                unpack_diffusion_output_shm(msg.output)
+-                            except Exception as e:
+-                                logger.exception("SHM unpack failed in result pump")
+-                                fut.set_exception(e)
+-                                continue
+-                            fut.set_result(msg.output)
+-                    elif batch_id:
+-                        fut = concurrent.futures.Future()
+-                        if msg.error:
+-                            fut.set_exception(RuntimeError(msg.error))
+-                        else:
+-                            try:
+-                                unpack_diffusion_output_shm(msg.output)
+-                            except Exception as e:
+-                                logger.exception("SHM unpack failed in result pump (cached)")
+-                                fut.set_exception(e)
+-                            else:
+-                                fut.set_result(msg.output)
+-                        with self._futures_lock:
+-                            self._completed_outputs[batch_id] = fut
++                    fut: concurrent.futures.Future = concurrent.futures.Future()
++                    fut.set_result(per_req_result)
++                    self._completed_outputs[per_req_id] = fut
++
++    def describe_pending_state(self, async_output_id: str | None = None) -> str:
++        """Summarize async-output bookkeeping for diagnosing stuck waits."""
++        with self._futures_lock:
++            waiting = list(self._output_futures)
++            cached = list(self._completed_outputs)
++            batches = list(self._batch_split_map)
++            rpcs = list(self._rpc_futures)
++        return (
++            f"async_output_id={async_output_id} "
++            f"waiting={len(waiting)}{waiting[:5]} "
++            f"cached={len(cached)}{cached[:5]} "
++            f"unsplit_batches={len(batches)}{batches[:5]} "
++            f"pending_rpcs={len(rpcs)}{rpcs[:5]}"
++        )
+ 
+     def _next_rpc_id(self) -> str:
+         with self._rpc_id_lock:
+diff --git a/vllm_omni/diffusion/ipc.py b/vllm_omni/diffusion/ipc.py
+index 061f8983877..251e335029e 100644
+--- a/vllm_omni/diffusion/ipc.py
++++ b/vllm_omni/diffusion/ipc.py
+@@ -121,8 +121,19 @@ def _pack_tensor_if_large(
+     val: torch.Tensor,
+     d2h_stream: torch.Stream | None = None,
+ ) -> torch.Tensor | dict:
+-    """Replace a tensor with an SHM handle if it exceeds the threshold."""
+-    if val.nelement() * val.element_size() > _SHM_TENSOR_THRESHOLD:
++    """Replace a tensor with an SHM handle if it exceeds the threshold.
++
++    Batch outputs are split into per-request views that share one storage.
++    Pickle serializes a view's whole storage, so a batch of small views costs
++    the full batch tensor once per request. Size the decision on the storage
++    to keep those views off the wire; packing copies just the view.
++    """
++    view_bytes = val.nelement() * val.element_size()
++    try:
++        storage_bytes = val.untyped_storage().nbytes()
++    except Exception:
++        storage_bytes = view_bytes
++    if max(view_bytes, storage_bytes) > _SHM_TENSOR_THRESHOLD:
+         return _tensor_to_shm(val, d2h_stream=d2h_stream)
+     return val
+ 
+diff --git a/vllm_omni/diffusion/worker/diffusion_worker.py b/vllm_omni/diffusion/worker/diffusion_worker.py
+index 0820d82b43f..e71f74c2f4b 100644
+--- a/vllm_omni/diffusion/worker/diffusion_worker.py
++++ b/vllm_omni/diffusion/worker/diffusion_worker.py
+@@ -65,6 +65,15 @@
+ logger = init_logger(__name__)
+ 
+ _ASYNC_OUTPUT_THREAD_JOIN_TIMEOUT_S = 10.0
++# Maximum time (in seconds) to wait for pending background D2H / SHM packing
++# to drain before the worker executes memory-releasing lifecycle tasks
++# (e.g. during sleep/wake transitions). This barrier prevents device tensors
++# from being freed while the side CUDA stream is still actively reading them.
++_ASYNC_OUTPUT_DRAIN_TIMEOUT_S = 10.0
++
++# Worker entry points that release device memory. Background D2H/SHM packing
++# still reads model output tensors, so it must finish before these run.
++_MEMORY_RELEASING_METHODS = frozenset({"sleep", "handle_sleep_task"})
+ 
+ 
+ @dataclass
+@@ -850,6 +859,13 @@ def __init__(
+ 
+         self._async_output_queue: queue.Queue | None = None
+         self._async_output_thread: threading.Thread | None = None
++        self._async_output_done = threading.Condition()
++        self._async_output_pending = 0
++        # MessageQueue.acquire_write() is single-writer: it reads current_idx,
++        # writes that block, then advances the index. The async output thread
++        # enqueues OUTPUT_READY while the main loop enqueues COMPUTE_DONE, so
++        # unsynchronized writers can target the same block and drop a message.
++        self._result_mq_lock = threading.Lock()
+         if not self.od_config.step_execution:
+             self._async_output_queue = queue.Queue()
+             self._async_output_thread = threading.Thread(
+@@ -882,25 +898,32 @@ def _create_worker(
+         )
+         return wrapper
+ 
++    def _enqueue_result(self, msg: Any) -> None:
++        """Serialize writes to the single-writer result queue."""
++        with self._result_mq_lock:
++            self.result_mq.enqueue(msg)
++
+     def _return_result(self, output: Any, rpc_id: str | None = None) -> None:
+         """Reply to client, only on rank 0."""
+         if self.result_mq is None:
+             return
+         if isinstance(output, OmniACK):
+-            self.result_mq.enqueue(output)
++            self._enqueue_result(output)
+             return
+ 
+         # Async path: enqueue compute_done immediately, bg thread does D2H+SHM.
+         if not self.od_config.step_execution and isinstance(output, (DiffusionOutput, BatchRunnerOutput)):
+             async_output_id = WorkerProc._generate_async_output_id()
+             gpu_event = current_omni_platform.record_device_event()
++            with self._async_output_done:
++                self._async_output_pending += 1
+             self._async_output_queue.put((output, async_output_id, gpu_event))
+             msg = AsyncDiffusionOutput(
+                 kind=AsyncOutputKind.COMPUTE_DONE,
+                 rpc_id=rpc_id,
+                 async_output_id=async_output_id,
+             )
+-            self.result_mq.enqueue(msg)
++            self._enqueue_result(msg)
+             return
+ 
+         # Sync path (original, or async fallback).
+@@ -909,7 +932,7 @@ def _return_result(self, output: Any, rpc_id: str | None = None) -> None:
+         except Exception as e:
+             if hasattr(output, "output"):
+                 logger.warning("SHM pack failed for model output: %s", e)
+-        self.result_mq.enqueue(output)
++        self._enqueue_result(output)
+ 
+     def _async_output_loop(self):
+         """Background thread: D2H + SHM packing for async diffusion output.
+@@ -932,7 +955,7 @@ def _async_output_loop(self):
+                 pack_diffusion_output_shm(output, d2h_stream=d2h_stream)
+                 d2h_stream.synchronize()
+ 
+-                self.result_mq.enqueue(
++                self._enqueue_result(
+                     AsyncDiffusionOutput(
+                         kind=AsyncOutputKind.OUTPUT_READY,
+                         async_output_id=async_output_id,
+@@ -944,13 +967,38 @@ def _async_output_loop(self):
+                     "Async output packing failed for id '%s'; sending error",
+                     async_output_id,
+                 )
+-                self.result_mq.enqueue(
++                self._enqueue_result(
+                     AsyncDiffusionOutput(
+                         kind=AsyncOutputKind.OUTPUT_READY,
+                         async_output_id=async_output_id,
+                         error="Background D2H/SHM packing failed",
+                     )
+                 )
++            finally:
++                with self._async_output_done:
++                    # Clamped: only items enqueued by _return_result are counted.
++                    self._async_output_pending = max(0, self._async_output_pending - 1)
++                    self._async_output_done.notify_all()
++
++    def drain_async_outputs(self, timeout: float = _ASYNC_OUTPUT_DRAIN_TIMEOUT_S) -> bool:
++        """Block until background D2H/SHM packing has no work left.
++
++        Returns False if outputs are still in flight when ``timeout`` expires.
++        """
++        with self._async_output_done:
++            if self._async_output_pending == 0:
++                return True
++            drained = self._async_output_done.wait_for(lambda: self._async_output_pending == 0, timeout=timeout)
++            pending = self._async_output_pending
++        if not drained:
++            logger.warning(
++                "Worker %d: %d async output(s) still in flight after %.1fs; "
++                "releasing device memory now may drop OUTPUT_READY messages",
++                self.gpu_id,
++                pending,
++                timeout,
++            )
++        return drained
+ 
+     def shutdown(self) -> None:
+         """Stop background work and release worker-owned IPC resources."""
+@@ -1049,6 +1097,8 @@ def _execute_rpc(self, rpc_request: dict) -> tuple[object | None, bool]:
+         }
+ 
+         try:
++            if method in _MEMORY_RELEASING_METHODS:
++                self.drain_async_outputs()
+             # Use execute_method from WorkerWrapperBase for consistent method resolution
+             result = self.worker.execute_method(method, *args, **kwargs)
+         except Exception as e:
+@@ -1110,6 +1160,7 @@ def _worker_busy_loop(self) -> None:
+                 continue
+ 
+             if isinstance(msg, dict) and msg.get("type") == "sleep":
++                self.drain_async_outputs()
+                 task = OmniSleepTask(level=msg.get("level", 2), task_id=msg.get("task_id", "local"))
+                 ack = self.worker.handle_sleep_task(task)
+                 self._return_result(ack)
+@@ -1136,7 +1187,7 @@ def _worker_busy_loop(self) -> None:
+                         if rpc_id is not None:
+                             # Async RPC: must complete the executor's pending
+                             # future so collective_rpc() doesn't hang.
+-                            self.result_mq.enqueue(
++                            self._enqueue_result(
+                                 AsyncDiffusionOutput(
+                                     kind=AsyncOutputKind.RPC_RESULT,
+                                     rpc_id=rpc_id,

@@ -1,0 +1,92 @@
+[
+  {
+    "author": "david6666666",
+    "body": "Could this validation raise an OmniClientError, or be translated before leaving the diffusion worker? Plain ValueError loses the client-error metadata in stage_diffusion_proc, so invalid counts and parameters become HTTP 500 instead of the expected 400.",
+    "line": 251,
+    "path": "vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py"
+  },
+  {
+    "author": "david6666666",
+    "body": "Could we enforce the H3 media limits before reading and decoding here? upload.read() is unbounded, and converting images to PIL below drops the original format and size, so the pipeline checks are bypassed (for example, BMP uploads are accepted).",
+    "line": 3021,
+    "path": "vllm_omni/entrypoints/openai/api_server.py"
+  },
+  {
+    "author": "david6666666",
+    "body": "This rejects the two-video recipe asset pair: 10.041667s + 4.966667s = 15.008334s. Could we trim the selected segment or allow a small container-rounding tolerance so the documented duration=15.0 example remains runnable?",
+    "line": 347,
+    "path": "vllm_omni/diffusion/models/minimax_h3/reference_video.py"
+  },
+  {
+    "author": "david6666666",
+    "body": "This branch passes decoded frames with source_path=None to MiniMax H3, but prepare_reference_videos only accepts file paths. The current R9 test uses a fake engine and misses this. Could we persist data-URL videos to a temp file, or remove this advertised path?",
+    "line": 3333,
+    "path": "vllm_omni/entrypoints/openai/api_server.py"
+  },
+  {
+    "author": "david6666666",
+    "body": "Could this mixed image+video path be gated by model capability? OmniOpenAIServingVideo is shared by all diffusion models, and the old guard protected models that only support one reference type. The current test uses a fake engine, so this cross-model regression is not covered.",
+    "line": 168,
+    "path": "vllm_omni/entrypoints/openai/serving_video.py"
+  },
+  {
+    "author": "david6666666",
+    "body": "Fixed in `b3474b48`: request-facing MiniMax H3 validation now raises `OmniClientError`, preserving the HTTP 400 client-error metadata. Internal invariant/configuration guards remain separate.",
+    "line": 251,
+    "path": "vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py"
+  },
+  {
+    "author": "david6666666",
+    "body": "Fixed in `b3474b48`: H3 multipart reads are now bounded before decoding, with the 30/50/15 MiB limits, reference-count limit, and image/video/audio format allowlists enforced before PIL conversion. BMP and oversized payload regression tests were added.",
+    "line": 3021,
+    "path": "vllm_omni/entrypoints/openai/api_server.py"
+  },
+  {
+    "author": "david6666666",
+    "body": "Fixed in `b3474b48`: the reference-video preparation path now tolerates only the small container-rounding overflow from the official pair and trims the selected segment to the remaining duration. A real-overflow regression test remains covered.",
+    "line": 347,
+    "path": "vllm_omni/diffusion/models/minimax_h3/reference_video.py"
+  },
+  {
+    "author": "david6666666",
+    "body": "Fixed in `b3474b48`: decoded data/HTTP video URLs are materialized to a temporary MP4 and passed with `source_path` before MiniMax H3 reference preparation; exception cleanup is included. The R9 contract test now asserts the persisted path and MP4 bytes.",
+    "line": 3333,
+    "path": "vllm_omni/entrypoints/openai/api_server.py"
+  },
+  {
+    "author": "david6666666",
+    "body": "Fixed in `b3474b48`: the shared mixed image+video path is now gated by the diffusion model capability metadata. MiniMax H3 advertises mixed-reference support, and a generic model regression test verifies that unsupported models return HTTP 400.",
+    "line": 168,
+    "path": "vllm_omni/entrypoints/openai/serving_video.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "fp8 supported or not?",
+    "line": 163,
+    "path": "docs/user_guide/diffusion_features.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "I think we need to double check the api server functionality in a follow up PR",
+    "line": 119,
+    "path": "vllm_omni/entrypoints/openai/protocol/videos.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "please refactor this later as the api server should not add model specific codes",
+    "line": 162,
+    "path": "vllm_omni/entrypoints/openai/api_server.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "refactor this later and compare the api server structure with other serving arch as well",
+    "line": 3049,
+    "path": "vllm_omni/entrypoints/openai/api_server.py"
+  },
+  {
+    "author": "david6666666",
+    "body": "MiniMax H3 already supports load-time online FP8 quantization of the DiT (transformer) since #5737; the text encoder and VAEs are unchanged (eligible linears: token-refiner and main DiT block attn/MLP, condition projection, AdaLN). I updated the feature-compatibility Quantization cell from `❓` to `✅ (DiT)` in `docs/user_guide/diffusion_features.md`.",
+    "line": 163,
+    "path": "docs/user_guide/diffusion_features.md"
+  }
+]

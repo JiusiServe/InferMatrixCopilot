@@ -145,6 +145,7 @@ def main() -> int:
     items = [i for i in ds["pr_review"] + (ds.get("pr_review_wave2") or [])
              + (ds.get("pr_review_wave3") or [])
              + (ds.get("pr_review_wave4") or [])
+             + (ds.get("pr_review_wave5") or [])
              if i.get("split") in splits]
     if only:
         items = [i for i in items if f"pr{i['pr']}" == only]

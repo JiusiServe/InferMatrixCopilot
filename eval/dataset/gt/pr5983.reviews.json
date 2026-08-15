@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "author": "anurag12-webster",
+      "body": "@vllm-omni-review-bot"
+    },
+    {
+      "author": "anurag12-webster",
+      "body": "@Isotr0py @princepride PTAL"
+    },
+    {
+      "author": "anurag12-webster",
+      "body": "hi @Isotr0py @princepride can you take a look at this"
+    },
+    {
+      "author": "anurag12-webster",
+      "body": "rebased onto main. #6023 rewrote `_result_pump`/`_deliver_batch_split` and merged before this pr, so the `InvalidStateError` fix here got dropped along with the old code shape it patched. the original #5793 crash was reproducible on main again.\n\nreapplied the same fix on top of #6023's new code, and added the regression test to `tests/diffusion/test_result_pump.py` (the test file #6023 introduced) instead of a separate file.\n\nverified on a real gpu: with the fix reverted, all 3 new tests fail with the exact `InvalidStateError` from the original report, at the 3 call sites in the new code. with the fix applied, all 21 tests in that file pass (3 new + 18 existing, no regressions)."
+    }
+  ],
+  "reviews": [
+    {
+      "author": "Gaohan123",
+      "body": "LGTM. Thanks",
+      "state": "APPROVED"
+    }
+  ]
+}

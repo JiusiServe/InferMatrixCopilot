@@ -1,0 +1,374 @@
+[
+  {
+    "author": "hsliuustc0106",
+    "body": "why we need to make changes here?",
+    "line": 322,
+    "path": "vllm_omni/engine/async_omni_engine.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "`--model` accepts local paths, so `/workspace/model --model-class-name LTX2Pipeline` lands on the legacy LTX-2 preset (512x768, 40 steps) and LTX-2.5 later rejects the fixed schedule. Please resolve the version from checkpoint metadata via `detect_ltx_model_version()` and cover an arbitrary local path.",
+    "line": 137,
+    "path": "examples/offline_inference/text_to_video/text_to_video.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "The same path-name check breaks local LTX-2.5 I2V checkpoints: `is_ltx25` remains false, so the image is pre-resized before the required CRF-18 round trip and the legacy defaults are selected. Use the checkpoint metadata detector here too.",
+    "line": 371,
+    "path": "examples/offline_inference/image_to_video/image_to_video.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "Please add `LTX2FullPipeline` to the existing registry and post-process resolution parameterizations in `test_ltx2_pipeline.py`. This new public entry is currently omitted from those contract tests.",
+    "line": 74,
+    "path": "vllm_omni/diffusion/registry.py"
+  },
+  {
+    "author": "Copilot",
+    "body": "`pytestmark` is assigned twice; the first assignment is immediately overwritten, which is confusing and makes the test markers easy to misread/modify incorrectly later. Keep a single `pytestmark` declaration with the intended markers.",
+    "line": 21,
+    "path": "tests/diffusion/models/ltx2/test_ltx2_transformer.py"
+  },
+  {
+    "author": "Copilot",
+    "body": "The ImportError message is hard-coded to \"LTX-2.5\" and a specific transformers version range even though this check is driven by the selected component profile. It would be clearer and more robust to reference the active profile and the missing encoder class name, and avoid pinning an unverified version range in an exception path.",
+    "line": 418,
+    "path": "vllm_omni/diffusion/models/ltx2/ltx2_components.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Removed the  change and its dedicated tests. Pipeline-class selection remains in the stage worker configuration, and the online smoke now verifies serving without this scope expansion.",
+    "line": 322,
+    "path": "vllm_omni/engine/async_omni_engine.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed. The generic T2V example now resolves the model class and calls  against checkpoint metadata, including arbitrary local paths. Regression coverage is in  and the LTX pipeline tests.",
+    "line": 137,
+    "path": "examples/offline_inference/text_to_video/text_to_video.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed. The I2V example now resolves LTX version from checkpoint metadata rather than the path name. Online serving also preserves the source image geometry for , so CRF preprocessing remains pipeline-owned and occurs before resize.",
+    "line": 371,
+    "path": "examples/offline_inference/image_to_video/image_to_video.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed.  is now covered by the existing registry, post-process, public-entry, and model-extras parameterizations in  and .",
+    "line": 74,
+    "path": "vllm_omni/diffusion/registry.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed in 98af1ec73. The redundant marker assignment was removed; the file now has one  declaration containing , , and .",
+    "line": 21,
+    "path": "tests/diffusion/models/ltx2/test_ltx2_transformer.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Keeping the explicit LTX-2.5 message and range intentionally.  is  only for the LTX-2.5 profiles when Gemma4 Unified is unavailable, and  is the verified runtime constraint requested in review and now declared in . The exception mirrors that installable constraint instead of suggesting a broader incompatible range.",
+    "line": 418,
+    "path": "vllm_omni/diffusion/models/ltx2/ltx2_components.py"
+  },
+  {
+    "author": "linyueqian",
+    "body": "P2: This re-keys the cross-attn modulation sources for the released LTX-2 and LTX-2.3 paths, not just 2.5. On main, `av_cross_attn_video_scale_shift` took the video timestep and the a2v gate took the audio sigma. Neither branch of `use_cross_timestep` reproduces that combination: with the flag on (2.3 and 2.5) the video scale_shift input switches from the masked per-token video timestep to the uniform audio sigma; with it off (LTX-2) the a2v gate switches from the audio sigma to the masked video timestep. T2V is unaffected since all four sources are numerically equal there, but under I2V the video timestep is zeroed on conditioning-frame tokens, so LTX-2 and LTX-2.3 I2V outputs change. These embeddings are consumed whenever AV cross attention runs (line 1115), independent of the adaln flags.\n\nCan you confirm both re-keyings match the pinned official implementations for 2 and 2.3, and share a run of the `ltx2_3_i2v` accuracy case on this head? Note there is no LTX-2 I2V accuracy case, so that side currently has no guard.",
+    "line": 1989,
+    "path": "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py"
+  },
+  {
+    "author": "linyueqian",
+    "body": "P2: `preserves_reference_image_size` is keyed on the `LTX2Pipeline` class, which also serves LTX-2 and LTX-2.3. For those versions the server previously LANCZOS-resized the reference image to the requested WxH, which made the pipeline's aspect-preserving resize plus center crop a no-op. With the server resize skipped, off-aspect inputs are now center-cropped instead of squashed, so legacy online I2V framing changes. The offline example still applies the LANCZOS squash for non-2.5 inputs (`prepare_primary_image`), so offline and online now disagree for 2/2.3.\n\nIf restoring the official preprocessing for legacy online I2V is intended, this deserves a release-note line; otherwise the flag needs to be version-conditional rather than class-wide.",
+    "line": 56,
+    "path": "vllm_omni/diffusion/model_metadata.py"
+  },
+  {
+    "author": "linyueqian",
+    "body": "P2: The flip itself looks correct. The guidance executor fuses every pass into the batch dimension and calls the transformer once per denoise step, so `has_separate_cfg=True` (from #2527) made Cache-DiT advance its step counter at the wrong rate for LTX. But Cache-DiT is documented as supported for LTX-2/2.3, so thresholds tuned under the old counting are stale after this change. A quick re-validation of the legacy Cache-DiT path, or at least a release-note callout, would cover it.",
+    "line": 1536,
+    "path": "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py"
+  },
+  {
+    "author": "linyueqian",
+    "body": "Nit: `_run_diffusers` requires `request[\"sigmas\"]`, but `_run_omni` forwards only the `video_*`/`audio_*` keys, so the Omni side silently ignores this key and falls back to the recipe schedule. Parity holds today because `LTX_DISTILLED_SIGMAS` equals these 8 values plus the terminal 0. If either side drifts, the test would compare different schedules without failing loudly. Consider forwarding `sigmas` through the extra args on the omni backend too, or asserting the recipe schedule matches the request.",
+    "line": 374,
+    "path": "tests/e2e/accuracy/ltx/test_ltx_official_similarity.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Confirmed and fixed on the current head. The version branch was removed: video scale/shift consumes the per-token video timestep, the A2V gate consumes audio sigma, audio scale/shift consumes audio timestep, and the V2A gate consumes video sigma. `test_ltx_cross_attention_modulations_use_official_timesteps` explicitly exercises the I2V-relevant masked video timestep `[0, 2]` against audio `[5]`. The PR already carries `diffusion-x2v-test`; its Other Accuracy Test runs the `ltx2_3_i2v` case on this head. I am leaving this thread open until that H100 result reports.",
+    "line": 1989,
+    "path": "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed on the current head without changing async engine plumbing. `OmniOpenAIServingVideo.preserves_reference_image_size` now detects the checkpoint version for the shared `LTX2Pipeline`: only 2.5 preserves the source geometry, while 2/2.3 retain the existing server resize. `test_ltx_i2v_resize_policy_is_version_conditional` covers 2.5, 2.3, and `LTX2FullPipeline`.",
+    "line": 56,
+    "path": "vllm_omni/diffusion/model_metadata.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Covered with the requested release-note callout in `recipes/LTX/LTX-2.md`: it states that LTX fused guidance is one Transformer call per denoise step and that residual thresholds from separate-CFG step accounting must be recalibrated. The adapter contract is also pinned by `test_ltx_transformer_has_fused_cfg_cache_dit_config`.",
+    "line": 1536,
+    "path": "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed. The Omni reference runner now forwards request `sigmas` through `apply_declared_extra_args`, so the tested schedule is explicit on both sides rather than relying on equality with the recipe default. The offline extra-body registry and its regression test also include the supported schedule keys.",
+    "line": 374,
+    "path": "tests/e2e/accuracy/ltx/test_ltx_official_similarity.py"
+  },
+  {
+    "author": "mglyn",
+    "body": "I noticed a concrete request-contract issue: both LTX-2.5 distilled recipes inherit the default negative prompt and allow_negative_prompt=True, although their guidance is positive-only. As a result, negative prompts or embeddings are accepted but never used. They should use negative_prompt=\"\" and allow_negative_prompt=False, consistent with the existing LTX-2 distilled recipe.\n\nSeparately, I suggest naming the transformer/ one-stage path LTX2DistilledOneStagePipeline. Rejection behavior remains recipe-driven, but the dedicated name would keep class semantics clear: LTX2Pipeline means guided Full/Dev one-stage execution for LTX-2/2.3, whereas the LTX-2.5 transformer/ path is distilled, positive-only, and eight-step. This should help prevent similar default and capability confusion later.",
+    "line": 24,
+    "path": "recipes/LTX/LTX-2.5.md"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed in 237f775c7. Both LTX-2.5 positive-only recipes now set `negative_prompt=\"\"` and `allow_negative_prompt=False`, with rejection tests for prompt and embedding inputs. After the pipeline API discussion, the canonical names are `LTX2Pipeline` for one-stage and `LTX2TwoStagePipeline` for two-stage; `LTX2DistilledPipeline` remains only as the existing compatibility alias. The recipe and public registries use the canonical two-stage name.",
+    "line": 24,
+    "path": "recipes/LTX/LTX-2.5.md"
+  },
+  {
+    "author": "mglyn",
+    "body": "LTX_DEFAULT_NEGATIVE_PROMPT is behind the latest native Lightricks default. The official prompt now starts with has_subtitles, has_blurbox, transition from black, transition to black, speech_ending_short.",
+    "line": 11,
+    "path": "vllm_omni/diffusion/models/ltx2/ltx2_recipes.py"
+  },
+  {
+    "author": "mglyn",
+    "body": "REVIEW(blocking): This is not currently true for the LTX\nproduction loader. ``--revision`` reaches config enrichment,\nbut version detection and component/weight loads still use\nrepository HEAD. Add a propagation test before keeping this\npinned-runtime contract.",
+    "line": 30,
+    "path": "tests/e2e/online_serving/test_ltx25.py"
+  },
+  {
+    "author": "mglyn",
+    "body": "REVIEW(high): #6146 found that native LTX-2/2.3 also obtains this\ntoken-major storage layout by sampling 5D latents before patchifying.\nRestricting it to 2.5 leaves the established 2/2.3 precision fix out\nof this shared path. Rebase on #6146 or generalize the layout here.",
+    "line": 218,
+    "path": "vllm_omni/diffusion/models/ltx2/ltx2_latents.py"
+  },
+  {
+    "author": "mglyn",
+    "body": "REVIEW(blocking): ``od_config.revision`` is dropped here and by the\ndownstream LTX component loaders.  A pinned request can therefore\nresolve its config at one revision while detecting the version and\nloading weights/tokenizer/schedulers from repository HEAD.  Thread\nthe standard revision through the complete LTX Hub-loading chain.",
+    "line": 146,
+    "path": "vllm_omni/diffusion/models/ltx2/ltx2_runtime.py"
+  },
+  {
+    "author": "mglyn",
+    "body": "REVIEW(blocking): main and native LTX pass per-token timesteps for\nevery model version.  Returning batch scalars for non-SP LTX-2/2.3\nchanges their numerical path and makes SP/non-SP semantics differ.\nExpand for every version, and add a non-SP LTX-2/2.3 regression test.",
+    "line": 654,
+    "path": "vllm_omni/diffusion/models/ltx2/ltx2_runtime.py"
+  },
+  {
+    "author": "mglyn",
+    "body": "REVIEW(high): Keep this consistent with the provided-latents branch\nabove; the native token-major layout is not specific to LTX-2.5.",
+    "line": 240,
+    "path": "vllm_omni/diffusion/models/ltx2/ltx2_latents.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed in b30693b4a. od_config.revision now reaches version detection, Hub prefetch, tokenizer, each component load, transformer config and weight source, scheduler, raw snapshot materialization, raw component sources, and output sample-rate detection. The production-chain regression covers both converted and official split layouts.",
+    "line": 146,
+    "path": "vllm_omni/diffusion/models/ltx2/ltx2_runtime.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed in b30693b4a. prepare_video_latents now materializes the official token-major storage layout for LTX-2, 2.3, and 2.5. The seeded RNG regression is parameterized across all three versions.",
+    "line": 218,
+    "path": "vllm_omni/diffusion/models/ltx2/ltx2_latents.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed in b30693b4a. Timestep kwargs are expanded per token for every LTX version regardless of SP, with a non-SP parameterized regression for 2, 2.3, and 2.5.",
+    "line": 654,
+    "path": "vllm_omni/diffusion/models/ltx2/ltx2_runtime.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Current head c4ee9ab51 retains the official modulation routing fix and test_ltx_cross_attention_modulations_use_official_timesteps; the post-merge affected suite is 406 passed. The diffusion-x2v-test label remains attached. I am leaving this thread open until the external H100 ltx2_3_i2v result is reported, as requested.",
+    "line": 1989,
+    "path": "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed in b30693b4a. The provided-latents branch now applies the same official token-major layout for 2, 2.3, and 2.5, with a version-parameterized stride/value regression.",
+    "line": 240,
+    "path": "vllm_omni/diffusion/models/ltx2/ltx2_latents.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed in b30693b4a. The pinned online case now uses the official split checkpoint, and revision propagation is covered for both paths: raw materialization pins the exact selected files and every raw weight source; the converted-loader regression checks prefetch, tokenizer, all six components, transformer config, scheduler, and transformer weight source. The post-process sample-rate lookup is pinned too.",
+    "line": 30,
+    "path": "tests/e2e/online_serving/test_ltx25.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed in b30693b4a. LTX_DEFAULT_NEGATIVE_PROMPT now begins with the five current native defaults: has_subtitles, has_blurbox, transition from black, transition to black, and speech_ending_short, before the existing list.",
+    "line": 11,
+    "path": "vllm_omni/diffusion/models/ltx2/ltx2_recipes.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "do not add the model specific notes here",
+    "line": 172,
+    "path": "docs/user_guide/diffusion_features.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "please use the latest add-recipe skill",
+    "line": 1,
+    "path": "recipes/LTX/LTX-2.5.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "do not add model specific patch here",
+    "line": 106,
+    "path": "vllm_omni/entrypoints/openai/serving_video.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "model spefic patch, can we move it into models folder?",
+    "line": 288,
+    "path": "vllm_omni/entrypoints/utils.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed in dad5acb87. Removed the model-specific LTX-2.5 qualification block from the shared diffusion-features page; the table now keeps only the compact capability row.",
+    "line": 172,
+    "path": "docs/user_guide/diffusion_features.md"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed in dad5acb87 using the current recipe template: added when-to-use guidance, the exact B300 environment and command, verification, operational notes, installation, and key-parameter sections while retaining all three official pipeline selectors.",
+    "line": 1,
+    "path": "recipes/LTX/LTX-2.5.md"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed in dad5acb87. serving_video now calls a generic metadata resolver and contains no LTX class/version branch. The LTX-2.5 CRF-18 resize policy lives in models/ltx2; the complete serving suite is 88 passed.",
+    "line": 106,
+    "path": "vllm_omni/entrypoints/openai/serving_video.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed in dad5acb87. Removed the direct LTX predicate from entrypoints/utils.py. Unindexed diffusion repositories now use a model-agnostic is_diffusion_model fallback, covered by a generic split-checkpoint regression; the complete utility suite is 34 passed.",
+    "line": 288,
+    "path": "vllm_omni/entrypoints/utils.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "[P1] Official LTX-2.5 parity fails at the pinned revisions\n\nI ran this exact added test at head `e2721dc97d48a412128327039b2a80bb07c5b0ea` on one NVIDIA L20X (Python 3.12.13, vLLM 0.27.0, vLLM-Omni `0.27.0rc2.dev60+ge2721dc97`, PyTorch 2.13.0+cu129):\n\n```bash\nCUDA_VISIBLE_DEVICES=2 HF_HOME=/workspace/model \\\npython -m pytest -q -s \\\n  'tests/e2e/accuracy/ltx/test_ltx25_official_similarity.py::test_ltx25_distilled_two_stage_matches_official[t2v]'\n```\n\nThe harness resolved official source `7954dcb0d986bdc36ef272564a9789ade07fcc65`, raw model `8a4ff96f581e72bedc1b44367581c49d544a05f1`, and Diffusers model `a6de4b5354f078db24d9cf4778c14846788aea3d`; both sides used `torch_sdpa`, seed 42, 1024x576, 25 frames, and the same 8+3 schedules. It nevertheless failed in 322.35 s with video SSIM mean/min `0.66285/0.65434` (required `0.995/0.99`), PSNR `17.812 dB` (required `40`), LPIPS `0.36954` (required `<=0.01`), audio cosine `0.14073` (required `>=0.95`), and relative L2 `2.59623` (required `<=0.3`). Because the two runtimes run sequentially on the same device/backend and the mismatch is this large, this does not look like a minor L20X-vs-H100 tolerance difference. Please reproduce and fix the official/Omni trajectory mismatch before treating this parity coverage as passing.\n\nFor comparison, the public pipelines themselves are runnable locally. These recipe commands both exited 0 and produced valid H.264 + 48 kHz stereo AAC MP4s:\n\n```bash\nCUDA_VISIBLE_DEVICES=2 HF_HOME=/workspace/model python \\\n  examples/offline_inference/text_to_video/text_to_video.py \\\n  --model Lightricks/LTX-2.5-Diffusers \\\n  --model-class-name LTX2DistilledOneStagePipeline \\\n  --prompt 'A cinematic shot of a red fox walking through a snowy forest at dawn, the camera tracking alongside, snow crunching underfoot.' \\\n  --height 544 --width 960 --num-frames 121 --num-inference-steps 8 \\\n  --frame-rate 24 --fps 24 --enforce-eager --output ltx25-distilled-one-stage.mp4\n\nCUDA_VISIBLE_DEVICES=2 HF_HOME=/workspace/model python \\\n  examples/offline_inference/text_to_video/text_to_video.py \\\n  --model Lightricks/LTX-2.5-Diffusers \\\n  --model-class-name LTX2DistilledTwoStagePipeline \\\n  --prompt 'A cinematic shot of a red fox walking through a snowy forest at dawn, the camera tracking alongside, snow crunching underfoot.' \\\n  --height 1088 --width 1920 --num-frames 121 --num-inference-steps 8 \\\n  --frame-rate 24 --fps 24 --enforce-eager --output ltx25-distilled-two-stage.mp4\n```\n\nObserved one-stage: 9.42 s generation, 78,666 MiB peak, 960x544/121 frames/5.042 s. Observed two-stage: 23.58 s generation, 111,716 MiB peak, 1920x1088/121 frames/5.042 s. The focused CPU-safe pipeline file also passed: `36 passed in 2.70s`.\n",
+    "line": 586,
+    "path": "tests/e2e/accuracy/ltx/test_ltx25_official_similarity.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Resolved at current head `8ce11ef77`.\n\nThe `e2721dc97` harness selected generic PyTorch SDPA independently in the two runtimes; the `torch_sdpa` metadata did not pin the same kernel. Kernel selection differed by shape/runtime on L20X, which explains the trajectory-scale mismatch. The permanent guard now selects BF16 cuDNN explicitly on both sides: native uses `PytorchAttention(priority=[CUDNN_ATTENTION, MATH])`, while Omni uses `CUDNN_ATTN`; MATH remains only the one-token fallback.\n\nA second issue affected Full two-stage I2V: multiplying Python `noise_scale=0.909375` by a BF16 conditioning mask rounded it early to `0.91015625`. The mask arithmetic now stays FP32. After the fix, native and Omni are bitwise exact at Stage 1 output, Stage 2 input, and Stage 2 final packed latent.\n\nCurrent B300/cu130 BF16-cuDNN decoded parity for all six public native T2V/I2V paths is:\n\n| Path | Task | SSIM mean/min | PSNR | LPIPS |\n|---|---|---:|---:|---:|\n| Full one-stage | T2V | 0.999652 / 0.999564 | 58.80 dB | 0.0000367 |\n| Full one-stage | I2V | 0.999589 / 0.999480 | 62.37 dB | 0.0000576 |\n| Full two-stage | T2V | 0.999588 / 0.999485 | 56.40 dB | 0.0000687 |\n| Full two-stage | I2V | 0.999585 / 0.999475 | 62.10 dB | 0.0000627 |\n| Distilled two-stage | T2V | 0.997186 / 0.996164 | 46.04 dB | 0.003450 |\n| Distilled two-stage | I2V | 0.996489 / 0.995810 | 46.29 dB | 0.003787 |\n\nThe thresholds now require SSIM mean/min >= 0.99 and PSNR >= 40 dB on every public path. The focused affected CPU suite is `111 passed`. Please rerun the pinned test on current head; it now exercises an explicit cross-runtime cuDNN contract instead of architecture-dependent generic SDPA dispatch.",
+    "line": 586,
+    "path": "tests/e2e/accuracy/ltx/test_ltx25_official_similarity.py"
+  },
+  {
+    "author": "mglyn",
+    "body": "Could we derive the expected checkpoint kind from `pipeline_kind` instead of storing it in every component profile? The base LTX-2/LTX-2.3 one-stage profiles currently leave this as `None`, so `validate_ltx_checkpoint()` returns early and `LTX2Pipeline` can accept a merged-distilled checkpoint while executing the regular CFG/STG recipe. A single mapping (`one_stage`/`two_stage` -> regular, distilled entries -> distilled, DMD2 -> unchecked) removes duplicate state and closes that gap.",
+    "line": 92,
+    "path": "vllm_omni/diffusion/models/ltx2/ltx2_components.py"
+  },
+  {
+    "author": "mglyn",
+    "body": "LTX-2.5 Full constructs its actual DiT from `transformer_full/config.json`, but the worker-level `tf_model_config` is still initialized from `transformer/config.json` and consumed before pipeline construction. The current BF16 checkpoints may share the same structure, but serialized-quant detection and any feature reading `hf_config` can bind to the distilled config. Can the selected transformer subfolder be reflected in config discovery, or can unsupported combinations be rejected explicitly?",
+    "line": 1216,
+    "path": "vllm_omni/diffusion/data.py"
+  },
+  {
+    "author": "mglyn",
+    "body": "Can we avoid reaching into the adapter's private `_sampler` field here? This makes guidance behavior depend on a concrete scheduler adapter implementation. Carrying a public `sampler` or `preserve_positive_velocity` semantic in `LTXForwardContext`, populated from the phase recipe, would keep the sampler/adapter boundary explicit.",
+    "line": 737,
+    "path": "vllm_omni/diffusion/models/ltx2/ltx2_runtime.py"
+  },
+  {
+    "author": "mglyn",
+    "body": "This `LTXAccuracyCase` block and its LTX-2/2.3 helper chain (`CASES`, `_resolve_model`, `_resolve_checkpoint`, `_resolve_image`, `_request`, and the old `_official_source`) appear unused in this file. The active 2/2.3 coverage already lives in `test_ltx_official_similarity.py`. Removing the copied dead harness saves roughly 180 lines without changing coverage.",
+    "line": 141,
+    "path": "tests/e2e/accuracy/ltx/test_ltx25_official_similarity.py"
+  },
+  {
+    "author": "mglyn",
+    "body": "The pinned native preprocessing returns the original image when either dimension is below 2. Here a 1-pixel dimension is rounded down to zero before configuring libx264. Please mirror the native `min(height, width) < 2` guard before the H.264 round trip.",
+    "line": 100,
+    "path": "vllm_omni/diffusion/models/ltx2/ltx2_conditioning.py"
+  },
+  {
+    "author": "mglyn",
+    "body": "Could we pin the process-wide SDPA state here in the same way as the existing LTX-2.3 accuracy guard (`torch.backends.cuda.enable_cudnn_sdp(False)` before model construction)? This module-op override covers the connector and DiT paths, but not Gemma/the text encoder. Since importing vLLM changes the global CUDA SDP state while the standalone official process may retain a different state, H100/H200 may route Gemma attention through different implementations, creating a reproducibility risk for these strict parity thresholds. Would mirroring the LTX-2.3 global pin so both runners use the same process-wide state make the test conditions more reproducible?",
+    "line": 123,
+    "path": "tests/e2e/accuracy/ltx/run_ltx25_reference.py"
+  },
+  {
+    "author": "mglyn",
+    "body": "Could we make a reduced CI resolution together with layerwise offload the preferred configuration for these two-stage cases, similar to the existing LTX-2.3 accuracy guard? Both variants load the x2 upsampler, and the Full path additionally materializes the large refinement LoRA, so their representative 1080p configurations exceed a single 80 GB H100.\r\nThe current tests appear to already use reduced shapes and pass --enable-layerwise-offload; could we verify and record the actual peak memory under this exact CI configuration to ensure sufficient H100 headroom?\r\nIf that is still insufficient, moving the cases to a higher-memory runner or removing them from this job would be preferable. TP or VAE tiling could be fallback options, but both materially change numerical behavior, so they would likely require rebaselined and relaxed accuracy thresholds.",
+    "line": 501,
+    "path": ".buildkite/cuda/test-nightly.yml"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Confirmed on pushed head `f7e2d6836`. The routing now matches the pinned native implementation: video scale/shift uses the per-token video timestep, A2V gate uses audio sigma, audio scale/shift uses audio timestep, and V2A gate uses video sigma. The requested current-head B300 `ltx2_3_i2v` run completed against official source `9377758131b1ffde4b7f766804590a6617bf2ab9`: video SSIM mean/min `0.992836/0.989994` and PSNR `40.66 dB`, passing its `0.95/0.90/30 dB` video gates. The overall legacy case still reports its independent pre-existing audio mismatch (`cosine=0.8306`); the I2V video/modulation portion requested here passes. `test_ltx_cross_attention_modulations_use_official_timesteps` guards the same official routing for LTX-2, which has no public I2V accuracy case.",
+    "line": 1989,
+    "path": "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Reproduced after the fixes on pushed head `f7e2d6836`. The exact B300 BF16-cuDNN distilled two-stage T2V test passed (`1 passed in 239.28s`): SSIM mean/min `0.997186/0.996164`, PSNR `46.04 dB`, LPIPS `0.003452`, audio relative L2/cosine `0.307041/0.954879`. The runner now also pins process-wide Gemma SDPA state before both official and Omni construction while keeping DiT explicitly on cuDNN with the one-token MATH fallback.",
+    "line": 586,
+    "path": "tests/e2e/accuracy/ltx/test_ltx25_official_similarity.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed in `cfee8a9e9`. `checkpoint_kind` was removed from component profiles and `resolve_ltx_checkpoint_kind()` now derives the contract from `pipeline_kind`: regular for one/two-stage, distilled for both distilled modes, and unchecked only for DMD2. This also closes the LTX-2/LTX-2.3 base-profile early-return gap; unit coverage includes every mapping and unknown-kind rejection.",
+    "line": 92,
+    "path": "vllm_omni/diffusion/models/ltx2/ltx2_components.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed in `cfee8a9e9` without adding LTX-specific branching to common config code. A generic model-extras transformer-config resolver now selects the declared subfolder; only Full `LTX2Pipeline`/`LTX2TwoStagePipeline` register the LTX resolver, which returns `transformer_full` for 2.5 and `transformer` for 2/2.3. Distilled classes retain the standard `transformer` default. The enrichment regression writes distinct markers into both configs and verifies Full binds to `transformer_full`.",
+    "line": 1216,
+    "path": "vllm_omni/diffusion/data.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed in `cfee8a9e9`. `LTXForwardContext` now exposes public `sampler`, populated directly from the phase recipe, and runtime guidance uses `forward_ctx.sampler == \"euler_ancestral\"`. No runtime code reaches into the adapter private `_sampler` field.",
+    "line": 737,
+    "path": "vllm_omni/diffusion/models/ltx2/ltx2_runtime.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed in `cfee8a9e9`. Removed the unused copied LTX-2/2.3 case dataclass, cases, source/model/checkpoint/image resolvers, and request builder from the LTX-2.5 accuracy file (196 deletions total in the review commit). Active LTX-2/2.3 coverage remains only in `test_ltx_official_similarity.py`.",
+    "line": 141,
+    "path": "tests/e2e/accuracy/ltx/test_ltx25_official_similarity.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed in `cfee8a9e9`. `_apply_image_conditioning_crf` now returns the original uint8 RGB array before importing/configuring PyAV when either dimension is below 2. The regression uses a 1x4 image, makes `av` unavailable, and verifies identity preservation.",
+    "line": 100,
+    "path": "vllm_omni/diffusion/models/ltx2/ltx2_conditioning.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed in `cfee8a9e9`. Both `_run_official` and `_run_omni` call `torch.backends.cuda.enable_cudnn_sdp(False)` before model construction, so Gemma uses the same process-wide dispatch. Connector/DiT remain independently pinned to explicit BF16 cuDNN, with MATH only for degenerate one-token attention. The current distilled two-stage B300 parity run passes the strict gates.",
+    "line": 123,
+    "path": "tests/e2e/accuracy/ltx/run_ltx25_reference.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Addressed in `cfee8a9e9`. The nightly cases already use reduced exact-CI shapes (distilled 1024x576x25, Full 512x384x25) plus `--enable-layerwise-offload`. The harness now records in-process official allocated/reserved peaks and the existing diffusion-worker-reported Omni peak in every metrics artifact (rather than incorrectly sampling the lightweight parent). On B300, the exact Full two-stage I2V CI request reports `39,034 MiB` Omni worker peak, versus the previous 225+ GiB no-offload stress configuration. The H100 nightly run will now emit its own actual worker value in the permanent artifact.",
+    "line": 501,
+    "path": ".buildkite/cuda/test-nightly.yml"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "The blanket `except Exception` here silently degrades version detection to `\"2\"` on a transient hub error (network blip, partial cache). That is not just cosmetic: detection feeds `should_preserve_reference_image_size` and the DiT config subfolder (`transformer_full` vs `transformer`), so a one-off download failure at startup can flip the resize semantics and load the wrong transformer config for the lifetime of the process — and `serving_video.py` caches the detection in a `cached_property`, so it never recovers. Could we at least `logger.debug/warn` the swallowed exception so this is diagnosable in the wild? Narrowing to `(OSError, requests exceptions, EntryNotFoundError)` would also keep genuinely-missing metadata on the fast path.",
+    "line": 307,
+    "path": "vllm_omni/diffusion/models/ltx2/ltx2_components.py"
+  }
+]

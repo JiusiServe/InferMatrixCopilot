@@ -140,14 +140,32 @@ and CI-economy classes unowned). v15 encoded those classes (checklist
 22–23, docs-IA extension, ledger-residue promotion, per-hunk second
 round) plus the reducer failure-path collapse.
 
-Wave-4 clean gate (v15, 3 replicates): **10—20; arm recall .261 vs opus
-.335 (ratio .78, up from .55 on the v13 fresh split); arm precision
-.816 vs .787 — above the baseline on a fresh human-GT holdout for the
-first time; $0.97/item vs $3.09.** The arm now wins exactly where v13
-collapsed — the GT-richest items (pr5864 GT=17 inline, pr5958 GT=20,
-pr5608 swept) — while the residual gap sits in mid-size items. A second
-replicate was invalidated by a DeepSeek 402 balance outage mid-sweep
-(quarantined; blocked on recharge).
+Wave-4 clean gate, three DS-core submissions (v15 r1, v15 r2 with
+cheap seats on v4-flash, v16 with Fable in the adversary and
+second-round seats) plus a Composer cursor-backend row. Raw win counts
+10—20, 11—19, 6—23—1, 4—24—2.
+
+**The statistically correct read (see `eval/dataset/paired_analysis.py`
+and the results table) is parity within measurement precision, not
+superiority.** Comparing raw rubric means across judgment sets is
+invalid here: the baseline's own recall mean read .335 / .338 / .416
+across three sets scoring the *same* baseline reviews (±.08 judge
+drift). Pairing inside each verdict and clustering replicates by item
+gives, pooled over 90 verdicts, Δrecall −.070 [−.161, +.021] and
+Δprecision +.015 [−.025, +.055] — both intervals span zero. An earlier
+revision of this RFC claimed precision above baseline from the raw
+means; that claim is withdrawn.
+
+What the campaign did establish: the arm reaches parity at ~1/3 the
+cost ($0.97/item vs $3.09); the aggregate recall gap is carried by 3 of
+10 items (the other 7 within ±.06); v15 leans precision (Δp +.029/+.022
+across two independent replicates, same sign) while v16 leans recall
+(best fresh-split recall .336) and reproduced the pr4870 GOLD-gap catch
+*inside* the pipeline; and resolving a .07 difference at the observed
+item-level sd (.127) needs ~32 items, which is why wave 5 extends the
+fresh pool rather than another 10-item verdict being run. A v15
+replicate was first invalidated by a DeepSeek 402 balance outage
+(quarantined) and rerun after recharge.
 
 ## Open questions
 

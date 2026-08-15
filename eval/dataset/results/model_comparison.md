@@ -19,13 +19,48 @@ forensics (spent). Wave 4 (holdout4, build_wave4.py) is the clean gate.
 All rows: DS v4-pro generator, 3 judge replicates, arm—baseline wins and
 rubric means (arm / baseline).
 
+> **READ THIS BEFORE THE RAW MEANS BELOW.** The `recall` / `precision`
+> columns are each side's raw rubric mean, and comparing them ACROSS
+> judgment sets is not a valid test: the baseline's own recall mean reads
+> .335 / .338 / .416 across three wave-4 sets that scored the *same*
+> baseline reviews — ±.08 of pure judge drift, larger than the differences
+> under study. The correct statistic pairs the two candidates inside each
+> verdict (one judge call scores both) and clusters replicates by item;
+> `paired_analysis.py` computes it. Under that test **no wave-4 config's
+> recall or precision differs significantly from the baseline** (table
+> below). An earlier revision of this file claimed "precision ABOVE
+> baseline" from the raw means; that claim is withdrawn — the paired
+> interval includes zero.
+
+### Paired, item-clustered effect sizes (wave-4, `paired_analysis.py`)
+
+Δ = arm − baseline within each verdict, replicates averaged per item,
+95% t-CI over the 10 items.
+
+| config | Δrecall [95% CI] | Δprecision [95% CI] | win share |
+|---|---|---|---|
+| v15 r1 | −.075 [−.184, +.035] | +.029 [−.022, +.080] | .33 |
+| v15 r2 (flash cheap seats) | −.056 [−.175, +.064] | +.022 [−.027, +.071] | .37 |
+| v16 (Fable adversary/round-2) | −.080 [−.169, +.010] | −.006 [−.069, +.058] | .22 |
+| Composer cursor-backend | −.081 [−.206, +.044] | −.045 [−.095, +.005] | .17 |
+| **pooled DS-core (90 verdicts)** | **−.070 [−.161, +.021]** | **+.015 [−.025, +.055]** | .31 |
+
+Every interval spans zero: on 10 items the campaign can state *parity
+within measurement precision*, not superiority in either direction. The
+pooled point estimates (recall −.07, precision +.015) are the best guess,
+and the aggregate recall gap is carried by 3 of 10 items (pr5723 −.20,
+pr5756 −.27, pr5978 −.27); the other 7 sit within ±.06 of zero. At the
+observed item-level sd (.127), resolving a .07 difference at 95%/80% power
+needs ~32 items — hence the wave-5 extension rather than another 10-item
+verdict.
+
 | gate | arm | wins | recall | precision | note |
 |---|---|---|---|---|---|
 | wave-3 attempt 1 | v14 | 2—28 | .207 / .371 | .788 / .843 | INVALID as a design measure: pass finals died at the 16k token ceiling on 7/10 items; planner broken |
 | wave-3 attempt 2 | v14+fixes | 5—25 | .231 / .424 | .790 / .824 | machinery healthy; pr5853 swept 3-0 (r .65/.18); loss localized to duties-vs-GT mismatch → forensics |
-| **wave-4 (clean)** | **v15** | **10—20** | **.261 / .335** | **.816 / .787** | **precision ABOVE baseline on a fresh holdout; recall ratio .78 (v13/v14 fresh splits: .55–.75). Arm wins the GT-richest items (5864 GT=17, 5958 GT=20, 5608 swept)** |
+| wave-4 (clean) | v15 | 10—20 | .261 / .335 | .816 / .787 | raw means only — see the paired table above (Δprecision +.029, CI includes 0). Arm wins the GT-richest items (5864 GT=17, 5958 GT=20, 5608 swept) |
 | wave-4 replicate 2 (first attempt) | v15 | INVALID | — | — | DeepSeek 402 Insufficient Balance mid-sweep; stubs judged as empty; quarantined (`INVALID_apierror_goal_v15r2_holdout4_sonnet`); rerun landed after recharge (next row) |
-| wave-4 replicate 2 | v15 (DS api, cheap seats on v4-flash) | 11—19—0 | .283 / .338 | .800 / .778 | replicates r1: precision above baseline in BOTH independent replicates; same items sweep (5608, 5958) and the same 4 mid-size items lose. Pooled 60 verdicts: 21—39, r .272/.336, p .808/.783 |
+| wave-4 replicate 2 | v15 (DS api, cheap seats on v4-flash) | 11—19—0 | .283 / .338 | .800 / .778 | independent replicate of r1: same sweeps (5608, 5958), same 4 mid-size losers, same sign on both paired deltas — the CONFIGURATION replicates even though neither delta is individually significant |
 | wave-4 (same gate) | v16 (v15 + Fable adversary/round-2 via claude-code backend) | 6—23—1 | .336 / .416 | .800 / .805 | best fresh-split arm recall of the campaign (ratio .81); precision parity. Train probe had shown BOTH means above (9—11, r .627/.625, p .805/.772) — did not transfer. Baseline drift across the three wave-4 sets on identical mds: opus r .335/.338/.416 (±.08) now exceeds the arm deltas being chased |
 | wave-4 (same gate) | v15 via cursor backend (Composer 2.5) | 4—24—2 | .283 / .364 | .765 / .810 | subscription; contamination sweep clean (0 skill refs, all traces); swept pr5958 (r .61/.33); recall ratio matches DS (.78), precision trails — the wave-2 pattern (Composer carries recall, DS carries precision) reproduces on the v15 pipeline |
 
@@ -39,17 +74,30 @@ recorded in their cost.json). Judgments: `goal_v14_holdout3_sonnet`,
 Replicate-2 config note: planner + promotion on v4-flash (owner
 direction), generator/verify/reducer unchanged on v4-pro.
 
-Standing conclusion (post v16): pooled over wave-4's three DS-core
-submissions (90 verdicts: v15 r1, v15 r2, v16) the arm is 27—62—1 with
-pooled precision .805 vs .790 (above) and pooled recall .293 vs .363
-(ratio .81). Fable in the adversary/round-2 seats buys the best
-fresh-split recall (v16 .336, and it reproduced the pr4870 GOLD-gap
-catch in-pipeline on train) at precision parity; the v15 all-DS config
-holds precision above instead. Strictly-better-on-both-means on one
-fresh gate is NOT demonstrated, and measured baseline judge drift
-(±.08 recall on identical mds across sets) now bounds what any further
-single-split submission can show — a pre-registered pooled/larger gate
-or a full-Fable generator run are the remaining honest levers.
+Standing conclusion (post v16, paired statistics):
+
+**On the fresh wave-4 gate the arm is at parity with CC+Opus 5 within
+measurement precision, at ~1/3 the cost — superiority is not demonstrated
+in either direction, and neither is the recall deficit the campaign spent
+its second half chasing.** Best point estimates over 90 pooled verdicts:
+recall −.07 (ratio .81), precision +.015. Head-to-head win share .31
+reflects the judge's recall-dominant preference on the 3 items where the
+arm genuinely under-covers.
+
+What each configuration buys, on the same gate:
+* **v15 (all-DS)** — the precision-leaning config (Δp +.029/+.022 across
+  two independent replicates, both positive; $0.97/item).
+* **v16 (Fable in adversary + second round)** — the recall-leaning config
+  (best fresh-split recall .336, ratio .81) and the only one that
+  reproduced the pr4870 GOLD-gap catch *inside* the pipeline; it trades
+  the precision lean away (Δp −.006).
+* **Composer cursor-backend** — subscription-priced, worst precision
+  (Δp −.045); a breadth proposer, not a closer.
+
+Wave 4 has now hosted three DS-core submissions plus the Composer row and
+is spent as a gate. The remaining honest lever is statistical power, not
+another 10-item verdict: wave 5 (`build_wave5.py`) extends the fresh
+item pool to 20 for a pre-registered pooled v16 measurement.
 
 # Cursor-model campaign (2026-08-14/15) — wave-2
 

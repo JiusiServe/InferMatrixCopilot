@@ -1,0 +1,92 @@
+[
+  {
+    "author": "Copilot",
+    "body": "`sampling_params_list[index].generator` can be `None` even when a request has a seed (since generator construction is typically deferred). That makes VACE conditioning latents depend on global RNG for those requests, breaking determinism/isolation relative to the per-request generator batching used elsewhere in this PR. Use the same per-request generator source as the rest of the batched path (e.g., derive from the request’s seed when generator is missing, or plumb the result of `req.collate_request_generators(...)` into this loop) so conditioning latents are reproducible and request-isolated.",
+    "line": 658,
+    "path": "vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_vace.py"
+  },
+  {
+    "author": "Copilot",
+    "body": "Batching compatibility for `sample_solver`/`flow_shift` is computed from raw `extra_args` values, so semantically equivalent inputs can be treated as incompatible (e.g., `\\\"Euler\\\"` vs `\\\"euler\\\"`, `\\\"5.0\\\"` vs `5.0`, or `None` vs an explicit default). This can artificially fragment request batches. Consider normalizing here (lowercasing `sample_solver`, casting `flow_shift` to `float` when present, and optionally mapping missing values to the engine default) so compatibility reflects the actual scheduler configuration used at runtime.",
+    "line": 39,
+    "path": "vllm_omni/diffusion/sched/request_scheduler.py"
+  },
+  {
+    "author": "Copilot",
+    "body": "When `clip_generator` is a per-sample list (the new batched path), this passes `generator=None` into `scheduler.step`. For schedulers that use `generator` (e.g., stochastic/ancestral variants), this can change results and break per-request RNG isolation. Prefer passing through the list if the scheduler supports generator lists, or otherwise redesign the stepping to preserve per-sample generator usage.",
+    "line": 1082,
+    "path": "vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_s2v.py"
+  },
+  {
+    "author": "Copilot",
+    "body": "`batch_compatibility_key` treats any non-`None` `last_image` value as present, but `last_image` isn’t validated/normalized here. If `last_image` is an empty list (or an unexpected type), the scheduler may batch it as 'present' while the runtime path later assumes `PIL.Image.Image | torch.Tensor | None`, potentially leading to runtime errors or incorrect batching decisions. Consider validating/normalizing `last_image` in preprocess (similar to `image`) and treating empty collections as absent for the compatibility key.",
+    "line": 98,
+    "path": "vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_i2v.py"
+  },
+  {
+    "author": "Copilot",
+    "body": "This duplicates raw audio waveforms across `num_outputs_per_prompt` via `np.repeat`, which can significantly increase host memory use for long clips and higher output counts. Since the waveform is request-local metadata, consider keeping it unexpanded (per request) and adjusting output splitting/post-processing to avoid materializing repeated copies.",
+    "line": 1265,
+    "path": "vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_s2v.py"
+  },
+  {
+    "author": "Copilot",
+    "body": "There’s now a unit test for `initialize_diffusion_stage` applying `max_num_seqs`, but this parallel startup path also mutates `od_config.max_num_seqs` and isn’t covered here. Add a small unit test (similar to the init test) around `launch_diffusion_stage_replica`’s config construction to prevent regressions where replica startup ignores the request batch size.",
+    "line": 1562,
+    "path": "vllm_omni/engine/stage_engine_startup.py"
+  },
+  {
+    "author": "nagisa-kunhah",
+    "body": "fix by `_normalize_explicit_sample_solver` and `_normalize_explicit_flow_shift`.",
+    "line": 39,
+    "path": "vllm_omni/diffusion/sched/request_scheduler.py"
+  },
+  {
+    "author": "nagisa-kunhah",
+    "body": "In the current S2V path, the fixed FlowUniPCMultistepScheduler does not consume generator in step(), so passing None for a batched generator list does not affect outputs or per-request RNG isolation.",
+    "line": 1082,
+    "path": "vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_s2v.py"
+  },
+  {
+    "author": "nagisa-kunhah",
+    "body": "Fixed by keeping raw audio waveforms request-local and splitting only the video outputs.",
+    "line": 1265,
+    "path": "vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_s2v.py"
+  },
+  {
+    "author": "nagisa-kunhah",
+    "body": "Added a unit test covering the parallel launch_diffusion_stage_replica path and verifying that od_config.max_num_seqs is set to the requested batch_size.",
+    "line": 1562,
+    "path": "vllm_omni/engine/stage_engine_startup.py"
+  },
+  {
+    "author": "nagisa-kunhah",
+    "body": "fix by `_normalize_i2v_last_image`.",
+    "line": 98,
+    "path": "vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_i2v.py"
+  },
+  {
+    "author": "SamitHuang",
+    "body": "Consider adding `.convert('RGB')` here when `raw_image` is a string to match the behavior in `pre_process_func` and S2V's behavior.",
+    "line": 502,
+    "path": "vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_i2v.py"
+  },
+  {
+    "author": "SamitHuang",
+    "body": "Similar to `raw_image`, consider adding `.convert('RGB')` here when `last_image` is a string.",
+    "line": 507,
+    "path": "vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_i2v.py"
+  },
+  {
+    "author": "nagisa-kunhah",
+    "body": "Thanks for your review! Done.",
+    "line": 502,
+    "path": "vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_i2v.py"
+  },
+  {
+    "author": "nagisa-kunhah",
+    "body": "Done",
+    "line": 507,
+    "path": "vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_i2v.py"
+  }
+]
