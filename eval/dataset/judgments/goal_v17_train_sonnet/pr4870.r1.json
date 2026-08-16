@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.82,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.88,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both independently surface the same high-value uncaught finding (identical NPU-runner twin bug), the async_chunk default-fallback inconsistency, and the AMD CI failure, giving them comparable recall/precision over the largely-already-resolved ground-truth items. Y edges ahead on actionability with ready-to-apply suggestion diffs and explicit tool-verified evidence (gh_ci_read, grep confirmations), and its proposed mixed-per-request-token-count test case is the closer match to the latent multi-axis batch-splitting gap that X's padding-focused hardening note doesn't quite reach. X's review is deeper in places (streaming consumer-disagreement analysis, WS realtime path) but slightly more speculative in its root-cause claims.",
+  "_cost_usd": 0.3073684,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_train",
+    "arm_a_sha256": "deb31874f9fc141175b51d036fa11dc1672c2a19ac6d8eddb93e8df2d7f5c42a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "03d7423c3a91e45838083e2025e3dea932f1d9448ba923b1d6ca1a0373899ea1",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

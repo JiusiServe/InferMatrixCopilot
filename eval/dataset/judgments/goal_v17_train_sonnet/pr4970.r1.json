@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.7,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.55,
+    "actionability": 0.8
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth has essentially no substantive concerns (LGTM plus an unrelated ask to split out a VoxCPM2 fix that neither candidate could see or address from this diff), so recall is low and roughly equal for both. Both correctly converge on the same real mechanism (default seed forces the per-row talker-MTP multinomial path), but X hedges appropriately and shows explicit grep/verification work for each claim, flagging uncertainty where it exists (e.g. CI failure causation); Y is more comprehensive and slightly more actionable (concrete test snippet, warning message) but stakes out many more highly specific, hard-to-verify claims (a three-PR history chain #1161→#2383→#4869, exact upstream vLLM sampler line numbers) that raise fabrication risk without added grounding evidence, making it comparatively less precise for a PR that human reviewers rubber-stamped.",
+  "_cost_usd": 0.25040920000000005,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_train",
+    "arm_a_sha256": "940a85dbf6f03f4639ccc9f0ee73493e0f8301fa9a33f728fc0fa23ad68c346e",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "410634f22ac0d9a55948ec0dfc9caa6557a8995e24766ff507dbe677d6dd37dc",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

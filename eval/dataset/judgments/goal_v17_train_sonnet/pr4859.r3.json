@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.8,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.55,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Y digs deeper into more of the ground-truth threads (serving_speech dialect removal with concrete doc/example fixes, the patch_emission +2 boundary, definitions.py layering) and reads as a more polished, actionable PR comment, giving it the recall and actionability edge. But Y's headline 'High' finding claims to have 'verified locally' that mutating config.num_hidden_layers truncates the encoder to 4 layers at forward time — this directly contradicts the ground-truth maintainer clarification (encoder is already built before the mutation, only metadata is affected) and standard Qwen2Model behavior (layers are fixed at construction, not resliced by config each forward), making it a fabricated/incorrect verification presented with fake confidence. X's version of the same finding correctly distinguishes metadata corruption from actual layer truncation, matching what the ground-truth reviewer amy-why-3459 actually flagged. X also independently surfaces the same double-resample WER bug and the encode_latent nondeterminism issue that Y found, with no comparable fabrication, giving it materially better precision despite noisier, more redundant write-up and thinner coverage on a couple of items.",
+  "_cost_usd": 0.5232976,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_train",
+    "arm_a_sha256": "42b1042db5a50b96fec9c77a74e9a712db31aaf8679d78498e36b9ba0bcd88d3",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "264e453d996b4a5c483bf206cefb21e513e90d0d6bda5e49948434353154f4a5",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

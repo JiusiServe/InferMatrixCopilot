@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.88,
+    "actionability": 0.93
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive inline concerns tied to this diff (just an LGTM and an unrelated VoxCPM2 scope request), so recall is vacuously satisfied by both. Both candidates independently trace the same core mechanism (serving_speech.py seed propagation → gpu_model_runner per-row generator → slow multinomial path) with specific, well-grounded line citations, giving both high precision. Y goes further with concrete, ready-to-paste artifacts (tombstone comment, regression test code, log message text), digs into PR-description accuracy (vLLM's own seeded-sampler fallback, stage-1 no-op), and ties the recurring-seed history together, edging out X's still-solid but comparatively narrower set of asks on actionability.",
+  "_cost_usd": 0.25252060000000004,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_train",
+    "arm_a_sha256": "940a85dbf6f03f4639ccc9f0ee73493e0f8301fa9a33f728fc0fa23ad68c346e",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "410634f22ac0d9a55948ec0dfc9caa6557a8995e24766ff507dbe677d6dd37dc",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

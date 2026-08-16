@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.75,
+    "precision": 0.6,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.75,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both independently catch the same high-value, not-in-ground-truth bug (seed_tts_eval double-resampling of already-24kHz audio) with near-identical, well-grounded reasoning. X covers all three real GT threads (audio_vae config mutation, dropped language/dialect field, patch_emission +2) with depth that mirrors how they actually got resolved (hedging 'if intentional, document; else fix'), while Y's treatment of the language-removal and +2 threads is thin, tacked onto a truncated 'additional observations' appendix. X loses precision points for a suspicious, likely-inaccurate 'verified locally' claim that the encoder is actually truncated (the real PR thread confirms only stale config metadata, no behavioral change) and unverifiable merge-SHA narrative; Y is more consistently evidence-cited and technically accurate but padded with redundant near-duplicate 'validated' entries and less scannable, evidence-dump formatting. X's clearer severity tiers and concrete suggested diffs make it more actionable overall.",
+  "_cost_usd": 0.4244045,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_train",
+    "arm_a_sha256": "42b1042db5a50b96fec9c77a74e9a712db31aaf8679d78498e36b9ba0bcd88d3",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "264e453d996b4a5c483bf206cefb21e513e90d0d6bda5e49948434353154f4a5",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

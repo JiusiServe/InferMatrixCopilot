@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.8,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth for this docs-only PR is essentially empty (casual LGTM approvals, no inline comments), so recall is trivially satisfied by both. X does deeper, better-grounded tracing with specific line-level citations and delivers concrete, actionable fixes (the 'silent audio vs 500 error' correction, the overly-broad extra_body claim caught against a GLM-Image counterexample, the index:0 collision note, and a jq verification snippet). Y validates similar baseline facts but is more hedged, asking a clarifying question about response shape rather than resolving it, and lands on a less decisive COMMENT verdict with thinner actionable guidance.",
+  "_cost_usd": 0.1603005,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_train",
+    "arm_a_sha256": "59c87ea9fe5ef84c4fd6e355d445866919d6d22fec9086ca08998208ec8a69a3",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5a2e689fc33efd67adbf119f1e4cf034841928ad70fea2d99f142a727ca8ea18",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.7,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently surface the same critical, well-grounded finding (super().forward() no longer matches ZImagePipeline's reduced signature) and both correctly validate the orchestrator fix using the same reasoning as the ground-truth inline comment (submit_initial/submit_update both reject lists, so already_submitted was never load-bearing). Y goes further with well-evidenced second-order consequences (1a/1b on the orchestrator, 2a/2b on the pipeline shim) and cleaner prioritization, while X pads its report with repetitive 'Validated' bullets and one weaker, less-grounded CI-lane finding. X compensates with literal inline suggestion diffs that are marginally more mechanically actionable.",
+  "_cost_usd": 0.2536654,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17_val",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_val",
+    "arm_a_sha256": "7bd856e2067a6fc00a0b01b539eb94cdffec9cbae4b8401260f5a9274a7807ec",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "bc98460632105aef812a50d392afd9f1bea66b3f783e8a9cd888456ce013cba3",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

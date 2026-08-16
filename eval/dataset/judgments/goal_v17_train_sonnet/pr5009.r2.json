@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.9,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both reviews are unusually rigorous and well-grounded, but Y maps much more directly onto the ground truth's central concern: it explicitly names ~14 affected sibling models and proposes scoping via `_DIFFUSION_IR_OP_PRIORITY_FUNCS`/registry (matching hsliuustc0106's exact ask) and independently re-derives Gaohan123's P1+P2-vs-main perf request. X's flagship finding instead targets a different scope axis (IR-op-level default leakage to non-RMSNorm ops) and treats the FLUX.1-dev evidence as already sufficient rather than surfacing the 'validated only on Qwen-Image' gap, so it captures the GT concern only indirectly. X edges out on precision/actionability with tighter evidence citations and ready-to-apply diff suggestions, but that's not enough to offset the recall gap. Neither review has a section literally titled LATENT GAP CHECK, so gap_hit is false for both.",
+  "_cost_usd": 0.5373656,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_train",
+    "arm_a_sha256": "77b6ccea38acd6b2e6c1a4248845e9ca81af6ba7867b5563a6a63e4195858d06",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "97e45909dc2469db55da15b6e8d6a525549029c219aefca76123ec8b801fd1bf",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

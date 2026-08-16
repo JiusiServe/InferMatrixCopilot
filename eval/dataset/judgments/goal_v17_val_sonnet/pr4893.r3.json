@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.78,
+    "actionability": 0.75
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates independently converge on the ground truth's core concern (the new test assertions validate the fake's injected device_communicator/reduce_scatter rather than the production wrapper), and both flag the DP-metadata guard being too broad (world_size>1 instead of gated on the MoE/EP mapping). X goes further with a well-reasoned, diff-grounded deadlock scenario (CFG-parallel rank asymmetry hitting the new all_gather_object) and a latent data_parallel_rank bug, both delivered with clean, coherent prose suggestions. Y's findings are comparably grounded and evidence-quoted but include a duplicated finding (rank-order fabrication flagged twice) and its GitHub-style suggestion blocks have broken indentation that wouldn't apply cleanly, denting actionability.",
+  "_cost_usd": 0.2998472,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17_val"
+  },
+  "_roles": {
+    "arm": "copilot_v17_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_val",
+    "arm_a_sha256": "41955c02afd9f063d9be7e63d969be4b28a00cd0c654d1937275d64d853cd85b",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0d4ddd4027e23f1f32216e748289588ea9a0e74ee8e599fa34b9d50f503d2f0d",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

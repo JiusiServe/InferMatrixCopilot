@@ -101,6 +101,82 @@ The deficit is concentrated, not diffuse: over the 20 pooled items, 6
 are positive for the arm, 4 are within ±.02, and a single item (pr5978,
 −.37) contributes about a third of the pooled gap.
 
+## v17 conversion-fix probe (2026-08-16) — val + train, judge = claude-sonnet-5
+
+Pre-registered in `goal-eval/PROBE-v17-conversion.md` before generation.
+**A probe on already-spent splits, not a measurement**: val and train have
+been iterated on all campaign, so these rows say whether the conversion
+fixes do what they were built to do — they say nothing about the holdout.
+Arm = HEAD `ae1b6f1`, core-only (Fable-5 quota still exhausted, so the v16
+adversary/round-2 routing was deliberately NOT applied rather than run into
+dead seats again).
+
+| config | Δrecall [95% CI] | Δprecision [95% CI] | win share |
+|---|---|---|---|
+| v17 val (4 items — see quarantine) | −.047 [−.108, +.013] | −.073 [−.240, +.094] | .29 |
+| v17 train (10 items) | −.052 [−.130, +.026] | +.036 [−.030, +.101] | .33 |
+| **v17 pooled (14 items, exploratory)** | **−.050 [−.104, +.003]** | **+.005 [−.056, +.065]** | .32 |
+
+Reference rows on the identical items: `goal_v13_val` on the same 4 items
+was +.038 recall / +.013 precision; `goal_v16f_train_sonnet` (the one split
+where the Fable seats actually ran, 15/15 live) was +.002 / +.033.
+
+**The conversion fixes did not close the recall gap.** Pooled −.050 is the
+same number the pre-registered holdout produced (−.049), from three
+independent splits. Precision is at parity (+.005). No CI here excludes
+zero, so nothing is *resolved* — but "unchanged at −.05" is now the reading
+supported by wave 4+5, val, and train alike.
+
+Two confounds are inseparable in the train row and must not be papered
+over: v17 both gained the conversion fixes and lost the two Fable seats
+v16 had. The train comparison therefore measures "core-only + conversion
+fixes" against "core + Fable", not the fixes alone.
+
+What the judges say the losses are made of (rationales, blinding resolved):
+
+* The arm's evidence discipline is rated **higher**, repeatedly — "more
+  rigorously evidence-cited", "more trustworthy even though it covers
+  slightly less ground"; arm precision runs .75–.90. Recall is the whole
+  gap, as it has been since v13.
+* **Right region, wrong axis**: on pr4804 the arm "only glances off the
+  v2-collision issue via a differently-framed 'broad except' critique"; on
+  pr5009 its "flagship finding instead targets a different scope axis".
+* **The cap-8 comment budget binds on the items we lose.** Four items hit
+  the cap AND spilled into an "additional observations" appendix the judge
+  called truncated (pr4859: "treatment of the language-removal and +2
+  threads is thin, tacked onto a truncated appendix"). Those 4 average
+  −.100 Δrecall; the other 10 average −.031. Same conversion-failure class
+  already fixed once — real findings routed out of the scored channel,
+  this time by the budget rather than by the `[resolved]` block.
+* **The dedupe gap costs precision on both splits**, as predicted in the
+  probe doc and deliberately left unfixed to avoid config selection:
+  "padded with redundant near-duplicate 'validated' entries and less
+  scannable". Every full-depth item emits exactly 14 Validated lines; arm
+  artifacts run 13–20k chars against the baseline's 5–11k.
+* **`suggestion` blocks cut both ways.** They won replicates outright
+  ("edges ahead on actionability via literal suggested-diff code blocks"),
+  but on pr4810 they lost two of three: a `major` finding shipped with "a
+  suggested code fix that inverts the guard", and a regex fix that
+  "directly contradicts its own stated reasoning". A wrong claim welded to
+  an applyable diff is refutable in a way a hedged one is not. Rendering
+  bug found alongside: the blocks emit broken indentation and "wouldn't
+  apply cleanly".
+* The `skill candidates awaiting curation` section is being judged as
+  review content ("an irrelevant 'skill candidates' section") — pipeline
+  exhaust leaking into the scored artifact.
+
+New defect found by this probe, and the most expensive one: a DeepSeek
+400, "The `content[].thinking` in the thinking mode must be passed back to
+the API", hit **8 of the 15 items, 14 times total**. Most items absorbed it
+through retries — losing whole passes silently, the same shape as the
+empty-final leak. On pr4825 it fired four times and killed the run
+outright; that item is quarantined
+(`INVALID_apierror_goal_v17_val_sonnet`) and reported MISSING per the
+probe's decision rule, never scored as a zero. The runner had already
+spent its one retry. Separately, `run_campaign_pipelined.py` judged the
+`(no RUN_REPORT.md — rc=3)` stub and printed `complete: 5/5 ok` — a
+blocked artifact must never reach the judge.
+
 What each configuration buys, measured on the same gates:
 * **v15 (all-DS)** — precision-leaning (Δp +.029/+.022 across two
   independent wave-4 replicates, same sign both times); $0.97/item.

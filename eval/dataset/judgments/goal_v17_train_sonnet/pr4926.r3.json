@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.78,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Y matches more ground-truth threads: it directly and substantively answers wtomin's 'what do version=1/version=2/default mean' question (X never touches this), and both catch the SM90-vs-Blackwell FA3 gating gap and the masked-varlen-func None-crash bug equally well. X's recall is weaker — it misses the version-semantics question and the test-marker/skipif debate entirely, compensating with tangential but not GT-matching depth (CI lane non-collection, kernel pinning). X is more actionable (ready-to-apply suggestion diffs for nearly every major finding) and slightly more conservatively grounded, while Y's hardest-hitting evidence (live Hub branch SHAs, cold/warm timing numbers) is unverifiable and carries some fabrication risk even though it reads as plausible tool-verified output. Neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.43435250000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_train",
+    "arm_a_sha256": "1355967950fd06e030e4944d9aea1ee92f4b5cdfd9293c3912814b06c8d18bde",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0639263265995e00edcd06c6242ac0a6a3647a980509c282af885c86ce6930e0",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

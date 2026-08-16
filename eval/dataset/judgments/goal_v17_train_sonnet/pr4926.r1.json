@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.5,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.7,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both catch the two confirmed ground-truth bugs (varlen_func None crash, FA3 SM90 gating) and go well beyond GT with plausible novel findings (per-layer kernel loading, duplication, Blackwell gating ambiguity). X's precision is hurt by highly specific, hard-to-verify external claims (exact HF Hub commit hashes across two repos, exact kernels-library internal error text) that read as fabricated confabulation, and its 'version=1 defeats the PR's purpose' framing is actually contradicted by the maintainer's own clarification in the GT thread. Y sticks closer to statically-verifiable, quoted code evidence, explicitly tracks which GT threads were already resolved (showing real engagement with review history), and ships copy-paste-ready `suggestion` diffs, making it both more grounded and more actionable.",
+  "_cost_usd": 0.4952578999999999,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_train",
+    "arm_a_sha256": "1355967950fd06e030e4944d9aea1ee92f4b5cdfd9293c3912814b06c8d18bde",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0639263265995e00edcd06c6242ac0a6a3647a980509c282af885c86ce6930e0",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

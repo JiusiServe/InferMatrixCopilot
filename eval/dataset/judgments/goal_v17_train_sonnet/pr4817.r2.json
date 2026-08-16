@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.92
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.78,
+    "actionability": 0.72
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth carries no substantive concerns (bot rate-limit notices, 'thanks for the fix'), so recall is trivially satisfied by both. Both candidates independently and correctly nail the flagship issue — the new regression test has no pytestmark and is silently deselected by the CI marker filter — with matching evidence and an identical fix. X goes deeper with well-grounded, actionable bugs invisible in the diff itself (warmup_quack_fp8() bypassing the gate entirely, warning_once failing to dedupe because it keys on the exception object, and the per-call retry loop amplifying any future failure), each with concrete patches and clear blocking/should-fix triage. Y's remaining findings (naming-rename confirmation, 'state the blast radius in the PR description', an AMD/NPU non-causation nit) are grounded but low-value padding that dilutes an otherwise good arch-exclusion catch (cc 11.x/sm_110a), making it less actionable overall than X's tightly prioritized report.",
+  "_cost_usd": 0.1259221,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_train",
+    "arm_a_sha256": "f95efefc340683a005d55c7a4efa226262573432d1565ee6b4c0a5f63c020cbc",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "de884ebeca54520b85a490b897397bd22bf362507bf9f7d4a833d74b390ae063",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

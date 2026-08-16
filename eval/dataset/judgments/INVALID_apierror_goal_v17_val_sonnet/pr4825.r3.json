@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.95
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Y crashed before producing any review content (just an error trace), so it has zero recall/precision/actionability by definition. X delivered a thorough, well-grounded review with specific file/line citations and concrete fixes; notably its critique of the hardcoded component tuple and suggestion to derive components from existing pipeline metadata (_dit_modules) closely mirrors the ground-truth reviewer's substantive concern about driving the mapping from _packed_modules_mapping/stacked_params_mapping instead of hardcoding, though it doesn't reference that exact mechanism. Most of the ground truth is process chatter (validation request, LGTM approvals) that isn't meaningfully 'findable' as a review comment, so X's moderate recall reflects covering the one real technical concern present.",
+  "_cost_usd": 0.1606662,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17_val"
+  },
+  "_roles": {
+    "arm": "copilot_v17_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_val",
+    "arm_a_sha256": "e89856567ad6cb0156d98643a000c37f4332c418dbb4a9cc9f4156dc96e59d21",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9201be5ea408a41833fb8e6040e5eb97d26044159a083e4d1896451ac3585494",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

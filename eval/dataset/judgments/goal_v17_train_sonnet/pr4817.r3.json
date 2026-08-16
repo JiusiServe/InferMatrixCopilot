@@ -1,0 +1,36 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.88,
+    "actionability": 0.88,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns, so both trivially satisfy recall. Both independently converge on the same two strongest findings (the new test lacks pytestmark so CI's marker-filtered selection silently deselects it, and the sm_110a/cc-11.x gap between the PR's own tcgen05 claim and the ==10 gate), which cross-validates those as real. Y goes further and verifies the CI-deselection claim with an actual local pytest run, and surfaces two additional non-obvious, concretely-fixable defects X misses entirely (warmup_quack_fp8 bypassing quack_enabled(), and warning_once's exception-object cache key defeating dedup), each with a suggested patch and clear blocking/should-fix severity. X's review, while similarly grounded, pads its output with repetitive/near-duplicate 'validated' bullets and a lower-value blast-radius note, diluting signal despite covering the same core ground as Y.",
+  "_cost_usd": 0.2647195,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_train",
+    "arm_a_sha256": "f95efefc340683a005d55c7a4efa226262573432d1565ee6b4c0a5f63c020cbc",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "de884ebeca54520b85a490b897397bd22bf362507bf9f7d4a833d74b390ae063",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

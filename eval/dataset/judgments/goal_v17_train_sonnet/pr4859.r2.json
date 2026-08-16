@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.55,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.6,
+    "actionability": 0.65
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both independently catch the audio_vae.py:141 config-mutation issue, the dropped 'include_language'/方言 feature, the untested decode-window +2 change, and a novel (GT-unconfirmed but plausible) double-resample bug in seed_tts_eval.py. X covers the language-removal concern far more thoroughly (cites README/example files, matches GT's request for docs/tests almost exactly) and is organized and immediately actionable, but its headline claim of 'verified locally' that the encoder literally executes only 4 layers at runtime contradicts the GT maintainer's explicit clarification that the encoder's built layer count is unchanged — a likely fabricated/incorrect verification that hurts precision on its top finding. Y is more careful/accurate on that same point (correctly notes the encoder's layers were 'actually built with the backbone's original layer count') but is padded with near-duplicate repeated claims about the same resample bug and has its coverage of language-removal/decode-window truncated mid-sentence, reducing effective recall and actionability.",
+  "_cost_usd": 0.4144307,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_train",
+    "arm_a_sha256": "42b1042db5a50b96fec9c77a74e9a712db31aaf8679d78498e36b9ba0bcd88d3",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "264e453d996b4a5c483bf206cefb21e513e90d0d6bda5e49948434353154f4a5",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}
