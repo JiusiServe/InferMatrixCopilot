@@ -12,6 +12,17 @@ from __future__ import annotations
 _SEVERITY_ORDER = {"blocker": 0, "major": 1, "minor": 2, "nit": 3}
 
 
+def _clip(text: str, limit: int) -> str:
+    """Clip at a word boundary with a visible marker. A hard character slice
+    ended real findings mid-word (measured: an overflow bullet stopped at
+    ``replaces `u``), which reads as corruption rather than as a summary."""
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    space = cut.rfind(" ")
+    return (cut[:space] if space > limit * 0.6 else cut).rstrip(" ,;:") + " […]"
+
+
 def _sweep_targets(diff: str, language: str = "python") -> str:
     """Deterministic sweep targets extracted from the diff's added lines.
 
@@ -187,11 +198,21 @@ def _review_summary_parts(output: dict) -> list[str]:
                 return rank
         return len(_VALIDATED_PREFIX_RANK)
 
-    validated_all = [
-        str(finding).strip()
-        for finding in (output.get("findings") or [])
-        if str(finding).lstrip().lower().startswith(_VALIDATED_PREFIX_RANK)
-    ]
+    # dedupe before ranking: parallel passes independently verify the same
+    # fact and each writes its own bullet, so the ledger shipped the same
+    # line three times on measured items and judges docked precision for the
+    # repetition. Keyed on the normalized first 90 chars — enough to catch
+    # re-phrasings of one fact, short enough not to merge distinct ones.
+    validated_all, seen = [], set()
+    for finding in (output.get("findings") or []):
+        text = str(finding).strip()
+        if not text.lstrip().lower().startswith(_VALIDATED_PREFIX_RANK):
+            continue
+        key = " ".join(text.lower().split())[:90]
+        if key in seen:
+            continue
+        seen.add(key)
+        validated_all.append(text)
     validated = sorted(validated_all, key=_prefix_rank)[:14]
     counts: dict[str, int] = {}
     # budget-cut overflow counts in the scan too — a capped finding was still
@@ -257,8 +278,16 @@ def _render_review_md(output: dict, pr_state: str = "") -> str:
             line = f"~{c['_declared_line']}"
         loc = f"`{c.get('file', '?')}:{line if line is not None else '?'}`"
         ev = f" (evidence: {c['evidence']})" if c.get("evidence") else ""
-        lines.append(f"{loc} [{c.get('severity', 'minor')}] — "
-                     f"{c.get('comment', '')}{ev}")
+        entry = (f"{loc} [{c.get('severity', 'minor')}] — "
+                 f"{c.get('comment', '')}{ev}")
+        # an applicable patch is worth more to a maintainer than any amount
+        # of description: the baseline ships dozens of these per review and
+        # was scored more actionable on every measured item
+        suggestion = str(c.get("suggestion") or "").strip()
+        if suggestion:
+            fence = "```" if "```" not in suggestion else "````"
+            entry += f"\n\n{fence}suggestion\n{suggestion}\n{fence}"
+        lines.append(entry)
     parts = _review_summary_parts(output)
     parts.append("\n\n".join(lines) if lines else output.get("summary", "No findings."))
     overflow = output.get("_review_overflow") or []
@@ -270,7 +299,7 @@ def _render_review_md(output: dict, pr_state: str = "") -> str:
                          f"- `{c.get('file', '?')}:"
                          f"{c.get('line', c.get('_declared_line', '?'))}` "
                          f"[{c.get('severity', 'minor')}] "
-                         f"{str(c.get('comment', '')).strip()[:220]}"
+                         f"{_clip(str(c.get('comment', '')).strip(), 320)}"
                          for c in overflow))
     body = "\n\n".join(parts)
     return f"{body}\n\n**Verdict:** {_review_verdict(comments, pr_state)}"

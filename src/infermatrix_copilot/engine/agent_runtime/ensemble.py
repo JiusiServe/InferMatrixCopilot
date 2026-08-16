@@ -182,7 +182,15 @@ async def run_agent_step_ensemble(
                 evidence=evidence, guidance=lens_guidance, expected=expected,
                 output_extension=output_extension, scope=scope,
                 extra_tools=extra_tools, max_iters=budget)
-        if (ctx.settings.ensemble_zero_yield_retry and output and not (output.get(merge_key) or [])):
+        # `output` is {} when the lens produced no contract-conformant final —
+        # the ONLY path where _coerce_output returns None, reached when a pass
+        # burns its whole completion ceiling and returns empty text. Both
+        # retries below used to require a truthy `output`, so that case fell
+        # through BOTH and the lens was dropped silently: measured 2026-08-16,
+        # five whole review passes and ~2.1M input tokens of investigation
+        # discarded across one holdout, three of them on its worst item.
+        if (ctx.settings.ensemble_zero_yield_retry
+                and not ((output or {}).get(merge_key) or [])):
             # zero-yield lens: one cheap single-lens re-ask beats the full
             # 8-lens ensemble retry it used to trigger (T3 forensics #6).
             # The retry KEEPS this lens's routing (`**overrides`): dropping it
@@ -208,10 +216,16 @@ async def run_agent_step_ensemble(
             result, output = await run_agent_step(
                 ctx, step_name=f"{step_name}#{lens['name']}{suffix}/retry",
                 purpose=purpose, evidence=evidence,
-                guidance=lens_guidance + "\n\nYour first pass yielded zero "
-                "candidates. Re-check your two highest-risk hunks; emit every "
-                "plausible candidate (do not self-censor) or a [validated] "
-                "finding for each checklist item you cleared.",
+                guidance=lens_guidance + (
+                    "\n\nYour first pass produced NO USABLE FINAL — most "
+                    "likely it ran past the reply ceiling. Investigate less "
+                    "and FILE: your final JSON must fit, so keep evidence to "
+                    "one quoted line per comment and findings to 15 lines."
+                    if not output else
+                    "\n\nYour first pass yielded zero candidates. Re-check "
+                    "your two highest-risk hunks; emit every plausible "
+                    "candidate (do not self-censor) or a [validated] finding "
+                    "for each checklist item you cleared."),
                 expected=expected, output_extension=output_extension,
                 scope=scope, extra_tools=extra_tools, max_iters=budget,
                 **overrides)

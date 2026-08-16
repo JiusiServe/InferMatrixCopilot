@@ -1152,3 +1152,46 @@ def test_outcome_blocked_distinguishes_dead_seat_from_quiet_seat():
                                     "_tools_used": ["grep", "read_file"]})
     assert not outcome_blocked(ok, {"status": "blocked",
                                     "_tools_used": ["grep"]})
+
+
+def test_resolved_residual_becomes_a_comment(settings, trace, tmp_path):
+    """A `[resolved]` line that states a RESIDUAL is promoted into a scored
+    comment. Ground truth on merged/amended heads is ~70% "the fix landed —
+    what does it still not cover?", and the passes produce exactly that
+    reasoning; it was rendering into the unscored Validated block."""
+    from infermatrix_copilot.engine.steps.review.steps import (
+        _promote_resolved_residuals,
+    )
+    out = _promote_resolved_residuals(
+        _ctx(settings, trace, tmp_path),
+        {"review_comments": [],
+         "findings": [
+             "[resolved] prior concern 'guard runs after the collective': "
+             "fixed at pipe.py:120 `validate(x)`. Residual: the batch path "
+             "at pipe.py:340 still calls it inside the rank-0 branch.",
+             "[resolved] prior concern 'missing pin': fixed at req.txt:3.",
+             "[sweep] read 40 files, nothing else of note"]})
+    kept = out["review_comments"]
+    assert len(kept) == 1, "only the residual-bearing line promotes"
+    assert kept[0]["file"] == "pipe.py" and kept[0]["line"] == 120
+    assert "Residual" in kept[0]["comment"]
+    assert next(trace.events("review_resolved_promoted"))["added"] == 1
+
+
+def test_empty_final_lens_is_retried_not_discarded(settings, trace, tmp_path):
+    """A pass that burns its ceiling and returns no contract-conformant final
+    used to fall through BOTH retry paths and be dropped silently — five
+    whole passes and ~2.1M input tokens of investigation lost on one
+    measured holdout."""
+    settings.ensemble_zero_yield_retry = True
+    llm = ScriptedLLM([
+        Reply(blocks=[Block(type="text", text="")]),      # lens a: no final
+        contract(items=[{"name": "recovered"}]),           # lens a: retry
+        contract(items=[{"name": "b"}]),                   # lens b
+        verdicts_reply({"i": 0, "action": "keep"},
+                       {"i": 1, "action": "keep"}),
+    ])
+    result, output = _run(_ctx(settings, trace, tmp_path, llm=llm))
+    assert result.ok
+    assert {i["name"] for i in output["items"]} == {"recovered", "b"}
+    assert any(e for e in trace.events("lens_zero_yield_retry"))

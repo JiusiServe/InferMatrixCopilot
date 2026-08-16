@@ -220,6 +220,15 @@ and the directive; a reader holding only the diff must see immediately which cha
 comment hangs on. For comments about diff code, `line` is a line the diff touches; for \
 repo-impact comments (a consumer/doc/test elsewhere that this change breaks or leaves \
 stale), point file/line at that repo location and quote it.
+- SUGGEST THE EDIT. When the fix is expressible as code, fill `suggestion` with the \
+replacement lines for the cited region — the patch itself, no prose, no diff markers. \
+A maintainer applies a suggestion; they have to re-derive a description. Leave it \
+empty only when the ask is genuinely a question or a judgement call.
+- SEVERITY IS A DECISION, NOT A HEDGE. Before assigning one, answer: would a \
+maintainer BLOCK the merge on this? If yes it is blocker/major — say so. Marking \
+everything `minor` to stay safe reads as "nothing here matters" and buries the one \
+finding that did; a review of eight minors and no stated blocker is a review that \
+declined to have an opinion.
 - A verification ask is a first-class comment when it names the exact test/benchmark \
 command and the specific regression risk it guards; bare process asks ("run the tests") \
 are still banned.

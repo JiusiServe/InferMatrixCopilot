@@ -134,6 +134,57 @@ def _consumer_sweep(repo: str | None, diff: str) -> str:
             "is where breakage hides:\n" + "\n".join(out))
 
 
+_RESIDUAL_MARKERS = ("residual", "not covered", "does not cover", "still ",
+                     "remains ", "left unfixed", "but ")
+
+
+def _promote_resolved_residuals(ctx: StepContext, output: dict) -> dict:
+    """Turn every `[resolved]` findings line that states a RESIDUAL into a
+    review comment.
+
+    Measured across two holdouts: the ground truth on merged/amended heads is
+    ~70% "a reviewer raised X, the fix landed — what does it still not
+    cover?", and the passes DO produce that reasoning (the `[resolved]`
+    contract in prompts.py asks for exactly it). But `[resolved]` is a
+    FINDINGS line, and findings render into the unscored 'Validated' block —
+    so the arm's best answers to the dominant question class were routed away
+    from the only channel a reader (or judge) scores. This promotion is
+    grounded by construction: it re-files a line the run already wrote and
+    verified, so it cannot invent a claim, and it sits outside the
+    coverage-promotion cap because it is not a discretionary addition."""
+    findings = [str(f) for f in (output.get("findings") or [])]
+    comments = list(output.get("review_comments") or [])
+    covered = {(str(c.get("file") or ""), str(c.get("comment") or "")[:60])
+               for c in comments}
+    added: list[dict] = []
+    for line in findings:
+        low = line.lstrip().lower()
+        if not low.startswith("[resolved]"):
+            continue
+        body = line.split("]", 1)[-1].strip()
+        if not any(m in body.lower() for m in _RESIDUAL_MARKERS):
+            continue          # a bare confirmation is not a finding
+        m = re.search(r"([\w./\-]+\.\w+):(\d+)", body)
+        file_, line_no = (m.group(1), int(m.group(2))) if m else ("?", None)
+        if (file_, body[:60]) in covered:
+            continue
+        added.append({"file": file_, "line": line_no, "severity": "minor",
+                      "comment": body,
+                      "evidence": line.strip(),
+                      "corroborated_by": ["resolved-residual"]})
+    if not added:
+        ctx.trace.record("review_resolved_promoted", step="agent.review_diff",
+                         added=0, resolved_lines=sum(
+                             1 for f in findings
+                             if f.lstrip().lower().startswith("[resolved]")))
+        return output
+    out = dict(output)
+    out["review_comments"] = comments + added[:4]
+    ctx.trace.record("review_resolved_promoted", step="agent.review_diff",
+                     added=len(added[:4]))
+    return out
+
+
 async def _promote_uncovered(ctx: StepContext, output: dict,
                              spec: dict) -> dict:
     """Coverage-promotion pass: one tool-less LLM call that promotes
@@ -623,7 +674,9 @@ async def _review_diff(ctx: StepContext) -> StepResult:
                       _consumer_sweep, _repo_path(ctx), str(diff))},
         output_extension={"review_comments":
                           "list of {file, line, anchor_snippet, severity: "
-                          "blocker|major|minor|nit, comment, evidence}"},
+                          "blocker|major|minor|nit, comment, evidence, "
+                          "suggestion: optional replacement code for the "
+                          "cited lines — the concrete edit, no prose}"},
         extra_tools={**_gh_read_tools(_repo_path(ctx)),
                      **review_repo_tools(_repo_path(ctx))},
     )
@@ -732,6 +785,11 @@ async def _review_diff(ctx: StepContext) -> StepResult:
         # worth mining — gating on the pre-salvage status silently disabled
         # the pass on exactly the GT-rich items it exists for) and BEFORE
         # the verify pass, so promoted items face the same scrutiny
+        # resolved-residual promotion FIRST: it re-files reasoning the run
+        # already verified, so it should be visible to the coverage editor
+        # (which is told not to duplicate kept comments) rather than compete
+        # with it for the cap of 3
+        output = _promote_resolved_residuals(ctx, output)
         output = await _promote_uncovered(ctx, output, spec)
         # coverage-driven second round (RFC q3): changed files nobody wrote a
         # line about seed ONE bounded extra pass — BEFORE the verify pass, so
