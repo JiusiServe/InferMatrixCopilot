@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth is sparse (one naming-convention comment already reflected in the diff, plus a formatting suggestion on the OffloadStrategy enum list). Both candidates go far beyond GT with well-grounded, code-cited findings, but Y explicitly flags the same enum-spelling issue (DISTRIBUTED_LAYERWISE/LAYERWISE vs actual DISTRIBUTED_LAYER_WISE/LAYER_WISE) at the same file/line as GT and independently surfaces the same cpu_offload.md naming-collision tension GT's first comment addresses (nit #9), giving it better recall; X only catches the enum item, buried as a low-priority nit. Precision and actionability are comparably high for both — every major/must-fix claim carries specific file:line evidence and a concrete suggested fix — though X's tighter, self-validated claim set is marginally more consistently grounded than Y's larger, occasionally more speculative claim list (e.g. the redirect-history archaeology).",
+  "_cost_usd": 0.3849148,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16f_holdout5_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout5_r1",
+    "arm_a_sha256": "f3d048b5c0fd3ceb17edd6212395088e8798fd78328fe7c529a1d89c9788c6b0",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "8a4bd981cd684d4e7de73fc0fb1af7912963b1c4aa02f6764ef9f25a324e376a",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

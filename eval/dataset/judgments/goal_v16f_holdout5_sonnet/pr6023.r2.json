@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.55,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Neither candidate surfaces the ground truth's central concern (aggregate-message-size/ring-buffer overflow for many sub-threshold tensors), so recall is low and roughly tied. On the shared batch-split-map race finding, X self-contradicts by first marking it 'resolved... race closed at this head' in its Validated section and then re-raising the identical bug as a 'major' finding, undermining trust in its analysis; Y reports the same bug once, with an actual reproduction log demonstrating the hang, which is far more convincing. Y also surfaces an additional sharp, verified edge case (zero-element view crashing SharedMemory allocation) with a repro, and every blocking finding includes a concrete code-level fix, making it more actionable than X's vaguer prose fixes and abruptly truncated output.",
+  "_cost_usd": 0.3478607,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16f_holdout5_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout5_r1",
+    "arm_a_sha256": "1722cc9c6d2951f8a7b7cbb68655662051ccc4d23d2ee8e227f5bfe9a9ae40e1",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "79574ebe4d2e7ed8479f1bdf32143ed3aea20aa7fef32ccdc7a91c5ccaaadc57",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

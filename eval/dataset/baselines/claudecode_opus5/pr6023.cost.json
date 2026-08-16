@@ -1,0 +1,49 @@
+{
+  "calls": 34,
+  "input_tokens": 1682167,
+  "output_tokens": 28298,
+  "cost_usd": 2.223501,
+  "is_error": false,
+  "terminal_reason": "completed",
+  "split": "holdout5",
+  "head": "a240368b50b5fe57ccbef7e84e08e172adbcdba4",
+  "base": "1260ceaae639437372797c710b61b4584d36b9ca",
+  "resolved_model": "claude-opus-5",
+  "snapshot_sha256": "552b15952e6dc5564911c14801fd1793ef7c2ddf8a1c325ba34fa2b7d79a6d31",
+  "validation_commands": [
+    "git diff --stat 1260ceaae639437372797c710b61b4584d36b9ca HEAD",
+    "git diff 1260ceaae639437372797c710b61b4584d36b9ca HEAD -- vllm_omni/ tools/",
+    "wc -l vllm_omni/diffusion/ipc.py vllm_omni/diffusion/executor/multiproc_executor.py vllm_omni/diffusion/worker/diffusion_worker.py",
+    "grep -n \"_futures_lock\\|_output_futures\\|_completed_outputs\\|_batch_split_map\\|_rpc_futures\\|_rpc_lock\" vllm_omni/diffusion/executor/multiproc_executor.py",
+    "git diff 1260ceaae639437372797c710b61b4584d36b9ca HEAD -- tests/ | head -320",
+    "timeout 600 python -m pytest tests/diffusion/test_result_pump.py -q 2>&1 | tail -20",
+    "cat > /tmp/race_repro.py <<'EOF'\nimport sys, threading, time\nfrom types import SimpleNamespace\nsys.path.insert(0, \"tests\")\nfrom diffusion.test_result_pump import _make_executor\nfrom vllm_omni.diffusion.data import AsyncDiffusionOutput, AsyncOutputKind, DiffusionOutput\n\nclass FB:\n    def __init__(sel",
+    "python - <<'PYEOF' > /tmp/race_repro.py\nsrc = '''\nimport sys, threading, time\nfrom types import SimpleNamespace\nsys.path.insert(0, \"tests\")\nfrom diffusion.test_result_pump import _make_executor\nfrom vllm_omni.diffusion.data import AsyncDiffusionOutput, AsyncOutputKind, DiffusionOutput\n\nclass FB:\n   ",
+    "timeout 300 python -c '\nimport sys, threading, time\nfrom types import SimpleNamespace\nsys.path.insert(0, \"tests\")\nfrom diffusion.test_result_pump import _make_executor\nfrom vllm_omni.diffusion.data import AsyncDiffusionOutput, AsyncOutputKind, DiffusionOutput\n\nclass FB:\n    def __init__(self, r): se",
+    "timeout 600 python -m pytest tests/diffusion/test_diffusion_ipc.py -q -p no:randomly 2>&1 | tail -6",
+    "grep -rn \"_ASYNC_OUTPUT_TIMEOUT\" vllm_omni/ | head",
+    "grep -rn \"def sleep\\|def handle_sleep_task\\|def wake_up\\|def handle_wake_task\\|def offload\\|empty_cache\\|def unload\\|def reset\" vllm_omni/diffusion/worker/*.py | head -40",
+    "grep -rn \"collective_rpc(\\s*\\\"\\|collective_rpc(\\s*method=\\|collective_rpc($\" vllm_omni/diffusion/ --include=*.py -A2 | grep -o '\"[a-z_]*\"' | sort -u | head -40",
+    "grep -rn \"result_mq.enqueue\\|result_mq\\.\\(enqueue\\)\" vllm_omni/ tests/ 2>/dev/null | head -20",
+    "grep -rn \"class MessageQueue\" /usr/local/lib/python3.12/dist-packages/vllm/distributed/device_communicators/shm_broadcast.py",
+    "timeout 120 python -c \"\nimport inspect\nfrom vllm.distributed.device_communicators.shm_broadcast import MessageQueue\nsrc = inspect.getsource(MessageQueue.enqueue)\nprint(src)\nprint('---acquire_write---')\nprint(inspect.getsource(MessageQueue.acquire_write)[:2500])\n\" 2>&1 | tail -70",
+    "timeout 120 python -c \"\nimport inspect\nfrom vllm.distributed.device_communicators.shm_broadcast import MessageQueue\nprint(inspect.getsource(MessageQueue.enqueue)[:2200])\n\" 2>&1 | tail -45",
+    "git diff 1260ceaae639437372797c710b61b4584d36b9ca HEAD -- docs/",
+    "timeout 120 python -c \"\nimport torch\nfrom vllm_omni.diffusion.ipc import _pack_tensor_if_large\nbig = torch.zeros(1_000_000, dtype=torch.float32)\nempty_view = big[0:0]\nprint('view bytes', empty_view.nelement()*empty_view.element_size(), 'storage', empty_view.untyped_storage().nbytes())\ntry:\n    r = _",
+    "timeout 600 python -m pytest tests/diffusion/test_async_output_worker.py -q -p no:randomly 2>&1 | tail -5",
+    "timeout 300 python -m ruff check vllm_omni/diffusion/ipc.py vllm_omni/diffusion/executor/multiproc_executor.py vllm_omni/diffusion/worker/diffusion_worker.py vllm_omni/diffusion/diffusion_engine.py 2>&1 | tail -10"
+  ],
+  "ran_validation": true,
+  "claude_md_seen": {
+    "/data/zhoutaichang/CLAUDE.md": "27ca8ea8056c231e"
+  },
+  "recorded_at": "2026-08-16T00:57:49",
+  "arm": "baseline_opus5",
+  "wall_s": 504.8,
+  "audit_ok": true,
+  "audit_violations": [],
+  "audit_blocked_attempts": [
+    "Write: path outside the worktree: /tmp/test_race_repro.py in {\"file_path\": \"/tmp/test_race_repro.py\", \"content\": \"# Repro: OUTPUT_READY arrives before split map, but the pump is still\\n# unpacking SHM when execute_batch r"
+  ],
+  "artifact_chars": 10038
+}

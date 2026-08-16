@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Neither candidate hits the two actual ground-truth concerns (aligning the latency timeline split with PR #5857's format, and whether FL2VA/Ref2VA were both actually tested) — both reviews focus entirely on independently-discovered code-grounded issues instead, so recall is low and roughly tied. Both are deeply verified against the codebase with specific file:line citations and agree on several real defects (timeout default 600s not 1800s, the 49-vs-50 per-step denominator, missing --enable-diffusion-pipeline-profiler flag, 128GB decimal/binary conflation, missing README entry), giving both high precision. Y edges ahead on actionability and coverage: it catches a genuinely valuable functional bug (short_edge must be 768, contradicting the recipe's 'keep short edge at 576' Ref2VA guidance) that X misses entirely, presents findings in a clearer human-readable structure with an explicit verdict, and adds useful process gaps (missing environment/version provenance, no prerequisites section).",
+  "_cost_usd": 0.1141501,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16f_holdout5_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout5_r1",
+    "arm_a_sha256": "788caadfebc09436ae59bdfe24c79870605485db36acd171c5ffc32c136d700b",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "dd0fa1368e8b703d2a5ec5e3e3f3d465a25e3bfc7ca1e9f4e56af4900893d13b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

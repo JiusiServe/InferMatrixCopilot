@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both ground-truth concerns (align latency-split format with PR #5857, and whether FL2VA/Ref2VA were both tested) are discussion-style questions neither candidate could fully derive from the diff alone, so recall is low for both; X's short_edge-must-be-768 catch sits in the same Ref2VA-limitations paragraph the reviewer questioned, giving it a marginal edge. Precision and groundedness are comparably strong — both independently verify the 1800s-vs-600s default, the 49-vs-50-step math, the 128GB decimal error, the disk-vs-memory BF16 conflation, the missing profiler flag, and the missing README entry, which cross-validates these as real bugs rather than fabrications. X surfaces more distinct, useful findings (short_edge restriction, smoke-row inconsistency, variance ambiguity, FlashInfer-vs-Cutlass mechanism) while Y is somewhat redundant (listing the same claims twice across 'Validated'/'refuted' summary and detailed sections) though its verbatim code quotes per-claim are slightly more rigorous evidence. Overall X's broader coverage of genuinely valid issues gives it a slight edge; actionability is close, with X's prose format easier to act on.",
+  "_cost_usd": 0.3752647,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16f_holdout5_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout5_r1",
+    "arm_a_sha256": "788caadfebc09436ae59bdfe24c79870605485db36acd171c5ffc32c136d700b",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "dd0fa1368e8b703d2a5ec5e3e3f3d465a25e3bfc7ca1e9f4e56af4900893d13b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

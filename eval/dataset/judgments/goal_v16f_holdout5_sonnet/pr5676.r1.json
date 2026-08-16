@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.85,
+    "actionability": 0.65
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates correctly flag the S2V scheduler.step generator=None issue (matching ground-truth item C, with Y's reasoning almost mirroring the author's actual response), but Y additionally lands a strong match on the i2v last_image batch-compatibility validation gap (ground-truth item D) and surfaces several other well-evidenced, independently plausible bugs (max_num_seqs clobbering, DMD2 inheritance risk, output_type payload contract change, VACE ndarray key collision) with concrete code-level fixes. X's four findings are grounded and reasonable but thinner in coverage and more hedged ('or document why...') rather than prescribing fixes. Neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.45586059999999995,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16f_holdout5_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout5_r1",
+    "arm_a_sha256": "84004e2fd2da4108c96dfc013978a0e2d2f535f333011a2c83865c230d915b5e",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "bf1e50122bd03032af8147548a1b6df139d5ddb9d6ec41cd3467a85ea4489078",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Neither candidate hits the ground-truth comments precisely — the GT concerns (offloader naming convention, README.md:17-18 numbering suggestions) appear already resolved in the shown diff, so overlap is mostly coincidental (both flag the same README.md:17-18 location over enum-name mismatch, a different substantive issue than GT's formatting suggestion). Y additionally brushes the folder/file-naming theme via nit #9, though its proposed direction (rename cpu_offload.md to model_level_offload.md) contradicts what the human reviewer apparently settled on, slightly hurting precision there. Both reviews are unusually thorough and well-grounded with specific file:line citations and concrete fixes; Y edges ahead on recall/breadth (13 findings vs 6, including a self-evidently correct shell-quoting bug and a cross-page internal-contradiction catch) while X is slightly tighter and more disciplined in its validation methodology, keeping precision marginally higher per-claim.",
+  "_cost_usd": 0.20791310000000002,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16f_holdout5_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout5_r1",
+    "arm_a_sha256": "f3d048b5c0fd3ceb17edd6212395088e8798fd78328fe7c529a1d89c9788c6b0",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "8a4bd981cd684d4e7de73fc0fb1af7912963b1c4aa02f6764ef9f25a324e376a",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

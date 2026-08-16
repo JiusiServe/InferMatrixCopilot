@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.55,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.7,
+    "precision": 0.7,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Y explicitly ties its findings to the actual resolution history (names commits d145581e/82a142ad matching Xunzhuo's real replies for the RGBA and dtype-promotion fixes) and does deeper, better-grounded investigation of the CI-failure claim by tracing that the AMD e2e lane does exercise the changed function via serving_video.py, contradicting a shallower dismissal; it also surfaces a genuinely novel, well-cited finding (2D frames now silently violate the documented (F,H,W,3) contract). X is more readable and gives concrete code-diff fixes (memory follow-up, scratch-buffer reuse) and catches the same dead-branch nit, but leans on several precise-sounding fuzz/benchmark numbers with no visible verification trail, which hurts trust in its grounding. Y's redundant near-duplicate 'stale test count' bullets and denser format cost it some actionability polish.",
+  "_cost_usd": 0.3831267,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16f_holdout5_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout5_r1",
+    "arm_a_sha256": "cc94762fe6ce050e3f8894639e008ed6553cbec7a7e37dafa6647bc7842a715b",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "f1c3b2ea619d1f9fcfbece3a4d066dfc15e8ef4d607f43d44d600decb717bdb9",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

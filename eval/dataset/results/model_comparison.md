@@ -44,6 +44,18 @@ rubric means (arm / baseline).
 | v16 (Fable adversary/round-2) | −.080 [−.169, +.010] | −.006 [−.069, +.058] | .22 |
 | Composer cursor-backend | −.081 [−.206, +.044] | −.045 [−.095, +.005] | .17 |
 | **pooled DS-core (90 verdicts)** | **−.070 [−.161, +.021]** | **+.015 [−.025, +.055]** | .31 |
+| v16 on wave 5 (fresh, pre-registered) | −.019 [−.068, +.031] | +.005 [−.058, +.069] | .20 |
+| **v16 POOLED wave 4+5 — PRIMARY** | **−.049 [−.097, −.001]** ✱ | **−.000 [−.041, +.040]** | .21 |
+
+✱ **The pre-registered primary analysis (`goal-eval/PREREG-wave5.md`,
+20 items, 60 verdicts): the recall CI excludes zero.** Per the decision
+rule fixed before the data existed — "CI entirely below 0 → the recall
+deficit is real; report it as measured and stop claiming parity" — the
+v16 arm's recall IS below the baseline, by −.049 (about five points of
+rubric recall), while its precision sits exactly at parity (−.000). The
+result is marginal (upper bound −.001) and should be read as "a real but
+small deficit", not a large one. Also fixed in advance and honored: no
+third wave is being run.
 
 Every interval spans zero: on 10 items the campaign can state *parity
 within measurement precision*, not superiority in either direction. The
@@ -74,30 +86,36 @@ recorded in their cost.json). Judgments: `goal_v14_holdout3_sonnet`,
 Replicate-2 config note: planner + promotion on v4-flash (owner
 direction), generator/verify/reducer unchanged on v4-pro.
 
-Standing conclusion (post v16, paired statistics):
+Standing conclusion (post wave-5, pre-registered):
 
-**On the fresh wave-4 gate the arm is at parity with CC+Opus 5 within
-measurement precision, at ~1/3 the cost — superiority is not demonstrated
-in either direction, and neither is the recall deficit the campaign spent
-its second half chasing.** Best point estimates over 90 pooled verdicts:
-recall −.07 (ratio .81), precision +.015. Head-to-head win share .31
-reflects the judge's recall-dominant preference on the 3 items where the
-arm genuinely under-covers.
+**The recall deficit is real and small; precision is at parity.** The
+pre-registered 20-item pooled measurement gives v16 Δrecall −.049
+[−.097, −.001] and Δprecision −.000 [−.041, +.040]. So the campaign's
+final answer to its own question is: the arm does NOT beat CC+Opus 5 on
+both means — it matches on precision and trails on recall by about five
+rubric points — while costing roughly a third as much ($0.86–0.97/item
+vs $3.09). Head-to-head win share .21 is worse than the rubric gap
+implies because the judge weights recall heavily.
 
-What each configuration buys, on the same gate:
-* **v15 (all-DS)** — the precision-leaning config (Δp +.029/+.022 across
-  two independent replicates, both positive; $0.97/item).
-* **v16 (Fable in adversary + second round)** — the recall-leaning config
-  (best fresh-split recall .336, ratio .81) and the only one that
-  reproduced the pr4870 GOLD-gap catch *inside* the pipeline; it trades
-  the precision lean away (Δp −.006).
-* **Composer cursor-backend** — subscription-priced, worst precision
-  (Δp −.045); a breadth proposer, not a closer.
+The deficit is concentrated, not diffuse: over the 20 pooled items, 6
+are positive for the arm, 4 are within ±.02, and a single item (pr5978,
+−.37) contributes about a third of the pooled gap.
 
-Wave 4 has now hosted three DS-core submissions plus the Composer row and
-is spent as a gate. The remaining honest lever is statistical power, not
-another 10-item verdict: wave 5 (`build_wave5.py`) extends the fresh
-item pool to 20 for a pre-registered pooled v16 measurement.
+What each configuration buys, measured on the same gates:
+* **v15 (all-DS)** — precision-leaning (Δp +.029/+.022 across two
+  independent wave-4 replicates, same sign both times); $0.97/item.
+* **v16 (Fable in adversary + second round)** — recall-leaning: it holds
+  the best fresh-split recall of the campaign and is the only
+  configuration that reproduced the pr4870 GOLD latent-gap catch inside
+  the pipeline. It trades v15's precision lean away (Δp −.000).
+* **Composer cursor-backend** — subscription-priced breadth proposer,
+  measurably worse precision (Δp −.045); not a closer.
+
+Power note for successors: at the observed item-level sd (.103),
+resolving a .049 difference at 95%/80% needs ~38 items. This
+measurement (20) resolves it only because the effect landed at the
+boundary; a smaller effect would need a larger gate, and no 10-item
+split can settle anything in this range.
 
 # Cursor-model campaign (2026-08-14/15) — wave-2
 

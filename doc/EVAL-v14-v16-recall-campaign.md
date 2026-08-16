@@ -7,9 +7,10 @@ the Strict pipeline beat the recorded `baselines/claudecode_opus5` arm on
 **both** recall and precision, using cursor-agent-based configurations and
 distillation from Fable traces.
 
-**Result in one line: parity within measurement precision at ~1/3 the cost —
-and the campaign's most useful output is arguably the measurement correction
-that established that, not the pipeline work that preceded it.**
+**Result in one line: the arm matches CC+Opus 5 on precision and trails it on
+recall by about five rubric points, at roughly a third of the cost — settled
+by a pre-registered 20-item measurement, after an earlier claim of superiority
+had to be withdrawn as a statistical artifact.**
 
 ## What was built
 
@@ -83,16 +84,37 @@ Three consequences, all of which generalize past this campaign:
    never could have answered the question they were run to answer — three
    configs were submitted against a bar the design could not measure.
 
+## The pre-registered answer (wave 5)
+
+Wave 4's 10-item gates could not resolve the effect they were run against, so
+wave 5 was drawn, frozen, and **pre-registered before any wave-5 number
+existed** (`eval/dataset/goal-eval/PREREG-wave5.md`): arm, items, judge,
+analysis and decision rule fixed in advance, including the instruction not to
+run a third wave if the interval still contained zero.
+
+Primary analysis, v16 pooled over wave 4 + wave 5 (20 items, 60 verdicts):
+
+| statistic | value | rule triggered |
+|---|---|---|
+| **Δrecall** | **−.049 [−.097, −.001]** | CI below 0 → the deficit is REAL; stop claiming parity on recall |
+| **Δprecision** | **−.000 [−.041, +.040]** | CI contains 0 → parity |
+
+The recall result is marginal (upper bound −.001) and should be read as *a
+real but small deficit*, not a large one. It is also concentrated: of the 20
+pooled items, 6 favour the arm, 4 are inside ±.02, and one item (pr5978,
+−.37) supplies roughly a third of the gap. Per the pre-registration, **no
+third wave was run.**
+
 ## Honest verdict against the goal
 
-The goal — both means strictly above the baseline — is **not demonstrated**,
-and with the corrected statistics it was never demonstrated at any point in
-the campaign. What is supported by the data:
+The goal — both means strictly above the baseline — is **not achieved**, and
+with corrected statistics it was never achieved at any point in the campaign.
+What the data supports:
 
-* the arm reaches **parity within measurement precision** on fresh human-GT
-  holdouts, at roughly a third of the baseline's cost;
-* the recall deficit is concentrated, not diffuse — 3 of 10 wave-4 items carry
-  the aggregate, the other 7 sit inside ±.06;
+* the arm **matches the baseline on precision and trails on recall by ~.05**,
+  at roughly a third of the baseline's cost;
+* the recall deficit is concentrated, not diffuse — a minority of items carry
+  the aggregate on both wave 4 and the pooled set;
 * **configuration effects replicate in sign** even where individual deltas are
   not significant: v15 leans precision (+.029/+.022 across independent
   generations), v16 leans recall (best fresh-split recall, .336) and is the
@@ -110,9 +132,20 @@ Both configurations are supported and documented in `.env.template`:
   — recall-leaning, adds two harness sessions per item. The right choice for
   high-stakes PRs where a missed defect costs more than a spurious comment.
 
-## Open
+## Where a successor should start
 
-Wave 5 (`goal-eval/PREREG-wave5.md`) is a pre-registered, one-shot pooled
-measurement taking the fresh-item pool to 20 for the v16 recall question,
-with its decision rule fixed in advance — including the instruction not to
-run a third wave if the interval still contains zero.
+The measurement is settled, so the next campaign should not re-litigate it.
+Three things follow from the data:
+
+1. **The gap is one item class, not a level.** A third of the pooled deficit
+   comes from a single item; wave-3 forensics named the recurring classes
+   (test/gate epistemics, docs information architecture, CI economy). Fixing
+   the class beats another round of general duties.
+2. **Budget the gate before the pipeline.** At the observed item-level sd
+   (.103), a .05 effect needs ~38 items. Anything measured on 10 items is
+   uninterpretable in this range — three configurations were submitted
+   against a bar wave 4 could not measure.
+3. **The remaining untried lever is a strong generator throughout.** Fable in
+   two seats produced the campaign's best recall and the only in-pipeline
+   GOLD-gap catch; Fable in every seat was scoped (~$10–20/item, inverting
+   the cost story) and deliberately not run.

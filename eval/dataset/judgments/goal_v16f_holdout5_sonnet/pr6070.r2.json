@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.12,
+    "precision": 0.85,
+    "actionability": 0.72,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.22,
+    "precision": 0.82,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both reviews are deep, code-grounded, and largely orthogonal to the human ground truth's specific line comments (neither caught the async_omni_engine.py:322 revert, the local-path model-version detection bugs in text_to_video.py/image_to_video.py, the registry.py test-coverage gap, or the pytestmark duplication). Y edges out on recall by explicitly matching two core ground-truth threads: the transformers version/NPU-CI tension (with the same 'kept aligned with upstream' framing) and the CRF-18/image_crf=0 opt-out point from hsliuustc0106's main review, plus adjacent-theme hits on the LTX-2/2.3 legacy-behavior-change concern (has_separate_cfg, preserves_reference_image_size) that echo linyueqian's inline comments even if not identical bugs. X's claim-verified/claim-refuted methodology is rigorous and evidence-dense (slightly higher raw precision), but its flat 'minor' severity tagging undersells genuinely blocking findings, and its overlap with ground-truth concerns is thinner. Y's Blocking/Should-fix/Minor/Docs structure with concrete 'Change:' directives makes it more directly usable for a merge decision, giving it the actionability edge.",
+  "_cost_usd": 0.37085470000000004,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16f_holdout5_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout5_r1",
+    "arm_a_sha256": "78042badcf571c8933cdc638aaebf721fcd42b5a8b3734802dd4d4f5456dc8a8",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a23c5798ed01a914ae4e93b2f399942089976e4e45d06a386cb1c3528b0aecbb",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}
