@@ -21,6 +21,21 @@ from .runner import run_agent_step
 from .utils import _build_evidence, _to_step_result
 
 
+def outcome_blocked(result: Any, output: dict | None) -> bool:
+    """True when a pass returned nothing usable — no items and no tool work.
+
+    A harness session that fails at the transport (auth, quota, CLI error)
+    surfaces here as a contract-shaped `status: blocked` with zero tokens and
+    zero tool calls, which is indistinguishable from a shy model unless the
+    counters are checked. Callers use it to tell "this seat did not run" from
+    "this seat ran and found nothing"."""
+    out = output or {}
+    if out.get("_tools_used"):
+        return False
+    status = str(out.get("status") or "").lower()
+    return status in ("blocked", "failed") or not getattr(result, "ok", True)
+
+
 def lens_backend_member(settings: Any, lens_name: str):
     """The harness Member a pass/lens should ride per
     `settings.review_lens_backends`, or None for the run's normal backend.
@@ -169,8 +184,27 @@ async def run_agent_step_ensemble(
                 extra_tools=extra_tools, max_iters=budget)
         if (ctx.settings.ensemble_zero_yield_retry and output and not (output.get(merge_key) or [])):
             # zero-yield lens: one cheap single-lens re-ask beats the full
-            # 8-lens ensemble retry it used to trigger (T3 forensics #6)
-            ctx.trace.record("lens_zero_yield_retry", lens=str(lens["name"]))
+            # 8-lens ensemble retry it used to trigger (T3 forensics #6).
+            # The retry KEEPS this lens's routing (`**overrides`): dropping it
+            # silently moved a routed seat onto the default backend, so an arm
+            # labelled "Fable in the adversary seat" was measured running
+            # DeepSeek there — the seat's whole purpose, erased without a
+            # trace signal (2026-08-16: a Fable-5 quota exhaustion made every
+            # routed session return is_error, and 18 of 28 holdout seats
+            # degraded this way while the run still reported success).
+            seat_dead = (outcome_blocked(result, output)
+                         and bool(overrides))
+            ctx.trace.record("lens_zero_yield_retry", lens=str(lens["name"]),
+                             routed=bool(overrides), seat_failed=seat_dead)
+            if seat_dead:
+                # a ROUTED seat that produced nothing at all is a capability
+                # gap, not a shy model — say so loudly enough that an arm
+                # cannot be mislabelled after the fact
+                ctx.trace.record(
+                    "capability_gap", capability="review.routed_seat",
+                    step=f"{step_name}#{lens['name']}{suffix}",
+                    effect=f"routed seat produced no output; retrying on the "
+                           f"same route (model={overrides.get('model_override')})")
             result, output = await run_agent_step(
                 ctx, step_name=f"{step_name}#{lens['name']}{suffix}/retry",
                 purpose=purpose, evidence=evidence,
@@ -179,7 +213,8 @@ async def run_agent_step_ensemble(
                 "plausible candidate (do not self-censor) or a [validated] "
                 "finding for each checklist item you cleared.",
                 expected=expected, output_extension=output_extension,
-                scope=scope, extra_tools=extra_tools, max_iters=budget)
+                scope=scope, extra_tools=extra_tools, max_iters=budget,
+                **overrides)
         return str(lens["name"]), result, output
 
     # lenses (and repeat samples of each lens — a single sample's item list is

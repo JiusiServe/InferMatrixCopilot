@@ -17,6 +17,7 @@ Outputs (resumable — existing non-empty .md files are skipped):
 """
 from __future__ import annotations
 
+import gzip
 import json
 import subprocess
 import uuid
@@ -263,8 +264,52 @@ def main() -> None:
     print(f"[copilot-arm] trace gate: {checked} packed trace(s) verified", flush=True)
     for p in problems:
         print(f"[copilot-arm]   {p}", flush=True)
+    routing_problems = _verify_routed_seats(OUT)
+    for p in routing_problems:
+        print(f"[copilot-arm]   {p}", flush=True)
     print("[copilot-arm] sweep complete", flush=True)
-    return 1 if problems else 0
+    return 1 if (problems or routing_problems) else 0
+
+
+def _verify_routed_seats(out_dir: Path) -> list[str]:
+    """Assert that every seat REVIEW_LENS_BACKENDS routed actually produced
+    work, on every item.
+
+    Measured 2026-08-16: a Fable-5 quota exhaustion made each routed session
+    fail at the transport and return a contract-shaped `status: blocked` with
+    zero tokens; the ensemble's zero-yield retry then re-ran the seat on the
+    default backend. The sweep reported success on all 10 items, and an arm
+    whose whole identity was "Fable in two seats" was measured — and briefly
+    reported — with the Fable seats mostly absent. A label this load-bearing
+    has to be checked, not trusted."""
+    routed = _os.environ.get("REVIEW_LENS_BACKENDS") or ""
+    if not routed.strip():
+        return []
+    try:
+        seats = sorted(json.loads(routed))
+    except ValueError as exc:
+        return [f"ROUTING GATE: REVIEW_LENS_BACKENDS is not valid JSON: {exc}"]
+    problems: list[str] = []
+    for gz in sorted(out_dir.glob("pr*.trace.json.gz")):
+        stem = gz.name.split(".")[0]
+        try:
+            packed = json.loads(gzip.open(gz).read())
+            events = [e for run in packed["streams"]["runs"]
+                      for e in (run.get("run_trace") or [])]
+        except Exception as exc:  # noqa: BLE001
+            problems.append(f"ROUTING GATE: {stem}: unreadable trace ({exc})")
+            continue
+        for seat in seats:
+            work = [e for e in events
+                    if e.get("kind") == "agent_output"
+                    and str(e.get("step", "")).endswith(f"#{seat}")
+                    and (e.get("tool_calls") or e.get("output_tokens"))]
+            if not work:
+                problems.append(
+                    f"ROUTING GATE: {stem}: routed seat '{seat}' produced no "
+                    f"work — the arm did NOT run the configuration it is "
+                    f"labelled with (check the backend's quota/auth)")
+    return problems
 
 
 if __name__ == "__main__":

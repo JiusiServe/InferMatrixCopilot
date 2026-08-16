@@ -370,20 +370,39 @@ async def _second_round(ctx: StepContext, output: dict, common: dict,
         if m and m.group(1) in seed_paths:
             slices.append(chunk)
     hunk_evidence = "".join(slices)[:100_000]
-    from ...agent_runtime.ensemble import lens_backend_member
+    from ...agent_runtime.ensemble import (
+        lens_backend_member,
+        outcome_blocked as _seat_produced_nothing,
+    )
 
     member = lens_backend_member(ctx.settings, "round2")
     routing = ({"harness_member": member, "model_override": member.model}
                if member is not None else {})
+    round_kwargs = {**common, "step_name": "agent.review_diff#round2",
+                    "guidance": common["guidance"] + "\n\n## SECOND ROUND\n"
+                    + guidance,
+                    "evidence": {**common["evidence"],
+                                 "uncovered_hunk_diffs": hunk_evidence,
+                                 "kept_comments": json.dumps(
+                                     kept, ensure_ascii=False)}}
     result, extra = await run_agent_step(
-        ctx, **{**common, "step_name": "agent.review_diff#round2",
-                "guidance": common["guidance"] + "\n\n## SECOND ROUND\n"
-                + guidance,
-                "evidence": {**common["evidence"],
-                             "uncovered_hunk_diffs": hunk_evidence,
-                             "kept_comments": json.dumps(kept,
-                                                         ensure_ascii=False)}},
+        ctx, **round_kwargs,
         max_iters=ctx.settings.review_second_round_max_iters, **routing)
+    if routing and _seat_produced_nothing(result, extra):
+        # A routed second round has no retry of its own, so a transport
+        # failure on that backend silently deleted the whole coverage pass:
+        # measured 2026-08-16, a Fable-5 quota exhaustion left 16 of 20
+        # holdout items reporting "8 uncovered hunks, 0 added" — the pass
+        # that exists to close coverage holes contributed nothing, invisibly.
+        # Fall back to the run's own backend and say so.
+        ctx.trace.record("capability_gap", capability="review.routed_seat",
+                         step="agent.review_diff#round2",
+                         effect="routed second round produced no output; "
+                                "retrying on the run's default backend")
+        result, extra = await run_agent_step(
+            ctx, **{**round_kwargs,
+                    "step_name": "agent.review_diff#round2/fallback"},
+            max_iters=ctx.settings.review_second_round_max_iters)
     if not result.ok and not (extra or {}).get("review_comments"):
         ctx.trace.record("review_second_round", step="agent.review_diff",
                          uncovered=len(uncovered), added_comments=0,

@@ -1106,3 +1106,49 @@ def test_lens_backend_member_parses_the_role_split_map(settings):
     assert lens_backend_member(settings, "adversary") is None
     settings.review_lens_backends = {}
     assert lens_backend_member(settings, "investigator") is None
+
+
+def test_zero_yield_retry_keeps_the_seat_routing(settings, trace, tmp_path,
+                                                 git_repo, monkeypatch):
+    """A routed seat that yields nothing must be RETRIED ON THE SAME ROUTE.
+    Dropping the override silently moved the seat onto the default backend,
+    so an arm labelled "Fable in the adversary seat" measured DeepSeek there
+    (2026-08-16: a model-quota exhaustion degraded 18 of 28 holdout seats
+    this way while every run still reported success)."""
+    from infermatrix_copilot.engine.agent_runtime import ensemble as ens
+
+    settings.ensemble_zero_yield_retry = True
+    settings.review_lens_backends = {"b": "cursor:composer-2.5"}
+    seen: list = []
+
+    async def fake_step(ctx, **kw):
+        seen.append((kw.get("step_name"), kw.get("harness_member"),
+                     kw.get("model_override")))
+        from infermatrix_copilot.engine.step import StepResult
+        return StepResult(True, summary="ok"), {"status": "success",
+                                                "items": []}
+
+    monkeypatch.setattr(ens, "run_agent_step", fake_step)
+    asyncio.run(ens.run_agent_step_ensemble(
+        _ctx(settings, trace, tmp_path, {"task_spec": {"pr": 1}},
+             llm=ScriptedLLM([])),
+        step_name="t.step", purpose="p", evidence={"e": "x"},
+        lenses=[{"name": "b", "focus": "look at B"}], merge_key="items",
+        output_extension={"items": "list"}))
+    retry = [s for s in seen if s[0].endswith("/retry")]
+    assert retry, "zero-yield retry did not run"
+    assert retry[0][1] is not None, "retry lost the harness member"
+    assert retry[0][2] == "composer-2.5", "retry lost the model override"
+
+
+def test_outcome_blocked_distinguishes_dead_seat_from_quiet_seat():
+    """A transport failure arrives as a contract-shaped `blocked` with zero
+    counters; a model that genuinely found nothing still shows tool work."""
+    from infermatrix_copilot.engine.agent_runtime.ensemble import outcome_blocked
+    from infermatrix_copilot.engine.step import StepResult
+    ok = StepResult(True, summary="ok")
+    assert outcome_blocked(ok, {"status": "blocked", "_tools_used": []})
+    assert not outcome_blocked(ok, {"status": "success",
+                                    "_tools_used": ["grep", "read_file"]})
+    assert not outcome_blocked(ok, {"status": "blocked",
+                                    "_tools_used": ["grep"]})

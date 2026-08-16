@@ -140,6 +140,27 @@ reachability, don't assume it.
 flag any that became constant (dead knobs, unreachable features, silently-ignored \
 user settings) — and re-read the surrounding comment block for text now asserting \
 the OPPOSITE of the new value.
+22a. NAME THE VICTIM. For every guard, raise, fallback, index substitution, or \
+default this diff adds or moves, the finding is not "can this branch be reached" but \
+"WHO ELSE fails when it does" — the co-scheduled request, the sibling model family, \
+the other rank, the saved user workflow, the next caller. A branch you PROVED \
+unreachable is still a finding when reaching it would hand the wrong result to the \
+wrong caller: rank wrong-recipient delivery and silently-degraded peers ABOVE dead \
+code. "Unreachable, therefore harmless" is the single most measured way this review \
+talks itself out of a real defect.
+22b. NAMES AND PLACEMENT. For every file, directory, page, enum member, flag, or \
+symbol this diff ADDS or RENAMES: state the convention its siblings already follow, \
+and name each new name that breaks it. Ask the questions a maintainer asks — do two \
+files now share a name with different meanings? does this file name match the thing \
+it documents? does this belong in this directory/layer at all, or is it a per-model \
+patch of something model-independent? Naming, taxonomy and placement are the LARGEST \
+single class of real maintainer review comments; they are findings, not polish.
+22c. VERIFY OFF-FIXTURE. A claim checked only against the fixtures the PR ships with \
+— its own demo list, its own new test, its own benchmark row — is UNVERIFIED. Before \
+writing `[claim-verified]` or `[resolved]`, construct at least one input the author \
+did NOT supply, and read the source of truth directly (the registry, the config, the \
+table) rather than the PR's assertion about it. A false `[resolved]` is worse than a \
+miss: it closes the very thread a reviewer would have opened.
 22. Test/gate EPISTEMICS (fires on every test, CI-config, or recipe/benchmark diff): \
 for each added/moved/removed test or gate answer three questions — (i) what property \
 does it actually PROVE (a mock that authors the very value the test asserts proves \
@@ -205,7 +226,12 @@ are still banned.
 - Behavior/correctness findings outrank documentation asks: at most 2 comments whose only \
 ask is adding a comment or docstring.
 - A suspicion you could NOT verify goes in the `findings` base field, NEVER in \
-review_comments — a posted review comment must stand on checked evidence. A call \
+review_comments as an ASSERTION — but a high-stakes unresolved question may be filed \
+as an explicit QUESTION comment (at most one per review, severity minor, phrased as \
+the question plus exactly what you checked and where you ran out): "X appears to Y; I \
+could not confirm Z because <limit> — can you check?" A real defect the review was \
+one tool call short of proving is worth more to a maintainer than silence, provided \
+it is never dressed as a verified claim. A call \
 site inside an INSTALLED dependency counts as blast-radius evidence only if you \
 verified the dependency actually dispatches to THIS repo's subclass (registry/\
 entry-point/plugin wiring) — an unverified linkage is phrased as a question, not \
@@ -390,12 +416,23 @@ _REVIEW_DEEP_PASSES = [
               "a reviewer would raise, file the `[resolved]` line "
               "(quote the guard) instead of staying silent. Emit only "
               "verified claims — your job is the true misses, not volume. "
-              "BUDGET DISCIPLINE: your tool budget is fixed — pick the 3-4 "
-              "most dangerous questions FIRST, close each one, and reserve "
-              "your last two rounds for emitting the full output contract; "
-              "an investigation that never files its review scores zero. "
-              "Your comment allowance is 10 (it overrides the general "
-              "cap)."},
+              "You OWN checklist 22a (name the VICTIM of every guard/"
+              "fallback/default the diff adds — never 'unreachable, "
+              "therefore harmless') and 22b (names, taxonomy and placement "
+              "of everything it adds or renames). Measured across two "
+              "holdouts: naming/placement/layering is the LARGEST class of "
+              "real maintainer comments and the class this review almost "
+              "never files, while predicate-completeness findings on the "
+              "very same lines are filed constantly — when you catch "
+              "yourself auditing whether a condition covers every input, "
+              "ask instead who is harmed when it fires, and whether the "
+              "thing being added is named and placed the way its siblings "
+              "are. BUDGET DISCIPLINE: your tool budget is fixed — pick the "
+              "3-4 most dangerous questions FIRST, close each one, and "
+              "reserve your last two rounds for emitting the full output "
+              "contract; an investigation that never files its review "
+              "scores zero. Your comment allowance is 10 (it overrides the "
+              "general cap)."},
 ]
 
 # Docs-heavy PRs swap the code-shaped breadth lenses for this pass: their
