@@ -70,3 +70,23 @@ already been judged?**
   the denominator.
 * Judge/arm cost is expected ~$25 total. No third split is run if the answer
   is ambiguous; ambiguity is reported as the result.
+
+## Generation note (appended before any verdict existed)
+
+* The smoke item `pr4816` was generated first, under the identical commit and
+  configuration, and its review text was read in full to confirm the four
+  conversion fixes actually fire end-to-end. They do: the `[resolved]`
+  residual about CI lane coverage was promoted into a scored comment, two
+  ```suggestion blocks rendered, and severities spread across
+  major/minor/nit instead of collapsing to all-minor. **That artifact is
+  reused as the val arm's pr4816 rather than regenerated**, so that no
+  version of this item is ever chosen from two candidates. Disclosed because
+  it means one of the five val artifacts was read by the operator before
+  judging; the judge is blind and automated, so this cannot move its score,
+  but the fact belongs on the record rather than in a shell history.
+* One defect observed in that smoke and deliberately NOT fixed before
+  measuring: the ledger dedupe (normalized 90-char prefix) still let four
+  near-identical `[claim-verified]` lines about the same `base` import
+  survive. Editing the pipeline after seeing an artifact and before judging
+  it is how a probe turns into config selection. It is recorded here as an
+  input to the NEXT iteration, not patched into this one.
