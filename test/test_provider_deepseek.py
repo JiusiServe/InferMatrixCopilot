@@ -240,3 +240,32 @@ def test_require_cli_names_the_pip_install(monkeypatch):
     monkeypatch.setattr(t, "cli_path", lambda: None)
     with pytest.raises(RuntimeError, match="deepseek-harness-sdk"):
         t.require_cli()
+
+
+def test_runaway_session_is_stopped_by_the_step_cap(fake_sdk, tmp_path):
+    """dsh owns its own loop and its bundled runtime exposes no step cap, so
+    max_iters cannot be handed to the harness. Measured on pr4816: two lenses
+    finished in ~40 steps while a third ran 558 steps / 564 tool calls and was
+    still going 50 minutes later. The cap is ours or there is none."""
+    closed = {"n": 0}
+
+    class _Runaway(_FakeHarness):
+        def run(self, prompt, **kwargs):
+            cb = kwargs.get("on_notification")
+            for _ in range(10_000):          # a loop that never ends on its own
+                if cb:
+                    cb({"type": "step/end"})
+                if closed["n"]:
+                    raise RuntimeError("runtime closed")
+            return _FakeRunResult()
+
+        def close(self):
+            closed["n"] += 1
+
+    import sys as _sys
+    _sys.modules["deepseek_harness"].DeepSeekHarness = _Runaway
+    req = _request(tmp_path)
+    req.max_iters = 5
+    out = DeepSeekHarnessTransport(_settings()).run_session(req)
+    assert closed["n"] >= 1, "the watchdog never closed the runaway harness"
+    assert out.refusals and "step cap" in out.refusals[0]

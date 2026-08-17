@@ -51,6 +51,7 @@ import re
 import shutil
 import sys
 import tempfile
+import threading
 from pathlib import Path
 
 from ..agent_loop import AgentOutcome
@@ -68,6 +69,23 @@ from .registry import PROVIDERS
 # credential does NOT travel here — it goes through the SDK config field so it
 # never lands in a subprocess environment we also hand to bash.
 _DSH_ENV_KEEP = ("DSH_HOME",)
+
+# How far past our own iteration budget a dsh session may wander before we
+# stop it. The harness plans its own steps and legitimately uses more of them
+# than our in-process loop does for the same work (two healthy lenses on
+# pr4816 took ~40 steps against a budget of 14), so a 1:1 cap would truncate
+# normal sessions. 6x still stops a runaway an order of magnitude short of the
+# 558 steps measured.
+_STEP_CAP_FACTOR = 6
+
+
+def _close(harness) -> None:
+    """Best-effort shutdown of a running harness from a watchdog thread."""
+    try:
+        if harness is not None:
+            harness.close()
+    except Exception:  # noqa: BLE001 — the watchdog must never raise
+        pass
 
 _PLUGIN_RE = re.compile(r"name: '(@deepseek-ai/[a-z0-9-]+)'")
 _bundled_plugins: set[str] | None = None
@@ -334,6 +352,34 @@ class DeepSeekHarnessTransport(HarnessTransport):
         finish = ""
         result = None
         error = ""
+        steps = 0
+        # dsh owns its own loop and its bundled runtime exposes NO step cap, so
+        # `max_iters` cannot be handed to the harness the way `claude
+        # --max-turns` takes it. Measured 2026-08-17 on pr4816: two lenses
+        # finished in ~40 steps each while a third ran 558 steps / 564 tool
+        # calls / 7MB of session log and was still going 50 minutes later,
+        # killed only by the arm's outer timeout — and minimal mounts no
+        # compaction, so a runaway grows its context the whole way. Both bounds
+        # below are ours: a step ceiling and a hard wall-clock deadline that
+        # closes the runtime, because `request_timeout_seconds` did not fire
+        # (it bounds a request, and a busy loop keeps making progress).
+        step_cap = max(1, int(req.max_iters)) * _STEP_CAP_FACTOR
+        stopper: dict = {"harness": None, "hit": ""}
+
+        def _on_notification(note) -> None:
+            nonlocal steps
+            kind = ""
+            if isinstance(note, dict):
+                kind = str(note.get("kind") or note.get("type") or "")
+            else:
+                kind = str(getattr(note, "kind", "")
+                           or getattr(note, "type", "") or "")
+            if kind.endswith("step/end"):
+                steps += 1
+                if steps >= step_cap and not stopper["hit"]:
+                    stopper["hit"] = f"step cap {step_cap} reached"
+                    _close(stopper["harness"])
+
         try:
             with DeepSeekHarness(
                     provider="deepseek-official", model=model,
@@ -343,10 +389,24 @@ class DeepSeekHarnessTransport(HarnessTransport):
                     env=self._env(cwd=cwd, model=model, system=req.system,
                                   session_root=session_root),
                     request_timeout_seconds=req.timeout_s) as harness:
-                result = harness.run(req.prompt)
+                stopper["harness"] = harness
+                watchdog = threading.Timer(
+                    max(60.0, float(req.timeout_s)),
+                    lambda: (stopper.__setitem__(
+                        "hit", f"wall-clock deadline {req.timeout_s:.0f}s"),
+                        _close(harness)))
+                watchdog.daemon = True
+                watchdog.start()
+                try:
+                    result = harness.run(req.prompt,
+                                         on_notification=_on_notification)
+                finally:
+                    watchdog.cancel()
             finish = str(getattr(result, "finish_reason", "") or "")
         except Exception as exc:  # noqa: BLE001 — a dead harness is an outcome
-            error = f"{type(exc).__name__}: {exc}"[:300]
+            error = (stopper["hit"] or f"{type(exc).__name__}: {exc}")[:300]
+        if stopper["hit"] and not error:
+            error = stopper["hit"]
 
         events = list(getattr(result, "events", None) or [])
         calls, tools, usage = self._activity(events)
