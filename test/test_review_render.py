@@ -181,3 +181,27 @@ def test_skill_curation_queue_stays_out_of_the_deliverable():
     assert "skill candidates awaiting curation" not in body.split("cand_lines")[-1] \
         or "cand_lines" in body
     assert 'lines += [f"- task: {spec}"' not in src
+
+
+def test_one_subject_named_by_path_and_by_basename_is_one_subject():
+    """One lens writes `orchestrator.py`, another writes the full
+    `vllm_omni/engine/orchestrator.py`. As raw strings those share nothing, so
+    two comments on one subject scored zero topic overlap and both shipped --
+    measured on the v19 val run, where the same CI-red question was asked
+    twice at `orchestrator.py:1290`."""
+    from infermatrix_copilot.engine.steps.review.utils import _render_review_md
+    md = _render_review_md({"review_comments": [
+        {"file": "vllm_omni/engine/orchestrator.py", "line": 1290,
+         "severity": "nit",
+         "comment": "Head shows buildkite vllm-omni-amd-ci and "
+                    "vllm-omni-npu-ci failing; this diff only touches shared "
+                    "orchestrator.py code with no amd or npu platform worker "
+                    "changes. Can you confirm those reds are pre-existing?"},
+        {"file": "vllm_omni/engine/orchestrator.py", "line": None,
+         "_declared_line": 1290, "severity": "nit",
+         "comment": "buildkite vllm-omni-amd-ci and vllm-omni-npu-ci are "
+                    "failing at PR head per the gate report. This diff only "
+                    "touches vllm_omni/engine/orchestrator.py with no amd or "
+                    "npu platform changes, so are those reds pre-existing?"},
+    ]})
+    assert md.count("[nit]") == 1

@@ -31,10 +31,17 @@ now new old one two three both all any some none""".split())
 
 
 def _topic(text: str) -> set[str]:
-    """The identifiers a finding is about, ignoring its `[tag]` and evidence."""
+    """The identifiers a finding is about, ignoring its `[tag]` and evidence.
+
+    Paths collapse to their basename: one lens writes `orchestrator.py` where
+    another writes `vllm_omni/engine/orchestrator.py`, and as raw strings those
+    share nothing, so two comments on one subject scored zero topic overlap.
+    Measured on the v19 val run — the two CI-red questions on
+    `orchestrator.py:1290` were the same finding asked twice and survived.
+    """
     body = re.split(r"\(evidence:", re.sub(r"^\s*\[[a-z-]+\]\s*", "", text))[0]
-    return {t.lower().rstrip(".") for t in _IDENT_RE.findall(body)
-            if len(t) > 3}
+    return {t.lower().rstrip(".").rsplit("/", 1)[-1]
+            for t in _IDENT_RE.findall(body) if len(t) > 3}
 
 
 def _claim(text: str) -> set[str]:
