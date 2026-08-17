@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.78,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.87,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns (just approvals), so recall is vacuously satisfied by both. X's findings are all minor/nit-tier doc-consistency polish with ready-to-apply GitHub suggestion blocks, giving it an actionability edge. Y goes deeper, tracing the actual code path to show the PR's new 'returns silent audio' claim is likely wrong (the traced chain produces a 500 error, not a zero-amplitude WAV) — a genuine correctness catch on added text, not a nit — and also correctly scopes the overbroad 'curl doesn't flatten extra_body' claim against a counter-example (GLM-Image recipe), while X's parallel README-staleness finding is a weaker, more superficial catch that Y explicitly investigates and dismisses as a non-issue. Y's superior grounding and value on the highest-severity finding outweighs X's cleaner suggestion-diff formatting.",
+  "_cost_usd": 0.14631919999999998,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17cb_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17cb_train",
+    "arm_a_sha256": "58879b02ffae7858eb37dfecb0a35c533f9c0392b72c22c044631a513392002a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5a2e689fc33efd67adbf119f1e4cf034841928ad70fea2d99f142a727ca8ea18",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

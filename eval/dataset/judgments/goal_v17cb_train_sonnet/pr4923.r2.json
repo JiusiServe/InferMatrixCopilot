@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.82,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.72,
+    "actionability": 0.8
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X uniquely engages the ground truth's most-discussed thread (gcanlin's architecture objection to reading cudagraph_mode in modeling) and independently derives the exact root cause of Wallbreazzz's real NPU crash (traces to npu_ar_model_runner._capture_talker_mtp_graphs, matching the reported traceback), plus corrects the PR's own TODO comment as understated. Y is also well-grounded (cross-corroborates several of X's citations) and lands a genuinely useful docs-staleness catch X misses, but its output is padded with redundant near-duplicate 'Validated' entries and its top suggestion — reverting max_num_seqs/max_num_batched_tokens outright — cuts against what reviewers actually wanted (benchmark justification, not reversion). Both are highly actionable with concrete diffs; neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.41782889999999995,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17cb_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17cb_train",
+    "arm_a_sha256": "03f360f306f851f39c42711f0ca96ae438d826dbdb9fa2795dd08bb02a2ba680",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9da2d20c4c6f3ebd76201601229ebe30caa5b10534567d559eab79d6e55fdaba",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

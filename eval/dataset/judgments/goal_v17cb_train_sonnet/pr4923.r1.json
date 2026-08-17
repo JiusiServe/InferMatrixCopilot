@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.6,
+    "actionability": 0.7
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.8,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y directly hits the three substantive ground-truth threads: it explicitly argues the cudagraph_mode read belongs in the runner not the model (mirroring gcanlin's core objection) and even proposes deleting it now, it sharpens the seed-reproducibility gap gcanlin flagged (noting it fails at every batch size under FULL, not just >1), and it independently derives the NPU graph-safety root cause that explains Wallbreazzz's real bug report, including the gap that the yaml pin doesn't cover custom NPU configs. X's review is broader in volume but padded with redundant restatements in its 'Validated' section, buries the NPU insight as a residual note rather than a stated finding, and includes a specific CI-red claim that isn't grounded in the diff. Y's findings are also more tightly reasoned (e.g., the CUDAGraphWrapper replay-ignores-args point) and each comes with a concrete, verifiable code fix.",
+  "_cost_usd": 0.4006485,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17cb_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17cb_train",
+    "arm_a_sha256": "03f360f306f851f39c42711f0ca96ae438d826dbdb9fa2795dd08bb02a2ba680",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9da2d20c4c6f3ebd76201601229ebe30caa5b10534567d559eab79d6e55fdaba",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

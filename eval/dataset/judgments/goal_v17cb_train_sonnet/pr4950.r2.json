@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth carries zero substantive concerns (just LGTM/PTAL), so recall is trivially satisfied by both. Precision differentiates them: X's core findings — disputing the new 'silent audio' wording with a specific multi-file failure trace, and catching that the new 'extra_body is ignored' claim is overgeneralized (contradicted by GLM-Image.md and serving_chat.py:441) — are higher-value, diff-grounded corrections to the PR's own new text, and X explicitly verifies a sibling file needs no change rather than guessing. Y's three findings (stale README cross-reference, missing text-only pointer, header/choices nit) are valid and actionable with ready-to-apply suggestion blocks, but are minor consistency nits rather than substantive accuracy catches, and Y's own evidence (torch.zeros silent-audio claim) sits uncomfortably with X's more mechanistically detailed rebuttal of that exact claim. Both are highly actionable with concrete file/line and rewording; neither includes a labeled LATENT GAP CHECK section.",
+  "_cost_usd": 0.3002601,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17cb_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17cb_train",
+    "arm_a_sha256": "58879b02ffae7858eb37dfecb0a35c533f9c0392b72c22c044631a513392002a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5a2e689fc33efd67adbf119f1e4cf034841928ad70fea2d99f142a727ca8ea18",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

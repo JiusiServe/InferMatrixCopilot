@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.92,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.7,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns (bot rate-limited, humans just said thanks), so recall is vacuous for both. Both candidates independently converge on the two real gaps beyond the diff's headline fix — missing pytestmark causing the new test to be deselected in CI, and warmup_quack_fp8() bypassing the new gate — which is a strong cross-validation signal that these are grounded. X presents this with concrete verification (actual pytest collect-only output showing '18 deselected'), clean prioritization (Blocking/Should-fix/Minor/Question), and precise suggested diffs, making every finding immediately actionable. Y covers similar ground but buries it under redundant templated 'Validated/claim-verified/resolved' bullets that mostly restate the same facts, and two of its findings cite broken locations ('?:102', '?:33') instead of real file paths, hurting both precision and actionability. X's speculative items (sticky-disable, warning_once dedup) are clearly hedged as design suggestions rather than confirmed defects, whereas Y's noisier format makes it harder to distinguish verified fact from speculation.",
+  "_cost_usd": 0.2034853,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17cb_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17cb_train",
+    "arm_a_sha256": "197d69403b35b2cd0bef66a8b139a41171e24dc30c5e1f97d1e9ebfacedd9b04",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "de884ebeca54520b85a490b897397bd22bf362507bf9f7d4a833d74b390ae063",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

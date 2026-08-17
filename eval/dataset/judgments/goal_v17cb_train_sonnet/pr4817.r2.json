@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.78,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth is essentially empty (bot rate-limit notices plus 'thanks'/'.'), so recall is vacuous for both. Both candidates independently surface the same two highest-value, diff-grounded findings — the new test file lacks pytestmark and is silently deselected by CI's marker-filtered pytest command, and warmup_quack_fp8() bypasses the new quack_enabled() gate — which strongly corroborates both as real, well-grounded reviews. X edges ahead on polish: it verifies the CI-deselection claim with an actual local pytest run showing '18 deselected', organizes findings into clear Blocking/Should-fix/Minor/Question tiers with precise before/after code, and every citation resolves to a real file. Y covers similar ground plus a couple of unique points (platform.py's major-in-(10,11,12) vs the ==10 gate) but is hurt by malformed citations ('?:102', '?:33' with no real file path) and redundant repeated 'validated' bullets that add bulk without new substance, slightly denting actionability and precision relative to X.",
+  "_cost_usd": 0.1997903,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17cb_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17cb_train",
+    "arm_a_sha256": "197d69403b35b2cd0bef66a8b139a41171e24dc30c5e1f97d1e9ebfacedd9b04",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "de884ebeca54520b85a490b897397bd22bf362507bf9f7d4a833d74b390ae063",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.6,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns, so recall is vacuous for both. Both candidates independently converge on the same two real defects (unmarked test file deselected by CI's marker filter, and warmup_quack_fp8() bypassing the new gate), which corroborates their validity. X pads its report with redundant restatements of the same cc-11.x point and several broken '?:xxx' file references that undercut actionability, while Y organizes findings by severity (Blocking/Should-fix/Minor/Question), backs the CI-deselection claim with an actual pytest run, and correctly triages red CI checks as unrelated rather than falsely blocking. Y's extra speculative findings (sticky fallback, warning_once dedup bug) are clearly flagged as design suggestions rather than diff-introduced bugs, keeping it well-calibrated.",
+  "_cost_usd": 0.2983244,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17cb_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17cb_train",
+    "arm_a_sha256": "197d69403b35b2cd0bef66a8b139a41171e24dc30c5e1f97d1e9ebfacedd9b04",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "de884ebeca54520b85a490b897397bd22bf362507bf9f7d4a833d74b390ae063",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

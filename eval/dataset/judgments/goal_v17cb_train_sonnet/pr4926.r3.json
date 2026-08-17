@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.7,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.8
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y covers more of the ground-truth threads with genuine depth: it independently verifies the version=1/2/default kernel-resolution behavior against the real kernels library (matching wtomin's question), extends RuixiangMa's SM90-gating concern with cross-capability simulation catching the Blackwell over-inclusion bug, and surfaces a real varlen-assumption gap closely related to the piecewise crash RuixiangMa found. X covers the two 'resolved' bugs (piecewise crash, SM90 gate) reasonably but pads its output with speculative claim-verified/refuted commentary on PR marketing language that adds little review value and isn't grounded in reviewer concerns. Both are highly actionable with concrete file/line references, X slightly more so via literal suggestion diffs, but Y's findings are more empirically grounded (actual timing, Hub API queries) giving it higher precision.",
+  "_cost_usd": 0.42404390000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17cb_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17cb_train",
+    "arm_a_sha256": "083dfdaff9b3a37b7c2fd4a1e6a311c19816ccb073cfe0b18ff48c9212533ff3",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0639263265995e00edcd06c6242ac0a6a3647a980509c282af885c86ce6930e0",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

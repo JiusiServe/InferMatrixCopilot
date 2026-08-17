@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.5,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.88,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Both candidates surface the same underlying ground-truth concern (trust_remote_code compatibility, found already fixed by a later commit, downgraded to a stale-PR-description nit), so recall is equal. X pads its report with roughly ten near-duplicate restatements of that single point (several with placeholder '?:line' paths), which dilutes precision and actionability even though its two genuinely novel findings (cache-before-validation bug, missing cache test) are solid. Y delivers a clean, non-redundant review with several deep, well-grounded, distinct findings (broad except swallowing transient errors, dead None-fallback on kernels≥0.15, missing cache-reset hook, uncovered test path) each with precise file/line and concrete fixes, making it far more useful despite comparable coverage of the sole ground-truth item.",
+  "_cost_usd": 0.252125,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17cb_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17cb_train",
+    "arm_a_sha256": "69e0287958c6a83ad22d262e2cf0f2a023ab76172749a3c6e2bbaa2cb79d2f25",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "589a8ff13cb3893b76dd0d5220ad632d82f46cc0edd9083528ebb2466be7c8a7",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

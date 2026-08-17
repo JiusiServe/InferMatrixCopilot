@@ -113,6 +113,20 @@ judge, `MOA_WHEN=off` verified through resolved settings and confirmed by
 | **v17ds train (10 items)** | **+.024 [−.030, +.077]** | **+.016 [−.061, +.093]** | .47 |
 | **v17ds pooled (15 items)** | **−.004 [−.056, +.049]** | **−.008 [−.078, +.062]** | .38 |
 | v17cb val — Composer 2.5 via cursor backend | −.003 [−.222, +.215] | −.040 [−.322, +.242] | .40 |
+| v17cb train — Composer 2.5 via cursor backend | −.052 [−.165, +.061] | −.097 [−.215, +.021] | .20 |
+
+**Backend champion on the same 10 train items: the api/DeepSeek core, not
+Composer.** api +.024 recall / +.016 precision against cursor −.052 / −.097.
+Val had put Composer ahead (−.003 vs −.059) and that was a small-sample
+mirage: n=5 with a ±.22 interval, against train's 4× tighter item variance
+(sd .075 api vs .158 cursor). Composer's spread is driven by swings —
+pr4970 +.317 against pr4923 −.233 — where the api arm moves within ±.06 on
+seven of ten items. The v15 ordering (Composer behind DeepSeek) did NOT
+invert; the val row simply could not resolve it.
+
+Both Composer runs are contamination-clean: 0 `imreview` references across
+packed traces including IO blobs, with all three skill copies vaulted
+off-$HOME for the duration and restored afterwards.
 
 **Correction to the entry below.** On 2026-08-16 this document reported
 "the conversion fixes did not close the recall gap" from a pooled −.050.
