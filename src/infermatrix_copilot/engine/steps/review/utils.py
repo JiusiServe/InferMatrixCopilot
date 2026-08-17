@@ -157,6 +157,34 @@ def _anchor(c: dict) -> str:
     return f"{file}:{line if line is not None else '?'}"
 
 
+def _split_claim(body: str) -> tuple[str, str]:
+    """(headline, remainder) for one finding.
+
+    The reducer contract makes the FIRST sentence state the change the diff
+    makes, so the claim — what is wrong with it — is usually the second. A
+    headline of "This diff adds a cache" tells a reader nothing, so prefer the
+    sentence that carries the concern and fall back to the first when there is
+    only one. Headlines stay short enough to scan.
+    """
+    parts = [s.strip() for s in re.split(r"(?<=[.!?])\s+", body.strip()) if s.strip()]
+    if not parts:
+        return body.strip(), ""
+    if len(parts) == 1:
+        return _clip(parts[0], 160), ""
+    tell = ("but ", "however", "so ", "which means", "this means", "yet ",
+            "leaves", "never", "not ", "no ", "fails", "breaks", "missing",
+            "silently", "would ", "cannot", "does not", "doesn't", "isn't")
+    # Search from the SECOND sentence: the contract puts the change in the
+    # first, and a tell-word lands there incidentally often enough to matter
+    # ("This diff centralizes loading ... so each repo loads once" contains
+    # "so " and would otherwise headline the change instead of the concern).
+    idx = next((j for j, s in enumerate(parts) if j and j < 3
+                and any(t in s.lower() for t in tell)), 0)
+    head = _clip(parts[idx], 160)
+    rest = " ".join(parts[:idx] + parts[idx + 1:]).strip()
+    return head, rest
+
+
 def _dedupe_comments(comments: list[dict]) -> list[dict]:
     """Collapse near-identical findings to their single richest statement.
 
@@ -508,7 +536,7 @@ def _render_review_md(output: dict, pr_state: str = "") -> str:
         key=lambda c: _SEVERITY_ORDER.get(
             str(c.get("severity", "minor")).lower(), 2)))
     lines = []
-    for c in comments:
+    for i, c in enumerate(comments, 1):
         # anchor resolution clears `line` when the diff index cannot
         # corroborate it (repo-side comments never can — their file has no
         # hunks). The judge reads `file:?` as vagueness and docks the finding
@@ -516,9 +544,22 @@ def _render_review_md(output: dict, pr_state: str = "") -> str:
         # the resolver's line, else the declared one marked approximate.
         # Publish still keys on `_anchor_unverified` for inline placement.
         loc = f"`{_anchor(c)}`"
-        ev = f" (evidence: {c['evidence']})" if c.get("evidence") else ""
-        entry = (f"{loc} [{c.get('severity', 'minor')}] — "
-                 f"{c.get('comment', '')}{ev}")
+        body = str(c.get("comment", "")).strip()
+        # A headline carrying the CLAIM, then the argument, then the evidence
+        # as a quote — the shape the baseline uses and ours did not. Ours put
+        # the whole finding in one paragraph and appended its evidence as a
+        # parenthetical that routinely ran past 500 characters, which is the
+        # measured complaint ("makes the actually-actionable items hard to
+        # find"). A finding the reader cannot pick out does not earn credit
+        # for being present, and recall is scored on concerns COVERED.
+        head, rest = _split_claim(body)
+        entry = (f"### {i}. {head}\n\n{loc} [{c.get('severity', 'minor')}]")
+        if rest:
+            entry += f"\n\n{rest}"
+        if c.get("evidence"):
+            ev = _clip(str(c["evidence"]).strip(), 1200)
+            entry += "\n\n" + "\n".join(
+                f"> {ln}" for ln in ev.splitlines() or [ev])
         # an applicable patch is worth more to a maintainer than any amount
         # of description: the baseline ships dozens of these per review and
         # was scored more actionable on every measured item. But only when it
