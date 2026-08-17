@@ -156,8 +156,16 @@ class Settings(BaseSettings):
     # the CLI path treats empty as "api" so maintainer setups keep working.
     # Harness ids (cursor / claude-code / codex) need no API key: the vendor
     # CLI holds the subscription auth.
-    strict_backend: str = ""             # "" | api | cursor | claude-code | codex
+    strict_backend: str = ""             # "" | api | cursor | claude-code | codex | deepseek
     strict_backend_model: str = ""       # model id INSIDE the harness (optional)
+    # dsh is the one API-keyed harness (providers/deepseek.py): the other
+    # three hold subscription auth inside the vendor CLI, so `tier_target`
+    # blanks credentials for harness backends and dsh must source its own.
+    # Empty falls back to `anthropic_api_key`, which on this machine holds the
+    # DeepSeek key. Leave the base URL empty unless dsh must talk to a proxy —
+    # its native endpoint is NOT the `/anthropic` gateway the api path uses.
+    deepseek_harness_api_key: str = ""
+    deepseek_harness_base_url: str = ""
     strict_backend_concurrency: int = 2  # concurrent harness sessions
     strict_backend_cli: str = ""         # binary path override (else PATH)
     strict_backend_timeout_s: float = 1800.0  # per-session wall-clock ceiling
@@ -374,7 +382,7 @@ class Settings(BaseSettings):
     def _validate_strict_backend(cls, v):
         """Unknown backend ids fail at startup, not mid-run: the selection is
         a routing decision and a typo must not silently mean 'api'."""
-        allowed = {"", "api", "cursor", "claude-code", "codex"}
+        allowed = {"", "api", "cursor", "claude-code", "codex", "deepseek"}
         if v not in allowed:
             raise ValueError(
                 f"STRICT_BACKEND must be one of {sorted(allowed - {''})} "

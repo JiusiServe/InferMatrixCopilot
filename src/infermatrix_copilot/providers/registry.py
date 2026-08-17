@@ -34,6 +34,18 @@ PROVIDERS: dict[str, ProviderSpec] = {
             cli_names=("codex",),
             capabilities=frozenset({
                 "mcp_tools", "sandbox_read_only", "usage_reporting"})),
+        # The one API-KEYED harness: dsh is driven through its Python SDK
+        # (no PATH binary — the bundled runtime ships in the wheel) and needs
+        # a DeepSeek credential, unlike the three subscription CLIs above.
+        # `api_keyed` marks that asymmetry for callers that assume "harness
+        # ⇒ the vendor holds the credential" (see providers/deepseek.py).
+        ProviderSpec(
+            id="deepseek", kind="harness",
+            display="DeepSeek Harness (dsh) via deepseek-harness-sdk",
+            cli_names=(),
+            capabilities=frozenset({
+                "mcp_tools", "sandbox_read_only", "system_prompt",
+                "api_keyed"})),
     )
 }
 
@@ -86,6 +98,10 @@ def transport_for_id(settings, provider_id: str) -> HarnessTransport:
         from .claude_code import ClaudeCodeTransport
 
         return ClaudeCodeTransport(settings)
+    if spec.id == "deepseek":
+        from .deepseek import DeepSeekHarnessTransport
+
+        return DeepSeekHarnessTransport(settings)
     from .codex import CodexTransport
 
     return CodexTransport(settings)
