@@ -1059,9 +1059,16 @@ def test_docs_heavy_diff_swaps_in_the_docs_pass(settings, trace, tmp_path,
 
 def test_validated_ledger_ranks_resolved_and_claims_first():
     """The rendered Validated section ranks [resolved]/[claim-*] confirmations
-    ahead of mechanics [sweep] notes and keeps up to 14 — arrival-order
-    truncation was cutting exactly the resolved-thread confirmations the
-    reader checks a post-fix review against."""
+    ahead of mechanics [sweep] notes — arrival-order truncation was cutting
+    exactly the resolved-thread confirmations the reader checks a post-fix
+    review against.
+
+    The cap was 14 and is now 6. 14 saturated on 9 of 10 items in BOTH
+    measured arms, which makes it a quota being filled rather than a ceiling
+    protecting the reader, and judges scored the result as burial: "buries the
+    same insight under ~10 near-duplicate 'Validated'/'claim-refuted' log
+    entries". Ranking is what this test pins; the cap rides along.
+    """
     from infermatrix_copilot.engine.steps.review.utils import (
         _review_summary_parts,
     )
@@ -1071,7 +1078,7 @@ def test_validated_ledger_ranks_resolved_and_claims_first():
     parts = _review_summary_parts({"findings": findings, "review_comments": []})
     validated = next(p for p in parts if p.startswith("**Validated:**"))
     lines = validated.splitlines()[1:]
-    assert len(lines) == 14
+    assert len(lines) == 6
     assert "[resolved]" in lines[0]
     assert "[claim-verified]" in lines[1]
 

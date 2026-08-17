@@ -9,7 +9,90 @@ files) so lens coverage never depends on a model re-enumerating the diff.
 
 from __future__ import annotations
 
+import re
+
 _SEVERITY_ORDER = {"blocker": 0, "major": 1, "minor": 2, "nit": 3}
+
+# Identifiers that name what a finding is ABOUT: snake_case symbols, file
+# paths, CamelCase types, commit shas. Bare English is excluded on purpose —
+# it carries the claim, not the subject, and the two are separated below.
+_IDENT_RE = re.compile(
+    r"\b(?:[a-z][a-z0-9]*(?:_[a-z0-9]+)+"        # snake_case
+    r"|[A-Za-z_][\w/]*\.[a-z]{2,4}\b"             # file.ext, path/file.ext
+    r"|[A-Z][a-z]+(?:[A-Z][a-z]+)+"               # CamelCase
+    r"|[0-9a-f]{7,40})\b")                        # commit sha
+
+_STOPWORDS = frozenset("""the a an and or of to in is are was were be been being
+this that it its for on at by with from as not no but if then so we you they i
+do does did has have had can could should would will may might there their them
+he she each per only also more most other than when where which who whom whose
+into over under out up down about after before same such very just even still
+now new old one two three both all any some none""".split())
+
+
+def _topic(text: str) -> set[str]:
+    """The identifiers a finding is about, ignoring its `[tag]` and evidence."""
+    body = re.split(r"\(evidence:", re.sub(r"^\s*\[[a-z-]+\]\s*", "", text))[0]
+    return {t.lower().rstrip(".") for t in _IDENT_RE.findall(body)
+            if len(t) > 3}
+
+
+def _claim(text: str) -> set[str]:
+    """The content words asserting what is wrong, minus the subject and tag."""
+    body = re.split(r"\(evidence:", re.sub(r"^\s*\[[a-z-]+\]\s*", "", text))[0]
+    return set(re.sub(r"\W+", " ", body.lower()).split()) - _STOPWORDS
+
+
+def _overlap(a: set, b: set) -> float:
+    """Containment against the SHORTER set, so a restatement that merely
+    appends detail still matches the original it restates."""
+    return len(a & b) / max(1, min(len(a), len(b)))
+
+
+def _same_finding(a: str, b: str, topic_t: float = 0.5,
+                  claim_t: float = 0.35, verbatim_t: float = 0.8) -> bool:
+    """True when two finding texts are one finding said twice.
+
+    Two SUFFICIENT conditions, because the duplicates arrive in two shapes and
+    each rule alone was measured wrong on real artifacts:
+
+    1. Near-verbatim: the claims agree almost entirely and diverge only in
+       trailing words ("…so ranks diverge" vs "…so ranks diverge here"). Word
+       overlap catches these and needs no subject — some findings name only
+       one identifier, or none.
+    2. Same subject, same claim, different citation: parallel lenses restate
+       one fact while each cites the evidence it happened to find ("dropped at
+       head for kernels 0.13.x compat" vs "commit 9947f414 dropped kwargs;
+       flash_attn_hub.py:34-35 calls …"). These agree far below the verbatim
+       bar — replaying rule 1 alone over twenty measured artifacts collapsed
+       138 ledger entries to 124 and removed 0 of 68 comments.
+
+    Rule 2 stays conjunctive rather than keying on the subject alone: shared
+    identifiers merged pr4977's `:~81` ("add a cache test") into `:~58` ("that
+    test sits on no CI path"), two distinct findings about one file, and the
+    judge credited `:~58` by name. A false merge deletes a finding and costs
+    recall; a missed merge only pads the review. The asymmetry says stay
+    strict.
+    """
+    ca, cb = _claim(a), _claim(b)
+    if not ca or not cb:
+        return False
+    claim_ov = _overlap(ca, cb)
+    if claim_ov >= verbatim_t:
+        return True
+    ta, tb = _topic(a), _topic(b)
+    if not ta or not tb:
+        return False
+    return _overlap(ta, tb) >= topic_t and claim_ov >= claim_t
+
+
+def _dedupe_texts(texts: list[str], **kw) -> list[str]:
+    """First-wins dedupe of finding texts under `_same_finding`."""
+    kept: list[str] = []
+    for t in texts:
+        if not any(_same_finding(t, k, **kw) for k in kept):
+            kept.append(t)
+    return kept
 
 
 def _clip(text: str, limit: int) -> str:
@@ -49,7 +132,21 @@ def _anchor(c: dict) -> str:
     line = c.get("line")
     if line is None and c.get("_declared_line") is not None:
         line = f"~{c['_declared_line']}"
-    file = c.get("file") or "?"
+    file = c.get("file") or ""
+    if not file or file == "?":
+        # A finding with no file is not a finding at a broken location — it is
+        # usually a finding about the PR's own prose, which has no file:line
+        # anywhere. Rendering it as `?:34` invented a reference the judge could
+        # check and fail: "two of its findings cite broken locations ('?:102',
+        # '?:33') instead of real file paths, hurting both precision and
+        # actionability" (pr4817), and the same complaint on pr4804/pr4870.
+        # Naming the surface honestly is both accurate and unfalsifiable.
+        text = str(c.get("comment") or "").lower()
+        if any(k in text for k in ("pr description", "pr body", "pr purpose",
+                                   "description still", "description claims",
+                                   "pr title", "commit message")):
+            return "PR description"
+        return "general"
     return f"{file}:{line if line is not None else '?'}"
 
 
@@ -63,27 +160,28 @@ def _dedupe_comments(comments: list[dict]) -> list[dict]:
     backends and both splits: "pads its report with ~4 near-duplicate
     restatements", "5+ near-duplicate findings".
 
-    Matched on word-set overlap within a file, NOT on a prefix: the measured
-    duplicates are restatements that agree almost entirely and diverge only in
-    trailing words ("…so ranks diverge" vs "…so ranks diverge here"), which
-    any prefix key lets through. Overlap is scored against the shorter text so
-    a restatement that merely appends detail still matches its original.
-    """
-    import re as _re
+    Matched on `_same_finding` — subject AND claim — and NOT scoped to a file.
+    Both of those are corrections to a version that measured as inert:
 
-    kept: list[tuple[str, set[str], dict]] = []
+    * The within-a-file scope let the commonest duplicate class straight
+      through. When the same fact is restated by several lenses, they often
+      anchor it differently, so `?:34` and `flash_attn_hub.py:34` landed in
+      different buckets and were never compared. Replaying the shipped rule
+      over ten measured artifacts removed 0 of 68 comments.
+    * Whole-word overlap at 0.8 is far too strict for restatements that cite
+      different evidence for one fact — the four `trust_remote_code`
+      description-staleness comments on pr4977 share a subject, not a
+      vocabulary.
+    """
+    kept: list[tuple[str, dict]] = []
     for c in comments:
-        file = str(c.get("file") or "")
-        words = set(_re.sub(r"\W+", " ",
-                            str(c.get("comment", "")).lower()).split())
-        if not words:
+        text = str(c.get("comment", ""))
+        if not text.strip():
             continue
-        if any(prev_file == file
-               and len(words & prev) / max(1, min(len(words), len(prev))) >= 0.8
-               for prev_file, prev, _ in kept):
+        if any(_same_finding(text, prev) for prev, _ in kept):
             continue
-        kept.append((file, words, c))
-    return [c for _, _, c in kept]
+        kept.append((text, c))
+    return [c for _, c in kept]
 
 
 def _valid_suggestion(code: str, file: str) -> bool:
@@ -289,22 +387,36 @@ def _review_summary_parts(output: dict) -> list[str]:
                 return rank
         return len(_VALIDATED_PREFIX_RANK)
 
-    # dedupe before ranking: parallel passes independently verify the same
-    # fact and each writes its own bullet, so the ledger shipped the same
-    # line three times on measured items and judges docked precision for the
-    # repetition. Keyed on the normalized first 90 chars — enough to catch
-    # re-phrasings of one fact, short enough not to merge distinct ones.
-    validated_all, seen = [], set()
+    # Dedupe before ranking: parallel passes independently verify the same
+    # fact and each writes its own bullet. The previous key — the normalized
+    # first 90 chars — was INERT on every artifact it was meant to fix:
+    # replayed over twenty measured reviews it removed 0 of 138 entries and
+    # 0 of 136, because restatements of one fact open with whichever evidence
+    # that lens happened to cite. Judges read the result exactly as it looks:
+    # "buries the same insight under ~10 near-duplicate 'Validated'/
+    # 'claim-refuted' log entries", "~6 near-verbatim restatements labeled
+    # 'resolved', which inflates apparent coverage without adding new signal
+    # and makes the actually-actionable items hard to find".
+    #
+    # The ledger is a summary of verification work, not the findings channel,
+    # so it takes the LOOSER half of `_same_finding`: subject agreement alone.
+    # Merging two ledger lines about one subject costs a little detail;
+    # merging two comments costs a finding, which is why the comment path
+    # keeps the conjunctive rule.
+    validated_all: list[str] = []
+    topics: list[set[str]] = []
     for finding in (output.get("findings") or []):
         text = str(finding).strip()
         if not text.lstrip().lower().startswith(_VALIDATED_PREFIX_RANK):
             continue
-        key = " ".join(text.lower().split())[:90]
-        if key in seen:
+        topic = _topic(text)
+        if topic and any(_overlap(topic, prev) >= 0.5 for prev in topics):
             continue
-        seen.add(key)
+        topics.append(topic)
         validated_all.append(text)
-    validated = sorted(validated_all, key=_prefix_rank)[:14]
+    # 14 saturated on 9 of 10 items in both measured arms — a cap that is
+    # always hit is a quota being filled, not a ceiling protecting the reader.
+    validated = sorted(validated_all, key=_prefix_rank)[:6]
     counts: dict[str, int] = {}
     # budget-cut overflow counts in the scan too — a capped finding was still
     # found, and "no finding reported" over a category the lenses DID flag

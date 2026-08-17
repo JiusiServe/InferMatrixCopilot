@@ -43,6 +43,7 @@ from .utils import (
     _SEVERITY_ORDER,
     _render_review_md,
     _render_review_summary,
+    _same_finding,
     _sweep_targets,
 )
 
@@ -165,8 +166,19 @@ def _promote_resolved_residuals(ctx: StepContext, output: dict) -> dict:
         if not any(m in body.lower() for m in _RESIDUAL_MARKERS):
             continue          # a bare confirmation is not a finding
         m = re.search(r"([\w./\-]+\.\w+):(\d+)", body)
-        file_, line_no = (m.group(1), int(m.group(2))) if m else ("?", None)
+        file_, line_no = (m.group(1), int(m.group(2))) if m else ("", None)
         if (file_, body[:60]) in covered:
+            continue
+        # ...and against EACH OTHER. `covered` only holds the pre-existing
+        # comments, so N resolved lines about one residual promoted N times:
+        # pr4977 shipped four near-identical "the PR description still claims
+        # trust_remote_code" comments (the cap of 4, saturated) out of five
+        # `[resolved]` lines stating that one residual, and the judge docked
+        # it for "4 nearly-identical inline comments restating the same
+        # PR-description staleness point, hurting signal density". Promotion
+        # is where that duplication is cheapest to stop — before these
+        # compete for the comment budget against distinct findings.
+        if any(_same_finding(body, prev["comment"]) for prev in added):
             continue
         added.append({"file": file_, "line": line_no, "severity": "minor",
                       "comment": body,
