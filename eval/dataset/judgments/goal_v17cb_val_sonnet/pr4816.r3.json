@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.8,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.55,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth has zero substantive concerns (just 'lgtm'), so recall is trivially full for both. X delivers a tight, well-organized review with grounded, actionable findings — the diffusion-mode residual bug, the untested base()-mocking regression, and version/CI-pin investigation — each with precise file:line refs and concrete code fixes. Y converges on similar core insights (untested base() mock, pre-existing diffusion None issue) but buries them under many near-duplicate 'resolved' entries repeating the same point, plus one malformed finding location ('?:754'), which hurts both precision and actionability despite comparable underlying analysis.",
+  "_cost_usd": 0.2887589,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17cb_val"
+  },
+  "_roles": {
+    "arm": "copilot_v17cb_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17cb_val",
+    "arm_a_sha256": "16900a18718c1b389e4e10a9161de71e2374ac86a51f7ef8b4e43d6f3cee23ec",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b9fe4c00140a73cf5cc08ceded6d03eb8b8faea45f6c3b50e6f9753b9a1a1a01",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

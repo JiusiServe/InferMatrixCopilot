@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.7,
+    "precision": 0.5,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.8,
+    "precision": 0.7,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently converge on the one substantive ground-truth concern (the reduce_scatter/device_communicator assertions only validate the test's own fake, not that init_vllm_model_parallel_group actually wires use_device_communicator=True), and both propose an equivalent spy/wrap fix — so recall is comparably strong. X pads its report with ~4 near-duplicate restatements of the same 'cfg_parallel_size>1 guard removed' observation across separate 'findings,' inflating apparent coverage without adding distinct value and hurting real precision/signal-to-noise. Y is organized as a single coherent narrative with a clear verdict, numbered non-redundant comments, concrete before/after fixes, and a 'what I checked and found fine' section showing genuine due diligence; it also surfaces a plausible additional correctness issue (DP-metadata collective firing outside the intended MoE mapping, risking a hang under CFG parallelism) that is well-reasoned even though it leans on code outside the shown diff. Neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.40736859999999997,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17cb_val",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17cb_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17cb_val",
+    "arm_a_sha256": "af17242804371428bedcecf399f4a98ce2a7e963383ce27086a4341e12b107d4",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0d4ddd4027e23f1f32216e748289588ea9a0e74ee8e599fa34b9d50f503d2f0d",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

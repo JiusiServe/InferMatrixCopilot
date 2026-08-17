@@ -1,19 +1,19 @@
 # Judgment: copilot_v17ds_val vs claudecode_opus5
 
-Judge: claude-sonnet-5 (blind, randomized order, 3 replicate(s) x 4 item(s) = 12 verdicts)
+Judge: claude-sonnet-5 (blind, randomized order, 3 replicate(s) x 5 item(s) = 15 verdicts)
 
 ## Wins
 
 - copilot_v17ds_val: 3
-- claudecode_opus5: 9
+- claudecode_opus5: 12
 - tie: 0
 
 ## Mean rubric scores
 
 | arm | actionability | gap_hit | precision | recall |
 |---|---|---|---|---|
-| claudecode_opus5 | 0.85 | 0.30 | 0.77 | 0.69 |
-| copilot_v17ds_val | 0.72 | 0.30 | 0.75 | 0.62 |
+| claudecode_opus5 | 0.86 | 0.23 | 0.79 | 0.75 |
+| copilot_v17ds_val | 0.74 | 0.23 | 0.73 | 0.69 |
 
 ## Per-verdict detail
 
@@ -22,6 +22,9 @@ Judge: claude-sonnet-5 (blind, randomized order, 3 replicate(s) x 4 item(s) = 12
 | pr4810.r1 | copilot_v17ds_val | slight | Both candidates independently surface the real latent gap — the still-unfixed get_cache_scale caller in hunyuan_image3_transformer.py — with file/line precision, matching the later #4891 fallout, so g |
 | pr4810.r2 | copilot_v17ds_val | clear | Both independently rediscover the exact latent gap (hunyuan_image3_transformer.py:2238 still calling the removed get_cache_scale API), and X additionally ties this to the ground-truth reviewer's #4808 |
 | pr4810.r3 | claudecode_opus5 | slight | Both independently surface the actual latent gap — the diffusion hunyuan_image3_transformer.py:2238 still calling the removed get_cache_scale, matching later issue #4891 — and both hit the ground trut |
+| pr4816.r1 | claudecode_opus5 | slight | Ground truth has no substantive concerns (just an 'lgtm' approval), so both candidates are essentially over-and-above reviews; both independently surface the same real-looking latent bug (pure-diffusi |
+| pr4816.r2 | claudecode_opus5 | slight | Both independently caught the same genuine latent bug (pure-diffusion mode sets serving_tokenization=None, so the unguarded base(raw_request).create_error_response() call would raise on NoneType) and  |
+| pr4816.r3 | claudecode_opus5 | clear | Ground truth is trivial (just an 'lgtm'), so both get full recall by default. Both independently surface the same real latent bug — pure-diffusion mode sets serving_tokenization=None but _create_speec |
 | pr4825.r1 | claudecode_opus5 | slight | Both candidates independently and correctly ground the two substantive GT threads: the unet-scan addition duplicating _dit_modules/_lora_components (echoing tthakkal's 'keep this PR SDXL-specific' pus |
 | pr4825.r2 | claudecode_opus5 | slight | Both candidates independently surface the substantive latent issue behind the GT thread (SDXL FF-layer naming mismatch between diffusers/PEFT checkpoint names and internal names, echoing dsocek's 'nam |
 | pr4825.r3 | copilot_v17ds_val | slight | Ground truth is thin (two LGTM approvals plus dsocek's design suggestion to derive naming/matching from existing pipeline metadata rather than hardcoding). Both candidates independently converge on th |

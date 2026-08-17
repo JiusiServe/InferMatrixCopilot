@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.72,
+    "actionability": 0.78,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth has zero substantive concerns (bot hit a usage limit, human just said lgtm), so recall is trivially satisfied by both. Both candidates converge on the same genuinely valid, diff-grounded gap — tests mock out base() so the actual renamed-attribute regression is never exercised — and both back it with concrete file:line evidence and runnable test suggestions. X is better calibrated (explicit Approve verdict matching the real lgtm outcome, clearer separation of in-scope vs. follow-up items) while Y pads its output with five near-duplicate 'resolved' bullets restating the same pre-existing diffusion-mode caveat and includes a malformed '?:754' location tag, slightly hurting precision and actionability despite also offering nicely formatted GitHub suggestion blocks.",
+  "_cost_usd": 0.2289349,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17cb_val"
+  },
+  "_roles": {
+    "arm": "copilot_v17cb_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17cb_val",
+    "arm_a_sha256": "16900a18718c1b389e4e10a9161de71e2374ac86a51f7ef8b4e43d6f3cee23ec",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b9fe4c00140a73cf5cc08ceded6d03eb8b8faea45f6c3b50e6f9753b9a1a1a01",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}
