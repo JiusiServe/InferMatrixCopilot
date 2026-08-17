@@ -109,14 +109,37 @@ nothing about the items changed — only the environment passed to the sweep.
 investigator + behavior to `mimo-v2.5`, adversary + verification to
 `qwen3.6-plus`, reducer staying on the tier model.
 
-* `qwen3.6-plus` returned `403 AccessDenied.Unpurchased` on **all 24
-  attempts** — the adversary and verification lenses never ran on their
-  assigned model, falling back to DeepSeek every time.
-* `mimo-v2.5` succeeded 14 times and failed 10, each failure landing ~8
-  minutes in with the same `content[].thinking` 400.
-* Net: **24% of productive round-1 lenses were written by mimo-v2.5**, not
-  DeepSeek. 104 minutes of the run were spent on member attempts that were
-  then thrown away and redone.
+* `qwen3.6-plus` returned `403 AccessDenied.Unpurchased` on 24 of its 27
+  attempts — that subscription is not active.
+* `mimo-v2.5` failed 10 times, each failure landing ~8 minutes in with the
+  same `content[].thinking` 400.
+* 104 minutes of the run were spent on member attempts that were then thrown
+  away and redone.
+
+**Corrected magnitude** (this paragraph replaces an earlier claim of "24% of
+productive round-1 lenses were written by mimo-v2.5", which was inferred from
+seat names rather than measured, and was wrong by ~2.6x). Attributing by the
+model recorded on each `agent_dispatch` that produced usable output:
+
+| model | attempts | productive outputs | output tokens |
+|---|---|---|---|
+| `deepseek-v4-pro` | rest + all fallbacks | 155 (89.1%) | 2,298,061 (89.3%) |
+| `mimo-v2.5` | 30 | 16 (9.2%) | 183,047 (7.1%) |
+| `qwen3.6-plus` | 27 | 3 (1.7%) | 94,497 (3.7%) |
+
+DeepSeek still wrote ~90% of the work. Both member figures are UPPER BOUNDS:
+`BudgetedLLM.create` (moa.py:215-227) reserves an estimated cost per LLM call
+and, on a refused reservation, reruns that individual call on the tier model
+while the lens keeps its original dispatch label. With `moa_max_usd = $1.50`
+against per-item spend of $0.85-1.66, that budget trips partway through most
+items. The trace cannot resolve how much lower the true share is, because
+only the dispatch carries a model and the per-call fallback emits none — a
+second provenance defect of the same family as the one below.
+
+The contamination is therefore real but much smaller than first reported.
+The corrected run remains warranted: a ~10% vendor substitution concentrated
+in the two round-1 lenses is still not the arm the probe pre-registered, and
+the wasted 104 minutes distorts every latency number.
 
 So `goal_v17_val_sonnet` and `goal_v17_train_sonnet` do NOT measure the arm
 they are named for. They are retained, not deleted, and relabelled **v17-moa

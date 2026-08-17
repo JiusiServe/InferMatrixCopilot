@@ -116,8 +116,14 @@ set explicitly on every arm v13–v16 and was omitted from this launch, so
 `moa_when` fell through to its code default `"full"` and mixture-of-agents
 ran on 12 of the 15 items: investigator + behavior went to `mimo-v2.5`,
 adversary + verification to `qwen3.6-plus` (which returned 403
-AccessDenied.Unpurchased on all 24 attempts and fell back to DeepSeek every
-time). **24% of productive round-1 lenses were written by mimo-v2.5.** These
+AccessDenied.Unpurchased on 24 of its 27 attempts and fell back to DeepSeek).
+Measured by the model on each `agent_dispatch` that produced usable output:
+**DeepSeek 155 outputs (89.1%), mimo-v2.5 16 (9.2%), qwen3.6-plus 3 (1.7%)**
+— so DeepSeek still wrote ~90% of the work, and the two member figures are
+UPPER BOUNDS because `BudgetedLLM` silently reruns individual calls on the
+tier model when the $1.50 per-run MoA budget is refused, without relabelling
+the lens. (An earlier revision of this section claimed 24% for mimo, inferred
+from seat names rather than measured; that was wrong by ~2.6x.) These
 rows are retained as **v17-moa (unintended vendor mixture)**; the corrected
 core-only measurement is `goal_v17ds_*_sonnet`. See the amendment in
 `goal-eval/PROBE-v17-conversion.md`.
