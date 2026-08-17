@@ -90,3 +90,58 @@ already been judged?**
   survive. Editing the pipeline after seeing an artifact and before judging
   it is how a probe turns into config selection. It is recorded here as an
   input to the NEXT iteration, not patched into this one.
+
+## Amendment — the first v17 run was contaminated by an unintended mixture
+
+Written after the first run's verdicts existed, BEFORE the corrected run was
+generated. It concerns a configuration fault, not a result, and the corrected
+arm's analysis plan is unchanged from the body above.
+
+**What happened.** Every earlier arm in this campaign (v13-v16) was launched
+with `MOA_WHEN=off` in its environment; their manifests record `'off'`. The
+v17 launch did not set it, so it fell through to the code default
+`moa_when="full"` (config.py:345), which enables mixture-of-agents on every
+full-depth PR review. Depth distributions are identical between the v16 and
+v17 runs on the same items (full 7 / standard 1 / light 2 on train), so
+nothing about the items changed — only the environment passed to the sweep.
+
+**What it did.** MoA dispatched round-1 lenses to three vendors:
+investigator + behavior to `mimo-v2.5`, adversary + verification to
+`qwen3.6-plus`, reducer staying on the tier model.
+
+* `qwen3.6-plus` returned `403 AccessDenied.Unpurchased` on **all 24
+  attempts** — the adversary and verification lenses never ran on their
+  assigned model, falling back to DeepSeek every time.
+* `mimo-v2.5` succeeded 14 times and failed 10, each failure landing ~8
+  minutes in with the same `content[].thinking` 400.
+* Net: **24% of productive round-1 lenses were written by mimo-v2.5**, not
+  DeepSeek. 104 minutes of the run were spent on member attempts that were
+  then thrown away and redone.
+
+So `goal_v17_val_sonnet` and `goal_v17_train_sonnet` do NOT measure the arm
+they are named for. They are retained, not deleted, and relabelled **v17-moa
+(unintended vendor mixture)**; the arm and judgment directories keep their
+original names because each verdict's `_roles` block records that name, and
+renaming would leave the provenance pointing at a directory holding different
+data. A README in each directory states what actually ran.
+
+**The corrected run.** Identical code (`ae1b6f1`), identical items, identical
+judge and analysis, with `MOA_WHEN=off` verified through the RESOLVED
+settings rather than the env string (`moa_eligible(...) == False`). New
+names so nothing is overwritten: arms `copilot_v17ds_val` /
+`copilot_v17ds_train`, judgments `goal_v17ds_val_sonnet` /
+`goal_v17ds_train_sonnet`.
+
+**Fixed in advance:** the corrected run's numbers are the v17 result. The
+contaminated run is reported alongside as what it is, and no version of any
+item is chosen between the two. If pr4825 crashes again — its fault was the
+`content[].thinking` 400 on the DeepSeek path, which MoA-off does not
+address — it is reported MISSING under the same rule as before, not retried
+until it passes.
+
+**Provenance defect this exposes**, recorded for a general fix: the arm
+manifest records `moa_when` from the environment variable, so it wrote
+`"(default)"` while the resolved value was `"full"`. Manifests must record
+resolved settings, not env strings. This is the third instance of provenance
+capturing the input rather than what ran (after the routed-seat mislabeling
+and the Fable quota exhaustion).
