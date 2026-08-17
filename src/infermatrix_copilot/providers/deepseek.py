@@ -16,13 +16,23 @@ TWO WAYS THIS BREAKS THE REGISTRY'S HARNESS ASSUMPTIONS, both deliberate:
    api path would use and hands it over `DeepSeekHarnessConfig.api_key`. For
    cursor/claude-code/codex, injecting a key would be a bug; here it is the
    only way the harness runs at all.
-2. **The composition is ours, not the vendor's default.** `minimal.cordis.yml`
-   upstream mounts no MCP client, so our scoped tools would be unreachable and
-   the lenses would lose the archaeology tools (`show_commit`,
-   `search_history`, `file_at_base`) that produced the campaign's largest
-   single win. We therefore generate the composition per session: upstream
-   minimal (no compaction, no runtime-context injection, no skills) PLUS one
-   `dsh-mcp-client` layer pointed at our tool bridge.
+2. **It cannot use our tool bridge, and that is a measured fact, not a
+   choice.** The bundled runtime compiles in 122 plugins and
+   `@deepseek-ai/dsh-mcp-client` is not one of them (verified by scanning the
+   executable; adding it means editing `python/sdk-runtime/package.json` in a
+   checkout and rebuilding the exe). So dsh lenses run on the harness's own
+   `bash` + `str_replace_editor`, and our scoped tools — including the
+   archaeology set `show_commit` / `search_history` / `file_at_base` — are
+   NOT reachable as named tools. bash subsumes most of them (they are thin
+   git wrappers) but those calls fall outside our audit trail, so a
+   `capability_gap` is traced on every session that was handed a bridge spec
+   it could not honour. An arm must never be labelled "tools bridged" when
+   it ran on native bash; this campaign has already measured three arms that
+   were not the configuration their label claimed.
+
+   The composition is still ours: upstream minimal's shape (no compaction, no
+   runtime-context injection, no skills) generated per session so the sandbox
+   can be pinned per scope.
 
 Sandbox: upstream minimal ships `mode: danger-full-access` and its own README
 says to run it "only against a disposable checkout or container". This machine
@@ -58,6 +68,50 @@ from .registry import PROVIDERS
 # credential does NOT travel here — it goes through the SDK config field so it
 # never lands in a subprocess environment we also hand to bash.
 _DSH_ENV_KEEP = ("DSH_HOME",)
+
+_PLUGIN_RE = re.compile(r"name: '(@deepseek-ai/[a-z0-9-]+)'")
+_bundled_plugins: set[str] | None = None
+
+
+def _runtime_plugins() -> set[str]:
+    """Plugin ids compiled into the bundled runtime executable, scanned once.
+
+    The runtime boots only what its config lists, but it can only IMPORT what
+    was compiled in; naming an absent plugin is a boot failure the SDK reports
+    as a request timeout minutes later rather than an error. Scanning the exe
+    for its plugin ids is crude but exact, and it runs once per process.
+    """
+    global _bundled_plugins
+    if _bundled_plugins is not None:
+        return _bundled_plugins
+    found: set[str] = set()
+    try:
+        from deepseek_harness_runtime import bundled_runtime_path
+
+        blob = Path(bundled_runtime_path()).read_bytes()
+        found = {m.decode() for m in
+                 re.findall(rb"@deepseek-ai/dsh-[a-z0-9-]+", blob)}
+    except Exception:  # noqa: BLE001 — an unscannable runtime must not block
+        found = set()   # empty ⇒ the assertion below degrades to a no-op
+    _bundled_plugins = found
+    return found
+
+
+def _assert_plugins_bundled(composition: str) -> None:
+    """Fail NOW, naming the plugin, instead of timing out in `initialize`."""
+    available = _runtime_plugins()
+    if not available:
+        return
+    missing = sorted({p for p in _PLUGIN_RE.findall(composition)
+                      if p not in available})
+    if missing:
+        raise RuntimeError(
+            "dsh composition names plugin(s) absent from the bundled runtime: "
+            + ", ".join(missing)
+            + " — the runtime compiles in a fixed set, so this would boot-fail "
+              "and surface only as an initialize timeout. Add the dependency "
+              "to python/sdk-runtime/package.json in a deepseek-harness "
+              "checkout and rebuild the exe, or drop the plugin.")
 
 
 class DeepSeekHarnessTransport(HarnessTransport):
@@ -190,27 +244,20 @@ class DeepSeekHarnessTransport(HarnessTransport):
             "    root: !!js process.env.DSH_SESSION_ROOT\n"
             "    compression: none\n",
         ]
-        if bridge_spec_path is not None:
-            # failOnStartupError: a silently tool-less lens looks like a shy
-            # model, not a broken bridge. The cursor backend learned this the
-            # hard way (--approve-mcps missing ⇒ native tools only, unnoticed).
-            blocks.append(
-                "- id: mcp-infermatrix\n"
-                "  name: '@deepseek-ai/dsh-mcp-client'\n"
-                "  config:\n"
-                "    serverName: infermatrix\n"
-                "    transport: stdio\n"
-                f"    command: {json.dumps(sys.executable)}\n"
-                "    args: ['-m', 'infermatrix_copilot.tool_bridge', "
-                f"'--spec', {json.dumps(str(bridge_spec_path))}]\n"
-                f"    cwd: {json.dumps(str(cwd))}\n"
-                "    env:\n"
-                f"      PYTHONPATH: {json.dumps(str(package_root))}\n"
-                "    failOnStartupError: true\n")
+        # NO MCP layer: `@deepseek-ai/dsh-mcp-client` is not among the 122
+        # plugins compiled into the bundled runtime, and a composition naming
+        # an absent plugin does not fail fast — the runtime dies on "plugin
+        # tree failed to load" while the SDK sits in `initialize` until its
+        # request timeout. Measured 2026-08-17: 30 minutes per lens, silent.
+        # `_assert_plugins_bundled` below turns that into an instant error.
         header = ("# Generated per session by providers/deepseek.py — upstream\n"
-                  "# minimal composition, sandbox pinned to this step's scope,\n"
-                  "# plus the infermatrix tool bridge. Do not hand-edit.\n")
-        path.write_text(header + "\n".join(blocks), encoding="utf-8")
+                  "# minimal composition, sandbox pinned to this step's scope.\n"
+                  "# Native bash + str_replace_editor only: the bundled runtime\n"
+                  "# carries no MCP client, so our tool bridge is unreachable.\n"
+                  "# Do not hand-edit.\n")
+        body = "\n".join(blocks)
+        _assert_plugins_bundled(body)
+        path.write_text(header + body, encoding="utf-8")
         return path
 
     def _env(self, *, cwd: Path, model: str, system: str,
@@ -315,12 +362,23 @@ class DeepSeekHarnessTransport(HarnessTransport):
             refusals.append(f"dsh finish_reason={finish}")
 
         if req.trace is not None:
+            if req.bridge_spec_path is not None:
+                # the step asked for our scoped tools and could not get them:
+                # say so loudly enough that this arm cannot later be described
+                # as having run with the tool bridge
+                req.trace.record(
+                    "capability_gap", capability="review.mcp_tool_bridge",
+                    step=req.step_name,
+                    effect="bundled dsh runtime has no MCP client plugin; the "
+                           "session ran on native bash + str_replace_editor "
+                           "and scoped-tool calls are absent from the audit "
+                           "trail")
             req.trace.record(
                 "harness_session", provider=self.spec.id, step=req.step_name,
                 finish_reason=finish or None, error=error or None,
                 tool_calls=calls, truncated=truncated,
                 served_model=usage.served_model,
-                mcp_bridged=req.bridge_spec_path is not None,
+                mcp_bridged=False,
                 sandbox_mode=("read-only" if req.scope.read_only
                               else "workspace-write"),
                 # first-run instrumentation: the SDK does not document the

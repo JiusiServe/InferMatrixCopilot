@@ -120,20 +120,48 @@ def test_composition_pins_sandbox_and_never_grants_full_access(tmp_path):
     assert "maxTokensAsSuccess: false" in ro
 
 
-def test_composition_mounts_the_tool_bridge_only_when_given_one(tmp_path):
+def test_composition_never_names_the_absent_mcp_plugin(tmp_path):
+    """The bundled runtime compiles in 122 plugins and mcp-client is not one.
+    Naming it does not fail fast -- the runtime dies on load while the SDK
+    waits in initialize, which cost 30 minutes per lens when measured."""
     t = DeepSeekHarnessTransport(_settings())
-    with_bridge = t._composition(
-        run_dir=tmp_path, step_name="s", cwd=tmp_path, read_only=True,
-        bridge_spec_path=tmp_path / "spec.json").read_text()
-    without = t._composition(
-        run_dir=tmp_path, step_name="s2", cwd=tmp_path, read_only=True,
-        bridge_spec_path=None).read_text()
-    assert "dsh-mcp-client" in with_bridge
-    assert "serverName: infermatrix" in with_bridge
-    assert "infermatrix_copilot.tool_bridge" in with_bridge
-    # a silently tool-less lens reads as a shy model, not a broken bridge
-    assert "failOnStartupError: true" in with_bridge
-    assert "dsh-mcp-client" not in without
+    for spec in (tmp_path / "spec.json", None):
+        text = t._composition(run_dir=tmp_path, step_name=f"s{spec}",
+                              cwd=tmp_path, read_only=True,
+                              bridge_spec_path=spec).read_text()
+        assert "dsh-mcp-client" not in text
+        assert "dsh-tool-bash-persistent" in text
+        assert "dsh-tool-str-replace-editor" in text
+
+
+def test_absent_plugin_fails_immediately_rather_than_timing_out(monkeypatch):
+    """The guard that turns a boot failure into an instant, named error."""
+    from infermatrix_copilot.providers import deepseek as mod
+    monkeypatch.setattr(mod, "_runtime_plugins",
+                        lambda: {"@deepseek-ai/dsh-fs-local"})
+    with pytest.raises(RuntimeError, match="dsh-mcp-client"):
+        mod._assert_plugins_bundled(
+            "- id: x\n  name: '@deepseek-ai/dsh-mcp-client'\n")
+    # an unscannable runtime must degrade to a no-op, never block a run
+    monkeypatch.setattr(mod, "_runtime_plugins", lambda: set())
+    mod._assert_plugins_bundled("- id: x\n  name: '@deepseek-ai/dsh-mcp-client'\n")
+
+
+def test_unbridgeable_tools_are_traced_as_a_capability_gap(fake_sdk, tmp_path):
+    """An arm that ran on native bash must never be describable as having had
+    the tool bridge -- three arms in this campaign were already measured under
+    labels they did not match."""
+    class _Trace:
+        def __init__(self): self.records = []
+        def record(self, kind, **fields): self.records.append((kind, fields))
+    trace = _Trace()
+    req = _request(tmp_path)
+    req.trace = trace
+    DeepSeekHarnessTransport(_settings()).run_session(req)
+    gaps = [f for k, f in trace.records if k == "capability_gap"]
+    assert gaps and gaps[0]["capability"] == "review.mcp_tool_bridge"
+    sessions = [f for k, f in trace.records if k == "harness_session"]
+    assert sessions and sessions[0]["mcp_bridged"] is False
 
 
 def test_env_never_leaks_model_endpoint_or_keys(tmp_path, monkeypatch):
