@@ -17,9 +17,16 @@ Two things are deliberately STRONGER than the in-process loop:
   next to the spec; a second process must not interleave with the parent's
   ``run_trace.jsonl``.
 
-Known M1 gap, disclosed: the in-process extra tools built from a live
-`StepContext` (skill/memory retrieval, repo_map) are not reconstructed here
-— harness sessions get builtins + doc_search/doc_read.
+What a harness session gets: the run's builtin tools, `doc_search`/`doc_read`,
+the on-demand `repo_map` (reconstructed here via `_repo_map_tool`; a failure
+degrades to a traced `capability_gap`, never a crash), and the read-only
+change-archaeology set (`diff_stat`, `file_at_base`, `show_commit`,
+`search_history`, `calc`).
+
+Known gap, disclosed: **skill/memory retrieval is deliberately NOT bridged.**
+Those tools can propose knowledge candidates, and opening a cross-process
+write path for them was declined — a harness session may read this repo's
+knowledge, never add to it.
 """
 
 from __future__ import annotations

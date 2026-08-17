@@ -39,13 +39,21 @@ PROVIDERS: dict[str, ProviderSpec] = {
         # a DeepSeek credential, unlike the three subscription CLIs above.
         # `api_keyed` marks that asymmetry for callers that assume "harness
         # ⇒ the vendor holds the credential" (see providers/deepseek.py).
+        # NOTE: no `mcp_tools`. The bundled dsh runtime compiles in 122 plugins
+        # and `@deepseek-ai/dsh-mcp-client` is not among them, so our tool
+        # bridge is unreachable and sessions run on the harness's native bash
+        # (providers/deepseek.py traces a `review.mcp_tool_bridge`
+        # capability_gap and reports mcp_bridged=False). Declaring the flag
+        # here claimed a capability the transport measurably does not have —
+        # and `base.ProviderSpec` defines these as "flags the integration can
+        # rely on". Nothing branches on it today, which is exactly why the
+        # false claim survived: it only ever misled readers.
         ProviderSpec(
             id="deepseek", kind="harness",
             display="DeepSeek Harness (dsh) via deepseek-harness-sdk",
             cli_names=(),
             capabilities=frozenset({
-                "mcp_tools", "sandbox_read_only", "system_prompt",
-                "api_keyed"})),
+                "sandbox_read_only", "system_prompt", "api_keyed"})),
     )
 }
 
