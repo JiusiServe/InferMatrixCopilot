@@ -6,7 +6,7 @@
 `zuiho-kai/claude-workflow-starter`. Before adding, moving, or deleting any
 knowledge page:
 
-1. Read `doc/PLAN-knowledge-reorg.md`, `knowledge/CONTRIBUTING.md`, then exactly
+1. Read `doc/archive/PLAN-knowledge-reorg.md`, `knowledge/CONTRIBUTING.md`, then exactly
    the one linked contribution topic that matches the change. The plan's
    owner-scoped inventory and detail-retention rules remain authoritative for
    this vendored tree.

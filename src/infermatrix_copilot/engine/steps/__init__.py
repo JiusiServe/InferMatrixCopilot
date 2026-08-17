@@ -4,7 +4,7 @@ Importing this package imports every step module for its registration side
 effects (each `@step` / `register_step` records a `StepSpec`);
 `register_builtin_steps` flushes the collected specs into a `StepRegistry`.
 There is no central `add(StepSpec(...))` block to keep in sync — a step's name,
-metadata and handler live together at its definition (see doc/CODE_TOUR.md §5).
+metadata and handler live together at its definition (see doc/architecture/CODE_TOUR.md §5).
 """
 
 from __future__ import annotations

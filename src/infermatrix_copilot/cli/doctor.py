@@ -42,7 +42,7 @@ def _check_env(settings) -> tuple[bool, str]:
 
 
 def _check_strict_backend(settings) -> tuple[bool, str]:
-    """Provider-registry selection (doc/RFC-provider-registry.md). Unset is
+    """Provider-registry selection (doc/features/provider-registry.md). Unset is
     reported but not failed here — CLI runs default to api; Strict runs
     refuse at strict_readiness with the same fix line."""
     backend = settings.strict_backend

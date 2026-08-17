@@ -6,7 +6,7 @@ on:
       - .github/workflows/vllm-omni-release-audit.yml
       - adapters/vllm_omni/manifest.yaml
       - adapters/vllm_omni/release_baseline.yaml
-      - doc/VLLM_OMNI_RELEASE_MAINTENANCE.md
+      - doc/contributing/release-maintenance.md
       - plugins/infermatrix-copilot/skills/imupdate/**
       - knowledge/repos/vllm-omni/**
       - tools/audit_vllm_omni_release.py

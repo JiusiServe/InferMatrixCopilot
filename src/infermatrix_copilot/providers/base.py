@@ -1,4 +1,4 @@
-"""Provider-layer contracts (doc/RFC-provider-registry.md).
+"""Provider-layer contracts (doc/features/provider-registry.md).
 
 A *provider* is one way to reach a model. Two kinds exist:
 

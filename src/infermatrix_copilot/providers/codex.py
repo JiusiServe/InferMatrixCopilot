@@ -6,7 +6,7 @@ codex-cli 0.145.0 (auth was absent on the dev machine, so unlike cursor/
 claude-code this transport is exercised offline against recorded shapes —
 the readiness path reports the login gap before any run starts).
 
-Governance posture (disclosed, per doc/RFC-provider-registry.md): codex
+Governance posture (disclosed, per doc/features/provider-registry.md): codex
 cannot disable its native shell, but ``--sandbox read-only`` is an OS-level
 PREVENTIVE guarantee against writes and network egress; the MCP tool
 bridge is offered alongside via ``-c mcp_servers...`` overrides so scoped

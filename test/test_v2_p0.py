@@ -1,4 +1,4 @@
-"""Design v2 P0 — correctness fixes (doc/DESIGN.md §V2.1(a)) pinned by tests:
+"""Design v2 P0 — correctness fixes (doc/architecture/DESIGN.md §V2.1(a)) pinned by tests:
 
 1. resume restores step-to-step state handoffs (state_updates contract);
 2. foreach fan-out lifts per-item state_updates into the merged result;
@@ -294,7 +294,7 @@ def test_adapter_zero_declares_risk_tiers():
 
 # -- repo-neutral core guard (§V2.2.1) -------------------------------------------
 
-# Known v1 leaks (doc/DESIGN.md §V2.1(b)), by source file: ceilings, so the
+# Known v1 leaks (doc/architecture/DESIGN.md §V2.1(b)), by source file: ceilings, so the
 # list can only shrink. A new repo-specific literal anywhere else fails.
 _KNOWN_LEAKS = {
     "__init__.py": 1,            # package docstring
@@ -333,4 +333,4 @@ def test_repo_neutral_core():
             over.append(f"{rel}: {count} repo-specific literal(s), ceiling {ceiling}")
     assert not over, (
         "repo knowledge belongs in adapters/<repo>/, not the core "
-        "(doc/DESIGN.md §V2.2.1):\n  " + "\n  ".join(over))
+        "(doc/architecture/DESIGN.md §V2.2.1):\n  " + "\n  ".join(over))

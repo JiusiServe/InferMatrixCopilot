@@ -1,5 +1,5 @@
 """Provider registry: selection, harness targets, the HarnessLLM adapter, and
-the run_harness_step seam (doc/RFC-provider-registry.md)."""
+the run_harness_step seam (doc/features/provider-registry.md)."""
 
 from types import SimpleNamespace
 

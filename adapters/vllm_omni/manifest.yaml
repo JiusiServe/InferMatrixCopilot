@@ -26,7 +26,7 @@ upstream:
 # community docs at the repo-root `knowledge/` = settings.knowledge_dir;
 # cross-repo general/ knowledge is shared, NOT nested here). Replaces the
 # retired AI profile/. Provenance + the author's copy authorization are in
-# doc/KNOWLEDGE.md. Paths below are relative to settings.knowledge_dir.
+# doc/architecture/KNOWLEDGE.md. Paths below are relative to settings.knowledge_dir.
 knowledge:
   source: zuiho-kai/claude-workflow-starter
   repo_subdir: repos/vllm-omni    # this repo's slice within the shared base

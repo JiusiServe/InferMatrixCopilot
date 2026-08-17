@@ -56,7 +56,7 @@ class HarnessLLM:
             raise RuntimeError(
                 "harness backend supports tool-less create() only — agent "
                 "steps run through the provider's run_session "
-                "(doc/RFC-provider-registry.md)")
+                "(doc/features/provider-registry.md)")
         reply = self._transport.complete(
             system=system, messages=messages,
             model=model or self.settings.strict_backend_model,

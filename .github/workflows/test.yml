@@ -2,7 +2,7 @@ name: tests
 
 # The suite is ~485 offline cases with no network and no paid LLM calls, so it can
 # run on every push. Until this existed it ran only when someone remembered to type
-# `pytest` (doc/CODE_TOUR.md documents it as a manual step) — tests that nothing runs
+# `pytest` (doc/architecture/CODE_TOUR.md documents it as a manual step) — tests that nothing runs
 # protect nothing.
 #
 # NOTE: this workflow is a SIGNAL, not a merge gate. Making it blocking needs a branch

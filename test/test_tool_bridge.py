@@ -1,5 +1,5 @@
 """Tool-bridge spec round-trip and the read-containment guard
-(doc/RFC-provider-registry.md — the `.env`-exfiltration case)."""
+(doc/features/provider-registry.md — the `.env`-exfiltration case)."""
 
 from pathlib import Path
 

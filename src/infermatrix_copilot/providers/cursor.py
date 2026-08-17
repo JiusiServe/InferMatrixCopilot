@@ -5,7 +5,7 @@ Invocation shape proven by the Composer eval arm
 --output-format stream-json`, prompt on STDIN (argv has a 128KiB per-arg
 limit on Linux and evidence packs exceed it), events parsed line-wise.
 
-Governance (decision record in doc/RFC-provider-registry.md): cursor-agent
+Governance (decision record in doc/features/provider-registry.md): cursor-agent
 cannot fully disable its built-in tools, so the copilot's scoped tools are
 OFFERED via the MCP tool bridge (preventive where used) and every session is
 post-audited (`audit.py`) with the verdict traced — the detective fallback,

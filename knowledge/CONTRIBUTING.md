@@ -3,7 +3,7 @@
 本页只是手工维护知识树的短入口，不再承载全部细则。先按任务选一篇专题，不要每次落盘都读完整套规范。
 
 本目录以 `zuiho-kai/claude-workflow-starter` 的贡献流程为内容和目录规范来源；
-vendored 后的批量整理还必须遵守 [知识重组计划](../doc/PLAN-knowledge-reorg.md) 的
+vendored 后的批量整理还必须遵守 [知识重组计划](../doc/archive/PLAN-knowledge-reorg.md) 的
 owner-scoped inventory、union-first 和证据保留约束。[SCHEMA.md](SCHEMA.md) 只补
 frontmatter、标签和溯源元数据，不能据此发明第二套知识结构。
 

@@ -20,7 +20,7 @@
 ```yaml
 ---
 title: 页面标题
-created: YYYY-MM-DD      # 上游首次提交日期（来源 doc/reorg-audit/baseline/dates.tsv）
+created: YYYY-MM-DD      # 上游首次提交日期（来源 doc/archive/reorg-audit/baseline/dates.tsv）
 updated: YYYY-MM-DD      # 最近实质更新日期
 type: rule | guide | architecture | index
 tags: [来自下方分类法]

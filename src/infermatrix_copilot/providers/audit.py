@@ -10,7 +10,7 @@ extra rule (no PR-discussion access) on top — that is a ground-truth-leakage
 concern, not a product one, and deliberately does NOT live here.
 
 Detective, not preventive — the disclosed fallback of the tool-governance
-decision in doc/RFC-provider-registry.md. Findings are surfaced as
+decision in doc/features/provider-registry.md. Findings are surfaced as
 violations for the caller to trace and render in RUN_REPORT, never silently
 dropped.
 """

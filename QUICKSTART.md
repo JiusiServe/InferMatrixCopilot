@@ -5,9 +5,14 @@ interface reviews PRs, debugs CI, rebases branches, answers/triages issues, and
 profiles repos — with a hard safety model: **everything is dry-run by default**,
 and natural language can never widen permissions.
 
-New to the code? Read [`doc/CODE_TOUR.md`](doc/CODE_TOUR.md) (data-flow
-walkthrough) and [`doc/DESIGN.md`](doc/DESIGN.md) (the why). This page just gets
-you running.
+This page gets the **standalone CLI** running. If you want the copilot inside
+Codex / Claude Code / Cursor instead, that is Direct mode — see
+[`doc/guide/hosts/`](doc/guide/hosts/README.md).
+
+New to the code? [`doc/GUIDE.md`](doc/GUIDE.md) is the single overview;
+[`doc/architecture/CODE_TOUR.md`](doc/architecture/CODE_TOUR.md) walks the code
+by data flow and [`doc/architecture/DESIGN.md`](doc/architecture/DESIGN.md)
+gives the why.
 
 ---
 
@@ -186,7 +191,7 @@ Exposes read-only tools — `start_review` / `start_issue_answer` /
 `list_playbooks`, `doc_read` / `doc_search`. Reviews take 5–12 min, so the API
 is start-then-poll. Only the read-only kinds are reachable and `post` is
 force-disabled at both the server boundary and the run subprocess. Setup:
-[`doc/MCP.md`](doc/MCP.md).
+[`doc/guide/mcp.md`](doc/guide/mcp.md).
 
 ---
 
@@ -201,7 +206,18 @@ force-disabled at both the server boundary and the run subprocess. Setup:
 - **Anything red in `doctor`** — the message *is* the fix. `gh` auth is the most
   common one: `gh auth login`.
 
-Deeper reading: [`doc/DESIGN.md`](doc/DESIGN.md) ·
-[`doc/CODE_TOUR.md`](doc/CODE_TOUR.md) ·
-[`doc/IMPLEMENTATION_STATUS.md`](doc/IMPLEMENTATION_STATUS.md) ·
-[`doc/SPEC/`](doc/SPEC/README.md) · [`doc/MCP.md`](doc/MCP.md)
+Deeper reading — start at the doc map, [`doc/README.md`](doc/README.md):
+
+- [`doc/GUIDE.md`](doc/GUIDE.md) — the single overview (features, usage,
+  development, playbooks, steps, tools, measured performance)
+- [`doc/guide/backends.md`](doc/guide/backends.md) — choosing and configuring a
+  Strict backend
+- [`doc/architecture/CODE_TOUR.md`](doc/architecture/CODE_TOUR.md) — the code by
+  data flow · [`doc/architecture/DESIGN.md`](doc/architecture/DESIGN.md) — why
+- [`doc/architecture/SPEC/`](doc/architecture/SPEC/README.md) — per-file
+  contracts: read the page for a file before you change it
+
+Note `IMPLEMENTATION_STATUS.md` has moved to
+[`doc/archive/`](doc/archive/IMPLEMENTATION_STATUS.md) and is frozen — it
+describes the July build, not the current one. `doc/GUIDE.md` carries the
+current picture.

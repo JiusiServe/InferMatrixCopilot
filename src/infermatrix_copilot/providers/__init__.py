@@ -1,5 +1,5 @@
 """Provider registry — one table of ways to reach a model
-(doc/RFC-provider-registry.md).
+(doc/features/provider-registry.md).
 
 Public surface: the registry (`PROVIDERS`, `resolve_provider`,
 `transport_for`), the contracts (`ProviderSpec`, `AgentSessionRequest`,

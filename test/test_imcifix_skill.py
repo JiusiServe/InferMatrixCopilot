@@ -20,7 +20,7 @@ def test_imcifix_skill_defines_issue_fix_workflow() -> None:
 
 def test_docs_expose_imcifix() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    codex = (ROOT / "docs" / "codex" / "README.md").read_text(encoding="utf-8")
+    codex = (ROOT / "doc" / "guide" / "hosts" / "codex.md").read_text(encoding="utf-8")
     cursor = (ROOT / "integrations" / "cursor" / "imcifix.md").read_text(encoding="utf-8")
 
     assert "$imcifix https://github.com/vllm-project/vllm-omni/issues/5023" in readme

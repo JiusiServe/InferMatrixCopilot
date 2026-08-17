@@ -1,7 +1,7 @@
 """Provider registry — the one table of ways to reach a model.
 
 All four ids resolve to shipped transports (M1 cursor, M2 claude-code,
-M3 codex — doc/RFC-provider-registry.md). `_UNSHIPPED` remains the
+M3 codex — doc/features/provider-registry.md). `_UNSHIPPED` remains the
 mechanism for declaring a future backend before its transport lands:
 `transport_for` raises its milestone pointer so `strict_readiness`/doctor
 report "not yet shipped" instead of a run failing mid-flight.
@@ -97,7 +97,7 @@ def transport_for_id(settings, provider_id: str) -> HarnessTransport:
     if milestone:
         raise NotImplementedError(
             f"backend {spec.id!r} is declared but ships in {milestone} "
-            "(doc/RFC-provider-registry.md)")
+            "(doc/features/provider-registry.md)")
     if spec.id == "cursor":
         from .cursor import CursorTransport
 

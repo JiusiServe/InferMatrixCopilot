@@ -173,7 +173,7 @@ async def run_agent_step(
         prompt += f"\n\n## STEP GUIDANCE\n{guidance}"
     if harness_member is not None or (target.kind == "harness"
                                       and llm_override is None):
-        # Harness backend (doc/RFC-provider-registry.md): the vendor CLI owns
+        # Harness backend (doc/features/provider-registry.md): the vendor CLI owns
         # the tool loop for this whole step — same prompt bundle and output
         # contract, builtin tools served back through the MCP bridge under
         # this scope. API MoA members (llm_override) keep the in-process

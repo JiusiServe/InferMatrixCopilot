@@ -15,7 +15,7 @@ run_count: 0
 
 ## When this applies
 You're told to "record a lesson / 复盘 / sink a rule", or you're adding or editing
-a page under `knowledge/`. Full guide + copy-paste templates: `doc/EXTENDING-KNOWLEDGE.md`.
+a page under `knowledge/`. Full guide + copy-paste templates: `doc/contributing/EXTENDING-KNOWLEDGE.md`.
 
 ## Steps
 1. **Owner first.** Reusable across repos → `general/<topic>/`; whole repo →

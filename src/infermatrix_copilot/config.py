@@ -62,7 +62,7 @@ class ResolvedTarget:
     api_key: str
     source: str
     provider: Literal["anthropic", "openai"] = "anthropic"
-    # Provider registry (doc/RFC-provider-registry.md): which registry entry
+    # Provider registry (doc/features/provider-registry.md): which registry entry
     # serves this target and how. `api` keeps today's exact semantics;
     # `harness` targets carry NO endpoint/credential here — subscription auth
     # lives inside the vendor CLI and is never resolved by Settings.
@@ -150,7 +150,7 @@ class Settings(BaseSettings):
     mcp_repo_allowlist: list[str] = []
     mcp_report_max_bytes: int = 65536
 
-    # Strict execution backend (doc/RFC-provider-registry.md): which provider
+    # Strict execution backend (doc/features/provider-registry.md): which provider
     # powers runs. REQUIRED for Strict — `strict_readiness` names the exact
     # fix when empty (decision: explicit selection, never a silent fallback);
     # the CLI path treats empty as "api" so maintainer setups keep working.
@@ -171,7 +171,7 @@ class Settings(BaseSettings):
     strict_backend_timeout_s: float = 1800.0  # per-session wall-clock ceiling
 
     # Shared, human-curated knowledge base — vendored from the community docs
-    # (see doc/KNOWLEDGE.md), organized as general/ (cross-repo experience) +
+    # (see doc/architecture/KNOWLEDGE.md), organized as general/ (cross-repo experience) +
     # repos/<repo>/ (repo-specific). Adapters reference only their repos/<repo>/
     # slice (manifest `knowledge.repo_subdir`); general/ is shared across all
     # repos. knowledge_general_docs is the always-on general slice; every deeper
@@ -499,7 +499,7 @@ class Settings(BaseSettings):
         agent_model fallback that once mislabeled a whole run."""
         backend = self.strict_backend
         if backend not in ("", "api"):
-            # Harness target (doc/RFC-provider-registry.md): the vendor CLI
+            # Harness target (doc/features/provider-registry.md): the vendor CLI
             # holds the subscription credential, so base_url/api_key stay
             # empty and per-tier API backends do not apply — the harness
             # serves both modes (its model comes from STRICT_BACKEND_MODEL).

@@ -1,4 +1,4 @@
-"""Profile establishment + Stage-4 maintenance steps (doc/DESIGN.md §V2.3.3).
+"""Profile establishment + Stage-4 maintenance steps (doc/architecture/DESIGN.md §V2.3.3).
 Read-only toward the TARGET repo; writes land only under adapters/<repo>/
 (knowledge risk, curator/human-gated downstream):
 

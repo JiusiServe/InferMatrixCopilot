@@ -1,4 +1,4 @@
-"""Scoped-tool MCP bridge for harness backends (doc/RFC-provider-registry.md).
+"""Scoped-tool MCP bridge for harness backends (doc/features/provider-registry.md).
 
 Entry: ``python -m infermatrix_copilot.tool_bridge --spec <bridge_spec.json>``
 — an stdio MCP server a harness session launches from its MCP config. It

@@ -1,4 +1,4 @@
-"""Profile establishment helpers (doc/DESIGN.md §V2.3.3, Stages 0–1.5).
+"""Profile establishment helpers (doc/architecture/DESIGN.md §V2.3.3, Stages 0–1.5).
 
 The redundancy filter is the ETH-study lesson (§V2.0.1): context that
 duplicates what the repo's own docs already say is pure cost — agents read

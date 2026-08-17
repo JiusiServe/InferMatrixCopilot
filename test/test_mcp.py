@@ -234,7 +234,7 @@ def test_strict_readiness_reports_setup_gaps(settings):
 
 
 def test_strict_readiness_requires_explicit_backend(settings, monkeypatch):
-    # doc/RFC-provider-registry.md: selection is explicit — unset refuses
+    # doc/features/provider-registry.md: selection is explicit — unset refuses
     # with the exact fix, never a silent api fallback
     missing = _core(settings).strict_readiness("vllm-omni")
     assert any("STRICT_BACKEND not set" in item for item in missing)
