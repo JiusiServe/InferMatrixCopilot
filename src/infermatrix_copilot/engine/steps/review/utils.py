@@ -33,11 +33,11 @@ now new old one two three both all any some none""".split())
 def _topic(text: str) -> set[str]:
     """The identifiers a finding is about, ignoring its `[tag]` and evidence.
 
-    Paths collapse to their basename: one lens writes `orchestrator.py` where
-    another writes `vllm_omni/engine/orchestrator.py`, and as raw strings those
+    Paths collapse to their basename: one lens writes `runner.py` where
+    another writes the full `pkg/engine/runner.py`, and as raw strings those
     share nothing, so two comments on one subject scored zero topic overlap.
-    Measured on the v19 val run — the two CI-red questions on
-    `orchestrator.py:1290` were the same finding asked twice and survived.
+    Measured on the v19 val run — the same CI-red question was asked twice at
+    one line and both copies survived.
     """
     body = re.split(r"\(evidence:", re.sub(r"^\s*\[[a-z-]+\]\s*", "", text))[0]
     return {t.lower().rstrip(".").rsplit("/", 1)[-1]
@@ -158,8 +158,7 @@ def _anchor(c: dict) -> str:
 
 
 def _dedupe_comments(comments: list[dict]) -> list[dict]:
-    """Drop near-identical findings, keeping the first (highest-severity, as
-    the caller sorts before calling).
+    """Collapse near-identical findings to their single richest statement.
 
     Parallel lenses converge on the same concern by design — that convergence
     is the corroboration signal the budget uses — but shipping it three times
@@ -179,16 +178,41 @@ def _dedupe_comments(comments: list[dict]) -> list[dict]:
       different evidence for one fact — the four `trust_remote_code`
       description-staleness comments on pr4977 share a subject, not a
       vocabulary.
+
+    Duplicates are MERGED, not dropped: the survivor is the richest statement
+    of the finding, not whichever arrived first. Dropping the tail cost recall
+    on both measured splits (train -.052 -> -.092, val -.003 -> -.122) while
+    precision rose, and the reason is visible in the rationales — restatements
+    differ in how precisely they state the causal mechanism, and that is
+    exactly what earns recall credit: "Y states the causal mechanism precisely
+    ('older get_kernel doesn't accept the kwarg, which would have made every
+    fallback attempt fail') matching the GT reasoning". Keeping the first
+    survivor threw that away at random. Severity still wins (the caller sorts
+    before calling), so a merge never quietly demotes a blocker.
     """
-    kept: list[tuple[str, dict]] = []
+    kept: list[list] = []          # [text, comment, severity_rank]
     for c in comments:
         text = str(c.get("comment", ""))
         if not text.strip():
             continue
-        if any(_same_finding(text, prev) for prev, _ in kept):
-            continue
-        kept.append((text, c))
-    return [c for _, c in kept]
+        rank = _SEVERITY_ORDER.get(str(c.get("severity", "minor")).lower(), 2)
+        for slot in kept:
+            if _same_finding(text, slot[0]):
+                # richer = names more of the code AND says more about it
+                if rank <= slot[2] and _richness(c) > _richness(slot[1]):
+                    slot[0], slot[1] = text, c
+                break
+        else:
+            kept.append([text, c, rank])
+    return [c for _, c, _ in kept]
+
+
+def _richness(c: dict) -> tuple[int, int]:
+    """How specifically a comment states its finding: how much of the code it
+    names, then how much it says. Evidence counts — a claim welded to a quoted
+    hunk is the one a reader can act on."""
+    text = str(c.get("comment", "")) + " " + str(c.get("evidence") or "")
+    return (len(_topic(text)), len(text))
 
 
 def _valid_suggestion(code: str, file: str) -> bool:
@@ -410,6 +434,8 @@ def _review_summary_parts(output: dict) -> list[str]:
     # Merging two ledger lines about one subject costs a little detail;
     # merging two comments costs a finding, which is why the comment path
     # keeps the conjunctive rule.
+    # Same merge rule as the comment path: the survivor per subject is the
+    # entry that says the most about it, not whichever lens wrote first.
     validated_all: list[str] = []
     topics: list[set[str]] = []
     for finding in (output.get("findings") or []):
@@ -417,10 +443,15 @@ def _review_summary_parts(output: dict) -> list[str]:
         if not text.lstrip().lower().startswith(_VALIDATED_PREFIX_RANK):
             continue
         topic = _topic(text)
-        if topic and any(_overlap(topic, prev) >= 0.5 for prev in topics):
-            continue
-        topics.append(topic)
-        validated_all.append(text)
+        for i, prev in enumerate(topics):
+            if topic and _overlap(topic, prev) >= 0.5:
+                if _richness({"comment": text}) > _richness(
+                        {"comment": validated_all[i]}):
+                    validated_all[i], topics[i] = text, topic
+                break
+        else:
+            topics.append(topic)
+            validated_all.append(text)
     # 14 saturated on 9 of 10 items in both measured arms — a cap that is
     # always hit is a quota being filled, not a ceiling protecting the reader.
     validated = sorted(validated_all, key=_prefix_rank)[:6]

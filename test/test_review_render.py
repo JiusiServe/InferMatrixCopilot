@@ -205,3 +205,39 @@ def test_one_subject_named_by_path_and_by_basename_is_one_subject():
                     "npu platform changes, so are those reds pre-existing?"},
     ]})
     assert md.count("[nit]") == 1
+
+
+def test_duplicate_findings_merge_to_the_richest_statement():
+    """Dropping the tail of a duplicate cluster cost recall on both measured
+    splits (train -.052 -> -.092, val -.003 -> -.122) while precision rose.
+    Restatements differ in how precisely they state the causal mechanism, and
+    that is what earns recall credit -- so the survivor is the richest one,
+    not whichever arrived first."""
+    from infermatrix_copilot.engine.steps.review.utils import _render_review_md
+    thin = {"file": "hub.py", "line": 34, "severity": "minor",
+            "comment": "The get_kernel call in flash_attn_hub.py dropped "
+                       "trust_remote_code, so the PR description is stale."}
+    rich = {"file": "hub.py", "line": 34, "severity": "minor",
+            "comment": "The get_kernel call in flash_attn_hub.py dropped "
+                       "trust_remote_code because kernels 0.13.x rejects the "
+                       "kwarg, which would have made every version fallback "
+                       "attempt fail on older installs; the PR description "
+                       "still advertises it as added."}
+    for order in ([thin, rich], [rich, thin]):
+        md = _render_review_md({"review_comments": list(order)})
+        assert md.count("[minor]") == 1, "duplicates must still collapse"
+        assert "every version fallback" in md, "the richest survivor is kept"
+
+
+def test_merging_never_demotes_a_blocker_to_its_chattier_twin():
+    """Severity outranks richness: a wordier minor must not displace the
+    blocker it restates."""
+    from infermatrix_copilot.engine.steps.review.utils import _render_review_md
+    md = _render_review_md({"review_comments": [
+        {"file": "m.py", "line": 5, "severity": "blocker",
+         "comment": "The cfg_parallel_size guard was removed so ranks diverge"},
+        {"file": "m.py", "line": 5, "severity": "nit",
+         "comment": "The cfg_parallel_size guard was removed so ranks diverge "
+                    "and this is worth a longer look at some point later on"},
+    ]})
+    assert "[blocker]" in md and "[nit]" not in md
