@@ -111,11 +111,22 @@ Arm = HEAD `ae1b6f1`, core-only (Fable-5 quota still exhausted, so the v16
 adversary/round-2 routing was deliberately NOT applied rather than run into
 dead seats again).
 
+⚠ **The rows below are NOT the arm they are named for.** `MOA_WHEN=off` was
+set explicitly on every arm v13–v16 and was omitted from this launch, so
+`moa_when` fell through to its code default `"full"` and mixture-of-agents
+ran on 12 of the 15 items: investigator + behavior went to `mimo-v2.5`,
+adversary + verification to `qwen3.6-plus` (which returned 403
+AccessDenied.Unpurchased on all 24 attempts and fell back to DeepSeek every
+time). **24% of productive round-1 lenses were written by mimo-v2.5.** These
+rows are retained as **v17-moa (unintended vendor mixture)**; the corrected
+core-only measurement is `goal_v17ds_*_sonnet`. See the amendment in
+`goal-eval/PROBE-v17-conversion.md`.
+
 | config | Δrecall [95% CI] | Δprecision [95% CI] | win share |
 |---|---|---|---|
-| v17 val (4 items — see quarantine) | −.047 [−.108, +.013] | −.073 [−.240, +.094] | .29 |
-| v17 train (10 items) | −.052 [−.130, +.026] | +.036 [−.030, +.101] | .33 |
-| **v17 pooled (14 items, exploratory)** | **−.050 [−.104, +.003]** | **+.005 [−.056, +.065]** | .32 |
+| v17-moa val (4 items — see quarantine) | −.047 [−.108, +.013] | −.073 [−.240, +.094] | .29 |
+| v17-moa train (10 items) | −.052 [−.130, +.026] | +.036 [−.030, +.101] | .33 |
+| **v17-moa pooled (14 items, exploratory)** | **−.050 [−.104, +.003]** | **+.005 [−.056, +.065]** | .32 |
 
 Reference rows on the identical items: `goal_v13_val` on the same 4 items
 was +.038 recall / +.013 precision; `goal_v16f_train_sonnet` (the one split
