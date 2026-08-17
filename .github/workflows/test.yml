@@ -74,6 +74,22 @@ jobs:
                 ", ".join(_RESOURCE_MARKERS))
           PY
 
+      # Doc integrity. These exist because the doc/ refactor measured the damage
+      # they prevent: 29 in-code citations of doc/ paths that no linter checked,
+      # and 44 of 45 SPEC pages silently behind their own source.
+      - name: Doc linters
+        run: |
+          python tools/check_doc_links.py
+          python tools/check_doc_citations.py
+
+      # BLOCKING as of the P5 rewrite: all 92 modules have a SPEC page and all
+      # 62 pages carry a `verified-against:` date. --strict additionally fails
+      # on a page whose source changed after that date, or one that dropped its
+      # marker — which is the whole point: 44 of 45 pages had silently fallen
+      # behind before this check existed.
+      - name: SPEC coverage and freshness
+        run: python tools/check_spec_freshness.py --strict
+
       # Written, tested, and until now invoked only from prose (AGENTS.md, DEVELOPMENT.md).
       - name: Knowledge linters
         run: |
