@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently and correctly ground the two substantive GT threads: the unet-scan addition duplicating _dit_modules/_lora_components (echoing tthakkal's 'keep this PR SDXL-specific' pushback) and a PEFT-name mapping gap for FF layers (echoing dsocek's naming-conflict/packed-mapping concern), plus both flag AMD/NPU CI failures and the weak test stub lacking target_modules. X additionally surfaces valid, well-cited extra issues (silent zero-layer activation with no diagnostic, SDXL text-encoder LoRA hard-fail, duplicated test) organized into a clear priority tiering that's more directly actionable for a human reviewer, giving it a slight recall/usability edge; Y is tighter and its evidence log is rigorously self-validated but covers less distinct ground and reads more like an audit trail than reviewer-ready comments despite its nice suggestion diffs. Neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.27341920000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17ds_val"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_val",
+    "arm_a_sha256": "55200c1e583b4b8f7b1897ae6d56c3e04bd762c1e70a148d789c75f70b3737da",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9201be5ea408a41833fb8e6040e5eb97d26044159a083e4d1896451ac3585494",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

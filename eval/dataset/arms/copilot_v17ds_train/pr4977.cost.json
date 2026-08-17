@@ -1,0 +1,114 @@
+{
+  "wall_s": 338.2,
+  "split": "train",
+  "rc": 3,
+  "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_train/runs/pr4977/run-20260817-104946-ed83da",
+  "recorded_at": "2026-08-17T10:49:56",
+  "attempts": [
+    {
+      "invocation_id": "inv-5bf59786",
+      "outcome": "run:run-20260817-104420-8edf85",
+      "rc": 3,
+      "pre_run": null
+    },
+    {
+      "invocation_id": "inv-244d8329",
+      "outcome": "run:run-20260817-104946-ed83da",
+      "rc": 3,
+      "pre_run": null
+    },
+    {
+      "run_dir": "run-20260817-104420-8edf85",
+      "llm_calls": 53,
+      "input_tokens": 157925,
+      "output_tokens": 66259,
+      "usd": 0.166646,
+      "source": "spans"
+    },
+    {
+      "run_dir": "run-20260817-104946-ed83da",
+      "llm_calls": 1,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "usd": 0.0,
+      "source": "spans"
+    }
+  ],
+  "attempt_usd_total": 0.166646,
+  "llm_calls": 1,
+  "input_tokens": 0,
+  "output_tokens": 0,
+  "usd": 0.0,
+  "source": "spans",
+  "metrics": {
+    "schema": 1,
+    "run": "run-20260817-104946-ed83da",
+    "task_kind": "pr_review",
+    "status": "blocked",
+    "quality": {
+      "q": null,
+      "weight_coverage": 0.0,
+      "partial": true,
+      "abstained": false,
+      "components": {
+        "recall_w": null,
+        "precision_v": null,
+        "useful": null,
+        "calib": null,
+        "decision": null
+      }
+    },
+    "cost": {
+      "usd": 0.0,
+      "minutes": 0.11,
+      "ci_minutes": 0,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "tool_calls": 0,
+      "usd_ref": 1.0,
+      "min_ref": 10.0,
+      "cost_index": 1.0049,
+      "cost_partial": false,
+      "unpriced_calls": 0,
+      "source": "spans",
+      "llm_calls": 1,
+      "by_role": {
+        "agent": {
+          "usd": 0.0,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "calls": 1
+        }
+      },
+      "cache_read_tokens": 0,
+      "cache_creation_tokens": 0
+    },
+    "timings": {
+      "steps": {
+        "fetch": 3.7,
+        "gate": 1.69,
+        "review": 1.43
+      },
+      "time_to_first_result_s": 6.87
+    },
+    "risk": {
+      "incidents": {
+        "catastrophic": 0,
+        "severe": 0,
+        "moderate": 0,
+        "minor": 0
+      },
+      "safety_multiplier": 1.0
+    },
+    "catq": null,
+    "tus": null,
+    "signals": {
+      "escalations": 1,
+      "pushes": 0,
+      "posted": 0,
+      "steps_completed": 2
+    }
+  },
+  "trace": "pr4977.trace.json.gz",
+  "trace_bytes": 14276
+}

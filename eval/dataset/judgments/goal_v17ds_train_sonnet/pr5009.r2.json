@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.68,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates nail the central ground-truth concern (unscoped global default change validated only on Qwen-Image, affecting many CUDA diffusion models), with Y's model enumeration even more closely matching NumberWan's actual list. But X additionally hits the 'report pixelwise accuracy alongside latency' ask by exact test name, which Y misses, giving X higher recall. On precision, X's findings are backed by an auditable evidence-tagged methodology (grep/search_history/show_commit citations, with a transparent non-issue section for ruled-out concerns), while Y's 'What I verified' section makes suspiciously precise, unverifiable claims (exact local pytest pass count, matching bf16 diffs to 4 decimals across three kernel implementations) presented as fact without shown evidence — a fabrication risk that undercuts its Part 2 approval. Both are concretely actionable with file/line evidence; X also includes literal suggested-diff blocks.",
+  "_cost_usd": 0.42788639999999994,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17ds_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_train",
+    "arm_a_sha256": "499a278f3c3ab6aa00a9e64a4c6bac19bf1079fe0e8876c67518ef4f5d952db3",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "97e45909dc2469db55da15b6e8d6a525549029c219aefca76123ec8b801fd1bf",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Candidate Y produced no review content at all (blocked run, API 402 error), so it covers zero ground-truth concerns and offers nothing actionable. Candidate X delivers a deeply grounded review that directly addresses the ground-truth concern (the trust_remote_code kwarg compatibility issue, correctly noting it was resolved by a later commit in the PR history) plus several additional well-grounded, file/line-specific findings (sticky fallback caching, dead-code branch on newer kernels versions, missing test coverage, cache reset hook, stale PR description, red CI gate) that are concrete and actionable.",
+  "_cost_usd": 0.10763249999999999,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17ds_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_train",
+    "arm_a_sha256": "ac133fb9b1432e6fe950b4f0a41324a92b9a10cc6f5780dbba41a8486437df1c",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "589a8ff13cb3893b76dd0d5220ad632d82f46cc0edd9083528ebb2466be7c8a7",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

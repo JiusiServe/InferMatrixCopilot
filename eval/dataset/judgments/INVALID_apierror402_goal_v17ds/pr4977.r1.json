@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "X's pipeline crashed on a 402 API error before producing any review content, so it covers none of the ground truth and offers nothing actionable. Y produced a substantive, diff-grounded review that directly addresses the sole ground-truth concern (the trust_remote_code/kernels-version compatibility issue) by noting it was already stripped out in the final commit, plus several additional specific, file:line-anchored findings (overly broad except, dead fallback branch on kernels>=0.15, missing test coverage, stale PR description, red CI gate) that are plausible and grounded even if a few empirical claims ('I ran the code') aren't independently verifiable here.",
+  "_cost_usd": 0.1274225,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17ds_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_train",
+    "arm_a_sha256": "ac133fb9b1432e6fe950b4f0a41324a92b9a10cc6f5780dbba41a8486437df1c",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "589a8ff13cb3893b76dd0d5220ad632d82f46cc0edd9083528ebb2466be7c8a7",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

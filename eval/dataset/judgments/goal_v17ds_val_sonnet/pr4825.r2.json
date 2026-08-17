@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.8,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently surface the substantive latent issue behind the GT thread (SDXL FF-layer naming mismatch between diffusers/PEFT checkpoint names and internal names, echoing dsocek's 'naming conflicting cases' concern), and both flag the _dit_modules duplication and CI-lane failures with solid file/line grounding; Y edges recall via explicit git archaeology tying directly to the dsocek/tthakkal WA-revert exchange. X is organized more usefully for a human reviewer (prioritized Blocking/Substantive/Test/Minor sections, complete self-contained fix snippets) while Y's report is a denser evidence-log format and includes one flawed suggestion block that deletes 'unet' from default_components without restoring the PR's purpose via the alternative mechanism it recommends, hurting actionability/precision slightly. Overall close, with X's cleaner actionable structure giving it a slight edge.",
+  "_cost_usd": 0.3373842,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17ds_val"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_val",
+    "arm_a_sha256": "55200c1e583b4b8f7b1897ae6d56c3e04bd762c1e70a148d789c75f70b3737da",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9201be5ea408a41833fb8e6040e5eb97d26044159a083e4d1896451ac3585494",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

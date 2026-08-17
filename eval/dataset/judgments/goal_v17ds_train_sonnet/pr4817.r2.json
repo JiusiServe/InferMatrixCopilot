@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth is empty (only bot rate-limit noise and a 'thanks' comment), so recall is vacuous for both. Both candidates independently converge on the same core, well-grounded findings: the new test lacks pytestmark and is deselected by CI's marker filter, the red AMD/NPU checks are unrelated pre-existing failures, stale 'Blackwell'-only doc/pyproject wording, and the env-override doc gap on sm_120/121. X adds two higher-value, code-specific catches Y misses entirely: warmup_quack_fp8() bypassing quack_enabled() (a real public-API correctness bug) and the warning_once exception-object dedup defect — both concrete, cite exact lines, and would matter to a maintainer. Y is thorough and mechanically well-evidenced (verified/refuted claim ledger, GitHub-style suggestion blocks) but its unique content skews toward doc/test-coverage nice-to-haves rather than functional defects. Both are highly actionable with file:line anchors and concrete diffs/suggestions.",
+  "_cost_usd": 0.24035120000000004,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17ds_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_train",
+    "arm_a_sha256": "958d0e2a1a40ae0dd4c3ffe53a1af438dd63600a2ed20f49d030977a91bcbee3",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "de884ebeca54520b85a490b897397bd22bf362507bf9f7d4a833d74b390ae063",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}
