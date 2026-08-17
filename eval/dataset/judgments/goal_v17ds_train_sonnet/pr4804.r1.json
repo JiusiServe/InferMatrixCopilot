@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.33,
+    "precision": 0.8,
+    "actionability": 0.75
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently nail the two highest-severity ground-truth findings almost verbatim: the v2-tokenizer-tried-for-every-codec_path bug (hsliuustc0106's High) and the stream-slot-leak-on-abort issue (linyueqian's High, including the id-space mismatch between _runtime_request_key and finished_req_ids); both also catch the WER-fallback-to-raw-bytes non-blocking note. Both miss the cumulative/delta chunk_np re-slice bug and the ceil-division/input_lengths latent bug, and neither addresses amy-why-3459's UX-style questions (cleanup, debug logs, generalizability). X additionally flags the vendored-provenance-header note that Y misses, while Y only lightly gestures at the stale-docstring note that X misses — a wash on recall. X edges ahead on actionability by providing literal ```suggestion diff blocks for its major/blocker findings versus Y's prose-only fixes, and shows slightly more rigor via its explicit validated/confirmed/refuted verification tags, though both reports are well-grounded with specific file:line citations.",
+  "_cost_usd": 0.44549820000000007,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17ds_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_train",
+    "arm_a_sha256": "4a9031372cf984e30d712b8a405aee054a1b7f7b763d4415ac91268c40a6486f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "18986f2736f812d8c896b12152ebcbf1d5319e9e1f79042f5fa16f1dd6272542",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

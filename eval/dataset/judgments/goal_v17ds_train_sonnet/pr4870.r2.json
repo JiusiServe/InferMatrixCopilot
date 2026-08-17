@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.75,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.78,
+    "actionability": 0.82,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "X more systematically maps back onto the actual ground-truth thread (explicitly confirms the qwen3_tts scoping fix, the seq_len removal, flags the same buildkite/vllm-omni-amd-ci red lane Gaohan123 asked about) and backs nearly every claim with grep/read evidence plus literal suggestion diffs, giving it higher recall and actionability. Y produces genuinely deep, well-argued findings (independent NPU-twin discovery shared with X, the cudagraph-padding reinterpretation, the async_chunk default mismatch) but leans more speculative on unverifiable claims (output_processor draining semantics, WS realtime path, list-vs-tensor consumer disagreement) and engages less directly with the resolved ground-truth items, so precision and recall trail slightly. Neither candidate frames its test-gap suggestion as a multi-batch-axis issue matching the #4910 latent gap.",
+  "_cost_usd": 0.4685922,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17ds_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_train",
+    "arm_a_sha256": "2cf8b267d13d54edab4dae0c2ecaa7341fc2524cadfa65d174a6e28aea1befca",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "03d7423c3a91e45838083e2025e3dea932f1d9448ba923b1d6ca1a0373899ea1",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

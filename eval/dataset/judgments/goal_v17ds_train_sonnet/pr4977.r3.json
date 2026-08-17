@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.7,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.8
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "The ground truth's sole substantive concern (trust_remote_code incompatible with kernels<0.15.0, no lower bound) was already resolved upstream by commit 9947f414; both candidates correctly identify this and flag the now-stale PR description, giving comparable recall. Y's review is higher signal: it adds a sharp, testable, novel finding (get_kernel with no version/revision raises ValueError on kernels>=0.15, contradicting the docs/pyproject version pins) and ties the sticky-fallback issue directly to the PR's own stated motivation (429 rate limits) with tighter reasoning. X cites exhaustive file:line evidence but buries genuine findings under redundant 'claim-verified' scratch-log entries repeating the same trust_remote_code point three times, plus an irrelevant 'skill candidates' section, which hurts precision and practical usefulness despite similar actionability.",
+  "_cost_usd": 0.3397203000000001,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17ds_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_train",
+    "arm_a_sha256": "7a7a4e443cc64b1b14b1c8f2703df260b566910de0ff91edaf493686887f8228",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "589a8ff13cb3893b76dd0d5220ad632d82f46cc0edd9083528ebb2466be7c8a7",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

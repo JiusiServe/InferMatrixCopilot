@@ -101,6 +101,53 @@ The deficit is concentrated, not diffuse: over the 20 pooled items, 6
 are positive for the arm, 4 are within ±.02, and a single item (pr5978,
 −.37) contributes about a third of the pooled gap.
 
+## v17 CORRECTED probe (2026-08-17) — MoA off, val + train, judge = claude-sonnet-5
+
+Supersedes the v17-moa rows below. Same code (`ae1b6f1`), same items, same
+judge, `MOA_WHEN=off` verified through resolved settings and confirmed by
+0 `moa_dispatch` events across all 15 traces.
+
+| config | Δrecall [95% CI] | Δprecision [95% CI] | win share |
+|---|---|---|---|
+| v17ds val (5 items) | −.059 [−.202, +.085] | −.057 [−.256, +.141] | .20 |
+| **v17ds train (10 items)** | **+.024 [−.030, +.077]** | **+.016 [−.061, +.093]** | .47 |
+| **v17ds pooled (15 items)** | **−.004 [−.056, +.049]** | **−.008 [−.078, +.062]** | .38 |
+| v17cb val — Composer 2.5 via cursor backend | −.003 [−.222, +.215] | −.040 [−.322, +.242] | .40 |
+
+**Correction to the entry below.** On 2026-08-16 this document reported
+"the conversion fixes did not close the recall gap" from a pooled −.050.
+That measurement was contaminated by an unintended vendor mixture. On train,
+the same 10 items go **−.052 (contaminated) → +.024 (clean)**, a swing of
++.076. The claim was an artifact of the contamination and is withdrawn.
+
+The corrected reading: on these two SPENT splits the arm sits at parity —
+pooled Δrecall −.004, Δprecision −.008, both intervals straddling zero and
+both point estimates within a half-percent of the baseline. Train alone is
+the first 10-item split in the campaign with BOTH deltas positive.
+
+Three standing caveats, none of them removable by more analysis:
+
+* val and train have been iterated on for the whole campaign. This is a
+  probe and `goal-eval/PROBE-v17-conversion.md` pre-registered it as one; it
+  cannot support a claim about fresh data.
+* Every CI spans zero. "Parity within measurement precision at n=15" is the
+  result, not superiority.
+* val (−.059) and train (+.024) disagree in sign. Pooling them to −.004
+  averages a real split difference; `pr4893` alone carries val's deficit
+  (−.250 on the DeepSeek arm, −.267 on Composer).
+
+`pr4893` failing near-identically under two different models is a PIPELINE
+defect rather than a model one, and it is diagnosable from artifacts already
+on disk.
+
+Composer 2.5 on the same v17 code reaches Δrecall −.003 on val, inverting
+the v15 ordering where Composer trailed DeepSeek (−.081 vs −.075). At n=5
+with a ±.22 interval this does not establish Composer above DeepSeek; the
+two intervals overlap almost entirely. Composer is 2–4× faster (350–680s vs
+1000–2900s per item) and rides the subscription, but every item logged
+`tok_out=0` — harness sessions do not surface tokens to span accounting — so
+its cost advantage is assumed, not measured.
+
 ## v17 conversion-fix probe (2026-08-16) — val + train, judge = claude-sonnet-5
 
 Pre-registered in `goal-eval/PROBE-v17-conversion.md` before generation.

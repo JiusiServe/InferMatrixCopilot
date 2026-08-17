@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns (just LGTM/approval), so both trivially achieve full recall. X digs deeper: it fully resolves the 'silent audio' claim into a concrete alternative failure mode (500 via pydantic tuple-extend bug) with a full evidence chain, whereas Y only hedges ('please verify... or rewrite'). X also catches a materially different, well-evidenced issue Y misses entirely — that the 'extra_body is not flattened' rule is stated too broadly and contradicts the GLM-Image recipe's working extra_body usage — plus adds two extra actionable, low-noise suggestions (index:0 collision fix, jq WAV-extraction snippet). Y's findings are grounded but shallower duplicates of X's weakest points, with less decisive conclusions.",
+  "_cost_usd": 0.1814742,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17ds_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_train",
+    "arm_a_sha256": "a02ad6bb65126c030085e36513edb894dfade0c68210cc864debfda4f741cb88",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5a2e689fc33efd67adbf119f1e4cf034841928ad70fea2d99f142a727ca8ea18",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.55,
+    "actionability": 0.78,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both independently find the same plausible unflagged WER double-resample bug and cover the audio_vae config-mutation and language/方言-removal concerns from the ground truth with good line-level grounding and actionable suggested diffs. But Y's top 'High' finding fabricates a claim that Qwen2Model.forward slices layers by config.num_hidden_layers at call time and backs it with fake 'verified locally' output, directly contradicting the PR author's own clarification (LHXuuu) that the encoder's actual layer count is unchanged — a serious precision failure that also casts doubt on Y's other 'confirmed by running it' claims. X correctly characterizes the same issue as stale config metadata with no found consumer, matching amy-why-3459's actual concern. Y edges recall slightly by explicitly echoing hsliuustc0106's 'refactor the env in the next release' layering complaint, which X misses in favor of a generic test-coverage ask.",
+  "_cost_usd": 0.40674660000000007,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17ds_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_train",
+    "arm_a_sha256": "df1bd7fc814242608b88298180df3918fa131cfeb25ca2d71e0d6681a07945bc",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "264e453d996b4a5c483bf206cefb21e513e90d0d6bda5e49948434353154f4a5",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

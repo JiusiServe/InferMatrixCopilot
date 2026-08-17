@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.88,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both independently catch the real NPU-twin duplicate bug and the red AMD CI lane, but X's analysis is deeper and more precisely grounded: it traces a plausible cudagraph-padding root cause with concrete line evidence, catches a genuine cross-consumer FINAL_ONLY list-handling mismatch and an unmentioned WebSocket regression, and cites the exact existing CI test that should validate the changed path. Y has broader mechanical coverage (and uniquely hits the multi-axis gap via its non-uniform token-count test suggestion) but includes a questionable claim (arguing for a default flip that contradicts the maintainer's stated 'fails soft' intent) and one truncated/garbled finding, denting precision.",
+  "_cost_usd": 0.4256261,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17ds_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_train",
+    "arm_a_sha256": "2cf8b267d13d54edab4dae0c2ecaa7341fc2524cadfa65d174a6e28aea1befca",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "03d7423c3a91e45838083e2025e3dea932f1d9448ba923b1d6ca1a0373899ea1",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

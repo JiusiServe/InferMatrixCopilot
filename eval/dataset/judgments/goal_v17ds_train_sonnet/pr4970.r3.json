@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.7,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.85,
+    "actionability": 0.8
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth is a near rubber-stamp (LGTM plus one off-diff ask to split out a VoxCPM2 fix) that neither candidate addresses, so recall is ~0 for both. Both independently converge on the same core mechanism and the same two actionable asks (tombstone comment explaining the missing seed, confirm the red NPU/AMD gates are pre-existing), which lends credibility to that shared core. X piles on extra claims — vLLM-version-specific sampler fallback behavior, a regression test, a warning-log suggestion — that add actionable volume but also unverifiable speculative depth for what is ultimately a trivial 2-line YAML deletion the human reviewer approved without comment. Y's report stays tightly scoped, tags each claim as validated/claim-verified/swept, and is proportionate to the actual change, making it the more reliably grounded of the two even though it covers less ground.",
+  "_cost_usd": 0.2284092,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17ds_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_train",
+    "arm_a_sha256": "28397c99e2dcb8ba156e6a40e08e04b3984bcb508ce47db3fb304dacd74c920d",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "410634f22ac0d9a55948ec0dfc9caa6557a8995e24766ff507dbe677d6dd37dc",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

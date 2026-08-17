@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth is nearly empty (LGTM plus an unrelated VoxCPM2 follow-up ask that neither candidate addresses), so recall is low for both. Both ground their core finding — that the deleted seed silently forces qwen3_tts onto a slower per-row sampling path via tts_local_seed — in specific, mutually consistent file/line evidence, giving comparable precision. Y covers everything X does (tombstone comment, CI-gate pre-existing-failure check) plus additional concrete, actionable items X lacks: a regression test snippet, a note that the PR description understates scope (also unseeding vLLM's own sampler fast path), and a follow-up logging suggestion, making it more useful overall.",
+  "_cost_usd": 0.282921,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17ds_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_train",
+    "arm_a_sha256": "28397c99e2dcb8ba156e6a40e08e04b3984bcb508ce47db3fb304dacd74c920d",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "410634f22ac0d9a55948ec0dfc9caa6557a8995e24766ff507dbe677d6dd37dc",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}
