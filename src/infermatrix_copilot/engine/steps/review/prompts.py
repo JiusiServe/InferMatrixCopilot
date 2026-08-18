@@ -220,17 +220,6 @@ and the directive; a reader holding only the diff must see immediately which cha
 comment hangs on. For comments about diff code, `line` is a line the diff touches; for \
 repo-impact comments (a consumer/doc/test elsewhere that this change breaks or leaves \
 stale), point file/line at that repo location and quote it.
-- STATE THE MECHANISM, not just the flag. After the change and before the directive, \
-carry the causal chain: under WHAT condition the problem triggers, THROUGH WHAT code \
-path it propagates (name and quote the function/branch), and WHAT a user or maintainer \
-observes when it does. "No test covers this" is a flag; "the only test constructing it \
-is CUDA-gated, and the merge-gate job selects `-m 'core_model and cpu'`, so a reload \
-regression reaches main unseen" is a finding. Where the PR claims a benefit, say \
-whether the mechanism actually delivers it. A finding worth keeping is worth the three \
-to six sentences this takes — measured against the reference reviewer, ours average \
-405 characters per finding and theirs 1238, and the gap is entirely this chain. Do NOT \
-pad: length comes from the chain and its quoted evidence, never from restating the \
-claim in different words, which is separately penalized as redundancy.
 - SUGGEST THE EDIT. When the fix is expressible as code, fill `suggestion` with the \
 replacement lines for the cited region — the patch itself, no prose, no diff markers. \
 A maintainer applies a suggestion; they have to re-derive a description. Leave it \
@@ -546,13 +535,7 @@ _REVIEW_MERGE = (
     "FIRST sentence must state the concrete change the diff makes (quote or "
     "paraphrase the hunk) — for repo-impact comments too, where the "
     "consequence elsewhere (named consumer/doc/test file, quoted) comes "
-    "second. A kept comment must carry its MECHANISM: the triggering "
-    "condition, the code path it propagates through (named and quoted), and "
-    "what is observed when it fires. Where a candidate states only the "
-    "conclusion, develop the chain from the evidence it already gathered "
-    "rather than dropping it — a flag and a finding score differently, and "
-    "the reference reviewer's findings run ~3x longer than ours entirely on "
-    "this. Never pad by restatement; redundancy is penalized separately. Comments about diff code must point `line` at a line the diff "
+    "second. Comments about diff code must point `line` at a line the diff "
     "touches. A verification ask that names the exact test/benchmark "
     "command and the concrete regression risk it guards is a first-class "
     "comment, not a process nit.")
