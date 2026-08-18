@@ -89,6 +89,7 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
         "mode",
         "knowledge_entry",
         "knowledge_routes",
+        "mandatory_review_guides",
         "routing",
         "navigation_policy",
         "execution_budget",
@@ -101,6 +102,10 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
     assert core.requests == []
     assert Path(review["knowledge_entry"]).parts[-2:] == ("knowledge", "AGENTS.md")
     assert review["knowledge_routes"] == []
+    assert len(review["mandatory_review_guides"]) == 1
+    assert Path(review["mandatory_review_guides"][0]).as_posix().endswith(
+        "general/review/guides/simplification-audit.md"
+    )
     # `owner/repo` is not a served repo. This used to report `needs_pr_context`
     # because the empty-description guard ran before the repo guard — misleading,
     # since no description would make an unserved repo routable, and unsafe once
@@ -108,6 +113,7 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
     assert review["routing"]["status"] == "unsupported_exact_router"
     assert review["navigation_policy"]["progress_before_knowledge"] is True
     assert review["navigation_policy"]["use_embedded_quick_maps"] is True
+    assert review["navigation_policy"]["read_mandatory_review_guides"] is True
     assert review["navigation_policy"]["stop_after_routes"] is True
     assert review["execution_budget"]["profile"] == "code"
     assert review["execution_budget"]["total_command_calls"] == 20
@@ -115,6 +121,10 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
     assert review["execution_budget"]["extension_command_calls"] == 4
     assert any(
         "subtraction" in item
+        for item in review["first_review_checklist"]
+    )
+    assert any(
+        "consumers, trust boundaries, and lifecycle ownership" in item
         for item in review["first_review_checklist"]
     )
     assert any(
@@ -250,7 +260,8 @@ def test_direct_routes_title_body_before_changed_files(monkeypatch):
         assert route["quick_map_status"] in {"ok", "truncated"}
         assert route["read_required"] is (route["quick_map_status"] != "ok")
     assert review["execution_budget"]["knowledge_file_reads"] == len(
-        [r for r in review["knowledge_routes"] if r["read_required"]])
+        [r for r in review["knowledge_routes"] if r["read_required"]]
+    ) + len(review["mandatory_review_guides"])
     scope = {
         item["owner"]: item
         for item in review["routing"]["scope_validation"]
@@ -259,7 +270,7 @@ def test_direct_routes_title_body_before_changed_files(monkeypatch):
     assert review["execution_budget"]["profile"] == "code"
     # was 0 unconditionally; the budget now grants exactly one read per route whose
     # map is not fully deliverable, so it cannot contradict read_required
-    assert review["execution_budget"]["knowledge_file_reads"] == 1
+    assert review["execution_budget"]["knowledge_file_reads"] == 2
 
 
 def test_direct_ranks_diffusion_owner_for_scheduler_managed_kv_pr(monkeypatch):
@@ -750,7 +761,7 @@ def test_every_routed_page_yields_a_quick_map():
         if status == "unavailable" or not text.strip():
             broken.append(f"{page}: {status}")
         elif status == "truncated" and not any(
-                page.endswith(k) for k in known_truncated):
+                Path(page).as_posix().endswith(k) for k in known_truncated):
             newly_truncated.append(page)
     assert not broken, (
         "routed pages with no deliverable Direct quick map — the host receives an "
@@ -898,7 +909,9 @@ def test_unavailable_quick_map_wires_through_review_end_to_end(monkeypatch, tmp_
         changed_files=[SERVING])
     n = len([r for r in review["knowledge_routes"] if r["read_required"]])
     assert n >= 1
-    assert review["execution_budget"]["knowledge_file_reads"] == n
+    assert review["execution_budget"]["knowledge_file_reads"] == (
+        n + len(review["mandatory_review_guides"])
+    )
     assert "unavailable" in review["navigation_policy"]["open_route_file_when"]
 
 
