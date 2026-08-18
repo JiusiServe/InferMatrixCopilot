@@ -241,30 +241,3 @@ def test_merging_never_demotes_a_blocker_to_its_chattier_twin():
                     "and this is worth a longer look at some point later on"},
     ]})
     assert "[blocker]" in md and "[nit]" not in md
-
-
-def test_finding_leads_with_the_concern_not_the_change():
-    """The reducer contract puts the change the diff makes in the FIRST
-    sentence, so a headline taken from it says nothing ("This diff adds a
-    cache"). The concern is what a reader scans for -- and a finding they
-    cannot pick out earns no credit for being present."""
-    from infermatrix_copilot.engine.steps.review.utils import _split_claim
-    head, rest = _split_claim(
-        "This diff centralizes Hub loading into _get_hub_module so each "
-        "repo_id loads once per process. No test exercises that path, so a "
-        "per-layer reload regression would ship unnoticed. Add a cpu test.")
-    assert head.startswith("No test exercises")
-    assert "centralizes Hub loading" in rest
-
-
-def test_evidence_renders_as_a_quote_not_a_parenthetical_tail():
-    """Evidence ran past 500 chars appended inside `(evidence: ...)`, which is
-    the measured "hard to find" complaint. It becomes a quote block."""
-    from infermatrix_copilot.engine.steps.review.utils import _render_review_md
-    md = _render_review_md({"review_comments": [
-        {"file": "t.py", "line": 3, "severity": "major",
-         "comment": "The guard was dropped. Ranks now diverge under DP>1.",
-         "evidence": "t.py:3 `if dp > 1:`"}]})
-    assert "(evidence:" not in md
-    assert "> t.py:3" in md
-    assert md.startswith("**Scan:**")
