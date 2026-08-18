@@ -31,8 +31,9 @@ import subprocess
 import sys
 import threading
 import uuid
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Literal, Optional
+from typing import Any, Literal
 
 from . import run_status as rs
 from .config import Settings
@@ -50,7 +51,7 @@ class CopilotMCP:
     ownership-aware reconciliation. Framework-agnostic (no `mcp` import) so it is
     unit-testable without a live protocol connection."""
 
-    def __init__(self, settings: Optional[Settings] = None):
+    def __init__(self, settings: Settings | None = None):
         """Wire settings + a `Copilot` (for `reserve_run`/`execute_reserved` path
         helpers), register this server's liveness token, reconcile any runs
         orphaned by a previous server, and start the single worker thread."""
@@ -64,7 +65,7 @@ class CopilotMCP:
         self.pid = os.getpid()
         rs.register_server(self.run_root, self.server_id, self.pid)
         rs.startup_reconcile(self.run_root)
-        self._q: "queue.Queue[tuple[str, bool]]" = queue.Queue()
+        self._q: queue.Queue[tuple[str, bool]] = queue.Queue()
         self._worker = threading.Thread(target=self._worker_loop, daemon=True,
                                         name="omni-mcp-worker")
         self._worker.start()
@@ -202,6 +203,10 @@ class CopilotMCP:
                         f"STRICT_BACKEND={backend} selected but its CLI is "
                         "not installed; install it or set STRICT_BACKEND_CLI "
                         "in ~/.infermatrix-copilot/.env")
+                else:
+                    gap = transport.auth_gap()
+                    if gap:
+                        missing.append(gap)
         repo_path = self.copilot._resolve_repo_path(repo)
         if not repo_path or not Path(repo_path).is_dir():
             missing.append(
@@ -312,7 +317,7 @@ def _guard(fn: Callable[[], dict]) -> dict:
         return {"error": str(exc)}
 
 
-def build_mcp(settings: Optional[Settings] = None):
+def build_mcp(settings: Settings | None = None):
     """Build the FastMCP server with the V1 read-only tools bound to a
     `CopilotMCP`. Importing FastMCP here keeps the `mcp` dependency out of the
     core import path (it lives behind the `[mcp]` extra)."""

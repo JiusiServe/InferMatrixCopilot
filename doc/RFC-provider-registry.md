@@ -1,8 +1,13 @@
 # RFC — Provider registry: subscription-auth harness backends for Strict
 
-- Status: accepted (grilling session 2026-08-14); M1 — registry, api
-  parity, tool bridge, cursor transport — implemented on this branch;
-  claude-code (M2) and codex (M3) declared but unshipped
+- Status: accepted (grilling session 2026-08-14); M1 (registry, api
+  parity, tool bridge, cursor transport) merged in PR #81 and live-smoked;
+  M2 claude-code and M3 codex implemented on this branch — claude-code
+  live-smoked on subscription auth, codex offline-tested only (no ChatGPT
+  login on the dev machine; readiness reports the login gap). The bridge
+  additionally serves the on-demand `repo_map`; skill/memory search tools
+  remain in-process only (cross-process candidate writes deliberately not
+  opened).
 - Owner: LLM/backend layer (`llm.py`, `config.py`), agent runtime
   (`engine/agent_runtime/runner.py`), new `src/infermatrix_copilot/providers/`
 - Prior art studied: Hermes Agent `api_mode` transports
