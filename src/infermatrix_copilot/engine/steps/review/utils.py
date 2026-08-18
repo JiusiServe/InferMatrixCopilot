@@ -170,7 +170,7 @@ def _split_claim(body: str) -> tuple[str, str]:
     if not parts:
         return body.strip(), ""
     if len(parts) == 1:
-        return _clip(parts[0], 160), ""
+        return "", body.strip()      # one sentence is not a claim + argument
     tell = ("but ", "however", "so ", "which means", "this means", "yet ",
             "leaves", "never", "not ", "no ", "fails", "breaks", "missing",
             "silently", "would ", "cannot", "does not", "doesn't", "isn't")
@@ -180,9 +180,13 @@ def _split_claim(body: str) -> tuple[str, str]:
     # "so " and would otherwise headline the change instead of the concern).
     idx = next((j for j, s in enumerate(parts) if j and j < 3
                 and any(t in s.lower() for t in tell)), 0)
-    head = _clip(parts[idx], 160)
+    if not idx:
+        return "", body.strip()      # no sentence carries a distinct concern
+    # NEVER clipped: a headline cut at a fixed width lands mid-thought, and
+    # 34 of 49 measured headlines ended on a dangling ";"/","/connector -- a
+    # fragment reads worse than the plain paragraph it replaced.
     rest = " ".join(parts[:idx] + parts[idx + 1:]).strip()
-    return head, rest
+    return parts[idx], rest
 
 
 def _dedupe_comments(comments: list[dict]) -> list[dict]:
@@ -553,9 +557,11 @@ def _render_review_md(output: dict, pr_state: str = "") -> str:
         # find"). A finding the reader cannot pick out does not earn credit
         # for being present, and recall is scored on concerns COVERED.
         head, rest = _split_claim(body)
-        entry = (f"### {i}. {head}\n\n{loc} [{c.get('severity', 'minor')}]")
-        if rest:
-            entry += f"\n\n{rest}"
+        if head:
+            entry = f"### {i}. {head}\n\n{loc} [{c.get('severity', 'minor')}]"
+            entry += f"\n\n{rest}" if rest else ""
+        else:   # no distinct claim sentence -- the plain shape, not a stub
+            entry = f"{loc} [{c.get('severity', 'minor')}] — {rest or body}"
         if c.get("evidence"):
             ev = _clip(str(c["evidence"]).strip(), 1200)
             entry += "\n\n" + "\n".join(
