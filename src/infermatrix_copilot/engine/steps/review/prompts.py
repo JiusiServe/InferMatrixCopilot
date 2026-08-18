@@ -366,6 +366,34 @@ _REVIEW_LENSES = [
               "emit generic 'add a unit test' asks: every test finding names "
               "the specific behavior at risk and the exact test to run or "
               "extend."},
+    # Breadth lens. The four above partition the CHECKLIST; none partitions the
+    # DIFF, so every one of them sees the whole change and self-selects hunks —
+    # coverage is emergent, and measurement showed they converge: distinct
+    # files reasoned about per review ran 12.2 for us against 13.8 for the
+    # reference reviewer, and the arm's worst recall items were its largest
+    # diffs. This lens owns coverage and nothing else. It is deliberately
+    # SHALLOW: two attempts to buy recall with deeper findings (claim headlines,
+    # per-finding causal chains) both measurably cost recall, so depth here is
+    # a regression, not an improvement.
+    {"name": "sweep",
+     "focus": "COVERAGE IS YOUR ONLY JOB — go WIDE, never deep. (a) List "
+              "EVERY file the diff touches before opening anything; that "
+              "list is your coverage target and you are done only when every "
+              "entry is resolved. (b) Visit each file ONCE, in order, and "
+              "reach either one supported finding or an explicit no-issue "
+              "conclusion. Do not re-open a file, do not chase a finding into "
+              "a fifth tool call, and do not develop a causal chain — the "
+              "other lenses go deep, and depth bought at the cost of an "
+              "unvisited file is a net loss. (c) The files most likely to "
+              "hide an issue are the ones a topic-driven reader skips: small "
+              "edits far from the PR's headline change, config/manifest/"
+              "fixture edits, and files touched only incidentally by a "
+              "rename or refactor — give those the SAME single pass, not "
+              "less. (d) Name every file you could not resolve within budget "
+              "as an explicit gap; an unnamed unvisited file is the failure "
+              "this lens exists to prevent. Emit at most one comment per "
+              "file, and only where you have evidence you can point at — "
+              "breadth is not a licence to speculate."},
 ]
 
 # Deep-investigation passes (review_deep_engine): the narrow-lens ensemble

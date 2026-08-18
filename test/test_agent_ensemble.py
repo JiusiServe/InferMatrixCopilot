@@ -385,8 +385,8 @@ def test_cross_lens_corroboration_ranks_first_at_the_cap(settings, trace,
     llm = ScriptedLLM([
         contract(review_comments=[corro_a] + singles),   # lens 1
         contract(review_comments=[corro_b]),             # lens 2
-        contract(review_comments=[]),                    # lens 3
-        contract(review_comments=[]),                    # lens 4
+        # remaining lenses contribute nothing — count follows the lens list
+        *[contract(review_comments=[])] * (len(_REVIEW_LENSES) - 2),
         verdicts_reply(),                                # reducer silent: keep all
     ])
     state = {"diff_text": "diff --git a/hot.py b/hot.py\n+A = 1",
@@ -423,9 +423,8 @@ def test_coverage_promotion_converts_findings_to_comments(settings, trace,
                                    "regressions; this PR fixes only one"}]}))])
     llm = ScriptedLLM([
         lens1,
-        contract(review_comments=[]),   # lens 2
-        contract(review_comments=[]),   # lens 3
-        contract(review_comments=[]),   # lens 4
+        # lenses 2..N contribute nothing — count follows the lens list
+        *[contract(review_comments=[])] * (len(_REVIEW_LENSES) - 1),
         verdicts_reply({"i": 0, "action": "keep"}),
         promotion,
     ])
@@ -504,9 +503,8 @@ def test_verify_pass_drops_refuted_demotes_unverifiable(settings, trace,
     ]
     llm = ScriptedLLM([
         contract(review_comments=cs),                 # lens 1
-        contract(review_comments=[]),                 # lenses 2-4
-        contract(review_comments=[]),
-        contract(review_comments=[]),
+        # lenses 2..N contribute nothing — count follows the lens list
+        *[contract(review_comments=[])] * (len(_REVIEW_LENSES) - 1),
         verdicts_reply({"i": 0, "action": "keep"},    # reducer keeps all
                        {"i": 1, "action": "keep"},
                        {"i": 2, "action": "keep"},
