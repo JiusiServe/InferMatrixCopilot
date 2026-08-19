@@ -303,3 +303,51 @@ class DebugMemory:
     def count(self) -> int:
         """Total number of stored entries, regardless of status."""
         return self._conn.execute("SELECT COUNT(*) FROM entries").fetchone()[0]
+
+    # -- curator surface (design D5) ----------------------------------------
+    def entries(self, *, repo: str | None = None,
+                statuses: tuple = ("active", "candidate")) -> list[dict]:
+        """Full rows filtered by repo/status — the curator's read surface.
+        The default status set excludes `stale` AND `retired`: retired rows
+        are terminal lineage records and must never re-enter clustering."""
+        sql = "SELECT * FROM entries WHERE status IN (%s)" % \
+            ",".join("?" * len(statuses))
+        args: list = list(statuses)
+        if repo is not None:
+            sql += " AND repo=?"
+            args.append(repo)
+        out = []
+        for row in self._conn.execute(sql + " ORDER BY id", args):
+            d = dict(row)
+            try:
+                d["files"] = json.loads(d.get("files") or "[]")
+            except ValueError:
+                d["files"] = []
+            out.append(d)
+        return out
+
+    def apply_curation(self, updates: dict[int, dict]) -> None:
+        """Apply the curator's decided field updates ({id: {col: value}}),
+        one transaction, then rebuild the FTS mirror once (tags are
+        indexed; per-row external-content sync is not worth the fragility).
+        Only existing columns are written; `files` lists are re-encoded."""
+        if self.readonly:
+            raise sqlite3.OperationalError("read-only debug memory store")
+        if not updates:
+            return
+        with self._conn:
+            for rowid, fields in updates.items():
+                cols, vals = [], []
+                for name, value in fields.items():
+                    if name not in self._columns:
+                        continue
+                    if name == "files" and isinstance(value, list):
+                        value = json.dumps(value)
+                    cols.append(f"{name}=?")
+                    vals.append(value)
+                if cols:
+                    self._conn.execute(
+                        f"UPDATE entries SET {', '.join(cols)} WHERE id=?",
+                        (*vals, rowid))
+            self._conn.execute(
+                "INSERT INTO entries_fts(entries_fts) VALUES('rebuild')")

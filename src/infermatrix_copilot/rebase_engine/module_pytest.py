@@ -67,11 +67,15 @@ def main(argv: list[str] | None = None) -> int:
     patterns = None
     artifact_globs: list[str] = []
     rebase_dir = os.environ.get("IMX_ADAPTER_REBASE", "")
+    # runtime overlay (design D4): the agent env contract may hand the
+    # learned-noise overlay path down; absent ⇒ seed-only, as before
+    overlay = os.environ.get("IMX_WATCHDOG_OVERLAY", "")
     if rebase_dir:
         pat_file = Path(rebase_dir).parent / "testing" / \
             "watchdog_patterns.yaml"
         if pat_file.is_file():
-            patterns = WatchdogPatterns.from_yaml(pat_file)
+            patterns = WatchdogPatterns.from_yaml(
+                pat_file, overlay=Path(overlay) if overlay else None)
         manifest = Path(rebase_dir).parent / "manifest.yaml"
         if manifest.is_file():
             import yaml
@@ -91,12 +95,28 @@ def main(argv: list[str] | None = None) -> int:
     from ..testing import watchdog_learn
 
     decisions = Path(log_dir) / "watchdog_decisions.jsonl"
+    # stable harvest identity (design D4): run id from the agent env
+    # contract when present, else synthesized from the log dir; seq is a
+    # per-process counter — the curator's exactly-once harvest dedups on
+    # (run, attempt, job_key, seq)
+    run_ident = os.environ.get("IMX_RUN_ID", "") or Path(log_dir).name
+    import itertools
+    import uuid
+    _seq = itertools.count(1)
+    # the seq counter restarts per PROCESS, so two wrapper invocations for
+    # the same test would collide on (run, "", test, 1) and the harvest
+    # would wrongly dedup a real second decision — a collision-resistant
+    # attempt id makes the identity process-unique (pid+seconds can
+    # collide across same-second retries or pid reuse)
+    _attempt = f"wrap-{uuid.uuid4().hex[:12]}"
 
     def record_fn(pattern: str, verdict: str, test_name: str) -> None:
         # LogWatchdog's contract is (matched line, verdict, test name);
         # watchdog_learn.record takes keyword-only fields
         watchdog_learn.record(decisions, pattern=pattern, verdict=verdict,
-                              test=test_name)
+                              test=test_name, run=run_ident,
+                              attempt=_attempt, job_key=test_name,
+                              seq=next(_seq))
 
     def report_fn(test_name: str, pattern: str, detail: str) -> None:
         report = Path(log_dir) / "tests" / f"{test_name}.watchdog_report"
@@ -105,11 +125,12 @@ def main(argv: list[str] | None = None) -> int:
             f.write(f"pattern={pattern}\n{detail}\n")
 
     def review_fn(test_name: str, snippet: str) -> str:
-        # explicit no-LLM reviewer: every tier-2 match takes the documented
-        # default-CONTINUE, but RECORDED (the learning pipeline promotes
-        # noise patterns from accumulated CONTINUE decisions — a silent
-        # short-circuit would starve it). The assembly PR swaps in the
-        # copilot's eco-tier LLM reviewer.
+        # explicit no-LLM reviewer BY DESIGN: this standalone keyless
+        # wrapper owns no LLM client, so every tier-2 match takes the
+        # documented default-CONTINUE, RECORDED (the learning pipeline
+        # promotes noise from accumulated CONTINUEs — a silent
+        # short-circuit would starve it). The assembly's own test loop
+        # wires the eco-tier LLM reviewer (rebase_v3._watchdog_collaborators).
         return "CONTINUE"
 
     runner = TestRunner(

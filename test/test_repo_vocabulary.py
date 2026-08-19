@@ -73,6 +73,10 @@ _VOCAB_CEILINGS = {
     "rebase_engine/test_manifest.py": 3,
     "rebase_engine/worktree.py": 2,
     "engine/steps/rebase_v3.py": 14,
+    # parent-schema read-compat (design D2): the parent store's own column
+    # name (vllm_commit) and its docstring mapping — this whole layer dies
+    # with the PR4d migration when the adapter drops rebase.knowledge
+    "rebase_engine/parent_compat.py": 3,
     # ceilinged v1-era defaults (also under test_repo_neutral_core)
     "config.py": 5,      # rebase_orchestrator_cmd + agent-root sibling name
     "task_spec.py": 2,   # default_repo literal

@@ -48,6 +48,11 @@ steps:
   # guard mutates (first-mutator on resume) and injects the adapter's
   # rebase.guard policy
   - {id: guard, step: rebase.v3_guard, when: not mode_report_only}
+  # explicit schema-v2 preparation BEFORE any agent can record (design
+  # round-4 F4): one of the three sanctioned ensure_schema_v2 entry
+  # points; report_only never reaches it (stores stay read-only)
+  - {id: knowledge_prep, step: rebase.v3_knowledge_prep,
+     when: not mode_report_only}
   - {id: scan, step: rebase.v3_scan, when: mode_report_only}
   - {id: wheel, step: rebase.v3_wheel, when: mode_full}
   - {id: assign, step: rebase.v3_assign, when: mode_full}
@@ -64,6 +69,14 @@ steps:
   - {id: precommit, step: rebase.v3_precommit, when: mode_runs_local_tests}
   - {id: push_gate, step: rebase.v3_push_gate, when: mode_runs_push_gate}
   - {id: ci, step: rebase.v3_ci, when: mode_runs_remote_ci}
+  # Rev 8 §2.2 tail, restored (completion design D5): the rebase-specific
+  # FINAL_SUMMARY lands first, then curation (runtime stores only; a
+  # curate failure is a REAL run failure and precedes the final report),
+  # then the closing knowledge attestation + baseline comparison, then
+  # the generic final report — so the report reflects curation AND drift.
+  - {id: phase5_report, step: rebase.v3_phase5_report, when: mode_full}
+  - {id: curate, step: rebase.v3_curate, when: mode_full}
+  - {id: compare, step: rebase.v3_compare, when: mode_full}
   # report BEFORE finalize: the terminal-row ruling may end the run blocked
   # (needs-human, exit 3) and RUN_REPORT must already exist when it does
   - {id: report, step: report.final_summary}

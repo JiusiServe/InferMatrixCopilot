@@ -175,19 +175,69 @@ class SkillStore:
 
     # -- write gate: propose -> candidate; promote is curator/human ----------
     def propose(self, *, name: str, description: str, body: str,
-                modules: list[str] | None = None) -> None:
+                modules: list[str] | None = None,
+                identity: str = "") -> None:
         """Record a proposed skill (keyed by `name`) into `_candidates.json` with
         a `proposed_at` timestamp — the only write agents are permitted. Re-using
-        a name overwrites its candidate. No SKILL.md is created until `promote`."""
+        a name overwrites its candidate. No SKILL.md is created until `promote`.
+        `identity` is an optional caller-defined stable key (the curator stores
+        its module+key pair) so a re-proposal of the SAME pattern can be told
+        apart from a slug collision without parsing prose."""
         with self._candidates_lock():
             candidates = self._load_candidates()
             candidates[name] = {
                 "name": name, "description": description, "body": body,
                 "modules": modules or [], "proposed_at": time.time(),
             }
+            if identity:
+                candidates[name]["identity"] = identity
             _write_durable(self.candidates_file,
                            json.dumps(candidates, indent=2,
                                       ensure_ascii=False))
+
+    def propose_if_new_identity(self, *, base_name: str, identity: str,
+                                description: str, body: str,
+                                modules: list[str] | None = None
+                                ) -> str | None:
+        """Atomic identity-deduped proposal (the curator's write path):
+        under the candidates flock, in ONE critical section — if any
+        pending candidate already carries `identity`, nothing is written
+        (returns None); otherwise the name is allocated (`base_name`, or a
+        digest-suffixed variant when the base is taken by a DIFFERENT
+        identity; a suffix collision refuses with None rather than
+        overwriting) and the candidate is recorded. Concurrent curators
+        can therefore never re-propose one identity or overwrite each
+        other's colliding names."""
+        import hashlib
+
+        with self._candidates_lock():
+            candidates = self._load_candidates()
+            if any(str(c.get("identity", "")) == identity
+                   for c in candidates.values()):
+                return None
+
+            def _taken(candidate_name: str) -> bool:
+                # pending candidates AND promoted skills both occupy the
+                # name: a same-named candidate would let a later
+                # promote() overwrite an ACTIVE skill
+                return candidate_name in candidates or \
+                    (self.directory / candidate_name / "SKILL.md").exists()
+
+            name = base_name
+            if _taken(name):
+                name = base_name + "-" + hashlib.sha256(
+                    identity.encode("utf-8")).hexdigest()[:8]
+                if _taken(name):
+                    return None  # digest collision too: refuse loudly
+            candidates[name] = {
+                "name": name, "description": description, "body": body,
+                "modules": modules or [], "proposed_at": time.time(),
+                "identity": identity,
+            }
+            _write_durable(self.candidates_file,
+                           json.dumps(candidates, indent=2,
+                                      ensure_ascii=False))
+            return name
 
     def promote(self, name: str) -> Path:
         """Curator action: turn the candidate `name` into a real `<name>/SKILL.md`

@@ -110,6 +110,9 @@ def complete_env(settings, tmp_path, monkeypatch):
     manifest["rebase"]["test_manifest"]["queue_map"] = {
         "gpu_1_queue": [0, "any"]}
     manifest["rebase"]["precommit"]["command"] = "true"
+    # no parent checkout in this fixture world; a declared knowledge layer
+    # would (correctly) fail the prelude closed
+    manifest["rebase"].pop("knowledge", None)
     (adir / "manifest.yaml").write_text(yaml.safe_dump(manifest))
     shutil.copytree(REPO_ROOT / "adapters" / "vllm_omni" / "rebase",
                     adir / "rebase")

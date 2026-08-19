@@ -483,6 +483,11 @@ def v3_env(settings, tmp_path, monkeypatch):
     manifest = yaml.safe_load(
         (REPO_ROOT / "adapters/vllm_omni/manifest.yaml").read_text())
     manifest["repo"]["path"] = str(repo)
+    # the real manifest DECLARES parent read-compat layers (rebase.knowledge)
+    # and the prelude fails CLOSED on a declared-but-unreadable layer; this
+    # fixture world has no parent checkout, so the fixture must not declare
+    # one (knowledge-declaring paths get their own dedicated tests)
+    manifest["rebase"].pop("knowledge", None)
     # production setup wiring (manifest -> ManifestSpec -> job -> TestJob):
     # the real map is empty, so the fixture declares one for the pin
     manifest["rebase"]["test_manifest"]["setup_map"] = {
@@ -570,13 +575,14 @@ def test_v3_per_mode_matrix():
     matrix = {
         "report_only": {"prelude", "guard_check", "scan", "report",
                         "finalize"},
-        "local_ci": {"prelude", "guard", "tests", "precommit", "report",
-                     "finalize"},
-        "remote_ci": {"prelude", "guard", "push_gate", "ci", "report",
-                      "finalize"},
-        "full": {"prelude", "guard", "wheel", "assign", "wave1",
-                 "wave_gate", "wave2", "tests", "precommit", "push_gate",
-                 "ci", "report", "finalize"},
+        "local_ci": {"prelude", "guard", "knowledge_prep", "tests",
+                     "precommit", "report", "finalize"},
+        "remote_ci": {"prelude", "guard", "knowledge_prep", "push_gate",
+                      "ci", "report", "finalize"},
+        "full": {"prelude", "guard", "knowledge_prep", "wheel", "assign",
+                 "wave1", "wave_gate", "wave2", "tests", "precommit",
+                 "push_gate", "ci", "phase5_report", "curate", "compare",
+                 "report", "finalize"},
     }
     for mode, expect in matrix.items():
         state = {"task_spec": {}, **mode_state_flags(mode)}
@@ -585,6 +591,20 @@ def test_v3_per_mode_matrix():
         assert ran == expect, f"{mode}: {sorted(ran ^ expect)}"
     ids = [s["id"] for s in doc["steps"]]
     assert ids.index("report") < ids.index("finalize")
+    # Rev 8 §2.2 tail order (completion design D5): the rebase summary
+    # precedes curation, curation precedes the closing attestation, and
+    # ALL of it precedes the final report — a curate failure can never
+    # hide behind an already-written success report. knowledge_prep must
+    # precede the first possible agent write (wave 1).
+    assert (ids.index("phase5_report") < ids.index("curate")
+            < ids.index("compare") < ids.index("report"))
+    assert ids.index("guard") < ids.index("knowledge_prep") \
+        < ids.index("wave1")
+    # report_only stays store-read-only: knowledge_prep (a WRITE step)
+    # must never run there
+    ro_state = {"task_spec": {}, **mode_state_flags("report_only")}
+    prep = next(s for s in doc["steps"] if s["id"] == "knowledge_prep")
+    assert not _eval_when(prep["when"], ro_state)
     assert ids.index("wave1") < ids.index("wave_gate") < ids.index("wave2")
 
 

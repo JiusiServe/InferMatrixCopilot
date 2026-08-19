@@ -175,6 +175,17 @@ def _agent_shell_env(ctx: StepContext, manifest: dict, repo_root: str,
     env["IMX_TARGET_REPO"] = str(repo_root)
     env["IMX_LOG_DIR"] = str(ctx.run_dir)
     env["IMX_ADAPTER_REBASE"] = str(adapter_dir / "rebase")
+    # watchdog learning contract (design D4): the wrapper stamps decisions
+    # with the run identity and merges the runtime noise overlay
+    _state = getattr(ctx, "state", None) or {}
+    env["IMX_RUN_ID"] = str(_state.get("run_id", "") or ctx.run_dir.name)
+    _settings = getattr(ctx, "settings", None)
+    if _settings is not None:
+        from ...memory.paths import KnowledgePaths as _KP2
+        _repo_slug = (_state.get("task_spec") or {}).get("repo", "")
+        env["IMX_WATCHDOG_OVERLAY"] = str(_KP2.resolve(
+            _settings, _repo_slug,
+            adapter_root=adapter_dir).watchdog_overlay)
     if gpu_mutex:
         # Phase-2 module agents serialize every wrapper invocation on the
         # GPU lock (parent contract)
@@ -286,30 +297,96 @@ def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
     def _memory() -> DebugMemory:
         return DebugMemory(kpaths.rebase_backend_db)
 
+    # READ-ONLY parent-store read-compat (Rev 8 §9 PR4c / design D2): the
+    # prelude already failed CLOSED if a declared layer was unreadable at
+    # run start; a MID-RUN read error here degrades open (copilot layers
+    # still answer) with a traced note — a knowledge hiccup must never
+    # kill a run the gate already provenance-stamped.
+    from ...adapters.base import expand_path
+    _knowledge_cfg = (manifest.get("rebase") or {}).get("knowledge") or {}
+    parent_db_path = expand_path(str(_knowledge_cfg.get("parent_debug_db")
+                                     or ""))
+    parent_skills_path = expand_path(
+        str(_knowledge_cfg.get("parent_skills_dir") or ""))
+
+    def _parent_memory_hits(query: str, k: int) -> list[dict]:
+        if not parent_db_path:
+            return []
+        try:
+            from ...rebase_engine.parent_compat import ParentDebugMemory
+            return ParentDebugMemory(parent_db_path).search(query, k=k)
+        except Exception as exc:  # noqa: BLE001 — degrade open, traced
+            ctx.trace.record("capability_note",
+                             capability="rebase.knowledge.parent_debug_db",
+                             detail=f"parent layer degraded mid-run: {exc}")
+            return []
+
     def search_debug_memory(**kw) -> dict:
         query = " ".join(str(kw.get(k, "") or "")
                          for k in ("keyword", "module", "tags")).strip()
         if not query:
             return {"results": []}
+        k = int(kw.get("max_results") or 5)
         try:
-            return {"results": _memory().search(
-                query, k=int(kw.get("max_results") or 5), repo=repo_name)}
+            raw = _memory().search(query, k=k, repo=repo_name)
         except Exception as exc:  # noqa: BLE001 - store trouble is a result
             return {"error": f"debug memory unavailable: {exc}"}
+        # dedup the copilot layer by signature FIRST: k same-signature
+        # rows must not count as a full result set and mask the parent
+        # layer entirely (verification-round finding)
+        results = []
+        result_sigs = set()
+        for r in raw:
+            sig = (r.get("module"), str(r.get("symptom", ""))[:80])
+            if sig not in result_sigs:
+                result_sigs.add(sig)
+                results.append(r)
+        # copilot layer first, parent read-compat layer appended (D2 union
+        # order); dedup on (module, symptom head) so a migrated/duplicated
+        # fact never shows twice. The parent layer is fetched TO
+        # EXHAUSTION (widening rounds until the union fills k or the
+        # store runs out) so cross-layer collisions can never starve a
+        # distinct parent hit out of the union, no matter how deep the
+        # duplicate run is (review iteration 3 F3).
+        seen = set(result_sigs)
+        fetch = k
+        while len(results) < k:
+            hits = _parent_memory_hits(query, fetch)
+            for hit in hits:
+                if len(results) >= k:
+                    break
+                sig = (hit.get("module"), str(hit.get("symptom", ""))[:80])
+                if sig not in seen:
+                    seen.add(sig)
+                    results.append({**hit, "source_layer": "parent"})
+            if len(hits) < fetch:
+                break  # the parent store is exhausted
+            fetch *= 4
+        return {"results": results}
 
     def record_debug_memory(**kw) -> dict:
         try:
+            run_id = str(ctx.state.get("run_id", ""))
+            # additive v2 fields land in their OWN columns (round-4 F4 —
+            # the old key-inside-verification packing lost every one of
+            # them to curation and migration); v3_knowledge_prep
+            # guarantees the columns exist before any agent records
             entry_id = _memory().record(
                 repo=repo_name, module=str(kw.get("module", "")),
-                run_id=str(ctx.state.get("run_id", "")),
+                run_id=run_id,
                 symptom=str(kw.get("symptom", "")),
                 root_cause=str(kw.get("root_cause", "")),
                 fix_summary=str(kw.get("fix", "")),
                 files=[f.strip() for f in
                        str(kw.get("files", "")).split(",") if f.strip()],
-                verification="recorded by rebase agent"
-                             + (f" (key={kw.get('key')})"
-                                if kw.get("key") else ""))
+                verification="recorded by rebase agent",
+                key=str(kw.get("key", "") or ""),
+                tags=kw.get("tags", ""),
+                watch_outs=str(kw.get("watch_outs", "") or ""),
+                upstream_commit=str(
+                    ctx.state.get("upstream_commit", "") or ""),
+                last_seen_run=run_id,
+                source="v3-agent")
             return {"ok": True, "id": entry_id}
         except Exception as exc:  # noqa: BLE001
             return {"error": f"debug memory write failed: {exc}"}
@@ -325,13 +402,30 @@ def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
         query = str(kw.get("keyword", "") or "")
         module_q = str(kw.get("module", "") or "")
         k = int(kw.get("max_results") or 3)
-        # retrieval = a REAL seed ∪ runtime union: runtime (learned, newer)
-        # first, then seed entries it doesn't override — a full seed page
-        # can never starve distinct runtime skills out of the result
+        # retrieval = a REAL union, priority order runtime > adapter seed >
+        # parent seed (D2): runtime (learned, newer) first, then seed
+        # entries it doesn't override, then the read-only parent layer —
+        # first store wins per name. Each layer is fetched EXHAUSTIVELY
+        # (k = the store's own size, so truncation is structurally
+        # impossible, not just unlikely) — a name collision with a higher
+        # layer can never starve a distinct lower-layer skill out of the
+        # union; the union itself is capped at k.
         merged: dict[str, object] = {}
-        for store_dir in (runtime_skills_dir, seed_skills_dir):
-            for s in SkillStore(store_dir).find(query=query,
-                                                module=module_q, k=k):
+        layers = [runtime_skills_dir, seed_skills_dir]
+        if parent_skills_path:
+            layers.append(Path(parent_skills_path))
+        for store_dir in layers:
+            try:
+                store = SkillStore(store_dir)
+                found = store.find(query=query, module=module_q,
+                                   k=len(store.load_all()) or 1)
+            except Exception as exc:  # noqa: BLE001 — degrade open, traced
+                ctx.trace.record(
+                    "capability_note",
+                    capability="rebase.knowledge.parent_skills_dir",
+                    detail=f"skill layer {store_dir} degraded: {exc}")
+                continue
+            for s in found:
                 merged.setdefault(s.name, s)
         return {"skills": [{"name": s.name, "description": s.description}
                            for s in list(merged.values())[:k]]}
@@ -591,6 +685,63 @@ async def _v3_prelude(ctx: StepContext) -> StepResult:
             encoding="utf-8")
 
     register_finalizer(ctx.run_dir, _terminal_report)
+
+    # D2 knowledge pre-flight (every mode — it is also report_only's
+    # "stores readable" precondition, and the Rev 8 §5 curator pre-flight's
+    # as-built home): a DECLARED parent layer must open READ-ONLY right
+    # now, and its opening logical digest is recorded for the §8 fairness
+    # gate. Fail closed — an unreadable declared layer invalidates the
+    # validation world; absent declarations attest nothing and block
+    # nothing.
+    from ...adapters.base import expand_path as _expand
+    from ...rebase_engine import knowledge_attest
+    kn_cfg = (manifest.get("rebase") or {}).get("knowledge") or {}
+    kn_paths: dict[str, str] = {}
+    for kn_key in ("parent_debug_db", "parent_skills_dir"):
+        raw = str(kn_cfg.get(kn_key) or "")
+        expanded = _expand(raw)
+        if raw and not expanded:
+            # expand_path maps an unset ${VAR} to "" ("undeclared") — for a
+            # DECLARED knowledge layer that silent downgrade is exactly the
+            # unfair knowledge-bare run the §8 gate must never produce
+            return StepResult(False, FailureKind.BLOCKED,
+                              f"declared knowledge layer {kn_key}={raw!r} "
+                              "did not expand (env var unset) — refusing an "
+                              "unprovenanced run")
+        kn_paths[kn_key] = expanded
+    try:
+        provenance = knowledge_attest.attest_layers(**kn_paths)
+    except Exception as exc:  # noqa: BLE001 — every shape fails closed
+        return StepResult(False, FailureKind.BLOCKED,
+                          "declared knowledge layer unreadable — refusing "
+                          f"an unprovenanced run: {exc}")
+    if provenance:
+        # the effective skill union's collision table (name → winning
+        # layer, priority runtime > adapter seed > parent): fairness
+        # reviewers must see WHICH content each colliding name served
+        from ...memory.paths import KnowledgePaths as _KPaths
+        from ...memory.skills import SkillStore as _SStore
+        repo_for_paths = (ctx.state.get("task_spec") or {}).get("repo", "")
+        kp = _KPaths.resolve(
+            ctx.settings, repo_for_paths,
+            adapter_root=Path(ctx.settings.adapters_dir)
+            / repo_for_paths.replace("-", "_"))
+        collisions: dict[str, str] = {}
+        layer_dirs = [("runtime", kp.skills_runtime_dir),
+                      ("adapter_seed", kp.skills_seed_dir)]
+        if kn_paths.get("parent_skills_dir"):
+            layer_dirs.append(("parent",
+                               Path(kn_paths["parent_skills_dir"])))
+        for layer_name, layer_dir in layer_dirs:
+            if not layer_dir.is_dir():
+                continue
+            for s in _SStore(layer_dir).load_all():
+                collisions.setdefault(s.name, layer_name)
+        sub.update({"knowledge": {"open": provenance,
+                                  "skill_union": collisions}})
+        ctx.trace.record(
+            "knowledge_provenance", when="open",
+            layers={k: v.get("digest", "") for k, v in provenance.items()})
 
     updates: dict = {}
     from ...adapters.base import expand_path
@@ -926,6 +1077,83 @@ async def _run_debug_agent(ctx: StepContext, manifest: dict, module: str,
            + (result.get("text") or "")[:200]
 
 
+def _watchdog_collaborators(ctx: StepContext):
+    """Two-tier watchdog collaborators for the local test loop (design D4).
+
+    `record_fn` appends every Tier-2 decision to the RUN DIR's decision log
+    with a stable identity `(run, attempt, job_key, seq)` — the curator's
+    exactly-once harvest moves them into the state-dir log later (the run
+    dir is the only writer target here, so a crashed run never half-writes
+    shared state). `review_fn` is the ECO-tier LLM reviewer (Rev 8 §7:
+    90 s cap, default-CONTINUE on any error/stall — a reviewer problem may
+    never kill a test the patterns alone would have let live).
+    `report_fn` writes the per-test watchdog report artifact (parent
+    parity with the standalone pytest wrapper)."""
+    import itertools
+
+    from ...testing import watchdog_learn
+
+    import uuid
+
+    run_id = str(ctx.state.get("run_id", "") or ctx.run_dir.name)
+    decisions = ctx.run_dir / "watchdog_decisions.jsonl"
+    seq = itertools.count(1)
+    # collision-resistant attempt id: the module agents' pytest wrapper
+    # shares this decision file with its own restarting seq counters —
+    # pid+seconds can collide across same-second retries or pid reuse and
+    # the harvest would wrongly dedup a REAL decision away
+    attempt = f"loop-{uuid.uuid4().hex[:12]}"
+
+    def record_fn(pattern: str, verdict: str, test_name: str) -> None:
+        watchdog_learn.record(decisions, pattern=pattern, verdict=verdict,
+                              test=test_name, run=run_id, attempt=attempt,
+                              job_key=test_name, seq=next(seq))
+
+    def report_fn(test_name: str, pattern: str, detail: str) -> None:
+        report = ctx.run_dir / "tests" / f"{test_name}.watchdog_report"
+        report.parent.mkdir(parents=True, exist_ok=True)
+        with open(report, "a", encoding="utf-8") as f:
+            f.write(f"pattern={pattern}\n{detail}\n")
+
+    client_holder: list = []
+
+    def _client():
+        if not client_holder:
+            from anthropic import Anthropic
+
+            target = ctx.settings.tier_target("eco")
+            # max_retries=0: the 90 s cap is a WALL cap — the SDK's
+            # default retry loop would multiply it
+            ckw: dict = {"api_key": target.api_key, "max_retries": 0}
+            if target.base_url:
+                ckw["base_url"] = target.base_url
+            client_holder.append((Anthropic(**ckw), target.model))
+        return client_holder[0]
+
+    def review_fn(test_name: str, snippet: str) -> str:
+        try:
+            client, model = _client()
+            msg = client.messages.create(
+                model=model, max_tokens=16, timeout=90.0,
+                messages=[{"role": "user", "content":
+                           "You are a CI test watchdog reviewing a "
+                           "suspicious log excerpt from a long-running "
+                           "test. KILL means the process is unrecoverable "
+                           "(hung, crashed, device error) and should be "
+                           "terminated now; CONTINUE means let it run. "
+                           "Answer with exactly one word, KILL or "
+                           "CONTINUE.\n\n"
+                           f"test: {test_name}\nlog excerpt:\n"
+                           f"{snippet[:4000]}"}])
+            text = "".join(getattr(b, "text", "")
+                           for b in msg.content).strip().upper()
+            return "KILL" if text.startswith("KILL") else "CONTINUE"
+        except Exception:  # noqa: BLE001 — reviewer trouble never kills
+            return "CONTINUE"
+
+    return record_fn, review_fn, report_fn
+
+
 @step("rebase.v3_test_loop", "script", "write_workspace",
       "The local test loop: run, baseline-compare, debug regressions.")
 async def _v3_test_loop(ctx: StepContext) -> StepResult:
@@ -995,11 +1223,18 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
                          detail="adapter declares no runtime venv — test "
                                 "jobs run with the inherited environment")
     rb = manifest.get("rebase") or {}
-    adapter_dir = Path(ctx.settings.adapters_dir) / \
-        ((ctx.state.get("task_spec") or {}).get("repo", "")).replace("-", "_")
+    repo_slug = ((ctx.state.get("task_spec") or {}).get("repo", ""))
+    adapter_dir = Path(ctx.settings.adapters_dir) / repo_slug.replace("-", "_")
     pat_file = adapter_dir / "testing" / "watchdog_patterns.yaml"
-    patterns = WatchdogPatterns.from_yaml(pat_file) \
+    # two-tier pattern load (design D4): adapter seed ∪ runtime overlay —
+    # the overlay (learned noise) only ever appends; absent ⇒ seed-only,
+    # byte-identical to the pre-wiring behavior
+    from ...memory.paths import KnowledgePaths as _KP
+    overlay_path = _KP.resolve(ctx.settings, repo_slug,
+                               adapter_root=adapter_dir).watchdog_overlay
+    patterns = WatchdogPatterns.from_yaml(pat_file, overlay=overlay_path) \
         if pat_file.is_file() else None
+    record_fn, review_fn, report_fn = _watchdog_collaborators(ctx)
 
     def notify_download(key: str, repo_id: str) -> None:
         ctx.trace.record("model_download_expected", job=key, repo=repo_id)
@@ -1010,6 +1245,7 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
         artifact_globs=list((rb.get("testing") or {})
                             .get("artifact_globs") or []),
         cuda_visible_devices=os.environ.get("CUDA_VISIBLE_DEVICES", ""),
+        record_fn=record_fn, review_fn=review_fn, report_fn=report_fn,
         notify_download=notify_download)
     jobs_by_slug = {j["slug"]: j for j in local_jobs}
 
@@ -1050,6 +1286,7 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
             repo_root=wt, tests_dir=ctx.run_dir / "tests",
             patterns=patterns, gpu_lock_dir=ctx.run_dir / "gpu_lock",
             cuda_visible_devices=runner.cuda,
+            record_fn=record_fn, review_fn=review_fn, report_fn=report_fn,
             notify_download=notify_download)
         # main's files must import main's code: prepend the worktree so the
         # baseline never executes against rebase dependencies (parent's

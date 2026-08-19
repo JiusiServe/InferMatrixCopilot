@@ -128,6 +128,83 @@ def read_decisions(decision_log: Path) -> list[dict]:
     return out
 
 
+def _identity(entry: dict) -> tuple:
+    """The exactly-once harvest key. Entries carrying the stable identity
+    fields dedup on (run, attempt, job_key, seq); legacy entries (recorded
+    before the fields existed) fall back to their full content — weaker,
+    but a legacy duplicate is then at worst re-counted once, never lost."""
+    if entry.get("seq") is not None:
+        return ("id", entry.get("run", ""), entry.get("attempt", ""),
+                entry.get("job_key", ""), int(entry["seq"]))
+    return ("legacy", entry.get("ts", ""), entry.get("pattern", ""),
+            entry.get("verdict", ""), entry.get("test", ""))
+
+
+def harvest(state_log: Path, checkpoint_file: Path, source_files: list,
+            *, lock_path: Path) -> int:
+    """Exactly-once move of per-run decision files into the STATE log
+    (design D4). The state log ITSELF is the dedup authority: under the
+    state lock, its torn tail (if any) is repaired first, its identity set
+    is scanned, and only missing entries are appended (complete lines,
+    fsync'd) — THEN the per-source digest checkpoint is updated
+    (tmp+rename), purely as a fast-path to skip re-reading unchanged
+    sources. A crash after append/before checkpoint re-scans and appends
+    nothing; a crash mid-append leaves a tail the next harvest repairs.
+    Returns the number of newly appended decisions."""
+    state_log = Path(state_log)
+    checkpoint_file = Path(checkpoint_file)
+    lock_path = Path(lock_path)
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o644)
+    try:
+        if fcntl is not None:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        checkpoint: dict = {}
+        if checkpoint_file.exists():
+            try:
+                checkpoint = json.loads(
+                    checkpoint_file.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                checkpoint = {}
+        state_log.parent.mkdir(parents=True, exist_ok=True)
+        appended = 0
+        with open(state_log, "a+b") as fh:
+            repair_tail(fh)
+            seen = {_identity(e) for e in read_decisions(state_log)}
+            for source in source_files:
+                source = Path(source)
+                if not source.is_file():
+                    continue
+                import hashlib
+                digest = hashlib.sha256(source.read_bytes()).hexdigest()
+                if checkpoint.get(str(source)) == digest:
+                    continue
+                for entry in read_decisions(source):
+                    ident = _identity(entry)
+                    if ident in seen:
+                        continue
+                    seen.add(ident)
+                    fh.seek(0, os.SEEK_END)
+                    fh.write((json.dumps(entry, ensure_ascii=False) + "\n")
+                             .encode("utf-8"))
+                    appended += 1
+                checkpoint[str(source)] = digest
+            fh.flush()
+            os.fsync(fh.fileno())
+        tmp = checkpoint_file.with_name(checkpoint_file.name + ".tmp")
+        checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(tmp, "w", encoding="utf-8") as cf:
+            json.dump(checkpoint, cf, indent=1)
+            cf.flush()
+            os.fsync(cf.fileno())
+        os.replace(tmp, checkpoint_file)
+        return appended
+    finally:
+        if fcntl is not None:
+            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        os.close(lock_fd)
+
+
 def eligible_patterns(decisions: list[dict], *, existing: set[str],
                       min_count: int = PROMOTE_MIN_COUNT,
                       min_days: int = PROMOTE_MIN_DAYS) -> list[str]:
