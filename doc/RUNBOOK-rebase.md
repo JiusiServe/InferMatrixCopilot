@@ -18,7 +18,10 @@ Placeholders used throughout (all resolved in the values file):
 `<target-repo-env-keys>` · `<ext1-pin-shas>` ·
 `<orchestrator-entrypoint>` · `<branch-override-env>` ·
 `<upstream-pin-env>` · `<frozen-upstream-sha>` ·
-`<last-rebase-baseline>` · `<knowledge-stores>` · `<gpu-device-set>`.
+`<last-rebase-baseline>` · `<knowledge-stores>` · `<gpu-device-set>` ·
+`<parent-debug-db>` · `<parent-skills-dir>` · `<parent-state-json>` ·
+`<phase1-snapshot-digest>` (recorded on the day) ·
+`archival_secret_allowlist` (PR7; may be empty).
 
 ## External checkout pin (EXT1-class guard)
 
@@ -101,6 +104,31 @@ file; this is the neutral checklist:
    §8; comparison over the MANIFEST-BUILT slug set (DRIFT #4), module
    outcomes mapped through the golden's routing flavor (DRIFT #7).
 
+## PR4d ops — knowledge migration + activation (POST-PR6-validation)
+
+The machinery ships dormant (plan §5.4); Decision 6's sequencing is
+unchanged — run this only after the PR6 gate passes:
+
+1. `infermatrix-copilot migrate-knowledge --repo <name> --dry-run` —
+   read the report (state dir `MIGRATION_REPORT.md`).
+2. `infermatrix-copilot migrate-knowledge --repo <name>` — refuses while
+   any run for the repo is live (knowledge run-lock) or the checkout
+   flock is held; re-running after a crash redoes safely (journaled).
+3. Review + commit the adapter `skills/` git diff (migrated seed skills
+   are a deployment artifact, owner-committed).
+4. Activate: add the repo to `IMX_KNOWLEDGE_RUNTIME` in `.env`
+   (timestamped backup first). Activation is fail-closed: without the
+   `MIGRATION_COMPLETE.json` marker the v3 prelude BLOCKS.
+5. Remove the adapter's `rebase.knowledge` keys (read-compat retires) —
+   HIGH-RISK manifest edit, owner-only.
+6. §8 PR4d re-validation gate: 1 clean `report_only` (semantic diffs vs
+   pre-PR4d baseline), 1 supervised `local_ci`, and the soak's second
+   supervised FULL run — all post-activation.
+7. Rollback: drop the repo from `IMX_KNOWLEDGE_RUNTIME` (legacy
+   locations were never modified) and, if needed, restore
+   `state/<repo>/backups/<ts>/` — rehearse once as part of PR4d
+   acceptance (plan §8).
+
 ## Rollback inventory (reverse order of application)
 
 | Surface | Rollback |
@@ -180,9 +208,17 @@ git -C $TGT rev-parse HEAD <rebase-branch>     # target start SHA
 
 ```bash
 TS=$(date +%Y%m%d-%H%M%S)
-# knowledge snapshot (restored before EACH run; non-destructive rollback)
+# knowledge snapshot (restored before EACH run; non-destructive rollback).
+# The debug DB is WAL-mode: a bare `cp -a` can miss committed WAL-only
+# rows and re-attach a stale WAL on restore, so the DB goes through the
+# sqlite-backup-based snapshot tool; plain files still copy. RECORD the
+# printed digest in the values-file freeze table — it is the §8
+# opening-identity reference both worlds are checked against.
 mkdir -p $AG/backups/$TS
-cp -a <knowledge-stores> $AG/backups/$TS/
+$COP/scripts/knowledge_digest.py snapshot \
+    --db <parent-debug-db> --dest $AG/backups/$TS/debug_memory.db
+cp -a <parent-skills-dir> $AG/backups/$TS/skills
+cp -a <parent-state-json> $AG/backups/$TS/state.json
 # validation branches from the frozen start SHA (one per world)
 git -C $TGT branch rebase-val-ext-$VAL <rebase-branch>
 git -C $TGT branch rebase-val-nat-$VAL <rebase-branch>
@@ -226,19 +262,33 @@ branch, frozen upstream. Its own flock on the target's
 
 ```bash
 git -C $TGT checkout rebase-val-ext-$VAL && git -C $TGT status --short  # clean
+# opening attestation for the ext world (record the printed digests)
+$COP/scripts/knowledge_digest.py digest --db <parent-debug-db> \
+    --skills <parent-skills-dir>
 cd $AG && <branch-override-env>=rebase-val-ext-$VAL \
     <upstream-pin-env>=$UPSTREAM_SHA \
     CUDA_VISIBLE_DEVICES=<gpu-device-set> \
     <orchestrator-entrypoint> 2>&1 | tee rebase_logs/val-ext-$VAL.log
+# closing attestation (the ext run's own writes are EXPECTED — this is
+# attribution data, not a gate condition)
+$COP/scripts/knowledge_digest.py digest --db <parent-debug-db> \
+    --skills <parent-skills-dir>
 ```
 
 - [ ] Runs to `phase=done` (check the orchestrator's state file). A
       mid-flight failure here is an EXTERNAL-side failure — investigate,
       do not paper over; the comparison needs a completed baseline.
 - [ ] Archive the ext world into `$COP/validation/$VAL/ext/` (state
-      file, latest run dir, `git -C $TGT rev-parse HEAD`).
-- [ ] **Restore for the v3 run**: knowledge stores back to the Phase-1
-      snapshot; target back to the frozen start
+      file, its built test manifest, latest run dir,
+      `git -C $TGT rev-parse HEAD`, both attestation outputs).
+- [ ] **Restore for the v3 run — WHILE HOLDING the checkout flock**
+      (a "locks free" pre-check alone is a race): take
+      `locks/<lock_name>.lock`, then
+      `$COP/scripts/knowledge_digest.py restore
+      --snapshot $AG/backups/$TS/debug_memory.db --target
+      <parent-debug-db>` (removes stale WAL sidecars; printed digest must
+      equal the Phase-1 snapshot digest), `cp -a` the skills/state.json
+      snapshots back, release the flock. Target back to the frozen start
       (`git -C $TGT checkout rebase-val-nat-$VAL`, clean status); locks
       free; GPUs idle (`nvidia-smi`).
 
@@ -268,8 +318,41 @@ the CI-W review rounds hardened.
 
 ### Phase 5 — comparison + sign-off (gate)
 
-Per plan §8 + DRIFT #4/#7, over the MANIFEST-BUILT slug set:
+Per plan §8 + DRIFT #4/#7, over the MANIFEST-BUILT slug set. The
+evidence assembly is scripted and FAIL-CLOSED — it stamps GATE-ELIGIBLE
+from the artifact-carried checks (opening-snapshot identity, nat-run
+no-drift, frozen SHAs, slug sets, wall-clock) and marks everything else
+HUMAN JUDGMENT PENDING:
 
+```bash
+$COP/scripts/compare_validation.py \
+    --ext-state $COP/validation/$VAL/ext/state.json \
+    --ext-manifest $COP/validation/$VAL/ext/test_manifest.json \
+    --nat-run $COP/validation/$VAL/nat/<run-dir> \
+    --frozen-target <target-start-sha> --frozen-upstream $UPSTREAM_SHA \
+    --snapshot-digest <phase1-snapshot-digest> \
+    --snapshot-skills-digest <phase1-skills-digest> \
+    --ext-open-digest <phase3-opening-db-digest> \
+    --ext-open-skills-digest <phase3-opening-skills-digest> \
+    --ext-start-head <ext-pre-run-target-head> \
+    --nat-start-head <nat-pre-run-target-head> \
+    --ext-head <ext-post-run-target-head> \
+    --nat-head <nat-post-run-target-head> \
+    --routing-golden test/goldens/shell_golden.json \
+    --ext-wallclock-sec <ext-sec> --nat-wallclock-sec <nat-sec> \
+    --out $COP/validation/$VAL/COMPARISON.md
+```
+
+Every flag is REQUIRED gate evidence (missing ⇒ GATE-ELIGIBLE: NO):
+the snapshot digests come from the Phase-1 snapshot output, the ext
+opening attestations from Phase 3's first `knowledge_digest.py digest`
+invocation, the START heads from the `git rev-parse` each of Phase 3/4
+records IMMEDIATELY BEFORE launching its run (they must equal the
+frozen target SHA — record them in the values file at launch time),
+and the post-run heads from each phase's archive step.
+
+- [ ] GATE-ELIGIBLE: YES (any NO reason is an abort-criteria discussion,
+      not something to hand-edit away).
 - [ ] Slug sets identical (ext vs nat manifest builds).
 - [ ] Per-module / per-slug outcomes equal-or-better (nat vs ext), ext
       module names mapped through the golden routing flavor; one re-run

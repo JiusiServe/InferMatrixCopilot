@@ -195,9 +195,10 @@ implements the mode matrix.
 | PR5 | Parity completion: tier-1 goldens, `shell_golden.json`, `DRIFT_TRIAGE.md` resolution, report-only dry path, timed rollback rehearsal | **DONE — GPT APPROVED** (5 finding rounds + 2 verification rounds; 14 findings all fixed with dedicated regression tests; final verdict "No findings" at 7f4be98. Shell golden captured 2026-08-01 from the live parent config on this host — 49 §10 jobs, module maps + the routing flavor, 69 watchdog patterns, push bytes, `assignment_routing` behavioral replay; tier-3 production-path suite `test_shell_golden.py`; DRIFT #1/#4 decided + #6/#7 added (see §6.29); report-only dry path ran END-TO-END against the live checkout: 54 jobs, 310 test changes, done/exit-0; **timed rollback rehearsal deferred to the PR6 gate** — it needs the human + a runnable v1 backend session, recorded as a hard PR6 precondition, §8) |
 | EXT1 | External checkout: startup flock guard, pinned SHA | **DONE — GPT APPROVED** (5 finding rounds + 1 verification round; 14 findings all fixed with dedicated regression tests; final verdict "No findings" at external `0395bbe` — the six-commit EXT1, pinned + rollback-listed in `doc/RUNBOOK-rebase.md`. The guard hardened well beyond the plan's sketch: fail-closed root-anchored symlink-hostile ATOMIC hygiene shield under the flock, validated worktree gitdir resolution, errno-precise contention-vs-setup diagnostics, baseline detection under the lock, no checkout fabrication; copilot `CheckoutLock` mirrors every semantic and `test_ext1_checkout_guard.py` pins both sides offline) |
 | CI-W | `v3_ci` remote-CI wiring (PR4c's deferred stub, unblocked by EXT1 + the PR6 preflight): `ci/buildkite.py` provider client behind the neutral `CIClient` protocol, `ci_loop` monitor at parent parity + hardening, `run_ci_rounds` phase-4 orchestrator, `_v3_ci` assembly, `rebase_ci_*` knobs, adapter `rebase.ci` pipeline/env/pattern data + `push.rebase_branch`/`push.signoff` | **DONE — GPT APPROVED** (5 finding rounds + 2 verification rounds + 2 owner-authorized extra verification rounds; 28 findings all fixed with dedicated regression tests; final verdict "No findings" at 5bf7100. The review deliberately hardened BEYOND parent parity — every divergence recorded in §6.30. Offline coverage: `test_ci_wiring.py` (~55 unit/contract tests) + 6 complete `remote_ci` e2e paths in `test_v3_complete_e2e.py` incl. a green run pushing over a real bare remote through the PR3 WAL cluster) |
-| PR6 | Cutover (GPU box + human): §8 validation, playbook flip, `.env` arming | planned — **the §9.1 supervised full run now exercises live remote CI through the CI-W wiring** |
-| PR4d | Knowledge migration + runtime-dir cutover (post-validation; env-bridge deletion moved to PR7 per §2.9) | planned |
-| PR7 | Retirement: delete external delegation, archive parent repo | planned |
+| PR6-prep | Completion Unit A (2026-08-19 completion design, GPT-gated: 5 finding rounds 11/10/9/4/2 + 2 verification rounds → APPROVE; §5.4): knowledge foundation (DebugMemory v2 schema for NEW stores + explicit `ensure_schema_v2` + `open_readonly`; `KnowledgePaths` resolver, per-consumer byte-identical; shared/exclusive knowledge run-lock; crash-safe SkillStore rewrites; decision-log torn-tail repair), D2 parent-store read-compat (manifest `rebase.knowledge`, prelude fail-closed + open/close attestations + drift), D4 watchdog wiring (seed∪overlay, run-dir decisions with stable identity, eco Tier-2 reviewer, exactly-once curator harvest), D5 curator port + `v3_knowledge_prep`/`v3_phase5_report`/`v3_curate`/`v3_compare` + the Rev 8 §2.2 tail restored, D9/D10 ops tooling + report-only ro pins | **DONE — GPT-gated per commit** (foundation commit: 3 iterations; slices 2–4 commit: iteration rounds until APPROVE; channel note §5.4) |
+| PR6 | Cutover (GPU box + human): §8 validation, playbook flip, `.env` arming | planned — **the §9.1 supervised full run now exercises live remote CI through the CI-W wiring, the read-compat knowledge layers, the watchdog learning wiring, and the curate/compare tail** |
+| PR4d | Knowledge migration + runtime-dir cutover (post-validation; env-bridge deletion moved to PR7 per §2.9). **Sequencing delta (2026-08-19, recorded §5.4): the MACHINERY is authored and landed dormant as "PR4d-code" (migration CLI `migrate-knowledge`, repo-scoped `IMX_KNOWLEDGE_RUNTIME` activation gated on a durable MIGRATION_COMPLETE marker, D8 env-mutation census); EXECUTION (migration run, flag flip, §8 re-validation soak) remains post-PR6 exactly as Decision 6 requires** | machinery **DONE** (dormant; single-commit revert leaves Unit A whole — pinned); execution planned post-PR6 |
+| PR7 | Retirement: delete external delegation, archive parent repo (archival script `scripts/archive_parent_repo.py` ships since PR6-prep; the deletion commit is deliberately NOT authored until the soak completes) | planned |
 
 ### 5.1 PR2 review outcome
 
@@ -237,6 +238,45 @@ section gains `rebase_branch_allowed: true` scoped to `repo.rebase_branch`
 exactly that branch; `main` stays protected regardless. Unchanged double
 gate: `push.guard_push` remains the single choke point and `ALLOW_PUSH=1` is
 still required at execution time (dry-run otherwise).
+
+### 5.4 Completion design (2026-08-19) — record
+
+Owner directive (verbatim goal): "finish the whole implementation so that
+I can do the repo rebase by the copilot. for the design, grilling choices
+and the implemented code, you must use the gpt review hook." That
+directive authorizes the PR4d sequencing delta above (machinery authored
+now, dormant; execution unchanged post-PR6) and mandated GPT gating for
+the design and every commit.
+
+**Review channel deviation, recorded:** cursor-agent's GPT-5.6 Sol quota
+was exhausted until 2026-08-20 (account-wide), so the completion design
+review and the per-commit code reviews ran through the Codex CLI's GPT
+(ChatGPT auth) with the same protocol shape — design: 5 finding rounds
+(11/10/9/4/2 findings, every one resolved in-document) + 2 verification
+rounds → APPROVE; commits: iterate the staged diff to APPROVE (max-3
+convention). Transcripts: `~/.plan-review/reviews/
+*rebase-completion*`. The PR-boundary cumulative review re-runs on
+gpt-5.6-sol-high when quota returns.
+
+The design's normative content (gap inventory G1–G10, decisions D1–D10,
+per-round findings ledgers) is archived alongside the transcripts as
+`*-rebase-completion-design-APPROVED.md`; where this plan is silent on a
+completion-work detail, that document governs.
+
+Delivered Rev 8 obligations previously under-delivered, now closed:
+§9-PR4c parent-store read-compat (as read-only layers with fail-closed
+prelude provenance — the §8 fairness gate's knowledge condition);
+§5 curator (`memory/curator.py` port; merged-away rows RETIRE with
+`derived_from` lineage instead of the parent's deletion — copilot
+knowledge governance, recorded divergence); §5 watchdog learning
+(overlay read, decision recording with stable identity, exactly-once
+curator-owned harvest, eco Tier-2 reviewer); §2.2's pipeline tail
+(`phase5_report → curate → compare → report.final_summary`, with
+`rebase.v3_compare` realizing the compare slot natively from substate —
+the v1 `compare_with_locked` step is untouched); §1.1 report-only
+read-only stores (ro opens + no-write pins); plus `v3_knowledge_prep`
+(schema readiness before the first agent write; `ensure_schema_v2` has
+exactly three sanctioned call sites, census-pinned).
 
 ## 6. Deltas vs Rev 8 (as-built decisions, each reviewer-driven)
 

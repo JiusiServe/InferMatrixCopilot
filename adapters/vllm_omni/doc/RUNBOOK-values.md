@@ -23,6 +23,10 @@ history only.
 | `<frozen-upstream-sha>` | `ffd46bfab2128bb84146050e98b51a617c6575ab` |
 | `<last-rebase-baseline>` | effective `LAST_REBASE_VLLM_COMMIT` from `<external-agent-root>/config.sh` (default `d4004455d2357985830af10e432709b42c820455`) — `grep -n LAST_REBASE_VLLM_COMMIT config.sh` on run day |
 | `<knowledge-stores>` | `$AG/agent/store/debug_memory.db  $AG/agent/skills  $AG/rebase_logs/state.json` |
+| `<parent-debug-db>` | `$AG/agent/store/debug_memory.db` (WAL-mode — snapshot via `scripts/knowledge_digest.py`, never bare `cp`) |
+| `<parent-skills-dir>` | `$AG/agent/skills` |
+| `<parent-state-json>` | `$AG/rebase_logs/state.json` |
+| `archival_secret_allowlist` | (empty — no tracked secret-bearing files known; PR7 archival aborts if one appears) |
 | `<gpu-device-set>` | `4,5,6,7` (decision B; contention fallback `4,5` — same set for BOTH runs) |
 | CI pipelines | manifest `rebase.ci.pipeline: vllm-omni-release`, `rebase.ci.baseline_pipeline: vllm-omni-rebase`, `ci.org: vllm` |
 | Push signoff | manifest `push.signoff`: tzhouam <tzhouam@connect.ust.hk> |
@@ -142,6 +146,8 @@ history only.
 | Effective `LAST_REBASE_VLLM_COMMIT` | ☐ |
 | `.env` backup name (Phase 1) | ☐ |
 | Knowledge snapshot dir (`backups/<ts>/`) | ☐ |
+| Phase-1 snapshot digest (`knowledge_digest.py snapshot` output) | ☐ |
+| Ext run open/close attestations recorded | ☐ |
 | Rollback rehearsal time (Phase 2, < 30 min) | ☐ |
 | Ext run: state=done timestamp + target HEAD | ☐ |
 | Nat run: run dir + exit + target HEAD | ☐ |
