@@ -15,8 +15,6 @@ benchmark 时快速路由到正确的人。模型清单以 [models 目录](../mo
 
 ## 关键模型与 Owner
 
-### 高优先级
-
 | 模型 | Owner | 备注 |
 |---|---|---|
 | minicpm | y-null | 杨楠心 |

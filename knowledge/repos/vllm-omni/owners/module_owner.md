@@ -18,17 +18,17 @@ benchmark 时快速路由到正确的人。模块清单以 [components 目录](.
 
 | 模块 | Owner | 备注 |
 |---|---|---|
-| Benchmark/metrics/profiler |  | 区至豪 |
-| Config/deploy/pipeline/cli | 外部负责 | |
-| scheduler |  | 杨蕊蕊 |
+| Benchmark/metrics/profiler | ZacheryAU | 区至豪 |
+| Config/deploy/pipeline/cli | 外部负责 | - |
+| scheduler | BLANKETusers | 张志恒 |
 | coordinator | NumberWan | 温梓健 |
-| Engine | | 郑晨光/吴艺辉 |
+| Engine | fake0fan/chickeyton | 郑晨光/吴艺辉 |
 | input/output processor | tzhouam | 周太昶/Shi Bo ao |
 | stage_input_processor | amy-why-3459 | 吴海燕 |
 | platforms | FayeSpica | 廖维明 |
 | Weight loading/transformers | NumberWan | 温梓健 |
 | worker/modelrunner | tzhouam | 周太昶 |
-| api_server |  | 戴昊曌 |
+| api_server | herotai214 | 戴昊曌 |
 | OmniConnector | natureofnature/spencerr221 | 刘威志/Liu Bingyu |
 | Quantization | david6666666 | 陈炜青 |
 | Diffusion-attention | david6666666 | 陈炜青 |
