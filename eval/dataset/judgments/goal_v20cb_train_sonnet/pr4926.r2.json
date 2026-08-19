@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.6,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.7,
+    "actionability": 0.75
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both hit the two big confirmed bugs (missing SM90+ gate on FLASH_ATTN_3_HUB, and the varlen/func mismatch that piecewise_attn can crash on), and both flag the duplicated-code smell, the degenerate q=k=v test tensors, and the overstated 'perfect numerical consistency' doc claim. Y's coverage is broader and more precisely grounded — it directly ties findings to the exact GT-confirmed fixes (citing the real follow-up commits and quoting SamitHuang's actual fix logic), catches a real gap that the platform only guards ImportError of `kernels` but not failures inside `get_kernel()` itself (contradicting the docs' 'falls back gracefully' claim), and surfaces two plausible downstream-consumer misses (ltx2_transformer, diffusers_adapter) that X doesn't mention. X is more readable and its suggestions are cleanly actionable, but it pads several findings with fabricated-looking 'verified' evidence (invented timing benchmarks, HF Hub query output, live CI-lane status) that reads as hallucinated theater rather than diff-grounded analysis, which hurts trust in an otherwise solid set of findings. Neither includes a literal 'LATENT GAP CHECK' section.",
+  "_cost_usd": 0.25007019999999996,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v20cb_train"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_train",
+    "arm_a_sha256": "d1dbf8c3832158320545e603632c2cd18f949fddb250f2074402a1ca10ddb6df",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0639263265995e00edcd06c6242ac0a6a3647a980509c282af885c86ce6930e0",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

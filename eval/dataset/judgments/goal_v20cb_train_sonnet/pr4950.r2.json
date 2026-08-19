@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.7,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth is a rubber-stamp approval with zero concerns, so recall is trivially satisfied by both. X does deeper verification (traces the actual talker/serving_chat code path to dispute the PR's own 'silent audio' wording with a specific, well-cited failure mode, and confirms the sibling README needs no fix by checking gradio_demo.py actually uses the SDK), yielding higher-value, well-grounded findings with concrete line refs and rewrites. Y is more conservative and equally well-cited but its main finding (README curl risk) is speculative and arguably contradicted by X's deeper check of the same file; both provide concrete, actionable suggestions and a reasonable CI-nit, but X's extra rigor edges it out despite the added length.",
+  "_cost_usd": 0.2610264,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v20cb_train"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_train",
+    "arm_a_sha256": "24b99e8934db6b4f15191280cd7fef3e1ddd05553cde67db583199bd019e915b",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5a2e689fc33efd67adbf119f1e4cf034841928ad70fea2d99f142a727ca8ea18",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

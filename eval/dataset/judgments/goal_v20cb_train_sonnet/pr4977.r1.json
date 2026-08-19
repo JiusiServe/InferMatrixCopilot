@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.78,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.85,
+    "actionability": 0.8
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently surface the same underlying fact the ground truth's sole inline concern (trust_remote_code/kernels-version fragility) was already resolved by a later commit, and both flag the same secondary issues (stale PR body, uncovered test, possibly-unrelated red NPU CI check), so recall is essentially tied and full. X's strongest original catch is a genuine, diff-native correctness bug (a module missing required symbols gets cached before validation, so a bad load is 'sticky' and skips retries) and ships two ready-to-merge suggestion diffs, giving it a slight actionability edge. Y's findings are marginally more precise and cohesive: it demonstrates actual verification (stubbed kernels module, checked against installed kernels 0.16.0) and its dead-code/version-pin-mismatch finding directly deepens the exact 'kernels version compatibility' theme the human reviewer raised, whereas X's coverage of that theme mostly just reports it as already fixed. Neither has a LATENT GAP CHECK section.",
+  "_cost_usd": 0.2386651,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v20cb_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_train",
+    "arm_a_sha256": "bafccb74b5b06fb396b4f22cbb89466da222e65825b9f072c4cea6162dc21fe3",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "589a8ff13cb3893b76dd0d5220ad632d82f46cc0edd9083528ebb2466be7c8a7",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

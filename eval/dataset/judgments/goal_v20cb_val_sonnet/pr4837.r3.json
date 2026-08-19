@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.55,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.88,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates correctly reconstruct the core ground-truth insight (already_submitted was gating unwrap even though both submit_initial and submit_update reject list prompts, so the distinction was meaningless), with X stating it slightly more precisely. But X's review is built roughly half around an elaborate 'blocker' claim that super().forward() no longer binds due to an unrelated upstream signature refactor, complete with fabricated-sounding runtime verification and commit archaeology not derivable from the diff — a claim contradicted by the two real LGTM approvals and by the diff itself only adding a type annotation to a preexisting call. That drags X's precision and the trustworthiness of its 'Request changes' verdict down substantially. Y stays tightly grounded in the actual diff and directly adjacent files (stage_pool.py, ming_flash_omni.py, deploy yaml), backs claims with concrete evidence and a ready-to-use regression test, and lands on a COMMENT verdict consistent with the real outcome, making it the safer and more useful review despite slightly lower recall on the exact phrasing of the ground-truth rationale.",
+  "_cost_usd": 0.1409927,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v20cb_val"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_val",
+    "arm_a_sha256": "9276bba9304e9e0b4b0f64f118bbce9907275a18450802e9e5f6a77e20d3cf8f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "bc98460632105aef812a50d392afd9f1bea66b3f783e8a9cd888456ce013cba3",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

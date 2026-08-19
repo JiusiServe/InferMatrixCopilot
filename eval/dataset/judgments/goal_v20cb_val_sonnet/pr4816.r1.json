@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth has zero substantive concerns (a blank codex-limits notice and a plain 'lgtm' approval), so recall is trivially satisfied by both. Both candidates independently converge on the same real, diff-grounded issues (untested `base()` coupling in the voice-error tests, the pure-diffusion `serving_tokenization=None` residual, and unverifiable CI gate failures), which is a strong precision signal, though X frames the pre-existing diffusion-mode gap as if the PR itself falls short rather than clearly labeling it pre-existing as Y does, and X's item 4 is openly speculative. X edges ahead on actionability by providing a concrete code fix for the helper function in addition to a test, whereas Y only proposes a test and duplicates its own finding between the Validated section and the nit list.",
+  "_cost_usd": 0.2584382,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v20cb_val"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_val",
+    "arm_a_sha256": "ea9b83a5feab151e43dd0c58f0d51c50187342f0ac98d60187ec7e9653f753b2",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b9fe4c00140a73cf5cc08ceded6d03eb8b8faea45f6c3b50e6f9753b9a1a1a01",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

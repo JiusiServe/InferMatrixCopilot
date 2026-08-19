@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.82,
+    "actionability": 0.78,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both correctly recognize the diff already bakes in the qwen3_tts scoping fix and the seq_len removal, and both independently catch the async_chunk getattr default inconsistency (True vs False) that echoes the ground-truth [Low] comment, plus the identical unfixed NPU bug. Y additionally reconstructs the spirit of the ground-truth [Med] blast-radius concern by naming the specific untested async_chunk=false models (moss_tts_nano, higgs_audio_v2, indextts2) still on DELTA coercion, and flags a real merge-gate E2E coverage gap with a concrete suggested patch — direct recall hits X doesn't match. X compensates with deeper, well-grounded original analysis (cudagraph padding root cause, list-vs-tensor consumer mismatch, WebSocket realtime path) that is highly actionable and precise but mostly orthogonal to what the human reviewers actually raised, so it helps precision/actionability more than recall. Neither candidate raises the multi-axis batch-splitting concern from the latent gap check.",
+  "_cost_usd": 0.2795591,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v20cb_train"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_train",
+    "arm_a_sha256": "604e00e0e0d031df52599006d904f2f4716e04cd3044d847250b5b62c11f189e",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "03d7423c3a91e45838083e2025e3dea932f1d9448ba923b1d6ca1a0373899ea1",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

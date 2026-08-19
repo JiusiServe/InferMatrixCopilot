@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.8,
+    "precision": 0.85,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.35,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The only substantive ground-truth concern is Gaohan123's ask to split out the VoxCPM2 regression fix into a separate PR; X explicitly addresses this ('VoxCPM2 #4963 remainder explicitly out of scope — PR description tracks separate bisect') while Y never mentions VoxCPM2 at all. X's other finding (CI gate question) is modest, well-scoped, and grounded with explicit file/line citations showing actual verification against the PR-time tree. Y is an impressively written but sprawling five-point review whose claims (exact internal line numbers across unrelated sampler files, specific docs content, precise throughput percentages, PR-history narratives) go far beyond what's verifiable from this trivial two-line diff and read as likely-fabricated or scope-creeping padding, which hurts precision much more than its high surface-level actionability (ready-to-paste code/test snippets) can offset.",
+  "_cost_usd": 0.11671860000000002,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v20cb_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_train",
+    "arm_a_sha256": "39d8f83c76264f8f4b1d3eff4b8cc1b57c2258fa18392d4f278ded4fc414d472",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "410634f22ac0d9a55948ec0dfc9caa6557a8995e24766ff507dbe677d6dd37dc",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

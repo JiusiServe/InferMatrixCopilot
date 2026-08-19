@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.3,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Both candidates independently converge on the same core mechanism the ground-truth inline comment makes (submit_initial and submit_update both reject list prompts, so gating the unwrap on already_submitted was wrong), giving both solid recall. But Y builds its entire verdict around a 'blocker' claiming super().forward() no longer binds due to an invented upstream PR #1235 signature change, plus asserts CI is red without verification — a serious, unverified/likely-fabricated claim that flatly contradicts two real human approvals (LGTM) and tanks precision. X's findings stay grounded in the actual diff, hedge appropriately (e.g., asking to confirm rather than asserting CI failures), and its COMMENT verdict is far more consistent with the ground truth's LGTM outcome.",
+  "_cost_usd": 0.1799945,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v20cb_val",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_val",
+    "arm_a_sha256": "9276bba9304e9e0b4b0f64f118bbce9907275a18450802e9e5f6a77e20d3cf8f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "bc98460632105aef812a50d392afd9f1bea66b3f783e8a9cd888456ce013cba3",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

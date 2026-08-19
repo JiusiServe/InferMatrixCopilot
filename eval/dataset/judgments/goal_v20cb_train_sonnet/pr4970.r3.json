@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.5,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.7,
+    "actionability": 0.5
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth is nearly empty (LGTM plus a tangential ask to split out a VoxCPM2 regression fix); Y explicitly validates that VoxCPM2/#4963 is out of scope and tracked separately, directly matching the one real reviewer concern, while X never mentions VoxCPM2 at all. Y's claims are also more visibly grounded (explicit [validated] tags with quoted PR-time-tree evidence) versus X's much larger volume of highly specific but unverifiable technical claims (exact FlashInfer/aiter line ranges, docs line numbers, invented follow-up items) that read as scope creep for a 2-line YAML diff the actual reviewers rubber-stamped. X is far more actionable with concrete code/comment suggestions, but that doesn't offset its miss on the only real ground-truth signal and its riskier precision.",
+  "_cost_usd": 0.248401,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v20cb_train"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_train",
+    "arm_a_sha256": "39d8f83c76264f8f4b1d3eff4b8cc1b57c2258fa18392d4f278ded4fc414d472",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "410634f22ac0d9a55948ec0dfc9caa6557a8995e24766ff507dbe677d6dd37dc",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

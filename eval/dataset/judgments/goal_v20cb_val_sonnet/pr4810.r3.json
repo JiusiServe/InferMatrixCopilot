@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.75,
+    "actionability": 0.75,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both independently surface the exact latent gap (hunyuan_image3_transformer.py:2238 still calling the removed get_cache_scale API), with specific reachability chains through the pipeline/AutoWeightsLoader, so gap_hit is true for both. But Y goes further on the one substantive concern the human reviewer actually raised — that the tests use fakes and don't prove real-checkpoint/mapper fidelity — hitting it from five angles (CI not wired up, hardcoded allowlist, misleading test name, hand-rolled mapper diverging from the real WeightsMapper API, unrealistic MiMo naming) plus verifying the safe-removal claims against actual vLLM source (default_weight_loader, maybe_remap_kv_scale_name) and reporting an actual local test run. X's review is comparably well-grounded on the gap finding but padded with two near-duplicate 'general' findings about the same AR double-mapper nit, and covers the test-realism theme with only one finding versus Y's five, giving it materially lower recall against the ground-truth review's core critique. Both are concrete and file/line-anchored, but Y's clearer verdict-first structure and explicit fix snippets edge out X's denser, more redundant format on actionability.",
+  "_cost_usd": 0.12163370000000001,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v20cb_val",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_val",
+    "arm_a_sha256": "87e3c276c5df2682b6b29b2405606b24368d5ace131cf1c2c50e48e5a263f9e9",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "62ede4acd697d051f739a163828672d894ec4150b7b17c941bb4b33f4b81409e",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

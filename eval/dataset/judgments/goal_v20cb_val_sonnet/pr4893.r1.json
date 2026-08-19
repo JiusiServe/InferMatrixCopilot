@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.7,
+    "actionability": 0.6
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "The ground truth is thin (mostly off-topic PR chatter plus one inline ask to extend reduce_scatter test verification, which the diff already appears to satisfy); X engages that exact test region more directly by proposing extending device_communicator/reduce_scatter assertions to _TP, giving it a slight recall edge there. But Y surfaces several substantive, well-grounded correctness bugs the diff actually introduces — the DP-metadata hook gated on world_size rather than on the MoE mapping being active, a plausible collective hang under CFG parallelism with an honest caveat about pre-existing brokenness, and a stale data_parallel_rank — each traced through real vLLM internals with concrete fixes, whereas X's findings are largely mechanical 'add more tests' suggestions dressed in heavy evidence-citation formatting without comparable depth. Y's higher precision and actionability outweigh its lower literal alignment with the sparse ground truth.",
+  "_cost_usd": 0.37095019999999995,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v20cb_val",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_val",
+    "arm_a_sha256": "75c16566b4cc8cc6dd9a68bac5a8708d6e6071a3ff6003ec3a9d9c6aab6fe778",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0d4ddd4027e23f1f32216e748289588ea9a0e74ee8e599fa34b9d50f503d2f0d",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

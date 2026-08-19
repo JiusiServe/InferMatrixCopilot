@@ -1,0 +1,34 @@
+{
+  "arm": "copilot_v20cb_val",
+  "engine": "infermatrix-copilot CLI (shipped pipeline, pr-review@6 adaptive-depth ensemble; issue-answer dry-run)",
+  "llm": "per .env (DeepSeek-routed)",
+  "dataset": "vllm_omni_dataset.yaml",
+  "splits": [
+    "val"
+  ],
+  "kinds": [
+    "pr_review"
+  ],
+  "n_items": 5,
+  "trace": {
+    "AGENT_TRACE": "(default)",
+    "AGENT_TRACE_IO": "(default)",
+    "AGENT_TRACE_IO_FULL": "(default)"
+  },
+  "moa_when": "off",
+  "pr_context_mode": "no_discussion",
+  "resolved": {
+    "moa_when": "off",
+    "moa_eligible_full_depth_pr": false,
+    "llm_mixture_members": [
+      "mimo-v2.5",
+      "qwen3.6-plus"
+    ],
+    "strict_backend": "cursor",
+    "strict_backend_model": "composer-2.5",
+    "review_lens_backends": {},
+    "agent_model": "deepseek-v4-pro[1m]",
+    "review_planner_model": "deepseek-v4-flash",
+    "review_promotion_model": "deepseek-v4-flash"
+  }
+}

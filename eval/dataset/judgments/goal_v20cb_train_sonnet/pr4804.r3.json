@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.68,
+    "actionability": 0.92
+  },
+  "y": {
+    "recall": 0.42,
+    "precision": 0.78,
+    "actionability": 0.87
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "X surfaces more of the ground truth's substantive open concerns, notably the reviewer-flagged [High] v2-tokenizer-misdetection bug (hsliuustc0106) as a top-billed major finding, plus the WER-fallback bogus-data issue and partial docstring-staleness coverage, giving it stronger recall despite some speculative claims (e.g. Realtime yaml slot mismatch, legacy-codec streaming API) that aren't verifiable from the shown diff and cost it some precision. Y is tighter and more rigorously self-validated — it correctly identifies the abort slot-leak as already fixed on GPU and pinpoints a precise residual NPU gap, and catches a diff-verifiable finding (the qwen3_tts gate removal on tts_local_seed) — earning higher precision, but it buries the High-severity tokenizer bug as a minor 'additional observation' and misses several other line-level concerns, softening its recall. Both are highly actionable with concrete file/line evidence and proposed fixes.",
+  "_cost_usd": 0.380124,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v20cb_train"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_train",
+    "arm_a_sha256": "05687f47874bfd8f79375846b8e0f01fa55ed0ec4b1489dfd7465a539d9e8e91",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "18986f2736f812d8c896b12152ebcbf1d5319e9e1f79042f5fa16f1dd6272542",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}
