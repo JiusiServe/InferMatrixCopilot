@@ -1,8 +1,8 @@
 # thin_mcp_server.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-08-19 -->
 
-`LOC ~806 · 默认 MCP：Direct 路由 + Strict 入口 · refactor-status: oversized`
+`LOC ~1286 · 默认 MCP：Direct 路由 + Strict 入口 · refactor-status: oversized`
 
 ## 职责
 安装器**实际注册**的那个 MCP 门面：以**零模型**提供 Direct 模式的知识路由，
@@ -21,7 +21,10 @@
   **宿主自己的模型**完成。执行主脊完全不参与。
 - **治理靠数据，因为 server 管不住宿主。** "该怎么审"被编码成随返回值一起下发的结构化
   字段：≤3 条路由（内嵌 `quick_map`，3.5k 封顶）、一个硬性的 `execution_budget`、
-  一份 checklist。
+  一份 checklist，以及 `mandatory_review_guides` —— 跨 owner 的强制评审程序
+  （`_DIRECT_MANDATORY_REVIEW_GUIDES`），**失败即关闭**：路径解析不了就报错，
+  而不是悄悄发一份少了它的契约。它们也计入 `execution_budget` 的
+  `knowledge_file_reads`，所以下发一份读不完的预算是不可能的。
 - **`validate_direct_review` 检查的是结构，不是证据真伪**：恰好一条最终评论、
   `subtraction_signal` 的自洽性（`none` 不得附带证据；`triggered` 需要减法项或最小性
   证明）、以及证明本次评审读的是固定提交的 `evidence_head_sha`。
@@ -34,7 +37,10 @@
   `unsupported_exact_router` —— 否则一个没有描述的、来自陌生仓库的 PR，会被喂上
   本仓库的 owner 知识。
 - `_knowledge_path` 阻止逃出知识根；`_guard` 把异常转成 `{"error": ...}` 值返回，
-  而不是协议层错误。
+  而不是协议层错误。**唯一的例外是 `_contributing_entry`**：贡献入口随文档搬到了
+  `doc/knowledge/`，已经不在知识根内，所以它按设计不走 `_knowledge_path`，而是
+  在源码树和 wheel 旁的两个候选路径里定位，都找不到才抛。它是一个写死的常量路径，
+  不接受调用方输入 —— 逃逸防护针对的是后者。
 - **Strict 绝不启动注定失败的 run**：Strict 分支先查 `strict_readiness`，
   改为返回缺失项。
 - `update_knowledge` 只返回知识贡献入口 —— 它**不是** `imupdate` 的发版审计器。
@@ -51,6 +57,7 @@ stdlib + `mcp` extra + `.adapters` + `.config` + `.intent.resolve_repo_alias` +
 `test_thin_mcp_server.py`、`test_thin_mcp.py`、`test_imreview_output_contract.py`。
 
 ## 重构备注
-约 806 行，是包里**最大**的模块；Direct 路由 helper（`_direct_*`）是一个内聚的约 350
-行单元，如果再次增长，那就是显而易见的拆分点。**拆分时务必保住"server 不跑模型"这条
+约 1286 行，是包里**最大**的模块，且自上次核对以来又长了约 480 行；Direct 路由
+helper（`_direct_*`，现有 6 个）是一个内聚单元，如果再次增长，那就是显而易见的
+拆分点。**拆分时务必保住"server 不跑模型"这条
 性质 —— 它就是 Direct 模式的产品承诺。**
