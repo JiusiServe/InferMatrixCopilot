@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
 from pathlib import Path
 
@@ -94,39 +95,36 @@ def attest_layers(*, parent_debug_db: str = "",
         from .parent_compat import ParentDebugMemory
 
         probe = ParentDebugMemory(parent_debug_db)  # schema-validating open
-        # index/content consistency for EVERY active row AND every
-        # token-bearing FIELD of it (a first-row or any-field probe
-        # would let partial staleness — one corrupted row, or one
-        # updated column whose old postings linger — slip past both the
-        # digest, which hashes only the content table, and the
-        # attestation). Each non-empty field is queried as its OWN
-        # column-scoped whole-field PHRASE with an exact rowid
-        # constraint, so unicode normalization, single-character tokens,
-        # and token order are the tokenizer's business, and text from
-        # another column can never satisfy the probe. A field whose text
-        # yields no tokens is skipped (unfindable by design).
-        for row in probe._conn.execute(
-                "SELECT id, key, symptom, root_cause, fix "
-                "FROM debug_entries WHERE status='active' ORDER BY id"):
-            for col in ("key", "symptom", "root_cause", "fix"):
-                text = str(row[col] or "").strip()
-                if not text:
-                    continue
-                phrase = '"' + text.replace('"', '""') + '"'
-                try:
-                    hit = probe._conn.execute(
-                        "SELECT rowid FROM debug_entries_fts "
-                        "WHERE debug_entries_fts MATCH ? AND rowid = ?",
-                        (f"{col}: {phrase}", row["id"])).fetchone()
-                except sqlite3.OperationalError:
-                    continue  # no tokens in this field: nothing to probe
-                if hit is None:
-                    raise sqlite3.DatabaseError(
-                        f"{parent_debug_db}: FTS index is stale for "
-                        f"active row id={row['id']} column {col!r} (its "
-                        "content is unfindable in its own index column) "
-                        "— rebuild the parent index before attesting "
-                        "this layer")
+        # index/content consistency via FTS5's OWN external-content
+        # integrity check — the complete verification (hand-rolled
+        # phrase/token probes kept failing review for a reason: phrase
+        # matching accepts subsequences, so a SHORTENED content field
+        # with stale postings still matched). `integrity-check` with
+        # rank=1 compares the full indexed token stream against the
+        # content table, catching missing rows, per-column staleness,
+        # and shortened/extended content alike. It is a write-flavored
+        # command, so it runs on a PRIVATE snapshot copy (sqlite backup
+        # API) — the parent store itself stays strictly unwritten.
+        import tempfile
+
+        fd, tmp_copy = tempfile.mkstemp(suffix=".attest.db")
+        os.close(fd)
+        try:
+            snap = sqlite3.connect(tmp_copy)
+            try:
+                probe._conn.backup(snap)
+                snap.execute(
+                    "INSERT INTO debug_entries_fts(debug_entries_fts, "
+                    "rank) VALUES('integrity-check', 1)")
+            except sqlite3.DatabaseError as exc:
+                raise sqlite3.DatabaseError(
+                    f"{parent_debug_db}: FTS index does not match the "
+                    f"content table ({exc}) — rebuild the parent index "
+                    "before attesting this layer") from exc
+            finally:
+                snap.close()
+        finally:
+            os.unlink(tmp_copy)
         block["parent_debug_db"] = {
             "path": parent_debug_db,
             "digest": debug_db_digest(parent_debug_db),

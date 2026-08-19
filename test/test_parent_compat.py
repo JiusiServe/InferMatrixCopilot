@@ -176,8 +176,20 @@ def test_attest_rejects_stale_or_empty_fts_index(tmp_path):
               "WHERE key='stable-key'")
     c.commit()
     c.close()
-    with pytest.raises(sqlite3.DatabaseError, match="column 'symptom'"):
+    with pytest.raises(sqlite3.DatabaseError, match="does not match"):
         ka.attest_layers(parent_debug_db=str(field_stale))
+    # SHORTENED content (hook iteration-3 finding): phrase matching
+    # accepts subsequences, so only a full token-stream comparison
+    # catches "alpha beta gamma" indexed vs "alpha beta" stored
+    shortened = _parent_db(tmp_path / "short.db", [
+        {"key": "sk", "symptom": "alpha beta gamma"}])
+    c = sqlite3.connect(shortened)
+    c.execute("UPDATE debug_entries SET symptom='alpha beta' "
+              "WHERE key='sk'")
+    c.commit()
+    c.close()
+    with pytest.raises(sqlite3.DatabaseError, match="does not match"):
+        ka.attest_layers(parent_debug_db=str(shortened))
 
 
 def test_attest_rejects_wrong_schema_as_parent_layer(tmp_path):
