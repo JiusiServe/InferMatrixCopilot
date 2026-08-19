@@ -141,12 +141,43 @@ def test_attest_rejects_stale_or_empty_fts_index(tmp_path):
               "VALUES ('m', 'unindexed-key', 'unindexed symptom words')")
     c.commit()
     c.close()
-    with pytest.raises(sqlite3.DatabaseError, match="stale or empty"):
+    with pytest.raises(sqlite3.DatabaseError, match="stale"):
         ka.attest_layers(parent_debug_db=str(db))
     # an EMPTY store still attests fine (nothing to be unsearchable)
     empty = _parent_db(tmp_path / "empty.db", [])
     assert "parent_debug_db" in ka.attest_layers(
         parent_debug_db=str(empty))
+    # PARTIAL corruption (hook iteration-3 finding): every active row is
+    # probed, so an index stale for just ONE row — while others still
+    # answer — is caught too
+    partial = _parent_db(tmp_path / "partial.db", [
+        {"key": "indexed-row", "symptom": "healthy indexed words"}])
+    c = sqlite3.connect(partial)
+    c.execute("INSERT INTO debug_entries (module, key, symptom) "
+              "VALUES ('m', 'ghost-row', 'never reached the index')")
+    c.commit()
+    c.close()
+    with pytest.raises(sqlite3.DatabaseError, match="stale"):
+        ka.attest_layers(parent_debug_db=str(partial))
+    # unicode + single-character content attests fine: the probe is the
+    # tokenizer's own whole-field phrase, never an ASCII regex
+    unicode_db = _parent_db(tmp_path / "uni.db", [
+        {"key": "é", "symptom": "éclair déjà-vu 修复 x"}])
+    assert "parent_debug_db" in ka.attest_layers(
+        parent_debug_db=str(unicode_db))
+    # PER-FIELD staleness (hook finding): update ONE column of an indexed
+    # row without re-indexing — the still-searchable key must not carry a
+    # stale symptom column past the gate
+    field_stale = _parent_db(tmp_path / "field.db", [
+        {"key": "stable-key", "symptom": "original symptom words",
+         "fix": "original fix"}])
+    c = sqlite3.connect(field_stale)
+    c.execute("UPDATE debug_entries SET symptom='rewritten symptom text' "
+              "WHERE key='stable-key'")
+    c.commit()
+    c.close()
+    with pytest.raises(sqlite3.DatabaseError, match="column 'symptom'"):
+        ka.attest_layers(parent_debug_db=str(field_stale))
 
 
 def test_attest_rejects_wrong_schema_as_parent_layer(tmp_path):

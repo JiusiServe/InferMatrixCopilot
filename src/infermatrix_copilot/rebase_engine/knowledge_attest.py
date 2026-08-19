@@ -94,24 +94,39 @@ def attest_layers(*, parent_debug_db: str = "",
         from .parent_compat import ParentDebugMemory
 
         probe = ParentDebugMemory(parent_debug_db)  # schema-validating open
-        # index/content consistency, not just "the query runs": a
-        # populated store whose external-content FTS index is empty or
-        # stale would answer every retrieval with nothing — search a
-        # known ACTIVE row by its own tokens and require it back
-        row = probe._conn.execute(
-            "SELECT id, key, symptom, root_cause, fix FROM debug_entries "
-            "WHERE status='active' ORDER BY id LIMIT 1").fetchone()
-        if row is not None:
-            tokens = " ".join(str(row[c] or "")
-                              for c in ("key", "symptom", "root_cause",
-                                        "fix")).strip()
-            if tokens:
-                hits = probe.search(tokens, k=100)
-                if not any(h["id"] == row["id"] for h in hits):
+        # index/content consistency for EVERY active row AND every
+        # token-bearing FIELD of it (a first-row or any-field probe
+        # would let partial staleness — one corrupted row, or one
+        # updated column whose old postings linger — slip past both the
+        # digest, which hashes only the content table, and the
+        # attestation). Each non-empty field is queried as its OWN
+        # column-scoped whole-field PHRASE with an exact rowid
+        # constraint, so unicode normalization, single-character tokens,
+        # and token order are the tokenizer's business, and text from
+        # another column can never satisfy the probe. A field whose text
+        # yields no tokens is skipped (unfindable by design).
+        for row in probe._conn.execute(
+                "SELECT id, key, symptom, root_cause, fix "
+                "FROM debug_entries WHERE status='active' ORDER BY id"):
+            for col in ("key", "symptom", "root_cause", "fix"):
+                text = str(row[col] or "").strip()
+                if not text:
+                    continue
+                phrase = '"' + text.replace('"', '""') + '"'
+                try:
+                    hit = probe._conn.execute(
+                        "SELECT rowid FROM debug_entries_fts "
+                        "WHERE debug_entries_fts MATCH ? AND rowid = ?",
+                        (f"{col}: {phrase}", row["id"])).fetchone()
+                except sqlite3.OperationalError:
+                    continue  # no tokens in this field: nothing to probe
+                if hit is None:
                     raise sqlite3.DatabaseError(
-                        f"{parent_debug_db}: FTS index is stale or empty "
-                        "— active rows are unsearchable (rebuild the "
-                        "parent index before attesting this layer)")
+                        f"{parent_debug_db}: FTS index is stale for "
+                        f"active row id={row['id']} column {col!r} (its "
+                        "content is unfindable in its own index column) "
+                        "— rebuild the parent index before attesting "
+                        "this layer")
         block["parent_debug_db"] = {
             "path": parent_debug_db,
             "digest": debug_db_digest(parent_debug_db),
