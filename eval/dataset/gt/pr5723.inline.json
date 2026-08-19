@@ -1,0 +1,32 @@
+[
+  {
+    "author": "tjtanaa",
+    "body": "The prebuilt image has been updated with the correct torchcodec.",
+    "line": 102,
+    "path": "recipes/MiniMaxAI/MiniMax-H3.md"
+  },
+  {
+    "author": "tjtanaa",
+    "body": "https://recipes.vllm.ai/MiniMaxAI/MiniMax-H3 has also been updated",
+    "line": 102,
+    "path": "recipes/MiniMaxAI/MiniMax-H3.md"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "<img width=\"1178\" height=\"496\" alt=\"image\" src=\"https://github.com/user-attachments/assets/56fb162b-cba0-420e-8693-f6af7ce70577\" />\r\ncan also update this part.",
+    "line": 102,
+    "path": "recipes/MiniMaxAI/MiniMax-H3.md"
+  },
+  {
+    "author": "amd-xiaoyu12",
+    "body": "Updated",
+    "line": 102,
+    "path": "recipes/MiniMaxAI/MiniMax-H3.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "`mkdocs --strict` fails here because `recipes/` is outside the MkDocs docs tree; Read the Docs reports this as the sole warning and aborts with `fail_on_warning: true`. Please use the canonical absolute recipe URL (for example, `https://recipes.vllm.ai/MiniMaxAI/MiniMax-H3`) or the GitHub URL.",
+    "line": 105,
+    "path": "docs/models/supported_models.md"
+  }
+]

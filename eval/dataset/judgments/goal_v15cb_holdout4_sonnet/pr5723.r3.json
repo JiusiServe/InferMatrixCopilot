@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.78,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.65,
+    "actionability": 0.75
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both catch the orphaned <sup>H3</sup>/missing AMD checkmark in supported_models.md, the strongest diff-grounded finding shared with GT (Xunzhuo's ask to update that table). X additionally nails the single most emphasized GT concern — the mkdocs --strict docs-build failure caused by the recipes.vllm.ai link at supported_models.md:105 — with the exact same root cause and fix as hsliuustc0106's inline comment (mis-filed as a 'nit' rather than blocking, but substantively correct); Y never mentions the docs build failure at all despite it being CHANGES_REQUESTED and raised three separate times. X also brushes against the 'separate minimax-h3-rocm.md' preference via its MiniMax-H3-MUSA.md file-convention nit, which Y lacks entirely. Both go well beyond the diff into code-grounded verification (acceptable/expected for a docs-vs-code PR), but Y includes a couple of unverifiable 'PR body' claims (~2x SDPA speedup, gfx950 4-GPU) that read as speculative attributions with no visible source, slightly hurting its precision; X's claims are more consistently tied to specific cited code paths. Both are actionable with file/line anchors and concrete fixes, X marginally more so via drafted replacement text.",
+  "_cost_usd": 0.1606303,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15cb_holdout4_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v15cb_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15cb_holdout4_r1",
+    "arm_a_sha256": "fc4bb76edc82096a579d7d3296aa1c8fdc60dee4517529833007132d201eecbb",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "cb201dcc2cdab115638b4f9fa9a4049589bf1e28f73d4bc1e3a3fbc1975ca7e7",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

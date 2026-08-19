@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth is essentially empty (bot rate-limit messages and 'thanks'), so recall is vacuous for both. Both candidates independently found the same central, well-verified defect (new test file lacks pytestmark, so CI's marker-filtered selector silently deselects it) and converge on several secondary nits (stale Blackwell docs language, pyproject.toml comment, sm_110a narrative inconsistency, misleading env-override docs). X edges ahead by surfacing two additional, higher-severity, well-grounded correctness bugs Y missed entirely: warmup_quack_fp8() bypassing the capability gate (a real crash/slowdown risk on the exact hardware this PR protects) and a sharp catch that vLLM's warning_once keys on the exception object so it never actually dedupes. Y's unique findings (10.x/11.x gate-scope ambiguity, doc enumeration nitpick) are valid but lower-impact and one is arguably redundant since the doc already states 'compute capability 10.x'. Both are highly actionable with concrete file:line fixes; Y's literal ```suggestion``` blocks are marginally more mechanical, but X's clearer severity triage and deeper unique catches make it the stronger review overall.",
+  "_cost_usd": 0.2390135,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17ds_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_train",
+    "arm_a_sha256": "958d0e2a1a40ae0dd4c3ffe53a1af438dd63600a2ed20f49d030977a91bcbee3",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "de884ebeca54520b85a490b897397bd22bf362507bf9f7d4a833d74b390ae063",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

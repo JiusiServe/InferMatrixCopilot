@@ -203,7 +203,8 @@ def _pr_context_bundle(ctx: StepContext, repo: str, pr: int) -> str:
     mode = str(getattr(ctx.settings, "pr_context_mode", "full") or "full")
     parts: list[str] = []
     code, out = _gh(["pr", "view", str(pr), "--json",
-                     "title,body,labels,headRefName,comments,reviews"], cwd=repo)
+                     "title,body,labels,headRefName,comments,reviews,commits"],
+                    cwd=repo)
     data: dict = {}
     if code == 0:
         try:
@@ -217,6 +218,18 @@ def _pr_context_bundle(ctx: StepContext, repo: str, pr: int) -> str:
         parts.append(f"## PR description\n### {data.get('title', '')}"
                      + (f"  [labels: {labels}]" if labels else "")
                      + f"\n{_clip(data.get('body'), 4000)}")
+        # commit timeline (both modes — the author's own commits, not review
+        # discussion): a squashed head diff hides add-then-revert churn, and a
+        # reviewer who cannot see that a described change was later removed
+        # misreads the description-vs-diff mismatch (it invited re-adding a
+        # reverted regression in a live run)
+        subjects = [
+            f"- {str(c.get('oid') or '')[:8]} "
+            f"{_clip((c.get('messageHeadline') or ''), 100)}"
+            for c in (data.get("commits") or [])[-20:]]
+        if subjects:
+            parts.append("## Commit timeline (subjects only — the diff below "
+                         "is the squashed net change)\n" + "\n".join(subjects))
     if mode == "full" and data:
         comments = [f"@{c.get('author', {}).get('login', '?')}: {_clip(c.get('body'))}"
                     for c in _last_n(data.get("comments") or [])]

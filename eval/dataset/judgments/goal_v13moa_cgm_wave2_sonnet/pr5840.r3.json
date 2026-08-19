@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.82,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.22,
+    "precision": 0.87,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates converge on the same strongest surviving ground-truth concern — the engine's _get_default_cache_config still hardcodes rel_l1_thresh=0.2, defeating the new None-sentinel/model-specific 0.17 default — with equally precise file/line grounding. Y edges ahead by demonstrating this via actual executed code rather than static citation, adding a rigorous polynomial-coefficient analysis that quantitatively explains the quality-loss mechanism behind the threshold concern, and catching a directly diff-verifiable drive-by change (the 39→107 frame assertion forcing unrelated edits to the FP8 smoke test) that X misses. X is comprehensive and well-cited but leans on more mechanical grep-style evidence dumps and includes one more speculative, execution-unverified finding (quality_policy Cache-DiT interaction). Neither candidate re-raises the already-fixed partition-enabler/python-example concerns or the transient inline bugs (both since resolved per the PR thread), so recall is similarly modest for both.",
+  "_cost_usd": 0.20290619999999998,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v13_moa_cgm",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_moa_cgm",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_moa_cgm",
+    "arm_a_sha256": "3747c7c93f52b576bcdcadf91e1c582d47a457825c0d2176c3a0b94c8eb63b83",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.82,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y independently surfaces the ground truth's single blocking concern (the recipes.vllm.ai link breaking the mkdocs --strict docs build, matching the human reviewer's exact reasoning and proposed canonical-URL fix) and touches the 'separate ROCm file' preference; X misses both entirely. Both reviews are well-grounded with specific file/line citations and largely convergent on other issues (orphaned footnote, wrong reference-count bullet, MODEL_ROOT/FL2VA partition bug, dangling FLASHINFER note), but Y's findings are organized by severity with more concrete suggested fixes, giving it a modest edge in actionability and precision as well.",
+  "_cost_usd": 0.3766462,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r1",
+    "arm_a_sha256": "f05b79daa4c427743ff40bade2c26fa7a5c790f2a1d173ca5a4c145f7dace5c2",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "cb201dcc2cdab115638b4f9fa9a4049589bf1e28f73d4bc1e3a3fbc1975ca7e7",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

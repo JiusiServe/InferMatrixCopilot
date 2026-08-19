@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.62,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.42,
+    "precision": 0.72,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently rediscover the two substantive surviving GT concerns (masked-path varlen_func None crash at flash_attn_hub.py:147/326, and SM90/Blackwell gating nuance), and both correctly cite the real fix commit 332da8f2, showing genuine repo grounding rather than fabrication. X adds broader, sometimes-novel findings (ring/sequence-parallel bypass, code duplication) but weakens precision with unverifiable specifics (exact HF Hub commit SHAs, precise timing benchmarks) that read as embellished authority. Y's evidence-citation format is more directly traceable to diff/repo lines and catches a distinct, well-grounded CI-breaking bug (unconditional torch.backends.cudnn.version() call crashing on the ROCm lane) plus test-coverage gaps for non-CUDA fallbacks, edging out X on grounded precision and thematic recall alignment with GT's testing/CI concerns.",
+  "_cost_usd": 0.5874973,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17ds_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_train",
+    "arm_a_sha256": "10b6cfe3c9d078aeea32c769f5034b021717e2031c99b8f8876c2811d57f2381",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0639263265995e00edcd06c6242ac0a6a3647a980509c282af885c86ce6930e0",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

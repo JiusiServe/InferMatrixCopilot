@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.8,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both reviews are diff/code-grounded with concrete file:line citations and largely valid findings (missing AMD checkmark on the model table, the fabricated reference-count limit, MODEL_ROOT/FLASHINFER nits), but neither hits the ground truth's central, twice-repeated blocking concern (docs build failure) or the 'separate minimax-h3-rocm.md' suggestion. Y comes closer to that theme (flags the recipes.vllm.ai link risk and explicitly ties it to the mkdocs --strict issue and commit 93c0112c) and additionally surfaces a genuinely severe, well-substantiated functional bug (MODEL pointed at the FL2VA partition silently breaking Ref2VA, directly undercutting the 'all tasks work out of the box' claim) that X only partially notices as an undefined-variable issue. X's findings are solid but generally lower-severity/more nitpicky (arithmetic residuals, SKU naming) and miss the FL2VA-partition bug's real severity.",
+  "_cost_usd": 0.5089739,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "f8688942ab7f6f19862624e90b12cac6bf7af29d2203a8a7a53f1fb929158556",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "cb201dcc2cdab115638b4f9fa9a4049589bf1e28f73d4bc1e3a3fbc1975ca7e7",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

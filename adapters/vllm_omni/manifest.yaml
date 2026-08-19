@@ -25,8 +25,8 @@ upstream:
 # Repo-specific slice of the SHARED, human-curated knowledge base (the vendored
 # community docs at the repo-root `knowledge/` = settings.knowledge_dir;
 # cross-repo general/ knowledge is shared, NOT nested here). Replaces the
-# retired AI profile/. Provenance + the author's copy authorization are in
-# doc/KNOWLEDGE.md. Paths below are relative to settings.knowledge_dir.
+# retired AI profile/. Layout and consumption rules are in
+# doc/architecture/KNOWLEDGE.md. Paths below are relative to settings.knowledge_dir.
 knowledge:
   source: zuiho-kai/claude-workflow-starter
   repo_subdir: repos/vllm-omni    # this repo's slice within the shared base
@@ -38,6 +38,11 @@ knowledge:
   # on-demand through doc_read/doc_search.
   briefing_docs_extra:
   - repos/vllm-omni/review/guides/maintainer-pattern-routing.md
+  # repo-specific review checklist injected (first 4k chars) into the Strict
+  # reviewer's system prompt — triggered checks distilled from maintainer
+  # review patterns; the page lives in the shared knowledge tree so Direct
+  # and knowledge maintenance see the same source
+  review_checklist: repos/vllm-omni/review/guides/strict-review-checklist.md
 
 modules:
   worker_runner:
@@ -61,11 +66,54 @@ modules:
   model_config:
     local_paths: [vllm_omni/config/]
     wave: 1
+  # risk high: platform code sets process-wide defaults (op priorities,
+  # capability gates) inherited by EVERY model on that platform — a 3-file
+  # 61-line default flip here is a repo-wide behavior change (PR 4964/5009
+  # class), so small diffs must still get the full review ensemble
   platform:
     local_paths: [vllm_omni/platforms/]
     wave: 1
+    risk: high
+  # shared diffusion pipeline: denoise loop, attention backends, DiT/VAE —
+  # multi-model shared code where one-model-validated changes have cross-model
+  # blast radius (kernel-provider and hub-loading changes live here)
+  diffusion:
+    local_paths: [vllm_omni/diffusion/]
+    wave: 1
+    risk: high
+  # deploy YAMLs are the serving registry: defaults and per-platform blocks
+  # (cudagraph modes, capacity) that decide runtime behavior for CLI and yaml
+  # launches alike. NOT risk-tagged: a 2-line deploy deletion measured as a
+  # precision WIN at light depth (pr4970), so tiny deploy diffs keep the
+  # cheap tier; deploy changes bundled with code still escalate via the
+  # code-side signals
+  deploy:
+    local_paths: [vllm_omni/deploy/]
+    wave: 1
+  distributed:
+    local_paths: [vllm_omni/distributed/]
+    wave: 1
+    risk: high
+  engine:
+    local_paths: [vllm_omni/engine/]
+    wave: 1
+  attention:
+    local_paths: [vllm_omni/attention/]
+    wave: 1
+  quantization:
+    local_paths: [vllm_omni/quantization/]
+    wave: 1
+  sampling:
+    local_paths: [vllm_omni/sample/]
+    wave: 1
+  tokenizers:
+    local_paths: [vllm_omni/tokenizers/]
+    wave: 1
+  metrics:
+    local_paths: [vllm_omni/metrics/]
+    wave: 2
   benchmarks:
-    local_paths: [benchmarks/]
+    local_paths: [benchmarks/, vllm_omni/benchmarks/]
     wave: 2
 
 review_routes:

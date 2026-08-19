@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.6,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "The sole substantive ground-truth concern (yenuo26's inline comment asking whether the reduce_scatter parameter needs verification in the hasattr-only test) is hit almost exactly by Y's comment #6, which cites the same lines (121-126), names the reduce_scatter lambda, and explains precisely why the test validates the mock rather than production code. X's closest analog (test:92) argues for spying on use_device_communicator instead, a related but distinct concern, giving weaker recall. Y's other findings are deep, specific, and internally consistent (rank-asymmetric CFG hang risk, dead all_gather_object branch, data_parallel_rank never set, vestigial teardown guards), each with concrete fixes. X's report is bloated with duplicated near-identical findings about the same cfg_parallel_size>1 removal (three separate bullets, two with broken '?:882' location placeholders) and truncated 'additional observations,' which drags down both precision and actionability despite some individually valid points.",
+  "_cost_usd": 0.23178110000000002,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17cb_val",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17cb_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17cb_val",
+    "arm_a_sha256": "af17242804371428bedcecf399f4a98ce2a7e963383ce27086a4341e12b107d4",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0d4ddd4027e23f1f32216e748289588ea9a0e74ee8e599fa34b9d50f503d2f0d",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

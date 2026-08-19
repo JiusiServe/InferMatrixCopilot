@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.74,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.76,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y covers the key codec-selection, stream-slot lifecycle, PCM fallback, stale documentation, and concurrency-testing concerns with concrete locations and remedies. X catches codec selection, PCM fallback, provenance, and testing gaps, but misses the central abort leak and has more weak or tangential findings.",
+  "_usage": {
+    "input": 3,
+    "output": 1521
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "copilot_v7_goal_r3",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v7_goal_r3",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v7_goal_r3",
+    "arm_a_sha256": "071f0020dcbe5874f1725b0d3a634d3d247f89289b0b45ce131249a77daac287",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "18986f2736f812d8c896b12152ebcbf1d5319e9e1f79042f5fa16f1dd6272542",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.78,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.72,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Most of the GT's headline P1s (Cache-DiT transformers_ref lifecycle, ModularPipeline metadata, Ref2VA implicit default) are already marked 'Fixed in <sha>' and the visible diff shows the corresponding fix artifacts (e.g. the new test_enable_and_refresh_every_declared_dit test), so neither candidate needed to (and didn't) re-flag them; neither caught SamitHuang's four code-quality nits either, keeping both recalls low. X's strongest hit is a precise, well-evidenced catch that the Qwen3-TTS task-type validator gates on a non-production arch string, closely tracking GT's TTS validation concern. Y covers similar TTS-validation ground less precisely but adds broader, higher-severity findings (a plausible crash regression for Bagel/SenseNova via getattr-vs-attrgetter on dotted _dit_modules paths, a partition-directory-naming crash) with reproduction transcripts, giving it a slight edge in coverage/value despite a bit more speculative surface area (self-flagged 'not yet firing' items, a shakier MODEL_ROOT doc claim) that trims its precision somewhat.",
+  "_cost_usd": 0.2631364,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r1",
+    "arm_a_sha256": "ae3577da5267998d66c1f783c76acef03eb04e3b33b34135ff0a6e5c318cb125",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "7d155ed781e729cb9d3a1c8ef3851789595fa7fa0c9c18281fbbf0c3a461d7e5",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

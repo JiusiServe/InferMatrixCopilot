@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.45,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.75,
+    "actionability": 0.6
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both independently surface a real, ground-truth-missed bug (double sample-rate conversion breaking the reported WER) and both cover the two live ground-truth threads (audio_vae.py:141 config mutation, serving_speech.py include_language removal). But X's top 'High' finding fabricates a 'verified locally' claim that Qwen2Model's forward pass re-slices layers by config.num_hidden_layers at runtime — this directly contradicts the maintainer's own clarification in the ground truth (LHXuuu: encoder is already built before the mutation, so its actual layer count is unchanged, matching vendor code) and standard HF Qwen2Model behavior; X also cites suspiciously specific unverified PR numbers for VAE-sampling history. Y's parallel finding on the same line is more accurate and matches the ground truth's actual nuance ('no in-repo consumer found, but invariant violation is real'), and Y adds a plausible, well-cited prompt_assembly.py window-bounds interaction bug neither ground truth nor X caught. X is noticeably cleaner and more actionable in presentation, but Y is more trustworthy and grounded overall, which the rubric weights more heavily than polish.",
+  "_cost_usd": 0.5143057,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17ds_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_train",
+    "arm_a_sha256": "df1bd7fc814242608b88298180df3918fa131cfeb25ca2d71e0d6681a07945bc",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "264e453d996b4a5c483bf206cefb21e513e90d0d6bda5e49948434353154f4a5",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

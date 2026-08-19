@@ -10,7 +10,7 @@ extra rule (no PR-discussion access) on top — that is a ground-truth-leakage
 concern, not a product one, and deliberately does NOT live here.
 
 Detective, not preventive — the disclosed fallback of the tool-governance
-decision in doc/RFC-provider-registry.md. Findings are surfaced as
+decision in doc/features/provider-registry.md. Findings are surfaced as
 violations for the caller to trace and render in RUN_REPORT, never silently
 dropped.
 """
@@ -61,15 +61,21 @@ def contained_in(path: str, roots: tuple[str, ...]) -> bool:
 
 
 def audit_events(events: list[dict], *, roots: tuple[str, ...],
-                 read_only: bool = True) -> SessionAudit:
+                 read_only: bool = True, cwd: str = "") -> SessionAudit:
     """Audit a cursor-agent stream-json event list. Each tool_call event
     appears twice (issue + result); only the issue (no "result" key) is
     counted so calls are not double-counted.
 
     Containment is checked on EVERY native tool call that names a path —
     read, grep, ls, glob, whatever the CLI grows next — not just reads: the
-    live smoke showed grepToolCall events sailing past a read-only audit."""
+    live smoke showed grepToolCall events sailing past a read-only audit.
+
+    `cwd` is the SESSION's working directory: the CLI emits worktree-relative
+    paths for in-tree accesses, and resolving those against the auditing
+    process's own cwd flagged every relative in-tree read as a violation
+    (live finding, composer cursor-backend arm). Defaults to the first root."""
     audit = SessionAudit()
+    base = cwd or (roots[0] if roots else "")
     for event in events:
         if event.get("type") != "tool_call":
             continue
@@ -93,6 +99,8 @@ def audit_events(events: list[dict], *, roots: tuple[str, ...],
             else:
                 audit.other_tool_calls += 1
             path = str((call.get("args") or {}).get("path") or "")
+            if path and not os.path.isabs(path) and base:
+                path = os.path.join(base, path)
             if (path and roots and not contained_in(path, roots)
                     and not _CLI_TOOL_SPOOL.search(os.path.realpath(path))):
                 audit.violations.append(

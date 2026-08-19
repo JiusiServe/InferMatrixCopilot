@@ -44,11 +44,15 @@ async def run_agent_step(
     max_iters: int | None = None,
     llm_override=None,
     model_override: str = "",
+    harness_member=None,
 ) -> tuple[StepResult, dict]:
     """The single entry point for every agent step (修正方案 §4.1).
     `llm_override`/`model_override` are the MoA runtime seam (design W6): an
     explicit per-call client+model (e.g. a mixture member) with NO mutation of
-    the shared ctx — omitted, the run's tier model applies as always."""
+    the shared ctx — omitted, the run's tier model applies as always.
+    `harness_member` is a MoA member whose `provider` names a harness: the
+    step is delegated to that vendor CLI (same bridge/audit path as a harness
+    backend) instead of the in-process loop."""
     if ctx.llm is None or not ctx.llm.available:
         return (StepResult(False, FailureKind.BLOCKED,
                            "LLM not configured — cannot run agent step"), {})
@@ -167,17 +171,22 @@ async def run_agent_step(
     prompt = dispatch_ctx.render()
     if guidance:
         prompt += f"\n\n## STEP GUIDANCE\n{guidance}"
-    if target.kind == "harness" and llm_override is None:
-        # Harness backend (doc/RFC-provider-registry.md): the vendor CLI owns
+    if harness_member is not None or (target.kind == "harness"
+                                      and llm_override is None):
+        # Harness backend (doc/features/provider-registry.md): the vendor CLI owns
         # the tool loop for this whole step — same prompt bundle and output
         # contract, builtin tools served back through the MCP bridge under
-        # this scope. MoA members (llm_override) are raw-API endpoints and
-        # keep the in-process loop even under a harness backend.
+        # this scope. API MoA members (llm_override) keep the in-process
+        # loop even under a harness backend; a harness MoA member
+        # (harness_member) delegates to ITS provider's CLI regardless of the
+        # run's backend selection.
         from ...providers import run_harness_step
 
         outcome = await asyncio.to_thread(
             run_harness_step, ctx, target, step_name=step_name,
-            system=system, prompt=prompt, scope=scope, max_iters=budget)
+            system=system, prompt=prompt, scope=scope, max_iters=budget,
+            provider_id=getattr(harness_member, "provider", ""),
+            model=getattr(harness_member, "model", ""))
     else:
         outcome = await asyncio.to_thread(
             run_agent,

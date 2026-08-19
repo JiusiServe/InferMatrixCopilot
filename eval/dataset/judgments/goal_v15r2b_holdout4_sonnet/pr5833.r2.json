@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "The sole ground-truth concern (Yuanrong Store Connector naming) already matches the visible diff, so it's not discoverable from this snapshot and both candidates score recall≈0 through no fault of their own. Both independently caught the same core bug (Cache-DiT/TeaCache/Diffusion Continuous Batching rendering under the Quantization heading), but Y goes further with a correctly-grounded duplicate-nav-entry analysis, the loss of auto-discovery from replacing a directory glob with a hardcoded connector list (citing the existing glob idiom elsewhere in the file), and an extra genuine title/H1 mismatch (AsyncOmni Architecture) that X misses. Y's fixes are also more concrete and ready-to-apply, while X's review is solid but narrower and padded with repetitive 'claim-verified' restatements that add little value.",
+  "_cost_usd": 0.3492141,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "4b89fc2fddce9c033988f10b0c7eb46f645c3cd9ab3a9e8c6a7d121ccf8d6454",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b0a1251303a011617b813526a2859371e8ee289f04fcc197988c5b4d83dc8aca",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

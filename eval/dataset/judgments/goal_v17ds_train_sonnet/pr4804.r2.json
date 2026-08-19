@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.78,
+    "actionability": 0.82
+  },
+  "y": {
+    "recall": 0.52,
+    "precision": 0.82,
+    "actionability": 0.78
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both independently converge on the two hardest ground-truth bugs (stream-slot leak via id-space mismatch, and v2 codec being tried first for legacy checkpoints sharing model_type), plus several shared secondary findings (NPU dummy-run seq_token_counts gap, dead _finish_empty_streaming_requests code, talker_mtp hardcoded sampling params, WER PCM fallback) — strong evidence both are grounded rather than fabricated. Y edges ahead on recall/precision: its root-cause for the slot leak (the async_chunk/num_scheduled_tokens gating that prevents on_requests_finished from firing) matches the ground-truth reviewer's own reasoning almost verbatim, it catches the vendored-provenance-header note the ground truth also raised, and it surfaces one more genuine major bug (seq_token_counts sum-equality vs. padded token count) that X misses; its claims are also grep-verified rather than asserted. X is more actionable as a human-readable artifact (clean Blocking/Should-fix/Minor structure vs. Y's dense evidence-dump formatting with leaking list syntax) and finds its own unique valid issues (Realtime yaml slot capacity, KV-cache pre-profiling allocation), but includes one speculative/unverifiable claim (asserting CI is red). Neither candidate catches the two ground-truth Medium findings (cumulative-to-delta chunk_np re-slice bug, or the ceil-division/padding bug in audio_tokenizer_v2.py:949).",
+  "_cost_usd": 0.40150820000000004,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17ds_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_train",
+    "arm_a_sha256": "4a9031372cf984e30d712b8a405aee054a1b7f7b763d4415ac91268c40a6486f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "18986f2736f812d8c896b12152ebcbf1d5319e9e1f79042f5fa16f1dd6272542",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

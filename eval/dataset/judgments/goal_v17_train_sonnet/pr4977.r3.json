@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.75,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.8,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently discovered the same underlying issue as the ground-truth P2 comment (trust_remote_code incompatible with kernels 0.13.x) and correctly noted it was already resolved by a later commit, giving both strong recall. X is heavily padded with near-duplicate 'claim-refuted' entries restating the same stale-PR-body point, which hurts signal-to-noise despite solid grounding and useful code-suggestion blocks. Y is more concise and surfaces a genuinely deeper, non-obvious finding (broad except swallowing transient vs. permanent failures, now sticky process-wide) plus a specific dead-code claim about kernels>=0.15, giving it a slight edge in precision and overall value despite carrying more unverifiable external-library claims.",
+  "_cost_usd": 0.27359310000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_train",
+    "arm_a_sha256": "e9aeeaf2db3a574c53602735387192f5751cf46a47d4fc3896e2a733a1e6b3e6",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "589a8ff13cb3893b76dd0d5220ad632d82f46cc0edd9083528ebb2466be7c8a7",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

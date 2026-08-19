@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.88,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both are rigorously grounded, cross-validating several of the same real issues (sync-heavy .item() calls, dead SkipSoftmaxSpec.enabled, unsupported '<2%' doc claim). Y aligns more closely with the PR's actual resolution history — it correctly recognizes the P2 SAGE-disable bug is already fixed via the trim loop, finds the AllGather-KV reject in layer.py and asks for the exact test/clarification the maintainers actually discussed, and adds a genuinely novel, concrete finding (new CPU-only tests deselected by the cuda-only pytestmark in the merge CI lane) that neither the ground truth nor X catches. X compensates with a strong, unique test-gap catch tied to the skip-softmax timestep fix mentioned in the ground truth, but several of its 'required' findings (sync overhead, unvalidated max_seqlen) are speculative perf nitpicks not raised by real reviewers, and its critique of the AllGather-KV reject as 'unrelated scope' cuts against the maintainer's endorsed deferral.",
+  "_cost_usd": 0.3944991,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15_holdout4_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r1",
+    "arm_a_sha256": "d7911ee2a8d180c40643068dea5f7ba592401a2c958ecdb423dd378890787849",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "283d5ab54325426c21ff03640adaaf73eb89e801040f4baf619381200e657fb0",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

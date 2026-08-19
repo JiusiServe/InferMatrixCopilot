@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.55,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.6,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both reviews miss the two blocking human concerns (missing profiler/VRAM/native-baseline evidence and the streaming-speed-rejection bug) and the benchmark-driver duplication thread, so recall is low for both. Y's duration_factor validation finding (talker vs s2mel_decoder sharing 2.5-branded bounds) partially echoes the ground truth's duplicate-validation theme, and its connector-allowlist findings are concrete, grep-verifiable, and a highly plausible real bug class for a new-model PR. X is more exhaustive and offers sharper code-level fixes, but several of its deepest claims (uninitialized bias, CONCAT-semantics preemption bug, renderer override) are speculative multi-hop inferences unverifiable against the shown diff and carry higher fabrication risk.",
+  "_cost_usd": 0.4553264,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "cursor_composer25"
+  },
+  "_roles": {
+    "arm": "cursor_composer25",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_composer25",
+    "arm_a_sha256": "0837a9ea4d43e76caa04657d0b238804712e8a14d620309614e5c6e93ebfdb67",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

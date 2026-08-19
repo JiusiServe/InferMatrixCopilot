@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.72,
+    "precision": 0.76,
+    "actionability": 0.94,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.58,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X identifies the grounded naming-remapping concern and recommends deriving mappings from model metadata, closely matching the substantive human feedback. Y partially covers that issue, but its to_out.0 warning is likely incorrect because the live and adapter names already match, and several CI observations are peripheral. X also provides more concrete locations, failure paths, and proposed fixes, though some follow-ups exceed this diff's scope.",
+  "_usage": {
+    "input": 3,
+    "output": 824
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v12_hybrid_val"
+  },
+  "_roles": {
+    "arm": "copilot_v12_hybrid_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v12_hybrid_val",
+    "arm_a_sha256": "850049b4aaf1982d2150998406cd20e903948e3fa781a1fde673b519c3ad71a4",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9201be5ea408a41833fb8e6040e5eb97d26044159a083e4d1896451ac3585494",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

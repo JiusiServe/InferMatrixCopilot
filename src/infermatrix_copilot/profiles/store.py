@@ -1,5 +1,5 @@
 """Repo profile store — the curated layer of a repo's knowledge
-(doc/DESIGN.md §V2.3), architecture borrowed from the personal agent's
+(doc/architecture/DESIGN.md §V2.3), architecture borrowed from the personal agent's
 profile_store: an immutable evidence layer (RunTraces + archives) below a
 small curated `profile.yaml`, mutated ONLY through typed patch ops.
 

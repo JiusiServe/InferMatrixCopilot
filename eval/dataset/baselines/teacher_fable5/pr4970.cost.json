@@ -1,0 +1,39 @@
+{
+  "calls": 29,
+  "input_tokens": 912785,
+  "output_tokens": 10868,
+  "cost_usd": 2.123337,
+  "is_error": false,
+  "terminal_reason": "completed",
+  "split": "train",
+  "head": "4992e10b736788ac5003e381f85c46a25379214c",
+  "base": "da15a4cb1cfeae3ca02bc075bbe64fe64de59820",
+  "resolved_model": "claude-fable-5",
+  "snapshot_sha256": "06b328ba0e00dd9d2eab386c15f813ab5121460ecf2da8b84b3e9a747e717b88",
+  "validation_commands": [
+    "git diff da15a4cb1cfeae3ca02bc075bbe64fe64de59820 HEAD",
+    "git log --oneline da15a4cb1cfeae3ca02bc075bbe64fe64de59820..HEAD",
+    "grep -n \"seed\" vllm_omni/deploy/qwen3_tts_high_concurrency.yaml vllm_omni/deploy/qwen3_tts*.yaml 2>/dev/null; ls vllm_omni/deploy/ | grep qwen3_tts",
+    "grep -rn \"qwen3_tts.yaml\" tests/ docs/ examples/ 2>/dev/null | head -30",
+    "grep -rn \"seed\" docs/ 2>/dev/null | grep -i \"qwen3.tts\\|tts\" | head -20",
+    "grep -rln \"qwen3_tts\" .buildkite 2>/dev/null | head; ls .buildkite 2>/dev/null | head -20",
+    "grep -n -A6 \"qwen3_tts\" .buildkite/test-nightly.yml | head -60",
+    "grep -rn \"qwen3_tts\" .buildkite/ | grep -iv npu | head -20; echo ---; grep -rln \"perf\\|benchmark\" .buildkite/scripts | head",
+    "grep -rln \"qwen3_tts_base\\|audio_throughput\" benchmarks/ tests/ 2>/dev/null | head; echo ---; grep -rn \"enabled: false\" benchmarks/ 2>/dev/null | grep -i \"wer\\|quality\" | head; ls benchmarks 2>/dev/null | head",
+    "grep -n -B4 -A12 \"qwen3_tts_base\" tests/dfx/perf/tests/test_tts.json | head -60",
+    "grep -n \"seed\\|eval_phase\\|wer\\|quality\" tests/dfx/perf/tests/test_tts.json | head -30",
+    "grep -n -B3 -A4 '\"eval_phase\": \"quality\"' tests/dfx/perf/tests/test_tts.json | head -50; echo ---; grep -n '\"enabled\"' tests/dfx/perf/tests/test_tts.json | head",
+    "grep -n \"seed\" benchmarks/tts/bench_tts.py | head -15"
+  ],
+  "ran_validation": false,
+  "claude_md_seen": {
+    "/data/zhoutaichang/CLAUDE.md": "27ca8ea8056c231e"
+  },
+  "recorded_at": "2026-08-15T01:23:06",
+  "arm": "baseline_opus5",
+  "wall_s": 179.2,
+  "audit_ok": true,
+  "audit_violations": [],
+  "audit_blocked_attempts": [],
+  "artifact_chars": 4964
+}

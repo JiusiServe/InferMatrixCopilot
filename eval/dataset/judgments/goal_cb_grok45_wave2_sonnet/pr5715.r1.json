@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.55
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.9,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y explicitly verifies that musa.inc.md and quickstart.md are byte-identical to merge-base (matching the ground-truth reviewer's 'do not change this' directives on those exact files) and gives the npu.inc.md vLLM-Ascend ref line the same scrutiny that triggered the human PTAL/LGTM exchange; X never mentions quickstart.md and only tangentially notes musa.inc.md is 'intentionally unchanged' without verification. Both candidates' findings are grounded in the diff/tree with no fabrication, but Y anchors every comment to a precise file:line with concrete suggested text, while two of X's three findings use ':?' placeholders for the line number, weakening actionability.",
+  "_cost_usd": 0.289297,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok45",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok45",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok45",
+    "arm_a_sha256": "f6b72d2406cd59bdff7a7794d776d0bde1c55ee6336f9bf80e91ea2bcd1e1db6",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5866809cd7926f6bee88b473acf165652378865539411405c15a7c86c14e7466",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

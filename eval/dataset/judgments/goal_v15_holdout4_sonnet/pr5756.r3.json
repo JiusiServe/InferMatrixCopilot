@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.88,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "The ground truth's two substantive concerns (lookup_model_spec's last-component matching, and a params_builder demo kwarg mismatch) both target an intermediate commit already fixed by the final diff, so neither is a live bug for either candidate to find; X still engages directly with that same fragile function and independently surfaces a real residual matching gap ('MiniMax-H3/Ref2VA' with no prefix), while Y never examines that code path at all. Both reviews are otherwise excellent, well-grounded, and highly actionable — Y is slightly more rigorous with quote-level evidence and catches a genuinely sharp example-workflow wiring bug and the fps=24 hard-fail, while X supplies concrete suggested-fix code diffs — but X's edge on ground-truth-adjacent recall decides it.",
+  "_cost_usd": 0.20927410000000002,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15_holdout4_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r1",
+    "arm_a_sha256": "d22e833fd281a03baf775e380b91423987ce999d0c230d0b3d813bbf8f50dec2",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5e297658ea0cb989e05b1860fc4dd4e2c45cf1fb82ba08b0a451b49c240fd935",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

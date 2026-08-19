@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Y's structured claim-verified/refuted methodology tracks the actual PR thread closely, independently rediscovering that the primary-rank test still hardcodes the same rank assumption yuanheng-zhao flagged, that the extra_args gap in RequestBatchSamplingParamsKey leaves asukaqaq-s's CFG/shape concern only partially resolved, and that docs weren't updated for the new None-steps allowance — all tight matches to ground-truth threads. X produces a larger set of well-cited, highly actionable independent findings (notably converging with Y on the request_batch_max_wait_ms=0 regression, a strong shared high-confidence bug) but has lower overlap with what actual reviewers raised and includes at least one contestable claim (the 'unreachable' per-DP-primary routing) that Y's more careful verification of the same region doesn't corroborate. Both are high-effort, high-quality reviews with no latent-gap-check section.",
+  "_cost_usd": 0.41054769999999996,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15_holdout4_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "8b3b0b08e1a8defaac40e67c5a984066109aab2a4e178dd50d66ac13b0a37305",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5d107b26c5dd605248f4ff3bf7b26b48a886f95ed933ef7eb79692e052dcfc5a",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.92,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.72,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth is trivial (only 'LGTM'/'PTAL' with zero substantive concerns), so both get full recall by default; the comparison hinges on precision and actionability of self-generated findings. Both independently verify the core routing fix and corroborate the same 'silent audio' code line (406), giving confidence neither fabricated; X goes further by tracing the full downstream HTTP response path to challenge the PR's own 'silent audio' wording, cross-checks a sibling recipe (GLM-Image.md) to scope the extra_body claim correctly, and supplies concrete drop-in rewrites plus a jq verification snippet. Y is equally well-grounded but shallower (explicitly notes it didn't re-run the HTTP shape) and its suggested fixes ('add a one-line clarification', 'confirm on main') are less concrete than X's exact text edits, so X edges ahead on actionability.",
+  "_cost_usd": 0.1756906,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_train_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v14_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_train_r1",
+    "arm_a_sha256": "545c7ba115e5e2e7f2e69286356c4b296e65643b92250a1504099512337bfafb",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5a2e689fc33efd67adbf119f1e4cf034841928ad70fea2d99f142a727ca8ea18",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

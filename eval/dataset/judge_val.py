@@ -66,6 +66,29 @@ _SPLITS = {
                        4893, 4810, 4825, 4837, 4816,            # val
                        4762, 4834, 4849, 4954, 4777],           # test
                "issues": []},
+    # Wave 2 (build_wave2.py): 10 recent PRs, pure frozen holdout — human-only
+    # GT, no GOLD gap items (recent PRs lack the history to prove one).
+    "holdout": {"prs": [5509, 5550, 5610, 5703, 5715, 5840, 5863, 5884,
+                        5957, 5976],
+                "issues": []},
+    # Wave 3 (build_wave3.py): fresh frozen holdout for the post-wave-2
+    # iteration — wave 2 is spent (its GT/rationales were opened for tuning
+    # forensics after the cursor-model campaign).
+    "holdout3": {"prs": [5678, 5691, 5713, 5843, 5853, 5857, 6045, 6049,
+                         6079, 6141],
+                 "issues": []},
+    # Wave 4 (build_wave4.py): the clean gate after wave 3 was spent (two
+    # disclosed v14 gate attempts, then opened for tuning forensics).
+    "holdout4": {"prs": [5608, 5720, 5723, 5756, 5779, 5801, 5833, 5864,
+                         5958, 5978],
+                 "issues": []},
+    # Wave 5 (build_wave5.py): the power extension — wave 4 answered at
+    # n=10 items, which cannot resolve a .07 difference (needs ~32). Wave 5
+    # takes the fresh pool to 20 for the pre-registered pooled measurement
+    # in goal-eval/PREREG-wave5.md.
+    "holdout5": {"prs": [5676, 5732, 5752, 5871, 5946, 5983, 5991, 6023,
+                         6070, 6075],
+                 "issues": []},
 }
 _SPLIT = os.environ.get("SPLIT", "val")
 PR_ITEMS = _SPLITS[_SPLIT]["prs"]

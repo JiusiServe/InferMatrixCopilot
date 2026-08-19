@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.7,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.65,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both miss most ground-truth items (the four SamitHuang style nits, the modular-alias metadata bug, and most P1s already had 'Fixed in...' replies by review time); X's report leans heavily on a bulky validated/claim-verified audit log and surfaces mostly [minor] doc/test-gap suggestions with only weak thematic overlap with GT (H, I). Y independently matches the TTS --task-type validation gap (GT #I) almost exactly and echoes the unvalidated-combined-mode risk (GT #F), while also surfacing well-evidenced, reproduced blocking bugs in the shared _dit_modules call sites that plausibly reflect real (if uncaptured) maintainer threads hinted at by hsliuustc0106's review note. Y's Blocking/Should-fix/Worth-considering structure with concrete repro transcripts and fix suggestions is more actionable than X's flat, mostly-minor severity labeling.",
+  "_cost_usd": 0.3815475,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15cb_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15cb_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15cb_holdout4_r1",
+    "arm_a_sha256": "1e81c1cd28694d3d33d3cc296646f80d2b8a75bfe6edb659921e285ae845db9e",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "7d155ed781e729cb9d3a1c8ef3851789595fa7fa0c9c18281fbbf0c3a461d7e5",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

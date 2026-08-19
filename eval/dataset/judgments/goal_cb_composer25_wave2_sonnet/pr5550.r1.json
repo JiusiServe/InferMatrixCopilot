@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.08,
+    "precision": 0.82,
+    "actionability": 0.55
+  },
+  "y": {
+    "recall": 0.22,
+    "precision": 0.82,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Most ground-truth concerns (stage_kv/interface.py validation gaps, executor init-failure leak, duplicated cross-layer validation) target code/files outside this truncated diff's scope, capping recall for both; but Y independently surfaces the same root theme — the new metadata DTOs carry zero invariants unlike their #5541 siblings — and explicitly recognizes the diffusion_engine.py try/except as fixing a prior worker-leak-on-init-failure bug, giving it better thematic overlap with the human review. X's findings are valid and grounded but mostly test-coverage nitpicks with lower substantive overlap. Y's findings are also more actionable, offering concrete code fixes and a prioritized Required/Should-fix/Minor structure versus X's 'add a test' style suggestions.",
+  "_cost_usd": 0.39357960000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_composer25",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_composer25",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_composer25",
+    "arm_a_sha256": "9fb2953ac8f2774b2c96684d44197ce5730c1781dc186ff5fa7902aa34eb9c18",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b6ae3b48c6859b0d16784163ab2044d7d85e3b3b32f4e60b559fa2a55186c64b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.88,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently rediscover the batch-wait-default regression (ground-truth item from david6666666/lishunyang12), and X additionally lands a close match to the yuanheng-zhao 'weak DP-rank test' concern and engages explicitly with resolved review comments, giving it a slim recall edge over Y, which mostly surfaces novel issues rather than the specific threads reviewers raised (e.g. neither hits the tensor_to_shm/tensor_from_shm merge nit, the DLO-vs-common scope question, or asukaqaq-s's topology critique). Precision and actionability favor Y marginally: its findings (wrong-recipient output substitution via results[i] fallback, 600s wave timeout vs 4h video-sync timeout mismatch, empty-prompt policy contradicted by real sound_effect_dataset.py/pipeline usages, unreachable DP-primary-queue branch) are concrete, severe, and backed by hard-to-fabricate cross-file evidence, each with a clear 'Change:' directive. X's findings are also well-grounded but slightly more speculative in places (TokensPrompt edge case) and include some redundancy (two separate findings on the same clone() line). Overall the two are close in quality; Y's greater density of high-severity, tightly-argued bugs edges out X's stronger literal recall.",
+  "_cost_usd": 0.45065109999999997,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r1",
+    "arm_a_sha256": "167d0385096c0b6f4a16a318ede8be2365527444a3abd90d9aaaf10dc35696aa",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5d107b26c5dd605248f4ff3bf7b26b48a886f95ed933ef7eb79692e052dcfc5a",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

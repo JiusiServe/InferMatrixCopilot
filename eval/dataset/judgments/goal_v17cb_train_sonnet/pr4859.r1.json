@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.75,
+    "precision": 0.55,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.7,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both independently surface the same core issues (seed_tts_eval double-rate-conversion, audio_vae config mutation, dropped language/方言 mapping, patch_emission +2 offset), giving them similar recall against the ground-truth thread, though X also calls out the definitions.py layering nit (matching hsliuustc0106's 'refactor in next release') that Y omits. The deciding factor is precision: X's flagship 'High' finding claims the config mutation actually truncates the encoder to 4 layers, backed by a suspicious 'verified locally' snippet — this directly contradicts LHXuuu's ground-truth confirmation that the encoder is already built before the mutation and is unaffected, making X's top claim likely fabricated/wrong. X also pads its report with unverifiable git-forensics (specific commit SHAs, a merge narrative, a CI-red claim) not grounded in the diff. Y reaches the same topic but correctly characterizes it as metadata-only staleness (matching ground truth almost exactly) and validates the +2 offset against HF, mirroring LHXuuu's own reasoning — evidence of stronger grounding. Both are highly actionable with concrete file/line references and suggested diffs, so actionability is comparable.",
+  "_cost_usd": 0.4938236,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17cb_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17cb_train",
+    "arm_a_sha256": "41084d917e11ddc4fd53d21c5b7d627ef2c75a0bfc6645a2e29220b7ecaf314d",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "264e453d996b4a5c483bf206cefb21e513e90d0d6bda5e49948434353154f4a5",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

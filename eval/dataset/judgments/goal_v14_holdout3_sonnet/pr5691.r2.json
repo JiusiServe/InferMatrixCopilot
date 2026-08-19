@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X independently rediscovers three of the ground truth's most severe hsliuustc0106 findings almost line-for-line: the text-encoder-tp GroupCoordinator crash (pipeline_minimax_h3.py:561-579 vs GT line 575), Ring silently ignoring packed cu_seqlens boundaries (minimax_h3_transformer.py:405-419 vs GT line 455), and the encoder loader downgrading missing weights to a warning (encoder.py:1021-1027 vs GT line 1020) — plus the unbounded-upload issue. Y spends most of its budget on verification/validation bookkeeping and finds a different, plausible-but-unconfirmed set of bugs (dead FA4 branch in ring.py, fa.py import splitting, max_seqlen_q sizing) but misses nearly all the actual planted findings, even mischaracterizing the text-encoder-tp issue as 'resolved'. Both are well-grounded with concrete file/line evidence and actionable fixes, but X's much higher recall on the true blocking bugs decides it.",
+  "_cost_usd": 0.3358201,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_holdout3_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r1",
+    "arm_a_sha256": "26d47af1b90e02969b6d8ec86e197920594d0a991efd75ca1b80c3340dfe2f88",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "c373c75c65a506fb368faf2717d73d36a35ca93216c0c727d7c4e3100440e9f3",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

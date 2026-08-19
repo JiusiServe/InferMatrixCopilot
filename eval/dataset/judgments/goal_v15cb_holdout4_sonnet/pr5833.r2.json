@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.87,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.83,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Neither candidate caught the actual ground-truth concern (the Yuanrong connector naming fix), which appears to already be resolved in the shown diff and likely undetectable from it, so recall is 0 for both. Both reviews are well-grounded and independently converge on the same real bug (Quantization heading swallowing Cache-DiT/TeaCache/Diffusion-Continuous-Batching in index.md), lending mutual credibility; X is slightly more conservative and evidence-tagged (higher precision), while Y surfaces additional substantive, diff-grounded findings (the omni_connectors glob-to-hardcoded regression, a plausible duplicate nav entry) and gives more concrete drop-in code fixes (higher actionability), giving it a slight edge overall.",
+  "_cost_usd": 0.2452129,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15cb_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15cb_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15cb_holdout4_r1",
+    "arm_a_sha256": "6a3e45efe5467c7f87c0c475b40a6767e8785a4bb39e716cdd1fb238faa284d4",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b0a1251303a011617b813526a2859371e8ee289f04fcc197988c5b4d83dc8aca",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

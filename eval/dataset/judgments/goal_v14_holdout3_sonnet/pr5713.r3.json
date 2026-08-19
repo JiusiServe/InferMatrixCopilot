@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.8,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both did deep, grounded investigation, but X's finding #4 explicitly matches the ground truth's P2 concern (the mocked NotImplementedError test only proves route-propagation, not the real engine contract) and even proposes the same remedy Gaohan123 suggested (a CPU unit test against the real sleep/wake state). Y only 'validates' that this test does what its docstring claims, never flagging the coverage gap as an actionable concern, so it misses the substance of P2. Both independently verified the P1 concern (upstream build_openai_app supplies the 501 mapping) reaching the same resolution as the PR thread. X's write-up is more actionable throughout (concrete diffs/suggested code per finding) versus Y's terser bullets, and Y has some redundancy (near-duplicate _ensure_awake findings #1/#2) and lower-value nitpicks (PR description arithmetic).",
+  "_cost_usd": 0.3925481,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_holdout3_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r1",
+    "arm_a_sha256": "c146a37499cb8117391acedbaa86950ddda736f2f9ad45e89c6d5a92a01a638d",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "71074056acda5e0ea6abca91c25a41d0367def6a8dfe0c49371d616d13890f84",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

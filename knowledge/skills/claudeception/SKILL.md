@@ -23,7 +23,7 @@ allowed-tools:
 4. 根因只属于某个模型 → `repos/<仓库>/models/<模型>/`。
 5. 当前机器地址、账号、cache 或 venv → ignored `local/`，不进入知识页面。
 
-具体失败写到最近目录的 `incidents/`；稳定方法写到 guide、rules 或 architecture。归属规则见 [目录归属](../../contributing/layout.md)，复盘规则见 [复盘和错题](../../contributing/incidents.md)。
+具体失败写到最近目录的 `incidents/`；稳定方法写到 guide、rules 或 architecture。归属规则见 [目录归属](../../../doc/knowledge/contributing/layout.md)，复盘规则见 [复盘和错题](../../../doc/knowledge/contributing/incidents.md)。
 
 ## 写之前
 
@@ -34,7 +34,7 @@ allowed-tools:
 
 ## 错题格式
 
-按 [错题正文格式](../../contributing/incidents.md#正文模板) 编写，一篇只写一件事故。至少包含：
+按 [错题正文格式](../../../doc/knowledge/contributing/incidents.md#正文模板) 编写，一篇只写一件事故。至少包含：
 
 - 编号；
 - 归属；

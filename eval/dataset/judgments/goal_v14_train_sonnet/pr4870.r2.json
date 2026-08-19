@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.75,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y matches the ground truth's substantive concerns far more precisely: its finding #4 (inconsistent async_chunk default/accessor) nearly mirrors the human 'Low' comment, and its finding #3 (cross-consumer list-vs-tensor disagreement plus the unmentioned WebSocket path) captures the spirit of the human 'Med' blast-radius question with sharper technical grounding than X's more scattered coverage-gap findings. Y also independently derives a more accurate root cause for the original bug (cudagraph padding vs. tail-only hidden states) and backs claims with actual pytest execution, edging out X on precision and actionability despite X's solid, well-evidenced NPU-parity finding (which Y also caught). Neither candidate raises the multi-batch-axis latent gap later fixed in PR #4910.",
+  "_cost_usd": 0.42119399999999996,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_train_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_train_r1",
+    "arm_a_sha256": "518810abfbbc9a9b88c71a08df280202490ab2a537a413f2052dfb64cf80f1f8",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "03d7423c3a91e45838083e2025e3dea932f1d9448ba923b1d6ca1a0373899ea1",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

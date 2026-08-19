@@ -1,0 +1,14 @@
+[
+  {
+    "author": "hsliuustc0106",
+    "body": "I think we should move this part to meetups.md and rename it as meetings",
+    "line": 61,
+    "path": "docs/community/governance.md"
+  },
+  {
+    "author": "Copilot",
+    "body": "The security disclosure guidance is internally inconsistent: it says not to report vulnerabilities in Slack channels, but then immediately suggests posting in `sig-omni` (a Slack channel). Rephrase to clarify that vulnerability *details* must not be shared publicly, while a detail-free contact request is acceptable if DMs are unavailable.",
+    "line": 9,
+    "path": "docs/community/contact_us.md"
+  }
+]

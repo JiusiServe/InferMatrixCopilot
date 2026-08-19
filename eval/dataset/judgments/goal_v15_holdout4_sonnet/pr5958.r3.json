@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.68,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.78,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently converge on the same three GT-verifiable live issues (missing @RuixiangMa on diffusion/models line 137, the LoRA 'intentionally narrowed'/'not changed' contradiction, and the offloader.md PR-description-vs-actual @Isotr0py/@david6666666 mismatch), with the other 17 GT inline comments already resolved in the shown head diff and thus unfindable by either. X is more polished and consistently gives explicit 'Change:' fixes, but several of its 'blocking' findings (framing reviewer-requested owner swaps as unauthorized 'unannounced removals' needing consent, recommending reverting the LoRA/model_extras owners) push against what the actual review thread shows was deliberately requested, hurting precision. Y is more calibrated (evidence-bullet style, fewer overreaching recommendations) and surfaces a genuinely unique, well-grounded catch — a test file (test_pd_disaggregation.py) referencing a YAML path under the now-dead model_executor/stage_configs/ directory — though its terse, occasionally truncated bullet format is less actionable than X's narrative writeups.",
+  "_cost_usd": 0.269914,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15_holdout4_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r1",
+    "arm_a_sha256": "f208c23e0ba7717528449fb61ed25a6fca3fd830be1be60ab0427fed8014419f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a618d8fdfdd2a7671220fc3626c167412f101811b64319de0c1c201facd71448",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

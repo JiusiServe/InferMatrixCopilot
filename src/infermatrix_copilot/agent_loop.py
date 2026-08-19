@@ -55,6 +55,8 @@ def run_agent(
     refusals: list[str] = []
     tools_used: list[str] = []
     usage_in = usage_out = 0
+    nudged_empty = False
+    nudged_cut = False
 
     for i in range(1, max_iters + 1):
         reply: Reply = llm.create(system=system, messages=messages, tools=tools, model=model)
@@ -69,10 +71,48 @@ def run_agent(
                 assistant_content.append(
                     {"type": "tool_use", "id": b.id, "name": b.name, "input": b.input}
                 )
-        messages.append({"role": "assistant", "content": assistant_content})
+        # an empty content list would 400 the next request — represent an
+        # all-empty assistant turn honestly instead
+        messages.append({"role": "assistant",
+                         "content": assistant_content
+                         or [{"type": "text", "text": "(empty)"}]})
 
         uses = reply.tool_uses
         if not uses:
+            # nudge only when there is an INVESTIGATION to save — an empty
+            # reply with zero tool calls behind it loses nothing, and
+            # retrying every such empty would double spend on a degenerate
+            # endpoint
+            if not (reply.text or "").strip() and tool_calls > 0 \
+                    and not nudged_empty and i < max_iters:
+                # the model stopped with NO tools and NO text — the whole
+                # investigation would be discarded (measured: a 32-round
+                # adversary pass ended exactly this way and the sample was
+                # lost). One loud nudge; a second empty ends the loop.
+                nudged_empty = True
+                messages.append({"role": "user", "content":
+                                 "Your message was EMPTY. Emit your final "
+                                 "answer per the OUTPUT CONTRACT now — "
+                                 "partial and honest beats empty. Do not "
+                                 "call tools."})
+                continue
+            if reply.stop_reason == "max_tokens" and tool_calls > 0 \
+                    and not nudged_cut and i < max_iters:
+                # the final answer hit the per-call token ceiling MID-JSON —
+                # measured on the wave-3 gate: a docs pass emitted exactly
+                # 16,000 completion tokens, the truncated contract failed
+                # coercion, and every candidate died. Ask once for the same
+                # answer, tighter; models compress well on demand.
+                nudged_cut = True
+                messages.append({"role": "user", "content":
+                                 "Your final message was CUT at the token "
+                                 "ceiling mid-JSON. Re-emit the SAME answer "
+                                 "as one complete JSON object, tighter: "
+                                 "evidence <= 2 quoted lines per comment, "
+                                 "findings <= 25 one-line entries (drop the "
+                                 "least decisive), no prose outside the "
+                                 "JSON. Do not call tools."})
+                continue
             return AgentOutcome(reply.text, i, tool_calls, refusals=refusals,
                                 input_tokens=usage_in, output_tokens=usage_out,
                                 tools_used=tools_used)
@@ -120,6 +160,32 @@ def run_agent(
     if reply.usage:
         usage_in += reply.usage.get("input_tokens", 0)
         usage_out += reply.usage.get("output_tokens", 0)
+    if not (reply.text or "").strip() or reply.stop_reason == "max_tokens":
+        # Measured failures: a deep pass burned its whole budget then answered
+        # the forced-final request with an EMPTY message (wave-2 pr5976 — 50+
+        # tool calls discarded), or with a final CUT at the token ceiling
+        # mid-JSON (wave-3 gate — 16,000 completion tokens, coercion failed).
+        # Both discard the investigation, so each gets exactly one loud retry.
+        cut = bool((reply.text or "").strip())
+        assistant = [b.text for b in reply.blocks if b.type == "text"]
+        messages.append({"role": "assistant",
+                         "content": "\n".join(assistant) or "(empty)"})
+        messages.append({"role": "user", "content":
+                         ("Your final message was CUT at the token ceiling "
+                          "mid-JSON. Re-emit the SAME answer as one complete "
+                          "JSON object, tighter: evidence <= 2 quoted lines "
+                          "per comment, findings <= 25 one-line entries. Do "
+                          "not call tools.") if cut else
+                         ("Your final message was EMPTY. That discards the "
+                          "entire investigation. Emit the output-contract "
+                          "JSON NOW, from findings you already gathered — "
+                          "partial and honest beats empty. Do not call "
+                          "tools.")})
+        reply = llm.create(system=system, messages=messages, tools=tools,
+                           model=model)
+        if reply.usage:
+            usage_in += reply.usage.get("input_tokens", 0)
+            usage_out += reply.usage.get("output_tokens", 0)
     return AgentOutcome(reply.text or "(agent hit max iterations)", max_iters,
                         tool_calls, truncated=True, refusals=refusals,
                         input_tokens=usage_in, output_tokens=usage_out,

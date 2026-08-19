@@ -1,0 +1,14 @@
+[
+  {
+    "author": "hsliuustc0106",
+    "body": "```suggestion\n          - Yuanrong Store Connector: design/feature/omni_connectors/yuanrong_connector.md\n```",
+    "line": 120,
+    "path": "docs/.nav.yml"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "```suggestion\n- [Yuanrong Store Connector](feature/omni_connectors/yuanrong_connector.md)\n```",
+    "line": 30,
+    "path": "docs/design/index.md"
+  }
+]

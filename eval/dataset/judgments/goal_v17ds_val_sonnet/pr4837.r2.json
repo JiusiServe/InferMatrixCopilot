@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.87,
+    "actionability": 0.88,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently surface the same real substance beyond the thin ground truth (two LGTMs plus one inline note validating the already_submitted removal): a credible blocker that ZImagePipeline.forward was reduced to a req-only signature while MingImagePipeline still calls it with the old kwargs, plus correct validation of the DiffusionOutput unwrap fix and missing-test gaps. Y explicitly restates and confirms yJader's exact reasoning (both submit_initial/submit_update reject lists regardless of already_submitted) as its lead argument, closely mirroring the ground-truth concern, whereas X only captures this inside a buried 'validated' bullet and instead headlines the orchestrator line as a test-coverage nit. Y also adds two additional well-reasoned, actionable follow-ups (unrouted >1-list crash, else-branch bypassing normalization) that X lacks. Both are highly actionable with file/line evidence and concrete next steps; X leans on literal suggestion blocks while Y closes with a prioritized action list, roughly comparable in usefulness.",
+  "_cost_usd": 0.2326912,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17ds_val",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_val",
+    "arm_a_sha256": "bff37bf66a78b68ede03dc3609e761dc80442b91628672e97ac87ff621738c24",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "bc98460632105aef812a50d392afd9f1bea66b3f783e8a9cd888456ce013cba3",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

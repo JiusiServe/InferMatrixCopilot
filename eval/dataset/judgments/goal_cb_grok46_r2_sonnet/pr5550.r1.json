@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.82,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Most ground-truth P1 comments target vllm_omni/diffusion/stage_kv/interface.py, a file this diff never touches, so neither candidate could recall them; among the concerns that are actually visible in this diff, Y's finding #7 (two overlapping identity-check validators across executor/runner/batch/step) directly matches asukaqaq-s's 'redundant validation across layers, consolidate exception types' comment, and Y's #13 meaningfully engages with the already-applied executor-shutdown-on-init-failure fix, while X's output is almost entirely test-coverage nitpicking that never surfaces these architectural concerns. Both reviews are well-grounded with quoted line evidence and comparable precision, but X mislabels a genuine crash bug (ARDiffusionModelRunner TypeError, independently found by both) as '[minor]' whereas Y correctly ranks it 'Required' with concrete fix code, giving Y better-calibrated actionability. Y is the stronger review overall on alignment with real reviewer concerns and severity accuracy, though its edge is not overwhelming since X's test-gap analysis is rigorous and self-verified.",
+  "_cost_usd": 0.4626196,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r2",
+    "arm_a_sha256": "b086f931b854156ef450aff10ecadd3aab257b9430319e58c7c98e4622bea81c",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b6ae3b48c6859b0d16784163ab2044d7d85e3b3b32f4e60b559fa2a55186c64b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

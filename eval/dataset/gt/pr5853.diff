@@ -1,0 +1,1837 @@
+diff --git a/docs/user_guide/diffusion/cache_acceleration/cache_dit.md b/docs/user_guide/diffusion/cache_acceleration/cache_dit.md
+index eaaca84ad6d..4d1f69068c2 100644
+--- a/docs/user_guide/diffusion/cache_acceleration/cache_dit.md
++++ b/docs/user_guide/diffusion/cache_acceleration/cache_dit.md
+@@ -6,6 +6,7 @@
+ - [Overview](#overview)
+ - [Quick Start](#quick-start)
+ - [Example Script](#example-script)
++- [Request-Scoped Quality](#request-scoped-quality-minimax-h3)
+ - [Acceleration Methods](#acceleration-methods)
+ - [Configuration Parameters](#configuration-parameters)
+ - [Best Practices](#best-practices)
+@@ -140,6 +141,43 @@ vllm serve Qwen/Qwen-Image --omni --port 8091 \
+   --cache-config '{"Fn_compute_blocks": 1, "residual_diff_threshold": 0.12}'
+ ```
+ 
++## Request-Scoped Quality (MiniMax H3)
++
++MiniMax H3 can switch Cache-DiT at the request boundary without enabling a
++cache backend at server startup. Add a quality field to an online request:
++
++```bash
++# Native reference path for this request.
++-F 'quality=lossless'
++
++# H3's conservative Cache-DiT profile for this request.
++-F 'quality=high'
++```
++
++For offline inference, set the same field on the sampling parameters:
++
++```python
++OmniDiffusionSamplingParams(
++    quality="high",
++    num_inference_steps=50,
++    extra_args={"task": "t2va", "duration": 5.0, "audio_flow_shift": 3.0},
++)
++```
++
++| Server startup | Request quality | Behavior |
++|---|---|---|
++| `--cache-backend cache_dit` | omitted | Use or restore the startup Cache-DiT profile |
++| `--cache-backend cache_dit` | `lossless` | Remove Cache-DiT hooks and run the reference path |
++| `--cache-backend cache_dit` | `high` | Use or install H3's conservative Cache-DiT profile |
++| no Cache-DiT | omitted or `lossless` | Run the reference path |
++| no Cache-DiT | `high` | Install H3's conservative Cache-DiT profile |
++
++The startup option is only needed when omitted-quality requests should use the
++server-configured Cache-DiT profile by default.
++
++See the [MiniMax H3 recipe](https://github.com/vllm-project/vllm-omni/blob/main/recipes/MiniMaxAI/MiniMax-H3.md#request-scoped-quality)
++for a complete request and measured trade-off.
++
+ ---
+ 
+ ## Acceleration Methods
+diff --git a/recipes/MiniMaxAI/MiniMax-H3.md b/recipes/MiniMaxAI/MiniMax-H3.md
+index cfe9b57966e..526a745ae36 100644
+--- a/recipes/MiniMaxAI/MiniMax-H3.md
++++ b/recipes/MiniMaxAI/MiniMax-H3.md
+@@ -574,10 +574,43 @@ default. `short_edge` controls the 768-pixel canvas and must be `768`.
+ outputs; the synchronous raw-MP4 endpoint returns the first output when more
+ than one is requested.
+ 
++## Request-scoped quality
++
++Add one of these fields to any HTTP request above. No Cache-DiT startup option
++is required; H3 installs its conservative profile when a `high` request
++arrives and removes it for a `lossless` request.
++
++```bash
++-F 'quality=lossless'  # Native reference path for this request.
++-F 'quality=high'      # H3's conservative Cache-DiT profile.
++```
++
++Omitting `quality` preserves the startup default: it uses the reference path
++normally, or the server-configured profile when the server was started with
++`--cache-backend cache_dit`.
++
++The following result was measured on 4× NVIDIA H200 with SP4, text-encoder
++TP4, 1344×768, 124 frames, 24 FPS, and 50 inference steps. One full
++`lossless` warmup was excluded, followed by three fixed prompt/seed pairs in
++balanced switch order.
++
++| `quality` | Median inference latency | Speedup | SSIM vs `lossless` | PSNR vs `lossless` | Expected trade-off |
++|---|---:|---:|---:|---:|---|
++| `lossless` | 85.49 s | 1.00× | 1.0000 | exact | Native reference path |
++| `high` | 63.36 s | 1.35× | 0.9709 | 34.98 dB | Faster with measured same-seed deviation |
++
++> [!NOTE]
++> `high` selects a fixed Cache-DiT profile, but its cache hit rate and
++> resulting latency/quality trade-off may vary by hardware, topology, and
++> workload. The values above apply to this deployment and are not universal
++> guarantees. `lossless` remains the exact reference path.
++
+ ## Key parameters
+ 
+ | Parameter | Recommended value | Notes |
+ |-----------|-------------------|-------|
++| `quality` | omitted or `lossless` | Request-level quality intent; `high` dynamically installs H3's conservative Cache-DiT profile |
++| `extra_params.force_refresh_step_hint` | omitted | Optional positive 1-based denoising-step hint for an active Cache-DiT request; pair with `extra_params.force_refresh_step_policy`=`once` or `repeat` |
+ | `task` | `t2va`, `fl2va`, or `ref2va` | Passed in `extra_params`; selects the task-specific DiT |
+ | `duration` | Workload-specific | Decimal seconds in `extra_params`; converted to H3-compatible frame count |
+ | `fps` | `24` | H3 output FPS is fixed |
+diff --git a/tests/diffusion/cache/test_cache_backends.py b/tests/diffusion/cache/test_cache_backends.py
+index 1137cfbc09f..6847a4720c4 100644
+--- a/tests/diffusion/cache/test_cache_backends.py
++++ b/tests/diffusion/cache/test_cache_backends.py
+@@ -91,8 +91,8 @@ def test_enable_single_transformer(self, mock_cache_dit, mock_block_adapter):
+ 
+     @patch("vllm_omni.diffusion.cache.cachedit.backend.BlockAdapter")
+     @patch("vllm_omni.diffusion.cache.cachedit.backend.cache_dit")
+-    def test_enable_and_refresh_every_declared_dit(self, mock_cache_dit, mock_block_adapter):
+-        """Combined pipelines enable and refresh Cache-DiT for every DiT."""
++    def test_lifecycle_applies_to_every_declared_dit(self, mock_cache_dit, mock_block_adapter):
++        """Combined pipelines manage every exact Cache-DiT target."""
+         pipeline = Mock()
+         pipeline.__class__.__name__ = "MiniMaxH3Pipeline"
+         pipeline._dit_modules = ["transformer", "transformers_ref"]
+@@ -102,18 +102,24 @@ def test_enable_and_refresh_every_declared_dit(self, mock_cache_dit, mock_block_
+             transformer._cache_dit_adapter_config = CacheDiTAdapterConfig(
+                 block_forward_patterns={"blocks": ForwardPattern.Pattern_3}
+             )
++        installed_adapters = [Mock(), Mock()]
++        mock_block_adapter.side_effect = installed_adapters
+ 
+         backend = CacheDiTBackend({"Fn_compute_blocks": 2})
+         backend.enable(pipeline)
+         backend.refresh(pipeline, num_inference_steps=20)
++        backend.disable(pipeline)
+ 
+-        assert len(backend._refresh_funcs) == 2
+         assert mock_cache_dit.enable_cache.call_count == 2
+         assert mock_cache_dit.refresh_context.call_count == 2
+         assert {call.args[0] for call in mock_cache_dit.refresh_context.call_args_list} == {
+             pipeline.transformer,
+             pipeline.transformers_ref,
+         }
++        assert [call.args[0] for call in mock_cache_dit.disable_cache.call_args_list] == installed_adapters
++        assert backend._refresh_funcs == []
++        assert backend._cache_targets == []
++        assert not backend.is_enabled()
+ 
+     @patch("vllm_omni.diffusion.cache.cachedit.backend.logger")
+     @patch("vllm_omni.diffusion.cache.cachedit.backend.cache_dit")
+@@ -246,6 +252,32 @@ def test_refresh_resets_same_step_count(self, mock_cache_dit, mock_block_adapter
+ 
+         assert mock_cache_dit.refresh_context.call_count == 2
+ 
++    @patch("vllm_omni.diffusion.cache.cachedit.backend.BlockAdapter")
++    @patch("vllm_omni.diffusion.cache.cachedit.backend.cache_dit")
++    def test_refresh_rearms_force_refresh_hint(self, mock_cache_dit, mock_block_adapter):
++        """A once hint must be restored for every repeated request."""
++        pipeline = Mock()
++        pipeline.__class__.__name__ = "DiTPipeline"
++        pipeline.transformer = Mock()
++        pipeline.transformer._cache_dit_adapter_config = CacheDiTAdapterConfig(
++            block_forward_patterns={"layers": ForwardPattern.Pattern_0}
++        )
++
++        config = DiffusionCacheConfig(
++            force_refresh_step_hint=7,
++            force_refresh_step_policy="once",
++        )
++        backend = CacheDiTBackend(config)
++        backend.enable(pipeline)
++        backend.refresh(pipeline, num_inference_steps=20)
++        backend.refresh(pipeline, num_inference_steps=20)
++
++        assert mock_cache_dit.refresh_context.call_count == 2
++        for call in mock_cache_dit.refresh_context.call_args_list:
++            refresh_config = call.kwargs["cache_config"]
++            assert refresh_config.force_refresh_step_hint == 7
++            assert refresh_config.force_refresh_step_policy == "once"
++
+     @patch("vllm_omni.diffusion.cache.cachedit.backend.BlockAdapter")
+     @patch("vllm_omni.diffusion.cache.cachedit.backend.cache_dit")
+     def test_enable_hunyuan_pipeline_uses_model_transformer(self, mock_cache_dit, mock_block_adapter):
+diff --git a/tests/diffusion/cache/test_cache_dit.py b/tests/diffusion/cache/test_cache_dit.py
+index fa224cf2002..2799f16072c 100644
+--- a/tests/diffusion/cache/test_cache_dit.py
++++ b/tests/diffusion/cache/test_cache_dit.py
+@@ -81,6 +81,8 @@ def test_cachedit_public_api_is_explicit():
+         "CacheDiTAdapterConfig",
+         "CacheDiTBackend",
+         "CacheDiTConfig",
++        "CacheDiTRequestSpec",
++        "RequestScopedCacheDiTRuntime",
+         "SensenovaCachedAdapter",
+         "cache_summary",
+         "enable_cache_for_dit",
+diff --git a/tests/diffusion/cache/test_cache_dit_request_runtime.py b/tests/diffusion/cache/test_cache_dit_request_runtime.py
+new file mode 100644
+index 00000000000..8bc6ee84689
+--- /dev/null
++++ b/tests/diffusion/cache/test_cache_dit_request_runtime.py
+@@ -0,0 +1,101 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++
++import pytest
++
++from vllm_omni.diffusion.cache.cachedit import runtime as runtime_module
++from vllm_omni.diffusion.cache.cachedit.runtime import (
++    CacheDiTRequestSpec,
++    RequestScopedCacheDiTRuntime,
++)
++from vllm_omni.diffusion.data import DiffusionCacheConfig
++
++pytestmark = [pytest.mark.core_model, pytest.mark.cpu, pytest.mark.diffusion]
++
++
++def _spec(key: str, steps: int = 50) -> CacheDiTRequestSpec:
++    return CacheDiTRequestSpec(
++        installation_key=key,
++        cache_config=DiffusionCacheConfig(),
++        num_inference_steps=steps,
++    )
++
++
++def _recording_backend(events):
++    class FakeBackend:
++        def __init__(self, config):
++            events.append(("create", config))
++            self.enabled = False
++
++        def enable(self, pipeline):
++            events.append(("enable", pipeline))
++            self.enabled = True
++
++        def refresh(self, pipeline, num_inference_steps):
++            events.append(("refresh", pipeline, num_inference_steps))
++
++        def disable(self, pipeline):
++            events.append(("disable", pipeline))
++            self.enabled = False
++
++        def is_enabled(self):
++            return self.enabled
++
++    return FakeBackend
++
++
++def test_startup_cache_follows_omit_lossless_high_omit_state_machine(monkeypatch):
++    events = []
++    FakeBackend = _recording_backend(events)
++    monkeypatch.setattr(runtime_module, "CacheDiTBackend", FakeBackend)
++    pipeline = object()
++    config = DiffusionCacheConfig()
++    runtime = RequestScopedCacheDiTRuntime(pipeline)
++    startup_backend = FakeBackend(config)
++    startup_backend.enabled = True
++
++    runtime.adopt(startup_backend, installation_key="generic")
++    runtime.prepare(_spec("generic", 50))  # omitted: keep startup cache
++    runtime.prepare(None)  # lossless: uninstall
++    runtime.prepare(None)  # repeated lossless: no-op
++    runtime.prepare(_spec("high", 40))  # high: install H3 profile
++    runtime.prepare(_spec("high", 30))  # repeated high: refresh only
++    runtime.prepare(_spec("generic", 20))  # omitted: restore startup profile
++
++    assert [event[0] for event in events] == [
++        "create",
++        "refresh",
++        "disable",
++        "create",
++        "enable",
++        "refresh",
++        "refresh",
++        "disable",
++        "create",
++        "enable",
++        "refresh",
++    ]
++    assert events[1][-1] == 50
++    assert events[5][-1] == 40
++    assert events[6][-1] == 30
++    assert events[10][-1] == 20
++    assert runtime.is_enabled
++
++
++def test_high_installs_without_startup_cache_and_lossless_uninstalls(monkeypatch):
++    events = []
++    monkeypatch.setattr(runtime_module, "CacheDiTBackend", _recording_backend(events))
++    pipeline = object()
++    runtime = RequestScopedCacheDiTRuntime(pipeline)
++
++    runtime.prepare(_spec("high", 40))
++    runtime.prepare(None)
++
++    assert [event[0] for event in events] == [
++        "create",
++        "enable",
++        "refresh",
++        "disable",
++    ]
++    assert events[2][-1] == 40
++    assert not runtime.is_enabled
+diff --git a/tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py b/tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py
+index 70f00f4b72a..d2cbc45512f 100644
+--- a/tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py
++++ b/tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py
+@@ -13,6 +13,70 @@
+ pytestmark = [pytest.mark.core_model, pytest.mark.cpu, pytest.mark.diffusion]
+ 
+ 
++def test_h3_prepares_resolved_cache_state_immediately_before_denoise():
++    from vllm_omni.diffusion.models.minimax_h3 import MiniMaxH3Pipeline
++    from vllm_omni.diffusion.request import OmniDiffusionRequest
++    from vllm_omni.diffusion.worker.request_batch import DiffusionRequestBatch
++    from vllm_omni.inputs.data import OmniDiffusionSamplingParams
++
++    pipeline = object.__new__(MiniMaxH3Pipeline)
++    torch.nn.Module.__init__(pipeline)
++    pipeline.partition = "fl2va"
++    pipeline.supported_tasks = frozenset({"t2va"})
++    pipeline.default_video_shift = 12.0
++    pipeline.default_audio_shift = 3.0
++    pipeline.device = torch.device("cpu")
++    pipeline.od_config = SimpleNamespace()
++    cache_spec = object()
++    quality_plan = SimpleNamespace(cache_dit=cache_spec)
++    pipeline._quality_policy = Mock()
++    pipeline._quality_policy.resolve.return_value = quality_plan
++    events = []
++    pipeline._cache_dit_runtime = SimpleNamespace(prepare=lambda spec: events.append(("prepare", spec)))
++    pipeline.encode_prompt = Mock(
++        return_value=(
++            torch.ones(1, 2),
++            torch.ones(1, dtype=torch.long),
++        )
++    )
++
++    def diffuse(**kwargs):
++        events.append(("diffuse", kwargs))
++        return torch.zeros(1), torch.zeros(1)
++
++    pipeline.diffuse = diffuse
++    pipeline.decode = Mock(return_value=(torch.zeros(1), torch.zeros(1)))
++    sampling = OmniDiffusionSamplingParams(
++        quality="high",
++        width=1344,
++        height=768,
++        fps=24,
++        num_frames=124,
++        num_inference_steps=50,
++        extra_args={"task": "t2va", "aspect_ratio": "16:9"},
++    )
++    batch = DiffusionRequestBatch(
++        [
++            OmniDiffusionRequest(
++                prompt="quality boundary",
++                sampling_params=sampling,
++                request_id="quality-boundary",
++            )
++        ]
++    )
++
++    output = pipeline.forward(batch)
++
++    assert events[0] == ("prepare", cache_spec)
++    assert events[1][0] == "diffuse"
++    pipeline._quality_policy.resolve.assert_called_once_with(
++        quality="high",
++        num_inference_steps=50,
++        extra_args={"task": "t2va", "aspect_ratio": "16:9"},
++    )
++    assert output.output == pipeline.decode.return_value
++
++
+ def test_pipeline_import_registry_and_component_discovery():
+     from vllm_omni.diffusion.models.minimax_h3 import MiniMaxH3Pipeline
+     from vllm_omni.diffusion.registry import (
+diff --git a/tests/diffusion/models/minimax_h3/test_minimax_h3_quality_policy.py b/tests/diffusion/models/minimax_h3/test_minimax_h3_quality_policy.py
+new file mode 100644
+index 00000000000..a4d918d2a81
+--- /dev/null
++++ b/tests/diffusion/models/minimax_h3/test_minimax_h3_quality_policy.py
+@@ -0,0 +1,212 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++
++from types import SimpleNamespace
++
++import pytest
++
++from vllm_omni.diffusion.data import DiffusionCacheConfig
++from vllm_omni.errors import OmniClientError
++
++pytestmark = [pytest.mark.core_model, pytest.mark.cpu, pytest.mark.diffusion]
++
++
++def _quality_od_config(*, cache_backend: str = "cache_dit", **overrides):
++    values = {
++        "cache_backend": cache_backend,
++        "cache_config": DiffusionCacheConfig(),
++        "diffusion_attention_config": SimpleNamespace(default=None, per_role={}),
++        "enable_cpu_offload": False,
++        "enable_layerwise_offload": False,
++        "enable_distributed_layerwise_offload": False,
++        "enforce_eager": True,
++        "num_gpus": 4,
++        "quantization_config": None,
++        "parallel_config": SimpleNamespace(
++            allgather_degree=1,
++            cfg_parallel_size=1,
++            data_parallel_size=1,
++            pipeline_parallel_size=1,
++            ring_degree=1,
++            sequence_parallel_size=4,
++            tensor_parallel_size=1,
++            ulysses_degree=4,
++            use_hsdp=False,
++        ),
++    }
++    values.update(overrides)
++    return SimpleNamespace(**values)
++
++
++def _resolve_quality(policy, **overrides):
++    values = {
++        "quality": "high",
++        "num_inference_steps": 50,
++        "extra_args": None,
++    }
++    values.update(overrides)
++    return policy.resolve(**values)
++
++
++def test_high_quality_policy_emits_cache_profile_without_deployment_gates():
++    from vllm_omni.diffusion.models.minimax_h3.quality_policy import (
++        MiniMaxH3QualityPolicy,
++    )
++
++    policy = MiniMaxH3QualityPolicy(
++        _quality_od_config(
++            cache_backend="none",
++            enable_layerwise_offload=True,
++            enforce_eager=False,
++            num_gpus=1,
++        )
++    )
++
++    plan = _resolve_quality(policy, num_inference_steps=17)
++    spec = plan.cache_dit
++
++    assert spec is not None
++    assert spec.installation_key == "minimax_h3.high"
++    assert spec.num_inference_steps == 17
++    assert spec.cache_config.Fn_compute_blocks == 1
++    assert spec.cache_config.Bn_compute_blocks == 0
++    assert spec.cache_config.max_warmup_steps == 4
++    assert spec.cache_config.residual_diff_threshold == pytest.approx(0.04)
++    assert spec.cache_config.max_continuous_cached_steps == 1
++    assert spec.cache_config.enable_taylorseer is False
++    assert spec.cache_config.scm_steps_mask_policy is None
++
++
++def test_h3_force_refresh_is_model_owned_and_request_scoped():
++    from vllm_omni.diffusion.models.minimax_h3.quality_policy import MiniMaxH3QualityPolicy
++
++    policy = MiniMaxH3QualityPolicy(_quality_od_config())
++    plan = _resolve_quality(
++        policy,
++        quality="high",
++        num_inference_steps=17,
++        extra_args={"force_refresh_step_hint": 7},
++    )
++
++    assert plan.cache_dit is not None
++    assert plan.cache_dit.installation_key == "minimax_h3.high:force_refresh=7:once"
++    assert plan.cache_dit.cache_config.force_refresh_step_hint == 7
++    assert plan.cache_dit.cache_config.force_refresh_step_policy == "once"
++
++
++def test_h3_force_refresh_policy_supports_repeat_and_does_not_mutate_generic_config():
++    from vllm_omni.diffusion.models.minimax_h3.quality_policy import MiniMaxH3QualityPolicy
++
++    config = _quality_od_config()
++    plan = _resolve_quality(
++        MiniMaxH3QualityPolicy(config),
++        quality=None,
++        num_inference_steps=20,
++        extra_args={"force_refresh_step_hint": 5, "force_refresh_step_policy": "repeat"},
++    )
++
++    assert plan.cache_dit is not None
++    assert plan.cache_dit.installation_key == "minimax_h3.generic:force_refresh=5:repeat"
++    assert plan.cache_dit.cache_config is not config.cache_config
++    assert plan.cache_dit.cache_config.force_refresh_step_hint == 5
++    assert plan.cache_dit.cache_config.force_refresh_step_policy == "repeat"
++    assert config.cache_config.force_refresh_step_hint is None
++    assert config.cache_config.force_refresh_step_policy == "once"
++
++    restored = _resolve_quality(MiniMaxH3QualityPolicy(config), quality=None)
++    assert restored.cache_dit is not None
++    assert restored.cache_dit.installation_key == "minimax_h3.generic"
++    assert restored.cache_dit.cache_config is config.cache_config
++
++
++@pytest.mark.parametrize(
++    ("extra_args", "message"),
++    [
++        ({"force_refresh_step_hint": True}, "positive integer"),
++        ({"force_refresh_step_hint": 0}, "between 1"),
++        ({"force_refresh_step_hint": 51}, "between 1"),
++        ({"force_refresh_step_hint": 5, "force_refresh_step_policy": "always"}, "one of"),
++        ({"force_refresh_step_policy": "repeat"}, "requires force_refresh_step_hint"),
++    ],
++)
++def test_h3_force_refresh_rejects_invalid_values(extra_args, message):
++    from vllm_omni.diffusion.models.minimax_h3.quality_policy import MiniMaxH3QualityPolicy
++
++    with pytest.raises(OmniClientError, match=message):
++        _resolve_quality(
++            MiniMaxH3QualityPolicy(_quality_od_config()),
++            extra_args=extra_args,
++        )
++
++
++@pytest.mark.parametrize(
++    ("cache_backend", "quality"),
++    [
++        ("cache_dit", "lossless"),
++        ("none", None),
++    ],
++)
++def test_h3_force_refresh_requires_active_cache_target(cache_backend, quality):
++    from vllm_omni.diffusion.models.minimax_h3.quality_policy import MiniMaxH3QualityPolicy
++
++    policy = MiniMaxH3QualityPolicy(_quality_od_config(cache_backend=cache_backend))
++
++    with pytest.raises(OmniClientError, match="require an active Cache-DiT"):
++        _resolve_quality(
++            policy,
++            quality=quality,
++            extra_args={"force_refresh_step_hint": 7},
++        )
++
++
++@pytest.mark.parametrize(
++    ("cache_backend", "quality", "expected_key"),
++    [
++        ("cache_dit", None, "minimax_h3.generic"),
++        ("cache_dit", "lossless", None),
++        ("cache_dit", "high", "minimax_h3.high"),
++        ("none", None, None),
++        ("none", "lossless", None),
++        ("none", "high", "minimax_h3.high"),
++    ],
++)
++def test_model_policy_owns_request_cache_target(cache_backend, quality, expected_key):
++    from vllm_omni.diffusion.models.minimax_h3.quality_policy import (
++        MiniMaxH3QualityPolicy,
++    )
++
++    config = _quality_od_config(cache_backend=cache_backend)
++    policy = MiniMaxH3QualityPolicy(config)
++
++    plan = _resolve_quality(
++        policy,
++        quality=quality,
++    )
++
++    if expected_key is None:
++        assert plan.cache_dit is None
++    else:
++        assert plan.cache_dit is not None
++        assert plan.cache_dit.installation_key == expected_key
++        if quality is None:
++            assert plan.cache_dit.cache_config is config.cache_config
++
++
++def test_h3_adopts_runner_installed_cache_dit_backend():
++    from vllm_omni.diffusion.models.minimax_h3 import MiniMaxH3Pipeline
++
++    backend = object()
++    pipeline = object.__new__(MiniMaxH3Pipeline)
++    pipeline._cache_dit_runtime = SimpleNamespace(
++        adopt=lambda adopted, *, installation_key: setattr(
++            pipeline,
++            "adopted",
++            (adopted, installation_key),
++        ),
++        is_enabled=True,
++    )
++
++    pipeline.adopt_cache_dit_backend(backend)
++
++    assert pipeline.adopted == (backend, "minimax_h3.generic")
++    assert pipeline.is_cache_dit_enabled()
+diff --git a/tests/diffusion/test_diffusion_model_runner.py b/tests/diffusion/test_diffusion_model_runner.py
+index a7f230d93dd..e57275485ae 100644
+--- a/tests/diffusion/test_diffusion_model_runner.py
++++ b/tests/diffusion/test_diffusion_model_runner.py
+@@ -162,6 +162,21 @@ def _fake_platform_for_peak_memory():
+     )
+ 
+ 
++def test_request_scoped_cache_dit_lifecycle_is_pipeline_opt_in():
++    events = []
++    plain_pipeline = object()
++    request_scoped_pipeline = SimpleNamespace(
++        adopt_cache_dit_backend=lambda backend: events.append(backend),
++        is_cache_dit_enabled=lambda: True,
++    )
++    backend = object()
++
++    assert not model_runner_module.adopt_request_scoped_cache_dit(plain_pipeline, backend)
++    assert model_runner_module.adopt_request_scoped_cache_dit(request_scoped_pipeline, backend)
++    assert model_runner_module.is_request_scoped_cache_dit_enabled(request_scoped_pipeline)
++    assert events == [backend]
++
++
+ def _make_runner(cache_backend, cache_backend_name: str, enable_cache_dit_summary: bool = True):
+     runner = object.__new__(DiffusionModelRunner)
+     runner.vllm_config = object()
+@@ -419,6 +434,33 @@ def refresh(self, pipeline, num_inference_steps, verbose=True):
+     assert cache_backend.refresh_calls == [(runner.pipeline, 4, True)]
+ 
+ 
++@pytest.mark.core_model
++@hardware_test(res={"cuda": "L4"}, num_cards=1)
++@pytest.mark.parametrize("cache_dit_enabled", [False, True])
++def test_execute_model_cache_summary_follows_pipeline_owned_cache_dit_state(monkeypatch, cache_dit_enabled):
++    runner = _make_runner(cache_backend=None, cache_backend_name="cache_dit")
++    runner.pipeline.adopt_cache_dit_backend = lambda backend: None
++    runner.pipeline.is_cache_dit_enabled = lambda: cache_dit_enabled
++    req = _make_request()
++
++    cache_summary_calls = []
++
++    monkeypatch.setattr(model_runner_module, "set_forward_context", _noop_forward_context)
++    monkeypatch.setattr(model_runner_module.current_omni_platform, "reset_peak_memory_stats", lambda: None)
++    monkeypatch.setattr(model_runner_module.current_omni_platform, "max_memory_reserved", lambda: 0)
++    monkeypatch.setattr(model_runner_module.current_omni_platform, "max_memory_allocated", lambda: 0)
++    monkeypatch.setattr(
++        model_runner_module,
++        "cache_summary",
++        lambda pipeline, details: cache_summary_calls.append((pipeline, details)),
++    )
++
++    output = DiffusionModelRunner.execute_model(runner, req)
++
++    assert output.output == "ok"
++    assert cache_summary_calls == ([(runner.pipeline, True)] if cache_dit_enabled else [])
++
++
+ @pytest.mark.core_model
+ @pytest.mark.cpu
+ def test_execute_model_passes_single_request_batch_to_non_admission_pipeline(monkeypatch):
+diff --git a/tests/diffusion/test_diffusion_scheduler.py b/tests/diffusion/test_diffusion_scheduler.py
+index 43ce7a45b6a..a20d7e5a96b 100644
+--- a/tests/diffusion/test_diffusion_scheduler.py
++++ b/tests/diffusion/test_diffusion_scheduler.py
+@@ -380,6 +380,63 @@ def test_batches_incompatible_request_sampling_params_separately(self) -> None:
+         assert first.num_running_reqs == 1
+         assert first.num_waiting_reqs == 1
+ 
++    def test_batches_different_quality_levels_separately(self) -> None:
++        scheduler = RequestScheduler()
++        scheduler.initialize(SimpleNamespace(max_num_seqs=2))
++
++        high = scheduler.add_request(
++            _make_step_request(
++                "high",
++                sampling_params=OmniDiffusionSamplingParams(
++                    num_inference_steps=2,
++                    quality="high",
++                ),
++            )
++        )
++        scheduler.add_request(
++            _make_step_request(
++                "lossless",
++                sampling_params=OmniDiffusionSamplingParams(
++                    num_inference_steps=2,
++                    quality="lossless",
++                ),
++            )
++        )
++
++        first = scheduler.schedule()
++
++        assert _new_ids(first) == [high]
++        assert first.num_running_reqs == 1
++        assert first.num_waiting_reqs == 1
++
++    def test_batches_omitted_and_explicit_lossless_separately(self) -> None:
++        scheduler = RequestScheduler()
++        scheduler.initialize(SimpleNamespace(max_num_seqs=2))
++
++        omitted = scheduler.add_request(
++            _make_step_request(
++                "omitted",
++                sampling_params=OmniDiffusionSamplingParams(
++                    num_inference_steps=2,
++                ),
++            )
++        )
++        scheduler.add_request(
++            _make_step_request(
++                "explicit",
++                sampling_params=OmniDiffusionSamplingParams(
++                    num_inference_steps=2,
++                    quality="lossless",
++                ),
++            )
++        )
++
++        first = scheduler.schedule()
++
++        assert _new_ids(first) == [omitted]
++        assert first.num_running_reqs == 1
++        assert first.num_waiting_reqs == 1
++
+     def test_batches_different_request_local_seed_together(self) -> None:
+         scheduler = RequestScheduler()
+         scheduler.initialize(SimpleNamespace(max_num_seqs=2))
+@@ -930,6 +987,35 @@ def test_step_batch_rejects_different_sampling_key(self) -> None:
+         assert second.num_running_reqs == 1
+         assert second.num_waiting_reqs == 1
+ 
++    def test_step_batch_rejects_different_quality_levels(self) -> None:
++        scheduler = StepScheduler()
++        scheduler.initialize(SimpleNamespace(max_num_seqs=2))
++
++        high = scheduler.add_request(
++            _make_step_request(
++                "high",
++                sampling_params=OmniDiffusionSamplingParams(
++                    num_inference_steps=4,
++                    quality="high",
++                ),
++            )
++        )
++        scheduler.add_request(
++            _make_step_request(
++                "lossless",
++                sampling_params=OmniDiffusionSamplingParams(
++                    num_inference_steps=4,
++                    quality="lossless",
++                ),
++            )
++        )
++
++        first = scheduler.schedule()
++
++        assert _new_ids(first) == [high]
++        assert first.num_running_reqs == 1
++        assert first.num_waiting_reqs == 1
++
+     def test_step_batch_co_schedules_requests_sharing_lora(self) -> None:
+         """Multiple requests with the same LoRA (id + scale) co-batch."""
+         from vllm_omni.lora.request import LoRARequest
+diff --git a/tests/entrypoints/openai_api/test_serving_chat_sampling_params.py b/tests/entrypoints/openai_api/test_serving_chat_sampling_params.py
+index de3158d43c0..e7f014a3bc0 100644
+--- a/tests/entrypoints/openai_api/test_serving_chat_sampling_params.py
++++ b/tests/entrypoints/openai_api/test_serving_chat_sampling_params.py
+@@ -95,6 +95,7 @@ def test_serving_boundary_normalizes_declared_root_and_nested_extras(serving_cha
+         messages=[],
+         modalities=["image"],
+         num_inference_steps=7,
++        quality="high",
+         size="768x512",
+         negative_prompt="avoid blur",
+         lora={"name": "adapter"},
+@@ -110,6 +111,7 @@ def test_serving_boundary_normalizes_declared_root_and_nested_extras(serving_cha
+     }
+     assert diffusion_request_args["cfg_text_scale"] == 7.0
+     assert diffusion_request_args["num_inference_steps"] == 7
++    assert diffusion_request_args["quality"] == "high"
+     assert diffusion_request_args["size"] == "768x512"
+     assert diffusion_request_args["negative_prompt"] == "avoid blur"
+     assert diffusion_request_args["lora"] == {"name": "adapter"}
+@@ -133,6 +135,19 @@ def test_unknown_root_extra_does_not_claim_canonical_extra(serving_chat):
+     assert "pipeline_option" not in diffusion_request_args
+ 
+ 
++def test_serving_boundary_rejects_invalid_quality(serving_chat):
++    serving_chat._diffusion_extra_body_params = frozenset()
++    request = ChatCompletionRequest(
++        model="test",
++        messages=[],
++        modalities=["image"],
++        quality="medium",
++    )
++
++    with pytest.raises(ValueError, match="quality must be one of"):
++        serving_chat._normalize_diffusion_request_args(request)
++
++
+ def test_unregistered_cfg_scale_aliases_common_true_cfg_scale(serving_chat):
+     serving_chat._diffusion_extra_body_params = frozenset()
+     request = ChatCompletionRequest(
+@@ -226,6 +241,7 @@ async def generate(**kwargs):
+         negative_prompt="avoid blur",
+         cfg_scale=7.0,
+         true_cfg_scale=2.0,
++        quality="high",
+         extra_body={"extra_args": {"solver": "ddim"}},
+     )
+ 
+@@ -239,6 +255,7 @@ async def generate(**kwargs):
+     }
+     assert sampling_params.true_cfg_scale == 2.0
+     assert sampling_params.num_inference_steps == 7
++    assert sampling_params.quality == "high"
+     assert (sampling_params.height, sampling_params.width) == (512, 768)
+     assert captured["prompt"]["negative_prompt"] == "avoid blur"
+     assert response.error.message == "No output generated from AsyncOmni"
+@@ -310,6 +327,7 @@ def generate(**kwargs):
+     assert sampling_params_list[0].extra_args == {"target_h": 512, "target_w": 768}
+     diffusion_params = sampling_params_list[1]
+     assert diffusion_params.num_inference_steps == 7
++    assert diffusion_params.quality is None
+     assert (diffusion_params.height, diffusion_params.width) == (512, 768)
+     assert diffusion_params.extra_args == {"solver": "euler"}
+     assert captured["prompt"]["negative_prompt"] == "avoid blur"
+diff --git a/tests/entrypoints/openai_api/test_serving_video_output_stream.py b/tests/entrypoints/openai_api/test_serving_video_output_stream.py
+index ec1727fe827..27f1bed1e52 100644
+--- a/tests/entrypoints/openai_api/test_serving_video_output_stream.py
++++ b/tests/entrypoints/openai_api/test_serving_video_output_stream.py
+@@ -17,6 +17,7 @@
+ from starlette.testclient import TestClient
+ 
+ from tests.helpers.media import generate_synthetic_image
++from vllm_omni.entrypoints.openai.protocol.videos import VideoGenerationRequest
+ from vllm_omni.entrypoints.openai.serving_video_output_stream import OmniStreamingVideoOutputHandler
+ from vllm_omni.inputs.data import OmniDiffusionSamplingParams
+ from vllm_omni.outputs import OmniRequestOutput
+@@ -103,6 +104,55 @@ async def ws_endpoint(websocket: WebSocket):
+ class TestStreamingVideoOutputWebSocket:
+     """WebSocket protocol tests for streaming generated video output."""
+ 
++    def test_sampling_params_quality_reaches_h3_pipeline_boundary(
++        self,
++        mocker: MockerFixture,
++    ) -> None:
++        async def mock_generate(*_args, **_kwargs):
++            if False:
++                yield None
++
++        _app, handler, _engine_client = _build_test_app(
++            mocker=mocker,
++            streaming_chunks=[],
++            mock_generate=mock_generate,
++        )
++        request_data = handler._coerce_request_data(
++            {
++                "type": "session.start",
++                "prompt": "H3 streaming quality",
++                "sampling_params": {"quality": "high"},
++            }
++        )
++        request = VideoGenerationRequest(**request_data)
++
++        _prompt, sampling_params, _video_params = asyncio.run(handler._build_prompt_and_sampling_params(request))
++
++        assert sampling_params.quality == "high"
++
++    def test_omitted_quality_preserves_engine_default(self, mocker: MockerFixture) -> None:
++        async def mock_generate(*_args, **_kwargs):
++            if False:
++                yield None
++
++        _app, handler, engine_client = _build_test_app(
++            mocker=mocker,
++            streaming_chunks=[],
++            mock_generate=mock_generate,
++        )
++        engine_client.default_sampling_params_list = [OmniDiffusionSamplingParams(quality="high")]
++        request_data = handler._coerce_request_data(
++            {
++                "type": "session.start",
++                "prompt": "H3 streaming default quality",
++            }
++        )
++        request = VideoGenerationRequest(**request_data)
++
++        _prompt, sampling_params, _video_params = asyncio.run(handler._build_prompt_and_sampling_params(request))
++
++        assert sampling_params.quality == "high"
++
+     def test_streaming_session_emits_video_start_binary_chunks_and_done(self, mocker: MockerFixture):
+         """A full session delivers video.start, binary chunks, then session.done."""
+ 
+diff --git a/tests/entrypoints/openai_api/test_video_server.py b/tests/entrypoints/openai_api/test_video_server.py
+index 5af971755b2..d16a51e002f 100644
+--- a/tests/entrypoints/openai_api/test_video_server.py
++++ b/tests/entrypoints/openai_api/test_video_server.py
+@@ -868,6 +868,7 @@ def test_default_sampling_params_apply_to_video_requests(test_client, mocker: Mo
+         OmniDiffusionSamplingParams(
+             num_inference_steps=4,
+             guidance_scale=7.5,
++            quality="high",
+             generator_device="cpu",
+             enable_frame_interpolation=True,
+             frame_interpolation_exp=2,
+@@ -890,6 +891,7 @@ def test_default_sampling_params_apply_to_video_requests(test_client, mocker: Mo
+     captured = engine.captured_sampling_params_list[0]
+     assert captured.num_inference_steps == 4
+     assert captured.guidance_scale == 7.5
++    assert captured.quality == "high"
+     assert captured.generator_device == "cpu"
+     assert captured.enable_frame_interpolation is True
+     assert captured.frame_interpolation_exp == 2
+@@ -1445,6 +1447,7 @@ def test_invalid_uploaded_input_reference_returns_400(test_client):
+ def test_video_request_validation():
+     req = VideoGenerationRequest(prompt="test")
+     assert req.prompt == "test"
++    assert req.quality is None
+     assert req.generate_sound is False
+     assert req.sound_duration is None
+     assert VideoGenerationRequest(prompt="test", generate_sound=True, sound_duration=1.5).generate_sound is True
+@@ -1464,6 +1467,8 @@ def test_video_request_validation():
+         VideoGenerationRequest(prompt="test", frame_interpolation_scale=0)
+     with pytest.raises(ValueError):
+         VideoGenerationRequest(prompt="test", sound_duration=0)
++    with pytest.raises(ValueError):
++        VideoGenerationRequest(prompt="test", quality="medium")
+ 
+ 
+ def test_list_videos_supports_order_after_and_limit(test_client, mocker: MockerFixture):
+@@ -1975,6 +1980,7 @@ def test_sync_sampling_params_pass_through(test_client, mocker: MockerFixture):
+             "num_inference_steps": "30",
+             "guidance_scale": "6.5",
+             "seed": "42",
++            "quality": "high",
+         },
+     )
+     assert response.status_code == 200
+@@ -1983,6 +1989,7 @@ def test_sync_sampling_params_pass_through(test_client, mocker: MockerFixture):
+     assert captured.num_inference_steps == 30
+     assert captured.guidance_scale == 6.5
+     assert captured.seed == 42
++    assert captured.quality == "high"
+ 
+ 
+ def test_sync_frame_interpolation_params_pass_to_sampling_params(test_client, mocker: MockerFixture):
+@@ -2018,6 +2025,7 @@ def test_sync_default_sampling_params_apply_to_video_requests(test_client, mocke
+         OmniDiffusionSamplingParams(
+             num_inference_steps=4,
+             guidance_scale=7.5,
++            quality="high",
+             enable_frame_interpolation=True,
+             frame_interpolation_exp=2,
+             frame_interpolation_scale=0.5,
+@@ -2038,6 +2046,7 @@ def test_sync_default_sampling_params_apply_to_video_requests(test_client, mocke
+     captured = engine.captured_sampling_params_list[0]
+     assert captured.num_inference_steps == 4
+     assert captured.guidance_scale == 7.5
++    assert captured.quality == "high"
+     assert captured.enable_frame_interpolation is True
+     assert captured.frame_interpolation_exp == 2
+     assert captured.frame_interpolation_scale == 0.5
+diff --git a/tests/inputs/test_diffusion_sampling_params.py b/tests/inputs/test_diffusion_sampling_params.py
+index 5daa1fd49e7..28e0ce0c840 100644
+--- a/tests/inputs/test_diffusion_sampling_params.py
++++ b/tests/inputs/test_diffusion_sampling_params.py
+@@ -25,6 +25,23 @@ def test_from_params_returns_existing_omni_params() -> None:
+     assert converted is params
+ 
+ 
++@pytest.mark.parametrize("quality", ["lossless", "high"])
++def test_quality_accepts_supported_request_levels(quality: str) -> None:
++    params = OmniDiffusionSamplingParams(quality=quality)
++
++    assert params.quality == quality
++
++
++def test_quality_defaults_to_model_owned_policy() -> None:
++    params = OmniDiffusionSamplingParams()
++    assert params.quality is None
++
++
++def test_quality_rejects_unsupported_request_level() -> None:
++    with pytest.raises(ValueError, match="quality must be one of"):
++        OmniDiffusionSamplingParams(quality="medium")
++
++
+ def test_from_params_converts_sampling_params_seed_and_known_extra_args() -> None:
+     params = _sampling_params(
+         seed=1234,
+@@ -33,6 +50,7 @@ def test_from_params_converts_sampling_params_seed_and_known_extra_args() -> Non
+             "height": 1024,
+             "width": 768,
+             "guidance_scale": 7.5,
++            "quality": "high",
+         },
+     )
+ 
+@@ -43,6 +61,7 @@ def test_from_params_converts_sampling_params_seed_and_known_extra_args() -> Non
+     assert converted.height == 1024
+     assert converted.width == 768
+     assert converted.guidance_scale == 7.5
++    assert converted.quality == "high"
+     assert converted.extra_args == {}
+ 
+ 
+diff --git a/vllm_omni/diffusion/cache/cachedit/__init__.py b/vllm_omni/diffusion/cache/cachedit/__init__.py
+index f3d07548907..7166f709839 100644
+--- a/vllm_omni/diffusion/cache/cachedit/__init__.py
++++ b/vllm_omni/diffusion/cache/cachedit/__init__.py
+@@ -20,6 +20,10 @@
+ from vllm_omni.diffusion.cache.cachedit.model_specific import (
+     register_custom_dit_enablers as _register_custom_dit_enablers,
+ )
++from vllm_omni.diffusion.cache.cachedit.runtime import (
++    CacheDiTRequestSpec,
++    RequestScopedCacheDiTRuntime,
++)
+ 
+ _register_custom_dit_enablers()
+ 
+@@ -29,6 +33,8 @@
+     "CacheDiTAdapterConfig",
+     "CacheDiTBackend",
+     "CacheDiTConfig",
++    "CacheDiTRequestSpec",
++    "RequestScopedCacheDiTRuntime",
+     "SensenovaCachedAdapter",
+     "cache_summary",
+     "enable_cache_for_dit",
+diff --git a/vllm_omni/diffusion/cache/cachedit/backend.py b/vllm_omni/diffusion/cache/cachedit/backend.py
+index c30a888a863..1133f3c9720 100644
+--- a/vllm_omni/diffusion/cache/cachedit/backend.py
++++ b/vllm_omni/diffusion/cache/cachedit/backend.py
+@@ -85,19 +85,37 @@ def refresh_cache_context(
+         # Cache-DiT has no predefined SCM mask for these small step counts.
+         scm_supported_steps = num_inference_steps >= 8 or num_inference_steps in (4, 6)
+         if projected_config.scm_steps_mask_policy is None or not scm_supported_steps:
++            if projected_config.force_refresh_step_hint is not None:
++                # Cache-DiT's ``once`` policy clears the hint after it fires.
++                # Reapply it at every request boundary so a repeated request
++                # with the same configured policy receives the same behavior.
++                cache_dit.refresh_context(
++                    transformer,
++                    cache_config=DBCacheConfig().reset(
++                        num_inference_steps=num_inference_steps,
++                        force_refresh_step_hint=projected_config.force_refresh_step_hint,
++                        force_refresh_step_policy=projected_config.force_refresh_step_policy,
++                    ),
++                    verbose=verbose,
++                )
++                return
+             cache_dit.refresh_context(transformer, num_inference_steps=num_inference_steps, verbose=verbose)
+             return
+ 
++        refresh_config = DBCacheConfig().reset(
++            num_inference_steps=num_inference_steps,
++            steps_computation_mask=cache_dit.steps_mask(
++                mask_policy=projected_config.scm_steps_mask_policy,
++                total_steps=num_inference_steps,
++            ),
++            steps_computation_policy=projected_config.scm_steps_policy,
++        )
++        if projected_config.force_refresh_step_hint is not None:
++            refresh_config.force_refresh_step_hint = projected_config.force_refresh_step_hint
++            refresh_config.force_refresh_step_policy = projected_config.force_refresh_step_policy
+         cache_dit.refresh_context(
+             transformer,
+-            cache_config=DBCacheConfig().reset(
+-                num_inference_steps=num_inference_steps,
+-                steps_computation_mask=cache_dit.steps_mask(
+-                    mask_policy=projected_config.scm_steps_mask_policy,
+-                    total_steps=num_inference_steps,
+-                ),
+-                steps_computation_policy=projected_config.scm_steps_policy,
+-            ),
++            cache_config=refresh_config,
+             verbose=verbose,
+         )
+ 
+@@ -213,19 +231,23 @@ def __init__(self, cache_config: Any = None):
+ 
+         super().__init__(config)
+         self._refresh_funcs: list[RefreshCacheContextFunc] = []
++        self._cache_targets: list[Any] = []
+ 
+     def enable(self, pipeline: SupportsComponentDiscovery) -> None:
+         pipeline_name = type(pipeline).__name__
+         custom_enabler = CUSTOM_DIT_ENABLERS.get(pipeline_name)
++        self._refresh_funcs = []
++        self._cache_targets = []
+         if custom_enabler is not None:
+             logger.info("Using custom cache-dit enabler for model: %s", pipeline_name)
+             self._refresh_funcs = [custom_enabler(pipeline, self.config)]
++            self._cache_targets = [_default_get_pipeline_transformer(pipeline)]
+         else:
+-            self._refresh_funcs = []
+             for name in _dit_module_names(pipeline):
+                 get_transformer = _make_pipeline_transformer_getter(name)
+                 block_adapter = _maybe_build_block_adapter(pipeline, get_transformer)
+                 adapter_cls = _maybe_get_cached_adapter_cls(pipeline, get_transformer)
++                cache_target = get_transformer(pipeline) if block_adapter is None else block_adapter
+                 self._refresh_funcs.append(
+                     enable_cache_for_dit(
+                         pipeline,
+@@ -235,12 +257,32 @@ def enable(self, pipeline: SupportsComponentDiscovery) -> None:
+                         get_transformer,
+                     )
+                 )
++                self._cache_targets.append(cache_target)
+             if not self._refresh_funcs:
+                 raise ValueError(f"Pipeline {pipeline_name} has no declared DiT modules for Cache-DiT")
+ 
+         self.enabled = True
+         logger.info("Cache-dit enabled successfully on %s", pipeline_name)
+ 
++    def disable(self, pipeline: SupportsComponentDiscovery) -> None:
++        """Remove Cache-DiT hooks so later requests use native forwards."""
++
++        if not self.enabled:
++            return
++
++        logger.info(
++            "Disabling cache-dit on %d DiT target(s) for %s",
++            len(self._cache_targets),
++            type(pipeline).__name__,
++        )
++        try:
++            for target in self._cache_targets:
++                cache_dit.disable_cache(target)
++        finally:
++            self._refresh_funcs = []
++            self._cache_targets = []
++            self.enabled = False
++
+     def refresh(self, pipeline: SupportsComponentDiscovery, num_inference_steps: int, verbose: bool = True) -> None:
+         if not self.enabled or not self._refresh_funcs:
+             logger.warning("Cache-dit is not enabled. Cannot refresh cache context.")
+diff --git a/vllm_omni/diffusion/cache/cachedit/runtime.py b/vllm_omni/diffusion/cache/cachedit/runtime.py
+new file mode 100644
+index 00000000000..e3403434abb
+--- /dev/null
++++ b/vllm_omni/diffusion/cache/cachedit/runtime.py
+@@ -0,0 +1,94 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++
++"""Declarative request-scoped Cache-DiT lifecycle."""
++
++from __future__ import annotations
++
++from dataclasses import dataclass
++from typing import Any
++
++from vllm_omni.diffusion.cache.cachedit.backend import CacheDiTBackend
++from vllm_omni.diffusion.data import DiffusionCacheConfig
++
++
++@dataclass(frozen=True)
++class CacheDiTRequestSpec:
++    """Desired Cache-DiT state for one request.
++
++    ``installation_key`` identifies configurations that require reinstalling
++    hooks when switching between them. Step-count changes only require a
++    context refresh.
++    """
++
++    installation_key: str
++    cache_config: DiffusionCacheConfig
++    num_inference_steps: int
++
++
++class RequestScopedCacheDiTRuntime:
++    """Reconcile declarative request state with installed Cache-DiT hooks."""
++
++    def __init__(self, pipeline: Any) -> None:
++        self._pipeline = pipeline
++        self._backend: CacheDiTBackend | None = None
++        self._installation_key: str | None = None
++
++    @property
++    def is_enabled(self) -> bool:
++        return self._backend is not None and self._backend.is_enabled()
++
++    def adopt(self, backend: CacheDiTBackend, *, installation_key: str) -> None:
++        """Assume ownership of an already-enabled startup backend."""
++
++        if self._backend is not None:
++            if self._backend is backend and self._installation_key == installation_key:
++                return
++            raise RuntimeError(
++                f"Cache-DiT is already installed with key {self._installation_key!r}; cannot adopt {installation_key!r}"
++            )
++        if not backend.is_enabled():
++            raise ValueError("Cannot adopt a Cache-DiT backend before it is enabled")
++
++        self._backend = backend
++        self._installation_key = installation_key
++
++    def prepare(self, spec: CacheDiTRequestSpec | None) -> None:
++        """Apply the minimal transition needed before the request denoise.
++
++        ``None`` disables installed hooks. An unchanged installation key only
++        refreshes request context; a changed key disables the previous hooks
++        before installing the requested profile.
++        """
++
++        desired_key = None if spec is None else spec.installation_key
++        if self._installation_key != desired_key:
++            self.disable()
++
++        if spec is None:
++            return
++
++        if self._backend is None:
++            backend = CacheDiTBackend(spec.cache_config)
++            backend.enable(self._pipeline)
++            self.adopt(backend, installation_key=spec.installation_key)
++
++        assert self._backend is not None
++        self._backend.refresh(
++            self._pipeline,
++            num_inference_steps=spec.num_inference_steps,
++        )
++
++    def disable(self) -> None:
++        try:
++            if self._backend is not None:
++                self._backend.disable(self._pipeline)
++        finally:
++            self._backend = None
++            self._installation_key = None
++
++
++__all__ = [
++    "CacheDiTRequestSpec",
++    "RequestScopedCacheDiTRuntime",
++]
+diff --git a/vllm_omni/diffusion/models/interface.py b/vllm_omni/diffusion/models/interface.py
+index 1f2c8c2266d..7a30fa77c0f 100644
+--- a/vllm_omni/diffusion/models/interface.py
++++ b/vllm_omni/diffusion/models/interface.py
+@@ -17,6 +17,7 @@
+ 
+     import torch
+ 
++    from vllm_omni.diffusion.cache.cachedit import CacheDiTBackend
+     from vllm_omni.diffusion.data import DiffusionOutput
+     from vllm_omni.diffusion.worker.input_batch import InputBatch
+     from vllm_omni.diffusion.worker.utils import StepRequestState
+@@ -131,3 +132,31 @@ def supports_prompt_update(pipeline: object) -> bool:
+     """Return whether ``pipeline`` implements :class:`SupportsPromptUpdate`."""
+ 
+     return isinstance(pipeline, SupportsPromptUpdate)
++
++
++@runtime_checkable
++class SupportsRequestScopedCacheDiT(Protocol):
++    """Optional protocol for pipelines that own Cache-DiT hook transitions."""
++
++    def adopt_cache_dit_backend(self, backend: CacheDiTBackend) -> None:
++        """Assume ownership of an enabled Cache-DiT backend."""
++        ...
++
++    def is_cache_dit_enabled(self) -> bool:
++        """Return whether this pipeline currently has Cache-DiT installed."""
++        ...
++
++
++def adopt_request_scoped_cache_dit(pipeline: object, backend: CacheDiTBackend) -> bool:
++    """Transfer an enabled Cache-DiT backend to an opted-in pipeline."""
++
++    if not isinstance(pipeline, SupportsRequestScopedCacheDiT):
++        return False
++    pipeline.adopt_cache_dit_backend(backend)
++    return True
++
++
++def is_request_scoped_cache_dit_enabled(pipeline: object) -> bool:
++    """Read Cache-DiT state from a pipeline that owns its lifecycle."""
++
++    return isinstance(pipeline, SupportsRequestScopedCacheDiT) and pipeline.is_cache_dit_enabled()
+diff --git a/vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py b/vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py
+index b11b4e32025..610e1925fda 100644
+--- a/vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py
++++ b/vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py
+@@ -22,6 +22,10 @@
+ from vllm.logger import init_logger
+ 
+ from vllm_omni.diffusion import envs
++from vllm_omni.diffusion.cache.cachedit import (
++    CacheDiTBackend,
++    RequestScopedCacheDiTRuntime,
++)
+ from vllm_omni.diffusion.data import DiffusionOutput, OmniDiffusionConfig
+ from vllm_omni.diffusion.distributed.parallel_state import (
+     get_dit_group,
+@@ -73,6 +77,7 @@
+     minimax_h3_ref2va_video_presentation,
+     minimax_h3_text_only_ids,
+ )
++from .quality_policy import MINIMAX_H3_GENERIC_CACHE_KEY, MiniMaxH3QualityPolicy
+ from .reference_video import (
+     load_audio_file,
+     load_video_audio,
+@@ -538,6 +543,19 @@ class MiniMaxH3Pipeline(
+     ]
+     dummy_run_num_frames: ClassVar[int] = 0
+ 
++    def adopt_cache_dit_backend(self, backend: CacheDiTBackend) -> None:
++        """Adopt runner-installed generic Cache-DiT for request transitions."""
++
++        self._cache_dit_runtime.adopt(
++            backend,
++            installation_key=MINIMAX_H3_GENERIC_CACHE_KEY,
++        )
++
++    def is_cache_dit_enabled(self) -> bool:
++        """Return the request-scoped Cache-DiT installation state."""
++
++        return self._cache_dit_runtime.is_enabled
++
+     def __init__(
+         self,
+         *,
+@@ -676,6 +694,9 @@ def __init__(
+         # Registry-side VAE patch-parallel discovery uses ``pipeline.vae``.
+         self.vae = self.video_vae
+ 
++        self._quality_policy = MiniMaxH3QualityPolicy(od_config)
++        self._cache_dit_runtime = RequestScopedCacheDiTRuntime(self)
++
+         self.setup_diffusion_pipeline_profiler(
+             enable_diffusion_pipeline_profiler=(od_config.enable_diffusion_pipeline_profiler)
+         )
+@@ -1551,6 +1572,8 @@ def forward(self, request: DiffusionRequestBatch) -> DiffusionOutput:
+             raise OmniClientError("MiniMax H3 requires a non-empty prompt")
+ 
+         sampling = request.sampling_params
++        quality = sampling.quality
++        logger.debug("MiniMax H3 request quality=%s", quality)
+         extra = sampling.extra_args or {}
+         task = self._resolve_task(extra.get("task"), multi_modal_data)
+ 
+@@ -1732,6 +1755,12 @@ def forward(self, request: DiffusionRequestBatch) -> DiffusionOutput:
+         num_steps = int(sampling.num_inference_steps or 50)
+         video_shift = float(extra.get("flow_shift", self.default_video_shift))
+         audio_shift = float(extra.get("audio_flow_shift", self.default_audio_shift))
++        quality_plan = self._quality_policy.resolve(
++            quality=quality,
++            num_inference_steps=num_steps,
++            extra_args=extra,
++        )
++        self._cache_dit_runtime.prepare(quality_plan.cache_dit)
+         num_outputs = _resolve_minimax_h3_num_outputs(sampling.num_outputs_per_prompt)
+         videos = []
+         audios = []
+diff --git a/vllm_omni/diffusion/models/minimax_h3/quality_policy.py b/vllm_omni/diffusion/models/minimax_h3/quality_policy.py
+new file mode 100644
+index 00000000000..1cd3a8b4ec4
+--- /dev/null
++++ b/vllm_omni/diffusion/models/minimax_h3/quality_policy.py
+@@ -0,0 +1,178 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++
++"""Model-owned request quality policy for MiniMax H3."""
++
++from __future__ import annotations
++
++from collections.abc import Mapping
++from dataclasses import dataclass, replace
++from numbers import Integral
++from typing import Any
++
++from vllm_omni.diffusion.cache.cachedit import CacheDiTRequestSpec
++from vllm_omni.diffusion.data import DiffusionCacheConfig
++from vllm_omni.errors import OmniClientError
++
++MINIMAX_H3_GENERIC_CACHE_KEY = "minimax_h3.generic"
++MINIMAX_H3_HIGH_CACHE_KEY = "minimax_h3.high"
++MINIMAX_H3_FORCE_REFRESH_STEP_HINT_ARG = "force_refresh_step_hint"
++MINIMAX_H3_FORCE_REFRESH_STEP_POLICY_ARG = "force_refresh_step_policy"
++MINIMAX_H3_FORCE_REFRESH_POLICIES = ("once", "repeat")
++
++
++def _high_quality_cache_config() -> DiffusionCacheConfig:
++    return DiffusionCacheConfig(
++        Fn_compute_blocks=1,
++        Bn_compute_blocks=0,
++        max_warmup_steps=4,
++        residual_diff_threshold=0.04,
++        max_continuous_cached_steps=1,
++        enable_taylorseer=False,
++        scm_steps_mask_policy=None,
++    )
++
++
++def _resolve_force_refresh(
++    extra_args: Mapping[str, Any] | None,
++    *,
++    num_inference_steps: int,
++) -> tuple[int, str] | None:
++    """Resolve H3's request-scoped Cache-DiT refresh hint.
++
++    These are model-specific ``extra_args`` rather than global sampling fields,
++    keeping other diffusion models unchanged.
++    """
++
++    if not extra_args:
++        return None
++
++    raw_hint = extra_args.get(MINIMAX_H3_FORCE_REFRESH_STEP_HINT_ARG)
++    raw_policy = extra_args.get(MINIMAX_H3_FORCE_REFRESH_STEP_POLICY_ARG)
++
++    if raw_hint is None:
++        if raw_policy is not None:
++            raise OmniClientError("MiniMax H3 force_refresh_step_policy requires force_refresh_step_hint")
++        return None
++    if isinstance(raw_hint, bool) or not isinstance(raw_hint, Integral):
++        raise OmniClientError("MiniMax H3 force_refresh_step_hint must be a positive integer")
++
++    hint = int(raw_hint)
++    if not 1 <= hint <= num_inference_steps:
++        raise OmniClientError(
++            "MiniMax H3 force_refresh_step_hint must be between 1 and "
++            f"num_inference_steps ({num_inference_steps}), got {hint}"
++        )
++
++    policy = "once" if raw_policy is None else raw_policy
++    if not isinstance(policy, str) or policy not in MINIMAX_H3_FORCE_REFRESH_POLICIES:
++        raise OmniClientError(
++            "MiniMax H3 force_refresh_step_policy must be one of "
++            f"{list(MINIMAX_H3_FORCE_REFRESH_POLICIES)}, got {policy!r}"
++        )
++    return hint, policy
++
++
++def _has_force_refresh_args(extra_args: Mapping[str, Any] | None) -> bool:
++    if not extra_args:
++        return False
++    return any(
++        extra_args.get(name) is not None
++        for name in (
++            MINIMAX_H3_FORCE_REFRESH_STEP_HINT_ARG,
++            MINIMAX_H3_FORCE_REFRESH_STEP_POLICY_ARG,
++        )
++    )
++
++
++def _with_force_refresh(
++    cache_config: DiffusionCacheConfig,
++    force_refresh: tuple[int, str] | None,
++) -> DiffusionCacheConfig:
++    if force_refresh is None:
++        return cache_config
++    hint, policy = force_refresh
++    return replace(
++        cache_config,
++        force_refresh_step_hint=hint,
++        force_refresh_step_policy=policy,
++    )
++
++
++def _cache_installation_key(base_key: str, force_refresh: tuple[int, str] | None) -> str:
++    """Make refresh-policy transitions explicit to the request runtime.
++
++    Cache-DiT cannot clear an existing ``force_refresh_step_hint`` through its
++    incremental context update API because ``None`` is treated as "keep the
++    old value".  Including the request hint in the installation key therefore
++    makes a hint change perform a safe hook reinstall, while repeated requests
++    with the same hint still only refresh the context.
++    """
++
++    if force_refresh is None:
++        return base_key
++    hint, policy = force_refresh
++    return f"{base_key}:force_refresh={hint}:{policy}"
++
++
++@dataclass(frozen=True)
++class MiniMaxH3QualityPlan:
++    """Resolved execution choices for one MiniMax H3 request."""
++
++    cache_dit: CacheDiTRequestSpec | None
++
++
++class MiniMaxH3QualityPolicy:
++    """Resolve H3 request quality into a declarative Cache-DiT target.
++
++    When the server starts with Cache-DiT, omitted quality selects the
++    server-configured profile. Otherwise, omitted quality selects no cache.
++    In either case, ``lossless`` selects no cache and ``high`` selects H3's
++    high-quality profile. The policy therefore owns whether a request installs
++    Cache-DiT; the startup backend only controls the omitted-quality default.
++    H3-specific Cache-DiT refresh hints are read from request ``extra_args``;
++    they do not change the global diffusion request contract.
++    The pipeline owns applying the resulting target at the request boundary.
++    """
++
++    def __init__(self, od_config: Any) -> None:
++        self._od_config = od_config
++        self._configured_backend = str(getattr(od_config, "cache_backend", "none") or "none").lower()
++
++    def resolve(
++        self,
++        *,
++        quality: str | None,
++        num_inference_steps: int,
++        extra_args: Mapping[str, Any] | None = None,
++    ) -> MiniMaxH3QualityPlan:
++        if quality == "high":
++            base_key = MINIMAX_H3_HIGH_CACHE_KEY
++            base_config = _high_quality_cache_config()
++        elif self._configured_backend == "cache_dit" and quality is None:
++            base_key = MINIMAX_H3_GENERIC_CACHE_KEY
++            base_config = self._od_config.cache_config
++        else:
++            if _has_force_refresh_args(extra_args):
++                raise OmniClientError("MiniMax H3 force-refresh arguments require an active Cache-DiT request target")
++            return MiniMaxH3QualityPlan(cache_dit=None)
++
++        force_refresh = _resolve_force_refresh(
++            extra_args,
++            num_inference_steps=num_inference_steps,
++        )
++        return MiniMaxH3QualityPlan(
++            cache_dit=CacheDiTRequestSpec(
++                installation_key=_cache_installation_key(base_key, force_refresh),
++                cache_config=_with_force_refresh(base_config, force_refresh),
++                num_inference_steps=num_inference_steps,
++            ),
++        )
++
++
++__all__ = [
++    "MINIMAX_H3_GENERIC_CACHE_KEY",
++    "MINIMAX_H3_HIGH_CACHE_KEY",
++    "MiniMaxH3QualityPlan",
++    "MiniMaxH3QualityPolicy",
++]
+diff --git a/vllm_omni/diffusion/sched/interface.py b/vllm_omni/diffusion/sched/interface.py
+index 25ec722d554..d292084cdc1 100644
+--- a/vllm_omni/diffusion/sched/interface.py
++++ b/vllm_omni/diffusion/sched/interface.py
+@@ -55,6 +55,10 @@ class StepBatchSamplingParamsKey:
+     true_cfg_scale: float | None = None
+     cfg_normalize: bool = False
+ 
++    # Request-scoped execution policy. A batch must use one quality mode
++    # because model acceleration hooks are shared by the whole worker batch.
++    quality: str | None = None
++
+     # Output count. Requests with different num_outputs_per_prompt produce
+     # differently shaped outputs and cannot share a batch.
+     num_outputs_per_prompt: int = 1
+@@ -108,6 +112,11 @@ class RequestBatchSamplingParamsKey:
+     layers: int = 4
+     use_en_prompt: bool = False
+ 
++    # Request-scoped execution policy. Keep accelerated and reference-path
++    # requests in separate worker batches. ``None`` delegates the default to
++    # the model and must remain distinct from explicit ``lossless``.
++    quality: str | None = None
++
+     # LoRA identity.
+     lora_int_id: int | None = None
+     lora_scale: float = 1.0
+diff --git a/vllm_omni/diffusion/worker/diffusion_model_runner.py b/vllm_omni/diffusion/worker/diffusion_model_runner.py
+index 2e8111a31cb..ade91162030 100644
+--- a/vllm_omni/diffusion/worker/diffusion_model_runner.py
++++ b/vllm_omni/diffusion/worker/diffusion_model_runner.py
+@@ -32,7 +32,13 @@
+ from vllm_omni.diffusion.data import DiffusionOutput, OmniDiffusionConfig
+ from vllm_omni.diffusion.forward_context import set_forward_context
+ from vllm_omni.diffusion.model_loader.diffusers_loader import DiffusersPipelineLoader
+-from vllm_omni.diffusion.models.interface import SupportsPromptUpdate, supports_prompt_update, supports_step_execution
++from vllm_omni.diffusion.models.interface import (
++    SupportsPromptUpdate,
++    adopt_request_scoped_cache_dit,
++    is_request_scoped_cache_dit_enabled,
++    supports_prompt_update,
++    supports_step_execution,
++)
+ from vllm_omni.diffusion.offloader import get_offload_backend
+ from vllm_omni.diffusion.registry import _NO_CACHE_ACCELERATION
+ from vllm_omni.diffusion.request import OmniDiffusionRequest
+@@ -304,7 +310,19 @@ def get_memory_context() -> AbstractContextManager[Any]:
+                 self.cache_backend = None
+                 self.od_config.cache_backend = None
+             else:
++                # Install configured cache capability once at startup. A model
++                # may explicitly adopt the enabled Cache-DiT backend and then
++                # own all later request-boundary enable/disable transitions.
+                 self.cache_backend.enable(self.pipeline)
++                if str(self.od_config.cache_backend).lower() == "cache_dit" and adopt_request_scoped_cache_dit(
++                    self.pipeline,
++                    self.cache_backend,
++                ):
++                    logger.info(
++                        "Pipeline %s owns request-scoped Cache-DiT transitions.",
++                        type(self.pipeline).__name__,
++                    )
++                    self.cache_backend = None
+ 
+         # Install prompt-embedding cache (transparent wrapper around
+         # ``pipeline.encode_prompt``). Enabled via config or env var; a no-op
+@@ -523,11 +541,11 @@ def _execute_request_list(
+             if is_primary and prompt_embed_cache is not None:
+                 logger.debug("prompt-embed cache: %s", prompt_embed_cache.stats())
+ 
++            runner_cache_dit_enabled = self.cache_backend is not None and self.cache_backend.is_enabled()
+             if (
+-                self.cache_backend is not None
+-                and self.cache_backend.is_enabled()
+-                and od_config.cache_backend == "cache_dit"
++                od_config.cache_backend == "cache_dit"
+                 and od_config.enable_cache_dit_summary
++                and (runner_cache_dit_enabled or is_request_scoped_cache_dit_enabled(self.pipeline))
+             ):
+                 cache_summary(self.pipeline, details=True)
+ 
+diff --git a/vllm_omni/entrypoints/openai/api_server.py b/vllm_omni/entrypoints/openai/api_server.py
+index d59a7699fe5..048fea3c5c1 100755
+--- a/vllm_omni/entrypoints/openai/api_server.py
++++ b/vllm_omni/entrypoints/openai/api_server.py
+@@ -2811,6 +2811,7 @@ def video_response_from_request(model_name: str, req: VideoGenerationRequest) ->
+         status=VideoGenerationStatus.QUEUED,
+         size=req.size,
+         prompt=req.prompt,
++        quality=req.quality or "default",
+     )
+     resp.seconds = str(req.seconds or resp.seconds)
+     return resp
+@@ -3150,6 +3151,7 @@ async def _parse_video_form(
+     short_edge: int | None = Form(default=None, ge=1),
+     num_outputs_per_prompt: int = Form(default=1, ge=1, le=10),
+     start_time_seconds: float | None = Form(default=None, ge=0.0),
++    quality: str | None = Form(default=None),
+     num_inference_steps: int | None = Form(default=None),
+     guidance_scale: float | None = Form(default=None),
+     guidance_scale_2: float | None = Form(default=None),
+@@ -3218,6 +3220,7 @@ async def _parse_video_form(
+         "short_edge": short_edge,
+         "num_outputs_per_prompt": num_outputs_per_prompt,
+         "start_time_seconds": start_time_seconds,
++        "quality": quality,
+         "num_inference_steps": num_inference_steps,
+         "guidance_scale": guidance_scale,
+         "guidance_scale_2": guidance_scale_2,
+diff --git a/vllm_omni/entrypoints/openai/diffusion_request_utils.py b/vllm_omni/entrypoints/openai/diffusion_request_utils.py
+index 84fec8a3ad8..e9e97bd045f 100644
+--- a/vllm_omni/entrypoints/openai/diffusion_request_utils.py
++++ b/vllm_omni/entrypoints/openai/diffusion_request_utils.py
+@@ -7,7 +7,10 @@
+ 
+ from vllm.logger import init_logger
+ 
+-from vllm_omni.inputs.data import OmniDiffusionSamplingParams
++from vllm_omni.inputs.data import (
++    DIFFUSION_QUALITY_LEVELS,
++    OmniDiffusionSamplingParams,
++)
+ 
+ logger = init_logger(__name__)
+ 
+@@ -90,6 +93,9 @@ def normalize_diffusion_request_args(
+     for alias, canonical_name in aliases.items():
+         if alias in request_args:
+             request_args[canonical_name] = request_args.pop(alias)
++    quality = request_args.get("quality")
++    if quality is not None and quality not in DIFFUSION_QUALITY_LEVELS:
++        raise ValueError(f"quality must be one of {list(DIFFUSION_QUALITY_LEVELS)}, got {quality!r}")
+     return normalized_extra_args, request_args
+ 
+ 
+diff --git a/vllm_omni/entrypoints/openai/protocol/videos.py b/vllm_omni/entrypoints/openai/protocol/videos.py
+index 92ff836b8da..87959b123f1 100644
+--- a/vllm_omni/entrypoints/openai/protocol/videos.py
++++ b/vllm_omni/entrypoints/openai/protocol/videos.py
+@@ -15,9 +15,10 @@
+ from functools import lru_cache
+ from typing import Annotated, Any, Literal
+ 
+-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
++from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
+ 
+ from vllm_omni.entrypoints.openai.image_api_utils import parse_size
++from vllm_omni.inputs.data import DIFFUSION_QUALITY_LEVELS
+ 
+ 
+ class VideoGenerationStatus(str, Enum):
+@@ -164,6 +165,24 @@ class VideoGenerationRequest(BaseModel):
+     )
+ 
+     # vllm-omni extensions for diffusion control
++    quality: str | None = Field(
++        default=None,
++        description=(
++            "Request-level generation quality intent. Supported values are "
++            "'lossless' and 'high'; exact behavior is model-specific. "
++            "When omitted, the model chooses its default policy."
++        ),
++    )
++
++    @field_validator("quality")
++    @classmethod
++    def validate_quality(cls, value: str | None) -> str | None:
++        if value is None:
++            return None
++        if value not in DIFFUSION_QUALITY_LEVELS:
++            raise ValueError(f"quality must be one of {list(DIFFUSION_QUALITY_LEVELS)}, got {value!r}")
++        return value
++
+     negative_prompt: str | None = Field(default=None, description="Text describing what to avoid in the video")
+     num_inference_steps: int | None = Field(
+         default=None,
+diff --git a/vllm_omni/entrypoints/openai/serving_chat.py b/vllm_omni/entrypoints/openai/serving_chat.py
+index 5dc3002ca4d..305f970f8ab 100755
+--- a/vllm_omni/entrypoints/openai/serving_chat.py
++++ b/vllm_omni/entrypoints/openai/serving_chat.py
+@@ -170,6 +170,7 @@ class OmniOpenAIServingChat(OpenAIServingChat, AudioMixin):
+             "width",
+             "num_outputs_per_prompt",
+             "seed",
++            "quality",
+             "num_inference_steps",
+             "guidance_scale",
+             "true_cfg_scale",
+@@ -759,6 +760,11 @@ async def _create_chat_completion(
+                     if hasattr(sp, "num_inference_steps") and num_inference_steps is not None:
+                         sp.num_inference_steps = num_inference_steps
+                     if isinstance(sp, OmniDiffusionSamplingParams):
++                        quality = extra_body.get("quality")
++                        self._set_if_supported(
++                            sp,
++                            quality=quality,
++                        )
+                         apply_normalized_diffusion_request_extra_args(sp, normalized_extra_args)
+                     else:
+                         apply_declared_extra_args(
+@@ -2937,6 +2943,7 @@ def _build_multistage_generation_inputs(
+         generator_device = gen_params.generator_device
+         num_outputs_per_prompt = gen_params.num_outputs_per_prompt
+         num_inference_steps = extra_body.get("num_inference_steps")
++        quality = extra_body.get("quality")
+         guidance_scale = extra_body.get("guidance_scale")
+         true_cfg_scale = extra_body.get("true_cfg_scale") or extra_body.get("cfg_scale")
+         negative_prompt = extra_body.get("negative_prompt")
+@@ -3087,6 +3094,7 @@ def _build_multistage_generation_inputs(
+                     seed=seed,
+                     generator_device=generator_device,
+                     num_outputs_per_prompt=num_outputs_per_prompt,
++                    quality=quality,
+                     num_inference_steps=num_inference_steps,
+                     guidance_scale=guidance_scale,
+                     true_cfg_scale=true_cfg_scale,
+@@ -3151,6 +3159,7 @@ def _prepare_diffusion_image_request(
+         self._set_if_supported(
+             gen_params,
+             generator_device=generator_device,
++            quality=extra_body.get("quality"),
+             num_inference_steps=extra_body.get("num_inference_steps"),
+             guidance_scale=extra_body.get("guidance_scale"),
+             true_cfg_scale=extra_body.get("true_cfg_scale") or extra_body.get("cfg_scale"),
+@@ -3489,6 +3498,7 @@ async def _create_diffusion_chat_completion(
+             # method apply its own model-specific default when the user does
+             # not provide a value.
+             num_inference_steps = extra_body.get("num_inference_steps")
++            quality = extra_body.get("quality")
+             guidance_scale = extra_body.get("guidance_scale")
+             true_cfg_scale = extra_body.get("true_cfg_scale")
+             seed = extra_body.get("seed")
+@@ -3543,6 +3553,8 @@ async def _create_diffusion_chat_completion(
+             # Only override defaults when the user explicitly provides values
+             if num_inference_steps is not None:
+                 gen_params.num_inference_steps = num_inference_steps
++            if quality is not None:
++                gen_params.quality = quality
+             if guidance_scale is not None:
+                 gen_params.guidance_scale = guidance_scale
+             if true_cfg_scale is not None:
+diff --git a/vllm_omni/entrypoints/openai/serving_video.py b/vllm_omni/entrypoints/openai/serving_video.py
+index c5536c87638..3a25283c867 100644
+--- a/vllm_omni/entrypoints/openai/serving_video.py
++++ b/vllm_omni/entrypoints/openai/serving_video.py
+@@ -200,6 +200,8 @@ async def _run_and_extract(
+ 
+         if "num_inference_steps" in provided_fields and request.num_inference_steps is not None:
+             gen_params.num_inference_steps = request.num_inference_steps
++        if "quality" in provided_fields:
++            gen_params.quality = request.quality
+         if "guidance_scale" in provided_fields and request.guidance_scale is not None:
+             gen_params.guidance_scale = request.guidance_scale
+         if "guidance_scale_2" in provided_fields and request.guidance_scale_2 is not None:
+diff --git a/vllm_omni/entrypoints/openai/serving_video_output_stream.py b/vllm_omni/entrypoints/openai/serving_video_output_stream.py
+index 64327420cdb..1923028e413 100644
+--- a/vllm_omni/entrypoints/openai/serving_video_output_stream.py
++++ b/vllm_omni/entrypoints/openai/serving_video_output_stream.py
+@@ -535,6 +535,8 @@ async def _build_prompt_and_sampling_params(
+         provided_fields = request.model_fields_set
+         if "num_inference_steps" in provided_fields and request.num_inference_steps is not None:
+             gen_params.num_inference_steps = request.num_inference_steps
++        if "quality" in provided_fields:
++            gen_params.quality = request.quality
+         if "guidance_scale" in provided_fields and request.guidance_scale is not None:
+             gen_params.guidance_scale = request.guidance_scale
+         if "guidance_scale_2" in provided_fields and request.guidance_scale_2 is not None:
+diff --git a/vllm_omni/inputs/data.py b/vllm_omni/inputs/data.py
+index 5e6b5275e7c..6ccc1099ae7 100644
+--- a/vllm_omni/inputs/data.py
++++ b/vllm_omni/inputs/data.py
+@@ -11,6 +11,8 @@
+ 
+ from vllm_omni.lora.request import LoRARequest
+ 
++DIFFUSION_QUALITY_LEVELS: tuple[str, ...] = ("lossless", "high")
++
+ 
+ class OmniTextPrompt(TextPrompt):
+     """Text prompt with optional embeddings and stage payloads.
+@@ -208,6 +210,10 @@ class OmniDiffusionSamplingParams:
+     do_classifier_free_guidance: bool = False
+     output_type: str | None = None
+ 
++    # Request-scoped quality intent. ``None`` delegates the default behavior
++    # to the model; explicit levels select a model-owned quality policy.
++    quality: str | None = None
++
+     # Batch info
+     num_outputs_per_prompt: int = 1
+     seed: int | None = None
+@@ -337,6 +343,10 @@ class OmniDiffusionSamplingParams:
+     # results
+     output: torch.Tensor | None = None
+ 
++    def __post_init__(self) -> None:
++        if self.quality is not None and self.quality not in DIFFUSION_QUALITY_LEVELS:
++            raise ValueError(f"quality must be one of {list(DIFFUSION_QUALITY_LEVELS)}, got {self.quality!r}")
++
+     @property
+     def batch_size(self):
+         # This class is changed to only represent a single prompt request

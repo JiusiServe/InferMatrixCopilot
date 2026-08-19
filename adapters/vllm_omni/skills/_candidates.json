@@ -1,1 +1,30 @@
-{}
+{
+  "behavior-lens-device-rng-review": {
+    "name": "behavior-lens-device-rng-review",
+    "description": "Behavior lens for PRs that flip a device guard from ==cuda to !=cpu: enumerate platform inheritance and validate the claimed allowlist",
+    "body": "When a diff changes `device.type == \"cuda\"` to `device.type != \"cpu\"` (or similar) in shared model code, treat the PR's stated allowlist as a contract. Grep the platform plugin registry and recipes to enumerate every device type that reaches the path; if the PR validates only a subset, the finding is \"implement the explicit allowlist or validate the rest\". Also check whether a device module is captured once with no argument (`torch.get_device_module()`) instead of bound to the actual tensor device.",
+    "modules": [],
+    "proposed_at": 1786614914.8996305
+  },
+  "verification-lens-pytestmark-deselection": {
+    "name": "verification-lens-pytestmark-deselection",
+    "description": "PR review verification lens: new test files without pytestmark are silently deselected by marker-filtered CI; check CI selection command vs each added test file's markers.",
+    "body": "When reviewing a PR that adds test files, grep each added file for `pytestmark`. In vllm-omni, CI selects tests with `-m 'core_model and cpu'` (`.buildkite/cuda/test-ready.yml:13/23/28`, `.buildkite/amd/test-amd-ready.yml:19`) and the XPU lane with `-m 'core_model and xpu and B60'`. There is no `pytest_collection_modifyitems` hook that auto-adds `core_model`, so a new test file without `pytestmark = [pytest.mark.core_model, pytest.mark.cpu]` is silently deselected (green CI, zero execution). Test integrity outranks test existence: report it as major and ask for the module-level marker matching every sibling file in the directory.",
+    "modules": [],
+    "proposed_at": 1786692376.3324893
+  },
+  "vllm-omni-docs-image-reference-convention": {
+    "name": "vllm-omni-docs-image-reference-convention",
+    "description": "When reviewing docs PRs in vllm-omni, verify figure references render on both the MkDocs site and GitHub preview; docs/design/feature/ conventionally uses raw.githubusercontent.com absolute URLs.",
+    "body": "# vLLM-Omni docs figure-reference convention\n\n- docs/design/feature/*.md conventionally embeds figures with absolute\n  `https://raw.githubusercontent.com/vllm-project/vllm-omni/refs/heads/main/docs/source/...`\n  URLs (see docs/design/feature/async_chunk.md), which render in both the\n  MkDocs site and GitHub's rendered PR/file preview.\n- A repo-relative `../../../source/...` from `docs/design/feature/<page>.md`\n  resolves to `<repo-root>/source/...` on GitHub (broken: assets live under\n  `docs/source/...`) while resolving correctly in the MkDocs site only because\n  MkDocs default `use_directory_urls: true` adds the page's directory level.\n- Review action: for any new `<img src=...>` in a docs diff, check the sibling\n  convention with `grep -n 'src=' docs/design/feature` and flag inconsistent or\n  GitHub-broken relative paths.",
+    "modules": [],
+    "proposed_at": 1786716286.719784
+  },
+  "vllm-omni-async-omni-output-review-contract": {
+    "name": "vllm-omni-async-omni-output-review-contract",
+    "description": "Reviewing vllm-omni docs/code that mention async Omni output materialization: verify the doc's guard, opt-in, platform, and fallback claims against gpu_ar_model_runner.py and the model/deploy files.",
+    "body": "# Async Omni output materialization review contract\n\nWhen a PR documents or changes async Omni output materialization, verify these\nclaims against the PR-time tree rather than trusting the prose:\n\n- Guard: `GPUARModelRunner._should_use_async_omni_output`\n  (vllm_omni/worker/gpu_ar_model_runner.py) requires, in order:\n  `use_async_scheduling`, `omni_prefix_cache is None`, `speculative_config is\n  None`, `model_config.async_chunk`, `not enable_return_routed_experts`,\n  model `use_async_omni_output`, and `not has_postprocess or\n  eager_omni_postprocess_before_async_output`.\n- Opt-ins: Qwen3-Omni thinker/talker in qwen3_omni.py, Qwen3-TTS talker in\n  qwen3_tts_talker.py (talkers set `eager_omni_postprocess_before_async_output`\n  and `omni_pooler_payload_include_hidden = False`); moss_tts opts out.\n- Deploy: qwen3_omni_moe.yaml and qwen3_tts.yaml ship `async_chunk: true` and\n  prefix-cache off on the AR stages; `async_scheduling` defaults True.\n- NPU: NPUARModelRunner builds `OmniModelRunnerOutput` synchronously and only\n  then wraps in `AsyncGPUModelRunnerOutput`.\n- Full-payload accumulation branch is unreachable under async_chunk because\n  `should_accumulate_full_payload_output` returns False when async_chunk is on.",
+    "modules": [],
+    "proposed_at": 1786716300.3188832
+  }
+}

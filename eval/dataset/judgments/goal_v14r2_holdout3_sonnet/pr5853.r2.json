@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.7,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X independently reconstructs the two confirmed provided_fields guard bugs (serving_video.py:203 and serving_video_output_stream.py:538) that the real reviewer flagged and mglyn later marked 'Resolved' — an exact, high-value recall hit Y never mentions. X also catches the H200/L20X hardware-label contradiction (which Y also finds) and uses visible verification (claim-verified/refuted against gh/grep) that anchors its findings, though it misses the 'fast' quality silent-fallthrough bug and validates quality rejection incorrectly. Y produces a deeper, more speculative architectural analysis (partial-install leak, disable() target mismatch, cross-model quality scope) with real insight — its disable()-target finding cross-validates with X's — but none of its major/moderate findings match the ground-truth inline comments, and several rest on unverified assumptions about cache_dit's internal behavior not shown in the diff, lowering confidence relative to X's grounded hits.",
+  "_cost_usd": 0.3206125,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_holdout3_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r2",
+    "arm_a_sha256": "1790deeb391841f3d06f24ef9035a796b62e3d5c027db628949fb0318a2a8bf4",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "427516abfc8f76c8072270d6092028442d369983b7f2226ce6615f35fb2879d4",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

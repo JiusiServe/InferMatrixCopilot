@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.8,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently nail the one substantive open ground-truth concern (FLASHINFER_ATTN allow-listing `quant` while never consuming it), with strong file:line grounding, so recall and coverage are essentially tied. Y edges ahead on precision and actionability: it demonstrates several findings via actual interactive execution (reproducing the silent-ignore bugs, confirming test pass counts) rather than static citation alone, surfaces an additional well-grounded and distinct correctness bug (output dtype silently flips to bf16 under SAGE for fp16 models) that neither X nor ground truth caught, and consistently pairs findings with drop-in code fixes. X has slightly more volume but pads it with a couple of weaker/self-refuting observations (e.g. the flashinfer-pin note concludes the current behavior is fine).",
+  "_cost_usd": 0.35984950000000004,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46",
+    "arm_a_sha256": "342e0fb2dc0fe31f1723fe9a252def1bedf85b904ce037a1f366328a6270da88",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "703e9ad7d9901fc59d5ad8d20917e36993f445b09d3ecaaba356dbe9c900f660",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

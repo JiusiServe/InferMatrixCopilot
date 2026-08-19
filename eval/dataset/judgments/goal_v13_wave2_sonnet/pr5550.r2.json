@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.32,
+    "precision": 0.8,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both independently and correctly flag the un-updated ARDiffusionModelRunner.execute_model override with strong line-anchored evidence — a wash. But Y's finding #2 (new DiffusionKV DTOs drop every invariant their #5541 sibling DTOs enforce, with a concrete __post_init__ fix) directly recovers the spirit of the ground truth's dominant theme — asukaqaq-s's validation-ownership architecture comment plus four separate P1 findings from hsliuustc0106 about missing/misplaced validation in the metadata/interface contract — which X never engages at all. Y also surfaces the duplicate-identity-check theme (echoing the same GT thread) and simply covers more ground with comparably strong grounding, at a small precision cost from a couple more speculative edge-case claims (e.g. the unnormalized cache_mode.value hypothetical).",
+  "_cost_usd": 0.22536460000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v13_wave2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_wave2",
+    "arm_a_sha256": "6dbf656049e08d7bf68f3e4049b47aaf36f48a76dd55f10c222b9ff0f5c75fb8",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b6ae3b48c6859b0d16784163ab2044d7d85e3b3b32f4e60b559fa2a55186c64b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

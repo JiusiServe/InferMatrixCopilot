@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.65,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.78,
+    "actionability": 0.78,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both catch the same core live issues (RuixiangMa missing from diffusion/models/, offloader.md's Isotr0py removal vs PR description, undisclosed lora narrowing, worker/Gaohan123 description mismatch), and both miss the null related_code_paths field. X reads as a more polished narrative review but leans on unverifiable specifics (exact commit SHAs, a 'simulated every .py file' blast-radius table with precise counts) that look fabricated rather than diff-grounded, and its plugins/model_extras 'bug' claim actually contradicts the human reviewer's endorsed state. Y's findings are backed by verbatim evidence quotes and explicit tool provenance (list_dir, gh_pr_view), making its grounding more trustworthy despite sharing the same plugins false-positive and being denser/more redundant in presentation.",
+  "_cost_usd": 0.34777700000000006,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16f_holdout4_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout4_r1",
+    "arm_a_sha256": "a7abb197e016203341ad5d7999c7008e28a36d7c8a6b97778014599d3a71fd73",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a618d8fdfdd2a7671220fc3626c167412f101811b64319de0c1c201facd71448",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

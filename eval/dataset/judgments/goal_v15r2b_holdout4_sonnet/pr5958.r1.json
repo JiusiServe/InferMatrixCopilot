@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.8,
+    "actionability": 0.78,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both nail the same core cluster (offloader Isotr0py↔david6666666, LoRA 'preserves prior ownership' contradiction, missing @RuixiangMa on diffusion/models, PR-description-vs-diff mismatches), and both share the same real precision miss on the plugins/model_extras line (contradicted by the ground-truth reviewer's explicit 'change to @gcanlin @tjtanaa @xuechendi' / 'add @princepride' comments, which both candidates argue against). Y edges ahead on recall/precision by more explicitly and verifiably nailing the worker/@Gaohan123 gap, the model_executor/models 9→5 narrowing, and the '3 vs 12 docs updated' description gap, each backed by literal diff/file quotes in a claim-verified/refuted format that's easy to spot-check. X is more polished and prescriptive (clear 'Change:' per finding, priority tiers) giving it slightly better actionability, but includes some less-verifiable flourishes (a specific commit hash, an external process-doc path) that add fabrication risk. Neither catches the null related_code_paths field or the parallel/runtime/cache specific-owner-addition items, and neither has a LATENT GAP CHECK section.",
+  "_cost_usd": 0.4570807,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15_holdout4_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "f80729ba8bb197f3121b8c9872274d5d7e285f3eea8809413ad12095052ea3fb",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a618d8fdfdd2a7671220fc3626c167412f101811b64319de0c1c201facd71448",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

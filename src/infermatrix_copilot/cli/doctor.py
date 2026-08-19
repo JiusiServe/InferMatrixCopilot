@@ -42,7 +42,7 @@ def _check_env(settings) -> tuple[bool, str]:
 
 
 def _check_strict_backend(settings) -> tuple[bool, str]:
-    """Provider-registry selection (doc/RFC-provider-registry.md). Unset is
+    """Provider-registry selection (doc/features/provider-registry.md). Unset is
     reported but not failed here — CLI runs default to api; Strict runs
     refuse at strict_readiness with the same fix line."""
     backend = settings.strict_backend
@@ -64,6 +64,9 @@ def _check_strict_backend(settings) -> tuple[bool, str]:
         return False, (f"backend {backend} selected but its CLI is missing — "
                        "fix: install it or set STRICT_BACKEND_CLI=/path/to/"
                        "cli in ~/.infermatrix-copilot/.env")
+    gap = transport.auth_gap()
+    if gap:
+        return False, f"backend {backend}: {gap}"
     return True, f"backend {backend} via {cli}"
 
 
@@ -137,7 +140,7 @@ _HOST_MODEL_PREFIXES: dict[str, tuple[str, ...]] = {
 }
 
 
-def _tier_targets(settings) -> list[tuple[str, "object"]]:
+def _tier_targets(settings) -> list[tuple[str, object]]:
     """(label, ResolvedTarget) per configured tier; performance omitted (not
     an error) when deferred/unconfigured."""
     from ..config import TierNotConfiguredError

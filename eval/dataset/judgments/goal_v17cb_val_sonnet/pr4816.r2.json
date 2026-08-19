@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.5,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.8
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth flagged zero concerns (trivial rename, approved 'lgtm'), so recall is trivially satisfied by both. X's core catches (pure-diffusion None-state gap, test masking via patched base()) are valid and diff-grounded, but a large share of its review (Dockerfile version-pin forensics, buildkite gate speculation, unverifiable upstream anthropic/api_router.py line citations, a hedged 'sibling rename' audit against a mismatched vLLM version) reaches well beyond the visible diff into unverifiable/likely-fabricated specifics, hurting precision. Y independently found the same core pure-diffusion/test-masking issue with concrete, diff-matching line citations (376, 754, 1017, 1157, 1248+) and more honestly frames CI failures as a question rather than an asserted root cause, though it is repetitive with near-duplicate bullets restating the same finding. Both provide concrete file/line callouts and code suggestions, giving comparable actionability, with X's fix snippet slightly more complete.",
+  "_cost_usd": 0.28302320000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17cb_val"
+  },
+  "_roles": {
+    "arm": "copilot_v17cb_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17cb_val",
+    "arm_a_sha256": "16900a18718c1b389e4e10a9161de71e2374ac86a51f7ef8b4e43d6f3cee23ec",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b9fe4c00140a73cf5cc08ceded6d03eb8b8faea45f6c3b50e6f9753b9a1a1a01",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

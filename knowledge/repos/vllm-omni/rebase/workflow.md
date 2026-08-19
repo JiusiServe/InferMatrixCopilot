@@ -68,7 +68,7 @@ rebase 前按该映射扫 upstream 变更（`git log` 对应路径），漂移�
   变更册（架构/CUDA Graph/spec decoding/采样/分布式/多模态/CI）。^[DOC-mrv2-commits]
 
 两份均为**外部活文档**（会更新），知识树只登记入口与用途，不复制正文；
-快照（含 sha256）存于 copilot 仓库 `doc/reorg-audit/enrichment-baseline/`。
+快照（含 sha256）存于 copilot 仓库 `doc/archive/reorg-audit/enrichment-baseline/`。
 
 ## 相关
 

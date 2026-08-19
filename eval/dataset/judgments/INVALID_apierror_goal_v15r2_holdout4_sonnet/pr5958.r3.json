@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.78,
+    "actionability": 0.92,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Candidate Y's run crashed before producing any review content (402 Insufficient Balance error), so it has no findings to credit. Candidate X produced a deeply-grounded, well-cited review that correctly caught several real ground-truth concerns — the LoRA ownership narrowing contradicting its own 'preserves prior ownership' comment, the offloader.md/PR-description mismatch over @Isotr0py's removal, and the missing @RuixiangMa on diffusion/models — with precise file/line actionability throughout. It missed many of the smaller 'add owner X' items (most already satisfied in the shown diff) and one finding (plugins/model_extras ownership) actually argued against a value the ground-truth reviewer had endorsed, costing some precision.",
+  "_cost_usd": 0.4659996,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15_holdout4_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "3238d6b2a851785e3e6f034a6bc3c59ac0b5cc2be4a2cae18cf4d9587179b7d3",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a618d8fdfdd2a7671220fc3626c167412f101811b64319de0c1c201facd71448",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

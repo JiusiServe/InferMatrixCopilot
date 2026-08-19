@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.78,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.72,
+    "actionability": 0.78
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both reviews are deep and well-organized but miss the ground truth's most critical blocking findings (incomplete profiler/VRAM/baseline validation evidence, and native speed being rejected for raw/SSE streaming despite adapter support, plus the WebSocket/HTTP asymmetry) and never touch the benchmarks/tts script design question. X's findings are slightly more grounded and thematically aligned with the PR's own fail-fast philosophy (e.g., dropped-payload zero-audio hole, uninitialized bias risk) with concrete code-level fixes, while Y's duration_factor 'branding' finding appears to misstate the S2Mel decoder's actual (unbounded) validation state relative to ground truth, a minor precision ding. Actionability is comparably strong for both, with X offering more inline code snippets.",
+  "_cost_usd": 0.4596074,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "cursor_composer25"
+  },
+  "_roles": {
+    "arm": "cursor_composer25",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_composer25",
+    "arm_a_sha256": "0837a9ea4d43e76caa04657d0b238804712e8a14d620309614e5c6e93ebfdb67",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

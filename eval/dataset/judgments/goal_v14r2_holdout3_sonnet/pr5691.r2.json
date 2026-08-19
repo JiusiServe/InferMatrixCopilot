@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.82,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.08,
+    "precision": 0.55,
+    "actionability": 0.72
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X independently nails four of the most severe ground-truth findings with near-exact mechanisms and line numbers: the text-encoder-tp GroupCoordinator crash, Ring attention silently ignoring packed padding boundaries, the encoder's warn-instead-of-raise on missing weights, and unbounded upload sizes. Y produces detailed, evidence-heavy findings but misses every one of the reviewers' actual bugs (the crash, the ring/packing corruption, the loaded.add() bug, the validation gaps), instead surfacing unverified tangential concerns (FA4 reachability, cross-pipeline video path ambiguity) with two near-duplicate 'major' findings padding its count. X's verdict and severity ranking also track the real outcome (blocking correctness/crash bugs) far better than Y's softer follow-up framing.",
+  "_cost_usd": 0.4472906000000001,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_holdout3_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r2",
+    "arm_a_sha256": "88d154d4bae510b3374dae67c2b8e7ca6e7ca1bd3ca102e1a1d10e4f5ad8b8ba",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "c373c75c65a506fb368faf2717d73d36a35ca93216c0c727d7c4e3100440e9f3",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

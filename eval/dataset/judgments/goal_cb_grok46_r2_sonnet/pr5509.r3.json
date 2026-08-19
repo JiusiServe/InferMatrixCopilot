@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.8,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently nail the core ground-truth issue (FLASHINFER_ATTN allow-listed for `quant` but silently dropped by FlashInferAttentionImpl) with strong, code-grounded evidence, and both correctly recognize the sage_kwargs-unconditional-pass issue is already fixed in this diff revision. Y edges ahead on precision (live-verified via actual Python execution, e.g. proving `dtype_vo`-only configs silently disable SAGE) and actionability (clean Blocking/Should-fix/Nits triage with concrete line ranges and drop-in code fixes), plus it independently surfaces the ring-SP-drops-SAGE gap that X also found, strengthening confidence both are real. X is comparably thorough and even reaches further (stale recipe doc, CI marker deselection) but its single dense evidence-dump paragraphs per finding and '?' placeholder line numbers make it slightly less scannable/actionable, and a couple of its extra findings are more speculative reach beyond the diff.",
+  "_cost_usd": 0.3559036,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r2",
+    "arm_a_sha256": "9617ee1248c689157017076cb003ba152f4d4a74bd15328d56969490b6de296b",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "703e9ad7d9901fc59d5ad8d20917e36993f445b09d3ecaaba356dbe9c900f660",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

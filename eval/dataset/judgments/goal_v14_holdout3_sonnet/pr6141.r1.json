@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.9,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Neither candidate catches the ground-truth Copilot finding precisely (the internal contradiction of banning Slack-channel disclosure while suggesting a sig-omni post) — both instead flag a related but distinct issue (lead-maintainer Slack DM unmappability), so recall is low and roughly tied. X and Y independently converge on the same two strongest, well-grounded findings (AWQ FAQ pointing to a page with no AWQ coverage; security-DM actionability gap), both with solid line-level evidence, giving both high precision. X goes further with several additional grounded, actionable findings (nav.yml glob regression risk, lost meeting cadence info, governance.md orphaned pointer, ISSUE_TEMPLATE security link) organized by severity with concrete fixes, edging out Y's terser but narrower two-finding report on overall usefulness and actionability.",
+  "_cost_usd": 0.19072909999999998,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_holdout3_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r1",
+    "arm_a_sha256": "55fb441b21f327813ade4fffc55928751d40ad1be7617ff25dbb11c450280ddb",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "672f8c68e1537f224e50a351c7f7828e2aa50a1d0b3a12720e3060da70662fd9",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

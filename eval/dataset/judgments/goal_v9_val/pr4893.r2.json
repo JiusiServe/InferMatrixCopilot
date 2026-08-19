@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.28,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.67,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates directly identify the ground-truth weakness: the new assertions validate behavior injected by the fake rather than the real wrapper. Y adds more credible, code-grounded analysis, while X contains several speculative, low-value, or apparently false concerns; both reviews provide concrete locations and proposed changes.",
+  "_usage": {
+    "input": 3,
+    "output": 1350
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "copilot_v9_official_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v9_official_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v9_official_r1",
+    "arm_a_sha256": "9951909d4e24543b596da03f10f6c690707328b8d7da79f1aaf225759c4c7381",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0d4ddd4027e23f1f32216e748289588ea9a0e74ee8e599fa34b9d50f503d2f0d",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 2
+  }
+}

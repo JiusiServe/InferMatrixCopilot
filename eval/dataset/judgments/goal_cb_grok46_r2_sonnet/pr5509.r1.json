@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.82,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.88,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently surface the core ground-truth concern (FLASHINFER_ATTN allow-listed for quant but never consumed) with strong, specific evidence, and both correctly recognize the already-fixed sage_kwargs gating rather than misreporting it as a live bug. Y edges out on precision and actionability by empirically verifying claims with executed code snippets (e.g. the dtype_vo-only silent no-op, output dtype mismatch under SAGE) and by pairing each finding with a concrete patch, whereas X's larger volume of findings (recipe staleness, CI marker deselection) is harder to verify and slightly dilutes precision. Both independently flag the ring-SP silently-dropping-quant issue, which cross-validates that finding as genuine rather than fabricated for either.",
+  "_cost_usd": 0.44397739999999997,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r2",
+    "arm_a_sha256": "9617ee1248c689157017076cb003ba152f4d4a74bd15328d56969490b6de296b",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "703e9ad7d9901fc59d5ad8d20917e36993f445b09d3ecaaba356dbe9c900f660",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

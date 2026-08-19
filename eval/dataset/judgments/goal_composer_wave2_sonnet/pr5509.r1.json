@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.85,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently surface the one substantive live GT concern (FLASHINFER_ATTN silently ignoring quant) and correctly note the kwargs-gating issue was already resolved in this diff, plus both flag a plausible ring-SP gap not in GT. Y goes further with actual executed verification (REPL snippets proving the FLASHINFER_ATTN no-op and dtype_vo no-op bugs) and more precise, immediately-actionable one-line fixes, while honestly hedging on unverifiable claims (batching/cu_seq_lens issue). X is thorough and well-grounded but relies more on description than proof and includes a weaker speculative item (torch.compile follow-up).",
+  "_cost_usd": 0.36195350000000004,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "cursor_composer25",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "cursor_composer25",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_composer25",
+    "arm_a_sha256": "4741bc54274bd351ff6c98f1e2cfe4e9c04a51271505efaee1b29095cdddf523",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "703e9ad7d9901fc59d5ad8d20917e36993f445b09d3ecaaba356dbe9c900f660",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

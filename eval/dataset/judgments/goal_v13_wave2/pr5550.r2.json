@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.07,
+    "precision": 0.76,
+    "actionability": 0.94,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.68,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Y covers the ground-truth concerns about DTO-local invariants and duplicated validation, while X mostly identifies valid but novel compatibility and test gaps. X is somewhat more precise, but Y's better recall and equally concrete remediation give it a slight overall edge.",
+  "_usage": {
+    "input": 3,
+    "output": 1376
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "copilot_v13_wave2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_wave2",
+    "arm_a_sha256": "6dbf656049e08d7bf68f3e4049b47aaf36f48a76dd55f10c222b9ff0f5c75fb8",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b6ae3b48c6859b0d16784163ab2044d7d85e3b3b32f4e60b559fa2a55186c64b",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 2
+  }
+}

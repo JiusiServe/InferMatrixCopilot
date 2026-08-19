@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.7,
+    "actionability": 0.8
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently rediscovered the substance of the sole ground-truth concern (trust_remote_code breaking kernels 0.13.x fallback), tracing it through commit history to confirm it was already dropped — strong recall for both. X's remaining findings (missing cache-hit/fallback test coverage, duplicated attribute-validation logic, per-repo lock granularity, retry-without-backoff) are all tightly grounded with quoted file/line evidence and several include concrete ```suggestion``` diffs, making them highly actionable and verifiable. Y covers similar ground (same test-gap finding, same stale-description finding) but adds a striking unverifiable claim ('I ran the code with a stubbed kernels module', 'verified against installed kernels 0.16.0 that get_kernel() raises ValueError') that reads as overclaimed execution evidence rather than static analysis grounded in the diff, which drags down precision even though the surrounding reasoning is plausible. Neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.2054664,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_train",
+    "arm_a_sha256": "e9aeeaf2db3a574c53602735387192f5751cf46a47d4fc3896e2a733a1e6b3e6",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "589a8ff13cb3893b76dd0d5220ad632d82f46cc0edd9083528ebb2466be7c8a7",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

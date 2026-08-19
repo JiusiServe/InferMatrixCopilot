@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.82,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.78,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X independently nails both of the ground truth's High-severity findings with precise mechanism matches: the v2/v1 codec model_type collision (hsliuustc0106's High comment) and the stream-slot leak in modeling_moss_tts_codec.py (linyueqian's High comment, same file/line 560), plus the WER-fallback-produces-bogus-data issue that linyueqian flagged non-blocking. Y touches the same neighborhoods (broad except around codec fallback, buffered-codes-dropped-on-finish) but with weaker, more tangential mechanisms that don't match the reviewers' actual reasoning as closely, and it misses the cumulative/delta serving_speech.py bug and the audio_tokenizer_v2.py ceil-division bug entirely, as does X. Both are well-grounded and highly actionable (Y even ships ready-to-apply suggestion diffs), but X's superior hit rate on the two most important confirmed findings gives it a clear recall edge without sacrificing precision.",
+  "_cost_usd": 0.38073640000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_train",
+    "arm_a_sha256": "3becdbbb5b11761e9281a323a4a0675563db1519f603c4f32a4193da8a610264",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "18986f2736f812d8c896b12152ebcbf1d5319e9e1f79042f5fa16f1dd6272542",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

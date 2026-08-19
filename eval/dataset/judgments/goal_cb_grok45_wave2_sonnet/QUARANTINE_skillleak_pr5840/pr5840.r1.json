@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.8,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.75,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently rediscover the ground truth's surviving critical concern (the 0.17 model default being dead code because the engine injects 0.2 first), and both correctly validate that the partition-gating and offline-example fixes already landed. X presents its findings with clear, prescriptive 'Change:' directives tied to specific files/lines, making it more directly actionable, while Y frequently ends findings with open questions ('Can you confirm...', 'Intentional...?') rather than concrete fixes, and its dense evidence-citation format is harder to act on despite being well-grounded. Y contributes one novel high-value finding (quality=high Cache-DiT path bypassing the documented TeaCache/Cache-DiT exclusivity) that X misses, giving it a slight edge in coverage breadth, but X's overall organization and concreteness make it marginally more useful as a review a maintainer could act on.",
+  "_cost_usd": 0.43411999999999995,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok45"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok45",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok45",
+    "arm_a_sha256": "9f46c657433abbe92559e0ffbcd8274321ebfbc3e5b912dc553942c1d4b1ccc7",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

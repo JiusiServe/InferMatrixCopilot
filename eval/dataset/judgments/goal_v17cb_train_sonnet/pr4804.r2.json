@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.72,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.62,
+    "actionability": 0.55
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X lands the two most significant ground-truth findings cleanly (hsliuustc0106's [High] v2-tokenizer-swallows-legacy-checkpoints issue via shared model_type, and linyueqian's [High] stream-slot-leak-on-abort with a correct id-space root cause that Y independently verifies but fails to escalate), plus the WER-normalization-fallback and NPU seq_token_counts gaps that both share. Y has real grounding strength (explicit grep/quote verification, resolved-vs-residual framing matching the actual PR conversation) but its report is marred by broken '?:48'-style file anchors, near-duplicate entries padding the finding count, and a complete miss on the single most prominent ground-truth High-severity item. X is also far more actionable, organized by severity with concrete prose fixes, versus Y's harder-to-navigate bug-dump format.",
+  "_cost_usd": 0.5625698,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17cb_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17cb_train",
+    "arm_a_sha256": "23aa0b56f4b7660d9300b86bab6cd9521792e305f2a4575180c020747cc38fae",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "18986f2736f812d8c896b12152ebcbf1d5319e9e1f79042f5fa16f1dd6272542",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

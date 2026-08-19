@@ -1,0 +1,36 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.78,
+    "actionability": 0.8
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth carries no substantive concerns (just bot rate-limit spam and a 'thanks'), so recall is vacuously satisfied by both. Both independently and correctly catch the CI-deselection bug (missing pytestmark) with concrete fixes, and both flag the sm_110a gap between the PR's own tcgen05 rationale and the ==10 gate — but X resolves it with a sharper technical explanation (GemmSm100.arch=100) while Y just asks for confirmation. X pulls ahead by surfacing two additional, well-grounded, high-value bugs Y misses entirely (warmup_quack_fp8 bypassing the gate, and warning_once's exception-identity keying defeating dedup), backed by live pytest verification, whereas several of Y's extra items (naming validation, 'blast radius' restatement) are lower-value observations rather than new defects.",
+  "_cost_usd": 0.2284064,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_train",
+    "arm_a_sha256": "f95efefc340683a005d55c7a4efa226262573432d1565ee6b4c0a5f63c020cbc",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "de884ebeca54520b85a490b897397bd22bf362507bf9f7d4a833d74b390ae063",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

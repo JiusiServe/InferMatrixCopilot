@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently rediscover the same live core issue behind GT concern #2 (async_omni_engine hardcodes rel_l1_thresh=0.2, making the MiniMax-H3-specific 0.17 default unreachable), with equally strong, well-cited grounding; the other GT threads (partition-specific enabler, unrunnable offline example, the two inline test/extractor bugs) already appear fixed in the shown diff, capping recall for both. X edges ahead on precision-weighted value by adding distinct, deeply verified findings beyond the wiring bug (non-monotone/near-constant calibration polynomial with quantitative analysis, memory footprint scaling, wasted RoPE computation, weak E2E cache-hit assertion) plus explicit verification of cross-request state and TP correctness, giving broader non-redundant coverage than Y, whose extra findings partly restate the same default-threshold issue across recipe/CLI/docs.",
+  "_cost_usd": 0.4122987,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_ds_wave2_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_ds_wave2_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_ds_wave2_r2",
+    "arm_a_sha256": "306dee20e29f24dbda086687a248cc00b4fe79898de435911fb82f5471b93f2e",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

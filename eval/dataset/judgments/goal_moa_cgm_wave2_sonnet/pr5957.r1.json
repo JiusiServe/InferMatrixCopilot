@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.75,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both reviews largely miss the actual human-reviewer concerns (WebSocket vs HTTP streaming speed asymmetry, missing profiler/VRAM validation evidence, duplicated duration_factor bounds across four files, s2mel-vs-talker bound mismatch, and the talker raising inside the library-call path) — recall is low for both. X's findings (test pytestmark CI-deselection, PR-body/docs language claims, XPU CI evidence gaps) are well-evidenced with file:line grep citations but read as checklist-style and orthogonal to what reviewers flagged. Y digs deeper into actual runtime-correctness risk (uninitialized mel_head.bias, CPU tensor aliasing in snapshot_mm_payload, concat-semantics bug in one-shot conditioning tensors, IndexTTS-2.0 blast radius) and happens to land on the same duration_factor validation code GT flagged, giving it marginally better thematic overlap, precision, and actionable fix snippets.",
+  "_cost_usd": 0.48204139999999995,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_moa_cgm",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_moa_cgm",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_moa_cgm",
+    "arm_a_sha256": "1c352ff48c58e5fd4a2d16c00ec5550796a1868d462d67786646aad6fd56c95a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.65,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both independently rediscover the NPU-mirror twin bug (npu_ar_model_runner.py never got the seq_len fix) and touch on the fragility of the async_chunk default, giving them comparable recall against the largely-already-resolved ground-truth thread; Y additionally surfaces the Med issue's resolution via git history (ede3dddf) which X misses entirely. But X is far more precise and actionable: each finding is a single, well-verified technical claim with clear file/line, concrete fix, and a genuine verification trail (ran tests, traced the shipped deploy config), while Y's output is a repetitive, semi-machine-formatted dump with ~5 near-duplicate entries about the same scoping fact and several broken '?:3508' file references that hurt actionability. X's finding #7 (mm_outputs.py hardening around per-request row-count mismatches, e.g. non-prefill span_len>1 producing no codes.audio) squarely engages the multi-batch-axis fragility that PR #4910 later fixed, while Y's related finding is only a docstring-wording nit — so only X hits the latent gap.",
+  "_cost_usd": 0.3687873,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17cb_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17cb_train",
+    "arm_a_sha256": "db040a60c0443d83d319fea4f33b133439a7c1867f56214dfe1a4a4601a81db0",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "03d7423c3a91e45838083e2025e3dea932f1d9448ba923b1d6ca1a0373899ea1",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

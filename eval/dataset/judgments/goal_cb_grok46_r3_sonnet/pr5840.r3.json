@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.75,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.8,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates correctly recognize that the diff shown already incorporates fixes for the original enabler/partition and offline-example concerns, and both independently rediscover the same live residual bug (AsyncOmniEngine still hardcodes rel_l1_thresh=0.2, so the new None-sentinel/0.17 model default never reaches real serving) plus the reviewer's own noted gap that the E2E smoke test never asserts a cache hit occurred. X adds one uniquely valuable, well-evidenced finding (TeaCache/Cache-DiT can both get enabled for quality=='high', contradicting the PR's own 'mutually exclusive' doc claim), but its output is a dense, evidence-dump style that's harder to act on and includes some more speculative/hedged nits (AMD CI). Y is comparably grounded (cross-checks its default-threshold claim with actual executed values, verifies R² against the PR's own reported number) and is more precisely organized into blocking/should-fix/minor with concrete 'Change:' directives, plus it catches an additional clean, verifiable issue (the drive-by 39→107 frame edit silently changing the unrelated FP8 smoke test) that X misses.",
+  "_cost_usd": 0.5339393,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46_r3",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r3",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r3",
+    "arm_a_sha256": "7eaa1c85cfd4d740b2cf2f9ec6a65dbaa6af5a02def0850258b60bda539749d9",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

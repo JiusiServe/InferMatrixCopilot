@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.65,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.55,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Neither candidate surfaces the actual human review thread's core concerns (whether functional tests are now redundant given perf coverage, and the intentional narrowing of source_file_dependencies to MiniCPM-owned files only) — both instead recommend re-adding run_benchmark.py/conftest.py to the dependency list, which the real author explicitly rejected as noise from shared infra, so recall is low and that specific finding is contextually wrong for both. Both are well-grounded with real line citations and verified claims (assert-baseline dead code, missing artifact upload, mismatched baseline sweep points), giving decent precision, but X presents a clean, prioritized Major/Should-fix/Minor review with experimentally verified claims, while Y buries its findings under a redundant, semi-duplicated validation dump that hurts readability and actionability.",
+  "_cost_usd": 0.2145265,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_holdout3_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r2",
+    "arm_a_sha256": "e783427577f55232a1582c5fe957616d67c6d782961d55b1cd654c720e18f2b9",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "531e9b74603b37dafe7d3f1011779f043bc357b8d13b9e18c955eaf7ef9f3267",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

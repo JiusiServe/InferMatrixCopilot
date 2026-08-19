@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.82,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.58,
+    "actionability": 0.88,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X more directly covers the naming-mapping concern and provides concrete, grounded fixes and tests, though several findings extend beyond the PR’s scope. Y identifies useful test and metadata gaps, but its central to_out claim is questionable and several findings are speculative; neither clearly requests posted before/after validation.",
+  "_usage": {
+    "input": 3,
+    "output": 929
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_proof_val"
+  },
+  "_roles": {
+    "arm": "copilot_v13_proof_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_proof_val",
+    "arm_a_sha256": "1834eeeeb4d689654568d9d5f648bfe1d1a45e7dfc8d932dfd784d5ee5269791",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9201be5ea408a41833fb8e6040e5eb97d26044159a083e4d1896451ac3585494",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

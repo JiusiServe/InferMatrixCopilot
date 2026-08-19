@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.62,
+    "actionability": 0.94,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.41,
+    "actionability": 0.72,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both identify the weak reduce_scatter verification, fully covering the sole actionable ground-truth concern. X gives a precise replacement test and stronger technical grounding, while Y adds more speculative, duplicated, vague, or internally contradictory findings.",
+  "_usage": {
+    "input": 3,
+    "output": 1349
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v8_official_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v8_official_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v8_official_r1",
+    "arm_a_sha256": "036d5578614b103e59ff08d60f9b1cb1a6edd1507a6162beee4c6179bb3c80fa",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0d4ddd4027e23f1f32216e748289588ea9a0e74ee8e599fa34b9d50f503d2f0d",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 3
+  }
+}

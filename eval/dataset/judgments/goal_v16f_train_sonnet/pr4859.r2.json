@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.6,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.62,
+    "precision": 0.85,
+    "actionability": 0.78,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both independently surface the strongest real finding (double sample-rate conversion in seed_tts_eval.py) with consistent, well-grounded evidence, and both cover the ground-truth threads on serving_speech.py's dialect removal and the audio_vae.py config-sharing issue. The key differentiator is precision on that audio_vae.py:141 finding: X asserts a 'verified locally' benchmark (layer truncation, 0.083 max diff) claiming the encoder's forward pass is actually truncated to 4 layers — this directly contradicts the ground truth's own resolution (LHXuuu: encoder is already constructed before the mutation, so its actual depth is unchanged, matching the vendor) and is almost certainly a fabricated/incorrect claim inflating a non-issue into a 'High' severity bug. Y's parallel finding is correctly calibrated as 'minor' and only claims the config attribute becomes stale, matching the ground-truth outcome. X also cites unverifiable historical PR numbers (#2906/#4341) adding further fabrication risk. X's format is marginally more actionable with explicit before/after code, but Y's grounding and calibration against the actual PR resolution make it the more trustworthy review.",
+  "_cost_usd": 0.31000729999999993,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16f_train_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_train_r1",
+    "arm_a_sha256": "e8a5a3eead4049fa0f643496c0e8a76b73ff086002216dc2238d07d13fededa4",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "264e453d996b4a5c483bf206cefb21e513e90d0d6bda5e49948434353154f4a5",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

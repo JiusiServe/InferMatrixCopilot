@@ -1,0 +1,21 @@
+{
+  "arm": "smoke_cursor_backend",
+  "engine": "infermatrix-copilot CLI (shipped pipeline, pr-review@6 adaptive-depth ensemble; issue-answer dry-run)",
+  "llm": "per .env (DeepSeek-routed)",
+  "dataset": "vllm_omni_dataset.yaml",
+  "splits": [
+    "holdout"
+  ],
+  "kinds": [
+    "pr_review",
+    "issue_answer"
+  ],
+  "n_items": 1,
+  "trace": {
+    "AGENT_TRACE": "(default)",
+    "AGENT_TRACE_IO": "(default)",
+    "AGENT_TRACE_IO_FULL": "(default)"
+  },
+  "moa_when": "(default)",
+  "pr_context_mode": "no_discussion"
+}

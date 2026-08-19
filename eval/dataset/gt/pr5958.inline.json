@@ -1,0 +1,122 @@
+[
+  {
+    "author": "hsliuustc0106",
+    "body": "add @Bounty-hunter  for diffusion parallelism",
+    "line": 142,
+    "path": ".github/CODEOWNERS"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "add @fhfuih for diffusion runtime",
+    "line": 130,
+    "path": ".github/CODEOWNERS"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "add @SamitHuang for cache",
+    "line": 120,
+    "path": ".github/CODEOWNERS"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "model: change from @Isotr0py @wtomin @ZJY0516 to @fhfuih @Bounty-hunter @wtomin ",
+    "line": 136,
+    "path": ".github/CODEOWNERS"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "replace Isotr0py to @david6666666 ",
+    "line": 148,
+    "path": ".github/CODEOWNERS"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "keep @SamitHuang @wtomin",
+    "line": 106,
+    "path": ".github/CODEOWNERS"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "add @RuixiangMa ",
+    "line": 136,
+    "path": ".github/CODEOWNERS"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "add @david6666666 @lishunyang12 ",
+    "line": 87,
+    "path": ".github/CODEOWNERS"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "change to @gcanlin @tjtanaa @xuechendi",
+    "line": 81,
+    "path": ".github/CODEOWNERS"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "add @princepride ",
+    "line": 80,
+    "path": ".github/CODEOWNERS"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "add @alex-jw-brooks ",
+    "line": 59,
+    "path": ".github/CODEOWNERS"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "add @Gaohan123 ",
+    "line": 53,
+    "path": ".github/CODEOWNERS"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "add @Gaohan123 ",
+    "line": 46,
+    "path": ".github/CODEOWNERS"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "add @Bounty-hunter ",
+    "line": 102,
+    "path": ".github/CODEOWNERS"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "add @vraiti ",
+    "line": 97,
+    "path": ".github/CODEOWNERS"
+  },
+  {
+    "author": "Copilot",
+    "body": "The input/output modality contracts design doc lists `@alex-jw-brooks` as an owner, but these engine file-level overrides omit them, so CODEOWNERS is no longer aligned with its cited source.\n\nThis issue also appears on line 60 of the same file.",
+    "line": 57,
+    "path": ".github/CODEOWNERS"
+  },
+  {
+    "author": "Copilot",
+    "body": "ar_runtime.md lists `@Gaohan123` as an owner for vllm_omni/worker/**, but the corresponding CODEOWNERS entry for /vllm_omni/worker/ does not include them.",
+    "line": 47,
+    "path": ".github/CODEOWNERS"
+  },
+  {
+    "author": "Copilot",
+    "body": "This LoRA rule is labeled as \"preserves prior ownership\", but it drops several owners compared with the previous CODEOWNERS entry (per this PR's diff). If the intent is truly to preserve, restore the prior owner list or update the comment/PR description to reflect the intentional change.\n\nThis issue also appears on line 146 of the same file.",
+    "line": 106,
+    "path": ".github/CODEOWNERS"
+  },
+  {
+    "author": "Copilot",
+    "body": "PR description says diffusion/offloader.md was updated to add `@lishunyang12` (and keep @Isotr0py), but the current owners list removes `@Isotr0py` entirely. Please reconcile the doc with the intended ownership (or update the PR description if the removal is intentional).",
+    "line": 8,
+    "path": "docs/design/module/diffusion/offloader.md"
+  },
+  {
+    "author": "Copilot",
+    "body": "`related_code_paths` is currently a null field (no list items). Every other module design doc uses a list here; leaving it empty can break tooling that assumes a sequence type. Consider making this explicitly an empty list (or add the intended related paths).",
+    "line": 19,
+    "path": "docs/design/module/execution_platforms.md"
+  }
+]

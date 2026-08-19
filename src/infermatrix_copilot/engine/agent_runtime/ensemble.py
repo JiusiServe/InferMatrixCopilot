@@ -21,6 +21,44 @@ from .runner import run_agent_step
 from .utils import _build_evidence, _to_step_result
 
 
+def outcome_blocked(result: Any, output: dict | None) -> bool:
+    """True when a pass returned nothing usable — no items and no tool work.
+
+    A harness session that fails at the transport (auth, quota, CLI error)
+    surfaces here as a contract-shaped `status: blocked` with zero tokens and
+    zero tool calls, which is indistinguishable from a shy model unless the
+    counters are checked. Callers use it to tell "this seat did not run" from
+    "this seat ran and found nothing"."""
+    out = output or {}
+    if out.get("_tools_used"):
+        return False
+    status = str(out.get("status") or "").lower()
+    return status in ("blocked", "failed") or not getattr(result, "ok", True)
+
+
+def lens_backend_member(settings: Any, lens_name: str):
+    """The harness Member a pass/lens should ride per
+    `settings.review_lens_backends`, or None for the run's normal backend.
+
+    Map values are "provider:model" or a bare provider id (model then comes
+    from `strict_backend_model`). Role-split composition: breadth passes on a
+    subscription CLI, precision roles on the tier model — the measured
+    complementarity (Composer carries recall, DS carries precision) on the
+    same pipeline. MoA members take precedence at the call site (an explicit
+    mixture is a stronger instruction than the static map)."""
+    spec = (getattr(settings, "review_lens_backends", None) or {}).get(lens_name)
+    if not spec:
+        return None
+    from .moa import Member
+
+    provider, _, model = str(spec).partition(":")
+    provider = provider.strip()
+    model = model.strip() or str(getattr(settings, "strict_backend_model", ""))
+    if not provider or not model:
+        return None
+    return Member(model=model, provider=provider)
+
+
 async def run_agent_step_ensemble(
     ctx: StepContext,
     *,
@@ -88,14 +126,23 @@ async def run_agent_step_ensemble(
                             for i, lens in enumerate(lenses)},
                 max_usd=ctx.settings.moa_max_usd)  # NO token counts here (W7)
 
-    def _lens_overrides(lens_i: int) -> dict:
-        if not moa_members:
-            return {}
-        m = moa_members[lens_i % len(moa_members)]
-        return {"llm_override": BudgetedLLM(
-                    m, ctx.llm.for_member(m), moa_budget,
-                    fallback=(fallback_llm, fallback_model)),
-                "model_override": m.model}
+    def _lens_overrides(lens_i: int, lens_name: str = "") -> dict:
+        if moa_members:
+            m = moa_members[lens_i % len(moa_members)]
+            if m.provider:
+                # harness member: the vendor CLI owns this lens's tool loop
+                # (same bridge/audit path as a harness backend); no
+                # BudgetedLLM — there is no per-token spend to reserve, the
+                # session rides its timeout
+                return {"harness_member": m, "model_override": m.model}
+            return {"llm_override": BudgetedLLM(
+                        m, ctx.llm.for_member(m), moa_budget,
+                        fallback=(fallback_llm, fallback_model)),
+                    "model_override": m.model}
+        m = lens_backend_member(ctx.settings, lens_name)
+        if m is not None:
+            return {"harness_member": m, "model_override": m.model}
+        return {}
 
     async def _one_lens(lens: dict, j: int, idx: int = 0,
                         lens_i: int = 0) -> tuple[str, StepResult, dict]:
@@ -114,7 +161,7 @@ async def run_agent_step_ensemble(
             f"{lens['focus']}\nGo DEEP on this lens — it is your depth "
             "priority; report other issues only if they surface on the way. "
             "Peer agents cover the other lenses.")
-        overrides = _lens_overrides(lens_i)
+        overrides = _lens_overrides(lens_i, str(lens.get("name") or ""))
         try:
             result, output = await run_agent_step(
                 ctx, step_name=f"{step_name}#{lens['name']}{suffix}",
@@ -135,19 +182,53 @@ async def run_agent_step_ensemble(
                 evidence=evidence, guidance=lens_guidance, expected=expected,
                 output_extension=output_extension, scope=scope,
                 extra_tools=extra_tools, max_iters=budget)
-        if (ctx.settings.ensemble_zero_yield_retry and output and not (output.get(merge_key) or [])):
+        # `output` is {} when the lens produced no contract-conformant final —
+        # the ONLY path where _coerce_output returns None, reached when a pass
+        # burns its whole completion ceiling and returns empty text. Both
+        # retries below used to require a truthy `output`, so that case fell
+        # through BOTH and the lens was dropped silently: measured 2026-08-16,
+        # five whole review passes and ~2.1M input tokens of investigation
+        # discarded across one holdout, three of them on its worst item.
+        if (ctx.settings.ensemble_zero_yield_retry
+                and not ((output or {}).get(merge_key) or [])):
             # zero-yield lens: one cheap single-lens re-ask beats the full
-            # 8-lens ensemble retry it used to trigger (T3 forensics #6)
-            ctx.trace.record("lens_zero_yield_retry", lens=str(lens["name"]))
+            # 8-lens ensemble retry it used to trigger (T3 forensics #6).
+            # The retry KEEPS this lens's routing (`**overrides`): dropping it
+            # silently moved a routed seat onto the default backend, so an arm
+            # labelled "Fable in the adversary seat" was measured running
+            # DeepSeek there — the seat's whole purpose, erased without a
+            # trace signal (2026-08-16: a Fable-5 quota exhaustion made every
+            # routed session return is_error, and 18 of 28 holdout seats
+            # degraded this way while the run still reported success).
+            seat_dead = (outcome_blocked(result, output)
+                         and bool(overrides))
+            ctx.trace.record("lens_zero_yield_retry", lens=str(lens["name"]),
+                             routed=bool(overrides), seat_failed=seat_dead)
+            if seat_dead:
+                # a ROUTED seat that produced nothing at all is a capability
+                # gap, not a shy model — say so loudly enough that an arm
+                # cannot be mislabelled after the fact
+                ctx.trace.record(
+                    "capability_gap", capability="review.routed_seat",
+                    step=f"{step_name}#{lens['name']}{suffix}",
+                    effect=f"routed seat produced no output; retrying on the "
+                           f"same route (model={overrides.get('model_override')})")
             result, output = await run_agent_step(
                 ctx, step_name=f"{step_name}#{lens['name']}{suffix}/retry",
                 purpose=purpose, evidence=evidence,
-                guidance=lens_guidance + "\n\nYour first pass yielded zero "
-                "candidates. Re-check your two highest-risk hunks; emit every "
-                "plausible candidate (do not self-censor) or a [validated] "
-                "finding for each checklist item you cleared.",
+                guidance=lens_guidance + (
+                    "\n\nYour first pass produced NO USABLE FINAL — most "
+                    "likely it ran past the reply ceiling. Investigate less "
+                    "and FILE: your final JSON must fit, so keep evidence to "
+                    "one quoted line per comment and findings to 15 lines."
+                    if not output else
+                    "\n\nYour first pass yielded zero candidates. Re-check "
+                    "your two highest-risk hunks; emit every plausible "
+                    "candidate (do not self-censor) or a [validated] finding "
+                    "for each checklist item you cleared."),
                 expected=expected, output_extension=output_extension,
-                scope=scope, extra_tools=extra_tools, max_iters=budget)
+                scope=scope, extra_tools=extra_tools, max_iters=budget,
+                **overrides)
         return str(lens["name"]), result, output
 
     # lenses (and repeat samples of each lens — a single sample's item list is
@@ -187,6 +268,26 @@ async def run_agent_step_ensemble(
                 by_sig[sig] = tagged
                 candidates.append(tagged)
 
+    # near-duplicate corroboration across lenses: the same concern surfaces at
+    # slightly different lines/wording, which exact-signature dedup cannot see
+    # — consensus stays 1 and the reducer treats independent agreement as
+    # noise (a 2-lens candidate was dropped as "unlikely" in a live run whose
+    # ground truth confirmed it). Tag file/line-proximate agreement so the
+    # reducer's drop rule can weigh it.
+    for i, a in enumerate(candidates):
+        fa, la = str(a.get("file", "")), a.get("line")
+        if not fa or not isinstance(la, int):
+            continue
+        others = {name
+                  for j, b in enumerate(candidates) if j != i
+                  for name in b.get("lenses") or []
+                  if str(b.get("file", "")) == fa
+                  and isinstance(b.get("line"), int)
+                  and abs(b["line"] - la) <= 8
+                  and name not in (a.get("lenses") or [])}
+        if others:
+            a["corroborated_by"] = sorted(others)
+
     def _dedup_union(key: str) -> list:
         """Union the list-valued `key` across all samples, dropping exact
         duplicates (dict/list items compared by canonical JSON, scalars by str),
@@ -221,6 +322,8 @@ async def run_agent_step_ensemble(
         # reducer's latency. A single-lens singleton does NOT qualify: an
         # unreplicated claim must still face verification (a hallucinated
         # blocker once sailed through here and became the entire review)
+        # `corroborated_by` survives into the merged items: downstream comment
+        # budgeting ranks independently-corroborated findings above singletons
         merged[merge_key] = [
             {k: v for k, v in c.items() if k not in ("lenses", "consensus")}
             for c in candidates]
@@ -347,9 +450,22 @@ async def run_agent_step_ensemble(
                 "lens_reduce_truncated", step=step_name,
                 candidates=len(candidates),
                 output_tokens=(reply.usage or {}).get("output_tokens", 0))
+            # candidates-only retry: re-sending the full evidence pack made
+            # the retry die at max_tokens exactly like the first attempt on a
+            # 19-candidate/316KB item (wave-3 pr5691 — both calls burned the
+            # whole ceiling reasoning over the evidence, the union shipped
+            # with duplicate findings, and precision collapsed). Dup/keep
+            # decisions are judged on candidate-text coherence alone here.
+            retry_prompt = (
+                f"## CANDIDATE ITEMS ({merge_key}, from {len(samples)} "
+                "samples)\n"
+                + json.dumps(numbered, ensure_ascii=False, indent=1)
+                + "\n\n(No evidence pack on this retry — judge duplicates "
+                "and internal coherence from the candidate texts alone; "
+                "drop only self-contradictory or vacuous items.)")
             retry = await asyncio.to_thread(
                 reducer_llm.create, system=_merge_system(verdicts_only=True),
-                messages=[{"role": "user", "content": merge_prompt}],
+                messages=[{"role": "user", "content": retry_prompt}],
                 model=tier_model, role="reducer",
                 max_tokens=max(6000, ctx.settings.llm_max_tokens))
             retry_text = retry.text
@@ -413,8 +529,14 @@ async def run_agent_step_ensemble(
                              "(merge reduction failed; unverified union)")
     # near-dup guard (W2): the reducer occasionally re-emits the same finding
     # (observed live: an identical dead-guard comment twice on PR 4810) — drop
-    # candidates identical on (file, line, normalized first-120-chars comment)
+    # candidates identical on (file, line, normalized first-120-chars comment).
+    # When the merge FAILED outright, collapse aggressively instead: same
+    # file within 8 lines = one finding (wave-3 pr5691: a failed merge
+    # shipped a raw union where 4 of the 8 rendered slots were two
+    # duplicated findings — in the failure path, losing a neighbor finding
+    # is cheaper than shipping duplicates).
     seen_sigs: set = set()
+    kept_lines: dict[str, list[int]] = {}
     deduped: list[int] = []
     for i in sorted(kept):
         c = kept[i]
@@ -425,6 +547,14 @@ async def run_agent_step_ensemble(
                " ".join(str(c.get("comment", "")).lower().split())[:120])
         if sig in seen_sigs:
             continue
+        if not verified:
+            fpath = str(c.get("file", ""))
+            line = c.get("line")
+            if isinstance(line, int) and any(
+                    abs(line - n) <= 8 for n in kept_lines.get(fpath, [])):
+                continue
+            if isinstance(line, int):
+                kept_lines.setdefault(fpath, []).append(line)
         seen_sigs.add(sig)
         deduped.append(i)
     merged[merge_key] = [

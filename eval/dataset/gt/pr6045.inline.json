@@ -1,0 +1,38 @@
+[
+  {
+    "author": "hsliuustc0106",
+    "body": "it seems this section is not aligned with the whole features in the nav especially about the quantization support.",
+    "line": 228,
+    "path": "docs/user_guide/diffusion_features.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "does it belong to diffusion only?",
+    "line": 43,
+    "path": "docs/features/README.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "do we have other attention backend?",
+    "line": 59,
+    "path": "docs/design/index.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "this have been moved out of tree",
+    "line": 57,
+    "path": "docs/.nav.yml"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "gguf has bee move out",
+    "line": 57,
+    "path": "docs/.nav.yml"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "This drops the only navigation entry for `user_guide/quantization/bitsandbytes.md`. BitsAndBytes remains implemented and tested, but no other guide links to this page, so it is undiscoverable in the new taxonomy. Please restore `BitsAndBytes W4` here after Int8.",
+    "line": 54,
+    "path": "docs/.nav.yml"
+  }
+]

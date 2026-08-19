@@ -17,4 +17,5 @@ sources: []
 | PR 描述如何路由精确 owner/model 代码地图 | [maintainer pattern routing](guides/maintainer-pattern-routing.md) |
 | 模型适配是否漏掉必要链路 | [model adaptation guardrails](guides/model-adaptation-guardrails.md) |
 | 模型验证是否证明语义正确 | [model validation](guides/model-validation.md) |
+| Strict 审查的仓库专属检查单（按触发条件执行） | [strict review checklist](guides/strict-review-checklist.md) |
 | 维护或浏览本目录 | [guides index](guides/_index.md) |

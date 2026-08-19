@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.12,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y directly engages with and confirms resolution of the two ground-truth blocking items (native-speed rejected in streaming, WebSocket speed asymmetry) and surfaces several independently diff-verifiable findings (vLLM 0.26→0.27 test-plan mismatch, CI pytestmark deselection, XPU enforce_eager scope creep) backed by quoted evidence. X's findings are plausible, well-argued, and actionable but almost entirely orthogonal to what the human reviewers actually flagged — it misses the native-speed streaming bug, WebSocket asymmetry, the validation-evidence gap, and the duplicated-bounds concern entirely, giving it much lower recall despite comparable depth.",
+  "_cost_usd": 0.4858391000000001,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok45"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok45",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok45",
+    "arm_a_sha256": "3cd48667039fcdfe0247259955f2bfc5fab5c2e08ba3a0b3902723ef1f0df3dc",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

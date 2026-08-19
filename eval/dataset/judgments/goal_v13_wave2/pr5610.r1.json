@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.38,
+    "precision": 0.5,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.68,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y covers substantially more ground-truth concerns, including platform behavior, connector ownership, image handling, full-payload reachability, and prefix-cache compatibility. Its findings are highly concrete, though several are speculative or minor. X catches dependency validation and platform nuance but misses most central reviewer concerns and raises multiple weak non-defects.",
+  "_usage": {
+    "input": 3,
+    "output": 1310
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "copilot_v13_wave2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_wave2",
+    "arm_a_sha256": "2266c6a7b8adfdc368211ac36a6a88d34131c806d5edc2fb28d854a33ba0c673",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

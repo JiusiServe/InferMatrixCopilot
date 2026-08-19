@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates miss the ground truth's P2 finding (exact-aligned packed inputs silently disabling SAGE via a duplicate cu_seqlens boundary) — X explicitly (and incorrectly) marks this as 'resolved', while Y's verdict summary also implies the trim loop 'handles' it. Both surface an AllGather-KV/TRTLLM incompatibility via layer.py:96-100, but Y engages far more substantively with the actual mechanism (rank-local Q vs gathered KV, query_ranges) that echoes the ground truth's P1 concern, while X's version is generic ('state whether this is intentionally unsupported'). Y's own findings (unvalidated max_seqlen_q/k, all-False-mask zero-token kernel, sync-per-launch cost) are backed by concrete worked repro examples and tie into the same producer-contract violation the ground truth's readiness fixes reference, giving it higher precision and slightly better actionability via its prioritized Required/Should-fix/Minor structure. Neither uses a labeled LATENT GAP CHECK section, so gap_hit is false for both.",
+  "_cost_usd": 0.5531896000000001,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r1",
+    "arm_a_sha256": "d7911ee2a8d180c40643068dea5f7ba592401a2c958ecdb423dd378890787849",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "283d5ab54325426c21ff03640adaaf73eb89e801040f4baf619381200e657fb0",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

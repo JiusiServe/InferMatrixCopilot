@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently rediscovered the substantive surviving concern — AsyncOmniEngine's default cache config still forces rel_l1_thresh=0.2, defeating the new MiniMax-H3-specific 0.17 default — echoing the human reviewer's threshold complaint; the other three original review threads (partition-aware enabler, non-runnable example, missing packed_total/attn_backend bugs) are already fixed in this diff and correctly not re-flagged by either. Y verified the engine bug with actual executed traces and added several additional findings directly grounded in the visible diff (e.g. the drive-by FP8 test frame-count/extra_args change is verifiable line-for-line) plus concrete, actionable test-coverage and memory/perf gaps. X's findings are also grounded and actionable but thinner, with a couple of weaker or tangential items (CI-status check, a speculative comment suggestion) diluting precision relative to Y.",
+  "_cost_usd": 0.376968,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v13_mimo_wave2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_mimo_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_mimo_wave2",
+    "arm_a_sha256": "3ecd233ed147f9a3508aee7b6d6e15773584cb230a572c0d82b63ae19e3a1373",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

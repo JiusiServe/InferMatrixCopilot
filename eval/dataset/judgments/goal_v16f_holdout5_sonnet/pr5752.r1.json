@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.75
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both independently and correctly find the two most consequential regressions (ungated video_reference source_path breaking generic models; T2VA aspect_ratio check ordering breaking explicit-canvas requests), both well-grounded with concrete line evidence. X additionally lands a dedicated, well-argued finding matching the ground truth's repeated 'api server should not add model-specific code' theme (two separate reviewer comments) and presents fixes in a cleanly actionable blocker/should-fix/minor structure with explicit Fix: guidance. Y matches a subtler ground-truth nuance (tests using a fake engine mask the regression) almost verbatim and catches a genuine test-count inconsistency, but its dense audit-log format is somewhat less actionable and its unique-theme recall is narrower than X's.",
+  "_cost_usd": 0.5106931,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16f_holdout5_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout5_r1",
+    "arm_a_sha256": "3c67e6beed14b899ce04ec8b3221da67ab0d152be6b5b51fbaf470cb2dfa2fca",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b590c64d5a8a4639f4821930aafe057151231d39e7e6d760072f23304748c04b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

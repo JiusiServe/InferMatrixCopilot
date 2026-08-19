@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.88,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.75,
+    "actionability": 0.65
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Most ground-truth concerns (NPU scope, CUDA/ROCm enforcement, connector-state snapshot claim, image path, full-payload branch, prefix cache) were already fixed in the diff shown, so neither candidate could re-find them verbatim — but X dug into the same load-bearing spots (connector-state ownership, image rendering) and surfaced genuinely new, well-grounded residual issues there (GitHub-vs-MkDocs image path, overstated single-consumer invariant with three counter-examples, TP>1 collective risk), all backed by precise file/line cross-references. Y's report is comparatively shallow — a boilerplate validation pass plus two minor, tangential findings (performance-number provenance, missing backlink) that don't engage with the areas the human reviewer actually cared about. X is clearly more thorough, more actionable, and better grounded in the code.",
+  "_cost_usd": 0.12001220000000001,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok46_r2"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r2",
+    "arm_a_sha256": "013be1ce97f44027f2876cd62e4bf6c267a8b7d4d5680b750ed34a20275260af",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

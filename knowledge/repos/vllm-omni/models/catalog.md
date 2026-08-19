@@ -93,7 +93,7 @@ python tools/audit_vllm_omni_release.py \
 
 命令从 Git 对象读取 registry，不 import vLLM；机器基线与完整维护步骤见
 `adapters/vllm_omni/release_baseline.yaml` 和
-`doc/VLLM_OMNI_RELEASE_MAINTENANCE.md`。
+`doc/contributing/release-maintenance.md`。
 
 已有专属沉淀页的模型见 [models/_index](_index.md)；没有专属规则的新家族先走共享
 Diffusion owner。参照用途见 [reference-models](reference-models.md)。

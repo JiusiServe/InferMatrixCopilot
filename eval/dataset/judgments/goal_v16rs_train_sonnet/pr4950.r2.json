@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns (just LGTM), so both trivially achieve full recall. X goes deeper with well-grounded, code-traced findings (silent-audio-vs-error mismatch, over-broad extra_body claim contradicted by GLM-Image.md, index-collision trap, jq verification step) that are concrete and directly tied to specific doc lines with suggested rewrites. Y is accurate but thinner, delivering only one formal actionable finding (unrelated CI failure) plus soft 'sweep' observations, one of which (flagging README.md:58 as 'stale') is arguably a false positive that X explicitly and correctly refutes with SDK extra_body-merging reasoning.",
+  "_cost_usd": 0.17933290000000002,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16rs_train_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16rs_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16rs_train_r1",
+    "arm_a_sha256": "cd0b341aeef480190b3756547aad3787fae6a2b85e23540e99f9b3b39ea54916",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5a2e689fc33efd67adbf119f1e4cf034841928ad70fea2d99f142a727ca8ea18",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

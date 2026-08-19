@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.85,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.78,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both ground the diff well, but Y's review substantively echoes the actual reviewer threads — it explicitly flags missing vLLM-Omni/PyTorch version pinning (mirroring the human ask for 'CUDA/driver/PyTorch versions'), and repeatedly interrogates Ref2VA's untested/risky status (restart command, OOM risk, timeout, audio-reference format), which is the crux of the 'have you tested ref2va' thread. X's findings (Ref2VA curl schema, peak-memory header mismatch, dangling RTX PRO 5000 reference, missing cross-links) are precise and well-grounded but narrower and less aligned with what reviewers actually pushed on. Y's sheer volume of specific, actionable fixes (with code snippets) slightly dilutes average precision versus X's tighter set, but overall usefulness and ground-truth alignment favor Y.",
+  "_cost_usd": 0.3394824,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46",
+    "arm_a_sha256": "b1bfa0538e1cefffd54eb3b3f400df66b296b427f07b0f0a03c8374af41529f1",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "726725524751ffed003542c0fd4e00bb3f74ef77a200d776d40628016c5bdd21",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,337 @@
+diff --git a/.github/CODEOWNERS b/.github/CODEOWNERS
+index c95d1df08ff..2f7f80673a5 100644
+--- a/.github/CODEOWNERS
++++ b/.github/CODEOWNERS
+@@ -1,6 +1,11 @@
+ # CODEOWNERS is used to automatically assign PR reviewers
+ # Format: path pattern @username or @team
+ # More info: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
++#
++# The vllm_omni/** source-tree rules below are derived from the `owners` and
++# `primary_code_paths` front matter in docs/design/module/*.md. When updating
++# ownership, update the design doc first, then regenerate the matching rule here.
++# Last-match-wins: more specific rules must come AFTER broader ones.
+ 
+ # Default owners (fallback reviewers for all files)
+ * @Gaohan123 @hsliuustc0106 @ywang96
+@@ -21,25 +26,10 @@
+ # CI
+ /.buildkite/ @yenuo26 @congw729 @NickCao
+ 
+-# Engine and model_executor
+-/vllm_omni/core/ @tzhouam @yinpeiqi @fake0fan @Sy0307
+-/vllm_omni/engine/ @tzhouam @yinpeiqi @fake0fan @Sy0307
+-/vllm_omni/entrypoints/ @tzhouam @yinpeiqi @fake0fan @alex-jw-brooks @NickCao
+-/vllm_omni/model_executor/ @tzhouam @gcanlin
+-/vllm_omni/worker/ @tzhouam @gcanlin
+-
+-# Diffusion
+-/vllm_omni/diffusion/ @Isotr0py @princepride @SamitHuang @wtomin @ZJY0516 @RuixiangMa @david6666666 @xuechendi
+-/vllm_omni/lora/ @princepride @SamitHuang @wtomin @ZJY0516 @RuixiangMa @yuanheng-zhao
+-
+-# Diffusion CPU offloading
+-/vllm_omni/diffusion/offloader/ @Isotr0py @princepride @SamitHuang @wtomin @ZJY0516 @RuixiangMa @yuanheng-zhao @xuechendi
+-
+-# Omni and TTS support
+-/vllm_omni/transformers_utils/ @tzhouam @yuanheng-zhao
+-/vllm_omni/model_executor/models/ @linyueqian @ZeldaHuang @princepride @yuanheng-zhao @amy-why-3459 @Bounty-hunter @Sy0307 @gcanlin @NickCao
++# ComfyUI / external apps
++/apps/ @fhfuih @alex-jw-brooks
+ 
+-# Benchmarks
++# Benchmarks (out-of-tree)
+ /benchmarks/accuracy/ @david6666666
+ /benchmarks/build_dataset/ @linyueqian @yuanheng-zhao
+ /benchmarks/diffusion/ @Isotr0py @princepride @SamitHuang @wtomin @ZJY0516 @RuixiangMa @xuechendi
+@@ -47,20 +37,112 @@
+ /benchmarks/glm_image/ @princepride @JaredforReal
+ /benchmarks/tts/ @linyueqian @ZeldaHuang @princepride @Sy0307 @gcanlin
+ 
+-# Usability and Observability
+-/vllm_omni/deploy/ @tzhouam @lishunyang12
+-/vllm_omni/metrics/ @lishunyang12
+-/vllm_omni/profiler/ @gcanlin
++# =====================================================================
++# Module design ownership (docs/design/module/*.md)
++# Each section header cites the source design doc.
++# =====================================================================
++
++# Autoregressive runtime — docs/design/module/ar_runtime.md
++/vllm_omni/core/ @tzhouam @yinpeiqi @fake0fan @Sy0307 @Gaohan123
++/vllm_omni/worker/ @tzhouam @yinpeiqi @fake0fan @Sy0307 @Gaohan123
++
++# Engine orchestration & stage runtime — docs/design/module/engine_orchestration.md, stage_runtime.md
++/vllm_omni/engine/ @tzhouam @fake0fan
++# File-level overrides: input/output modality contracts own these engine files
++# — docs/design/module/input_output_modality_contracts.md
++/vllm_omni/engine/messages.py @Sy0307 @amy-why-3459 @Gaohan123 @alex-jw-brooks
++/vllm_omni/engine/serialization.py @Sy0307 @amy-why-3459 @Gaohan123 @alex-jw-brooks
++/vllm_omni/engine/mm_outputs.py @Sy0307 @amy-why-3459 @Gaohan123 @alex-jw-brooks
++/vllm_omni/engine/output_modality.py @Sy0307 @amy-why-3459 @Gaohan123 @alex-jw-brooks
++/vllm_omni/engine/output_processor.py @Sy0307 @amy-why-3459 @Gaohan123 @alex-jw-brooks
++
++# Input/output modality contracts — docs/design/module/input_output_modality_contracts.md
++/vllm_omni/inputs/ @Sy0307 @amy-why-3459 @Gaohan123 @alex-jw-brooks
++/vllm_omni/outputs/ @Sy0307 @amy-why-3459 @Gaohan123 @alex-jw-brooks
++/vllm_omni/request.py @Sy0307 @amy-why-3459 @Gaohan123 @alex-jw-brooks
++/vllm_omni/data_entry_keys.py @Sy0307 @amy-why-3459 @Gaohan123 @alex-jw-brooks
++
++# Entrypoints and serving boundaries — docs/design/module/entrypoints.md
++/vllm_omni/entrypoints/ @alex-jw-brooks @linyueqian @NickCao
++# File-level overrides within entrypoints/
++/vllm_omni/entrypoints/openai/errors.py @alex-jw-brooks @NickCao
++/vllm_omni/entrypoints/cli/benchmark/ @alex-jw-brooks @Bounty-hunter
++
++# Error contracts — docs/design/module/error_contracts.md
++/vllm_omni/errors.py @alex-jw-brooks @NickCao
++
++# OmniConnector (inter-stage transport) — docs/design/module/omni_connector.md
++/vllm_omni/distributed/ @princepride @yuanheng-zhao @xuechendi @natureofnature @fake0fan
+ 
+-# ComfyUI
+-/apps/ @fhfuih @alex-jw-brooks
++# Model integration — docs/design/module/model_integration.md
++/vllm_omni/model_executor/ @tzhouam @gcanlin
++/vllm_omni/model_executor/models/ @tzhouam @gcanlin @Sy0307 @amy-why-3459 @linyueqian
++/vllm_omni/model_extras/ @tzhouam @gcanlin @princepride
++/vllm_omni/plugins/ @gcanlin @tjtanaa @xuechendi
++# Config override within model_executor — docs/design/module/vllm_omni_config.md
++/vllm_omni/model_executor/stage_configs/ @lishunyang12 @alex-jw-brooks
+ 
+-# Large Scale Serving
+-/vllm_omni/distributed/ @princepride @yuanheng-zhao @xuechendi @natureofnature @fake0fan
++# Execution platforms (hardware backends) — docs/design/module/execution_platforms.md
++/vllm_omni/platforms/ @gcanlin @tjtanaa @xuechendi
++/vllm_omni/attention/ @gcanlin @tjtanaa @xuechendi @david6666666 @lishunyang12
+ 
+-# Quantization and configuration
++# Configuration & deploy — docs/design/module/vllm_omni_config.md
+ /vllm_omni/config/ @lishunyang12 @alex-jw-brooks
++/vllm_omni/deploy/ @lishunyang12 @alex-jw-brooks
++
++# Quantization — docs/design/module/quantization.md
+ /vllm_omni/quantization/ @david6666666 @Isotr0py @lishunyang12
+ 
+-# Hardware plugins and accelerators
+-/vllm_omni/platforms/ @gcanlin @tjtanaa @xuechendi
++# Observability — docs/design/module/observability.md
++/vllm_omni/metrics/ @lishunyang12 @vraiti
++
++# Profiling — docs/design/module/profiling.md
++/vllm_omni/profiler/ @gcanlin
++
++# Benchmarking (in-tree) — docs/design/module/benchmarking.md
++/vllm_omni/benchmarks/ @alex-jw-brooks @Bounty-hunter
++
++# LoRA (no dedicated design doc; ownership intentionally narrowed)
++/vllm_omni/lora/ @SamitHuang @wtomin
++
++# Transformers utils (related path only in design docs; preserves prior ownership)
++/vllm_omni/transformers_utils/ @tzhouam @yuanheng-zhao
++
++# =====================================================================
++# Diffusion module family — docs/design/module/diffusion/
++# Umbrella rule first; sub-module rules after it win via last-match.
++# =====================================================================
++
++# Diffusion umbrella (top-level files: data.py, forward_context.py, etc.)
++# — docs/design/module/diffusion/index.md
++/vllm_omni/diffusion/ @Isotr0py @princepride @SamitHuang @wtomin @ZJY0516 @RuixiangMa @david6666666 @xuechendi
++
++# Cache management — docs/design/module/cache_management.md
++/vllm_omni/diffusion/cache/ @Isotr0py @princepride @SamitHuang
++
++# Diffusion quantization — docs/design/module/quantization.md
++/vllm_omni/diffusion/quantization/ @david6666666 @Isotr0py @lishunyang12
++
++# Diffusion profiling — docs/design/module/profiling.md
++/vllm_omni/diffusion/profiler/ @gcanlin
++
++# Diffusion runtime (scheduler, executor, worker)
++# — docs/design/module/diffusion/diffusion_runtime.md, continuous_batching.md
++/vllm_omni/diffusion/sched/ @Isotr0py @princepride @SamitHuang @fhfuih
++/vllm_omni/diffusion/executor/ @Isotr0py @princepride @SamitHuang @fhfuih
++/vllm_omni/diffusion/worker/ @Isotr0py @princepride @SamitHuang @fhfuih
++
++# Diffusion model integration (pipelines, registration, checkpoint loading)
++# — docs/design/module/diffusion/diffusion_model_integration.md
++/vllm_omni/diffusion/models/ @fhfuih @Bounty-hunter @wtomin
++/vllm_omni/diffusion/model_loader/ @fhfuih @Bounty-hunter @wtomin @RuixiangMa
++/vllm_omni/diffusion/lora/ @fhfuih @Bounty-hunter @wtomin @RuixiangMa
++
++# Diffusion parallelism (rank topology, TP/SP/PP/VAE patch)
++# — docs/design/module/diffusion/parallelism.md
++/vllm_omni/diffusion/distributed/ @princepride @yuanheng-zhao @xuechendi @Bounty-hunter
++/vllm_omni/diffusion/attention/parallel/ @princepride @yuanheng-zhao @xuechendi @Bounty-hunter
++
++# Diffusion offloader (CPU offloading, DLO)
++# — docs/design/module/diffusion/offloader.md
++/vllm_omni/diffusion/offloader/ @yuanheng-zhao @david6666666 @lishunyang12
+diff --git a/docs/design/module/ar_runtime.md b/docs/design/module/ar_runtime.md
+index 194aade5fe3..cf7d126817c 100644
+--- a/docs/design/module/ar_runtime.md
++++ b/docs/design/module/ar_runtime.md
+@@ -7,6 +7,7 @@ owners:
+   - "@yinpeiqi"
+   - "@fake0fan"
+   - "@Sy0307"
++  - "@Gaohan123"
+ primary_code_paths:
+   - vllm_omni/core/**
+   - vllm_omni/worker/**
+diff --git a/docs/design/module/benchmarking.md b/docs/design/module/benchmarking.md
+index 93eba2c7260..b200865e913 100644
+--- a/docs/design/module/benchmarking.md
++++ b/docs/design/module/benchmarking.md
+@@ -4,6 +4,7 @@ kind: module
+ status: draft
+ owners:
+   - "@alex-jw-brooks"
++  - "@Bounty-hunter"
+ primary_code_paths:
+   - vllm_omni/benchmarks/**
+   - vllm_omni/entrypoints/cli/benchmark/**
+diff --git a/docs/design/module/cache_management.md b/docs/design/module/cache_management.md
+index 6f22cf91983..22245f89568 100644
+--- a/docs/design/module/cache_management.md
++++ b/docs/design/module/cache_management.md
+@@ -5,6 +5,7 @@ status: draft
+ owners:
+   - "@Isotr0py"
+   - "@princepride"
++  - "@SamitHuang"
+ primary_code_paths:
+   - vllm_omni/diffusion/cache/**
+ related_code_paths:
+diff --git a/docs/design/module/diffusion/diffusion_model_integration.md b/docs/design/module/diffusion/diffusion_model_integration.md
+index 3673db9c1d8..d6eb44561fd 100644
+--- a/docs/design/module/diffusion/diffusion_model_integration.md
++++ b/docs/design/module/diffusion/diffusion_model_integration.md
+@@ -3,9 +3,10 @@ title: Diffusion Model Integration
+ kind: module
+ status: draft
+ owners:
+-  - "@Isotr0py"
++  - "@fhfuih"
++  - "@Bounty-hunter"
+   - "@wtomin"
+-  - "@ZJY0516"
++  - "@RuixiangMa"
+ primary_code_paths:
+   - vllm_omni/diffusion/models/**
+   - vllm_omni/diffusion/model_loader/**
+diff --git a/docs/design/module/diffusion/diffusion_runtime.md b/docs/design/module/diffusion/diffusion_runtime.md
+index 9925ed48719..61224cd5b37 100644
+--- a/docs/design/module/diffusion/diffusion_runtime.md
++++ b/docs/design/module/diffusion/diffusion_runtime.md
+@@ -6,6 +6,7 @@ owners:
+   - "@Isotr0py"
+   - "@princepride"
+   - "@SamitHuang"
++  - "@fhfuih"
+ primary_code_paths:
+   - vllm_omni/diffusion/sched/**
+   - vllm_omni/diffusion/executor/**
+diff --git a/docs/design/module/diffusion/offloader.md b/docs/design/module/diffusion/offloader.md
+index 52e634a2fea..919b1f39a85 100644
+--- a/docs/design/module/diffusion/offloader.md
++++ b/docs/design/module/diffusion/offloader.md
+@@ -4,7 +4,8 @@ kind: module
+ status: draft
+ owners:
+   - "@yuanheng-zhao"
+-  - "@Isotr0py"
++  - "@david6666666"
++  - "@lishunyang12"
+ primary_code_paths:
+   - vllm_omni/diffusion/offloader/**
+ related_code_paths:
+diff --git a/docs/design/module/diffusion/parallelism.md b/docs/design/module/diffusion/parallelism.md
+index 39034d5d366..138810ec40f 100644
+--- a/docs/design/module/diffusion/parallelism.md
++++ b/docs/design/module/diffusion/parallelism.md
+@@ -6,6 +6,7 @@ owners:
+   - "@princepride"
+   - "@yuanheng-zhao"
+   - "@xuechendi"
++  - "@Bounty-hunter"
+ primary_code_paths:
+   - vllm_omni/diffusion/distributed/**
+   - vllm_omni/diffusion/attention/parallel/**
+diff --git a/docs/design/module/entrypoints.md b/docs/design/module/entrypoints.md
+index 80b576f964c..160f1251450 100644
+--- a/docs/design/module/entrypoints.md
++++ b/docs/design/module/entrypoints.md
+@@ -6,6 +6,7 @@ architecture_state: current-plus-in-flight
+ owners:
+   - "@alex-jw-brooks"
+   - "@linyueqian"
++  - "@NickCao"
+ document_stewards:
+   - "@hsliuustc0106"
+   - "@Gaohan123"
+diff --git a/docs/design/module/execution_platforms.md b/docs/design/module/execution_platforms.md
+index beeeef92274..30469345ba9 100644
+--- a/docs/design/module/execution_platforms.md
++++ b/docs/design/module/execution_platforms.md
+@@ -8,8 +8,15 @@ owners:
+   - "@xuechendi"
+ primary_code_paths:
+   - vllm_omni/platforms/**
+-related_code_paths:
+   - vllm_omni/attention/**
++primary_code_path_owners:
++  # Additional owners scoped to attention kernels (quantized/custom attention)
++  - paths:
++      - vllm_omni/attention/**
++    owners:
++      - "@david6666666"
++      - "@lishunyang12"
++related_code_paths: []
+ depends_on:
+   - ar_runtime.md
+   - diffusion/index.md
+diff --git a/docs/design/module/input_output_modality_contracts.md b/docs/design/module/input_output_modality_contracts.md
+index 1083b09b0a2..dc06a643973 100644
+--- a/docs/design/module/input_output_modality_contracts.md
++++ b/docs/design/module/input_output_modality_contracts.md
+@@ -6,6 +6,8 @@ architecture_state: current
+ owners:
+   - "@Sy0307"
+   - "@amy-why-3459"
++  - "@Gaohan123"
++  - "@alex-jw-brooks"
+ document_stewards:
+   - "@hsliuustc0106"
+   - "@Gaohan123"
+diff --git a/docs/design/module/model_integration.md b/docs/design/module/model_integration.md
+index 8b2afe0a0b5..1d8d7ab7343 100644
+--- a/docs/design/module/model_integration.md
++++ b/docs/design/module/model_integration.md
+@@ -9,6 +9,14 @@ primary_code_paths:
+   - vllm_omni/model_executor/**
+   - vllm_omni/model_extras/**
+   - vllm_omni/plugins/**
++primary_code_path_owners:
++  # Additional owners scoped to a sub-path of model_executor/**
++  - paths:
++      - vllm_omni/model_executor/models/**
++    owners:
++      - "@Sy0307"
++      - "@amy-why-3459"
++      - "@linyueqian"
+ related_code_paths:
+   - vllm_omni/transformers_utils/**
+   - vllm_omni/tokenizers/**
+diff --git a/docs/design/module/observability.md b/docs/design/module/observability.md
+index 83971e2d395..6f74e85d6e4 100644
+--- a/docs/design/module/observability.md
++++ b/docs/design/module/observability.md
+@@ -4,6 +4,7 @@ kind: module
+ status: draft
+ owners:
+   - "@lishunyang12"
++  - "@vraiti"
+ primary_code_paths:
+   - vllm_omni/metrics/**
+ related_code_paths:

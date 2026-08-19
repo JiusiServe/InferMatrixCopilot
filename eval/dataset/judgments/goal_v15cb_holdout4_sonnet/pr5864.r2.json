@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Neither candidate surfaces the ground truth's single biggest concern (asukaqaq-s's DP/SP topology restructuring critique), and most of the inline nits (magic timeout, ipc.py dedup, duplicate tests, weak rank-0/2 test) were already fixed by the reviewed snapshot, capping recall for both. X delivers deeper, more consequential correctness findings (cascading wave failures, fail-closed timeout killing the whole engine, an unreachable dead-code branch validated by a matching-but-vacuous test, silent cross-request output substitution, shutdown races) each with precise file:line evidence and concrete 'Change:' directives, and its batch-wait finding closely echoes david6666666's configurability concern. Y is well-evidenced (quote-backed) but skews toward lower-severity doc-lag and test-coverage-gap items, missing the correctness-bug depth X provides, so despite comparable precision its actionable value is lower.",
+  "_cost_usd": 0.3912565,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15cb_holdout4_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v15cb_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15cb_holdout4_r1",
+    "arm_a_sha256": "3c657bd6dba4fc662fdcde392f33bd1d124aa5121a76677609d8d5fb6cb8eb9d",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5d107b26c5dd605248f4ff3bf7b26b48a886f95ed933ef7eb79692e052dcfc5a",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

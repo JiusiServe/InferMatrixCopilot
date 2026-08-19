@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently found the same highest-value overlap with ground truth (AsyncOmniEngine still defaults rel_l1_thresh=0.2, silently bypassing the calibrated MiniMax-H3 0.17 default) with matching file/line evidence, but both entirely missed the two most concrete, reviewer-verified blocking bugs (missing packed_total kwarg causing a TypeError, and the fake Attention test helper missing attn_backend causing 6 test failures), capping recall for both. Y edges ahead on precision and depth: it catches a diff-verifiable finding X missed entirely (the drive-by frame-count change forcing edits to the unrelated FP8 smoke test, visible directly in the diff), backs claims with executed-code traces, and includes a 'verified correct' section that separates confirmed non-issues from real ones, whereas X pads its finding list with lower-value/non-actionable items (e.g. a sp_prepare note that concludes no action is needed, a hedged AMD-CI question). Both are well-organized and actionable with concrete file/line references and suggested fixes.",
+  "_cost_usd": 0.4980674,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_composer25",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_composer25",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_composer25",
+    "arm_a_sha256": "c435d3ae443cde62d1af10d630f9f02e20e60cb2252a1dc63d617c01a9136191",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

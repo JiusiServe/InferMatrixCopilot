@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.64,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.7,
+    "precision": 0.52,
+    "actionability": 0.88,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X explicitly identifies the older-kernels incompatibility with trust_remote_code and its resulting total fallback failure, while Y mentions it only indirectly as stale PR-description context. Both add several speculative or low-value findings, but X’s core concern and proposed remedies are more precise and actionable.",
+  "_usage": {
+    "input": 3,
+    "output": 1193
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v7_goal_r4"
+  },
+  "_roles": {
+    "arm": "copilot_v7_goal_r4",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v7_goal_r4",
+    "arm_a_sha256": "3fb18b33eeb2e7ca591c599a97daa0477290aa30e6ad3feaf937cedfd3ba7681",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "589a8ff13cb3893b76dd0d5220ad632d82f46cc0edd9083528ebb2466be7c8a7",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 2
+  }
+}

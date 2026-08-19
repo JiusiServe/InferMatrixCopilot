@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.12,
+    "precision": 0.82,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates miss most of the human reviewers' specific P1 findings (modular-alias metadata gap at model_metadata.py:47, Ref2VA implicit-task-default regression at line 727, and SamitHuang's code-quality nits are entirely absent from both); only the Qwen3-TTS task_type validation gap (serve.py/model.py) is clearly hit by each. Y's coverage is broader and more thematically aligned with ground truth (combined-mode memory/validation concerns via the NPU doc downgrade and default-flip finding, directly visible in the given diff), and its blocking findings include concrete reproduction output for genuinely severe systemic risks (Cache-DiT dotted-path handling breaking Bagel/SenseNova). X's findings are competently grounded but narrower, mostly minor test-coverage gaps rather than live bugs. Neither has a LATENT GAP CHECK section.",
+  "_cost_usd": 0.4581742,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r1",
+    "arm_a_sha256": "ae3577da5267998d66c1f783c76acef03eb04e3b33b34135ff0a6e5c318cb125",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "7d155ed781e729cb9d3a1c8ef3851789595fa7fa0c9c18281fbbf0c3a461d7e5",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.55,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.78,
+    "actionability": 0.78
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both independently surface the same genuine unaddressed bug (double PCM sample-rate conversion in seed_tts_eval) and raise the dialect-removal concern comparably well, matching ground truth's amy-why-3459 thread. But on the audio_vae config-mutation concern (ground truth's other real thread), Y correctly scopes it as a metadata-only issue — exactly matching LHXuuu's authoritative explanation that the encoder's actual layer count is unaffected — while X confidently asserts with fabricated-sounding 'verification' that the encoder is truncated to 4 layers, directly contradicting the maintainer's resolution. Y also correctly validates the patch_emission +2 change against the HF reference (matching ground truth's conclusion it's intentional, not a bug), whereas X treats it as an unexplained magic number needing tests. X's confident wrong claims hurt its precision more than Y's denser but better-calibrated findings.",
+  "_cost_usd": 0.47308459999999997,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17cb_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17cb_train",
+    "arm_a_sha256": "41084d917e11ddc4fd53d21c5b7d627ef2c75a0bfc6645a2e29220b7ecaf314d",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "264e453d996b4a5c483bf206cefb21e513e90d0d6bda5e49948434353154f4a5",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

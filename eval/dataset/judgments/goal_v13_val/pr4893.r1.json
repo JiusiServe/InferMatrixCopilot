@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.58,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.42,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates catch the sole ground-truth concern: the reduce_scatter assertions validate attributes injected by the fake rather than the real wrapper. X is more precise overall, while Y adds more speculative, pre-existing, stylistic, or follow-up concerns; both provide concrete locations and fixes.",
+  "_usage": {
+    "input": 3,
+    "output": 574
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "copilot_v13_proof_val",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_proof_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_proof_val",
+    "arm_a_sha256": "3a910d274a0f99984473aba477ab54e27e47789d293bda139eefb5246199da7f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0d4ddd4027e23f1f32216e748289588ea9a0e74ee8e599fa34b9d50f503d2f0d",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.9,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.92
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both reviews are well-grounded and highly actionable with concrete file:line refs and code snippets, but the ground-truth concerns center on validation redundancy/consolidation across layers (asukaqaq-s), missing DTO-local invariants (asukaqaq-s's explicit 'unique IDs, positive values' category), and redundant validator calls (RuixiangMa) — Y directly hits all three (findings #2, #7, and the DTO invariant proposal mirrors asukaqaq-s's suggested checks almost verbatim), while X's two findings (missing pre-RPC validation on batch/step paths, silent DLO fallback) only lightly echo the validation-consistency theme. Y also surfaces a genuinely new high-value bug (ARDiffusionModelRunner signature mismatch) and documentation/scope issues echoing hsliuustc0106's stale-description complaint. X is slightly higher precision/tighter (all findings verified real with no overreach), but Y's broader, still well-grounded coverage yields materially better recall without sacrificing much precision.",
+  "_cost_usd": 0.3602675000000001,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "cursor_grok45",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "cursor_grok45",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_grok45",
+    "arm_a_sha256": "03788e7a653dca7dcc339950db05ed6869f9cbacf4626038e5247dc3a293d225",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b6ae3b48c6859b0d16784163ab2044d7d85e3b3b32f4e60b559fa2a55186c64b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

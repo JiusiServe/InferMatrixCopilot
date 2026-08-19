@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.6,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns (just LGTM approvals), so both trivially get full recall. X's findings are more substantive and better grounded: it catches that the PR's blanket 'extra_body is ignored' claim is actually false for other request fields, backing it with a concrete counter-example (GLM-Image.md) that Y's review explicitly validates as correct without noticing the overreach — a real miss for Y. X also balances its critique with a 'checked, no change needed' section showing deliberate investigation rather than padding. Y's three actual findings are valid but thinner nits, and one (the README.md:57 suggestion) mildly contradicts Y's own validated note that the file's SDK usage is already correct, weakening its grounding; Y's output is also heavy with sweep/validated log entries that aren't real findings. Y's literal GitHub suggestion blocks are highly actionable, keeping actionability close, but X's deeper, more consistent technical reasoning gives it the precision edge.",
+  "_cost_usd": 0.2001592,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17cb_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17cb_train",
+    "arm_a_sha256": "58879b02ffae7858eb37dfecb0a35c533f9c0392b72c22c044631a513392002a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5a2e689fc33efd67adbf119f1e4cf034841928ad70fea2d99f142a727ca8ea18",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

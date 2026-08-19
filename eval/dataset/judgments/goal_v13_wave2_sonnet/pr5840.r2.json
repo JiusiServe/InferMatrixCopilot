@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.75,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.78,
+    "precision": 0.88,
+    "actionability": 0.92
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates correctly recognize that the diff already fixes the GT's partition-gating, offline-example, and both inline (packed_total/attn_backend) issues, and both independently rediscover the one concern still live at this snapshot — the engine's async_omni_engine.py silently forcing rel_l1_thresh=0.2 and defeating the new 0.17 MiniMax-H3 default — with strong file:line evidence. Y edges ahead on precision and actionability: it demonstrates the engine bug via actual executed I/O traces, adds a genuinely novel and technically deep finding (the calibration polynomial is near-constant/non-monotone over its own domain), and organizes findings into clearly prioritized blocking/should-fix/minor tiers with a dedicated 'verified correct' section that reduces ambiguity. X is comparably thorough (notably the Cache-DiT/quality='high' conflict and AMD CI-relevance catch are valuable, well-hedged findings) but is slightly more mechanically listed and its extra findings skew more cosmetic.",
+  "_cost_usd": 0.46843070000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v13_wave2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_wave2",
+    "arm_a_sha256": "8f36c69762945dccaf24f0db7f798511a3e63f39f1446ac63f9054eb134c767a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.65,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y independently surfaces the same core registry.py builder-less passthrough regression X found, but backs it with actual runtime reproductions (LingBot mode resolution, stage-modality warning) rather than static evidence quotes alone, and its 'Smaller items' section directly matches three of the eight GT comments (the import-aliasing/shadowing critique in __init__.py, and the deleted-test-not-rehomed concern). X's report repeatedly asserts 'no entrypoints/openai serving file changed' as a validated fact to support its 'online serving unchanged' narrative, which is contradicted by the ground truth reviewer leaving a comment directly on vllm_omni/entrypoints/openai/serving_video.py:30 — a real factual miss that dents precision. Both reviews are highly actionable with concrete file:line fixes, but Y edges ahead on rigor (it explicitly tests and refutes its own num_frames hypothesis) and topical overlap with the human reviewer's actual concerns.",
+  "_cost_usd": 0.3759939000000001,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_holdout3_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r2",
+    "arm_a_sha256": "11c81bb3234c7152c36f6a57e0260d0bb841e504aea95c8b0d26349bf00cff2c",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "f3f11d2cd7926100dbdc03762099a2cc9cdcebc0d29f39ad1339fc8af49d3171",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

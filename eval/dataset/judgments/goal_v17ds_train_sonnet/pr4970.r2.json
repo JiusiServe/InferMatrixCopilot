@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.8,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth is essentially empty (LGTM plus an unrelated VoxCPM2 request neither candidate could infer from this diff), so both score well on recall by default. Both trace the seed→tts_local_seed→per-row-multinomial mechanism accurately and ground findings in real file:line evidence; X is slightly more conservative and self-contained, while Y adds a genuinely valuable catch (docs/configuration/stage_configs.md examples still showing seed:42, inviting copy-paste regression) plus a concrete regression-test suggestion, giving it more actionable, concrete asks — though Y's excursions into vLLM-internal sampler mechanics (topk_topp_sampler.py, exact version behavior) are harder to verify and slightly riskier for precision.",
+  "_cost_usd": 0.23906909999999998,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17ds_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_train",
+    "arm_a_sha256": "28397c99e2dcb8ba156e6a40e08e04b3984bcb508ce47db3fb304dacd74c920d",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "410634f22ac0d9a55948ec0dfc9caa6557a8995e24766ff507dbe677d6dd37dc",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

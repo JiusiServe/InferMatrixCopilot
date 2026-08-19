@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X hits 4 of 6 ground-truth concerns (the design/index.md 'Attention optimization' mis-nesting matches 'do we have other attention backend?' almost exactly, plus GGUF removal and demonstrated awareness that BitsAndBytes was removed-then-restored mid-PR), while Y only catches the GGUF issue and misses the attention-backend and bitsandbytes threads entirely. Both are well-grounded and actionable with specific file:line evidence and concrete fixes, but X's broader coverage of the actual reviewer's concerns gives it the clear recall edge without sacrificing precision.",
+  "_cost_usd": 0.4238268,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_holdout3_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r2",
+    "arm_a_sha256": "9cd0c4d9cf5e19af82f988c41a4d1d15a8d5910edbc226b10a3bb8a37124d037",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "547e7dae328bb016f40e52ff9f47201f77c529d80a351e2defe03ab5d3f2b6e1",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

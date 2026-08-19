@@ -1,0 +1,36 @@
+{
+  "calls": 33,
+  "input_tokens": 1648808,
+  "output_tokens": 29764,
+  "cost_usd": 4.413561,
+  "is_error": false,
+  "terminal_reason": "completed",
+  "split": "train",
+  "head": "3b2d87c9c3bc6de90acab52b72fa4ec848452fdd",
+  "base": "ca0ae7269ca3e9487645cf66088fdfc338951da9",
+  "resolved_model": "claude-fable-5",
+  "snapshot_sha256": "3f34bf24e9cf2ffc1d98f5757e2b70745bd56336799461dfad735e9554a45b53",
+  "validation_commands": [
+    "git -C /data/zhoutaichang/.infermatrix-copilot/worktrees/vllm-omni-pr4923 diff --stat ca0ae7269ca3e9487645cf66088fdfc338951da9 HEAD",
+    "git diff --stat ca0ae7269ca3e9487645cf66088fdfc338951da9 HEAD",
+    "git diff ca0ae7269ca3e9487645cf66088fdfc338951da9 HEAD",
+    "grep -n \"talker_mtp\" /data/zhoutaichang/.infermatrix-copilot/worktrees/vllm-omni-pr4923/vllm_omni/worker/gpu_model_runner.py | head -80",
+    "ls /data/zhoutaichang/.infermatrix-copilot/worktrees/vllm-omni-pr4923/vllm_omni/model_executor/models/qwen3_tts/ && grep -rn \"pooler_output\\|hidden_states\" /data/zhoutaichang/.infermatrix-copilot/worktrees/vllm-omni-pr4923/vllm_omni/model_executor/models/qwen3_tts/qwen3_tts_code2wav.py | head -20",
+    "python -c \"import vllm; print(vllm.__version__)\" 2>/dev/null; python -c \"\nfrom vllm.config import CompilationConfig\nimport inspect\nfrom vllm.config.compilation import CUDAGraphMode\nprint([m.name for m in CUDAGraphMode])\nprint(CUDAGraphMode.PIECEWISE.has_full_cudagraphs())\nprint(CUDAGraphMode.FULL_AN",
+    "python - <<'EOF' 2>&1 | tail -20\nimport inspect\nfrom vllm.config import VllmConfig\nsrc = inspect.getsource(VllmConfig)\nimport re\n# find cudagraph_mode default resolution\nfor m in re.finditer(r'.*cudagraph_mode.*', src):\n    line = m.group(0).strip()\n    if 'FULL_AND_PIECEWISE' in line or 'PIECEWISE'",
+    "python -c \"\nimport inspect, re\nfrom vllm.config import VllmConfig\nsrc = inspect.getsource(VllmConfig)\nfor line in src.splitlines():\n    if 'cudagraph_mode' in line and ('FULL' in line or 'PIECEWISE' in line or 'NONE' in line):\n        print(line.strip()[:170])\n\" 2>&1 | tail -15",
+    "python -c \"\nimport inspect, re\nfrom vllm.config import VllmConfig\nsrc = inspect.getsource(VllmConfig)\nlines = src.splitlines()\nfor i,line in enumerate(lines):\n    if 'cudagraph_mode is None' in line or 'FULL_AND_PIECEWISE' in line:\n        print('\\n'.join(l[:150] for l in lines[max(0,i-4):i+6]))\n   ",
+    "python -c \"\nimport vllm.config.compilation as cc, inspect, re\nsrc = inspect.getsource(cc)\nlines = src.splitlines()\nfor i,line in enumerate(lines):\n    if 'FULL_AND_PIECEWISE' in line and ('=' in line or 'default' in line.lower()):\n        print('\\n'.join(l[:150] for l in lines[max(0,i-6):i+4])); pri"
+  ],
+  "ran_validation": true,
+  "claude_md_seen": {
+    "/data/zhoutaichang/CLAUDE.md": "27ca8ea8056c231e"
+  },
+  "recorded_at": "2026-08-15T01:18:01",
+  "arm": "baseline_opus5",
+  "wall_s": 470.7,
+  "audit_ok": true,
+  "audit_violations": [],
+  "audit_blocked_attempts": [],
+  "artifact_chars": 8594
+}

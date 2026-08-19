@@ -1,0 +1,50 @@
+[
+  {
+    "author": "david6666666",
+    "body": "For a request like quality=\"fast\" this falls through to cache_dit=None, i.e. Cache-DiT disabled -- the slowest H3 path. Since \fast is a valid level in the shared protocol (DIFFUSION_QUALITY_LEVELS), a caller asking for the fastest tier silently gets the reference path instead. Suggest rejecting unsupported levels like high does without cache_dit, or mapping \fast to an actual accelerated profile; at minimum log a warning so this isn't silent.",
+    "line": 75,
+    "path": "vllm_omni/diffusion/models/minimax_h3/quality_policy.py"
+  },
+  {
+    "author": "david6666666",
+    "body": "Small consistency nit: every sibling field above only overrides when explicitly provided (provided_fields), but this always assigns. Harmless today since the default is None, but it would silently clobber a model-set default quality if one is ever introduced. Mind gating it like \num_inference_steps for symmetry.",
+    "line": 203,
+    "path": "vllm_omni/entrypoints/openai/serving_video.py"
+  },
+  {
+    "author": "david6666666",
+    "body": "Same as the sync path: unconditional assignment while sibling fields are gated on provided_fields. Fine today (None default), but a future model default quality would be silently overwritten. Consider gating for consistency.",
+    "line": 538,
+    "path": "vllm_omni/entrypoints/openai/serving_video_output_stream.py"
+  },
+  {
+    "author": "mglyn",
+    "body": "Resolved. I removed fast from the shared diffusion quality levels.",
+    "line": 75,
+    "path": "vllm_omni/diffusion/models/minimax_h3/quality_policy.py"
+  },
+  {
+    "author": "mglyn",
+    "body": "Resolved. quality is now applied only when explicitly present in request.model_fields_set, preserving the engine/model default when omitted.",
+    "line": 203,
+    "path": "vllm_omni/entrypoints/openai/serving_video.py"
+  },
+  {
+    "author": "mglyn",
+    "body": "Resolved. The streaming path now uses the same provided_fields guard and preserves the default quality when the request omits quality.",
+    "line": 538,
+    "path": "vllm_omni/entrypoints/openai/serving_video_output_stream.py"
+  },
+  {
+    "author": "david6666666",
+    "body": "you can add quality use example here and paste the measured trade-off like table\n```\nquality | Meaninferencelatency | Speedup | SSIM vslossless | PSNR vslossless | Expectedtrade-off\n-- | -- | -- | -- | -- | --\n```",
+    "line": 576,
+    "path": "recipes/MiniMaxAI/MiniMax-H3.md"
+  },
+  {
+    "author": "mglyn",
+    "body": "sure",
+    "line": 576,
+    "path": "recipes/MiniMaxAI/MiniMax-H3.md"
+  }
+]

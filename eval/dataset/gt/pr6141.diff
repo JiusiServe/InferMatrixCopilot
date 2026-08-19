@@ -1,0 +1,164 @@
+diff --git a/docs/.nav.yml b/docs/.nav.yml
+index bdc11ec7c1d..730c43be67d 100644
+--- a/docs/.nav.yml
++++ b/docs/.nav.yml
+@@ -163,7 +163,8 @@ nav:
+ - CLI Reference: cli
+ - Community:
+   - Governance: community/governance.md
+-  - community/*
++  - Contact Us: community/contact_us.md
++  - Community Meetings: community/meetings.md
+   - Slack: https://slack.vllm.ai
+   - Blog: https://blog.vllm.ai
+   - Forum: https://discuss.vllm.ai
+diff --git a/docs/community/contact_us.md b/docs/community/contact_us.md
+index 09c7815a038..cae175f4c5e 100644
+--- a/docs/community/contact_us.md
++++ b/docs/community/contact_us.md
+@@ -1,5 +1,9 @@
+ # Contact Us
+ 
+-- For technical questions and feature requests, please use GitHub [Issues](https://github.com/vllm-project/vllm-omni/issues)
+-- For coordinating contributions and development and discussing with other users and developers, please join `sig-omni` channel in our [Slack](https://slack.vllm.ai/) or use the [vLLM Forum](https://discuss.vllm.ai/)
+-- For security disclosures, please use GitHub's [Security Advisories](https://github.com/vllm-project/vllm-omni/security/advisories) feature
++- For bugs and feature requests, search or open a GitHub [issue](https://github.com/vllm-project/vllm-omni/issues).
++- For technical and usage questions, join the `sig-omni` channel in [vLLM Slack](https://slack.vllm.ai/) or use the [vLLM Forum](https://discuss.vllm.ai/).
++- For coordinating contributions and development, use `sig-omni`, the forum, or join a [community meeting](meetings.md).
++
++## Security Disclosures
++
++Do not share vulnerability details in public GitHub issues, pull requests, discussions, or Slack channels. To arrange a private report, send a direct message to one of the [lead maintainers](governance.md#lead-maintainers) in [vLLM Slack](https://slack.vllm.ai/). If you cannot send a direct message, you may post a detail-free request in `sig-omni` asking a lead maintainer to contact you privately; do not include any vulnerability details in that request.
+diff --git a/docs/community/governance.md b/docs/community/governance.md
+index 63d38cd209d..ae12ef038a8 100644
+--- a/docs/community/governance.md
++++ b/docs/community/governance.md
+@@ -52,31 +52,11 @@ Committers have write access and merge rights. They typically have deep expertis
+ - [@ZJY0516](https://github.com/ZJY0516): Diffusion attention backend, kernel fusion, and CustomOp
+ - [@yuanheng-zhao](https://github.com/yuanheng-zhao): Diffusion cache, offload, and Omni Support
+ 
+-## Diffusion Workload Division
++## Reviewer Routing
+ 
+-This section breaks down diffusion-related responsibilities. If you have PRs touching these areas, please ping the listed owners for review.
++For path-based reviewer routing, consult [`.github/CODEOWNERS`](https://github.com/vllm-project/vllm-omni/blob/main/.github/CODEOWNERS). Detailed subsystem boundaries and safe-change guidance live in the [module design documents](../design/index.md#module-design-documents).
+ 
+-### Runtime-related
+-
+-- Diffusion models: @RuixiangMa, @wtomin, @xuechendi
+-
+-### Optimization
+-
+-- Parallel: @RuixiangMa, @wtomin
+-- Attention backend: @ZJY0516
+-- Cache: @yuanheng-zhao, @RuixiangMa, @SamitHuang
+-- Offload: @yuanheng-zhao
+-- Intel GPU support: @xuechendi
+-- Quantization: @lishunyang12, @david6666666
+-- Kernel fusion / communication-computation: @ZJY0516
+-
+-### Docs & Test
+-
+-- Diffusion docs: @RuixiangMa, @wtomin
+-
+-## Meetings
+-
+-Committers hold **bi-weekly meetings** to discuss future directions and collaborations of the project.
++`CODEOWNERS` is operational routing metadata, not a governance or approval policy. Being listed does not grant committer status or merge rights, and it does not mean every listed reviewer must approve a change. The maintainer roster above is authoritative for project roles and merge rights.
+ 
+ ## Committer Nomination Process
+ 
+diff --git a/docs/community/meetings.md b/docs/community/meetings.md
+new file mode 100644
+index 00000000000..7f812a59930
+--- /dev/null
++++ b/docs/community/meetings.md
+@@ -0,0 +1,8 @@
++# Community Meetings
++
++vLLM-Omni hosts developer-facing meetings for Chinese- and English-language audiences. Schedules and access details can change, so use these maintained documents as the source of truth:
++
++- [Chinese-language meeting document](https://docs.google.com/document/d/1pdUBiS_7mdOUNDtdwy-9OUf7jsMWN324BIbps5olDME/edit?tab=t.0)
++- [English-language meeting document](https://docs.google.com/document/d/19AlD08T8uJ7wqfs8VtYCi0iGMTwlTYVVlAxFZ3S7OIg/edit?tab=t.0)
++
++Each document contains the current schedule, access details, agendas, and past meeting notes. For broader vLLM community events, see the [vLLM events calendar](https://vllm.ai/events/).
+diff --git a/docs/community/meetups.md b/docs/community/meetups.md
+deleted file mode 100644
+index 3374fe711cf..00000000000
+--- a/docs/community/meetups.md
++++ /dev/null
+@@ -1 +0,0 @@
+-# Meetups
+diff --git a/docs/community/volunteers.md b/docs/community/volunteers.md
+deleted file mode 100644
+index 2c25485ea90..00000000000
+--- a/docs/community/volunteers.md
++++ /dev/null
+@@ -1,12 +0,0 @@
+-# Volunteers for Bugfix and CI
+-
+-We encourage you to check current docs and [issues](https://github.com/vllm-project/vllm-omni/issues) to find possible solutions for your questions. If non of these can solve it, please propose an issue to describe your questions about bug or CI problems for developing.
+-
+-If you have urgent need for locating and solving bugfix or CI problems, please find community volunteers below.
+-
+-| Dec 4-Dec 12 | Dec 15-Dec 19 | Dec 22-Dec 26 | Dec 29- Jan 2, 2026| Jan 5-Jan 9 | Jan 12-Jan 16 |
+-|----------|----------|----------|----------|----------|----------|
+-| <a href="https://github.com/congw729">Conw729</a> | <a href="https://github.com/yinpeiqi">yinpeiqi</a> | <a href="https://github.com/tzhouam">tzhouam</a> | <a href="https://github.com/SamitHuang">SamitHuang</a> | <a href="https://github.com/gcanlin">gcanlin</a> | <a href="https://github.com/natureofnature">natureofnature</a> |
+-| <a href="https://github.com/david6666666">david6666666</a> | <a href="https://github.com/R2-Y">R2-Y</a> | <a href="https://github.com/hsliuustc0106">hsliuustc0106</a> | <a href="https://github.com/Gaohan123">Gaohan123</a> | <a href="https://github.com/ZJY0516">ZJY0516</a> | <a href="https://github.com/qibaoyuan">qibaoyuan</a> |
+-
+-We kindly welcome more contributors to fix bugs and contribute new features!
+diff --git a/docs/contributing/README.md b/docs/contributing/README.md
+index f86a18f2ee0..2224c667e52 100644
+--- a/docs/contributing/README.md
++++ b/docs/contributing/README.md
+@@ -3,7 +3,7 @@
+ Thank you for your interest in contributing to vLLM-Omni! This document provides guidelines and instructions for contributing.
+ 
+ !!! note
+-    We host weekly developer-facing online meetings to discuss milestones and updates **every Tuesday at 19:30 PDT**. Meeting link as well as the past meeting notes can be found [here](https://tinyurl.com/vllm-omni-meeting).
++    vLLM-Omni hosts developer-facing meetings for Chinese- and English-language audiences. See [Community Meetings](../community/meetings.md) for current schedules, access details, agendas, and past notes.
+ 
+ ## Getting Started
+ 
+@@ -122,7 +122,7 @@ Repository skills guide the agent, but they do not replace contributor judgment,
+ If you encounter a bug or have a feature request, please search existing issues first to see if it has already been reported. If not, please file a new issue, providing as much relevant information as possible.
+ 
+ !!! important
+-    If you discover a security vulnerability, please report it by creating a GitHub issue with the `security` label.
++    Do not report suspected security vulnerabilities through a public issue, pull request, discussion, or Slack channel. Follow the [security disclosure instructions](../community/contact_us.md#security-disclosures) to arrange a private report.
+ 
+ ## Pull Requests & Code Reviews
+ 
+diff --git a/docs/usage/faq.md b/docs/usage/faq.md
+index 0539e158b01..87b63998e7e 100644
+--- a/docs/usage/faq.md
++++ b/docs/usage/faq.md
+@@ -10,12 +10,12 @@ A: Refer to [GPU memory calculation and configuration](../configuration/gpu_memo
+ 
+ > Q: I encounter some bugs or CI problems, which is urgent. How can I solve it?
+ 
+-A: At first, you can check current [issues](https://github.com/vllm-project/vllm-omni/issues) to find possible solutions. If none of these satisfy your demand and it is urgent, please find these [volunteers](https://docs.vllm.ai/projects/vllm-omni/en/latest/community/volunteers/) for help.
++A: Search the current [issues](https://github.com/vllm-project/vllm-omni/issues) first. If no existing issue matches a bug or CI failure, open a [bug report](https://github.com/vllm-project/vllm-omni/issues/new?template=400-bug-report.yml) with a minimal reproducer, environment details, and relevant logs. For technical or usage questions, use the `sig-omni` channel in [vLLM Slack](https://slack.vllm.ai/) or the [vLLM Forum](https://discuss.vllm.ai/).
+ 
+ > Q: Does vLLM-Omni support AWQ or any other quantization?
+ 
+-A: We plan to introduce GGUF FP8 prequantized models and online FP8 quantization in version 0.16.0. Support for other quantization types will follow in future releases. For details, please see our [Q1 quantization roadmap](https://github.com/vllm-project/vllm-omni/issues/1057).
++A: AWQ is available through the inherited vLLM quantization registry, and vLLM-Omni supports several additional methods. Actual support and validation vary by model, component, hardware, and checkpoint. See the [quantization overview](../user_guide/quantization/overview.md) for validated combinations and method-specific guides.
+ 
+ > Q: Does vLLM-Omni support multimodal streaming input and output?
+ 
+-A: Not yet. We already put it on the [Roadmap](https://github.com/vllm-project/vllm-omni/issues/165). Please stay tuned!
++A: Yes, for specific models and serving paths. Current capabilities include [streaming video input](../serving/video_stream_api.md), [streaming diffusion output](../user_guide/diffusion/execution_modes.md#streaming-output), and experimental full-duplex real-time audio described in the [project overview](../README.md). Check the model and API documentation because input and output support is model-specific.
+diff --git a/mkdocs.yml b/mkdocs.yml
+index 242eb33aeca..1a3b5109f5b 100644
+--- a/mkdocs.yml
++++ b/mkdocs.yml
+@@ -73,6 +73,8 @@ plugins:
+   - awesome-nav
+   - redirects:
+       redirect_maps:
++        community/meetups.md: community/meetings.md
++        community/volunteers.md: community/contact_us.md
+         user_guide/diffusion/request_batching.md: user_guide/diffusion/execution_modes.md
+         user_guide/diffusion/step_execution.md: user_guide/diffusion/execution_modes.md
+         user_guide/diffusion/cpu_offload_diffusion.md: user_guide/diffusion/cpu_offload.md

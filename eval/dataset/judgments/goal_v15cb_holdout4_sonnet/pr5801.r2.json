@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.55,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "The one substantive ground-truth concern (the H3 RoPE path silently assumes tiled/duplicated freqs and diverges without error if that invariant breaks) is directly caught by Y's finding #5, with a concrete repro showing silent divergence — X's findings are all speculative 'add more test coverage' suggestions that never surface this issue. Y also independently finds a genuine, diff-provable regression (norm.py:68 changes RMSNorm's default weight dtype from ambient/context-following to hardcoded fp32, breaking fused-kernel dispatch for every other model using this layer) with an exact, correct fix, while X's list is padded with duplicate/near-identical findings and one purely speculative 'if CI is failing, check this' non-finding. Y's points are more concrete and actionable, most including ready-to-apply code diffs, versus X's hedged 'consider adding a test for X' phrasing.",
+  "_cost_usd": 0.3133302,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15cb_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15cb_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15cb_holdout4_r1",
+    "arm_a_sha256": "90232f947a07c4fa9845de1f2e9270c35e3f25d5b5fd63e58097685c621e8cb1",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0ac7a88b887a97acc40e7614e44e3692d3e06a3bd75c8cab12c4dc831b63d48b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

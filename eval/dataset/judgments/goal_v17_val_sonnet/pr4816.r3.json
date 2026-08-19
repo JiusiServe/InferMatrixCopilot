@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.78,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "tie",
+  "margin": "slight",
+  "rationale": "Ground truth carries no substantive concerns (bare 'lgtm' + a bot notice), so recall is vacuous for both. Both candidates independently surface the same real, well-grounded defect: pure-diffusion mode sets serving_tokenization=None while _create_speech_error_json_response still dereferences base(raw_request) unguarded, meaning the PR's fix is incomplete for diffusion servers — both back this with correct file/line evidence and concrete patches. X extends further into speculative territory (Dockerfile vLLM-pin sleuthing, sibling openai_serving_* rename audit) that is honestly hedged but unverifiable from the diff; Y catches an additional plausible bug (bare ErrorResponse returned with implicit 200 instead of 404 in create_chat_completion) and uses a more disciplined evidence/validate methodology, though a couple of its 'findings' (CI selection, stale comment) are informational rather than actionable fixes. Both are highly actionable with inline suggestions; overall quality is comparable enough to call it a slight tie leaning Y for the extra verified bug.",
+  "_cost_usd": 0.34621349999999995,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17_val"
+  },
+  "_roles": {
+    "arm": "copilot_v17_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_val",
+    "arm_a_sha256": "744d1e88dc61e380b74b2777910c14c86c906f3fcdbe2f3b8cd988c07032e350",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b9fe4c00140a73cf5cc08ceded6d03eb8b8faea45f6c3b50e6f9753b9a1a1a01",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

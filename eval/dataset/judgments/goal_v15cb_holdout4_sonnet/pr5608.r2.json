@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.82,
+    "actionability": 0.78
+  },
+  "y": {
+    "recall": 0.25,
+    "precision": 0.87,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently converge on the same strongest, diff-grounded issue (sibling BNSD call sites in qwen3_code_predictor.py and the 310P patch left unrouted through the new helper) and the same test-coverage gap (the toy shape only exercises the alignment clause, never the batch*heads clause), which speaks well for precision on both sides. Neither explicitly answers FayeSpica's literal ask for a three-way BNSD/BSND/plain-torch perf table, so recall stays low for both, though Y at least performs a BNSD-vs-BSND equivalence check that touches the spirit of that request while X does not. X's report is noisier (a bloated 'validated' checklist) and self-contradicts on the code_predictor risk (calling it likely-fine in one place, then flagging it as a real gap later), whereas Y organizes by severity, ties its risk claim to precise concurrency/seq_len numbers from the model config, and ships ready-to-paste code fixes, making it marginally more precise and actionable.",
+  "_cost_usd": 0.389793,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15cb_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15cb_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15cb_holdout4_r1",
+    "arm_a_sha256": "d24d41aab4bcf6246b184512c93b67ae9896158e335de3548c404b2313c7249f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "400e2cdee23e452f67bea91295a8fd9f971ab290f37c9a61d27bec6c625cf76a",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.42,
+    "precision": 0.72,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently rediscover real, diff-grounded issues (absent-vs-empty base_schedule, boundary-vs-interval step-count inconsistency between legacy/distilled paths), but Y also engages the single dominant thread of the actual ground-truth discussion — whether/how to integrate with the existing DMD2PipelineMixin — giving it materially better recall against what reviewers actually cared about. X compensates with a sharp, well-verified catch (Ref2VA inheriting FL2VA's global shift scales) that closely mirrors the ground truth's core per-partition concern, and X's findings are more conservatively hedged with an explicit verification trail, giving it higher precision. Y's package-placement complaint directly contradicts a decision ground-truth reviewers actually made (and the author implemented), and its specific import-timing numbers and 'CI gates are red' claim are unverifiable/likely embellished, denting its precision. Actionability favors Y slightly due to clearer Major/Medium/Minor triage and more decisive fix recommendations.",
+  "_cost_usd": 0.5045451999999999,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16f_holdout5_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout5_r1",
+    "arm_a_sha256": "6123236bc5af5d0643f97524beeaf1ded77818af784ba727167eb28c0b6ace5f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "cdfcd7e56d440a4c457855f176cc4f71bbbbeb4593318d2a19a263a12b56e2d8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

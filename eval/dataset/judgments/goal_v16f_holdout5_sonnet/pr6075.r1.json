@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently catch the ground-truth's core substantive item (OffloadStrategy enum casing at README.md:17-18 vs base.py's real LAYER_WISE/DISTRIBUTED_LAYER_WISE), but neither explicitly addresses the folder/file-naming feedback in comment 1, capping recall similarly for both. X's must-fix findings (bash backslash-in-single-quote JSON breakage, OffloadPlan doc contradiction) are crisp, well-cited, and internally consistent with the diff, and its should-fix/nit tiers stay grounded without overclaiming. Y's two 'major' findings (missing --omni flag, prohibited --data-parallel-size under --omni) are also valuable and well-evidenced, but Y includes a confusing, unverifiable meta-comment about the PR body ('InferMatrix direct review...') that reads as pipeline noise and slightly undercuts trust in its precision. Both are highly actionable with file/line specificity and suggested fixes.",
+  "_cost_usd": 0.30211770000000004,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16f_holdout5_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout5_r1",
+    "arm_a_sha256": "f3d048b5c0fd3ceb17edd6212395088e8798fd78328fe7c529a1d89c9788c6b0",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "8a4bd981cd684d4e7de73fc0fb1af7912963b1c4aa02f6764ef9f25a324e376a",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

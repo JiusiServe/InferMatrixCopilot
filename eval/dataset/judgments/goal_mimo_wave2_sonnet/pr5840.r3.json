@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.75,
+    "actionability": 0.65
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently catch the one surviving substantive ground-truth concern — the async engine's hardcoded rel_l1_thresh=0.2 default bypassing the MiniMax-H3-specific 0.17 resolution — which is strong corroborating evidence it's real. Y's writeup is materially deeper and more rigorous: it verifies the bug with an executed trace, validates the partition-separation and cross-request state claims with the same evidentiary style as the human reviewer (exact test counts, specific code paths), and surfaces additional well-grounded issues (memory retention scaling, eager RoPE computation on cached steps, E2E test that can't detect a caching regression, a drive-by frame-count change silently altering unrelated test coverage). X finds the same core bug plus some legitimate doc/CI follow-ons, but pads the list with two self-negating nits that concede they aren't real problems, weakening precision and actionability relative to Y.",
+  "_cost_usd": 0.2356764,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v13_mimo_wave2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_mimo_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_mimo_wave2",
+    "arm_a_sha256": "3ecd233ed147f9a3508aee7b6d6e15773584cb230a572c0d82b63ae19e3a1373",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

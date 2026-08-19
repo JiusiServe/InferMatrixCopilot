@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.88,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Y directly and forcefully covers the PR's central, most-repeated ground-truth thread (scope: validated only on Qwen-Image/H200 but flipped as default for ~14 other CUDA diffusion models), even naming the exact _DIFFUSION_IR_OP_PRIORITY_FUNCS/registry.py scoping mechanism hsliuustc0106 asked for — X only touches this obliquely via Cosmos3 and treats the PR's own scope claim as 'verified' rather than demanding more evidence. X compensates with a sharp hit on the pixelwise-parity-alongside-latency ask that Y misses, plus more literal ready-to-apply diff suggestions, giving it an edge in actionability and slightly tighter grounding. Both independently converge on several non-GT but clearly valid findings (nn.RMSNorm bypassing the platform's RMSNorm priority entirely, stale ROCm/XPU platforms, #4074/#3588 history), which cross-validates precision for both; Y carries slightly more unverifiable risk (three 'red' CI gates, a bare #4709 citation).",
+  "_cost_usd": 0.42437719999999995,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_train",
+    "arm_a_sha256": "77b6ccea38acd6b2e6c1a4248845e9ca81af6ba7867b5563a6a63e4195858d06",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "97e45909dc2469db55da15b6e8d6a525549029c219aefca76123ec8b801fd1bf",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

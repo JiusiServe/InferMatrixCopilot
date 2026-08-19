@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.86,
+    "precision": 0.58,
+    "actionability": 0.91,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.64,
+    "precision": 0.41,
+    "actionability": 0.79,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X covers the central global-blast-radius, regression-test, and performance-decomposition concerns with concrete locations and remedies. Its precision is reduced by speculative or out-of-scope findings about ROCm, CI imports, and a pre-existing escape hatch. Y catches the global scope and missing Part-2 test, but includes contradictory CI-marker claims and an ineffective Qwen-specific override suggestion.",
+  "_usage": {
+    "input": 3,
+    "output": 1179
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v7_goal_r3"
+  },
+  "_roles": {
+    "arm": "copilot_v7_goal_r3",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v7_goal_r3",
+    "arm_a_sha256": "06f8c02e19f4301d57e7ec1fffefa656e1c24f8e5abc2d6cf6c4fbd90f67d26a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "97e45909dc2469db55da15b6e8d6a525549029c219aefca76123ec8b801fd1bf",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

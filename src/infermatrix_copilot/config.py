@@ -62,7 +62,7 @@ class ResolvedTarget:
     api_key: str
     source: str
     provider: Literal["anthropic", "openai"] = "anthropic"
-    # Provider registry (doc/RFC-provider-registry.md): which registry entry
+    # Provider registry (doc/features/provider-registry.md): which registry entry
     # serves this target and how. `api` keeps today's exact semantics;
     # `harness` targets carry NO endpoint/credential here — subscription auth
     # lives inside the vendor CLI and is never resolved by Settings.
@@ -150,20 +150,28 @@ class Settings(BaseSettings):
     mcp_repo_allowlist: list[str] = []
     mcp_report_max_bytes: int = 65536
 
-    # Strict execution backend (doc/RFC-provider-registry.md): which provider
+    # Strict execution backend (doc/features/provider-registry.md): which provider
     # powers runs. REQUIRED for Strict — `strict_readiness` names the exact
     # fix when empty (decision: explicit selection, never a silent fallback);
     # the CLI path treats empty as "api" so maintainer setups keep working.
     # Harness ids (cursor / claude-code / codex) need no API key: the vendor
     # CLI holds the subscription auth.
-    strict_backend: str = ""             # "" | api | cursor | claude-code | codex
+    strict_backend: str = ""             # "" | api | cursor | claude-code | codex | deepseek
     strict_backend_model: str = ""       # model id INSIDE the harness (optional)
+    # dsh is the one API-keyed harness (providers/deepseek.py): the other
+    # three hold subscription auth inside the vendor CLI, so `tier_target`
+    # blanks credentials for harness backends and dsh must source its own.
+    # Empty falls back to `anthropic_api_key`, which on this machine holds the
+    # DeepSeek key. Leave the base URL empty unless dsh must talk to a proxy —
+    # its native endpoint is NOT the `/anthropic` gateway the api path uses.
+    deepseek_harness_api_key: str = ""
+    deepseek_harness_base_url: str = ""
     strict_backend_concurrency: int = 2  # concurrent harness sessions
     strict_backend_cli: str = ""         # binary path override (else PATH)
     strict_backend_timeout_s: float = 1800.0  # per-session wall-clock ceiling
 
     # Shared, human-curated knowledge base — vendored from the community docs
-    # (see doc/KNOWLEDGE.md), organized as general/ (cross-repo experience) +
+    # (see doc/architecture/KNOWLEDGE.md), organized as general/ (cross-repo experience) +
     # repos/<repo>/ (repo-specific). Adapters reference only their repos/<repo>/
     # slice (manifest `knowledge.repo_subdir`); general/ is shared across all
     # repos. knowledge_general_docs is the always-on general slice; every deeper
@@ -209,8 +217,22 @@ class Settings(BaseSettings):
                                       # results — uncached tokens x n_lenses;
                                       # evidence lives ONCE in the shared
                                       # cached prefix instead
-    evidence_caps: dict[str, int] = {"pr_diff": 120_000, "issue_text": 30_000,
-                                     "pr_context": 15_000}     # per-item cap; full text archived to run dir
+    evidence_caps: dict[str, int] = {"pr_diff": 340_000, "issue_text": 30_000,
+                                     "pr_context": 15_000,
+                                     # second-round per-file diff slices for
+                                     # its seed files (uncapped-diff extracts)
+                                     "uncovered_hunk_diffs": 100_000}
+                                     # pr_diff 120k->260k: a 170k-char diff
+                                     # (pr4804) lost ~30% of its hunks to the
+                                     # cap and review recall collapsed to 0.16
+                                     # — the cap must clear real large PRs;
+                                     # the diff sits in the shared cached
+                                     # prefix so the cost is one lens's worth.
+                                     # 260k->340k (v15): wave-3's pr5691
+                                     # (316k chars) lost its tail 18% and
+                                     # arm recall on it was 0.06 vs 0.38 —
+                                     # ~85k tokens still fits the context
+                                     # with room for the scaffolding
     # PR context bundle (W1): description/discussion/linked issues fed to the
     # reviewer. "no_discussion" excludes comments/review threads — REQUIRED for
     # eval arms (the frozen dataset's ground truth IS the review discussion;
@@ -229,14 +251,51 @@ class Settings(BaseSettings):
     ensemble_stagger_seconds: float = 8.0  # head start for lens 0 so the
                                         # shared prompt prefix is cached
                                         # before sibling lenses send it
-    ensemble_lens_max_iters: int = 10  # rounds are ~3x cheaper with windowed
+    ensemble_lens_max_iters: int = 14  # rounds are ~3x cheaper with windowed
                                        # reads; 6 starved lenses into paging
-                                       # death (and 38/40 truncated at T0)    # per-lens tool budget — replicate means
-                                        # dropped when this was cut to 4 (recall
-                                        # starvation); 6 is the measured setting
-    ensemble_merge_evidence_chars: int = 60_000  # must fit the pr_diff — a
+                                       # death (and 38/40 truncated at T0).
+                                       # 10→14 with the official v4-pro: the
+                                       # judged deficit vs the agentic
+                                       # baseline is per-finding reading
+                                       # depth, and the baseline reads
+                                       # 3-10x more code per finding
+    ensemble_merge_evidence_chars: int = 360_000  # must fit the pr_diff — a
                                         # reducer that can't see the diff
-                                        # can't verify (T3 forensics #5)
+                                        # can't verify (T3 forensics #5);
+                                        # raised with evidence_caps.pr_diff
+                                        # (60k saw ~35% of a 170k diff)
+
+    # Per-comment agentic verification (val-gate lesson: with recall at
+    # parity the arm lost on per-comment grounding — precision .54-.56 vs
+    # .65). Every merged draft comment gets one small tool-loop that must
+    # anchor and re-derive its claim on the PR-time tree before the budget.
+    review_verify_comments: bool = True
+    review_verify_max_iters: int = 4    # tiny loop: read anchor, one grep,
+                                        # one consumer read, conclude
+    review_verify_concurrency: int = 6  # verify calls share the pr_diff
+                                        # cache prefix; modest fan-out
+
+    # Deep-investigation engine (official-model rethink): replace the four
+    # narrow lenses with one long free investigation pass (+ an independent
+    # adversary pass at full depth). The lens templates were variance
+    # scaffolding for a weak generator; a strong generator produces its best
+    # work in the agentic-investigation shape the winning baseline uses.
+    review_deep_engine: bool = True
+    review_deep_max_iters: int = 32     # investigation budget per pass —
+                                        # the baseline reads 3-10x more code
+                                        # per finding than a 14-iter lens
+
+    # Coverage-driven second investigation round (RFC-strict-review-deep-
+    # engine open q3): after reduce+promote+verify, changed files with
+    # neither a comment nor a recorded verification line seed ONE bounded
+    # extra pass. Wave-2 forensics: on GT-rich items the passes' comments
+    # clustered on a few central files while GT concerns sat in files no
+    # pass ever wrote a line about — a fixed pass count cannot see its own
+    # coverage holes.
+    review_second_round: bool = True
+    review_second_round_max_iters: int = 16
+    review_second_round_min_files: int = 1   # uncovered-file count that
+                                             # triggers the round
 
     # Adaptive review depth (hybrid planner, review/planner.py): deterministic
     # rules decide the clear cases in pure code; only the gray middle zone
@@ -260,6 +319,25 @@ class Settings(BaseSettings):
                                       #   10-iter lenses split: 8 starved it
                                       #   into a forced block on a real 60-line
                                       #   PR (5156: cut at 11 tool calls)
+    # Per-pass backend routing (role-split composition, 2026-08-15): map a
+    # review pass/lens name (investigator, adversary, behavior, verification,
+    # docs, round2) to "provider:model" (e.g. "cursor:composer-2.5") or a bare
+    # provider id (model then comes from strict_backend_model). Unmapped
+    # passes ride the run's normal backend. Wave-2/4 measured Composer
+    # carrying recall and DS carrying precision on the SAME pipeline — this
+    # lets the breadth roles ride the subscription CLI while verify/reducer
+    # stay on the precision model. Member failures fall back per-lens to the
+    # tier model (existing MoA fallback path). Env: REVIEW_LENS_BACKENDS as
+    # JSON, e.g. '{"investigator": "cursor:composer-2.5"}'.
+    review_lens_backends: dict[str, str] = {}
+    review_promotion_model: str = ""  # coverage/residue promotion (tool-less
+                                      #   ledger mining); empty -> the run's
+                                      #   tier model. Owner direction
+                                      #   2026-08-15: cheap seats ride
+                                      #   v4-flash, precision roles (verify/
+                                      #   reducer/passes) stay on the tier
+                                      #   model — promoted items face the
+                                      #   verify pass either way
     review_planner_model: str = ""    # gray-zone planner; empty -> the run's
                                       #   tier model (model_for(mode))
 
@@ -304,7 +382,7 @@ class Settings(BaseSettings):
     def _validate_strict_backend(cls, v):
         """Unknown backend ids fail at startup, not mid-run: the selection is
         a routing decision and a typo must not silently mean 'api'."""
-        allowed = {"", "api", "cursor", "claude-code", "codex"}
+        allowed = {"", "api", "cursor", "claude-code", "codex", "deepseek"}
         if v not in allowed:
             raise ValueError(
                 f"STRICT_BACKEND must be one of {sorted(allowed - {''})} "
@@ -421,7 +499,7 @@ class Settings(BaseSettings):
         agent_model fallback that once mislabeled a whole run."""
         backend = self.strict_backend
         if backend not in ("", "api"):
-            # Harness target (doc/RFC-provider-registry.md): the vendor CLI
+            # Harness target (doc/features/provider-registry.md): the vendor CLI
             # holds the subscription credential, so base_url/api_key stay
             # empty and per-tier API backends do not apply — the harness
             # serves both modes (its model comes from STRICT_BACKEND_MODEL).

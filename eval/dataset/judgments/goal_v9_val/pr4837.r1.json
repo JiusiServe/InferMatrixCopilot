@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.82,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.84,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates fully cover and correctly explain the sole substantive ground-truth concern. X is slightly more actionable and better distinguishes validated behavior from requested fixes, though both dilute precision with adjacent unchanged-path, test, and CI observations.",
+  "_usage": {
+    "input": 3,
+    "output": 562
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v9_official_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v9_official_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v9_official_r1",
+    "arm_a_sha256": "d67f13dadda7c29adb9add9616f8023ef07bbe8378d9c499bc7e242652382074",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "bc98460632105aef812a50d392afd9f1bea66b3f783e8a9cd888456ce013cba3",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

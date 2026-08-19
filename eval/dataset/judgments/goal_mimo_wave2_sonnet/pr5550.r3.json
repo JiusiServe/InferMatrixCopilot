@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.8,
+    "actionability": 0.72,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Neither review overlaps much with the ground truth's dominant thread (stage_kv/interface.py physical-tensor, digest-binding, and null-block validation gaps), which appears to target an earlier/broader-scope revision of the PR not reflected in the shown diff; both instead correctly confirm the diffusion_engine.py init-cleanup fix that GT flagged. Within that constraint, X is substantially deeper: it surfaces a concrete, specific bug (ARDiffusionModelRunner subclass not updated for the new kwarg, causing a swallowed TypeError) that Y misses entirely, and gives a much more rigorous DTO-invariant analysis (referential integrity, duplicate IDs, frozen dataclasses) with runnable code vs. Y's one-line 'consider freezing' note. Both are well-grounded and specific with file:line citations, but X's findings are more actionable (concrete patches/snippets) and cover more of the same territory more thoroughly, while Y contributes only one clearly novel item (missing PAGED_SCHEDULER+metadata happy-path test).",
+  "_cost_usd": 0.49215650000000005,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_mimo_wave2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_mimo_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_mimo_wave2",
+    "arm_a_sha256": "fc0b4d673aa092c5753cbf289097015c37d026e9427022b0a3f7aa0d35d8b7a0",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b6ae3b48c6859b0d16784163ab2044d7d85e3b3b32f4e60b559fa2a55186c64b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

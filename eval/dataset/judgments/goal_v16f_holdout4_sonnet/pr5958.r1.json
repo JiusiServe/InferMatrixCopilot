@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.68,
+    "precision": 0.9,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both independently catch the same three strongest real gaps (RuixiangMa missing from diffusion/models, plugins/model_extras contradicting the cited model_integration.md doc, and distributed/ overreaching its cited omni_connector.md scope) plus the offloader PR-description/Isotr0py mismatch that matches a ground-truth Copilot comment — strong mutual corroboration. X additionally develops the LoRA-narrowing/undisclosed-owner-removal theme (matching another ground-truth Copilot comment) into a well-organized, severity-tiered review with concrete 'Change:' fixes, giving it better recall and actionability. Y is rigorously grounded with verbatim citations but is redundant (near-duplicate offloader/worker bullets), denser to act on, and misses the execution_platforms.md related_code_paths null-list issue entirely.",
+  "_cost_usd": 0.4395387,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16f_holdout4_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout4_r1",
+    "arm_a_sha256": "a7abb197e016203341ad5d7999c7008e28a36d7c8a6b97778014599d3a71fd73",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a618d8fdfdd2a7671220fc3626c167412f101811b64319de0c1c201facd71448",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

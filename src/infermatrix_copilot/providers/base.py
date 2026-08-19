@@ -1,4 +1,4 @@
-"""Provider-layer contracts (doc/RFC-provider-registry.md).
+"""Provider-layer contracts (doc/features/provider-registry.md).
 
 A *provider* is one way to reach a model. Two kinds exist:
 
@@ -19,12 +19,27 @@ auth inside the vendor CLI's own state and this codebase never sees it.
 
 from __future__ import annotations
 
+import os
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
 from ..scopes import ToolScope
+
+# Env a harness CLI subprocess keeps. Everything else — API keys, base URLs,
+# gh tokens, host markers like CLAUDECODE — is dropped: subscription auth
+# lives in HOME state, and an inherited ANTHROPIC_BASE_URL (a gateway on
+# this class of machine) would silently reroute a vendor CLI's traffic.
+_ENV_KEEP = {"PATH", "HOME", "TERM", "COLORTERM", "LANG", "USER", "LOGNAME",
+             "SHELL", "TMPDIR"}
+_ENV_KEEP_PREFIXES = ("LC_", "XDG_")
+
+
+def sanitized_env() -> dict[str, str]:
+    """The allowlisted environment for spawning a harness CLI."""
+    return {k: v for k, v in os.environ.items()
+            if k in _ENV_KEEP or k.startswith(_ENV_KEEP_PREFIXES)}
 
 
 @dataclass(frozen=True)
@@ -108,6 +123,13 @@ class HarnessTransport:
                 f"({' / '.join(self.spec.cli_names)}) — install it or set "
                 "STRICT_BACKEND_CLI=/path/to/cli in ~/.infermatrix-copilot/.env")
         return cli
+
+    def auth_gap(self) -> str | None:
+        """A one-line auth problem with its fix, or None when unknown/fine.
+        Cheap enough for `strict_readiness` (one fast CLI status call at
+        most); transports without a cheap check return None and let the run
+        surface auth errors loudly."""
+        return None
 
     # -- contract ------------------------------------------------------------
     def run_session(self, req: AgentSessionRequest):

@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently nail the one substantive unresolved ground-truth concern (FLASHINFER_ATTN allow-listed for quant but never consumed) with precise file/line evidence and concrete fixes, and both also independently surface the same unlisted-but-valid ring-SP/SAGE-silently-dropped bug, giving strong cross-validation. Y edges ahead on precision/craft: it verifies claims with actual executed Python snippets (e.g. the AttnQuantSpec.enabled vs QuantConfig.enabled mismatch causing a silent dtype_vo no-op — a genuinely novel, sharp bug X misses) and is transparent about what it couldn't verify locally. X counters with a valuable unique catch of its own (new SAGE tests are cuda-marked and never run in the CI lanes that exist) and a more exhaustive systematic sweep, but its sheer claim volume (CI yml internals, role-scoping speculation) is harder to independently confirm and reads as slightly lower-precision per-claim despite being well-cited. Actionability is comparably strong on both sides with concrete diffs and file:line pointers.",
+  "_cost_usd": 0.4371245,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46",
+    "arm_a_sha256": "342e0fb2dc0fe31f1723fe9a252def1bedf85b904ce037a1f366328a6270da88",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "703e9ad7d9901fc59d5ad8d20917e36993f445b09d3ecaaba356dbe9c900f660",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

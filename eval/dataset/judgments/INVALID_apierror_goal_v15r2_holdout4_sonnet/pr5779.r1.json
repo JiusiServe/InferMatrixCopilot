@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.75,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "X produced no review at all (harness crashed with a 402 API error before the review step ran), so it has zero recall, precision, and actionability. Y is a thorough, well-grounded review with specific file:line citations and concrete repros (e.g. unvalidated max_seqlen_q/k, all-False mask launching a zero-token kernel), but it misses the two substantive ground-truth findings: it doesn't catch the SAGE-disabling duplicate-boundary bug (P2) and in fact praises the trimming logic that GT says is incomplete, and its AllGather-KV discussion (finding #6) appears to reference code/fix state not present in the reviewed diff, making it only tangentially related to P1 rather than a direct catch. Y is still far more useful than X's total failure, so the win for Y is decisive despite modest recall.",
+  "_cost_usd": 0.4682138,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "e38c7e72b00ffa97a88937cfd57b57817ab558155eb06d6ca5c5b44a63950fcb",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "283d5ab54325426c21ff03640adaaf73eb89e801040f4baf619381200e657fb0",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

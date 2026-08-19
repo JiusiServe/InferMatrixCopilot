@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.75,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.9,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently surface the sole live ground-truth concern (FLASHINFER_ATTN allow-listed for quant but never consumed, silently running dense) with strong grounding. Y edges ahead on precision: its dtype_vo-only silent-no-op finding is directly verifiable from the diff itself (AttnQuantSpec.enabled checks dtype_qk OR dtype_vo, but QuantConfig.enabled checks only dtype_qk), its RuntimeError/ValueError inconsistency nit is likewise diff-verifiable, and it appropriately hedges an unverified claim (sequence-boundary question) rather than asserting it as fact. Y's ring-SP-bypasses-quant finding also shows deeper architectural reasoning by mirroring an existing skip-softmax guard pattern. X is thorough and well-evidenced but includes more speculative claims about files outside the diff (CI marker collection, a recipe doc) and ends two findings in garbled/truncated text, slightly denting reliability and actionability. Both provide file/line-level actionable fixes; Y's are more often ready-to-apply code snippets.",
+  "_cost_usd": 0.3288645,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46_r3",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r3",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r3",
+    "arm_a_sha256": "86b44ba696537ca43e58a1fe97839b0fd61db21370727ec43dec32ca98d0c0f0",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "703e9ad7d9901fc59d5ad8d20917e36993f445b09d3ecaaba356dbe9c900f660",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

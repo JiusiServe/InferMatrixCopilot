@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.5,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.7,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both largely miss the two GT reviewers' repeated 'test try/except masks failures → false CI green' concern and mostly surface fresh (plausible but non-overlapping) findings rather than the specific human concerns. Y's CI-lane-collection finding (test-ready.yml/test-merge.yml never collecting the execution test) closely mirrors wtomin/yenuo26's marker-for-L1-inclusion concern and is backed by direct code quotes with line numbers, giving it better recall and grounding. X pads its review with narrative 'I queried the repos'/'timed on this box'/'simulated the selector' claims bearing specific commit hashes and benchmark numbers that are not derivable from the diff and read as fabricated, which hurts precision even though the underlying code-quality points (unpinned version, per-layer reload, duplication) are reasonable. Y also supplies concrete ```suggestion diffs for most findings, matching the GT reviewers' own convention, making it more directly actionable.",
+  "_cost_usd": 0.36627750000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_train",
+    "arm_a_sha256": "1355967950fd06e030e4944d9aea1ee92f4b5cdfd9293c3912814b06c8d18bde",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0639263265995e00edcd06c6242ac0a6a3647a980509c282af885c86ce6930e0",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

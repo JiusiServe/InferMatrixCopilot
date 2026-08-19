@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.6,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X independently rediscovers four of the ground-truth's core blocking concerns almost verbatim (the text-encoder-tp GroupCoordinator crash, ring attention dropping packed padding boundaries, encoder loader silently accepting missing shards, and unbounded upload sizes), each with precise file/line evidence and concrete fixes. Y is exhaustively detailed but its 'major' findings (FA4 symbol rebinding, ring FA4 unreachability, video-reference path type confusion) land on none of the actual ground-truth inline comments, contains duplicated findings restated twice, and several bullets are hedged ('confirm whether...') or cut off mid-sentence, reducing actionability.",
+  "_cost_usd": 0.4291011,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_holdout3_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r2",
+    "arm_a_sha256": "88d154d4bae510b3374dae67c2b8e7ca6e7ca1bd3ca102e1a1d10e4f5ad8b8ba",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "c373c75c65a506fb368faf2717d73d36a35ca93216c0c727d7c4e3100440e9f3",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

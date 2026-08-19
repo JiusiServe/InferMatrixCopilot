@@ -1,0 +1,20 @@
+[
+  {
+    "author": "Gaohan123",
+    "body": "I suggest move these 2 tool functions into vllm_omni/diffusion/utils",
+    "line": 56,
+    "path": "vllm_omni/diffusion/executor/multiproc_executor.py"
+  },
+  {
+    "author": "anurag12-webster",
+    "body": "okay sure",
+    "line": 56,
+    "path": "vllm_omni/diffusion/executor/multiproc_executor.py"
+  },
+  {
+    "author": "anurag12-webster",
+    "body": "done, moved to vllm_omni/diffusion/utils/future_utils.py",
+    "line": 56,
+    "path": "vllm_omni/diffusion/executor/multiproc_executor.py"
+  }
+]

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently rediscovered the live core of ground-truth concern #2 (the calibrated 0.17 default is bypassed by AsyncOmniEngine's hardcoded 0.2), and both correctly validated that the partition-specific FL2VA/Ref2VA gating (concern #1) is now properly implemented rather than re-flagging it as broken; the other two human concerns were already fixed in this diff so neither candidate had anything to find there. Y's review is somewhat stronger on precision and actionability: it demonstrates the engine-default bug with executed verification output, adds a genuinely deep and well-quantified finding (the calibration polynomial is near-constant/non-monotone, R²≈0.09, with a computed floor threshold), and organizes findings into blocking/should-fix/minor with concrete, low-risk fixes (move RoPE call into closure, vary timesteps in the cache-hit test, don't drive-by-change the FP8 test). X's report is also well-grounded with file:line evidence but includes a couple of weaker/speculative items (the no-op sp_prepare 'future' concern, the AMD CI nit) that dilute its precision slightly relative to Y's tighter set of claims.",
+  "_cost_usd": 0.43102100000000004,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_composer25",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_composer25",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_composer25",
+    "arm_a_sha256": "c435d3ae443cde62d1af10d630f9f02e20e60cb2252a1dc63d617c01a9136191",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

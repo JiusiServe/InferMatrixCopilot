@@ -1,0 +1,26 @@
+[
+  {
+    "author": "Gaohan123",
+    "body": "[P1] This expectation does not match the current HTTP error mapping. `omni_wakeup()` directly awaits `engine_client.wake_up()` and there is no exception handler that converts `NotImplementedError` into a 501 response. Under a live server, this exception is therefore surfaced as a generic HTTP 500 response, whose body will not contain `sleep(level=2)` or `not yet implemented`.\n\nThis also contradicts the PR description and the new CPU test's docstring, both of which state that the live endpoint returns a generic 500. If this PR intentionally avoids changing production error mapping, please expect HTTP 500 here and remove the `err_message` assertion. Alternatively, the production route must explicitly translate `NotImplementedError` into a structured 501 response.",
+    "line": 134,
+    "path": "tests/dfx/reliability/invalid_param_test/test_invalid_server_control.py"
+  },
+  {
+    "author": "Gaohan123",
+    "body": "[P2] This test does not verify the real level-2 wake contract because both the exception type and its exact message are authored inside the mock. It never performs `sleep(level=2)` or invokes the production component responsible for detecting the discarded-weight state. Consequently, the test would still pass if the real engine stopped raising this exception or changed its message.\n\nPlease either rename this as a route exception-propagation test and add a unit test around the real sleep/wake state implementation, or configure a lightweight real component whose `sleep(level=2)` followed by `wake_up()` produces the production exception.",
+    "line": 185,
+    "path": "tests/entrypoints/openai_api/test_omni_sleep_wakeup.py"
+  },
+  {
+    "author": "yenuo26",
+    "body": "Agreed that omni_wakeup() itself doesn't explicitly convert the exception locally. However, the live app registers an upstream NotImplementedError → 501 handler via build_openai_app, so the live endpoint returning 501 with an OpenAI-style JSON message is expected behavior (as verified when I set the error code check to 500, with the following actual response).\r\nThis PR does not change the production error mapping. The CPU test only covers route propagation (bare FastAPI), while the E2E test covers the full error mapping. I'll update the CPU test docstring to correct the claim that live returns 500, and also rename the test case accordingly.\r\n```\r\nAssertionError: (HttpResponse(status_code=501, success=False, error_message='{\"error\":{\"message\":\"wake_up() after sleep(level=2) is not yet implemented: weights were discarded from GPU and reloading from disk is not yet supported. Use sleep(level=1) instead, which offloads weights to CPU RAM and supports fast DMA restore.\",\"type\":\"NotImplementedError\",\"param\":null,\"code\":501}}', json_body={'error': {'message': 'wake_up() after sleep(level=2) is not yet implemented: weights were discarded from GPU and reloading from disk is not yet supported. Use sleep(level=1) instead, which offloads weights to CPU RAM and supports fast DMA restore.', 'type': 'NotImplementedError', 'param': None, 'code': 501}}), 500)\r\n```",
+    "line": 134,
+    "path": "tests/dfx/reliability/invalid_param_test/test_invalid_server_control.py"
+  },
+  {
+    "author": "yenuo26",
+    "body": "Good catch — agreed this case was overstating what it covers.\r\nI’ll rename it to a route exception-propagation test and update the docstring accordingly: it only checks that /v1/omni/wakeup does not swallow a NotImplementedError raised by the engine client (mock authors the exception on purpose).\r\nThe real level-2 contract — sleep(level=2) then wake_up() hitting the production discarded-weight path and the live HTTP error mapping — is already covered by the HTTP e2e in tests/dfx/reliability/invalid_param_test/test_invalid_server_control.py(test_wakeup_after_level2_sleep_fails)",
+    "line": 185,
+    "path": "tests/entrypoints/openai_api/test_omni_sleep_wakeup.py"
+  }
+]

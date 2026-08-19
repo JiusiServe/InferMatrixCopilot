@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.55,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently rediscover that the ground-truth's sole concern (trust_remote_code breaking locked kernels 0.13.x installs) was already resolved by commit 9947f414, but Y states the causal mechanism precisely ('older get_kernel doesn't accept the kwarg, which would have made every fallback attempt fail') matching the GT reasoning, while X buries the same insight under ~10 near-duplicate 'Validated'/'claim-refuted' log entries and 4 nearly-identical inline comments restating the same PR-description staleness point, hurting signal density. Y adds genuinely new, well-grounded findings (sticky cache of transient failures via broad except, dead-code fallback branch on kernels>=0.15, missing cache-reset hook) with appropriate hedging on less-verifiable claims (CI gate), whereas X's unique findings (cache poisoning without validation, CI lane coverage) are solid but diluted by redundancy. Both are reasonably actionable with file/line refs, X even supplies literal patch suggestions, but Y's overall higher signal-to-noise and deeper technical correctness give it the edge.",
+  "_cost_usd": 0.288202,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17cb_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17cb_train",
+    "arm_a_sha256": "69e0287958c6a83ad22d262e2cf0f2a023ab76172749a3c6e2bbaa2cb79d2f25",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "589a8ff13cb3893b76dd0d5220ad632d82f46cc0edd9083528ebb2466be7c8a7",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

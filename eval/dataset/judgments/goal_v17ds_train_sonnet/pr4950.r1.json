@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns (all LGTM), so recall is vacuous for both. Both candidates independently verify the same core facts (serving_chat.py:373/441 request-root read, no extra_body merge for chat_template_kwargs), which cross-validates their grounding. Y goes further and more concretely: it traces the 'silent audio' claim to an actual failure mechanism (empty multimodal_outputs → error choice → pydantic iteration bug in choices.extend), catches that the diff's 'curl does not flatten extra_body' claim is overbroad by citing GLM-Image.md's real extra_body usage, and surfaces a genuine client-facing bug (both choices sharing index:0) that X never finds. X's findings are valid but thinner and more hedged ('please verify' rather than a demonstrated mechanism).",
+  "_cost_usd": 0.23593640000000002,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17ds_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_train",
+    "arm_a_sha256": "a02ad6bb65126c030085e36513edb894dfade0c68210cc864debfda4f741cb88",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5a2e689fc33efd67adbf119f1e4cf034841928ad70fea2d99f142a727ca8ea18",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

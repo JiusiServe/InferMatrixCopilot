@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.84,
+    "actionability": 0.96,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.89,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates accurately cover the ground-truth singleton-list normalization rationale. X provides stronger, concrete compatibility analysis and a verdict consistent with its blocker, while Y includes weaker speculative findings and incongruously labels a request-breaking blocker as post-merge follow-up.",
+  "_usage": {
+    "input": 3,
+    "output": 796
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v8_official_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v8_official_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v8_official_r1",
+    "arm_a_sha256": "3a0a60749103483d92701ef05a5e3be2ed05126cdaf5e79a0f973ca6590e3463",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "bc98460632105aef812a50d392afd9f1bea66b3f783e8a9cd888456ce013cba3",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 3
+  }
+}

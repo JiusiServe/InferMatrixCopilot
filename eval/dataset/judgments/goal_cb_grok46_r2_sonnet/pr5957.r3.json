@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.55,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.25,
+    "precision": 0.8,
+    "actionability": 0.75
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y independently surfaces the same WebSocket-vs-HTTP native-speed asymmetry that is the ground truth's second blocking item and a detailed inline comment (protocol/audio.py:558, quoting the exact raise message), plus a well-evidenced pytestmark/CI-deselection finding, giving it real overlap with reviewer concerns and strong quoted-code grounding. X's seven findings (mel_head.bias, CFM conditioning concat, snapshot_mm_payload, prefix caching, TokenOnlyRenderer, etc.) are detailed and well-written but do not match any of the ground truth's actual concerns (streaming-speed asymmetry, duration_factor duplication/mismatch, missing profiling evidence, benchmark harness architecture) except a superficial location overlap on the duration_factor check where it flags a different (wording) issue than the reviewer's actual point. Both are highly actionable with file:line specificity, X slightly more prescriptive with concrete diffs; neither has a LATENT GAP CHECK section.",
+  "_cost_usd": 0.3836337,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok46_r2"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r2",
+    "arm_a_sha256": "e4a2af141d8e34f5b98c3f67500be9bd637d91de9236c1baa683d80972213d64",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

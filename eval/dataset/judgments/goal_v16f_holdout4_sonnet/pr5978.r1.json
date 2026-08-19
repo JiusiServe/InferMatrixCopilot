@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.7
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.8,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y directly engages with all three of yuanheng-zhao's core inline concerns (the max_duration_seconds/rank-order guard placement, the weak sampling test that can't catch a probe/decode mismatch, and crediting the workdir cleanup), while X never mentions any of them and instead builds an extensive but tangential audit around hardware-SKU/B300 vs H100 and revision-pinning claims. Both reviews are well-grounded with file:line evidence and concrete fixes, but X's 'findings' lean more toward confirmation-log entries than new actionable defects, whereas Y pairs specific code-level fixes (view-vs-copy semantics, offload staging gap, T2VA coverage regression matching the ground truth's accuracy-gate discussion) with an executed local verification of the AAC-priming claim.",
+  "_cost_usd": 0.42334130000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16f_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout4_r1",
+    "arm_a_sha256": "5bfcfc992058476933051862d7f5ef81caac947da9c5344b50f0e5d57b17ec92",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4847f9bc7acb40b4a7467503f4eb812a8e50f5fe424e5df5f56f1ab2a3da3ee3",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

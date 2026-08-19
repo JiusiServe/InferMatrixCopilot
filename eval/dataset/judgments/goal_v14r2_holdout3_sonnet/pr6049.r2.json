@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.78,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.68,
+    "actionability": 0.72,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates do deep, well-grounded technical analysis of behavior the human reviewer never touched (validation removal, modality plumbing, CI gating), so recall against the actual GT thread is low for both — but X's 'shadowed import/alias' and 'deleted tests not re-homed' side notes closely mirror the reviewer's actual __init__.py aliasing suggestions and the test-coverage question, giving it real recall Y lacks entirely. X also proposes concrete code-level fixes (allowlist spec, dict-merge semantics, unaliased import naming) versus Y's more descriptive 'add validators/confirm CI' recommendations, and Y has some redundant/overlapping findings (two entries on registry.py:316) diluting precision slightly.",
+  "_cost_usd": 0.27990750000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_holdout3_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r2",
+    "arm_a_sha256": "11c81bb3234c7152c36f6a57e0260d0bb841e504aea95c8b0d26349bf00cff2c",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "f3f11d2cd7926100dbdc03762099a2cc9cdcebc0d29f39ad1339fc8af49d3171",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

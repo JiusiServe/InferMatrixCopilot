@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.7,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X engages deeply with nearly every thread the human reviewer raised (NPU/platform scope, connector-output ownership/live-state, the image-path resolution issue, full-payload-branch reachability, prefix-cache compatibility), even flagging that the 'fix' for connector ownership still has holes and finding a fresh GitHub-specific image breakage the humans missed — all with precise file:line grounding. Y verifies the same guard table/opt-in facts but produces only two substantive findings, one of which (input-side connector synchronicity) is adjacent to but not the same as the human's core output-connector-ownership concern, and it misses the image-path, prefix-cache, and dependency-conflict threads entirely. Both are grounded and reasonably actionable, but X's recall and thoroughness are clearly superior.",
+  "_cost_usd": 0.2992207,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_ds_wave2_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_ds_wave2_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_ds_wave2_r2",
+    "arm_a_sha256": "66a990d16e167ac035ea57e63de8804cff4c06a324ce0ce74185532cbb6797b2",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

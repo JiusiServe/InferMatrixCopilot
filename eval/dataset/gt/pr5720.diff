@@ -1,0 +1,1908 @@
+diff --git a/recipes/MiniMaxAI/MiniMax-H3-MUSA.md b/recipes/MiniMaxAI/MiniMax-H3-MUSA.md
+index 672962259c6..8d5053759b9 100644
+--- a/recipes/MiniMaxAI/MiniMax-H3-MUSA.md
++++ b/recipes/MiniMaxAI/MiniMax-H3-MUSA.md
+@@ -12,19 +12,17 @@
+ - Maintainer: Community
+ 
+ This recipe adapts [MiniMax-H3.md](MiniMax-H3.md) for MUSA environments.
+-MiniMax H3 has two independently served checkpoint partitions:
+-
+-- `FL2VA` serves text-to-video+audio (`t2va`) and
+-  first-frame-to-video+audio (`fl2va`).
+-- `Ref2VA` serves image/audio or video-reference generation (`ref2va`).
++The modular H3 pipeline can load both task-specific DiTs, but this MUSA recipe
++uses a **single task partition**: `FL2VA` for `t2va`/`fl2va`, or `Ref2VA` for
++`ref2va`. This avoids loading both DiTs.
+ 
+ ## Prerequisites
+ 
+ ### Checkpoint
+ 
+-Only download the partition needed by the server. Downloading the whole model
+-repository also retrieves duplicate shared components and the original
+-top-level pipeline layout.
++Download the partition required by the selected startup task. The commands below
++run a single-task server; do not use the modular default (combined) mode on MUSA
++until its two-DiT memory and performance profile is validated.
+ 
+ For T2VA and FL2VA:
+ 
+@@ -66,14 +64,13 @@ soundfile. Formats that libsndfile cannot read are demuxed through ffmpeg.
+ 
+ ## Start a server
+ 
+-One server loads one checkpoint partition. Set `MODEL` to `FL2VA` for T2VA
+-and FL2VA, or to `Ref2VA` for Ref2VA.
++Use the partition path and set `--task-type` explicitly: `fl2va` for T2VA/FL2VA
++or `ref2va` for Ref2VA.
+ 
+-The validated Ref2VA configuration uses tensor parallelism across four MTT
+-S5000 GPUs and offloads inactive model components to CPU:
++The validated Ref2VA configuration uses tensor parallelism across four MTT S5000 GPUs and offloads inactive model components to CPU:
+ 
+ ```bash
+-export MODEL="${MODEL_ROOT}/FL2VA"
++export MODEL="${MODEL_ROOT}/Ref2VA"
+ export PORT=8091
+ 
+ MUSA_VISIBLE_DEVICES=0,1,2,3 \
+@@ -85,6 +82,7 @@ vllm serve "${MODEL}" \
+   --port "${PORT}" \
+   --trust-remote-code \
+   --num-gpus 4 \
++  --task-type ref2va \
+   --tensor-parallel-size 4 \
+   --vae-patch-parallel-size 4 \
+   --enable-cpu-offload \
+@@ -133,7 +131,8 @@ Keep `--vae-use-tiling` enabled for this serving profile.
+ - Keep Ring Attention at degree 1. The current Ring path does not preserve
+   MiniMax H3 packed padding boundaries.
+ - H3 is CFG-distilled, so `--cfg-parallel-size` must remain 1.
+-- Each server process loads only one checkpoint partition.
++- This MUSA recipe uses an explicitly selected single task partition; combined
++  serving loads both DiTs.
+ - H3 currently executes one generation request per diffusion batch.
+ - FP8 quantization has not been enabled for MiniMax H3.
+ - MP3, M4A, MP4, and reference-video audio fallback requires `ffmpeg` on
+diff --git a/recipes/MiniMaxAI/MiniMax-H3-NPU.md b/recipes/MiniMaxAI/MiniMax-H3-NPU.md
+index afc3ffcc12d..930411f1a15 100755
+--- a/recipes/MiniMaxAI/MiniMax-H3-NPU.md
++++ b/recipes/MiniMaxAI/MiniMax-H3-NPU.md
+@@ -26,12 +26,12 @@ environments. Differences from the GPU path:
+ 
+ ### Checkpoint
+ 
+-Same as the GPU recipe — Hugging Face access approval is required:
++Same as the GPU recipe — Hugging Face access approval is required. Authenticate
++once; `vllm serve` downloads the required nested components automatically:
+ 
+ ```bash
+ hf auth login
+-export MODEL_ROOT=/path/to/MiniMax-H3
+-hf download MiniMaxAI/MiniMax-H3 --local-dir "${MODEL_ROOT}"
++export MODEL=MiniMaxAI/MiniMax-H3
+ ```
+ 
+ ### Environment
+@@ -73,24 +73,21 @@ pip install mindiesd-*.whl
+ 
+ ## Start a server
+ 
+-One server loads one checkpoint partition. Set `MODEL` to `FL2VA` for T2VA
+-and FL2VA requests, or to `Ref2VA` for Ref2VA requests.
++Pass the repository ID directly. The pipeline loads the two nested DiTs while
++sharing the tokenizer, processor, text encoder, and VAEs from `FL2VA`.
+ 
+-### Multi-NPU: 768P validated configuration
++### Multi-NPU: 768P combined-service configuration
+ 
+-Validated on eight NPUs of an Atlas 800I A3 server with Ulysses sequence
+-parallelism degree 8, text-encoder tensor parallelism degree 8, native tiled
+-VAE patch parallelism degree 8, and layerwise offload:
++Use Ulysses sequence parallelism degree 8, text-encoder tensor parallelism
++degree 8, native tiled VAE patch parallelism degree 8, and layerwise offload:
+ 
+ ```bash
+ export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+ export PORT=9098
+-export MODEL="${MODEL_ROOT}/FL2VA"
++export MODEL=MiniMaxAI/MiniMax-H3
+ export VLLM_WORKER_MULTIPROC_METHOD=spawn
+ export VLLM_OMNI_VIDEO_SYNC_TIMEOUT=1800
+ export PYTHONDONTWRITEBYTECODE=1
+-export HF_HUB_OFFLINE=1
+-export TRANSFORMERS_OFFLINE=1
+ 
+ vllm serve "${MODEL}" \
+   --omni \
+@@ -112,6 +109,9 @@ Do not add `--enforce-eager`. The first request includes regional
+ compilation; warm the server once before measuring steady-state latency.
+ H3 is CFG-distilled, so `--cfg-parallel-size` must remain 1.
+ 
++The same endpoint accepts `task=t2va`, `task=fl2va`, and `task=ref2va`; no
++partition restart is required. Layerwise offload applies to both DiTs.
++
+ ### Optional optimizations
+ 
+ Two independent optimizations may be enabled on top of the configuration
+@@ -124,7 +124,7 @@ every other flag unchanged:
+   --diffusion-attention-backend RAINFUSION_ATTN
+ ```
+ 
+-**INT8 online quantization** — add one flag to either command above:
++**INT8 online quantization** — add one flag to the server command above:
+ 
+ ```bash
+   --quantization int8
+@@ -134,12 +134,6 @@ Keep `--ring 1` when using RainFusion: the `rf_v2` kernel ranks key blocks
+ over the whole sequence, so ring parallelism would split away the keys it
+ needs. Scale with `--usp` instead.
+ 
+-To serve Ref2VA, stop the FL2VA server and restart with:
+-
+-```bash
+-export MODEL="${MODEL_ROOT}/Ref2VA"
+-```
+-
+ ## HTTP API examples
+ 
+ The request format is identical to the GPU recipe; see
+@@ -168,7 +162,8 @@ throughput guarantee.
+ 
+ ## Known limitations
+ 
+-- Each server process loads only one checkpoint partition.
++- Combined serving requires sibling `FL2VA` and `Ref2VA` directories, loads
++  both task-specific DiTs, and loads one copy of every shared component.
+ - H3 currently executes one generation request per diffusion batch.
+ - The first regional-compile request is a warmup and should not be included
+   in steady-state performance measurements.
+diff --git a/recipes/MiniMaxAI/MiniMax-H3.md b/recipes/MiniMaxAI/MiniMax-H3.md
+index 9fc59628d4a..845934a6edd 100644
+--- a/recipes/MiniMaxAI/MiniMax-H3.md
++++ b/recipes/MiniMaxAI/MiniMax-H3.md
+@@ -12,27 +12,34 @@
+ - Maintainer: Community
+ 
+ MiniMax H3 is a CFG-distilled joint video/audio diffusion transformer. Its
+-checkpoint has two independently served partitions:
++checkpoint has two task-specific DiT partitions:
+ 
+ - `FL2VA`: text-to-video+audio (`t2va`) and first-frame-to-video+audio
+   (`fl2va`)
+ - `Ref2VA`: up to 9 images, 3 videos, and 3 audio references in supported
+   image/video/audio combinations (`ref2va`; audio-only is rejected)
+ 
++One vLLM-Omni diffusion stage can load both DiTs while instantiating the
++tokenizer, processor, Qwen3-VL text encoder, video VAE, and audio VAE only
++once. Requests select the DiT with `extra_params.task`.
++
+ The generated MP4 contains H.264 video and synchronized stereo audio.
+ 
+ ## Prerequisites
+ 
+-The checkpoint requires Hugging Face access approval. Download it and point
+-`MODEL_ROOT` at the directory containing the `FL2VA` and `Ref2VA`
+-subdirectories:
++The checkpoint requires Hugging Face access approval. Authenticate once;
++`vllm serve` downloads the required components automatically:
+ 
+ ```bash
+ hf auth login
+-export MODEL_ROOT=/path/to/MiniMax-H3
+-hf download MiniMaxAI/MiniMax-H3 --local-dir "${MODEL_ROOT}"
++export MODEL=MiniMaxAI/MiniMax-H3
+ ```
+ 
++The vLLM-Omni pipeline downloads `FL2VA/**`, `Ref2VA/model_index.json`, and
++`Ref2VA/transformer/**`. It does not download or load the diffusers-format
++`transformer`, `transformer_ref`, or `vae` weights at the repository root, nor
++duplicate Ref2VA copies of shared components.
++
+ Install vLLM-Omni from the checkout containing MiniMax H3 support. The
+ two-GPU RTX 5090/4090 profiles use cuDNN attention and do not need
+ FlashAttention-4. Install the optional dependency only for the four-GPU
+@@ -49,16 +56,17 @@ reference-video preparation and MP4 output.
+ 
+ ## Start a server
+ 
+-One server loads one checkpoint partition. Set `MODEL` to `FL2VA` for T2VA
+-and FL2VA requests, or to `Ref2VA` for either Ref2VA request.
++Pass the repository ID directly. The pipeline uses `FL2VA` for model discovery
++and shared components, and loads the second DiT from `Ref2VA/transformer`.
+ 
+ ### Memory and storage requirements
+ 
+ Treat GPU HBM, host RAM, and checkpoint storage as separate requirements. Each
+ H3 checkpoint partition (`FL2VA` or `Ref2VA`) contains about **134 GiB** of
+-BF16 safetensors (about **135 GiB** on disk). Keeping both partitions locally
+-therefore needs roughly **270 GiB** of model storage, although the examples
+-serve only one partition at a time.
++BF16 safetensors (about **135 GiB** on disk). Keeping both partitions
++locally therefore needs roughly **270 GiB** of model storage. A combined
++service downloads both; `--task-type fl2va` or `--task-type ref2va` downloads
++only the selected partition.
+ 
+ CPU offload and distributed layerwise offload reduce GPU residency; they do
+ not make the model weights disappear. With `--dlo-no-use-allgather`, each
+@@ -79,7 +87,7 @@ This matches the accuracy-qualified reference path and prevents the Qwen3-VL
+ encoder and DiT from being resident on the GPU at the same time.
+ 
+ ```bash
+-export MODEL="${MODEL_ROOT}/FL2VA"
++export MODEL=MiniMaxAI/MiniMax-H3
+ export PORT=8091
+ 
+ CUDA_VISIBLE_DEVICES=0 \
+@@ -96,8 +104,8 @@ vllm serve "${MODEL}" \
+ ```
+ 
+ Use a GPU with enough memory for the active H3 component and enough system RAM
+-for the offloaded components. CPU offload reduces GPU memory pressure but adds
+-PCIe/NVLink transfer latency.
++for both offloaded DiTs plus the shared components. Model-level offload keeps
++the two DiTs mutually exclusive on GPU, but adds PCIe/NVLink transfer latency.
+ 
+ ### Two 24/32 GB GPUs: TP2 distributed layerwise offload
+ 
+@@ -109,7 +117,7 @@ copied to the GPUs once per denoise stage, reused by every sampling step, and
+ released before VAE decode so the decoder can reuse their HBM.
+ 
+ ```bash
+-export MODEL="${MODEL_ROOT}/FL2VA"
++export MODEL=MiniMaxAI/MiniMax-H3
+ export PORT=8091
+ 
+ CUDA_VISIBLE_DEVICES=0,1 \
+@@ -120,6 +128,7 @@ vllm serve "${MODEL}" \
+   --host 0.0.0.0 \
+   --port "${PORT}" \
+   --trust-remote-code \
++  --task-type fl2va \
+   --num-gpus 2 \
+   --tensor-parallel-size 2 \
+   --usp 1 \
+@@ -191,9 +200,9 @@ bash examples/offline_inference/minimax_h3/run_h3_2gpu_all_tasks.sh
+ The script selects 20 resident layers for `PROFILE=rtx5090` and 12 for
+ `PROFILE=rtx4090`; `DLO_RESIDENT_LAYERS=N` overrides either default.
+ 
+-### Four GPUs: measured best-practice throughput
++### Four GPUs: throughput-oriented combined service
+ 
+-The best validated four-GPU configuration on four NVIDIA B300 GPUs is:
++For a combined service on four high-memory GPUs, use:
+ 
+ - no CPU or layerwise offload;
+ - Ulysses sequence parallelism degree 4;
+@@ -202,8 +211,11 @@ The best validated four-GPU configuration on four NVIDIA B300 GPUs is:
+ - CuTe FlashAttention-4 through the `FLASH_ATTN` backend, with Ring and TP
+   left at 1.
+ 
++Both DiTs remain resident in this no-offload configuration. If they do not fit,
++use model-level CPU offload.
++
+ ```bash
+-export MODEL="${MODEL_ROOT}/FL2VA"
++export MODEL=MiniMaxAI/MiniMax-H3
+ export PORT=8091
+ 
+ CUDA_VISIBLE_DEVICES=0,1,2,3 \
+@@ -243,7 +255,7 @@ vLLM-style tensor-parallel layers and runs with distributed collectives over
+ its own encoder process group):
+ 
+ ```bash
+-export MODEL="${MODEL_ROOT}/FL2VA"
++export MODEL=MiniMaxAI/MiniMax-H3
+ export PORT=8091
+ 
+ CUDA_VISIBLE_DEVICES=0,1,2,3 \
+@@ -275,12 +287,9 @@ the reference path within bf16 rounding: every encoder rank all-reduces the
+ row-parallel projections, so the full `[seq, 5120]` layer-50 hidden state is
+ replicated on every rank.
+ 
+-To serve Ref2VA, stop the FL2VA server and restart the same one- or four-GPU
+-command with:
+-
+-```bash
+-export MODEL="${MODEL_ROOT}/Ref2VA"
+-```
++No restart is needed: `task=fl2va` routes to `FL2VA/transformer`, while
++`task=ref2va` routes to
++`Ref2VA/transformer`. T2VA uses the FL2VA DiT.
+ 
+ ### Online FP8 quantization
+ 
+@@ -336,7 +345,7 @@ export API_URL="http://127.0.0.1:${PORT}/v1/videos/sync"
+ 
+ ### 1. T2VA: text to video and audio
+ 
+-Run this request against the `FL2VA` partition:
++Run this request against the combined service:
+ 
+ ```bash
+ curl -sS -X POST "${API_URL}" \
+@@ -354,7 +363,7 @@ curl -sS -X POST "${API_URL}" \
+ 
+ ### 2. FL2VA: first frame to video and audio
+ 
+-Run this request against the `FL2VA` partition. When width and height are
++Run this request against the combined service. When width and height are
+ omitted, H3 preserves the first-frame aspect ratio and uses a 768-pixel short
+ edge.
+ 
+@@ -393,10 +402,11 @@ curl -sS -X POST "${API_URL}" \
+ 
+ ### 3. Ref2VA: image-only, image/audio, or mixed references
+ 
+-Run these requests against the `Ref2VA` partition. Image-only Ref2VA omits
+-`audio_reference`; adding one or more audio references is optional. The typed
+-fields accept one object or an ordered JSON list. `audio_reference` accepts an
+-HTTP(S) URL or a `data:` URL.
++Run these requests against the combined service or a Ref2VA-only service.
++Image-only Ref2VA omits `audio_reference`; adding one or more audio references
++is optional. The typed fields accept one object or an ordered JSON list.
++`audio_reference` accepts an HTTP(S) URL or a `data:` URL. In one terminal,
++expose the local reference assets to the serving host:
+ 
+ ```bash
+ python -m http.server 8092 \
+@@ -446,7 +456,7 @@ shorter, the reference soundtrack is truncated to the generated clip.
+ 
+ ### 4. Ref2VA: video, separate audio, and mixed references
+ 
+-Run this request against the `Ref2VA` partition. Repeat the
++Run this request against the combined service. Repeat the
+ `input_references` multipart field once per source video. H3 consumes the
+ videos in form order and preserves their original soundtracks during
+ conditioning.
+@@ -508,7 +518,7 @@ than one is requested.
+ 
+ | Parameter | Recommended value | Notes |
+ |-----------|-------------------|-------|
+-| `task` | `t2va`, `fl2va`, or `ref2va` | Passed in `extra_params`; must match the served partition |
++| `task` | `t2va`, `fl2va`, or `ref2va` | Passed in `extra_params`; selects the task-specific DiT |
+ | `duration` | Workload-specific | Decimal seconds in `extra_params`; converted to H3-compatible frame count |
+ | `fps` | `24` | H3 output FPS is fixed |
+ | `num_inference_steps` | `50` | Matches the reference accuracy workloads |
+@@ -550,7 +560,8 @@ reduction.
+ 
+ ## Known limitations
+ 
+-- Each server process loads only one checkpoint partition.
++- Combined serving requires sibling `FL2VA` and `Ref2VA` directories, loads
++  both task-specific DiTs, and loads shared components once from `FL2VA`.
+ - H3 currently executes one generation request per diffusion batch.
+ - The first regional-compile request is a warmup and should not be included in
+   steady-state performance measurements.
+diff --git a/tests/diffusion/cache/test_cache_backends.py b/tests/diffusion/cache/test_cache_backends.py
+index bb7e9f2c93e..1137cfbc09f 100644
+--- a/tests/diffusion/cache/test_cache_backends.py
++++ b/tests/diffusion/cache/test_cache_backends.py
+@@ -86,9 +86,35 @@ def test_enable_single_transformer(self, mock_cache_dit, mock_block_adapter):
+ 
+         # Verify cache-dit was enabled
+         assert backend.enabled is True
+-        assert backend._refresh_func is not None
++        assert backend._refresh_funcs
+         mock_cache_dit.enable_cache.assert_called_once()
+ 
++    @patch("vllm_omni.diffusion.cache.cachedit.backend.BlockAdapter")
++    @patch("vllm_omni.diffusion.cache.cachedit.backend.cache_dit")
++    def test_enable_and_refresh_every_declared_dit(self, mock_cache_dit, mock_block_adapter):
++        """Combined pipelines enable and refresh Cache-DiT for every DiT."""
++        pipeline = Mock()
++        pipeline.__class__.__name__ = "MiniMaxH3Pipeline"
++        pipeline._dit_modules = ["transformer", "transformers_ref"]
++        pipeline.transformer = Mock()
++        pipeline.transformers_ref = Mock()
++        for transformer in (pipeline.transformer, pipeline.transformers_ref):
++            transformer._cache_dit_adapter_config = CacheDiTAdapterConfig(
++                block_forward_patterns={"blocks": ForwardPattern.Pattern_3}
++            )
++
++        backend = CacheDiTBackend({"Fn_compute_blocks": 2})
++        backend.enable(pipeline)
++        backend.refresh(pipeline, num_inference_steps=20)
++
++        assert len(backend._refresh_funcs) == 2
++        assert mock_cache_dit.enable_cache.call_count == 2
++        assert mock_cache_dit.refresh_context.call_count == 2
++        assert {call.args[0] for call in mock_cache_dit.refresh_context.call_args_list} == {
++            pipeline.transformer,
++            pipeline.transformers_ref,
++        }
++
+     @patch("vllm_omni.diffusion.cache.cachedit.backend.logger")
+     @patch("vllm_omni.diffusion.cache.cachedit.backend.cache_dit")
+     def test_enable_without_model_adapter_uses_cache_dit_registry(self, mock_cache_dit, mock_logger):
+@@ -106,7 +132,7 @@ class BuiltinPipeline:
+         backend.enable(pipeline)
+ 
+         assert backend.enabled is True
+-        assert backend._refresh_func is not None
++        assert backend._refresh_funcs
+         assert mock_cache_dit.enable_cache.call_args.args[0] is pipeline.transformer
+         mock_logger.info.assert_any_call(
+             "Transformer %s does not declare _cache_dit_adapter_config; "
+@@ -138,7 +164,7 @@ class UnsupportedPipeline:
+ 
+         assert isinstance(exc_info.value.__cause__, ValueError)
+         assert backend.enabled is False
+-        assert backend._refresh_func is None
++        assert backend._refresh_funcs == []
+ 
+     @patch("vllm_omni.diffusion.cache.cachedit.backend.BlockAdapter")
+     @patch("vllm_omni.diffusion.cache.cachedit.backend.cache_dit")
+@@ -245,7 +271,7 @@ def test_enable_hunyuan_pipeline_uses_model_transformer(self, mock_cache_dit, mo
+         backend.enable(mock_pipeline)
+ 
+         assert backend.enabled is True
+-        assert backend._refresh_func is not None
++        assert backend._refresh_funcs
+         mock_block_adapter.assert_called_once()
+         adapter_kwargs = mock_block_adapter.call_args.kwargs
+         assert adapter_kwargs["transformer"] is mock_pipeline.model
+@@ -285,7 +311,7 @@ def test_enable_dreamid_pipeline_uses_fused_blocks(self, mock_cache_dit, mock_bl
+         backend.enable(mock_pipeline)
+ 
+         assert backend.enabled is True
+-        assert backend._refresh_func is not None
++        assert backend._refresh_funcs
+         mock_block_adapter.assert_called_once()
+         adapter_kwargs = mock_block_adapter.call_args.kwargs
+         assert adapter_kwargs["transformer"] is mock_pipeline.transformer
+diff --git a/tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py b/tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py
+index 460aceaa7e3..70f00f4b72a 100644
+--- a/tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py
++++ b/tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py
+@@ -1,6 +1,7 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
++import json
+ from multiprocessing.reduction import ForkingPickler
+ from types import SimpleNamespace
+ from unittest.mock import Mock
+@@ -24,12 +25,336 @@ def test_pipeline_import_registry_and_component_discovery():
+         "pipeline_minimax_h3",
+         "MiniMaxH3Pipeline",
+     )
++    assert _DIFFUSION_MODELS["MiniMaxH3ModularPipeline"] == _DIFFUSION_MODELS["MiniMaxH3Pipeline"]
+     assert _DIFFUSION_POST_PROCESS_FUNCS["MiniMaxH3Pipeline"] == "get_minimax_h3_post_process_func"
+-    assert MiniMaxH3Pipeline._dit_modules == ["transformer"]
++    assert (
++        _DIFFUSION_POST_PROCESS_FUNCS["MiniMaxH3ModularPipeline"] == _DIFFUSION_POST_PROCESS_FUNCS["MiniMaxH3Pipeline"]
++    )
++    assert MiniMaxH3Pipeline._dit_modules == ["transformer", "transformers_ref"]
+     assert MiniMaxH3Pipeline._encoder_modules == ["text_encoder"]
+     assert MiniMaxH3Pipeline._vae_modules == ["video_vae", "audio_vae"]
+ 
+ 
++def _write_partition_index(path, *, partition, tasks):
++    path.mkdir(parents=True)
++    (path / "model_index.json").write_text(
++        json.dumps(
++            {
++                "_class_name": "MiniMaxH3Pipeline",
++                "_diffusers_version": "0.32.2",
++                "_minimax_h3": {
++                    "partition": partition,
++                    "tasks": tasks,
++                    "sigma_shift_scales": {"video": 12.0, "audio": 3.0},
++                },
++            }
++        ),
++        encoding="utf-8",
++    )
++
++
++def test_modular_diffusers_index_is_resolved_generically(tmp_path):
++    from vllm_omni.diffusion.data import OmniDiffusionConfig, resolve_model_class_name
++    from vllm_omni.diffusion.utils.hf_utils import is_diffusion_model
++    from vllm_omni.entrypoints.utils import resolve_model_config_path
++
++    (tmp_path / "modular_model_index.json").write_text(
++        json.dumps(
++            {
++                "_class_name": "MiniMaxH3ModularPipeline",
++                "_diffusers_version": "0.36.0.dev0",
++            }
++        ),
++        encoding="utf-8",
++    )
++
++    assert is_diffusion_model(str(tmp_path))
++    assert resolve_model_class_name(str(tmp_path)) == "MiniMaxH3ModularPipeline"
++    assert resolve_model_config_path(str(tmp_path)) is None
++
++    config = OmniDiffusionConfig(model=str(tmp_path))
++    config.enrich_config()
++    assert config.model_class_name == "MiniMaxH3ModularPipeline"
++    assert config.supports_multimodal_inputs
++    assert config.max_multimodal_image_inputs == 9
++    assert config.supports_mixed_reference_inputs
++
++
++@pytest.mark.parametrize(
++    ("task_type", "partition"),
++    [
++        (None, "combined"),
++        ("auto", "combined"),
++        ("t2va", "fl2va"),
++        ("fl2va", "fl2va"),
++        ("ref2va", "ref2va"),
++    ],
++)
++def test_startup_task_selects_weight_partition(task_type, partition):
++    from vllm_omni.diffusion.models.minimax_h3.pipeline_minimax_h3 import _minimax_h3_partition_for_task
++
++    assert _minimax_h3_partition_for_task(task_type) == partition
++
++
++def test_startup_auto_task_uses_explicit_local_partition(tmp_path):
++    from vllm_omni.diffusion.models.minimax_h3.pipeline_minimax_h3 import _minimax_h3_partition_for_task
++
++    for directory, partition, tasks in (
++        ("FL2VA", "fl2va", ["t2va", "fl2va"]),
++        ("Ref2VA", "ref2va", ["ref2va"]),
++    ):
++        model_path = tmp_path / directory
++        _write_partition_index(model_path, partition=partition, tasks=tasks)
++        assert _minimax_h3_partition_for_task(None, str(model_path)) == partition
++        assert _minimax_h3_partition_for_task("auto", str(model_path)) == partition
++        assert _minimax_h3_partition_for_task("combined", str(model_path)) == "combined"
++
++
++def test_startup_task_rejects_unsupported_value():
++    from vllm_omni.diffusion.models.minimax_h3.pipeline_minimax_h3 import _minimax_h3_partition_for_task
++
++    with pytest.raises(ValueError, match="task_type must be one of"):
++        _minimax_h3_partition_for_task("unsupported")
++
++
++def test_combined_task_inference_and_transformer_routing():
++    from vllm_omni.diffusion.models.minimax_h3 import MiniMaxH3Pipeline
++
++    pipeline = object.__new__(MiniMaxH3Pipeline)
++    torch.nn.Module.__init__(pipeline)
++    pipeline.partition = "combined"
++    pipeline.supported_tasks = frozenset({"t2va", "fl2va", "ref2va"})
++    pipeline.transformer = torch.nn.Identity()
++    pipeline.transformers_ref = torch.nn.Linear(1, 1)
++    assert pipeline._resolve_task(None, {}) == "t2va"
++    assert pipeline._resolve_task(None, {"image": object()}) == "fl2va"
++    assert pipeline._resolve_task(None, {"audio": object()}) == "ref2va"
++    assert pipeline._resolve_task(None, {"video": object()}) == "ref2va"
++    pipeline.partition = "ref2va"
++    pipeline.supported_tasks = frozenset({"ref2va"})
++    assert pipeline._resolve_task(None, {"image": object()}) == "ref2va"
++
++    pipeline.partition = "combined"
++    pipeline.supported_tasks = frozenset({"t2va", "fl2va", "ref2va"})
++    assert pipeline._transformer_for_task("fl2va") is pipeline.transformer
++    assert pipeline._transformer_for_task("ref2va") is pipeline.transformers_ref
++
++
++@pytest.mark.parametrize(
++    (
++        "task_type",
++        "expected_partition",
++        "expected_dits",
++        "component_partition",
++        "source_partitions",
++        "expected_tasks",
++    ),
++    [
++        (None, "combined", 2, "FL2VA", ["FL2VA", "Ref2VA"], {"t2va", "fl2va", "ref2va"}),
++        ("fl2va", "fl2va", 1, "FL2VA", ["FL2VA"], {"t2va", "fl2va"}),
++        ("ref2va", "ref2va", 1, "Ref2VA", ["Ref2VA"], {"ref2va"}),
++    ],
++)
++def test_pipeline_loads_task_selected_dits_and_shared_components_once(
++    monkeypatch,
++    tmp_path,
++    task_type,
++    expected_partition,
++    expected_dits,
++    component_partition,
++    source_partitions,
++    expected_tasks,
++):
++    from vllm_omni.diffusion.data import (
++        DiffusionParallelConfig,
++        OmniDiffusionConfig,
++    )
++    from vllm_omni.diffusion.models.minimax_h3 import (
++        pipeline_minimax_h3 as pipeline_module,
++    )
++
++    _write_partition_index(
++        tmp_path / "FL2VA",
++        partition="fl2va",
++        tasks=["t2va", "fl2va"],
++    )
++    _write_partition_index(
++        tmp_path / "Ref2VA",
++        partition="ref2va",
++        tasks=["ref2va"],
++    )
++    for partition_name in ("FL2VA", "Ref2VA"):
++        for component in (
++            "transformer",
++            "tokenizer",
++            "processor",
++            "text_encoder",
++            "video_vae",
++            "audio_vae",
++        ):
++            (tmp_path / partition_name / component).mkdir()
++
++    created = {"dit": [], "text_encoder": [], "video_vae": [], "audio_vae": []}
++
++    class FakeModule(torch.nn.Module):
++        def __init__(self, *args, **kwargs):
++            super().__init__()
++
++    class FakeDiT(FakeModule):
++        def __init__(self, *args, **kwargs):
++            super().__init__()
++            created["dit"].append((args, kwargs))
++
++    def component_factory(name):
++        def create(path, *args, **kwargs):
++            created[name].append(str(path))
++            return FakeModule()
++
++        return create
++
++    tokenizer_calls = []
++    processor_calls = []
++    tokenizer_cls = Mock(spec=pipeline_module.Qwen2TokenizerFast)
++    tokenizer_cls.from_pretrained.side_effect = lambda *args, **kwargs: (
++        tokenizer_calls.append((args, kwargs)) or object()
++    )
++    processor_cls = Mock(spec=pipeline_module.Qwen3VLProcessor)
++    processor_cls.from_pretrained.side_effect = lambda *args, **kwargs: (
++        processor_calls.append((args, kwargs)) or object()
++    )
++    monkeypatch.setattr(pipeline_module, "MiniMaxH3DiTModel", FakeDiT)
++    monkeypatch.setattr(
++        pipeline_module,
++        "MiniMaxH3Qwen3VLEncoder",
++        component_factory("text_encoder"),
++    )
++    monkeypatch.setattr(
++        pipeline_module,
++        "MiniMaxH3VideoVAE",
++        component_factory("video_vae"),
++    )
++    monkeypatch.setattr(
++        pipeline_module,
++        "MiniMaxH3AudioVAE",
++        component_factory("audio_vae"),
++    )
++    monkeypatch.setattr(
++        pipeline_module,
++        "Qwen2TokenizerFast",
++        tokenizer_cls,
++    )
++    monkeypatch.setattr(
++        pipeline_module,
++        "Qwen3VLProcessor",
++        processor_cls,
++    )
++    monkeypatch.setattr(
++        pipeline_module,
++        "_dit_rank_world",
++        lambda: (None, 0, 1),
++    )
++    monkeypatch.setattr(
++        pipeline_module,
++        "get_local_device",
++        lambda: torch.device("cpu"),
++    )
++    download_calls = []
++
++    def fake_download(**kwargs):
++        download_calls.append(kwargs)
++        return str(tmp_path)
++
++    monkeypatch.setattr(
++        pipeline_module,
++        "download_weights_from_hf_specific",
++        fake_download,
++    )
++
++    od_config = OmniDiffusionConfig(
++        model="MiniMaxAI/MiniMax-H3",
++        revision=None,
++        task_type=task_type,
++        quantization_config=None,
++        parallel_config=DiffusionParallelConfig(
++            cfg_parallel_size=1,
++            text_encoder_tp_size=1,
++        ),
++    )
++    pipeline = pipeline_module.MiniMaxH3Pipeline(od_config=od_config)
++
++    assert pipeline.partition == expected_partition
++    assert pipeline.supported_tasks == expected_tasks
++    assert len(created["dit"]) == expected_dits
++    component_path = tmp_path / component_partition
++    assert created["text_encoder"] == [str(component_path / "text_encoder")]
++    assert created["video_vae"] == [str(component_path / "video_vae")]
++    assert created["audio_vae"] == [str(component_path / "audio_vae")]
++    assert len(tokenizer_calls) == 1
++    assert len(processor_calls) == 1
++    expected_dit_modules = ["transformer", "transformers_ref"] if expected_dits == 2 else ["transformer"]
++    assert pipeline._dit_modules == expected_dit_modules
++    assert hasattr(pipeline, "transformers_ref") is (expected_dits == 2)
++    if expected_partition == "ref2va":
++        assert pipeline._transformer_for_task("ref2va") is pipeline.transformer
++    assert [source.model_or_path for source in pipeline.weights_sources] == [
++        str(tmp_path / partition_name) for partition_name in source_partitions
++    ]
++    expected_patterns = (
++        pipeline_module.MINIMAX_H3_DOWNLOAD_PATTERNS
++        if expected_partition == "combined"
++        else pipeline_module.MINIMAX_H3_TASK_DOWNLOAD_PATTERNS[expected_partition]
++    )
++    assert download_calls == [
++        {
++            "model_name_or_path": "MiniMaxAI/MiniMax-H3",
++            "cache_dir": None,
++            "allow_patterns": expected_patterns,
++            "revision": None,
++            "require_all": True,
++        }
++    ]
++
++
++def test_combined_weight_loader_routes_each_contiguous_partition():
++    from vllm_omni.diffusion.models.minimax_h3 import MiniMaxH3Pipeline
++
++    class FakeTransformer(torch.nn.Module):
++        def __init__(self):
++            super().__init__()
++            self.loaded = []
++            self.post_load_calls = 0
++
++        def load_weights(self, weights):
++            self.loaded = [name for name, _ in weights]
++            return set(self.loaded)
++
++        def post_load_weights(self):
++            self.post_load_calls += 1
++
++    pipeline = object.__new__(MiniMaxH3Pipeline)
++    torch.nn.Module.__init__(pipeline)
++    pipeline.transformer = FakeTransformer()
++    pipeline.transformers_ref = FakeTransformer()
++    pipeline.text_encoder = torch.nn.Identity()
++    pipeline.video_vae = torch.nn.Identity()
++    pipeline.audio_vae = torch.nn.Identity()
++    loaded = pipeline.load_weights(
++        iter(
++            [
++                ("transformer.a", torch.ones(1)),
++                ("transformer.b", torch.ones(1)),
++                ("transformers_ref.a", torch.ones(1)),
++            ]
++        )
++    )
++
++    assert pipeline.transformer.loaded == ["a", "b"]
++    assert pipeline.transformers_ref.loaded == ["a"]
++    assert pipeline.transformer.post_load_calls == 1
++    assert pipeline.transformers_ref.post_load_calls == 1
++    assert loaded == {"transformer.a", "transformer.b", "transformers_ref.a"}
++
++
+ def test_dlo_offload_plan_includes_token_refiner():
+     from vllm_omni.diffusion.models.minimax_h3 import MiniMaxH3Pipeline
+ 
+@@ -451,6 +776,21 @@ def test_distributed_layerwise_resident_blocks_release_on_failure():
+     controller.offload_resident_layers.assert_called_once_with()
+ 
+ 
++def test_distributed_layerwise_resident_blocks_can_be_skipped():
++    from vllm_omni.diffusion.models.minimax_h3 import MiniMaxH3Pipeline
++
++    pipeline = object.__new__(MiniMaxH3Pipeline)
++    torch.nn.Module.__init__(pipeline)
++    controller = Mock()
++    pipeline._dlo_residency_controller = controller
++
++    with pipeline._resident_dit_layers_on_device(enabled=False):
++        pass
++
++    controller.load_resident_layers.assert_not_called()
++    controller.offload_resident_layers.assert_not_called()
++
++
+ def test_encoder_layerwise_offload_keeps_tp_blocks_rank_local(monkeypatch):
+     from vllm_omni.diffusion.models.minimax_h3.encoder import (
+         MiniMaxH3Qwen3VLEncoder,
+diff --git a/tests/diffusion/test_diffusion_config_propagation.py b/tests/diffusion/test_diffusion_config_propagation.py
+index 10fe001688d..205b2e49157 100644
+--- a/tests/diffusion/test_diffusion_config_propagation.py
++++ b/tests/diffusion/test_diffusion_config_propagation.py
+@@ -131,6 +131,11 @@ def test_qwen_image_edit_plus_sets_generic_multimodal_limit():
+     assert od_config.max_multimodal_image_inputs == QWEN_IMAGE_EDIT_PLUS_MAX_INPUT_IMAGES
+ 
+ 
++def test_task_type_roundtrip():
++    od = _roundtrip_diffusion_config(model="x", task_type="model-defined-task")
++    assert od.task_type == "model-defined-task"
++
++
+ def test_additional_config_roundtrip():
+     additional_config = {"torchair_graph_config": {"enabled": True}}
+     od = _roundtrip_diffusion_config(model="x", additional_config=additional_config)
+diff --git a/tests/engine/test_arg_utils.py b/tests/engine/test_arg_utils.py
+index cf77e2256d6..ca491275ef8 100644
+--- a/tests/engine/test_arg_utils.py
++++ b/tests/engine/test_arg_utils.py
+@@ -128,6 +128,24 @@ def test_qwen3_tts_codec_frame_rate_patching():
+     assert omni_config.codec_frame_rate_hz == 12.3
+ 
+ 
++def test_qwen3_tts_startup_task_type_is_validated():
++    vllm_config = EngineArgs().create_model_config()
++
++    config = OmniModelConfig.from_vllm_model_config(
++        vllm_config,
++        model_arch="Qwen3TTSTalkerForConditionalGenerationARVLLM",
++        task_type="Base",
++    )
++    assert config.task_type == "Base"
++
++    with pytest.raises(ValueError, match="Qwen3-TTS --task-type must be one of"):
++        OmniModelConfig.from_vllm_model_config(
++            vllm_config,
++            model_arch="Qwen3TTSTalkerForConditionalGenerationARVLLM",
++            task_type="fl2va",
++        )
++
++
+ def test_from_cli_args_picks_up_stage_configs_path():
+     """from_cli_args should pick up stage_configs_path from namespace."""
+     ns = argparse.Namespace(
+diff --git a/tests/entrypoints/test_async_omni_diffusion_config.py b/tests/entrypoints/test_async_omni_diffusion_config.py
+index d31e9f28a1f..ecb0f20e8fb 100644
+--- a/tests/entrypoints/test_async_omni_diffusion_config.py
++++ b/tests/entrypoints/test_async_omni_diffusion_config.py
+@@ -240,6 +240,28 @@ def test_serve_cli_accepts_ulysses_mode():
+     assert parallel_config.ulysses_mode == "advanced_uaa"
+ 
+ 
++def test_serve_cli_forwards_model_defined_task_type_to_diffusion_stage():
++    parser = TrackingArgumentParser()
++    subparsers = parser.add_subparsers(dest="command")
++    OmniServeCommand().subparser_init(subparsers)
++
++    args = parser.parse_args(
++        [
++            "serve",
++            "MiniMaxAI/MiniMax-H3",
++            "--omni",
++            "--task-type",
++            "fl2va",
++        ]
++    )
++
++    explicit_kwargs = args.get_explicit_kwargs_dict()
++    stage_cfg = AsyncOmniEngine._create_default_diffusion_stage_cfg(explicit_kwargs)[0]
++
++    assert args.task_type == "fl2va"
++    assert stage_cfg["engine_args"]["task_type"] == "fl2va"
++
++
+ def test_serve_cli_accepts_diffusion_pipeline_profiler_flag():
+     """Ensure diffusion serve CLI exposes the profiler switch."""
+     parser = TrackingArgumentParser()
+diff --git a/tests/entrypoints/test_omni_snapshot_download.py b/tests/entrypoints/test_omni_snapshot_download.py
+index 412c0f6d90b..d2c76a24978 100644
+--- a/tests/entrypoints/test_omni_snapshot_download.py
++++ b/tests/entrypoints/test_omni_snapshot_download.py
+@@ -53,6 +53,11 @@ def download_backend(monkeypatch: pytest.MonkeyPatch):
+         "download_weights_from_hf_specific",
+         lambda **_kwargs: picked.append("huggingface"),
+     )
++    monkeypatch.setattr(
++        omni_base,
++        "file_or_path_exists",
++        lambda *_args, **_kwargs: False,
++    )
+ 
+     def run() -> str:
+         picked.clear()
+@@ -82,3 +87,14 @@ def test_unset_defaults_to_huggingface(monkeypatch, download_backend):
+     monkeypatch.delenv("VLLM_USE_MODELSCOPE", raising=False)
+ 
+     assert download_backend() == "huggingface"
++
++
++def test_modular_diffusers_defers_component_download(monkeypatch, download_backend):
++    monkeypatch.delenv("VLLM_USE_MODELSCOPE", raising=False)
++    monkeypatch.setattr(
++        omni_base,
++        "file_or_path_exists",
++        lambda *_args, **_kwargs: True,
++    )
++
++    assert download_backend() == "none"
+diff --git a/tests/model_tests/diffusion/test_alignment.py b/tests/model_tests/diffusion/test_alignment.py
+index e93abb74fcf..f5d2768c535 100644
+--- a/tests/model_tests/diffusion/test_alignment.py
++++ b/tests/model_tests/diffusion/test_alignment.py
+@@ -33,6 +33,7 @@
+     "LTX2T2VDMD2Pipeline",
+     "LTX2I2VDMD2Pipeline",
+     "MiniMaxH3Pipeline",
++    "MiniMaxH3ModularPipeline",
+     "StableAudioPipeline",
+     "WanImageToVideoPipeline",
+     "WanS2VPipeline",
+diff --git a/vllm_omni/config/model.py b/vllm_omni/config/model.py
+index d172347f7db..d18cabcf511 100644
+--- a/vllm_omni/config/model.py
++++ b/vllm_omni/config/model.py
+@@ -17,6 +17,8 @@
+ 
+ logger = init_logger(__name__)
+ 
++_QWEN3_TTS_TASK_TYPES = frozenset({"CustomVoice", "VoiceDesign", "Base"})
++
+ 
+ class OmniModelArchConfigConvertor(ModelArchConfigConvertorBase):
+     """Config convertor for Omni multi-stage models.
+@@ -101,8 +103,8 @@ class OmniModelConfig(ModelConfig):
+              "audio", "latents"). If None, output type is inferred.
+          stage_connector_config: Stage connector configuration dictionary.
+              Contains "name" (connector name), "extra" (extra connector config).
+-         task_type: Default task type for TTS models (CustomVoice, VoiceDesign, or Base).
+-             If not specified, will be inferred from model path.
++         task_type: Model-defined startup task type. Each model validates its
++             supported values and applies the corresponding behavior.
+ 
+ 
+     The correct way to initialize this class is via vLLM config, as most
+@@ -208,6 +210,14 @@ def draw_hf_text_config(self):
+             )
+             return get_hf_text_config(self.hf_config)
+ 
++    def _validate_startup_task_type(self) -> None:
++        """Validate startup-only task selectors owned by an AR model."""
++        if self.model_arch != "Qwen3TTSTalkerForConditionalGenerationARVLLM" or self.task_type is None:
++            return
++        if self.task_type not in _QWEN3_TTS_TASK_TYPES:
++            supported = ", ".join(sorted(_QWEN3_TTS_TASK_TYPES))
++            raise ValueError(f"Qwen3-TTS --task-type must be one of {supported}; got {self.task_type!r}")
++
+     def _patch_qwen3_tts(self):
+         """Patches the value of `position_id_per_seconds` in Qwen3's
+         TTS's talker_config into the this class's codec_frame_rate_hz.
+@@ -275,6 +285,7 @@ def from_vllm_model_config(cls, model_config: ModelConfig, **omni_kwargs):
+             omni_cfg._patch_qwen3_tts()
+ 
+         omni_cfg._maybe_override_text_config()
++        omni_cfg._validate_startup_task_type()
+ 
+         if omni_cfg.hf_config is not None:
+             omni_cfg.hf_config.architectures = omni_cfg.architectures
+diff --git a/vllm_omni/config/omni_config.py b/vllm_omni/config/omni_config.py
+index 002352cd25e..b26395399f4 100644
+--- a/vllm_omni/config/omni_config.py
++++ b/vllm_omni/config/omni_config.py
+@@ -449,6 +449,7 @@ class keeps the diffusion-only knobs from ``OmniDiffusionConfig`` without
+     model: str | None = None
+     model_class_name: str | None = None
+     model_arch: str | None = None
++    task_type: str | None = None
+     dtype: Any = "auto"
+     trust_remote_code: bool = False
+     revision: str | None = None
+@@ -679,6 +680,7 @@ def enrich_config(self) -> None:
+         "stage_id",
+         "model",
+         "model_arch",
++        "task_type",
+         "dtype",
+         "trust_remote_code",
+         "revision",
+diff --git a/vllm_omni/diffusion/cache/cachedit/backend.py b/vllm_omni/diffusion/cache/cachedit/backend.py
+index ac6f93785ce..c30a888a863 100644
+--- a/vllm_omni/diffusion/cache/cachedit/backend.py
++++ b/vllm_omni/diffusion/cache/cachedit/backend.py
+@@ -3,10 +3,13 @@
+ 
+ """Generic Cache-DiT backend lifecycle and integration."""
+ 
++from __future__ import annotations
++
+ from collections.abc import Callable
+-from typing import Any, TypeAlias
++from typing import TYPE_CHECKING, Any, TypeAlias, cast
+ 
+ import cache_dit
++import torch.nn as nn
+ from cache_dit import BlockAdapter, DBCacheConfig
+ from cache_dit.caching.cache_adapters.cache_adapter import CachedAdapter
+ from vllm.logger import init_logger
+@@ -18,6 +21,9 @@
+ )
+ from vllm_omni.diffusion.data import DiffusionCacheConfig
+ 
++if TYPE_CHECKING:
++    from vllm_omni.diffusion.models.interface import SupportsComponentDiscovery
++
+ logger = init_logger(__name__)
+ 
+ RefreshCacheContextFunc: TypeAlias = Callable[[Any, int, bool], None]
+@@ -27,14 +33,18 @@
+ CUSTOM_DIT_ENABLERS: dict[str, CacheDiTEnabler] = {}
+ 
+ 
+-def cache_summary(pipeline: Any, details: bool = True) -> None:
++def _dit_module_names(pipeline: SupportsComponentDiscovery) -> tuple[str, ...]:
++    """Return the pipeline DiT attributes that are present at runtime."""
++    names = getattr(pipeline, "_dit_modules", None)
++    if not isinstance(names, (list, tuple)):
++        names = ("transformer",)
++    return tuple(name for name in names if isinstance(name, str) and getattr(pipeline, name, None) is not None)
++
++
++def cache_summary(pipeline: SupportsComponentDiscovery, details: bool = True) -> None:
+     """Log Cache-DiT statistics for every transformer on the pipeline."""
+ 
+-    transformers = [
+-        transformer
+-        for attribute in ("transformer", "transformer_2")
+-        if (transformer := getattr(pipeline, attribute, None)) is not None
+-    ]
++    transformers = [getattr(pipeline, name) for name in _dit_module_names(pipeline)]
+     for transformer in transformers:
+         cache_dit.summary(transformer, details=details)
+ 
+@@ -42,19 +52,34 @@ def cache_summary(pipeline: Any, details: bool = True) -> None:
+         logger.warning("CacheDiT summary failed; this pipeline has no defined transformer attribute")
+ 
+ 
+-def _default_get_pipeline_transformer(pipeline: Any) -> Any:
+-    return pipeline.transformer
++def _default_get_pipeline_transformer(
++    pipeline: SupportsComponentDiscovery,
++) -> nn.Module:
++    return cast(nn.Module, getattr(pipeline, "transformer"))
++
++
++def _make_pipeline_transformer_getter(
++    name: str,
++) -> Callable[[SupportsComponentDiscovery], nn.Module]:
++    def get_pipeline_transformer(
++        pipeline: SupportsComponentDiscovery,
++    ) -> nn.Module:
++        return cast(nn.Module, getattr(pipeline, name))
++
++    return get_pipeline_transformer
+ 
+ 
+ def _build_cache_context_refresh(
+     cache_config: DiffusionCacheConfig,
+-    get_pipeline_transformer: Callable[[Any], Any] = _default_get_pipeline_transformer,
++    get_pipeline_transformer: Callable[[SupportsComponentDiscovery], nn.Module] = _default_get_pipeline_transformer,
+ ) -> RefreshCacheContextFunc:
+     """Build the cache context refresh callback for one transformer."""
+ 
+     projected_config = CacheDiTConfig.from_diffusion_config(cache_config)
+ 
+-    def refresh_cache_context(pipeline: Any, num_inference_steps: int, verbose: bool = True) -> None:
++    def refresh_cache_context(
++        pipeline: SupportsComponentDiscovery, num_inference_steps: int, verbose: bool = True
++    ) -> None:
+         transformer = get_pipeline_transformer(pipeline)
+ 
+         # Cache-DiT has no predefined SCM mask for these small step counts.
+@@ -80,10 +105,11 @@ def refresh_cache_context(pipeline: Any, num_inference_steps: int, verbose: bool
+ 
+ 
+ def enable_cache_for_dit(
+-    pipeline: Any,
++    pipeline: SupportsComponentDiscovery,
+     cache_config: DiffusionCacheConfig,
+     block_adapter: BlockAdapter | None = None,
+     adapter_cls: type[CachedAdapter] | None = None,
++    get_pipeline_transformer: Callable[[SupportsComponentDiscovery], nn.Module] = _default_get_pipeline_transformer,
+ ) -> RefreshCacheContextFunc:
+     """Enable Cache-DiT for a standard single-transformer DiT pipeline."""
+ 
+@@ -98,7 +124,7 @@ def enable_cache_for_dit(
+         db_cache_config.max_warmup_steps,
+     )
+ 
+-    transformer = _default_get_pipeline_transformer(pipeline)
++    transformer = get_pipeline_transformer(pipeline)
+     cache_target = transformer if block_adapter is None else block_adapter
+     if adapter_cls is not None:
+         adapter_cls.apply(
+@@ -128,13 +154,16 @@ def enable_cache_for_dit(
+             calibrator_config=calibrator_config,
+         )
+ 
+-    return _build_cache_context_refresh(cache_config)
++    return _build_cache_context_refresh(cache_config, get_pipeline_transformer)
+ 
+ 
+-def _maybe_build_block_adapter(pipeline: Any) -> BlockAdapter | None:
++def _maybe_build_block_adapter(
++    pipeline: SupportsComponentDiscovery,
++    get_pipeline_transformer: Callable[[SupportsComponentDiscovery], nn.Module] = _default_get_pipeline_transformer,
++) -> BlockAdapter | None:
+     """Build the model-declared block adapter, when one is configured."""
+ 
+-    transformer = _default_get_pipeline_transformer(pipeline)
++    transformer = get_pipeline_transformer(pipeline)
+     adapter_config: CacheDiTAdapterConfig | None = getattr(transformer, "_cache_dit_adapter_config", None)
+     if adapter_config is None:
+         logger.info(
+@@ -160,10 +189,13 @@ def _maybe_build_block_adapter(pipeline: Any) -> BlockAdapter | None:
+     )
+ 
+ 
+-def _maybe_get_cached_adapter_cls(pipeline: Any) -> type[CachedAdapter] | None:
++def _maybe_get_cached_adapter_cls(
++    pipeline: SupportsComponentDiscovery,
++    get_pipeline_transformer: Callable[[SupportsComponentDiscovery], nn.Module] = _default_get_pipeline_transformer,
++) -> type[CachedAdapter] | None:
+     """Return the custom cached adapter declared by the transformer."""
+ 
+-    transformer = _default_get_pipeline_transformer(pipeline)
++    transformer = get_pipeline_transformer(pipeline)
+     adapter_config: CacheDiTAdapterConfig | None = getattr(transformer, "_cache_dit_adapter_config", None)
+     return None if adapter_config is None else adapter_config.cached_adapter_cls
+ 
+@@ -180,29 +212,37 @@ def __init__(self, cache_config: Any = None):
+             config = cache_config
+ 
+         super().__init__(config)
+-        self._refresh_func: RefreshCacheContextFunc | None = None
++        self._refresh_funcs: list[RefreshCacheContextFunc] = []
+ 
+-    def enable(self, pipeline: Any) -> None:
++    def enable(self, pipeline: SupportsComponentDiscovery) -> None:
+         pipeline_name = type(pipeline).__name__
+         custom_enabler = CUSTOM_DIT_ENABLERS.get(pipeline_name)
+         if custom_enabler is not None:
+             logger.info("Using custom cache-dit enabler for model: %s", pipeline_name)
+-            self._refresh_func = custom_enabler(pipeline, self.config)
++            self._refresh_funcs = [custom_enabler(pipeline, self.config)]
+         else:
+-            block_adapter = _maybe_build_block_adapter(pipeline)
+-            adapter_cls = _maybe_get_cached_adapter_cls(pipeline)
+-            self._refresh_func = enable_cache_for_dit(
+-                pipeline,
+-                self.config,
+-                block_adapter,
+-                adapter_cls,
+-            )
++            self._refresh_funcs = []
++            for name in _dit_module_names(pipeline):
++                get_transformer = _make_pipeline_transformer_getter(name)
++                block_adapter = _maybe_build_block_adapter(pipeline, get_transformer)
++                adapter_cls = _maybe_get_cached_adapter_cls(pipeline, get_transformer)
++                self._refresh_funcs.append(
++                    enable_cache_for_dit(
++                        pipeline,
++                        self.config,
++                        block_adapter,
++                        adapter_cls,
++                        get_transformer,
++                    )
++                )
++            if not self._refresh_funcs:
++                raise ValueError(f"Pipeline {pipeline_name} has no declared DiT modules for Cache-DiT")
+ 
+         self.enabled = True
+         logger.info("Cache-dit enabled successfully on %s", pipeline_name)
+ 
+-    def refresh(self, pipeline: Any, num_inference_steps: int, verbose: bool = True) -> None:
+-        if not self.enabled or self._refresh_func is None:
++    def refresh(self, pipeline: SupportsComponentDiscovery, num_inference_steps: int, verbose: bool = True) -> None:
++        if not self.enabled or not self._refresh_funcs:
+             logger.warning("Cache-dit is not enabled. Cannot refresh cache context.")
+             return
+ 
+@@ -211,7 +251,8 @@ def refresh(self, pipeline: Any, num_inference_steps: int, verbose: bool = True)
+                 "Refreshing cache context for transformer with num_inference_steps: %s",
+                 num_inference_steps,
+             )
+-        self._refresh_func(pipeline, num_inference_steps, verbose)
++        for refresh_func in self._refresh_funcs:
++            refresh_func(pipeline, num_inference_steps, verbose)
+ 
+ 
+ __all__ = [
+diff --git a/vllm_omni/diffusion/data.py b/vllm_omni/diffusion/data.py
+index af205713ef8..065bc5a5d97 100644
+--- a/vllm_omni/diffusion/data.py
++++ b/vllm_omni/diffusion/data.py
+@@ -541,16 +541,15 @@ def resolve_model_class_name(model: str | None, diffusion_load_format: str = "de
+     """
+     from vllm.transformers_utils.config import get_hf_file_to_dict
+ 
++    from vllm_omni.diffusion.utils.hf_utils import get_diffusion_model_index
++
+     if not model:
+         return None
+ 
+     is_lance_subfolder = os.path.basename(str(model).rstrip("/")) in {"Lance_3B", "Lance_3B_Video"}
+ 
+-    # Diffusers models: read _class_name from model_index.json.
+-    try:
+-        model_index = get_hf_file_to_dict("model_index.json", model)
+-    except Exception:
+-        model_index = None
++    # Diffusers models: read _class_name from the pipeline index.
++    model_index = get_diffusion_model_index(model)
+     if model_index is not None:
+         return model_index.get("_class_name")
+     if diffusion_load_format == "diffusers":
+@@ -603,6 +602,10 @@ class OmniDiffusionConfig:
+ 
+     model_class_name: str | None = None
+ 
++    # Optional model-defined startup task. Pipelines may use this to select
++    # task-specific components or weights before serving requests.
++    task_type: str | None = None
++
+     dtype: torch.dtype = torch.bfloat16
+ 
+     model_config: dict[str, Any] = field(default_factory=dict)
+@@ -1143,18 +1146,23 @@ def _looks_like_lance_subfolder(model: str | None) -> bool:
+     def enrich_config(self) -> None:
+         """Load model metadata from HuggingFace and populate config fields.
+ 
+-        Diffusers-style models expose ``model_index.json`` with ``_class_name``.
++        Diffusers-style models expose a pipeline index with ``_class_name``.
+         Non-diffusers models (e.g. Bagel, NextStep) only have ``config.json``,
+         so we fall back to reading that and mapping model_type manually.
+         """
+         from vllm.transformers_utils.config import get_hf_file_to_dict
+ 
++        from vllm_omni.diffusion.utils.hf_utils import get_diffusion_model_index
++
+         # Default model_class_name for diffusers adapter
+         if self.model_class_name is None and self.diffusion_load_format == "diffusers":
+             self.model_class_name = "DiffusersAdapterPipeline"
+ 
+         try:
+-            config_dict = get_hf_file_to_dict("model_index.json", self.model)
++            config_dict = get_diffusion_model_index(
++                self.model,
++                revision=self.revision,
++            )
+             if config_dict is not None:
+                 if self.model_class_name is None:
+                     self.model_class_name = config_dict.get("_class_name", None)
+@@ -1169,7 +1177,7 @@ def enrich_config(self) -> None:
+                         self.diffusers_pipeline_cls = getattr(diffusers, diffusers_pipeline_cls_name)
+                     except (KeyError, AttributeError) as exc:
+                         logger.warning(
+-                            "Could not find valid _class_name for diffusers pipeline in model_index.json: %s. "
++                            "Could not find a valid _class_name in the Diffusers pipeline index: %s. "
+                             "Without the underlying pipeline class the dummy run may omit required inputs.",
+                             exc,
+                         )
+@@ -1182,16 +1190,16 @@ def enrich_config(self) -> None:
+                     else:
+                         self.set_tf_model_config(TransformerConfig())
+             else:
+-                raise FileNotFoundError("model_index.json not found")
++                raise FileNotFoundError("Diffusers pipeline index not found")
+         except (AttributeError, OSError, ValueError, FileNotFoundError):
+             # Skip transformer config loading for diffusers adapter
+             # (non-DiT models don't have a separate transformer folder/config)
+             if self.diffusion_load_format == "diffusers":
+                 self.set_tf_model_config(TransformerConfig())
+                 logger.warning(
+-                    "Could not find valid model_index.json per diffusers format. "
++                    "Could not find a valid pipeline index per Diffusers format. "
+                     "This model is likely unsupported by the diffusers backend. "
+-                    "Also, without knowing the underlying diffusers pipeline class from model_index.json, "
++                    "Also, without knowing the underlying pipeline class from its index, "
+                     "the dummy run will input only text prompt, which may cause errors for pipelines "
+                     "that require additional inputs."
+                 )
+@@ -1207,7 +1215,7 @@ def enrich_config(self) -> None:
+                         self.set_tf_model_config(TransformerConfig())
+                         self.update_multimodal_support()
+                         return
+-                    raise ValueError(f"Could not find config.json or model_index.json for model {self.model}")
++                    raise ValueError(f"Could not find config.json or a Diffusers pipeline index for {self.model}")
+ 
+                 self.set_tf_model_config(TransformerConfig.from_dict(cfg))
+                 model_type = cfg.get("model_type")
+diff --git a/vllm_omni/diffusion/lora/manager.py b/vllm_omni/diffusion/lora/manager.py
+index 2fcf43b6e31..9098fec2a72 100644
+--- a/vllm_omni/diffusion/lora/manager.py
++++ b/vllm_omni/diffusion/lora/manager.py
+@@ -366,8 +366,8 @@ def _matches_target(module_name: str) -> bool:
+             fully_sharded_loras=False,
+         )
+ 
+-        # Default denoising components plus any a pipeline opts into via
+-        # ``_lora_components`` (opt-in; other pipelines unchanged).
++        # Default denoising components, declared DiT components, and any a
++        # pipeline opts into via ``_lora_components``.
+         #
+         # NOTE: SDXL-style pipelines expose the denoiser as ``unet``.
+         # Without scanning this component, adapters can load/activate while
+@@ -379,8 +379,10 @@ def _matches_target(module_name: str) -> bool:
+             "bagel",
+             "unet",
+         )
++        declared_components = tuple(getattr(self.pipeline, "_dit_modules", ()) or ())
+         extra_components = tuple(getattr(self.pipeline, "_lora_components", ()) or ())
+-        for component_name in (*default_components, *extra_components):
++        component_names = dict.fromkeys((*default_components, *declared_components, *extra_components))
++        for component_name in component_names:
+             if not hasattr(self.pipeline, component_name):
+                 continue
+             component = getattr(self.pipeline, component_name)
+diff --git a/vllm_omni/diffusion/model_metadata.py b/vllm_omni/diffusion/model_metadata.py
+index 22c9a273775..03efc1ec527 100644
+--- a/vllm_omni/diffusion/model_metadata.py
++++ b/vllm_omni/diffusion/model_metadata.py
+@@ -42,6 +42,13 @@ class DiffusionModelMetadata:
+         max_multimodal_image_inputs=9,
+         supports_mixed_reference_inputs=True,
+     ),
++    # The modular alias is served by MiniMaxH3Pipeline and has the same
++    # Ref2VA request contract. Keep admission limits in sync with it.
++    "MiniMaxH3ModularPipeline": DiffusionModelMetadata(
++        supports_multimodal_inputs=True,
++        max_multimodal_image_inputs=9,
++        supports_mixed_reference_inputs=True,
++    ),
+     "WanPipeline": DiffusionModelMetadata(attention_mask_free=True),
+     "WanImageToVideoPipeline": DiffusionModelMetadata(attention_mask_free=True),
+     "WanVACEPipeline": DiffusionModelMetadata(attention_mask_free=True),
+diff --git a/vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py b/vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py
+index 9923b8d1cde..9d0dcda9381 100644
+--- a/vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py
++++ b/vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py
+@@ -9,6 +9,7 @@
+ import tempfile
+ from collections.abc import Iterable, Mapping, Sequence
+ from contextlib import contextmanager
++from itertools import groupby
+ from pathlib import Path
+ from typing import Any, ClassVar
+ 
+@@ -43,6 +44,9 @@
+ )
+ from vllm_omni.diffusion.worker.request_batch import DiffusionRequestBatch
+ from vllm_omni.errors import OmniClientError
++from vllm_omni.model_executor.model_loader.weight_utils import (
++    download_weights_from_hf_specific,
++)
+ from vllm_omni.platforms import current_omni_platform
+ 
+ from .condition_noise import (
+@@ -106,6 +110,57 @@
+ MINIMAX_H3_REFERENCE_IMAGE_FORMATS = frozenset({"jpeg", "png", "webp", "heic", "heif"})
+ MINIMAX_H3_MIN_OUTPUT_SECONDS = 4.0
+ MINIMAX_H3_MAX_OUTPUT_SECONDS = 15.0
++MINIMAX_H3_DOWNLOAD_PATTERNS = [
++    "FL2VA/**",
++    "Ref2VA/model_index.json",
++    "Ref2VA/transformer/**",
++]
++MINIMAX_H3_TASK_DOWNLOAD_PATTERNS = {
++    "fl2va": ["FL2VA/**"],
++    "ref2va": ["Ref2VA/**"],
++}
++
++
++def _minimax_h3_partition_for_task(
++    task_type: str | None,
++    model: str | None = None,
++) -> str:
++    task = str(task_type or "auto").lower()
++    if task == "auto" and model is not None:
++        path = Path(model)
++        if path.is_dir() and path.name in {"FL2VA", "Ref2VA"} and (path / "model_index.json").is_file():
++            return path.name.lower()
++    if task in {"auto", "combined"}:
++        return "combined"
++    if task in {"t2va", "fl2va"}:
++        return "fl2va"
++    if task == "ref2va":
++        return "ref2va"
++    raise ValueError(f"MiniMax-H3 task_type must be one of auto, t2va, fl2va, or ref2va; got {task_type!r}")
++
++
++def _resolve_minimax_h3_model_root(
++    model: str,
++    revision: str | None,
++    partition: str,
++) -> Path:
++    path = Path(model)
++    if path.is_dir():
++        if path.name in {"FL2VA", "Ref2VA"} and (path / "model_index.json").is_file():
++            return path.parent
++        return path
++    allow_patterns = (
++        MINIMAX_H3_DOWNLOAD_PATTERNS if partition == "combined" else MINIMAX_H3_TASK_DOWNLOAD_PATTERNS[partition]
++    )
++    return Path(
++        download_weights_from_hf_specific(
++            model_name_or_path=model,
++            cache_dir=None,
++            allow_patterns=allow_patterns,
++            revision=revision,
++            require_all=True,
++        )
++    )
+ 
+ 
+ def _resolve_component_quant_config(quant_config, component: str):
+@@ -455,11 +510,7 @@ class MiniMaxH3Pipeline(
+ ):
+     """CFG-distilled joint video/audio generation for MiniMax H3."""
+ 
+-    _dit_modules: ClassVar[list[str]] = ["transformer"]
+-    # TODO(offload): Reconcile this static plan with the modular H3 pipeline
+-    # (#5720). Its combined mode has ``transformer`` and ``transformers_ref``;
+-    # build the resident/staging plan from the selected task partition so a
+-    # consumer-GPU single-task server never stages both DiTs.
++    _dit_modules: ClassVar[list[str]] = ["transformer", "transformers_ref"]
+     _encoder_modules: ClassVar[list[str]] = ["text_encoder"]
+     _vae_modules: ClassVar[list[str]] = ["video_vae", "audio_vae"]
+     _offload_plan: ClassVar[OffloadPlan] = OffloadPlan(
+@@ -498,24 +549,64 @@ def __init__(
+         if int(self.parallel_config.cfg_parallel_size) != 1:
+             raise ValueError("MiniMax-H3 is CFG-distilled and has no negative branch; cfg_parallel_size must be 1")
+         self.device = get_local_device()
+-        model_path = str(od_config.model)
+-        model_index = json.loads((Path(model_path) / "model_index.json").read_text(encoding="utf-8"))
++        self.partition = _minimax_h3_partition_for_task(
++            getattr(od_config, "task_type", None),
++            str(od_config.model),
++        )
++        model_root = _resolve_minimax_h3_model_root(
++            str(od_config.model),
++            od_config.revision,
++            self.partition,
++        )
++        model_path = model_root / ("Ref2VA" if self.partition == "ref2va" else "FL2VA")
++        model_index = json.loads((model_path / "model_index.json").read_text(encoding="utf-8"))
+         release = model_index.get("_minimax_h3") or {}
+-        self.partition = str(release.get("partition", ""))
+-        self.supported_tasks = frozenset(release.get("tasks") or ())
++        partition = str(release.get("partition", "")).lower()
++        expected_partition = "ref2va" if self.partition == "ref2va" else "fl2va"
++        if partition != expected_partition:
++            raise ValueError(f"invalid MiniMax-H3 {expected_partition} partition at {model_path}")
++
++        supported_tasks = {str(task).lower() for task in release.get("tasks", [])}
++        if not supported_tasks:
++            supported_tasks = {"ref2va"} if partition == "ref2va" else {"t2va", "fl2va"}
++        ref2va_model_path = None
++        if self.partition == "combined":
++            ref2va_model_path = model_root / "Ref2VA"
++            ref2va_index_path = ref2va_model_path / "model_index.json"
++            if not ref2va_index_path.is_file():
++                raise ValueError(f"Ref2VA partition not found at {ref2va_model_path}")
++            ref2va_index = json.loads(ref2va_index_path.read_text(encoding="utf-8"))
++            ref2va_release = ref2va_index.get("_minimax_h3") or {}
++            if str(ref2va_release.get("partition", "")).lower() != "ref2va":
++                raise ValueError(f"invalid MiniMax-H3 ref2va partition at {ref2va_model_path}")
++            supported_tasks.update(str(task).lower() for task in ref2va_release.get("tasks", ["ref2va"]))
++
++        self.supported_tasks = frozenset(supported_tasks)
+         shifts = release.get("sigma_shift_scales") or {}
+         self.default_video_shift = float(shifts.get("video", 12.0))
+         self.default_audio_shift = float(shifts.get("audio", 3.0))
+ 
+         self.weights_sources = [
+             DiffusersPipelineLoader.ComponentSource(
+-                model_or_path=model_path,
++                model_or_path=str(model_path),
+                 subfolder="transformer",
+                 revision=od_config.revision,
+                 prefix="transformer.",
+                 fall_back_to_pt=False,
+             )
+         ]
++        self._dit_modules = ["transformer"]
++        if ref2va_model_path is not None:
++            self.weights_sources.append(
++                DiffusersPipelineLoader.ComponentSource(
++                    model_or_path=str(ref2va_model_path),
++                    subfolder="transformer",
++                    revision=od_config.revision,
++                    prefix="transformers_ref.",
++                    fall_back_to_pt=False,
++                )
++            )
++            self._dit_modules.append("transformers_ref")
+         transformer_quant_config = _resolve_component_quant_config(
+             od_config.quantization_config,
+             "transformer",
+@@ -524,14 +615,19 @@ def __init__(
+             od_config,
+             quant_config=transformer_quant_config,
+         )
++        if ref2va_model_path is not None:
++            self.transformers_ref = MiniMaxH3DiTModel(
++                od_config,
++                quant_config=transformer_quant_config,
++            )
+ 
+         self.tokenizer = Qwen2TokenizerFast.from_pretrained(
+-            model_path,
++            str(model_path),
+             subfolder="tokenizer",
+             local_files_only=os.path.isdir(model_path),
+         )
+         self.processor = Qwen3VLProcessor.from_pretrained(
+-            model_path,
++            str(model_path),
+             subfolder="processor",
+             local_files_only=os.path.isdir(model_path),
+         )
+@@ -586,16 +682,23 @@ def load_weights(
+         self,
+         weights: Iterable[tuple[str, torch.Tensor]],
+     ) -> set[str]:
+-        prefix = "transformer."
+-
+-        def transformer_weights():
+-            for name, tensor in weights:
+-                if name.startswith(prefix):
+-                    yield name[len(prefix) :], tensor
+-
+-        loaded = self.transformer.load_weights(transformer_weights())
+-        self.transformer.post_load_weights()
+-        loaded_with_prefix = {prefix + name for name in loaded}
++        def source_prefix(item: tuple[str, torch.Tensor]) -> str:
++            name, _ = item
++            prefix = name.partition(".")[0] + "."
++            if prefix in {"transformer.", "transformers_ref."}:
++                return prefix
++            raise ValueError(f"unexpected MiniMax-H3 weight {name!r}")
++
++        loaded_with_prefix: set[str] = set()
++        loaded_prefixes: set[str] = set()
++        for prefix, grouped_weights in groupby(weights, key=source_prefix):
++            if prefix in loaded_prefixes:
++                raise ValueError(f"MiniMax-H3 weight source {prefix!r} is not contiguous")
++            loaded_prefixes.add(prefix)
++            transformer = getattr(self, prefix.removesuffix("."))
++            loaded = transformer.load_weights((name[len(prefix) :], tensor) for name, tensor in grouped_weights)
++            transformer.post_load_weights()
++            loaded_with_prefix.update(prefix + name for name in loaded)
+         # The text encoder and both VAEs load eagerly in ``__init__`` rather
+         # than through ``weights_sources``. Record them for the runner's strict
+         # missing-parameter check.
+@@ -604,14 +707,23 @@ def transformer_weights():
+             loaded_with_prefix.update(f"{component_name}.{name}" for name, _ in component.named_parameters())
+         return loaded_with_prefix
+ 
++    def _transformer_for_task(self, task: str) -> MiniMaxH3DiTModel:
++        if task == "ref2va" and hasattr(self, "transformers_ref"):
++            return self.transformers_ref
++        return self.transformer
++
+     def _resolve_task(
+         self,
+         requested: str | None,
+         multi_modal_data: dict[str, Any],
+     ) -> str:
+         if requested is None:
++            # A Ref2VA-only startup has no FL2VA transformer; preserve its
++            # historical implicit default even for image-only references.
+             if self.partition == "ref2va":
+                 requested = "ref2va"
++            elif multi_modal_data.get("video") is not None or multi_modal_data.get("audio") is not None:
++                requested = "ref2va"
+             elif multi_modal_data.get("image") is not None:
+                 requested = "fl2va"
+             else:
+@@ -1226,14 +1338,14 @@ def _initial_noise(
+         return video_rows, audio_rows
+ 
+     @contextmanager
+-    def _resident_dit_layers_on_device(self):
++    def _resident_dit_layers_on_device(self, *, enabled: bool = True):
+         controller = getattr(self, "_dlo_residency_controller", None)
+-        if controller is not None:
++        if controller is not None and enabled:
+             controller.load_resident_layers()
+         try:
+             yield
+         finally:
+-            if controller is not None:
++            if controller is not None and enabled:
+                 controller.offload_resident_layers()
+ 
+     def diffuse(
+@@ -1357,10 +1469,15 @@ def diffuse(
+             num_steps=num_steps,
+             shift_scale=audio_shift,
+         )
+-        with self._resident_dit_layers_on_device():
++        transformer = self._transformer_for_task(task)
++        # The static DLO plan keeps leading blocks resident only for the
++        # primary ``transformer``. In combined mode ``transformers_ref`` is
++        # fully streamed, so a Ref2VA request must not stage the inactive
++        # FL2VA transformer resident blocks.
++        with self._resident_dit_layers_on_device(enabled=transformer is self.transformer):
+             with self.progress_bar(total=len(video_sigmas) - 1) as progress:
+                 video_rows, audio_rows = minimax_h3_denoise_loop(
+-                    model=self.transformer,
++                    model=transformer,
+                     positive=branch,
+                     initial_video_rows=initial_video,
+                     initial_audio_rows=initial_audio,
+diff --git a/vllm_omni/diffusion/registry.py b/vllm_omni/diffusion/registry.py
+index 6d8f40e0f1f..a45f3bdeeec 100644
+--- a/vllm_omni/diffusion/registry.py
++++ b/vllm_omni/diffusion/registry.py
+@@ -91,6 +91,11 @@
+         "pipeline_minimax_h3",
+         "MiniMaxH3Pipeline",
+     ),
++    "MiniMaxH3ModularPipeline": (
++        "minimax_h3",
++        "pipeline_minimax_h3",
++        "MiniMaxH3Pipeline",
++    ),
+     "StableAudioPipeline": (
+         "stable_audio",
+         "pipeline_stable_audio",
+@@ -427,9 +432,11 @@ def _apply_sequence_parallel_if_enabled(model, od_config: OmniDiffusionConfig) -
+         if sp_size <= 1:
+             return
+ 
+-        # Find transformer model(s) in the pipeline that have _sp_plan
+-        # Include transformer_2 for two-stage models (e.g., Wan MoE)
+-        transformer_attrs = ["transformer", "transformer_2", "dit", "unet"]
++        # Prefer the pipeline's declared DiT components so custom component
++        # names receive the same SP hooks as conventional transformer names.
++        transformer_attrs = getattr(model, "_dit_modules", None)
++        if not transformer_attrs:
++            transformer_attrs = ("transformer", "transformer_2", "dit", "unet")
+         applied_count = 0
+ 
+         for attr in transformer_attrs:
+@@ -508,6 +515,7 @@ def _apply_sequence_parallel_if_enabled(model, od_config: OmniDiffusionConfig) -
+     "LTX2T2VDMD2Pipeline": "get_ltx2_post_process_func",
+     "LTX2I2VDMD2Pipeline": "get_ltx2_post_process_func",
+     "MiniMaxH3Pipeline": "get_minimax_h3_post_process_func",
++    "MiniMaxH3ModularPipeline": "get_minimax_h3_post_process_func",
+     "StableAudioPipeline": "get_stable_audio_post_process_func",
+     "SoulXSingerPipeline": "get_soulxsinger_post_process_func",
+     "SoulXSingerSVCPipeline": "get_soulxsinger_post_process_func",
+diff --git a/vllm_omni/diffusion/utils/hf_utils.py b/vllm_omni/diffusion/utils/hf_utils.py
+index dad02583f08..78d8c653635 100644
+--- a/vllm_omni/diffusion/utils/hf_utils.py
++++ b/vllm_omni/diffusion/utils/hf_utils.py
+@@ -7,6 +7,24 @@
+ 
+ logger = init_logger(__name__)
+ 
++DIFFUSION_MODEL_INDEX_FILES = (
++    "model_index.json",
++    "modular_model_index.json",
++)
++
++
++def get_diffusion_model_index(
++    model_name: str,
++    *,
++    revision: str | None = None,
++) -> dict | None:
++    """Read the first standard Diffusers pipeline index available."""
++    for filename in DIFFUSION_MODEL_INDEX_FILES:
++        config = get_hf_file_to_dict(filename, model_name, revision=revision)
++        if isinstance(config, Mapping):
++            return dict(config)
++    return None
++
+ 
+ def load_diffusers_config(model_name) -> dict:
+     from diffusers.pipelines.pipeline_utils import DiffusionPipeline
+@@ -58,33 +76,32 @@ def is_diffusion_model(model_name: str) -> bool:
+     """Check if a model is a diffusion model.
+ 
+     Uses multiple fallback strategies to detect diffusion models:
+-    1. Check local file system for model_index.json (fastest, no imports)
++    1. Check the local file system for a standard Diffusers index
+     2. Check using vllm's get_hf_file_to_dict utility
+     3. Try the standard diffusers approach (may fail due to import issues)
+     """
+     # Strategy 1: Check local file system first (fastest, avoids import issues)
+     if os.path.isdir(model_name):
+-        model_index_path = os.path.join(model_name, "model_index.json")
+-        if os.path.exists(model_index_path):
++        for filename in DIFFUSION_MODEL_INDEX_FILES:
++            model_index_path = os.path.join(model_name, filename)
++            if not os.path.exists(model_index_path):
++                continue
+             try:
+                 import json
+ 
+                 with open(model_index_path) as f:
+                     config_dict = json.load(f)
+                 if config_dict.get("_class_name") and config_dict.get("_diffusers_version"):
+-                    logger.debug("Detected diffusion model via local model_index.json")
++                    logger.debug("Detected diffusion model via local %s", filename)
+                     return True
+             except Exception as e:
+-                logger.debug("Failed to read local model_index.json: %s", e)
++                logger.debug("Failed to read local %s: %s", filename, e)
+ 
+     # Strategy 2: Check using vllm's utility (works for both local and remote models)
+-    try:
+-        config_dict = get_hf_file_to_dict("model_index.json", model_name)
+-        if config_dict is not None and config_dict.get("_class_name") and config_dict.get("_diffusers_version"):
+-            logger.debug("Detected diffusion model via model_index.json")
+-            return True
+-    except Exception as e:
+-        logger.debug("Failed to check model_index.json via get_hf_file_to_dict: %s", e)
++    config_dict = get_diffusion_model_index(model_name)
++    if config_dict is not None and config_dict.get("_class_name") and config_dict.get("_diffusers_version"):
++        logger.debug("Detected diffusion model via a standard Diffusers index")
++        return True
+ 
+     # Strategy 3: Try the standard diffusers approach (may fail due to import issues)
+     # This is last because it requires importing diffusers/xformers/flash_attn
+diff --git a/vllm_omni/diffusion/worker/diffusion_model_runner.py b/vllm_omni/diffusion/worker/diffusion_model_runner.py
+index 3255e59db39..2e8111a31cb 100644
+--- a/vllm_omni/diffusion/worker/diffusion_model_runner.py
++++ b/vllm_omni/diffusion/worker/diffusion_model_runner.py
+@@ -280,8 +280,11 @@ def get_memory_context() -> AbstractContextManager[Any]:
+                             exc,
+                         )
+                 else:
+-                    self._compile_transformer("transformer")
+-                    self._compile_transformer("transformer_2")
++                    transformer_attrs = getattr(self.pipeline, "_dit_modules", None)
++                    if not transformer_attrs:
++                        transformer_attrs = ("transformer", "transformer_2")
++                    for attr_name in transformer_attrs:
++                        self._compile_transformer(attr_name)
+             else:
+                 logger.warning(
+                     "Model runner: Platform %s does not support torch inductor, skipping torch.compile.",
+diff --git a/vllm_omni/engine/arg_utils.py b/vllm_omni/engine/arg_utils.py
+index 8f2fc6ef53b..633eec4366b 100644
+--- a/vllm_omni/engine/arg_utils.py
++++ b/vllm_omni/engine/arg_utils.py
+@@ -140,8 +140,9 @@ class OmniEngineArgs(EngineArgs):
+         stage_connector_spec: Extra configuration for stage connector
+         async_chunk: If set to True, perform async chunk
+         worker_type: Model Type, e.g., "ar" or "generation"
+-        task_type: Default task type for TTS models (CustomVoice, VoiceDesign, or Base).
+-            If not specified, will be inferred from model path.
++        task_type: Model-defined startup task type. Consumers validate the
++            supported values and decide whether it selects request behavior,
++            task-specific weights, or both.
+         omni_master_address: TCP address that the OmniMasterServer (running
+             inside AsyncOmniEngine) listens on for engine core registrations.
+             Required when single-stage mode is active.
+diff --git a/vllm_omni/engine/async_omni_engine.py b/vllm_omni/engine/async_omni_engine.py
+index 2856674db53..c938d0757b6 100644
+--- a/vllm_omni/engine/async_omni_engine.py
++++ b/vllm_omni/engine/async_omni_engine.py
+@@ -1019,6 +1019,7 @@ def _create_default_diffusion_stage_cfg(kwargs: dict[str, Any]) -> list:
+             "max_num_seqs": kwargs.get("max_num_seqs") or 1,
+             "parallel_config": parallel_config,
+             "model_class_name": kwargs.get("model_class_name", None),
++            "task_type": kwargs.get("task_type", None),
+             "model_config": kwargs.get("model_config", None),
+             "additional_config": kwargs.get("additional_config", None),
+             "step_execution": kwargs.get("step_execution", False),
+diff --git a/vllm_omni/entrypoints/cli/serve.py b/vllm_omni/entrypoints/cli/serve.py
+index 3671eff2b33..51db3e1e423 100644
+--- a/vllm_omni/entrypoints/cli/serve.py
++++ b/vllm_omni/entrypoints/cli/serve.py
+@@ -213,9 +213,10 @@ def subparser_init(self, subparsers: argparse._SubParsersAction) -> TrackingArgu
+             "--task-type",
+             type=str,
+             default=None,
+-            choices=["CustomVoice", "VoiceDesign", "Base"],
+-            help="Default task type for TTS models (CustomVoice, VoiceDesign, or Base). "
+-            "If not specified, will be inferred from model path.",
++            help="Model-defined startup task type. The selected model validates "
++            "supported values; for example, TTS models accept CustomVoice, "
++            "VoiceDesign, or Base, while diffusion models may use it to select "
++            "task-specific weights. If omitted, the model default is used.",
+         )
+         # Forced aligner / word timestamps. --forced-aligner is the opt-in
+         # toggle; heavier knobs (gpu_memory_utilization, dtype, max_model_len)
+diff --git a/vllm_omni/entrypoints/omni_base.py b/vllm_omni/entrypoints/omni_base.py
+index 55ebffa0271..3cae336618e 100644
+--- a/vllm_omni/entrypoints/omni_base.py
++++ b/vllm_omni/entrypoints/omni_base.py
+@@ -9,6 +9,7 @@
+ import huggingface_hub
+ import vllm.envs as envs
+ from vllm.logger import init_logger
++from vllm.transformers_utils.repo_utils import file_or_path_exists
+ from vllm.v1.engine.exceptions import EngineDeadError, EngineGenerateError
+ 
+ from vllm_omni.engine.async_omni_engine import AsyncOmniEngine
+@@ -73,6 +74,16 @@ def omni_snapshot_download(model_id: str) -> str:
+ 
+         return snapshot_download(model_id)
+ 
++    # Modular Diffusers repositories describe independently loadable
++    # components. Let the selected pipeline download only its component
++    # sources instead of eagerly materializing the entire repository.
++    try:
++        if file_or_path_exists(model_id, "modular_model_index.json", revision=None):
++            return model_id
++    except (huggingface_hub.errors.GatedRepoError, huggingface_hub.errors.RepositoryNotFoundError):
++        # Preserve the more helpful errors raised by the full-download path.
++        pass
++
+     try:
+         download_weights_from_hf_specific(
+             model_name_or_path=model_id,
+diff --git a/vllm_omni/entrypoints/utils.py b/vllm_omni/entrypoints/utils.py
+index dab544d626a..8a8f34c153e 100644
+--- a/vllm_omni/entrypoints/utils.py
++++ b/vllm_omni/entrypoints/utils.py
+@@ -16,7 +16,10 @@
+ from vllm_omni.config.pipeline_registry import OMNI_PIPELINES
+ from vllm_omni.config.stage_config import _DEPLOY_DIR
+ from vllm_omni.config.yaml_util import create_config, load_yaml_config, merge_configs
+-from vllm_omni.diffusion.utils.hf_utils import _looks_like_dreamzero
++from vllm_omni.diffusion.utils.hf_utils import (
++    _looks_like_dreamzero,
++    get_diffusion_model_index,
++)
+ from vllm_omni.entrypoints.stage_utils import _to_dict
+ from vllm_omni.inputs.data import OmniSamplingParams
+ from vllm_omni.platforms import current_omni_platform
+@@ -74,9 +77,9 @@ def _try_get_class_name_from_diffusers_config(model: str) -> str | None:
+     Returns:
+         Model type string if found, None otherwise
+     """
+-    model_index = get_hf_file_to_dict("model_index.json", model, revision=None)
++    model_index = get_diffusion_model_index(model)
+     if model_index and isinstance(model_index, dict) and "_class_name" in model_index:
+-        logger.debug(f"Found model_type '{model_index['_class_name']}' in model_index.json")
++        logger.debug(f"Found Diffusers model type '{model_index['_class_name']}'")
+         return model_index["_class_name"]
+ 
+     return None
+@@ -278,12 +281,12 @@ def resolve_model_config_path(model: str) -> str | None:
+         model_type = hf_config.model_type
+     except (ValueError, Exception):
+         # If standard transformers format fails, try diffusers format
+-        if file_or_path_exists(model, "model_index.json", revision=None):
++        if get_diffusion_model_index(model) is not None:
+             model_type = _try_get_class_name_from_diffusers_config(model)
+             if model_type is None:
+                 raise ValueError(
+                     f"Could not determine model_type for diffusers model: {model}. "
+-                    f"Please ensure the model has 'model_type' in transformer/config.json or model_index.json"
++                    "Please ensure its Diffusers pipeline index contains '_class_name'"
+                 )
+         elif file_or_path_exists(model, "config.json", revision=None):
+             # Try to read config.json manually for custom models like Bagel that fail get_config
+@@ -308,7 +311,7 @@ def resolve_model_config_path(model: str) -> str | None:
+             if model_type is None:
+                 raise ValueError(
+                     f"Could not determine model_type for model: {model}. "
+-                    f"Model is not in standard transformers format and does not have model_index.json. "
++                    "Model is not in standard transformers or Diffusers format. "
+                     f"Please ensure the model has proper configuration files with 'model_type' field"
+                 )
+ 

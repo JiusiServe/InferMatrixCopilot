@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.22,
+    "precision": 0.64,
+    "actionability": 0.82,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.08,
+    "precision": 0.55,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X recognizes the HTTP native-speed validation change and the failing AMD gate, while offering several concrete, plausibly valid test-coverage findings. Y is highly actionable but largely pursues speculative concerns outside the ground truth and misses the benchmark, profiling, WebSocket, and validation-consistency concerns.",
+  "_usage": {
+    "input": 3,
+    "output": 1564
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "copilot_v13_mimo_wave2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_mimo_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_mimo_wave2",
+    "arm_a_sha256": "e80f980ecc3f3ec97591b635a032c17715bc4075672176da84691fc5319dc47c",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

@@ -1,5 +1,5 @@
 """Provider registry: selection, harness targets, the HarnessLLM adapter, and
-the run_harness_step seam (doc/RFC-provider-registry.md)."""
+the run_harness_step seam (doc/features/provider-registry.md)."""
 
 from types import SimpleNamespace
 
@@ -52,10 +52,18 @@ def test_unknown_backend_rejected_at_startup():
         _settings(strict_backend="not-a-backend")
 
 
-def test_unshipped_backends_name_their_milestone():
-    with pytest.raises(NotImplementedError, match="M2"):
-        transport_for(_settings(strict_backend="claude-code"))
-    with pytest.raises(NotImplementedError, match="M3"):
+def test_every_harness_id_resolves_a_transport():
+    for backend in ("cursor", "claude-code", "codex"):
+        transport = transport_for(_settings(strict_backend=backend))
+        assert transport.spec.id == backend
+        assert transport.spec.kind == "harness"
+
+
+def test_unshipped_mechanism_names_the_milestone(monkeypatch):
+    from infermatrix_copilot.providers import registry
+
+    monkeypatch.setitem(registry._UNSHIPPED, "codex", "M9")
+    with pytest.raises(NotImplementedError, match="M9"):
         transport_for(_settings(strict_backend="codex"))
 
 
@@ -158,3 +166,36 @@ def test_run_harness_step_writes_bridge_spec_and_delegates(tmp_path, monkeypatch
     assert req.timeout_s == 42.0
     assert req.bridge_spec_path is not None and req.bridge_spec_path.is_file()
     assert req.bridge_spec_path.parent == tmp_path / "bridge"
+
+
+def test_run_harness_step_pins_explicit_provider_and_model(tmp_path, monkeypatch):
+    """The MoA harness-member path: provider_id/model select an explicit
+    transport and model, independent of the run's STRICT_BACKEND."""
+    from infermatrix_copilot.providers import registry as reg
+
+    transport = FakeTransport()
+    seen = {}
+
+    def fake_for_id(settings, provider_id):
+        seen["provider_id"] = provider_id
+        return transport
+
+    monkeypatch.setattr(reg, "transport_for_id", fake_for_id)
+    monkeypatch.setattr(
+        providers, "transport_for",
+        lambda s: (_ for _ in ()).throw(AssertionError(
+            "default transport must not be consulted when provider_id set")))
+    settings = _settings()  # api-backed run
+    ctx = SimpleNamespace(settings=settings,
+                          state={"task_spec": {"repo": "vllm-omni"}},
+                          run_dir=tmp_path, trace=None)
+    target = settings.tier_target("eco")
+
+    outcome = providers.run_harness_step(
+        ctx, target, step_name="agent.review_diff#lens1",
+        system="SYS", prompt="P", scope=read_only_scope(), max_iters=3,
+        provider_id="cursor", model="composer-2.5")
+
+    assert outcome.text == '{"status": "success"}'
+    assert seen["provider_id"] == "cursor"
+    assert transport.calls[0].model == "composer-2.5"

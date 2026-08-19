@@ -17,6 +17,7 @@ Outputs (resumable — existing non-empty .md files are skipped):
 """
 from __future__ import annotations
 
+import gzip
 import json
 import subprocess
 import uuid
@@ -52,7 +53,8 @@ OUT = HERE / "arms" / _os.environ.get("ARM_OUT", "copilot_v2")
 RUN_ROOT = Path.home() / ".infermatrix-copilot" / "runs"
 CLI = _os.environ.get("OMNI_CLI") or _shutil.which("infermatrix-copilot") or "infermatrix-copilot"
 CWD = HERE.parent.parent  # repo root, where .env lives
-SPLIT_ORDER = {"val": 0, "train": 1, "test": 2}
+SPLIT_ORDER = {"val": 0, "train": 1, "test": 2, "holdout": 3, "holdout3": 4,
+               "holdout4": 5, "holdout5": 6}
 
 
 def _find_run_dir(private_root: Path, kind: str, n: int) -> Path | None:
@@ -139,8 +141,12 @@ def one(kind: str, n: int, split: str) -> str:
             if gap < 0.5:
                 time.sleep(0.5 - gap)
             _last_start[0] = time.time()
+        # harness-backend runs chain many vendor-CLI sessions per item and can
+        # legitimately exceed the api-backend default — ARM_TIMEOUT_S raises it
         proc = subprocess.run([CLI, "-p", prompt, "--yes"], capture_output=True,
-                              text=True, timeout=3000, cwd=str(CWD), env=env)
+                              text=True,
+                              timeout=int(os.environ.get("ARM_TIMEOUT_S", "3000")),
+                              cwd=str(CWD), env=env)
         # the LLM-only intent parser occasionally returns a clarify instead of
         # a TaskSpec ("I couldn't parse that") — nondeterministic; retry.
         if "couldn't parse" in proc.stdout:
@@ -214,6 +220,14 @@ def main() -> None:
     kinds = [k for k in (_os.environ.get("KINDS") or
                          "pr_review,issue_answer").split(",") if k]
     items = ([("pr_review", i["pr"], i["split"]) for i in d["pr_review"]]
+             + [("pr_review", i["pr"], i["split"])
+                for i in (d.get("pr_review_wave2") or [])]
+             + [("pr_review", i["pr"], i["split"])
+                for i in (d.get("pr_review_wave3") or [])]
+             + [("pr_review", i["pr"], i["split"])
+                for i in (d.get("pr_review_wave4") or [])]
+             + [("pr_review", i["pr"], i["split"])
+                for i in (d.get("pr_review_wave5") or [])]
              + [("issue_answer", i["issue"], i["split"]) for i in d["issue_answer"]])
     items = [t for t in items if t[2] in want and t[0] in kinds]
     if only:
@@ -229,9 +243,23 @@ def main() -> None:
                   ("AGENT_TRACE", "AGENT_TRACE_IO", "AGENT_TRACE_IO_FULL")},
         "moa_when": _os.environ.get("MOA_WHEN", "(default)"),
         "pr_context_mode": _os.environ.get("PR_CONTEXT_MODE", "(default)"),
+        # RESOLVED settings, not the env strings above. On 2026-08-17 this
+        # manifest recorded moa_when "(default)" while the resolved value was
+        # "full", and a whole 15-item probe ran as a three-vendor mixture
+        # unnoticed. Provenance that records the INPUT cannot detect a default
+        # that changed underneath it.
+        "resolved": _resolved_settings(),
     }, indent=2))
     print(f"[copilot-arm] {len(items)} items -> {OUT}", flush=True)
-    with ThreadPoolExecutor(max_workers=2) as ex:
+    for gap in _preflight_gaps():
+        print(f"[copilot-arm] PREFLIGHT: {gap}", flush=True)
+        return 2
+    # ARM_JOBS: item-level concurrency. Historical default 2 predates knowing
+    # the endpoint's real limits (deepseek-v4-pro allows 500 concurrent
+    # requests; one item peaks at ~15 in-flight calls) — a full split can run
+    # wide. Item starts are already staggered; RUN_ROOT is private per item.
+    with ThreadPoolExecutor(
+            max_workers=int(_os.environ.get("ARM_JOBS", "2"))) as ex:
         futs = {ex.submit(one, *t): t for t in items}
         for f in as_completed(futs):
             try:
@@ -245,8 +273,166 @@ def main() -> None:
     print(f"[copilot-arm] trace gate: {checked} packed trace(s) verified", flush=True)
     for p in problems:
         print(f"[copilot-arm]   {p}", flush=True)
+    routing_problems = _verify_routed_seats(OUT)
+    for p in routing_problems:
+        print(f"[copilot-arm]   {p}", flush=True)
     print("[copilot-arm] sweep complete", flush=True)
-    return 1 if problems else 0
+    return 1 if (problems or routing_problems) else 0
+
+
+def _resolved_settings() -> dict:
+    """The settings that will actually govern this sweep, resolved.
+
+    Env-string provenance is not provenance: `MOA_WHEN` unset reads as
+    "(default)" in a manifest while resolving to "full" in the code, which is
+    how a DeepSeek-only arm silently became a mimo/qwen mixture on 12 of 15
+    items (2026-08-17). Recording the resolved values makes the same mistake
+    visible in the artifact rather than three hours later in a trace scan.
+    """
+    try:
+        import sys as _sys
+
+        _sys.path.insert(0, str(CWD / "src"))
+        from infermatrix_copilot.config import Settings
+
+        s = Settings()
+        members = [m.get("model") for m in
+                   ((s.llm_mixture or {}).get("members") or [])
+                   if isinstance(m, dict)]
+        return {
+            "moa_when": s.moa_when,
+            "moa_eligible_full_depth_pr": s.moa_when in ("always", "full"),
+            "llm_mixture_members": members,
+            "strict_backend": s.strict_backend or "api",
+            "strict_backend_model": s.strict_backend_model,
+            "review_lens_backends": dict(s.review_lens_backends or {}),
+            "agent_model": s.agent_model,
+            "review_planner_model": getattr(s, "review_planner_model", ""),
+            "review_promotion_model": getattr(s, "review_promotion_model", ""),
+        }
+    except Exception as exc:  # noqa: BLE001 — provenance must never block a run
+        return {"error": f"could not resolve settings: {type(exc).__name__}: {exc}"}
+
+
+def _preflight_gaps() -> list[str]:
+    """Refuse to start a sweep that is already known to fail.
+
+    Two 402 Insufficient Balance events in three days (2026-08-15 wave-4
+    replicate 2, 2026-08-17 v17ds) each converted an empty account into
+    contaminated artifacts: rc=3 stubs that the pipeline judged as zeros and
+    that had to be found and quarantined afterwards. A refusal to start is
+    strictly cheaper than that cleanup.
+    """
+    gaps: list[str] = []
+    key = ""
+    for line in (CWD / ".env").read_text(errors="ignore").splitlines() \
+            if (CWD / ".env").is_file() else []:
+        if line.startswith("ANTHROPIC_API_KEY="):
+            key = line.split("=", 1)[1].strip().strip('"').strip("'")
+    if not key:
+        return gaps  # nothing to check against; let the run surface it
+    try:
+        import urllib.request
+
+        req = urllib.request.Request(
+            "https://api.deepseek.com/user/balance",
+            headers={"Authorization": f"Bearer {key}"})
+        data = json.loads(urllib.request.urlopen(req, timeout=20).read())
+    except Exception:  # noqa: BLE001 — a probe outage must not block a sweep
+        return gaps
+    if not data.get("is_available", True):
+        gaps.append("DeepSeek account reports is_available=false — top up "
+                    "before spending a sweep (this is the failure that "
+                    "produced rc=3 stubs twice)")
+    for info in data.get("balance_infos") or []:
+        if info.get("currency") == "CNY":
+            try:
+                if float(info.get("total_balance", 0)) < 20:
+                    gaps.append(
+                        f"DeepSeek balance is only {info['total_balance']} CNY "
+                        "— a full split costs ~10-15 CNY per 10 items; refusing "
+                        "to start a sweep that may die halfway")
+            except (TypeError, ValueError):
+                pass
+    return gaps
+
+
+def _verify_no_unintended_mixture(out_dir: Path) -> list[str]:
+    """Report any MoA member that actually served a lens.
+
+    The routed-seat gate below only inspects `REVIEW_LENS_BACKENDS`, so the
+    mixture-of-agents path walked straight past it: on 2026-08-17 an arm
+    labelled DeepSeek-only dispatched round-1 lenses to mimo-v2.5 and
+    qwen3.6-plus on 12 of 15 items, and nothing in the sweep noticed. An arm
+    that ran a vendor its label does not name is not the arm it claims to be,
+    whatever the deltas say.
+
+    Reports rather than fails: a deliberate MoA arm is legitimate, it just
+    has to be visible in the sweep output instead of discoverable only by
+    grepping traces afterwards.
+    """
+    out: list[str] = []
+    for gz in sorted(out_dir.glob("pr*.trace.json.gz")):
+        stem = gz.name.split(".")[0]
+        try:
+            packed = json.loads(gzip.open(gz).read())
+            events = [e for run in packed["streams"]["runs"]
+                      for e in (run.get("run_trace") or [])]
+        except Exception:  # noqa: BLE001 — the trace gate reports unreadables
+            continue
+        members = sorted({str(e.get("model")) for e in events
+                          if e.get("kind") == "agent_dispatch" and e.get("model")
+                          and str(e.get("model")) != _os.environ.get(
+                              "STRICT_BACKEND_MODEL", "")})
+        dispatched = [e for e in events if e.get("kind") == "moa_dispatch"]
+        if dispatched:
+            out.append(
+                f"MIXTURE GATE: {stem}: MoA dispatched (MOA_WHEN resolves to "
+                f"{_resolved_settings().get('moa_when')!r}) — models seen: "
+                f"{', '.join(members) or 'none recorded'}. If this arm is "
+                f"labelled single-model, it is mislabelled.")
+    return out
+
+
+def _verify_routed_seats(out_dir: Path) -> list[str]:
+    """Assert that every seat REVIEW_LENS_BACKENDS routed actually produced
+    work, on every item.
+
+    Measured 2026-08-16: a Fable-5 quota exhaustion made each routed session
+    fail at the transport and return a contract-shaped `status: blocked` with
+    zero tokens; the ensemble's zero-yield retry then re-ran the seat on the
+    default backend. The sweep reported success on all 10 items, and an arm
+    whose whole identity was "Fable in two seats" was measured — and briefly
+    reported — with the Fable seats mostly absent. A label this load-bearing
+    has to be checked, not trusted."""
+    problems = _verify_no_unintended_mixture(out_dir)
+    routed = _os.environ.get("REVIEW_LENS_BACKENDS") or ""
+    if not routed.strip():
+        return problems
+    try:
+        seats = sorted(json.loads(routed))
+    except ValueError as exc:
+        return [f"ROUTING GATE: REVIEW_LENS_BACKENDS is not valid JSON: {exc}"]
+    for gz in sorted(out_dir.glob("pr*.trace.json.gz")):
+        stem = gz.name.split(".")[0]
+        try:
+            packed = json.loads(gzip.open(gz).read())
+            events = [e for run in packed["streams"]["runs"]
+                      for e in (run.get("run_trace") or [])]
+        except Exception as exc:  # noqa: BLE001
+            problems.append(f"ROUTING GATE: {stem}: unreadable trace ({exc})")
+            continue
+        for seat in seats:
+            work = [e for e in events
+                    if e.get("kind") == "agent_output"
+                    and str(e.get("step", "")).endswith(f"#{seat}")
+                    and (e.get("tool_calls") or e.get("output_tokens"))]
+            if not work:
+                problems.append(
+                    f"ROUTING GATE: {stem}: routed seat '{seat}' produced no "
+                    f"work — the arm did NOT run the configuration it is "
+                    f"labelled with (check the backend's quota/auth)")
+    return problems
 
 
 if __name__ == "__main__":

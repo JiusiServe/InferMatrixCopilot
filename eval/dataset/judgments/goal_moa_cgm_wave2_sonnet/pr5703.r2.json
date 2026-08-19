@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.65,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates converge on the same core technical issue the human reviewer flagged (the device gating/RNG-fork change at vae.py:170/214/218) and both catch the FL2VA/Ref2VA doc mismatch and missing test coverage, but neither reproduces the ground truth's specific asks (using current_omni_platform.device, or trimming the redundant UT file), capping recall for both. X pads its top finding with a suspiciously staged 'empirically confirmed' terminal transcript with elided commands for exotic hardware (MUSA/XPU) it almost certainly never ran, undercutting trust in its grounding despite the underlying fork_rng device_type claim being technically sound. Y's findings are consistently tagged with concrete grep/file:line evidence (buildkite yaml, pipeline.py call sites, test file contents) reading as genuinely tool-verified rather than narrated, giving it higher precision while matching X's actionability and coverage.",
+  "_cost_usd": 0.3073762,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_moa_cgm"
+  },
+  "_roles": {
+    "arm": "copilot_moa_cgm",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_moa_cgm",
+    "arm_a_sha256": "099e6250178a7191fb82b71880b0879a111d3ab5b4c3d6c39f948b75bdec2418",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "47c759a926d11580522c19149ea99a2b5e0137b0d44702c431e26d95d6161018",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

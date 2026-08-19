@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.72,
+    "actionability": 1.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X fully covers the sole ground-truth concern and gives a precise file/line explanation. Its additional findings are concrete and plausibly grounded, though several concern pre-existing or broader branch issues rather than this narrow diff, reducing precision. Y produced no substantive review.",
+  "_usage": {
+    "input": 3,
+    "output": 444
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v7_goal_r7"
+  },
+  "_roles": {
+    "arm": "copilot_v7_goal_r7",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v7_goal_r7",
+    "arm_a_sha256": "685d113aa6f04a2674765507dba06689c25261383573d356ed7b08289e36619e",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "bc98460632105aef812a50d392afd9f1bea66b3f783e8a9cd888456ce013cba3",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 3
+  }
+}

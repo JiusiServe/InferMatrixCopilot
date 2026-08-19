@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.6,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Neither candidate surfaces the ground truth's actual live concerns (missing profiling/VRAM/baseline evidence, WebSocket-vs-HTTP speed-validation asymmetry, talker-raise library-caller surface, S2Mel/talker duration_factor bound duplication) with precision; X gets partial credit for independently probing the same native-speed/streaming-validation territory (serving_speech.py, protocol/audio.py, stale speech_api.md docs) while Y's only overlap is a surface-level message-wording nit at the same talker line. X's findings (CI marker deselection, connector exception swallowing, PR-scope creep vs stated common-path claims, cache-salt collision) are quote-heavy and directly verifiable against config/CI text, giving higher confidence in groundedness; Y's findings are individually more technically ambitious (uninitialized bias, tensor-concat race on preemption, CPU view aliasing) but rely on longer inferential chains that are harder to trust without direct verification, raising fabrication risk. Both are highly actionable with concrete file/line and suggested fixes, so the difference tips on precision and marginal recall relevance rather than depth or effort.",
+  "_cost_usd": 0.34241920000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v13_moa_cgm",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_moa_cgm",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_moa_cgm",
+    "arm_a_sha256": "510c9baf33573fe2b4c87a09f0acb68f3d2db76489969ea19bed869ab9b2bd9c",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

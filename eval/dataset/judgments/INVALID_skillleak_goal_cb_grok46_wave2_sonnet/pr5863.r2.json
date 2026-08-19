@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently corroborate several real issues (numactl flags misrepresented as server flags, the unschemad audio_reference file, nvidia-smi vs X-Peak-Memory-MB metric confusion, missing README catalog row), giving X's narrower set of 4 findings high precision and actionability. Y covers all of those plus a genuinely strong diff-grounded catch (the memory-model section attributes the HBM reduction solely to Ulysses degree while text-encoder-tp-size scales in lockstep in the same table, making the fit unidentifiable) and engages substantively with Ref2VA's untested/OOM-risk status, which is the closest either gets to the ground-truth reviewer's Ref2VA concern. Neither candidate addresses the GT's literal points since both were already resolved in this diff revision (validation table filled in, Ref2VA honestly marked unmeasured), so recall is low for both, but Y's Ref2VA reliability analysis edges it out.",
+  "_cost_usd": 0.40336720000000004,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46",
+    "arm_a_sha256": "c4b87a12e1d6e3ccf9e6c5b5af5a2ab61a5e56d1baf23b511c6c721975cf02c8",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "726725524751ffed003542c0fd4e00bb3f74ef77a200d776d40628016c5bdd21",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

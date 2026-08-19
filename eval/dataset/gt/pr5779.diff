@@ -1,0 +1,716 @@
+diff --git a/docs/user_guide/diffusion/attention_backends.md b/docs/user_guide/diffusion/attention_backends.md
+index 54e5ae8e379..7dc35b36756 100644
+--- a/docs/user_guide/diffusion/attention_backends.md
++++ b/docs/user_guide/diffusion/attention_backends.md
+@@ -14,7 +14,7 @@ The full set of backends and their platform defaults is in the **Backend Options
+ 
+ | Value | Notes |
+ |---|---|
+-| `TRTLLM_ATTN` | FlashInfer's trtllm-gen FMHA (TensorRT-LLM's generated kernels, vendored by FlashInfer). BF16, GQA native, `head_dim=128`. Datacenter Blackwell only (sm_100 / sm_103). Supports **Skip-Softmax** sparse attention — see below. Requires `flashinfer`. |
++| `TRTLLM_ATTN` | FlashInfer's trtllm-gen FMHA (TensorRT-LLM's generated kernels, vendored by FlashInfer). Dense BF16, GQA native, `head_dim=128`. Datacenter Blackwell only (sm_100 / sm_103). Packed paths can provide `cu_seqlens` directly. Supports optional **Skip-Softmax** sparse attention — see below. Requires `flashinfer`. |
+ | `FLASH_ATTN` | Wraps FlashAttention 4 on Blackwell when `flash-attn-4` is installed, then falls back to FlashAttention 3/2. Default on Hopper / Ada / Ampere when a compatible FlashAttention package is installed. |
+ | `CUDNN_ATTN` | Pins `sdpa_kernel([CUDNN_ATTENTION])`. Default on Blackwell (sm_10x / sm_12x) with cuDNN ≥ 9.5. Wins on mask-heavy DiTs (HunyuanVideo-1.5: 2× e2e vs SDPA). |
+ | `FLASHINFER_ATTN` | Calls FlashInfer's dense `single_prefill_with_kv_cache` directly with `custom_mask` for non-causal masked attention. Used as Blackwell fallback when cuDNN is unavailable. Requires `flashinfer`. |
+@@ -105,7 +105,7 @@ A plain dict is also accepted and normalized to `AttentionConfig`.
+ 
+ Auto-route preference, in order:
+ 
+-1. `TRTLLM_ATTN` — on **datacenter** Blackwell (sm_100 / sm_103) when `flashinfer` is installed, the model's `head_dim` is 128, **and the model is mask-free** (see below)
++1. `TRTLLM_ATTN` — on **datacenter** Blackwell (sm_100 / sm_103) when `flashinfer` is installed, the model's `head_dim` is 128, **and the model declares a compatible packed/mask-free path**
+ 2. `CUDNN_ATTN` — when cuDNN ≥ 9.5 is available (ships in PyTorch 2.5+ wheels)
+ 3. `FLASHINFER_ATTN` — when `flashinfer` is installed but cuDNN < 9.5
+ 4. `FLASH_ATTN` — when `flash-attn` is installed with the Blackwell CUTE kernel
+@@ -113,7 +113,7 @@ Auto-route preference, in order:
+ 
+ `TRTLLM_ATTN` is skipped on workstation Blackwell (sm_120 / sm_121) and for any `head_dim != 128`, so those GPUs keep the `CUDNN_ATTN` route described below.
+ 
+-`TRTLLM_ATTN` outranks `CUDNN_ATTN` on datacenter Blackwell because it is the only backend that can enable Skip-Softmax, not because its dense kernel is faster — dense, the two are comparable. It cannot honor an attention mask, so the auto-default only applies to pipelines verified mask-free (the Wan family); mask-using pipelines keep `CUDNN_ATTN`. `TRTLLM_ATTN` stays available everywhere via explicit `--diffusion-attention-backend TRTLLM_ATTN` (which raises clearly if a mask is received).
++`TRTLLM_ATTN` outranks `CUDNN_ATTN` on datacenter Blackwell for compatible packed/mask-free pipelines. Workstation Blackwell (sm_120 / sm_121) and pipelines that require attention masks retain their normal fallback.
+ 
+ The startup log line `Defaulting to diffusion attention backend CUDNN_ATTN (Blackwell sm_120, cuDNN 91002)` confirms the route.
+ 
+diff --git a/recipes/MiniMaxAI/MiniMax-H3.md b/recipes/MiniMaxAI/MiniMax-H3.md
+index 9fc59628d4a..4c492ca3714 100644
+--- a/recipes/MiniMaxAI/MiniMax-H3.md
++++ b/recipes/MiniMaxAI/MiniMax-H3.md
+@@ -41,6 +41,13 @@ B300/GB200 `FLASH_ATTN` profile:
+ ```bash
+ uv venv
+ source .venv/bin/activate
++uv pip install -e .
++```
++
++To keep FA4 available as an explicit option on Blackwell, install the
++FlashAttention-4 extra:
++
++```bash
+ uv pip install -e '.[fa4]'
+ ```
+ 
+@@ -199,15 +206,13 @@ The best validated four-GPU configuration on four NVIDIA B300 GPUs is:
+ - Ulysses sequence parallelism degree 4;
+ - native tiled VAE patch parallelism degree 4;
+ - regional `torch.compile` for the repeated DiT blocks;
+-- CuTe FlashAttention-4 through the `FLASH_ATTN` backend, with Ring and TP
+-  left at 1.
++- dense BF16 `TRTLLM_ATTN`, with Ring and TP left at 1.
+ 
+ ```bash
+ export MODEL="${MODEL_ROOT}/FL2VA"
+ export PORT=8091
+ 
+ CUDA_VISIBLE_DEVICES=0,1,2,3 \
+-FLASHINFER_DISABLE_VERSION_CHECK=1 \
+ VLLM_WORKER_MULTIPROC_METHOD=spawn \
+ VLLM_OMNI_VIDEO_SYNC_TIMEOUT=1800 \
+ vllm serve "${MODEL}" \
+@@ -220,19 +225,76 @@ vllm serve "${MODEL}" \
+   --ring 1 \
+   --vae-patch-parallel-size 4 \
+   --vae-parallel-mode tile \
+-  --vae-use-tiling \
+-  --diffusion-attention-backend FLASH_ATTN
++  --vae-use-tiling
+ ```
+ 
+-On Blackwell, `FLASH_ATTN` selects FA4. Confirm the server log contains
+-`Using CuTe FlashAttention-4 on Blackwell` before recording measurements.
+-
+ Do not add `--enforce-eager` to this performance configuration. The first
+ request includes regional compilation; warm the server once before measuring
+ steady-state latency. H3 is CFG-distilled, so `--cfg-parallel-size` must remain
+ 1. The H3 VAE supports its native `tile` mode, not
+ `spatial_shard_height` or `spatial_shard_width`.
+ 
++### Attention Backends
++
++On datacenter Blackwell GPUs, MiniMax H3 defaults to dense BF16
++`TRTLLM_ATTN`; no attention backend flag is required. To select it explicitly,
++use:
++
++```bash
++--diffusion-attention-backend TRTLLM_ATTN
++```
++
++Stable measurements with the four-GPU profile above put dense `TRTLLM_ATTN`
++and FA4 within 2% of each other. `TRTLLM_ATTN` remains the datacenter Blackwell
++default and enables the optional optimizations below. Confirm the server log
++contains `Defaulting to diffusion attention backend TRTLLM_ATTN` before
++recording measurements when using the default selection.
++
++FA4 remains available by explicitly selecting the `FLASH_ATTN` backend:
++
++```bash
++--diffusion-attention-backend FLASH_ATTN
++```
++
++On Blackwell, `FLASH_ATTN` selects FA4. Confirm the server log contains
++`Using CuTe FlashAttention-4 on Blackwell` before recording FA4 measurements.
++
++`TRTLLM_ATTN` additionally supports two **lossy** optimizations for the long main
++DiT attention sequence: SAGE attention quantization and Skip-Softmax Sparse
++Attention. SAGE quantizes Q/K to the configured dtype and V to FP8. This example uses
++`fp8_e4m3` for Q/K; B200 also supports `int8` Q/K. The TRTLLM SAGE path fixes V
++to FP8, so vLLM-Omni only exposes the Q/K dtype. The token refiner is a short
++attention path, so the `per_role` override leaves SAGE and Skip-Softmax disabled
++for it. The example enables the calibration-free Skip-Softmax path with
++`threshold=0.05`, after the normalized timestep reaches `0.97`:
++
++```bash
++--diffusion-attention-config '{
++  "default": {
++    "backend": "TRTLLM_ATTN",
++    "quant": {
++      "dtype_qk": "fp8_e4m3",
++      "q_block_size": 1,
++      "k_block_size": 16
++    },
++    "skip_softmax": {
++      "threshold": 0.05,
++      "disabled_until_timestep": 0.97
++    }
++  },
++  "per_role": {
++    "minimax_h3.token_refiner": {
++      "backend": "TRTLLM_ATTN"
++    }
++  }
++}'
++```
++
++For configuration details, see
++[TRTLLM_ATTN Backend and Skip-Softmax](https://github.com/vllm-project/vllm-omni/blob/main/docs/user_guide/diffusion/attention_backends.md#trtllm_attn-backend-and-skip-softmax)
++and
++[TRTLLM_ATTN SAGE Quantization](https://github.com/vllm-project/vllm-omni/blob/main/docs/user_guide/diffusion/attention_backends.md#trtllm_attn-sage-quantization).
++
+ ### Text encoder tensor parallelism
+ 
+ The Qwen3-VL text encoder (~51.5 GB in BF16 for the retained 50 layers) is by
+@@ -247,7 +309,6 @@ export MODEL="${MODEL_ROOT}/FL2VA"
+ export PORT=8091
+ 
+ CUDA_VISIBLE_DEVICES=0,1,2,3 \
+-FLASHINFER_DISABLE_VERSION_CHECK=1 \
+ VLLM_WORKER_MULTIPROC_METHOD=spawn \
+ VLLM_OMNI_VIDEO_SYNC_TIMEOUT=1800 \
+ vllm serve "${MODEL}" \
+@@ -261,8 +322,7 @@ vllm serve "${MODEL}" \
+   --text-encoder-tp-size 4 \
+   --vae-patch-parallel-size 4 \
+   --vae-parallel-mode tile \
+-  --vae-use-tiling \
+-  --diffusion-attention-backend FLASH_ATTN
++  --vae-use-tiling
+ ```
+ 
+ `N` must divide the Qwen3-VL head counts (64 attention heads / 8 KV heads), so
+diff --git a/tests/diffusion/attention/test_trtllm_attn.py b/tests/diffusion/attention/test_trtllm_attn.py
+index a2f855596f3..76daf9d3baf 100644
+--- a/tests/diffusion/attention/test_trtllm_attn.py
++++ b/tests/diffusion/attention/test_trtllm_attn.py
+@@ -8,6 +8,7 @@
+ import torch.nn.functional as F
+ 
+ from vllm_omni.diffusion.attention.backends import trtllm_attn as tg
++from vllm_omni.diffusion.attention.backends.abstract import AttentionMetadata
+ from vllm_omni.diffusion.attention.backends.trtllm_attn import TrtllmAttentionImpl
+ 
+ pytestmark = [pytest.mark.core_model, pytest.mark.diffusion, pytest.mark.cuda]
+@@ -142,6 +143,9 @@ class _Pipe(fc.DenoiseProgressMixin):
+     _Pipe().record_denoise_step(4)
+     assert ctx.denoise_step_idx == 4 and ctx.denoise_timestep == pytest.approx(0.25)
+ 
++    _Pipe().record_denoise_step(5, normalized_timestep=0.7)
++    assert ctx.denoise_step_idx == 5 and ctx.denoise_timestep == pytest.approx(0.7)
++
+ 
+ @pytest.mark.parametrize(
+     "bk, field",
+@@ -187,6 +191,7 @@ def test_mask_free_allowlist_gates_trtllm_default():
+ 
+     assert meta("WanPipeline").attention_mask_free is True
+     assert meta("WanVACEPipeline").attention_mask_free is True
++    assert meta("MiniMaxH3Pipeline").attention_mask_free is True
+     assert meta("FluxPipeline").attention_mask_free is False
+     assert meta(None).attention_mask_free is False
+ 
+@@ -204,6 +209,91 @@ class _Meta:
+         _impl().forward_cuda(q, k, v, _Meta())
+ 
+ 
++def test_packed_metadata_trims_padding_mask(monkeypatch):
++    b, s, h, d = 1, 8, 8, 128
++    q, k, v = (torch.zeros(b, s, h, d) for _ in range(3))
++    mask = torch.tensor([[True, True, True, True, True, True, False, False]])
++    cu_seqlens = torch.tensor([0, 6, 8], dtype=torch.int32)
++    metadata = AttentionMetadata(
++        attn_mask=mask,
++        extra={
++            "cu_seqlens_q": cu_seqlens,
++            "cu_seqlens_k": cu_seqlens,
++            "max_seqlen_q": 6,
++            "max_seqlen_k": 6,
++        },
++    )
++    captured = {}
++
++    def fake_attention(**kwargs):
++        captured.update(kwargs)
++        return torch.zeros_like(kwargs["query"])
++
++    monkeypatch.setattr(tg, "HAS_FLASHINFER", True)
++    monkeypatch.setattr(tg, "trtllm_ragged_attention_deepseek", fake_attention)
++    monkeypatch.setattr(TrtllmAttentionImpl, "_get_workspace", classmethod(lambda cls, device: torch.empty(0)))
++
++    out = _impl().forward_cuda(q, k, v, metadata)
++
++    assert out.shape == q.shape
++    assert captured["query"].shape[0] == 6
++    assert captured["key"].shape[0] == 6
++    assert captured["value"].shape[0] == 6
++    assert captured["batch_size"] == 1
++    assert captured["seq_lens"].tolist() == [6]
++    assert captured["cum_seq_lens_q"].tolist() == [0, 6]
++    assert captured["cum_seq_lens_kv"].tolist() == [0, 6]
++    assert captured["max_q_len"] == 6
++    assert captured["max_kv_len"] == 6
++    assert torch.count_nonzero(out[:, 6:]) == 0
++
++
++def test_packed_metadata_rejects_non_prefix_mask(monkeypatch):
++    b, s, h, d = 1, 8, 8, 128
++    q, k, v = (torch.zeros(b, s, h, d) for _ in range(3))
++    cu_seqlens = torch.tensor([0, 6, 8], dtype=torch.int32)
++    metadata = AttentionMetadata(
++        attn_mask=torch.tensor([[True, True, False, True, True, True, False, False]]),
++        extra={
++            "cu_seqlens_q": cu_seqlens,
++            "cu_seqlens_k": cu_seqlens,
++            "max_seqlen_q": 6,
++            "max_seqlen_k": 6,
++        },
++    )
++    monkeypatch.setattr(tg, "HAS_FLASHINFER", True)
++
++    with pytest.raises(ValueError, match="prefix-valid"):
++        _impl().forward_cuda(q, k, v, metadata)
++
++
++def test_packed_metadata_must_be_complete():
++    b, s, h, d = 1, 8, 8, 128
++    q, k, v = (torch.zeros(b, s, h, d) for _ in range(3))
++    metadata = AttentionMetadata(extra={"cu_seqlens_q": torch.tensor([0, s], dtype=torch.int32)})
++
++    with pytest.raises(ValueError, match="Incomplete packed TRTLLM attention metadata"):
++        _impl().forward_cuda(q, k, v, metadata)
++
++
++def test_packed_metadata_must_cover_inputs(monkeypatch):
++    b, s, h, d = 1, 8, 8, 128
++    q, k, v = (torch.zeros(b, s, h, d) for _ in range(3))
++    cu_seqlens = torch.tensor([0, 6], dtype=torch.int32)
++    metadata = AttentionMetadata(
++        extra={
++            "cu_seqlens_q": cu_seqlens,
++            "cu_seqlens_k": cu_seqlens,
++            "max_seqlen_q": 6,
++            "max_seqlen_k": 6,
++        }
++    )
++    monkeypatch.setattr(tg, "HAS_FLASHINFER", True)
++
++    with pytest.raises(ValueError, match="must cover all Q/K/V tokens"):
++        _impl().forward_cuda(q, k, v, metadata)
++
++
+ def test_propagate_calibration_045_schema(monkeypatch):
+     import types
+ 
+@@ -295,6 +385,30 @@ def test_bf16_dense_matches_sdpa():
+     assert rel < 0.01, f"BF16 dense rel err {rel:.4f} too high"
+ 
+ 
++@requires_trtllm_attn
++def test_bf16_packed_padding_matches_sdpa():
++    torch.manual_seed(0)
++    b, s, used, h, d = 1, 256, 192, 8, 128
++    scale = 1.0 / math.sqrt(d)
++    q, k, v = (torch.randn(b, s, h, d, device="cuda", dtype=torch.bfloat16) for _ in range(3))
++    cu_seqlens = torch.tensor([0, used, s], dtype=torch.int32, device="cuda")
++    metadata = AttentionMetadata(
++        attn_mask=torch.arange(s, device="cuda")[None] < used,
++        extra={
++            "cu_seqlens_q": cu_seqlens,
++            "cu_seqlens_k": cu_seqlens,
++            "max_seqlen_q": used,
++            "max_seqlen_k": used,
++        },
++    )
++
++    out = _impl().forward_cuda(q, k, v, metadata).float()
++    ref_used = _sdpa_ref(q[:, :used], k[:, :used], v[:, :used], scale)
++    used_rel = (out[:, :used] - ref_used).abs().mean() / ref_used.abs().mean()
++    assert used_rel < 0.01, f"BF16 packed valid-token rel err {used_rel:.4f} too high"
++    assert torch.count_nonzero(out[:, used:]) == 0
++
++
+ requires_sage = pytest.mark.skipif(
+     not (_has_trtllm_attn() and tg._sage_quantize_fn() is not None),
+     reason="requires Blackwell SM100+ GPU with flashinfer >= 0.6.16rc1 (trtllm_sage_attention_quantize)",
+@@ -321,6 +435,47 @@ def test_sage_quant_matches_sdpa(dtype_qk):
+     assert rel < 0.1, f"SAGE({dtype_qk}) rel err {rel:.4f} too high"
+ 
+ 
++@requires_sage
++def test_sage_packed_non_aligned_length_matches_sdpa():
++    torch.manual_seed(0)
++    b, s, used, h, d = 1, 208, 194, 8, 128
++    scale = 1.0 / math.sqrt(d)
++    q, k, v = (torch.randn(b, s, h, d, device="cuda", dtype=torch.bfloat16) for _ in range(3))
++    cu_seqlens = torch.tensor([0, used, s], dtype=torch.int32, device="cuda")
++    metadata = AttentionMetadata(
++        attn_mask=torch.arange(s, device="cuda")[None] < used,
++        extra={
++            "cu_seqlens_q": cu_seqlens,
++            "cu_seqlens_k": cu_seqlens,
++            "max_seqlen_q": used,
++            "max_seqlen_k": used,
++        },
++    )
++
++    out = _impl(quant={"dtype_qk": "fp8_e4m3", "q_block_size": 1, "k_block_size": 16}).forward_cuda(q, k, v, metadata)
++    assert torch.isfinite(out).all()
++    ref = _sdpa_ref(q[:, :used], k[:, :used], v[:, :used], scale)
++    rel = (out[:, :used].float() - ref).abs().mean() / ref.abs().mean()
++    assert rel < 0.2, f"SAGE packed valid-token rel err {rel:.4f} too high"
++    assert torch.count_nonzero(out[:, used:]) == 0
++
++
++@requires_sage
++def test_sage_short_sequence_uses_dense_kernel():
++    torch.manual_seed(0)
++    b, s, h, d = 1, 14, 8, 128
++    scale = 1.0 / math.sqrt(d)
++    q, k, v = (torch.randn(b, s, h, d, device="cuda", dtype=torch.bfloat16) for _ in range(3))
++
++    impl = _impl(quant={"dtype_qk": "fp8_e4m3", "q_block_size": 1, "k_block_size": 16})
++    impl._sage_quantize_fn = lambda *args, **kwargs: pytest.fail("short sequence must not use SAGE")
++    out = impl.forward_cuda(q, k, v)
++    ref = _sdpa_ref(q, k, v, scale)
++    rel = (out.float() - ref).abs().mean() / ref.abs().mean()
++    assert torch.isfinite(out).all()
++    assert rel < 0.01, f"SAGE short-sequence dense fallback rel err {rel:.4f} too high"
++
++
+ @requires_trtllm_attn
+ def test_skip_tiny_threshold_matches_dense():
+     torch.manual_seed(0)
+diff --git a/vllm_omni/diffusion/attention/backends/trtllm_attn.py b/vllm_omni/diffusion/attention/backends/trtllm_attn.py
+index 718484a590b..c63280fc870 100644
+--- a/vllm_omni/diffusion/attention/backends/trtllm_attn.py
++++ b/vllm_omni/diffusion/attention/backends/trtllm_attn.py
+@@ -180,6 +180,7 @@ def __init__(
+         prefix: str = "",
+         qkv_layout: str | None = None,
+         backend_kwargs: dict | None = None,
++        role: str = "self",
+         **extra_impl_args,
+     ) -> None:
+         self.num_heads = num_heads
+@@ -187,6 +188,7 @@ def __init__(
+         self.softmax_scale = softmax_scale
+         self.causal = causal
+         self.num_kv_heads = num_kv_heads if num_kv_heads is not None else num_heads
++        self.role = role
+ 
+         self.skip = SkipSoftmaxConfig.from_backend_kwargs(backend_kwargs)
+         self._warned_missing_timestep = False
+@@ -255,8 +257,16 @@ def forward_cuda(
+         value: torch.Tensor,
+         attn_metadata: AttentionMetadata | None = None,
+     ) -> torch.Tensor:
++        extra = getattr(attn_metadata, "extra", {}) if attn_metadata is not None else {}
++        packed_keys = ("cu_seqlens_q", "cu_seqlens_k", "max_seqlen_q", "max_seqlen_k")
++        present_packed_keys = [key for key in packed_keys if key in extra]
++        if present_packed_keys and len(present_packed_keys) != len(packed_keys):
++            missing = sorted(set(packed_keys) - set(present_packed_keys))
++            raise ValueError(f"Incomplete packed TRTLLM attention metadata; missing {missing}")
++        has_packed_metadata = len(present_packed_keys) == len(packed_keys)
++
+         attn_mask = getattr(attn_metadata, "attn_mask", None) if attn_metadata is not None else None
+-        if attn_mask is not None:
++        if attn_mask is not None and not has_packed_metadata:
+             raise ValueError(
+                 "TRTLLM_ATTN does not support attn_mask (Wan sets one only under SP with "
+                 "mask_sp_padding=True and a non-divisible seq len). Either set "
+@@ -270,30 +280,96 @@ def forward_cuda(
+                 "another backend via --diffusion-attention-backend."
+             )
+ 
+-        batch, q_len, num_q_heads, head_dim = query.shape
++        physical_batch, q_len, num_q_heads, head_dim = query.shape
+         kv_len, num_kv_heads = key.shape[1], key.shape[2]
+ 
+         device = query.device
+ 
+-        q = query.reshape(batch * q_len, num_q_heads, head_dim).contiguous()
+-        k = key.reshape(batch * kv_len, num_kv_heads, head_dim).contiguous()
+-        v = value.reshape(batch * kv_len, num_kv_heads, head_dim).contiguous()
+-
+-        seq_lens = torch.full((batch,), kv_len, dtype=torch.int32, device=device)
+-        cu_seq_lens_q = torch.arange(0, (batch + 1) * q_len, step=q_len, dtype=torch.int32, device=device)
+-        cu_seq_lens_kv = torch.arange(0, (batch + 1) * kv_len, step=kv_len, dtype=torch.int32, device=device)
++        q = query.reshape(physical_batch * q_len, num_q_heads, head_dim).contiguous()
++        k = key.reshape(physical_batch * kv_len, num_kv_heads, head_dim).contiguous()
++        v = value.reshape(physical_batch * kv_len, num_kv_heads, head_dim).contiguous()
++        output_tokens = q.shape[0]
++
++        if has_packed_metadata:
++            cu_seq_lens_q = extra["cu_seqlens_q"]
++            cu_seq_lens_kv = extra["cu_seqlens_k"]
++            if cu_seq_lens_q.ndim != 1 or cu_seq_lens_kv.ndim != 1:
++                raise ValueError("Packed TRTLLM attention cu_seqlens tensors must be one-dimensional")
++            if cu_seq_lens_q.numel() != cu_seq_lens_kv.numel() or cu_seq_lens_q.numel() < 2:
++                raise ValueError("Packed TRTLLM attention requires matching non-empty Q and KV sequence batches")
++            if int(cu_seq_lens_q[-1].item()) != q.shape[0] or int(cu_seq_lens_kv[-1].item()) != k.shape[0]:
++                raise ValueError("Packed TRTLLM attention cu_seqlens must cover all Q/K/V tokens")
++
++            # Drop trailing empty sequences retained by packed producers when
++            # alignment adds no padding tokens.
++            while (
++                cu_seq_lens_q.numel() > 2
++                and int(cu_seq_lens_q[-1].item()) == int(cu_seq_lens_q[-2].item())
++                and int(cu_seq_lens_kv[-1].item()) == int(cu_seq_lens_kv[-2].item())
++            ):
++                cu_seq_lens_q = cu_seq_lens_q[:-1]
++                cu_seq_lens_kv = cu_seq_lens_kv[:-1]
++
++            # A packed prefix mask denotes structural suffix padding, not another
++            # document. Exclude it before quantization and attention; in particular,
++            # SAGE block quantization must not span the valid/padding boundary.
++            if attn_mask is not None:
++                if q.shape[0] != k.shape[0] or attn_mask.numel() != q.shape[0]:
++                    raise ValueError("Packed TRTLLM prefix masks require equal Q/K lengths")
++                flat_mask = attn_mask.reshape(-1).to(dtype=torch.bool)
++                valid_tokens = int(flat_mask.sum().item())
++                expected_mask = torch.arange(flat_mask.numel(), device=device) < valid_tokens
++                if not torch.equal(flat_mask, expected_mask):
++                    raise ValueError("TRTLLM_ATTN only supports prefix-valid packed attention masks")
++
++                q_boundary = (cu_seq_lens_q == valid_tokens).nonzero(as_tuple=False)
++                kv_boundary = (cu_seq_lens_kv == valid_tokens).nonzero(as_tuple=False)
++                if q_boundary.numel() != 1 or kv_boundary.numel() != 1:
++                    raise ValueError("Packed TRTLLM prefix length must be a Q/K sequence boundary")
++                q_end = int(q_boundary.item()) + 1
++                kv_end = int(kv_boundary.item()) + 1
++                if q_end != kv_end:
++                    raise ValueError("Packed TRTLLM prefix masks require matching Q/K sequence batches")
++
++                q = q[:valid_tokens]
++                k = k[:valid_tokens]
++                v = v[:valid_tokens]
++                cu_seq_lens_q = cu_seq_lens_q[:q_end].contiguous()
++                cu_seq_lens_kv = cu_seq_lens_kv[:kv_end].contiguous()
++
++            batch = cu_seq_lens_q.numel() - 1
++            seq_lens = (cu_seq_lens_kv[1:] - cu_seq_lens_kv[:-1]).to(dtype=torch.int32).contiguous()
++            max_q_len = int(extra["max_seqlen_q"])
++            max_kv_len = int(extra["max_seqlen_k"])
++        else:
++            batch = physical_batch
++            seq_lens = torch.full((batch,), kv_len, dtype=torch.int32, device=device)
++            cu_seq_lens_q = torch.arange(0, (batch + 1) * q_len, step=q_len, dtype=torch.int32, device=device)
++            cu_seq_lens_kv = torch.arange(0, (batch + 1) * kv_len, step=kv_len, dtype=torch.int32, device=device)
++            max_q_len = q_len
++            max_kv_len = kv_len
+         workspace = self._get_workspace(device)
+ 
+         bmm1_scale = self.softmax_scale
+         bmm2_scale = 1.0
+ 
+-        _skip_factor = self._resolve_skip_factor(kv_len)
++        _skip_factor = self._resolve_skip_factor(max_kv_len)
+ 
+         # SAGE kwargs are only understood by newer FlashInfer builds; pass them exclusively when
+         # SAGE quant is active (which already requires the kernel, checked at init) so the dense
+         # path stays compatible with older builds that lack these parameters.
+         sage_kwargs: dict = {}
+-        if self.quant.enabled:
++        # The SAGE kernel requires every KV sequence to contain at least one full
++        # quantization block. Small auxiliary attention sites use the dense kernel.
++        use_sage = self.quant.enabled and bool(torch.all(seq_lens >= self.quant.k_block_size).item())
++        if self.quant.enabled and not use_sage:
++            message = (
++                f"TRTLLM_ATTN SAGE quantization is configured for attention role {self.role!r}, but at least one "
++                f"KV sequence is shorter than k_block_size={self.quant.k_block_size}. Falling back to dense "
++                "attention for this input."
++            )
++            logger.warning_once(message)
++        if use_sage:
+             q, k, v, sage_attn_sfs, sage_block_sizes = self.quant.quantize(q, k, v, self._sage_quantize_fn)
+             sage_kwargs["sage_attn_sfs"] = sage_attn_sfs
+             sage_kwargs["num_elts_per_sage_attn_blk"] = sage_block_sizes
+@@ -304,8 +380,8 @@ def forward_cuda(
+             value=v,
+             workspace_buffer=workspace,
+             seq_lens=seq_lens,
+-            max_q_len=q_len,
+-            max_kv_len=kv_len,
++            max_q_len=max_q_len,
++            max_kv_len=max_kv_len,
+             bmm1_scale=bmm1_scale,
+             bmm2_scale=bmm2_scale,
+             o_sf_scale=-1.0,
+@@ -319,4 +395,12 @@ def forward_cuda(
+             skip_softmax_threshold_scale_factor=_skip_factor,
+             **sage_kwargs,
+         )
+-        return out.reshape(batch, q_len, num_q_heads, head_dim)
++        if out.shape[0] != output_tokens:
++            padded_out = torch.zeros(
++                (output_tokens, num_q_heads, head_dim),
++                dtype=out.dtype,
++                device=out.device,
++            )
++            padded_out[: out.shape[0]] = out
++            out = padded_out
++        return out.reshape(physical_batch, q_len, num_q_heads, head_dim)
+diff --git a/vllm_omni/diffusion/attention/layer.py b/vllm_omni/diffusion/attention/layer.py
+index 77d65f79eaa..7eb74a94103 100644
+--- a/vllm_omni/diffusion/attention/layer.py
++++ b/vllm_omni/diffusion/attention/layer.py
+@@ -89,6 +89,15 @@ def __init__(
+             role_category=role_category,
+             allow_trtllm_default=allow_trtllm_default,
+         )
++        parallel_config = getattr(config, "parallel_config", None)
++        allgather_degree = getattr(parallel_config, "allgather_degree", 1)
++        # TODO: Move AllGather-KV compatibility into an AttentionBackend capability
++        # so validation does not depend on backend names.
++        if not skip_sequence_parallel and allgather_degree > 1 and attn_backend_cls.get_name() == "TRTLLM_ATTN":
++            raise ValueError(
++                "TRTLLM_ATTN does not support AllGather-KV sequence parallelism. "
++                "Set --allgather-degree 1 or select another diffusion attention backend."
++            )
+         if spec is not None:
+             backend_kwargs = spec.backend_kwargs()
+             self.backend_pref = spec.backend
+@@ -107,6 +116,7 @@ def __init__(
+             qkv_layout=qkv_layout,
+             prefix=prefix,
+             backend_kwargs=backend_kwargs,
++            role=role,
+         )
+         # Instantiate fallback backend for float32 support
+         self.sdpa_fallback = SDPABackend.get_impl_cls()(
+diff --git a/vllm_omni/diffusion/data.py b/vllm_omni/diffusion/data.py
+index af205713ef8..5e461aa55da 100644
+--- a/vllm_omni/diffusion/data.py
++++ b/vllm_omni/diffusion/data.py
+@@ -1434,6 +1434,10 @@ def __post_init__(self) -> None:
+         if self.target_sparsity is not None and self.threshold is not None:
+             raise ValueError("skip_softmax: set either target_sparsity or threshold, not both.")
+ 
++    @property
++    def enabled(self) -> bool:
++        return self.threshold is not None or self.target_sparsity is not None
++
+ 
+ @dataclass
+ class AttnQuantSpec:
+diff --git a/vllm_omni/diffusion/forward_context.py b/vllm_omni/diffusion/forward_context.py
+index a8e23756fb9..bb589d7bb09 100644
+--- a/vllm_omni/diffusion/forward_context.py
++++ b/vllm_omni/diffusion/forward_context.py
+@@ -221,9 +221,15 @@ def record_denoise_step(
+         step_idx: int | None,
+         timestep=None,
+         scheduler=None,
++        normalized_timestep: float | None = None,
+     ) -> None:
+         set_forward_context_denoise_step_idx(step_idx)
+-        if timestep is None or _forward_context is None:
++        if _forward_context is None:
++            return
++        if normalized_timestep is not None:
++            _forward_context.denoise_timestep = float(normalized_timestep)
++            return
++        if timestep is None:
+             return
+         scheduler = scheduler if scheduler is not None else getattr(self, "scheduler", None)
+         ntt = getattr(getattr(scheduler, "config", None), "num_train_timesteps", None)
+diff --git a/vllm_omni/diffusion/model_metadata.py b/vllm_omni/diffusion/model_metadata.py
+index 22c9a273775..2b28b0820ce 100644
+--- a/vllm_omni/diffusion/model_metadata.py
++++ b/vllm_omni/diffusion/model_metadata.py
+@@ -41,6 +41,9 @@ class DiffusionModelMetadata:
+         supports_multimodal_inputs=True,
+         max_multimodal_image_inputs=9,
+         supports_mixed_reference_inputs=True,
++        # H3 represents alignment padding as a second packed sequence.  The
++        # packed TRTLLM backend consumes cu_seqlens and isolates that padding.
++        attention_mask_free=True,
+     ),
+     "WanPipeline": DiffusionModelMetadata(attention_mask_free=True),
+     "WanImageToVideoPipeline": DiffusionModelMetadata(attention_mask_free=True),
+diff --git a/vllm_omni/diffusion/models/minimax_h3/denoise_loop.py b/vllm_omni/diffusion/models/minimax_h3/denoise_loop.py
+index 9b4402f303f..d22065c3a9c 100644
+--- a/vllm_omni/diffusion/models/minimax_h3/denoise_loop.py
++++ b/vllm_omni/diffusion/models/minimax_h3/denoise_loop.py
+@@ -149,7 +149,8 @@ def minimax_h3_denoise_loop(
+     device: torch.device,
+     imgvid_cond_noise_aug_for_inference: float = MINIMAX_H3_IMGVID_COND_TIMESTEP,
+     audio_cond_noise_aug_for_inference: float = MINIMAX_H3_AUDIO_REF_COND_TIMESTEP,
+-    on_step: Callable[[int, torch.Tensor, torch.Tensor], None] | None = None,
++    on_step_end: Callable[[int, torch.Tensor, torch.Tensor], None] | None = None,
++    on_step_start: Callable[[int, float, float], None] | None = None,
+     step_profiler: Callable[[int], AbstractContextManager] | None = None,
+ ) -> tuple[torch.Tensor, torch.Tensor]:
+     """Run the full denoise loop; returns final (video_rows, audio_rows).
+@@ -206,6 +207,9 @@ def minimax_h3_denoise_loop(
+             set_forward_context_denoise_step_idx(step)
+             s_v, s_v_next = sigmas_video[step], sigmas_video[step + 1]
+             s_a, s_a_next = sigmas_audio[step], sigmas_audio[step + 1]
++            if on_step_start is not None:
++                # Attention gates use the scheduler-style descending timestep.
++                on_step_start(step, s_v, s_a)
+             t_v, t_a = 1.0 - s_v, 1.0 - s_a
+             imgvid_cond_t = max(t_v, float(imgvid_cond_noise_aug_for_inference))
+             audio_ref_cond_t = max(t_a, float(audio_cond_noise_aug_for_inference))
+@@ -246,8 +250,8 @@ def minimax_h3_denoise_loop(
+             audio_rows[audio_update] = new_audio
+             if audio_anchor is not None:
+                 audio_rows[~audio_update] = audio_anchor  # per-step audio ref reset
+-            if on_step is not None:
+-                on_step(step, video_rows, audio_rows)
++            if on_step_end is not None:
++                on_step_end(step, video_rows, audio_rows)
+ 
+     set_forward_context_denoise_step_idx(None)
+     return video_rows, audio_rows
+diff --git a/vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py b/vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py
+index d98c07545e8..610c20d1931 100644
+--- a/vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py
++++ b/vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py
+@@ -311,6 +311,8 @@ def __init__(
+         quant_config: QuantizationConfig | None,
+         *,
+         prefix: str,
++        role: str = "self",
++        role_category: str | None = None,
+         skip_sequence_parallel: bool = False,
+     ) -> None:
+         super().__init__()
+@@ -351,8 +353,9 @@ def __init__(
+             causal=False,
+             # Packed rows reach the impl as [B, S, N, D].
+             qkv_layout="BSND",
++            role=role,
++            role_category=role_category,
+             skip_sequence_parallel=skip_sequence_parallel,
+-            role="self",
+             prefix=prefix,
+         )
+ 
+@@ -582,6 +585,8 @@ def __init__(
+             arch,
+             quant_config,
+             prefix=f"{prefix}.attn",
++            role="minimax_h3.token_refiner",
++            role_category="self",
+             skip_sequence_parallel=True,
+         )
+         self.mlp = MiniMaxH3MLP(
+diff --git a/vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py b/vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py
+index 9923b8d1cde..1f41d6d1ffe 100644
+--- a/vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py
++++ b/vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py
+@@ -27,6 +27,7 @@
+     init_world_group,
+ )
+ from vllm_omni.diffusion.distributed.utils import get_local_device
++from vllm_omni.diffusion.forward_context import DenoiseProgressMixin
+ from vllm_omni.diffusion.model_loader.diffusers_loader import (
+     DiffusersPipelineLoader,
+ )
+@@ -446,6 +447,7 @@ def __init__(self, rank: int) -> None:
+ 
+ class MiniMaxH3Pipeline(
+     nn.Module,
++    DenoiseProgressMixin,
+     ProgressBarMixin,
+     DiffusionPipelineProfilerMixin,
+     SupportImageInput,
+@@ -1371,7 +1373,11 @@ def diffuse(
+                     device=self.device,
+                     imgvid_cond_noise_aug_for_inference=(MINIMAX_H3_IMGVID_COND_TIMESTEP),
+                     audio_cond_noise_aug_for_inference=(MINIMAX_H3_AUDIO_REF_COND_TIMESTEP),
+-                    on_step=lambda step, video, audio: progress.update(),
++                    on_step_start=lambda step, video_sigma, audio_sigma: self.record_denoise_step(
++                        step,
++                        normalized_timestep=video_sigma,
++                    ),
++                    on_step_end=lambda step, video, audio: progress.update(),
+                 )
+ 
+         target_video = video_rows[branch.update_mask_dev]

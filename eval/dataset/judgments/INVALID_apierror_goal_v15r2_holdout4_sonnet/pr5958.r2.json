@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Candidate Y's run crashed before producing any review (402 API balance error, no findings at all), so it contributes zero recall/precision/actionability. Candidate X delivered a deeply grounded, diff-cited review that independently surfaces two of the four ground-truth Copilot-bot concerns (the LoRA 'preserves prior ownership' contradiction and the diffusion/offloader.md Isotr0py-removal vs description mismatch) plus numerous additional well-grounded, actionable findings (verifiable owner-list mismatches like the dropped @RuixiangMa on diffusion/models/, wrong owners on vllm_omni/plugins/). Most of the human reviewer's line comments were simple 'add X' suggestions already incorporated into the final diff, making them largely moot for a reviewer of this diff, which caps X's achievable recall despite strong coverage of the concerns that remain live.",
+  "_cost_usd": 0.25322459999999997,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15_holdout4_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "3238d6b2a851785e3e6f034a6bc3c59ac0b5cc2be4a2cae18cf4d9587179b7d3",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a618d8fdfdd2a7671220fc3626c167412f101811b64319de0c1c201facd71448",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

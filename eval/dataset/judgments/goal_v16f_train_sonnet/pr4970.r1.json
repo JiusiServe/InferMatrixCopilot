@@ -1,0 +1,36 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.7
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "gap_hit": false,
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has essentially no substantive technical content (just an LGTM and an off-diff request to split out a VoxCPM2 fix), which neither candidate could recall since it's invisible in the truncated diff, so both score equally low on recall. Both candidates independently traced the same seed-propagation mechanism through serving_speech.py and gpu_model_runner.py with well-grounded, specific code citations and comparable precision. Y edges ahead on actionability: it supplies a ready-to-paste regression test, a concrete tombstone comment, and a genuinely new well-grounded insight (deploy seed also disables vLLM's FlashInfer/aiter sampler fast paths) beyond what X surfaces, while X's findings read more like raw evidence logs than polished actionable review comments.",
+  "_cost_usd": 0.19067099999999998,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16f_train_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_train_r1",
+    "arm_a_sha256": "192ba34f8bd09b38ad7b41151893eba00dcdc81c274f017b362f947995138f75",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "410634f22ac0d9a55948ec0dfc9caa6557a8995e24766ff507dbe677d6dd37dc",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

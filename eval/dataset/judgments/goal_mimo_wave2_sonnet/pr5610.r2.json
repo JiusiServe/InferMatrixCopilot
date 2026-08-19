@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.8,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.9,
+    "actionability": 0.15,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "X deeply engaged with the doc against the actual code, confirming (and in one case pushing back on) most of the substantive concerns reviewers raised — NPU/XPU/MUSA platform scoping, the connector live-state ownership claim, the full-payload-branch unreachability argument, and prefix-cache incompatibility — while surfacing several new, concretely actionable findings (GitHub-broken image src, TP>1 connector collective, YAML key omission) with file/line citations. Y ran a shallow validation pass, caught almost none of the ground-truth concerns, nearly included then retracted a false finding, and ended with an empty 'approve' verdict offering no actionable guidance despite the PR's real review history containing substantive back-and-forth.",
+  "_cost_usd": 0.3059153,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_mimo_wave2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_mimo_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_mimo_wave2",
+    "arm_a_sha256": "2bbccdbdc3f276ef9f8c46e710a8b638c6991adb95f9e3125ee2d6ba34fbd8ce",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

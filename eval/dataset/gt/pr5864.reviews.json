@@ -1,0 +1,52 @@
+{
+  "comments": [
+    {
+      "author": "hsliuustc0106",
+      "body": "@yuanheng-zhao @asukaqaq-s PTAL"
+    },
+    {
+      "author": "asukaqaq-s",
+      "body": "Should DLO be restricted to a single replica? For multi-GPU SP:\r\n\r\n```text\r\nDP replica 0:\r\n  SP ranks [0,1,2,3] → request A\r\n  Weight AllGather within the SP group\r\n\r\nDP replica 1:\r\n  SP ranks [4,5,6,7] → request B\r\n  Weight AllGather within the SP group\r\n```\r\n\r\nWe would disable AllGather across DP replicas and only allow co-located replicas to share CPU memory via `mmap` to the same directory. Otherwise, all DP replicas on the node must process identical token requests, making asynchronous request handling difficult.\r\n\r\nThe communication topology must be configured accordingly. For eight GPUs with `DP=2` and `SP=4`, create two communication groups, each with a group size of four.\r\n\r\nThe original approach is more suitable for offline batch inference:\r\n\r\n```text\r\nSP/TP groups (model parallelism for one request):\r\n  [0,1,2,3] → request A\r\n  [4,5,6,7] → request B\r\n\r\nDP peer groups (same SP/TP coordinate across replicas):\r\n  [0,4] → AllGather\r\n  [1,5] → AllGather\r\n  [2,6] → AllGather\r\n  [3,7] → AllGather\r\n```\r\n\r\nRequests A and B may require kernel-level padding to ensure identical shapes; otherwise, the cross-replica AllGather introduces many synchronization points.\r\n"
+    },
+    {
+      "author": "david6666666",
+      "body": "The request batching mechanism within the request queue should ideally be configurable to accommodate various request scenarios.\r\n\r\n<img width=\"1280\" height=\"1260\" alt=\"image\" src=\"https://github.com/user-attachments/assets/c54b5ac4-f6a9-43c2-9222-346f5e85e252\" />\r\n"
+    },
+    {
+      "author": "david6666666",
+      "body": "before:\r\n<img width=\"1280\" height=\"1120\" alt=\"image\" src=\"https://github.com/user-attachments/assets/72bf1320-1727-4883-a869-146d53665d5d\" />\r\n\r\nafter:\r\n<img width=\"1280\" height=\"1260\" alt=\"image\" src=\"https://github.com/user-attachments/assets/10c283ff-947b-44af-a108-59e8ffb08084\" />\r\n"
+    },
+    {
+      "author": "lishunyang12",
+      "body": "Addressed the review feedback in `e55738af` and `84a05548`.\r\n\r\n@hsliuustc0106:\r\n\r\n1. Lifecycle: shutdown now closes the diffusion engine before waiting for dispatch tasks. Worker joins use one global 15-second deadline, followed by termination of all survivors and one global 5-second grace deadline. The previous code could spend the full timeout once per worker.\r\n2. Multiprocess regression: `test_spawned_per_worker_queues_release_nested_numpy_shm` starts two real spawn children, creates one production queue and result pump per worker, transfers nested video/audio NumPy arrays through SHM, shuts down pumps, queues, and workers, then asserts every child exited and every SHM name is gone. The seven focused modules now report `145 passed` with no `resource_tracker` warning.\r\n3. Reproduction: `examples/offline_inference/minimax_h3/dlo_dp2_lifecycle.py` now provides the exact two-GPU `dlo-dp2` and ordinary non-DLO TP2 `request` modes. The PR body contains the complete environment and commands, and explicitly states `enforce_eager=True`.\r\n4. Baseline: the PR body now distinguishes literal parent `48298030`, which rejects the configuration, from archived head `64b19970`, which reproduces the greater-than-115-second hang.\r\n\r\n@david6666666 request admission waiting is now configurable as requested. `request_batch_max_wait_ms=0` remains zero and disables waiting; a nonzero value such as the runner value of 500 ms explicitly enables coalescing.\r\n\r\n@asukaqaq-s I agree that per-replica SP groups plus rank-local mmap sharing are the cleaner long-term topology. That redesign is intentionally out of this DP correctness PR. The current cross-DP AllGather path now accepts only requests with a complete matching scheduler compatibility key and fails closed on a partial-wave timeout, so an uncertain process group is never reused."
+    },
+    {
+      "author": "lishunyang12",
+      "body": "DCO follow-up: the two review-fix commits were rewritten only to add the required `Signed-off-by` trailers. Code content is unchanged.\n\n- `e55738af` is now `b7c59afa`\n- `84a05548` is now `74d35ffa`\n\nThe PR description has been updated to the signed hashes."
+    },
+    {
+      "author": "lishunyang12",
+      "body": "Target-GPU rerun is now complete on head `2d190bf6` using 2x B300, vLLM 0.26.0, PyTorch 2.11.0+cu130, `CUDNN_ATTN`, and `enforce_eager=True`.\n\nThe first current-head run exposed a real lifecycle regression: both ordinary TP2 and DLO/DP2 generated successfully, but `engine.close()` returned with both workers alive. The root cause was the interaction between two states: the orchestrator pre-marks `client._shutting_down = True` to suppress false death reports, while the new idempotence guard returned immediately when it saw that pre-mark. Consequently, the actual `DiffusionEngine.close()` was skipped.\n\nCommit `2d190bf6` separates shutdown-in-progress from shutdown-completed and serializes teardown. Added regression coverage verifies that an orchestrator-pre-marked client still closes the engine and that a second shutdown remains idempotent.\n\nPost-fix GPU results:\n\n- Ordinary non-DLO TP2: generation 19.296 s, shutdown 4.848 s, `active_children=[]`.\n- DLO AllGather DP2: empty+valid wave rejected both requests in 0.005 s; the same engine completed two recovery requests in 26.937 s; shutdown 14.204 s; `active_children=[]`.\n- Both modes produced video `[124, 768, 1344, 3]` and audio `[1, 2, 165600]`.\n- Both logs contain worker `Shutdown complete`; neither contains orchestrator timeout, deferred StageRuntime shutdown, unexpected worker death, `resource_tracker`, or leaked shared memory.\n- The DLO log tracebacks are the intentionally injected empty-prompt wave and are followed by successful same-engine recovery plus exit status 0.\n\nFocused CPU regression: `108 passed`; inline-client module: `11 passed`; Ruff and `git diff --check` pass.\n\n@hsliuustc0106 PTAL when convenient."
+    },
+    {
+      "author": "lishunyang12",
+      "body": "Addressed all latest inline review feedback."
+    },
+    {
+      "author": "hsliuustc0106",
+      "body": "LGTM"
+    }
+  ],
+  "reviews": [
+    {
+      "author": "hsliuustc0106",
+      "body": "I reproduced the main DLO/DP fix on head `e656fc3a` with MiniMax-H3 FL2VA, vLLM 0.26.0, PyTorch 2.11.0+cu130, and 2x L20X (the PR reports 2x B300). I used the PR topology and `enforce_eager=True` because the execution mode is not stated.\n\nThe functional results are good:\n- the empty+valid wave rejected both requests in 5.8–6.1 ms and named the empty request ID;\n- the next DP2 wave in the same engine completed in 31.6–34.5 s;\n- both outputs matched `[124, 768, 1344, 3]` video and `[1, 2, 165600]` audio, with different frame hashes;\n- the seven changed test modules passed (`138 passed`).\n\nHowever, the clean-shutdown claim did not reproduce. Both full E2E runs logged:\n\n```text\n[AsyncOmniEngine] Orchestrator did not stop within 30.0 seconds; continuing cleanup\n[AsyncOmniEngine] Deferring StageRuntime shutdown until the Orchestrator exits\nresource_tracker: There appear to be 1 leaked shared_memory objects to clean up at shutdown\n```\n\nThe second run closed the asyncio loop and released output references before synchronous shutdown, with the same result.\n\nPlease address this before marking the PR ready:\n1. Make the real MiniMax-H3 DP2 lifecycle exit without the orchestrator timeout, deferred StageRuntime shutdown, or leaked shared memory.\n2. Add a multiprocess lifecycle regression that transfers a large nested NumPy result through the per-worker queues and asserts result pumps, worker processes, and shared-memory resources are gone after shutdown. The current mock-only shutdown tests do not cover this failure.\n3. Publish the exact two-GPU E2E script/command, environment, and execution mode, and rerun it with complete shutdown logs. Since `WorkerProc.shutdown()` is shared code, please also validate an ordinary non-DLO request-mode case.\n4. Clarify the “before” revision: the literal parent `48298030` rejects this DP2 configuration during initialization, while the archived force-pushed head `64b19970` does reproduce the >115 s hang.\n\nThe deadlock prevention works, but the lifecycle behavior claimed by this PR is not clean yet.",
+      "state": "CHANGES_REQUESTED"
+    },
+    {
+      "author": "yuanheng-zhao",
+      "body": "Generally LGTM",
+      "state": "COMMENTED"
+    }
+  ]
+}

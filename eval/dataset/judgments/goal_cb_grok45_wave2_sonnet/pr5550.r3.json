@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.7,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both independently surface the same real latent bug (ARDiffusionModelRunner.execute_model not accepting diffusion_kv_metadata) and the DLO+metadata DP fallback issue, which cross-validates both as grounded rather than fabricated. Most ground-truth P1/P2 concerns target stage_kv/interface.py validation logic (tensor geometry, null-block, digest binding) that no longer exists in this renamed/refactored snapshot, capping recall for both candidates similarly; X compensates by mapping closely to asukaqaq-s's explicit 'local construction-time invariant' validation taxonomy and correctly crediting the already-fixed engine-cleanup P1, while Y lands a sharper but narrower catch on batch/step pre-RPC validation asymmetry (echoing hsliuustc0106's P2 theme). X is more consistently concrete with suggested code fixes and clear severity tiers, whereas Y mixes strong evidence-heavy findings with self-answered non-findings and visibly truncated text, hurting actionability and precision.",
+  "_cost_usd": 0.41089270000000006,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok45"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok45",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok45",
+    "arm_a_sha256": "1b0b8654a330427175a2d96c7b7c35617454cffb13737d78cb4b587583c9c45a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b6ae3b48c6859b0d16784163ab2044d7d85e3b3b32f4e60b559fa2a55186c64b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

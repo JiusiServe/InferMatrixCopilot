@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth carries no substantive concerns (just LGTM approvals), so recall is trivially satisfied by both. X traces the actual code path (stage_input_processors, talker dummy-forward, serving_chat error handling) to show the PR's own 'silent audio' claim is likely wrong, catches an overbroad extra_body generalization with a concrete counter-example (GLM-Image.md), and proposes exact replacement text plus a runnable jq/base64 verification snippet — all highly grounded and directly actionable. Y's findings are thinner: one is framed as an unresolved question ('can you paste the choices array') rather than a verified claim, and the CI note largely duplicates X's but is more hedged. X's greater verification rigor and concrete fix suggestions make it clearly stronger.",
+  "_cost_usd": 0.1313055,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_train",
+    "arm_a_sha256": "59c87ea9fe5ef84c4fd6e355d445866919d6d22fec9086ca08998208ec8a69a3",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5a2e689fc33efd67adbf119f1e4cf034841928ad70fea2d99f142a727ca8ea18",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

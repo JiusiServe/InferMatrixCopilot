@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently surface the one live ground-truth concern (FLASHINFER_ATTN silently ignoring quant) with strong, well-grounded evidence, and both correctly recognize the earlier 'unconditional kwargs' concern as already resolved rather than re-flagging it. X's unique standout is a sharp CI test-marker deselection catch; Y's unique standouts are the Ring-SP silent SAGE bypass (a severe, novel correctness/production-safety finding) and the SAGE output-dtype-mismatch catch, both backed by executed verification snippets that lend extra confidence to precision. Y's Blocking/Should-fix/Nits triage is marginally more actionable than X's flat major/minor tagging, and X's final section is truncated. The margin is slight since both are unusually thorough, evidence-heavy reviews of comparable overall quality.",
+  "_cost_usd": 0.41739600000000004,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46_r3",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r3",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r3",
+    "arm_a_sha256": "5ac3e027db8a98782877c288b7c2edd43ca2c9744175e93e743f834d1680776a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "703e9ad7d9901fc59d5ad8d20917e36993f445b09d3ecaaba356dbe9c900f660",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

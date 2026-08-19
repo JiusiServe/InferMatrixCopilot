@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.5,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.75,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y independently rediscovers the ground truth's centerpiece finding (WebSocket StreamingSpeechSessionConfig still hard-rejects speed!=1.0 while HTTP now allows native speed via IndexTTS25Adapter — matching linyueqian's protocol/audio.py:85 inline comment almost exactly) and grounds every claim in quoted code/line evidence with an explicit validated-vs-sweep methodology. X's findings (mel_head.bias uninitialized memory, IndexTTS-2 regression table, CONCAT semantics) are detailed and plausibly grounded but orthogonal to what actual reviewers flagged, entirely missing both the WebSocket/HTTP speed asymmetry and the blocking profiler/VRAM evidence gap. X is slightly more actionable with inline code-fix snippets, but Y's superior recall and evidence-backed precision dominate.",
+  "_cost_usd": 0.3298537000000001,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok46_r2"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r2",
+    "arm_a_sha256": "e4a2af141d8e34f5b98c3f67500be9bd637d91de9236c1baa683d80972213d64",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

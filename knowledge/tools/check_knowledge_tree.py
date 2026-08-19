@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""检查 contributing/、general/ 和 repos/ 的目录、索引与 Markdown 链接。"""
+"""检查 general/ 和 repos/ 的目录、索引与 Markdown 链接。
+
+贡献规范（CONTRIBUTING.md、SCHEMA.md、contributing/）已迁到 doc/knowledge/：
+它们是**文档**，不是知识页，因此不再由本校验器扫描。知识树本身只剩数据面。"""
 
 from __future__ import annotations
 
@@ -11,7 +14,7 @@ from urllib.parse import unquote
 
 
 ROOT = Path(__file__).resolve().parent.parent
-KNOWLEDGE_ROOTS = (ROOT / "contributing", ROOT / "general", ROOT / "repos")
+KNOWLEDGE_ROOTS = (ROOT / "general", ROOT / "repos")
 INDEX_NAME = "_index.md"
 SPECIAL_PAGES = {INDEX_NAME, "rules.md", "architecture.md"}
 GROUP_DIRS = {"guides", "history", "incidents", "references", "results", "rfcs"}
@@ -385,16 +388,22 @@ def check_local_is_untracked() -> None:
 
 
 def check_short_contributing_entry() -> None:
-    path = ROOT / "CONTRIBUTING.md"
-    if not path.is_file():
-        errors.append("缺少根贡献入口：CONTRIBUTING.md")
+    """贡献入口的长度门。
+
+    入口已迁到 doc/knowledge/CONTRIBUTING.md（它是文档，不是知识页）。这条规则跟着
+    它走而不是被删掉：让入口保持短、细则下沉到 contributing/ 专题，是这棵树能被
+    按需导航的原因；删掉这道门，入口会重新长回一份没人读完的全文规范。
+    仓库根不可得时（例如只装了 wheel 的知识树）跳过，不误报。
+    """
+    entry = ROOT.parent / "doc" / "knowledge" / "CONTRIBUTING.md"
+    if not entry.is_file():
         return
-    text = read_text(path)
+    text = read_text(entry)
     non_empty_lines = sum(1 for line in text.splitlines() if line.strip())
-    byte_size = path.stat().st_size
+    byte_size = entry.stat().st_size
     if non_empty_lines > 100 or byte_size > 8 * 1024:
         errors.append(
-            "根贡献入口过长，细则必须下沉到 contributing/："
+            "贡献入口过长，细则必须下沉到 doc/knowledge/contributing/："
             f"{non_empty_lines} 个非空行，{byte_size} bytes"
         )
 
@@ -411,7 +420,6 @@ def main() -> int:
     excluded_parts = {
         ".git",
         "artifacts",
-        "contributing",
         "general",
         "local",
         "outputs",

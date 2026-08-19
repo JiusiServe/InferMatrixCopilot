@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.75,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Candidate Y produced no review at all (API balance error, run blocked), so it contributes zero recall, precision, or actionability. Candidate X delivers a detailed, well-grounded review with specific file/line references, verified claims (stubbed torch_npu.npu_rotary_mul, traced tensor shapes), and concrete fixes; it doesn't hit the exact ground-truth asks (3-way perf comparison, basic extraction request) since those were already resolved in-diff, but it extends the same 'shared util' theme with a sharper follow-up about unused sibling call sites, plus finds real correctness/test-coverage gaps.",
+  "_cost_usd": 0.2101732,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15_holdout4_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "b446f8107e08e2ef816f08075e0e14db1d9a359dc75b6d4193803e960348ec22",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "400e2cdee23e452f67bea91295a8fd9f971ab290f37c9a61d27bec6c625cf76a",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.48,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.72,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently surface the same core issues (double-resample WER bug, audio_vae config mutation, dropped language/dialect field) and are highly actionable with concrete file/line fixes. But X's headline audio_vae finding claims the mutation actually truncates the encoder's runtime layer count ('verified locally... output changed after mutation: True'), which directly contradicts the ground-truth explanation from the PR author (LHXuuu: 'the encoder module is already constructed before config.num_hidden_layers is changed, so the actual encoder layer count is unchanged') — Y's version of this finding matches that ground truth almost verbatim. X also injects unverifiable specifics (fabricated-looking commit SHAs for a merge narrative, and phantom issue numbers #2906/#4341 for prior VAE implementations) that read as hallucinated rather than diff-grounded, hurting precision. Y's evidence-tagged (claim-verified/claim-refuted) methodology stays tightly anchored to the diff and repo greps throughout.",
+  "_cost_usd": 0.30205360000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_train_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v14_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_train_r1",
+    "arm_a_sha256": "d4f310e6bab2b5c5f79e35f6d327c29f089af2e73164da4112236f81c8301401",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "264e453d996b4a5c483bf206cefb21e513e90d0d6bda5e49948434353154f4a5",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

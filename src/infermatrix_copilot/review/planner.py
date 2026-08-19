@@ -26,7 +26,13 @@ from typing import Any, Sequence
 from ..llm import parse_json_reply
 
 DEPTHS = ("light", "standard", "full")
-DEFAULT_STANDARD_LENSES = ("logic", "behavior")  # fail-safe pair, priority order
+# fail-safe set, priority order. Verification is included: the planner
+# fallback runs when the gray-zone call fails, i.e. with no information — and
+# a review with no verification lens misses the test-integrity/CI-selection
+# class entirely (observed on a live gray-zone item: standard=[logic,
+# behavior] never read the CI lane rules, which held the baseline's headline
+# finding).
+DEFAULT_STANDARD_LENSES = ("logic", "behavior", "verification")
 
 _DOC_SUFFIXES = (".md", ".rst", ".txt", ".adoc")
 _CONFIG_SUFFIXES = (".yaml", ".yml", ".toml", ".ini", ".cfg", ".json")
@@ -48,6 +54,13 @@ _RENAME = re.compile(r'^rename (?:from|to) "?(.+?)"?\s*$')
 # must not disqualify a tiny PR from the light tier.
 _API_LINE = re.compile(
     r"^[+-]\s*(?:async\s+def\s+\w+|def\s+\w+\s*\(|class\s+\w+|[A-Z][A-Z0-9_]{2,}\s*=)")
+# assignment target on a ± code line: a `-`/`+` pair sharing the LHS with a
+# DIFFERENT RHS is a value flip — an existing behavior knob changed (default
+# lists, feature flags, thresholds). `_API_LINE` misses these (a default flip
+# inside a function body has no def/class/CONST shape), and a tiny diff that
+# flips a value can have repo-wide blast radius, so it must never rule light.
+_ASSIGN_LINE = re.compile(
+    r"^[+-]\s*(?P<lhs>[A-Za-z_][\w.]*(?:\[[^\]=]+\])?)\s*=(?![=])\s*(?P<rhs>.+?)\s*$")
 
 
 def _unquote(path: str) -> str:
@@ -84,6 +97,7 @@ class DiffSignals:
     high_risk_files: tuple[str, ...] = ()
     api_change_hints: tuple[str, ...] = ()   # `-` lines: changed/removed surface
     api_added: int = 0                        # `+` def/class/const: new surface
+    value_flips: tuple[str, ...] = ()         # -/+ pairs: same LHS, new RHS
     code_insertions: int = 0
     code_deletions: int = 0
 
@@ -94,6 +108,13 @@ class DiffSignals:
     @property
     def docs_only(self) -> bool:
         return bool(self.files) and len(self.doc_files) == len(self.files)
+
+    @property
+    def docs_heavy(self) -> bool:
+        """Docs are the substance: doc files present, zero code files (config/
+        asset riders allowed — a nav .yml or an image beside three .md files
+        does not make a docs PR a code PR)."""
+        return bool(self.doc_files) and not self.code_files
 
     @property
     def code_lines_changed(self) -> int:
@@ -109,7 +130,8 @@ class DiffSignals:
                 "asset_files": len(self.asset_files),
                 "high_risk_files": list(self.high_risk_files),
                 "api_change_hints": len(self.api_change_hints),
-                "api_added": self.api_added}
+                "api_added": self.api_added,
+                "value_flips": list(self.value_flips)}
 
 
 @dataclass(frozen=True)
@@ -147,6 +169,11 @@ def diff_signals(diff_text: str,
     code_insertions = code_deletions = 0
     api_hints: list[str] = []
     api_added = 0
+    # (path, lhs) -> rhs of removed assignments; a later `+` line with the
+    # same LHS but a different RHS is a value flip. Same-RHS pairs are code
+    # motion and stay silent.
+    removed_assigns: dict[tuple[str, str], str] = {}
+    value_flips: list[str] = []
     current_path = ""
     current_kind = "code"
 
@@ -191,6 +218,17 @@ def diff_signals(diff_text: str,
                 api_hints.append(f"{current_path}: `{raw[:120].strip()}`")
             else:
                 api_added += 1
+        if current_kind == "code":
+            m = _ASSIGN_LINE.match(raw)
+            if m:
+                key = (current_path, m.group("lhs"))
+                if raw[0] == "-":
+                    removed_assigns.setdefault(key, m.group("rhs"))
+                elif key in removed_assigns \
+                        and removed_assigns[key] != m.group("rhs"):
+                    if len(value_flips) < 10:
+                        value_flips.append(
+                            f"{current_path}: `{m.group('lhs')}`")
 
     by_kind: dict[str, list[str]] = {"doc": [], "test": [], "config": [],
                                      "asset": [], "code": []}
@@ -205,7 +243,8 @@ def diff_signals(diff_text: str,
         asset_files=tuple(by_kind["asset"]),
         code_files=tuple(by_kind["code"]),
         high_risk_files=risky, api_change_hints=tuple(api_hints),
-        api_added=api_added, code_insertions=code_insertions,
+        api_added=api_added, value_flips=tuple(value_flips),
+        code_insertions=code_insertions,
         code_deletions=code_deletions)
 
 
@@ -213,8 +252,22 @@ def classify(sig: DiffSignals, settings: Any) -> tuple[str, str] | None:
     """(depth, reason) for the CLEAR cases; None = gray zone. Light requires
     positive evidence — a diff that parses to zero files goes gray, so a
     misparse degrades toward more review, never toward light."""
-    if sig.docs_only:
-        return "light", "docs-only diff"
+    if sig.docs_only or sig.docs_heavy:
+        # Docs PRs are reviews of CLAIMS (commands, numbers, links, pins) —
+        # wave-2 measured the light tier's single pass at roughly half the
+        # baseline's recall on every docs item, with the judge crediting
+        # exactly the claim-verification work light has no budget for. Only
+        # a genuinely small docs diff stays light; the rest get the
+        # ensemble (steps.py swaps in the docs claims-audit pass set).
+        if sig.lines_changed <= settings.review_light_max_lines \
+                and len(sig.files) <= settings.review_light_max_files:
+            return "light", "docs-only diff (small)"
+        if sig.lines_changed > settings.large_diff_lines:
+            return "full", (f"large docs diff: {sig.lines_changed} lines / "
+                            f"{len(sig.doc_files)} doc files")
+        return "standard", (f"docs diff above the light threshold: "
+                            f"{sig.lines_changed} lines / "
+                            f"{len(sig.files)} files")
     if sig.code_lines_changed > settings.large_diff_lines \
             or len(sig.code_files) > settings.large_diff_files:
         return "full", (f"large code diff: {sig.code_lines_changed} code "
@@ -224,7 +277,7 @@ def classify(sig: DiffSignals, settings: Any) -> tuple[str, str] | None:
                         f"{list(sig.high_risk_files)}")
     if sig.files and len(sig.files) <= settings.review_light_max_files \
             and sig.lines_changed <= settings.review_light_max_lines \
-            and not sig.api_change_hints:
+            and not sig.api_change_hints and not sig.value_flips:
         return "light", (f"small low-risk diff: {sig.lines_changed} lines / "
                          f"{len(sig.files)} files, no API/default changes")
     return None
@@ -281,9 +334,16 @@ def _plan_llm(sig: DiffSignals, diff_text: str, lens_names: Sequence[str],
               f"## DIFF EXCERPT (untrusted)\n<untrusted_data>\n"
               f"{diff_text[:6_000]}\n</untrusted_data>")
     try:
+        # 8000, not 400: the official deepseek-v4-pro is a REASONING model —
+        # its thinking consumes the completion budget invisibly (measured on a
+        # real gray diff: 2000 tokens spent, ZERO text returned), so at 400
+        # the planner silently failed on every gray item across two campaigns
+        # (planner:"llm-fallback" on 5610/5713/6079) and the deliberate
+        # standard-fallback masked it. The call is one-shot and tiny either
+        # way; the generous ceiling only pays for what the model thinks.
         reply = llm.create(system=system,
                            messages=[{"role": "user", "content": prompt}],
-                           model=model, max_tokens=400, role="planner")
+                           model=model, max_tokens=8_000, role="planner")
     except Exception:
         return None
     obj = parse_json_reply(reply.text or "")

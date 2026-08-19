@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.38,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.18,
+    "precision": 0.75,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X independently converges on the same validation-completeness themes the human reviewers raised (asukaqaq-s's call for local construction-time invariants and consolidated validators, hsliuustc0106's block-length/seq_len binding concern) by scrutinizing the new DTOs against their #5541 siblings, and also finds the AR-diffusion runner signature gap and untested DLO fallback that Y independently found too. Y's findings, while heavily evidenced, skew toward test-methodology nitpicks ('this test doesn't exercise the RPC path') rather than the production-code correctness/validation gaps that dominate the ground truth, giving it much lower thematic overlap. X's fixes are also more concrete (code diffs, clear rationale) versus Y's dense evidence-dump prose that mostly recommends 'add a test'.",
+  "_cost_usd": 0.3796796,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok46_r2"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r2",
+    "arm_a_sha256": "b086f931b854156ef450aff10ecadd3aab257b9430319e58c7c98e4622bea81c",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b6ae3b48c6859b0d16784163ab2044d7d85e3b3b32f4e60b559fa2a55186c64b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.5,
+    "actionability": 0.78,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.32,
+    "precision": 0.68,
+    "actionability": 0.8
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "X's headline blocking finding tells the author to revert the transformers>=5.10.1,<5.15 pin, but ground truth (hsliuustc0106) explicitly requested exactly that tightened range and the PR author later confirmed it was kept intentionally — X's top recommendation contradicts reviewer consensus, hurting precision. Neither candidate hits the two most substantive unresolved ground-truth findings (linyueqian's cross-attn modulation re-keying and the preserves_reference_image_size LANCZOS-skip regression for legacy LTX-2/2.3), but Y independently surfaces the same underlying pattern (unguarded version-scope creep affecting non-2.5 pipelines) via its ltx2_conditioning.py:615 and serving_video.py:112 findings, and its claim-verification methodology (explicitly checking PR-body claims against code with cited evidence, flagging a tautological parity assertion) is more rigorous and better aligned with the ground-truth's own skepticism about parity claims. Both are highly actionable with concrete file:line citations and clear fixes.",
+  "_cost_usd": 0.4146547,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16f_holdout5_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout5_r1",
+    "arm_a_sha256": "78042badcf571c8933cdc638aaebf721fcd42b5a8b3734802dd4d4f5456dc8a8",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a23c5798ed01a914ae4e93b2f399942089976e4e45d06a386cb1c3528b0aecbb",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

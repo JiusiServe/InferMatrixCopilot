@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.65,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.5,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X directly identifies the packed-projection and checkpoint naming concern raised by the human reviewer, with concrete code paths and fixes, but misses the requested before/after validation and adds several speculative or out-of-scope findings. Y partially approaches the naming concern through a proposed SDXL regression test, but several findings are weak, explicitly unverified, or cosmetic, and it also misses before/after validation.",
+  "_usage": {
+    "input": 3,
+    "output": 963
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v11_deep_val"
+  },
+  "_roles": {
+    "arm": "copilot_v11_deep_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v11_deep_val",
+    "arm_a_sha256": "0dd152c1a5d921a7a5f7ebd045e61912055ca3bb52cd87bfef95462dc5f78579",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9201be5ea408a41833fb8e6040e5eb97d26044159a083e4d1896451ac3585494",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

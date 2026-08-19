@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.78,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth carries no substantive concerns (just an approval), so both candidates score recall=1.0 trivially and both go well beyond it by independently surfacing the same real defect: state.serving_tokenization=None in pure-diffusion mode still lets _create_speech_error_json_response call base(raw_request).create_error_response() unguarded, reproducing the 500 this PR claims to fix. Both also flag that the regression tests still mock api_server_module.base, so the fix isn't actually regression-tested. Y is slightly more precise/actionable: it anchors every major/minor finding to specific file:line evidence with an explicit validated/refuted claim ledger, adds a distinct, well-grounded major finding (create_chat_completion's handler-None branch returns a bare ErrorResponse instead of a 404 JSON, a real behavioral gap in code this diff touches) and ships GitHub-suggestion-formatted diffs. X's unique additions (version-pin/CI speculation, a sibling openai_serving_* rename audit) are honestly hedged as unverified leads, which keeps them non-fabricated but lowers their evidentiary weight and actionability compared to Y's more concretely verified extras.",
+  "_cost_usd": 0.23912719999999998,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17_val"
+  },
+  "_roles": {
+    "arm": "copilot_v17_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_val",
+    "arm_a_sha256": "744d1e88dc61e380b74b2777910c14c86c906f3fcdbe2f3b8cd988c07032e350",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b9fe4c00140a73cf5cc08ceded6d03eb8b8faea45f6c3b50e6f9753b9a1a1a01",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

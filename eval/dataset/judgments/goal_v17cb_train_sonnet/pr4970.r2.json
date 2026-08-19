@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.7,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth's only real concern is 'split the VoxCPM2 regression into a separate PR' plus an LGTM; X's blast-radius sweep independently flags VoxCPM2's deploy yaml and concludes it's correctly out of scope, a genuine match, while Y never mentions VoxCPM2 at all. X's claims are also more conservative and evidence-tagged, whereas Y layers in unverifiable deep claims about vLLM 0.26.0 sampler internals that add fabrication risk despite being well-written. Y is more actionable and thorough, but the diff is trivial (2-line seed removal) and the task warns against rewarding verbosity over being right and grounded.",
+  "_cost_usd": 0.268169,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17cb_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17cb_train",
+    "arm_a_sha256": "75aaa89845a21a6b079cd556444804ba82d6b335ed11ce1e4f2825b6e94ea422",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "410634f22ac0d9a55948ec0dfc9caa6557a8995e24766ff507dbe677d6dd37dc",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

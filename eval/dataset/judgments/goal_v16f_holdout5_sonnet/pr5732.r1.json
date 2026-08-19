@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.7,
+    "precision": 0.75,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates correctly identify that the RGBA-detection and mixed-dtype-promotion bugs flagged in ground truth were already fixed in the shown head, and both independently surface the dead uint8 fast-path (matching david6666666's nit) and the AMD/NPU CI-gate concern (matching Xunzhuo's thread). Y backs its claims with actual differential fuzzing and measured before/after benchmarks (directly answering the human reviewer's request for timing evidence) and gives tight, concrete code-level fixes for each finding, while X is exhaustively evidence-cited but padded with three near-duplicate 'stale 11 vs 13 passed' entries that dilute precision without adding new signal. X does contribute one genuinely novel, well-reasoned catch (2-D frames now produce a (F,H,W) shape violating the documented (F,H,W,3) contract) that Y misses, keeping the gap close.",
+  "_cost_usd": 0.3458413,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16f_holdout5_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout5_r1",
+    "arm_a_sha256": "cc94762fe6ce050e3f8894639e008ed6553cbec7a7e37dafa6647bc7842a715b",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "f1c3b2ea619d1f9fcfbece3a4d066dfc15e8ef4d607f43d44d600decb717bdb9",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

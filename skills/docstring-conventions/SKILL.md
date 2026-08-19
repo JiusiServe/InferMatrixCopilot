@@ -11,7 +11,7 @@ run_count: 0
 ## Diagnose
 A module/class/function/method has no docstring, or one that restates the
 signature instead of explaining behavior + I/O. Or a PR adds a public function
-with no docstring. The normative reference is `doc/DOCSTRING_STYLE.md`.
+with no docstring. The normative reference is `doc/contributing/DOCSTRING_STYLE.md`.
 
 ## Fix
 Write to the house voice (grounded in PEP 257 form + Google's "what to

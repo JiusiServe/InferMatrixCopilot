@@ -17,7 +17,7 @@
 | Git、PR、rebase | [general/git](knowledge/general/git/_index.md) | [Git](knowledge/repos/vllm-omni/git/_index.md) / [rebase](knowledge/repos/vllm-omni/rebase/_index.md) |
 | Benchmark | [general/benchmark](knowledge/general/benchmark/_index.md) | [vLLM-Omni benchmark](knowledge/repos/vllm-omni/benchmark/_index.md) |
 | 远端验证 | [general/remote](knowledge/general/remote/_index.md) | [vLLM-Omni remote](knowledge/repos/vllm-omni/remote/_index.md) |
-| 新增或整理知识 | [knowledge/CONTRIBUTING](knowledge/CONTRIBUTING.md) | 先确定最近的 owner |
+| 新增或整理知识 | [knowledge/CONTRIBUTING](doc/knowledge/CONTRIBUTING.md) | 先确定最近的 owner |
 
 vLLM-Omni 的代码 owner：
 
@@ -31,7 +31,7 @@ vLLM-Omni 的代码 owner：
 | queue、token budget、prefix cache、调度 | [scheduler](knowledge/repos/vllm-omni/components/scheduler/rules.md) |
 | 明确的模型或 registry key | [models](knowledge/repos/vllm-omni/models/_index.md) |
 
-完整知识入口仍在 [knowledge/README](knowledge/README.md)。只有 owner 不明确时才看
+完整知识入口仍在 [知识树地图](doc/knowledge/tree-map.md)。只有 owner 不明确时才看
 [组件职责表](knowledge/repos/vllm-omni/components/_index.md)；不要默认打开事故记录、
 history、results 或所有 `_index.md`。
 
@@ -49,12 +49,12 @@ src/infermatrix_copilot/
 playbooks/                       Strict/Autonomous 工作流定义
 adapters/                        发布包中的仓库配置
 knowledge/                       通用、仓库、组件和模型知识
-doc/SPEC/                        与 src 文件对应的约束和职责
+doc/architecture/SPEC/                        与 src 文件对应的约束和职责
 test/                            离线测试
 ```
 
-整体架构先看 [CODE_TOUR](doc/CODE_TOUR.md)，修改具体源码前再看
-[file-level SPEC](doc/SPEC/README.md) 中对应文件。
+整体架构先看 [CODE_TOUR](doc/architecture/CODE_TOUR.md)，修改具体源码前再看
+[file-level SPEC](doc/architecture/SPEC/README.md) 中对应文件。
 
 ## 常见改动从哪里开始
 
@@ -65,7 +65,7 @@ test/                            离线测试
 | 模型、Key、Base URL | `config.py`、`llm.py` | `test_llm_providers.py`、`test_tier_split.py` |
 | 工作流步骤 | `playbooks/*.yaml`、`engine/steps/` | 对应 step 测试和 playbook 加载测试 |
 | 新仓库支持 | `adapters/<repo>/`、`knowledge/repos/<repo>/` | adapter 测试和知识检查 |
-| 更新 vLLM-Omni 知识 | `/imupdate` 维护流程 | [release maintenance](doc/VLLM_OMNI_RELEASE_MAINTENANCE.md) |
+| 更新 vLLM-Omni 知识 | `/imupdate` 维护流程 | [release maintenance](doc/contributing/release-maintenance.md) |
 | 安装或发布包 | `scripts/install_mcp.py`、`pyproject.toml` | installer 测试和 wheel 内容检查 |
 
 ## 本地开发
@@ -117,9 +117,11 @@ required status check —— 这是仓库设置，任何一次提交都做不到
 
 ## 进一步阅读
 
-- [设计](doc/DESIGN.md)
-- [知识来源和同步边界](doc/KNOWLEDGE.md)
-- [扩展知识库](doc/EXTENDING-KNOWLEDGE.md)
-- [MCP 安装与接口](doc/MCP.md)
-- [Autonomous workflow](docs/autonomous-workflow.md)
+- [指南](doc/GUIDE.md) —— 操作者使用 + 维护者开发，外加 playbook / step / tool
+  清单和性能对比（`CODE_TOUR` 的结构视角对照版）
+- [设计](doc/architecture/DESIGN.md)
+- [知识来源和同步边界](doc/architecture/KNOWLEDGE.md)
+- [扩展知识库](doc/knowledge/writing.md)
+- [MCP 安装与接口](doc/guide/mcp.md)
+- [Autonomous workflow](doc/guide/autonomous-workflow.md)
 - [评测](eval/README.md)

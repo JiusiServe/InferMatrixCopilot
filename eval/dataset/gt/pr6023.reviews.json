@@ -1,0 +1,52 @@
+{
+  "comments": [
+    {
+      "author": "SamitHuang",
+      "body": "Tracking issue: https://github.com/vllm-project/vllm-omni/issues/6024"
+    },
+    {
+      "author": "hsliuustc0106",
+      "body": "The storage-aware packing change fixes the shared-view amplification reported here, but I think there is a longer-term transport issue worth discussing.\n\nSHM selection is still made per value, while `MessageQueue` chooses its overflow path based on the aggregate serialized message size. With this PR's packing logic, I measured 32 independent 900 KB tensors: none was packed because each value is below the 1 MB threshold, but the resulting message was 28,813,783 bytes, above the 24 MiB ring-buffer limit. That still reaches the ZMQ XPUB/SUB overflow path and therefore leaves the same silent-drop failure mode reachable through a different payload shape.\n\nI don't think this should block the immediate fix, which correctly reduces the shared-view case from 128,007,220 bytes to 3,604 bytes in my focused check. Could maintainers discuss the desired long-term contract for oversized aggregate messages? Some options are:\n\n- make packing aggregate-size-aware;\n- provide chunking/reliable backpressure for the large-message path; or\n- fail fast with an actionable size error instead of allowing a silent PUB/SUB drop.\n\nA `MessageQueue` integration regression at batch size 32 would also help: assert that a large request-level batch either remains within the ring-buffer limit or is delivered reliably through the overflow path."
+    },
+    {
+      "author": "SamitHuang",
+      "body": "> The storage-aware packing change fixes the shared-view amplification reported here, but I think there is a longer-term transport issue worth discussing.\r\n> \r\n> SHM selection is still made per value, while `MessageQueue` chooses its overflow path based on the aggregate serialized message size. With this PR's packing logic, I measured 32 independent 900 KB tensors: none was packed because each value is below the 1 MB threshold, but the resulting message was 28,813,783 bytes, above the 24 MiB ring-buffer limit. That still reaches the ZMQ XPUB/SUB overflow path and therefore leaves the same silent-drop failure mode reachable through a different payload shape.\r\n> \r\n> I don't think this should block the immediate fix, which correctly reduces the shared-view case from 128,007,220 bytes to 3,604 bytes in my focused check. Could maintainers discuss the desired long-term contract for oversized aggregate messages? Some options are:\r\n> \r\n> * make packing aggregate-size-aware;\r\n> * provide chunking/reliable backpressure for the large-message path; or\r\n> * fail fast with an actionable size error instead of allowing a silent PUB/SUB drop.\r\n> \r\n> A `MessageQueue` integration regression at batch size 32 would also help: assert that a large request-level batch either remains within the ring-buffer limit or is delivered reliably through the overflow path.\r\n\r\nAgree:\r\n\r\n1. **Near-Term (vllm-omni IPC)**:\r\n     We can make `pack_diffusion_output_shm` aggregate-aware when processing `BatchRunnerOutput`. For example, estimating the aggregate un-packed tensor footprint and dynamically lowering the per-tensor packing threshold (or greedily packing tensors in descending size order until the remaining inline payload is safely within ~12–16 MiB). This guarantees that diffusion batch messages never hit the MessageQueue overflow path regardless of request count or tensor dimensions.\r\n\r\n2. **Long-Term (vLLM MessageQueue transport)** (rely on `vllm` upstream upgrade) \r\nThe fallback to ZMQ XPUB/SUB for oversized messages remains a fragile path across the framework (as also observed in #4845). Replacing the overflow path with SHM-backed chunking or a reliable socket mechanism with backpressure / fail-fast size checks in upstream vLLM would eliminate the silent-drop failure mode fundamentally.\r\n\r\n3. **Regression Test**:\r\n     Add a synthetic 32-request test case to `tests/diffusion/test_diffusion_ipc.py` to assert that multi-request batch outputs are safely bounded below the ring-buffer limit."
+    },
+    {
+      "author": "hsliuustc0106",
+      "body": "does this PR solve #5793 ?"
+    },
+    {
+      "author": "SamitHuang",
+      "body": "> does this PR solve #5793 ?\r\n\r\nno,  #5793 (ResultPump crash on cancelled futures) is addressed directly by #5983, for safe cancellation handling\r\nThis PR fixes the cases of normal requests were erroneously stalling or timing out in the first place: \r\n- tensor view storage amplification over ZMQ\r\n- batch split-map race\r\n- `result_mq` single-writer corruption\r\n- and atomic future resolution in the pump"
+    },
+    {
+      "author": "hsliuustc0106",
+      "body": "> > does this PR solve #5793 ?\r\n> \r\n> no, #5793 (ResultPump crash on cancelled futures) is addressed directly by #5983, for safe cancellation handling This PR fixes the cases of normal requests were erroneously stalling or timing out in the first place:\r\n> \r\n> * tensor view storage amplification over ZMQ\r\n> * batch split-map race\r\n> * `result_mq` single-writer corruption\r\n> * and atomic future resolution in the pump\r\n\r\nfor video generation, I think we need to optimize tensor transmission from engine/server output to client. Also, we should be more concise about what's the meaning of the global env vars and can we avoid them"
+    },
+    {
+      "author": "SamitHuang",
+      "body": "> for video generation, I think we need to optimize tensor transmission from engine/server output to client. Also, we should be more concise about what's the meaning of the global env vars and can we avoid them\r\n\r\n1. On the video payload transmisstion\r\n\r\nRight, for video models (e.g., LTX-2.3, MiniMax-H3), the video payloads (uncompressed raw video tensors) are much larger than image payload.  When the Engine/API server sends final outputs over HTTP API to an external user/client, returning raw video arrays (e.g. JSON/base64 of 1.2 GB) over the network is inefficient. \r\n\r\nA better solution is either compressed video streaming (for web clients) or zero-copy shared-memory pointers (for co-located trainers like verl-omni).\r\n\r\nThere are 2 hops in the transmission pipeline:\r\n  • Hop 1: GPU Worker Process $\\rightarrow$ Engine / Scheduler Process (Internal IPC)\r\n  • Hop 2: Engine / Server $\\rightarrow$ External Client (HTTP / API Serving)\r\n\r\nThis PR is a targeted bugfix solving async output drops, worker-to-engine IPC buffer overflow, and pump thread race conditions, and has fixed and optimized Hop 1 via POSIX Shared Memory. For Hop 2 optimization (either compress the video or use zero-copy SHM), I think we should do it in another followup PR.\r\n\r\n2. On the global env var\r\n\r\nThis PR doesn't add new env var. `_ASYNC_OUTPUT_DRAIN_TIMEOUT_S = 10.0` is purely an internal Python constant in `diffusion_worker.py`. I have updated the comment and docs to explain it"
+    },
+    {
+      "author": "hsliuustc0106",
+      "body": "> This PR is a targeted bugfix solving async output drops, worker-to-engine IPC buffer overflow, and pump thread race conditions, and has fixed and optimized Hop 1 via POSIX Shared Memory. For Hop 2 optimization (either compress the video or use zero-copy SHM), I think we should do it in another followup PR.\r\n\r\nPlease mark it with a new issue and we need to proceed to optimize the transmission. BTW, I remember we have done similar optimization to the WAN model before but it seems that optimization is not repo-wide:)\r\n\r\n\r\n"
+    },
+    {
+      "author": "SamitHuang",
+      "body": "> Please mark it with a new issue and we need to proceed to optimize the transmission. BTW, I remember we have done similar optimization to the WAN model before but it seems that optimization is not repo-wide:)\r\n\r\ntrack here: https://github.com/vllm-project/vllm-omni/issues/6212"
+    }
+  ],
+  "reviews": [
+    {
+      "author": "fhfuih",
+      "body": "Overall LGTM. This PR fixes the conflict between the async output channel and the free-up action of a sleep task.",
+      "state": "COMMENTED"
+    },
+    {
+      "author": "hsliuustc0106",
+      "body": "lgtm",
+      "state": "APPROVED"
+    }
+  ]
+}

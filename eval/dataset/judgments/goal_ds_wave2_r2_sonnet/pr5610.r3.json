@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.7,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "The diff shown is the PR's final (post-fix) state, so most ground-truth concerns (NPU/XPU/MUSA platform scope, connector live-state ownership, image path, full-payload-branch unreachability, prefix-cache incompatibility) are already resolved in the doc; X explicitly re-verifies nearly all of these against the actual code and even extends the connector-ownership concern into a new, well-evidenced finding (three additional call sites draining connector output) plus catches a fresh, plausible GitHub-vs-MkDocs image rendering bug. Y's review is thinner and largely orthogonal to what the human reviewer cared about — it never engages with the connector-ownership/self.requests issue (the PR's most substantive architectural concern) or the image-path, full-payload, or prefix-cache areas, instead raising a mostly tangential 'evidence-grade benchmark label' request. Both reviews are grounded and actionable with file/line citations, but X's coverage of the human reviewer's actual concerns is far broader.",
+  "_cost_usd": 0.3499507,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_ds_wave2_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_ds_wave2_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_ds_wave2_r2",
+    "arm_a_sha256": "66a990d16e167ac035ea57e63de8804cff4c06a324ce0ce74185532cbb6797b2",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

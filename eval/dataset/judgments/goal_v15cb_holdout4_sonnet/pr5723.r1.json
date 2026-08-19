@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.7
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y traces claims through actual pipeline/platform code to surface two substantive, well-grounded bugs (MODEL pointing at the FL2VA partition breaking ref2va despite the 'all tasks work out of the box' claim, and a stale reference-count bullet contradicting the file's own input matrix) and shows awareness of the mkdocs --strict history and the MiniMax-H3-MUSA precedent for a separate file, both central to the ground-truth review. X's findings are mostly low-materiality nits (pip vs uv pip, missing warmup note, unlabeled stage-sum gaps) and never engages with the two headline blocking concerns (docs build failure, separate-file preference) that two human reviewers explicitly demanded changes for. Both are reasonably grounded and actionable with file/line citations, but Y's findings are more consequential and better tied to what reviewers actually cared about, giving it the edge on recall, precision, and actionability.",
+  "_cost_usd": 0.3614208,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15cb_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15cb_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15cb_holdout4_r1",
+    "arm_a_sha256": "fc4bb76edc82096a579d7d3296aa1c8fdc60dee4517529833007132d201eecbb",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "cb201dcc2cdab115638b4f9fa9a4049589bf1e28f73d4bc1e3a3fbc1975ca7e7",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

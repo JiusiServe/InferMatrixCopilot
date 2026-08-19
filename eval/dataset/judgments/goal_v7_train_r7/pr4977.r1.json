@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.5,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.65,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y directly captures the ground-truth compatibility issue by explaining that older kernels versions reject trust_remote_code and that retaining it would break every fallback. X only notices the stale PR-description claim, while many of its other findings are stylistic, pre-existing, or unrelated; Y also has speculative extras, but its core compatibility finding is precise and actionable.",
+  "_usage": {
+    "input": 3,
+    "output": 609
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "copilot_v7_goal_r7",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v7_goal_r7",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v7_goal_r7",
+    "arm_a_sha256": "ed62047386aa1b1464201d2582b61cfa4816b81b2182a1b042cb2b4ad5de295c",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "589a8ff13cb3893b76dd0d5220ad632d82f46cc0edd9083528ebb2466be7c8a7",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

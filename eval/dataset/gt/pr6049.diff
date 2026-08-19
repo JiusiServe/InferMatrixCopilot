@@ -1,0 +1,846 @@
+diff --git a/examples/offline_inference/image_to_video/image_to_video.py b/examples/offline_inference/image_to_video/image_to_video.py
+index b2f27bb5b4c..59644d1c161 100644
+--- a/examples/offline_inference/image_to_video/image_to_video.py
++++ b/examples/offline_inference/image_to_video/image_to_video.py
+@@ -61,7 +61,9 @@
+ from vllm_omni.entrypoints.omni import Omni
+ from vllm_omni.inputs.data import OmniDiffusionSamplingParams
+ from vllm_omni.model_extras import (
+-    build_image_to_video_prompt,
++    build_image_to_video_prompt as build_model_image_to_video_prompt,
++)
++from vllm_omni.model_extras import (
+     get_extra_body_params,
+     get_model_class_name,
+ )
+@@ -83,6 +85,22 @@ def parse_json_object(value: str, flag_name: str = "argument") -> dict[str, Any]
+ parse_profiler_config = functools.partial(parse_json_object, flag_name="--profiler-config")
+ 
+ 
++def build_image_to_video_prompt(
++    prompt: str,
++    negative_prompt: str | None,
++    media_inputs: dict[str, Any],
++) -> dict[str, Any]:
++    """Build the canonical request envelope for the shared I2V example."""
++    result: dict[str, Any] = {
++        "prompt": prompt,
++        "modalities": ["video"],
++        "multi_modal_data": media_inputs,
++    }
++    if negative_prompt is not None:
++        result["negative_prompt"] = negative_prompt
++    return result
++
++
+ def parse_args() -> argparse.Namespace:
+     parser = argparse.ArgumentParser(
+         description=(
+@@ -522,10 +540,13 @@ def main():
+         # Preserve the historical empty-prompt behavior for non-LTX examples.
+         negative_prompt = ""
+     prompt_dict = build_image_to_video_prompt(
+-        model_class_name=model_class_name,
+         prompt=args.prompt,
+         negative_prompt=negative_prompt,
+         media_inputs=media_inputs,
++    )
++    prompt_dict = build_model_image_to_video_prompt(
++        model_class_name=model_class_name,
++        prompt=prompt_dict,
+         height=height,
+         width=width,
+         num_frames=num_frames,
+diff --git a/examples/offline_inference/text_to_image/README.md b/examples/offline_inference/text_to_image/README.md
+index 4485e21c351..1a72b152cf4 100644
+--- a/examples/offline_inference/text_to_image/README.md
++++ b/examples/offline_inference/text_to_image/README.md
+@@ -57,8 +57,9 @@ python examples/offline_inference/text_to_image/text_to_image.py \
+   --output lingbot_t2i.png
+ ```
+ 
+-The LingBot prompt builder selects the `image` output modality and requests one
+-frame. Passing an input image is not supported in LingBot T2I mode.
++The shared T2I entry point selects the `image` output modality. The LingBot
++pipeline validates that T2I requests produce one frame and do not include an
++input image.
+ 
+ ## Quick Start
+ 
+diff --git a/examples/offline_inference/text_to_image/text_to_image.py b/examples/offline_inference/text_to_image/text_to_image.py
+index 03bdf70808f..e6f26e7b94d 100644
+--- a/examples/offline_inference/text_to_image/text_to_image.py
++++ b/examples/offline_inference/text_to_image/text_to_image.py
+@@ -21,7 +21,9 @@
+ from vllm_omni.lora.request import LoRARequest
+ from vllm_omni.lora.utils import stable_lora_int_id
+ from vllm_omni.model_extras import (
+-    build_text_to_image_prompt,
++    build_text_to_image_prompt as build_model_text_to_image_prompt,
++)
++from vllm_omni.model_extras import (
+     get_extra_body_params,
+     get_model_class_name,
+     should_init_extra_args_for_non_diffusion_stages,
+@@ -56,6 +58,17 @@ def parse_json_object(value: str, flag_name: str = "argument") -> dict[str, Any]
+ parse_profiler_config = functools.partial(parse_json_object, flag_name="--profiler-config")
+ 
+ 
++def build_text_to_image_prompt(prompt: str, negative_prompt: str | None) -> dict[str, Any]:
++    """Build the canonical request envelope for the shared T2I example."""
++    result: dict[str, Any] = {
++        "prompt": prompt,
++        "modalities": ["image"],
++    }
++    if negative_prompt is not None:
++        result["negative_prompt"] = negative_prompt
++    return result
++
++
+ def _normalize_images_for_save(images: list[Any]) -> list[Any]:
+     """Convert NumPy diffusion outputs to PIL images before saving."""
+     normalized = []
+@@ -505,9 +518,12 @@ def main():
+     generation_start = time.perf_counter()
+ 
+     prompt_dict = build_text_to_image_prompt(
+-        model_class_name=model_class_name,
+         prompt=args.prompt,
+         negative_prompt=args.negative_prompt,
++    )
++    prompt_dict = build_model_text_to_image_prompt(
++        model_class_name=model_class_name,
++        prompt=prompt_dict,
+         height=args.height,
+         width=args.width,
+     )
+diff --git a/examples/online_serving/image_to_video/README.md b/examples/online_serving/image_to_video/README.md
+index f18cea1c8ce..e6d9b070f15 100644
+--- a/examples/online_serving/image_to_video/README.md
++++ b/examples/online_serving/image_to_video/README.md
+@@ -1,6 +1,9 @@
+ # Image-To-Video
+ 
+-This example demonstrates how to deploy the Wan2.2 image-to-video model for online video generation using vLLM-Omni.
++This example demonstrates online image-to-video generation with vLLM-Omni.
++The startup script defaults to Wan2.2, but `MODEL` can select any supported
++image-to-video model. The existing curl helper remains a concrete Wan2.2
++request through the standard Videos API.
+ 
+ ## Start Server
+ 
+@@ -20,9 +23,7 @@ bash run_server.sh
+ 
+ The script allows overriding:
+ - `MODEL` (default: `Wan-AI/Wan2.2-I2V-A14B-Diffusers`)
+-- `PORT` (default: `8091`)
+-- `BOUNDARY_RATIO` (default: `0.875`)
+-- `FLOW_SHIFT` (default: `12.0`)
++- `PORT` (default: `8099`)
+ - `CACHE_BACKEND` (default: `none`)
+ - `ENABLE_CACHE_DIT_SUMMARY` (default: `0`)
+ 
+diff --git a/examples/online_serving/image_to_video/run_server.sh b/examples/online_serving/image_to_video/run_server.sh
+index a488f5340ee..2cb24d84167 100644
+--- a/examples/online_serving/image_to_video/run_server.sh
++++ b/examples/online_serving/image_to_video/run_server.sh
+@@ -1,12 +1,12 @@
+ #!/bin/bash
+-# Wan2.2 image-to-video server start script
++# Shared image-to-video server start script
+ 
+ MODEL="${MODEL:-Wan-AI/Wan2.2-I2V-A14B-Diffusers}"
+ PORT="${PORT:-8099}"
+ CACHE_BACKEND="${CACHE_BACKEND:-none}"
+ ENABLE_CACHE_DIT_SUMMARY="${ENABLE_CACHE_DIT_SUMMARY:-0}"
+ 
+-echo "Starting Wan2.2 I2V server..."
++echo "Starting image-to-video server..."
+ echo "Model: $MODEL"
+ echo "Port: $PORT"
+ echo "Cache backend: $CACHE_BACKEND"
+diff --git a/examples/online_serving/text_to_image/README.md b/examples/online_serving/text_to_image/README.md
+index 17d377ea3e2..7f8988a0add 100644
+--- a/examples/online_serving/text_to_image/README.md
++++ b/examples/online_serving/text_to_image/README.md
+@@ -1,6 +1,9 @@
+ # Text-To-Image
+ 
+-This example demonstrates how to deploy Qwen-Image model for online image generation service using vLLM-Omni.
++This example demonstrates online text-to-image generation with vLLM-Omni. The
++startup script and Python clients default to Qwen-Image, but `MODEL` can select
++any supported text-to-image model. The existing curl helper remains a concrete
++Qwen-Image request through the standard Images API.
+ 
+ ## Start Server
+ 
+@@ -226,8 +229,8 @@ count, use `size` and `n` rather than `height`, `width`, or
+ | `height`                 | int   | None    | Image height in pixels         |
+ | `width`                  | int   | None    | Image width in pixels          |
+ | `size`                   | str   | None    | Image size (e.g., "1024x1024") |
+-| `num_inference_steps`    | int   | 50      | Number of denoising steps      |
+-| `true_cfg_scale`         | float | 4.0     | Qwen-Image CFG scale           |
++| `num_inference_steps`    | int   | model   | Number of denoising steps      |
++| `true_cfg_scale`         | float | model   | True CFG scale when supported  |
+ | `seed`                   | int   | None    | Random seed (reproducible)     |
+ | `negative_prompt`        | str   | None    | Negative prompt                |
+ | `num_outputs_per_prompt` | int   | 1       | Number of images to generate   |
+diff --git a/examples/online_serving/text_to_image/gradio_demo.py b/examples/online_serving/text_to_image/gradio_demo.py
+index c8329c02ac1..e42be80ea86 100644
+--- a/examples/online_serving/text_to_image/gradio_demo.py
++++ b/examples/online_serving/text_to_image/gradio_demo.py
+@@ -1,6 +1,6 @@
+ #!/usr/bin/env python3
+ """
+-Qwen-Image Gradio Demo for online serving.
++Shared text-to-image Gradio demo for online serving.
+ 
+ Usage:
+     python gradio_demo.py [--server http://localhost:8091] [--port 7860]
+@@ -77,9 +77,9 @@ def generate_image(
+ def create_demo(server_url: str):
+     """Create Gradio demo interface."""
+ 
+-    with gr.Blocks(title="Qwen-Image Demo") as demo:
+-        gr.Markdown("# Qwen-Image Online Generation")
+-        gr.Markdown("Generate images using Qwen-Image model")
++    with gr.Blocks(title="Text-to-Image Demo") as demo:
++        gr.Markdown("# Text-to-Image Online Generation")
++        gr.Markdown("Generate images using the model configured on the server")
+ 
+         with gr.Row():
+             with gr.Column(scale=1):
+@@ -115,7 +115,6 @@ def create_demo(server_url: str):
+                         label="Inference Steps",
+                         minimum=10,
+                         maximum=100,
+-                        # Default steps aligned with run_curl_text_to_image.sh to 100
+                         value=100,
+                         step=5,
+                     )
+@@ -173,7 +172,7 @@ def create_demo(server_url: str):
+ 
+ 
+ def main():
+-    parser = argparse.ArgumentParser(description="Qwen-Image Gradio Demo")
++    parser = argparse.ArgumentParser(description="Shared text-to-image Gradio demo")
+     parser.add_argument("--server", default="http://localhost:8091", help="Server URL")
+     parser.add_argument("--port", type=int, default=7860, help="Gradio port")
+     parser.add_argument("--share", action="store_true", help="Create public link")
+diff --git a/examples/online_serving/text_to_image/openai_chat_client.py b/examples/online_serving/text_to_image/openai_chat_client.py
+index f3c43086a14..f70faae7872 100644
+--- a/examples/online_serving/text_to_image/openai_chat_client.py
++++ b/examples/online_serving/text_to_image/openai_chat_client.py
+@@ -1,6 +1,6 @@
+ #!/usr/bin/env python3
+ """
+-Qwen-Image OpenAI-compatible image generation client.
++Shared OpenAI-compatible text-to-image generation client.
+ 
+ Usage:
+     python openai_chat_client.py --prompt "A beautiful landscape" --output output.png
+@@ -39,7 +39,7 @@ def generate_image(
+         height: Image height in pixels
+         width: Image width in pixels
+         steps: Number of diffusion steps
+-        true_cfg_scale: Qwen-Image CFG scale
++        true_cfg_scale: True CFG scale for models that support it
+         seed: Random seed
+         negative_prompt: Negative prompt
+         num_outputs_per_prompt: Number of images to generate
+@@ -70,7 +70,7 @@ def generate_image(
+         payload["num_inference_steps"] = steps
+     if true_cfg_scale is not None:
+         payload["true_cfg_scale"] = true_cfg_scale
+-    if negative_prompt:
++    if negative_prompt is not None:
+         payload["negative_prompt"] = negative_prompt
+     if seed is not None:
+         payload["seed"] = seed
+@@ -115,15 +115,15 @@ def generate_image(
+ 
+ 
+ def main():
+-    parser = argparse.ArgumentParser(description="Qwen-Image chat client")
++    parser = argparse.ArgumentParser(description="Shared text-to-image client")
+     parser.add_argument("--prompt", "-p", default="a cup of coffee on the table", help="Text prompt")
+-    parser.add_argument("--output", "-o", default="qwen_image_output.png", help="Output file")
++    parser.add_argument("--output", "-o", default="text_to_image_output.png", help="Output file")
+     parser.add_argument("--server", "-s", default="http://localhost:8091", help="Server URL")
+-    parser.add_argument("--height", type=int, default=1024, help="Image height")
+-    parser.add_argument("--width", type=int, default=1024, help="Image width")
+-    parser.add_argument("--steps", type=int, default=50, help="Inference steps")
+-    parser.add_argument("--cfg-scale", type=float, default=4.0, help="True CFG scale")
+-    parser.add_argument("--seed", type=int, default=0, help="Random seed")
++    parser.add_argument("--height", type=int, help="Image height; defaults to the model setting")
++    parser.add_argument("--width", type=int, help="Image width; defaults to the model setting")
++    parser.add_argument("--steps", type=int, help="Inference steps; defaults to the model setting")
++    parser.add_argument("--cfg-scale", type=float, help="True CFG scale when supported")
++    parser.add_argument("--seed", type=int, help="Random seed")
+     parser.add_argument("--negative", help="Negative prompt")
+ 
+     parser.add_argument("--lora-path", default=None, help="Server-local LoRA adapter folder (PEFT format)")
+diff --git a/examples/online_serving/text_to_image/run_server.sh b/examples/online_serving/text_to_image/run_server.sh
+index b25337a0e93..84f63e24e8d 100755
+--- a/examples/online_serving/text_to_image/run_server.sh
++++ b/examples/online_serving/text_to_image/run_server.sh
+@@ -1,10 +1,10 @@
+ #!/bin/bash
+-# Qwen-Image online serving startup script
++# Shared text-to-image online serving startup script
+ 
+ MODEL="${MODEL:-Qwen/Qwen-Image}"
+ PORT="${PORT:-8091}"
+ 
+-echo "Starting Qwen-Image server..."
++echo "Starting text-to-image server..."
+ echo "Model: $MODEL"
+ echo "Port: $PORT"
+ 
+diff --git a/tests/examples/offline_inference/test_image_task_prompts.py b/tests/examples/offline_inference/test_image_task_prompts.py
+new file mode 100644
+index 00000000000..57e8f1560c5
+--- /dev/null
++++ b/tests/examples/offline_inference/test_image_task_prompts.py
+@@ -0,0 +1,47 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++
++from __future__ import annotations
++
++import pytest
++from PIL import Image
++
++from examples.offline_inference.image_to_video.image_to_video import build_image_to_video_prompt
++from examples.offline_inference.text_to_image.text_to_image import build_text_to_image_prompt
++
++pytestmark = [pytest.mark.core_model, pytest.mark.cpu]
++
++
++@pytest.mark.parametrize(
++    ("negative_prompt", "expected_negative_prompt"),
++    [(None, None), ("", ""), ("blurry", "blurry")],
++)
++def test_text_to_image_builds_canonical_prompt(
++    negative_prompt: str | None,
++    expected_negative_prompt: str | None,
++) -> None:
++    result = build_text_to_image_prompt("a red fox", negative_prompt)
++
++    assert result["prompt"] == "a red fox"
++    assert result["modalities"] == ["image"]
++    if expected_negative_prompt is None:
++        assert "negative_prompt" not in result
++    else:
++        assert result["negative_prompt"] == expected_negative_prompt
++
++
++def test_image_to_video_builds_canonical_prompt() -> None:
++    image = Image.new("RGB", (32, 16), "red")
++
++    result = build_image_to_video_prompt(
++        prompt="the fox turns toward the camera",
++        negative_prompt="flicker",
++        media_inputs={"image": image},
++    )
++
++    assert result == {
++        "prompt": "the fox turns toward the camera",
++        "modalities": ["video"],
++        "multi_modal_data": {"image": image},
++        "negative_prompt": "flicker",
++    }
+diff --git a/tests/model_extras/test_model_extras.py b/tests/model_extras/test_model_extras.py
+index 503f02018b6..fde3ea8785f 100644
+--- a/tests/model_extras/test_model_extras.py
++++ b/tests/model_extras/test_model_extras.py
+@@ -3,6 +3,8 @@
+ 
+ from __future__ import annotations
+ 
++from typing import Any
++
+ import pytest
+ from PIL import Image
+ 
+@@ -135,67 +137,6 @@ def test_lingbot_extra_registry_declares_request_params() -> None:
+     assert should_init_extra_args_for_non_diffusion_stages("LingBotVideoPipeline") is False
+ 
+ 
+-@pytest.mark.core_model
+-@pytest.mark.cpu
+-def test_lingbot_text_to_image_prompt_builder_preserves_empty_negative_prompt() -> None:
+-    assert build_text_to_image_prompt(
+-        "LingBotVideoPipeline",
+-        prompt="a red fox in fresh snow",
+-        negative_prompt="",
+-        height=192,
+-        width=320,
+-    ) == {
+-        "prompt": "a red fox in fresh snow",
+-        "modalities": ["image"],
+-        "negative_prompt": "",
+-    }
+-
+-
+-@pytest.mark.core_model
+-@pytest.mark.cpu
+-def test_lingbot_image_to_video_prompt_builder() -> None:
+-    image = Image.new("RGB", (320, 192), "red")
+-    result = build_image_to_video_prompt(
+-        "LingBotVideoPipeline",
+-        prompt="the fox looks toward the camera",
+-        negative_prompt=None,
+-        media_inputs={"image": image},
+-        height=192,
+-        width=320,
+-        num_frames=9,
+-    )
+-    assert result == {
+-        "prompt": "the fox looks toward the camera",
+-        "modalities": ["video"],
+-        "multi_modal_data": {"image": image},
+-        "num_frames": 9,
+-    }
+-
+-
+-@pytest.mark.core_model
+-@pytest.mark.cpu
+-@pytest.mark.parametrize(
+-    "media_inputs",
+-    [
+-        {},
+-        {"image": "input.png"},
+-        {"image": [Image.new("RGB", (16, 16))]},
+-        {"image": Image.new("RGB", (16, 16)), "video": b"video"},
+-    ],
+-    ids=["missing", "path", "multiple", "extra-modality"],
+-)
+-def test_lingbot_image_to_video_prompt_builder_rejects_invalid_media(
+-    media_inputs: dict[str, object],
+-) -> None:
+-    with pytest.raises(ValueError, match="exactly one PIL image"):
+-        build_image_to_video_prompt(
+-            "LingBotVideoPipeline",
+-            prompt="move",
+-            negative_prompt=None,
+-            media_inputs=media_inputs,
+-        )
+-
+-
+ @pytest.mark.core_model
+ @pytest.mark.cpu
+ @pytest.mark.parametrize("pipeline_name", ["Cosmos3OmniDiffusersPipeline", "Cosmos3OmniPipeline"])
+@@ -342,8 +283,11 @@ def test_ming_flash_omni_declared_extra_args_route_into_sampling_params() -> Non
+ def test_ming_flash_omni_text_to_image_prompt_builder() -> None:
+     assert build_text_to_image_prompt(
+         "MingImagePipeline",
+-        prompt="Please draw a cute cat.",
+-        negative_prompt="ugly, blurry",
++        {
++            "prompt": "Please draw a cute cat.",
++            "modalities": ["image"],
++            "negative_prompt": "ugly, blurry",
++        },
+         height=512,
+         width=768,
+     ) == {
+@@ -360,8 +304,7 @@ def test_ming_flash_omni_text_to_image_prompt_builder() -> None:
+     # pipeline's 1024x1024 default still applies.
+     assert build_text_to_image_prompt(
+         "MingImagePipeline",
+-        prompt="Draw a poster.",
+-        negative_prompt=None,
++        {"prompt": "Draw a poster.", "modalities": ["image"]},
+     ) == {
+         "prompt": "Draw a poster.",
+         "modalities": ["image"],
+@@ -391,28 +334,6 @@ def test_ming_flash_omni_image_to_image_prompt_builder() -> None:
+     assert "negative_prompt" not in result
+ 
+ 
+-@pytest.mark.core_model
+-@pytest.mark.cpu
+-@pytest.mark.parametrize("pipeline_name", ["Cosmos3OmniDiffusersPipeline", "Cosmos3OmniPipeline"])
+-def test_cosmos3_text_to_image_prompt_builder_selects_image_modality(pipeline_name: str) -> None:
+-    assert build_text_to_image_prompt(
+-        pipeline_name,
+-        prompt="a red sports car at golden hour",
+-        negative_prompt="blurry, distorted",
+-        height=1024,
+-        width=1024,
+-    ) == {
+-        "prompt": "a red sports car at golden hour",
+-        "modalities": ["image"],
+-        "negative_prompt": "blurry, distorted",
+-    }
+-    assert build_text_to_image_prompt(
+-        pipeline_name,
+-        prompt="a red sports car",
+-        negative_prompt=None,
+-    ) == {"prompt": "a red sports car", "modalities": ["image"]}
+-
+-
+ @pytest.mark.core_model
+ @pytest.mark.cpu
+ def test_audiox_extra_registry_declares_request_and_response_params() -> None:
+@@ -505,8 +426,11 @@ def test_unknown_pipeline_has_empty_extra_registry() -> None:
+ def test_bagel_text_to_image_prompt_builder() -> None:
+     assert build_text_to_image_prompt(
+         "BagelPipeline",
+-        prompt="a cat",
+-        negative_prompt="blurry",
++        {
++            "prompt": "a cat",
++            "modalities": ["image"],
++            "negative_prompt": "blurry",
++        },
+         height=512,
+         width=768,
+     ) == {
+@@ -543,14 +467,17 @@ def test_bagel_image_to_image_prompt_builder() -> None:
+ 
+ @pytest.mark.core_model
+ @pytest.mark.cpu
+-def test_unknown_pipeline_uses_default_text_to_image_prompt() -> None:
+-    assert build_text_to_image_prompt(
+-        "UnknownPipeline",
+-        prompt="a cat",
+-        negative_prompt=None,
+-        height=512,
+-        width=512,
+-    ) == {"prompt": "a cat"}
++def test_unknown_pipeline_preserves_canonical_text_to_image_prompt() -> None:
++    canonical_prompt = {"prompt": "a cat", "modalities": ["image"]}
++    assert (
++        build_text_to_image_prompt(
++            "UnknownPipeline",
++            canonical_prompt,
++            height=512,
++            width=512,
++        )
++        is canonical_prompt
++    )
+ 
+ 
+ @pytest.mark.core_model
+@@ -569,12 +496,14 @@ def test_unknown_pipeline_uses_default_image_to_image_prompt() -> None:
+     }
+ 
+ 
+-def _build_vace_prompt(media_inputs: dict[str, object], *, num_frames: int = 5) -> dict:
++def _build_vace_prompt(media_inputs: dict[str, Any], *, num_frames: int = 5) -> dict:
+     return build_image_to_video_prompt(
+         "WanVACEPipeline",
+-        prompt="a bird flying",
+-        negative_prompt=None,
+-        media_inputs=media_inputs,
++        {
++            "prompt": "a bird flying",
++            "modalities": ["video"],
++            "multi_modal_data": media_inputs,
++        },
+         height=16,
+         width=320,
+         num_frames=num_frames,
+@@ -597,7 +526,7 @@ def _build_vace_prompt(media_inputs: dict[str, object], *, num_frames: int = 5)
+     ],
+     ids=["i2v", "v2lf", "flf2v", "inpaint", "r2v"],
+ )
+-def test_vace_image_to_video_prompt_builder(media_inputs: dict[str, object]) -> None:
++def test_vace_image_to_video_prompt_builder(media_inputs: dict[str, Any]) -> None:
+     result = _build_vace_prompt(media_inputs)
+     mmd = result["multi_modal_data"]
+     if "reference_images" in mmd:
+@@ -616,7 +545,7 @@ def test_vace_image_to_video_prompt_builder(media_inputs: dict[str, object]) ->
+         ({"control_image": Image.new("RGB", (320, 16))}, "Unsupported VACE media input"),
+     ],
+ )
+-def test_vace_rejects_invalid_media_combinations(media_inputs: dict[str, object], message: str) -> None:
++def test_vace_rejects_invalid_media_combinations(media_inputs: dict[str, Any], message: str) -> None:
+     with pytest.raises(ValueError, match=message):
+         _build_vace_prompt(media_inputs)
+ 
+@@ -664,8 +593,7 @@ def test_mammothmoda2_extra_registry_declares_request_and_response_params() -> N
+ 
+     wrapper_prompt = build_text_to_image_prompt(
+         "MammothModa2ForConditionalGeneration",
+-        prompt="a cat",
+-        negative_prompt=None,
++        {"prompt": "a cat", "modalities": ["image"]},
+         height=256,
+         width=256,
+     )
+@@ -679,8 +607,11 @@ def test_mammothmoda2_text_to_image_prompt_builder() -> None:
+     # prompt is ignored (MammothModa2 t2i uses CFG, not an explicit negative path).
+     assert build_text_to_image_prompt(
+         "MammothModa2DiTPipeline",
+-        prompt="a cat",
+-        negative_prompt="blurry",
++        {
++            "prompt": "a cat",
++            "modalities": ["image"],
++            "negative_prompt": "blurry",
++        },
+         height=512,
+         width=768,
+     ) == {
+diff --git a/vllm_omni/model_extras/cosmos3.py b/vllm_omni/model_extras/cosmos3.py
+index a17e8193f00..d0ffa5182d1 100644
+--- a/vllm_omni/model_extras/cosmos3.py
++++ b/vllm_omni/model_extras/cosmos3.py
+@@ -3,32 +3,6 @@
+ 
+ from __future__ import annotations
+ 
+-from typing import Any
+-
+-
+-def build_text_to_image_prompt(
+-    prompt: str,
+-    negative_prompt: str | None,
+-    height: int | None = None,
+-    width: int | None = None,
+-) -> dict[str, Any]:
+-    """Build a Cosmos3 T2I prompt by selecting image output modality.
+-
+-    Cosmos3 uses the same pipeline class for T2I and video modes. The OpenAI
+-    image endpoint selects T2I by adding ``modalities=["image"]``. ``height``
+-    and ``width`` are accepted for registry compatibility; sizing travels
+-    through sampling params instead of the prompt payload.
+-    """
+-    del height, width
+-    text_prompt: dict[str, Any] = {
+-        "prompt": prompt,
+-        "modalities": ["image"],
+-    }
+-    if negative_prompt is not None:
+-        text_prompt["negative_prompt"] = negative_prompt
+-    return text_prompt
+-
+-
+ COSMOS3_EXTRA_BODY_PARAMS = frozenset(
+     {
+         "flow_shift",
+diff --git a/vllm_omni/model_extras/lingbot_video.py b/vllm_omni/model_extras/lingbot_video.py
+index b087e7073e0..c92f48bd2d8 100644
+--- a/vllm_omni/model_extras/lingbot_video.py
++++ b/vllm_omni/model_extras/lingbot_video.py
+@@ -3,11 +3,6 @@
+ 
+ from __future__ import annotations
+ 
+-from collections.abc import Mapping
+-from typing import Any
+-
+-from PIL import Image
+-
+ LINGBOT_VIDEO_EXTRA_BODY_PARAMS = frozenset(
+     {
+         "batch_cfg",
+@@ -24,43 +19,3 @@
+         "t_thresh",
+     }
+ )
+-
+-
+-def build_text_to_image_prompt(
+-    prompt: str,
+-    negative_prompt: str | None,
+-    height: int | None = None,
+-    width: int | None = None,
+-) -> dict[str, Any]:
+-    del height, width
+-    result: dict[str, Any] = {
+-        "prompt": prompt,
+-        "modalities": ["image"],
+-    }
+-    if negative_prompt is not None:
+-        result["negative_prompt"] = negative_prompt
+-    return result
+-
+-
+-def build_image_to_video_prompt(
+-    prompt: str,
+-    negative_prompt: str | None,
+-    media_inputs: Mapping[str, Any],
+-    height: int | None = None,
+-    width: int | None = None,
+-    num_frames: int | None = None,
+-) -> dict[str, Any]:
+-    del height, width
+-    if set(media_inputs) != {"image"} or not isinstance(media_inputs["image"], Image.Image):
+-        raise ValueError("LingBot text-image-to-video requires exactly one PIL image input.")
+-
+-    result: dict[str, Any] = {
+-        "prompt": prompt,
+-        "modalities": ["video"],
+-        "multi_modal_data": {"image": media_inputs["image"]},
+-    }
+-    if num_frames is not None:
+-        result["num_frames"] = num_frames
+-    if negative_prompt is not None:
+-        result["negative_prompt"] = negative_prompt
+-    return result
+diff --git a/vllm_omni/model_extras/registry.py b/vllm_omni/model_extras/registry.py
+index 2e6db22e1f8..4c41c5920af 100644
+--- a/vllm_omni/model_extras/registry.py
++++ b/vllm_omni/model_extras/registry.py
+@@ -28,21 +28,12 @@
+     COSMOS3_EXTRA_BODY_PARAMS,
+     COSMOS3_EXTRA_OUTPUT_PARAMS,
+ )
+-from vllm_omni.model_extras.cosmos3 import (
+-    build_text_to_image_prompt as build_cosmos3_text_to_image_prompt,
+-)
+ from vllm_omni.model_extras.helios import (
+     HELIOS_EXTRA_BODY_PARAMS,
+     HELIOS_EXTRA_OUTPUT_PARAMS,
+ )
+ from vllm_omni.model_extras.hunyuan_image3 import build_x_to_text_prompt as build_hunyuan_x_to_text_prompt
+ from vllm_omni.model_extras.lingbot_video import LINGBOT_VIDEO_EXTRA_BODY_PARAMS
+-from vllm_omni.model_extras.lingbot_video import (
+-    build_image_to_video_prompt as build_lingbot_image_to_video_prompt,
+-)
+-from vllm_omni.model_extras.lingbot_video import (
+-    build_text_to_image_prompt as build_lingbot_text_to_image_prompt,
+-)
+ from vllm_omni.model_extras.ltx2 import LTX_EXTRA_BODY_PARAMS, LTX_EXTRA_OUTPUT_PARAMS
+ from vllm_omni.model_extras.magi_human import (
+     MAGI_HUMAN_EXTRA_BODY_PARAMS,
+@@ -147,18 +138,6 @@ def build_x_to_text_prompt(
+     return builder(model, prompt, has_image)
+ 
+ 
+-def default_text_to_image_prompt(
+-    prompt: str,
+-    negative_prompt: str | None,
+-    height: int | None = None,
+-    width: int | None = None,
+-) -> dict[str, Any]:
+-    result: dict[str, Any] = {"prompt": prompt}
+-    if negative_prompt is not None:
+-        result["negative_prompt"] = negative_prompt
+-    return result
+-
+-
+ def default_image_to_image_prompt(
+     prompt: str,
+     negative_prompt: str | None,
+@@ -175,20 +154,6 @@ def default_image_to_image_prompt(
+     return result
+ 
+ 
+-def default_image_to_video_prompt(
+-    prompt: str,
+-    negative_prompt: str | None,
+-    media_inputs: Mapping[str, Any],
+-    height: int | None = None,
+-    width: int | None = None,
+-    num_frames: int | None = None,
+-) -> dict[str, Any]:
+-    del height, width, num_frames
+-    if set(media_inputs) != {"image"} or not isinstance(media_inputs["image"], Image.Image):
+-        raise ValueError("This model only supports a single --image input in the shared image-to-video example.")
+-    return default_image_to_image_prompt(prompt, negative_prompt, media_inputs["image"])
+-
+-
+ _EXTRA_SPECS: dict[str, dict[str, Any]] = {
+     "AudioXPipeline": {
+         "extra_body_params": AUDIOX_EXTRA_BODY_PARAMS,
+@@ -208,12 +173,11 @@ def default_image_to_video_prompt(
+     "Cosmos3OmniDiffusersPipeline": {
+         "extra_body_params": COSMOS3_EXTRA_BODY_PARAMS,
+         "extra_output_params": COSMOS3_EXTRA_OUTPUT_PARAMS,
+-        "text_to_image_prompt_builder": build_cosmos3_text_to_image_prompt,
++        # The shared T2I example already supplies modalities=["image"].
+     },
+     "Cosmos3OmniPipeline": {
+         "extra_body_params": COSMOS3_EXTRA_BODY_PARAMS,
+         "extra_output_params": COSMOS3_EXTRA_OUTPUT_PARAMS,
+-        "text_to_image_prompt_builder": build_cosmos3_text_to_image_prompt,
+     },
+     "MagiHumanPipeline": {
+         "extra_body_params": MAGI_HUMAN_EXTRA_BODY_PARAMS,
+@@ -229,8 +193,8 @@ def default_image_to_video_prompt(
+     },
+     "LingBotVideoPipeline": {
+         "extra_body_params": LINGBOT_VIDEO_EXTRA_BODY_PARAMS,
+-        "text_to_image_prompt_builder": build_lingbot_text_to_image_prompt,
+-        "image_to_video_prompt_builder": build_lingbot_image_to_video_prompt,
++        # Shared T2I/I2V envelopes select the output modality. LingBot's
++        # pipeline owns model-specific validation and normalization.
+     },
+     **{
+         model_class_name: {
+@@ -263,7 +227,7 @@ def default_image_to_video_prompt(
+ }
+ 
+ # Multi-stage discovery reports the top-level wrapper rather than its DiT
+-# submodule, so both names must resolve to the same request adapters.
++# submodule, so both names must resolve to the same request builders.
+ _EXTRA_SPECS["MammothModa2ForConditionalGeneration"] = _EXTRA_SPECS["MammothModa2DiTPipeline"]
+ _EXTRA_SPECS["Mammothmoda2Model"] = _EXTRA_SPECS["MammothModa2DiTPipeline"]
+ 
+@@ -305,18 +269,21 @@ def should_init_extra_args_for_non_diffusion_stages(model_class_name: str | None
+ 
+ def build_text_to_image_prompt(
+     model_class_name: str | None,
+-    prompt: str,
+-    negative_prompt: str | None,
++    prompt: dict[str, Any],
+     height: int | None = None,
+     width: int | None = None,
+ ) -> dict[str, Any]:
++    """Build a model-specific T2I prompt from an example-owned envelope."""
+     spec = _get_spec(model_class_name)
+-    builder: TextToImagePromptBuilder = (
+-        spec.get("text_to_image_prompt_builder", default_text_to_image_prompt)
+-        if spec is not None
+-        else default_text_to_image_prompt
++    builder: TextToImagePromptBuilder | None = spec.get("text_to_image_prompt_builder") if spec else None
++    if builder is None:
++        return prompt
++    return builder(
++        prompt=str(prompt["prompt"]),
++        negative_prompt=prompt.get("negative_prompt"),
++        height=height,
++        width=width,
+     )
+-    return builder(prompt, negative_prompt, height, width)
+ 
+ 
+ def build_image_to_image_prompt(
+@@ -338,17 +305,24 @@ def build_image_to_image_prompt(
+ 
+ def build_image_to_video_prompt(
+     model_class_name: str | None,
+-    prompt: str,
+-    negative_prompt: str | None,
+-    media_inputs: Mapping[str, Any],
++    prompt: dict[str, Any],
+     height: int | None = None,
+     width: int | None = None,
+     num_frames: int | None = None,
+ ) -> dict[str, Any]:
++    """Build a model-specific I2V prompt from an example-owned envelope."""
+     spec = _get_spec(model_class_name)
+-    builder: ImageToVideoPromptBuilder = (
+-        spec.get("image_to_video_prompt_builder", default_image_to_video_prompt)
+-        if spec is not None
+-        else default_image_to_video_prompt
++    builder: ImageToVideoPromptBuilder | None = spec.get("image_to_video_prompt_builder") if spec else None
++    if builder is None:
++        return prompt
++    media_inputs = prompt.get("multi_modal_data") or {}
++    if not isinstance(media_inputs, Mapping):
++        raise TypeError("Canonical I2V prompt multi_modal_data must be a mapping.")
++    return builder(
++        prompt=str(prompt["prompt"]),
++        negative_prompt=prompt.get("negative_prompt"),
++        media_inputs=media_inputs,
++        height=height,
++        width=width,
++        num_frames=num_frames,
+     )
+-    return builder(prompt, negative_prompt, media_inputs, height, width, num_frames)

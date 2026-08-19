@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.67,
+    "precision": 0.6,
+    "actionability": 0.92,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.55,
+    "actionability": 0.94,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X directly covers the parent-output ordering concern and the requested benchmark, though it misses the explicit precommit issue and adds speculative or pre-existing findings. Y strongly validates parent ordering and flags failing CI, but does not request the specified benchmark and spends substantial attention on adjacent or pre-existing issues.",
+  "_usage": {
+    "input": 3,
+    "output": 1093
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "copilot_v13_proof_test",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_proof_test",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_proof_test",
+    "arm_a_sha256": "ce0266983c595171c18dd5c48c208bbb2687522be8a7c7e913135ac8252e59df",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5eabb9c2ecaee56109ca8916c98f608c63cff4946702c512694924d4704baea8",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 2
+  }
+}

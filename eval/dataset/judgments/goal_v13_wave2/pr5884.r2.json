@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.68,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.82,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both correctly explain why attrgetter is necessary for dotted paths and connect the implementation to the offloader precedent. Y is more technically grounded and actionable, while X includes more weakly relevant findings such as generic CI triage and documentation nits; Y's SoulX failure claim is somewhat speculative but otherwise its findings are concrete and well-supported.",
+  "_usage": {
+    "input": 3,
+    "output": 727
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "copilot_v13_wave2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_wave2",
+    "arm_a_sha256": "c4fc317ccff99ec552a98dd414a5dce11d3c1a275c1e0d64bdd1e459ed102405",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "80debb7f8b9b3343eef7ae50f0618e17195384c354a466e33b4f3b71b6863ca2",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 2
+  }
+}

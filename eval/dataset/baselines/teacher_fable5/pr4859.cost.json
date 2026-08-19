@@ -1,0 +1,41 @@
+{
+  "calls": 49,
+  "input_tokens": 3018046,
+  "output_tokens": 33382,
+  "cost_usd": 6.432928,
+  "is_error": false,
+  "terminal_reason": "completed",
+  "split": "train",
+  "head": "6ff4ce59ed87f2f7afc9d795f4796ad540ba7658",
+  "base": "a8b2bf11d2f2e9282e2182c2aad932d58777e3dc",
+  "resolved_model": "claude-fable-5",
+  "snapshot_sha256": "3d187cf56d61b14145f181495acb54c5baca12ddc793fe7af525c539d55af4b3",
+  "validation_commands": [
+    "git -C /data/zhoutaichang/.infermatrix-copilot/worktrees/vllm-omni-pr4859 diff --stat a8b2bf11d2f2e9282e2182c2aad932d58777e3dc HEAD",
+    "git diff --stat a8b2bf11d2f2e9282e2182c2aad932d58777e3dc HEAD",
+    "git diff a8b2bf11d2f2e9282e2182c2aad932d58777e3dc HEAD",
+    "grep -n -C4 \"dialect\" examples/online_serving/text_to_speech/ming_tts/openai_speech_client.py | head -50; sed -n 95,110p examples/online_serving/text_to_speech/ming_tts/README.md",
+    "git show a8b2bf11d2f2:vllm_omni/benchmarks/patch/patch.py | grep -n \"tts_output_pcm_bytes\\|_pcm_s16le_to_seed_tts_wer_bytes\" | head; echo ---; git show a8b2bf11d2f2:vllm_omni/benchmarks/data_modules/seed_tts_eval.py | sed -n '170,190p'",
+    "git log --oneline a8b2bf11d2f2..HEAD; echo ===; git log --oneline --all -S '_pcm_s16le_to_seed_tts_wer_bytes' -- vllm_omni/benchmarks/patch/patch.py | head; echo ===; git cat-file -e 0455bffc3768e1fe616fea37885fb0a84cd5985b 2>/dev/null && git show 0455bffc:vllm_omni/benchmarks/patch/patch.py | grep ",
+    "git log --oneline --all -S \"_pcm_s16le_to_seed_tts_wer_bytes\" -- vllm_omni/benchmarks/patch/patch.py | head -20",
+    "git show --stat d40efb3e | head -30; echo ===; git show d40efb3e -- vllm_omni/benchmarks/patch/patch.py | head -120",
+    "git show d40efb3e -- vllm_omni/benchmarks/patch/patch.py | head -150",
+    "git show d40efb3e^:vllm_omni/benchmarks/patch/patch.py | grep -n \"tts_output_pcm_bytes\\|_pcm_s16le_to_seed_tts_wer_bytes\" | head; echo ---; git show d40efb3e -- vllm_omni/benchmarks/data_modules/seed_tts_eval.py | sed -n 1,80p",
+    "grep -n \"_save_seed_tts_eval_audio\" -A 30 vllm_omni/benchmarks/data_modules/seed_tts_eval.py | head -45; echo ===; git show 795ae240 --stat | head -20",
+    "git show --stat 795ae240 | head -20; echo ---; ls vllm_omni/benchmarks/audio_format.py 2>&1",
+    "python -c \"\nimport transformers, inspect\nprint(transformers.__version__)\nfrom transformers import Qwen2Config, Qwen2Model\nc = Qwen2Config(hidden_size=32, intermediate_size=64, num_hidden_layers=2, num_attention_heads=4, num_key_value_heads=2, vocab_size=100)\nm = Qwen2Model(c)\nprint('same object:', m",
+    "python -c \"\nimport torch\nfrom transformers import Qwen2Config, Qwen2Model\nc = Qwen2Config(hidden_size=32, intermediate_size=64, num_hidden_layers=8, num_attention_heads=4, num_key_value_heads=2, vocab_size=100)\nc._attn_implementation = 'sdpa'\nm = Qwen2Model(c).eval()\nc.num_hidden_layers = 4  # simul",
+    "python -c \"\nimport ast, sys\nfor f in ['vllm_omni/benchmarks/data_modules/seed_tts_eval.py','vllm_omni/benchmarks/patch/patch.py','vllm_omni/entrypoints/openai/serving_speech.py','vllm_omni/metrics/definitions.py','vllm_omni/model_executor/models/common/ming/audio_vae.py','vllm_omni/model_executor/mo"
+  ],
+  "ran_validation": true,
+  "claude_md_seen": {
+    "/data/zhoutaichang/CLAUDE.md": "27ca8ea8056c231e"
+  },
+  "recorded_at": "2026-08-15T01:29:03",
+  "arm": "baseline_opus5",
+  "wall_s": 542.6,
+  "audit_ok": true,
+  "audit_violations": [],
+  "audit_blocked_attempts": [],
+  "artifact_chars": 8516
+}

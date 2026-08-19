@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.9,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.92,
+    "actionability": 0.95
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth's only concrete concern (Yuanrong connector filename in .nav.yml/index.md) already appears fixed in this diff snapshot, so neither candidate could realistically catch it — recall is near-zero and tied. Both independently find the same real, well-grounded bug (Quantization heading swallowing Cache-DiT/TeaCache/batching in index.md) plus the orphaned ar_diffusion_pipeline_capability.md and stale nav-label/H1 mismatches, but Y goes further with equally grounded, actionable extras (the duplicate quantization.md nav entry with concrete mkdocs single-Page-reference reasoning, loss of glob auto-discovery for the connectors directory, heading-case inconsistency) and is careful to hedge claims it couldn't build-verify. X's findings are all valid but form a subset of Y's coverage.",
+  "_cost_usd": 0.30079540000000005,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r1",
+    "arm_a_sha256": "fc0b93dfdda1e7674d9a2a30159d39f50bc4c1e1e57b143c605e9ee1ccb59144",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b0a1251303a011617b813526a2859371e8ee289f04fcc197988c5b4d83dc8aca",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

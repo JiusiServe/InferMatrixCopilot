@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.65,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.08,
+    "precision": 0.6,
+    "actionability": 0.8
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates largely miss the ground truth's core cluster of concerns (the duplicated 0.5-2.0 duration_factor bound across talker/s2mel_decoder/adapter, the talker-raise-as-validation-layer question, and the maintainer's blocking ask for profiler/VRAM/native-baseline evidence). X gets marginal credit for surfacing the same underlying native_speed_control HTTP-vs-WebSocket streaming asymmetry theme (via its speech_api.md and protocol/audio.py findings, even citing the WS-specific error message), which is the substance behind three of the four ground-truth inline comments; Y's closest touchpoint (a minor note that the duration_factor error message wrongly says 'IndexTTS 2.5' for 2.0 requests) is more tangential. Both produce many additional, well-evidenced, plausible findings beyond the ground truth with strong file/line grounding and concrete suggested fixes, but X's evidence-quote-per-claim format is slightly more verifiable/precise; Y's narrative Blocking/Important/Minor structure is marginally more readable but leans on more speculative 'a checkpoint variant that lacks X could...' framing. Actionability is comparably high for both.",
+  "_cost_usd": 0.5084913,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46",
+    "arm_a_sha256": "225d96a3db2d4b5856a870ec0a5a6cd75cefa43ad4cd9232274999727908d338",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

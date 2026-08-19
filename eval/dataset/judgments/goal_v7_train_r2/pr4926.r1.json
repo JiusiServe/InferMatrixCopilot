@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.39,
+    "precision": 0.65,
+    "actionability": 0.94,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.44,
+    "precision": 0.82,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y covers more of the test-marker and dependency-version concerns while keeping most findings grounded and concrete. X identifies the version fallback and hardware issues, but adds several speculative or questionable findings, reducing precision despite excellent actionability.",
+  "_usage": {
+    "input": 3,
+    "output": 2101
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v7_goal_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v7_goal_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v7_goal_r2",
+    "arm_a_sha256": "9ef8d3c28d7ec6a53ff34670ff0fe36c268bdc2c98dffc59b6a50d3299d2b316",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0639263265995e00edcd06c6242ac0a6a3647a980509c282af885c86ce6930e0",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

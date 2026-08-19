@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y's design/index.md finding ('four unrelated designs now sit under Attention optimization') directly matches the ground-truth reviewer's 'do we have other attention backend?' comment at the same location, and Y independently traced git history showing BitsAndBytes was dropped then restored within the PR, which explains the ground-truth's BitsAndBytes comment (now stale) while flagging GGUF as the unresolved analog — matching X's GGUF finding too. X only overlaps ground truth via the GGUF nav-drop; both miss the quantization-scope (features/README.md:43) and diffusion_features.md:228 comments entirely. Both reviews are well-grounded with concrete file/line evidence and concrete fixes, but Y covers more of the actual reviewer concerns without sacrificing precision.",
+  "_cost_usd": 0.3449535,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_holdout3_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r2",
+    "arm_a_sha256": "9cd0c4d9cf5e19af82f988c41a4d1d15a8d5910edbc226b10a3bb8a37124d037",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "547e7dae328bb016f40e52ff9f47201f77c529d80a351e2defe03ab5d3f2b6e1",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

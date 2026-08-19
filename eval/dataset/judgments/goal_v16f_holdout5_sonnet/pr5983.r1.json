@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.75,
+    "actionability": 0.65
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth is sparse (an already-resolved 'move helpers to utils' comment plus an LGTM), so recall is similar and unremarkable for both. Both independently surface the same two strongest, diff-grounded findings — the identical unfixed TOCTOU race in diffusion_engine.py and the two regression tests that only assert fut.cancelled() and don't actually catch a crashed pump thread — lending them credibility. X presents these with tighter prioritization, concrete proposed code diffs, and one additional well-reasoned novel finding (the _completed_outputs leak on the non-racy abort ordering) plus a specific pytest-version verification of the weak-test claim. Y has a comparably strong unique finding (AMD CI failure correlated via pytestmark to the new tests) but its 'Validated' section repeats the same two claims (wrong test file name, 'all 3 fail' inaccuracy) three-plus times nearly verbatim, which is noisy and hurts actionability/precision by inflating apparent finding count without added value.",
+  "_cost_usd": 0.2059437,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16f_holdout5_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout5_r1",
+    "arm_a_sha256": "2d3a0dc839e55804731cc999f047b616115ecffa0c8829a3144f730d70474eed",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "7849cfd280bbe99a1c4e5cbf433c23a2ea5eb89278ee9f694847fdd50c8e3d19",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

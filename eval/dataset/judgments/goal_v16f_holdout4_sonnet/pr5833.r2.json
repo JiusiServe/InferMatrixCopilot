@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.9,
+    "actionability": 0.88,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.87,
+    "actionability": 0.94,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Neither candidate caught the ground-truth Yuanrong-connector naming suggestion, which in any case appears already applied in the shown diff (the suggested text matches what's already committed), making it effectively unreachable from this snapshot — recall is 0 for both. Both reviews independently and correctly flag the same core rendering bug (Cache-DiT/TeaCache/Diffusion Continuous Batching nesting under Quantization) and the duplicate Quantization nav entry, with concrete file:line evidence and fixes, so precision and actionability are both high. Y edges ahead on depth and organization: it explains the MkDocs-specific mechanics (loose lists, File→Page collision, navigation.tabs behavior), catches an additional legitimate maintainability issue (hardcoded connector list losing directory auto-discovery), and structures findings by priority with ready-to-apply code blocks; X is equally rigorous but slightly less incisive, and its one edge (correctly noting the experimental doc is intentionally excluded from nav) is offset by Y's broader and better-organized coverage.",
+  "_cost_usd": 0.1741261,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16f_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout4_r1",
+    "arm_a_sha256": "a86233bde63a25d0e2e0f6b2ab3b04c7041674bb87297fd58f7711622ac00e54",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b0a1251303a011617b813526a2859371e8ee289f04fcc197988c5b4d83dc8aca",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

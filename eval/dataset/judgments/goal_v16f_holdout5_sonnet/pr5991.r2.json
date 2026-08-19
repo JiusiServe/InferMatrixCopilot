@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.65,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Most literal ground-truth bugs (NaN ordering, zip strict=True, ClassVar AttributeError, absent-vs-empty schedule, boundary-vs-step counting, Ref2VA schedule reuse) are already fixed in this final diff, so neither candidate can 'recall' them verbatim; what matters is who finds the closest residual analogs. Y catches the sharpest one — default_video_shift/audio_shift still sourced only from the FL2VA release and applied to the Ref2VA base_schedule, a direct echo of the PR's central per-partition-scoping concern — plus a real NaN bypass in shifted_sigmas and a legitimate test-coverage gap (diffuse stubbed, real denoise-loop conversion untested), all with precise line-level evidence. X's review is well-verified in places (ran tests, checked denoise_loop math) but its headline 'wrong package' finding recommends reverting sigma_schedule.py out of diffusion/sched/ — exactly the move a real reviewer explicitly requested and got implemented — which is a confident, well-argued but factually contradicted claim that hurts precision. Both are highly actionable with file/line anchors; Y edges ahead on precision and relevance to the actual review history.",
+  "_cost_usd": 0.1885145,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16f_holdout5_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout5_r1",
+    "arm_a_sha256": "6123236bc5af5d0643f97524beeaf1ded77818af784ba727167eb28c0b6ace5f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "cdfcd7e56d440a4c457855f176cc4f71bbbbeb4593318d2a19a263a12b56e2d8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

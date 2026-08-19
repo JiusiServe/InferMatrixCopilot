@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.9,
+    "actionability": 0.95
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.9,
+    "actionability": 0.85
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates correctly flag the two most concrete ground-truth issues (GGUF silently dropped from nav while still referenced in tables, and the design/index.md 'Attention optimization' heading wrongly bucketing unrelated Cache-DiT/TeaCache/batching/offload entries — matching 'do we have other attention backend?'). X goes further by tracing the PR's git history to note BitsAndBytes was removed-then-restored and flags GGUF as the equivalent un-restored regression, directly matching the ground truth's detailed BitsAndBytes comment, and adds several additional well-grounded, actionable findings (missing TeaCache link, dangling matrix pointer, missing Integrations pointer). Y's findings are equally precise and grounded but narrower in scope, missing the BitsAndBytes point and the quantization-scope/alignment questions entirely.",
+  "_cost_usd": 0.2625461,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_holdout3_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r1",
+    "arm_a_sha256": "bf70eabeda4e654872c97be159302aafce32a19d40463979e455a633767b3f3f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "547e7dae328bb016f40e52ff9f47201f77c529d80a351e2defe03ab5d3f2b6e1",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

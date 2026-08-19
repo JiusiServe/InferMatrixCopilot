@@ -1,0 +1,32 @@
+[
+  {
+    "author": "hsliuustc0106",
+    "body": "please align with https://github.com/vllm-project/vllm-omni/pull/5857 in terms of latency timeline split. and also for your Pro 6000 PR",
+    "line": 88,
+    "path": "recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md"
+  },
+  {
+    "author": "yiminghub2024",
+    "body": "DONE @hsliuustc0106 ",
+    "line": 88,
+    "path": "recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "did you test other modes? FL2VA and Ref2VA?",
+    "line": 103,
+    "path": "recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md"
+  },
+  {
+    "author": "yiminghub2024",
+    "body": "tested Ref2VA the same so not write in pr . @hsliuustc0106 ",
+    "line": 103,
+    "path": "recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md"
+  },
+  {
+    "author": "yiminghub2024",
+    "body": "so we need not test all models every hardware ",
+    "line": 103,
+    "path": "recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md"
+  }
+]

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.78,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.87,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both independently surface the one substantive open ground-truth concern (FLASHINFER_ATTN allow-listed for `quant` but never consumed, silently running dense) with solid file/line grounding, and both correctly recognize the sage-kwargs gating as already fixed rather than mis-flagging it. Y goes deeper with execution-verified findings (dtype_vo-only silent no-op reproduced via actual code run, ring-SP bypass silently dropping quant by extension of an existing skip-softmax guard) that are more central to correctness than X's heavier lean toward doc-drift/CI-globbing/packaging-pin nits, which are valid but more tangential and in one case (recipes file) reaches outside the diff. Y's fixes are also more concretely actionable with inline code snippets versus X's '?'-line markers backed by evidence quotes.",
+  "_cost_usd": 0.4155374,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok45",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok45",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok45",
+    "arm_a_sha256": "758017685cec5dbe1a8cee6d777f930d90be0538a561024e13d370616469de7d",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "703e9ad7d9901fc59d5ad8d20917e36993f445b09d3ecaaba356dbe9c900f660",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

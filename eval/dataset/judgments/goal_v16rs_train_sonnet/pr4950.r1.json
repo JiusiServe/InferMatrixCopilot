@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.75,
+    "actionability": 0.4,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth carries no substantive concerns (just LGTM/approve), so recall is uninformative and tied. On precision and actionability Y pulls ahead: it traces the actual execution path to catch a specific factual overstatement in the PR's new prose ('silent audio' vs. an error response), correctly narrows an overbroad claim about extra_body flattening with a concrete counterexample, and resolves an ambiguity X left dangling about a stale sibling doc — all with concrete line-anchored suggested text. X's findings are thinner: mostly confirmations plus one CI-unrelated-to-diff note phrased as 'please confirm' rather than a concrete edit.",
+  "_cost_usd": 0.2044039,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16rs_train_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16rs_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16rs_train_r1",
+    "arm_a_sha256": "cd0b341aeef480190b3756547aad3787fae6a2b85e23540e99f9b3b39ea54916",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5a2e689fc33efd67adbf119f1e4cf034841928ad70fea2d99f142a727ca8ea18",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

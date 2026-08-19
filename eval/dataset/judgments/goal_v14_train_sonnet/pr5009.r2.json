@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.72,
+    "precision": 0.78,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.78,
+    "precision": 0.68,
+    "actionability": 0.88
+  },
+  "winner": "tie",
+  "margin": "slight",
+  "rationale": "Both candidates independently surface the PR's central ground-truth thread (platform-wide vllm_c default validated only on Qwen-Image, and the irony that Part 2's nn.RMSNorm swap means Part 1 no longer even affects Qwen-Image) with strong, diff-grounded evidence, plus overlapping secondary catches (ROCm/XPU left on old logic, module-scope CUDA import breaking non-CUDA collection, missing UT for Part 2). Y edges recall/actionability with a near-verbatim match to NumberWan's affected-model list and cleaner, more surgical findings, but its 'What I verified' section makes unfalsifiable claims (running pytest on a named GPU, exact kernel-vs-native numeric diffs) that read as fabricated and undercut its confident Part-2 approval. X stays more disciplined with grep/file:line-grounded evidence throughout, but one 'major' finding (claiming with_default silently flips untouched IrOpPriorityConfig fields) appears to misstate the config's actual field count, weakening precision. Net effect is a wash.",
+  "_cost_usd": 0.3435516,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_train_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_train_r1",
+    "arm_a_sha256": "8d2a3014f1936fe3b8735c8532e1400d8f71702976406455eed6d9681974c54f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "97e45909dc2469db55da15b6e8d6a525549029c219aefca76123ec8b801fd1bf",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

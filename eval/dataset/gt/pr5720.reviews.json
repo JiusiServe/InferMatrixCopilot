@@ -1,0 +1,29 @@
+{
+  "comments": [
+    {
+      "author": "Isotr0py",
+      "body": "| Mode | Weights loading memory usage / GPU | Peak memory usage / GPU |\r\n-- | -- | -- \r\nCombined | 148.27 GiB | 158.67 GiB |\r\nFL2VA-only | 86.27 GiB | 91.41 GiB |\r\nRef2VA-only | 86.27 GiB | 97.40 GiB |"
+    },
+    {
+      "author": "hsliuustc0106",
+      "body": "fix conflicts"
+    }
+  ],
+  "reviews": [
+    {
+      "author": "hsliuustc0106",
+      "body": "Posting the three additional actionable findings from the review. The Cache-DiT and combined-service evidence findings are already covered by active maintainer threads.",
+      "state": "COMMENTED"
+    },
+    {
+      "author": "SamitHuang",
+      "body": "a few code quality and convention issues that need to be addressed\r\n",
+      "state": "DISMISSED"
+    },
+    {
+      "author": "SamitHuang",
+      "body": "suggested minor fixes ",
+      "state": "COMMENTED"
+    }
+  ]
+}

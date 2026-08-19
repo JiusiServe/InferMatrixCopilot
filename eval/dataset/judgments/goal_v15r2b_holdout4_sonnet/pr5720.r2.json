@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.8,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.8,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently caught the Qwen3-TTS task-type validation regression (GT's P2 hsliuustc0106 comment), and both are heavily evidence-grounded with file:line citations and reproduction snippets, giving them comparable precision and actionability. Y has broader recall: it touches the Ref2VA-partition task-default fragility (via the empty-tasks-list edge case) and the combined-mode memory/perf-risk theme (GT's P1 combined-service validation comment and Isotr0py's memory table), plus surfaces new well-grounded Cache-DiT dotted-path failures in the same subsystem GT flagged (transformer routing bugs), whereas X's extra findings (CI red, hf_utils try/except, config_factory gaps) are plausible but mostly orthogonal to GT's actual concerns. Neither candidate covers the SamitHuang style nits (SimpleNamespace, Any hints, kwargs.get) or the modular-alias metadata gap, and neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.45632290000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "6c59f727ced45c6f537e6eb4883517d557307c093cbeef56d3e63b5352e6c974",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "7d155ed781e729cb9d3a1c8ef3851789595fa7fa0c9c18281fbbf0c3a461d7e5",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

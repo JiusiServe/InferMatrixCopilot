@@ -5,7 +5,7 @@ Invocation shape proven by the Composer eval arm
 --output-format stream-json`, prompt on STDIN (argv has a 128KiB per-arg
 limit on Linux and evidence packs exceed it), events parsed line-wise.
 
-Governance (decision record in doc/RFC-provider-registry.md): cursor-agent
+Governance (decision record in doc/features/provider-registry.md): cursor-agent
 cannot fully disable its built-in tools, so the copilot's scoped tools are
 OFFERED via the MCP tool bridge (preventive where used) and every session is
 post-audited (`audit.py`) with the verdict traced — the detective fallback,
@@ -18,7 +18,6 @@ DeepSeek gateway) or repo credentials.
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import subprocess
 import tempfile
@@ -26,14 +25,14 @@ from pathlib import Path
 
 from ..agent_loop import AgentOutcome
 from ..llm import Block, Reply
-from .base import AgentSessionRequest, HarnessTransport, SessionUsage, flatten_messages
+from .base import (
+    AgentSessionRequest,
+    HarnessTransport,
+    SessionUsage,
+    flatten_messages,
+    sanitized_env,
+)
 from .registry import PROVIDERS
-
-# Env the CLI subprocess keeps. Everything else — API keys, base URLs, gh
-# tokens, host markers — is dropped; subscription auth lives in HOME state.
-_ENV_KEEP = {"PATH", "HOME", "TERM", "COLORTERM", "LANG", "USER", "LOGNAME",
-             "SHELL", "TMPDIR"}
-_ENV_KEEP_PREFIXES = ("LC_", "XDG_")
 
 
 class CursorTransport(HarnessTransport):
@@ -41,11 +40,21 @@ class CursorTransport(HarnessTransport):
 
     spec = PROVIDERS["cursor"]
 
-    # -- process plumbing ----------------------------------------------------
-    def _env(self) -> dict[str, str]:
-        return {k: v for k, v in os.environ.items()
-                if k in _ENV_KEEP or k.startswith(_ENV_KEEP_PREFIXES)}
+    def auth_gap(self) -> str | None:
+        cli = self.cli_path()
+        if not cli:
+            return None  # the CLI-missing gap is reported separately
+        try:
+            out = subprocess.run([cli, "status"], capture_output=True,
+                                 text=True, encoding="utf-8", errors="replace",
+                                 timeout=15, check=False)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        if "Logged in" not in f"{out.stdout}\n{out.stderr}":
+            return "cursor-agent is not logged in — run: cursor-agent login"
+        return None
 
+    # -- process plumbing ----------------------------------------------------
     def _run(self, text: str, *, cwd: str, timeout_s: float,
              model: str = "") -> tuple[list[dict], bool]:
         """One CLI invocation → (parsed events, timed_out). A timeout kills
@@ -62,7 +71,7 @@ class CursorTransport(HarnessTransport):
         timed_out = False
         try:
             proc = subprocess.run(
-                cmd, input=text, cwd=cwd, env=self._env(),
+                cmd, input=text, cwd=cwd, env=sanitized_env(),
                 capture_output=True, text=True, encoding="utf-8",
                 errors="replace", timeout=timeout_s, check=False)
             stdout = proc.stdout or ""
@@ -153,7 +162,7 @@ class CursorTransport(HarnessTransport):
                 else:
                     path.unlink(missing_ok=True)
         audit = audit_events(events, roots=(str(cwd), str(req.run_dir)),
-                             read_only=req.scope.read_only)
+                             read_only=req.scope.read_only, cwd=str(cwd))
         usage = self._usage(events)
         if req.trace is not None:
             req.trace.record(

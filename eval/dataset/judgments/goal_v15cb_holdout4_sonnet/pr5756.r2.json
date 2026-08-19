@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.88,
+    "actionability": 0.8
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth is thin (two Copilot inline comments, both already resolved per the 'Done' reply and the diff's fixed lookup_model_spec logic), so neither candidate can score high recall against it, though both independently rediscover the same residual model-path-matching risk the GT thread targeted. X edges ahead on actionability with ready-to-paste fixes, clear severity tiers, and genuine product-level insight (H3 duration/audio-truncation semantics, lossy audio re-encoding) that Y misses entirely. Y counters with sharper narrow catches (fps=8 test masked by mocking, missing VALIDATE_INPUTS on the new references node) and very tightly cited evidence, but its output is diluted by heavy non-finding boilerplate ([resolved]/[claim-verified] noise) that reduces practical usefulness relative to X's cleaner, prioritized narrative.",
+  "_cost_usd": 0.4660458,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15cb_holdout4_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v15cb_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15cb_holdout4_r1",
+    "arm_a_sha256": "0ccdf6eca3e4307fa7d94480c579f7f477209be0aa414cca6229950d2edb888a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5e297658ea0cb989e05b1860fc4dd4e2c45cf1fb82ba08b0a451b49c240fd935",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

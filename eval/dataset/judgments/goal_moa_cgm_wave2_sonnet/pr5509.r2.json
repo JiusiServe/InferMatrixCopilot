@@ -1,0 +1,36 @@
+{
+  "x": {
+    "recall": 0.95,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.95,
+    "precision": 0.8,
+    "actionability": 0.75
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently nail the one live ground-truth concern (FLASHINFER_ATTN silently ignoring quant) and both surface the same additional dtype_vo-only no-op bug plus the unrelated doc-section deletions. X is organized with clear Blocking/Should-fix/Nits tiers and backs most claims with ready-to-apply code diffs, appropriately hedging the one speculative finding (sequence-boundary quantization) as a question rather than an assertion. Y contributes one excellent unique finding (the SAGE GPU test never runs on any CI lane) but pads its report with redundant restatements of the same FLASHINFER_ATTN bug and several 'additional observations' that are truncated mid-sentence, slightly hurting precision and actionability.",
+  "gap_hit": false,
+  "_cost_usd": 0.396197,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_moa_cgm"
+  },
+  "_roles": {
+    "arm": "copilot_moa_cgm",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_moa_cgm",
+    "arm_a_sha256": "fe0a990b48bf1e22e8dce58a27a61b2d7678feba67def4076a294df1c54a8614",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "703e9ad7d9901fc59d5ad8d20917e36993f445b09d3ecaaba356dbe9c900f660",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

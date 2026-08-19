@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.7
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.8,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth concerns (TODO validation section, Ref2VA testing status) are already resolved in this final diff snapshot, so neither candidate can literally recreate them; X ignores the area entirely (all 5 findings are minor formatting/README-index nits), while Y substantively re-engages the Ref2VA-readiness thread (unmeasured status, restart command's download-pattern gap, foreseeable OOM) giving it materially higher recall against the spirit of the ground truth. Y is also far more actionable and technically deep, catching a genuinely valid, well-derived bug (the memory-model attributes reduction to Ulysses degree when text-encoder-tp was confounded, with arithmetic cross-checked against the doc's own numbers) that neither X nor the human reviewers caught. X's findings are solid but shallow and lower-value; Y's larger volume carries slightly more precision risk on a couple of speculative estimates, but the bulk is well-grounded with specific file:line citations and verified arithmetic.",
+  "_cost_usd": 0.30111580000000004,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r2",
+    "arm_a_sha256": "fdc42679e8933db19e1e2d9c04a700c4c4817d34620270354fbfd0fa4b165a4c",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "726725524751ffed003542c0fd4e00bb3f74ef77a200d776d40628016c5bdd21",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

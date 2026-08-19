@@ -1,0 +1,127 @@
+{
+  "wall_s": 1593.7,
+  "split": "holdout",
+  "rc": 0,
+  "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_moa_cgm/runs/pr5509/run-20260814-230058-e85d63",
+  "recorded_at": "2026-08-14T23:27:30",
+  "attempts": [
+    {
+      "invocation_id": "inv-ef000c46",
+      "outcome": "run:run-20260814-230058-e85d63",
+      "rc": 0,
+      "pre_run": null
+    },
+    {
+      "run_dir": "run-20260814-214244-28a698",
+      "llm_calls": 95,
+      "input_tokens": 602008,
+      "output_tokens": 192003,
+      "usd": 0.471226,
+      "source": "spans"
+    },
+    {
+      "run_dir": "run-20260814-230058-e85d63",
+      "llm_calls": 109,
+      "input_tokens": 674483,
+      "output_tokens": 177518,
+      "usd": 0.522512,
+      "source": "spans"
+    }
+  ],
+  "attempt_usd_total": 0.993738,
+  "llm_calls": 109,
+  "input_tokens": 674483,
+  "output_tokens": 177518,
+  "usd": 0.522512,
+  "source": "spans",
+  "metrics": {
+    "schema": 1,
+    "run": "run-20260814-230058-e85d63",
+    "task_kind": "pr_review",
+    "status": "done",
+    "quality": {
+      "q": null,
+      "weight_coverage": 0.0,
+      "partial": true,
+      "abstained": false,
+      "components": {
+        "recall_w": null,
+        "precision_v": null,
+        "useful": null,
+        "calib": null,
+        "decision": null
+      }
+    },
+    "cost": {
+      "usd": 0.5225,
+      "minutes": 26.52,
+      "ci_minutes": 0,
+      "input_tokens": 674483,
+      "output_tokens": 177518,
+      "tool_calls": 326,
+      "usd_ref": 1.0,
+      "min_ref": 10.0,
+      "cost_index": 1.8478,
+      "cost_partial": false,
+      "unpriced_calls": 0,
+      "source": "spans",
+      "llm_calls": 109,
+      "by_role": {
+        "moa_member": {
+          "usd": 0.055193,
+          "input_tokens": 73339,
+          "output_tokens": 5380,
+          "calls": 13
+        },
+        "agent": {
+          "usd": 0.436345,
+          "input_tokens": 577744,
+          "output_tokens": 149755,
+          "calls": 93
+        },
+        "moa_member_fallback": {
+          "usd": 0.0,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "calls": 1
+        },
+        "reducer": {
+          "usd": 0.030974,
+          "input_tokens": 23400,
+          "output_tokens": 22383,
+          "calls": 2
+        }
+      },
+      "cache_read_tokens": 4912000,
+      "cache_creation_tokens": 0
+    },
+    "timings": {
+      "steps": {
+        "fetch": 3.67,
+        "gate": 1.92,
+        "review": 1585.45,
+        "report": 0.08
+      },
+      "time_to_first_result_s": 1591.08
+    },
+    "risk": {
+      "incidents": {
+        "catastrophic": 0,
+        "severe": 0,
+        "moderate": 0,
+        "minor": 0
+      },
+      "safety_multiplier": 1.0
+    },
+    "catq": null,
+    "tus": null,
+    "signals": {
+      "escalations": 0,
+      "pushes": 0,
+      "posted": 0,
+      "steps_completed": 4
+    }
+  },
+  "trace": "pr5509.trace.json.gz",
+  "trace_bytes": 83063
+}

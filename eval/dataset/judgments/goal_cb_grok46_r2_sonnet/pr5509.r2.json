@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.88,
+    "actionability": 0.92,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently surface the one live, actionable ground-truth concern (FLASHINFER_ATTN allow-listing a quant config nothing consumes) with strong diff-grounded evidence, and both independently catch the same unlisted-but-real Ring SP silent-drop bug, cross-validating each other's precision. X organizes findings by severity (blocking/should-fix/nits) with concrete inline diffs and a clear verdict, making it substantially more actionable as an actual review; Y's run-report/evidence-dump format is equally rigorous (and adds a couple of nice unique catches like the stale recipes doc and CI marker-selection gap) but is denser and harder to act on directly. Precision is comparably high for both, with X's one riskier claim (FlashInfer's external prefill.py output-dtype behavior) offset by Y's speculative CI-marker analysis.",
+  "_cost_usd": 0.3924786,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok46_r2"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r2",
+    "arm_a_sha256": "9617ee1248c689157017076cb003ba152f4d4a74bd15328d56969490b6de296b",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "703e9ad7d9901fc59d5ad8d20917e36993f445b09d3ecaaba356dbe9c900f660",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both reviews are deeply evidence-grounded and share several valid findings (T2VA accuracy-gate removal, unpinned MODEL_REVISION, media_utils.py's shared blast radius, ref2va audio truncation risk), so precision is comparably high. Y has notably better recall of the ground-truth inline concerns: it explicitly credits the workdir-removal fix (matching the resolved 'workdir dead arg' nit) and flags that the new sampling test can't catch a frame-count-source mismatch (echoing the 'weak test' concern), plus it names the red CI gates explicitly; X only tangentially brushes the rank-order/hang concern via a test-robustness note and never mentions workdir or the weak-sampling-test issue at all. Y also surfaces more substantive, well-reasoned issues beyond the ground truth (lossless-RGB memory/disk lifecycle, double-decode frame-count mismatch, nightly time budget, CDN asset fragility, snapshot_download post-condition, offload-staging inconsistency) with concrete fixes, giving it an actionability edge.",
+  "_cost_usd": 0.47575339999999994,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "62453e52a1eee9446aa57588eb1342f77b34c65d22dba9b042b7fa227def189e",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4847f9bc7acb40b4a7467503f4eb812a8e50f5fe424e5df5f56f1ab2a3da3ee3",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

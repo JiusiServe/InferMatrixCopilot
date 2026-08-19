@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.78,
+    "actionability": 0.88,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "The only substantive ground-truth concern reviewable against this diff is whether Ref2VA (untested) is safe to run by just swapping the model path — Y hits this directly and concretely (finding #4: 4-GPU Ref2VA restart risks OOM given FL2VA-only validation and thin headroom), while X only notes missing Ref2VA examples/pointers without questioning validation status. Y also independently catches a genuine, diff-internal inconsistency (warm-up 'once' vs 'two warmups') and covers more ground (sync-timeout scope, RAM/NUMA analysis, table completeness) with solid code citations, though two of its richer findings (alternate PR-description benchmark rows, 5090.md HBM comparison) reference content outside the shown diff and can't be fully verified, slightly denting precision. X is very rigorous and well-verified but narrower and misses the core reviewer concern entirely.",
+  "_cost_usd": 0.26275350000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_holdout3_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r2",
+    "arm_a_sha256": "7451f066941eed1f4581ec161f799670050f6330dffd7016f3150722234ff164",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0c9521d957061cba9c0df8c76435b9ce67650296c5e211578db2b474c4668332",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

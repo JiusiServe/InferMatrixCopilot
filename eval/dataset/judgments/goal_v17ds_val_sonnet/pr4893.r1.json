@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.55,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.78,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both independently surface the same real bug (the DP-metadata pre-hook fires even when the vLLM MoE mapping isn't active), which cross-validates that finding, and both engage the one substantive ground-truth item (the reduce_scatter/device_communicator test assertions) — Y more sharply, showing the assertions only validate the mock rather than real coordinator behavior. X is let down by quality problems: a suggestion block that contradicts its own preceding analysis (says the proposed hook access 'would fail' then gives that exact code as the fix), three 'additional observations' that are truncated mid-sentence, and a tangential pyproject.toml dependency finding on an untouched file. Y's findings are internally consistent, appropriately hedged (e.g., flagging the CFG-parallel hang risk as plausibly pre-existing rather than overclaiming), and each comes with a concrete, coherent fix.",
+  "_cost_usd": 0.33891059999999995,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17ds_val",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_val",
+    "arm_a_sha256": "d987d032cb0702a647c24e7f811e2579d4bcaebcc007fc7620191299638cb7fc",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0d4ddd4027e23f1f32216e748289588ea9a0e74ee8e599fa34b9d50f503d2f0d",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

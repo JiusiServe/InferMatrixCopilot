@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.8,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Candidate Y produced no review at all (run failed with a 402 API error), so it scores zero on every axis. Candidate X delivered a detailed, well-grounded review with specific file:line citations, correctly catching a real diff-verifiable contradiction (ROCm serve commands point MODEL at the FL2VA partition while the prose claims 'all tasks work out of the box' including Ref2VA) and correctly noting supported_models.md's table was never actually updated despite the new footnote — both echoing ground-truth concerns about updating supported_models.md and avoiding overclaiming ROCm support. It also touched the mkdocs --strict/canonical-URL issue that was the PR's actual blocking review comment, though buried as a nit rather than flagged as blocking. Some deeper code claims (reference-count validation internals, aiter fallback behavior) can't be fully verified against the truncated diff but are internally consistent and plausible, so precision is docked only slightly for that uncertainty.",
+  "_cost_usd": 0.2964075,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15_holdout4_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "808e012e7cc4506e3c2ca00b0d950f65e330cf5be500a4ff9198f9af748407af",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "cb201dcc2cdab115638b4f9fa9a4049589bf1e28f73d4bc1e3a3fbc1975ca7e7",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

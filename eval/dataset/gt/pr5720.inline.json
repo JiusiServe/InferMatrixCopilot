@@ -1,0 +1,92 @@
+[
+  {
+    "author": "lishunyang12",
+    "body": "[P1] This registers the second DiT, but Cache-DiT still enables and refreshes only `pipeline.transformer` (and its summary only knows `transformer_2`). With `cache_backend=cache_dit`, `task=ref2va` therefore runs `transformers_ref` without cache acceleration. Please extend the cache lifecycle to all `_dit_modules`, or explicitly reject this backend for combined H3, and add coverage for both task routes.",
+    "line": 609,
+    "path": "vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "[P1] The new combined/no-offload command keeps both DiTs resident, but the only latency figures below were collected with one partition. Please add a combined-service measurement covering peak VRAM and warm latency/throughput for both `fl2va` and `ref2va` (plus output parity), or clearly mark this recipe path as unvalidated; otherwise the new default mode is not performance-qualified.",
+    "line": 214,
+    "path": "recipes/MiniMaxAI/MiniMax-H3.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "[P1] Reuse the existing MiniMax-H3 capability metadata for the modular alias. `modular_model_index.json` resolves to `MiniMaxH3ModularPipeline`, which the registry maps to this same pipeline, but this entry advertises only one image and leaves mixed references disabled. The serving layer uses these fields before `forward`, so valid Ref2VA requests with multiple images or mixed image/video references are rejected before the pipeline's 9-image/mixed-input validation runs. Please set this alias to the same `max_multimodal_image_inputs=9` and `supports_mixed_reference_inputs=True` contract, and add an admission test.",
+    "line": 47,
+    "path": "vllm_omni/diffusion/model_metadata.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "[P1] Preserve the Ref2VA partition's implicit task default. With `--task-type ref2va` (or a local Ref2VA checkpoint), `supported_tasks` is only `{ref2va}`; an image-only request that omits `extra_params.task` now infers `fl2va` and fails at the membership check below. The previous implementation defaulted any request on the Ref2VA partition to `ref2va`. Please retain that behavior for single-partition startup and add a regression test.",
+    "line": 727,
+    "path": "vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "[P2] Restore model-specific validation for the existing TTS flag before removing `choices`. Qwen3-TTS consumes `task_type` from each request and does not validate this startup value, so `vllm serve <TTS-model> --task-type fl2va` now starts successfully but silently ignores the invalid value instead of failing at argument parsing. Please preserve the TTS choices via model-aware validation or validate the generic flag during model initialization.",
+    "line": 216,
+    "path": "vllm_omni/entrypoints/cli/serve.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed in c56eab27: the modular alias now advertises the same 9-image and mixed-reference admission contract as MiniMaxH3Pipeline, with regression coverage.",
+    "line": 47,
+    "path": "vllm_omni/diffusion/model_metadata.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed in c56eab27: Ref2VA-only startup now defaults omitted tasks to ref2va before modality inference, with a regression test.",
+    "line": 727,
+    "path": "vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed in c56eab27: Qwen3-TTS validates its startup --task-type during OmniModelConfig initialization, while H3 task selectors remain supported.",
+    "line": 216,
+    "path": "vllm_omni/entrypoints/cli/serve.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Fixed in 639f6236: Cache-DiT now enables, refreshes, and summarizes every declared `_dit_modules` DiT, with combined two-DiT regression coverage.",
+    "line": 609,
+    "path": "vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py"
+  },
+  {
+    "author": "lishunyang12",
+    "body": "Updated in d0c183c7: the recipe now presents the combined service configuration without a separate performance qualification.",
+    "line": 214,
+    "path": "recipes/MiniMaxAI/MiniMax-H3.md"
+  },
+  {
+    "author": "SamitHuang",
+    "body": "Please avoid using `SimpleNamespace` to fake typed objects like `OmniDiffusionConfig`, `Qwen2TokenizerFast`, and `Qwen3VLProcessor`. Consider using `unittest.mock.Mock` or instantiating the real config objects to prevent misleading type hints and fragility.",
+    "line": 261,
+    "path": "tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py"
+  },
+  {
+    "author": "SamitHuang",
+    "body": "Please avoid adding new `Any` type hints. Use more specific types or `typing.Protocol` if the exact type is dynamic.",
+    "line": 30,
+    "path": "vllm_omni/diffusion/cache/cachedit/backend.py"
+  },
+  {
+    "author": "SamitHuang",
+    "body": "Please avoid adding new `kwargs.get` string lookups. If `task_type` is a known parameter, consider adding it explicitly to the method signature or a typed config object.",
+    "line": 1022,
+    "path": "vllm_omni/engine/async_omni_engine.py"
+  },
+  {
+    "author": "SamitHuang",
+    "body": "Please avoid broad `except Exception:` swallows. Catch specific exceptions like `OSError` or `json.JSONDecodeError` instead.",
+    "line": 25,
+    "path": "vllm_omni/diffusion/utils/hf_utils.py"
+  },
+  {
+    "author": "Isotr0py",
+    "body": "Fix in https://github.com/vllm-project/vllm-omni/pull/5720/commits/b0131985c880fb6b0a74ce31545296932484c67c. Actually, I found `Any` is terribly widely used in this file to present diffusion pipeline. 🥵  \r\n\r\nJust refresh all of them to use `SupportsComponentDiscovery`.",
+    "line": 30,
+    "path": "vllm_omni/diffusion/cache/cachedit/backend.py"
+  }
+]

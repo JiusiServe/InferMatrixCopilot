@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.68,
+    "precision": 0.7,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.62,
+    "actionability": 0.88,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X covers the version/fallback documentation, hardware gating, partial-function availability, test-marker, and coverage concerns with concrete locations and fixes. It loses precision through speculative peripheral findings and advice to skip kernel-loading failures, while Y misses key version/documentation concerns and incorrectly claims an escaping get_kernel exception causes an unbound-variable NameError.",
+  "_usage": {
+    "input": 3,
+    "output": 1633
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v7_goal_r3"
+  },
+  "_roles": {
+    "arm": "copilot_v7_goal_r3",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v7_goal_r3",
+    "arm_a_sha256": "22a34b10aa9bc1ce82bd33bb1a21f59d772d76d7bf71bb29f15bb87427e764d5",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0639263265995e00edcd06c6242ac0a6a3647a980509c282af885c86ce6930e0",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

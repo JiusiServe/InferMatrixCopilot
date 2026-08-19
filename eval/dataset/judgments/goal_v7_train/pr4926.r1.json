@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.71,
+    "precision": 0.7,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.57,
+    "actionability": 0.82,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X covers more ground-truth concerns, especially kernel-version semantics, fallback behavior, SM90 gating, and the varlen-function hazard, with concrete locations and fixes. Both reviews add unsupported or overstated findings, but Y contains more speculative CI attribution and the mathematically incorrect claim that Q=K=V makes attention output trivially Q.",
+  "_usage": {
+    "input": 3,
+    "output": 1693
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v7_goal_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v7_goal_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v7_goal_r1",
+    "arm_a_sha256": "35fc2dc4b95fcdf946d33f4ca3cff395b8c38fd02717c61119d3176ada0702f8",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0639263265995e00edcd06c6242ac0a6a3647a980509c282af885c86ce6930e0",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

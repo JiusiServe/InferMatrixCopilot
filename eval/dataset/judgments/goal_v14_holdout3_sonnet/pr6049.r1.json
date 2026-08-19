@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.55,
+    "actionability": 0.7
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.78,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Neither candidate hits the actual ground-truth nitpicks (import-order in __init__.py, curl-script necessity, serving_video.py edit, offline/online asymmetry), so recall is low for both. Y's top finding is a concrete, well-evidenced correctness bug (LingBot silently drops to T2V for reference/last-image-only I2V requests, discarding the old validation) with a nuanced fix that avoids over-reverting (preserving Wan2.2 FLF2V); X explicitly declares this exact LingBot validation concern 'resolved,' which appears to be a false negative given Y's reproduction, undermining X's credibility despite its far greater volume of hedged/validated bullets. Y's remaining points (envelope-discard bug, unrecognized 'video' modality, asymmetric validation/aliasing) are also concrete and actionable, while X pads with many confirmation bullets and speculative CI-log conjecture that add little marginal value.",
+  "_cost_usd": 0.3872599,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_holdout3_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r1",
+    "arm_a_sha256": "152858e97a72182a36d89dd4c79a09dde933d53283072d98bf0fd1d103087638",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "f3f11d2cd7926100dbdc03762099a2cc9cdcebc0d29f39ad1339fc8af49d3171",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

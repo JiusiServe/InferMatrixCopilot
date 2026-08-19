@@ -1,0 +1,107 @@
+{
+  "wall_s": 1835.2,
+  "split": "holdout3",
+  "rc": 0,
+  "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r2/runs/pr5691/run-20260815-050650-a3631b",
+  "recorded_at": "2026-08-15T05:37:21",
+  "attempts": [
+    {
+      "invocation_id": "inv-4fc7a34f",
+      "outcome": "run:run-20260815-050650-a3631b",
+      "rc": 0,
+      "pre_run": null
+    },
+    {
+      "run_dir": "run-20260815-050650-a3631b",
+      "llm_calls": 220,
+      "input_tokens": 1934006,
+      "output_tokens": 369994,
+      "usd": 1.786457,
+      "source": "spans"
+    }
+  ],
+  "attempt_usd_total": 1.786457,
+  "llm_calls": 220,
+  "input_tokens": 1934006,
+  "output_tokens": 369994,
+  "usd": 1.786457,
+  "source": "spans",
+  "metrics": {
+    "schema": 1,
+    "run": "run-20260815-050650-a3631b",
+    "task_kind": "pr_review",
+    "status": "done",
+    "quality": {
+      "q": null,
+      "weight_coverage": 0.0,
+      "partial": true,
+      "abstained": false,
+      "components": {
+        "recall_w": null,
+        "precision_v": null,
+        "useful": null,
+        "calib": null,
+        "decision": null
+      }
+    },
+    "cost": {
+      "usd": 1.7865,
+      "minutes": 30.52,
+      "ci_minutes": 0,
+      "input_tokens": 1934006,
+      "output_tokens": 369994,
+      "tool_calls": 349,
+      "usd_ref": 1.0,
+      "min_ref": 10.0,
+      "cost_index": 2.3232,
+      "cost_partial": false,
+      "unpriced_calls": 0,
+      "source": "spans",
+      "llm_calls": 220,
+      "by_role": {
+        "agent": {
+          "usd": 1.692152,
+          "input_tokens": 1739048,
+          "output_tokens": 332179,
+          "calls": 217
+        },
+        "reducer": {
+          "usd": 0.094304,
+          "input_tokens": 194958,
+          "output_tokens": 37815,
+          "calls": 3
+        }
+      },
+      "cache_read_tokens": 31751168,
+      "cache_creation_tokens": 0
+    },
+    "timings": {
+      "steps": {
+        "fetch": 5.18,
+        "gate": 1.56,
+        "review": 1824.44,
+        "report": 0.06
+      },
+      "time_to_first_result_s": 1831.23
+    },
+    "risk": {
+      "incidents": {
+        "catastrophic": 0,
+        "severe": 0,
+        "moderate": 0,
+        "minor": 0
+      },
+      "safety_multiplier": 1.0
+    },
+    "catq": null,
+    "tus": null,
+    "signals": {
+      "escalations": 0,
+      "pushes": 0,
+      "posted": 0,
+      "steps_completed": 4
+    }
+  },
+  "trace": "pr5691.trace.json.gz",
+  "trace_bytes": 118471
+}

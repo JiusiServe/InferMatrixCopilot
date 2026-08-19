@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.82,
+    "actionability": 0.88
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.87,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns to recall, so both score trivially high there; the split comes down to finding quality. Both independently catch the same highest-value bug (the new test lacks pytestmark and is deselected by the CI marker filter, so the regression guard never runs) and both flag the same doc/pyproject 'Blackwell' wording drift. Y goes further with two novel, well-grounded functional findings X misses entirely: warmup_quack_fp8() bypasses quack_enabled() and can raise on sm_120 during the documented build-time warmup, and warning_once keys on the exception object so the flood-log symptom isn't actually deduped — both cite exact lines and are directly relevant to the bug this PR fixes. X's extra findings (sm_110 ambiguity, pyproject comment, kernel-load test gap) are valid but skew toward minor/doc nits already partially echoed by Y. X's GitHub-suggestion-block formatting is marginally more machine-actionable, keeping the margin slight rather than clear.",
+  "_cost_usd": 0.27916620000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17ds_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_train",
+    "arm_a_sha256": "958d0e2a1a40ae0dd4c3ffe53a1af438dd63600a2ed20f49d030977a91bcbee3",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "de884ebeca54520b85a490b897397bd22bf362507bf9f7d4a833d74b390ae063",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

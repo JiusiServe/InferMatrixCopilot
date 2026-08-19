@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.82,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently find the same well-grounded novel bug (identical NPU seq_len twin, line-cited) and the same residual async_chunk default inconsistency (3507 vs 3823) that echoes the ground-truth Low concern; both validate the runner fix and flag under-tested streaming. Y edges ahead on recall by explicitly reconciling its findings against the PR's actual resolution history (marking the Med scoping concern '[resolved]' with a sharp residual note that the voxtral test can't detect a broken async_chunk read) and by digging up well-evidenced, novel gaps (AMD CI lane specifics, and that the fix's E2E table validates only the CustomVoice failure from #4851, not the Base one). X's AMD-CI claim is asserted without the citation trail Y provides, slightly hurting precision, though X's padding-root-cause reasoning is a genuine, well-grounded bonus. Neither candidate explicitly interrogates a second/orthogonal batch axis in the splitting logic, so gap_hit is false for both.",
+  "_cost_usd": 0.39956660000000005,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16f_train_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_train_r1",
+    "arm_a_sha256": "3fefc4081d5aa4b7f5dcce0d99a7867a1fa61fbc1439e38b4b34920ad51c1c03",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "03d7423c3a91e45838083e2025e3dea932f1d9448ba923b1d6ca1a0373899ea1",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

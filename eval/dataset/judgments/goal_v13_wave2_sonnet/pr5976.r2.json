@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.7,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.05,
+    "precision": 0.85,
+    "actionability": 0.8
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both independently corroborate the same critical double-seeded num_stale_output_tokens bug and the dead async_tokens_to_discard writes with matching line citations, giving strong grounding for those. Neither hits the ground truth's actual (mostly stylistic, already-resolved) inline comments, so recall is low and roughly tied for both. Y edges out on precision via explicit validate/sweep passes that rule out several borderline concerns as non-issues, plus a well-evidenced novel finding (NPU _dummy_run missing randomize_inputs) and a thorough 10-file arg_utils.py regression sweep, whereas X asserts a VLLM_CACHE_ROOT race condition that Y directly refutes with specific lock-ordering evidence, a likely false positive. X is marginally more actionable with inline code-diff fix suggestions.",
+  "_cost_usd": 0.3041178,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_wave2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_wave2",
+    "arm_a_sha256": "10c2602a19281706645f1b6391ffdc87bc7bc4ee82e7440083fc87f2c76dd9b6",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4703d9c3f9a1a403af03ff17f62c2d816d9363ba7048d8dcee9a84a47834bc46",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently rediscover the ground truth's core surviving concern (the engine hardcodes rel_l1_thresh=0.2, so the new 0.17 MiniMax-H3 default never takes effect) with strong, matching evidence, and both correctly confirm the partition-isolation fix (FL2VA-only hooking, Ref2VA rejection) is now sound. Y goes further with a rigorous, well-evidenced critique of the calibration polynomial's near-constant/non-monotone behavior and tighter secondary findings (memory footprint scaling, wasted RoPE computation, weak e2e cache-hit assertions, a drive-by unrelated test change), all clearly actionable. X's extra findings are more numerous but lower-value on average, including re-litigating the AMD CI failure that the ground truth reviewer already resolved as unrelated. Neither candidate flags the inline packed_total/attn_backend bugs, but those appear already fixed in the shown diff, so little recall is lost there for either.",
+  "_cost_usd": 0.4295448,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v13_moa_cgm",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_moa_cgm",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_moa_cgm",
+    "arm_a_sha256": "3747c7c93f52b576bcdcadf91e1c582d47a457825c0d2176c3a0b94c8eb63b83",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

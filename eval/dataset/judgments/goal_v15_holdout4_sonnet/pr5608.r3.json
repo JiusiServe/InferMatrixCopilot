@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.6,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both miss the ground truth's explicit ask for a three-way (BNSD/BSND/plain-torch) benchmark, but both independently rediscover the deeper spirit of FayeSpica's 'make this a shared, model-independent op' comment by showing the new helper still isn't wired into two sibling BNSD call sites — a strong, well-cited finding in both. X is more narratively polished and gives literal code-diff fixes, but repeatedly asserts 'confirmed via execution' for NPU-specific behavior (exact RuntimeError text, bit-identical benchmarking) that's hard to trust as genuinely verified, and its headline claim that the code-predictor bug triggers even at low concurrency (seq_len=2) looks like a reasoning slip compared to Y's more internally consistent seq_len=33/batch>16 math tied to the actual deploy config. Y's findings are uniformly evidence-anchored with exact quoted lines/configs/CI yaml and includes a genuinely new, well-grounded point (NPU e2e path is skip-marked, so the fallback gets no real-hardware coverage) that X doesn't raise, making it modestly more precise and equally actionable.",
+  "_cost_usd": 0.4505539,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15_holdout4_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r1",
+    "arm_a_sha256": "cccd15fae16dbe783a04136950ad460c0be927e9cc18a63827eee75f172e5db8",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "400e2cdee23e452f67bea91295a8fd9f971ab290f37c9a61d27bec6c625cf76a",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

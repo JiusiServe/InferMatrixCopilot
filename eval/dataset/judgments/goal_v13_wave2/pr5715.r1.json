@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.43,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Y explicitly verifies that both files targeted by the substantive ground-truth comments were reverted, while X covers only the MUSA concern. However, X's two findings are grounded and concrete, whereas Y adds several speculative or weak comments, notably around the accepted NPU ref, relative working directory, version-pinned configuration URL, and cosmetic release wording.",
+  "_usage": {
+    "input": 3,
+    "output": 1694
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "copilot_v13_wave2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_wave2",
+    "arm_a_sha256": "468125edafccecb362348d60678705ecd20dd73115d9140b36d508f34756349a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5866809cd7926f6bee88b473acf165652378865539411405c15a7c86c14e7466",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Candidate Y's run crashed before producing any review (402 API error, no findings at all), so it contributes zero recall, precision, and actionability. Candidate X delivers a deep, well-grounded review with precise line references and verified code traces (unvalidated max_seqlen_q/k, all-false-mask edge case, sync overhead, SAGE gate gaps); it partially overlaps the ground-truth themes (AllGather-KV incompatibility, SAGE-disabling edge cases, timestep convention) though from different angles and without hitting the exact P1/P2 specifics or the threshold/DCO fixes, so recall is moderate rather than high. X's findings are specific, actionable, and mostly diff-grounded, making it the clear and decisive winner.",
+  "_cost_usd": 0.34717760000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15_holdout4_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "e38c7e72b00ffa97a88937cfd57b57817ab558155eb06d6ca5c5b44a63950fcb",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "283d5ab54325426c21ff03640adaaf73eb89e801040f4baf619381200e657fb0",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

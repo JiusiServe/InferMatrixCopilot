@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.78,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently rediscovered the ground truth's core still-live concern (the MiniMax-H3 0.17 default never reaches serving because async_omni_engine hardcodes 0.2), with equally strong file/line evidence and fix suggestions, and both correctly validated that the FL2VA-partition gating and offline-example fixes already hold. Y goes further with a rigorous, self-computed analysis showing the calibrated threshold polynomial is near-constant and non-monotone (directly relevant to GT's 'material quality loss' theme), plus sharp test-coverage critiques (cache-hit test can't catch stale t_emb, e2e smoke can't detect a no-op cache) and a TP-rank-consistency check X never attempts. X adds one plausible but unverifiable Cache-DiT/TeaCache conflict claim and useful CI/docs findings, but pads with lower-value cosmetic items and slightly overstates the AMD CI causality that GT already dismissed as an expired/unrelated build.",
+  "_cost_usd": 0.3201026,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v13_wave2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_wave2",
+    "arm_a_sha256": "8f36c69762945dccaf24f0db7f798511a3e63f39f1446ac63f9054eb134c767a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

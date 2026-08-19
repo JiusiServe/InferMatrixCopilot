@@ -35,5 +35,5 @@ sources: []
 | 判断何时使用多个 agent | [agents](agents/_index.md) | agent 分工和交接 |
 | 拆需求、产品闭环和执行计划 | [planning](planning/_index.md) | 通用规划方法 |
 
-页面元数据（frontmatter、标签分类法、页面生命周期）规范见 [SCHEMA](../SCHEMA.md)；
-目录归属与页面写法见 [贡献规范](../contributing/_index.md)。
+页面元数据（frontmatter、标签分类法、页面生命周期）规范见 [SCHEMA](../../doc/knowledge/SCHEMA.md)；
+目录归属与页面写法见 [贡献规范](../../doc/knowledge/contributing/_index.md)。

@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.8,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "The visible diff is the already-amended tree (head 50126edf) where most of hsliuustc0106's original concerns (NPU/platform scope, prefix-cache compatibility, full-payload-branch unreachability, connector ownership) were folded in as fixes, so a strong review needed to explicitly re-verify those exact claims. Y's 'verified as correct' section directly re-checks NPU synchronicity, XPU/MUSA inheritance, the prefix-cache note, and the full-payload-branch unreachability argument — hitting nearly all of the GT reviewer's concern areas — and additionally surfaces a genuinely novel, well-grounded image-path defect (GitHub relative-src breakage) and a substantive connector-ownership overstatement that echoes GT's live-state concern almost exactly. X's findings are grounded and actionable but narrower, touching only the platform-scope thread and missing the connector-ownership, prefix-cache, and full-payload-branch areas entirely. Neither candidate has a LATENT GAP CHECK section.",
+  "_cost_usd": 0.34855569999999997,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v13_ds_wave2_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_ds_wave2_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_ds_wave2_r2",
+    "arm_a_sha256": "66a990d16e167ac035ea57e63de8804cff4c06a324ce0ce74185532cbb6797b2",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

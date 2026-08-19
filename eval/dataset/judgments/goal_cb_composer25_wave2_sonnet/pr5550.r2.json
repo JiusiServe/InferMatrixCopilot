@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.8,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y directly engages the PR's most substantive ground-truth thread (asukaqaq-s's 'too many validation layers, unclear ownership' comment) with a specific, code-snippet-backed fix for missing DTO-local invariants, and independently surfaces the executor-leak-on-init-failure fix (matching hsliuustc0106's P1 item) while adding a nuanced ownership critique X doesn't reach. X's findings are grounded and cite real line evidence but mostly suggest 'add a test' rather than identifying concrete design gaps, giving it lower recall against the ground truth's substantive concerns and less actionable remediation. Both largely miss the stage_kv/interface.py-specific P1 items (tensor geometry, null-block, seq_len bug, digest binding), likely because that file isn't visible in the truncated diff, capping recall for both candidates. Neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.3346446,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_composer25",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_composer25",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_composer25",
+    "arm_a_sha256": "9fb2953ac8f2774b2c96684d44197ce5730c1781dc186ff5fa7902aa34eb9c18",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b6ae3b48c6859b0d16784163ab2044d7d85e3b3b32f4e60b559fa2a55186c64b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

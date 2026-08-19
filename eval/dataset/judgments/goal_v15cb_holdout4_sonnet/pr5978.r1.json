@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.8,
+    "actionability": 0.65
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth's substantive concerns were the rank-0/broadcast hang risk, a weak/self-testing unit test, and a dead workdir arg (all already fixed in this diff), plus a CI-failure question. X confirms the hang-fix resolution precisely but never touches the workdir removal or CI-failure thread; Y explicitly credits the workdir cleanup, flags the still-red Buildkite gates, and independently reconstructs the T2VA threshold/removal saga with correct commit hashes matching the human PR comments almost verbatim, plus claims concrete local verification of the AAC fix. Both sets of findings are well file/line-grounded, but Y's are organized with clearer verdicts, concrete fixes/code snippets, and severity ordering, making it more actionable and better matched to the real reviewer context despite similar length.",
+  "_cost_usd": 0.41281199999999996,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15cb_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15cb_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15cb_holdout4_r1",
+    "arm_a_sha256": "183106034cb7f1a50d92938529971903d49ee0c22020411e7d3b2bc275049329",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4847f9bc7acb40b4a7467503f4eb812a8e50f5fe424e5df5f56f1ab2a3da3ee3",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "calls": 14,
+  "input_tokens": 349996,
+  "output_tokens": 7531,
+  "cost_usd": 1.166088,
+  "is_error": false,
+  "terminal_reason": "completed",
+  "split": "train",
+  "head": "9947f41430aa2c7a45b17b1f396bf90b92433c45",
+  "base": "b7d08fe5f6b1306eee44172c6589e3225de6897e",
+  "resolved_model": "claude-fable-5",
+  "snapshot_sha256": "7d15e2e5e6877087cd448912635a29ba177c8c8256bc842600b6a299f4e1a58c",
+  "validation_commands": [
+    "git -C /data/zhoutaichang/.infermatrix-copilot/worktrees/vllm-omni-pr4977 diff b7d08fe5f6b1306eee44172c6589e3225de6897e HEAD --stat",
+    "git diff b7d08fe5f6b1306eee44172c6589e3225de6897e HEAD --stat",
+    "git diff b7d08fe5f6b1306eee44172c6589e3225de6897e HEAD",
+    "git log --oneline b7d08fe5f6b1..HEAD && git show 0f2516f2 --stat && git show 528804e8 --stat",
+    "python3 -c \"import inspect, kernels; print(kernels.__version__ if hasattr(kernels,'__version__') else 'n/a'); print(inspect.signature(kernels.get_kernel))\" 2>&1",
+    "python3 - <<'EOF'\nimport inspect, kernels\nsrc = inspect.getsource(kernels.get_kernel)\nprint(src)\nEOF",
+    "python3 -c \"\nimport inspect, kernels\nprint(inspect.getsource(kernels.get_kernel))\"",
+    "python3 -c \"\nimport inspect\nfrom kernels.utils import select_revision_or_version\nprint(inspect.getsource(select_revision_or_version))\""
+  ],
+  "ran_validation": true,
+  "claude_md_seen": {
+    "/data/zhoutaichang/CLAUDE.md": "27ca8ea8056c231e"
+  },
+  "recorded_at": "2026-08-15T01:20:00",
+  "arm": "baseline_opus5",
+  "wall_s": 118.6,
+  "audit_ok": true,
+  "audit_violations": [],
+  "audit_blocked_attempts": [],
+  "artifact_chars": 5222
+}

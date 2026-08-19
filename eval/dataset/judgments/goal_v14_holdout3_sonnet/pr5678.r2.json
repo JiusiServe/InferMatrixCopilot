@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.65,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y's must-fix findings (ownership validation rejecting ~226 valid EngineArgs fields, the async_scheduling/scheduler_cls divergence) directly hit the architectural crux the human reviewer flagged — config parity gaps and incomplete owner sets — backed by concrete, quantified repros (81 YAMLs checked, 51 pipelines swept). X missed all seven ground-truth inline bugs and, worse, explicitly marked the two areas ground truth flags as broken (model_subdir/tokenizer_subdir precedence, omni_kv_config precedence) as 'validated' correct, actively asserting the code is fine where it isn't. Both share the same legitimate ROCm dead-code catch not in ground truth. Both are highly actionable with concrete file/line evidence, but Y's findings are better grounded and more relevant to what the human reviewer actually cared about.",
+  "_cost_usd": 0.4803636,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_holdout3_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r1",
+    "arm_a_sha256": "5698b1ffe83673f753726a1904ba3c1997f79a26513b51e084adbf5adcf83ccb",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "629955d5b6f052975d79f02bc72365b49e78d8babba831bce0e73b172ff802a7",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

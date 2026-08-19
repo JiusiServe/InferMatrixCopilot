@@ -182,7 +182,7 @@ release_baseline.yaml 的 audited_sha
 
 `imupdate` 不会根据一次 diff 自动编造 owner 规则，也不会自动 commit、push 或开 PR。
 详细的审计项和底层命令见
-[`doc/VLLM_OMNI_RELEASE_MAINTENANCE.md`](doc/VLLM_OMNI_RELEASE_MAINTENANCE.md)。
+[`doc/contributing/release-maintenance.md`](doc/contributing/release-maintenance.md)。
 
 ## Skill 命令和 MCP 接口不是一回事
 
@@ -202,7 +202,7 @@ release_baseline.yaml 的 audited_sha
 - `get_review_result(run_id, offset=0)`：轮询 Strict 结果；报告较长时按
   `next_offset` 继续读取。
 - `update_knowledge(repo="vllm-omni")`：只返回知识贡献入口
-  `knowledge/CONTRIBUTING.md`。它不是 `imupdate` 的发版审计器。
+  `doc/knowledge/CONTRIBUTING.md`。它不是 `imupdate` 的发版审计器。
 - `doc_search(query, repo="vllm-omni", limit=20)`：搜索模型或组件知识。
 - `doc_read(path, repo="vllm-omni", offset=0)`：读取搜索到的知识页面。
 
@@ -233,14 +233,25 @@ Strict 会返回 `run_id`，Agent 再用 `get_review_status` 查看进度，并�
 Autonomous workflow 不是 `imreview` 的第三种模式，而是同一工作流引擎的独立
 CLI/MCP 入口。默认安装器不会注册它；只有需要独立执行 issue、CI、rebase 等任务时
 才需要阅读
-[`docs/autonomous-workflow.md`](docs/autonomous-workflow.md)。
+[`doc/guide/autonomous-workflow.md`](doc/guide/autonomous-workflow.md)。
 
-## 维护者文档
+## 更多文档
 
-- [开发者入口和文档地图](DEVELOPMENT.md)
-- [安装和通用 MCP 配置](doc/MCP.md)
-- [vLLM-Omni 发版漂移审计](doc/VLLM_OMNI_RELEASE_MAINTENANCE.md)
-- [知识库贡献规范](knowledge/CONTRIBUTING.md)
-- [知识维护示例](docs/knowledge-maintainer.zh-CN.md)
-- [项目设计与实现](doc/)
-- [评测说明](eval/README.md)
+**[`doc/README.md`](doc/README.md) 是文档地图**——一行一条，按你要做的事挑一篇。
+下面只列最常用的四条路：
+
+| 你要做什么 | 看这篇 |
+|---|---|
+| 完整了解它是什么、能做什么 | [指南](doc/GUIDE.md)（概览 / 功能 / 使用 / 开发 / playbook / step / tool / 性能） |
+| 在 Codex / Claude Code / Cursor 里装上用 | [宿主端](doc/guide/hosts/README.md) |
+| 让 Strict 跑在订阅或别的模型上 | [后端](doc/guide/backends.md) |
+| 维护这个仓库本身 | [开发者入口](DEVELOPMENT.md) |
+
+> **宿主 ≠ 后端**：`claude-code` / `codex` / `cursor` 这三个名字两边都出现，
+> 方向相反。宿主提供模型给你用（Direct），后端是 copilot 拿去用的模型（Strict）。
+
+其余：[MCP 接口](doc/guide/mcp.md) ·
+[发版漂移审计](doc/contributing/release-maintenance.md) ·
+[知识库贡献规范](doc/knowledge/CONTRIBUTING.md) ·
+[知识维护示例](doc/knowledge/maintainer-walkthrough.md) ·
+[评测结论](doc/evaluation/README.md)

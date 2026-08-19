@@ -1,0 +1,107 @@
+{
+  "wall_s": 430.9,
+  "split": "train",
+  "rc": 0,
+  "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v7_goal_r2/runs/pr4977/run-20260812-175914-044a56",
+  "recorded_at": "2026-08-12T18:06:23",
+  "attempts": [
+    {
+      "invocation_id": "inv-ceef1bc4",
+      "outcome": "run:run-20260812-175914-044a56",
+      "rc": 0,
+      "pre_run": null
+    },
+    {
+      "run_dir": "run-20260812-175914-044a56",
+      "llm_calls": 43,
+      "input_tokens": 229223,
+      "output_tokens": 67271,
+      "usd": 0.163249,
+      "source": "spans"
+    }
+  ],
+  "attempt_usd_total": 0.163249,
+  "llm_calls": 43,
+  "input_tokens": 229223,
+  "output_tokens": 67271,
+  "usd": 0.163249,
+  "source": "spans",
+  "metrics": {
+    "schema": 1,
+    "run": "run-20260812-175914-044a56",
+    "task_kind": "pr_review",
+    "status": "done",
+    "quality": {
+      "q": null,
+      "weight_coverage": 0.0,
+      "partial": true,
+      "abstained": false,
+      "components": {
+        "recall_w": null,
+        "precision_v": null,
+        "useful": null,
+        "calib": null,
+        "decision": null
+      }
+    },
+    "cost": {
+      "usd": 0.1632,
+      "minutes": 7.14,
+      "ci_minutes": 0,
+      "input_tokens": 229223,
+      "output_tokens": 67271,
+      "tool_calls": 73,
+      "usd_ref": 1.0,
+      "min_ref": 10.0,
+      "cost_index": 1.3151,
+      "cost_partial": false,
+      "unpriced_calls": 0,
+      "source": "spans",
+      "llm_calls": 43,
+      "by_role": {
+        "agent": {
+          "usd": 0.154758,
+          "input_tokens": 222914,
+          "output_tokens": 61122,
+          "calls": 42
+        },
+        "reducer": {
+          "usd": 0.008492,
+          "input_tokens": 6309,
+          "output_tokens": 6149,
+          "calls": 1
+        }
+      },
+      "cache_read_tokens": 1013376,
+      "cache_creation_tokens": 0
+    },
+    "timings": {
+      "steps": {
+        "fetch": 3.4,
+        "gate": 1.79,
+        "review": 423.18,
+        "report": 0.06
+      },
+      "time_to_first_result_s": 428.42
+    },
+    "risk": {
+      "incidents": {
+        "catastrophic": 0,
+        "severe": 0,
+        "moderate": 0,
+        "minor": 0
+      },
+      "safety_multiplier": 1.0
+    },
+    "catq": null,
+    "tus": null,
+    "signals": {
+      "escalations": 0,
+      "pushes": 0,
+      "posted": 0,
+      "steps_completed": 4
+    }
+  },
+  "trace": "pr4977.trace.json.gz",
+  "trace_bytes": 19255
+}

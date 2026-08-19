@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.6,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.78,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "X's findings (mel_head bias, s2mel zero-audio fallback, full-payload concat semantics, snapshot_mm_payload) are detailed but almost entirely orthogonal to the ground-truth reviewers' actual concerns (benchmark-script duplication, missing profiler/VRAM evidence, native-speed streaming validation asymmetry, duration_factor bound duplication/consistency). Y engages more directly with GT-adjacent territory (validates native-speed streaming behavior, flags stale docs/serving/speech_api.md contradicting the new HTTP speed exception — echoing GT's WebSocket/HTTP asymmetry comment) and grounds nearly every finding with literal quoted file:line evidence, making it more verifiable and precise. Both are reasonably actionable with concrete file:line targets, but Y's evidence-first format and closer thematic overlap with the human reviewers' concerns give it the edge on recall and precision.",
+  "_cost_usd": 0.4405831,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_moa_cgm"
+  },
+  "_roles": {
+    "arm": "copilot_v13_moa_cgm",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_moa_cgm",
+    "arm_a_sha256": "510c9baf33573fe2b4c87a09f0acb68f3d2db76489969ea19bed869ab9b2bd9c",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

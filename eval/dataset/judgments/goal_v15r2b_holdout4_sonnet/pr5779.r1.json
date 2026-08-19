@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.75,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both independently rediscover the ground truth's core theme (packed-metadata host/device syncs, the AllGather-KV guard's scope/test gap, and the unsubstantiated 'within 2%' claim), giving both decent precision. Y goes deeper into territory adjacent to the ground truth's P1/P2 concerns — it proposes a concrete technical alternative for the AllGather guard (honor query_ranges), surfaces a related SAGE/empty-mask edge case in the same trim logic, flags the token-refiner/skip-softmax asymmetry, and ties a test gap to the real #5771 timestep fix — while X mostly reports the post-fix state as 'resolved' with thinner residual concerns and never engages the SAGE-disabling edge case at all. X contributes one genuinely novel high-value finding (CI marker mismatch silently deselecting the whole test file) but two of its bonus bullets are truncated mid-sentence, slightly hurting actionability.",
+  "_cost_usd": 0.3763982,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "2bd4755ee3fb6147f39e4e1302d921c06d2850109afa237c62c4eeec63175097",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "283d5ab54325426c21ff03640adaaf73eb89e801040f4baf619381200e657fb0",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

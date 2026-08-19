@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both verify flags/arithmetic rigorously and independently catch the same headroom math error and the TP1-vs-TP2 host-RAM sizing issue. X more directly hits the ground-truth Ref2VA concern (explicitly flags that only FL2VA was validated and reusing the 4-GPU command for Ref2VA risks OOM), while Y's Ref2VA finding is reframed as a missing-prerequisites/download-steps gap rather than an untested-config risk. X also surfaces several additional well-grounded, actionable issues (sync-timeout sizing, PCIe/NUMA device-order rationale, missing alternative configs, missing resident-layer rationale, missing software version) that Y misses, giving it higher recall at comparable precision and actionability; Y's unique contribution (missing numactl prerequisite) is real but narrower in scope.",
+  "_cost_usd": 0.23152850000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_holdout3_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r2",
+    "arm_a_sha256": "7451f066941eed1f4581ec161f799670050f6330dffd7016f3150722234ff164",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0c9521d957061cba9c0df8c76435b9ce67650296c5e211578db2b474c4668332",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

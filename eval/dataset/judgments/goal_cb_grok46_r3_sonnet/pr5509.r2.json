@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.92,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.8,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently surface the one substantive still-open ground-truth issue (FLASHINFER_ATTN allowlisted for quant but never consumed, causing silent dense fallback) and both correctly recognize the sage_kwargs-unconditional issue was already fixed in this diff, so recall is essentially tied. X edges ahead on precision/actionability: its findings (dtype_vo-only silent no-op, ring-SP bypass, doc deletions) are tightly grounded in the diff with concrete verification (REPL checks, test run output) and paired with drop-in code fixes, organized into a clean Blocking/Should-fix/Nits triage. Y's unique CI-marker-deselection catch is valuable but harder to verify from the diff alone, some findings (dtype_vo/flashinfer_backend unused) are split redundantly across two write-ups, and the report cuts off mid-sentence at the end, slightly hurting polish and completeness.",
+  "_cost_usd": 0.3137936,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok46_r3"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r3",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r3",
+    "arm_a_sha256": "5ac3e027db8a98782877c288b7c2edd43ca2c9744175e93e743f834d1680776a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "703e9ad7d9901fc59d5ad8d20917e36993f445b09d3ecaaba356dbe9c900f660",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

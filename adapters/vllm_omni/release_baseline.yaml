@@ -134,7 +134,7 @@ ignored_paths:
   reason: package dependencies
 
 pin_documents:
-- doc/KNOWLEDGE.md
+- doc/architecture/KNOWLEDGE.md
 - knowledge/repos/vllm-omni/models/catalog.md
 - knowledge/repos/vllm-omni/components/configuration/_index.md
 - knowledge/repos/vllm-omni/components/diffusion/_index.md

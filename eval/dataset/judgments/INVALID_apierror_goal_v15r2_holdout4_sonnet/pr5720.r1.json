@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.8,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Candidate X's run errored out before producing any review content (402 API error), so it contributes zero recall, precision, and actionability. Candidate Y is a thorough, well-cited review with concrete file:line references and reproduction steps, catching 2 of the 5 core P1/P2 ground-truth concerns (unvalidated combined-service performance, dropped Qwen3-TTS task_type validation) plus several additional plausible bugs not in the ground truth, but it misses the cache-dit transformers_ref gap, the modular-alias metadata gap, the Ref2VA default-task regression, and all of SamitHuang's code-quality nitpicks.",
+  "_cost_usd": 0.3227078,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "4ff93b7fb8845f3c75cf08adf9ba1eb15a1a688b3320cc6a3158d969a224e48a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "7d155ed781e729cb9d3a1c8ef3851789595fa7fa0c9c18281fbbf0c3a461d7e5",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

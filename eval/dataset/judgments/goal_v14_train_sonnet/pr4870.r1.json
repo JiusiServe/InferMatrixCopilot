@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.68,
+    "precision": 0.82,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.62,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both reviews independently catch the same high-value, ungrounded-in-ground-truth finding (identical unfixed bug in the NPU sibling runner) and both flag the async_chunk default inconsistency and the red AMD CI gate, matching real PR signals. X goes deeper on the core issue the human reviewer validated—tying the fix to cudagraph padding/graph-padded hidden states with specific line evidence, closely mirroring the ground-truth reviewer's own explanation—and adds a well-grounded risk about FINAL_ONLY payloads being consumed inconsistently by the two audio reducers. Y is slightly more rigorous in its claim-verification methodology (explicitly refuting an unsupported PR-body claim and validating the qwen3 scoping gate directly), giving it a precision edge, but neither candidate raises the amy-why-3459 model-placement design question or the dual-batch-axis latent gap, so gap_hit is false for both.",
+  "_cost_usd": 0.510231,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_train_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v14_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_train_r1",
+    "arm_a_sha256": "518810abfbbc9a9b88c71a08df280202490ab2a537a413f2052dfb64cf80f1f8",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "03d7423c3a91e45838083e2025e3dea932f1d9448ba923b1d6ca1a0373899ea1",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

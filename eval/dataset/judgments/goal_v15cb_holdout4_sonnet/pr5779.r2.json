@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.72,
+    "actionability": 0.6
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth's substantive concerns are the AllGather-KV packed-metadata breakage (P1) and the exact-aligned-input SAGE-disable bug (P2), both later patched by follow-up commits. X reviews the tree as if these are all resolved, lists them as '[resolved]' without engaging their nuance, and spends most of its output on test-coverage/doc nits (CI lane gaps, missing unit tests) that are grounded but low-value and don't probe the actual mechanisms reviewers cared about. Y validates the same two fixes are present but goes further: it traces the exact-aligned-suffix trim fix, critiques the AllGather-KV reject as overly broad/name-based and proposes a narrower query_ranges-based fix (directly engaging bobboli's open FA4+AllGather-KV question), and surfaces new, concretely-demonstrated bugs (unvalidated max_seqlen_q/k, all-false-mask zero-token launch, SAGE gate ignoring q_block_size) with runnable counterexamples and precise line-anchored fixes. Neither has a LATENT GAP CHECK section, so gap_hit is false for both. Y is more grounded, more actionable, and covers materially more of the reviewers' actual concern space.",
+  "_cost_usd": 0.1367568,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15cb_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15cb_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15cb_holdout4_r1",
+    "arm_a_sha256": "ce352b3293900aa0f6cb0a92f360902cbfa5e1eb01dd5e86a46a2510d9c94a57",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "283d5ab54325426c21ff03640adaaf73eb89e801040f4baf619381200e657fb0",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

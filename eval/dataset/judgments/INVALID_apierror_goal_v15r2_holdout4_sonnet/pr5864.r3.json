@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "decisive",
+  "rationale": "Y's review step crashed with an API 402 error before producing any findings, so it contributes nothing on all axes. X delivered a deep, specific review with file:line citations landing in the same code regions GT reviewers flagged (e.g. multiproc_executor.py:486 near the CFG/shape-mismatch comment, and the DP-primary-rank test in test_multiproc_engine_concurrency.py, where X's claim that the branch is unreachable in production is a sharper version of GT's 'weak test' critique). X missed several GT threads outright (DLO single-replica design question, the magic timeout=10 nit, duplicate-test nit in test_ipc_async.py) but added well-grounded, highly actionable findings of its own (fault isolation, wave-timeout defaults, shutdown races) not in GT.",
+  "_cost_usd": 0.2556586,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15_holdout4_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "27df62d56650b70ba992004895addfc1aad53a1d29a94d0ae7f36120412f5c62",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5d107b26c5dd605248f4ff3bf7b26b48a886f95ed933ef7eb79692e052dcfc5a",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

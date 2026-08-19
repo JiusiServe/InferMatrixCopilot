@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.85,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth here is essentially empty substance (an LGTM plus an off-diff ask to spin out a VoxCPM2 regression fix into a separate PR); neither candidate mentions VoxCPM2, so recall is 0 for both. Both independently converge on the same well-grounded mechanism (deploy seed -> tts_local_seed -> per-row generator -> scalar multinomial cliff) and both raise the same core points (confirm red AMD/NPU lanes are pre-existing, add a tombstone comment so the seed doesn't silently return, add a regression-guard test) with concrete file:line citations, giving both high precision. Y edges ahead on actionability by shipping ready-to-paste artifacts (full YAML comment text, full pytest function) rather than describing the fix, and adds one extra grounded, non-redundant finding (the PR body understates that this also re-enables vLLM's own seeded-sampler fast paths) plus a cheap follow-up suggestion, making it marginally more complete and useful without sacrificing grounding.",
+  "_cost_usd": 0.1600738,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16rs_train_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16rs_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16rs_train_r1",
+    "arm_a_sha256": "72d04948aed9a0b8c7ec22ced4593a2fd5bee2f28c950c27b725bcb5b99d4c0e",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "410634f22ac0d9a55948ec0dfc9caa6557a8995e24766ff507dbe677d6dd37dc",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

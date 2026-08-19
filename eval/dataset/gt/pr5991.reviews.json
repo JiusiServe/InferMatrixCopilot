@@ -1,0 +1,35 @@
+{
+  "comments": [
+    {
+      "author": "hsliuustc0106",
+      "body": "I remember we have a general DMD2 pipelinemixin, please check"
+    },
+    {
+      "author": "Huangzjun",
+      "body": "Thanks for the pointer — I did check DMD2PipelineMixin. The main blocker is that it works by swapping in a DMD2EulerScheduler, but H3 doesn't hold a self.scheduler at all (sigmas are built functionally and stepped by minimax_h3_rf_v_to_x0 / minimax_h3_euler_eta0_step), so the swap wouldn't take effect. H3 also needs two sigma schedules from one shared base u (video shift=12, audio shift=3), which the single-modality DMD2Config doesn't express. So I kept the H3-local path and just added the missing input: base positions from _minimax_h3.base_schedule. @hsliuustc0106 "
+    },
+    {
+      "author": "hsliuustc0106",
+      "body": "> Thanks for the pointer — I did check DMD2PipelineMixin. The main blocker is that it works by swapping in a DMD2EulerScheduler, but H3 doesn't hold a self.scheduler at all (sigmas are built functionally and stepped by minimax_h3_rf_v_to_x0 / minimax_h3_euler_eta0_step), so the swap wouldn't take effect. H3 also needs two sigma schedules from one shared base u (video shift=12, audio shift=3), which the single-modality DMD2Config doesn't express. So I kept the H3-local path and just added the missing input: base positions from _minimax_h3.base_schedule. @hsliuustc0106\r\n\r\nbut at least we should consider how to integrate with the mixin. If it does not satisfy our need, you can propose how to modify it"
+    },
+    {
+      "author": "hsliuustc0106",
+      "body": "I recommend integrating at the schedule layer rather than making MiniMax H3 inherit `DMD2PipelineMixin` as-is.\n\nThe current mixin is tied to scheduler-backed pipelines: `__init_dmd2__` installs `DMD2EulerScheduler`, and the mixin’s request/forward path rewrites `num_inference_steps`, guidance parameters, and `flow_shift`. H3 has no `self.scheduler`; it constructs coupled video/audio sigma arrays and uses separate `flow_shift` and `audio_flow_shift` values. Direct inheritance would therefore be either ineffective or likely to break H3-specific behavior.\n\nSuggested refactor:\n\n1. Extract a reusable `DMD2SigmaSchedule` (or equivalent) from `DMD2Config). It should validate the continuous RF `base_schedule`, expose `num_inference_steps = len(base_schedule) - 1`, and generate shifted sigmas. This should remain distinct from `denoising_timesteps`, which represents integer scheduler timesteps.\n2. Keep `DMD2PipelineMixin` as the scheduler-backed adapter for Flux/Wan/LTX pipelines, but make it consume the shared schedule/config utility.\n3. In H3, load and retain one schedule per partition/task (FL2VA and Ref2VA), select the active partition’s schedule during request resolution, and use that same base schedule to derive the video and audio sigmas with their respective shifts.\n4. Keep H3’s custom denoise loop and request sanitization. Add tests for valid/invalid/empty schedules, combined-mode per-partition selection, and the advertised 4-step schedule with 5 sigma boundaries.\n\nThis shares the DMD2 metadata and validation contract without forcing H3 into the existing scheduler/MRO contract. I would avoid expanding the full pipeline mixin in this PR unless we first define explicit hooks for schedule resolution and request sanitization."
+    },
+    {
+      "author": "Huangzjun",
+      "body": "> I recommend integrating at the schedule layer rather than making MiniMax H3 inherit `DMD2PipelineMixin` as-is.\r\n\r\nThanks, this framing is much better than what I had — I've gone with the schedule-layer approach.\r\n\r\n(1) Shared schedule utility. Added DMD2SigmaSchedule in vllm_omni/diffusion/models/dmd2/schedule.py. It validates the continuous RF base_schedule (length, finiteness, 1.0 → 0.0 endpoints, strict monotonicity), exposes num_inference_steps = len(base_schedule) - 1, and generates shifted sigmas via shifted_sigmas(shift_scale). It's kept deliberately separate from DMD2Config.denoising_timesteps and is torch-free, since these are continuous positions rather than integer scheduler timesteps — that's exactly what lets one schedule serve several coupled modalities.\r\n\r\n(3) H3 consumes it. H3 no longer carries its own validator. _read_base_schedule is now just DMD2SigmaSchedule.from_metadata(release), one schedule is retained per partition (FL2VA / Ref2VA), the active one is selected during request resolution, and that same base derives the video and audio sigmas at shift 12 and 3 respectively.\r\n\r\n(4) H3-specific behavior untouched. The custom denoise loop and request sanitization are unchanged. Tests cover valid/invalid/empty schedules, per-partition selection in combined mode, and the 4-step schedule with its 5 sigma boundaries; the shared class also gets its own test module.\r\n\r\n(2) Deferred, per your last paragraph. I haven't touched DMD2PipelineMixin behavior in this PR. Wiring the scheduler-backed adapter onto the shared utility makes sense, but it needs the explicit schedule-resolution and request-sanitization hooks you mentioned, so I'd rather do it as a focused follow-up than bundle it here. Happy to open that one if you'd like."
+    },
+    {
+      "author": "Gaohan123",
+      "body": "The CI error also happened in the latest nightly CI: https://buildkite.com/vllm/vllm-omni/builds/13407/canvas?sid=019fecd9-14c2-476d-be9c-1f55634370e3&tab=output"
+    }
+  ],
+  "reviews": [
+    {
+      "author": "Gaohan123",
+      "body": "LGTM. Thanks",
+      "state": "APPROVED"
+    }
+  ]
+}

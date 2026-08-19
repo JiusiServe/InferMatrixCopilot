@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.6,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth is trivial (just an 'lgtm'), so both get full recall by default. Both independently surface the same real latent bug — pure-diffusion mode sets serving_tokenization=None but _create_speech_error_json_response still calls base(raw_request).create_error_response() unguarded — which is a strong, well-grounded shared finding. Y pads its review with three near-duplicate restatements of that same point across separate bullets, and its 'Merge blocker' finding on the CI failures is self-contradictory since Y's own evidence shows the PR is already MERGED; it also suggests reintroducing openai_serving_tokenization as a compat alias, which undoes the rename's purpose. X keeps findings tighter and non-redundant, proposes a single clean fix location, and explicitly hedges its more speculative follow-up (sibling renames) as unverified against the pinned vLLM version rather than asserting it.",
+  "_cost_usd": 0.22900620000000002,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17ds_val"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_val",
+    "arm_a_sha256": "88a54e75cb5488edec30be6112370f4d96be37b5704f2997fba945089b226354",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b9fe4c00140a73cf5cc08ceded6d03eb8b8faea45f6c3b50e6f9753b9a1a1a01",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

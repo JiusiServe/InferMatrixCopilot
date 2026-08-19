@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.82,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently converge on the same core, diff-grounded bug that echoes the review's implicit scope dispute (widening `== \"cuda\"` to `!= \"cpu\"` plus an unset `fork_rng(device_type=...)` risks non-CUDA/MUSA devices like NPU), and both correctly catch the FL2VA/Ref2VA copy-paste bug in the new recipe — solid recall on the substantive technical thread, though neither surfaces gcanlin's specific suggestion to use `current_omni_platform.device`, and both frame the dropped test file as 'missing coverage' rather than matching the ground truth's 'redundant, drop it' resolution. Precision is comparably high for both, with concrete line citations and plausible technical reasoning. X pulls ahead on actionability: clean severity-tiered sections (Blocking/Should fix/Nits), literal before/after code patches, and an empirically-run pytest check, versus Y's denser wall-of-text findings that pack evidence into unbroken paragraphs, making fixes harder to scan and action despite similar underlying rigor.",
+  "_cost_usd": 0.3087982,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok46"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46",
+    "arm_a_sha256": "cee8034bb24d355d121d474f3c918b6d0b787ae71cada3ec3c1f846b25f20180",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "47c759a926d11580522c19149ea99a2b5e0137b0d44702c431e26d95d6161018",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

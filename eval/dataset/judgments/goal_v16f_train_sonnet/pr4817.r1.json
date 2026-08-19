@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.88,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive reviewer concerns (bot credit-limit messages and 'thanks'), so both candidates get full recall by default. Both independently converge on the same top-tier finding (new test file lacks pytestmark and is silently deselected by marker-filtered CI) and the sm_110a docstring/code inconsistency, lending credibility to both. X edges ahead with a sharper blocking-severity catch — warmup_quack_fp8() bypasses the new gate entirely, directly undermining the PR's own fix — plus a concrete warning_once dedup bug, both delivered with ready-to-apply code patches. Y's unique ROCm gfx10xx and multi-device-heterogeneity findings are plausible but more speculative/out-of-scope, and its verbose 'Validated' bullet padding dilutes signal-to-noise versus X's tighter, more actionable structure.",
+  "_cost_usd": 0.24518859999999998,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16f_train_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_train_r1",
+    "arm_a_sha256": "1a445fa8ddc1b5d852cb6eefa10616e48b0f747fde459c5382f789d482f6a1e6",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "de884ebeca54520b85a490b897397bd22bf362507bf9f7d4a833d74b390ae063",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

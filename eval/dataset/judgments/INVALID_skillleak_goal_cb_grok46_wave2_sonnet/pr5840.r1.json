@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.7,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.88,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently rediscovered the one still-live ground-truth blocker (the MiniMax-H3 0.17 default never reaching the runtime path because AsyncOmniEngine injects 0.2) with strong, code-grounded evidence, and both also echoed the reviewer's closing caveat that the E2E smoke test can't prove a cache hit occurred; the other three ground-truth items (FL2VA/Ref2VA gating, the offline example variable, and the two inline merge-onto-main bugs) all appear already fixed in this diff, so neither candidate had much left to find there and neither used the human's merge-onto-main verification technique. Precision is high for both — Y is slightly tighter, with an especially sharp, well-evidenced catch that p(0)≈0.217 already exceeds the advertised 0.17 threshold; X covers more ground (memory/OOM scaling risk, wasted RoPE computation, a stale-t_emb test gap, and a drive-by frame-count change silently altering an unrelated FP8 test) with comparably solid grounding, giving it a slight recall/breadth edge. Both are concrete and actionable with file/line pointers and specific fixes.",
+  "_cost_usd": 0.37102650000000004,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok46"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46",
+    "arm_a_sha256": "ed9a249e740bc02aca24ee3a7ae1cef54c280533611e748e9f825bac7536c28f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

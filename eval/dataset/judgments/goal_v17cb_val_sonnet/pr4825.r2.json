@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.75,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.5,
+    "actionability": 0.35
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Y's central finding (the reverted `.to_out.0.`→`.to_out.` WeightsMapper leaving SDXL naming-conflict adapters unmapped) is a remarkably precise, well-corroborated match to the ground truth's core concern (dsocek's Qwen-image naming-conflict comment, and tthakkal's reply that they removed that exact change) — a genuine recall win. But Y buries this single insight under ~7 near-duplicate restatements with garbled, incomplete citations ('?:25', '?:309'), which reads as a malfunctioning pipeline rather than a curated review and badly hurts actionability and effective precision. X is cleanly structured, prioritized, and every finding is concretely grounded with file/line/code (test duplication and the weak peft_helper stub are directly verifiable from the shown diff); its FF-layer/text-encoder findings echo the same naming-conflict theme in spirit though not the literal instance GT flagged, and its CI-failure claim is unverifiable and slightly suspect given both human reviewers LGTM'd with no CI complaints. Overall X is far more actionable and trustworthy despite Y's one sharper recall hit.",
+  "_cost_usd": 0.3659302,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17cb_val"
+  },
+  "_roles": {
+    "arm": "copilot_v17cb_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17cb_val",
+    "arm_a_sha256": "9ed77f50b53c2132b158c858d747cc907c0c683f9934aa1e9439a7821a95144a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9201be5ea408a41833fb8e6040e5eb97d26044159a083e4d1896451ac3585494",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.8,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.82,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently surface the one live ground-truth concern (bobboli's FLASHINFER_ATTN silently dropping quant) with strong cross-file evidence, and both independently catch the same real, diff-verifiable dtype_vo/enabled mismatch bug that isn't in ground truth — recall and precision are close to tied. X edges out on actionability: findings are triaged (Blocking/Should-fix/Questions/Nits) and several include ready-to-apply code snippets, whereas Y's automated-report style is thorough and evidence-quoted but reads as a flatter list with fewer concrete patches. X's citation of specific unverifiable commit SHAs for the doc deletion is a minor precision blemish that roughly offsets Y's slightly more disciplined quote-sourced evidence style.",
+  "_cost_usd": 0.3462478,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_composer25"
+  },
+  "_roles": {
+    "arm": "copilot_cb_composer25",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_composer25",
+    "arm_a_sha256": "36ba4ae53c6b78335ca82c87617bf0823620609686d6f954054b0f9ce170b271",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "703e9ad7d9901fc59d5ad8d20917e36993f445b09d3ecaaba356dbe9c900f660",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

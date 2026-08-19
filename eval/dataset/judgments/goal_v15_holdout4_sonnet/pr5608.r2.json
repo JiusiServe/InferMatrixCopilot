@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.68,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates converge on the same core technical findings (untouched sibling BNSD call sites, ndim conflation bug, non-contiguous return, undertested B*N boundary, uncited magic numbers) but neither directly recalls the GT's central ask for a three-way perf comparison, only tangentially recovering the 'shared/model-independent helper' concern via the sibling-call-site angle. X is more disciplined about grounding: it hedges unverifiable claims explicitly ('treated as evidence, not CI-verified') and backs nearly every finding with quoted file:line evidence, whereas Y asserts specific unverifiable outcomes (an exact RuntimeError message from a claimed run, a flat 'CI is red on merged head' status) that read as overclaimed rather than diff-grounded. Both are equally concrete and actionable with file/line citations and proposed fixes.",
+  "_cost_usd": 0.4051099,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r1",
+    "arm_a_sha256": "cccd15fae16dbe783a04136950ad460c0be927e9cc18a63827eee75f172e5db8",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "400e2cdee23e452f67bea91295a8fd9f971ab290f37c9a61d27bec6c625cf76a",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

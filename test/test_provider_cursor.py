@@ -193,3 +193,21 @@ def test_cli_absence_is_a_named_error(tmp_path, monkeypatch):
         raise AssertionError("expected RuntimeError")
     except RuntimeError as exc:
         assert "STRICT_BACKEND_CLI" in str(exc)
+
+
+def test_audit_resolves_relative_paths_against_session_cwd(tmp_path):
+    """The CLI emits worktree-relative paths for in-tree accesses; they must
+    resolve against the SESSION cwd, not the auditing process's cwd."""
+    from infermatrix_copilot.providers.audit import audit_events
+
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / "mod.py").write_text("x = 1\n")
+    events = [
+        {"type": "tool_call", "tool_call": {"readToolCall":
+            {"args": {"path": "pkg/mod.py"}}}},        # in-tree, relative
+        {"type": "tool_call", "tool_call": {"grepToolCall":
+            {"args": {"path": "/etc"}}}},               # absolute, outside
+    ]
+    audit = audit_events(events, roots=(str(tmp_path),), cwd=str(tmp_path))
+    assert [v for v in audit.violations if "pkg/mod.py" in v] == []
+    assert any("/etc" in v for v in audit.violations)

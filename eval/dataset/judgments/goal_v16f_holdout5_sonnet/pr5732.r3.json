@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.75,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "X explicitly recovers the substance of the two central ground-truth findings (RGBA-dimensionality bug and mixed-dtype promotion loss) by tracing them to commit d145581e and confirming their fix in 82a142ad with the same technical detail Xunzhuo's replies use, plus independently lands on the same dead-branch nit as david6666666 — giving it clearly higher recall. Y never engages those two historical bugs at all, though it is cleaner (no redundant findings), offers a genuinely valuable memory-bottleneck insight with real profiling, gives more concrete code-patch suggestions, and reaches a more defensible CI conclusion, so its precision/actionability edge out X's (which repeats the same stale-test-count claim three times, diluting its otherwise well-grounded findings).",
+  "_cost_usd": 0.1939651,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16f_holdout5_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout5_r1",
+    "arm_a_sha256": "cc94762fe6ce050e3f8894639e008ed6553cbec7a7e37dafa6647bc7842a715b",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "f1c3b2ea619d1f9fcfbece3a4d066dfc15e8ef4d607f43d44d600decb717bdb9",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

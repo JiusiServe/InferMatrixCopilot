@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.74,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.72,
+    "precision": 0.56,
+    "actionability": 0.88,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X directly addresses the naming-mapping concern and validation, with concrete fixes and locations, though several findings are pre-existing or beyond this diff. Y identifies useful test gaps but makes questionable claims about unresolved to_out.0 handling and non-SDXL unet blast radius that conflict with its own evidence.",
+  "_usage": {
+    "input": 3,
+    "output": 1073
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v9_official_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v9_official_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v9_official_r1",
+    "arm_a_sha256": "867edb6fb930d64f4fff32740b307105a67157062cc06755e9c66a3a773e1d70",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9201be5ea408a41833fb8e6040e5eb97d26044159a083e4d1896451ac3585494",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 2
+  }
+}

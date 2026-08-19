@@ -1,5 +1,5 @@
 """Provider registry — one table of ways to reach a model
-(doc/RFC-provider-registry.md).
+(doc/features/provider-registry.md).
 
 Public surface: the registry (`PROVIDERS`, `resolve_provider`,
 `transport_for`), the contracts (`ProviderSpec`, `AgentSessionRequest`,
@@ -57,20 +57,26 @@ def llm_for(settings):
 
 
 def run_harness_step(ctx, target, *, step_name: str, system: str, prompt: str,
-                     scope, max_iters: int):
-    """Run one agent step through the selected harness: write the bridge spec
-    for this scope, then delegate the whole step to the transport. Returns
+                     scope, max_iters: int, provider_id: str = "",
+                     model: str = ""):
+    """Run one agent step through a harness: write the bridge spec for this
+    scope, then delegate the whole step to the transport. Returns
     `agent_loop.AgentOutcome` so the runner's downstream (output coercion,
-    traces, salvage) is shared with the in-process loop."""
+    traces, salvage) is shared with the in-process loop. Default transport is
+    the run's selected backend; `provider_id`/`model` pin an explicit harness
+    instead (the MoA harness-member path, independent of `STRICT_BACKEND`)."""
     from ..tool_bridge import write_bridge_spec
+    from .registry import transport_for_id
 
-    transport = transport_for(ctx.settings)
+    transport = (transport_for_id(ctx.settings, provider_id) if provider_id
+                 else transport_for(ctx.settings))
     spec = ctx.state.get("task_spec") or {}
     bridge_spec = write_bridge_spec(
         run_dir=ctx.run_dir, step_name=step_name, scope=scope,
         repo=str(spec.get("repo") or ctx.settings.default_repo))
     return transport.run_session(AgentSessionRequest(
-        system=system, prompt=prompt, scope=scope, model=target.model,
+        system=system, prompt=prompt, scope=scope,
+        model=model or target.model,
         max_iters=max_iters, timeout_s=ctx.settings.strict_backend_timeout_s,
         run_dir=ctx.run_dir, step_name=step_name,
         bridge_spec_path=bridge_spec, trace=ctx.trace))

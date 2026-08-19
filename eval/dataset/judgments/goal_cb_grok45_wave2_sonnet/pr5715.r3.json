@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.9,
+    "actionability": 0.65,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y explicitly confirms the musa.inc.md/quickstart.md reverts (matching the ground-truth 'do not change this' comments) and digs deeply into npu.inc.md's Ascend RC-branch pin around line 56-62, the exact area that needed FayeSpica's PTAL/LGTM — X barely touches that region with a shallow naming nit and never mentions the musa/quickstart lines at all. Both sets of findings are diff-grounded and non-fabricated, but Y's are more numerous, cross-verified against repo state (Dockerfiles, version.py, mkdocs.yml), and paired with concrete replacement text/verification commands, giving it higher actionability at only a small precision cost from a couple more speculative claims.",
+  "_cost_usd": 0.22001700000000002,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok45",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok45",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok45",
+    "arm_a_sha256": "f6b72d2406cd59bdff7a7794d776d0bde1c55ee6336f9bf80e91ea2bcd1e1db6",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5866809cd7926f6bee88b473acf165652378865539411405c15a7c86c14e7466",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

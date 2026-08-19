@@ -1,0 +1,23 @@
+{
+  "comments": [
+    {
+      "author": "david6666666",
+      "body": "PR has merge conflicts with main (vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py), please rebase."
+    },
+    {
+      "author": "david6666666",
+      "body": "is this pr ready now?\r\n"
+    },
+    {
+      "author": "fan2956",
+      "body": "> is this pr ready now?\r\nNot yet，main H3 infer failed on npu because #5703，this pr will verify again after this bug fix\r\n"
+    }
+  ],
+  "reviews": [
+    {
+      "author": "david6666666",
+      "body": "LGTM",
+      "state": "APPROVED"
+    }
+  ]
+}

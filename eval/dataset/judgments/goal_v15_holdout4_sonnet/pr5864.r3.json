@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.75,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.75
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both are extensive, well-grounded reviews with concrete file:line evidence; X is broader and more prescriptively actionable (explicit 'Change:' fixes, plus a genuine novel bug in the results[i]-fallback substitution). But Y more directly recalls the actual ground-truth concerns: it independently converges on the same request_batch_max_wait_ms regression david6666666/lishunyang12 discussed, explicitly validates the CFG-compatibility-key resolution asukaqaq-s raised, flags the same weak dp-rank-assumption test yuanheng-zhao called out, and — critically — surfaces a residual bug in the exact InlineStageDiffusionClient shutdown path that was the subject of the PR's most serious real regression, whereas X mischaracterizes that same code as a safe pattern worth copying elsewhere. Y's verification-style evidence (base-tree diffs, CI checks) also gives it a precision edge.",
+  "_cost_usd": 0.34138179999999996,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15_holdout4_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r1",
+    "arm_a_sha256": "167d0385096c0b6f4a16a318ede8be2365527444a3abd90d9aaaf10dc35696aa",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5d107b26c5dd605248f4ff3bf7b26b48a886f95ed933ef7eb79692e052dcfc5a",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

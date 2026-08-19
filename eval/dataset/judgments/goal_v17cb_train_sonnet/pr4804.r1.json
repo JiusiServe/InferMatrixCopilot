@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.62,
+    "actionability": 0.68,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.52,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y lands near-exact matches on both of GT's severity-flagged concerns (hsliuustc0106's High finding that legacy checkpoints mis-instantiate as v2 codec, and the NPU dummy-run seq_token_counts gap), plus the WER-fallback and docstring-staleness items from linyueqian's review. X matches the seq_token_counts and WER-fallback items too but completely misses the v2-tokenizer High finding, its 'resolved/residual' framing for the slot-leak issue diverges from GT's actual abort-path root cause, and two of its findings have broken '?:' file locations that hurt grounding and actionability. Neither candidate catches linyueqian's cumulative/delta re-slice bug or the ceil-division padding bug, but Y's extra findings (KV-cache memory profiling, hardcoded stop token, dropped sampling params) read as coherent, well-evidenced review depth rather than filler.",
+  "_cost_usd": 0.4880719,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17cb_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17cb_train",
+    "arm_a_sha256": "23aa0b56f4b7660d9300b86bab6cd9521792e305f2a4575180c020747cc38fae",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "18986f2736f812d8c896b12152ebcbf1d5319e9e1f79042f5fa16f1dd6272542",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

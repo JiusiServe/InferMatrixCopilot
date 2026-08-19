@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.5,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.65,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both reviews largely miss the ground truth's core threads (missing profiling/VRAM validation evidence, WebSocket vs HTTP speed-control asymmetry, duration_factor raised inside the talker as a stage-worker exception, S2Mel/talker range mismatch and duplicated bounds) — plausibly because the reviewed snapshot already reflects post-fix state for several of these. X touches the duration_factor location (indextts2_talker.py:566-569) but for a different, tangential reason (message wording), giving it a marginal recall edge. Y's findings are more rigorously evidence-grounded, quoting verbatim source lines and CI selector commands for nearly every claim (e.g. the Spanish/Arabic normalization vs PR-body overclaim, pytestmark CI deselection), which inspires more confidence than X's dramatic but harder-to-verify 'blocking' claims (uninitialized mel_head.bias, CONCAT-accumulation bug) presented without literal source quotes. Both are highly actionable with concrete file/line fixes; X does score a verifiable win by accurately praising doc content that matches the diff (num_beams, batch non-determinism notes).",
+  "_cost_usd": 0.5623364,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_moa_cgm"
+  },
+  "_roles": {
+    "arm": "copilot_moa_cgm",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_moa_cgm",
+    "arm_a_sha256": "1c352ff48c58e5fd4a2d16c00ec5550796a1868d462d67786646aad6fd56c95a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

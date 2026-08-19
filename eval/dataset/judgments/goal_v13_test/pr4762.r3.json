@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.56,
+    "precision": 0.64,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.78,
+    "precision": 0.76,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y covers more ground-truth concerns, including final-pipeline resolution, mutable cached configs, positional compatibility, CI failures, and unsupported endpoint exposure. It also identifies concrete, well-grounded regressions and bypasses, though several polish items are speculative. X is actionable but spends more findings on weak testing, documentation, and cache-invalidation concerns while missing multiple human-review issues.",
+  "_usage": {
+    "input": 3,
+    "output": 1300
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "copilot_v13_proof_test",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v13_proof_test",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_proof_test",
+    "arm_a_sha256": "6b0172f07026db6023636a8b271947c48c883bb6a04a698a4c7cc81627c36489",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "c615f14501463b018880cd05f5661edb7f27b80dd2a94250edda06d342b8df34",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 3
+  }
+}

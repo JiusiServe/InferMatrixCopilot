@@ -1,0 +1,37 @@
+{
+  "calls": 56,
+  "input_tokens": 4265764,
+  "output_tokens": 34609,
+  "cost_usd": 8.235997,
+  "is_error": false,
+  "terminal_reason": "completed",
+  "split": "train",
+  "head": "231b3ddb97c177e6cee50f16be5ab8e9dee9228c",
+  "base": "0798b0bf03cb6e7c4dc40ee58fe12ce492ce255f",
+  "resolved_model": "claude-fable-5",
+  "snapshot_sha256": "ce068efd87cd13bc9cb2eb08b56da3cf9cbf886882b8833df7146905056d986b",
+  "validation_commands": [
+    "git diff 0798b0bf03cb6e7c4dc40ee58fe12ce492ce255f HEAD --stat",
+    "git diff 0798b0bf03cb6e7c4dc40ee58fe12ce492ce255f HEAD",
+    "python3 -c \"\nimport inspect\nfrom vllm.entrypoints.openai.serving_engine import OpenAIServing\nsrc = inspect.getsource(OpenAIServing.__init__)\nprint(src[:3000])\n\" 2>&1 | head -60",
+    "python3 - <<'EOF'\nimport importlib, inspect\nfor mod in [\"vllm.entrypoints.openai.serving_models\", \"vllm.entrypoints.openai.serving_engine\"]:\n    try:\n        m = importlib.import_module(mod)\n        print(\"OK\", mod)\n    except Exception as e:\n        print(\"FAIL\", mod, e)\nimport vllm\nprint(vllm.__ve",
+    "python3 -c \"import vllm, inspect; from vllm.entrypoints.openai import serving_engine as se; import re; src=inspect.getsource(se.OpenAIServing.__init__); print(src[:2500])\" 2>/dev/null || find / -name \"serving_engine.py\" -path \"*vllm*\" 2>/dev/null | grep -v omni | head -3",
+    "python3 -c \"\nimport inspect\nfrom vllm.entrypoints.openai.engine.serving import OpenAIServing\nsrc = inspect.getsource(OpenAIServing.__init__)\nprint(src[:2500])\n\"",
+    "python3 -c \"import vllm; print(vllm.__version__, vllm.__file__)\"",
+    "grep -rn \"self.model_config\" /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/serving_engine.py | head; grep -n \"def __init__\" -A 30 /usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/serving_engine.py | head -50",
+    "timeout 300 python3 -m pytest -q tests/worker/test_gpu_ar_model_runner.py::test_build_omni_output_splits_mm_by_scheduled_tokens_when_hidden_is_tail_only --tb=short 2>&1 | tail -15",
+    "timeout 600 python3 -m pytest -q \"tests/entrypoints/openai_api/test_serving_speech.py::TestTTSAsyncOffloading::test_prepare_speech_generation_no_async_chunk_stream_uses_final_only\" \"tests/entrypoints/openai_api/test_serving_speech.py::TestTTSAsyncOffloading::test_prepare_speech_generation_no_async_c",
+    "timeout 300 python3 -m pytest -q \"tests/entrypoints/openai_api/test_serving_speech.py::TestTTSAsyncOffloading::test_prepare_speech_generation_no_async_chunk_stream_uses_final_only\" --tb=long 2>&1 | grep -A 12 \"ERROR\\|ImportError\\|ModuleNotFound\" | head -25"
+  ],
+  "ran_validation": true,
+  "claude_md_seen": {
+    "/data/zhoutaichang/CLAUDE.md": "27ca8ea8056c231e"
+  },
+  "recorded_at": "2026-08-15T01:20:07",
+  "arm": "baseline_opus5",
+  "wall_s": 596.6,
+  "audit_ok": true,
+  "audit_violations": [],
+  "audit_blocked_attempts": [],
+  "artifact_chars": 6575
+}

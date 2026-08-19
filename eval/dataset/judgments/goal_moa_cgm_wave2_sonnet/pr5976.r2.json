@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.6,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.72,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both largely miss the ground truth's actual (shallow, stylistic) reviewer comments, instead independently converging on a substantive num_stale_output_tokens double-seeding bug, which cross-validates that finding as real. Y edges out on precision via its 'Confirmed'-tagged, source-quoted evidence and a disciplined sweep that explicitly rules out false leads (test_compile.py, qwen2_5_omni_thinker.py), plus a more thorough arg_utils.py enumeration citing ~10 affected classes by file:line; Y also touches the parallel_state.py/use_all2all topic the human reviewer flagged, giving it a slim recall edge. X is somewhat more actionable with fuller proposed code diffs, but includes harder-to-verify claims (CI gate colors, a claimed 105-test run, simulated repro output) that weigh against precision.",
+  "_cost_usd": 0.41080890000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_moa_cgm"
+  },
+  "_roles": {
+    "arm": "copilot_moa_cgm",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_moa_cgm",
+    "arm_a_sha256": "18f2080bb4b63492d060c2a4a33459a1ee5e738af4201c8f6db17ab2e03e8d54",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4703d9c3f9a1a403af03ff17f62c2d816d9363ba7048d8dcee9a84a47834bc46",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.68,
+    "actionability": 0.72,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates correctly recognize that musa.inc.md/quickstart.md were left untouched (echoing the ground truth's two 'do not change this' comments) and both flag the same core substantive issues (RC branch vs stable tag inconsistency on npu.inc.md, stale version-pinned link in configuration/README.md, undocumented experimental full-duplex feature). X goes further with concrete, verifiable grounding (specific file/line cross-references, model class names, commit hashes explaining the musa/quickstart revert, exact verification commands) and gives concrete replacement text for several fixes, making it both more precise and more actionable. Y's review is competent but includes a few weaker, less-grounded nits (cadence-bullet readability, docs/README missing a 'Latest News' section that predates this PR, a self-contradictory note about the paper link) that dilute its precision relative to X.",
+  "_cost_usd": 0.2233381,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "cursor_composer25"
+  },
+  "_roles": {
+    "arm": "cursor_composer25",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_composer25",
+    "arm_a_sha256": "acbef00a1138d71fc553151e29989c56b3a42f74305651097f47969ecf336eee",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5866809cd7926f6bee88b473acf165652378865539411405c15a7c86c14e7466",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

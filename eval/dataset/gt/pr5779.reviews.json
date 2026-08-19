@@ -1,0 +1,24 @@
+{
+  "comments": [
+    {
+      "author": "lishunyang12",
+      "body": "LGTM, let's make trtllm as the default backend for SM100. "
+    },
+    {
+      "author": "lishunyang12",
+      "body": "Readiness fixes are now pushed: corrected the H3 Skip-Softmax timestep to use `t = 1 - sigma`, restored the non-negative threshold contract, and rewrote the mismatched DCO author identity. Focused TRTLLM tests pass (34 passed, 4 skipped); required CI has rerun."
+    }
+  ],
+  "reviews": [
+    {
+      "author": "david6666666",
+      "body": "LGTM",
+      "state": "COMMENTED"
+    },
+    {
+      "author": "lishunyang12",
+      "body": "Follow-up from `lishunyang12`:\n\nI prepared [commit `20cc23ae`](https://github.com/lishunyang12/vllm-omni/commit/20cc23ae) on the `agent/minimax-h3-trtllm-default` branch.\n\nIt makes MiniMax H3 declare its packed-sequence contract, so the platform auto-selects dense BF16 `TRTLLM_ATTN` on supported datacenter Blackwell (SM100/SM103) when FlashInfer's trtllm-gen kernel is available. Workstation Blackwell (SM120/SM121), unsupported head dimensions, and mask-using paths retain their normal fallback. No Skip-Softmax or attention quantization is enabled by default.\r\n\r\nValidation:\r\n- `41 passed, 2 skipped`\r\n- Ruff check/format and `git diff --check` passed\r\n- Matched 4x B300 SM103 run: 1248x768, 209 frames, 50 steps, seed 1101, Ulysses4/Ring1/TP1, VAE tile4, regional compile\r\n- One compile warmup excluded; steady-state results:\r\n  - FA4: 83.854 s diffusion / 88.558 s wall\r\n  - Dense BF16 TRTLLM: 71.990 s diffusion / 76.176 s wall\r\n  - TRTLLM is 14.1% faster for diffusion and 14.0% faster end to end in this workload\r\n\r\nThe complete test data and reproduction scripts are in [vllm-omni-rankings/scripts/minimax_h3_trtllm_e2e](https://github.com/lishunyang12/vllm-omni-rankings/tree/main/scripts/minimax_h3_trtllm_e2e):\r\n\r\n- [FA4 E2E video](https://github.com/lishunyang12/vllm-omni-rankings/blob/main/scripts/minimax_h3_trtllm_e2e/minimax_h3_t2va_fa4_4xb300_8p7s_50step.mp4)\r\n- [TRTLLM dense BF16 E2E video](https://github.com/lishunyang12/vllm-omni-rankings/blob/main/scripts/minimax_h3_trtllm_e2e/minimax_h3_t2va_trtllm_dense_bf16_4xb300_8p7s_50step.mp4)\r\n- [Serve script](https://github.com/lishunyang12/vllm-omni-rankings/blob/main/scripts/minimax_h3_trtllm_e2e/serve_b300.sh)\r\n- [Curl T2VA request 1](https://github.com/lishunyang12/vllm-omni-rankings/blob/main/scripts/minimax_h3_trtllm_e2e/curl_t2va.sh)\r\n- [Offline A/B benchmark script](https://github.com/lishunyang12/vllm-omni-rankings/blob/main/scripts/minimax_h3_trtllm_e2e/run_attention_ab.py)\r\n- [README and exact environment/results](https://github.com/lishunyang12/vllm-omni-rankings/blob/main/scripts/minimax_h3_trtllm_e2e/README.md)\r\n\r\nThe uploaded videos are combined packed-H3 optimization evidence rather than an isolated run of #5779 alone; the follow-up commit is ready to cherry-pick if desired.",
+      "state": "COMMENTED"
+    }
+  ]
+}

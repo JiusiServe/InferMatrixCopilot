@@ -1,0 +1,38 @@
+{
+  "calls": 25,
+  "input_tokens": 868805,
+  "output_tokens": 11216,
+  "cost_usd": 1.9262650000000003,
+  "is_error": false,
+  "terminal_reason": "completed",
+  "split": "train",
+  "head": "fc423e5a9e86029f6f4db9353bde28ac6884790b",
+  "base": "e7b281799ec80cabc1493f3c8a623589a95cf1de",
+  "resolved_model": "claude-fable-5",
+  "snapshot_sha256": "b98eae994ed06876fca186553f467e5df2fde874d4445dba671e8ec39115b46d",
+  "validation_commands": [
+    "git -C /data/zhoutaichang/.infermatrix-copilot/worktrees/vllm-omni-pr4817 diff e7b281799ec80cabc1493f3c8a623589a95cf1de HEAD --stat",
+    "git diff e7b281799ec80cabc1493f3c8a623589a95cf1de HEAD --stat",
+    "git diff e7b281799ec80cabc1493f3c8a623589a95cf1de HEAD",
+    "python -m pytest tests/quantization/test_quack_fp8_gate.py -q 2>&1 | tail -5",
+    "ls tests/quantization/ && git log --oneline -3 -- tests/quantization/ 2>/dev/null",
+    "ls tests/ | head -20; find tests -maxdepth 2 -name \"__init__.py\" | head -5",
+    "for d in tests/*/; do [ -f \"$d/__init__.py\" ] || echo \"no __init__: $d\"; done",
+    "ls -d tests/*/ | while read d; do test -f \"${d}__init__.py\" || echo \"no __init__: $d\"; done",
+    "find tests -maxdepth 1 -type d -not -name __pycache__ -not -path tests | sort > /tmp/alldirs.txt; find tests -maxdepth 2 -name __init__.py -path \"tests/*/__init__.py\" | xargs -n1 dirname | sort > /tmp/initdirs.txt; comm -23 /tmp/alldirs.txt /tmp/initdirs.txt",
+    "find tests -maxdepth 1 -type d | sort | sed 's|$|/__init__.py|' | while read f; do test -f \"$f\" || echo \"MISSING $f\"; done",
+    "python -m pytest tests/quantization/test_quack_fp8_gate.py -m 'core_model and cpu' -q 2>&1 | tail -3",
+    "ls .buildkite/ && ls .github/workflows/ 2>/dev/null"
+  ],
+  "ran_validation": true,
+  "claude_md_seen": {
+    "/data/zhoutaichang/CLAUDE.md": "27ca8ea8056c231e"
+  },
+  "recorded_at": "2026-08-15T01:18:25",
+  "arm": "baseline_opus5",
+  "wall_s": 218.9,
+  "audit_ok": true,
+  "audit_violations": [],
+  "audit_blocked_attempts": [],
+  "artifact_chars": 4589
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth is empty of substantive concerns, so recall is moot for both. Both candidates independently found the same core grounded issues (missing pytestmark deselecting the new regression test from CI, warmup_quack_fp8 bypassing the gate, sm_110a docstring inconsistency, unrelated red CI checks), with X even reproducing the exact 18-test deselection count, lending strong credibility to both. X edges ahead because it correctly triages warmup_quack_fp8's uncaught-exception bug as a hard Blocking issue (it defeats the PR's own stated purpose), while Y buries the same finding under a 'nit' label alongside genuinely minor items like a missing sm_101 test case, which weakens actionable prioritization. X also contributes a distinct, well-grounded design insight (sticky-disable after first quack failure) that Y doesn't surface, whereas Y's extra items (vendor-benchmark-reproducibility nit, duplicated sm_110a mention) add less unique value.",
+  "_cost_usd": 0.2697326,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_train_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v14_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_train_r1",
+    "arm_a_sha256": "3a3e37c19f895a78fb6ab1381598815331923c73915164a2ea35b615239e3772",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "de884ebeca54520b85a490b897397bd22bf362507bf9f7d4a833d74b390ae063",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

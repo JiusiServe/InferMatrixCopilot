@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.82,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "tie",
+  "margin": "slight",
+  "rationale": "Ground truth is thin (LGTM plus four style/organization nits on patch.py relevance and move-to-utils requests); neither candidate addresses those specific points, so recall is near-zero for both (X gets marginal credit for engaging the same benchmarks/patch.py hunk with a different critique). Both independently converge on the same real, well-evidenced bug (double-seeded num_stale_output_tokens) and the same arg_utils.py unconditional-registration regression, which is strong cross-corroboration for precision on their headline findings. X is better organized and more actionable (Blocking/Should-fix/Minor buckets, concrete diffs, suggested tests) but its narrative 'reproduced' terminal output is unverifiable and slightly risks fabrication; Y's grep/quote-backed evidence per finding is more auditable and surfaces one unique, concrete bug (NPU _dummy_run kwarg mismatch) but its dense sweep-dump format is harder to act on directly.",
+  "_cost_usd": 0.3487845,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok46"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46",
+    "arm_a_sha256": "aa6727f25eda1f03ed64ec8b620098b946d62b293680e713dea464109509367f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4703d9c3f9a1a403af03ff17f62c2d816d9363ba7048d8dcee9a84a47834bc46",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

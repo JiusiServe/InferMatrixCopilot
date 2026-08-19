@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.85,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.92,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Neither candidate recalls the actual ground-truth concern (a Yuanrong connector path fix that appears to have already been applied in the diff shown, making it effectively unobservable) — recall is 0 for both. Both independently find the same core real issues (Quantization heading swallowing Cache-DiT/TeaCache/Diffusion-Continuous-Batching, the duplicate quantization nav entry, the orphaned ar_diffusion_pipeline_capability.md, and a nav-label/H1 mismatch), and both are well-grounded with file:line evidence and no apparent fabrication. Y is more thorough (also catches the AsyncOmni H1 mismatch, the connector-glob-vs-hardcoded-list regression, and heading-case inconsistencies) and more actionable, offering literal ready-to-apply markdown fixes and honestly flagging unverified mechanistic claims, whereas X's findings are valid but fewer and stated more as prose recommendations amid a cluttered verification log.",
+  "_cost_usd": 0.22087669999999998,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "4b89fc2fddce9c033988f10b0c7eb46f645c3cd9ab3a9e8c6a7d121ccf8d6454",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b0a1251303a011617b813526a2859371e8ee289f04fcc197988c5b4d83dc8aca",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

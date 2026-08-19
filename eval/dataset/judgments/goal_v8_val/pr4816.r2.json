@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.5,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.35,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "There are no substantive ground-truth concerns, so both have vacuous full recall but over-report findings. X’s missing-regression-test and pure-diffusion observations are concrete, while its compatibility and sibling-state claims are speculative; Y repeats the valid points but adds more weak or incorrect test-coverage and CI objections. Both are highly actionable, with X somewhat more precise.",
+  "_usage": {
+    "input": 3,
+    "output": 880
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v8_official_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v8_official_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v8_official_r1",
+    "arm_a_sha256": "cc061418b0061f8fc6a673d4b5f2cb8b042eb635682295297e5238830028d4ec",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b9fe4c00140a73cf5cc08ceded6d03eb8b8faea45f6c3b50e6f9753b9a1a1a01",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 2
+  }
+}

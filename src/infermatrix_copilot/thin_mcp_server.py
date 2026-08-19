@@ -288,6 +288,25 @@ def _knowledge_entry(name: str) -> str:
     return str(path)
 
 
+def _contributing_entry() -> str:
+    """The knowledge CONTRIBUTION entry point, which lives in `doc/`, not in the
+    knowledge tree.
+
+    The authoring rules are documentation and moved to `doc/knowledge/`; the
+    knowledge tree is now data only. This resolver therefore deliberately does
+    NOT go through `_knowledge_path` — that helper's whole job is to refuse
+    paths outside the knowledge root, and this path is legitimately outside it.
+    Source checkout first, then the packaged copy beside the wheel's knowledge
+    tree, so an installed wheel still answers the tool.
+    """
+    for candidate in (_ROOT / "doc" / "knowledge" / "CONTRIBUTING.md",
+                      _KNOWLEDGE.parent / "doc" / "knowledge" / "CONTRIBUTING.md"):
+        if candidate.is_file():
+            return str(candidate.resolve())
+    raise FileNotFoundError(
+        "knowledge contribution entry is missing: doc/knowledge/CONTRIBUTING.md")
+
+
 def _adapter_changed_file_routes(
     repo: str,
     changed_files: list[str],
@@ -1196,9 +1215,7 @@ def build_mcp(
     @mcp.tool()
     def update_knowledge(repo: str = "vllm-omni") -> dict:
         """Return the knowledge contribution entrypoint for the host to follow."""
-        return _guard(lambda: {
-            "knowledge_entry": _knowledge_entry("CONTRIBUTING.md")
-        })
+        return _guard(lambda: {"knowledge_entry": _contributing_entry()})
 
     @mcp.tool()
     def doc_search(

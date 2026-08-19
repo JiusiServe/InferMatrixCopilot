@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.5,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.68,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both largely miss the core GT P1s (cache-dit gap on transformers_ref, missing modular-alias capability metadata, dropped Ref2VA implicit task default, unvalidated combined-service perf); the only real overlap is the Qwen3-TTS --task-type regression, and Y nails it more precisely — identifying the validator checks a string ('...ARVLLM') that production never uses, making the gate dead code — backed by grep-quoted evidence throughout, versus X's vaguer 'validates only Qwen3-TTS' framing. X's headline 'Blocking' claims (Bagel/SenseNova-U1 cache-dit dotted-path crashes) are unverifiable from the given diff and read as speculative, especially since the shown test diff already exercises multi-DiT cache enable/refresh. X does land some directly-confirmable doc regressions (dropped HF_OFFLINE/TRANSFORMERS_OFFLINE, stale MODEL_ROOT reference) and has cleaner severity-tiered formatting, giving it better actionability despite weaker precision.",
+  "_cost_usd": 0.41223970000000004,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15_holdout4_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "6c59f727ced45c6f537e6eb4883517d557307c093cbeef56d3e63b5352e6c974",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "7d155ed781e729cb9d3a1c8ef3851789595fa7fa0c9c18281fbbf0c3a461d7e5",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

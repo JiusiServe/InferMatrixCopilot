@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.9,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.75,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y substantively engages with both ground-truth themes — validation/methodology rigor (missing vllm-omni/PyTorch version pinning, 1Hz sampling undersampling the sub-2s decode window) and Ref2VA testing risk (restart command likely fails against the documented single-partition download pattern, two-GPU headroom vs untested Ref2VA token counts) — while X's four findings, though all valid and well-grounded (numactl flags, dangling RTX-PRO-5000 reference, missing README index entry, ambiguous audio_reference JSON shape), are narrower doc-polish nits with no overlap to what human reviewers actually flagged. Y also surfaces a self-contradiction verifiable purely from the diff's own arithmetic (the 'floor near 55 GiB' claim contradicts its own fitted formula) and a collinearity flaw in the memory-model fit (Ulysses degree and text-encoder-tp scale together 1:2 in the table, making the two confounded) — both checkable from the diff text alone. Y's sheer volume of claims citing out-of-diff source line numbers carries real unverifiable-citation risk, capping its precision below X's, but its recall and usefulness are substantially higher.",
+  "_cost_usd": 0.37140229999999996,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok45",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok45",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok45",
+    "arm_a_sha256": "758acc266037ae1f5ffd72402958e6928ad8d38301c4c64b6fd8b82f3338fbea",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "726725524751ffed003542c0fd4e00bb3f74ef77a200d776d40628016c5bdd21",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

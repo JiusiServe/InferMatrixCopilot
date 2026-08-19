@@ -143,9 +143,28 @@ def test_rules_light_on_tiny_low_risk_diff(settings):
     assert depth == "light" and "small low-risk" in reason
 
 
-def test_rules_docs_only_is_light_regardless_of_size(settings):
-    sig = diff_signals(_diff("docs/big.md", lines_per_file=900))
-    assert classify(sig, settings)[0] == "light"
+def test_rules_docs_only_depth_scales_with_size(settings):
+    # docs PRs are reviews of claims; only genuinely small ones stay light
+    # (wave-2: the light tier ran at ~half the baseline's recall on every
+    # docs item). Mid-size docs go standard, large docs go full.
+    small = diff_signals(_diff("docs/small.md", lines_per_file=30))
+    depth, reason = classify(small, settings)
+    assert depth == "light" and "docs-only" in reason
+    mid = diff_signals(_diff("docs/mid.md", lines_per_file=200))
+    assert classify(mid, settings)[0] == "standard"
+    big = diff_signals(_diff("docs/big.md", lines_per_file=900))
+    assert classify(big, settings)[0] == "full"
+
+
+def test_rules_docs_heavy_with_asset_rider_is_not_gray(settings):
+    # a nav yml or an image beside doc files must not push a docs PR into
+    # the gray zone (wave-2 pr5610: 3 docs + 1 asset fell to the LLM
+    # planner, which failed, and the docs pass set was never selected)
+    diff = _diff("docs/a.md", "docs/b.md", lines_per_file=120)
+    diff += _diff("docs/.nav.yml", lines_per_file=4)
+    sig = diff_signals(diff)
+    assert sig.docs_heavy
+    assert classify(sig, settings)[0] == "standard"
 
 
 def test_rules_full_on_large_diff(settings):
@@ -198,6 +217,43 @@ def test_rules_api_change_disqualifies_light(settings):
     assert classify(diff_signals(diff), settings) is None  # gray, not light
 
 
+def test_rules_value_flip_disqualifies_light(settings):
+    # a tiny diff that flips an existing assignment's value (default lists,
+    # flags, thresholds) can have repo-wide blast radius — it must go gray,
+    # never light, even though no def/class/CONST shape changed
+    diff = ("diff --git a/src/platform.py b/src/platform.py\n"
+            "--- a/src/platform.py\n+++ b/src/platform.py\n"
+            '-        default = ["native"] if using_inductor else ["c", "native"]\n'
+            '+        default = ["c", "native"]\n')
+    sig = diff_signals(diff)
+    assert sig.value_flips == ('src/platform.py: `default`',)
+    assert classify(sig, settings) is None  # gray, not light
+
+
+def test_signals_code_motion_is_not_a_value_flip(settings):
+    # same LHS, same RHS: the assignment merely moved — still light
+    diff = ("diff --git a/src/mod.py b/src/mod.py\n"
+            "--- a/src/mod.py\n+++ b/src/mod.py\n"
+            "-    limit = 10\n"
+            "+    limit = 10\n")
+    sig = diff_signals(diff)
+    assert sig.value_flips == ()
+    assert classify(sig, settings)[0] == "light"
+
+
+def test_signals_config_file_flip_stays_light(settings):
+    # the flip signal is code-file-only: a 2-line yaml value change keeps the
+    # light tier (config semantics are the config owner's checklist, and tiny
+    # config deletions measured as safe light items)
+    diff = ("diff --git a/deploy/a.yaml b/deploy/a.yaml\n"
+            "--- a/deploy/a.yaml\n+++ b/deploy/a.yaml\n"
+            "-timeout = 30\n"
+            "+timeout = 60\n")
+    sig = diff_signals(diff)
+    assert sig.value_flips == ()
+    assert classify(sig, settings)[0] == "light"
+
+
 # ---- plan_review: overrides and invariants ----------------------------------
 
 def test_override_wins_with_zero_llm_calls(settings):
@@ -235,7 +291,9 @@ def test_gray_zone_llm_picks_standard(settings):
                        model="m")
     assert plan.depth == "standard" and plan.planner == "llm"
     assert plan.lens_names == ("logic", "verification")
-    assert len(llm.calls) == 1 and llm.calls[0]["max_tokens"] == 400
+    # 2000, not 400: reasoning models spend tokens thinking before the JSON;
+    # at 400 the planner reply was cut pre-JSON and silently failed every time
+    assert len(llm.calls) == 1 and llm.calls[0]["max_tokens"] == 8_000
     # untrusted diff content is fenced in the prompt
     prompt = llm.calls[0]["messages"][0]["content"]
     assert "<untrusted_data>" in prompt and "</untrusted_data>" in prompt

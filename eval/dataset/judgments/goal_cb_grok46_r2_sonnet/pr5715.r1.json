@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.9,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y explicitly verifies that musa.inc.md and quickstart.md remained unchanged (byte-identical to merge-base), directly engaging the 'do not change this' thread that X never mentions at all, and both candidates independently converge on the same npu.inc.md Ascend RC-pin concern that maps to the PTAL/LGTM thread. Y's seven findings are more thoroughly evidenced (specific line quotes, cross-file checks, concrete suggested diffs) though one (comment 4, workdir anchoring) is somewhat speculative; X's two findings are valid and well-grounded but narrower, missing half the ground-truth thread entirely. Both are concrete and actionable with file/line pointers, but Y's suggested replacement text and verification commands edge out X on actionability.",
+  "_cost_usd": 0.24523119999999998,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r2",
+    "arm_a_sha256": "d41956668af47318044d161972ca18ded622fac2d38cb66aaa0ad9949d6f9356",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5866809cd7926f6bee88b473acf165652378865539411405c15a7c86c14e7466",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

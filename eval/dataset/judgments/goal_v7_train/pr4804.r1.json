@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.33,
+    "precision": 0.56,
+    "actionability": 0.88,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.58,
+    "precision": 0.76,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y captures the slot-lifecycle leak, legacy/v2 codec misclassification, NPU dummy-run breakage, stale documentation, and bogus-WER fallback with concrete fixes. X catches the fallback and provenance issues but misses more core human concerns and includes several weaker or speculative findings.",
+  "_usage": {
+    "input": 3,
+    "output": 1162
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "copilot_v7_goal_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v7_goal_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v7_goal_r1",
+    "arm_a_sha256": "4a06a5f1c99baf059fc80970d8a842eaeef2a1125d75a3a232d24acf0aeb717c",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "18986f2736f812d8c896b12152ebcbf1d5319e9e1f79042f5fa16f1dd6272542",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

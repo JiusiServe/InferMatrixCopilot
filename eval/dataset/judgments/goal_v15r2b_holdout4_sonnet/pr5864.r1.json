@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.75,
+    "actionability": 0.6
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.8,
+    "actionability": 0.75
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y's findings map onto more ground-truth-adjacent concerns — a near-exact hit on the weak DP-primary-rank test (test_multiproc_engine_concurrency.py, same test yuanheng-zhao flagged), a direct hit on the leftover _ndarray_from_shm alias in the ipc.py area the human asked to merge, and deep engagement with the shutdown-lifecycle regression zone (explicitly cross-referencing the InlineStageDiffusionClient guard). It also surfaces several high-severity, concretely-evidenced novel bugs (wave-wide collateral failure, silent cross-request output substitution, a 600s timeout that contradicts the example's own 4h env var) with real cross-file repo evidence. X's review is equally rigorous and well-cited but covers fewer ground-truth themes and spends significant space on 'Validated' confirmations that add rigor but not recall or new actionable findings. Neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.4477427,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "8b3b0b08e1a8defaac40e67c5a984066109aab2a4e178dd50d66ac13b0a37305",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5d107b26c5dd605248f4ff3bf7b26b48a886f95ed933ef7eb79692e052dcfc5a",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

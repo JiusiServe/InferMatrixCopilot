@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.82,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth centers on whether Ref2VA was actually tested; X's finding #4 explicitly states validation was FL2VA-only and flags the resulting OOM risk on the memory-constrained 4-GPU route, directly hitting that concern, while Y never mentions Ref2VA testing status at all. Both candidates independently catch the same real issues (34.7→35.3 GiB arithmetic error, missing README index entry, omitted PR-body alternative routes, missing vLLM-Omni commit pin), so precision is comparably high, but X surfaces substantially more grounded, code-level findings (RAM doubling at TP1 vs TP2, membind/pinned-memory NUMA constraint, sync-timeout sizing, resident-layer rationale) that Y's narrower automated scan missed. Both are concrete with file/line anchors and actionable fixes.",
+  "_cost_usd": 0.2259071,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_holdout3_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r1",
+    "arm_a_sha256": "f6759ab5cc33f1eeeb7457c6906df78a8b97e38881e28a65d934252ed591e706",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0c9521d957061cba9c0df8c76435b9ce67650296c5e211578db2b474c4668332",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

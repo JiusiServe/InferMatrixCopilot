@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "The ground truth's only substantive signal is that reviewers said 'do not change this' on musa.inc.md and quickstart.md, implying those files were correctly reverted/left untouched. X explicitly verifies both files are byte-identical to merge-base and reasons about why MUSA was deliberately excluded, while Y only addresses the MUSA angle and never mentions quickstart.md, giving X clearly better recall. Both candidates are well-grounded in the diff with specific file/line references and no obvious fabrications, but X goes further with deeper repo verification (mkdocs.yml, version.py enforcement, docs structure) and provides concrete suggested replacement text plus a verification command, making it more actionable without sacrificing precision.",
+  "_cost_usd": 0.19280170000000002,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_grok45"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok45",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok45",
+    "arm_a_sha256": "f6b72d2406cd59bdff7a7794d776d0bde1c55ee6336f9bf80e91ea2bcd1e1db6",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5866809cd7926f6bee88b473acf165652378865539411405c15a7c86c14e7466",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

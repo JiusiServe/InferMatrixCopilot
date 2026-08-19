@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.68,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.38,
+    "precision": 0.75,
+    "actionability": 0.85
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X explicitly traces the PR's review history and confirms resolution of the three ground-truth inline concerns (scope, flag-source robustness, unused seq_len) citing the same commits (df8137e8, ede3dddf) the human reviewers referenced, and independently catches the AMD CI failure Gaohan123/Sy0307 discussed — high recall with systematic evidence citations. Y produces deeper, well-reasoned original findings (cudagraph-padding hypothesis, FINAL_ONLY consumer disagreement, WebSocket impact) but never engages with the actual review thread, missing the Med/Nit items entirely and only tangentially touching Low, plus states some causal claims (padding root cause) with more confidence than verified. Both independently flag the same NPU-twin bug and CI failure; neither raises the multi-axis batch-splitting gap.",
+  "_cost_usd": 0.37185630000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_train",
+    "arm_a_sha256": "deb31874f9fc141175b51d036fa11dc1672c2a19ac6d8eddb93e8df2d7f5c42a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "03d7423c3a91e45838083e2025e3dea932f1d9448ba923b1d6ca1a0373899ea1",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,98 @@
+[
+  {
+    "author": "david6666666",
+    "body": "In combined mode this schedule comes from FL2VA, but it is also used for Ref2VA requests. A distilled FL2VA paired with a regular Ref2VA would therefore force the Ref2VA transformer onto four steps. Could we select the schedule from the active task/partition instead?",
+    "line": 1767,
+    "path": "vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py"
+  },
+  {
+    "author": "david6666666",
+    "body": "An interior NaN passes this ordering check because comparisons with NaN are false, then propagates into every denoising step. Please reject non-finite schedule entries before checking the order.",
+    "line": 42,
+    "path": "vllm_omni/diffusion/models/minimax_h3/time_request.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "[P1] This rejects every valid schedule. `values` has length n while `values[1:]` has length n-1, so `strict=True` raises `ValueError: zip() argument 2 is shorter than argument 1` after the comparisons finish. The new valid-schedule test reproduces this. Please use non-strict pairwise iteration (and keep the malformed-order check).",
+    "line": 42,
+    "path": "vllm_omni/diffusion/models/minimax_h3/time_request.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "[P1] This unconditional attribute read breaks the existing contract test, which constructs `MiniMaxH3Pipeline` with `object.__new__` and does not initialize `default_base_schedule`; the full contract file now fails with `AttributeError`. Please update that fixture (and add distilled-forward coverage), or provide a safe class-level/default fallback.",
+    "line": 1767,
+    "path": "vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "[P1] This counts sigma boundaries rather than denoising steps. For the advertised `[1.0, 0.7, 0.4, 0.15, 0.0]` schedule, the denoise loop runs `len(sigmas) - 1 == 4` iterations, but this sets `num_steps` to 5, rejects an explicit `num_inference_steps=4`, and passes 5 to Cache-DiT. Please use the actual denoising-step count for request/cache semantics while retaining the full boundary schedule for the solver.",
+    "line": 1771,
+    "path": "vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "[P2] An explicitly present empty schedule bypasses validation because `[]` is falsey, so the checkpoint silently falls back to the legacy uniform 50-step schedule. Please distinguish an absent key from `base_schedule=[]` (for example, validate when `base_schedule is not None`).",
+    "line": 613,
+    "path": "vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "[P1] In combined mode, `release` was loaded from the FL2VA `model_index.json`, but this value is later used for every task, including Ref2VA. If the two partitions have different schedule metadata, Ref2VA will run with the FL2VA schedule. Please retain schedule metadata per partition/task or reject combined checkpoints whose schedule contracts differ.",
+    "line": 612,
+    "path": "vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py"
+  },
+  {
+    "author": "Huangzjun",
+    "body": "Good catch — fixed. Schedule metadata is now stored per partition (fl2va / ref2va), and forward() selects it via _base_schedule_for_task(task), so a distilled FL2VA no longer forces Ref2VA onto 4 steps.",
+    "line": 1767,
+    "path": "vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py"
+  },
+  {
+    "author": "Huangzjun",
+    "body": "Fixed — _validate_base_schedule() now rejects non-finite entries before the monotonicity check, so interior NaN/inf no longer slip through.",
+    "line": 42,
+    "path": "vllm_omni/diffusion/models/minimax_h3/time_request.py"
+  },
+  {
+    "author": "Huangzjun",
+    "body": "Fixed — switched to non-strict pairwise iteration. The old strict=True raised on every valid schedule because values[1:] is one element shorter; the malformed-order tests were also masking this because any() short-circuited before the zip finished.",
+    "line": 42,
+    "path": "vllm_omni/diffusion/models/minimax_h3/time_request.py"
+  },
+  {
+    "author": "Huangzjun",
+    "body": "replaced the instance-only attribute with a class-level _base_schedule_by_partition = {} default, so partially constructed pipelines (including the object.__new__ fixtures) fall back to the legacy uniform path without an AttributeError.",
+    "line": 1767,
+    "path": "vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py"
+  },
+  {
+    "author": "Huangzjun",
+    "body": "Fixed — when a distilled schedule is present, num_steps is now len(base_schedule) - 1 (4 denoising hops for the 5-point schedule). The full boundary list is still passed to the solver, and Cache-DiT / request validation use the denoising-step count. Added forward coverage for this.",
+    "line": 1771,
+    "path": "vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py"
+  },
+  {
+    "author": "Huangzjun",
+    "body": "_read_base_schedule() now distinguishes a missing key (None → legacy uniform) from an explicit empty list, which is validated and rejected.",
+    "line": 613,
+    "path": "vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py"
+  },
+  {
+    "author": "Huangzjun",
+    "body": "same change as the combined-mode comment above: FL2VA and Ref2VA each load their own base_schedule from their respective model_index.json, and the active task picks the matching partition.",
+    "line": 612,
+    "path": "vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py"
+  },
+  {
+    "author": "david6666666",
+    "body": "I think we shoud move to vllm_omni/diffusion/sched",
+    "line": 1,
+    "path": "vllm_omni/diffusion/sched/sigma_schedule.py"
+  },
+  {
+    "author": "Huangzjun",
+    "body": "Done — moved DMD2SigmaSchedule to vllm_omni/diffusion/sched/sigma_schedule.py and updated all imports/tests. No behavior change.",
+    "line": 1,
+    "path": "vllm_omni/diffusion/sched/sigma_schedule.py"
+  }
+]

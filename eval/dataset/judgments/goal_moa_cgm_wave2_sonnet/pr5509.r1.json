@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.68,
+    "actionability": 0.55,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.75,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently nail the one actively-unresolved ground-truth concern (FLASHINFER_ATTN allow-listing quant but never consuming it, recommending restriction to TRTLLM_ATTN) with near-identical, well-grounded evidence, and both independently spot a second real bug (dtype_vo-only enabling a mismatch between AttnQuantSpec.enabled and QuantConfig.enabled) that's verifiable directly in the diff. Y edges ahead on recall by also engaging the resolved concern's spirit (flagging that the 'kwargs only when enabled' fix has no regression test), and on precision/actionability by backing extra findings (ring-SP silently dropping SAGE, output dtype mismatch under SAGE, arch preflight gap) with executed code snippets and clear, cleanly organized Blocking/Should-fix/Nits sections. X's report has real value (CI-lane gap analysis, doc-deletion catch) but several 'additional observations' are truncated mid-sentence and unusable, and its evidence dumps are harder to act on than Y's concrete diffs. Neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.3639376,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_moa_cgm",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_moa_cgm",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_moa_cgm",
+    "arm_a_sha256": "fe0a990b48bf1e22e8dce58a27a61b2d7678feba67def4076a294df1c54a8614",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "703e9ad7d9901fc59d5ad8d20917e36993f445b09d3ecaaba356dbe9c900f660",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

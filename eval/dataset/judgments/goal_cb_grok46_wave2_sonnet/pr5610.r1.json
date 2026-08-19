@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.95,
+    "actionability": 0.65
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.9,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Most ground-truth concerns (platform scope, connector-state ownership, image-path resolution, full-payload-branch reachability, prefix-cache incompatibility) were already fixed in this diff snapshot; Y explicitly re-verifies nearly all of them with citations and additionally surfaces several new, well-grounded issues (GitHub-broken image src, understated connector-drain invariant, TP>1 collective on the background thread, YAML/ASCII nits) with concrete actionable fixes. X's single flagged finding (XPU/MUSA hash-invariance overstatement) is high-quality and precisely cited, extending the same theme ground truth raised about non-CUDA platforms, but its overall coverage of the concern space is much narrower and its verification notes stay at confirmation level rather than producing further actionable line-level fixes.",
+  "_cost_usd": 0.4208395,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46",
+    "arm_a_sha256": "3d67b11e6e2fbaee24300e96ea049e6f13d7804ce83a953221193af32b6d2380",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

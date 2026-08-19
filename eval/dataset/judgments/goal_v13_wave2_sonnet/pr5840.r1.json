@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.8,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.82,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently rediscover the one ground-truth concern still live in this diff snapshot (the tea_cache 0.2 default silently overriding the MiniMax-H3 0.17 model default via async_omni_engine.py), with near-identical file/line evidence and equally actionable fixes; both also explicitly re-verify that the partition-specific enabler (GT concern #1) is now correctly implemented rather than falsely re-flagging it. Y edges ahead with an additional, well-evidenced major finding (quality_policy.py allows Cache-DiT to be installed on a TeaCache server despite the recipe's 'mutually exclusive' claim) and catches that the failing AMD CI lane actually does exercise the modified test file, contradicting a claim in the human review that X takes at face value. X's report is deeper and more narratively rigorous (calibration-curve math, memory/RoPE analysis) but those extra findings are harder to independently verify and don't map to ground-truth concerns, so precision/recall land close with a slight edge to Y.",
+  "_cost_usd": 0.357443,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_wave2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_wave2",
+    "arm_a_sha256": "8f36c69762945dccaf24f0db7f798511a3e63f39f1446ac63f9054eb134c767a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

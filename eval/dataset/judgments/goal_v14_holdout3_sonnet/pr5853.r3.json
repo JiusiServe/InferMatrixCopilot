@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.35,
+    "precision": 0.75,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both largely miss the ground truth's sharpest inline finding (the 'fast' quality tier silently no-opping) and the serving_video.py/serving_video_output_stream.py gating nits — likely because those were already fixed in the reviewed diff (Y even quotes DIFFUSION_QUALITY_LEVELS without 'fast', confirming resolution), giving both low recall; Y edges recall slightly by explicitly validating the serving_video gating as fixed. X's findings (partial-install rollback bug, disable() target-list gap, cross-model quality no-op, lossless-not-truly-reference) are deeper, less redundant, and paired with concrete code-level fixes, while Y has some hedged/unverifiable major findings (CI attribution) and duplicate bullets that dilute precision and actionability. Both independently and correctly caught the PR-description/hardware-discrepancy issues.",
+  "_cost_usd": 0.498634,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_holdout3_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r1",
+    "arm_a_sha256": "628f46190cf73786dbab2fe3caf9b245be7470536bf5e4fc8959fc2a021af3f3",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "427516abfc8f76c8072270d6092028442d369983b7f2226ce6615f35fb2879d4",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,50 @@
+[
+  {
+    "author": "hsliuustc0106",
+    "body": "do we still need to add test for this since they have been moved to examples",
+    "line": 25,
+    "path": "tests/model_extras/test_model_extras.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "why not change online serving folder as well?",
+    "line": 61,
+    "path": "examples/offline_inference/image_to_video/image_to_video.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "```suggestion\n    build_image_to_video_prompt,\n```",
+    "line": 5,
+    "path": "vllm_omni/model_extras/__init__.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "```suggestion\n    build_text_to_image_prompt,\n```",
+    "line": 6,
+    "path": "vllm_omni/model_extras/__init__.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "apply for all",
+    "line": 6,
+    "path": "vllm_omni/model_extras/__init__.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "do we have to create the bash file here?",
+    "line": 6,
+    "path": "examples/online_serving/image_to_video/run_curl_image_to_video.sh"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "same here",
+    "line": 2,
+    "path": "examples/online_serving/text_to_image/run_curl_text_to_image.sh"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "shy we need to modfy this file?",
+    "line": 30,
+    "path": "vllm_omni/entrypoints/openai/serving_video.py"
+  }
+]

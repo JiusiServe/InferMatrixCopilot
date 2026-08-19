@@ -1,0 +1,18 @@
+{
+  "arm": "cursor_cursorgrok4.5high",
+  "model_requested": "cursor-grok-4.5-high",
+  "head": "75cd907089322c648cf1494a2423d706e20fec2a",
+  "base": "fc8946fcf542cf108fa8b2fdc69de737bbfd52d8",
+  "snapshot_sha256": "0250972d67ae968a6f260a906b426a0695bc5e6677d3f796a84a259d86925480",
+  "wall_s": 351.4,
+  "shell_commands": 8,
+  "file_reads": 24,
+  "cost_usd": null,
+  "audit_ok": false,
+  "audit_violations": [
+    "read outside worktree: /home/zhoutaichang/.claude/skills/imreview/SKILL.md",
+    "read outside worktree: /home/zhoutaichang/.cursor/projects/data-zhoutaichang-infermatrix-copilot-worktrees-vllm-omni-pr5840/terminals/219037.txt"
+  ],
+  "artifact_chars": 3646,
+  "split": "holdout"
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.1,
+    "precision": 0.8,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth contains no inline comments and its only substantive concern (splitting out a VoxCPM2 regression fix) is unrelated to the visible 2-line diff and missed by both candidates, so recall is low for both. Both produce well-grounded, plausible findings about the seed removal's downstream effects (red CI lanes touching this yaml, missing tombstone comment, missing regression test) with comparable precision. Y edges ahead by adding a further well-cited finding about vLLM's own stage-0 sampler fast-path being affected and, crucially, supplies copy-pasteable code for its suggested yaml comment and regression test, making it more concretely actionable than X's descriptive-only suggestions.",
+  "_cost_usd": 0.31492680000000006,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16rs_train_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16rs_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16rs_train_r1",
+    "arm_a_sha256": "72d04948aed9a0b8c7ec22ced4593a2fd5bee2f28c950c27b725bcb5b99d4c0e",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "410634f22ac0d9a55948ec0dfc9caa6557a8995e24766ff507dbe677d6dd37dc",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,1245 @@
+diff --git a/apps/ComfyUI-vLLM-Omni/README.md b/apps/ComfyUI-vLLM-Omni/README.md
+index 54f2fdf2e40..cbd53a9a000 100644
+--- a/apps/ComfyUI-vLLM-Omni/README.md
++++ b/apps/ComfyUI-vLLM-Omni/README.md
+@@ -47,7 +47,7 @@ If no, check your shell running the ComfyUI process. There may be some error mes
+ This extension offers the following nodes based on the output modalities (at **ComfyUI sidebar -> Node Library**):
+ 
+ - **Generate Image** for text-to-image and image-to-image tasks
+-- **Generate Video** for text-to-video and image-to-video tasks
++- **Generate Video** for text-to-video, first-frame/image-to-video, and reference-conditioned video
+ - **Multimodality Understanding** for multimodality-to-text and multimodality-to-audio tasks
+ - **TTS** and **TTS Voice Clone** for TTS tasks
+ 
+@@ -105,7 +105,7 @@ You can configure per-stage sampling parameters for multi-stage models.
+ > [!TIP]
+ > The node automatically choose text-to-image or image-to-image API endpoints depending on whether you connect an image input or not.
+ 
+-### Text-to-video and image-to-video generation (e.g., Wan)
++### Text-to-video and image-to-video generation (e.g., Wan, MiniMax-H3)
+ 
+ (Also available at **ComfyUI sidebar->Template->vLLM-Omni->vLLM-Omni Video Generation**)
+ 
+@@ -117,7 +117,11 @@ You can configure per-stage sampling parameters for multi-stage models.
+ </p>
+ 
+ > [!TIP]
+-> The node automatically choose text-to-video or image-to-video API endpoints depending on whether you connect an image input or not.
++> Connect a **frame** image for first-frame / image-to-video (e.g., Wan I2V, MiniMax-H3 FL2VA).
++>
++> For reference-conditioned generation (MiniMax-H3 Ref2VA), connect a **Video References** node instead.
++>
++> Do not use `frame` and `references` together. Task routing is automatic from which inputs you connect.
+ 
+ ### TTS (e.g., Qwen TTS series)
+ 
+diff --git a/apps/ComfyUI-vLLM-Omni/__init__.py b/apps/ComfyUI-vLLM-Omni/__init__.py
+index e89b2ca1eb5..2681078995d 100644
+--- a/apps/ComfyUI-vLLM-Omni/__init__.py
++++ b/apps/ComfyUI-vLLM-Omni/__init__.py
+@@ -15,11 +15,13 @@
+     VLLMOmniDiffusionSampling,
+     VLLMOmniGenerateImage,
+     VLLMOmniGenerateVideo,
++    VLLMOmniMiniMaxH3Params,
+     VLLMOmniQwenTTSParams,
+     VLLMOmniRemoteLoRA,
+     VLLMOmniSamplingParamsList,
+     VLLMOmniTTS,
+     VLLMOmniUnderstanding,
++    VLLMOmniVideoReferences,
+     VLLMOmniVoiceClone,
+     VLLMOmniWanParams,
+ )
+@@ -32,6 +34,7 @@
+     "VLLMOmniUnderstanding": VLLMOmniUnderstanding,
+     "VLLMOmniTTS": VLLMOmniTTS,
+     "VLLMOmniVoiceClone": VLLMOmniVoiceClone,
++    "VLLMOmniVideoReferences": VLLMOmniVideoReferences,
+     # === Params ===
+     "VLLMOmniARSampling": VLLMOmniARSampling,
+     "VLLMOmniDiffusionSampling": VLLMOmniDiffusionSampling,
+@@ -39,6 +42,7 @@
+     "VLLMOmniRemoteLoRA": VLLMOmniRemoteLoRA,
+     "VLLMOmniQwenTTSParams": VLLMOmniQwenTTSParams,
+     "VLLMOmniWanParams": VLLMOmniWanParams,
++    "VLLMOmniMiniMaxH3Params": VLLMOmniMiniMaxH3Params,
+ }
+ 
+ # A dictionary that contains the friendly/humanly readable titles for the nodes
+@@ -49,6 +53,7 @@
+     "VLLMOmniUnderstanding": "Multimodality Understanding",
+     "VLLMOmniTTS": "TTS (Text to Speech)",
+     "VLLMOmniVoiceClone": "TTS Voice Cloning",
++    "VLLMOmniVideoReferences": "Video References",
+     # === Params ===
+     "VLLMOmniARSampling": "AR Sampling Params",
+     "VLLMOmniDiffusionSampling": "Diffusion Sampling Params",
+@@ -56,6 +61,7 @@
+     "VLLMOmniRemoteLoRA": "LoRA",
+     "VLLMOmniQwenTTSParams": "Qwen TTS Params",
+     "VLLMOmniWanParams": "Wan Video Params",
++    "VLLMOmniMiniMaxH3Params": "MiniMax-H3 Video Params",
+ }
+ 
+ WEB_DIRECTORY = "./web"
+diff --git a/apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/nodes.py b/apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/nodes.py
+index bfea939982c..8fd00cd9c6c 100644
+--- a/apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/nodes.py
++++ b/apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/nodes.py
+@@ -10,7 +10,9 @@
+     AudioFormat,
+     AutoregressionSamplingParams,
+     DiffusionSamplingParams,
++    MiniMaxH3ModelSpecificParams,
+     QwenTTSModelSpecificParams,
++    VideoReferences,
+     WanModelSpecificParams,
+ )
+ from .utils.validators import (
+@@ -163,7 +165,8 @@ def INPUT_TYPES(cls):
+                 "num_frames": ("INT", {"default": 41, "min": 1}),
+             },
+             "optional": {
+-                "image": ("IMAGE",),
++                "frame": ("IMAGE",),
++                "references": ("VIDEO_REFERENCES",),
+                 "sampling_params": ("SAMPLING_PARAMS",),
+                 "lora": ("REMOTE_LORA",),
+                 "model_params": ("VIDEO_PARAMS",),
+@@ -174,6 +177,15 @@ def INPUT_TYPES(cls):
+     RETURN_NAMES = ("video",)
+     FUNCTION = "generate"
+ 
++    @classmethod
++    def VALIDATE_INPUTS(cls, url, model, frame=None, references=None, **_kwargs) -> str | Literal[True]:
++        base = super().VALIDATE_INPUTS(url, model)
++        if base is not True:
++            return base
++        if frame is not None and references is not None:
++            return "Provide only one of frame or references, not both."
++        return True
++
+     async def generate(
+         self,
+         url: str,
+@@ -184,7 +196,8 @@ async def generate(
+         fps: int,
+         num_frames: int,
+         negative_prompt: str | None = None,
+-        image: torch.Tensor | None = None,
++        frame: torch.Tensor | None = None,
++        references: dict | None = None,
+         sampling_params: dict | list[dict] | None = None,
+         model_params: dict | None = None,
+         lora: dict | None = None,
+@@ -207,14 +220,16 @@ async def generate(
+ 
+         if sampling_params is not None:
+             sampling_params.pop("type", None)  # internal fields
+-        if model_params is not None:
+-            model_params.pop("type", None)  # internal fields
++        # model_params["type"] is also an internal field, but is used in api_client
++        # if model_params is not None:
++        #     model_params.pop("type", None)  # internal fields
+ 
+         client = VLLMOmniClient(url)
+         output = await client.generate_video(
+             model=model,
+             prompt=prompt,
+-            image=image,  # image present => i2v, absent => t2v
++            frame=frame,  # frame present => fl2va / Wan I2V
++            references=references,
+             width=width,
+             height=height,
+             num_frames=num_frames,
+@@ -734,3 +749,78 @@ def INPUT_TYPES(cls):
+ 
+     def get_params(self, **kwargs):
+         return (WanModelSpecificParams(kwargs),)
++
++
++class VLLMOmniMiniMaxH3Params:
++    @classmethod
++    def INPUT_TYPES(cls):
++        return {
++            "required": {
++                "audio_flow_shift": (
++                    "FLOAT",
++                    {"default": 3.0, "min": 0.0, "max": 100.0, "step": 0.1},
++                ),
++                "flow_shift": (
++                    "FLOAT",
++                    {"default": 12.0, "min": 0.0, "max": 100.0, "step": 0.1},
++                ),
++            }
++        }
++
++    RETURN_TYPES = ("VIDEO_PARAMS",)
++    RETURN_NAMES = ("MiniMax-H3 video params",)
++    FUNCTION = "get_params"
++    CATEGORY = "vLLM-Omni/Video Params"
++
++    def get_params(self, **kwargs):
++        params = MiniMaxH3ModelSpecificParams(kwargs)
++        params["type"] = "minimax_h3"
++        return (params,)
++
++
++class VLLMOmniVideoReferences:
++    @classmethod
++    def INPUT_TYPES(cls):
++        return {
++            "required": {},
++            "optional": {
++                "image_1": ("IMAGE",),
++                "image_2": ("IMAGE",),
++                "audio_1": ("AUDIO",),
++                "audio_2": ("AUDIO",),
++                "video_1": ("VIDEO",),
++                "video_2": ("VIDEO",),
++            },
++        }
++
++    RETURN_TYPES = ("VIDEO_REFERENCES",)
++    RETURN_NAMES = ("references",)
++    FUNCTION = "get_references"
++    CATEGORY = "vLLM-Omni"
++
++    def get_references(
++        self,
++        image_1: torch.Tensor | None = None,
++        image_2: torch.Tensor | None = None,
++        audio_1: AudioInput | None = None,
++        audio_2: AudioInput | None = None,
++        video_1: VideoInput | None = None,
++        video_2: VideoInput | None = None,
++        **kwargs,
++    ):
++        if kwargs:
++            logger.info("Uncaught kwargs: %s", kwargs)
++        refs = VideoReferences()
++        if image_1 is not None:
++            refs["image_1"] = image_1
++        if image_2 is not None:
++            refs["image_2"] = image_2
++        if audio_1 is not None:
++            refs["audio_1"] = audio_1
++        if audio_2 is not None:
++            refs["audio_2"] = audio_2
++        if video_1 is not None:
++            refs["video_1"] = video_1
++        if video_2 is not None:
++            refs["video_2"] = video_2
++        return (refs,)
+diff --git a/apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/api_client.py b/apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/api_client.py
+index 8600fe39355..cd509244a32 100644
+--- a/apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/api_client.py
++++ b/apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/api_client.py
+@@ -24,6 +24,7 @@
+     image_tensor_to_base64,
+     image_tensor_to_png_bytes,
+     video_to_base64,
++    video_to_bytes,
+ )
+ from .logger import get_logger, pretty_printer
+ from .models import lookup_model_spec
+@@ -63,7 +64,11 @@ async def url_bytes(session: aiohttp.ClientSession, url: str, verb: str = "get",
+ 
+ class VLLMOmniClient:
+     def __init__(
+-        self, base_url: str, timeout: float | None = None, poll_interval: float = 5.0, max_poll_duration: float = 60 * 5
++        self,
++        base_url: str,
++        timeout: float | None = None,
++        poll_interval: float = 5.0,
++        max_poll_duration: float = 60 * 30,
+     ):
+         self.base_url = base_url
+         self.timeout = aiohttp.ClientTimeout(total=timeout)
+@@ -261,12 +266,17 @@ async def generate_video(
+         num_frames: int,
+         fps: int,
+         negative_prompt: str | None = None,
+-        image: torch.Tensor | None = None,
++        frame: torch.Tensor | None = None,
++        references: dict | None = None,
+         sampling_params: dict | None = None,
+         model_params: dict | None = None,
+         lora: dict | None = None,
+-        **extra_body,
++        **extra_params,
+     ) -> VideoInput:
++        if frame is not None and references is not None:
++            raise ValueError("Provide only one of frame or references, not both.")
++
++        # === regular payload fields ===
+         form = aiohttp.FormData()
+         form.add_field("model", model)
+         form.add_field("prompt", prompt)
+@@ -279,23 +289,91 @@ async def generate_video(
+         if sampling_params is not None:
+             for k, v in sampling_params.items():
+                 form.add_field(k, str(v))
+-        if model_params is not None:
+-            for k, v in model_params.items():
+-                form.add_field(k, str(v))
+         if lora is not None:
+             form.add_field("lora", json.dumps(lora, ensure_ascii=False))
+-        if extra_body:
+-            form.add_field("extra_body", json.dumps(extra_body, ensure_ascii=False))
+ 
+-        if image is not None:
++        # === multimodal inputs (first-last-frames, references, etc.) ===
++        input_reference_image: torch.Tensor | None = None
++        audio_reference: AudioInput | None = None
++        reference_videos: list[VideoInput] = []
++        video_task: str | None = None
++
++        if frame is not None:
++            input_reference_image = frame
++            video_task = "fl2va"
++        elif references is not None:
++            images = [references[k] for k in ("image_1", "image_2") if k in references and references[k] is not None]
++            audios = [references[k] for k in ("audio_1", "audio_2") if k in references and references[k] is not None]
++            videos = [references[k] for k in ("video_1", "video_2") if k in references and references[k] is not None]
++
++            if not images and not audios and not videos:
++                raise ValueError("references is empty; connect at least one image/audio/video.")
++
++            if videos:
++                if images or audios:
++                    raise ValueError(
++                        "Video references cannot be combined with image or audio references. "
++                        "Connect only video_1/video_2 for multi-video Ref2VA."
++                    )
++                reference_videos = videos
++                video_task = "ref2va"
++            elif len(images) == 1 and len(audios) == 1:
++                input_reference_image = images[0]
++                audio_reference = audios[0]
++                video_task = "ref2va"
++            else:
++                raise ValueError(
++                    "Invalid references combination. Supported modes: "
++                    "(1) one or more videos only, or (2) exactly one image and one audio."
++                )
++        else:
++            video_task = "t2va"
++
++        if input_reference_image is not None:
+             image_filename = "image.png"  # Required for multipart form
+             form.add_field(
+                 "input_reference",
+-                image_tensor_to_png_bytes(image, image_filename),
++                image_tensor_to_png_bytes(input_reference_image, image_filename),
+                 filename=image_filename,
+                 content_type="image/png",
+             )
+ 
++        if audio_reference is not None:
++            form.add_field(
++                "audio_reference",
++                json.dumps({"audio_url": audio_to_base64(audio_reference)}, ensure_ascii=False),
++            )
++
++        for idx, video in enumerate(reference_videos, start=1):
++            video_filename = f"reference_{idx}.mp4"
++            form.add_field(
++                "input_references",
++                video_to_bytes(video, video_filename),
++                filename=video_filename,
++                content_type="video/mp4",
++            )
++
++        # === model specific params. Either use a specialized builder, or add flattened fields as-is ===
++        if model_params is not None:
++            model_params = dict(model_params)
++            model_params.pop("type", None)
++
++        spec, _ = lookup_model_spec(model)
++        params_builder = spec.get("params_builder") if spec else None
++        if params_builder is not None:
++            form_fields = params_builder(
++                model_params or {},
++                extra_params={**extra_params, "task": video_task},
++            )
++            for k, v in form_fields.items():
++                form.add_field(k, v if isinstance(v, str) else str(v))
++        else:
++            if model_params is not None:
++                for k, v in model_params.items():
++                    form.add_field(k, str(v))
++            if extra_params:
++                form.add_field("extra_params", json.dumps(extra_params, ensure_ascii=False))
++
+         async with aiohttp.ClientSession(timeout=self.timeout) as session:
+             # Start the video generation job
+             url = f"{self.base_url}/videos"
+diff --git a/apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/models.py b/apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/models.py
+index bfeddd82b87..3a37db16d57 100644
+--- a/apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/models.py
++++ b/apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/models.py
+@@ -1,7 +1,12 @@
++import json
+ import re
++from typing import Any
+ 
++from .logger import get_logger
+ from .types import Modality, ModelMode, Spec
+ 
++logger = get_logger(__name__)
++
+ 
+ def _bagel_payload_preprocessor(payload: dict) -> dict:
+     try:
+@@ -29,6 +34,30 @@ def _qwen25_payload_preprocessor(payload: dict) -> dict:
+     return payload
+ 
+ 
++def _minimaxh3_params_builder(
++    model_params: dict[str, Any],
++    *,
++    extra_params: dict[str, Any],
++) -> dict[str, Any]:
++    """Build multipart form fields for MiniMax-H3 from model_params + routed task."""
++    params = dict(model_params)
++    params.pop("type", None)
++    form_fields: dict[str, Any] = {}
++    merged_extra_params: dict[str, Any] = dict(extra_params or {})
++
++    if "flow_shift" in params:
++        form_fields["flow_shift"] = params.pop("flow_shift")
++    for key in ("audio_flow_shift",):
++        if key in params:
++            merged_extra_params[key] = params.pop(key)
++    if params:
++        logger.warning("Unused MiniMax-H3 model params ignored: %s", sorted(params))
++
++    if merged_extra_params:
++        form_fields["extra_params"] = json.dumps(merged_extra_params, ensure_ascii=False)
++    return form_fields
++
++
+ _MODEL_PIPELINE_SPECS: dict[str, Spec] = {
+     r"BAGEL-7B-MoT": {
+         "stages": [
+@@ -71,6 +100,21 @@ def _qwen25_payload_preprocessor(payload: dict) -> dict:
+             }
+         ],
+     },
++    r"MiniMax-H3(/FL2VA|/Ref2VA)?": {
++        "stages": ["diffusion"],
++        "modes": [
++            {
++                "mode": ModelMode.VIDEO_GENERATION,
++                "input_modalities": [
++                    Modality.TEXT,
++                    Modality.IMAGE,
++                    Modality.VIDEO,
++                    Modality.AUDIO,
++                ],
++            }
++        ],
++        "params_builder": _minimaxh3_params_builder,
++    },
+ }
+ # Convert dict keys to regex patterns
+ MODEL_PIPELINE_SPECS: dict[re.Pattern, Spec] = {}
+@@ -80,12 +124,10 @@ def _qwen25_payload_preprocessor(payload: dict) -> dict:
+ 
+ 
+ def lookup_model_spec(model: str) -> tuple[Spec | None, str | None]:
+-    try:
+-        last_component = model.rstrip("/").rsplit("/", 1)[-1]
+-    except IndexError:
+-        last_component = model
++    normalized = model.rstrip("/").lstrip("/")
++    lookup_key = normalized.split("/", 1)[-1]
+     for pattern, spec in MODEL_PIPELINE_SPECS.items():
+-        if pattern.search(last_component):
++        if pattern.search(lookup_key):
+             return spec, pattern.pattern
+     return None, None
+ 
+@@ -101,6 +143,9 @@ def lookup_model_spec(model: str) -> tuple[Spec | None, str | None]:
+         "Qwen/Qwen3-Omni-30B-A3B-Instruct",
+         "Custom/Path/UnknownModel-Instruct",
+         "Not/Matching/Anything",
++        "/path/to/MiniMax-H3/FL2VA",
++        "/path/to/MiniMax-H3/Ref2VA",
++        "MiniMaxAI/MiniMax-H3",
+     ]
+ 
+     test_payload = {"messages": [{"role": "user", "content": "prompt"}]}
+@@ -112,7 +157,13 @@ def lookup_model_spec(model: str) -> tuple[Spec | None, str | None]:
+             if preprocessor := spec.get("payload_preprocessor"):
+                 result = preprocessor(test_payload)
+                 print(f"✓ {path:<40} → {result}")
++            elif params_builder := spec.get("params_builder"):
++                result = params_builder(
++                    {"audio_flow_shift": 3.0, "flow_shift": 12.0, "type": "minimax_h3"},
++                    extra_params={"task": "t2va"},
++                )
++                print(f"✓ {path:<40} → {result}")
+             else:
+-                print(f"✓ {path:<40} → No preprocessor")
++                print(f"✓ {path:<40} → No preprocessor/params_builder")
+         else:
+             print(f"✗ {path:<40} → No match")
+diff --git a/apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/types.py b/apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/types.py
+index cedd11068f3..e1ae4391606 100644
+--- a/apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/types.py
++++ b/apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/types.py
+@@ -23,6 +23,14 @@ class WanModelSpecificParams(dict):
+     pass
+ 
+ 
++class MiniMaxH3ModelSpecificParams(dict):
++    pass
++
++
++class VideoReferences(dict):
++    pass
++
++
+ class ModelMode(Enum):
+     IMAGE_GENERATION = auto()
+     VIDEO_GENERATION = auto()
+@@ -43,9 +51,11 @@ class ModelModeSpec(TypedDict):
+ 
+ 
+ PayloadPreprocessor: TypeAlias = Callable[[dict[str, Any]], dict[str, Any]]
++ParamsBuilder: TypeAlias = Callable[..., dict[str, Any]]
+ 
+ 
+ class Spec(TypedDict):
+     stages: list[Literal["diffusion", "autoregression"]]
+     modes: list[ModelModeSpec]
+     payload_preprocessor: NotRequired[PayloadPreprocessor]
++    params_builder: NotRequired[ParamsBuilder]
+diff --git a/apps/ComfyUI-vLLM-Omni/docs/images/comfyui-video-generation.jpg b/apps/ComfyUI-vLLM-Omni/docs/images/comfyui-video-generation.jpg
+index a449a4eee70..35a28bd5dc7 100644
+Binary files a/apps/ComfyUI-vLLM-Omni/docs/images/comfyui-video-generation.jpg and b/apps/ComfyUI-vLLM-Omni/docs/images/comfyui-video-generation.jpg differ
+diff --git a/apps/ComfyUI-vLLM-Omni/example_workflows/vLLM-Omni Video Generation.json b/apps/ComfyUI-vLLM-Omni/example_workflows/vLLM-Omni Video Generation.json
+index 636360ab8ca..9785845a58f 100644
+--- a/apps/ComfyUI-vLLM-Omni/example_workflows/vLLM-Omni Video Generation.json	
++++ b/apps/ComfyUI-vLLM-Omni/example_workflows/vLLM-Omni Video Generation.json	
+@@ -1,513 +1 @@
+-{
+-    "id": "3aea1d08-7de5-4997-ba71-b2f66ad72a21",
+-    "revision": 0,
+-    "last_node_id": 14,
+-    "last_link_id": 28,
+-    "nodes": [
+-        {
+-            "id": 10,
+-            "type": "MarkdownNote",
+-            "pos": [
+-                227.99306819575278,
+-                -231.24143306069843
+-            ],
+-            "size": [
+-                240.3326478922474,
+-                136.3505820791881
+-            ],
+-            "flags": {},
+-            "order": 0,
+-            "mode": 0,
+-            "inputs": [],
+-            "outputs": [],
+-            "title": "Note: Task and Input",
+-            "properties": {},
+-            "widgets_values": [
+-                "vLLM-Omni nodes are categorized based on the output modality. The \"Generate Video\" node supports both text-to-video generation and image-to-video generation. The node will create corresponding payload depending on whether an input image is present or not."
+-            ],
+-            "color": "#432",
+-            "bgcolor": "#000"
+-        },
+-        {
+-            "id": 4,
+-            "type": "LoadImage",
+-            "pos": [
+-                496.31859627609606,
+-                -229.71277089860084
+-            ],
+-            "size": [
+-                270,
+-                314
+-            ],
+-            "flags": {},
+-            "order": 1,
+-            "mode": 0,
+-            "inputs": [
+-                {
+-                    "localized_name": "image",
+-                    "name": "image",
+-                    "type": "COMBO",
+-                    "widget": {
+-                        "name": "image"
+-                    },
+-                    "link": null
+-                },
+-                {
+-                    "localized_name": "choose file to upload",
+-                    "name": "upload",
+-                    "type": "IMAGEUPLOAD",
+-                    "widget": {
+-                        "name": "upload"
+-                    },
+-                    "link": null
+-                }
+-            ],
+-            "outputs": [
+-                {
+-                    "localized_name": "IMAGE",
+-                    "name": "IMAGE",
+-                    "type": "IMAGE",
+-                    "links": [
+-                        25
+-                    ]
+-                },
+-                {
+-                    "localized_name": "MASK",
+-                    "name": "MASK",
+-                    "type": "MASK",
+-                    "links": null
+-                }
+-            ],
+-            "properties": {
+-                "Node name for S&R": "LoadImage"
+-            },
+-            "widgets_values": [
+-                "cute-cat.jpg",
+-                "image"
+-            ]
+-        },
+-        {
+-            "id": 8,
+-            "type": "VLLMOmniDiffusionSampling",
+-            "pos": [
+-                465.5140218220927,
+-                148.80072646828987
+-            ],
+-            "size": [
+-                284.205078125,
+-                226
+-            ],
+-            "flags": {},
+-            "order": 2,
+-            "mode": 0,
+-            "inputs": [
+-                {
+-                    "localized_name": "n",
+-                    "name": "n",
+-                    "type": "INT",
+-                    "widget": {
+-                        "name": "n"
+-                    },
+-                    "link": null
+-                },
+-                {
+-                    "localized_name": "num_inference_steps",
+-                    "name": "num_inference_steps",
+-                    "type": "INT",
+-                    "widget": {
+-                        "name": "num_inference_steps"
+-                    },
+-                    "link": null
+-                },
+-                {
+-                    "localized_name": "guidance_scale",
+-                    "name": "guidance_scale",
+-                    "type": "FLOAT",
+-                    "widget": {
+-                        "name": "guidance_scale"
+-                    },
+-                    "link": null
+-                },
+-                {
+-                    "localized_name": "true_cfg_scale",
+-                    "name": "true_cfg_scale",
+-                    "type": "FLOAT",
+-                    "widget": {
+-                        "name": "true_cfg_scale"
+-                    },
+-                    "link": null
+-                },
+-                {
+-                    "localized_name": "vae_use_slicing",
+-                    "name": "vae_use_slicing",
+-                    "type": "BOOLEAN",
+-                    "widget": {
+-                        "name": "vae_use_slicing"
+-                    },
+-                    "link": null
+-                },
+-                {
+-                    "localized_name": "vae_use_tiling",
+-                    "name": "vae_use_tiling",
+-                    "type": "BOOLEAN",
+-                    "widget": {
+-                        "name": "vae_use_tiling"
+-                    },
+-                    "link": null
+-                },
+-                {
+-                    "localized_name": "seed",
+-                    "name": "seed",
+-                    "type": "INT",
+-                    "widget": {
+-                        "name": "seed"
+-                    },
+-                    "link": null
+-                }
+-            ],
+-            "outputs": [
+-                {
+-                    "localized_name": "diffusion sampling params",
+-                    "name": "diffusion sampling params",
+-                    "type": "SAMPLING_PARAMS",
+-                    "links": [
+-                        27
+-                    ]
+-                }
+-            ],
+-            "properties": {
+-                "Node name for S&R": "VLLMOmniDiffusionSampling"
+-            },
+-            "widgets_values": [
+-                1,
+-                50,
+-                1,
+-                1,
+-                false,
+-                false,
+-                1992,
+-                "randomize"
+-            ]
+-        },
+-        {
+-            "id": 14,
+-            "type": "VLLMOmniWanParams",
+-            "pos": [
+-                518.6005521845747,
+-                428.4455663719664
+-            ],
+-            "size": [
+-                270,
+-                106
+-            ],
+-            "flags": {},
+-            "order": 3,
+-            "mode": 0,
+-            "inputs": [
+-                {
+-                    "localized_name": "guidance_scale_2",
+-                    "name": "guidance_scale_2",
+-                    "type": "FLOAT",
+-                    "widget": {
+-                        "name": "guidance_scale_2"
+-                    },
+-                    "link": null
+-                },
+-                {
+-                    "localized_name": "boundary_ratio",
+-                    "name": "boundary_ratio",
+-                    "type": "FLOAT",
+-                    "widget": {
+-                        "name": "boundary_ratio"
+-                    },
+-                    "link": null
+-                },
+-                {
+-                    "localized_name": "flow_shift",
+-                    "name": "flow_shift",
+-                    "type": "FLOAT",
+-                    "widget": {
+-                        "name": "flow_shift"
+-                    },
+-                    "link": null
+-                }
+-            ],
+-            "outputs": [
+-                {
+-                    "localized_name": "Wan video params",
+-                    "name": "Wan video params",
+-                    "type": "VIDEO_PARAMS",
+-                    "links": [
+-                        28
+-                    ]
+-                }
+-            ],
+-            "properties": {
+-                "Node name for S&R": "VLLMOmniWanParams"
+-            },
+-            "widgets_values": [
+-                4,
+-                0.875,
+-                5
+-            ]
+-        },
+-        {
+-            "id": 12,
+-            "type": "VLLMOmniGenerateVideo",
+-            "pos": [
+-                827.2566336087867,
+-                -73.77449831827545
+-            ],
+-            "size": [
+-                400,
+-                346
+-            ],
+-            "flags": {},
+-            "order": 4,
+-            "mode": 0,
+-            "inputs": [
+-                {
+-                    "localized_name": "image",
+-                    "name": "image",
+-                    "shape": 7,
+-                    "type": "IMAGE",
+-                    "link": 25
+-                },
+-                {
+-                    "localized_name": "sampling_params",
+-                    "name": "sampling_params",
+-                    "shape": 7,
+-                    "type": "SAMPLING_PARAMS",
+-                    "link": 27
+-                },
+-                {
+-                    "localized_name": "lora",
+-                    "name": "lora",
+-                    "shape": 7,
+-                    "type": "REMOTE_LORA",
+-                    "link": null
+-                },
+-                {
+-                    "localized_name": "model_params",
+-                    "name": "model_params",
+-                    "shape": 7,
+-                    "type": "VIDEO_PARAMS",
+-                    "link": 28
+-                },
+-                {
+-                    "localized_name": "url",
+-                    "name": "url",
+-                    "type": "STRING",
+-                    "widget": {
+-                        "name": "url"
+-                    },
+-                    "link": null
+-                },
+-                {
+-                    "localized_name": "model",
+-                    "name": "model",
+-                    "type": "STRING",
+-                    "widget": {
+-                        "name": "model"
+-                    },
+-                    "link": null
+-                },
+-                {
+-                    "localized_name": "prompt",
+-                    "name": "prompt",
+-                    "type": "STRING",
+-                    "widget": {
+-                        "name": "prompt"
+-                    },
+-                    "link": null
+-                },
+-                {
+-                    "localized_name": "negative_prompt",
+-                    "name": "negative_prompt",
+-                    "type": "STRING",
+-                    "widget": {
+-                        "name": "negative_prompt"
+-                    },
+-                    "link": null
+-                },
+-                {
+-                    "localized_name": "width",
+-                    "name": "width",
+-                    "type": "INT",
+-                    "widget": {
+-                        "name": "width"
+-                    },
+-                    "link": null
+-                },
+-                {
+-                    "localized_name": "height",
+-                    "name": "height",
+-                    "type": "INT",
+-                    "widget": {
+-                        "name": "height"
+-                    },
+-                    "link": null
+-                },
+-                {
+-                    "localized_name": "fps",
+-                    "name": "fps",
+-                    "type": "INT",
+-                    "widget": {
+-                        "name": "fps"
+-                    },
+-                    "link": null
+-                },
+-                {
+-                    "localized_name": "num_frames",
+-                    "name": "num_frames",
+-                    "type": "INT",
+-                    "widget": {
+-                        "name": "num_frames"
+-                    },
+-                    "link": null
+-                }
+-            ],
+-            "outputs": [
+-                {
+-                    "localized_name": "video",
+-                    "name": "video",
+-                    "type": "VIDEO",
+-                    "links": [
+-                        26
+-                    ]
+-                }
+-            ],
+-            "properties": {
+-                "Node name for S&R": "VLLMOmniGenerateVideo"
+-            },
+-            "widgets_values": [
+-                "http://localhost:8000/v1",
+-                "Wan-AI/Wan2.2-TI2V-5B-Diffusers",
+-                "Make the cat in the attached video yawning. Eye closed and mouth wide open. Keep the original realistic style.",
+-                "Cartoonish",
+-                900,
+-                1200,
+-                12,
+-                41
+-            ]
+-        },
+-        {
+-            "id": 13,
+-            "type": "SaveVideo",
+-            "pos": [
+-                1257.5441369501657,
+-                -44.12956394419863
+-            ],
+-            "size": [
+-                374,
+-                372.34896826553796
+-            ],
+-            "flags": {},
+-            "order": 5,
+-            "mode": 0,
+-            "inputs": [
+-                {
+-                    "localized_name": "video",
+-                    "name": "video",
+-                    "type": "VIDEO",
+-                    "link": 26
+-                },
+-                {
+-                    "localized_name": "filename_prefix",
+-                    "name": "filename_prefix",
+-                    "type": "STRING",
+-                    "widget": {
+-                        "name": "filename_prefix"
+-                    },
+-                    "link": null
+-                },
+-                {
+-                    "localized_name": "format",
+-                    "name": "format",
+-                    "type": "COMBO",
+-                    "widget": {
+-                        "name": "format"
+-                    },
+-                    "link": null
+-                },
+-                {
+-                    "localized_name": "codec",
+-                    "name": "codec",
+-                    "type": "COMBO",
+-                    "widget": {
+-                        "name": "codec"
+-                    },
+-                    "link": null
+-                }
+-            ],
+-            "outputs": [],
+-            "properties": {},
+-            "widgets_values": [
+-                "video/ComfyUI",
+-                "auto",
+-                "auto"
+-            ]
+-        }
+-    ],
+-    "links": [
+-        [
+-            25,
+-            4,
+-            0,
+-            12,
+-            0,
+-            "IMAGE"
+-        ],
+-        [
+-            26,
+-            12,
+-            0,
+-            13,
+-            0,
+-            "VIDEO"
+-        ],
+-        [
+-            27,
+-            8,
+-            0,
+-            12,
+-            1,
+-            "SAMPLING_PARAMS"
+-        ],
+-        [
+-            28,
+-            14,
+-            0,
+-            12,
+-            3,
+-            "VIDEO_PARAMS"
+-        ]
+-    ],
+-    "groups": [
+-        {
+-            "id": 1,
+-            "title": "Input",
+-            "bounding": [
+-                213.1706010087147,
+-                -313.20095750667554,
+-                560.8246471437027,
+-                407.4246532472182
+-            ],
+-            "color": "#3f789e",
+-            "font_size": 24,
+-            "flags": {}
+-        }
+-    ],
+-    "config": {},
+-    "extra": {
+-        "workflowRendererVersion": "LG",
+-        "ds": {
+-            "scale": 1.1469075819486894,
+-            "offset": [
+-                101.7632950847089,
+-                492.29121889347806
+-            ]
+-        }
+-    },
+-    "version": 0.4
+-}
++{"id":"3aea1d08-7de5-4997-ba71-b2f66ad72a21","revision":0,"last_node_id":24,"last_link_id":35,"nodes":[{"id":13,"type":"SaveVideo","pos":[1315.729153459605,-137.92038948394355],"size":[374,313.7692307692308],"flags":{},"order":9,"mode":0,"inputs":[{"localized_name":"video","name":"video","type":"VIDEO","link":32},{"localized_name":"filename_prefix","name":"filename_prefix","type":"STRING","widget":{"name":"filename_prefix"},"link":null},{"localized_name":"format","name":"format","type":"COMBO","widget":{"name":"format"},"link":null},{"localized_name":"codec","name":"codec","type":"COMFY_DYNAMICCOMBO_V3","widget":{"name":"codec"},"link":null}],"outputs":[{"localized_name":"video","name":"video","type":"VIDEO","links":null}],"properties":{},"widgets_values":["video/ComfyUI","auto","auto"]},{"id":10,"type":"MarkdownNote","pos":[183.74636797766794,-571.2529158046766],"size":[240.3326478922474,136.3505820791881],"flags":{},"order":0,"mode":0,"inputs":[],"outputs":[],"title":"Note: Task and Input","properties":{},"widgets_values":["vLLM-Omni nodes are categorized based on the output modality. The \"Generate Video\" node supports both *text-to-video*, *frame-to-video*, and *reference-to-video* generation. The node will create corresponding payload depending on whether an input image is present or not."],"color":"#432","bgcolor":"#000"},{"id":4,"type":"LoadImage","pos":[452.07189605801125,-569.7242536425791],"size":[270,314],"flags":{},"order":1,"mode":0,"inputs":[{"localized_name":"image","name":"image","type":"COMBO","widget":{"name":"image"},"link":null},{"localized_name":"choose file to upload","name":"upload","type":"IMAGEUPLOAD","widget":{"name":"upload"},"link":null}],"outputs":[{"localized_name":"IMAGE","name":"IMAGE","type":"IMAGE","links":[29]},{"localized_name":"MASK","name":"MASK","type":"MASK","links":null}],"properties":{"Node name for S&R":"LoadImage"},"widgets_values":["rap.png","image"]},{"id":23,"type":"LoadImage","pos":[9.206110246057657,-7.6955291509170785],"size":[270,314],"flags":{},"order":2,"mode":0,"inputs":[{"localized_name":"image","name":"image","type":"COMBO","widget":{"name":"image"},"link":null},{"localized_name":"choose file to upload","name":"upload","type":"IMAGEUPLOAD","widget":{"name":"upload"},"link":null}],"outputs":[{"localized_name":"IMAGE","name":"IMAGE","type":"IMAGE","links":[34]},{"localized_name":"MASK","name":"MASK","type":"MASK","links":null}],"properties":{"Node name for S&R":"LoadImage"},"widgets_values":["white-cat.jpg","image"]},{"id":22,"type":"MarkdownNote","pos":[-9.783113411416666,-148.8790300038605],"size":[297.3012007349086,88],"flags":{},"order":3,"mode":0,"inputs":[],"outputs":[],"title":"Note: Reference to video (r2v)","properties":{},"widgets_values":["For r2v tasks, connect this Video Reference block to the main Generate Video block. Then disconnect the \"frame\" input above."],"color":"#432","bgcolor":"#000"},{"id":24,"type":"LoadAudio","pos":[317.9929742385805,-141.44821500065095],"size":[282.798828125,136],"flags":{},"order":4,"mode":0,"inputs":[{"localized_name":"audio","name":"audio","type":"COMBO","widget":{"name":"audio"},"link":null},{"localized_name":"audioUI","name":"audioUI","type":"AUDIO_UI","widget":{"name":"audioUI"},"link":null},{"localized_name":"choose file to upload","name":"upload","type":"AUDIOUPLOAD","widget":{"name":"upload"},"link":null}],"outputs":[{"localized_name":"AUDIO","name":"AUDIO","type":"AUDIO","links":[35]}],"properties":{"Node name for S&R":"LoadAudio"},"widgets_values":["nothing-beats-a-jet2-holiday.mp3",null,""]},{"id":21,"type":"VLLMOmniVideoReferences","pos":[376.6129172897595,105.41557277556292],"size":[156.9380859375,126],"flags":{},"order":7,"mode":0,"inputs":[{"localized_name":"image_1","name":"image_1","shape":7,"type":"IMAGE","link":34},{"localized_name":"image_2","name":"image_2","shape":7,"type":"IMAGE","link":null},{"localized_name":"audio_1","name":"audio_1","shape":7,"type":"AUDIO","link":35},{"localized_name":"audio_2","name":"audio_2","shape":7,"type":"AUDIO","link":null},{"localized_name":"video_1","name":"video_1","shape":7,"type":"VIDEO","link":null},{"localized_name":"video_2","name":"video_2","shape":7,"type":"VIDEO","link":null}],"outputs":[{"localized_name":"references","name":"references","type":"VIDEO_REFERENCES","links":null}],"properties":{"Node name for S&R":"VLLMOmniVideoReferences"},"widgets_values":[]},{"id":8,"type":"VLLMOmniDiffusionSampling","pos":[83.24620208113915,422.08543477542605],"size":[284.205078125,226],"flags":{},"order":5,"mode":0,"inputs":[{"localized_name":"n","name":"n","type":"INT","widget":{"name":"n"},"link":null},{"localized_name":"num_inference_steps","name":"num_inference_steps","type":"INT","widget":{"name":"num_inference_steps"},"link":null},{"localized_name":"guidance_scale","name":"guidance_scale","type":"FLOAT","widget":{"name":"guidance_scale"},"link":null},{"localized_name":"true_cfg_scale","name":"true_cfg_scale","type":"FLOAT","widget":{"name":"true_cfg_scale"},"link":null},{"localized_name":"vae_use_slicing","name":"vae_use_slicing","type":"BOOLEAN","widget":{"name":"vae_use_slicing"},"link":null},{"localized_name":"vae_use_tiling","name":"vae_use_tiling","type":"BOOLEAN","widget":{"name":"vae_use_tiling"},"link":null},{"localized_name":"seed","name":"seed","type":"INT","widget":{"name":"seed"},"link":null}],"outputs":[{"localized_name":"diffusion sampling params","name":"diffusion sampling params","type":"SAMPLING_PARAMS","links":[30]}],"properties":{"Node name for S&R":"VLLMOmniDiffusionSampling"},"widgets_values":[1,50,1,1,false,false,213,"randomize"]},{"id":18,"type":"VLLMOmniMiniMaxH3Params","pos":[483.0944676363692,426.7197881452892],"size":[276.56796875,82],"flags":{},"order":6,"mode":0,"inputs":[{"localized_name":"audio_flow_shift","name":"audio_flow_shift","type":"FLOAT","widget":{"name":"audio_flow_shift"},"link":null},{"localized_name":"flow_shift","name":"flow_shift","type":"FLOAT","widget":{"name":"flow_shift"},"link":null}],"outputs":[{"localized_name":"MiniMax-H3 video params","name":"MiniMax-H3 video params","type":"VIDEO_PARAMS","links":[33]}],"properties":{"Node name for S&R":"VLLMOmniMiniMaxH3Params"},"widgets_values":[3,12]},{"id":16,"type":"VLLMOmniGenerateVideo","pos":[826.1428043381621,-148.53719710697413],"size":[425.5948726785682,551.767376721426],"flags":{},"order":8,"mode":0,"inputs":[{"localized_name":"frame","name":"frame","shape":7,"type":"IMAGE","link":29},{"localized_name":"references","name":"references","shape":7,"type":"VIDEO_REFERENCES","link":null},{"localized_name":"sampling_params","name":"sampling_params","shape":7,"type":"SAMPLING_PARAMS","link":30},{"localized_name":"lora","name":"lora","shape":7,"type":"REMOTE_LORA","link":null},{"localized_name":"model_params","name":"model_params","shape":7,"type":"VIDEO_PARAMS","link":33},{"localized_name":"url","name":"url","type":"STRING","widget":{"name":"url"},"link":null},{"localized_name":"model","name":"model","type":"STRING","widget":{"name":"model"},"link":null},{"localized_name":"prompt","name":"prompt","type":"STRING","widget":{"name":"prompt"},"link":null},{"localized_name":"negative_prompt","name":"negative_prompt","type":"STRING","widget":{"name":"negative_prompt"},"link":null},{"localized_name":"width","name":"width","type":"INT","widget":{"name":"width"},"link":null},{"localized_name":"height","name":"height","type":"INT","widget":{"name":"height"},"link":null},{"localized_name":"fps","name":"fps","type":"INT","widget":{"name":"fps"},"link":null},{"localized_name":"num_frames","name":"num_frames","type":"INT","widget":{"name":"num_frames"},"link":null}],"outputs":[{"localized_name":"video","name":"video","type":"VIDEO","links":[32]}],"properties":{"Node name for S&R":"VLLMOmniGenerateVideo"},"widgets_values":["http://localhost:8000/v1","/workspace/models/hub/models--MiniMaxAI--MiniMax-H3/snapshots/428986c4aa5280855b9ac26eff8d1a46b5999cd0/FL2VA","A scene of urban fantasy art. A dynamic graffiti art character. A boy made of spray paint comes to life on a concrete wall. He sings an English rap song at high speed while striking a classic, energetic rapper pose. The scene is set under an urban railway bridge at night. The light comes from a single street lamp, creating a cinematic atmosphere full of high energy and amazing detail. The audio of the video consists entirely of the rap, with no other dialogue or noise.","",832,480,24,120]}],"links":[[29,4,0,16,0,"IMAGE"],[30,8,0,16,2,"SAMPLING_PARAMS"],[32,16,0,13,0,"VIDEO"],[33,18,0,16,4,"VIDEO_PARAMS"],[34,23,0,21,0,"IMAGE"],[35,24,0,21,2,"AUDIO"]],"groups":[{"id":1,"title":"Image-to-video input (first-frame-to-video)","bounding":[168.92390079062986,-653.2124402506535,560.8246471437027,407.4246532472182],"color":"#3f789e","flags":{}},{"id":2,"title":"Reference-to-video input","bounding":[-66.75175444110151,-225.24978633666066,805.4597228678848,554.7384400819777],"color":"#3f789e","flags":{}}],"config":{},"extra":{"workflowRendererVersion":"LG","ds":{"scale":0.8,"offset":[1240.4751945653188,770.6151743053379]}},"version":0.4}
+diff --git a/tests/e2e/features/comfyui/test_comfyui_integration.py b/tests/e2e/features/comfyui/test_comfyui_integration.py
+index bfb26e89710..e8d68b1599b 100644
+--- a/tests/e2e/features/comfyui/test_comfyui_integration.py
++++ b/tests/e2e/features/comfyui/test_comfyui_integration.py
+@@ -25,9 +25,15 @@
+     VLLMOmniGenerateVideo,
+     VLLMOmniTTS,
+     VLLMOmniUnderstanding,
++    VLLMOmniVideoReferences,
+     VLLMOmniVoiceClone,
+ )
+-from comfyui_vllm_omni.utils.types import AutoregressionSamplingParams, DiffusionSamplingParams, WanModelSpecificParams
++from comfyui_vllm_omni.utils.types import (
++    AutoregressionSamplingParams,
++    DiffusionSamplingParams,
++    MiniMaxH3ModelSpecificParams,
++    WanModelSpecificParams,
++)
+ from PIL import Image
+ from pytest_mock import MockerFixture
+ from vllm import SamplingParams
+@@ -68,6 +74,8 @@ class SamplingKind(str, Enum):
+     TTS_DIFFUSION_SINGLE = "tts_diffusion_single"
+     VIDEO_NONE = "video_none"
+     VIDEO_DIFFUSION_SINGLE = "video_diffusion_single"
++    VIDEO_REF2VA_IMAGE_AUDIO = "video_ref2va_image_audio"
++    VIDEO_REF2VA_MULTI_VIDEO = "video_ref2va_multi_video"
+ 
+ 
+ # Pre-defined arguments to be used in function calls during the tests
+@@ -127,6 +135,15 @@ class SamplingKind(str, Enum):
+ 
+ VIDEO_MODEL_PARAMS = WanModelSpecificParams({"guidance_scale_2": 5.0, "boundary_ratio": 0.98, "flow_shift": 12.0})
+ 
++# Matches MiniMax-H3 recipe Ref2VA defaults (task is auto-routed by the client).
++H3_MODEL_PARAMS = MiniMaxH3ModelSpecificParams(
++    {
++        "type": "minimax_h3",
++        "audio_flow_shift": 3.0,
++        "flow_shift": 12.0,
++    }
++)
++
+ LORA_PARAMS = {"local_path": "test_lora_path", "name": "test_name", "scale": 0.7, "int_id": 10}
+ 
+ 
+@@ -306,6 +323,7 @@ async def _mock_generate(*args, **kwargs):
+         received_sampling_params_list: Sequence[OmniSamplingParams] | None = (
+             args[2] if len(args) > 2 else kwargs.get("sampling_params_list")
+         )
++        prompt = args[0] if len(args) > 0 else kwargs.get("prompt")
+ 
+         assert received_sampling_params_list is not None, (
+             "In the current codebase, the API layer always provides not-None sampling parameter list when calling `AsyncOmni.generate`"
+@@ -372,6 +390,59 @@ async def _mock_generate(*args, **kwargs):
+                 LORA_PARAMS,
+             )
+             _assert_model_param_values(received_sampling_params_list[0], VIDEO_MODEL_PARAMS)
++        elif sampling_case.kind is SamplingKind.VIDEO_REF2VA_IMAGE_AUDIO:
++            assert len(received_sampling_params_list) == 1
++            assert isinstance(prompt, dict)
++            multi_modal_data = prompt.get("multi_modal_data")
++            assert isinstance(multi_modal_data, dict)
++            assert isinstance(multi_modal_data.get("image"), Image.Image)
++            assert isinstance(multi_modal_data.get("audio"), str)
++            assert "video" not in multi_modal_data
++            _assert_sampling_param_values(
++                received_sampling_params_list[0],
++                {
++                    "width": VIDEO_WIDTH,
++                    "height": VIDEO_HEIGHT,
++                    "num_frames": VIDEO_NUM_FRAMES,
++                    "fps": VIDEO_FPS,
++                },
++            )
++            _assert_model_param_values(
++                received_sampling_params_list[0],
++                {
++                    "flow_shift": 12.0,
++                    "task": "ref2va",
++                    "audio_flow_shift": 3.0,
++                },
++            )
++        elif sampling_case.kind is SamplingKind.VIDEO_REF2VA_MULTI_VIDEO:
++            assert len(received_sampling_params_list) == 1
++            assert isinstance(prompt, dict)
++            multi_modal_data = prompt.get("multi_modal_data")
++            assert isinstance(multi_modal_data, dict)
++            input_videos = multi_modal_data.get("video")
++            assert isinstance(input_videos, list)
++            assert len(input_videos) == 2
++            assert all(isinstance(path, str) for path in input_videos)
++            assert "image" not in multi_modal_data
++            assert "audio" not in multi_modal_data
++            _assert_sampling_param_values(
++                received_sampling_params_list[0],
++                {
++                    "width": VIDEO_WIDTH,
++                    "height": VIDEO_HEIGHT,
++                    "num_frames": VIDEO_NUM_FRAMES,
++                    "fps": VIDEO_FPS,
++                },
++            )
++            _assert_model_param_values(
++                received_sampling_params_list[0],
++                {
++                    "flow_shift": 12.0,
++                    "task": "ref2va",
++                    "audio_flow_shift": 3.0,
++                },
++            )
+         else:
+             raise AssertionError(f"Unknown sampling case: {sampling_case.kind}")
+ 
+@@ -775,7 +846,7 @@ async def test_video_generation_node(api_server: str, model: str, image_input: b
+         "model_params": VIDEO_MODEL_PARAMS,
+     }
+     if image_input:
+-        kwargs["image"] = torch.zeros((1, VIDEO_HEIGHT, VIDEO_WIDTH, 3), dtype=torch.float32)
++        kwargs["frame"] = torch.zeros((1, VIDEO_HEIGHT, VIDEO_WIDTH, 3), dtype=torch.float32)
+     if sampling_case.sampling_params is not None:
+         kwargs["sampling_params"] = sampling_case.sampling_params
+     if sampling_case.lora:
+@@ -786,3 +857,79 @@ async def test_video_generation_node(api_server: str, model: str, image_input: b
+     assert isinstance(result, tuple)
+     assert len(result) == 1
+     assert isinstance(result[0], VideoInput)
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize(
++    "server_case,sampling_case,ref_mode",
++    [
++        pytest.param(
++            ServerCase(
++                served_model="MiniMaxAI/MiniMax-H3",
++                stage_list=["diffusion"],
++                stage_configs=[{"stage_type": "diffusion"}],
++                outputs=[_build_diffusion_video_output()],
++            ),
++            SamplingCase(kind=SamplingKind.VIDEO_REF2VA_IMAGE_AUDIO, sampling_params=None),
++            "image_audio",
++            id="ref2va-image-audio",
++        ),
++        pytest.param(
++            ServerCase(
++                served_model="MiniMaxAI/MiniMax-H3",
++                stage_list=["diffusion"],
++                stage_configs=[{"stage_type": "diffusion"}],
++                outputs=[_build_diffusion_video_output()],
++            ),
++            SamplingCase(kind=SamplingKind.VIDEO_REF2VA_MULTI_VIDEO, sampling_params=None),
++            "multi_video",
++            id="ref2va-multi-video",
++        ),
++    ],
++    indirect=["server_case", "sampling_case"],
++)
++async def test_video_generation_node_minimax_h3_ref2va(
++    api_server: str,
++    sampling_case: SamplingCase,
++    ref_mode: str,
++):
++    """MiniMax-H3 Ref2VA paths matching recipes/MiniMaxAI/MiniMax-H3.md."""
++    node = VLLMOmniGenerateVideo()
++    refs_node = VLLMOmniVideoReferences()
++
++    if ref_mode == "image_audio":
++        (references,) = refs_node.get_references(
++            image_1=torch.zeros((1, VIDEO_HEIGHT, VIDEO_WIDTH, 3), dtype=torch.float32),
++            audio_1={"waveform": torch.zeros((1, 1, 24000), dtype=torch.float32), "sample_rate": 24000},
++        )
++        prompt = (
++            "A white cat with black mustache and eyebrow markings sits on a beige couch, "
++            "lip-syncing precisely to the complete reference audio."
++        )
++    elif ref_mode == "multi_video":
++        (references,) = refs_node.get_references(
++            video_1=VideoInput(b"subject-video"),  # type: ignore[reportAbstractUsage]
++            video_2=VideoInput(b"background-video"),  # type: ignore[reportAbstractUsage]
++        )
++        prompt = (
++            "Remove the green screen background of Video 1 and replace it with the fairytale environment from Video 2."
++        )
++    else:
++        raise AssertionError(f"Unknown ref_mode: {ref_mode}")
++
++    result = await node.generate(
++        url=api_server,
++        model="MiniMaxAI/MiniMax-H3",
++        prompt=prompt,
++        negative_prompt="",
++        width=VIDEO_WIDTH,
++        height=VIDEO_HEIGHT,
++        fps=VIDEO_FPS,
++        num_frames=VIDEO_NUM_FRAMES,
++        references=references,
++        model_params=H3_MODEL_PARAMS,
++    )
++
++    assert isinstance(result, tuple)
++    assert len(result) == 1
++    assert isinstance(result[0], VideoInput)

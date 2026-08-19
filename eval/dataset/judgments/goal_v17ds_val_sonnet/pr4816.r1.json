@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.7,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive concerns (just an 'lgtm' approval), so both candidates are essentially over-and-above reviews; both independently surface the same real-looking latent bug (pure-diffusion mode leaves serving_tokenization=None while an unguarded base(raw_request).create_error_response() call elsewhere still dereferences it), which is well-grounded and cross-corroborated by consistent line numbers. X presents this cleanly as one finding plus a distinct, honestly-hedged test-gap and version-coupling discussion, with each item non-redundant and appropriately qualified. Y restates the same core finding three separate times across different anchors (inflating apparent finding count), overstates CI failures as a 'merge blocker' despite its own evidence showing the PR was merged, and proposes a confused backward-compat alias that contradicts the PR's own rationale — lowering its precision despite one genuinely novel finding (untested chat-completion fallback).",
+  "_cost_usd": 0.3028954,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17ds_val"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_val",
+    "arm_a_sha256": "88a54e75cb5488edec30be6112370f4d96be37b5704f2997fba945089b226354",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b9fe4c00140a73cf5cc08ceded6d03eb8b8faea45f6c3b50e6f9753b9a1a1a01",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

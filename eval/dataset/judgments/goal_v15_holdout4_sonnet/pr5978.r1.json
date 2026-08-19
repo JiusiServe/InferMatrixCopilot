@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.78,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.8,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y's finding #8 (guard sits after the early return; 'if the intent is validate before collectives, move it above') closely tracks the ground truth's top concern — the rank-0 dist.broadcast hang from checking max_duration_seconds too late — while X only gestures at it in a truncated, low-priority overflow note without identifying the hang mechanism. Y also better matches the ground-truth 'test tests itself' critique (finding #3, noting the test can't catch a probe/decode mismatch because it mocks both), and adds several additional well-grounded, highly actionable findings (view-aliasing memory leak, T2VA coverage regression, CDN asset fragility, offload-staging inconsistency) with concrete code fixes. X's findings are also grounded and specific but skew toward secondary polish items and miss the PR's most severe latent bug.",
+  "_cost_usd": 0.3822434,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r1",
+    "arm_a_sha256": "8796cf3e1c12fa950b9b422d5f79e897c25db29f61ddc0b7f11ce216249aaf84",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4847f9bc7acb40b4a7467503f4eb812a8e50f5fe424e5df5f56f1ab2a3da3ee3",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

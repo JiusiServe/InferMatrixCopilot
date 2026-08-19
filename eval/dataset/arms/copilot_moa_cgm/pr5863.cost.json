@@ -1,0 +1,101 @@
+{
+  "wall_s": 285.8,
+  "split": "holdout",
+  "rc": 0,
+  "run_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_moa_cgm/runs/pr5863/run-20260814-221035-333b96",
+  "recorded_at": "2026-08-14T22:15:19",
+  "attempts": [
+    {
+      "invocation_id": "inv-bc382f94",
+      "outcome": "run:run-20260814-221035-333b96",
+      "rc": 0,
+      "pre_run": null
+    },
+    {
+      "run_dir": "run-20260814-221035-333b96",
+      "llm_calls": 12,
+      "input_tokens": 150527,
+      "output_tokens": 20700,
+      "usd": 0.078104,
+      "source": "spans"
+    }
+  ],
+  "attempt_usd_total": 0.078104,
+  "llm_calls": 12,
+  "input_tokens": 150527,
+  "output_tokens": 20700,
+  "usd": 0.078104,
+  "source": "spans",
+  "metrics": {
+    "schema": 1,
+    "run": "run-20260814-221035-333b96",
+    "task_kind": "pr_review",
+    "status": "done",
+    "quality": {
+      "q": null,
+      "weight_coverage": 0.0,
+      "partial": true,
+      "abstained": false,
+      "components": {
+        "recall_w": null,
+        "precision_v": null,
+        "useful": null,
+        "calib": null,
+        "decision": null
+      }
+    },
+    "cost": {
+      "usd": 0.0781,
+      "minutes": 4.73,
+      "ci_minutes": 0,
+      "input_tokens": 150527,
+      "output_tokens": 20700,
+      "tool_calls": 25,
+      "usd_ref": 1.0,
+      "min_ref": 10.0,
+      "cost_index": 1.2062,
+      "cost_partial": false,
+      "unpriced_calls": 0,
+      "source": "spans",
+      "llm_calls": 12,
+      "by_role": {
+        "agent": {
+          "usd": 0.078104,
+          "input_tokens": 150527,
+          "output_tokens": 20700,
+          "calls": 12
+        }
+      },
+      "cache_read_tokens": 544128,
+      "cache_creation_tokens": 0
+    },
+    "timings": {
+      "steps": {
+        "fetch": 4.49,
+        "gate": 1.77,
+        "review": 277.15,
+        "report": 0.06
+      },
+      "time_to_first_result_s": 283.45
+    },
+    "risk": {
+      "incidents": {
+        "catastrophic": 0,
+        "severe": 0,
+        "moderate": 0,
+        "minor": 0
+      },
+      "safety_multiplier": 1.0
+    },
+    "catq": null,
+    "tus": null,
+    "signals": {
+      "escalations": 0,
+      "pushes": 0,
+      "posted": 0,
+      "steps_completed": 4
+    }
+  },
+  "trace": "pr5863.trace.json.gz",
+  "trace_bytes": 13985
+}

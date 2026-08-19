@@ -1,0 +1,23 @@
+{
+  "comments": [
+    {
+      "author": "hsliuustc0106",
+      "body": "Could you please provide the timeline comparison chart (or SVG / breakdown plot) showing the before-and-after stage latency for this PR?\r\n\r\nHaving a visual trace of the MP4 stage vs. direct frame conversion latency would be super helpful to attach to the PR thread for documentation!"
+    },
+    {
+      "author": "Xunzhuo",
+      "body": "@hsliuustc0106 I reran a stage-level A/B on `MI300X` for the CPU-side conversion and MP4 path.\r\n\r\nProtocol:\r\n- 209 float32 RGB frames at 1344x768, generated once per fresh process\r\n- fixed moving-gradient content, 24 FPS, `ultrafast` encoder preset\r\n- baseline is the pre-PR `np.stack -> clip -> scale -> round` implementation\r\n- optimized is current head `82a142ad`\r\n- three independent measured processes per implementation; values below are medians\r\n- RSS sampled every 10 ms\r\n\r\n| Stage / metric | Baseline | Optimized | Change |\r\n|---|---:|---:|---:|\r\n| frame conversion | 1201.15 ms | 529.47 ms | -55.9% (2.27x) |\r\n| MP4 encode | 602.89 ms | 705.77 ms | unchanged code; run-to-run noise |\r\n| conversion + MP4 | 1808.96 ms | 1235.26 ms | -31.7% |\r\n| peak process RSS | 8.874 GiB | 4.141 GiB | -4.733 GiB (-53.3%) |\r\n| peak RSS above resident input | 5.393 GiB | 0.660 GiB | -87.8% |\r\n\r\nStage timeline (median):\r\n\r\n```text\r\nbaseline   [ conversion 1201.15 ms ][ MP4 602.89 ms ]  total 1808.96 ms\r\noptimized  [ conversion  529.47 ms ][ MP4 705.77 ms ]  total 1235.26 ms\r\n```\r\n\r\nCorrectness gate:\r\n- uint8 frame SHA-256 is identical: `c423103a9b1ba9ea1ad7e78466c685a779148a87f5e625d9d4947834c798b19a`\r\n- MP4 SHA-256 is identical: `a2b1b7d84f0e5e7fa72075fc679c54570354be10d0629850852e2ed5eba19339`\r\n- `tests/entrypoints/openai_api/test_video_api_utils.py`: 13 passed on MI300X\r\n\r\nThe MP4 implementation is unchanged; the optimization is isolated to frame conversion and its temporary-buffer footprint.\r\n"
+    },
+    {
+      "author": "Xunzhuo",
+      "body": "@hsliuustc0106 The remaining AMD/NPU CI failures appear unrelated to this PR: AMD jobs expired before getting agents, and the NPU job timed out during async D2H before video encoding. The relevant tests and other CI checks pass. Could you please take another look when convenient? Thanks!"
+    }
+  ],
+  "reviews": [
+    {
+      "author": "david6666666",
+      "body": "LGTM",
+      "state": "APPROVED"
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+[
+  {
+    "author": "hsliuustc0106",
+    "body": "why no add a diffusion model link?",
+    "line": 9,
+    "path": ".claude/skills/review-pr/references/checks/model-addition-checklist.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "This freezes only the textual diff; later `rg`, imports, and tests still run in the caller’s current checkout. Materialize `head_sha` in a detached worktree (or use SHA-addressed reads) and assert the validation checkout is the frozen head before inspecting source.",
+    "line": 29,
+    "path": ".claude/skills/review-pr/references/process/review-execution.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "`git diff` excludes untracked files, and this command records only their names. Snapshot the contents of in-scope untracked files (NUL-safe) and include them, together with index/worktree state, in the final staleness check.",
+    "line": 49,
+    "path": ".claude/skills/review-pr/references/review-execution.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "Which source wins when these routes disagree with the live diff? A Direct dry run on #5895 selected Configuration/Serving while the worker path mapped to Model Executor. Please make the live consumer plus repo-local routing authoritative and treat `quick_map` routes as supplemental.",
+    "line": 96,
+    "path": ".claude/skills/review-pr/SKILL.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "This creates a merge gate stricter than current repository policy: CONTRIBUTING asks for user-facing docs and an RFC for major architectural changes, not a design document for every small feature. Please scope this to the documented policy, or update that policy explicitly, so the review skill does not generate false blockers.",
+    "line": 45,
+    "path": ".claude/skills/review-pr/references/general-checks.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "The linked skill declares `name: vllm-omni-npu-model-runner-upgrade`, so invoking the label shown here can miss skill discovery. Please use the declared name, for example `$vllm-omni-npu-model-runner-upgrade`.",
+    "line": 32,
+    "path": ".claude/skills/review-pr/references/review-routing.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "This skill explicitly accepts fork PRs, then executes their imports and tests here. A malicious fork can therefore run arbitrary code with reviewer-host credentials, filesystem, and network access. Require executable validation to run in a disposable sandbox with no secrets and restricted filesystem/network access; otherwise limit untrusted forks to static, SHA-addressed inspection.",
+    "line": 177,
+    "path": ".claude/skills/review-pr/SKILL.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "Checking only `HEAD == head_sha` does not prove that this worktree still contains the pinned bytes: imports, tests, or static checks can modify tracked files or create untracked import shadows without moving `HEAD`. Fingerprint and verify tracked, index, and untracked state before each validation group and delivery, or recreate the detached worktree after potentially mutating commands.",
+    "line": 39,
+    "path": ".claude/skills/review-pr/references/process/review-execution.md"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "This moved to `references/process/general-checks.md`, but current lines 45-47 still require every new feature to add or extend a feature-design page. The contributing policy requires user-facing docs and an RFC only for major architectural changes over 500 LOC, so the original false-blocker concern remains. Please make the design-page requirement conditional on repository policy or an existing owning design contract.",
+    "line": 45,
+    "path": ".claude/skills/review-pr/references/general-checks.md"
+  }
+]

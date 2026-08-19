@@ -1,0 +1,68 @@
+[
+  {
+    "author": "david6666666",
+    "body": "This may be a blocker to support FP8 quantization for this model. But let's address it after day-0 since model release is quite urgent.",
+    "line": 365,
+    "path": "vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py"
+  },
+  {
+    "author": "david6666666",
+    "body": "https://github.com/vllm-project/vllm-omni/pull/5394 also is text-encoder-tp feature, after Day 0, you can check if there is a more elegant implementation.",
+    "line": 717,
+    "path": "vllm_omni/entrypoints/cli/serve.py"
+  },
+  {
+    "author": "princepride",
+    "body": "This `.item()` forces a GPU sync in every attention layer. Could we pass `used` in as a Python value instead?",
+    "line": 400,
+    "path": "vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py"
+  },
+  {
+    "author": "princepride",
+    "body": "`attn_mask` is ignored once FlashAttention takes the packed `cu_seqlens` path. Can we avoid allocating it here for that path?",
+    "line": 404,
+    "path": "vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py"
+  },
+  {
+    "author": "princepride",
+    "body": "This refiner output is the same at every denoising step. Can we compute it once before the denoising loop and reuse it?",
+    "line": 973,
+    "path": "vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "With `--text-encoder-tp-size 2` on four ranks, ranks 2 and 3 abort here. Every process constructs `GroupCoordinator(group_ranks=[[0, 1]])`, but that class asserts that the current rank belongs to one of its groups. Please create the groups collectively while returning a non-member-safe handle outside the encoder subset, and add an `N < world_size` multiprocess test.",
+    "line": 575,
+    "path": "vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "Ring attention does not preserve this packed padding boundary. H3 encodes padding as a second document in `cu_seqlens`, but the Ring path ignores both the packed metadata and `attn_mask`, so real tokens attend padding rows, which can become nonzero after AdaLN. Please reject Ring/hybrid Ring for H3 until the Ring kernel honors packed boundaries, or add packed-aware Ring plus a multi-rank parity test.",
+    "line": 455,
+    "path": "vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "`loaded.add(param_name)` marks a fused QKV or gate/up parameter complete after any one source shard is loaded. These parameters start as `torch.empty`, missing entries only warn below, and the pipeline later reports every eager encoder parameter as loaded. Please track required shard IDs and raise unless every retained parameter and fused slice was loaded.",
+    "line": 1020,
+    "path": "vllm_omni/diffusion/models/minimax_h3/encoder.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "These repeated uploads have no count, per-file, or aggregate byte limit; the loop copies every file to `/tmp` before model validation. Multipart parsing does not cap file contents, so one request can exhaust disk. Please enforce limits while streaming, clean up on breach, and return 413.",
+    "line": 2968,
+    "path": "vllm_omni/entrypoints/openai/api_server.py"
+  },
+  {
+    "author": "hsliuustc0106",
+    "body": "This only rejects image/video conflicts. `input_references` plus `audio_reference`, or an explicit `task=t2va/fl2va`, is persisted and accepted before MiniMax rejects it inside the engine; sync returns 500 and async creates a failed job. Please validate the task/source matrix here and return 400 before persisting files.",
+    "line": 3029,
+    "path": "vllm_omni/entrypoints/openai/api_server.py"
+  },
+  {
+    "author": "mglyn",
+    "body": "It looks like `condition_proj` and RoPE are also loop-invariant.\r\n\r\nA related opportunity might be projecting the timesteps to AdaLN. Although their outputs change with the steps, they only depend on a limited sigma schedule, so in theory, you could use a model-level lookup table shared across requests. This might save `24.29 GiB` of BF16 AdaLN weights.",
+    "line": 973,
+    "path": "vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py"
+  }
+]

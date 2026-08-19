@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Neither candidate reproduced GT's four most specific bugs (defaults-projection regression at stage_init_utils.py:780, unowned CLI fields silently dropped at omni_config.py:901, subdir-override precedence loss at :1354, omni_kv_config precedence reversal at :1275), so both have low ceilings on recall. Y's Must-Fix #1 (ownership validation rejecting/mishandling wide swaths of legacy-working CLI args, with concrete reproduction across pipelines) and #3 (parity tests only check subset/miss typed-only extras) closely echo the GT general PR comment's summary ('accepted fields can be lost, execution-type validation can use the wrong owner set, and parity tests can miss typed-only defaults') and the F-comment's spirit, giving Y meaningfully higher recall. X's ownership-validation findings sit in the same code region but argue the opposite failure mode (fields wrongly hard-rejected vs. GT's silently-dropped) and its test-gap findings cite different specifics (custom_voice_dir vs skip_tokenizer_init), yielding weaker overlap. Both are well-evidenced with file:line citations and concrete fixes, so precision and actionability are comparably high, with Y slightly ahead due to actual reproduction commands/outputs.",
+  "_cost_usd": 0.39352020000000004,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_holdout3_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r2",
+    "arm_a_sha256": "4f56627b6d958f69b671aefaf413e8df520e3e3feffea4aa79970860c060c8dd",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "629955d5b6f052975d79f02bc72365b49e78d8babba831bce0e73b172ff802a7",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

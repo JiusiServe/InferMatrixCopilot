@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.8,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.88
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently rediscover the one substantive live issue from ground truth (the runtime default silently pins rel_l1_thresh=0.2, bypassing the calibrated 0.17), with solid file/line grounding; neither catches the two inline TypeError-class bugs (missing packed_total kwarg, missing attn_backend on the test fake). Y goes further: it backs the threshold claim with actual verification traces, extends the 'quality loss' theme with a quantified, non-obvious finding that the calibrated polynomial is near-constant and non-monotone, and catches a precise, diff-confirmable scope-creep bug (the 39→107 frame assertion change bleeding into the unrelated FP8 smoke test). X's findings are valid but shallower, with one filler bullet explicitly marked 'no change required'.",
+  "_cost_usd": 0.42354710000000007,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "cursor_composer25",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "cursor_composer25",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_composer25",
+    "arm_a_sha256": "ddd4ede1695a4f2ea79cc38f2b78f982a7cdbc203efae46a5e64c42aed61811e",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.9,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.85,
+    "actionability": 0.75
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth is nearly empty (approval + one already-resolved suggestion baked into the diff), so recall is trivially near-full for both. Both independently found the same strongest issue (the identical TOCTOU race unfixed in diffusion_engine.py) and the same sharp catch (2 of 3 new regression tests don't actually gate the regression since daemon-thread exceptions don't fail pytest), giving comparable precision. X presents tighter, more actionable findings with concrete diffs and a clear prioritized verdict, while Y's report is padded with several near-duplicate 'claim-refuted' bullets restating the same test-gating point and denser, harder-to-scan evidence blocks, slightly hurting its actionability despite Y's genuinely useful CI-marker investigation.",
+  "_cost_usd": 0.195012,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16f_holdout5_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout5_r1",
+    "arm_a_sha256": "2d3a0dc839e55804731cc999f047b616115ecffa0c8829a3144f730d70474eed",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "7849cfd280bbe99a1c4e5cbf433c23a2ea5eb89278ee9f694847fdd50c8e3d19",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

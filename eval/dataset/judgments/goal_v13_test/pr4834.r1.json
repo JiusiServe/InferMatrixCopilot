@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.95,
+    "precision": 0.82,
+    "actionability": 0.97,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 0.95,
+    "precision": 0.93,
+    "actionability": 0.97,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both cover the testing, enum, and CI concerns and explicitly identify the latent over-strict level-2 guard. Y is more focused and consistently ties findings to concrete evidence and fixes, while X adds several speculative or lower-value claims that reduce precision.",
+  "_usage": {
+    "input": 3,
+    "output": 1231
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_proof_test"
+  },
+  "_roles": {
+    "arm": "copilot_v13_proof_test",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_proof_test",
+    "arm_a_sha256": "b2e9e7f194924e5a699b414eb116e6078eb4a4f20ab5696c304cf093a4259cc0",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "05ba88edbe75596d53ffc0adcf76df898385eb4f6f271110f37f19da2cac4adf",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

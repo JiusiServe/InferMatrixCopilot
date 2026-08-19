@@ -77,14 +77,23 @@ def _coerce_output(text: str, ctx: StepContext, contract: dict) -> dict | None:
     obj = parse_json_reply(text)
     if isinstance(obj, dict) and obj.get("status"):
         return obj
-    # one repair round: convert the draft into the contract
+    # One repair round: convert the draft into the contract. The draft window
+    # keeps head AND tail — a final that was cut at the token ceiling carries
+    # its comments toward the end, and the old head-only 20k window fed the
+    # repair everything EXCEPT the substance (measured on the wave-3 gate:
+    # review passes died exactly this way). Same reason the ceiling is the
+    # full llm_max_tokens: an 8k repair cap re-truncated big review drafts.
+    draft = str(text)
+    if len(draft) > 60_000:
+        draft = draft[:42_000] + "\n...[draft clipped]...\n" + draft[-18_000:]
     reply = ctx.llm.create(
         system=("Convert the agent's draft output into a single JSON object "
                 "matching this contract exactly (fill unknowns with sensible "
-                "defaults, keep all substance):\n"
+                "defaults, keep all substance — if the draft looks truncated, "
+                "close it into valid JSON rather than inventing content):\n"
                 + json.dumps(contract, ensure_ascii=False)),
-        messages=[{"role": "user", "content": str(text)[:20_000]}],
-        max_tokens=8000)  # repair reply must fit a full contract
+        messages=[{"role": "user", "content": draft}],
+        max_tokens=max(16_000, ctx.settings.llm_max_tokens))
     obj = parse_json_reply(reply.text)
     if isinstance(obj, dict) and obj.get("status"):
         return obj

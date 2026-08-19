@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.85,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.9,
+    "actionability": 0.8
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates miss the ground truth's most severe finding (fork-PR arbitrary code execution risk) and the untracked-file/worktree-freeze correctness gaps entirely, so recall is low for both. X covers more ground with 7 well-evidenced, specific findings (severity-ladder overreach explicitly calling out the >500 LOC RFC rule as one of the few policy-backed ones, which echoes the ground-truth's merge-gate-vs-policy concern; routing-table duplication touching the same routing-authority problem space) while Y's 3 findings are narrower but each is tightly grounded (skill-invocation $ prefix inconsistency echoes the declared-name mismatch, and the design-contracts metadata no-op is a legitimate independent catch). Both are highly actionable with path:line citations and concrete fixes; X edges out on precision-adjusted usefulness due to broader coverage despite Y's marginally tighter grounding.",
+  "_cost_usd": 0.2646617,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16f_holdout5_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout5_r1",
+    "arm_a_sha256": "2ea497f03541cf98681a5e6a43a4085a42bba3aaf85d25985f9f38a152872f2a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "d2f8ee49b13678fcf5fde88c339aee0cbfa5106416ed5cab0149c4c4cfd0e845",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

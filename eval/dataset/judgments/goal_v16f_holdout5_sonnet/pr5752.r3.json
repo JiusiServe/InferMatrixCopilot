@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.75,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both independently converge on the same two most important residual bugs (t2va now rejects requests with explicit width/height, and the video_reference source_path fix for H3 now breaks generic models like Wan VACE/Cosmos3 with quoted line-level evidence), which strongly validates both reviews' core findings. Y edges out on recall by directly hitting hsliuustc0106's 'api server should not add model-specific code' concern (Y's 'H3-specific constraints hardcoded into shared schema') and more precisely matching the media-enforcement-gap concern (image format checks bypassed for typed image_reference), neither of which X clearly surfaces. X contributes valuable unique findings (rank-gated audio validation, input_reference singular-field path bug) but its bonus 'Additional observations' section is visibly truncated/garbled mid-sentence, slightly hurting precision and polish. Both give concrete file/line fixes and are similarly actionable; neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.38808370000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v16f_holdout5_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout5_r1",
+    "arm_a_sha256": "3c67e6beed14b899ce04ec8b3221da67ab0d152be6b5b51fbaf470cb2dfa2fca",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b590c64d5a8a4639f4821930aafe057151231d39e7e6d760072f23304748c04b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

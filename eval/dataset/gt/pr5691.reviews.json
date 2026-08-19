@@ -1,0 +1,36 @@
+{
+  "comments": [
+    {
+      "author": "david6666666",
+      "body": "Subsequently, we can enable high-throughput mode—combined with distributed layer-wise offload #5397 —on hardware with limited HBM."
+    },
+    {
+      "author": "lishunyang12",
+      "body": "> Subsequently, we can enable high-throughput mode—combined with distributed layer-wise offload #5397 —on hardware with limited HBM.\r\n\r\nWe will leave it in the subsequent PR "
+    },
+    {
+      "author": "lishunyang12",
+      "body": "Great work! "
+    },
+    {
+      "author": "david6666666",
+      "body": "Thanks for @princepride and @hsliuustc0106 review. There will be subsequent pull requests for H3-related performance optimizations and feature additions."
+    },
+    {
+      "author": "fhfuih",
+      "body": "Local test with H200, single GPU. Since the recipe don't provide sample input image/audio links, I created some payloads myself.\r\n\r\n**t2va**: same input as recipe\r\n\r\n```bash\r\nexport MODEL=\"${MODEL_ROOT}/FL2VA\"\r\nVLLM_WORKER_MULTIPROC_METHOD=spawn \\\r\nVLLM_OMNI_VIDEO_SYNC_TIMEOUT=1800 \\\r\nvllm serve \"${MODEL}\" \\\r\n  --omni \\\r\n  --port \"${PORT}\" \\\r\n  --trust-remote-code \\\r\n  --num-gpus 1 \\\r\n  --enable-cpu-offload \\\r\n  --diffusion-attention-backend FLASH_ATTN\r\n```\r\n\r\n```bash\r\ncurl -sS -X POST \"${API_URL}\" \\\r\n  -F 'prompt=In a snowy blue-purple forest, Ori carefully walks past a sleeping giant; footsteps crunch in the snow while the creature breathes and softly snorts.' \\\r\n  -F 'width=1344' \\\r\n  -F 'height=768' \\\r\n  -F 'fps=24' \\\r\n  -F 'num_inference_steps=50' \\\r\n  -F 'flow_shift=12' \\\r\n  -F 'seed=1101' \\\r\n  -F 'extra_params={\"task\":\"t2va\",\"duration\":8.7,\"audio_flow_shift\":3.0}' \\\r\n  -o t2va.mp4\r\n```\r\n\r\nResult\r\n\r\n```\r\nINFO 08-03 13:25:09 [diffusion_pipeline_profiler.py:32] [DiffusionPipelineProfiler] MiniMaxH3Pipeline.encode_prompt took 0.517864s\r\n100%|██████████| 49/49 [11:35<00:00, 14.19s/it]\r\nINFO 08-03 13:36:45 [diffusion_pipeline_profiler.py:32] [DiffusionPipelineProfiler] MiniMaxH3Pipeline.diffuse took 695.409950s\r\nINFO 08-03 13:36:58 [diffusion_pipeline_profiler.py:32] [DiffusionPipelineProfiler] MiniMaxH3Pipeline.decode took 12.797730s\r\nINFO 08-03 13:36:58 [diffusion_pipeline_profiler.py:32] [DiffusionPipelineProfiler] MiniMaxH3Pipeline.forward took 708.727082s\r\n...\r\n(APIServer pid=3154804) INFO 08-03 13:37:03 [stats.py:791] | e2e_total_ms | 713,868.115 |\r\n```\r\n\r\nhttps://github.com/user-attachments/assets/2582ca2e-5338-4f75-881f-0aff59350761\r\n\r\n==========\r\n\r\n**fl2v**: Grabbed example input (text+first frame) from [Wan 2.7 doc](https://www.alibabacloud.com/help/en/model-studio/image-to-video-general-api-reference?spm=a2c63.p38356.help-menu-2400256.d_2_3_1_0.44641f9cqBrWaA#47e2a9662fxvv) (😁) , same sampling params as recipe\r\n\r\n```\r\ncurl -sS -X POST \"${API_URL}\" \\\r\n  -F 'prompt=...' \\\r\n  -F 'fps=24' \\\r\n  -F 'num_inference_steps=50' \\\r\n  -F 'flow_shift=12' \\\r\n  -F 'seed=2101' \\\r\n  -F 'extra_params={\"task\":\"fl2va\",\"duration\":8.7,\"audio_flow_shift\":3.0}' \\\r\n  -F \"input_reference=@${FIRST_FRAME};type=image/png\" \\\r\n  -o fl2va.mp4\r\n```\r\n\r\nResult:\r\n\r\n```\r\nINFO 08-03 13:49:23 [diffusion_pipeline_profiler.py:32] [DiffusionPipelineProfiler] MiniMaxH3Pipeline.encode_prompt took 3.722952s\r\nINFO 08-03 14:00:24 [diffusion_pipeline_profiler.py:32] [DiffusionPipelineProfiler] MiniMaxH3Pipeline.diffuse took 661.503759s\r\nINFO 08-03 14:00:37 [diffusion_pipeline_profiler.py:32] [DiffusionPipelineProfiler] MiniMaxH3Pipeline.decode took 12.105981s\r\nINFO 08-03 14:00:37 [diffusion_pipeline_profiler.py:32] [DiffusionPipelineProfiler] MiniMaxH3Pipeline.forward took 677.710945s\r\n...\r\n(APIServer pid=3154804) INFO 08-03 14:00:44 [stats.py:791] | e2e_total_ms | 684,904.245 |\r\n```\r\n\r\n(Video originally 8s & 1344*768. Resized to 840*480 to bypass GitHub 10MB limit)\r\n\r\n\r\nhttps://github.com/user-attachments/assets/4ad6da59-849d-42dc-82e8-af4a68c7c349\r\n\r\n\r\n==========\r\n\r\n**ref2av**: A 1024*768 white cat image, plus the \"Jet 2 holiday\" audio\r\n\r\n```\r\ncurl -sS -X POST \"${API_URL}\" \\\r\n  -F 'prompt=The white cat in the image sings the reference audio, lip-syncing precisely to the complete reference audio.' \\\r\n  -F 'width=1024' \\\r\n  -F 'height=768' \\\r\n  -F 'fps=24' \\\r\n  -F 'num_inference_steps=50' \\\r\n  -F 'flow_shift=12' \\\r\n  -F 'seed=3101' \\\r\n  -F 'extra_params={\"task\":\"ref2va\",\"duration\":15.0,\"audio_flow_shift\":3.0}' \\\r\n  -F \"input_reference=@${REF_IMAGE};type=image/png\" \\\r\n  -F \"audio_reference={\\\"audio_url\\\":\\\"${AUDIO_URL}\\\"}\" \\\r\n  -o ref2va_image_audio.mp4\r\n```\r\n\r\nResult:\r\n\r\n```\r\nINFO 08-03 14:19:23 [diffusion_pipeline_profiler.py:32] [DiffusionPipelineProfiler] MiniMaxH3Pipeline.encode_prompt took 2.058567s\r\nINFO 08-03 14:41:59 [diffusion_pipeline_profiler.py:32] [DiffusionPipelineProfiler] MiniMaxH3Pipeline.diffuse took 1350.958279s\r\nINFO 08-03 14:42:14 [diffusion_pipeline_profiler.py:32] [DiffusionPipelineProfiler] MiniMaxH3Pipeline.decode took 15.545213s\r\nINFO 08-03 14:42:14 [diffusion_pipeline_profiler.py:32] [DiffusionPipelineProfiler] MiniMaxH3Pipeline.forward took 1373.038156s\r\n...\r\n(APIServer pid=3262086) INFO 08-03 14:42:25 [stats.py:791] | e2e_total_ms | 1,384,115.003 |\r\n```\r\n\r\n(Video originally 1024*768, resized to 640*480 to bypass GitHub 10MB limit)\r\n\r\n\r\nhttps://github.com/user-attachments/assets/49d895b0-6f83-483d-8d67-c292677b33ed\r\n\r\n"
+    }
+  ],
+  "reviews": [
+    {
+      "author": "princepride",
+      "body": "I found some performance issues, ptal.",
+      "state": "COMMENTED"
+    },
+    {
+      "author": "Gaohan123",
+      "body": "LGTM. Thanks",
+      "state": "APPROVED"
+    }
+  ]
+}

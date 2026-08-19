@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.0,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both miss the sole ground-truth item (a Yuanrong-connector naming nitpick that appears already resolved in the visible diff), so recall is 0 for both. Both catch the same core bug — the Quantization heading in index.md swallowing Cache-DiT/TeaCache/Diffusion-Continuous-Batching — and the stale 'Distributed utils' H1 vs 'Ray-based Execution' nav label. Y digs deeper, surfacing a plausible duplicate nav registration for quantization/overview.md (with MkDocs Page-uniqueness reasoning) and the auto-discovery loss from replacing a directory glob with hardcoded connector paths, findings X never raises. Y is also better organized (Must-fix/Should-fix/Nits) with ready-to-apply snippets, while X's findings, though valid and well-evidenced, are shallower and padded with redundant verification bullets.",
+  "_cost_usd": 0.1590086,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r1",
+    "arm_a_sha256": "fc0b93dfdda1e7674d9a2a30159d39f50bc4c1e1e57b143c605e9ee1ccb59144",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b0a1251303a011617b813526a2859371e8ee289f04fcc197988c5b4d83dc8aca",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

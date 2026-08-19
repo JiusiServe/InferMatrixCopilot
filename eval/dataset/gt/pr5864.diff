@@ -1,0 +1,1820 @@
+diff --git a/examples/offline_inference/minimax_h3/dlo_dp2_lifecycle.py b/examples/offline_inference/minimax_h3/dlo_dp2_lifecycle.py
+new file mode 100644
+index 00000000000..f8117b0f967
+--- /dev/null
++++ b/examples/offline_inference/minimax_h3/dlo_dp2_lifecycle.py
+@@ -0,0 +1,240 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""Reproduce MiniMax-H3 request-mode and DLO/DP2 lifecycle behavior.
++
++Examples:
++
++    VLLM_WORKER_MULTIPROC_METHOD=spawn \
++    VLLM_OMNI_VIDEO_SYNC_TIMEOUT=14400 \
++    VLLM_OMNI_DLO_DP_WAVE_TIMEOUT=600 \
++    CUDA_VISIBLE_DEVICES=0,1 \
++    python examples/offline_inference/minimax_h3/dlo_dp2_lifecycle.py \
++        --model /path/to/MiniMax-H3/FL2VA --mode dlo-dp2
++
++    VLLM_WORKER_MULTIPROC_METHOD=spawn \
++    VLLM_OMNI_VIDEO_SYNC_TIMEOUT=14400 \
++    CUDA_VISIBLE_DEVICES=0,1 \
++    python examples/offline_inference/minimax_h3/dlo_dp2_lifecycle.py \
++        --model /path/to/MiniMax-H3/FL2VA --mode request
++"""
++
++from __future__ import annotations
++
++import argparse
++import asyncio
++import copy
++import json
++import multiprocessing
++import time
++from pathlib import Path
++from typing import Any
++
++import numpy as np
++
++from vllm_omni.entrypoints.async_omni import AsyncOmni
++
++DEFAULT_PROMPTS = (
++    "At night, three cats march into a bedroom playing tiny brass instruments, "
++    "then abruptly file out, with synchronized room ambience.",
++    "A paper boat crosses a rain-filled street while distant traffic and water sounds remain synchronized.",
++)
++
++
++def parse_args() -> argparse.Namespace:
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--model", required=True, help="Path to MiniMax-H3/FL2VA")
++    parser.add_argument(
++        "--mode",
++        choices=("dlo-dp2", "request"),
++        required=True,
++        help="DLO AllGather DP2 or ordinary non-DLO TP2 request mode",
++    )
++    parser.add_argument("--steps", type=int, default=2)
++    parser.add_argument("--duration", type=float, default=5.0)
++    parser.add_argument("--width", type=int, default=1344)
++    parser.add_argument("--height", type=int, default=768)
++    parser.add_argument("--batch-wait-ms", type=float, default=500.0)
++    parser.add_argument("--init-timeout", type=float, default=1800.0)
++    parser.add_argument("--output", type=Path)
++    return parser.parse_args()
++
++
++def engine_kwargs(args: argparse.Namespace) -> dict[str, Any]:
++    common: dict[str, Any] = {
++        "model": args.model,
++        "trust_remote_code": True,
++        "num_gpus": 2,
++        "usp": 1,
++        "ring": 1,
++        "vae_parallel_mode": "tile",
++        "vae_use_tiling": True,
++        "diffusion_attention_backend": "CUDNN_ATTN",
++        "request_batch_max_wait_ms": args.batch_wait_ms,
++        "enforce_eager": True,
++        "stage_init_timeout": args.init_timeout,
++        "init_timeout": args.init_timeout,
++    }
++    if args.mode == "dlo-dp2":
++        common.update(
++            tensor_parallel_size=1,
++            data_parallel_size=2,
++            text_encoder_tp_size=1,
++            vae_patch_parallel_size=1,
++            enable_distributed_layerwise_offload=True,
++            dlo_use_allgather=True,
++            dlo_resident_layers=0,
++        )
++    else:
++        common.update(
++            tensor_parallel_size=2,
++            data_parallel_size=1,
++            text_encoder_tp_size=2,
++            vae_patch_parallel_size=2,
++            enable_distributed_layerwise_offload=False,
++        )
++    return common
++
++
++def sampling_params(
++    engine: AsyncOmni,
++    args: argparse.Namespace,
++    seed: int,
++) -> list[Any]:
++    params = copy.deepcopy(engine.default_sampling_params_list)
++    diffusion = params[0]
++    diffusion.width = args.width
++    diffusion.height = args.height
++    diffusion.fps = 24
++    diffusion.num_inference_steps = args.steps
++    diffusion.seed = seed
++    diffusion.extra_args = {
++        "task": "t2va",
++        "duration": args.duration,
++        "aspect_ratio": "16:9",
++        "flow_shift": 12.0,
++        "audio_flow_shift": 3.0,
++    }
++    return params
++
++
++async def generate_one(
++    engine: AsyncOmni,
++    args: argparse.Namespace,
++    *,
++    request_id: str,
++    prompt: str,
++    seed: int,
++) -> Any:
++    final_output = None
++    async for output in engine.generate(
++        prompt=prompt,
++        request_id=request_id,
++        sampling_params_list=sampling_params(engine, args, seed),
++    ):
++        if output.finished:
++            final_output = output
++    if final_output is None:
++        raise RuntimeError(f"{request_id} finished without an output")
++    return final_output
++
++
++def output_summary(output: Any, args: argparse.Namespace) -> dict[str, Any]:
++    if not output.images:
++        raise RuntimeError(f"{output.request_id} returned no video")
++    frames = np.asarray(output.images[0])
++    audio = np.asarray(output.multimodal_output.get("audio"))
++    if frames.ndim != 4 or tuple(frames.shape[1:]) != (
++        args.height,
++        args.width,
++        3,
++    ):
++        raise RuntimeError(f"{output.request_id} returned invalid video shape {tuple(frames.shape)}")
++    if audio.ndim != 3 or tuple(audio.shape[:2]) != (1, 2):
++        raise RuntimeError(f"{output.request_id} returned invalid audio shape {tuple(audio.shape)}")
++    if args.duration == 5.0 and args.height == 768 and args.width == 1344:
++        if tuple(frames.shape) != (124, 768, 1344, 3) or tuple(audio.shape) != (1, 2, 165600):
++            raise RuntimeError(
++                f"{output.request_id} default shape mismatch: video={tuple(frames.shape)}, audio={tuple(audio.shape)}"
++            )
++    return {
++        "request_id": output.request_id,
++        "frames_shape": list(frames.shape),
++        "audio_shape": list(audio.shape),
++        "peak_memory_mb": output.peak_memory_mb,
++        "stage_durations": output.stage_durations,
++    }
++
++
++async def run(args: argparse.Namespace) -> dict[str, Any]:
++    engine = AsyncOmni(**engine_kwargs(args))
++    summary: dict[str, Any] = {
++        "mode": args.mode,
++        "engine_kwargs": engine_kwargs(args),
++    }
++    try:
++        if args.mode == "dlo-dp2":
++            started = time.perf_counter()
++            asymmetric = await asyncio.gather(
++                generate_one(
++                    engine,
++                    args,
++                    request_id="invalid-empty",
++                    prompt="",
++                    seed=1001,
++                ),
++                generate_one(
++                    engine,
++                    args,
++                    request_id="invalid-peer",
++                    prompt=DEFAULT_PROMPTS[0],
++                    seed=1002,
++                ),
++                return_exceptions=True,
++            )
++            summary["asymmetric_wave_s"] = time.perf_counter() - started
++            summary["asymmetric_errors"] = [
++                f"{type(result).__name__}: {result}" for result in asymmetric if isinstance(result, BaseException)
++            ]
++            if len(summary["asymmetric_errors"]) != 2:
++                raise RuntimeError("Both requests in the asymmetric DP wave must fail before dispatch")
++
++        started = time.perf_counter()
++        request_count = 2 if args.mode == "dlo-dp2" else 1
++        outputs = await asyncio.gather(
++            *(
++                generate_one(
++                    engine,
++                    args,
++                    request_id=f"recovery-{index}",
++                    prompt=DEFAULT_PROMPTS[index],
++                    seed=2000 + index,
++                )
++                for index in range(request_count)
++            )
++        )
++        summary["valid_wave_s"] = time.perf_counter() - started
++        summary["outputs"] = [output_summary(output, args) for output in outputs]
++    finally:
++        started = time.perf_counter()
++        engine.close()
++        summary["shutdown_s"] = time.perf_counter() - started
++
++    children = multiprocessing.active_children()
++    summary["active_children"] = [{"name": child.name, "pid": child.pid} for child in children]
++    if children:
++        raise RuntimeError(f"Worker processes remain after shutdown: {children}")
++    return summary
++
++
++def main() -> None:
++    args = parse_args()
++    summary = asyncio.run(run(args))
++    rendered = json.dumps(summary, indent=2, sort_keys=True)
++    print(f"E2E_RESULT {rendered}", flush=True)
++    if args.output is not None:
++        args.output.parent.mkdir(parents=True, exist_ok=True)
++        args.output.write_text(rendered + "\n", encoding="utf-8")
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/tests/diffusion/test_async_output_worker.py b/tests/diffusion/test_async_output_worker.py
+index 8cda3be1c88..da684a4f5b7 100644
+--- a/tests/diffusion/test_async_output_worker.py
++++ b/tests/diffusion/test_async_output_worker.py
+@@ -178,10 +178,9 @@ def test_bg_thread_enqueues_output_ready_after_pack(self, mocker):
+         t = threading.Thread(target=proc._async_output_loop, daemon=True)
+         t.start()
+ 
+-        # Give the loop time to process, then unblock and stop.
++        # Give the loop time to process, then send the shutdown sentinel.
+         time.sleep(0.5)
+-        proc._running = False
+-        proc._async_output_queue.put((DiffusionOutput(), "sentinel", None))
++        proc._async_output_queue.put(None)
+         t.join(timeout=2.0)
+ 
+         mock_pack.assert_called()
+@@ -191,3 +190,43 @@ def test_bg_thread_enqueues_output_ready_after_pack(self, mocker):
+             for c in proc.result_mq.enqueue.call_args_list
+         )
+         assert output_ready_enqueued, "Expected OUTPUT_READY with async_output_id='abc123' in enqueue calls"
++
++
++class TestWorkerProcShutdown:
++    def test_shutdown_stops_async_thread_and_releases_queues(self):
++        import threading
++
++        proc = _make_worker_proc(step_execution=False)
++        proc.worker = MagicMock()
++        proc.mq = MagicMock()
++        broadcast_mq = proc.mq
++        result_mq = proc.result_mq
++
++        thread = threading.Thread(target=proc._async_output_queue.get)
++        proc._async_output_thread = thread
++        thread.start()
++
++        proc.shutdown()
++
++        assert not thread.is_alive()
++        proc.worker.shutdown.assert_called_once_with()
++        broadcast_mq.shutdown.assert_called_once_with()
++        result_mq.shutdown.assert_called_once_with()
++        assert proc.mq is None
++        assert proc.result_mq is None
++
++    def test_shutdown_releases_queues_when_worker_shutdown_fails(self):
++        proc = _make_worker_proc(step_execution=True)
++        proc.worker = MagicMock()
++        proc.worker.shutdown.side_effect = RuntimeError("shutdown failed")
++        proc.mq = MagicMock()
++        broadcast_mq = proc.mq
++        result_mq = proc.result_mq
++
++        with pytest.raises(RuntimeError, match="shutdown failed"):
++            proc.shutdown()
++
++        broadcast_mq.shutdown.assert_called_once_with()
++        result_mq.shutdown.assert_called_once_with()
++        assert proc.mq is None
++        assert proc.result_mq is None
+diff --git a/tests/diffusion/test_diffusion_engine.py b/tests/diffusion/test_diffusion_engine.py
+index e26211e9c55..3beb699a67c 100644
+--- a/tests/diffusion/test_diffusion_engine.py
++++ b/tests/diffusion/test_diffusion_engine.py
+@@ -331,6 +331,55 @@ def test_engine_rejects_multi_seq_request_batch_for_single_request_pipeline(
+             DiffusionEngine(od_config)
+         fake_executor_cls.assert_not_called()
+ 
++    def test_engine_allows_independent_dlo_dp_requests_for_single_request_pipeline(
++        self,
++        monkeypatch: pytest.MonkeyPatch,
++        mocker: MockerFixture,
++    ) -> None:
++        od_config = SimpleNamespace(
++            model_class_name="SinglePipeline",
++            custom_pipeline_args=None,
++            streaming_output=False,
++            max_num_seqs=2,
++            request_batch_max_wait_ms=0,
++            parallel_config=SimpleNamespace(data_parallel_size=2),
++            enable_distributed_layerwise_offload=True,
++            dlo_use_allgather=True,
++        )
++        fake_executor = SimpleNamespace(
++            execute_request=mocker.Mock(return_value="per-request"),
++            execute_batch=mocker.Mock(return_value="batch"),
++            execute_step=mocker.Mock(return_value="step"),
++        )
++        fake_executor_cls = mocker.Mock(return_value=fake_executor)
++
++        monkeypatch.setattr(
++            "vllm_omni.diffusion.diffusion_engine.get_diffusion_post_process_func",
++            lambda *args, **kwargs: None,
++        )
++        monkeypatch.setattr(
++            "vllm_omni.diffusion.diffusion_engine.get_diffusion_pre_process_func",
++            lambda *args, **kwargs: None,
++        )
++        monkeypatch.setattr(
++            "vllm_omni.diffusion.diffusion_engine.DiffusionExecutor.get_class",
++            lambda *args, **kwargs: fake_executor_cls,
++        )
++        monkeypatch.setattr(
++            diffusion_engine_module.DiffusionModelRegistry,
++            "_try_load_model_cls",
++            lambda model_class_name: _SingleRequestPipeline,
++        )
++
++        engine = DiffusionEngine(od_config)
++
++        assert engine.execution_mode == DiffusionExecutionMode.REQUEST_BATCH
++        assert engine.supports_request_batch is False
++        assert engine.dp_concurrent is True
++        assert engine.scheduler.max_num_running_reqs == 2
++        assert od_config.request_batch_max_wait_ms == 0
++        fake_executor_cls.assert_called_once_with(od_config)
++
+     @pytest.mark.parametrize("request_ids", [("req-a",), ("req-a", "req-b")])
+     def test_engine_enables_batch_dispatch_for_request_batch_pipeline(
+         self,
+diff --git a/tests/diffusion/test_diffusion_ipc.py b/tests/diffusion/test_diffusion_ipc.py
+index f7cc39d9430..3e4c587f161 100644
+--- a/tests/diffusion/test_diffusion_ipc.py
++++ b/tests/diffusion/test_diffusion_ipc.py
+@@ -2,11 +2,19 @@
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+ import contextlib
++import multiprocessing as mp
++import queue
++import threading
++import time
++from multiprocessing import shared_memory
+ 
++import numpy as np
+ import pytest
+ import torch
++from vllm.distributed.device_communicators.shm_broadcast import MessageQueue
+ 
+ from vllm_omni.diffusion.data import DiffusionOutput
++from vllm_omni.diffusion.executor.multiproc_executor import MultiprocDiffusionExecutor
+ from vllm_omni.diffusion.ipc import (
+     _SHM_TENSOR_THRESHOLD,
+     DIFFUSION_RPC_RESULT_ENVELOPE,
+@@ -30,6 +38,129 @@ def _cleanup_shm_handle(value: object) -> None:
+             _unpack_if_shm_handle(value)
+ 
+ 
++def _result_queue_worker(connection, rank: int) -> None:
++    """Send one nested NumPy result through a worker-owned MessageQueue."""
++    result_mq = MessageQueue(n_reader=1, n_local_reader=1, local_reader_ranks=[0])
++    try:
++        connection.send(result_mq.export_handle())
++        assert connection.recv() == "reader-ready"
++
++        frames = np.full(300_000, rank, dtype=np.float32)
++        audio = np.arange(300_000, dtype=np.float32) + rank
++        output = DiffusionOutput(
++            output={
++                "rank": rank,
++                "nested": {"frames": frames},
++                "audio": [audio],
++            }
++        )
++        pack_diffusion_output_shm(output)
++        connection.send(
++            [
++                output.output["nested"]["frames"]["name"],
++                output.output["audio"][0]["name"],
++            ]
++        )
++        result_mq.enqueue(output)
++        assert connection.recv() == "shutdown"
++    finally:
++        result_mq.shutdown()
++        connection.close()
++
++
++def test_per_worker_result_queues_release_nested_numpy_shm_and_processes() -> None:
++    """Exercise the production per-worker queue/pump/SHM lifecycle."""
++    ctx = mp.get_context("spawn")
++    parent_connections = []
++    processes = []
++    result_mqs = []
++    shm_names = []
++    executor = None
++
++    try:
++        for rank in range(2):
++            parent_connection, child_connection = ctx.Pipe()
++            process = ctx.Process(
++                target=_result_queue_worker,
++                args=(child_connection, rank),
++                name=f"IPCResultWorker-{rank}",
++            )
++            process.start()
++            child_connection.close()
++            parent_connections.append(parent_connection)
++            processes.append(process)
++
++        for connection in parent_connections:
++            handle = connection.recv()
++            result_mqs.append(MessageQueue.create_from_handle(handle, 0))
++            connection.send("reader-ready")
++            shm_names.extend(connection.recv())
++
++        executor = object.__new__(MultiprocDiffusionExecutor)
++        executor._result_mqs = result_mqs
++        executor._result_mq = result_mqs[0]
++        executor._pump_running = False
++        executor._pump_stop = threading.Event()
++        executor._sync_result_buffer = queue.Queue()
++        executor._is_failed = False
++        executor._futures_lock = threading.RLock()
++        executor._rpc_futures = {}
++        executor._output_futures = {}
++        executor._completed_outputs = {}
++        executor._batch_split_map = {}
++        executor._start_result_pump()
++
++        deadline = time.monotonic() + 10.0
++        while executor._sync_result_buffer.qsize() < 2 and time.monotonic() < deadline:
++            time.sleep(0.01)
++        assert executor._sync_result_buffer.qsize() == 2
++
++        outputs = []
++        for _ in range(2):
++            output = executor._sync_result_buffer.get_nowait()
++            unpack_diffusion_output_shm(output)
++            outputs.append(output)
++
++        assert sorted(output.output["rank"] for output in outputs) == [0, 1]
++        for output in outputs:
++            rank = output.output["rank"]
++            assert output.output["nested"]["frames"][0] == rank
++            assert output.output["audio"][0][0] == rank
++
++        executor._pump_stop.set()
++        for thread in executor._result_pump_threads:
++            thread.join(timeout=3.0)
++        assert all(not thread.is_alive() for thread in executor._result_pump_threads)
++    finally:
++        if executor is not None:
++            executor._pump_stop.set()
++            for thread in getattr(executor, "_result_pump_threads", []):
++                thread.join(timeout=3.0)
++
++        for connection in parent_connections:
++            with contextlib.suppress(BrokenPipeError, EOFError, OSError):
++                connection.send("shutdown")
++        for process in processes:
++            process.join(timeout=10.0)
++            if process.is_alive():
++                process.terminate()
++                process.join(timeout=5.0)
++        for result_mq in result_mqs:
++            with contextlib.suppress(Exception):
++                result_mq.shutdown()
++        for connection in parent_connections:
++            connection.close()
++
++    assert all(process.exitcode == 0 for process in processes)
++    for name in shm_names:
++        try:
++            leaked = shared_memory.SharedMemory(name=name)
++        except FileNotFoundError:
++            continue
++        leaked.close()
++        pytest.fail(f"shared memory segment {name} still exists after unpack")
++
++
+ def test_diffusion_output_dict_tensors_round_trip_through_shm() -> None:
+     image = torch.arange(300_000, dtype=torch.float32)
+     video = torch.arange(300_000, dtype=torch.float32) * 2
+@@ -83,6 +214,29 @@ def test_diffusion_output_list_tensors_round_trip_through_shm() -> None:
+     torch.testing.assert_close(output.output[1], frames[1])
+ 
+ 
++def test_diffusion_output_numpy_array_round_trips_through_shm() -> None:
++    frames = np.arange(300_000, dtype=np.float32)
++    output = DiffusionOutput(output=frames)
++
++    pack_diffusion_output_shm(output)
++
++    assert output.output["__ndarray_shm__"] is True
++
++    unpack_diffusion_output_shm(output)
++
++    assert isinstance(output.output, np.ndarray)
++    np.testing.assert_array_equal(output.output, frames)
++
++
++def test_numpy_object_array_stays_inline() -> None:
++    values = np.empty(200_000, dtype=object)
++    values[:] = "safe-to-pickle"
++
++    packed = _pack_value_if_large(values)
++
++    assert packed is values
++
++
+ def test_rpc_result_envelope_diffusion_output_round_trips_through_shm() -> None:
+     tensor = torch.arange(300_000, dtype=torch.float32)
+     envelope = {
+@@ -108,6 +262,25 @@ def test_rpc_result_envelope_diffusion_output_round_trips_through_shm() -> None:
+     assert unpacked["rank_statuses"] == [{"rank": 0, "ok": True}]
+ 
+ 
++def test_rpc_result_envelope_dp_tagged_output_round_trips_through_shm() -> None:
++    frames = np.arange(300_000, dtype=np.float32)
++    envelope = {
++        "type": DIFFUSION_RPC_RESULT_ENVELOPE,
++        "result": {"dp_rank": 1, "output": DiffusionOutput(output=frames)},
++        "rank_statuses": [{"rank": 1, "ok": True}],
++    }
++
++    packed = pack_diffusion_output_shm(envelope)
++    tagged = packed["result"]
++    assert tagged["dp_rank"] == 1
++    assert tagged["output"].output["__ndarray_shm__"] is True
++
++    unpacked = unpack_diffusion_output_shm(packed)
++    tagged = unpacked["result"]
++    assert tagged["dp_rank"] == 1
++    np.testing.assert_array_equal(tagged["output"].output, frames)
++
++
+ def test_batch_runner_output_round_trips_nested_results_through_shm() -> None:
+     first = torch.arange(_large_numel(torch.float32), dtype=torch.float32)
+     second = torch.arange(_large_numel(torch.float32), dtype=torch.float32) + 1
+diff --git a/tests/diffusion/test_inline_stage_diffusion_client.py b/tests/diffusion/test_inline_stage_diffusion_client.py
+index 4981f7f920b..824c1483aa4 100644
+--- a/tests/diffusion/test_inline_stage_diffusion_client.py
++++ b/tests/diffusion/test_inline_stage_diffusion_client.py
+@@ -75,6 +75,32 @@ async def _step_streaming(_request):
+     assert output.request_id == "req-1"
+ 
+ 
++@pytest.mark.asyncio
++async def test_inline_requests_clone_shared_sampling_params(client, mock_engine):
++    requests = []
++
++    async def _step_streaming(request):
++        requests.append(request)
++        yield [OmniRequestOutput.from_diffusion(request_id=request.request_id, images=[MagicMock()])]
++
++    mock_engine.step_streaming = _step_streaming
++
++    shared = OmniDiffusionSamplingParams()
++    await client.add_request_async("req-1", "First prompt", shared)
++    await client.add_request_async("req-2", "Second prompt", shared)
++
++    for _ in range(10):
++        if len(requests) == 2:
++            break
++        await asyncio.sleep(0.01)
++
++    assert len(requests) == 2
++    assert requests[0].sampling_params is not requests[1].sampling_params
++    assert requests[0].sampling_params.guidance_scale_provided is False
++    assert requests[1].sampling_params.guidance_scale_provided is False
++    assert shared.guidance_scale is None
++
++
+ @pytest.mark.asyncio
+ async def test_inline_dispatch_request_streaming_success(client, mock_engine):
+     """Inline StageDiffusionClient correctly receives streaming chunk output from Diffusion Engine"""
+@@ -137,6 +163,20 @@ def test_inline_shutdown(client, mock_engine):
+     mock_engine.close.assert_called_once()
+ 
+ 
++def test_inline_shutdown_runs_after_orchestrator_premark(client, mock_engine):
++    # The orchestrator pre-marks clients to suppress false worker-death errors
++    # before StagePool invokes the actual teardown.
++    client._shutting_down = True
++
++    client.shutdown()
++
++    mock_engine.close.assert_called_once()
++    assert client._shutdown_complete
++
++    client.shutdown()
++    mock_engine.close.assert_called_once()
++
++
+ def test_inline_registers_executor_failure_callback(client, mock_engine):
+     mock_engine.executor.register_failure_callback.assert_called_once()
+ 
+diff --git a/tests/diffusion/test_ipc_async.py b/tests/diffusion/test_ipc_async.py
+index c54d2f79329..03919095b9a 100644
+--- a/tests/diffusion/test_ipc_async.py
++++ b/tests/diffusion/test_ipc_async.py
+@@ -137,6 +137,18 @@ def test_rpc_envelope_path_with_stream(self, mocker):
+             d2h_stream=d2h,
+         )
+ 
++    @pytest.mark.parametrize("wrapped_in_rpc_envelope", [False, True])
++    def test_dp_tagged_output_path_with_stream(self, mocker, wrapped_in_rpc_envelope):
++        mock_pack_fields = mocker.patch(
++            "vllm_omni.diffusion.ipc._pack_diffusion_fields",
++        )
++        d2h = mocker.MagicMock()
++        result = DiffusionOutput()
++        tagged = {"dp_rank": 1, "output": result}
++        value = {"type": "diffusion_rpc_result", "result": tagged} if wrapped_in_rpc_envelope else tagged
++        pack_diffusion_output_shm(value, d2h_stream=d2h)
++        mock_pack_fields.assert_called_once_with(result, d2h_stream=d2h)
++
+     def test_runner_output_path_with_stream(self, mocker):
+         mock_pack_fields = mocker.patch(
+             "vllm_omni.diffusion.ipc._pack_diffusion_fields",
+diff --git a/tests/diffusion/test_multiproc_engine_concurrency.py b/tests/diffusion/test_multiproc_engine_concurrency.py
+index f1c48ba3079..9ceca094936 100644
+--- a/tests/diffusion/test_multiproc_engine_concurrency.py
++++ b/tests/diffusion/test_multiproc_engine_concurrency.py
+@@ -276,6 +276,8 @@ def test_dlo_dp_multi_rank_reply_uses_synchronous_rpc_collection(self):
+         def worker():
+             request = req_q.get(timeout=2)
+             assert "rpc_id" not in request
++            assert request["output_rank"] is None
++            assert request["collect_rank_status"] is False
+             wave_id = request["wave_id"]
+             for dp_rank in range(2):
+                 res_q.put(
+@@ -297,6 +299,181 @@ def worker():
+ 
+         assert [result.error for result in results] == ["0", "1"]
+ 
++    @pytest.mark.parametrize(
++        ("tp_size", "sp_size", "pp_size", "cfg_size", "expected_primary_ranks"),
++        [
++            (2, 1, 1, 1, [0, 2]),
++            (2, 2, 1, 1, [0, 4]),
++            (1, 2, 2, 1, [0, 4]),
++            (1, 1, 2, 2, [0, 4]),
++        ],
++    )
++    def test_step_execution_reads_each_dp_primary_result_queue(
++        self,
++        tp_size,
++        sp_size,
++        pp_size,
++        cfg_size,
++        expected_primary_ranks,
++    ):
++        dp_size = 2
++        num_gpus = dp_size * tp_size * sp_size * pp_size * cfg_size
++        executor, _, _ = _make_executor(num_gpus=num_gpus)
++        executor.od_config = SimpleNamespace(
++            step_execution=True,
++            parallel_config=SimpleNamespace(
++                data_parallel_size=dp_size,
++                tensor_parallel_size=tp_size,
++                sequence_parallel_size=sp_size,
++                pipeline_parallel_size=pp_size,
++                cfg_parallel_size=cfg_size,
++            ),
++        )
++        request: dict = {}
++        executor._broadcast_mq = SimpleNamespace(enqueue=lambda value: request.update(value))
++
++        def result_queue(global_rank):
++            result_mq = MagicMock()
++            result_mq.dequeue.side_effect = lambda timeout=None: {
++                "dp_rank": global_rank,
++                "output": _tagged_output(str(global_rank)),
++                "wave_id": request["wave_id"],
++            }
++            return result_mq
++
++        # Every queue returns a valid, rank-tagged result. If the executor
++        # selects a non-primary queue, the returned rank exposes the mistake.
++        executor._result_mqs = [result_queue(rank) for rank in range(num_gpus)]
++        executor._result_mq = executor._result_mqs[0]
++
++        results = executor.collective_rpc(
++            "execute_model",
++            unique_reply_rank=None,
++            exec_all_ranks=True,
++        )
++
++        assert [result.error for result in results] == [str(rank) for rank in expected_primary_ranks]
++        for rank, result_mq in enumerate(executor._result_mqs):
++            assert result_mq.dequeue.call_count == (1 if rank in expected_primary_ranks else 0)
++
++    @pytest.mark.parametrize("empty_prompt", ["", {"prompt": ""}])
++    def test_dlo_dp_rejects_empty_prompt_before_worker_dispatch(self, empty_prompt):
++        executor, _, _ = _make_executor(num_gpus=2)
++        executor.od_config = SimpleNamespace(
++            step_execution=False,
++            parallel_config=SimpleNamespace(data_parallel_size=2),
++            enable_distributed_layerwise_offload=True,
++            dlo_use_allgather=True,
++        )
++        executor.collective_rpc = Mock()
++        scheduler_output = _make_sched_output("invalid", "valid")
++        scheduler_output.scheduled_new_reqs[0].req.prompt = empty_prompt
++
++        with pytest.raises(ValueError, match="non-empty prompt"):
++            executor.execute_request(scheduler_output)
++
++        executor.collective_rpc.assert_not_called()
++
++    def test_dlo_dp_valid_wave_still_runs_after_rejected_wave(self):
++        executor, _, _ = _make_executor(num_gpus=2)
++        executor.od_config = SimpleNamespace(
++            step_execution=False,
++            parallel_config=SimpleNamespace(data_parallel_size=2),
++            enable_distributed_layerwise_offload=True,
++            dlo_use_allgather=True,
++        )
++        executor.collective_rpc = Mock(return_value=[_tagged_output("A"), _tagged_output("B")])
++        invalid_wave = _make_sched_output("invalid", "valid")
++        invalid_wave.scheduled_new_reqs[0].req.prompt = ""
++
++        with pytest.raises(ValueError, match="non-empty prompt"):
++            executor.execute_request(invalid_wave)
++
++        result = executor.execute_request(_make_sched_output("A", "B"))
++
++        assert [output.result.error for output in result.runner_outputs] == ["A", "B"]
++        executor.collective_rpc.assert_called_once()
++
++    def test_dlo_dp_allows_shared_default_denoise_steps(self):
++        executor, _, _ = _make_executor(num_gpus=2)
++        executor.od_config = SimpleNamespace(
++            step_execution=False,
++            parallel_config=SimpleNamespace(data_parallel_size=2),
++            enable_distributed_layerwise_offload=True,
++            dlo_use_allgather=True,
++        )
++        executor.collective_rpc = Mock(return_value=[_tagged_output("A"), _tagged_output("B")])
++        scheduler_output = _make_sched_output("A", "B")
++        for new_req in scheduler_output.scheduled_new_reqs:
++            new_req.req.sampling_params.num_inference_steps = None
++
++        result = executor.execute_request(scheduler_output)
++
++        assert [output.result.error for output in result.runner_outputs] == ["A", "B"]
++        executor.collective_rpc.assert_called_once()
++
++    @pytest.mark.parametrize(
++        ("field", "value"),
++        [
++            ("num_inference_steps", 2),
++            ("guidance_scale", 7.5),
++            ("width", 1024),
++        ],
++    )
++    def test_dlo_dp_rejects_incompatible_collective_wave(self, field, value):
++        executor, _, _ = _make_executor(num_gpus=2)
++        executor.od_config = SimpleNamespace(
++            step_execution=False,
++            parallel_config=SimpleNamespace(data_parallel_size=2),
++            enable_distributed_layerwise_offload=True,
++            dlo_use_allgather=True,
++        )
++        executor.collective_rpc = Mock()
++        scheduler_output = _make_sched_output("A", "B")
++        setattr(scheduler_output.scheduled_new_reqs[1].req.sampling_params, field, value)
++
++        with pytest.raises(ValueError, match="compatible shape, CFG"):
++            executor.execute_request(scheduler_output)
++
++        executor.collective_rpc.assert_not_called()
++
++    def test_dlo_dp_partial_reply_times_out_and_fails_closed(self, monkeypatch):
++        from vllm_omni.diffusion.executor import multiproc_executor as executor_module
++
++        executor, req_q, res_q = _make_executor(num_gpus=2)
++        executor.od_config = SimpleNamespace(
++            step_execution=False,
++            parallel_config=SimpleNamespace(data_parallel_size=2),
++            enable_distributed_layerwise_offload=True,
++            dlo_use_allgather=True,
++        )
++        executor._sync_result_buffer = res_q
++        executor._fail_closed_on_dp_wave_timeout = Mock()
++        monkeypatch.setattr(executor_module, "_DLO_DP_WAVE_TIMEOUT_S", 0.05)
++
++        def reply_from_only_one_dp_rank():
++            request = req_q.get(timeout=2.0)
++            res_q.put(
++                {
++                    "dp_rank": 0,
++                    "output": _tagged_output("rank-0"),
++                    "wave_id": request["wave_id"],
++                }
++            )
++
++        worker = threading.Thread(target=reply_from_only_one_dp_rank, daemon=True)
++        worker.start()
++        started = time.monotonic()
++
++        result = executor.execute_request(_make_sched_output("A", "B"))
++
++        elapsed = time.monotonic() - started
++        worker.join(timeout=2.0)
++        assert elapsed < 1.0
++        assert all("timed out" in output.result.error for output in result.runner_outputs)
++        executor._fail_closed_on_dp_wave_timeout.assert_called_once()
++        assert isinstance(executor._fail_closed_on_dp_wave_timeout.call_args.args[0], TimeoutError)
++
+ 
+ # ───────────────── concurrent collective RPC ─────────────────
+ 
+@@ -948,6 +1125,42 @@ def _drain() -> None:
+         assert rpc_id not in client._pending_rpcs
+ 
+ 
++class TestExecutorShutdownCleaner:
++    def test_worker_joins_share_one_global_deadline(self, monkeypatch):
++        from vllm_omni.diffusion.executor import multiproc_executor as executor_module
++
++        class FakeProcess:
++            def __init__(self, name):
++                self.name = name
++                self.alive = True
++                self.terminated = False
++                self.join_timeouts = []
++
++            def is_alive(self):
++                return self.alive
++
++            def join(self, timeout):
++                self.join_timeouts.append(timeout)
++                if self.terminated:
++                    self.alive = False
++
++            def terminate(self):
++                self.terminated = True
++
++        monotonic = Mock(side_effect=[100.0, 100.0, 110.0, 120.0, 120.0, 124.0])
++        monkeypatch.setattr(executor_module, "time", SimpleNamespace(monotonic=monotonic))
++        first = FakeProcess("worker-0")
++        second = FakeProcess("worker-1")
++        cleaner = executor_module._ExecutorShutdownCleaner(processes=[first, second])
++
++        cleaner()
++
++        assert first.join_timeouts == [15.0, 5.0]
++        assert second.join_timeouts == [5.0, 1.0]
++        assert first.terminated and second.terminated
++        assert not first.is_alive() and not second.is_alive()
++
++
+ # ───────── monitor thread & death sentinel integration tests ─────────
+ 
+ 
+diff --git a/tests/diffusion/test_result_pump.py b/tests/diffusion/test_result_pump.py
+index fe49df47e83..cf00cb6cc06 100644
+--- a/tests/diffusion/test_result_pump.py
++++ b/tests/diffusion/test_result_pump.py
+@@ -35,6 +35,7 @@ def _make_executor(step_execution=False):
+     executor._pump_stop = threading.Event()
+     executor._sync_result_buffer = queue.Queue()
+     executor._result_mq = MagicMock()
++    executor._result_mqs = []
+     executor._broadcast_mq = MagicMock()
+     executor._closed = False
+     executor._is_failed = False
+@@ -157,6 +158,41 @@ def test_non_async_message_placed_in_sync_buffer(self):
+         retrieved = executor._sync_result_buffer.get_nowait()
+         assert isinstance(retrieved, DiffusionOutput)
+ 
++    def test_start_result_pump_reads_every_worker_queue(self):
++        executor = _make_executor()
++        messages = [DiffusionOutput(output="rank0"), DiffusionOutput(output="rank1")]
++        result_mqs = [MagicMock(), MagicMock()]
++
++        def make_dequeue(message):
++            emitted = False
++
++            def dequeue(timeout=None):
++                nonlocal emitted
++                if not emitted:
++                    emitted = True
++                    return message
++                executor._pump_stop.wait(0.01)
++                raise TimeoutError
++
++            return dequeue
++
++        for result_mq, message in zip(result_mqs, messages, strict=True):
++            result_mq.dequeue = make_dequeue(message)
++
++        executor._result_mqs = result_mqs
++        executor._result_mq = result_mqs[0]
++        executor._start_result_pump()
++        deadline = time.monotonic() + 2.0
++        while executor._sync_result_buffer.qsize() < 2 and time.monotonic() < deadline:
++            time.sleep(0.01)
++        executor._pump_stop.set()
++        for thread in executor._result_pump_threads:
++            thread.join(timeout=2.0)
++
++        assert len(executor._result_pump_threads) == 2
++        received = [executor._sync_result_buffer.get_nowait().output for _ in range(2)]
++        assert sorted(received) == ["rank0", "rank1"]
++
+     def test_compute_done_routes_to_rpc_future(self):
+         executor = _make_executor()
+         rpc_id = "42"
+@@ -233,6 +269,20 @@ def test_output_ready_caches_when_no_future_waiting(self):
+ class TestShutdownCleansUpFutures:
+     """Test that shutdown cancels pending futures."""
+ 
++    def test_shutdown_joins_result_pump_threads(self):
++        executor = _make_executor()
++        pump = threading.Thread(
++            target=executor._pump_stop.wait,
++            name="test-result-pump",
++        )
++        executor._result_pump_threads = [pump]
++        pump.start()
++
++        executor.shutdown()
++
++        assert not pump.is_alive()
++        assert executor._result_pump_threads == []
++
+     def test_shutdown_sets_exception_on_pending_futures(self):
+         executor = _make_executor()
+ 
+diff --git a/vllm_omni/diffusion/diffusion_engine.py b/vllm_omni/diffusion/diffusion_engine.py
+index 086206fa02e..6bbf6cfae1e 100644
+--- a/vllm_omni/diffusion/diffusion_engine.py
++++ b/vllm_omni/diffusion/diffusion_engine.py
+@@ -116,6 +116,16 @@ def _max_num_seqs(od_config: OmniDiffusionConfig) -> int:
+         return 1
+ 
+ 
++def _uses_dlo_dp_concurrency(od_config: OmniDiffusionConfig) -> bool:
++    parallel_config = getattr(od_config, "parallel_config", None)
++    dp_size = getattr(parallel_config, "data_parallel_size", 1)
++    return (
++        dp_size > 1
++        and getattr(od_config, "enable_distributed_layerwise_offload", False)
++        and getattr(od_config, "dlo_use_allgather", True)
++    )
++
++
+ def _move_tensor_tree_to_cpu(value: object) -> object:
+     if isinstance(value, torch.Tensor):
+         return value.cpu() if value.device.type != "cpu" else value
+@@ -202,7 +212,7 @@ def _resolve_execution_mode(self, od_config: OmniDiffusionConfig) -> DiffusionEx
+             return DiffusionExecutionMode.STEP_BATCH
+ 
+         self.supports_request_batch = supports_request_batch(od_config)
+-        if not self.supports_request_batch and _max_num_seqs(od_config) > 1:
++        if not self.supports_request_batch and _max_num_seqs(od_config) > 1 and not _uses_dlo_dp_concurrency(od_config):
+             raise ValueError(
+                 f"{getattr(od_config, 'model_class_name', None)!r} does not support request-level batching. "
+                 "Use max_num_seqs=1 for serial request execution, or choose a pipeline with "
+@@ -233,17 +243,10 @@ def _init_runtime_state(self) -> None:
+         # for distributed layerwise offload (which shards weights and
+         # needs all ranks active simultaneously).  Ordinary DP with a
+         # non-batch pipeline should not schedule multiple requests.
+-        dp_size = 1
+-        if getattr(self.od_config, "parallel_config", None) is not None:
+-            dp_size = getattr(self.od_config.parallel_config, "data_parallel_size", 1)
+-        dist_offload = getattr(self.od_config, "enable_distributed_layerwise_offload", False)
+-        if dp_size > 1 and dist_offload and getattr(self.od_config, "dlo_use_allgather", True):
++        dp_size = getattr(getattr(self.od_config, "parallel_config", None), "data_parallel_size", 1)
++        if _uses_dlo_dp_concurrency(self.od_config):
+             self.scheduler.max_num_running_reqs = dp_size
+             self.dp_concurrent = True
+-            # Set batch admission wait so concurrent requests accumulate
+-            # before scheduling.  The scheduler reads this from od_config.
+-            if getattr(self.od_config, "request_batch_max_wait_ms", 0) == 0:
+-                self.od_config.request_batch_max_wait_ms = 500.0
+             logger.info(
+                 "dp_concurrent: max_num_running_reqs=%d, batch_wait=%sms",
+                 dp_size,
+diff --git a/vllm_omni/diffusion/executor/multiproc_executor.py b/vllm_omni/diffusion/executor/multiproc_executor.py
+index fa7130e4052..5fa11b63d41 100644
+--- a/vllm_omni/diffusion/executor/multiproc_executor.py
++++ b/vllm_omni/diffusion/executor/multiproc_executor.py
+@@ -4,6 +4,7 @@
+ import json
+ import multiprocessing as mp
+ import multiprocessing.connection
++import os
+ import queue
+ import threading
+ import time
+@@ -21,6 +22,7 @@
+ from vllm_omni.diffusion.data import SHUTDOWN_MESSAGE, AsyncDiffusionOutput, AsyncOutputKind, DiffusionOutput
+ from vllm_omni.diffusion.executor.abstract import DiffusionExecutor
+ from vllm_omni.diffusion.ipc import DIFFUSION_RPC_RESULT_ENVELOPE, unpack_diffusion_output_shm
++from vllm_omni.diffusion.sched.request_scheduler import build_request_batch_sampling_params_key
+ from vllm_omni.diffusion.worker import WorkerProc
+ 
+ if TYPE_CHECKING:
+@@ -30,6 +32,21 @@
+ logger = init_logger(__name__)
+ 
+ _DEQUEUE_TIMEOUT_S = 5.0
++_DLO_DP_WAVE_TIMEOUT_S = float(os.environ.get("VLLM_OMNI_DLO_DP_WAVE_TIMEOUT", 600.0))
++_WORKER_SHUTDOWN_GRACE_S = 15.0
++_WORKER_TERMINATE_GRACE_S = 5.0
++_RESULT_PUMP_JOIN_TIMEOUT_S = 2.0
++
++
++def _is_empty_dp_prompt(prompt: object) -> bool:
++    """Return whether a DP request has no usable text prompt."""
++    if prompt is None:
++        return True
++    if isinstance(prompt, str):
++        return not prompt
++    if isinstance(prompt, dict) and "prompt" in prompt:
++        return not prompt["prompt"]
++    return False
+ 
+ 
+ @dataclass
+@@ -52,14 +69,20 @@ def __call__(self) -> None:
+                 logger.warning("Failed to send shutdown signal: %s", exc)
+ 
+         if self.processes:
++            join_deadline = time.monotonic() + _WORKER_SHUTDOWN_GRACE_S
+             for proc in self.processes:
+                 if not proc.is_alive():
+                     continue
+-                proc.join(5)
+-                if proc.is_alive():
+-                    logger.warning("Terminating diffusion worker %s after timeout", proc.name)
+-                    proc.terminate()
+-                    proc.join(5)
++                proc.join(max(0.0, join_deadline - time.monotonic()))
++
++            alive = [proc for proc in self.processes if proc.is_alive()]
++            for proc in alive:
++                logger.warning("Terminating diffusion worker %s after timeout", proc.name)
++                proc.terminate()
++
++            terminate_deadline = time.monotonic() + _WORKER_TERMINATE_GRACE_S
++            for proc in alive:
++                proc.join(max(0.0, terminate_deadline - time.monotonic()))
+ 
+ 
+ class MultiprocDiffusionExecutor(DiffusionExecutor):
+@@ -75,6 +98,7 @@ def _init_executor(self) -> None:
+         self._is_failed = False
+         self._failure_callbacks: list[Callable[[], None]] = []
+         self._result_mq: MessageQueue | None = None
++        self._result_mqs: list[MessageQueue] = []
+         self._rpc_wave_id: int = 0
+ 
+         num_workers = cast(int, self.od_config.num_gpus)
+@@ -84,7 +108,7 @@ def _init_executor(self) -> None:
+         broadcast_handle = self._broadcast_mq.export_handle()
+ 
+         # Launch workers
+-        processes, result_handle = self._launch_workers(broadcast_handle, self.wake_events)
++        processes, result_handles = self._launch_workers(broadcast_handle, self.wake_events)
+         self._processes = processes
+ 
+         shutdown_cleaner = _ExecutorShutdownCleaner(
+@@ -96,7 +120,8 @@ def _init_executor(self) -> None:
+         self._finalizer = weakref.finalize(self, shutdown_cleaner)
+ 
+         try:
+-            self._result_mq = self._init_result_queue(result_handle)
++            self._result_mqs = [self._init_result_queue(handle) for handle in result_handles]
++            self._result_mq = self._result_mqs[0]
+         except Exception:
+             self.shutdown()
+             raise
+@@ -112,8 +137,8 @@ def _init_executor(self) -> None:
+         self._futures_lock = threading.RLock()
+         self._pump_running = False
+         self._pump_stop = threading.Event()
+-        # When pump is active it is the sole reader of result_mq; non-async
+-        # messages are placed here for collective_rpc() to consume.
++        # When pumps are active they are the sole readers of the worker result
++        # queues; non-async messages are placed here for collective_rpc().
+         self._sync_result_buffer: queue.Queue = queue.Queue()
+         if not self.od_config.step_execution:
+             self._start_result_pump()
+@@ -140,12 +165,17 @@ def _ensure_open(self) -> None:
+         if self._broadcast_mq is None:
+             raise RuntimeError("Broadcast queue is closed")
+ 
+-    def _dequeue_one_with_failure_polling(self, deadline: float | None, method: str) -> Any:
++    def _dequeue_one_with_failure_polling(
++        self,
++        deadline: float | None,
++        method: str,
++        result_mq: MessageQueue | None = None,
++    ) -> Any:
+         """Block until one result message, polling ``_is_failed`` between chunk timeouts.
+ 
+-        When async output is enabled, pump is the sole reader of result_mq;
+-        non-async messages are placed in _sync_result_buffer, so this method
+-        reads from there instead of result_mq directly.
++        When async output is enabled, the pumps are the sole readers of the
++        worker result queues; non-async messages are placed in
++        _sync_result_buffer, so this method reads from there instead.
+         """
+         while True:
+             if deadline is None:
+@@ -163,8 +193,11 @@ def _dequeue_one_with_failure_polling(self, deadline: float | None, method: str)
+                         raise EngineDeadError()
+                     continue
+             else:
++                queue_to_read = result_mq if result_mq is not None else self._result_mq
++                if queue_to_read is None:
++                    raise RuntimeError("Result queue is closed")
+                 try:
+-                    return self._result_mq.dequeue(timeout=chunk_timeout)  # pyright: ignore[reportOptionalMemberAccess] MQ is not None before shutdown
++                    return queue_to_read.dequeue(timeout=chunk_timeout)
+                 except (TimeoutError, zmq.error.Again):
+                     if self._is_failed:
+                         raise EngineDeadError()
+@@ -223,7 +256,14 @@ def _handle_rpc_response(response: Any) -> Any:
+ 
+     _MAX_STALE_DISCARDS = 16
+ 
+-    def _validate_wave_id(self, response: Any, expected_wave_id: int, deadline: float | None, method: str) -> Any:
++    def _validate_wave_id(
++        self,
++        response: Any,
++        expected_wave_id: int,
++        deadline: float | None,
++        method: str,
++        result_mq: MessageQueue | None = None,
++    ) -> Any:
+         """Discard stale RPC responses from a previous wave."""
+         discards = 0
+         while discards < self._MAX_STALE_DISCARDS:
+@@ -239,7 +279,7 @@ def _validate_wave_id(self, response: Any, expected_wave_id: int, deadline: floa
+                 method,
+             )
+             discards += 1
+-            response = self._dequeue_one_with_failure_polling(deadline, method)
++            response = self._dequeue_one_with_failure_polling(deadline, method, result_mq)
+         raise TimeoutError(
+             f"Discarded {self._MAX_STALE_DISCARDS} stale RPC responses "
+             f"without finding wave_id={expected_wave_id} for method={method}."
+@@ -249,7 +289,7 @@ def _launch_workers(
+         self,
+         broadcast_handle: Handle,
+         wake_events: list[Event],
+-    ) -> tuple[list[mp.Process], Handle | None]:
++    ) -> tuple[list[mp.Process], list[Handle]]:
+         od_config = self.od_config
+         logger.info("Starting server...")
+ 
+@@ -287,7 +327,7 @@ def _launch_workers(
+             processes.append(process)
+ 
+         # Wait for all workers to be ready
+-        result_handle = None
++        result_handles: list[Handle] = []
+         for writer in scheduler_pipe_writers:
+             writer.close()
+ 
+@@ -303,14 +343,16 @@ def _launch_workers(
+             if data["status"] != "ready":
+                 raise RuntimeError("Initialization failed. Please see the error messages above.")
+ 
+-            if i == 0:
+-                result_handle = data.get("result_handle")
++            result_handle = data.get("result_handle")
++            if result_handle is None:
++                raise RuntimeError(f"Rank {i} did not provide a result queue handle")
++            result_handles.append(result_handle)
+ 
+             reader.close()
+ 
+         logger.debug("All workers are ready")
+ 
+-        return processes, result_handle
++        return processes, result_handles
+ 
+     @property
+     def is_dead(self) -> bool:
+@@ -369,6 +411,27 @@ def _monitor() -> None:
+         t = threading.Thread(target=_monitor, daemon=True, name="diffusion-worker-monitor")
+         t.start()
+ 
++    def _fail_closed_on_dp_wave_timeout(self, exc: TimeoutError) -> None:
++        """Shut down every rank after a partial DP wave times out.
++
++        Once one rank is stuck in a DLO AllGather, that process group cannot be
++        reused safely. Shutting down the executor converts an otherwise
++        permanent request hang into a bounded engine failure and lets the
++        caller restart.
++        """
++        logger.error(
++            "DLO DP collective wave timed out after %.1fs; shutting down the worker group: %s",
++            _DLO_DP_WAVE_TIMEOUT_S,
++            exc,
++        )
++        self._is_failed = True
++        self.shutdown()
++        for callback in self._failure_callbacks:
++            try:
++                callback()
++            except Exception:
++                logger.exception("failure_callback raised")
++
+     def register_failure_callback(
+         self,
+         callback: Callable[[], None],
+@@ -398,21 +461,17 @@ def execute_request(self, scheduler_output: DiffusionSchedulerOutput) -> BaseRun
+             and getattr(self.od_config, "enable_distributed_layerwise_offload", False)
+             and getattr(self.od_config, "dlo_use_allgather", True)
+         ):
+-            # Validate: all concurrent requests must share the same
+-            # num_inference_steps and identical extra_args, because
+-            # AllGather is a collective that requires every rank to
+-            # participate at each step.
+-            step_counts = {
+-                nr.req.sampling_params.num_inference_steps
+-                for nr in new_reqs
+-                if nr.req.sampling_params.num_inference_steps is not None
+-            }
+-            has_none = any(nr.req.sampling_params.num_inference_steps is None for nr in new_reqs)
+-            if (len(step_counts) > 1) or has_none:
++            # Reuse the request scheduler's complete compatibility key. DLO
++            # AllGather requires every DP rank to execute the same collective
++            # schedule, including shape, CFG, denoise steps, output count,
++            # and LoRA settings. Two default (None) step counts are valid and
++            # resolve identically inside the same pipeline.
++            compatibility_keys = [build_request_batch_sampling_params_key(nr.req) for nr in new_reqs]
++            if any(key != compatibility_keys[0] for key in compatibility_keys[1:]):
+                 raise ValueError(
+-                    "DP multi-concurrency requires all concurrent requests to have "
+-                    "the same explicit num_inference_steps (None is not allowed), got "
+-                    f"{[nr.req.sampling_params.num_inference_steps for nr in new_reqs]}."
++                    "DLO DP multi-concurrency requires compatible shape, CFG, "
++                    "denoise schedule, output count, and LoRA settings for all "
++                    "requests in one collective wave."
+                 )
+             extra_args_signatures: set = set()
+             for nr in new_reqs:
+@@ -424,11 +483,18 @@ def execute_request(self, scheduler_output: DiffusionSchedulerOutput) -> BaseRun
+                     "share identical extra_args. Different extra_args can change "
+                     "the forward schedule and cause AllGather deadlock."
+                 )
++            empty_prompt_ids = [nr.request_id for nr in new_reqs if _is_empty_dp_prompt(nr.req.prompt)]
++            if empty_prompt_ids:
++                raise ValueError(
++                    "DP multi-concurrency requires a non-empty prompt for every request; "
++                    f"empty prompt request IDs: {empty_prompt_ids}."
++                )
+ 
+             reqs_list = [nr.req for nr in new_reqs]
+             try:
+                 results = self.collective_rpc(
+                     "execute_model",
++                    timeout=_DLO_DP_WAVE_TIMEOUT_S,
+                     args=(reqs_list, self.od_config, scheduler_output.kv_prefetch_job),
+                     unique_reply_rank=None,
+                     exec_all_ranks=True,
+@@ -448,6 +514,8 @@ def execute_request(self, scheduler_output: DiffusionSchedulerOutput) -> BaseRun
+                     else:
+                         raise RuntimeError(f"Unexpected response type [{i}]: {type(res)!r}")
+             except Exception as exc:
++                if isinstance(exc, TimeoutError):
++                    self._fail_closed_on_dp_wave_timeout(exc)
+                 for new_req in new_reqs:
+                     runner_outputs.append(
+                         RunnerOutput(
+@@ -591,14 +659,18 @@ def collective_rpc(
+         deadline = None if timeout is None else time.monotonic() + timeout
+         kwargs = kwargs or {}
+ 
++        multi_rank_reply = unique_reply_rank is None and exec_all_ranks
+         execute_all_ranks = unique_reply_rank is None or exec_all_ranks
+-        collect_rank_status = unique_reply_rank is None
++        # Status aggregation is for control-plane RPCs, where rank 0 sends
++        # one envelope representing every rank. DP request concurrency needs
++        # one independent reply per DP primary instead.
++        collect_rank_status = unique_reply_rank is None and not multi_rank_reply
+         rpc_request = {
+             "type": "rpc",
+             "method": method,
+             "args": args,
+             "kwargs": kwargs,
+-            "output_rank": unique_reply_rank if unique_reply_rank is not None else 0,
++            "output_rank": None if multi_rank_reply else (unique_reply_rank if unique_reply_rank is not None else 0),
+             "exec_all_ranks": execute_all_ranks,
+             "collect_rank_status": collect_rank_status,
+         }
+@@ -608,7 +680,6 @@ def collective_rpc(
+         # so the D2H copy runs on a side stream in the worker background
+         # thread while the default stream is free for the next forward.
+         # pump routes the result back to a Future via rpc_id.
+-        multi_rank_reply = unique_reply_rank is None and exec_all_ranks
+         if (
+             not self.od_config.step_execution
+             and method in ("execute_model", "execute_model_batch")
+@@ -651,11 +722,28 @@ def collective_rpc(
+             responses: list = []
+             if unique_reply_rank is None and exec_all_ranks and num_responses > 1:
+                 # DP multi-concurrency: collect num_responses replies, sort by dp_rank.
++                result_mqs: list[MessageQueue | None] = [None] * num_responses
++                if self.od_config.step_execution:
++                    parallel_config = self.od_config.parallel_config
++                    replica_size = (
++                        getattr(parallel_config, "tensor_parallel_size", 1)
++                        * getattr(parallel_config, "sequence_parallel_size", 1)
++                        * getattr(parallel_config, "pipeline_parallel_size", 1)
++                        * getattr(parallel_config, "cfg_parallel_size", 1)
++                    )
++                    primary_ranks = [dp_rank * replica_size for dp_rank in range(num_responses)]
++                    all_result_mqs = getattr(self, "_result_mqs", [])
++                    if not all_result_mqs or primary_ranks[-1] >= len(all_result_mqs):
++                        raise RuntimeError(
++                            "Missing result queues for DP primary ranks "
++                            f"{primary_ranks}; available queues: {len(all_result_mqs)}"
++                        )
++                    result_mqs = [all_result_mqs[rank] for rank in primary_ranks]
+                 tagged: list[tuple[int, Any]] = []
+                 collected_errors: list[str] = []
+-                for _ in range(num_responses):
+-                    response = self._dequeue_one_with_failure_polling(deadline, method)
+-                    response = self._validate_wave_id(response, wave_id, deadline, method)
++                for result_mq in result_mqs:
++                    response = self._dequeue_one_with_failure_polling(deadline, method, result_mq)
++                    response = self._validate_wave_id(response, wave_id, deadline, method, result_mq)
+                     try:
+                         unpack_diffusion_output_shm(response)
+                     except Exception as e:
+@@ -698,20 +786,35 @@ def collective_rpc(
+     def _start_result_pump(self) -> None:
+         self._pump_running = True
+         self._pump_stop.clear()
+-        self._result_pump_thread = threading.Thread(target=self._result_pump, daemon=True, name="DiffusionResultPump")
+-        self._result_pump_thread.start()
+-        logger.info("Async result pump started")
++        result_mqs = self._result_mqs or ([self._result_mq] if self._result_mq is not None else [])
++        self._result_pump_threads = [
++            threading.Thread(
++                target=self._result_pump,
++                args=(result_mq,),
++                daemon=True,
++                name=f"DiffusionResultPump-{rank}",
++            )
++            for rank, result_mq in enumerate(result_mqs)
++        ]
++        for thread in self._result_pump_threads:
++            thread.start()
++        self._result_pump_thread = self._result_pump_threads[0] if self._result_pump_threads else None
++        logger.info("Async result pump started for %d worker queue(s)", len(self._result_pump_threads))
+ 
+-    def _result_pump(self) -> None:
+-        """Sole reader of result_mq when async output is enabled.
++    def _result_pump(self, result_mq: MessageQueue | None = None) -> None:
++        """Sole reader of one worker result queue when async output is enabled.
+ 
+         Dispatches AsyncDiffusionOutput messages to the appropriate future:
+         * RPC_RESULT / COMPUTE_DONE → _rpc_futures[rpc_id]
+         * OUTPUT_READY → _output_futures[async_output_id]
+         """
++        result_mq = result_mq or self._result_mq
++        if result_mq is None:
++            return
++
+         while not self._pump_stop.is_set():
+             try:
+-                msg = self._result_mq.dequeue(timeout=1.0)
++                msg = result_mq.dequeue(timeout=1.0)
+             except TimeoutError:
+                 if self._is_failed:
+                     break
+@@ -823,8 +926,18 @@ def shutdown(self) -> None:
+         try:
+             self._finalizer()
+         finally:
++            pump_threads = getattr(self, "_result_pump_threads", [])
++            for thread in pump_threads:
++                if thread is threading.current_thread():
++                    continue
++                thread.join(timeout=_RESULT_PUMP_JOIN_TIMEOUT_S)
++                if thread.is_alive():
++                    logger.warning("Result pump thread %s did not stop before shutdown", thread.name)
++            self._pump_running = False
+             self._broadcast_mq = None
+             self._result_mq = None
++            self._result_mqs = []
++            self._result_pump_threads = []
+             with self._futures_lock:
+                 for fut in self._rpc_futures.values():
+                     if not fut.done():
+diff --git a/vllm_omni/diffusion/inline_stage_diffusion_client.py b/vllm_omni/diffusion/inline_stage_diffusion_client.py
+index 3c4edda26ad..5082796a2be 100644
+--- a/vllm_omni/diffusion/inline_stage_diffusion_client.py
++++ b/vllm_omni/diffusion/inline_stage_diffusion_client.py
+@@ -8,6 +8,7 @@
+ from __future__ import annotations
+ 
+ import asyncio
++import threading
+ import time
+ from concurrent.futures import ThreadPoolExecutor
+ from typing import TYPE_CHECKING, Any
+@@ -66,6 +67,8 @@ def __init__(
+         self._tasks: dict[str, asyncio.Task] = {}
+         self._engine_dead = False
+         self._shutting_down = False
++        self._shutdown_complete = False
++        self._shutdown_lock = threading.Lock()
+ 
+         self._engine.executor.register_failure_callback(self._mark_engine_dead)
+ 
+@@ -101,6 +104,10 @@ async def add_request_async(
+         sampling_params: OmniDiffusionSamplingParams,
+         kv_sender_info: dict[int, dict[str, Any]] | None = None,
+     ) -> None:
++        # Each request mutates its sampling state while it is normalized and
++        # executed. Callers commonly reuse one params object for concurrent
++        # requests, so take the copy synchronously before either task starts.
++        sampling_params = sampling_params.clone()
+         logger.debug(
+             "[InlineStageDiffusionClient] stage-%s [rep-%s] add request: %s",
+             self.stage_id,
+@@ -298,19 +305,25 @@ def check_health(self) -> None:
+             raise
+ 
+     def shutdown(self) -> None:
+-        self._shutting_down = True
++        with self._shutdown_lock:
++            if self._shutdown_complete:
++                return
++            self._shutting_down = True
+ 
+-        # Cancel all pending tasks
+-        for task in self._tasks.values():
+-            task.cancel()
+-
+-        try:
+-            # Cancel queued futures and wait for the running one to complete deterministically
+-            self._executor.shutdown(wait=True, cancel_futures=True)
+-        except Exception:
+-            pass
++            # Cancel all pending tasks
++            for task in self._tasks.values():
++                task.cancel()
+ 
+-        try:
+-            self._engine.close()
+-        except Exception:
+-            pass
++            try:
++                # Stop the engine first so any control RPC running in the thread
++                # pool can observe shutdown instead of keeping stage teardown
++                # blocked while the executor waits for that RPC.
++                self._engine.close()
++            except Exception:
++                pass
++
++            try:
++                self._executor.shutdown(wait=True, cancel_futures=True)
++            except Exception:
++                pass
++            self._shutdown_complete = True
+diff --git a/vllm_omni/diffusion/ipc.py b/vllm_omni/diffusion/ipc.py
+index 5b7465af016..061f8983877 100644
+--- a/vllm_omni/diffusion/ipc.py
++++ b/vllm_omni/diffusion/ipc.py
+@@ -13,6 +13,7 @@
+ 
+ from typing import Any
+ 
++import numpy as np
+ import torch
+ 
+ from vllm_omni.diffusion.data import DiffusionOutput
+@@ -21,6 +22,45 @@
+ DIFFUSION_RPC_RESULT_ENVELOPE = "diffusion_rpc_result"
+ 
+ 
++def _array_to_shm(array: np.ndarray) -> dict[str, Any]:
++    """Copy a contiguous NumPy-compatible array into shared memory."""
++    from multiprocessing import shared_memory
++
++    if array.dtype.hasobject:
++        raise TypeError("NumPy object arrays cannot be transferred through raw shared memory")
++
++    array = np.ascontiguousarray(array)
++    nbytes = array.nbytes
++    shm = shared_memory.SharedMemory(create=True, size=nbytes)
++    shm_array = np.ndarray(array.shape, dtype=array.dtype, buffer=shm.buf[:nbytes])
++    np.copyto(shm_array, array)
++    handle = {
++        "name": shm.name,
++        "shape": list(array.shape),
++        "numpy_dtype": str(array.dtype),
++        "nbytes": nbytes,
++    }
++    shm.close()
++    return handle
++
++
++def _array_from_shm(handle: dict[str, Any]) -> np.ndarray:
++    """Copy an array from shared memory, then close and unlink its segment."""
++    from multiprocessing import shared_memory
++
++    shm = shared_memory.SharedMemory(name=handle["name"])
++    try:
++        array = np.ndarray(
++            handle["shape"],
++            dtype=np.dtype(handle["numpy_dtype"]),
++            buffer=shm.buf[: handle["nbytes"]],
++        ).copy()
++    finally:
++        shm.close()
++        shm.unlink()
++    return array
++
++
+ def _tensor_to_shm(
+     tensor: torch.Tensor,
+     d2h_stream: torch.Stream | None = None,
+@@ -35,10 +75,6 @@ def _tensor_to_shm(
+     path.  The caller must synchronize *d2h_stream* after all tensors are
+     packed.
+     """
+-    from multiprocessing import shared_memory
+-
+-    import numpy as np
+-
+     original_dtype = tensor.dtype
+     if d2h_stream is not None:
+         # Non-blocking D2H: copy on side stream to pinned CPU memory.
+@@ -58,44 +94,26 @@ def _tensor_to_shm(
+         tensor = tensor.detach().cpu().contiguous()
+         if original_dtype == torch.bfloat16:
+             tensor = tensor.to(torch.float32)
+-    arr = tensor.numpy()
+-    nbytes = arr.nbytes
+-    shm = shared_memory.SharedMemory(create=True, size=nbytes)
+-    shm_arr = np.ndarray(arr.shape, dtype=arr.dtype, buffer=shm.buf[:nbytes])
+-    np.copyto(shm_arr, arr)
+-    handle = {
+-        "__tensor_shm__": True,
+-        "name": shm.name,
+-        "shape": list(tensor.shape),
+-        "torch_dtype": str(original_dtype),
+-        "numpy_dtype": str(arr.dtype),
+-        "nbytes": nbytes,
+-    }
+-    shm.close()
++    handle = _array_to_shm(tensor.numpy())
++    handle.update(
++        {
++            "__tensor_shm__": True,
++            "torch_dtype": str(original_dtype),
++        }
++    )
+     return handle
+ 
+ 
+ def _tensor_from_shm(handle: dict[str, Any]) -> torch.Tensor:
+     """Reconstruct a tensor from a shared-memory handle and free the segment."""
+-    from multiprocessing import shared_memory
+-
+-    import numpy as np
+-
+-    shm = shared_memory.SharedMemory(name=handle["name"])
+-    try:
+-        np_dtype = np.dtype(handle["numpy_dtype"])
+-        arr = np.ndarray(handle["shape"], dtype=np_dtype, buffer=shm.buf[: handle["nbytes"]])
+-        tensor = torch.from_numpy(arr.copy())
+-        # Restore the original dtype if it differs from the numpy-compatible
+-        # dtype used for the SHM transfer (e.g. bfloat16 → float32 → bfloat16).
+-        torch_dtype_str = handle.get("torch_dtype", "")
+-        if torch_dtype_str:
+-            original_dtype = getattr(torch, torch_dtype_str.replace("torch.", ""), None)
+-            if original_dtype is not None and tensor.dtype != original_dtype:
+-                tensor = tensor.to(original_dtype)
+-    finally:
+-        shm.close()
+-        shm.unlink()
++    tensor = torch.from_numpy(_array_from_shm(handle))
++    # Restore the original dtype if it differs from the numpy-compatible
++    # dtype used for the SHM transfer (e.g. bfloat16 → float32 → bfloat16).
++    torch_dtype_str = handle.get("torch_dtype", "")
++    if torch_dtype_str:
++        original_dtype = getattr(torch, torch_dtype_str.replace("torch.", ""), None)
++        if original_dtype is not None and tensor.dtype != original_dtype:
++            tensor = tensor.to(original_dtype)
+     return tensor
+ 
+ 
+@@ -109,6 +127,18 @@ def _pack_tensor_if_large(
+     return val
+ 
+ 
++def _ndarray_to_shm(array: np.ndarray) -> dict[str, Any]:
++    """Copy a contiguous NumPy array into POSIX shared memory."""
++    handle = _array_to_shm(array)
++    handle["__ndarray_shm__"] = True
++    return handle
++
++
++def _ndarray_from_shm(handle: dict[str, Any]) -> np.ndarray:
++    """Reconstruct a NumPy array from shared memory and free the segment."""
++    return _array_from_shm(handle)
++
++
+ def _pack_value_if_large(
+     val: object,
+     d2h_stream: torch.Stream | None = None,
+@@ -123,6 +153,8 @@ def _pack_value_if_large(
+     """
+     if isinstance(val, torch.Tensor):
+         return _pack_tensor_if_large(val, d2h_stream=d2h_stream)
++    if isinstance(val, np.ndarray):
++        return _ndarray_to_shm(val) if not val.dtype.hasobject and val.nbytes > _SHM_TENSOR_THRESHOLD else val
+     if isinstance(val, dict):
+         return {key: _pack_value_if_large(value, d2h_stream=d2h_stream) for key, value in val.items()}
+     if isinstance(val, list):
+@@ -136,6 +168,8 @@ def _unpack_if_shm_handle(val: object) -> object:
+     """Reconstruct tensors from SHM handles, mirroring ``_pack_value_if_large``."""
+     if isinstance(val, dict) and val.get("__tensor_shm__"):
+         return _tensor_from_shm(val)
++    if isinstance(val, dict) and val.get("__ndarray_shm__"):
++        return _ndarray_from_shm(val)
+     if isinstance(val, dict):
+         return {key: _unpack_if_shm_handle(value) for key, value in val.items()}
+     if isinstance(val, list):
+@@ -186,13 +220,12 @@ def pack_diffusion_output_shm(
+     if isinstance(output, dict) and "dp_rank" in output and "output" in output:
+         inner = output["output"]
+         if isinstance(inner, DiffusionOutput):
+-            output["output"] = _pack_diffusion_fields(inner)
++            output["output"] = _pack_diffusion_fields(inner, d2h_stream=d2h_stream)
+         return output
+ 
+     if _is_rpc_result_envelope(output):
+         result = output.get("result")
+-        if isinstance(result, DiffusionOutput):
+-            output["result"] = _pack_diffusion_fields(result, d2h_stream=d2h_stream)
++        output["result"] = pack_diffusion_output_shm(result, d2h_stream=d2h_stream)
+         return output
+ 
+     result = getattr(output, "result", None)
+@@ -228,8 +261,7 @@ def unpack_diffusion_output_shm(output: object) -> object:
+ 
+     if _is_rpc_result_envelope(output):
+         result = output.get("result")
+-        if isinstance(result, DiffusionOutput):
+-            output["result"] = _unpack_diffusion_fields(result)
++        output["result"] = unpack_diffusion_output_shm(result)
+         return output
+ 
+     result = getattr(output, "result", None)
+diff --git a/vllm_omni/diffusion/sched/request_scheduler.py b/vllm_omni/diffusion/sched/request_scheduler.py
+index ec6b2aa8e20..2c4bcc0bfcb 100644
+--- a/vllm_omni/diffusion/sched/request_scheduler.py
++++ b/vllm_omni/diffusion/sched/request_scheduler.py
+@@ -24,17 +24,21 @@
+ ) - {"lora_int_id"}
+ 
+ 
++def build_request_batch_sampling_params_key(request: OmniDiffusionRequest) -> RequestBatchSamplingParamsKey:
++    """Build the compatibility key shared by scheduling and DP dispatch."""
++    sampling = request.sampling_params
++    # LoRA identity is optional on sampling params (and on test stubs).
++    lora_request = getattr(sampling, "lora_request", None)
++    key_kwargs = {name: getattr(sampling, name) for name in _REQUEST_BATCH_SAMPLING_PARAMS_KEY_FIELD_NAMES}
++    key_kwargs["lora_int_id"] = lora_request.lora_int_id if lora_request is not None else None
++    return RequestBatchSamplingParamsKey(**key_kwargs)
++
++
+ class RequestScheduler(BaseScheduler):
+     """Diffusion scheduler with vLLM-style waiting/running queues."""
+ 
+     def _build_sampling_params_key(self, request: OmniDiffusionRequest) -> RequestBatchSamplingParamsKey:
+-        """Build a request-batch compatibility key from sampling parameters."""
+-        sampling = request.sampling_params
+-        # LoRA identity is optional on sampling params (and on test stubs).
+-        lora_request = getattr(sampling, "lora_request", None)
+-        key_kwargs = {name: getattr(sampling, name) for name in _REQUEST_BATCH_SAMPLING_PARAMS_KEY_FIELD_NAMES}
+-        key_kwargs["lora_int_id"] = lora_request.lora_int_id if lora_request is not None else None
+-        return RequestBatchSamplingParamsKey(**key_kwargs)
++        return build_request_batch_sampling_params_key(request)
+ 
+     def update_from_output(self, sched_output: DiffusionSchedulerOutput, output: RunnerOutput) -> set[str]:
+         scheduled_request_ids = sched_output.scheduled_request_ids
+diff --git a/vllm_omni/diffusion/worker/diffusion_worker.py b/vllm_omni/diffusion/worker/diffusion_worker.py
+index 9a2958fcf37..a3d1c791f88 100644
+--- a/vllm_omni/diffusion/worker/diffusion_worker.py
++++ b/vllm_omni/diffusion/worker/diffusion_worker.py
+@@ -63,6 +63,8 @@
+ 
+ logger = init_logger(__name__)
+ 
++_ASYNC_OUTPUT_THREAD_JOIN_TIMEOUT_S = 10.0
++
+ 
+ @dataclass
+ class _DiffusionVllmModelConfig:
+@@ -429,8 +431,8 @@ def execute_model(
+         ranks stay synchronised at each AllGather call while computing
+         different activations.
+ 
+-        Each rank returns its OWN DiffusionOutput (no gather).  The executor
+-        collects N responses via result_mq (all ranks share one queue).
++        Each rank returns its OWN DiffusionOutput (no gather). The executor
++        collects N responses via the per-worker result queues.
+         """
+         assert self.model_runner is not None, "Model runner not initialized"
+ 
+@@ -895,8 +897,11 @@ def _async_output_loop(self):
+         """
+         device = torch.device(torch.accelerator.current_accelerator().type, self.gpu_id)
+         d2h_stream = torch.Stream(device=device)
+-        while self._running:
+-            output, async_output_id, gpu_event = self._async_output_queue.get()
++        while True:
++            item = self._async_output_queue.get()
++            if item is None:
++                break
++            output, async_output_id, gpu_event = item
+             try:
+                 # Cross-stream ordering: wait for default stream to finish
+                 # writing the output tensors before the side stream reads.
+@@ -925,6 +930,40 @@ def _async_output_loop(self):
+                     )
+                 )
+ 
++    def shutdown(self) -> None:
++        """Stop background work and release worker-owned IPC resources."""
++        self._running = False
++
++        if self._async_output_queue is not None:
++            self._async_output_queue.put(None)
++        if self._async_output_thread is not None:
++            self._async_output_thread.join(timeout=_ASYNC_OUTPUT_THREAD_JOIN_TIMEOUT_S)
++            if self._async_output_thread.is_alive():
++                logger.warning(
++                    "Worker %d: Async output thread did not stop before shutdown",
++                    self.gpu_id,
++                )
++
++        try:
++            self.worker.shutdown()
++        finally:
++            if self.mq is not None:
++                self.mq.shutdown()
++                self.mq = None
++
++            # The worker creates this queue's shared-memory ring buffer.
++            # Dropping the final creator reference invokes
++            # ShmRingBuffer.__del__, which closes and unlinks it before
++            # multiprocessing.resource_tracker exits.
++            if self.result_mq is not None and (
++                self._async_output_thread is None or not self._async_output_thread.is_alive()
++            ):
++                result_mq = self.result_mq
++                self.result_mq = None
++                result_mq.shutdown()
++                del result_mq
++                gc.collect()
++
+     def _gather_rpc_rank_statuses(self, status: dict[str, Any]) -> list[dict[str, Any]]:
+         if not torch.distributed.is_initialized():
+             return [status]
+@@ -1196,7 +1235,7 @@ def signal_handler(signum: int, frame) -> None:
+         finally:
+             if worker_proc is not None:
+                 try:
+-                    worker_proc.worker.shutdown()
++                    worker_proc.shutdown()
+                 except Exception as exc:
+                     logger.warning("Worker %d: Shutdown encountered an error: %s", rank, exc)
+                 worker_proc.context.term()

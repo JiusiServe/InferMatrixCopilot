@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.9,
+    "actionability": 0.8
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.92,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y explicitly re-verifies most of the ground-truth reviewer's prior concerns (NPU/XPU/MUSA platform scope, connector-drain ordering, full-payload-branch unreachability, prefix-cache incompatibility) as now correctly fixed, then goes deeper than the original thread by showing the new 'sole consumer' ownership claim is still overstated (three other code paths drain the same connector state) and flagging an unaddressed TP>1 collective-call hazard — both directly in the spirit of the human reviewer's live-state concern. X's findings (prefix_caching cross-link, unscoped Example 1, CUDA-only device-type gating, GitHub/MkDocs image mismatch) are all valid and well-evidenced but touch fewer of the ground-truth threads and stay comparatively surface-level. Both miss the dependency-conflict/mkdocs-build theme entirely, and neither has a LATENT GAP CHECK section.",
+  "_cost_usd": 0.3969976,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46",
+    "arm_a_sha256": "e3b658ca25103fca5e1c98ab5a9fef018afd080bbe6f0eddc551ddb3fccc396b",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "a8d1e55c4b87baf475d5d21ff83906f89ce242bb3c3d854212401f9ffd0c1611",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

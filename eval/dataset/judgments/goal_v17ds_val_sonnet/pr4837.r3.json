@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.95,
+    "precision": 0.87,
+    "actionability": 0.92,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.95,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently surface the one substantive ground-truth point (the already_submitted guard removal is correct because both submit paths reject lists uniformly) and both go well beyond it to flag the same major latent bug — MingImagePipeline.forward still passing old kwargs to a ZImagePipeline.forward that now only accepts req — plus matching CI-failure and missing-test observations, which cross-validation makes plausible rather than fabricated. X edges ahead on actionability and readability: a clear prioritized 'Suggested order of work,' cleanly separated root-cause chain (2→2a→2b) showing what breaks even after the immediate TypeError is fixed, and tighter prose. Y is equally rigorous (exhaustive verified/refuted evidence trail, cross-checks impact on hunyuan/glm pipelines, includes copy-pasteable suggestion blocks) but is denser and more repetitive, with some evidence bullets adding little beyond restating the same fact.",
+  "_cost_usd": 0.2720662,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17ds_val"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_val",
+    "arm_a_sha256": "bff37bf66a78b68ede03dc3609e761dc80442b91628672e97ac87ff621738c24",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "bc98460632105aef812a50d392afd9f1bea66b3f783e8a9cd888456ce013cba3",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

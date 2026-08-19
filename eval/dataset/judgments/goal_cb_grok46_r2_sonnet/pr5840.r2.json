@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.75,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both candidates independently and correctly diagnose the same critical live bug (the engine's default 0.2 threshold shadowing the new MiniMax-H3-specific 0.17 default), which is the strongest match to the ground truth's quality-loss concern; both also confirm the already-fixed partition-gating logic rather than missing it. X reaches further into a speculative, multi-hop, out-of-diff finding (quality_policy.py Cache-DiT interaction) that raises fabrication risk, while Y stays tightly scoped to the diff and adds a concrete, self-verifiable quantitative critique of the calibration polynomial. Y's clearer Blocking/Should-fix/Minor structure with explicit change callouts also edges out X's denser evidence-dump format on actionability.",
+  "_cost_usd": 0.5378381,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46_r2",
+    "arm_a_sha256": "33267e3b19d297d6800e80bc5d184a327dcaaa3a421b3f8b9b7c2b53d3d76cda",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

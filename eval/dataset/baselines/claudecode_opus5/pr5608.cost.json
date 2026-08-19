@@ -1,0 +1,46 @@
+{
+  "calls": 28,
+  "input_tokens": 910765,
+  "output_tokens": 21823,
+  "cost_usd": 1.4993044999999998,
+  "is_error": false,
+  "terminal_reason": "completed",
+  "split": "holdout4",
+  "head": "de8517f6f2bc0ae2f8bfeaad0832c1863884c6af",
+  "base": "b3f4fbf9e217ab6174fc0c475e33a478006ac34c",
+  "resolved_model": "claude-opus-5",
+  "snapshot_sha256": "43b9382d8441192b80578d1f686953bd7d4e1cde60428c7e0a12a46cdbc5424d",
+  "validation_commands": [
+    "git diff b3f4fbf9e217ab6174fc0c475e33a478006ac34c HEAD --stat",
+    "git diff b3f4fbf9e217ab6174fc0c475e33a478006ac34c HEAD",
+    "ls vllm_omni/platforms/npu/ && ls vllm_omni/platforms/npu/layers/ 2>&1 && ls vllm_omni/platforms/npu/models/ | head -50",
+    "sed -n '1,80p' tests/platforms/npu/test_310p_patches.py",
+    "cat vllm_omni/platforms/npu/layers/__init__.py; echo \"---\"; python -c \"import torch; print(torch.__version__)\" 2>&1 | tail -2",
+    "grep -n \"apply_rotary_pos_emb\\|unsqueeze_dim\\|transpose(1, 2)\\|head_dim\\|num_heads\\|def forward\\|scaled_dot_product\\|npu_fusion\" vllm_omni/model_executor/models/qwen3_tts/tokenizer_12hz/modeling_qwen3_tts_tokenizer_v2.py | head -60",
+    "sed -n '120,175p;340,400p' vllm_omni/model_executor/models/qwen3_tts/tokenizer_12hz/modeling_qwen3_tts_tokenizer_v2.py",
+    "sed -n '1,120p' vllm_omni/model_executor/models/qwen3_tts/tokenizer_12hz/configuration_qwen3_tts_tokenizer_v2.py | grep -n \"num_attention_heads\\|hidden_size\\|head_dim\\|num_key_value\" ",
+    "grep -rn \"codec_chunk_ramp\" --include=*.py | head -20",
+    "grep -rn \"num_code_groups\" --include=\"*.py\" . | head -20; echo \"=== code predictor forward callers ===\"; grep -rn \"CodePredictor\\|code_predictor\" --include=\"*.py\" vllm_omni/model_executor/models/qwen3_tts/ | head -30",
+    "sed -n '160,215p' vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py",
+    "grep -n \"def forward\" -A 40 vllm_omni/model_executor/models/common/qwen3_code_predictor.py | sed -n '1,40p'; echo \"=== wrapper ===\"; grep -n \"class CodePredictorWrapper\" -A 80 vllm_omni/model_executor/models/common/qwen3_code_predictor.py | grep -n \"seq\\|forward\\|cat\\|step\" | head -40",
+    "sed -n '430,560p' vllm_omni/model_executor/models/common/qwen3_code_predictor.py",
+    "head -20 vllm_omni/platforms/npu/layers/fused_moe.py; echo \"=== ruff cfg ===\"; grep -n \"line-length\\|\\[tool.ruff\" -A3 pyproject.toml | head -20",
+    "timeout 600 python -m pytest tests/platforms/npu/test_310p_patches.py -q -k tokenizer 2>&1 | tail -20",
+    "cd /tmp && cat > t.py <<'EOF'\nimport sys, types, torch, importlib.util\nm = types.ModuleType(\"torch_npu\")\ndef rot_half(x):\n    x1, x2 = x[..., :x.shape[-1]//2], x[..., x.shape[-1]//2:]\n    return torch.cat((-x2, x1), dim=-1)\ndef npu_rotary_mul(x, cos, sin):\n    return x*cos + rot_half(x)*sin\nm.npu_ro",
+    "python3 -c '\nimport sys, types, torch, importlib.util\nm = types.ModuleType(\"torch_npu\")\ndef rot_half(x):\n    x1, x2 = x[..., :x.shape[-1]//2], x[..., x.shape[-1]//2:]\n    return torch.cat((-x2, x1), dim=-1)\ndef npu_rotary_mul(x, cos, sin):\n    return x*cos + rot_half(x)*sin\nm.npu_rotary_mul = npu_ro",
+    "ls tests/platforms/npu/; echo \"=== docs mention ===\"; grep -rn \"BNSD\\|BSND\" --include=\"*.py\" vllm_omni | head -20"
+  ],
+  "ran_validation": true,
+  "claude_md_seen": {
+    "/data/zhoutaichang/CLAUDE.md": "27ca8ea8056c231e"
+  },
+  "recorded_at": "2026-08-15T06:19:37",
+  "arm": "baseline_opus5",
+  "wall_s": 314.0,
+  "audit_ok": true,
+  "audit_violations": [],
+  "audit_blocked_attempts": [
+    "Write: path outside the worktree: /tmp/t.py in {\"file_path\": \"/tmp/t.py\", \"content\": \"import sys, types, torch, importlib.util\\nm = types.ModuleType(\\\"torch_npu\\\")\\ndef rot_half(x):\\n    x1, x2 = x[..., :x.s"
+  ],
+  "artifact_chars": 6950
+}

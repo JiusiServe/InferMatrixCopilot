@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.25,
+    "precision": 0.85,
+    "actionability": 0.35,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.6,
+    "precision": 0.75,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Y engages with the actual reviewer discussion far more: it independently identifies the same 'mirrors module_collector.py' pattern david6666666 raised and extends it with a concrete logging suggestion, and its minor note on _default_get_pipeline_transformer directly speaks to fhfuih's 'is attrgetter necessary everywhere' question. X only gestures at the mirrored-pattern point and otherwise offers a single non-blocking, no-action-required contract note, giving it much weaker actionability. Y's added findings (SoulX activation risk, silent resolution failures, is_cached guard semantics, dedup, test gaps, sibling getattr call sites) are diff-consistent extrapolations with specific file/line pointers, making them plausible and largely grounded even though some depth is unverifiable, whereas X's approve-with-one-caveat review is safe but shallow.",
+  "_cost_usd": 0.1460954,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "cursor_grok45",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "cursor_grok45",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_grok45",
+    "arm_a_sha256": "908d035f54790ff0f2071e5036003603f6a3fbe9f0f9ac0dc8e58a5f8ac62bbb",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "80debb7f8b9b3343eef7ae50f0618e17195384c354a466e33b4f3b71b6863ca2",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

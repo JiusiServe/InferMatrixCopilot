@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.82,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.18,
+    "precision": 0.88,
+    "actionability": 0.82,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Neither candidate hits the ground-truth reviewer's three specific threads (trigger-set scope debate, functional-vs-perf redundancy, trigger-frequency asymmetry) exactly, and both independently recommend re-adding run_benchmark.py/conftest.py to source_file_dependencies — the opposite of what the PR author explained and the human reviewer accepted. X gets partial recall credit for explicitly flagging that the new perf step largely duplicates the existing functional Online Test, which echoes the human's redundancy question, plus covers substantially more distinct, well-cited technical issues (missing artifact upload, stale/mismatched baseline values, A3 dataset/cache mismatch, doc convention, double execution on nightly, timeout convention) with strong self-verification (ran pytest --collect-only). Y's four findings are tightly evidenced with verbatim code quotes and are arguably marginally higher-precision, but its narrower scope leaves real value on the table. Both are highly actionable with file/line anchors, but X's breadth and directness edge it out.",
+  "_cost_usd": 0.2651801,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v14_holdout3_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r1",
+    "arm_a_sha256": "239bab4d52baa190cede1ba77263d22ea54b565779f0a2900752934e7211dfc1",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "531e9b74603b37dafe7d3f1011779f043bc357b8d13b9e18c955eaf7ef9f3267",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

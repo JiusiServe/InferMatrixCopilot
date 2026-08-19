@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.78,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.15,
+    "precision": 0.72,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X's 'Validated' bullets directly engage the exact code paths the human reviewers flagged — talker fail-fast for library callers, shared duration-factor constants across adapter/talker/s2mel, and native-speed streaming gating (HTTP fixed, WebSocket still requires speed=1.0) — confirming those concerns were addressed, plus it surfaces well-evidenced novel findings (unmarked pytest files silently deselected by CI markers, Spanish TN silently degrading to identity). Y is well-written and technically careful with several plausible latent bugs (uninitialized mel_head.bias, tensor-concat accumulation hazard, CPU snapshot no-copy), but none of its findings overlap with what the actual reviewers raised, so it covers almost none of the ground-truth concern set. Both reviews are comparably grounded and actionable with concrete file/line evidence and explicit suggested changes, but X's substantially higher recall of the real reviewer concerns decides it.",
+  "_cost_usd": 0.43826360000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46",
+    "arm_a_sha256": "9ea27c39d00510461e17b35158e781eca09cf4844251897e31108719ba17e315",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9bac33ab1f1a0555b23cce4c38e60ff72d2240dc2c5c0076b9ac557840bed136",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

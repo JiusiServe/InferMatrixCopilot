@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.75,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Y independently surfaces the exact tension the human reviewer raised about _AdmissionWaitDecision (private-vs-extension-point, missing invariant enforcement) via points #5 and #7, and correctly diagnoses the same vacuous-test issue X found but ties it precisely to the new max_num_running_reqs<=1 condition with verified reasoning. X mostly confirms already-fixed items (finiteness checks, TTS parity) rather than surfacing new/outstanding concerns, and one of its two 'test proves nothing' claims (zero_max_wait test) mischaracterizes a test that is actually testing its stated condition correctly. Y's findings are more numerous, more rigorously verified (explicit trace-throughs, run confirmations), and more directly actionable with precise fixes.",
+  "_cost_usd": 0.47330749999999994,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_holdout3_r1",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r1",
+    "arm_a_sha256": "7e3034c408c58b745e401401ea9ce312a578813c392393956c6ce5b7b554781c",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4ed51148204a106ed35fa7e1ae403167cdcd488aeedb89802a531a52e6684609",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

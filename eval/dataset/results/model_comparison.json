@@ -1,0 +1,3262 @@
+{
+  "generated_at": "2026-08-15T00:23:20+08:00",
+  "campaign": "goal: Strict(DS) vs CC+Opus5",
+  "baseline": "claudecode_opus5 (Claude Code + Opus 5, pinned worktree)",
+  "sets": {
+    "goal_v13_val": {
+      "arm": "copilot_v13_proof_val",
+      "baseline": "claudecode_opus5",
+      "judge": "GPT-5.6 Sol 272K High",
+      "n_items": 5,
+      "n_verdicts": 15,
+      "wins": {
+        "claudecode_opus5": 7,
+        "copilot_v13_proof_val": 8
+      },
+      "mean_rubric": {
+        "claudecode_opus5": {
+          "recall": 0.889,
+          "precision": 0.589,
+          "actionability": 0.934,
+          "gap_hit": 0.2
+        },
+        "copilot_v13_proof_val": {
+          "recall": 0.857,
+          "precision": 0.555,
+          "actionability": 0.9,
+          "gap_hit": 0.2
+        }
+      },
+      "normalized": {
+        "recall": {
+          "ratio": 0.96,
+          "delta": -0.032
+        },
+        "precision": {
+          "ratio": 0.94,
+          "delta": -0.034
+        },
+        "actionability": {
+          "ratio": 0.96,
+          "delta": -0.034
+        },
+        "gap_hit": {
+          "ratio": 1.0,
+          "delta": 0.0
+        }
+      },
+      "win_share": 0.533,
+      "items": [
+        "pr4810",
+        "pr4816",
+        "pr4825",
+        "pr4837",
+        "pr4893"
+      ],
+      "verdicts": [
+        {
+          "item": "pr4810",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr4810",
+          "rep": "r2",
+          "winner": "copilot_v13_proof_val",
+          "margin": "slight"
+        },
+        {
+          "item": "pr4810",
+          "rep": "r3",
+          "winner": "copilot_v13_proof_val",
+          "margin": "slight"
+        },
+        {
+          "item": "pr4816",
+          "rep": "r1",
+          "winner": "copilot_v13_proof_val",
+          "margin": "slight"
+        },
+        {
+          "item": "pr4816",
+          "rep": "r2",
+          "winner": "copilot_v13_proof_val",
+          "margin": "slight"
+        },
+        {
+          "item": "pr4816",
+          "rep": "r3",
+          "winner": "copilot_v13_proof_val",
+          "margin": "slight"
+        },
+        {
+          "item": "pr4825",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr4825",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr4825",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr4837",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr4837",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr4837",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr4893",
+          "rep": "r1",
+          "winner": "copilot_v13_proof_val",
+          "margin": "clear"
+        },
+        {
+          "item": "pr4893",
+          "rep": "r2",
+          "winner": "copilot_v13_proof_val",
+          "margin": "clear"
+        },
+        {
+          "item": "pr4893",
+          "rep": "r3",
+          "winner": "copilot_v13_proof_val",
+          "margin": "slight"
+        }
+      ],
+      "label": "v13 val (dev gate)"
+    },
+    "goal_v13_test": {
+      "arm": "copilot_v13_proof_test",
+      "baseline": "claudecode_opus5",
+      "judge": "GPT-5.6 Sol 272K High",
+      "n_items": 5,
+      "n_verdicts": 15,
+      "wins": {
+        "claudecode_opus5": 8,
+        "copilot_v13_proof_test": 7
+      },
+      "mean_rubric": {
+        "claudecode_opus5": {
+          "recall": 0.762,
+          "precision": 0.719,
+          "actionability": 0.95,
+          "gap_hit": 0.2
+        },
+        "copilot_v13_proof_test": {
+          "recall": 0.689,
+          "precision": 0.687,
+          "actionability": 0.905,
+          "gap_hit": 0.2
+        }
+      },
+      "normalized": {
+        "recall": {
+          "ratio": 0.9,
+          "delta": -0.073
+        },
+        "precision": {
+          "ratio": 0.96,
+          "delta": -0.032
+        },
+        "actionability": {
+          "ratio": 0.95,
+          "delta": -0.045
+        },
+        "gap_hit": {
+          "ratio": 1.0,
+          "delta": 0.0
+        }
+      },
+      "win_share": 0.467,
+      "items": [
+        "pr4762",
+        "pr4777",
+        "pr4834",
+        "pr4849",
+        "pr4954"
+      ],
+      "verdicts": [
+        {
+          "item": "pr4762",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr4762",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr4762",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr4777",
+          "rep": "r1",
+          "winner": "copilot_v13_proof_test",
+          "margin": "slight"
+        },
+        {
+          "item": "pr4777",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr4777",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr4834",
+          "rep": "r1",
+          "winner": "copilot_v13_proof_test",
+          "margin": "clear"
+        },
+        {
+          "item": "pr4834",
+          "rep": "r2",
+          "winner": "copilot_v13_proof_test",
+          "margin": "clear"
+        },
+        {
+          "item": "pr4834",
+          "rep": "r3",
+          "winner": "copilot_v13_proof_test",
+          "margin": "clear"
+        },
+        {
+          "item": "pr4849",
+          "rep": "r1",
+          "winner": "copilot_v13_proof_test",
+          "margin": "clear"
+        },
+        {
+          "item": "pr4849",
+          "rep": "r2",
+          "winner": "copilot_v13_proof_test",
+          "margin": "clear"
+        },
+        {
+          "item": "pr4849",
+          "rep": "r3",
+          "winner": "copilot_v13_proof_test",
+          "margin": "slight"
+        },
+        {
+          "item": "pr4954",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr4954",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr4954",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        }
+      ],
+      "label": "v13 test"
+    },
+    "goal_v13_wave2": {
+      "arm": "copilot_v13_wave2",
+      "baseline": "claudecode_opus5",
+      "judge": "GPT-5.6 Sol 272K High",
+      "n_items": 10,
+      "n_verdicts": 30,
+      "wins": {
+        "claudecode_opus5": 16,
+        "copilot_v13_wave2": 14
+      },
+      "mean_rubric": {
+        "copilot_v13_wave2": {
+          "recall": 0.492,
+          "precision": 0.748,
+          "actionability": 0.92,
+          "gap_hit": 0.0
+        },
+        "claudecode_opus5": {
+          "recall": 0.651,
+          "precision": 0.672,
+          "actionability": 0.936,
+          "gap_hit": 0.0
+        }
+      },
+      "normalized": {
+        "recall": {
+          "ratio": 0.76,
+          "delta": -0.159
+        },
+        "precision": {
+          "ratio": 1.11,
+          "delta": 0.076
+        },
+        "actionability": {
+          "ratio": 0.98,
+          "delta": -0.016
+        }
+      },
+      "win_share": 0.467,
+      "items": [
+        "pr5509",
+        "pr5550",
+        "pr5610",
+        "pr5703",
+        "pr5715",
+        "pr5840",
+        "pr5863",
+        "pr5884",
+        "pr5957",
+        "pr5976"
+      ],
+      "verdicts": [
+        {
+          "item": "pr5509",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5509",
+          "rep": "r2",
+          "winner": "copilot_v13_wave2",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5509",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r1",
+          "winner": "copilot_v13_wave2",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r2",
+          "winner": "copilot_v13_wave2",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r3",
+          "winner": "copilot_v13_wave2",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r1",
+          "winner": "copilot_v13_wave2",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r2",
+          "winner": "copilot_v13_wave2",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r3",
+          "winner": "copilot_v13_wave2",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r1",
+          "winner": "copilot_v13_wave2",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r2",
+          "winner": "copilot_v13_wave2",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r3",
+          "winner": "copilot_v13_wave2",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r1",
+          "winner": "copilot_v13_wave2",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r1",
+          "winner": "copilot_v13_wave2",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r2",
+          "winner": "copilot_v13_wave2",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r3",
+          "winner": "copilot_v13_wave2",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        }
+      ],
+      "label": "DS v4-pro r1, wave-2 holdout"
+    },
+    "goal_v13_wave2_sonnet": {
+      "arm": "copilot_v13_wave2",
+      "baseline": "claudecode_opus5",
+      "judge": "claude-sonnet-5",
+      "n_items": 10,
+      "n_verdicts": 30,
+      "wins": {
+        "claudecode_opus5": 20,
+        "copilot_v13_wave2": 10
+      },
+      "mean_rubric": {
+        "copilot_v13_wave2": {
+          "recall": 0.323,
+          "precision": 0.833,
+          "actionability": 0.801,
+          "gap_hit": 0.0
+        },
+        "claudecode_opus5": {
+          "recall": 0.437,
+          "precision": 0.793,
+          "actionability": 0.887,
+          "gap_hit": 0.0
+        }
+      },
+      "normalized": {
+        "recall": {
+          "ratio": 0.74,
+          "delta": -0.114
+        },
+        "precision": {
+          "ratio": 1.05,
+          "delta": 0.04
+        },
+        "actionability": {
+          "ratio": 0.9,
+          "delta": -0.086
+        }
+      },
+      "win_share": 0.333,
+      "items": [
+        "pr5509",
+        "pr5550",
+        "pr5610",
+        "pr5703",
+        "pr5715",
+        "pr5840",
+        "pr5863",
+        "pr5884",
+        "pr5957",
+        "pr5976"
+      ],
+      "verdicts": [
+        {
+          "item": "pr5509",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5509",
+          "rep": "r2",
+          "winner": "copilot_v13_wave2",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5509",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r2",
+          "winner": "copilot_v13_wave2",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r2",
+          "winner": "copilot_v13_wave2",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r3",
+          "winner": "copilot_v13_wave2",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r1",
+          "winner": "copilot_v13_wave2",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r2",
+          "winner": "copilot_v13_wave2",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r3",
+          "winner": "copilot_v13_wave2",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r1",
+          "winner": "copilot_v13_wave2",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r2",
+          "winner": "copilot_v13_wave2",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r3",
+          "winner": "copilot_v13_wave2",
+          "margin": "slight"
+        }
+      ],
+      "label": "DS v4-pro r1 re-scored"
+    },
+    "goal_ds_wave2_r2_sonnet": {
+      "arm": "copilot_v13_ds_wave2_r2",
+      "baseline": "claudecode_opus5",
+      "judge": "claude-sonnet-5",
+      "n_items": 10,
+      "n_verdicts": 30,
+      "wins": {
+        "claudecode_opus5": 27,
+        "copilot_v13_ds_wave2_r2": 3
+      },
+      "mean_rubric": {
+        "copilot_v13_ds_wave2_r2": {
+          "recall": 0.278,
+          "precision": 0.804,
+          "actionability": 0.779,
+          "gap_hit": 0.0
+        },
+        "claudecode_opus5": {
+          "recall": 0.509,
+          "precision": 0.816,
+          "actionability": 0.878,
+          "gap_hit": 0.0
+        }
+      },
+      "normalized": {
+        "recall": {
+          "ratio": 0.55,
+          "delta": -0.231
+        },
+        "precision": {
+          "ratio": 0.99,
+          "delta": -0.012
+        },
+        "actionability": {
+          "ratio": 0.89,
+          "delta": -0.099
+        }
+      },
+      "win_share": 0.1,
+      "items": [
+        "pr5509",
+        "pr5550",
+        "pr5610",
+        "pr5703",
+        "pr5715",
+        "pr5840",
+        "pr5863",
+        "pr5884",
+        "pr5957",
+        "pr5976"
+      ],
+      "verdicts": [
+        {
+          "item": "pr5509",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5509",
+          "rep": "r2",
+          "winner": "copilot_v13_ds_wave2_r2",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5509",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r3",
+          "winner": "copilot_v13_ds_wave2_r2",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r3",
+          "winner": "copilot_v13_ds_wave2_r2",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        }
+      ],
+      "label": "DS v4-pro r2 fresh gen"
+    },
+    "goal_mimo_wave2": {
+      "arm": "copilot_v13_mimo_wave2",
+      "baseline": "claudecode_opus5",
+      "judge": "GPT-5.6 Sol 272K High",
+      "n_items": 10,
+      "n_verdicts": 29,
+      "wins": {
+        "claudecode_opus5": 27,
+        "copilot_v13_mimo_wave2": 2
+      },
+      "mean_rubric": {
+        "copilot_v13_mimo_wave2": {
+          "recall": 0.481,
+          "precision": 0.595,
+          "actionability": 0.731,
+          "gap_hit": 0.0
+        },
+        "claudecode_opus5": {
+          "recall": 0.639,
+          "precision": 0.697,
+          "actionability": 0.939,
+          "gap_hit": 0.0
+        }
+      },
+      "normalized": {
+        "recall": {
+          "ratio": 0.75,
+          "delta": -0.158
+        },
+        "precision": {
+          "ratio": 0.85,
+          "delta": -0.102
+        },
+        "actionability": {
+          "ratio": 0.78,
+          "delta": -0.208
+        }
+      },
+      "win_share": 0.069,
+      "items": [
+        "pr5509",
+        "pr5550",
+        "pr5610",
+        "pr5703",
+        "pr5715",
+        "pr5840",
+        "pr5863",
+        "pr5884",
+        "pr5957",
+        "pr5976"
+      ],
+      "verdicts": [
+        {
+          "item": "pr5509",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5509",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5509",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r1",
+          "winner": "copilot_v13_mimo_wave2",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r3",
+          "winner": "copilot_v13_mimo_wave2",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        }
+      ],
+      "label": "MiMo-v2.5, wave-2"
+    },
+    "goal_mimo_wave2_sonnet": {
+      "arm": "copilot_v13_mimo_wave2",
+      "baseline": "claudecode_opus5",
+      "judge": "claude-sonnet-5",
+      "n_items": 10,
+      "n_verdicts": 27,
+      "wins": {
+        "claudecode_opus5": 25,
+        "copilot_v13_mimo_wave2": 2
+      },
+      "mean_rubric": {
+        "copilot_v13_mimo_wave2": {
+          "recall": 0.27,
+          "precision": 0.732,
+          "actionability": 0.59,
+          "gap_hit": 0.0
+        },
+        "claudecode_opus5": {
+          "recall": 0.474,
+          "precision": 0.808,
+          "actionability": 0.883,
+          "gap_hit": 0.0
+        }
+      },
+      "normalized": {
+        "recall": {
+          "ratio": 0.57,
+          "delta": -0.204
+        },
+        "precision": {
+          "ratio": 0.91,
+          "delta": -0.076
+        },
+        "actionability": {
+          "ratio": 0.67,
+          "delta": -0.293
+        }
+      },
+      "win_share": 0.074,
+      "items": [
+        "pr5509",
+        "pr5550",
+        "pr5610",
+        "pr5703",
+        "pr5715",
+        "pr5840",
+        "pr5863",
+        "pr5884",
+        "pr5957",
+        "pr5976"
+      ],
+      "verdicts": [
+        {
+          "item": "pr5509",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5509",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5509",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r2",
+          "winner": "copilot_v13_mimo_wave2",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r3",
+          "winner": "copilot_v13_mimo_wave2",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        }
+      ],
+      "label": "MiMo-v2.5 re-scored"
+    },
+    "goal_composer_wave2_sonnet": {
+      "arm": "cursor_composer25",
+      "baseline": "claudecode_opus5",
+      "judge": "claude-sonnet-5",
+      "n_items": 10,
+      "n_verdicts": 30,
+      "wins": {
+        "claudecode_opus5": 26,
+        "cursor_composer25": 4
+      },
+      "mean_rubric": {
+        "cursor_composer25": {
+          "recall": 0.381,
+          "precision": 0.751,
+          "actionability": 0.773,
+          "gap_hit": 0.0
+        },
+        "claudecode_opus5": {
+          "recall": 0.507,
+          "precision": 0.799,
+          "actionability": 0.883,
+          "gap_hit": 0.0
+        }
+      },
+      "normalized": {
+        "recall": {
+          "ratio": 0.75,
+          "delta": -0.126
+        },
+        "precision": {
+          "ratio": 0.94,
+          "delta": -0.048
+        },
+        "actionability": {
+          "ratio": 0.88,
+          "delta": -0.11
+        }
+      },
+      "win_share": 0.133,
+      "items": [
+        "pr5509",
+        "pr5550",
+        "pr5610",
+        "pr5703",
+        "pr5715",
+        "pr5840",
+        "pr5863",
+        "pr5884",
+        "pr5957",
+        "pr5976"
+      ],
+      "verdicts": [
+        {
+          "item": "pr5509",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5509",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5509",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r3",
+          "winner": "cursor_composer25",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r1",
+          "winner": "cursor_composer25",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r2",
+          "winner": "cursor_composer25",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r3",
+          "winner": "cursor_composer25",
+          "margin": "slight"
+        }
+      ],
+      "label": "Composer-2.5 harness",
+      "audit_failed_items": [
+        "pr5884"
+      ],
+      "audit_violations": {
+        "pr5884": [
+          "read outside worktree: /home/zhoutaichang/.cursor/projects/data-zhoutaichang-infermatrix-copilot-worktrees-vllm-omni-pr5884/terminals/684336.txt"
+        ]
+      },
+      "wins_clean_only": {
+        "claudecode_opus5": 23,
+        "cursor_composer25": 4
+      },
+      "n_clean_items": 9
+    },
+    "goal_grok45_wave2_sonnet": {
+      "arm": "cursor_grok45",
+      "baseline": "claudecode_opus5",
+      "judge": "claude-sonnet-5",
+      "n_items": 10,
+      "n_verdicts": 30,
+      "wins": {
+        "claudecode_opus5": 28,
+        "cursor_grok45": 2
+      },
+      "mean_rubric": {
+        "cursor_grok45": {
+          "recall": 0.3,
+          "precision": 0.813,
+          "actionability": 0.712,
+          "gap_hit": 0.0
+        },
+        "claudecode_opus5": {
+          "recall": 0.464,
+          "precision": 0.783,
+          "actionability": 0.891,
+          "gap_hit": 0.0
+        }
+      },
+      "normalized": {
+        "recall": {
+          "ratio": 0.65,
+          "delta": -0.164
+        },
+        "precision": {
+          "ratio": 1.04,
+          "delta": 0.03
+        },
+        "actionability": {
+          "ratio": 0.8,
+          "delta": -0.179
+        }
+      },
+      "win_share": 0.067,
+      "items": [
+        "pr5509",
+        "pr5550",
+        "pr5610",
+        "pr5703",
+        "pr5715",
+        "pr5840",
+        "pr5863",
+        "pr5884",
+        "pr5957",
+        "pr5976"
+      ],
+      "verdicts": [
+        {
+          "item": "pr5509",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5509",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5509",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r2",
+          "winner": "cursor_grok45",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r3",
+          "winner": "cursor_grok45",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        }
+      ],
+      "label": "Grok-4.5 harness",
+      "audit_failed_items": [
+        "pr5509",
+        "pr5610",
+        "pr5703",
+        "pr5715",
+        "pr5840",
+        "pr5863",
+        "pr5884",
+        "pr5957",
+        "pr5976"
+      ],
+      "audit_violations": {
+        "pr5509": [
+          "read outside worktree: /home/zhoutaichang/.claude/skills/imreview/SKILL.md",
+          "read outside worktree: /home/zhoutaichang/.cursor/projects/data-zhoutaichang-infermatrix-copilot-worktrees-vllm-omni-pr5509/terminals/694614.txt"
+        ],
+        "pr5610": [
+          "read outside worktree: /home/zhoutaichang/.claude/skills/imreview/SKILL.md"
+        ],
+        "pr5703": [
+          "read outside worktree: /home/zhoutaichang/.claude/skills/imreview/SKILL.md",
+          "read outside worktree: /data/zhoutaichang/.cache/uv/archive-v0/b1YBuFePm-5r6QpFFv7bF/lib/python3.12/site-packages/infermatrix_copilot/knowledge/repos/vllm-omni/components/serving/rule",
+          "read outside worktree: /home/zhoutaichang/.cursor/projects/data-zhoutaichang-infermatrix-copilot-worktrees-vllm-omni-pr5703/terminals/191251.txt"
+        ],
+        "pr5715": [
+          "read outside worktree: /home/zhoutaichang/.claude/skills/imreview/SKILL.md"
+        ],
+        "pr5840": [
+          "read outside worktree: /home/zhoutaichang/.claude/skills/imreview/SKILL.md",
+          "read outside worktree: /home/zhoutaichang/.cursor/projects/data-zhoutaichang-infermatrix-copilot-worktrees-vllm-omni-pr5840/terminals/219037.txt"
+        ],
+        "pr5863": [
+          "read outside worktree: /home/zhoutaichang/.claude/skills/imreview/SKILL.md"
+        ],
+        "pr5884": [
+          "read outside worktree: /home/zhoutaichang/.claude/skills/imreview/SKILL.md",
+          "read outside worktree: /home/zhoutaichang/.cursor/projects/data-zhoutaichang-infermatrix-copilot-worktrees-vllm-omni-pr5884/terminals/86416.txt"
+        ],
+        "pr5957": [
+          "read outside worktree: /home/zhoutaichang/.claude/skills/imreview/SKILL.md",
+          "read outside worktree: /home/zhoutaichang/.cursor/projects/data-zhoutaichang-infermatrix-copilot-worktrees-vllm-omni-pr5957/terminals/723999.txt"
+        ],
+        "pr5976": [
+          "read outside worktree: /home/zhoutaichang/.claude/skills/imreview/SKILL.md",
+          "read outside worktree: /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/utils.py",
+          "read outside worktree: /usr/local/lib/python3.12/dist-packages/vllm/v1/engine/utils.py"
+        ]
+      },
+      "wins_clean_only": {
+        "claudecode_opus5": 3
+      },
+      "n_clean_items": 1
+    },
+    "goal_cb_composer25_wave2_sonnet": {
+      "arm": "copilot_cb_composer25",
+      "baseline": "claudecode_opus5",
+      "judge": "claude-sonnet-5",
+      "n_items": 10,
+      "n_verdicts": 30,
+      "wins": {
+        "claudecode_opus5": 25,
+        "copilot_cb_composer25": 4,
+        "tie": 1
+      },
+      "mean_rubric": {
+        "copilot_cb_composer25": {
+          "recall": 0.318,
+          "precision": 0.729,
+          "actionability": 0.709,
+          "gap_hit": 0.0
+        },
+        "claudecode_opus5": {
+          "recall": 0.432,
+          "precision": 0.783,
+          "actionability": 0.882,
+          "gap_hit": 0.0
+        }
+      },
+      "normalized": {
+        "recall": {
+          "ratio": 0.74,
+          "delta": -0.114
+        },
+        "precision": {
+          "ratio": 0.93,
+          "delta": -0.054
+        },
+        "actionability": {
+          "ratio": 0.8,
+          "delta": -0.173
+        }
+      },
+      "win_share": 0.15,
+      "items": [
+        "pr5509",
+        "pr5550",
+        "pr5610",
+        "pr5703",
+        "pr5715",
+        "pr5840",
+        "pr5863",
+        "pr5884",
+        "pr5957",
+        "pr5976"
+      ],
+      "verdicts": [
+        {
+          "item": "pr5509",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5509",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5509",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r2",
+          "winner": "copilot_cb_composer25",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r2",
+          "winner": "copilot_cb_composer25",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r3",
+          "winner": "tie",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r1",
+          "winner": "copilot_cb_composer25",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r2",
+          "winner": "copilot_cb_composer25",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        }
+      ],
+      "label": "Composer-2.5, v13 via cursor backend"
+    },
+    "goal_cb_grok45_wave2_sonnet": {
+      "arm": "copilot_cb_grok45",
+      "baseline": "claudecode_opus5",
+      "judge": "claude-sonnet-5",
+      "n_items": 10,
+      "n_verdicts": 30,
+      "wins": {
+        "claudecode_opus5": 24,
+        "copilot_cb_grok45": 5,
+        "tie": 1
+      },
+      "mean_rubric": {
+        "copilot_cb_grok45": {
+          "recall": 0.351,
+          "precision": 0.776,
+          "actionability": 0.749,
+          "gap_hit": 0.0
+        },
+        "claudecode_opus5": {
+          "recall": 0.496,
+          "precision": 0.81,
+          "actionability": 0.877,
+          "gap_hit": 0.0
+        }
+      },
+      "normalized": {
+        "recall": {
+          "ratio": 0.71,
+          "delta": -0.145
+        },
+        "precision": {
+          "ratio": 0.96,
+          "delta": -0.034
+        },
+        "actionability": {
+          "ratio": 0.85,
+          "delta": -0.128
+        }
+      },
+      "win_share": 0.183,
+      "items": [
+        "pr5509",
+        "pr5550",
+        "pr5610",
+        "pr5703",
+        "pr5715",
+        "pr5840",
+        "pr5863",
+        "pr5884",
+        "pr5957",
+        "pr5976"
+      ],
+      "verdicts": [
+        {
+          "item": "pr5509",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5509",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5509",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r2",
+          "winner": "copilot_cb_grok45",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r1",
+          "winner": "copilot_cb_grok45",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r1",
+          "winner": "copilot_cb_grok45",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r2",
+          "winner": "copilot_cb_grok45",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r3",
+          "winner": "copilot_cb_grok45",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r3",
+          "winner": "tie",
+          "margin": "slight"
+        }
+      ],
+      "label": "Grok-4.5, v13 via cursor backend"
+    },
+    "goal_cb_grok46_wave2_sonnet": {
+      "arm": "copilot_cb_grok46",
+      "baseline": "claudecode_opus5",
+      "judge": "claude-sonnet-5",
+      "n_items": 7,
+      "n_verdicts": 21,
+      "wins": {
+        "claudecode_opus5": 17,
+        "copilot_cb_grok46": 3,
+        "tie": 1
+      },
+      "mean_rubric": {
+        "copilot_cb_grok46": {
+          "recall": 0.325,
+          "precision": 0.81,
+          "actionability": 0.75,
+          "gap_hit": 0.0
+        },
+        "claudecode_opus5": {
+          "recall": 0.552,
+          "precision": 0.807,
+          "actionability": 0.882,
+          "gap_hit": 0.0
+        }
+      },
+      "normalized": {
+        "recall": {
+          "ratio": 0.59,
+          "delta": -0.227
+        },
+        "precision": {
+          "ratio": 1.0,
+          "delta": 0.003
+        },
+        "actionability": {
+          "ratio": 0.85,
+          "delta": -0.132
+        }
+      },
+      "win_share": 0.167,
+      "items": [
+        "pr5509",
+        "pr5610",
+        "pr5715",
+        "pr5840",
+        "pr5863",
+        "pr5884",
+        "pr5976"
+      ],
+      "verdicts": [
+        {
+          "item": "pr5509",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5509",
+          "rep": "r2",
+          "winner": "copilot_cb_grok46",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5509",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r1",
+          "winner": "tie",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r2",
+          "winner": "copilot_cb_grok46",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r3",
+          "winner": "copilot_cb_grok46",
+          "margin": "slight"
+        }
+      ],
+      "label": "Grok-4.6 cb r2 \u2014 TAINTED (skill leak)"
+    },
+    "goal_cb_grok46_r3_sonnet": {
+      "arm": "copilot_cb_grok46_r3",
+      "baseline": "claudecode_opus5",
+      "judge": "claude-sonnet-5",
+      "n_items": 6,
+      "n_verdicts": 18,
+      "wins": {
+        "claudecode_opus5": 16,
+        "copilot_cb_grok46_r3": 2
+      },
+      "mean_rubric": {
+        "copilot_cb_grok46_r3": {
+          "recall": 0.253,
+          "precision": 0.822,
+          "actionability": 0.747,
+          "gap_hit": 0.0
+        },
+        "claudecode_opus5": {
+          "recall": 0.452,
+          "precision": 0.821,
+          "actionability": 0.866,
+          "gap_hit": 0.0
+        }
+      },
+      "normalized": {
+        "recall": {
+          "ratio": 0.56,
+          "delta": -0.199
+        },
+        "precision": {
+          "ratio": 1.0,
+          "delta": 0.001
+        },
+        "actionability": {
+          "ratio": 0.86,
+          "delta": -0.119
+        }
+      },
+      "win_share": 0.111,
+      "items": [
+        "pr5550",
+        "pr5610",
+        "pr5715",
+        "pr5840",
+        "pr5863",
+        "pr5976"
+      ],
+      "verdicts": [
+        {
+          "item": "pr5550",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r1",
+          "winner": "copilot_cb_grok46_r3",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r2",
+          "winner": "copilot_cb_grok46_r3",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        }
+      ],
+      "label": "Grok-4.6, v13 via cursor backend (r3, canonical)"
+    },
+    "goal_v13moa_cgm_wave2_sonnet": {
+      "arm": "copilot_v13_moa_cgm",
+      "baseline": "claudecode_opus5",
+      "judge": "claude-sonnet-5",
+      "n_items": 10,
+      "n_verdicts": 30,
+      "wins": {
+        "claudecode_opus5": 24,
+        "tie": 1,
+        "copilot_v13_moa_cgm": 5
+      },
+      "mean_rubric": {
+        "copilot_v13_moa_cgm": {
+          "recall": 0.292,
+          "precision": 0.799,
+          "actionability": 0.756,
+          "gap_hit": 0.0
+        },
+        "claudecode_opus5": {
+          "recall": 0.415,
+          "precision": 0.791,
+          "actionability": 0.877,
+          "gap_hit": 0.0
+        }
+      },
+      "normalized": {
+        "recall": {
+          "ratio": 0.7,
+          "delta": -0.123
+        },
+        "precision": {
+          "ratio": 1.01,
+          "delta": 0.008
+        },
+        "actionability": {
+          "ratio": 0.86,
+          "delta": -0.121
+        }
+      },
+      "win_share": 0.183,
+      "items": [
+        "pr5509",
+        "pr5550",
+        "pr5610",
+        "pr5703",
+        "pr5715",
+        "pr5840",
+        "pr5863",
+        "pr5884",
+        "pr5957",
+        "pr5976"
+      ],
+      "verdicts": [
+        {
+          "item": "pr5509",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5509",
+          "rep": "r2",
+          "winner": "tie",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5509",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r1",
+          "winner": "copilot_v13_moa_cgm",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r1",
+          "winner": "copilot_v13_moa_cgm",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r2",
+          "winner": "copilot_v13_moa_cgm",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r3",
+          "winner": "copilot_v13_moa_cgm",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r1",
+          "winner": "copilot_v13_moa_cgm",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        }
+      ],
+      "label": "MoA composer+grok4.6+mimo r1, DS spine"
+    },
+    "goal_moa_cgm_wave2_sonnet": {
+      "arm": "copilot_moa_cgm",
+      "baseline": "claudecode_opus5",
+      "judge": "claude-sonnet-5",
+      "n_items": 10,
+      "n_verdicts": 30,
+      "wins": {
+        "claudecode_opus5": 25,
+        "copilot_moa_cgm": 5
+      },
+      "mean_rubric": {
+        "copilot_moa_cgm": {
+          "recall": 0.338,
+          "precision": 0.82,
+          "actionability": 0.777,
+          "gap_hit": 0.0
+        },
+        "claudecode_opus5": {
+          "recall": 0.469,
+          "precision": 0.798,
+          "actionability": 0.883,
+          "gap_hit": 0.0
+        }
+      },
+      "normalized": {
+        "recall": {
+          "ratio": 0.72,
+          "delta": -0.131
+        },
+        "precision": {
+          "ratio": 1.03,
+          "delta": 0.022
+        },
+        "actionability": {
+          "ratio": 0.88,
+          "delta": -0.106
+        }
+      },
+      "win_share": 0.167,
+      "items": [
+        "pr5509",
+        "pr5550",
+        "pr5610",
+        "pr5703",
+        "pr5715",
+        "pr5840",
+        "pr5863",
+        "pr5884",
+        "pr5957",
+        "pr5976"
+      ],
+      "verdicts": [
+        {
+          "item": "pr5509",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5509",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5509",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5550",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5610",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r2",
+          "winner": "copilot_moa_cgm",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5703",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5715",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5840",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5863",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "decisive"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r2",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5884",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "clear"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r1",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r2",
+          "winner": "copilot_moa_cgm",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5957",
+          "rep": "r3",
+          "winner": "claudecode_opus5",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r1",
+          "winner": "copilot_moa_cgm",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r2",
+          "winner": "copilot_moa_cgm",
+          "margin": "slight"
+        },
+        {
+          "item": "pr5976",
+          "rep": "r3",
+          "winner": "copilot_moa_cgm",
+          "margin": "slight"
+        }
+      ],
+      "label": "MoA composer+grok4.6+mimo r2 (peer session)"
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.65,
+    "precision": 0.55,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.78,
+    "precision": 0.72,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently surface the two real ground-truth concerns (audio_vae.py:141 config mutation, serving_speech.py language/dialect drop) and correctly validate the patch_emission.py +2 offset against the vendor rationale; Y additionally catches the metrics/definitions.py layering note (hsliuustc0106's 'refactor the env in the next release') that X misses. Y's report is tighter and better synthesized — it ties the double sample-rate-conversion bug directly to WER non-reproducibility with concrete math, flags a real ripple effect (voice_presets caching non-deterministic latents across restarts), and orders findings by severity without repetition. X repeats the same 3-4 findings three times across 'Validated', main body, and 'Additional observations', and pads the report with WER-percentage/issue-number ledger entries not grounded in the given diff or ground truth, hurting precision despite comparable actionability (both give concrete file:line suggestions).",
+  "_cost_usd": 0.4139781,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17cb_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17cb_train",
+    "arm_a_sha256": "41084d917e11ddc4fd53d21c5b7d627ef2c75a0bfc6645a2e29220b7ecaf314d",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "264e453d996b4a5c483bf206cefb21e513e90d0d6bda5e49948434353154f4a5",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

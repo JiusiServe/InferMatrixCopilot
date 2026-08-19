@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.75,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates independently found the same real unaddressed race (split-map pop happening before the slow unlocked SHM unpack) and the same swallowed-unpack-error bug, both grounded in cited diff lines — precision is solid for both. Neither caught the ground truth's most substantive open item (the aggregate MessageQueue/ring-buffer overflow with many sub-threshold tensors), but X's nit about the misleading 'Clamped' comment on the max(0,...) guard is the only partial hit on the ground-truth inline-comment thread about that clamp, giving X a slim recall edge. X is clearly more actionable: concrete proposed code patches, a clear Blocking/Worth-addressing/Nits structure, and a definitive verdict, versus Y's more mechanical evidence-log format that ends abruptly mid-sentence and includes some redundant/self-contradictory bookkeeping (claim-verified vs claim-refuted on the same LTX point).",
+  "_cost_usd": 0.1857903,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16f_holdout5_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout5_r1",
+    "arm_a_sha256": "1722cc9c6d2951f8a7b7cbb68655662051ccc4d23d2ee8e227f5bfe9a9ae40e1",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "79574ebe4d2e7ed8479f1bdf32143ed3aea20aa7fef32ccdc7a91c5ccaaadc57",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

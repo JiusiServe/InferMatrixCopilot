@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "actionability": 0.0,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Candidate X produced no review at all (blocked by an API billing error), so it contributes nothing to recall/precision/actionability. Candidate Y delivers a detailed, code-grounded review with verifiable line citations and quoted comments that match the actual diff (e.g. the SAGE quantization comment, the trim-loop logic), and its 'AllGather-KV reject is unrelated scope/untested' finding lands in the same code region as the ground-truth P1 concern, though framed as a critique of the fix rather than the original bug — likely because the diff shown already incorporates the reviewers' fixes for P1/P2, limiting how much of the original two inline concerns remain detectable. Y's findings are concrete and actionable (file:line, snippets, suggested patches) even where they diverge from the two specific ground-truth threads. Y wins decisively simply by producing a substantive, well-grounded review where X produced none.",
+  "_cost_usd": 0.32686760000000004,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v15_holdout4_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v15_holdout4_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15_holdout4_r2",
+    "arm_a_sha256": "e38c7e72b00ffa97a88937cfd57b57817ab558155eb06d6ca5c5b44a63950fcb",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "283d5ab54325426c21ff03640adaaf73eb89e801040f4baf619381200e657fb0",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

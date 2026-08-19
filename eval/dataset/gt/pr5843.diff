@@ -1,0 +1,534 @@
+diff --git a/docs/mkdocs/hooks/generate_argparse.py b/docs/mkdocs/hooks/generate_argparse.py
+index 0d18ad6c915..b695185d19c 100644
+--- a/docs/mkdocs/hooks/generate_argparse.py
++++ b/docs/mkdocs/hooks/generate_argparse.py
+@@ -123,6 +123,7 @@ def add_parser(self, name, **kwargs):
+                         "TrackingNamespace": None,  # type annotation only
+                         "make_arg_parser": lambda parser: parser,  # no-op for doc
+                         "_ensure_vllm_platform": lambda: None,  # no-op for doc
++                        "_nonneg_finite_float": float,
+                         "VLLM_SUBCMD_PARSER_EPILOG": "",
+                         "logger": logger,
+                         "DummySubparsers": DummySubparsers,
+diff --git a/tests/diffusion/test_diffusion_engine.py b/tests/diffusion/test_diffusion_engine.py
+index c0f79aff665..a0c6acb0236 100644
+--- a/tests/diffusion/test_diffusion_engine.py
++++ b/tests/diffusion/test_diffusion_engine.py
+@@ -25,6 +25,7 @@
+ from vllm_omni.diffusion.sched.interface import (
+     CachedRequestData,
+     NewRequestData,
++    _AdmissionWaitDecision,
+ )
+ from vllm_omni.diffusion.sched.interface import (
+     DiffusionSchedulerOutput as RealDiffusionSchedulerOutput,
+@@ -75,6 +76,34 @@ def num_waiting_requests(self) -> int:
+     def num_running_requests(self) -> int:
+         return 0
+ 
++    def get_admission_wait_decision(
++        self,
++        *,
++        now: float,
++        dp_concurrent: bool = False,
++    ) -> _AdmissionWaitDecision:
++        del dp_concurrent
++        return _AdmissionWaitDecision(
++            should_wait=True,
++            deadline=now + 0.5,
++            stable_window_s=0.05,
++            max_batch=self.max_num_running_reqs,
++        )
++
++    def should_end_admission_wait(
++        self,
++        decision: _AdmissionWaitDecision,
++        *,
++        now: float,
++        stable_since: float,
++    ) -> bool:
++        waiting = self.num_waiting_requests()
++        return (
++            waiting >= decision.max_batch
++            or (waiting > 0 and now - stable_since >= decision.stable_window_s)
++            or (decision.deadline is not None and now >= decision.deadline)
++        )
++
+     def schedule(self) -> DiffusionSchedulerOutput:
+         if not self._waiting_queue:
+             return DiffusionSchedulerOutput(step_id=self._step_id)
+@@ -536,6 +565,11 @@ def test_config_rejects_negative_request_batch_max_wait_ms(self) -> None:
+         with pytest.raises(ValueError, match="request_batch_max_wait_ms"):
+             OmniDiffusionConfig(model="test", request_batch_max_wait_ms=-1.0)
+ 
++    @pytest.mark.parametrize("bad_wait", [float("nan"), float("inf"), float("-inf")])
++    def test_config_rejects_nonfinite_request_batch_max_wait_ms(self, bad_wait: float) -> None:
++        with pytest.raises(ValueError, match="request_batch_max_wait_ms"):
++            OmniDiffusionConfig(model="test", request_batch_max_wait_ms=bad_wait)
++
+     def test_config_normalizes_request_batch_max_wait_ms_to_float(self) -> None:
+         config = OmniDiffusionConfig(model="test", request_batch_max_wait_ms=5)
+ 
+@@ -603,7 +637,7 @@ def test_request_batch_admission_exits_early_when_waiting_queue_stable(self) ->
+ 
+         start = time.monotonic()
+         with engine._cv:
+-            engine._wait_for_request_batch_admission_locked()
++            engine._wait_for_admission_if_needed_locked()
+         waited_s = time.monotonic() - start
+ 
+         # Stable-window exit (~50ms), not the full 1000ms deadline.
+diff --git a/tests/diffusion/test_diffusion_engine_rpc_routing.py b/tests/diffusion/test_diffusion_engine_rpc_routing.py
+index 5e4e9189abe..1d4c2d17eca 100644
+--- a/tests/diffusion/test_diffusion_engine_rpc_routing.py
++++ b/tests/diffusion/test_diffusion_engine_rpc_routing.py
+@@ -146,7 +146,7 @@ def _make_engine_with_loop(
+     engine.executor = _ConcurrencyTrackingExecutor(rpc_delay=rpc_delay)
+ 
+     sched = RequestScheduler()
+-    sched.initialize(SimpleNamespace(max_num_seqs=1))
++    sched.initialize(SimpleNamespace(max_num_seqs=1, request_batch_max_wait_ms=0.0))
+     engine.scheduler = sched
+     engine.step_execution = False
+     engine.supports_request_batch = False
+diff --git a/tests/diffusion/test_diffusion_scheduler.py b/tests/diffusion/test_diffusion_scheduler.py
+index ec0bef26428..ce9f0ebe1f5 100644
+--- a/tests/diffusion/test_diffusion_scheduler.py
++++ b/tests/diffusion/test_diffusion_scheduler.py
+@@ -244,7 +244,86 @@ def test_ignores_seed_and_generator(self) -> None:
+ class TestRequestScheduler:
+     def setup_method(self) -> None:
+         self.scheduler: RequestScheduler = RequestScheduler()
+-        self.scheduler.initialize(SimpleNamespace())
++        self.scheduler.initialize(SimpleNamespace(request_batch_max_wait_ms=0.0))
++
++    def test_admission_wait_disabled_with_zero_max_wait(self) -> None:
++        self.scheduler.initialize(SimpleNamespace(request_batch_max_wait_ms=0.0))
++        decision = self.scheduler.get_admission_wait_decision(now=10.0)
++
++        assert decision.should_wait is False
++
++    @pytest.mark.parametrize(
++        ("dp_concurrent", "expected_stable_window_s"),
++        [(False, 0.05), (True, 0.3)],
++    )
++    def test_admission_wait_decision_encodes_coalescing_policy(
++        self,
++        dp_concurrent: bool,
++        expected_stable_window_s: float,
++    ) -> None:
++        self.scheduler.initialize(
++            SimpleNamespace(
++                max_num_seqs=4,
++                request_batch_max_wait_ms=1000.0,
++            )
++        )
++
++        decision = self.scheduler.get_admission_wait_decision(
++            now=10.0,
++            dp_concurrent=dp_concurrent,
++        )
++
++        assert decision.should_wait is True
++        assert decision.deadline == 11.0
++        assert decision.stable_window_s == expected_stable_window_s
++        assert decision.max_batch == 4
++
++    def test_admission_wait_disabled_while_wave_is_running(self) -> None:
++        self.scheduler.initialize(
++            SimpleNamespace(
++                max_num_seqs=1,
++                request_batch_max_wait_ms=1000.0,
++            )
++        )
++        self.scheduler.add_request(_make_request("running"))
++        self.scheduler.schedule()
++
++        decision = self.scheduler.get_admission_wait_decision(now=10.0)
++
++        assert decision.should_wait is False
++
++    def test_admission_wait_end_conditions(self) -> None:
++        self.scheduler.initialize(
++            SimpleNamespace(
++                max_num_seqs=2,
++                request_batch_max_wait_ms=1000.0,
++            )
++        )
++        decision = self.scheduler.get_admission_wait_decision(now=10.0)
++        self.scheduler.add_request(_make_request("a"))
++
++        assert not self.scheduler.should_end_admission_wait(
++            decision,
++            now=10.01,
++            stable_since=10.0,
++        )
++        assert self.scheduler.should_end_admission_wait(
++            decision,
++            now=10.05,
++            stable_since=10.0,
++        )
++        assert self.scheduler.should_end_admission_wait(
++            decision,
++            now=11.0,
++            stable_since=11.0,
++        )
++
++        self.scheduler.add_request(_make_request("b"))
++        assert self.scheduler.should_end_admission_wait(
++            decision,
++            now=10.01,
++            stable_since=10.01,
++        )
+ 
+     def test_single_request_success_lifecycle(self) -> None:
+         req_id = self.scheduler.add_request(_make_request("a"))
+@@ -898,6 +977,14 @@ def setup_method(self) -> None:
+         self.scheduler: StepScheduler = StepScheduler()
+         self.scheduler.initialize(SimpleNamespace())
+ 
++    def test_admission_wait_is_not_supported(self) -> None:
++        decision = self.scheduler.get_admission_wait_decision(
++            now=10.0,
++            dp_concurrent=True,
++        )
++
++        assert decision.should_wait is False
++
+     def test_single_request_step_lifecycle(self) -> None:
+         request = _make_step_request("step", num_inference_steps=3)
+         req_id = self.scheduler.add_request(request)
+diff --git a/tests/entrypoints/test_async_omni_diffusion_config.py b/tests/entrypoints/test_async_omni_diffusion_config.py
+index ecb0f20e8fb..64b586bf269 100644
+--- a/tests/entrypoints/test_async_omni_diffusion_config.py
++++ b/tests/entrypoints/test_async_omni_diffusion_config.py
+@@ -389,6 +389,24 @@ def test_serve_cli_accepts_request_batch_max_wait_ms():
+     assert stage_cfg["engine_args"]["request_batch_max_wait_ms"] == 250.0
+ 
+ 
++@pytest.mark.parametrize("bad_wait", ["nan", "inf", "-inf", "-1"])
++def test_serve_cli_rejects_invalid_request_batch_max_wait_ms(bad_wait: str):
++    parser = TrackingArgumentParser()
++    subparsers = parser.add_subparsers(dest="command")
++    OmniServeCommand().subparser_init(subparsers)
++
++    with pytest.raises(SystemExit):
++        parser.parse_args(
++            [
++                "serve",
++                "Qwen/Qwen-Image",
++                "--omni",
++                "--request-batch-max-wait-ms",
++                bad_wait,
++            ]
++        )
++
++
+ def test_serve_cli_accepts_additional_config():
+     """Ensure diffusion serve CLI exposes additional_config and forwards it to stage config."""
+     parser = TrackingArgumentParser()
+diff --git a/tools/pre_commit/check_tts_adapter.py b/tools/pre_commit/check_tts_adapter.py
+index 233e1a0e63d..5835f7d80a3 100644
+--- a/tools/pre_commit/check_tts_adapter.py
++++ b/tools/pre_commit/check_tts_adapter.py
+@@ -31,8 +31,8 @@
+ ADAPTERS_INIT = Path("vllm_omni/entrypoints/openai/tts_adapters/__init__.py")
+ 
+ # Budgets. These may only go DOWN. See the module docstring.
+-MAX_MODEL_TYPE_BRANCHES = 29
+-MAX_LEGACY_DETECTORS = 1
++MAX_MODEL_TYPE_BRANCHES = 27
++MAX_LEGACY_DETECTORS = 0
+ 
+ _GUIDANCE = """
+ Move the per-model behaviour into its adapter under
+diff --git a/vllm_omni/diffusion/data.py b/vllm_omni/diffusion/data.py
+index 6874d9efe11..73051692dd2 100644
+--- a/vllm_omni/diffusion/data.py
++++ b/vllm_omni/diffusion/data.py
+@@ -948,8 +948,10 @@ def __post_init__(self):
+ 
+         self.master_port = self._resolve_master_port()
+         self.request_batch_max_wait_ms = float(self.request_batch_max_wait_ms or 0.0)
+-        if self.request_batch_max_wait_ms < 0:
+-            raise ValueError(f"request_batch_max_wait_ms must be non-negative, got {self.request_batch_max_wait_ms}.")
++        if not math.isfinite(self.request_batch_max_wait_ms) or self.request_batch_max_wait_ms < 0:
++            raise ValueError(
++                f"request_batch_max_wait_ms must be a finite non-negative number, got {self.request_batch_max_wait_ms}."
++            )
+ 
+         if isinstance(self.profiler_config, dict):
+             from vllm.config import ProfilerConfig
+diff --git a/vllm_omni/diffusion/diffusion_engine.py b/vllm_omni/diffusion/diffusion_engine.py
+index e44d935fb0e..c9b4bd72f6e 100644
+--- a/vllm_omni/diffusion/diffusion_engine.py
++++ b/vllm_omni/diffusion/diffusion_engine.py
+@@ -434,8 +434,7 @@ def _busy_loop(self):
+                     # Only RPC / abort work pending; loop back to drain it.
+                     continue
+ 
+-                if self.supports_request_batch or self.dp_concurrent:
+-                    self._wait_for_request_batch_admission_locked()
++                self._wait_for_admission_if_needed_locked()
+ 
+                 sched_output = self.scheduler.schedule()
+ 
+@@ -469,53 +468,39 @@ def _busy_loop(self):
+         # Engine is stopping: fail any RPCs still queued so callers don't hang.
+         self._fail_pending_rpcs(RuntimeError("DiffusionEngine is shutting down."))
+ 
+-    def _wait_for_request_batch_admission_locked(self) -> None:
+-        """Wait for compatible requests to accumulate before scheduling a wave.
++    def _wait_for_admission_if_needed_locked(self) -> None:
++        """Apply scheduler admission policy while holding the engine condition.
+ 
+         Caller must hold ``self._cv``.
+         """
+-        if self.step_execution or (not self.supports_request_batch and not self.dp_concurrent):
+-            return
+-
+-        max_wait_s = self.od_config.request_batch_max_wait_ms / 1000.0
+-        if max_wait_s == 0:
+-            return
+-
+-        max_batch = self.scheduler.max_num_running_reqs
+-        waiting = self.scheduler.num_waiting_requests()
+-        running = self.scheduler.num_running_requests()
+-
+-        if running > 0:
++        start = time.monotonic()
++        decision = self.scheduler.get_admission_wait_decision(
++            now=start,
++            dp_concurrent=self.dp_concurrent,
++        )
++        if not decision.should_wait:
+             return
+ 
+-        start = time.monotonic()
+-        deadline = start + max_wait_s
+         last_waiting = -1
+         stable_since = start
+-        # For dp_concurrent, use a longer stable window so all dp_size
+-        # HTTP requests have time to land before scheduling.
+-        if self.dp_concurrent:
+-            stable_window_s = min(0.3, max_wait_s / 2.0)
+-        else:
+-            stable_window_s = min(0.05, max_wait_s / 5.0)
+ 
+         while not self.stop_event.is_set():
+             waiting = self.scheduler.num_waiting_requests()
+             now = time.monotonic()
+ 
+-            if waiting >= max_batch:
+-                break
+-            if waiting > 0 and (now - stable_since) >= stable_window_s:
+-                break
+-            if now >= deadline:
+-                break
+-
+             if waiting > last_waiting:
+                 stable_since = now
+                 last_waiting = waiting
+ 
+-            remaining = deadline - now
+-            self._cv.wait(timeout=min(remaining, 0.002))
++            if self.scheduler.should_end_admission_wait(
++                decision,
++                now=now,
++                stable_since=stable_since,
++            ):
++                break
++
++            remaining = decision.deadline - now if decision.deadline is not None else 0.002
++            self._cv.wait(timeout=min(max(remaining, 0.0), 0.002))
+ 
+         waited_ms = (time.monotonic() - start) * 1000.0
+         final_waiting = self.scheduler.num_waiting_requests()
+@@ -523,7 +508,7 @@ def _wait_for_request_batch_admission_locked(self) -> None:
+             logger.info(
+                 "[RequestBatch] admission wait done waiting=%d max_batch=%d waited_ms=%.1f",
+                 final_waiting,
+-                max_batch,
++                decision.max_batch,
+                 waited_ms,
+             )
+ 
+diff --git a/vllm_omni/diffusion/sched/base_scheduler.py b/vllm_omni/diffusion/sched/base_scheduler.py
+index 042bed0d160..b558c1ee6b0 100644
+--- a/vllm_omni/diffusion/sched/base_scheduler.py
++++ b/vllm_omni/diffusion/sched/base_scheduler.py
+@@ -21,6 +21,7 @@
+     RequestBatchSamplingParamsKey,
+     SchedulerRequestState,
+     StepBatchSamplingParamsKey,
++    _AdmissionWaitDecision,
+ )
+ from vllm_omni.diffusion.worker.utils import RunnerOutput
+ 
+@@ -158,6 +159,27 @@ def num_waiting_requests(self) -> int:
+     def num_running_requests(self) -> int:
+         return len(self._running)
+ 
++    def get_admission_wait_decision(
++        self,
++        *,
++        now: float,
++        dp_concurrent: bool = False,
++    ) -> _AdmissionWaitDecision:
++        """Return the admission-delay policy for the next scheduling wave."""
++        del now, dp_concurrent
++        return _AdmissionWaitDecision(should_wait=False)
++
++    def should_end_admission_wait(
++        self,
++        decision: _AdmissionWaitDecision,
++        *,
++        now: float,
++        stable_since: float,
++    ) -> bool:
++        """Return whether an active admission delay should end."""
++        del decision, now, stable_since
++        return True
++
+     def get_request_state(self, request_id: str) -> SchedulerRequestState | None:
+         return self._request_states.get(request_id)
+ 
+diff --git a/vllm_omni/diffusion/sched/interface.py b/vllm_omni/diffusion/sched/interface.py
+index a08108b79eb..eecd53556a5 100644
+--- a/vllm_omni/diffusion/sched/interface.py
++++ b/vllm_omni/diffusion/sched/interface.py
+@@ -31,6 +31,16 @@ def is_finished(status: DiffusionRequestStatus) -> bool:
+         return status >= DiffusionRequestStatus.FINISHED_COMPLETED
+ 
+ 
++@dataclass(frozen=True)
++class _AdmissionWaitDecision:
++    """Internal scheduler policy for delaying the next admission wave."""
++
++    should_wait: bool
++    deadline: float | None = None
++    stable_window_s: float = 0.0
++    max_batch: int = 1
++
++
+ @dataclass(frozen=True, eq=True)
+ class StepBatchSamplingParamsKey:
+     """Denoise step level Batch-compatibility key derived from ``OmniDiffusionSamplingParams``.
+diff --git a/vllm_omni/diffusion/sched/request_scheduler.py b/vllm_omni/diffusion/sched/request_scheduler.py
+index 2c4bcc0bfcb..96836018305 100644
+--- a/vllm_omni/diffusion/sched/request_scheduler.py
++++ b/vllm_omni/diffusion/sched/request_scheduler.py
+@@ -12,6 +12,7 @@
+     DiffusionRequestStatus,
+     DiffusionSchedulerOutput,
+     RequestBatchSamplingParamsKey,
++    _AdmissionWaitDecision,
+ )
+ 
+ if TYPE_CHECKING:
+@@ -35,7 +36,43 @@ def build_request_batch_sampling_params_key(request: OmniDiffusionRequest) -> Re
+ 
+ 
+ class RequestScheduler(BaseScheduler):
+-    """Diffusion scheduler with vLLM-style waiting/running queues."""
++    """Scheduler for static request waves, including admission coalescing."""
++
++    def get_admission_wait_decision(
++        self,
++        *,
++        now: float,
++        dp_concurrent: bool = False,
++    ) -> _AdmissionWaitDecision:
++        assert self.od_config is not None
++        max_wait_ms = self.od_config.request_batch_max_wait_ms
++        if max_wait_ms <= 0.0 or self.max_num_running_reqs <= 1:
++            return _AdmissionWaitDecision(should_wait=False)
++        if self.num_running_requests() > 0:
++            return _AdmissionWaitDecision(should_wait=False)
++
++        max_wait_s = max_wait_ms / 1000.0
++        stable_window_s = min(0.3, max_wait_s / 2.0) if dp_concurrent else min(0.05, max_wait_s / 5.0)
++        return _AdmissionWaitDecision(
++            should_wait=True,
++            deadline=now + max_wait_s,
++            stable_window_s=stable_window_s,
++            max_batch=self.max_num_running_reqs,
++        )
++
++    def should_end_admission_wait(
++        self,
++        decision: _AdmissionWaitDecision,
++        *,
++        now: float,
++        stable_since: float,
++    ) -> bool:
++        waiting = self.num_waiting_requests()
++        return (
++            waiting >= decision.max_batch
++            or (waiting > 0 and now - stable_since >= decision.stable_window_s)
++            or (decision.deadline is not None and now >= decision.deadline)
++        )
+ 
+     def _build_sampling_params_key(self, request: OmniDiffusionRequest) -> RequestBatchSamplingParamsKey:
+         return build_request_batch_sampling_params_key(request)
+diff --git a/vllm_omni/entrypoints/cli/serve.py b/vllm_omni/entrypoints/cli/serve.py
+index c71ae4e4c7a..7fb9cb8cd93 100644
+--- a/vllm_omni/entrypoints/cli/serve.py
++++ b/vllm_omni/entrypoints/cli/serve.py
+@@ -7,6 +7,7 @@
+ 
+ import argparse
+ import json
++import math
+ import os
+ import signal
+ from types import FrameType
+@@ -43,6 +44,17 @@
+ """
+ 
+ 
++def _nonneg_finite_float(value: str) -> float:
++    """Argparse type for finite, non-negative floats (rejects nan/inf)."""
++    try:
++        parsed = float(value)
++    except ValueError as exc:
++        raise argparse.ArgumentTypeError(f"invalid float value: {value!r}") from exc
++    if not math.isfinite(parsed) or parsed < 0:
++        raise argparse.ArgumentTypeError(f"must be a finite non-negative number, got {value!r}")
++    return parsed
++
++
+ def _ensure_vllm_platform():
+     """Ensure vLLM's current_platform is valid before arg parsing.
+ 
+@@ -599,7 +611,7 @@ def subparser_init(self, subparsers: argparse._SubParsersAction) -> TrackingArgu
+         )
+         omni_config_group.add_argument(
+             "--request-batch-max-wait-ms",
+-            type=float,
++            type=_nonneg_finite_float,
+             default=0.0,
+             help="Request-mode batch admission: max milliseconds to wait for compatible "
+             "requests to accumulate before scheduling a fused forward wave. "
+diff --git a/vllm_omni/entrypoints/openai/tts_adapters/__init__.py b/vllm_omni/entrypoints/openai/tts_adapters/__init__.py
+index 45f7da06c8c..cd44f0ff58f 100644
+--- a/vllm_omni/entrypoints/openai/tts_adapters/__init__.py
++++ b/vllm_omni/entrypoints/openai/tts_adapters/__init__.py
+@@ -31,16 +31,7 @@
+ 
+ #: Model types the serving layer detects that have no adapter yet. See
+ #: :class:`LegacyDetector`. This list must only ever shrink.
+-LEGACY_TTS_DETECTORS: tuple[LegacyDetector, ...] = (
+-    # Ming *flash-omni* claims the ``ming_tts`` stage key, while Ming *dense*
+-    # (which does have an adapter) is identified by architecture. The stage key
+-    # must therefore be tested first, hence the explicit priority.
+-    LegacyDetector(
+-        name="ming_flash_omni_tts",
+-        stage_keys=frozenset({"ming_tts"}),
+-        detect_priority=50,
+-    ),
+-)
++LEGACY_TTS_DETECTORS: tuple[LegacyDetector, ...] = ()
+ 
+ 
+ def register_tts_adapter(cls: type[TTSModelAdapter]) -> type[TTSModelAdapter]:

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.2,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.25,
+    "precision": 0.88,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both reviews largely miss the granular inline nits from yuanheng-zhao (duplicate tests, weak DP-primary-rank test assumption, magic-number join timeout, DLO-vs-common shutdown question) and asukaqaq-s's top-level SP/DP topology architecture concern, so recall is low for both; Y edges ahead by explicitly validating the CFG/compatibility-key concern via its 'Validated' scan. Both correctly nail the major request_batch_max_wait_ms regression with near-identical grounding. X delivers substantially more novel, well-cited, highly actionable findings (13 numbered items each with concrete 'Change:' fixes) versus Y's leaner 6 residual findings, most of Y's content being confirmation of already-stated PR-author fixes rather than fresh reviewer value, though Y's evidence citations are marginally more rigorous.",
+  "_cost_usd": 0.5749065999999999,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16f_holdout4_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout4_r1",
+    "arm_a_sha256": "08a7d7da14947558fd846f8e6c62c359c977ec1a544198b16749fa8d30c0a308",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5d107b26c5dd605248f4ff3bf7b26b48a886f95ed933ef7eb79692e052dcfc5a",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

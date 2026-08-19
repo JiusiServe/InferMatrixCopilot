@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.82,
+    "actionability": 0.96,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.68,
+    "actionability": 0.87,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates fully cover the ground-truth rationale for unconditional singleton-list normalization. X provides more complete, concrete analysis of the Ming incompatibility, while Y adds duplicative or low-value findings, including an unnecessary blast-radius confirmation and weakly located CI commentary.",
+  "_usage": {
+    "input": 3,
+    "output": 640
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_proof_val"
+  },
+  "_roles": {
+    "arm": "copilot_v13_proof_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_proof_val",
+    "arm_a_sha256": "b41ea5e119b68a1bd8f36307d0ff894c335404476ef7c9825c3c8095a39c8379",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "bc98460632105aef812a50d392afd9f1bea66b3f783e8a9cd888456ce013cba3",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

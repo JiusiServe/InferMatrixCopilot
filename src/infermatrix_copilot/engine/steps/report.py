@@ -26,8 +26,10 @@ async def _final_report(ctx: StepContext) -> StepResult:
     the run dir, never into the deliverable. Returns the report path."""
     lines = ["# Run report", ""]
     spec = ctx.state.get("task_spec")
-    if spec:
-        lines += [f"- task: {spec}", ""]
+    # The task spec is run metadata, and it was rendering as a raw Python repr
+    # (`{'kind': 'pr_review', 'mode': 'eco', ...}`) at the top of the judged
+    # deliverable. It says nothing a reader of the review needs and belongs
+    # with the other diagnostics.
     note = ctx.state.get("checkout_note")
     if note:
         lines += [f"- {note}", ""]
@@ -41,7 +43,15 @@ async def _final_report(ctx: StepContext) -> StepResult:
                     break
         if text:
             lines += [f"## {key}", "", str(text), ""]
-    try:  # surface proposed-but-unpromoted skills — the curation queue was silent
+    # The skill-curation queue is operator state about the COPILOT, not review
+    # of the PR — the same leak class the T3 forensics above removed once, and
+    # a direct violation of this module's own contract ("RUN_REPORT.md contains
+    # each deliverable exactly ONCE and nothing else"). It shipped a fixed
+    # ~1000-char block on every measured item, naming lenses and internal skill
+    # slugs inside the artifact a reviewer reads. It goes to diagnostics, where
+    # the curation queue is just as visible to the operator who acts on it.
+    cand_lines: list[str] = []
+    try:
         from ...memory.skills import SkillStore
         from ..agent_runtime.knowledge import _resolve_adapter
 
@@ -51,14 +61,17 @@ async def _final_report(ctx: StepContext) -> StepResult:
             stores.insert(0, SkillStore(adapter.skills_dir))
         cands = {n: c for st in stores for n, c in st.candidates().items()}
         if cands:
-            lines += ["## skill candidates awaiting curation", ""]
-            lines += [f"- **{n}**: {str(c.get('description', ''))[:200]}"
-                      for n, c in sorted(cands.items())]
-            lines += ["", "(promote with SkillStore.promote(name); candidates "
-                      "are never auto-activated)", ""]
+            cand_lines += ["## skill candidates awaiting curation", ""]
+            cand_lines += [f"- **{n}**: {str(c.get('description', ''))[:200]}"
+                           for n, c in sorted(cands.items())]
+            cand_lines += ["", "(promote with SkillStore.promote(name); "
+                           "candidates are never auto-activated)", ""]
     except Exception:  # noqa: BLE001 — reporting must never fail the run
         pass
     diag = ["# Step diagnostics", ""]
+    if spec:
+        diag += [f"- task: {spec}", ""]
+    diag += cand_lines
     for step_id, outputs in outputs_map.items():
         diag.append(f"## {step_id}")
         for k, v in (outputs or {}).items():

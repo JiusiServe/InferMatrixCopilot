@@ -1,4 +1,4 @@
-"""Repo profile store (doc/DESIGN.md §V2.3.2): typed ops, write tiers,
+"""Repo profile store (doc/architecture/DESIGN.md §V2.3.2): typed ops, write tiers,
 provenance, stability gate, dormancy, briefing budget, dispatch injection."""
 
 import asyncio

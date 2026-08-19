@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.75,
+    "actionability": 0.85
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.85,
+    "actionability": 0.8
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth here is sparse and stylistic (two 'move to utils' nits, a kwargs-style preference, and a question about an unrelated-looking hunk) and neither candidate touches any of these four points, so recall is low for both. Both independently converge on the same real double-seed bug in the stale-token drain (strong cross-validation) and both flag the dead async_tokens_to_discard writes, but Y is more rigorous overall: it explicitly separates validated-safe findings from actual issues, catches an additional major bug (NPU _dummy_run missing randomize_inputs) X misses entirely, and its arg_utils finding spans 10 evidenced archs versus X's single-arch analysis. X's VLLM_CACHE_ROOT race claim is directly contradicted by Y's explicit investigation showing it's safe, a likely false positive that dings X's precision. Both are highly concrete and actionable with file/line targets and suggested fixes.",
+  "_cost_usd": 0.42286029999999997,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_wave2"
+  },
+  "_roles": {
+    "arm": "copilot_v13_wave2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_wave2",
+    "arm_a_sha256": "10c2602a19281706645f1b6391ffdc87bc7bc4ee82e7440083fc87f2c76dd9b6",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4703d9c3f9a1a403af03ff17f62c2d816d9363ba7048d8dcee9a84a47834bc46",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

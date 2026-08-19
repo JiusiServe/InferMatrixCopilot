@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.75,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.75,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Both candidates independently rediscover the S2V clip_generator=None issue with the exact same reasoning as the ground-truth author's dismissal (scheduler ignores generator), but X goes further by extending the i2v last_image finding to reference the actual fix function (_normalize_i2v_last_image) and surfacing a residual shape-mismatch gap beyond it. X also surfaces several plausible, well-grounded, highly actionable findings (max_num_seqs clobbering, DMD2 inheritance risk, admission-key granularity) each with concrete 'Change to:' code fixes, while Y's four findings are thinner and its most valuable contribution (E2E coverage gap for S2V/VACE) is useful but not matched by GT concerns either. Neither review uses a 'LATENT GAP CHECK' section so gap_hit is false for both; X wins clearly on recall, comparable grounding, and stronger actionability.",
+  "_cost_usd": 0.4105842,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16f_holdout5_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout5_r1",
+    "arm_a_sha256": "84004e2fd2da4108c96dfc013978a0e2d2f535f333011a2c83865c230d915b5e",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "bf1e50122bd03032af8147548a1b6df139d5ddb9d6ec41cd3467a85ea4489078",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

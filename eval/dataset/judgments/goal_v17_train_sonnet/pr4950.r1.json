@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.5
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.9,
+    "actionability": 0.9
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns (just LGTM/approvals), so both trivially achieve full recall. Both candidates' findings are well-grounded in the diff and cited code paths, but Y goes noticeably deeper: it traces the 'silent audio' claim through three files to argue the actual failure mode is a 500 error, catches that the 'curl doesn't flatten extra_body' rule is overstated relative to the image-generation path (cross-checking against GLM-Image.md), and flags a genuine index-collision trap plus a concrete jq extraction fix — all with exact suggested rewrites. X's two findings are valid but hedge into open questions ('please paste the choices array', 'confirm CI on main') rather than concrete edits, making it materially less actionable than Y's essay-style review with specific proposed text changes.",
+  "_cost_usd": 0.2319247,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v17_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v17_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_train",
+    "arm_a_sha256": "59c87ea9fe5ef84c4fd6e355d445866919d6d22fec9086ca08998208ec8a69a3",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "5a2e689fc33efd67adbf119f1e4cf034841928ad70fea2d99f142a727ca8ea18",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

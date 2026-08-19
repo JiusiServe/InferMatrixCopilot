@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.7,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates independently rediscover the one ground-truth issue still live in this diff (the serve-path default rel_l1_thresh=0.2 silently overriding the documented 0.17), and both correctly confirm the partition-gating concern from the ground truth is already resolved in this snapshot. Y goes further with actual traced runtime evidence for the threshold bug, a rigorous numeric analysis of the calibration polynomial's near-constant/non-monotone behavior, plus concrete, well-grounded findings on memory retention, wasted RoPE computation, and two specific test-coverage weaknesses (E2E can't detect zero cache hits; the cache-hit test can't catch stale t_emb). X's review is solid but includes a speculative 'Low' finding on TeaCache+Ulysses divergence that Y actually investigated and refuted (gather_output=True makes decisions TP-rank-identical), slightly hurting X's precision. Both provide file:line actionable fixes, but Y's are more numerous and more concretely tied to verified evidence.",
+  "_cost_usd": 0.3904321,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "cursor_composer25",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "cursor_composer25",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_composer25",
+    "arm_a_sha256": "ddd4ede1695a4f2ea79cc38f2b78f982a7cdbc203efae46a5e64c42aed61811e",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "3393de3ed432ea9ad7ca2a70fdf5cacae3075cbe15289680efbc0ada08a031b8",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.82,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.88,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both reviews independently converge on the same core, well-grounded findings (mtp seed non-reproducibility under full cudagraphs, the duplicate omni_pooler_payload_include_hidden assignment, the stale prefix-caching/max_num_batched_tokens comments, and platform-specific risk in use_cuda_graphs=is_npu()), which is strong evidence both actually investigated the repo rather than fabricating. X goes deeper on some threads (e.g., NPU cudagraph capture-count second-order effects) but includes speculative, less-grounded asides (a suspiciously specific unverifiable error string, a tangential fish_speech_slow_ar.py comparison) that slightly dent precision. Y explicitly flags the benchmark-attribution confound raised by reviewers (Sy0307's 'perf gain may be from other changes' ask) and self-labels claims as verified/refuted with cited evidence, giving it a modest recall and precision edge, plus its GitHub-native ```suggestion``` blocks are marginally more directly actionable than X's code blocks. Neither includes a labeled LATENT GAP CHECK section.",
+  "_cost_usd": 0.3290912,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17ds_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17ds_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17ds_train",
+    "arm_a_sha256": "e108187eca48b75975191435931f9057ac6b73c0d3cfb9007ae8caf3610aa076",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "9da2d20c4c6f3ebd76201601229ebe30caa5b10534567d559eab79d6e55fdaba",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

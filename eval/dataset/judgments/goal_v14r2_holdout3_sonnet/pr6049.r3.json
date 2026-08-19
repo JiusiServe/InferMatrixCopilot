@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.75,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.32,
+    "precision": 0.82,
+    "actionability": 0.8
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y independently surfaces the import-aliasing pattern that underlies three of the eight ground-truth comments (and touches the test-relocation theme in comment 1), while X matches essentially none of the ground truth and repeatedly asserts as 'validated' that entrypoints/serving files and run_curl_*.sh were untouched — directly contradicted by ground-truth comments anchored on exactly those files. Both candidates independently catch the same real openai_chat_client.py partial-size bug and the registry media-validation regression, but Y backs its top findings with actual runtime reproduction (LingBot mode resolution, stage-modality warning) giving it an edge in grounding, while X pads with a near-duplicate finding at the same registry.py:316 location. X's CI-marker-mismatch root-cause finding is a genuine unique value-add, but it doesn't offset the recall gap and the false 'unchanged files' claims that undercut precision.",
+  "_cost_usd": 0.38730790000000004,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v14_holdout3_r2",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v14_holdout3_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v14_holdout3_r2",
+    "arm_a_sha256": "11c81bb3234c7152c36f6a57e0260d0bb841e504aea95c8b0d26349bf00cff2c",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "f3f11d2cd7926100dbdc03762099a2cc9cdcebc0d29f39ad1339fc8af49d3171",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

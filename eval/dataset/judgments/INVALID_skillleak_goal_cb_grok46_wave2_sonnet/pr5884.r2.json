@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.75,
+    "actionability": 0.7
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.8,
+    "actionability": 0.85
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Ground truth's substantive content is really two points: attrgetter matters because it resolves dotted paths that getattr misses (Bagel), and this mirrors module_collector.py's existing pattern with a suggested shared dedupe helper. Y explicitly hits both — it cites ModuleDiscovery._collect_modules/module_collector.py as the pattern being mirrored and independently proposes the same shared-helper consolidation david6666666 suggested. X covers the dotted-path rationale well but never mentions the module_collector.py precedent or dedup suggestion at all. Both independently surface the same latent SoulX activation risk, which cross-validates that finding's grounding, but Y treats it as a blocking concern with concrete remediation options while X buries an equally serious claim (possible crash/wrong audio) under a 'minor' label, weakening its calibration. Y's fixes also include ready-to-use code snippets (log message, widened guard), giving it a slight actionability edge over X's already-solid line-referenced findings.",
+  "_cost_usd": 0.250871,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_cb_grok46",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_cb_grok46",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_grok46",
+    "arm_a_sha256": "573c65f05e8dccb0c88b31d5070503dd988009e3f11238acba07f22f0af6982f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "80debb7f8b9b3343eef7ae50f0618e17195384c354a466e33b4f3b71b6863ca2",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

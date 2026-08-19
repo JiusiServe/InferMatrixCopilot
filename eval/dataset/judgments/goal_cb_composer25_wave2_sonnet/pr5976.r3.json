@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.05,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.1,
+    "precision": 0.82,
+    "actionability": 0.68,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth here is thin (an approved PR with only style/organization nitpicks about patch.py provenance, use_all2all kwargs, and two 'move to utils' requests), and neither candidate substantively covers those specific threads, so recall is low for both. Both independently converge on the same real bug (double-seeding num_stale_output_tokens on the replace_streaming_prompt path) and the same xpu/platform.py and arg_utils.py issues, which is strong evidence both are grounded rather than fabricated; Y's explicit validated/sweep labeling is slightly more epistemically careful, giving it an edge on precision. X pulls ahead on actionability and breadth, though, offering concrete drop-in code fixes (assert-to-warning fallback, nullcontext snippet) and several additional well-evidenced findings (VLLM_CACHE_ROOT race, dummy-id randomization) versus Y's more question-framed, narrower set of findings.",
+  "_cost_usd": 0.3746398,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_cb_composer25"
+  },
+  "_roles": {
+    "arm": "copilot_cb_composer25",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_cb_composer25",
+    "arm_a_sha256": "ec0a38a4ebe6b8879dcda9d8a7770a416d64cb24c9a9de6533a9a2f8b3fd9676",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "4703d9c3f9a1a403af03ff17f62c2d816d9363ba7048d8dcee9a84a47834bc46",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

@@ -2,7 +2,7 @@ name: tests
 
 # The suite is ~485 offline cases with no network and no paid LLM calls, so it can
 # run on every push. Until this existed it ran only when someone remembered to type
-# `pytest` (doc/CODE_TOUR.md documents it as a manual step) — tests that nothing runs
+# `pytest` (doc/architecture/CODE_TOUR.md documents it as a manual step) — tests that nothing runs
 # protect nothing.
 #
 # NOTE: this workflow is a SIGNAL, not a merge gate. Making it blocking needs a branch
@@ -21,7 +21,16 @@ jobs:
   suite:
     runs-on: ubuntu-latest
     steps:
+      # Full history, not the default depth-1 shallow clone. check_spec_freshness
+      # dates each source file with `git log -1 -- <path>`, and in a shallow clone
+      # the single commit has no parent, so git reports EVERY tracked file as
+      # created in it. All 62 SPEC pages then read as modified today and the
+      # strict check fails wholesale. It only ever passed because the tip commit
+      # happened to predate the pages' verified-against: dates; the first commit
+      # made on a later day broke all 62 at once.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -73,6 +82,22 @@ jobs:
           print("packaged runtime data resolves via _resource_dir:",
                 ", ".join(_RESOURCE_MARKERS))
           PY
+
+      # Doc integrity. These exist because the doc/ refactor measured the damage
+      # they prevent: 29 in-code citations of doc/ paths that no linter checked,
+      # and 44 of 45 SPEC pages silently behind their own source.
+      - name: Doc linters
+        run: |
+          python tools/check_doc_links.py
+          python tools/check_doc_citations.py
+
+      # BLOCKING as of the P5 rewrite: all 92 modules have a SPEC page and all
+      # 62 pages carry a `verified-against:` date. --strict additionally fails
+      # on a page whose source changed after that date, or one that dropped its
+      # marker — which is the whole point: 44 of 45 pages had silently fallen
+      # behind before this check existed.
+      - name: SPEC coverage and freshness
+        run: python tools/check_spec_freshness.py --strict
 
       # Written, tested, and until now invoked only from prose (AGENTS.md, DEVELOPMENT.md).
       - name: Knowledge linters

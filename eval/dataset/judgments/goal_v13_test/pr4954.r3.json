@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.74,
+    "actionability": 0.94,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.68,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X covers the shared-helper contract change and directly questions whether the legacy fallback has a live producer, closely matching both substantive human concerns. Its comments are highly concrete, though several production/test assertions are speculative or overstated. Y finds valid ancillary issues but misses the documentation concern, does not meaningfully challenge the legacy path, and repeats findings.",
+  "_usage": {
+    "input": 3,
+    "output": 1174
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v13_proof_test"
+  },
+  "_roles": {
+    "arm": "copilot_v13_proof_test",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v13_proof_test",
+    "arm_a_sha256": "9c0bc66cc0ec8c5b6746a9b3f7c1f0737dcd37bc9280b775127e2be759f2a9f4",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "876219c8b0b10edabcc0c302eb8ce6951e35bdecf6437bbb6247e39bc44276e3",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 3
+  }
+}

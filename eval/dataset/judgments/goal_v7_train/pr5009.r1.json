@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.78,
+    "precision": 0.72,
+    "actionability": 0.91,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.74,
+    "precision": 0.43,
+    "actionability": 0.78,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X accurately identifies the global CUDA blast radius and missing performance justification, with concrete scoping and testing recommendations. Y catches the blast radius and incomplete pytest marking, but most additional findings are speculative or low-value, especially the CI, cross-platform, and mode-independent OINK requests. Neither includes a LATENT GAP CHECK section.",
+  "_usage": {
+    "input": 3,
+    "output": 1171
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v7_goal_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v7_goal_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v7_goal_r1",
+    "arm_a_sha256": "52170ad9a0546d4a059c82764298e5cf30547d276b389250cd4a0baac022e6ce",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "97e45909dc2469db55da15b6e8d6a525549029c219aefca76123ec8b801fd1bf",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

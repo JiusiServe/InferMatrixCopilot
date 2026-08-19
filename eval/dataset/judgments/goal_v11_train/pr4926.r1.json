@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.74,
+    "precision": 0.72,
+    "actionability": 0.96,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.61,
+    "precision": 0.86,
+    "actionability": 0.92,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "X covers more ground-truth themes, especially kernel-version semantics, documentation, hardware gating, and test coverage. Y is more disciplined and precise, but misses some version/fallback documentation concerns. X loses precision for speculative CI claims and questionable recommendations such as skipping Hub failures.",
+  "_usage": {
+    "input": 3,
+    "output": 2975
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v11_deep_r2"
+  },
+  "_roles": {
+    "arm": "copilot_v11_deep_r2",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v11_deep_r2",
+    "arm_a_sha256": "2c9c16d5f272bd6fdc31a6f299cd6ac492aa9bed35e7e2cbc0e2d84e0ca13504",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0639263265995e00edcd06c6242ac0a6a3647a980509c282af885c86ce6930e0",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}

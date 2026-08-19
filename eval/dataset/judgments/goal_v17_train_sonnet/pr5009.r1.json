@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.72,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both independently catch the strongest ground-truth theme (scope: the platform-default flip is validated only on Qwen-Image but affects every CUDA diffusion model), and both make the same sharp, unverified-in-GT catch that Part 2's switch to nn.RMSNorm makes Part 1 a no-op for Qwen-Image itself — X's enumerated model list even mirrors NumberWan's actual reply almost 1:1, giving it a recall edge. But Y's findings are more rigorously evidence-cited (explicit changed-vs-unchanged sourcing, a validated/claim-verified scan table) and it catches a subtlety X gets wrong: X asserts Cosmos3 is 'genuinely protected' by its native override, while Y shows the override only pins rms_norm/fused_add_rms_norm and silently inherits the new vllm_c-first default for every other IR op — a more precise dissection of the same scope problem. Y also ships copy-paste suggestion diffs, edging out X on actionability.",
+  "_cost_usd": 0.3848672,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v17_train"
+  },
+  "_roles": {
+    "arm": "copilot_v17_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v17_train",
+    "arm_a_sha256": "77b6ccea38acd6b2e6c1a4248845e9ca81af6ba7867b5563a6a63e4195858d06",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "97e45909dc2469db55da15b6e8d6a525549029c219aefca76123ec8b801fd1bf",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

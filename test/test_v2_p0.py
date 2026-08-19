@@ -1,4 +1,4 @@
-"""Design v2 P0 — correctness fixes (doc/DESIGN.md §V2.1(a)) pinned by tests:
+"""Design v2 P0 — correctness fixes (doc/architecture/DESIGN.md §V2.1(a)) pinned by tests:
 
 1. resume restores step-to-step state handoffs (state_updates contract);
 2. foreach fan-out lifts per-item state_updates into the merged result;
@@ -283,13 +283,18 @@ def test_high_risk_modules_from_adapter_override():
 def test_adapter_zero_declares_risk_tiers():
     from infermatrix_copilot.adapters.base import load_adapter
     adapter = load_adapter(REPO_ROOT / "adapters" / "vllm_omni")
-    assert set(adapter.high_risk_modules) == {"worker_runner", "model_executor",
-                                             "scheduler"}
+    assert set(adapter.high_risk_modules) == {
+        "worker_runner", "model_executor", "scheduler",
+        # extended from review-campaign forensics: platform code sets
+        # process-wide defaults, diffusion is multi-model shared code, and
+        # distributed owns cross-stage transport — small diffs there still
+        # need the full review ensemble
+        "platform", "diffusion", "distributed"}
 
 
 # -- repo-neutral core guard (§V2.2.1) -------------------------------------------
 
-# Known v1 leaks (doc/DESIGN.md §V2.1(b)), by source file: ceilings, so the
+# Known v1 leaks (doc/architecture/DESIGN.md §V2.1(b)), by source file: ceilings, so the
 # list can only shrink. A new repo-specific literal anywhere else fails.
 _KNOWN_LEAKS = {
     "__init__.py": 1,            # package docstring
@@ -328,4 +333,4 @@ def test_repo_neutral_core():
             over.append(f"{rel}: {count} repo-specific literal(s), ceiling {ceiling}")
     assert not over, (
         "repo knowledge belongs in adapters/<repo>/, not the core "
-        "(doc/DESIGN.md §V2.2.1):\n  " + "\n  ".join(over))
+        "(doc/architecture/DESIGN.md §V2.2.1):\n  " + "\n  ".join(over))

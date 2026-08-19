@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.5,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.5,
+    "precision": 0.75,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both independently surfaced the same critical regression (typed video_reference always forcing source_path onto every model, silently breaking generic pipelines like Wan/Cosmos that expect decoded frames) and both caught the T2VA mandatory-aspect_ratio regression plus the 'API server should not carry model-specific code' refactor concern the human reviewer raised twice. Y's ComfyUI-client trace for the aspect_ratio bug is a stronger, more concrete grounding than X's synthetic repro, but Y also asserts a '104 passed, 1 skipped' test count that conflicts with the PR's actual '185 passed, 1 skipped' validation comment, hurting its grounding. X is organized into clear, immediately actionable severity buckets with concrete fixes and explicitly confirms several already-fixed GT concerns (OmniClientError sweep, rank-0 audio gating), giving it a slight edge in precision and usability.",
+  "_cost_usd": 0.16890830000000004,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16f_holdout5_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_holdout5_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_holdout5_r1",
+    "arm_a_sha256": "3c67e6beed14b899ce04ec8b3221da67ab0d152be6b5b51fbaf470cb2dfa2fca",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b590c64d5a8a4639f4821930aafe057151231d39e7e6d760072f23304748c04b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

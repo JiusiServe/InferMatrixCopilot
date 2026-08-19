@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.15,
+    "precision": 0.88,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.3,
+    "precision": 0.82,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Most stage_kv/interface.py-specific ground-truth comments (P1 geometry/digest/block-count/null-block checks) target an earlier revision of the code no longer present in this diff snapshot, so recall for both is capped low; the coverable ground-truth themes are the meta concerns about redundant cross-layer validation (asukaqaq-s) and the executor-leak-on-init-failure fix. Y hits both more directly: finding #7 explicitly identifies duplicate identity checks across layers (matching asukaqaq-s's core complaint), finding #2's proposed DTO invariants closely mirrors the reviewer's suggested 'construction-time invariants' taxonomy, and Y credits the engine-cleanup fix with added nuance about scheduler ownership. Y also surfaces a genuinely new, well-grounded, high-value bug (ARDiffusionModelRunner signature mismatch) that neither ground truth nor X caught. X is tighter and its two findings (batch/step skip pre-RPC identity validation; DLO fallback silently serializes) are well-grounded and highly actionable, giving it slightly higher precision, but its narrower scope covers less ground-truth territory than Y's broader sweep.",
+  "_cost_usd": 0.44572950000000006,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "cursor_grok45",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "cursor_grok45",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/cursor_grok45",
+    "arm_a_sha256": "03788e7a653dca7dcc339950db05ed6869f9cbacf4626038e5247dc3a293d225",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b6ae3b48c6859b0d16784163ab2044d7d85e3b3b32f4e60b559fa2a55186c64b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

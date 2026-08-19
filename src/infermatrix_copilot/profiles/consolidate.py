@@ -1,4 +1,4 @@
-"""Stage-4 profile maintenance (doc/DESIGN.md §V2.3.3): scheduled, gated
+"""Stage-4 profile maintenance (doc/architecture/DESIGN.md §V2.3.3): scheduled, gated
 consolidation — the ONLY tier allowed to rewrite/merge — plus deterministic
 staleness decay and drift detection. Mirrors the personal agent's weekly
 pass: per-interaction writes stay additive because continuous LLM rewriting

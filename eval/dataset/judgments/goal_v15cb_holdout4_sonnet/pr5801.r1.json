@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.55,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.2,
+    "precision": 0.75,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X finds a genuine, well-grounded blocking regression (RMSNorm's new hard fp32 default silently breaks the fused kernel and dtype contract for every other model using the shared layer) and independently converges on the same fragile 'tiled freqs' contract the human reviewer flagged inline, plus several other grounded, concrete perf/correctness issues with actionable diffs. Y explicitly investigated the same RMSNorm dtype blast-radius concern but marked it '[resolved]' (a miss on the most important issue), and its reported findings skew toward narrower test-coverage nits without matching the ground-truth's core theme. Both are grounded and non-fabricated, but X is broader, more accurate, and more actionable.",
+  "_cost_usd": 0.30105250000000006,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v15cb_holdout4_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v15cb_holdout4_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v15cb_holdout4_r1",
+    "arm_a_sha256": "90232f947a07c4fa9845de1f2e9270c35e3f25d5b5fd63e58097685c621e8cb1",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0ac7a88b887a97acc40e7614e44e3692d3e06a3bd75c8cab12c4dc831b63d48b",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

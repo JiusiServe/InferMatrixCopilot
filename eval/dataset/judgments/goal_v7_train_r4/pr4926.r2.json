@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.72,
+    "precision": 0.7,
+    "actionability": 0.94,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.48,
+    "precision": 0.62,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X covers more ground-truth themes, including kernel-version requirements, fallback semantics, SM90 gating, test markers, and piecewise/varlen behavior. Both add valid concerns beyond the human review, but X includes some unsupported hardware claims while Y contains weaker assertions, notably calling a reachable varlen fallback dead code. Both reviews are highly actionable with concrete locations and fixes.",
+  "_usage": {
+    "input": 3,
+    "output": 1699
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v7_goal_r4"
+  },
+  "_roles": {
+    "arm": "copilot_v7_goal_r4",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v7_goal_r4",
+    "arm_a_sha256": "fcc55b80aa715e8377109de1ea998f905c8ba1d16f748021f95e7ff54a0b049a",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0639263265995e00edcd06c6242ac0a6a3647a980509c282af885c86ce6930e0",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 2
+  }
+}

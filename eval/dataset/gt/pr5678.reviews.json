@@ -1,0 +1,15 @@
+{
+  "comments": [
+    {
+      "author": "hsliuustc0106",
+      "body": "Can we align this PR with [#5140’s final target](https://github.com/vllm-project/vllm-omni/pull/5140#final-target-layered-configuration-structure), or document why this PR supersedes it?\n\n#5140 gives each resolved stage Omni-owned topology/runtime/connector/request metadata plus one `engine_spec`: `EngineArgs` for AR/generation or an un-enriched `OmniDiffusionConfig` for diffusion, materialized in the owning process.\n\nThis PR instead splits selected `EngineArgs` fields across manual `OmniStage*Config` trees and `_..._FIELDS` sets, then flattens them back. Those buckets already differ from upstream ownership—`max_model_len`, tokenizer fields, and hybrid-cache settings are examples—and the inline threads show the result: accepted fields can be lost, execution-type validation can use the wrong owner set, and parity tests can miss typed-only defaults.\n\nSince runtime has not cut over, please either rework the projector around one complete engine spec, or make the divergence explicit in #4021 and add a schema-derived exhaustive support check against the pinned upstream `EngineArgs`."
+    }
+  ],
+  "reviews": [
+    {
+      "author": "hsliuustc0106",
+      "body": "lgtm",
+      "state": "APPROVED"
+    }
+  ]
+}

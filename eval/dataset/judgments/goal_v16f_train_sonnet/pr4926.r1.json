@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.4,
+    "precision": 0.55,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.45,
+    "precision": 0.7,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both cover similar technical ground (uncached per-layer kernel fetch, FA3/Blackwell gate vs Hopper-only docs, varlen-func-None residual risk, CI lane/marker gaps) but neither hits the resolved GT threads precisely since the diff already reflects post-fix code. Y is more tightly grounded: nearly every claim quotes exact code plus explains its verification status (validated/claim-refuted), and it independently surfaces the pyproject.toml `kernels<0.15.0` lower-bound gap, which closely matches wtomin's actual ask about minimum kernels version requirements. X raises more findings and reads fluently, but several rest on unverifiable specifics (exact HF commit SHAs, precise cold/warm timing numbers, and a claimed 'kernels 0.16.0' test environment that contradicts the project's own pinned `<0.15.0`), which hurts credibility and precision. Actionability is comparable, with X slightly more readable and Y slightly more evidence-dense.",
+  "_cost_usd": 0.3821196,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v16f_train_r1"
+  },
+  "_roles": {
+    "arm": "copilot_v16f_train_r1",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v16f_train_r1",
+    "arm_a_sha256": "4fa30def122e930e01e192f62066d823acf442c3c95d5bb91299bacee452fa8f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0639263265995e00edcd06c6242ac0a6a3647a980509c282af885c86ce6930e0",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

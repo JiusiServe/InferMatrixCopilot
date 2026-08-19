@@ -1,0 +1,7 @@
+{
+  "pr": 5946,
+  "sha256": "f4aab2285f302a1d4e37b41349b65d3682ce4ea5be22428114455210bcbac4f4",
+  "text": "## PR description\n### Add MiniMax-H3 recipe for DGX Spark (GB10)  [labels: ready]\nAdd MiniMax-H3 recipe for DGX Spark (GB10)\n\n## Commit timeline (subjects only — the diff below is the squashed net change)\n- b18e6b07 Add MiniMax-H3 recipe for DGX Spark (GB10)\n- d818a66c Update MiniMax-H3-Spark-GB10.md\n- bc265de5 Update MiniMax-H3-Spark-GB10.md to remove modular H3 note\n- 2e420772 Revise memory details and t2va request instructions\n\n## PR state and gates\nPR state: MERGED\ngates clean (mergeable, no failing checks)",
+  "built_at": "2026-08-16T00:34:23",
+  "policy": "no_discussion — byte-equivalent to _pr_context_bundle (fetch.py:155) plus pr.gate_check (fetch.py:277); comments, reviews and inline review comments never requested"
+}

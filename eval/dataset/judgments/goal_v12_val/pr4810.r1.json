@@ -1,0 +1,40 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.7,
+    "actionability": 0.9,
+    "gap_hit": true
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.88,
+    "gap_hit": true
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y directly captures the human concern that fake parameters do not validate a real quantized-checkpoint load, while X discusses fake-test weaknesses without clearly demanding that runtime validation. Both identify the missed diffusion loader, but X incorrectly claims the test is absent from CI; Y also has some speculative dependency/configuration findings, though most of its comments are concrete and grounded.",
+  "_usage": {
+    "input": 3,
+    "output": 1235
+  },
+  "_judge_resolved_model": "GPT-5.6 Sol 272K High",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v12_hybrid_val"
+  },
+  "_roles": {
+    "arm": "copilot_v12_hybrid_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v12_hybrid_val",
+    "arm_a_sha256": "c6d4a21f89cafff098f5263fa96ad66009fccd2fd5b36d733935d5c864111674",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "62ede4acd697d051f739a163828672d894ec4150b7b17c941bb4b33f4b81409e",
+    "judge_backend": "cursor",
+    "judge_model": "gpt-5.6-sol-high",
+    "judge_resolved_model": "GPT-5.6 Sol 272K High",
+    "judge_rep": 1
+  }
+}
