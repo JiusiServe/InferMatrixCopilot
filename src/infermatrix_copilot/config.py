@@ -158,6 +158,24 @@ class Settings(BaseSettings):
         return {r.strip() for r in self.imx_knowledge_runtime.split(",")
                 if r.strip()}
 
+    def expansion_env(self) -> dict[str, str]:
+        """Manifest `${VAR}` FALLBACK values derived from this Settings
+        instance (upper-cased field names): the `.env` file's configuration
+        is loaded into Settings fields without being exported, so manifest
+        expansion would otherwise see only shell-exported variables.
+        Secret-bearing fields are excluded — a manifest path must never be
+        able to pull a credential into an error message or log line."""
+        secret_markers = ("key", "token", "secret", "password")
+        out: dict[str, str] = {}
+        for name, value in self.__dict__.items():
+            if name.startswith("_") or \
+                    any(m in name.lower() for m in secret_markers):
+                continue
+            if isinstance(value, (str, Path, int, float, bool)) and \
+                    str(value):
+                out[name.upper()] = str(value)
+        return out
+
     # Repo profiles (design v2 §V2.3)
     profile_stale_days: int = 90        # dormancy window for unconfirmed facts
     profile_briefing_enabled: bool = True  # =0: the {no-profile} ablation arm

@@ -65,17 +65,19 @@ def _kpaths(ctx: StepContext):
         / repo_slug.replace("-", "_"))
 
 
-def _knowledge_layer_paths(manifest: dict) -> dict | StepResult:
-    """The DECLARED parent read-compat layers, expanded — BLOCKED when a
-    declared key's env var did not expand (the silent knowledge-bare run
-    the §8 gate can never allow; same rule the prelude enforces)."""
+def _knowledge_layer_paths(manifest: dict, settings) -> dict | StepResult:
+    """The DECLARED parent read-compat layers, expanded (process env
+    first, then the `.env`-derived Settings fallback) — BLOCKED when a
+    declared key still did not expand (the silent knowledge-bare run the
+    §8 gate can never allow; same rule the prelude enforces)."""
     from ...adapters.base import expand_path
 
     cfg = (manifest.get("rebase") or {}).get("knowledge") or {}
+    extra = settings.expansion_env()
     out: dict[str, str] = {}
     for key in ("parent_debug_db", "parent_skills_dir"):
         raw = str(cfg.get(key) or "")
-        expanded = expand_path(raw)
+        expanded = expand_path(raw, extra=extra)
         if raw and not expanded:
             return StepResult(False, FailureKind.BLOCKED,
                               f"declared knowledge layer {key}={raw!r} did "
@@ -173,7 +175,7 @@ async def _v3_curate(ctx: StepContext) -> StepResult:
 
     kp = _kpaths(ctx)
     repo_slug = (ctx.state.get("task_spec") or {}).get("repo", "")
-    layers = _knowledge_layer_paths(manifest)
+    layers = _knowledge_layer_paths(manifest, ctx.settings)
     if isinstance(layers, StepResult):
         return layers
     try:
@@ -274,7 +276,7 @@ async def _v3_compare(ctx: StepContext) -> StepResult:
     data = sub.read()
     knowledge = data.get("knowledge") or {}
     drift = False
-    layers = _knowledge_layer_paths(manifest)
+    layers = _knowledge_layer_paths(manifest, ctx.settings)
     if isinstance(layers, StepResult):
         return layers
     if knowledge.get("open"):

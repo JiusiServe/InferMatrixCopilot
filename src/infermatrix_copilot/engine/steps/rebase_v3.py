@@ -304,10 +304,12 @@ def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
     # kill a run the gate already provenance-stamped.
     from ...adapters.base import expand_path
     _knowledge_cfg = (manifest.get("rebase") or {}).get("knowledge") or {}
+    _kn_extra = ctx.settings.expansion_env()
     parent_db_path = expand_path(str(_knowledge_cfg.get("parent_debug_db")
-                                     or ""))
+                                     or ""), extra=_kn_extra)
     parent_skills_path = expand_path(
-        str(_knowledge_cfg.get("parent_skills_dir") or ""))
+        str(_knowledge_cfg.get("parent_skills_dir") or ""),
+        extra=_kn_extra)
 
     def _parent_memory_hits(query: str, k: int) -> list[dict]:
         if not parent_db_path:
@@ -697,9 +699,10 @@ async def _v3_prelude(ctx: StepContext) -> StepResult:
     from ...rebase_engine import knowledge_attest
     kn_cfg = (manifest.get("rebase") or {}).get("knowledge") or {}
     kn_paths: dict[str, str] = {}
+    _kn_extra = ctx.settings.expansion_env()
     for kn_key in ("parent_debug_db", "parent_skills_dir"):
         raw = str(kn_cfg.get(kn_key) or "")
-        expanded = _expand(raw)
+        expanded = _expand(raw, extra=_kn_extra)
         if raw and not expanded:
             # expand_path maps an unset ${VAR} to "" ("undeclared") — for a
             # DECLARED knowledge layer that silent downgrade is exactly the

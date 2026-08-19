@@ -243,6 +243,40 @@ def test_slug_colliding_candidates_both_survive(tmp_path):
     assert runtime.candidates_file.read_text(encoding="utf-8") == before
 
 
+def test_plan_review_gets_resolved_mode_context():
+    """Live-smoke finding (2026-08-20): the plan reviewer sees the v3
+    yaml's FULL step list but not the resolved mode, so a report_only
+    plan looked like it runs its write/push steps and was spuriously
+    blocked. The review context must carry the mode and the exact
+    active-step set the `when:` gates produce — and nothing for
+    non-mode-aware playbooks."""
+    from types import SimpleNamespace
+
+    import yaml
+
+    from infermatrix_copilot.cli.copilot import _mode_review_context
+    from infermatrix_copilot.playbooks.store import parse_playbook
+
+    doc = (REPO_ROOT / "playbooks" / "repo-rebase-v3.yaml").read_text(
+        encoding="utf-8")
+    pb = parse_playbook(yaml.safe_load(doc), "repo-rebase-v3.yaml")
+    spec = SimpleNamespace(params={"rebase_mode": "report_only"})
+    ctx = _mode_review_context(pb, spec)
+    assert "rebase_mode=report_only" in ctx
+    assert "'scan'" in ctx and "'prelude'" in ctx
+    for gated_off in ("'curate'", "'ci'", "'wave1'", "'knowledge_prep'"):
+        assert gated_off not in ctx
+    # full mode lists the whole pipeline
+    ctx_full = _mode_review_context(
+        pb, SimpleNamespace(params={"rebase_mode": "full"}))
+    assert "'curate'" in ctx_full and "'compare'" in ctx_full
+    # non-mode-aware playbooks add nothing
+    pb2 = parse_playbook(yaml.safe_load(doc) | {"mode_aware": False},
+                         "x.yaml")
+    assert _mode_review_context(
+        pb2, SimpleNamespace(params={"rebase_mode": "full"})) == ""
+
+
 def test_candidate_never_shadows_a_promoted_skill(tmp_path):
     """Commit-hook finding (2026-08-20): a candidate whose allocated name
     matches an already-PROMOTED skill would let a later promote()

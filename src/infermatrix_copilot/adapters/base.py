@@ -19,14 +19,34 @@ import yaml
 HIGH_RISK_SECTIONS = ("push", "repo", "upstream", "rebase")
 
 
-def expand_path(value: str) -> str:
+def expand_path(value: str, extra: dict | None = None) -> str:
     """Expand `~` and `${VAR}` in a manifest path so committed adapters stay
     machine-independent. An unset variable yields "" (treated as "not declared",
     which degrades through the normal capability-gap path) rather than a bogus
-    literal path containing `${...}`."""
+    literal path containing `${...}`.
+
+    `extra` is a FALLBACK mapping for variables the process env does not
+    carry (typically `Settings.expansion_env()` — the `.env` file's
+    configuration, which pydantic loads into Settings fields without
+    exporting them). The process env always wins, and the process env is
+    never mutated (guardrail)."""
     if not value:
         return ""
     expanded = os.path.expanduser(os.path.expandvars(value))
+    if "$" in expanded and extra:
+        import re
+
+        def _sub(match: "re.Match") -> str:
+            # token-aware: `$FOO` must never rewrite the head of
+            # `$FOO_BAR` — the whole variable NAME is matched, and an
+            # unknown name stays intact (so the caller's fail-closed
+            # ""-on-unresolved contract still fires)
+            name = match.group(1) or match.group(2)
+            val = extra.get(name)
+            return str(val) if val else match.group(0)
+
+        expanded = re.sub(r"\$\{(\w+)\}|\$(\w+)", _sub, expanded)
+        expanded = os.path.expanduser(expanded)
     return "" if "$" in expanded else expanded
 REQUIRED_SECTIONS = ("name", "repo")
 

@@ -87,6 +87,40 @@ def test_prelude_blocks_on_unexpanded_env_var(settings, trace, tmp_path,
     assert not r.ok and "did not expand" in r.summary
 
 
+def test_manifest_expansion_falls_back_to_settings(settings, tmp_path,
+                                                   monkeypatch):
+    """Live-smoke finding (2026-08-20): `.env` keys load into Settings
+    fields without being exported, so `${REBASE_AGENT_ROOT}`-style
+    manifest paths expanded to nothing unless the shell happened to
+    export them. Expansion now falls back to Settings-derived values —
+    process env still wins, secrets never substitute."""
+    from infermatrix_copilot.adapters.base import expand_path
+
+    monkeypatch.delenv("REBASE_AGENT_ROOT", raising=False)
+    extra = settings.expansion_env()
+    assert extra["REBASE_AGENT_ROOT"] == str(settings.rebase_agent_root)
+    got = expand_path("${REBASE_AGENT_ROOT}/agent/skills", extra=extra)
+    assert got == f"{settings.rebase_agent_root}/agent/skills"
+    # the process env WINS over the fallback
+    monkeypatch.setenv("REBASE_AGENT_ROOT", "/from/the/shell")
+    assert expand_path("${REBASE_AGENT_ROOT}/x",
+                       extra=extra) == "/from/the/shell/x"
+    # secret-bearing fields are never available to manifest paths
+    assert not any("key" in k.lower() or "token" in k.lower()
+                   for k in extra)
+    # a variable that exists nowhere still yields "" (fail-closed callers
+    # keep blocking)
+    monkeypatch.delenv("NO_SUCH_VAR_ANYWHERE", raising=False)
+    assert expand_path("${NO_SUCH_VAR_ANYWHERE}/x", extra=extra) == ""
+    # token-aware fallback (hook finding): a known name must never
+    # rewrite the HEAD of a longer unknown one — $REBASE_AGENT_ROOT_V2
+    # stays unresolved and fails closed, in braced and unbraced forms
+    monkeypatch.delenv("REBASE_AGENT_ROOT_V2", raising=False)
+    monkeypatch.delenv("REBASE_AGENT_ROOT", raising=False)
+    assert expand_path("${REBASE_AGENT_ROOT_V2}/x", extra=extra) == ""
+    assert expand_path("$REBASE_AGENT_ROOT_V2/x", extra=extra) == ""
+
+
 def test_prelude_records_open_provenance(settings, trace, tmp_path):
     repo = _repo(tmp_path)
     parent_db = _parent_db(tmp_path / "parent.db",

@@ -55,6 +55,33 @@ class GateOutcome(NamedTuple):
         return cls(proceed=False, exit_code=exit_code)
 
 
+def _mode_review_context(playbook, spec) -> str:
+    """Plan-review context for MODE-AWARE playbooks: the reviewer sees the
+    raw yaml's FULL step list, but the `when:` gates resolve against the
+    ALREADY-RESOLVED mode (`resolve_effective_mode` runs before the review
+    gate) — without this context a report-only plan looks like it runs its
+    write/push steps and gets spuriously blocked. The active-step set is
+    the same mechanical truth the executor computes, never prose."""
+    if not getattr(playbook, "mode_aware", False):
+        return ""
+    mode = str((getattr(spec, "params", None) or {})
+               .get("rebase_mode", "") or "")
+    if not mode:
+        return ""
+    from ..engine.executor import _eval_when
+    from ..rebase_engine.modes import mode_state_flags
+
+    flags = {"task_spec": {}, **mode_state_flags(mode)}
+    active = [s.get("id", s.get("step", "?"))
+              for s in playbook_to_doc(playbook).get("steps", [])
+              if "when" not in s or _eval_when(s["when"], flags)]
+    return (f"\n\nResolved mode context (authoritative): "
+            f"rebase_mode={mode}. Under this mode the `when:` gates run "
+            f"ONLY these steps: {active}. Every other listed step is "
+            "statically gated OFF for this run — judge the plan for THIS "
+            "mode's step set.")
+
+
 class Copilot:
     """Orchestration core: resolves a TaskSpec to a playbook (reuse > adapt >
     generate), runs it through the plan-review gate + confirmation into the
@@ -124,7 +151,10 @@ class Copilot:
         if not resolution.requires_review:
             return True
         doc = yaml.safe_dump(playbook_to_doc(resolution.playbook), sort_keys=False)
-        verdict = run_plan_review(self.llm, playbook_doc=doc, task=spec.describe(),
+        task_text = spec.describe() + _mode_review_context(
+            resolution.playbook, spec)
+        verdict = run_plan_review(self.llm, playbook_doc=doc,
+                                  task=task_text,
                                   model=self.settings.reviewer)
         if verdict.verdict == "unavailable":
             print("  ⚠ no reviewer LLM — your confirmation is the plan-review gate")

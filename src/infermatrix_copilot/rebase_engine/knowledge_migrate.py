@@ -314,7 +314,9 @@ def _migrate_locked(settings, repo, adapter, kp: KnowledgePaths,
 
     # ── sources, realpath-deduped, digest-bound ─────────────────────────
     candidates: list[tuple[str, Path, str]] = []  # (tag, path, family)
-    parent_db = expand_path(str(kn_cfg.get("parent_debug_db") or ""))
+    _extra = settings.expansion_env()
+    parent_db = expand_path(str(kn_cfg.get("parent_debug_db") or ""),
+                            extra=_extra)
     if parent_db and Path(parent_db).is_file():
         candidates.append(("parent-db", Path(parent_db), "parent"))
     legacy_global = Path(settings.memory_db)
@@ -335,7 +337,8 @@ def _migrate_locked(settings, repo, adapter, kp: KnowledgePaths,
         sources.append((tag, Path(path), family,
                         ka.debug_db_digest(path)))
 
-    parent_skills = expand_path(str(kn_cfg.get("parent_skills_dir") or ""))
+    parent_skills = expand_path(str(kn_cfg.get("parent_skills_dir") or ""),
+                                extra=settings.expansion_env())
     planned_skills: list[dict] = []
     if parent_skills and Path(parent_skills).is_dir():
         existing = {p.parent.name for p in
