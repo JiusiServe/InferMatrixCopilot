@@ -7,19 +7,19 @@
 | 任务 | 入口 | 什么时候停止 |
 |---|---|---|
 | PR review | Direct 根据 PR title/body 返回精确 owner/model `quick_map` | 路由返回后停止知识导航 |
-| 通用方法 | [general](general/_index.md) | 命中一个当前任务 guide 后停止 |
-| 仓库规则和代码地图 | [repos](repos/_index.md) | 命中主要 owner 后停止横向展开 |
+| 通用方法 | [general](../../knowledge/general/_index.md) | 命中一个当前任务 guide 后停止 |
+| 仓库规则和代码地图 | [repos](../../knowledge/repos/_index.md) | 命中主要 owner 后停止横向展开 |
 | 写入或整理知识 | [CONTRIBUTING](CONTRIBUTING.md) | 选择最近 owner 后再写 |
 
 vLLM-Omni 的直接入口是
-[仓库地图](repos/vllm-omni/_index.md)。已知 owner 时不要从根目录逐层点击：
+[仓库地图](../../knowledge/repos/vllm-omni/_index.md)。已知 owner 时不要从根目录逐层点击：
 
-- 配置：[`components/configuration/rules.md`](repos/vllm-omni/components/configuration/rules.md)
-- 在线服务：[`components/serving/rules.md`](repos/vllm-omni/components/serving/rules.md)
-- 模型执行：[`components/model-executor/rules.md`](repos/vllm-omni/components/model-executor/rules.md)
-- Diffusion：[`components/diffusion/rules.md`](repos/vllm-omni/components/diffusion/rules.md)
-- 调度：[`components/scheduler/rules.md`](repos/vllm-omni/components/scheduler/rules.md)
-- 模型专属：直接查看 [`models/`](repos/vllm-omni/models/_index.md) 下对应目录
+- 配置：[`components/configuration/rules.md`](../../knowledge/repos/vllm-omni/components/configuration/rules.md)
+- 在线服务：[`components/serving/rules.md`](../../knowledge/repos/vllm-omni/components/serving/rules.md)
+- 模型执行：[`components/model-executor/rules.md`](../../knowledge/repos/vllm-omni/components/model-executor/rules.md)
+- Diffusion：[`components/diffusion/rules.md`](../../knowledge/repos/vllm-omni/components/diffusion/rules.md)
+- 调度：[`components/scheduler/rules.md`](../../knowledge/repos/vllm-omni/components/scheduler/rules.md)
+- 模型专属：直接查看 [`models/`](../../knowledge/repos/vllm-omni/models/_index.md) 下对应目录
 
 ## 目录分层
 
@@ -53,6 +53,6 @@ rg -n "关键词" repos/vllm-omni/components repos/vllm-omni/models -g "*.md"
 ## 校验
 
 ```powershell
-python tools/check_knowledge_tree.py
-python tools/check_wiki_lint.py
+python knowledge/tools/check_knowledge_tree.py
+python knowledge/tools/check_wiki_lint.py
 ```

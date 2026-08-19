@@ -20,8 +20,8 @@
 | [`guide/hosts/`](guide/hosts/README.md) | **宿主端**：在 Codex / Claude Code / Cursor 里使用 copilot（Direct） |
 | [`guide/mcp.md`](guide/mcp.md) | MCP 安装与七个工具接口 |
 | [`guide/autonomous-workflow.md`](guide/autonomous-workflow.md) | 独立执行器（默认不注册） |
-| [`guide/knowledge-maintainer.md`](guide/knowledge-maintainer.md) | 知识维护实操 |
-| [`guide/samples/`](guide/samples/) | 三个知识贡献示例 |
+| [`guide/knowledge-maintainer.md`](knowledge/maintainer-walkthrough.md) | 知识维护实操 |
+| [`guide/samples/`](knowledge/samples) | 三个知识贡献示例 |
 
 > **宿主 ≠ 后端。** `claude-code` / `codex` / `cursor` 三个名字两边都出现，方向
 > 相反：**宿主**提供模型给你用（Direct），**后端**是 copilot 拿去用的模型
@@ -50,9 +50,9 @@
 | 文档 | 内容 |
 |---|---|
 | [`contributing/DOCSTRING_STYLE.md`](contributing/DOCSTRING_STYLE.md) | docstring 约定 |
-| [`contributing/EXTENDING-KNOWLEDGE.md`](contributing/EXTENDING-KNOWLEDGE.md) | 扩展知识库 |
+| [`knowledge/writing.md`](knowledge/writing.md) | **怎么写和更新知识库**——落盘位置、页面类型、copilot 怎么消费、两道门禁 |
 | [`contributing/release-maintenance.md`](contributing/release-maintenance.md) | vLLM-Omni 发版漂移审计（`imupdate` 底层） |
-| [`contributing/knowledge-templates/`](contributing/knowledge-templates/README.md) | 可直接复制的知识页模板 |
+| [`knowledge/templates/`](knowledge/templates/README.md) | 可直接复制的知识页模板（7 种页型，各自对照一篇 vLLM-Omni 实页） |
 
 ## evaluation/ —— 测量（冻结记录）
 

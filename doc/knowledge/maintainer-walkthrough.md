@@ -6,6 +6,13 @@
 社区维护者直接向 InferMatrixCopilot 提交规则即可，不需要访问私有知识源。同步流程
 必须保留目标仓库已有的模块和模型规则，不能用上游知识树整棵覆盖。
 
+> **这份手册是"照着做一遍"，不是规范。** 完整的落盘位置判断、页面类型、copilot
+> 消费模型和两道门禁看
+> [`writing.md`](writing.md)；
+> 有约束力的规则以 [`contributing/`](contributing/_index.md) 为准；
+> 页面骨架直接复制
+> [`templates/`](templates/README.md)。
+
 ## 只想马上加一条规则
 
 不要从头写。只打开符合当前情况的一个样本：
@@ -127,7 +134,7 @@
 
 1. 优先复制[完整新 model owner 样本](samples/add-new-model-owner.zh-CN.md)；
    需要其他页面类型时再看
-   [`doc/contributing/knowledge-templates/`](../contributing/knowledge-templates/README.md)。
+   [`templates/`](templates/README.md)。
 2. 创建 `_index.md`，写清源码路径、职责边界、测试入口和依赖关系。
 3. 有稳定架构信息时创建 `architecture.md`。
 4. 第一条真实规则出现时才创建 `rules.md`，不要提交空页面。
@@ -188,7 +195,10 @@ owner 最终确认：
 - [ ] 没有保存完整 diff、review 对话、运行结果或临时路径。
 - [ ] 修改已有 `rules.md` 时更新了 `updated` 和 `sources`。
 - [ ] 新增页面或目录时更新了最近 `_index.md`。
-- [ ] 两个校验脚本均为 0 错误、0 提醒。
+- [ ] 两个校验脚本均为 0 错误（提醒需要人判断，不要求清零）。
+- [ ] 没有重命名、移动或删除 owner 入口页，也没有手改正文里的 `main @ <SHA>` pin ——
+  这两样由发版审计对账，改动必须同步 `adapters/vllm_omni/release_baseline.yaml`。
+  见[同步与校验 §发版审计](contributing/validation.md#vllm-omni-页面还有一道发版审计)。
 
 ```powershell
 python knowledge/tools/check_knowledge_tree.py
@@ -196,5 +206,5 @@ python knowledge/tools/check_wiki_lint.py
 ```
 
 更完整的目录、frontmatter 和页面规范见
-[`knowledge/CONTRIBUTING.md`](../../knowledge/CONTRIBUTING.md)。英文扩展说明见
-[`doc/contributing/EXTENDING-KNOWLEDGE.md`](../contributing/EXTENDING-KNOWLEDGE.md)。
+[`CONTRIBUTING.md`](CONTRIBUTING.md)。完整写作指南见
+[`writing.md`](writing.md)。

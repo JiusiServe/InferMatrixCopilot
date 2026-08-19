@@ -1,392 +1,264 @@
-# Extending the knowledge base (`knowledge/`)
+# 怎么写和更新知识库（`knowledge/`）
 
-A practical guideline for users and developers who want to **add or change a page**
-in the curated Markdown wiki at repo-root `knowledge/`.
+要在仓库根目录 `knowledge/` 这棵精选 Markdown wiki 里**新增或修改一页**，**从这里
+开始**。本页是操作指南：一条事实该落在哪、由哪种页型承载、copilot 会怎么消费它、
+以及怎么过两道门禁。
 
-Chinese maintainer guide:
-[`doc/guide/knowledge-maintainer.md`](../guide/knowledge-maintainer.md).
+三个surface，分清你在读哪一个：
 
-`knowledge/` is a **vendored** copy of `zuiho-kai/claude-workflow-starter`
-(provenance and copy authorization in [KNOWLEDGE.md](../architecture/KNOWLEDGE.md)); it is
-maintained in-repo as ordinary tracked files. The wiki's own short entry point is
-[`knowledge/CONTRIBUTING.md`](../../knowledge/CONTRIBUTING.md), which routes to one
-topic page in [`knowledge/contributing/`](../../knowledge/contributing/) per action —
-read it when you need the authoritative rule. **This guide adds copy-paste
-templates and a decision tree on top of that**, plus how the copilot actually
-*consumes* the wiki so you know what to keep tight.
+| Surface | 是什么 | 什么时候读 |
+|---|---|---|
+| **本页** | 工作流 —— 决策树、页型、消费模型、门禁 | 你正准备动笔写 |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) → [`contributing/`](contributing/_index.md) | **有约束力的规范**，一个动作一篇专题 | 你需要那条硬规则；本页与它冲突时**以它为准** |
+| [`templates/`](templates/) | 可复制的页面骨架，一种页型一个文件 | 你已经知道页面放哪，想直接开写 |
 
-> The same workflow is distilled into a retrievable skill,
-> [`skills/knowledge-base-contribution/SKILL.md`](../../skills/knowledge-base-contribution/SKILL.md),
-> so the copilot's own agents follow it during retrospectives.
+中文的手把手走查（含组件与模型的填写示例）：
+[`maintainer-walkthrough.md`](maintainer-walkthrough.md)。
+
+`knowledge/` 在本仓库内作为普通受版本控制的文件维护；布局、消费方式与维护规则见
+[KNOWLEDGE.md](../architecture/KNOWLEDGE.md)。
+
+> 同一套工作流被蒸馏成一个可检索 skill
+> [`skills/knowledge-base-contribution/SKILL.md`](../../skills/knowledge-base-contribution/SKILL.md)，
+> 让 copilot 自己的 agent 在复盘时也遵守它。
 
 ---
 
-## 0. TL;DR — the four-step loop
+## 0. TL;DR —— 四步循环
 
-1. **Pick the owner directory** (§1). Route by the *verified root cause*, never by
-   where the symptom first showed.
-2. **Write/edit one page** of the right type (rules / architecture / guide /
-   incident). Keep exactly **one canonical copy** of each fact; everything else
-   links to it.
-3. **Register it in the same change**: add a `遇到什么 → 查看哪里` row (or a
-   child-dir link) in the **nearest `_index.md`**. An unregistered page fails the gate.
-4. **Validate** (both gates must print 0 errors):
+1. **选定 owner 目录**（§1）。按**已验证的根因**路由，绝不按症状最先出现的地方。
+2. **写/改一页**正确页型的内容（rules / architecture / guide / incident）——
+   从 [`templates/`](templates/) 复制对应骨架（§4），并读一遍它
+   所对照的那篇 vLLM-Omni 实页（§3）。每条事实**只保留一份正文**，其他入口只链接。
+3. **在同一次修改里注册它**：在**最近的 `_index.md`** 里加一行
+   `遇到什么 → 查看哪里`（或一条子目录链接）。未注册的页面过不了门禁。
+4. **校验**（两道门禁都必须 0 错误）：
 
    ```bash
-   python knowledge/tools/check_knowledge_tree.py    # structure / index / links / incidents
-   python knowledge/tools/check_wiki_lint.py         # synthesis-layer frontmatter + tag taxonomy
+   python knowledge/tools/check_knowledge_tree.py    # 结构 / 索引 / 链接 / incident
+   python knowledge/tools/check_wiki_lint.py         # 沉淀层 frontmatter + 标签分类法
    ```
 
-Deliver via PR (the wiki gate runs in review); never direct-push. See §5.
+交付见 §7。**本页描述的是人工写入路径**；上游发版驱动的结构事实走 `imupdate`
+（[发版漂移审计](../contributing/release-maintenance.md)）—— 它只更新机器已证明的
+baseline、catalog、source map、SHA pin 和 manifest，不做 owner 归属判断，也不写规则。
+运行中的 agent 只能提 candidate 由人工晋升。下面的落盘位置判断和页型选择属于人工
+路径；两个校验器三条路径都要过。
 
 ---
 
-## 1. Where does it go? — the owner decision tree
+## 1. 该放哪？—— owner 决策树
 
-### Layer 1 — general vs repo-specific
+### 第一层 —— general 还是仓库专属
 
-| The lesson is… | Put it under |
+| 这条经验… | 放到 |
 |---|---|
-| True on **any** repo (review, ci, debug, git, planning, remote, docs, benchmark, agents, environment) | `knowledge/general/<topic>/` |
-| Specific to **one repo** | `knowledge/repos/<repo>/` |
-| A **current-machine** fact (host, path, account, cache, venv, token) | `knowledge/local/` — git-ignored, never tracked |
+| 在**任何**仓库都成立（review、ci、debug、git、planning、remote、docs、benchmark、agents、environment） | `knowledge/general/<topic>/` |
+| 只对**某一个仓库**成立 | `knowledge/repos/<repo>/` |
+| 是**当前这台机器**的事实（主机、路径、账号、cache、venv、token） | `knowledge/local/` —— 已被 git 忽略，永不入库 |
 
-### Layer 2 — inside a repo slice
+### 第二层 —— 仓库切片内部
 
-| The lesson is about… | Put it under |
+| 这条经验讲的是… | 放到 |
 |---|---|
-| A repo-wide workflow topic (review, ci, git, benchmark, remote, rebase…) | `repos/<repo>/<topic>/` |
-| **Shared source code** used by several models (diffusion, scheduler, serving…) | `repos/<repo>/components/<module>/` |
-| **One model's** own implementation / config / checkpoint | `repos/<repo>/models/<model>/` |
+| 仓库级的工作主题（review、ci、git、benchmark、remote、rebase…） | `repos/<repo>/<topic>/` |
+| 多个模型**共用的源码**（diffusion、scheduler、serving…） | `repos/<repo>/components/<module>/` |
+| **某一个模型**自己的实现 / 配置 / checkpoint | `repos/<repo>/models/<model>/` |
 
-Route by the **verified** root cause. "Frontend saw a 404" does not mean the root
-cause lives in frontend — sink the page where the cause was proven, not where the
-symptom appeared.
+按**已验证**的根因路由。"前端看到 404" 不等于根因在前端 —— 页面沉到**证明了原因**
+的那一层，而不是症状冒出来的那一层。
 
-### Layer 3 — which page type
+### 第三层 —— 选哪种页型
 
-| You have… | Page type | Notes |
+| 你手上有… | 页型 | 说明 |
 |---|---|---|
-| A rule that must change the **next** run (trigger → do → don't → how to verify) | `rules.md` in the nearest owner dir | The default product of a retrospective. Always-on (see §2) — keep it tight. |
-| A **stable** data-flow / responsibility / boundary description | `architecture.md` | No title-only stubs. |
-| A longer method that isn't a hard gate | a feature page in the owner root; work-topic collections may use `guides/` | Component/model owners stay flat; all deeper pages are pulled on demand. |
-| **Complex reproducible history** a rule can't carry | `incidents/YYYY-MM-DD-short-name.md` | Optional. Only when the repro chain / evidence still has independent lookup value. |
+| 一条必须改变**下一次**执行的规则（触发 → 必须 → 禁止 → 怎么验收） | 最近 owner 目录里的 `rules.md` | 复盘的默认产物。**always-on**（见 §2），必须写紧 |
+| 一段**稳定的**数据流 / 职责 / 边界描述 | `architecture.md` | 不允许只有标题的空壳页 |
+| 一套不是硬门禁的较长方法 | owner 根目录下的专题页；工作主题集合可以用 `guides/` | 组件/模型 owner 保持扁平，更深的页面一律按需拉取 |
+| 规则装不下的**复杂可复现历史** | `incidents/YYYY-MM-DD-short-name.md` | 可选。只有当复现链/证据本身仍有独立查阅价值时才建 |
 
-**Retrospective rule of thumb:** the default output of "复盘 / record a lesson" is a
-**rule**, not an incident. Add an incident only when the evidence chain is complex
-enough that the rule alone can't carry it.
-
----
-
-## 2. How the copilot consumes it (so you know what to optimize)
-
-Wiring lives in `src/infermatrix_copilot/engine/agent_runtime/knowledge.py` +
-`src/infermatrix_copilot/config.py` + each `adapters/<repo>/manifest.yaml`.
-
-- **Always-on briefing** — injected into *every* run, each capped:
-  - the general slice `settings.knowledge_general_docs` (`general/_index.md`);
-  - the adapter's `briefing_docs` — for vllm-omni: `repos/vllm-omni/rules.md` +
-    `repos/vllm-omni/_index.md`;
-  - `performance_briefing_docs` for strong models (compact review patterns).
-- **On demand** — the `doc_search` / `doc_read` tools recursively reach every
-  deeper Markdown page in `general/` **plus the active
-  adapter's `repo_subdir` only** (other repos' slices are refused; path traversal
-  is blocked; `doc_read` windows 24k chars and pages with an offset).
-- **MCP** — the same repo-scoped `doc_search` / `doc_read` are exposed read-only
-  over MCP, so a host model can query the wiki without starting a run.
-
-**Practical implication for authors:** `rules.md` and `_index.md` are *budget* —
-they load on every task. Keep them to triggers + gates + navigation. Push
-narrative, long repros, and step-by-step method into on-demand feature pages or `incidents/`,
-which are pulled only when a run actually needs them.
-
-To register a **new repo's** slice, point its adapter manifest at it
-(`knowledge.repo_subdir`, `briefing_docs`, `performance_briefing_docs`) — see §3.8.
+**复盘的经验法则：** "复盘 / 记一条教训" 的默认产物是**规则**，不是 incident。
+只有当证据链复杂到规则本身承载不了时，才追加一个 incident。
 
 ---
 
-## 3. Templates (copy-paste)
+## 2. copilot 怎么消费它（所以你才知道该把什么写紧）
 
-**Ready-to-copy files live in [`knowledge-templates/`](knowledge-templates/)** (see
-its [README](knowledge-templates/README.md) for the copy → register → validate
-recipe) — `cp` one into place instead of retyping the blocks below. The blocks
-here are the same skeletons, inline for reading in context.
+接线在 `src/infermatrix_copilot/engine/agent_runtime/knowledge.py` +
+`src/infermatrix_copilot/config.py` + 每个 `adapters/<repo>/manifest.yaml`。
 
-All templates are gate-valid once you (a) replace placeholders and (b) register
-the page in the nearest `_index.md`. **Frontmatter is required on synthesis-layer
-pages** — `rule` / `guide` / `architecture` / `index` under `general/` and
-`repos/` — and enforced by `knowledge/tools/check_wiki_lint.py`: it needs `title`,
-`created` + `updated` (both `YYYY-MM-DD`), `type` (one of those four), and a
-non-empty `tags` list drawn from the taxonomy in
-[`knowledge/SCHEMA.md`](../../knowledge/SCHEMA.md) (`## 标签分类法`); `confidence`, if
-present, must be `high|medium|low`. **Evidence-layer pages** (`incidents/`,
-`history/`, `results/`) take **no** frontmatter — the incident template uses plain
-`- 编号/…` fields instead (checked by `check_knowledge_tree.py`). Directory names
-use lowercase
-`a-z0-9-`; `_index`, `local`, `components`, `models`, `incidents`, `guides` are
-reserved role names — don't reuse them as custom topics.
+- **always-on briefing** —— 注入**每一次** run，各自有上限：
+  - general 切片 `settings.knowledge_general_docs`（`general/_index.md`）；
+  - adapter 的 `briefing_docs` —— vllm-omni 是 `repos/vllm-omni/rules.md` +
+    `repos/vllm-omni/_index.md`；
+  - `briefing_docs_extra` —— 所有档位都加载的扩展切片，vllm-omni 目前是
+    `repos/vllm-omni/review/guides/maintainer-pattern-routing.md`；
+  - 强模型额外的 `performance_briefing_docs`（精简版评审模式）；
+  - `review_checklist` —— 单页仓库评审清单，前 4k 字符注入 Strict reviewer 的
+    system prompt，vllm-omni 指向
+    `repos/vllm-omni/review/guides/strict-review-checklist.md`。
+- **按需** —— `doc_search` / `doc_read` 工具可递归到达 `general/` 里每一页更深的
+  Markdown，**外加当前 adapter 的 `repo_subdir`**（其他仓库的切片一律拒绝；路径穿越
+  被阻断；`doc_read` 每页窗口 24k 字符，用 offset 翻页）。
+- **MCP** —— 同一套按仓库限定的 `doc_search` / `doc_read` 以只读形式暴露在 MCP 上，
+  所以宿主模型不启动 run 也能查询 wiki。
 
-### 3.1 `_index.md` — any topic / directory (the required routing table)
+**对作者的现实含义：** `rules.md` 和 `_index.md` 是**预算** —— 它们每个任务都会加载。
+把它们控制在触发器 + 门禁 + 导航。叙述、长复现、逐步方法推到按需拉取的专题页或
+`incidents/`，那些只有真正需要时才被取用。
 
-```markdown
+**agent 写不进这棵树。** 运行中的 agent 经 `skill_update_candidate` 只能提出
+**candidate**；把 candidate 变成生效的 `SKILL.md`，或把一条 profile fact 写进
+`profile.yaml`，都是**人工/策展动作**（`SPEC/memory/skills.md`、`SPEC/profiles/store.md`）。
+这就是"读宽写窄"：事实随便记（RunTrace、debug memory），知识必须过门。
+所以本页的落盘规则约束的是**人**——以及那个替人准备 candidate 的 agent。
+
+要注册一个**新仓库**的切片，把它的 adapter manifest 指过去
+（`knowledge.repo_subdir`、`briefing_docs`，可选 `briefing_docs_extra`、
+`performance_briefing_docs`、`review_checklist`）—— 见 §5。
+
 ---
-title: "<Human title>"
-created: 2026-07-20
-updated: 2026-07-20
-type: index
-tags: [<repo-or-topic>]
-sources: []
----
 
-# <Human title>
+## 3. 动笔之前先读真实的树
 
-## 什么时候查这里
+vLLM-Omni 切片是下面每一条约定的参考实现。模板里的占位符含义不清时，**实页才是
+ground truth**：
 
-- <one line: when a task should open this directory>
+| 要写… | 先读这篇 |
+|---|---|
+| owner 门禁页 | [`components/configuration/rules.md`](../../knowledge/repos/vllm-omni/components/configuration/rules.md) —— 规则组、审查组、`VOMNI-CFG-*` ID |
+| 模型门禁页 | [`models/hunyuan-image3/rules.md`](../../knowledge/repos/vllm-omni/models/hunyuan-image3/rules.md) —— `HY3-*` ID，以及什么才算可审计 ID |
+| 路由索引 | [`components/_index.md`](../../knowledge/repos/vllm-omni/components/_index.md) —— 一行一个 owner，以及**什么时候不要**打开 `architecture.md` |
+| 仓库入口 | [`repos/vllm-omni/_index.md`](../../knowledge/repos/vllm-omni/_index.md) —— review 最短路径表 |
+| 组件架构 | [`components/diffusion/architecture.md`](../../knowledge/repos/vllm-omni/components/diffusion/architecture.md) —— 负责什么 / 不负责什么 / 带 commit pin 的布局 |
+| incident | [`ci/incidents/`](../../knowledge/repos/vllm-omni/ci/incidents/_index.md) —— 五个字段，以及规则是怎么从中提炼出来的 |
 
-## 不放什么
+那些页面共同遵守、而新手通常会漏掉的三条约定：
 
-- <what belongs elsewhere> → `<other/owner/path>`
+1. **owner 的 `rules.md` 以 Direct 代码快速入口开头。** vLLM-Omni 现有的 12 个
+   owner 规则页（5 个 component + 7 个 model）全都这么做：*意图 → 规则组 → 第一批
+   live 源码*，写成 producer→consumer 链
+   （`stage_config.py::{build_stage_runtime_overrides}` → `omni_config.py::…`）。
+   这一页是 always-on 预算，读者必须能在不消化其余 20 条的情况下够到命中的那 3 条。
+2. **规则 ID 带 owner 前缀，并且永不重新编号。** 一个 owner 一个前缀，新 owner 起
+   新前缀，不复用别人的：vLLM-Omni 在用 `CONF`、`SERV`、`DIFF`、`EXEC`、`SCHED`、
+   `VOMNI-CFG`、`HY3`、`COSMOS`、`FLUX2`、`KREA`、`MCPMO`、`MING`、`Q3TTS`，另有
+   afd-plugin 的 `AFD` 和通用 `REV`。评审和 incident 会引用这些 ID，所以只能
+   **retire**，不能改派。页面上要明确写出哪些文字才是可审计 ID；章节标题只是分组。
+   （数量会漂移，需要准确值时现数：ID 定义写成 `## <ID> — …` 或
+   `- **<ID> — …**`。）
+3. **写清楚什么**不**在这里。** 树里每一页好文档都会点名邻居并把读者路由过去。
+   这正是"一条事实只有一处"得以成立的原因 —— 整棵 wiki 依赖的唯一性质。
 
-## 目录内容
+## 4. 模板
 
-| 遇到什么 | 查看哪里 | 说明 |
-|---|---|---|
-| <symptom / task> | [<page>](<page>.md) | <one-line scope> |
-| <deeper history> | [incidents](incidents/_index.md) | optional |
+**骨架在 [`templates/`](templates/)** —— 一种页型一个文件，
+其 [README](templates/README.md) 给出 复制 → 填写 → 注册 → 校验 的流程。
+**它们是唯一副本**：本指南刻意不再内联重复一遍，因为上一版就是这么做的，两份副本
+最终漂移成了两套。
+
+```bash
+cp doc/knowledge/templates/rules.md \
+   knowledge/repos/<repo>/components/<module>/rules.md
 ```
 
-Every non-index page and every child directory in this folder **must** appear
-exactly once as a link in this table (that link is what the gate checks).
+只要你 (a) 替换掉占位符、(b) 在最近的 `_index.md` 里注册页面，每个模板都是过门禁的。
+frontmatter 由两条规则决定：
 
-### 3.2 `_index.md` — a **repo** entry (`repos/<repo>/_index.md`)
+- **沉淀层** —— `general/` 和 `repos/` 下的 `rule` / `guide` / `architecture` /
+  `index` 页 —— **必须**带 frontmatter，由 `check_wiki_lint.py` 强制：`title`、
+  `created` + `updated`（都是 `YYYY-MM-DD`）、`type`（四者之一）、非空的 `tags`
+  （取自 [`SCHEMA.md`](SCHEMA.md) 的 `## 标签分类法`）。
+  `confidence` 如果出现，必须是 `high|medium|low`；`sources` 不是必填字段。
+  **这包括 `_index.md`** —— 全树 123 个索引页里，109 个沉淀层索引全部带着它，
+  另外 14 个是 `incidents/`、`history/`、`results/` 的证据层索引，按规定不带。
+- **证据层** —— `incidents/`、`history/`、`results/` —— **不带** frontmatter；
+  incident 模板改用 `- 编号/…` 这组扁平字段，由 `check_knowledge_tree.py` 检查。
 
-Same as 3.1, plus an identity header before the tables:
+目录名用小写 `a-z0-9-`。`_index`、`local`、`components`、`models`、`incidents`、
+`guides` 是**保留角色名**，不要拿来当自定义主题。
 
-```markdown
-# <Repo display name>
+## 5. 接入一个新仓库切片
 
-- 上游仓库：`<owner>/<repo>`
-- 常用分支：默认分支 `<main>`；<other branches>
-- 适用范围：<what work this slice covers>
-- 组件源码映射已按 `<repo> main @ <sha>` 校验
-
-## 什么时候查这里
-- 当前 Git 仓库或用户明确目标是 <repo>。
-
-## 不放什么
-- 跨仓库通用方法（放 `general/`）；其他仓库的规则。
-
-## 当前入口
-| 遇到什么 | 查看哪里 | 说明 |
-|---|---|---|
-| 开始任何 <repo> 修改、测试、发布任务 | [硬门禁](rules.md) | 仓库硬规则 |
-| 查看共享代码模块 | [components](components/_index.md) | 模块职责地图 |
-| 查看某个模型 | [models](models/_index.md) | 模型入口 |
-```
-
-### 3.3 `_index.md` — a **component** or **model** (extra required fields)
-
-Component `components/<module>/_index.md` must additionally list: the source
-paths it owns, its responsibility / IO boundary, its test entry, and which
-models/features it affects. Model `models/<model>/_index.md` must additionally
-list: canonical name + aliases, source paths, which shared components it depends
-on, and how checkpoints/sizes/quantizations differ.
-
-### 3.4 `rules.md` — the always-on gate page
-
-```markdown
----
-title: "<Owner> 硬门禁"
-created: 2026-07-20
-updated: 2026-07-20
-type: rule
-tags: [<repo-or-topic>]
-sources: []
----
-
-# <Owner> 硬门禁
-
-只在当前任务明确属于 <owner> 时应用本页。先遵守根 `CLAUDE.md` 的通用 P0。
-
-## 场景触发器
-
-| 用户提到 | 必读 | 硬约束 |
-|---|---|---|
-| <trigger phrase> | [<method>](<method>.md) | <what MUST/ MUST-NOT happen + how to verify> |
-
-## 规则（每条给稳定 ID）
-
-### <RULE-ID> <short name>
-- 触发：<when this applies>
-- 必须：<the required action>
-- 禁止：<the forbidden action>
-- 验收：<the exact check proving compliance>
-```
-
-Give every independent, auditable constraint a **stable ID** (e.g. `HY3-2c`).
-One ID = one behavioral invariant. Keep rules readable without knowing any
-incident number. Don't pre-create an empty `rules.md`; create it when the first
-rule exists and link it from the sibling `_index.md`.
-
-### 3.5 `architecture.md` — stable boundaries (no title-only stubs)
-
-Synthesis-layer, so it needs frontmatter (`type: architecture`). Component variant:
-
-```markdown
----
-title: "<Module> 架构"
-created: 2026-07-21
-updated: 2026-07-21
-type: architecture
-tags: [<tag-from-SCHEMA.md>]
-sources: []
----
-
-# <Module> 架构
-
-## 职责和边界
-## 主要源码和调用入口
-## 数据怎样流动
-## 怎样验证
-```
-
-Model variant (same frontmatter, `type: architecture`):
-
-```markdown
-# <Model> 架构
-
-## 模型专有部分与共享模块的边界
-## 配置、checkpoint 和兼容范围
-## 从输入到输出的主要流程
-## 怎样验证功能、精度和性能
-```
-
-### 3.6 An ordinary method page
-
-```markdown
----
-title: "<Guide title>"
-created: 2026-07-20
-updated: 2026-07-20
-type: guide
-tags: [<repo-or-topic>]
-sources: []
----
-
-# <Guide title>
-
-## 什么时候用
-- <trigger>
-
-## 步骤 / 方法
-1. <step, with the file:line or command it touches>
-
-## 怎样验证
-- <the check that proves it worked>
-```
-
-For a component/model, put the page directly in the owner root and link it from
-the owner's `_index.md`. Work-topic collections may place it in `guides/` and
-register it in `guides/_index.md`.
-
-### 3.7 An `incidents/` page (validator-checked fields)
-
-File name **must** match `YYYY-MM-DD-short-name.md`. The body must contain these
-exact field labels, and the state must be one of
-`待归类 / 处理中 / 已验证 / 已提炼 / 仅历史`. The `编号` must be unique across the tree.
-
-```markdown
-# <人能读懂的现象标题>
-
-- 编号：`inc-2026-07-20-short-name`
-- 归属：`repos/<repo>/<topic>`
-- 状态：处理中
-- 搜索词：<term1>、<term2>、<term3>
-- 影响范围：<what breaks>
-
-## 现象
-## 根因（live 证据）
-## 修复
-## 验收
-## 已提炼的规则
-- 见 [<owner> rules](../rules.md#<rule-id>)
-```
-
-One incident = one canonical write-up; other places link to it. Normal work still
-starts from rules, never from an incident path.
-
-### 3.8 Onboarding a **new repo** slice
-
-1. Create the wiki skeleton and register each level up the chain:
+1. 建出 wiki 骨架，并逐级注册上去：
 
    ```text
-   knowledge/repos/<repo>/_index.md      # from template 3.2
-   knowledge/repos/<repo>/rules.md       # only if a real per-repo gate exists
-   # add a row for <repo> in knowledge/repos/_index.md
+   knowledge/repos/<repo>/_index.md      # 用 templates/repo-index.md
+   knowledge/repos/<repo>/rules.md       # 仅当确实存在仓库级门禁时才建
+   # 在 knowledge/repos/_index.md 里为 <repo> 加一行
    ```
 
-2. Point the adapter at the slice (`adapters/<repo>/manifest.yaml`):
+2. 把 adapter 指向该切片（`adapters/<repo>/manifest.yaml`）：
 
    ```yaml
    knowledge:
-     repo_subdir: repos/<repo>              # its slice under knowledge/
-     briefing_docs:                          # always-on: keep tiny
+     repo_subdir: repos/<repo>              # 它在 knowledge/ 下的切片
+     briefing_docs:                          # always-on：保持极小
      - repos/<repo>/rules.md
      - repos/<repo>/_index.md
-     performance_briefing_docs:              # optional, strong-model only
+     briefing_docs_extra:                    # 可选，所有档位都加载
+     - repos/<repo>/review/guides/<routing>.md
+     performance_briefing_docs:              # 可选，仅强模型
      - repos/<repo>/review/guides/<patterns>.md
+     review_checklist: repos/<repo>/review/guides/<checklist>.md   # 可选，单页
    ```
 
-3. If you forked the wiki from upstream, delete the `repos/` slices that aren't
-   yours and update `repos/_index.md` accordingly.
+   这六个键之外的字段会被 `check_wiki_lint.py` 拒绝；briefing 和 checklist 都不能
+   指向 `incidents/`、`history/`、`results/`。
+
+3. 如果你是从上游 fork 的 wiki，删掉不属于你的 `repos/` 切片，并相应更新
+   `repos/_index.md`。
 
 ---
 
-## 4. Gate cheat-sheet — what the two gates enforce
+## 6. 门禁速查 —— 两道门到底卡什么
 
-`check_knowledge_tree.py` (structure) and `check_wiki_lint.py` (frontmatter/schema)
-both run in review; both must be clean.
+`check_knowledge_tree.py`（结构）和 `check_wiki_lint.py`（frontmatter/schema）
+都在评审时运行，**两个都必须 0 错误**（提醒需要人判断，见表末一行）。
 
-| Check | Gate | Rule |
+| 检查项 | 门 | 规则 |
 |---|---|---|
-| Index present | tree | Every directory containing Markdown has an `_index.md`. |
-| Registration | tree | Every non-index page **and** every child dir is linked **exactly once** from the nearest `_index.md`. |
-| Links | tree | Relative links must resolve; absolute paths are rejected. |
-| Size | tree | Warn at ≥300 non-empty lines or 16 KiB; **must split** at ≥500 lines or 32 KiB (or note `暂不拆分` + a review date in the index). |
-| Directory fan-out | tree | Non-group dir warns above 7 ordinary pages; group dirs (`guides` `incidents` `history` `references` `results` `rfcs`) hard-fail above 20. |
-| Incident format | tree | `YYYY-MM-DD-short-name.md` + the five `- 编号/归属/状态/搜索词/影响范围` fields + a valid state + a unique 编号. |
-| Privacy | tree | No real IPv4, Windows `C:\Users\…`, remote user home, or private-key blocks in tracked pages. |
-| Safety | tree | No `StrictHostKeyChecking=no`, global `safe.directory *`, `--gpus all`, `pkill`, `rm -rf`, or `find … -exec rm`. |
-| `local/` | tree | Must stay git-ignored (untracked). |
-| Root entry | tree | `knowledge/CONTRIBUTING.md` stays ≤100 non-empty lines / ≤8 KiB (detail sinks into `contributing/`). |
-| Frontmatter | lint | Synthesis pages (`rule/guide/architecture/index` in `general/`+`repos/`) need `title`, `created`+`updated` (`YYYY-MM-DD`), `type` (those four), non-empty `tags`; optional `confidence: high\|medium\|low`. |
-| Tag taxonomy | lint | Every `tags` value must appear in `SCHEMA.md`'s `## 标签分类法`. |
-| Evidence layer | lint | `incidents/` `history/` `results/` pages are **not** frontmatter-checked (they use the plain incident fields). |
-| Adapter briefings | lint | `manifest.yaml` `knowledge:` allows only `source`/`repo_subdir`/`briefing_docs`/`performance_briefing_docs`, and briefing docs must not point at evidence-layer pages. |
+| 索引存在 | tree | 任何含 Markdown 的目录都要有 `_index.md` |
+| 已注册 | tree | 每个非索引页**以及**每个子目录，都要被最近的 `_index.md` **恰好链接一次** |
+| 链接 | tree | 相对链接必须可解析；绝对路径一律拒绝 |
+| 体量 | tree | ≥300 非空行或 16 KiB 告警；≥500 行或 32 KiB **必须拆分**（豁免要在同目录 `_index.md` 里同时出现该**文件名**和字面词 `暂不拆分`，再补复查日期） |
+| 目录扇出 | tree | 非分组目录超过 7 个普通页告警；分组目录（`guides` `incidents` `history` `references` `results` `rfcs`）超过 20 个硬失败 |
+| incident 格式 | tree | `YYYY-MM-DD-short-name.md` + 五个 `- 编号/归属/状态/搜索词/影响范围` 字段 + 合法状态 + 全树唯一的编号 |
+| 隐私 | tree | 受版本控制的页面里不得出现真实 IPv4、Windows `C:\Users\…`、远端用户 home 或私钥块 |
+| 安全 | tree | 不得出现 `StrictHostKeyChecking=no`、全局 `safe.directory *`、`--gpus all`、`pkill`、`rm -rf`、`find … -exec rm` |
+| `local/` | tree | 必须保持 git 忽略（未入库） |
+| 根入口 | tree | `doc/knowledge/CONTRIBUTING.md` 保持 ≤100 非空行 / ≤8 KiB（细节下沉到 `contributing/`；校验器跨树检查这一条） |
+| owner 轴 | tree | `components/`、`models/` 必须直属仓库；源码 owner 下不得有 `guides/` |
+| 整页重复 | tree | 两个 owner 下逐字节相同的整页正文（≥200 字符）硬失败 |
+| frontmatter | lint | 沉淀层页面（`general/`+`repos/` 下的 `rule/guide/architecture/index`）需要 `title`、`created`+`updated`（`YYYY-MM-DD`）、`type`（四者之一）、非空 `tags`；可选 `confidence: high\|medium\|low` |
+| 标签分类法 | lint | 每个 `tags` 取值都必须出现在 `SCHEMA.md` 的 `## 标签分类法` 里 |
+| 证据层 | lint | `incidents/` `history/` `results/` **不做** frontmatter 检查（它们用扁平 incident 字段） |
+| adapter briefing | lint | `manifest.yaml` 的 `knowledge:` 只允许 `source`/`repo_subdir`/`briefing_docs`/`briefing_docs_extra`/`performance_briefing_docs`/`review_checklist`；briefing 与 checklist 不得指向证据层页面，`review_checklist` 指向的页面必须存在 |
+| 提醒（不失败） | 两者 | 接近拆分线、目录超过 7 个普通页、孤页、超过 365 天未更新、`confidence: low` / `contested` —— 需要人判断，不是必须清零的门 |
 
-`rules.md`, `architecture.md`, `_index.md` are "special" pages and don't count
-toward the 7-page fan-out warning.
-
----
-
-## 5. Delivery
-
-- Edit `knowledge/` in place like any tracked content; ship via **PR**. The wiki
-  gate runs in review — don't direct-push to a protected branch.
-- The tree is **vendored** — never edit upstream. To pull a future upstream page,
-  diff against `zuiho-kai/claude-workflow-starter` and import the specific pages
-  deliberately (there is no submodule link).
-- Machine facts (host, path, account, token, cache, venv) go **only** in the
-  git-ignored `knowledge/local/`; keep tracked pages free of them (the gate
-  enforces this, but check before you commit anyway).
+`rules.md`、`architecture.md`、`_index.md` 属于"特殊页"，不计入 7 页扇出告警。
 
 ---
 
-## 6. The retrieval skill
+## 7. 交付
+
+- 像改任何受版本控制的内容一样就地改 `knowledge/`；wiki 门禁在评审时运行 ——
+  **不要**直接推保护分支。**目标仓库不会向本仓库提 PR**：它的 owner 提
+  `[Knowledge]` issue，由维护者落盘。
+- 引入任何外部页面时**有选择地**导入具体页面并只取语义增量 ——
+  **整树替换不是合法的更新方式**（这里没有 submodule 链接）。
+- 机器事实（主机、路径、账号、token、cache、venv）**只**放在被 git 忽略的
+  `knowledge/local/`；受版本控制的页面里不得出现（门禁会拦，但提交前请自己也看一眼）。
+- 改到 `repos/vllm-omni/` 时还有**第三道门**：`owner_documents` 入口页、`pin_documents`
+  里的 SHA pin 和 `sources:` 由发版审计对账，两个校验器看不见它；任何触及该切片的 PR
+  都会在 CI 里跑 `enforce`。见
+  [同步与校验 §发版审计](contributing/validation.md#vllm-omni-页面还有一道发版审计)。
+
+---
+
+## 8. 可检索 skill
 
 [`skills/knowledge-base-contribution/SKILL.md`](../../skills/knowledge-base-contribution/SKILL.md)
-encodes this workflow for the copilot's own agents (owner routing, page-type
-choice, `_index.md` registration, always-on tightness, and the validator). It is
-retrieved via `skill_search` and surfaces during retrospectives when an agent is
-told to record a lesson. Update it in the same PR whenever this guideline changes.
+把这套工作流编码给 copilot 自己的 agent（owner 路由、页型选择、`_index.md` 注册、
+always-on 紧凑度、以及校验器）。它经 `skill_search` 被检索，在 agent 被要求记录一条
+教训时浮现。**本指南每次变更，都要在同一个 PR 里更新它。**

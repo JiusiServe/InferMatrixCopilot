@@ -145,13 +145,13 @@
 3. 在上一层 `_index.md` 增加入口；新增模型 owner 时由 `models/` 目录自动发现，
    不修改父级 `models/_index.md`。
 4. 添加真实内容，不提交空目录。
-5. 运行 `python tools/check_knowledge_tree.py`。
+5. 运行 `python knowledge/tools/check_knowledge_tree.py`。
 
 ### 新增普通页面
 
 1. 在最近 owner 目录新建 Markdown。
 2. 在当前目录 `_index.md` 增加“遇到什么 → 查看哪里”。
 3. 只有检查器提醒文件或目录达到阈值时，才按需读 [何时拆分](scaling.md) 并在同一修改中整理。
-4. 运行 `python tools/check_knowledge_tree.py`。
+4. 运行 `python knowledge/tools/check_knowledge_tree.py`。
 
 目录名使用小写英文、数字和短横线，例如 `remote-debug`。同一层不能重名。`_index`、`local`、`components`、`models`、`incidents` 和 `guides` 是框架保留角色，只能按本文定义使用，不能拿来命名自定义主题。添加新目录不需要修改检查脚本的固定名单；上一层 `_index.md` 能找到它即可。

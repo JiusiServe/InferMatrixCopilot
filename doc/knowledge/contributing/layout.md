@@ -20,55 +20,43 @@
 
 一个问题同时影响多个入口时，只在最近 owner 保留一份正文，其他位置只链接。
 
-## 写入前 owner 凭证
-
-选择或新建任何知识文件前，先在工作记录或 commentary 中写出下面四项：
-
-```text
-OWNER ROUTING
-- content:
-- nearest owner:
-- owner evidence:
-- target directory:
-```
-
-- `nearest owner` 先回答事实归 `framework` 主题、仓库工作主题、共享源码 component、单一 model 还是 `local`；不能先选一个现有 `rules.md`，再用文件已经存在作为归属证据。
-- `owner evidence` 必须是稳定边界，例如源码目录、维护职责、测试、运行流程或明确的输入输出；“这里以前写过类似内容”和“这是一次开发工作”都不是源码 owner 证据。
-- `target directory` 必须直接位于最近 owner 下。工作主题不能包住 component/model，component/model 也不再套工作主题。
-- owner 确定后才选择载体：硬门禁进 `rules.md`，稳定职责和数据流进 `architecture.md`，展开方法进 `guides/`。载体类型不能反过来决定 owner。
-
-如果删除 PR、事故或本次任务背景后，内容仍在描述某块源码的职责、字段、调用链或验证边界，它就属于对应 component/model，而不是 `dev`、`review` 或 `debug`。找不到稳定 owner 时继续核对 live 源码，不把工作主题当作 fallback。
-
-父级入口只保留到唯一正文 owner 的链接和一句路由条件。不能在父级复制正文，也不能把同一结论改写一份后声称不是重复。
-
 ## 工作主题和代码 owner 是并列的
 
 - `review`、`ci`、`docs`、`benchmark`、`remote`、`dev` 表示“正在做什么”。
 - `components/frontend`、`components/backend`、`components/diffusion` 表示“事实属于哪块代码”。
 - `models/hunyuan-image3` 表示“事实只属于哪个模型”。
 
-不要套娃：
+不要套娃 —— 下面每一对只改了归属，其他部分刻意保持一致：
 
 ```text
 # 错误
-repos/acme/dev/frontend/incidents/
-repos/vllm-omni/ci/models/hunyuan-image3/
+repos/acme/dev/frontend/incidents/          # frontend 是代码 owner，被工作主题 dev 包住
+repos/vllm-omni/ci/models/hunyuan-image3/   # models/ 被工作主题 ci 包住
 
 # 正确
-repos/acme/dev/
-repos/acme/components/frontend/
-repos/vllm-omni/ci/
+repos/acme/components/frontend/incidents/   # owner 直属仓库，incidents/ 保持不变
+repos/acme/dev/                             # 前后端共用的开发流程留在工作主题
 repos/vllm-omni/models/hunyuan-image3/
+repos/vllm-omni/ci/                         # CI 形状的部分留在 ci/，与 model 页互相链接
 ```
+
+**两条里只有第二条有检查器。** `check_knowledge_tree.py` 要求 `components/` 和
+`models/` 的父目录必须是仓库根，违反就报错；但没有任何检查器认得 `frontend` 是一个
+owner，第一条只能靠人。
+
+理由对两条相同：工作主题记录“当时在做什么”，随任务过期；代码 owner 跟着源码目录走。
+把 owner 挂到工作主题下，同一条事实会按“谁在什么任务里发现它”分裂成多份，而知道
+owner 却不知道当时任务的读者反而找不到它。
+
+`incidents/` 挂在 component/model owner 下是允许的 —— 树里就有
+`models/hunyuan-image3/incidents/`。源码 owner 下唯一被禁止的中转层是 `guides/`。
 
 ## 最小目录图
 
 ```text
-CLAUDE.md
-README.md
-CONTRIBUTING.md                    # 短入口
-contributing/                      # 本仓库的知识树维护规范
-  _index.md
+AGENTS.md                          # agent 开工入口
+CLAUDE.md                          # 路由与安全短入口
+                                   # 贡献规范不在这棵树里，见 doc/knowledge/
 
 general/                         # 换仓库仍然成立
   <主题>/
@@ -179,5 +167,5 @@ rg "SSH timeout|shape mismatch" general repos -g "*.md"
 2. 父级是否只有路由链接和一句触发条件？否则继续下沉，删除复制正文。
 3. 同一内容是否在工作主题和源码 owner 各有一份？是则只保留最近 owner 的正文。
 4. `components/`、`models/` 是否直属仓库、没有被工作主题包住？运行
-   `python tools/check_knowledge_tree.py`；检查器只验证确定的目录不变量和完全相同的
+   `python knowledge/tools/check_knowledge_tree.py`；检查器只验证确定的目录不变量和完全相同的
    整页副本，不代替 owner 语义判断。

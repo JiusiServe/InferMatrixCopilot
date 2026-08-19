@@ -52,7 +52,7 @@ RULES PURITY: <passed candidates>/<all candidates>
 DUPLICATE BODY: none | <重复正文及唯一保留位置>
 ```
 
-逐条确认新增规则脱离原事故仍可执行、下一次开工确实必须立即看到，并且只链接 guide/architecture/incident 而不复制其正文。`python tools/check_knowledge_tree.py` 只验证结构和链接，不能替代这项语义检查。
+逐条确认新增规则脱离原事故仍可执行、下一次开工确实必须立即看到，并且只链接 guide/architecture/incident 而不复制其正文。`python knowledge/tools/check_knowledge_tree.py` 只验证结构和链接，不能替代这项语义检查。
 
 ## PR/review 学习的低成本完整摄取
 

@@ -202,7 +202,7 @@ release_baseline.yaml 的 audited_sha
 - `get_review_result(run_id, offset=0)`：轮询 Strict 结果；报告较长时按
   `next_offset` 继续读取。
 - `update_knowledge(repo="vllm-omni")`：只返回知识贡献入口
-  `knowledge/CONTRIBUTING.md`。它不是 `imupdate` 的发版审计器。
+  `doc/knowledge/CONTRIBUTING.md`。它不是 `imupdate` 的发版审计器。
 - `doc_search(query, repo="vllm-omni", limit=20)`：搜索模型或组件知识。
 - `doc_read(path, repo="vllm-omni", offset=0)`：读取搜索到的知识页面。
 
@@ -252,6 +252,6 @@ CLI/MCP 入口。默认安装器不会注册它；只有需要独立执行 issue
 
 其余：[MCP 接口](doc/guide/mcp.md) ·
 [发版漂移审计](doc/contributing/release-maintenance.md) ·
-[知识库贡献规范](knowledge/CONTRIBUTING.md) ·
-[知识维护示例](doc/guide/knowledge-maintainer.md) ·
+[知识库贡献规范](doc/knowledge/CONTRIBUTING.md) ·
+[知识维护示例](doc/knowledge/maintainer-walkthrough.md) ·
 [评测结论](doc/evaluation/README.md)
