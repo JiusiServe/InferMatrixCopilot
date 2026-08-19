@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.9,
+    "precision": 0.88,
+    "actionability": 0.87,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.9,
+    "precision": 0.82,
+    "actionability": 0.87,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates correctly identify and resolve the single ground-truth concern (stale trust_remote_code claim, fixed at 9947f414) and add substantive, diff-grounded findings with file:line citations well beyond the ground truth's sparse output. Y catches one genuinely unique, valuable bug X misses (cache poisoning when a hub module lacks required symbols, with a ready-to-apply fix), but pads the review by repeating the trust_remote_code point four separate times across sections and has visibly truncated/garbled headers ('[…]'), diluting signal density. X is more concise per point, covers comparable ground (missing test coverage, sticky-failure caching, stale docs, CI gate) plus a distinctive kernels-version dead-code catch, without redundancy. Actionability is comparable — Y offers two full code suggestion blocks, X offers precise prose fixes — so the tiebreak favors X's tighter, less repetitive signal.",
+  "_cost_usd": 0.2401201,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v20cb_train"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_train",
+    "arm_a_sha256": "bafccb74b5b06fb396b4f22cbb89466da222e65825b9f072c4cea6162dc21fe3",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "589a8ff13cb3893b76dd0d5220ad632d82f46cc0edd9083528ebb2466be7c8a7",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

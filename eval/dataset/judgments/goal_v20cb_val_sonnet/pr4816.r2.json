@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.72,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.87,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth is empty (bot rate-limit notice plus a bare 'lgtm'), so recall is vacuous for both. Both candidates independently converge on the same real findings — the residual pure-diffusion serving_tokenization=None path and the untested real-base() error path — which cross-validates those as genuine rather than fabricated. X is more actionable (ships a concrete helper-function fix and inline test code) but pads its review with many unverifiable external claims (upstream file/line citations, Docker pin details, a speculative sibling-rename sweep) and is internally inconsistent, labeling a residual issue 'blocking-ish' while still verdicting Approve. Y stays tighter to the diff, cites evidence lines for every claim, correctly identifies the diffusion-mode issue as pre-existing/nit rather than a regression, and its COMMENT verdict is better calibrated to what is otherwise a clean mechanical rename.",
+  "_cost_usd": 0.18368540000000003,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v20cb_val"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_val",
+    "arm_a_sha256": "ea9b83a5feab151e43dd0c58f0d51c50187342f0ac98d60187ec7e9653f753b2",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b9fe4c00140a73cf5cc08ceded6d03eb8b8faea45f6c3b50e6f9753b9a1a1a01",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

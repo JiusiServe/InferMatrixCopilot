@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.65,
+    "actionability": 0.8,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently recall the ground-truth Low (async_chunk fallback robustness) concern and validate the already-resolved Med scoping fix, but neither surfaces amy-why-3459's model-placement question or the multi-axis latent gap. X is exceptionally disciplined, backing every claim with explicit diff-changed vs. unchanged-tree evidence citations, yielding high trust and concrete, ready-to-apply suggestions (NPU port gap, CI merge-gate coverage gap, default-value inconsistency). Y is deeper and more insightful (list-audio consumer disagreement, WebSocket realtime path) but mixes in speculative or unverifiable claims (a confident 'AMD CI is red' assertion and an unsourced '0.228-cosine mystery' reference) with no evidence trail, which drags down its precision relative to X's rigor.",
+  "_cost_usd": 0.39816860000000004,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v20cb_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_train",
+    "arm_a_sha256": "604e00e0e0d031df52599006d904f2f4716e04cd3044d847250b5b62c11f189e",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "03d7423c3a91e45838083e2025e3dea932f1d9448ba923b1d6ca1a0373899ea1",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.85,
+    "precision": 0.55,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.85,
+    "precision": 0.78,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates land the one real ground-truth concern (already_submitted removal is safe because both submit_initial and submit_update reject list prompts), with comparable actionability via concrete line refs and suggested fixes/tests. X's centerpiece 'blocker' — that super().forward() no longer binds because an unrelated prior PR (#1235) truncated ZImagePipeline's signature — is an elaborate, highly specific claim (fabricated-looking commit hashes, a simulated 'confirmed at runtime' REPL trace) that two human approvers and CI apparently didn't catch, and is internally inconsistent since X separately attributes the red CI checks to platform issues rather than this supposed universal TypeError; this drags precision down hard since it's the review's dominant claim. Y stays more conservative, sticking closer to diff-grounded evidence (StagePool rejection lines, async_chunk config, existing test files) and asking for tests rather than asserting an unverified catastrophic break, making it more trustworthy despite its awkward tool-output formatting.",
+  "_cost_usd": 0.24503450000000002,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v20cb_val"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_val",
+    "arm_a_sha256": "9276bba9304e9e0b4b0f64f118bbce9907275a18450802e9e5f6a77e20d3cf8f",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "bc98460632105aef812a50d392afd9f1bea66b3f783e8a9cd888456ce013cba3",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.8,
+    "actionability": 0.92,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.82,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Ground truth has no substantive reviewer concerns, so recall is trivially satisfied by both. Both independently catch the same critical finding (new test lacks pytestmark and is silently deselected by the CI marker filter) with strong, verifiable evidence. X goes further and surfaces a genuinely important, well-argued blocking bug — warmup_quack_fp8() checks only _load_quack() and bypasses quack_enabled(), so it can still fire on gated-off sm_120 hardware — with a concrete fix, whereas Y only mentions this as a buried 'residual' note in a catch-all finding rather than flagging it clearly. Y is slightly more rigorous about citing exact evidence quotes and correctly separating pre-existing vs. PR-introduced issues, while X's CI-status claim (specific red Buildkite checks) is less grounded in the diff itself, so precision is roughly comparable with a slight edge to Y; X's clearer, code-backed fixes give it a slight actionability edge overall.",
+  "_cost_usd": 0.10631750000000002,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v20cb_train"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_train",
+    "arm_a_sha256": "5b735b7d69d020190d86617adfc062545c2c3b7cd1b9ca14a80d1c714e8448cf",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "de884ebeca54520b85a490b897397bd22bf362507bf9f7d4a833d74b390ae063",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

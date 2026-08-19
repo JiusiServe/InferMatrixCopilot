@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 0.45,
+    "precision": 0.5,
+    "actionability": 0.75
+  },
+  "y": {
+    "recall": 0.55,
+    "precision": 0.7,
+    "actionability": 0.8
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both cover the core live issues (Hub kernel version-pinning risk, FA3 Hopper/Blackwell gating nuance, per-layer kernel reload cost, thin test coverage), but Y grounds every claim in explicit file:line quotes tagged 'unchanged by this diff, present in PR-time tree' and even cross-references the actual fix commits (332da8f2, deeb67af) that match the ground-truth reviewer thread almost exactly, plus independently surfaces the CI-collection/marker concern that mirrors wtomin's real inline comment. X reads as more polished but repeatedly presents suspiciously precise 'evidence' (exact Hub commit SHAs, measured warm/cold load timings, 'simulated' capability sweeps) that could not plausibly be produced from a static diff review, which is a real fabrication risk and drags down precision despite the underlying architectural points being reasonable. Neither review includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.3618831,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v20cb_train"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_train",
+    "arm_a_sha256": "d1dbf8c3832158320545e603632c2cd18f949fddb250f2074402a1ca10ddb6df",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0639263265995e00edcd06c6242ac0a6a3647a980509c282af885c86ce6930e0",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

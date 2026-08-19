@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.6,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.7,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "X explicitly cross-references the actual review thread's resolution status (confirming the Med gating-scope and Low fallback-robustness concerns were addressed) while surfacing a well-grounded new residual bug (getattr default True vs config default False) plus concrete, evidence-trailed test/CI coverage gaps with suggested patches. Y produces deeper but more speculative analysis (a padding root-cause hypothesis and an unverifiable 'AMD CI is red' claim not grounded in the diff) and never engages with the literal reviewer concerns, so it covers less of the actual ground truth despite comparable actionability. Neither candidate raises the multi-batch-axis splitting concern from the latent gap check.",
+  "_cost_usd": 0.4290276,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v20cb_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_train",
+    "arm_a_sha256": "604e00e0e0d031df52599006d904f2f4716e04cd3044d847250b5b62c11f189e",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "03d7423c3a91e45838083e2025e3dea932f1d9448ba923b1d6ca1a0373899ea1",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.95,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.75,
+    "actionability": 0.7,
+    "gap_hit": false
+  },
+  "winner": "X",
+  "margin": "clear",
+  "rationale": "Ground truth has no substantive concerns, so recall is vacuous for both. Both catch the key CI-blind-spot (missing pytestmark deselects the new test), but X verifies it with an actual local pytest run showing '18 deselected'/'18 passed' and backs every claim with concrete patches (warmup_quack_fp8 gate bypass, sticky-disable fix, warning_once dedup bug), giving it sharper actionability. Y's findings are grounded but more repetitive/formulaic, and pads with an out-of-scope pre-existing multi-GPU note duplicated across two entries, diluting precision and usefulness.",
+  "_cost_usd": 0.1799461,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v20cb_train"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_train",
+    "arm_a_sha256": "5b735b7d69d020190d86617adfc062545c2c3b7cd1b9ca14a80d1c714e8448cf",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "de884ebeca54520b85a490b897397bd22bf362507bf9f7d4a833d74b390ae063",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 1
+  }
+}

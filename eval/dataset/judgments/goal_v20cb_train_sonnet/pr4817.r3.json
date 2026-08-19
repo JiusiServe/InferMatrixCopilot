@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.55,
+    "actionability": 0.6,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.85,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "decisive",
+  "rationale": "Ground truth carries no substantive concerns (bot spam, 'thanks', no inline comments), so recall is vacuous for both. Both candidates independently and correctly flag the real CI gap (new test file lacks pytestmark, so it's deselected by the core_model/cpu marker filter), but Y verifies it with an actual pytest run and X buries it among several redundant/low-value 'findings' (restating the PR's own fix as a finding, pre-existing multi-GPU heterogeneity noted twice) that dilute precision and make the audit-log-style output ('[claim-verified]', 'general') harder to act on. Y additionally surfaces a genuine blocking bug X only gestures at vaguely (warmup_quack_fp8 bypassing the gate entirely), a real logging/dedup defect, and a design fix for the catastrophic per-call retry amplifier, each with concrete patches and calibrated confidence (explicitly flagging its own unverified claims like the (10,3) test case).",
+  "_cost_usd": 0.2870977,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v20cb_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_train",
+    "arm_a_sha256": "5b735b7d69d020190d86617adfc062545c2c3b7cd1b9ca14a80d1c714e8448cf",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "de884ebeca54520b85a490b897397bd22bf362507bf9f7d4a833d74b390ae063",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

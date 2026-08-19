@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.35,
+    "precision": 0.55,
+    "actionability": 0.5,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.78,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Y nails the ground truth's central, still-live concern almost verbatim: it names nearly the same affected-model list (flux, flux2, sd3, hunyuan_video_15, ltx2, omnigen2, wan2_2_s2v, ovis, longcat, ernie) that NumberWan later posted, and proposes the exact fix hsliuustc0106 asked for (scope via `_DIFFUSION_IR_OP_PRIORITY_FUNCS`/registry.py using Cosmos3 as precedent). It also independently surfaces that Part 2 removes all vLLM RMSNorm from the Qwen path, undercutting the PR's own P1 benchmark — a sharp, diff-grounded insight — and addresses the perf-comparison and regression-test asks with concrete, actionable follow-ups. X repeats essentially the same 'Qwen bypasses IR priority / other models untested' observation four times across 'Validated' bullets and 'general' findings without sharpening it into the scoping ask, and frames the blast radius as a 'fleet benefit' rather than the unvalidated risk ground truth flagged, diluting precision and actionability. Neither includes a LATENT GAP CHECK section.",
+  "_cost_usd": 0.33492220000000006,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v20cb_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_train",
+    "arm_a_sha256": "479440490faf69f773aade9ad0338400860989209a85201d20696bbef7795244",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "97e45909dc2469db55da15b6e8d6a525549029c219aefca76123ec8b801fd1bf",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

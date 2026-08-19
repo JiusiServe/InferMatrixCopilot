@@ -1,0 +1,35 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.82,
+    "actionability": 0.9
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.72,
+    "actionability": 0.85
+  },
+  "winner": "X",
+  "margin": "slight",
+  "rationale": "Both candidates independently dug past the truncated diff and correctly identified/resolved the sole substantive ground-truth concern (trust_remote_code kwarg incompatible with pinned kernels<0.15.0), confirming it was fixed by a later commit — recall is equal and high. X's remaining findings (cache-before-validation bug, missing unit test, CI coverage gaps) are conservatively labeled with verification status and grounded in cited PR-tree state, while Y makes several bold but unverifiable claims presented as fact ('verified against the installed kernels 0.16.0' library internals, 'merged with this check failing' for NPU CI) that read as risky assertions rather than diff-grounded findings, pulling precision down. Both reviews are concrete and actionable with specific file:line citations and suggested fixes, giving X a slight overall edge.",
+  "_cost_usd": 0.13753030000000002,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v20cb_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_train",
+    "arm_a_sha256": "bafccb74b5b06fb396b4f22cbb89466da222e65825b9f072c4cea6162dc21fe3",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "589a8ff13cb3893b76dd0d5220ad632d82f46cc0edd9083528ebb2466be7c8a7",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

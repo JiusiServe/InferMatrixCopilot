@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.3,
+    "precision": 0.85,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.4,
+    "precision": 0.9,
+    "actionability": 0.9,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "clear",
+  "rationale": "Both candidates go well beyond the ground truth's fairly light docs/test-marker complaints into real code-level bugs, and both independently converge on several genuine issues (uncached get_kernel() per attention layer, the unwrapped final get_kernel() call with no fallback, FA3-Hub's major>=9 gate wrongly admitting Blackwell) — this convergence lends credibility to both. Y more precisely recalls the ground-truth threads: it directly answers wtomin's 'what do version=1/2/default mean' question with concrete evidence (branch SHAs, actual warning text) rather than just proposing a pin, and it correctly identifies that RuixiangMa's flash_attn_func=None crash concern is only partially fixed (the piecewise path was patched but _forward_varlen_masked/_run_varlen_dense still call an unchecked varlen_func), whereas X marks that whole area '[resolved]' without noticing the masked-path gap still exists. Y's findings are also generally more verifiable/grounded (shows actual timing runs, simulated selector matrix, real repo version metadata) and read as a coherent, well-prioritized human review, while X's is comprehensive but its finding headlines are truncated/garbled ('[…]') and wrapped in denser, harder-to-parse scaffolding. X does add a few plausible unique findings (LTX-2 mask conversion, diffusers-adapter case fallthrough) that Y lacks, keeping the gap from being decisive.",
+  "_cost_usd": 0.4982763,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "copilot_v20cb_train",
+    "Y": "claudecode_opus5"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_train",
+    "arm_a_sha256": "d1dbf8c3832158320545e603632c2cd18f949fddb250f2074402a1ca10ddb6df",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "0639263265995e00edcd06c6242ac0a6a3647a980509c282af885c86ce6930e0",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

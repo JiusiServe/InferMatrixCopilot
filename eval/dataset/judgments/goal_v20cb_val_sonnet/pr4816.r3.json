@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 1.0,
+    "precision": 0.55,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 1.0,
+    "precision": 0.8,
+    "actionability": 0.75,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Ground truth is an empty/mechanical PR (bot rate-limit notice + human 'lgtm'), so recall is vacuous for both. Both candidates independently surface the same real, diff-grounded core issue (tests mock `base()` so they never exercise the real `serving_tokenization` state path) and the same pre-existing diffusion-mode None gap, with concrete file/line evidence and code suggestions. X goes further with speculative Dockerfile version-pin sleuthing and a 'follow-up' about sibling renames sourced from a locally-installed vLLM 0.26.0 that it admits doesn't match the pinned 0.24.0 — padding that isn't grounded in the diff and lowers precision, and its 'blocking-ish' framing overstates severity for a pre-existing, already-approved change. Y's findings stay tighter, correctly labels the diffusion issue as pre-existing/nit, and offers a ready-to-apply GitHub suggestion block, better matching the actual low-severity outcome.",
+  "_cost_usd": 0.1336847,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v20cb_val"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_val",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_val",
+    "arm_a_sha256": "ea9b83a5feab151e43dd0c58f0d51c50187342f0ac98d60187ec7e9653f753b2",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "b9fe4c00140a73cf5cc08ceded6d03eb8b8faea45f6c3b50e6f9753b9a1a1a01",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 3
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "x": {
+    "recall": 0.8,
+    "precision": 0.6,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "y": {
+    "recall": 0.65,
+    "precision": 0.85,
+    "actionability": 0.85,
+    "gap_hit": false
+  },
+  "winner": "Y",
+  "margin": "slight",
+  "rationale": "Both independently surface the same high-value bug the human reviewers missed (env-driven sample rate mis-decoding already-normalized 24kHz PCM in seed_tts_eval), and both hit the language/dialect-drop and definitions.py-placement threads from the real review. X has broader topical recall (also flags the audio_vae config-mutation concern that matches amy-why-3459's GT comment), but backs that finding with a fabricated-looking 'verified locally' transformers execution trace claiming the encoder is truncated — directly contradicted by LHXuuu's actual PR clarification that the encoder is unaffected, which is a serious grounding failure for a 'High' severity claim. Y omits that topic entirely (lower recall) but is more disciplined throughout, tagging claims as verified/refuted against cited code and avoiding unverifiable execution claims, giving it cleaner precision. Actionability is comparable (both give file:line-specific fixes; Y adds literal suggestion diffs).",
+  "_cost_usd": 0.41808960000000006,
+  "_judge_resolved_model": "claude-sonnet-5",
+  "_blinding": {
+    "X": "claudecode_opus5",
+    "Y": "copilot_v20cb_train"
+  },
+  "_roles": {
+    "arm": "copilot_v20cb_train",
+    "baseline": "claudecode_opus5"
+  },
+  "_arm_meta": {
+    "arm_a_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/arms/copilot_v20cb_train",
+    "arm_a_sha256": "5ecfd2073e66a06e84102081f728cde910646f5a782a5d0fa1678b5597b2f837",
+    "arm_b_dir": "/data/zhoutaichang/copilot/InferMatrixCopilot/eval/dataset/baselines/claudecode_opus5",
+    "arm_b_sha256": "264e453d996b4a5c483bf206cefb21e513e90d0d6bda5e49948434353154f4a5",
+    "judge_backend": "claude",
+    "judge_model": "claude-sonnet-5",
+    "judge_resolved_model": "claude-sonnet-5",
+    "judge_rep": 2
+  }
+}
