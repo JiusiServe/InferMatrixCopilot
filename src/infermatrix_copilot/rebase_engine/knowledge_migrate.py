@@ -373,6 +373,12 @@ def _migrate_locked(settings, repo, adapter, kp: KnowledgePaths,
                     for t, p, _f, d in sources},
         "target": str(state_db),
         "planned_seed_adds": planned_skills}, indent=1))
+    # marker-last also means marker-INVALID-first on a rerun: a previous
+    # MIGRATION_COMPLETE must not let activated runtimes start against a
+    # partially re-migrated world if this pass crashes mid-mutation
+    # (hook iteration-3 finding); it is recreated as the final act
+    (kp.state_dir / KnowledgePaths.MIGRATION_MARKER).unlink(
+        missing_ok=True)
 
     # ── target debug DB: backup, rebuild at tmp, atomic replace ─────────
     kp.backups_dir.mkdir(parents=True, exist_ok=True)

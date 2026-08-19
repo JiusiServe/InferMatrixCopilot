@@ -327,7 +327,18 @@ def test_target_wal_rows_survive_failed_swap(settings, tmp_path,
         migrate_knowledge(settings, "widget-repo")
     monkeypatch.setattr(km.os, "replace", real_replace)
     c.close()
-    # the WAL-resident row is still there, and the redo keeps it
+    # marker-invalid-first (hook iteration-3 finding): the crashed rerun
+    # must have taken the old MIGRATION_COMPLETE with it — an activated
+    # runtime now fails CLOSED instead of starting against a
+    # half-migrated world
+    state_dir = state_db.parent
+    assert not (state_dir / "MIGRATION_COMPLETE.json").exists()
+    settings.imx_knowledge_runtime = "widget-repo"
+    with pytest.raises(KnowledgeStateError):
+        KnowledgePaths.resolve(settings, "widget-repo")
+    settings.imx_knowledge_runtime = ""
+    # the WAL-resident row is still there, and the redo keeps it — and
+    # restores the marker as its final act
     keys = {r["key"] for r in DebugMemory(state_db).entries(
         repo="widget-repo")}
     assert "wal-resident" in keys
@@ -335,6 +346,7 @@ def test_target_wal_rows_survive_failed_swap(settings, tmp_path,
     keys = {r["key"] for r in DebugMemory(state_db).entries(
         repo="widget-repo")}
     assert "wal-resident" in keys
+    assert (state_dir / "MIGRATION_COMPLETE.json").exists()
 
 
 # ── activation flag (D1/D3) ─────────────────────────────────────────────────
