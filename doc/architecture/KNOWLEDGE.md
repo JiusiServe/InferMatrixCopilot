@@ -46,8 +46,12 @@ extensions merely because they are absent from the common source.
   is `adapters/vllm_omni/release_baseline.yaml`.
 - **AFD code-mirror pin:** the `knowledge/repos/afd-plugin/components/` owner
   maps and architecture summaries are verified against
-  `vllm-project/afd-plugin` `main @
-  a432692ed7d5dd6437a4755b530ee7aaf2685dad` (vLLM 0.26.0 baseline).
+  `vllm-project/afd-plugin` default branch at
+  `a432692ed7d5dd6437a4755b530ee7aaf2685dad` (vLLM 0.26.0 baseline).
+  Deliberately NOT written as `main @ <sha>`: this file is a
+  `pin_documents` entry, and the release audit requires every marker in
+  that form to equal `audited_sha`. This SHA belongs to another
+  repository, so the pin syntax is reserved for vllm-omni pins only.
 
 ## Layout: general vs repo-specific
 The knowledge base separates the two, and so do we — the whole tree is **shared**,

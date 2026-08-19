@@ -85,13 +85,13 @@
 | SSH、容器、远端服务或长跑 | [远端入口](general/remote/_index.md) | 先验证目标、环境、超时、状态文件和清理边界 |
 | 多 agent 或并行工作 | [agent loop](general/agents/guides/agent-loop-workflow.md) | 只拆能独立验证的任务，主 agent 复核结论 |
 | 产品规划或 roadmap | [产品闭环](general/planning/guides/product-loop-planning.md) | 先写用户可感知的完整闭环，再拆技术任务 |
-| 复盘、沉淀经验或总结教训 | [复盘语义分流](general/debug/guides/retrospective-to-rules.md) | 动笔前先完成[语义分流台账](contributing/incidents.md#动笔前的语义分流台账)；`rules.md` 最后编辑，incident 默认不创建 |
+| 复盘、沉淀经验或总结教训 | [复盘语义分流](general/debug/guides/retrospective-to-rules.md) | 动笔前先完成[语义分流台账](../doc/knowledge/contributing/incidents.md#动笔前的语义分流台账)；`rules.md` 最后编辑，incident 默认不创建 |
 
 仓库入口链接的 `rules.md` 可以增加更严格的门禁，但不能放宽这里的通用 P0。
 
 ## 4. 知识写到哪里
 
-- **先定 owner，再选载体**：写任何正文前先按[写入前 owner 凭证](contributing/layout.md#写入前-owner-凭证)记录内容、最近 owner、owner 证据和目标目录。不能因为现有 `rules.md` 方便追加就先选文件；工作主题不能覆盖源码 owner，父级只路由、不复制正文。
+- **先定 owner，再选载体**：写任何正文前先按[写入前 owner 凭证](../doc/knowledge/contributing/layout.md#写入前-owner-凭证)记录内容、最近 owner、owner 证据和目标目录。不能因为现有 `rules.md` 方便追加就先选文件；工作主题不能覆盖源码 owner，父级只路由、不复制正文。
 - 能反复避免问题、改变下一次行为的结论 → 最近 owner 的 `rules.md`。跨仓库规则放 `general/<主题>/`，仓库规则放 `repos/<仓库>/`，模块或模型规则继续下沉到对应目录。
 - 稳定的数据流、职责和边界 → 最近 owner 的 `architecture.md`。
 - 需要展开说明但不是硬门禁的方法 → 对应主题的 `guides/`。
@@ -100,7 +100,7 @@
 
 用户要求“复盘”时，必须回答为什么发生、为什么原有规则或测试没有发现、怎样提前阻止，并在写文件前按语义分流。incident 默认不创建；只有规则和架构已完成、仍有其他载体无法保存的证据、且存在具体未来查询触发时才准入，不能用它收纳从规则中剔除的历史细节。
 
-长期知识禁止写入系统、全局或个人 memory 位置。新增、移动、拆分或删除 Markdown 前先读短入口 [CONTRIBUTING.md](CONTRIBUTING.md)，再按任务只读它链接的一篇专题规范；同步最近的 `_index.md`，然后运行：
+长期知识禁止写入系统、全局或个人 memory 位置。新增、移动、拆分或删除 Markdown 前先读短入口 [CONTRIBUTING.md](../doc/knowledge/CONTRIBUTING.md)，再按任务只读它链接的一篇专题规范；同步最近的 `_index.md`，然后运行：
 
 ```powershell
 python tools/check_knowledge_tree.py
@@ -117,5 +117,5 @@ python tools/check_knowledge_tree.py
 
 - 通用经验：[general/_index.md](general/_index.md)
 - 仓库经验：[repos/_index.md](repos/_index.md)
-- 贡献与目录维护：[CONTRIBUTING.md](CONTRIBUTING.md)
+- 贡献与目录维护：[CONTRIBUTING.md](../doc/knowledge/CONTRIBUTING.md)
 - 当前机器信息：ignored `local/`

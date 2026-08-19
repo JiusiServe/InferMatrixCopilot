@@ -24,4 +24,4 @@ sources: []
 |---|---|---|
 | SSH、容器、Slurm、长跑和清理 | [远端指南](guides/_index.md) | 通用远端工作方法 |
 | 调查通用 SSH、Slurm、venv 和清理错误 | [远端错题](incidents/_index.md) | 已验证的具体失败 |
-| 记录本机服务器信息 | [目录归属中的 local 规则](../../contributing/layout.md#local) | 实例文件仍由 Git 忽略 |
+| 记录本机服务器信息 | [目录归属中的 local 规则](../../../doc/knowledge/contributing/layout.md#local) | 实例文件仍由 Git 忽略 |
