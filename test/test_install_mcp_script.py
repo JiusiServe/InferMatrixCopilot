@@ -2,6 +2,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 INSTALLER = ROOT / "scripts" / "install_mcp.py"
@@ -101,6 +103,70 @@ def test_cursor_install_preserves_existing_config(tmp_path):
     text = update_skill.read_text(encoding="utf-8")
     assert "{{INFERMATRIX_COPILOT_ROOT}}" not in text
     assert str(ROOT) in text
+
+
+def test_zcode_install_merges_nested_mcp_servers(tmp_path):
+    installer = _load_installer()
+    config_path = tmp_path / ".zcode" / "cli" / "config.json"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text(
+        json.dumps(
+            {
+                "plugins": {"keep": True},
+                "mcp": {"servers": {"existing": {"command": "existing"}}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    installer._install_zcode(tmp_path)
+
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    assert config["plugins"] == {"keep": True}
+    assert config["mcp"]["servers"]["existing"]["command"] == "existing"
+    server = config["mcp"]["servers"]["infermatrix-copilot"]
+    assert server["type"] == "stdio"
+    assert server["command"] == "uvx"
+    assert "infermatrix-copilot-mcp" in server["args"]
+    assert list(config_path.parent.glob("config.json.*.bak"))
+    assert (tmp_path / ".zcode" / "skills" / "imreview" / "SKILL.md").is_file()
+    update_skill = tmp_path / ".zcode" / "skills" / "imupdate" / "SKILL.md"
+    assert "{{INFERMATRIX_COPILOT_ROOT}}" not in update_skill.read_text(
+        encoding="utf-8"
+    )
+
+
+def test_zcode_install_creates_config_when_missing(tmp_path):
+    installer = _load_installer()
+
+    installer._install_zcode(tmp_path)
+
+    config_path = tmp_path / ".zcode" / "cli" / "config.json"
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    assert config["mcp"]["servers"]["infermatrix-copilot"]["command"] == "uvx"
+    assert (tmp_path / ".zcode" / "skills" / "imdesign" / "SKILL.md").is_file()
+
+
+def test_zcode_install_rejects_invalid_config(tmp_path):
+    installer = _load_installer()
+    config_path = tmp_path / ".zcode" / "cli" / "config.json"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text("{ not json", encoding="utf-8")
+
+    with pytest.raises(installer.InstallError):
+        installer._install_zcode(tmp_path)
+
+    assert config_path.read_text(encoding="utf-8") == "{ not json"
+
+
+def test_zcode_detected_via_config_dir(monkeypatch, tmp_path):
+    installer = _load_installer()
+    monkeypatch.setattr(installer.shutil, "which", lambda command: None)
+
+    assert not installer._zcode_installed(tmp_path)
+    (tmp_path / ".zcode").mkdir()
+    assert installer._zcode_installed(tmp_path)
+    assert "zcode" in installer._detect_agents(tmp_path)
 
 
 def test_codex_install_sets_timeout_and_installs_current_skill_location(
