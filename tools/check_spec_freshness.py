@@ -30,6 +30,7 @@ anything is stale.
 from __future__ import annotations
 
 import datetime
+import os
 import re
 import subprocess
 import sys
@@ -56,6 +57,32 @@ def spec_root() -> Path | None:
     return next((p for p in SPEC_CANDIDATES if p.is_dir()), None)
 
 
+def _history_start() -> list[str]:
+    """Revisions to date files from, skipping GitHub's synthetic PR merge.
+
+    On a `pull_request` event the runner checks out `refs/pull/N/merge` — the
+    branch merged into the base, a commit that exists nowhere else. A file
+    edited on BOTH sides then differs from both parents, so git reports the
+    merge as the commit that last touched it and the file dates to merge time.
+    Its page can never be fresh however recently a human verified it, and the
+    same SHA passes on the push run while failing on the pull_request run.
+
+    The test is the event, not the shape of HEAD. "Tip is a merge" would also
+    swallow a real conflict resolution pushed as the tip, which genuinely edits
+    source and must keep counting. Under `pull_request` the tip is always
+    GitHub's synthetic merge — a resolution of the branch's own would sit at
+    HEAD^2 — so keying on the event skips exactly the commit that is not real
+    history and nothing else.
+    """
+    if os.environ.get("GITHUB_EVENT_NAME") != "pull_request":
+        return ["HEAD"]
+    out = subprocess.run(
+        ["git", "rev-list", "--parents", "-n", "1", "HEAD"],
+        cwd=REPO, capture_output=True, text=True).stdout.split()
+    parents = out[1:]
+    return parents if len(parents) > 1 else ["HEAD"]
+
+
 def last_commit(path: Path) -> int:
     """Unix timestamp of the newest commit touching `path`, or 0 when untracked.
 
@@ -64,7 +91,7 @@ def last_commit(path: Path) -> int:
     that adds a spec fail its own check.
     """
     out = subprocess.run(
-        ["git", "log", "-1", "--format=%ct", "--", str(path)],
+        ["git", "log", "-1", "--format=%ct", *_history_start(), "--", str(path)],
         cwd=REPO, capture_output=True, text=True).stdout.strip()
     return int(out) if out.isdigit() else 0
 
