@@ -277,8 +277,14 @@ def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
         return {"exit_code": outcome.rc, "passed": outcome.rc == 0,
                 "log_file": outcome.log_file}
 
+    from ...memory.paths import KnowledgePaths
+    kpaths = KnowledgePaths.resolve(
+        ctx.settings, repo_name,
+        adapter_root=Path(ctx.settings.adapters_dir)
+        / repo_name.replace("-", "_"))
+
     def _memory() -> DebugMemory:
-        return DebugMemory(ctx.settings.memory_db)
+        return DebugMemory(kpaths.rebase_backend_db)
 
     def search_debug_memory(**kw) -> dict:
         query = " ".join(str(kw.get(k, "") or "")
@@ -312,10 +318,8 @@ def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
     # proposals land in the RUNTIME state dir — writing candidates into
     # the checked-in adapter source would dirty it and bypass the module
     # scope's writable wall (Rev 8 §1.1 seed/runtime split)
-    seed_skills_dir = Path(ctx.settings.adapters_dir) \
-        / repo_name.replace("-", "_") / "skills"
-    runtime_skills_dir = Path(ctx.settings.memory_db).parent / "state" \
-        / repo_name / "skills_runtime"
+    seed_skills_dir = kpaths.skills_seed_dir
+    runtime_skills_dir = kpaths.skills_runtime_dir
 
     def search_skills(**kw) -> dict:
         query = str(kw.get("keyword", "") or "")

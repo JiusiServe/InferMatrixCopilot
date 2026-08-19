@@ -306,6 +306,23 @@ class Copilot:
             except RunLockHeld as exc:
                 print(style("✋ ", "red", "bold") + str(exc))
                 return BLOCKED_EXIT
+        # Per-repo knowledge lock, SHARED, held for the run's lifetime:
+        # never contends with other runs; it exists so the knowledge
+        # migration's EXCLUSIVE acquire can prove no potential store
+        # writer is alive (and so no run starts mid-migration).
+        knowledge_lock = None
+        if spec.repo:
+            from ..memory.paths import (KnowledgeLockHeld, KnowledgePaths,
+                                        KnowledgeRunLock)
+            try:
+                knowledge_lock = KnowledgeRunLock(
+                    KnowledgePaths.resolve(self.settings, spec.repo)
+                    .knowledge_run_lock).acquire_shared()
+            except KnowledgeLockHeld as exc:
+                if held_lock is None:
+                    lock.release()
+                print(style("✋ ", "red", "bold") + str(exc))
+                return BLOCKED_EXIT
         try:
             from .. import tracing
             tracing.init(run_dir.name, run_dir / "trace.jsonl")
@@ -358,6 +375,8 @@ class Copilot:
                 return BLOCKED_EXIT
             return 0 if outcome.status == "done" else 1
         finally:
+            if knowledge_lock is not None:
+                knowledge_lock.release()
             if held_lock is None:
                 lock.release()
 

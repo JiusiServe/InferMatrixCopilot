@@ -44,9 +44,47 @@ def normalize_pattern(pattern: str) -> str:
     return p
 
 
+def repair_tail(fh) -> None:
+    """Truncate a torn final record (crash mid-append) back to the last
+    newline-terminated line. Must be called under the file's flock, on a
+    handle open for update. The fragment was never durable — dropping it is
+    the accepted crash-during-write semantics; what this prevents is a
+    RESUMED writer fusing its next record onto the fragment, producing one
+    malformed line that silently swallows a real decision at harvest."""
+    fh.seek(0, os.SEEK_END)
+    size = fh.tell()
+    if size == 0:
+        return
+    fh.seek(size - 1)
+    if fh.read(1) == b"\n":
+        return
+    # walk back to the previous newline (bounded chunks, files are small)
+    pos = size - 1
+    chunk = 4096
+    while pos > 0:
+        start = max(0, pos - chunk)
+        fh.seek(start)
+        buf = fh.read(pos - start)
+        nl = buf.rfind(b"\n")
+        if nl != -1:
+            fh.truncate(start + nl + 1)
+            fh.flush()
+            os.fsync(fh.fileno())
+            return
+        pos = start
+    fh.truncate(0)
+    fh.flush()
+    os.fsync(fh.fileno())
+
+
 def record(decision_log: Path, *, pattern: str, verdict: str, test: str = "",
-           module: str = "", run: str = "") -> None:
-    """Append one decision (flock + fsync: watchdog threads race)."""
+           module: str = "", run: str = "", attempt: str = "",
+           job_key: str = "", seq: int | None = None) -> None:
+    """Append one decision (flock + fsync: watchdog threads race). The
+    optional `run`/`attempt`/`job_key`/`seq` fields form the stable identity
+    the curator's exactly-once harvest dedups on. Before appending, a torn
+    tail left by a crashed writer is repaired under the same lock, so a
+    resumed writer can never fuse its record onto a fragment."""
     decision_log = Path(decision_log)
     decision_log.parent.mkdir(parents=True, exist_ok=True)
     entry = {
@@ -55,11 +93,20 @@ def record(decision_log: Path, *, pattern: str, verdict: str, test: str = "",
         "verdict": verdict.upper(),
         "test": test, "module": module, "run": run,
     }
-    with open(decision_log, "a", encoding="utf-8") as fh:
+    if attempt:
+        entry["attempt"] = attempt
+    if job_key:
+        entry["job_key"] = job_key
+    if seq is not None:
+        entry["seq"] = int(seq)
+    with open(decision_log, "a+b") as fh:
         if fcntl is not None:
             fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
         try:
-            fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+            repair_tail(fh)
+            fh.seek(0, os.SEEK_END)
+            fh.write((json.dumps(entry, ensure_ascii=False) + "\n")
+                     .encode("utf-8"))
             fh.flush()
             os.fsync(fh.fileno())
         finally:
@@ -139,7 +186,11 @@ def promote(decision_log: Path, overlay: Path, *, seed_noise: list[str],
     doc["noise"] = current + [_to_noise_regex(p) for p in new]
     overlay.parent.mkdir(parents=True, exist_ok=True)
     tmp = overlay.with_name(overlay.name + ".tmp")
-    tmp.write_text(yaml.safe_dump(doc, allow_unicode=True, sort_keys=False),
-                   encoding="utf-8")
+    with open(tmp, "w", encoding="utf-8") as fh:
+        fh.write(yaml.safe_dump(doc, allow_unicode=True, sort_keys=False))
+        fh.flush()
+        os.fsync(fh.fileno())
     os.replace(tmp, overlay)
+    from ..memory.skills import _fsync_dir
+    _fsync_dir(overlay.parent)
     return new

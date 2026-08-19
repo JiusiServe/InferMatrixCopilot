@@ -12,12 +12,36 @@ import re
 import sqlite3
 import time
 from pathlib import Path
+from urllib.parse import quote
+
+
+def readonly_uri(path: str | Path) -> str:
+    """`file:` URI opening `path` read-only, with the path percent-escaped so
+    filenames containing `?`, `#`, or `%` cannot be misparsed into URI
+    machinery (and silently open the wrong database)."""
+    return f"file:{quote(str(path), safe='/')}?mode=ro"
 
 REQUIRED_FIELDS = (
     "repo", "module", "run_id", "symptom", "root_cause",
     "fix_summary", "files", "verification",
 )
 STATUSES = ("candidate", "active", "stale", "retired")
+
+# Schema v2 (Rev 8 §5 additive columns + curation provenance). New DBs are
+# created with them; an EXISTING DB is upgraded ONLY through the explicit
+# `ensure_schema_v2()` maintenance routine — never as a side effect of
+# opening the store (report-only paths must be able to prove no-write).
+ADDITIVE_COLUMNS: dict[str, str] = {
+    "key": "TEXT DEFAULT ''",
+    "tags": "TEXT DEFAULT ''",
+    "watch_outs": "TEXT DEFAULT ''",
+    "upstream_commit": "TEXT DEFAULT ''",
+    "last_seen_run": "TEXT DEFAULT ''",
+    "source": "TEXT DEFAULT ''",
+    "run_count": "INTEGER DEFAULT 1",
+    "derived_from": "TEXT DEFAULT ''",
+}
+_FTS_V2_EXTRA = ("key", "tags", "watch_outs")
 
 
 class DebugMemory:
@@ -28,33 +52,171 @@ class DebugMemory:
 
     def __init__(self, db_path: str | Path):
         """Open (creating parent dirs and the schema if absent) the SQLite db at
-        `db_path`. Rows are returned as `sqlite3.Row` so callers get dict access."""
+        `db_path`. Rows are returned as `sqlite3.Row` so callers get dict access.
+        An EXISTING database is opened as-is — no DDL of any kind runs against
+        it (schema upgrades are the explicit `ensure_schema_v2()` action)."""
         self.db_path = Path(db_path)
+        self.readonly = False
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(str(self.db_path))
         self._conn.row_factory = sqlite3.Row
-        self._init_schema()
+        if not self._table_exists("entries"):
+            # an existing file that already holds OTHER tables is not a
+            # debug store — refuse instead of installing our schema into it
+            if self._conn.execute(
+                    "SELECT 1 FROM sqlite_master LIMIT 1").fetchone():
+                raise sqlite3.DatabaseError(
+                    f"{self.db_path} is an existing database without an "
+                    "'entries' table — not a debug memory store")
+            self._create_schema()
+        elif not self._table_exists("entries_fts"):
+            # crash window repair: entries landed, mirror did not
+            self._create_schema()
+        self._introspect()
 
-    def _init_schema(self) -> None:
-        """Create the `entries` table and its `entries_fts` FTS5 mirror if they
-        do not yet exist. The mirror is `content='entries'` external-content so
-        the searchable columns stay in sync with the base row on insert."""
-        c = self._conn
-        c.execute(
-            """CREATE TABLE IF NOT EXISTS entries (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                repo TEXT, module TEXT, run_id TEXT,
-                symptom TEXT, root_cause TEXT, fix_summary TEXT,
-                files TEXT, verification TEXT,
-                status TEXT DEFAULT 'active',
-                created_at REAL)"""
-        )
-        c.execute(
-            """CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5(
-                symptom, root_cause, fix_summary, module, repo,
-                content='entries', content_rowid='id')"""
-        )
-        c.commit()
+    @classmethod
+    def open_readonly(cls, db_path: str | Path) -> "DebugMemory":
+        """Open an EXISTING db strictly read-only (sqlite URI `mode=ro`,
+        path percent-escaped): no mkdir, no DDL, no content writes. Copilot
+        stores are rollback-journal databases, so the open leaves the file
+        byte-identical (pinned by test); a WAL-mode store with live sidecars
+        reads through them without creating anything new. Raises
+        `FileNotFoundError` for a missing file and `sqlite3.DatabaseError`
+        for a corrupt one (probed eagerly) — the fail-closed open the
+        report-only prelude relies on."""
+        path = Path(db_path)
+        if not path.is_file():
+            raise FileNotFoundError(f"no debug memory db at {path}")
+        self = cls.__new__(cls)
+        self.db_path = path
+        self.readonly = True
+        self._conn = sqlite3.connect(readonly_uri(path), uri=True)
+        self._conn.row_factory = sqlite3.Row
+        self._conn.execute("SELECT count(*) FROM entries").fetchone()
+        self._introspect()
+        return self
+
+    def _table_exists(self, name: str) -> bool:
+        """True when table `name` exists — the new-vs-existing DB probe that
+        keeps `__init__` DDL-free for existing databases."""
+        return self._conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type IN ('table','view') "
+            "AND name=?", (name,)).fetchone() is not None
+
+    def _create_schema(self) -> None:
+        """Install the current (v2) schema, atomically and race-safely: both
+        tables inside ONE immediate transaction with IF NOT EXISTS — two
+        concurrent first opens serialize on the write lock and the loser's
+        creates no-op; a crash can never leave `entries` without its mirror
+        visible as "initialized". When repairing a half-created legacy db
+        (entries present, mirror missing) the mirror's columns follow the
+        EXISTING entries table, so a legacy store never gains a mirror that
+        indexes columns it does not have."""
+        cols = ",\n                ".join(
+            f"{name} {decl}" for name, decl in ADDITIVE_COLUMNS.items())
+        old_isolation = self._conn.isolation_level
+        self._conn.isolation_level = None  # manage the txn explicitly
+        try:
+            self._conn.execute("BEGIN IMMEDIATE")
+            self._conn.execute(
+                f"""CREATE TABLE IF NOT EXISTS entries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    repo TEXT, module TEXT, run_id TEXT,
+                    symptom TEXT, root_cause TEXT, fix_summary TEXT,
+                    files TEXT, verification TEXT,
+                    status TEXT DEFAULT 'active',
+                    created_at REAL,
+                    {cols})"""
+            )
+            have = {r[1] for r in
+                    self._conn.execute("PRAGMA table_info(entries)")}
+            extra = [c for c in _FTS_V2_EXTRA if c in have]
+            base_cols = ["symptom", "root_cause", "fix_summary", "module",
+                         "repo"] + extra
+            self._conn.execute(
+                f"""CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5(
+                    {', '.join(base_cols)},
+                    content='entries', content_rowid='id')"""
+            )
+            # backfill via FTS5's own 'rebuild': a mirror created NEXT TO
+            # existing rows must index them or every pre-repair memory goes
+            # invisible to search. Rebuild re-derives the index from the
+            # content table, so it is idempotent — safe on the fresh path
+            # (empty), the repair path (backfills), and the concurrent-
+            # creator path (no duplicate index entries).
+            self._conn.execute(
+                "INSERT INTO entries_fts(entries_fts) VALUES('rebuild')")
+            self._conn.execute("COMMIT")
+        except BaseException:
+            try:
+                self._conn.execute("ROLLBACK")
+            except sqlite3.Error:
+                pass
+            raise
+        finally:
+            self._conn.isolation_level = old_isolation
+
+    def _introspect(self) -> None:
+        """Record which columns this database actually has — `record()` writes
+        the additive fields only where they exist, so a not-yet-upgraded
+        legacy DB keeps working (fields dropped, never an SQL error)."""
+        self._columns = {r["name"] for r in
+                         self._conn.execute("PRAGMA table_info(entries)")}
+        self._fts_columns = {r["name"] for r in
+                             self._conn.execute("PRAGMA table_info(entries_fts)")}
+
+    @property
+    def schema_v2(self) -> bool:
+        """True when every `ADDITIVE_COLUMNS` column exists."""
+        return set(ADDITIVE_COLUMNS) <= self._columns
+
+    def ensure_schema_v2(self) -> bool:
+        """Explicit, writable schema upgrade to v2 — the ONLY way an existing
+        database gains the additive columns. Sanctioned call sites (pinned by
+        test): the knowledge-migration CLI, `rebase.v3_knowledge_prep`, and
+        `rebase.v3_curate`. Adds the missing columns and rebuilds the FTS
+        mirror to index key/tags/watch_outs, all in one transaction. Returns
+        True when it changed anything; no-op (False) on an already-v2 db."""
+        if self.readonly:
+            raise sqlite3.OperationalError("read-only debug memory store")
+        old_isolation = self._conn.isolation_level
+        self._conn.isolation_level = None
+        try:
+            # take the write lock FIRST, then decide: two concurrent
+            # upgraders (runs share the knowledge lock only SHARED) must
+            # serialize here, and the loser must re-observe the schema the
+            # winner installed instead of failing on duplicate ALTERs
+            self._conn.execute("BEGIN IMMEDIATE")
+            self._introspect()
+            missing = [c for c in ADDITIVE_COLUMNS if c not in self._columns]
+            fts_missing = [c for c in _FTS_V2_EXTRA
+                           if c not in self._fts_columns]
+            if not missing and not fts_missing:
+                self._conn.execute("COMMIT")
+                return False
+            for col in missing:
+                self._conn.execute(
+                    f"ALTER TABLE entries ADD COLUMN {col} "
+                    f"{ADDITIVE_COLUMNS[col]}")
+            self._conn.execute("DROP TABLE IF EXISTS entries_fts")
+            self._conn.execute(
+                """CREATE VIRTUAL TABLE entries_fts USING fts5(
+                    symptom, root_cause, fix_summary, module, repo,
+                    key, tags, watch_outs,
+                    content='entries', content_rowid='id')""")
+            self._conn.execute(
+                "INSERT INTO entries_fts(entries_fts) VALUES('rebuild')")
+            self._conn.execute("COMMIT")
+        except BaseException:
+            try:
+                self._conn.execute("ROLLBACK")
+            except sqlite3.Error:
+                pass
+            raise
+        finally:
+            self._conn.isolation_level = old_isolation
+        self._introspect()
+        return True
 
     def record(self, **fields) -> int:
         """Insert one failure/fix entry and return its new row id. Rejects (with
@@ -73,23 +235,41 @@ class DebugMemory:
             raise ValueError(f"bad status {status!r}; one of {STATUSES}")
         files = fields["files"]
         files_json = json.dumps(files if isinstance(files, list) else [str(files)])
+        cols = ["repo", "module", "run_id", "symptom", "root_cause",
+                "fix_summary", "files", "verification", "status", "created_at"]
+        vals: list = [fields["repo"], fields["module"], fields["run_id"],
+                      fields["symptom"], fields["root_cause"],
+                      fields["fix_summary"], files_json,
+                      fields["verification"], status,
+                      fields.get("created_at") or time.time()]
+        # additive v2 fields: written only where the column exists — a legacy
+        # (not-yet-upgraded) db drops them instead of erroring
+        for name in ADDITIVE_COLUMNS:
+            if name in self._columns and name in fields:
+                v = fields[name]
+                if name in ("tags", "watch_outs") and isinstance(v, list):
+                    v = ",".join(str(t) for t in v)
+                cols.append(name)
+                vals.append(v)
         cur = self._conn.execute(
-            """INSERT INTO entries
-               (repo, module, run_id, symptom, root_cause, fix_summary, files,
-                verification, status, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?)""",
-            (fields["repo"], fields["module"], fields["run_id"], fields["symptom"],
-             fields["root_cause"], fields["fix_summary"], files_json,
-             fields["verification"], status, time.time()),
-        )
+            f"INSERT INTO entries ({','.join(cols)}) "
+            f"VALUES ({','.join('?' * len(cols))})", vals)
         rowid = cur.lastrowid
+        fts_cols = ["rowid", "symptom", "root_cause", "fix_summary",
+                    "module", "repo"]
+        fts_vals: list = [rowid, fields["symptom"], fields["root_cause"],
+                          fields["fix_summary"], fields["module"],
+                          fields["repo"]]
+        for name in _FTS_V2_EXTRA:
+            if name in self._fts_columns:
+                v = fields.get(name, "")
+                if isinstance(v, list):
+                    v = ",".join(str(t) for t in v)
+                fts_cols.append(name)
+                fts_vals.append(v)
         self._conn.execute(
-            """INSERT INTO entries_fts (rowid, symptom, root_cause, fix_summary,
-                                        module, repo)
-               VALUES (?,?,?,?,?,?)""",
-            (rowid, fields["symptom"], fields["root_cause"], fields["fix_summary"],
-             fields["module"], fields["repo"]),
-        )
+            f"INSERT INTO entries_fts ({','.join(fts_cols)}) "
+            f"VALUES ({','.join('?' * len(fts_cols))})", fts_vals)
         self._conn.commit()
         return int(rowid)
 

@@ -102,11 +102,14 @@ def _retrieve_memories(ctx: StepContext, query: str) -> list[str]:
     `[module] symptom -> fix` hits. The repo adapter's DB is searched before the
     shared one so repo-scoped memories rank first; duplicate lines are dropped
     and any DB error is swallowed (retrieval never fails a step)."""
-    dbs: list[Path] = []
+    from ...memory.paths import KnowledgePaths
+
     adapter = _resolve_adapter(ctx)
-    if adapter is not None:
-        dbs.append(Path(adapter.debug_memory_db))
-    dbs.append(Path(ctx.settings.memory_db))
+    repo = str((ctx.state.get("task_spec") or {}).get("repo", ""))
+    dbs = [Path(p) for p in KnowledgePaths.resolve(
+        ctx.settings, repo,
+        adapter_root=adapter.root if adapter is not None else None,
+    ).debug_read_layers]
     hits: list[str] = []
     seen: set[str] = set()
     for db in dbs:  # repo-scoped memories rank before the shared pool's
@@ -179,9 +182,14 @@ def _repo_map_tool(ctx: StepContext, adapter) -> dict[str, ToolDef]:
     language = "python"
     cache_dir = ctx.run_dir / "repo_map"
     if adapter is not None:
+        from ...memory.paths import KnowledgePaths
+
         language = str(adapter.manifest.get("repo", {}).get("language")
                        or "python")
-        cache_dir = adapter.root / "repo_map"
+        cache_dir = KnowledgePaths.resolve(
+            ctx.settings, str((ctx.state.get("task_spec") or {})
+                              .get("repo", "")),
+            adapter_root=adapter.root).repo_map_cache_dir
     rmap = RepoMap(repo, language, cache_dir=cache_dir)
     if not rmap.supported:
         ctx.trace.record("capability_gap", capability=f"repo_map.{language}",
