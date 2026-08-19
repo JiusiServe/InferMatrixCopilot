@@ -1,5 +1,8 @@
 # 20-case PR-review evaluation — full rerun with complete traces
 
+> **冻结记录，保持英文原文。** 本页是当时被评审/被判分的文本本身；翻译它就是**改动一份记录**。文档树的其余部分统一为中文 —— 见 [`../README.md`](../README.md)。
+
+
 3 generation replicates x 20 `pr_review` items (10 train / 5 val / 5 test) x 3 judge replicates = 180 blind pairwise verdicts against the recorded `claudecode_opus48` baseline (never rerun). Judge: `claude-sonnet-5`, tool-less, randomized X/Y order — a third model, distinct from both arms. Metric definitions reused unchanged from `eval/dataset/judge_val.py`.
 
 **Configuration**: `MOA_WHEN=off`, `PR_CONTEXT_MODE=no_discussion`, `REVIEW_DEPTH=auto`, `ALLOW_POST=0`/`ALLOW_PUSH=0`, full trace capture (`AGENT_TRACE_IO_FULL=1`). MoA off matches the A1 arm in `doc/evaluation/EVAL-goal-report.md`, so the val slice stays comparable.

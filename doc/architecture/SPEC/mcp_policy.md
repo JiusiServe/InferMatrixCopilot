@@ -1,42 +1,37 @@
-# mcp_policy.py — spec
+# mcp_policy.py —— 规范
 
-<!-- verified-against: 2026-08-17 -->
+<!-- verified-against: 2026-08-18 -->
 
-`LOC ~141 · safety primitive (MCP structural gate) · refactor-status: ok`
+`LOC ~141 · 安全原语（MCP 结构性门） · refactor-status: ok`
 
-## Responsibility
-Re-derive a *safe* `TaskSpec` from raw MCP input, refusing anything the MCP
-surface may not do — the structural guarantee that a host cannot widen the
-server's permissions.
+## 职责
+从原始 MCP 输入**重新推导**出一个*安全的* `TaskSpec`，拒绝 MCP 面不被允许做的任何事
+—— 这就是"宿主无法扩大服务端权限"的**结构性**保证。
 
-## Public contract
-`enforce_mcp_policy(raw) -> TaskSpec` (raises on refusal).
+## 公开契约
+`enforce_mcp_policy(raw) -> TaskSpec`（拒绝时抛错）。
 
-## Invariants (**C2**, **C3**, **A2**)
-- **It runs TWICE, and that is the design.** Once at the **boundary** (the
-  server, when a tool is called) and once in the **child** (authoritative,
-  right after it reads `request.json`). The child re-check exists because the
-  guarantee must not depend on `request.json` being untampered: a same-user
-  host process could rewrite it between reservation and execution.
-- `kind` must be in `READ_ONLY_KINDS`; `post` is forced to `False`; `repo` must
-  be in the allowlist; `pr`/`issue` must be positive; unknown params are
-  stripped rather than passed through.
-- **The allowed set is imported, never restated.** It references
-  `task_spec.READ_ONLY_KINDS` directly so the policy can never drift from the
-  task model — adding a write-capable kind cannot silently widen MCP.
-- The MCP hosts are non-interactive: there is no `[y/N]`, so nothing here may
-  fall back to "ask the user".
+## 不变量（**C2**、**C3**、**A2**）
+- **它跑两次，这是设计如此。** 一次在**边界**（server，工具被调用时），一次在
+  **子进程**（**权威**，就在它读完 `request.json` 之后）。子进程这次复检之所以存在，
+  是因为这条保证**不能依赖 `request.json` 未被篡改**：同用户的宿主进程完全可以在预约
+  与执行之间把它改写。
+- `kind` 必须 ∈ `READ_ONLY_KINDS`；`post` 被**硬置为 `False`**；`repo` 必须在 allowlist
+  内；`pr`/`issue` 必须为正；未知 params 被**剥除**而不是透传。
+- **允许集是 import 进来的，绝不重述。** 它直接引用 `task_spec.READ_ONLY_KINDS`，
+  因此策略永远不会与任务模型漂移 —— 新增一个具备写能力的 kind，**无法**静默地把 MCP
+  面放宽。
+- MCP 宿主是**非交互**的：这里没有 `[y/N]`，所以本文件里任何逻辑都不得退化成"问用户"。
 
-## Scope — not here
-No run execution; no model calls; no knowledge access.
+## 边界 —— 不属于这里
+不执行 run；不调模型；不访问知识。
 
-## Dependencies (allowed)
-`..task_spec` + stdlib. A leaf safety primitive.
+## 依赖（允许）
+`..task_spec` + stdlib。一个叶子安全原语。
 
-## Tests
-`test_mcp.py` (tamper defense, read-only tool set).
+## 测试
+`test_mcp.py`（篡改防御、只读工具集）。
 
-## Refactor notes
-Like `push.guard_push` and `scopes`, this is a pure permission primitive — keep
-it dependency-free. Any new MCP-reachable capability must be expressed as a
-change to `READ_ONLY_KINDS`, not as a special case here.
+## 重构备注
+和 `push.guard_push`、`scopes` 一样，这是一个纯权限原语 —— 保持它无依赖。任何新的
+"MCP 可达能力"都必须表达为对 `READ_ONLY_KINDS` 的修改，**而不是这里的一个特例**。

@@ -1,64 +1,56 @@
-# thin_mcp_server.py — spec
+# thin_mcp_server.py —— 规范
 
-<!-- verified-against: 2026-08-17 -->
+<!-- verified-against: 2026-08-18 -->
 
-`LOC ~806 · the DEFAULT MCP: Direct routing + Strict entry · refactor-status: oversized`
+`LOC ~806 · 默认 MCP：Direct 路由 + Strict 入口 · refactor-status: oversized`
 
-## Responsibility
-The MCP façade the installer actually registers: serve Direct-mode knowledge
-routing with zero models, and bridge to Strict when asked.
+## 职责
+安装器**实际注册**的那个 MCP 门面：以**零模型**提供 Direct 模式的知识路由，
+并在被要求时桥接到 Strict。
 
-## Functionality
-Seven tools: `review` (branches on `mode`), `validate_direct_review`,
-`get_review_status` / `get_review_result` (forwarded to `CopilotMCP`),
-`update_knowledge`, `doc_search`, `doc_read`.
+## 功能
+七个工具：`review`（按 `mode` 分流）、`validate_direct_review`、
+`get_review_status` / `get_review_result`（转发给 `CopilotMCP`）、
+`update_knowledge`、`doc_search`、`doc_read`。
 
-## Public contract
-The seven tools above; `build_mcp(...)`; `main()`.
+## 公开契约
+上述七个工具；`build_mcp(...)`；`main()`。
 
-## Invariants (**C1**, **C2**, **D1**)
-- **Direct runs NO model in this server.** It returns knowledge routes and a
-  governance contract; the host's own model does the reading. The execution
-  spine does not participate.
-- **Governance is data, because the server cannot police the host.** "How to
-  review" is encoded as structured fields travelling with the return value:
-  ≤3 routes with embedded `quick_map` (3.5k cap), a hard `execution_budget`,
-  a checklist.
-- **`validate_direct_review` checks STRUCTURE, not evidence truth**: exactly
-  one final comment, `subtraction_signal` consistency (`none` carries no
-  evidence; `triggered` needs a subtraction item or minimality proof), and an
-  `evidence_head_sha` proving the review read the pinned commit. It cannot and
-  does not verify that cited evidence is real — claiming otherwise would be
-  worse than not claiming it.
-- **Routing never silently substitutes.** `title`/`body` select owners;
-  `changed_files` normally only scope-validate. They select only as a LAST
-  RESORT (when no surviving route matches an owner the files imply), and that
-  case is explicit: `status="scope_fallback"`,
-  `selected_by="title_body+changed_files"`, and each such route says why.
-- **The repo guard runs FIRST.** An unsupported repo returns
-  `unsupported_exact_router` before any route derivation — otherwise a
-  description-less PR on a foreign repo would be served this repo's owner
-  knowledge.
-- `_knowledge_path` prevents escaping the knowledge root; `_guard` converts
-  exceptions into `{"error": ...}` values rather than protocol faults.
-- **Strict never starts doomed runs**: the Strict branch consults
-  `strict_readiness` first and returns the missing items instead.
-- `update_knowledge` returns only the contribution entry point — it is **not**
-  `imupdate`'s release auditor.
+## 不变量（**C1**、**C2**、**D1**）
+- **Direct 在这个 server 里不跑任何模型。** 它返回知识路由和一份治理契约；阅读由
+  **宿主自己的模型**完成。执行主脊完全不参与。
+- **治理靠数据，因为 server 管不住宿主。** "该怎么审"被编码成随返回值一起下发的结构化
+  字段：≤3 条路由（内嵌 `quick_map`，3.5k 封顶）、一个硬性的 `execution_budget`、
+  一份 checklist。
+- **`validate_direct_review` 检查的是结构，不是证据真伪**：恰好一条最终评论、
+  `subtraction_signal` 的自洽性（`none` 不得附带证据；`triggered` 需要减法项或最小性
+  证明）、以及证明本次评审读的是固定提交的 `evidence_head_sha`。
+  **它不能也没有**去验证被引用的证据是否真实 —— 声称它能，比不声称更糟。
+- **路由绝不静默替换。** `title`/`body` 选 owner；`changed_files` 通常只做范围校验。
+  它们只在**最后手段**下选路（当存活路由无一命中它们推导出的 owner 时），且该情况是
+  **显式的**：`status="scope_fallback"`、`selected_by="title_body+changed_files"`，
+  且每条这样的路由都会说明理由。
+- **仓库守卫先跑。** 不支持的仓库在任何路由推导**之前**就返回
+  `unsupported_exact_router` —— 否则一个没有描述的、来自陌生仓库的 PR，会被喂上
+  本仓库的 owner 知识。
+- `_knowledge_path` 阻止逃出知识根；`_guard` 把异常转成 `{"error": ...}` 值返回，
+  而不是协议层错误。
+- **Strict 绝不启动注定失败的 run**：Strict 分支先查 `strict_readiness`，
+  改为返回缺失项。
+- `update_knowledge` 只返回知识贡献入口 —— 它**不是** `imupdate` 的发版审计器。
 
-## Scope — not here
-No model calls in the Direct path; no Strict background machinery
-(`mcp_server.py`); no policy definition (`mcp_policy.py`).
+## 边界 —— 不属于这里
+Direct 路径里不调模型；不含 Strict 后台机器（`mcp_server.py`）；不定义策略
+（`mcp_policy.py`）。
 
-## Dependencies (allowed)
+## 依赖（允许）
 stdlib + `mcp` extra + `.adapters` + `.config` + `.intent.resolve_repo_alias` +
-`.knowledge_docs` + `.mcp_policy` + `.mcp_server`.
+`.knowledge_docs` + `.mcp_policy` + `.mcp_server`。
 
-## Tests
-`test_thin_mcp_server.py`, `test_thin_mcp.py`, `test_imreview_output_contract.py`.
+## 测试
+`test_thin_mcp_server.py`、`test_thin_mcp.py`、`test_imreview_output_contract.py`。
 
-## Refactor notes
-At ~806 LOC this is the largest module in the package; the Direct routing
-helpers (`_direct_*`) are a coherent ~350-line unit and the obvious split if it
-grows again. Keep the "server runs no model" property when splitting — it is
-the product promise of Direct mode.
+## 重构备注
+约 806 行，是包里**最大**的模块；Direct 路由 helper（`_direct_*`）是一个内聚的约 350
+行单元，如果再次增长，那就是显而易见的拆分点。**拆分时务必保住"server 不跑模型"这条
+性质 —— 它就是 Direct 模式的产品承诺。**

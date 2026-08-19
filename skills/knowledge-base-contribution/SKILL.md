@@ -15,7 +15,8 @@ run_count: 0
 
 ## When this applies
 You're told to "record a lesson / 复盘 / sink a rule", or you're adding or editing
-a page under `knowledge/`. Full guide + copy-paste templates: `doc/contributing/EXTENDING-KNOWLEDGE.md`.
+a page under `knowledge/`. Full guide: `doc/knowledge/writing.md`;
+copy-paste skeletons: `doc/knowledge/templates/`.
 
 ## Steps
 1. **Owner first.** Reusable across repos → `general/<topic>/`; whole repo →
@@ -32,7 +33,7 @@ a page under `knowledge/`. Full guide + copy-paste templates: `doc/contributing/
 4. **Register in the SAME change.** Add a `遇到什么 → 查看哪里` row for the page (or
    a child-dir link) in the nearest `_index.md`. An unregistered page fails the gate.
    Synthesis-layer pages (rule/guide/architecture/index in general/repos) also need
-   frontmatter (`title/created/updated/type` + a `tags` value from `knowledge/SCHEMA.md`);
+   frontmatter (`title/created/updated/type` + a `tags` value from `doc/knowledge/SCHEMA.md`);
    evidence-layer pages (incidents/history/results) take none.
 5. **Keep always-on pages tight.** `rules.md` + `_index.md` load as briefing on
    every task — keep them to triggers/gates/navigation. Push narrative and long
@@ -43,10 +44,18 @@ a page under `knowledge/`. Full guide + copy-paste templates: `doc/contributing/
 python knowledge/tools/check_knowledge_tree.py     # structure/index/links/incidents
 python knowledge/tools/check_wiki_lint.py          # synthesis frontmatter + tag taxonomy
 ```
-Split limits: warn ≥300 non-empty lines or 16 KiB; must split ≥500 lines or 32 KiB.
+Split limits: warn ≥300 non-empty lines or 16 KiB; must split ≥500 lines or 32 KiB
+(escape hatch: name the file AND the literal `暂不拆分` in that directory's `_index.md`).
 Group dirs (guides/incidents/history/references/results/rfcs) allow ≤20 pages; other
 dirs warn above 7. Incidents need the five `编号/归属/状态/搜索词/影响范围` fields, a
 valid state, and a unique 编号. Deliver via PR — the tree is vendored; never edit upstream.
+
+Third gate for `repos/vllm-omni/` only, which the two validators cannot see:
+`tools/audit_vllm_omni_release.py` reconciles `owner_documents` entry pages, in-body
+`main @ <sha>` pins and upstream `sources:` against
+`adapters/vllm_omni/release_baseline.yaml`, and any PR touching that slice runs it in
+`enforce` mode. Renaming/moving an owner entry page or hand-editing a pin needs the
+baseline updated in the same change — see `doc/knowledge/contributing/validation.md`.
 
 ## Anti-patterns
 - Adding a page but not linking it from the nearest `_index.md` (gate failure).
@@ -56,3 +65,5 @@ valid state, and a unique 编号. Deliver via PR — the tree is vendored; never
 - Real machine addresses/paths/credentials in a tracked page (they go in `local/`).
 - Routing by where the symptom appeared instead of the verified root cause.
 - A synthesis page with no frontmatter, or a `tags` value not in `SCHEMA.md` — fails `check_wiki_lint.py`.
+- Renaming a vLLM-Omni owner entry page (or touching a SHA pin) without updating
+  `release_baseline.yaml` — both validators stay green, the release audit fails in CI.

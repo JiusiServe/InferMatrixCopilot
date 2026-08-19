@@ -4,6 +4,8 @@
 > pr-review v4 / 64 tests / 20 steps，实际是 v6 / 430+ 用例 / 38 steps。
 > 现状看 [`../GUIDE.md`](../GUIDE.md)。保留它是作为设计 15 项任务的交付记录。
 
+> **冻结存档，保持英文原文。** 内容停在各自的日期上，不代表现状；翻译一份存档等于改动它。现行文档统一为中文 —— 见 [`../README.md`](../README.md)。
+
 
 Task numbers from `copilot_design` §四 (milestones from `docs/copilot/implementation/`).
 "Here" = implemented in this repo, offline-tested (64 tests).

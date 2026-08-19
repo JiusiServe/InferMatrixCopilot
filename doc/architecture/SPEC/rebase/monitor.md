@@ -1,35 +1,32 @@
-# rebase/monitor.py — spec
+# rebase/monitor.py —— 规范
 
-<!-- verified-against: 2026-08-17 -->
+<!-- verified-against: 2026-08-18 -->
 
-`LOC ~159 · edge (external pipeline monitor) · refactor-status: ok`
+`LOC ~159 · 边缘（外部流水线监控） · refactor-status: ok`
 
-## Responsibility
-Read/classify the parent orchestrator's state for the locked
-`rebase.run_external` delegation.
+## 职责
+为 locked 的 `rebase.run_external` 委托，读取并分类父编排器的状态。
 
-## Public contract
-`build_command`, `parse_parent_state`, `summarize_progress`, `diff_progress`,
-`classify_failure`, `build_escalation`.
+## 公开契约
+`build_command`、`parse_parent_state`、`summarize_progress`、`diff_progress`、
+`classify_failure`、`build_escalation`。
 
-## Invariants
-- Read-only toward the parent's `state.json`.
-- Classifies exit code + state into a typed failure + escalation material.
-- Stale-state aware — a prior run's `phase=done` must not mask this run's crash.
-- Names the parent package/paths (allowed repo literals, leak-capped at 1).
+## 不变量
+- 对父进程的 `state.json` **只读**。
+- 把退出码 + 状态分类成**类型化失败** + 升级材料。
+- **感知陈旧状态** —— 上一次 run 的 `phase=done` **绝不能**掩盖这一次 run 的崩溃。
+- 点名父包/路径（被允许的仓库字面量，泄漏上限为 1）。
 
-## Scope — not here
-Does not run or reimplement the rebase; no push logic; no notification (that is
-`notify`).
+## 边界 —— 不属于这里
+不运行也不重新实现 rebase；不含推送逻辑；不发通知（那是 `notify`）。
 
-## Dependencies (allowed)
-stdlib `json`/`subprocess` only.
+## 依赖（允许）
+仅 stdlib 的 `json`/`subprocess`。
 
-## Tests
-`test_rebase_monitor.py`.
+## 测试
+`test_rebase_monitor.py`。
 
-## Refactor notes
-Cohesive monitoring/classification unit. The baseline-signature comparison here
-is the known-weak spot the CI-normalize module was written to avoid inheriting —
-if this monitor's classification is ever tightened, reuse `ci/normalize` rather
-than re-implementing string compare.
+## 重构备注
+内聚的监控/分类单元。这里的基线签名比较，正是 `ci/normalize` 模块**当初写出来就是为了
+不去继承**的已知弱点 —— 如果将来要收紧这个 monitor 的分类，请**复用 `ci/normalize`**，
+而不是再实现一遍字符串比较。

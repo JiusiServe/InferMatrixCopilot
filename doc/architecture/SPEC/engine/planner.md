@@ -1,48 +1,45 @@
-# engine/planner.py — spec
+# engine/planner.py —— 规范
 
-<!-- verified-against: 2026-08-17 -->
+<!-- verified-against: 2026-08-18 -->
 
-`LOC ~116 · planning · refactor-status: ok`
+`LOC ~116 · 规划 · refactor-status: ok`
 
-## Responsibility
-Resolve a `TaskSpec` (+ repo capabilities) to a runnable `Playbook` via
-**reuse > adapt > generate**, with capability-gap handling.
+## 职责
+把一个 `TaskSpec`（+ 仓库能力）解析成可运行的 `Playbook`，走
+**reuse > adapt > generate**，并处理能力缺口。
 
-## Functionality
-Looks up a playbook (`store.find`); returns reuse (verbatim) / adapt (extra
-params on non-locked → review) / generate (read-only kinds, fixed template);
-raises `PlanningError` on locked-adapt, write-capable generate, or capability
-gaps.
+## 功能
+查找 playbook（`store.find`）；返回 reuse（原样）/ adapt（在非 locked 上追加参数 →
+需评审）/ generate（仅只读 kind，固定模板）；遇到 locked 改编、具备写能力的 generate、
+或能力缺口时抛 `PlanningError`。
 
-## Public contract
-`Planner(store, registry)`; `resolve(spec, capabilities?) -> Resolution`;
-`PlanningError`; `_GENERATE_TEMPLATES`.
+## 公开契约
+`Planner(store, registry)`；`resolve(spec, capabilities?) -> Resolution`；
+`PlanningError`；`_GENERATE_TEMPLATES`。
 
-## Invariants
-- Reuse: `requires_review=False` when params ⊆ declared surface.
-- Locked playbook refuses adaptation (raises).
-- **C2**: generate is read-only-kinds-only and re-checks every step is
-  `risk ∈ {read, report}` (raises otherwise).
-- Capability gap (**§ARCH.8**): write-capable + unmet → raise "run repo_profile";
-  read-only → generate; `capabilities=None` = v1 behavior.
-- Tier comes from `spec.tier` — never invented.
+## 不变量
+- reuse：当参数 ⊆ 已声明面时 `requires_review=False`。
+- **locked playbook 拒绝改编**（抛错）。
+- **C2**：generate **只对只读 kind 存在**，并会重新检查每个 step 的
+  `risk ∈ {read, report}`（否则抛错）。
+- 能力缺口（**§ARCH.8**）：具备写能力 + 未满足 → 抛出 "run repo_profile"；
+  只读 → 走 generate；`capabilities=None` 即 v1 行为。
+- tier 来自 `spec.tier` —— **绝不自己发明**。
 
-## Scope — not here
-Selection/parameterization only. No execution, no repo knowledge, no LLM,
-no raw-tool composition (**A3**).
+## 边界 —— 不属于这里
+只做选择/参数化。不执行、不含仓库知识、不含 LLM、不做原始工具编排（**A3**）。
 
-## Dependencies (allowed)
-`playbooks/store`, `task_spec`, `engine/registry`.
+## 依赖（允许）
+`playbooks/store`、`task_spec`、`engine/registry`。
 
-## Extension points
-New read-only kind needing generation → a `_GENERATE_TEMPLATES` entry of
-read/report steps. Write-capable kinds must ship a vetted playbook.
+## 扩展点
+需要生成的新只读 kind → 在 `_GENERATE_TEMPLATES` 加一条由 read/report step 组成的
+条目。**具备写能力的 kind 必须自带一份已审核的 playbook。**
 
-## Tests
-`test_planner_playbooks.py`, `test_capabilities.py`.
+## 测试
+`test_planner_playbooks.py`、`test_capabilities.py`。
 
-## Refactor notes
-Small and clean; the three branches are the whole point — do not collapse them.
-The capability-gap message text is user-facing guidance ("run repo_profile") —
-keep it actionable. If generate ever needs LLM composition, it must still pass
-the per-step risk re-check; never bypass C2 for flexibility.
+## 重构备注
+小而干净；**三条分支就是它的全部意义 —— 不要把它们合并**。能力缺口的提示文本是面向
+用户的操作指引（"run repo_profile"）—— 保持它可执行。如果将来 generate 需要 LLM 编排，
+它**仍然必须**通过逐 step 的 risk 复检；绝不为了灵活性绕过 C2。

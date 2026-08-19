@@ -16,7 +16,10 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
-SCHEMA = ROOT / "SCHEMA.md"
+# SCHEMA.md is documentation about the tree, not a page in it, so it moved to
+# doc/knowledge/ with the rest of the authoring docs. The taxonomy it defines is
+# still enforced here — the rule follows the file rather than being dropped.
+SCHEMA = ROOT.parent / "doc" / "knowledge" / "SCHEMA.md"
 SYNTH_ROOTS = (ROOT / "general", ROOT / "repos")
 RAW_PARTS = {"incidents", "history", "results"}
 SKIP_PARTS: set[str] = set()

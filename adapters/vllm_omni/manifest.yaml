@@ -25,7 +25,7 @@ upstream:
 # Repo-specific slice of the SHARED, human-curated knowledge base (the vendored
 # community docs at the repo-root `knowledge/` = settings.knowledge_dir;
 # cross-repo general/ knowledge is shared, NOT nested here). Replaces the
-# retired AI profile/. Provenance + the author's copy authorization are in
+# retired AI profile/. Layout and consumption rules are in
 # doc/architecture/KNOWLEDGE.md. Paths below are relative to settings.knowledge_dir.
 knowledge:
   source: zuiho-kai/claude-workflow-starter

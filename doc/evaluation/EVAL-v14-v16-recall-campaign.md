@@ -1,5 +1,8 @@
 # Campaign report — v14→v16 recall attack (2026-08-15)
 
+> **冻结记录，保持英文原文。** 本页是当时被评审/被判分的文本本身；翻译它就是**改动一份记录**。文档树的其余部分统一为中文 —— 见 [`../README.md`](../README.md)。
+
+
 Successor to `doc/evaluation/EVAL-goal-strict-vs-opus5.md` (the v7→v13 campaign, which
 ended at 15—15 combined fresh verdicts under a GPT judge and a −.16 recall
 ratio under the Sonnet judge). This campaign's goal, set by the owner: make

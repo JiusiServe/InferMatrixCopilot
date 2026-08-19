@@ -1,27 +1,27 @@
-# engine/steps/report.py — spec
+# engine/steps/report.py —— 规范
 
-<!-- verified-against: 2026-08-17 -->
+<!-- verified-against: 2026-08-18 -->
 
-`LOC ~24 · step library · refactor-status: ok`
+`LOC ~24 · step 库 · refactor-status: ok`
 
-## Responsibility
-`report.final_summary` — write `RUN_REPORT.md` from accumulated step outputs.
+## 职责
+`report.final_summary` —— 用累积的 step 输出写出 `RUN_REPORT.md`。
 
 ## Steps
-`report.final_summary` (report/report).
+`report.final_summary`（report/report）。
 
-## Invariants
-- Pure output; no failure paths (always ok).
-- Reads `ctx.state["outputs"]`; writes only the run dir.
+## 不变量
+- 纯输出；**没有失败路径**（永远 ok）。
+- 读 `ctx.state["outputs"]`；只写 run 目录。
 
-## Scope — not here
-No analysis, no repo knowledge, no side effects beyond the report file.
+## 边界 —— 不属于这里
+不做分析、不含仓库知识、除报告文件外没有任何副作用。
 
-## Dependencies (allowed)
-`engine/step`, `._common`.
+## 依赖（允许）
+`engine/step`、`._common`。
 
-## Tests
-Exercised in playbook end-to-end tests.
+## 测试
+在 playbook 端到端测试中被覆盖。
 
-## Refactor notes
-Trivial. If richer reporting is wanted, keep it additive and side-effect-free.
+## 重构备注
+平凡。如果想要更丰富的报告，请保持**追加式且无副作用**。

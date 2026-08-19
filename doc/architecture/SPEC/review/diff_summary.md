@@ -1,31 +1,30 @@
-# review/diff_summary.py — spec
+# review/diff_summary.py —— 规范
 
-<!-- verified-against: 2026-08-17 -->
+<!-- verified-against: 2026-08-18 -->
 
-`LOC ~62 · review (always-on stage) · refactor-status: ok`
+`LOC ~62 · 评审（always-on 阶段） · refactor-status: ok`
 
-## Responsibility
-The cheap, always-on first stage of patch review.
+## 职责
+patch review 里那个**廉价、常开**的第一阶段。
 
-## Public contract
+## 公开契约
 `build_diff_summary(repo, base_ref, primary_files, trace) -> DiffSummary`
-(changed files, insertions/deletions, out-of-scope files, full-file writes,
-tests run, push requested).
+（改动文件、增删行数、越界文件、整文件写、已跑测试、是否请求推送）。
 
-## Invariants
-- Deterministic; no LLM.
-- Reads git diff + RunTrace events (`out_of_scope_edit`, `full_file_write`,
-  `test_run`, `push_requested`) to build the summary.
+## 不变量
+- 确定性；**不含 LLM**。
+- 读取 git diff + RunTrace 事件（`out_of_scope_edit`、`full_file_write`、
+  `test_run`、`push_requested`）来构建摘要。
 
-## Scope — not here
-No trigger decisions (that is `triggers`), no verdict (that is `reviewer`).
+## 边界 —— 不属于这里
+不做触发判断（那是 `triggers`），不出裁决（那是 `reviewer`）。
 
-## Dependencies (allowed)
-`run_trace`; stdlib `subprocess`/`fnmatch`.
+## 依赖（允许）
+`run_trace`；stdlib 的 `subprocess`/`fnmatch`。
 
-## Tests
-`test_review.py`.
+## 测试
+`test_review.py`。
 
-## Refactor notes
-Clean single stage. Keep it cheap (no LLM) — it runs on every gate; the LLM only
-runs when this summary trips a trigger.
+## 重构备注
+单阶段，很干净。**保持它便宜（不调 LLM）** —— 它每道门都会跑；只有当这份摘要触发了
+某条规则时，LLM 才会跑。

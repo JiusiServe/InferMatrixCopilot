@@ -1,68 +1,62 @@
-# cli/ — spec
+# cli/ —— 规范
 
-<!-- verified-against: 2026-08-17 -->
+<!-- verified-against: 2026-08-18 -->
 
-`LOC ~1000 across 5 files · interface + orchestration façade · refactor-status: ok`
+`LOC ~1000（5 个文件） · 接口 + 编排门面 · refactor-status: ok`
 
-## Responsibility
-The flag CLI and the `Copilot` façade: resolve → gate → execute; own the run
-directory, RunTrace, notifier, and metrics wiring. Formerly one 406-line module;
-now a package that separates the argparse/REPL wiring from the orchestrator.
+## 职责
+flag CLI 与 `Copilot` 门面：解析 → 过门 → 执行；并持有 run 目录、RunTrace、notifier
+和 metrics 的接线。它曾是一个 406 行的模块；现在是一个把 argparse/REPL 接线与编排器
+分开的包。
 
-## Package layout (one concern per file)
-- `__init__.py` — re-exports `Copilot`, `main` (surface below); no logic.
-- `__main__.py` — `python -m infermatrix_copilot.cli` parity.
-- `copilot.py` — the `Copilot` orchestrator (resolve/run_task/run_playbook/
-  run_queue/resume_last/_execute + built-ins).
-- `entry.py` — `argparse`, `_handle_line`, `main` (turns argv/stdin into calls
-  on `Copilot`).
-- `utils.py` — pure formatters: `parse_task_params`, `format_metrics_line`.
-- `doctor.py` — preflight diagnostics (added 2026-07): per-item ✓/✗ with a
-  single exact fix command per failure.
+## 包内布局（一个文件一个关注点）
+- `__init__.py` —— 只再导出 `Copilot`、`main`（见下方公开面）；无逻辑。
+- `__main__.py` —— `python -m infermatrix_copilot.cli` 的对等入口。
+- `copilot.py` —— `Copilot` 编排器（resolve/run_task/run_playbook/run_queue/
+  resume_last/_execute + 内置命令）。
+- `entry.py` —— `argparse`、`_handle_line`、`main`（把 argv/stdin 变成对 `Copilot`
+  的调用）。
+- `utils.py` —— 纯格式化器：`parse_task_params`、`format_metrics_line`。
+- `doctor.py` —— 预检诊断（2026-07 新增）：逐项 ✓/✗，每个失败给出**唯一**确切的修复命令。
 
-## Public contract (importable from `infermatrix_copilot.cli`)
-`main(argv)`; `Copilot` (`resolve`, `run_task`, `run_playbook`, `run_queue`,
-`resume_last`, `status`, `logs`, `playbooks`, `_execute`, `_adapter_for`,
-`_resolve_repo_path`). The re-exporting `__init__` keeps `infermatrix_copilot.cli:main`
-(entry point) and `from infermatrix_copilot.cli import Copilot` unchanged.
+## 公开契约（可从 `infermatrix_copilot.cli` import）
+`main(argv)`；`Copilot`（`resolve`、`run_task`、`run_playbook`、`run_queue`、
+`resume_last`、`status`、`logs`、`playbooks`、`_execute`、`_adapter_for`、
+`_resolve_repo_path`）。再导出的 `__init__` 让 `infermatrix_copilot.cli:main`
+（entry point）和 `from infermatrix_copilot.cli import Copilot` 保持不变。
 
-## Invariants
-- `resolve` feeds capabilities (adapter + REPO_PATHS) to the planner.
-- Plan-review gate before confirm; confirm fires for
-  `confirm_required or requires_review` unless `--yes` (`_gate_and_confirm`, K6).
-- `_execute` is the single execution path (task / explicit-playbook / resume).
-- Repo knowledge (protected branches, high-risk modules) comes from the adapter
-  into run state (**A5**); blocked → exit 3 (`BLOCKED_EXIT`).
-- `--playbook` is the only way to run a candidate.
-- **`doctor` is read-only and never prints a secret's value** — only its name.
-  It makes no paid LLM call unless `--probe` is passed, which is the single
-  paid check (one token per configured tier). `--json` serves CI, and exiting
-  non-zero when credentials are absent is the EXPECTED state there.
-- **`--performance` is the only way to raise the model tier**; the default is
-  `eco`. Raising the tier never widens permissions (`tier` stays derived from
-  `kind`).
-- The CLI main path gates **before** creating a run directory, so an abandoned
-  plan leaves nothing behind. The MCP reservation shape (create, then plan) is
-  deliberately different — see `mcp_server.md`.
+## 不变量
+- `resolve` 把能力（adapter + REPO_PATHS）喂给 planner。
+- 确认之前先过 plan-review 门；除非 `--yes`，`confirm_required or requires_review`
+  时触发确认（`_gate_and_confirm`，K6）。
+- `_execute` 是**唯一**的执行路径（task / 显式 playbook / resume）。
+- 仓库知识（保护分支、高风险模块）由 adapter 进入 run state（**A5**）；
+  被阻塞 → 退出码 3（`BLOCKED_EXIT`）。
+- `--playbook` 是运行 candidate 的**唯一**方式。
+- **`doctor` 只读，且永不打印密钥的值** —— 只打印它的名字。除非传 `--probe`，
+  否则它不做任何付费 LLM 调用；`--probe` 是唯一的付费检查（每个已配置档位一个 token）。
+  `--json` 供 CI 使用，而**在没有凭据时以非零码退出正是 CI 里的预期状态**。
+- **`--performance` 是抬高模型档位的唯一方式**；默认是 `eco`。
+  **抬高档位永远不会扩大权限**（`tier` 仍然由 `kind` 推导）。
+- CLI 主路径在**创建 run 目录之前**过门，所以被放弃的计划不留下任何东西。
+  MCP 的预约形状（先建、后规划）是**刻意不同**的 —— 见 `mcp_server.md`。
 
-## Scope — not here
-No step logic, no repo-knowledge literals, no LLM prompts. Orchestration wiring
-only.
+## 边界 —— 不属于这里
+不含 step 逻辑、不含仓库知识字面量、不含 LLM prompt。**只做编排接线。**
 
-## Dependencies (allowed)
-`engine/*`, `playbooks/*`, `intent`, `task_spec`, `adapters/base`,
-`push`, `review/reviewer`, `notify`, `run_trace`, `config`, `ui`,
-`chat`. MUST NOT be imported by any lower layer (**§ARCH.4.2**).
+## 依赖（允许）
+`engine/*`、`playbooks/*`、`intent`、`task_spec`、`adapters/base`、`push`、
+`review/reviewer`、`notify`、`run_trace`、`config`、`ui`、`chat`。
+**任何下层都不得 import 它**（**§ARCH.4.2**）。
 
-## Extension points
-New REPL command → `_handle_line` (entry.py); new run wiring → `_execute`
-(copilot.py); new pure formatter → utils.py.
+## 扩展点
+新 REPL 命令 → `_handle_line`（entry.py）；新的 run 接线 → `_execute`（copilot.py）；
+新的纯格式化器 → utils.py。
 
-## Tests
-`test_cli.py`, `test_phase_b.py`, `test_chat.py`, `test_ui.py`.
+## 测试
+`test_cli.py`、`test_phase_b.py`、`test_chat.py`、`test_ui.py`。
 
-## Refactor notes
-Split **applied** (was a cohesion-split candidate). The `Copilot` class stays
-whole in `copilot.py` so the resolve→execute flow is followed in one file; only
-the argparse/REPL front-end (`entry.py`) and the two pure formatters (`utils.py`)
-moved out. K6 (`_gate_and_confirm`) is done and lives on the class.
+## 重构备注
+拆分**已完成**（它曾是内聚拆分候选）。`Copilot` 类完整留在 `copilot.py`，
+好让 resolve→execute 的流程能在一个文件里读完；只有 argparse/REPL 前端（`entry.py`）
+和两个纯格式化器（`utils.py`）搬了出去。K6（`_gate_and_confirm`）已完成，挂在类上。

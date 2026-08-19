@@ -1,39 +1,38 @@
-# notify.py — spec
+# notify.py —— 规范
 
-<!-- verified-against: 2026-08-17 -->
+<!-- verified-against: 2026-08-18 -->
 
-`LOC ~112 · cross-cutting (escalation) · refactor-status: ok`
+`LOC ~112 · 跨切（升级） · refactor-status: ok`
 
-## Responsibility
-The "notify, never guess" exit channel.
+## 职责
+"通知，而不是猜测"的出口通道。
 
-## Functionality
-`Notifier.escalate` writes `ESCALATION.md`, emails (Resend or SMTP if
-configured), traces the escalation; `BLOCKED_EXIT` = 3.
+## 功能
+`Notifier.escalate` 写出 `ESCALATION.md`、发邮件（配置了就走 Resend 或 SMTP）、
+把这次升级记进 trace；`BLOCKED_EXIT` = 3。
 
-## Public contract
-`Notifier(settings, run_dir, trace, run_id)` with `escalate(reason, phase,
-severity, state_summary, artifacts)`; `BLOCKED_EXIT`.
+## 公开契约
+`Notifier(settings, run_dir, trace, run_id)`，带 `escalate(reason, phase,
+severity, state_summary, artifacts)`；以及 `BLOCKED_EXIT`。
 
-## Invariants
-- A blocked run writes `ESCALATION.md`, notifies, and the caller exits 3.
-- Escalation is a first-class outcome — never swallowed as an error path.
-- Email failures are best-effort and must not mask the escalation itself.
+## 不变量
+- 被阻塞的 run 会写出 `ESCALATION.md`、发出通知，调用方以退出码 3 结束。
+- **升级是一等结果** —— 绝不被当作错误路径吞掉。
+- 邮件失败是尽力而为的，**不得**掩盖升级本身。
 
-## Scope — not here
-Deciding *to* escalate is the executor's (typed-failure routing) — this file
-only performs the notification.
+## 边界 —— 不属于这里
+"要不要升级"由 executor 决定（类型化失败路由）—— 本文件只负责**执行通知**。
 
-## Dependencies (allowed)
-`config`, `run_trace`; stdlib `urllib`/`smtplib`.
+## 依赖（允许）
+`config`、`run_trace`；stdlib 的 `urllib`/`smtplib`。
 
-## Extension points
-New channel (IM/webhook) → a method here, gated on its own config field;
-keep `escalate` the single entry.
+## 扩展点
+新通道（IM/webhook）→ 在这里加一个方法，由它自己的配置字段开关；
+保持 `escalate` 是唯一入口。
 
-## Tests
-Via `test_engine.py` routing + escalation assertions.
+## 测试
+经 `test_engine.py` 的路由 + 升级断言覆盖。
 
-## Refactor notes
-Clean. If channels multiply, introduce a small `Channel` strategy list rather
-than more branches inside `escalate`.
+## 重构备注
+干净。如果通道变多，引入一个小的 `Channel` 策略列表，而不是在 `escalate` 内部继续
+加分支。

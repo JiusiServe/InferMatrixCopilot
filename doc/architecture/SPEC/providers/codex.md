@@ -1,49 +1,41 @@
-# providers/codex.py — spec
+# providers/codex.py —— 规范
 
-<!-- verified-against: 2026-08-17 -->
+<!-- verified-against: 2026-08-18 -->
 
-`LOC ~197 · harness transport (ChatGPT subscription) · refactor-status: ok`
+`LOC ~197 · harness transport（ChatGPT 订阅） · refactor-status: ok`
 
-## Responsibility
-Run a whole agent step through the `codex` CLI on ChatGPT subscription auth.
+## 职责
+在 ChatGPT 订阅认证下，通过 `codex` CLI 跑完**一整个** agent step。
 
-## Functionality
-`codex exec` with MCP overrides pointing at the tool bridge, event-stream
-parsing for the final text and usage, and an OS-level read-only sandbox as the
-containment control.
+## 功能
+`codex exec`，用 MCP override 指向工具桥，按事件流解析最终文本与用量，并以 OS 级只读
+沙箱作为容纳控制。
 
-## Public contract
-`CodexTransport` (`auth_gap`, `run_session`, `complete`),
-`spec = PROVIDERS["codex"]`.
+## 公开契约
+`CodexTransport`（`auth_gap`、`run_session`、`complete`）、`spec = PROVIDERS["codex"]`。
 
-## Invariants (**C1**, **C2**)
-- **The sandbox is the control, not the tool list.** Codex cannot disable its
-  native shell, so containment is `--sandbox read-only` at the OS level. Broad
-  *reads* inside the sandbox are therefore possible and accepted; what the
-  sandbox guarantees is that nothing is written.
-- Bridged tool calls still pass `tools.dispatch`; the sandbox is defence in
-  depth, not a replacement.
-- `_tool_activity` is a best-effort activity log, explicitly **not an audit** —
-  the sandbox is the enforcement point. Do not let callers treat it as one.
-- `complete()` runs tool-less in an empty scratch cwd, so a one-shot call
-  cannot reach the repo at all.
-- `auth_gap()` reports the ChatGPT-login gap: this backend is offline-tested
-  only (no login on the dev machine), and readiness must say so rather than
-  imply verification.
+## 不变量（**C1**、**C2**）
+- **控制手段是沙箱，不是工具列表。** Codex 无法关闭自己的原生 shell，所以容纳靠 OS 级的
+  `--sandbox read-only`。因此沙箱内**较宽的读取是可能且被接受的**；沙箱保证的是
+  **什么都写不出去**。
+- 经桥的工具调用仍然过 `tools.dispatch`；沙箱是**纵深防御，不是替代**。
+- `_tool_activity` 是尽力而为的活动日志，**明确不是审计** —— 强制点是沙箱。
+  不要让调用方把它当审计用。
+- `complete()` 在一个空的临时 cwd 里无工具运行，所以一次性调用**根本够不到仓库**。
+- `auth_gap()` 会报出 ChatGPT 登录缺口：这个后端**仅经离线测试**（开发机没有登录），
+  readiness 必须如实说出来，而不是暗示它已被验证。
 
-## Scope — not here
-No sandbox policy invention (the CLI flag is the contract); no usage
-fabrication.
+## 边界 —— 不属于这里
+不发明沙箱策略（CLI 的 flag 就是契约）；不编造用量。
 
-## Dependencies (allowed)
-stdlib + `.base` + `..agent_loop.AgentOutcome` + `..llm` types.
+## 依赖（允许）
+stdlib + `.base` + `..agent_loop.AgentOutcome` + `..llm` 的类型。
 
-## Tests
-`test_provider_codex.py` (offline; the live path is unverified by design —
-see the status note in `doc/features/provider-registry.md`).
+## 测试
+`test_provider_codex.py`（离线；实网路径**按设计未经验证** —— 见
+`doc/features/provider-registry.md` 里的状态说明）。
 
-## Refactor notes
-Do not "improve" `_tool_activity` into an audit: `providers/audit.py` exists
-for backends where no OS-level control is available, and conflating the two
-would blur which control class is actually in force — a fact RUN_REPORT
-discloses.
+## 重构备注
+**不要**把 `_tool_activity` "改进"成审计：`providers/audit.py` 的存在正是为了那些没有
+OS 级控制可用的后端；把两者混同，会模糊掉"当前实际生效的是哪一类控制"——
+而这正是 RUN_REPORT 要披露的事实。

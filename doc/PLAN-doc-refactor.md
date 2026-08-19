@@ -171,6 +171,7 @@ model configuration"）；后端端要么要 Key，要么要订阅登录。
 | 单个源文件"不能破坏什么" | `architecture/SPEC/<path>.md` | `GUIDE §4.2` 只留跨文件那四条 |
 | 某特性怎么用/怎么配/实测如何 | `features/<name>.md` | — |
 | 测量数字与方法论 | `evaluation/*` | `GUIDE §8` 给结论摘要 + 链接 |
+| 怎么写/维护知识库 | `knowledge/`（doc 侧，2026-08-18 合并） | `knowledge/` 树本身只留数据；规范由 doc 侧承载 |
 
 **判定规则**：写一段话之前问"这条事实的归属在哪"。如果不在你正在写的文档，
 写一个链接。

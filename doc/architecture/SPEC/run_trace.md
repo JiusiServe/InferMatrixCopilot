@@ -1,40 +1,39 @@
-# run_trace.py — spec
+# run_trace.py —— 规范
 
-<!-- verified-against: 2026-08-17 -->
+<!-- verified-against: 2026-08-18 -->
 
-`LOC ~40 · cross-cutting (audit spine) · refactor-status: ok`
+`LOC ~40 · 跨切（审计脊柱） · refactor-status: ok`
 
-## Responsibility
-Append-only JSONL event log — the immutable audit layer.
+## 职责
+仅追加的 JSONL 事件日志 —— 不可变的审计层。
 
-## Functionality
-`record(event, **fields)` appends one JSON line; `events(name)` filters by type.
+## 功能
+`record(event, **fields)` 追加一行 JSON；`events(name)` 按类型过滤。
 
-## Public contract
-`RunTrace(path)` with `record`, `events`.
+## 公开契约
+`RunTrace(path)`，带 `record`、`events`。
 
-## Invariants
-- **E1**: every governance claim maps to a trace event (`agent_dispatch`/
-  `agent_output`, `tool_call`/`tool_refused`/`out_of_scope_edit`/
-  `full_file_write`, `patch_review*`, `push_requested`, `capability_gap`,
-  `env_exported`, `posted_artifact`, `profile_*`).
-- Facts are recorded freely (**D1**); this is the immutable layer under the
-  curated profile.
+## 不变量
+- **E1**：每一条治理主张都映射到一个 trace 事件（`agent_dispatch`/`agent_output`、
+  `tool_call`/`tool_refused`/`out_of_scope_edit`/`full_file_write`、
+  `patch_review*`、`push_requested`、`capability_gap`、`env_exported`、
+  `posted_artifact`、`profile_*`）。
+- 事实可以自由记录（**D1**）；这是精选 profile 之下的**不可变层**。
 
-## Scope — not here
-Recording only. No policy, no filtering of what may be recorded, no reads that
-drive control flow (except `events()` for diff-summary/metrics assembly).
+## 边界 —— 不属于这里
+只负责记录。不含策略，不过滤"什么可以被记录"，也不做驱动控制流的读取
+（`events()` 仅供 diff-summary / metrics 组装使用）。
 
-## Dependencies (allowed)
-stdlib only.
+## 依赖（允许）
+仅 stdlib。
 
-## Extension points
-New event → just `record("<name>", ...)` at the site; document notable names in
-`_CONSTRAINTS.md` §E1 if it backs a guarantee.
+## 扩展点
+新事件 → 在现场直接 `record("<name>", ...)`；如果它支撑某条保证，就在
+`_CONSTRAINTS.md` §E1 里记下这个名字。
 
-## Tests
-Exercised across the suite via `trace.events(...)` assertions.
+## 测试
+全套测试通过 `trace.events(...)` 断言间接覆盖。
 
-## Refactor notes
-Deliberately trivial and dependency-free — keep it that way. It underpins every
-governance claim, so it must never gain logic that could fail and lose an event.
+## 重构备注
+**刻意保持平凡且无依赖 —— 请维持现状。** 它托着每一条治理主张，所以绝不能引入
+可能失败、进而丢事件的逻辑。

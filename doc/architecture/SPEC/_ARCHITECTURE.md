@@ -1,138 +1,129 @@
-# 00 — Architecture, Scope, Functionality
+# 00 —— 架构、范围、功能
 
-## 1. What the system is
+## 1. 这个系统是什么
 
-A playbook-driven repo-maintenance copilot for vLLM-Omni (and, by design, any
-repo with an established profile). It turns a natural-language or flag command
-into a governed, resumable, auditable pipeline of vetted steps, and escalates
-rather than guesses when blocked.
+一个 playbook 驱动的仓库维护 copilot，服务 vLLM-Omni（按设计，也服务任何建立了
+profile 的仓库）。它把一条自然语言或 flag 命令，变成一条**受治理、可 resume、
+可审计**的已审核 step 流水线，并在被阻塞时**升级而不是猜测**。
 
-## 2. Functionality (the task kinds)
+## 2. 功能（任务 kind）
 
-Exactly seven task kinds exist; each has a fixed blast-radius **tier** that no
-input can change (see `task_spec.py`):
+**恰好存在七种任务 kind**；每种都有一个**任何输入都无法改变**的爆炸半径 **tier**
+（见 `task_spec.py`）：
 
-| Kind | Tier | Read-only | What it does |
+| Kind | Tier | 只读 | 做什么 |
 |---|---|---|---|
-| `repo_rebase` | L0 | no | rebase the fork onto upstream (delegates to the locked 5-phase orchestrator) |
-| `pr_rebase` | L1 | no | replay a PR branch onto its latest base |
-| `pr_debug` | L1 | no | diagnose & fix a PR's failing CI |
-| `pr_review` | L2 | yes* | evidence-grounded inline review |
-| `issue_answer` | L2 | yes* | draft an answer to an issue |
-| `issue_filter` | L2 | yes* | triage/label/route issues |
-| `repo_profile` | L2 | no** | establish/refresh a repo's profile |
+| `repo_rebase` | L0 | 否 | 把 fork rebase 到上游（委托给 locked 的 5 阶段编排器） |
+| `pr_rebase` | L1 | 否 | 把 PR 分支重放到它最新的 base 上 |
+| `pr_debug` | L1 | 否 | 诊断并修复 PR 上失败的 CI |
+| `pr_review` | L2 | 是* | 证据锚定的 inline 评审 |
+| `issue_answer` | L2 | 是* | 起草一份 issue 回答 |
+| `issue_filter` | L2 | 是* | 分流/打标/路由 issue |
+| `repo_profile` | L2 | 否** | 建立/刷新一个仓库的 profile |
 
-\* read-only unless the explicit `post` intent is set. \*\* reads the target
-repo but writes knowledge under `adapters/<repo>/`.
+\* 除非设置了显式的 `post` 意图，否则只读。\*\* 读取目标仓库，但把知识写进
+`adapters/<repo>/`。
 
-Tiers (`§3.2` of DESIGN): **L0** reuse a locked playbook verbatim; **L1** adapt
-a vetted playbook (plan-review gated); **L2** may fall back to generation, but
-only for read-only kinds.
+tier（DESIGN `§3.2`）：**L0** 原样复用 locked playbook；**L1** 改编已审核 playbook
+（受 plan-review 门禁）；**L2** 可以退化到生成，**但只对只读 kind**。
 
-## 3. The three layers + the engine substrate
+## 3. 三层 + 引擎底座
 
 ```
- Interface   cli/ / chat.py / ui.py              NL & flags -> one dispatcher
+ 接口层   cli/ / chat.py / ui.py              自然语言与 flag -> 一个分派器
      │
- Task        task_spec.py / intent.py            NL -> TaskSpec (tier from kind)
+ 任务层   task_spec.py / intent.py            自然语言 -> TaskSpec（tier 由 kind 定）
      │
- Planning    engine/planner.py / playbooks/      reuse > adapt > generate
+ 规划层   engine/planner.py / playbooks/      reuse > adapt > generate
      │
- Engine      engine/{step,registry,executor}     run steps: checkpoint, foreach,
-     │       engine/agent_runtime.py              typed failures, governed agents
-     │       agent_loop.py, tools.py, scopes.py
+ 引擎层   engine/{step,registry,executor}     跑 step：检查点、foreach、
+     │     engine/agent_runtime.py            类型化失败、受治理 agent
+     │     agent_loop.py, tools.py, scopes.py
      │
- Steps       engine/steps/*                       the vetted step library
+ Step 库  engine/steps/*                      已审核的 step 库
      │
- Edge        adapters/, ci/, profiles/             repo knowledge & capabilities
-             review/, memory/, run_trace, notify, metrics   cross-cutting
-             scopes.py, push.py                   pure safety primitives
+ 边缘     adapters/, ci/, profiles/            仓库知识与能力
+          review/, memory/, run_trace, notify, metrics   跨切服务
+          scopes.py, push.py                   纯安全原语
 ```
 
-There are three code layers (Interface / Task+Planning / Engine+Steps) over an
-edge of repo knowledge and cross-cutting services. The design's "Target layer"
-is **not** a code layer: its task-definition role is carried by `TaskSpec` +
-`Playbook`, and its only surviving artifact — push authorization — is the
-`push.py` safety primitive (sibling of `scopes.py`).
+代码上是三层（接口 / 任务+规划 / 引擎+Step），架在一层仓库知识与跨切服务的**边缘**
+之上。设计里的 "Target 层" **不是**一个代码层：它的任务定义职责由 `TaskSpec` +
+`Playbook` 承担，而它唯一存活下来的产物 —— 推送授权 —— 就是 `push.py` 这个安全原语
+（`scopes.py` 的兄弟）。
 
-- **Engine is a substrate, not a pipeline.** It provides a vetted step library,
-  task-agnostic execution guarantees (checkpoint/resume, typed failure routing,
-  scope enforcement, escalation, RunTrace), and a plan→execute loop. It does not
-  hold repo knowledge and does not let the planner compose raw tools.
-- **Knowledge lives at the edge.** Repo-specific facts (modules, CI, prompts,
-  conventions, push policy) live under `adapters/<repo>/` (manifest + profile),
-  never in the core. Adding a repo is an edge addition, not a core change.
+- **引擎是底座，不是流水线。** 它提供已审核的 step 库、与任务无关的执行保证
+  （检查点/resume、类型化失败路由、scope 强制、升级、RunTrace），以及一个
+  plan→execute 循环。**它不持有仓库知识，也不允许 planner 去编排原始工具。**
+- **知识住在边缘。** 仓库专属事实（模块、CI、prompt、约定、推送策略）住在
+  `adapters/<repo>/`（manifest + profile），**绝不在核心里**。
+  **增加一个仓库是边缘的增量，不是核心的改动。**
 
-## 4. Dependency rules (enforced layering)
+## 4. 依赖规则（被强制的分层）
 
-Imports may only point **down and outward**. Verified constraints a change may
-not violate:
+import **只能向下、向外**。以下是一次改动不得违反的、已被验证的约束：
 
-1. Leaf edge packages (`profiles/`, `ci/`, `adapters/`, `review/`, `memory/`)
-   and safety primitives (`scopes.py`, `push.py`) MUST NOT import `engine/`.
-   The engine depends on them.
-2. Interface (`cli/`, `chat.py`) MUST NOT be imported by any lower layer.
-   `chat.py` may reference `cli.Copilot` under `TYPE_CHECKING` only.
-3. `engine/step.py` is the base vocabulary: it may depend only on `run_trace`.
-   Nothing task- or repo-specific.
-4. `engine/steps/*` compose tools and edge packages; they reach the agent
-   runtime via `engine.agent_runtime`. A step MUST NOT be imported by the
-   engine substrate (steps sit above it).
-5. Cross-step shared helpers live in `engine/steps/_common.py` — step modules
-   MUST NOT import each other (the old `pr_steps -> builtin_steps` late import
-   is gone and may not return).
+1. 叶子边缘包（`profiles/`、`ci/`、`adapters/`、`review/`、`memory/`）和安全原语
+   （`scopes.py`、`push.py`）**不得** import `engine/`。是引擎依赖它们。
+2. 接口层（`cli/`、`chat.py`）**不得**被任何下层 import。
+   `chat.py` 只可以在 `TYPE_CHECKING` 下引用 `cli.Copilot`。
+3. `engine/step.py` 是基础词汇：它**只能**依赖 `run_trace`。
+   不含任何任务或仓库专属内容。
+4. `engine/steps/*` 编排工具与边缘包；它们经 `engine.agent_runtime` 到达 agent 运行时。
+   **step 不得被引擎底座 import**（step 位于其上）。
+5. 跨 step 的共享 helper 住在 `engine/steps/_common.py` —— step 模块
+   **不得互相 import**（旧的 `pr_steps -> builtin_steps` 延迟 import 已被移除，
+   **不得回来**）。
 
-## 5. Scope
+## 5. 范围
 
-**In scope:** the seven task kinds above; a single orchestration engine;
-repo-profile establishment/maintenance; conversational + flag CLIs; multi-repo
-support via profiles; safety guardrails (plan/patch review, scope enforcement,
-push guard, escalation); per-run metrics.
+**在范围内：** 上面七种任务 kind；单一编排引擎；仓库 profile 的建立/维护；
+对话式 + flag 两种 CLI；经 profile 支持多仓库；安全护栏（plan/patch review、
+scope 强制、推送守卫、升级）；逐 run 指标。
 
-**Out of scope (by design):** reimplementing the nightly rebase (it is
-delegated, wrapped-not-rewritten); a general agent framework; running paid
-evals from inside the app (eval harness is offline machinery in `eval/`);
-being a forge other than what a CI/forge adapter declares; storing secrets
-(only `.env`, git-ignored, never committed).
+**刻意在范围外：** 重新实现夜跑 rebase（它是**被委托的，包装而非重写**）；
+一个通用 agent 框架；从应用内部跑付费评测（评测 harness 是 `eval/` 里的离线机器）；
+成为 CI/forge adapter 所声明之外的 forge；存储密钥（只有 `.env`，被 git 忽略，
+**绝不提交**）。
 
-## 6. Data & artifacts (the ground truth)
+## 6. 数据与产物（ground truth）
 
-- **Per run** — `~/.infermatrix-copilot/runs/run-<ts>/`: `run_trace.jsonl` (append-only
-  facts), `progress.json` (step checkpoints), `RUN_REPORT.md`, `metrics.json`,
-  `ESCALATION.md` (only when blocked), plus step-specific artifacts
-  (`rebase_status.json`, `COMPARISON.md`, evidence archives).
-- **Per repo (knowledge)** — `adapters/<repo>/`, **two trust tiers** (DESIGN
-  §V2.3.0): **Tier 1 — the manifest** `manifest.yaml` (human-authored, human-gated:
-  identity/paths/push/ci — the safety config the agent may not self-edit), and
-  **Tier 2 — the profile** `profile/` (agent-established, evidence-gated:
-  `profile.yaml`, `PROFILE_REPORT.md`, `JUDGE_REPORT.md`, `ops_log.jsonl`,
-  `format.yaml`/`review.md`/… as established) + `skills/`,
-  `store/debug_memory.db`, `repo_map/` cache. (The container is a repo *adapter*
-  holding a *manifest* + a *profile* — renamed from "plugin" 2026-07-11.)
-- **Governance rule:** RunTrace/evidence are the immutable layer; the profile is
-  the curated layer over it. Facts summarize evidence, never replace it.
+- **逐 run** —— `~/.infermatrix-copilot/runs/run-<ts>/`：`run_trace.jsonl`
+  （仅追加的事实）、`progress.json`（step 检查点）、`RUN_REPORT.md`、`metrics.json`、
+  `ESCALATION.md`（仅在被阻塞时），外加 step 专属产物
+  （`rebase_status.json`、`COMPARISON.md`、证据归档）。
+- **逐仓库（知识）** —— `adapters/<repo>/`，**两个信任层**（DESIGN §V2.3.0）：
+  **Tier 1 —— manifest** `manifest.yaml`（人工撰写、人工门禁：身份/路径/push/ci ——
+  **agent 不得自行编辑**的安全配置），以及
+  **Tier 2 —— profile** `profile/`（agent 建立、证据门禁：`profile.yaml`、
+  `PROFILE_REPORT.md`、`JUDGE_REPORT.md`、`ops_log.jsonl`，以及按需建立的
+  `format.yaml`/`review.md`/…）+ `skills/`、`store/debug_memory.db`、`repo_map/` 缓存。
+  （容器是一个仓库 *adapter*，里面装着一份 *manifest* + 一份 *profile* ——
+  2026-07-11 由 "plugin" 更名而来。）
+- **治理规则：** RunTrace/证据是**不可变层**；profile 是架在它之上的**精选层**。
+  **fact 概括证据，绝不取代证据。**
 
-## 7. Safety model (defense in depth)
+## 7. 安全模型（纵深防御）
 
-Five independent gates, ANDed — a change may strengthen but not remove any:
+五道相互独立、按"与"叠加的门 —— 一次改动可以**加强**但**不得移除**其中任何一道：
 
-1. **Tier from kind** — NL/user text can never widen permissions
-   (`_CONSTRAINTS.md` C1).
-2. **Plan review** — adapted/generated plans are reviewed before execution;
-   generation is structurally barred from write/push steps.
-3. **ToolScope/PathScope** — every tool call passes one dispatcher; out-of-scope
-   writes execute but are recorded, never silent.
-4. **Patch review** — conditional on 7 risk triggers, fail-closed before pushes.
-5. **Push guard** — one choke point; protected branches never pushed to; force
-   is with-lease only; dry-run unless `ALLOW_PUSH=1`.
+1. **tier 由 kind 定** —— 自然语言/用户文本永远无法扩大权限（`_CONSTRAINTS.md` C1）。
+2. **plan review** —— 改编/生成出来的计划在执行前先被评审；
+   生成路径在**结构上**被禁止包含 write/push step。
+3. **ToolScope/PathScope** —— 每次工具调用都过同一个分派器；越界的写**会执行但被记录**，
+   **绝不静默**。
+4. **patch review** —— 由 7 条风险触发器条件触发，在推送前 **fail-closed**。
+5. **推送守卫** —— 唯一 choke point；受保护分支永不被推送；force 只有 with-lease；
+   除非 `ALLOW_PUSH=1` 否则 dry-run。
 
-Blocked runs write `ESCALATION.md`, notify, and exit 3 — notify, never guess.
+被阻塞的 run 写出 `ESCALATION.md`、发出通知、以退出码 3 结束 ——
+**通知，绝不猜测**。
 
-## 8. Repo invariance (the multi-repo contract) [partly planned]
+## 8. 仓库不变性（多仓库契约）[部分为计划中]
 
-Quality on a profiled repo must stay within a declared band of the reference
-repo, and onboarding a repo requires **zero** edits under `src/infermatrix_copilot/`.
-Enforced by: repo-neutral core (`test_repo_neutral_core`), capability-matched
-playbooks, explicit `capability_gap` degradation, per-repo knowledge
-namespacing. Measured by the cross-repo eval + invariance index
-(`eval/invariance.py`) — the eval campaign itself is `[planned]`.
+在一个已建立 profile 的仓库上，质量必须落在参考仓库的**声明区间**内，
+且接入一个新仓库需要**对 `src/infermatrix_copilot/` 零改动**。
+由以下机制强制：仓库中立的核心（`test_repo_neutral_core`）、按能力匹配的 playbook、
+显式的 `capability_gap` 降级、逐仓库的知识命名空间。
+由跨仓库评测 + 不变性指数衡量（`eval/invariance.py`）——
+**评测战役本身仍是 `[planned]`。**

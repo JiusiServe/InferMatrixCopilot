@@ -1,133 +1,124 @@
-# Concision plan — making the codebase smaller without losing a guarantee
+# 精简计划 —— 在不丢任何一条保证的前提下把代码库变小
 
-This is the cross-cutting plan the refactor follows to make the codebase
-**concise**: remove duplication, delete dead code, and collapse repeated
-boilerplate into shared helpers. Every item names the exact sites (grep-backed),
-the estimated line saving, the abstraction to introduce, and the invariant that
-must survive. Per-file specs carry a matching **Concision** subsection.
+这是重构所遵循的跨切计划，目标是让代码库**精简**：去重复、删死代码、把重复的样板
+收敛成共享 helper。每一条都点名确切的现场（有 grep 支撑）、预估可省行数、要引入的抽象，
+以及**必须存活下来的不变量**。逐文件规范里带有对应的 **精简** 小节。
 
-## Status — K1–K7 applied on `main` (2026-07-10)
+## 状态 —— K1–K7 已在 `main` 上应用（2026-07-10）
 
-All seven items are **done** (211 tests green throughout; each shipped as its
-own commit). Outcome: −2 net files (3 shims + 4 dead dataclasses removed, 1
-shared `profiles/languages.py` added), and every duplication below collapsed to
-a single source of truth. Raw line count is roughly flat because K2 trades
-three divergent copies for one shared module (DRY, not fewer lines); the real
-win is maintainability — a new step now reuses `_common` guards, and language
-rules live in one place. Keep this doc as the record of *why* those helpers
-exist so they are not re-inlined.
+七条**全部完成**（全程 211 个测试绿；每条各自一个提交）。结果：**净 −2 个文件**
+（删掉 3 个 shim + 4 个死 dataclass，新增 1 个共享的 `profiles/languages.py`），
+且下面每一处重复都收敛到了单一真相来源。原始行数大致持平，因为 K2 是用**三份互相
+分叉的副本**换来**一个共享模块**（DRY，不是更少的行）；真正的收益是**可维护性** ——
+现在一个新 step 直接复用 `._common` 的守卫，语言规则也只住在一处。
+**保留本文档作为那些 helper 为何存在的记录，免得它们被重新内联回去。**
 
-## Two axes — do not confuse them
+## 两条轴 —— 不要混淆
 
-- **Concision** (this doc): fewer lines, less duplication, less dead code.
-  Preferred for this refactor.
-- **Cohesion split** (per-file "Refactor notes"): break an oversized file into
-  focused files — improves readability but adds files and does NOT reduce total
-  lines.
+- **精简**（本文档）：更少的行、更少的重复、更少的死代码。**本次重构优先它。**
+- **内聚拆分**（各逐文件规范的"重构备注"）：把过大的文件拆成聚焦的文件 ——
+  提升可读性，但会**增加文件数**，**并不减少总行数**。
 
-Where they conflict, **prefer concision**. Example: `agent_runtime.py` (685 LOC)
-had a cohesion-split note, but the concision win there was smaller (dedupe the
-repair-round and evidence-cap code), not the split — so the dedup came first.
-The cohesion split followed once the file was still hard to navigate.
+两者冲突时，**优先精简**。例子：`agent_runtime.py`（685 行）曾带着一条内聚拆分备注，
+但那里的精简收益更小（把修复轮和证据封顶的代码去重），**不是**拆分 ——
+所以先做了去重。等它仍然难以导航时，内聚拆分才跟上。
 
-## Cohesion splits applied (2026-07-10, after K1–K7)
+## 已应用的内聚拆分（2026-07-10，在 K1–K7 之后）
 
-Two oversized files were split into packages once the concision passes above
-left them still dense (219 tests green throughout; public import surfaces
-preserved via re-exporting `__init__`s, so no importer changed):
-- `engine/agent_runtime.py` (685 LOC) → `engine/agent_runtime/` —
-  `dispatch`/`knowledge`/`utils` (substrate) + `runner`/`ensemble` (entries).
-- `engine/steps/review.py` (341 LOC) → `engine/steps/review/` —
-  `prompts` (eval-tuned text) + `utils` (deterministic helpers) + `steps`
-  (handlers).
-- `engine/steps/pr.py` (484 LOC) → `engine/steps/pr/` — split by concern:
-  `fetch` (read-only) + `rebase` + `debug` + `publish` (both risk=push steps)
-  + `utils` (`extract_signature`).
-- `cli.py` (406 LOC) → `cli/` — `copilot` (the orchestrator class, kept whole)
-  + `entry` (argparse/REPL) + `utils` (pure formatters); `__init__`/`__main__`
-  preserve the `infermatrix_copilot.cli:main` entry point and `python -m` parity.
-In every case the stateless/pure helpers moved to a `utils.py` so the class/
-handler files carry control flow, not plumbing. Eval-citation comments moved
-with their code, and public import surfaces were preserved via re-exporting
-`__init__`s (one test's white-box monkeypatch target was updated to the new
-submodule — `pr.debug._gh` — the only test change across all four splits).
+在上面的精简轮之后仍然稠密的两个（后来是四个）过大文件被拆成了包
+（全程 219 个测试绿；公开 import 面经由再导出的 `__init__` 保留，
+**没有任何 importer 需要改**）：
+- `engine/agent_runtime.py`（685 行）→ `engine/agent_runtime/` ——
+  `dispatch`/`knowledge`/`utils`（底座）+ `runner`/`ensemble`（入口）。
+- `engine/steps/review.py`（341 行）→ `engine/steps/review/` ——
+  `prompts`（评测调优过的文本）+ `utils`（确定性 helper）+ `steps`（handler）。
+- `engine/steps/pr.py`（484 行）→ `engine/steps/pr/` —— 按关注点拆：
+  `fetch`（只读）+ `rebase` + `debug` + `publish`（两个 risk=push 的 step 都在这里）
+  + `utils`（`extract_signature`）。
+- `cli.py`（406 行）→ `cli/` —— `copilot`（编排器类，**完整保留**）+
+  `entry`（argparse/REPL）+ `utils`（纯格式化器）；`__init__`/`__main__` 保住了
+  `infermatrix_copilot.cli:main` 入口点和 `python -m` 的对等性。
 
-## Rules the concision refactor must not break
+每一次拆分里，无状态/纯 helper 都搬进了 `utils.py`，好让类/handler 文件承载**控制流
+而不是管道**。评测引用注释**跟着它们的代码一起搬**，公开 import 面经再导出的
+`__init__` 保留（只有一处测试的白盒 monkeypatch 目标改到了新子模块 —— `pr.debug._gh`
+—— 这是四次拆分里**唯一**的测试改动）。
 
-- Every invariant tagged in a per-file spec survives verbatim; every guard test
-  still passes (a helper may change *how* a guarantee is met, never *whether*).
-- New helpers live where the dependency rules allow (`engine/steps/_common.py`
-  for step helpers; a leaf data module for shared data). A helper must not
-  create a forbidden cross-import (`_ARCHITECTURE.md` §4).
-- A helper that would be used **once** is not worth it — only extract at ≥2
-  real call sites (the numbers below all qualify).
+## 精简重构不得破坏的规则
 
-## Prioritized catalog (highest value first)
+- 逐文件规范里标记的**每一条不变量都逐字存活**；每一个护栏测试仍然通过
+  （helper 可以改变一条保证**如何**被满足，**绝不能改变它是否**被满足）。
+- 新 helper 必须住在依赖规则允许的地方（step helper 进 `engine/steps/_common.py`；
+  共享数据进一个叶子数据模块）。**helper 不得制造被禁止的交叉 import**
+  （`_ARCHITECTURE.md` §4）。
+- **只会被用一次的 helper 不值得抽** —— 只在 ≥2 个真实调用点时才抽取
+  （下面的数字都满足）。
 
-### K1 — Delete dead target dataclasses  ·  ~35 LOC  ·  risk: none
-`ModuleTask`, `ModuleSchedule`, `ValidationPlan`, `RebaseRunSpec` in
-`targets/base.py` (now `push.py`) were used nowhere but their re-exports
-(verified: 0 other importers). Delete the four dataclasses + their re-exports.
-**Keep** `PushPolicy`/`PushDecision`/`guard_push` (the live push guard).
-*Invariant to preserve:* C4 (push guard) untouched.
+## 按优先级排列的目录（价值最高在前）
 
-### K2 — Centralize per-language rules  ·  ~30–40 LOC + prevents drift  ·  risk: low
-The "what is a source file / a symbol / a branch, per language" data is
-triplicated: `review._sweep_targets` (`line_rules`), `establish`
-(`LANGUAGE_SUFFIXES` + `scan_modules`), `repo_map` (`_SYMBOL_RES` + `_SUFFIXES`).
-Introduce one leaf data module `profiles/languages.py` (pure data + tiny
-accessors: suffixes, symbol regex, branch/index regex per language). The three
-consumers import it. *Invariant to preserve:* unknown language degrades honestly
-in each consumer (file-level sweep / empty module scan / "use grep").
+### K1 —— 删除死掉的 target dataclass · 约 35 行 · 风险：无
+`targets/base.py`（现在的 `push.py`）里的 `ModuleTask`、`ModuleSchedule`、
+`ValidationPlan`、`RebaseRunSpec` 除了自己的再导出之外**无处使用**
+（已验证：0 个其他 importer）。删掉这四个 dataclass 及其再导出。
+**保留** `PushPolicy`/`PushDecision`/`guard_push`（活着的推送守卫）。
+*要保住的不变量：* C4（推送守卫）不受影响。
 
-### K3 — Step-handler guard helpers  ·  ~40–60 LOC  ·  risk: low
-Add to `engine/steps/_common.py` and replace the repeated blocks:
-- `require_repo(ctx) -> Path | StepResult` — the **8** `repo is None → BLOCKED`
-  guards across step files become one line each.
-- `adapter_or_result(ctx) -> RepoAdapter | StepResult` (or a `@needs_adapter`
-  decorator) — the **7** `_adapter_from_state` + `isinstance(..., StepResult)`
-  guards in `profile.py`.
-- `no_llm_gap(ctx, step, effect) -> StepResult` — the **4** identical
-  "no LLM → record `capability_gap` → return ok/skip" blocks.
-- `store_for(adapter) -> ProfileStore` — the **6** `ProfileStore(adapter.profile_dir)`
-  constructions in `profile.py`.
-*Invariant to preserve:* typed BLOCKED returns (B1), the `capability_gap` trace
-event (E2), and each step's public name/behavior.
+### K2 —— 集中按语言的规则 · 约 30–40 行 + 防止漂移 · 风险：低
+"在这门语言里，什么算源文件 / 符号 / 分支"这份数据一式三份：
+`review._sweep_targets`（`line_rules`）、`establish`（`LANGUAGE_SUFFIXES` +
+`scan_modules`）、`repo_map`（`_SYMBOL_RES` + `_SUFFIXES`）。
+引入一个叶子数据模块 `profiles/languages.py`（纯数据 + 极小访问器：逐语言的后缀、
+符号正则、分支/索引正则），三个消费者从它 import。
+*要保住的不变量：* 未知语言在**每个**消费者里都诚实降级
+（只做文件级 sweep / 空的模块扫描 / "use grep"）。
 
-### K4 — `state_updates` ergonomics  ·  readability + ~10 LOC  ·  risk: low
-**21** call sites write `outputs={"state_updates": {...}, ...}` by hand. Add a
-small constructor helper — `published(summary, *, state=None, **outputs)` or a
-`StepResult.publishing(...)` classmethod — so a handoff is one clear call.
-*Invariant to preserve:* **B2** — every state key a later step consumes is still
-published; the helper makes it easier to comply, not optional.
+### K3 —— step handler 的守卫 helper · 约 40–60 行 · 风险：低
+加进 `engine/steps/_common.py`，替换那些重复块：
+- `require_repo(ctx) -> Path | StepResult` —— 各 step 文件里那 **8** 处
+  `repo is None → BLOCKED` 守卫，各自缩成一行。
+- `adapter_or_result(ctx) -> RepoAdapter | StepResult`（或一个 `@needs_adapter`
+  装饰器）—— `profile.py` 里那 **7** 处 `_adapter_from_state` +
+  `isinstance(..., StepResult)` 守卫。
+- `no_llm_gap(ctx, step, effect) -> StepResult` —— 那 **4** 处一模一样的
+  "无 LLM → 记 `capability_gap` → 返回 ok/skip" 块。
+- `store_for(adapter) -> ProfileStore` —— `profile.py` 里那 **6** 处
+  `ProfileStore(adapter.profile_dir)` 构造。
+*要保住的不变量：* 类型化的 BLOCKED 返回（B1）、`capability_gap` trace 事件（E2），
+以及每个 step 的公开名字/行为。
 
-### K5 — Retire the three engine shims  ·  ~26 LOC + 3 files  ·  risk: low
-`engine/{builtin_steps,pr_steps,rebase_native_steps}.py` are re-export shims.
-Migrate their importers (each shim's spec lists them), then delete the files and
-their specs. *Invariant to preserve:* the `rebase_native_steps._RUNTIME`
-"same object" guarantee until its fixtures are migrated.
+### K4 —— `state_updates` 的人体工学 · 可读性 + 约 10 行 · 风险：低
+有 **21** 处调用点手写 `outputs={"state_updates": {...}, ...}`。加一个小的构造 helper
+—— `published(summary, *, state=None, **outputs)` 或一个 `StepResult.publishing(...)`
+类方法 —— 让一次交接变成**一次清晰的调用**。
+*要保住的不变量：* **B2** —— 每个被后续 step 消费的 state 键仍然被发布；
+**helper 让"遵守"更容易，而不是让它变成可选。**
 
-### K6 — Deduplicate cli gate+confirm  ·  ~15 LOC  ·  risk: low
-`Copilot.run_task` and `run_playbook` repeat the plan-review + `[y/N]` confirm
-sequence. Extract `_gate_and_confirm(resolution, spec, assume_yes) -> bool`.
-*Invariant to preserve:* plan-review before confirm; confirm fires for
-`confirm_required or requires_review`.
+### K5 —— 退役三个引擎 shim · 约 26 行 + 3 个文件 · 风险：低
+`engine/{builtin_steps,pr_steps,rebase_native_steps}.py` 是再导出 shim。
+先迁移它们的 importer（各 shim 的规范里列了名单），然后删掉文件和它们的规范。
+*要保住的不变量：* 在其 fixture 迁移完成之前，
+`rebase_native_steps._RUNTIME` 的"同一个对象"保证。
 
-### K7 — Fetch-step "from state" early return  ·  ~10 LOC  ·  risk: none
-**5** fetch steps open with `if "X" in ctx.state: return ...(state_updates)`.
-A `from_state(ctx, key) -> StepResult | None` helper collapses them.
-*Invariant to preserve:* the injected/offline test path stays intact.
+### K6 —— 去重 cli 的 过门+确认 · 约 15 行 · 风险：低
+`Copilot.run_task` 和 `run_playbook` 重复了 plan-review + `[y/N]` 确认的序列。
+抽出 `_gate_and_confirm(resolution, spec, assume_yes) -> bool`。
+*要保住的不变量：* 确认之前先 plan-review；
+`confirm_required or requires_review` 时触发确认。
 
-## Estimated total
-~160–200 LOC removed and ~4 files deleted, with several repeated patterns
-reduced to single call sites — before any cohesion split. The step files shrink
-most (K3+K4+K7), which is where new steps are added, so the marginal cost of a
-new step drops too.
+### K7 —— 抓取类 step 的"从 state"早返回 · 约 10 行 · 风险：无
+有 **5** 个抓取 step 以 `if "X" in ctx.state: return ...(state_updates)` 开头。
+一个 `from_state(ctx, key) -> StepResult | None` helper 就能把它们收掉。
+*要保住的不变量：* 注入式/离线测试路径保持完好。
 
-## Suggested sequence (each independently shippable, tests green between)
-1. K1, K5 (pure deletions — smallest diff, immediate shrink).
-2. K3, K4, K7 (`_common.py` helpers — the step-file boilerplate collapse).
-3. K2 (`profiles/languages.py` — the cross-file dedup).
-4. K6 (cli helper).
-5. Only then reconsider cohesion splits (per-file Refactor notes), now against a
-   smaller, deduped baseline.
+## 总计预估
+约 **160–200 行**被移除、约 **4 个文件**被删除，若干重复模式收敛到单一调用点 ——
+而这一切都发生在任何内聚拆分**之前**。缩得最多的是各 step 文件（K3+K4+K7），
+而那正是新 step 被添加的地方，所以**新增一个 step 的边际成本也随之下降**。
+
+## 建议顺序（每一步都可独立发布，之间保持测试绿）
+1. K1、K5（纯删除 —— diff 最小，立竿见影地变小）。
+2. K3、K4、K7（`._common` helper —— step 文件样板的收敛）。
+3. K2（`profiles/languages.py` —— 跨文件去重）。
+4. K6（cli helper）。
+5. **然后**才重新考虑内聚拆分（各逐文件规范的重构备注），
+   此时面对的已经是一个更小、已去重的基线。

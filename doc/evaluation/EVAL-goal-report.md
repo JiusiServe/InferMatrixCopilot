@@ -1,5 +1,8 @@
 # Goal evaluation report — one-click NL copilot vs the CC+Opus baseline
 
+> **冻结记录，保持英文原文。** 本页是当时被评审/被判分的文本本身；翻译它就是**改动一份记录**。文档树的其余部分统一为中文 —— 见 [`../README.md`](../README.md)。
+
+
 2026-07-18 · hook-reviewed eval plan v3 (6 review rounds; plan + trail + all
 tooling in `eval/dataset/goal-eval/`) · metric definitions reused unchanged
 from `eval/dataset/judge_val.py` (7 dims, blind pairwise, 3 judge replicates,

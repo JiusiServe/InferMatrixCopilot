@@ -1,25 +1,24 @@
-# Autonomous workflow
+# 独立执行器（Autonomous workflow）
 
-This page documents the optional autonomous CLI and workflow MCP. It is separate
-from the default Direct MCP described in the repository README.
+本页介绍可选的 autonomous CLI 与 workflow MCP。它与仓库 README 描述的**默认 Direct
+MCP 是两回事**。
 
-The autonomous workflow runs its own model and supports longer repo-maintenance
-playbooks such as review, issue handling, CI debugging, and rebase. It therefore
-requires model credentials and repository configuration.
+autonomous 工作流**跑自己的模型**，支持更长的仓库维护 playbook —— 评审、issue 处理、
+CI 调试、rebase。因此它需要模型凭据和仓库配置。
 
-## Install
+## 安装
 
 ```bash
 bash install.sh
 ```
 
-Edit `.env`, set the required model credentials and `REPO_PATHS`, then run:
+编辑 `.env`，填好必需的模型凭据和 `REPO_PATHS`，然后运行：
 
 ```bash
 ./infermatrix-copilot doctor
 ```
 
-## Use
+## 使用
 
 ```bash
 ./infermatrix-copilot
@@ -29,22 +28,22 @@ Edit `.env`, set the required model credentials and `REPO_PATHS`, then run:
 ./infermatrix-copilot --resume
 ```
 
-The autonomous MCP command is:
+autonomous 的 MCP 命令是：
 
 ```text
 infermatrix-copilot-workflow-mcp
 ```
 
-It is not registered by the default Codex installer.
+**默认的 Codex 安装器不会注册它。**
 
-## Safety
+## 安全
 
-- Pushes require an allowing policy and are dry-run unless explicitly enabled.
-- Protected branches are never direct-pushed.
-- Posting requires explicit intent and configuration.
-- Blocked runs write escalation artifacts instead of guessing.
+- push 需要策略允许，未显式开启前一律 dry-run。
+- 保护分支永不被直接推送。
+- 发布需要明确意图加上配置开关。
+- 被阻塞的 run 写出升级产物，而不是猜测继续。
 
-Implementation details:
+实现细节：
 
 - [`../../QUICKSTART.md`](../../QUICKSTART.md)
 - [`../architecture/DESIGN.md`](../architecture/DESIGN.md)

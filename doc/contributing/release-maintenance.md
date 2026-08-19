@@ -75,6 +75,8 @@ owner 路由、manifest、知识 `sources:` 和 pin 对账，最后输出稳定 
 和 CI 结果稳定后再做。Release 审计只对账结构事实，不把 PR 内容、事故过程或审计报告
 写进知识树，也不因为上游发版自动升级 InferMatrixCopilot 版本或依赖。
 
-CI 每周对 upstream `main` 运行 `report-only`。修改 baseline 的 PR 会自动用
-`previous_audited_sha → audited_sha` 运行 `enforce`；Actions 手动运行可用
-`report-only` 检查任意区间，`enforce` 只接受当前 baseline 声明的升级区间。
+CI 每周一对 upstream `main` 运行 `report-only`。**任何**改到 baseline、adapter
+manifest、`imupdate` skill、本页、`knowledge/repos/vllm-omni/**` 或两个审计脚本的 PR，
+都会自动用 `previous_audited_sha → audited_sha` 运行 `enforce` —— 知识页的改动同样触发。
+Actions 手动运行可用 `report-only` 检查任意区间，`enforce` 只接受当前 baseline 声明的
+升级区间。

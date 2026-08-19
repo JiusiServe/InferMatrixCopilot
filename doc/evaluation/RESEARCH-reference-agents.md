@@ -1,5 +1,8 @@
 # Reference-agent research — mechanisms for PR review & issue answering
 
+> **冻结记录，保持英文原文。** 本页是当时被评审/被判分的文本本身；翻译它就是**改动一份记录**。文档树的其余部分统一为中文 —— 见 [`../README.md`](../README.md)。
+
+
 Goal-phase-3 deliverable (hook-approved research plan, 2026-07-17). Evidence classes: **source-backed** (clone file:line), **documented** (official doc URL), **inferred** (labeled; never grounds an "adopt"). Every entry cross-checks what the copilot already has (adaptive depth `review/planner.py`, single-model lens ensemble `agent_runtime/ensemble.py`, on-demand `gh_pr_view`/`gh_issue_view`/`gh_ci_read` `_common.py:133-173`, knowledge briefing + doc tools).
 
 ## A. Baseline behavior autopsy (output-level; no turn traces exist — `cost.json` has aggregate `calls` only, so tool-usage claims are inference)

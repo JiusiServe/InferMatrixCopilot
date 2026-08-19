@@ -4,6 +4,8 @@
 > MCP 与插件的实际形态见 [`../guide/mcp.md`](../guide/mcp.md) 与
 > [`../guide/hosts/README.md`](../guide/hosts/README.md)。
 
+> **冻结存档，保持英文原文。** 内容停在各自的日期上，不代表现状；翻译一份存档等于改动它。现行文档统一为中文 —— 见 [`../README.md`](../README.md)。
+
 
 Status: PROPOSED, revision 6 (planning only — nothing here is executed yet).
 Rev 6 folds in a fifth external review (GPT). All three blockers were real; two
@@ -177,7 +179,7 @@ touched (the rev-4/5 multi-server bug).
 
 ---
 
-## Workstream 2 — contribute the copilot's net-new knowledge to `zuiho-kai/claude-workflow-starter` (fork → PR)
+## Workstream 2 — contribute the copilot's net-new knowledge to the upstream knowledge repository (fork → PR)
 
 *Declared ready by the review; unchanged from rev 4. Summary:*
 
@@ -188,14 +190,14 @@ touched (the rev-4/5 multi-server bug).
 - **Content preserved**: a **navigation allowlist** exempts only those `_index.md`
   files (additive rows); a pre/post SHA-256 manifest hash-gates everything else.
 - **Dedup + public provenance** (hard gates): never re-contribute
-  `community:zuiho-kai/…`-sourced facts; cite **public** vllm-omni commit/PR/
+  upstream-sourced facts; cite **public** vllm-omni commit/PR/
   issue/source links (not internal `eval GT #n`).
 - **Book form only** — no parallel machine tree.
 - **Hygiene**: DCO `git commit -s` **mandatory** (verified); Chinese PR body; the
   PR body carries the hash **verify command + summary + compact allowlisted-index
   list** (full manifest + dedup matrix are local artifacts, not committed).
 - Phases: local prep (no mutations) → audit/dedup → author pages → minimal nav →
-  hygiene → open PR → `zuiho-kai:master`.
+  hygiene → open PR → upstream `master`.
 
 ---
 

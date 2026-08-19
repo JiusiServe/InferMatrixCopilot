@@ -378,9 +378,8 @@ CI（`.github/workflows/test.yml`）跑上面全部检查，外加把 wheel 装�
 
 ### 4.6 知识树的编辑规矩
 
-`knowledge/` 是 `zuiho-kai/claude-workflow-starter` 的 vendored 改编。增删移任何
-知识页之前，先读 `doc/archive/PLAN-knowledge-reorg.md` 和 `knowledge/CONTRIBUTING.md`，
-再读**恰好一个**匹配的贡献主题。要点：
+增删移任何知识页之前，先读 `doc/knowledge/CONTRIBUTING.md`，再读**恰好一个**匹配的
+贡献主题（`doc/archive/PLAN-knowledge-reorg.md` 是已归档历史，不是现行契约）。要点：
 
 - 每条结论按**用途 + 代码 owner** 双重路由；PR 学习只能产出可执行规则，写进最近
   owner 的 `rules.md`。

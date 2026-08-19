@@ -1,36 +1,35 @@
-# engine/registry.py — spec
+# engine/registry.py —— 规范
 
-<!-- verified-against: 2026-08-17 -->
+<!-- verified-against: 2026-08-18 -->
 
-`LOC ~31 · engine substrate · refactor-status: ok`
+`LOC ~31 · 引擎底座 · refactor-status: ok`
 
-## Responsibility
-`StepRegistry`: the name → `StepSpec` map — the single place a name string
-resolves to a handler.
+## 职责
+`StepRegistry`：名字 → `StepSpec` 的映射 —— **名字字符串解析到 handler 的唯一地点**。
 
-## Functionality
-`register`/`get`/`__contains__`/`names`.
+## 功能
+`register` / `get` / `__contains__` / `names`。
 
-## Public contract
-`StepRegistry` with the methods above.
+## 公开契约
+`StepRegistry`，带上述方法。
 
-## Invariants
-- Duplicate registration raises; `get` on unknown raises with the registered set
-  (fail loudly, never silent).
+## 不变量
+- 重复注册直接抛错；对未知名字调用 `get` 会连同**已注册集合**一起抛出
+  （**大声失败，绝不静默**）。
 
-## Scope — not here
-Storage/lookup only — no execution, no policy, no self-population (population is
-`steps.register_builtin_steps`).
+## 边界 —— 不属于这里
+只做存储/查找 —— 不执行、不含策略、不自我填充（填充由
+`steps.register_builtin_steps` 负责）。
 
-## Dependencies (allowed)
-`engine/step`.
+## 依赖（允许）
+`engine/step`。
 
-## Extension points
-None needed; it is a container.
+## 扩展点
+不需要；它就是一个容器。
 
-## Tests
-Exercised via `register_builtin_steps` in most tests.
+## 测试
+多数测试通过 `register_builtin_steps` 间接覆盖。
 
-## Refactor notes
-Minimal and correct. Do not add filtering/policy here — that belongs to the
-planner (which selects) and the store (which validates references).
+## 重构备注
+极简且正确。**不要**在这里加过滤/策略 —— 那属于 planner（负责选择）和 store
+（负责校验引用）。

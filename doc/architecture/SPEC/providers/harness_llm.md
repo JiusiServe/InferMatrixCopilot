@@ -1,40 +1,36 @@
-# providers/harness_llm.py — spec
+# providers/harness_llm.py —— 规范
 
-<!-- verified-against: 2026-08-17 -->
+<!-- verified-against: 2026-08-18 -->
 
-`LOC ~66 · LLM-shaped adapter over a harness (TOOL-LESS only) · refactor-status: ok`
+`LOC ~66 · 套在 harness 之上的 LLM 形状适配器（仅限无工具） · refactor-status: ok`
 
-## Responsibility
-Let existing `llm.LLM` call sites keep working under a harness backend, for
-tool-less calls only.
+## 职责
+让既有的 `llm.LLM` 调用点在 harness 后端下继续工作 —— **仅限无工具调用**。
 
-## Functionality
-Wraps a `HarnessTransport` behind the `LLM` shape so callers that hold an
-`LLM` (intent classification, ensemble reducer/merge, output repair, chat)
-become one-shot CLI invocations under a harness backend.
+## 功能
+把 `HarnessTransport` 包成 `LLM` 的形状，于是那些持有 `LLM` 的调用方
+（意图分类、ensemble reducer/merge、输出修复、chat）在 harness 后端下变成一次性的
+CLI 调用。
 
-## Public contract
-`HarnessLLM` (`available`, `for_target`, `for_member`, `create`).
+## 公开契约
+`HarnessLLM`（`available`、`for_target`、`for_member`、`create`）。
 
-## Invariants (**C1**, **B1**)
-- **Any call passing tools raises.** Agent steps must route through
-  `run_session` — the harness owns its loop — and a loud error here is the
-  guard against silently running a **second, ungoverned tool loop** alongside
-  the vendor's. This is the single reason the module exists in this shape.
-- Call sites are unchanged: `create()` keeps its signature, so no caller needs
-  to know which backend is active.
-- `for_member` is the MoA seam (a mixture member riding a harness inside an
-  api-backed run).
+## 不变量（**C1**、**B1**）
+- **任何带工具的调用都会抛错。** agent step 必须走 `run_session` —— 工具循环归 harness
+  —— 而这里的一声大响，正是防止在厂商循环之外**悄悄再跑一个不受治理的第二工具循环**的
+  守卫。**这就是本模块之所以长成这个形状的唯一理由。**
+- 调用点不变：`create()` 保持签名，所以没有任何调用方需要知道当前是哪个后端。
+- `for_member` 是 MoA 的接缝（混合成员在 api 后端的 run 内部骑上某个 harness）。
 
-## Scope — not here
-No agent-step delegation (that is `run_session`); no tool bridging.
+## 边界 —— 不属于这里
+不做 agent step 委托（那是 `run_session`）；不做工具桥接。
 
-## Dependencies (allowed)
-`.base` + `..llm` types.
+## 依赖（允许）
+`.base` + `..llm` 的类型。
 
-## Tests
-`test_providers.py`.
+## 测试
+`test_providers.py`。
 
-## Refactor notes
-Resist adding a tools path "for convenience" — it would reintroduce exactly the
-ungoverned second loop this class exists to prevent.
+## 重构备注
+**要顶住"为了方便加一条带工具路径"的冲动** —— 那会把这个类存在的意义（防止不受治理的
+第二循环）原样请回来。

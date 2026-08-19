@@ -1,5 +1,8 @@
 # Goal campaign — DeepSeek-v4-pro Strict vs Claude Code + Opus 5 (2026-08-12/13)
 
+> **冻结记录，保持英文原文。** 本页是当时被评审/被判分的文本本身；翻译它就是**改动一份记录**。文档树的其余部分统一为中文 —— 见 [`../README.md`](../README.md)。
+
+
 > **Final update (2026-08-13, official-model rework):** after the official
 > `deepseek-v4-pro` release the pipeline was rebuilt for a strong generator
 > (deep investigator+adversary passes alongside the behavior/verification

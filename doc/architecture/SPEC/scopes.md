@@ -1,39 +1,38 @@
-# scopes.py — spec
+# scopes.py —— 规范
 
-<!-- verified-against: 2026-08-17 -->
+<!-- verified-against: 2026-08-18 -->
 
-`LOC ~94 · engine (permissions) · refactor-status: ok`
+`LOC ~94 · 引擎（权限） · refactor-status: ok`
 
-## Responsibility
-Path-level tool permissions — the permission vocabulary the dispatcher enforces.
+## 职责
+路径级的工具权限 —— dispatcher 强制执行的那套权限词汇。
 
-## Functionality
-`ToolScope.check` (tool allowed? write path allowed?); `PathScope.check_write`
-(writable hard wall + primary owned-files); scope factories.
+## 功能
+`ToolScope.check`（工具是否允许？写路径是否允许？）；`PathScope.check_write`
+（可写硬墙 + primary 归属文件）；scope 工厂函数。
 
-## Public contract
-`ToolScope(name, allowed_tools, path_scope?, read_only)`; `PathScope(writable,
-primary)`; `Decision`; `read_only_scope`, `pre_plan_scope`, `post_plan_scope`;
-tool-set constants (READ/WRITE/EXEC).
+## 公开契约
+`ToolScope(name, allowed_tools, path_scope?, read_only)`；`PathScope(writable,
+primary)`；`Decision`；`read_only_scope`、`pre_plan_scope`、`post_plan_scope`；
+工具集常量（READ/WRITE/EXEC）。
 
-## Invariants
-- Three outcomes: allowed / refused (tool not in set, write outside `writable`,
-  or read-only scope) / out-of-scope (inside `writable` but outside `primary` —
-  allowed + recorded).
-- `writable` is a hard wall; `primary` defines the module's owned files.
+## 不变量
+- **三种结果**：允许 / 拒绝（工具不在集合内、写到 `writable` 之外、或处于只读
+  scope）/ 越界（在 `writable` 内但在 `primary` 之外 —— **允许并记录**）。
+- `writable` 是一堵硬墙；`primary` 定义该模块归属的文件。
 
-## Scope — not here
-Permission decisions only — no execution, no tracing (the dispatcher traces).
+## 边界 —— 不属于这里
+只做权限判定 —— 不执行、不记 trace（由 dispatcher 记）。
 
-## Dependencies (allowed)
-stdlib only.
+## 依赖（允许）
+仅 stdlib。
 
-## Extension points
-New scope shape → a factory function; keep the three-outcome `Decision` contract.
+## 扩展点
+新的 scope 形状 → 加一个工厂函数；保持三结果的 `Decision` 契约。
 
-## Tests
-`test_scopes_tools.py`.
+## 测试
+`test_scopes_tools.py`。
 
-## Refactor notes
-Clean, dependency-free, security-critical. Keep it pure (no side effects) so it
-stays trivially testable. `engine/step.py` imports it — do not add a back-import.
+## 重构备注
+干净、无依赖、安全攸关。保持它是纯的（无副作用），这样它才一直是可轻松测试的。
+`engine/step.py` 会 import 它 —— **不要**加反向 import。

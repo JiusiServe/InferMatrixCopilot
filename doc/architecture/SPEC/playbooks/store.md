@@ -1,41 +1,40 @@
-# playbooks/store.py — spec
+# playbooks/store.py —— 规范
 
-<!-- verified-against: 2026-08-17 -->
+<!-- verified-against: 2026-08-18 -->
 
-`LOC ~166 · planning (registry) · refactor-status: ok`
+`LOC ~166 · 规划（注册表） · refactor-status: ok`
 
-## Responsibility
-The versioned playbook registry: load/parse/validate YAML, recall by
-kind+repo+capabilities, persist candidates.
+## 职责
+带版本的 playbook 注册表：加载/解析/校验 YAML，按 kind+repo+capabilities 召回，
+持久化 candidate。
 
-## Public contract
-`Playbook`, `PlaybookStep`, `parse_playbook`, `playbook_to_doc`;
-`PlaybookStore(dir, registry)` with `find(kind, repo, capabilities?)`,
-`missing_capabilities(kind, capabilities)`, `get`, `all`, `save_candidate`,
-`validate`.
+## 公开契约
+`Playbook`、`PlaybookStep`、`parse_playbook`、`playbook_to_doc`；
+`PlaybookStore(dir, registry)`，带 `find(kind, repo, capabilities?)`、
+`missing_capabilities(kind, capabilities)`、`get`、`all`、`save_candidate`、
+`validate`。
 
-## Invariants
-- Statuses `candidate | active | locked | retired`; only active/locked recalled
-  by `find`; candidates run only via explicit `--playbook`.
-- `find`: exact-repo wins; repo-neutral match only when `requires ⊆
-  capabilities` (when known); locked > active; higher version > lower.
-- `validate` refuses a playbook referencing an unregistered step (fail at load).
-- `save_candidate` forces `status=candidate` (**D1** — no self-promotion).
+## 不变量
+- 状态为 `candidate | active | locked | retired`；`find` **只召回 active/locked**；
+  candidate 只能经显式 `--playbook` 运行。
+- `find`：精确 repo 优先；仓库无关的匹配仅当 `requires ⊆ capabilities`（已知时）；
+  locked > active；高版本 > 低版本。
+- `validate` 拒绝引用了未注册 step 的 playbook（**加载即失败**）。
+- `save_candidate` 强制 `status=candidate`（**D1** —— 不允许自我晋升）。
 
-## Scope — not here
-No execution, no planning policy (planner's), no step logic.
+## 边界 —— 不属于这里
+不执行、不含规划策略（那是 planner 的）、不含 step 逻辑。
 
-## Dependencies (allowed)
-`engine/registry`, `pyyaml`.
+## 依赖（允许）
+`engine/registry`、`pyyaml`。
 
-## Extension points
-New playbook field → extend `Playbook` + `parse_playbook` + `playbook_to_doc`
-together.
+## 扩展点
+新增 playbook 字段 → `Playbook` + `parse_playbook` + `playbook_to_doc` **一起**扩展。
 
-## Tests
-`test_planner_playbooks.py`, `test_capabilities.py`, `test_review_step.py`.
+## 测试
+`test_planner_playbooks.py`、`test_capabilities.py`、`test_review_step.py`。
 
-## Refactor notes
-Clean. `Playbook`/`PlaybookStep` are data; `PlaybookStore` is mechanics — keep
-them separable. If DAG playbooks arrive, `PlaybookStep` gains edges but the
-`find`/`validate` contract stays.
+## 重构备注
+干净。`Playbook`/`PlaybookStep` 是数据，`PlaybookStore` 是机制 —— 保持两者可分离。
+如果将来出现 DAG 形态的 playbook，`PlaybookStep` 会长出边，但 `find`/`validate`
+的契约不变。

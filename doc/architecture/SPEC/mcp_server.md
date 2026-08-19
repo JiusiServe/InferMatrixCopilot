@@ -1,55 +1,48 @@
-# mcp_server.py — spec
+# mcp_server.py —— 规范
 
-<!-- verified-against: 2026-08-17 -->
+<!-- verified-against: 2026-08-18 -->
 
-`LOC ~392 · Strict background machinery (start/poll) · refactor-status: ok`
+`LOC ~392 · Strict 后台机器（start/poll） · refactor-status: ok`
 
-## Responsibility
-Run Strict workflows for an MCP host: reserve, launch, track, and serve
-results — without ever blocking a synchronous tool call.
+## 职责
+为 MCP 宿主运行 Strict 工作流：预约、拉起、跟踪、供给结果 ——
+**且绝不阻塞一次同步工具调用**。
 
-## Functionality
-Reviews take 5–12 minutes, which would blow any synchronous MCP call timeout,
-so the surface is **start/poll tool pairs**: `start_review` /
-`start_issue_answer` / `start_issue_triage` reserve and return a `run_id`
-immediately; `get_result` (paginated via `next_offset`, capped by
-`mcp_report_max_bytes`) and `get_status` (`run_status` + `progress`) poll it.
+## 功能
+评审要跑 5–12 分钟，任何同步 MCP 调用都会超时，所以接口是**start/poll 工具对**：
+`start_review` / `start_issue_answer` / `start_issue_triage` 预约后**立即**返回
+`run_id`；`get_result`（经 `next_offset` 分页，受 `mcp_report_max_bytes` 封顶）
+和 `get_status`（`run_status` + `progress`）负责轮询。
 
-## Public contract
-`CopilotMCP`, `build_mcp()`, the start/poll tools.
+## 公开契约
+`CopilotMCP`、`build_mcp()`，以及那组 start/poll 工具。
 
-## Invariants (**C2**, **C3**, **E1**)
-- **Safety is structural, not host-trusted.** `enforce_mcp_policy` runs here
-  AND (authoritatively) in the child, so only `READ_ONLY_KINDS` ever run,
-  `post` is always `False`, and only allow-listed repos are reachable —
-  regardless of what a tampered `request.json` claims.
-- **Every run is an isolated subprocess**
-  (`python -m infermatrix_copilot --execute-reserved <id>`). Two reasons, both
-  load-bearing: the copilot's stdout must stay out of this process's JSON-RPC
-  stdio channel (child stdout → `<run_dir>/console.log`), and the
-  process-global tracer / `last_run_dir` become per-run by construction.
-- **Runs are serialized through one worker thread.**
-- Polling correctness across restarts and multiple concurrent servers comes
-  from `run_status.py`'s durable record + ownership-aware reconciliation, not
-  from in-memory state.
-- **The `mcp` SDK import is optional**, gated behind the `[mcp]` extra, and
-  must never be imported by the core package — a plain CLI install stays
-  dependency-free.
-- `build_mcp()` exposes the V1 tool surface (the autonomous-workflow executor);
-  it is **not registered by default**.
+## 不变量（**C2**、**C3**、**E1**）
+- **安全是结构性的，不是"信任宿主"。** `enforce_mcp_policy` 在这里跑一次，
+  **并且**在子进程里（权威地）再跑一次，因此只有 `READ_ONLY_KINDS` 会被执行、
+  `post` 恒为 `False`、只有 allowlist 内的仓库可达 —— **无论被篡改的
+  `request.json` 声称什么**。
+- **每次 run 都是一个隔离子进程**
+  （`python -m infermatrix_copilot --execute-reserved <id>`）。两个理由都很关键：
+  copilot 的 stdout 必须离开本进程的 JSON-RPC stdio 通道（子进程 stdout →
+  `<run_dir>/console.log`），且进程级全局 tracer / `last_run_dir` **由此天然按 run 隔离**。
+- **run 由单个 worker 线程串行执行。**
+- 跨重启、跨多个并发 server 的轮询正确性，来自 `run_status.py` 的持久记录 + 按属主
+  对账，**而不是内存状态**。
+- **`mcp` SDK 是可选 import**，藏在 `[mcp]` extra 之后，且**绝不能**被核心包 import
+  —— 纯 CLI 安装保持零依赖。
+- `build_mcp()` 暴露 V1 工具面（autonomous 工作流执行器）；它**默认不注册**。
 
-## Scope — not here
-No Direct-mode logic (`thin_mcp_server.py`); no policy definition
-(`mcp_policy.py`); no status file format (`run_status.py`).
+## 边界 —— 不属于这里
+不含 Direct 模式逻辑（`thin_mcp_server.py`）；不定义策略（`mcp_policy.py`）；
+不定义状态文件格式（`run_status.py`）。
 
-## Dependencies (allowed)
-stdlib + `mcp` (optional extra) + `.mcp_policy` + `.run_status` + `.cli`.
+## 依赖（允许）
+stdlib + `mcp`（可选 extra）+ `.mcp_policy` + `.run_status` + `.cli`。
 
-## Tests
-`test_mcp.py` (tamper defense, single-writer reconciliation, pagination,
-read-only tool set).
+## 测试
+`test_mcp.py`（篡改防御、单写者对账、分页、只读工具集）。
 
-## Refactor notes
-The reservation shape (create the run dir, then plan) is MCP-specific; the CLI
-main path still gates BEFORE creating a run directory, so an abandoned plan
-leaves no directory. Do not unify the two without preserving that difference.
+## 重构备注
+预约形状（先建 run 目录，再规划）是 **MCP 专属**的；CLI 主路径仍然在**建目录之前**
+过门，所以被放弃的计划不会留下目录。**不要在没有保住这个差别的前提下把两者统一。**

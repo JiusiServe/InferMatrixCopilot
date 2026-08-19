@@ -15,106 +15,200 @@
 
 ## 原始 RFC
 
-- **Status**: draft v3, for team discussion (two gpt-5.6 review rounds folded)
-- **Author**: tzhouam (+ copilot analysis)
-- **Date**: 2026-07-23
-- **Discussion**: https://github.com/JiusiServe/InferMatrixCopilot/issues/3
+- **状态**：draft v3，供团队讨论（已折入两轮 gpt-5.6 评审）
+- **作者**：tzhouam（+ copilot 分析）
+- **日期**：2026-07-23
+- **讨论**：https://github.com/JiusiServe/InferMatrixCopilot/issues/3
 
-## Summary
+## 摘要
 
-Give the copilot a trigger layer so it runs unattended against our GitHub repos — starting with automatic PR review, later issue answering/triage. Today every run is manually invoked. The headless building blocks exist; this RFC covers the trigger, the idempotency/trigger-ownership rules, the security hardening that must land first, and the rollout gates for letting it post.
+给 copilot 一个触发层，让它对我们的 GitHub 仓库**无人值守**地运行 ——
+先做自动 PR 评审，之后再做 issue 回答/分流。今天每一次 run 都是手动发起的。
+headless 的构件已经具备；本 RFC 覆盖触发器、幂等/触发归属规则、
+**必须先落地**的安全加固，以及允许它发布的放量门。
 
-## Motivation
+## 动机
 
-- The copilot is now used beyond vllm-omni (AgentInfer, afd-plugin); issues #1/#2 came from that adoption and are fixed. Manual invocation is the remaining friction.
-- Measured envelope (20-PR campaign, 3 generation replicates over the same 20 PRs — not 60 independent items): ~$0.19 and 6–13 min per review on the eco path; precision 0.777 ± 0.026, recall 0.430 ± 0.018, with documented context asymmetry vs the recorded baseline. Read: comments are usually right but coverage is partial — an *additional* reviewer, cheap enough to run on every PR; never a replacement for human review.
-- Reviews that arrive minutes after a PR opens change author behavior; reviews that must be requested mostly don't happen.
+- copilot 现在已被用在 vllm-omni 之外（AgentInfer、afd-plugin）；issue #1/#2 就来自
+  这次采用，且都已修复。**手动发起是仅剩的摩擦。**
+- 实测包络（20-PR 战役，同一批 20 个 PR 上的 3 次生成 replicate ——
+  **不是 60 个独立条目**）：eco 路径下每次评审约 $0.19、6–13 分钟；
+  precision 0.777 ± 0.026、recall 0.430 ± 0.018，且与已录制基线之间存在**有记录的
+  上下文不对称**。读法：**评论通常是对的，但覆盖是部分的** ——
+  它是一个**额外的**评审者，便宜到可以对每个 PR 都跑；**绝不是人工评审的替代品**。
+- 在 PR 打开后几分钟就到达的评审会改变作者行为；**必须被请求才会发生的评审，
+  大多不会发生。**
 
-## What already exists
+## 已经存在的东西
 
-- Headless one-shot: `-p "review <pr-url> and post the review" --yes`; URL/bare-ref routing is deterministic (no LLM intent call) and explicit post intent survives it (issue #1 fix).
-- Double-gated outward writes: command must carry post intent AND `ALLOW_POST=1`; anything less is a dry run. Push safety (force-with-lease only, protected `main`) is unchanged and out of scope here.
-- `pr.gate_check` reports draft/merge-state/failing CI — as review *context*, deliberately non-blocking. The trigger layer must do its own eligibility filtering (draft/closed/merged); it cannot lean on this step.
-- Unattended failure path: `ESCALATION.md`, exit 3, escalation email.
+- headless 一次性：`-p "review <pr-url> and post the review" --yes`；
+  URL/裸引用的路由是确定性的（不花 LLM 意图调用），且显式的 post 意图能穿过它
+  （issue #1 的修复）。
+- **双闸的对外写入**：命令必须携带 post 意图**并且** `ALLOW_POST=1`；
+  达不到就是 dry run。推送安全（只有 force-with-lease、保护 `main`）不变，
+  且不在本 RFC 范围内。
+- `pr.gate_check` 报告 draft/合并态/失败 CI —— 作为评审**上下文**，
+  **刻意非阻塞**。触发层必须做**自己的**资格过滤（draft/closed/merged）；
+  **它不能倚靠这个 step。**
+- 无人值守的失败路径：`ESCALATION.md`、退出码 3、升级邮件。
 
-## Prerequisite hardening (blockers before ANY auto-run)
+## 前置加固（任何自动运行之前的阻塞项）
 
-Auto-run turns hostile PR/issue content from a theoretical input into a routine one, and the current posture has real gaps. These land first:
+自动运行把"敌意的 PR/issue 内容"从理论输入变成**日常输入**，而当前姿态存在真实缺口。
+这些**必须先落地**：
 
-- **H1 — repo-bounded reads.** Today the agent's read tools resolve relative paths against the run's repo root but pass absolute paths through untouched, and `PathScope` bounds only writes. A prompt-injected review agent could read arbitrary host files (keys, `.env`) and quote them into its output. Fix: refuse absolute paths outside the run's root/worktree for `read_file`/`list_dir`/`grep`/`run_shell` cwd, and refuse `.env*`/key-material patterns (the jail chat's `repo_read` already has, applied to the step runtime).
-- **H2 — outbound scrubber.** Before `pr.post_review` publishes, scan the body for credential-shaped strings (key prefixes, PEM headers, high-entropy tokens) and refuse/redact with an escalation. Defense in depth for exfiltration-via-comment; note `<untrusted_data>` fencing is prompt guidance, not an enforcement boundary — H1/H2 are the boundary.
-- **H3 — least-privilege identity & isolation.** The poller must not use ambient `gh` auth (which may hold broad rights). Dedicated machine account + fine-grained PAT: selected repos only, PR read/write, nothing else — and the poller runs as a dedicated OS user whose environment holds only that PAT and its own LLM key, not the host's other credentials. This also puts a bot name on every posted comment.
-- **H4 — no agent-controlled persistent writes in auto-run.** Review agents normally may propose skill candidates (`skill_update_candidate`); under auto-run that is an injection-to-persistent-state path, so knowledge-write tools are disabled for auto-triggered runs. Auto-runs are pure read + report; knowledge accrual stays a human-invoked flow.
+- **H1 —— 读取受仓库边界约束。** 今天 agent 的读取工具会把相对路径解析到该 run 的仓库根，
+  但**绝对路径原样透传**，而 `PathScope` **只约束写**。一个被提示注入的评审 agent
+  可以读取**任意宿主文件**（密钥、`.env`）并把它们引用进输出。
+  修法：对 `read_file`/`list_dir`/`grep`/`run_shell` 的 cwd，
+  **拒绝该 run 根/worktree 之外的绝对路径**，并拒绝 `.env*`/密钥材料模式
+  （对话侧的 `repo_read` 已经有这套，把它应用到 step 运行时）。
+- **H2 —— 出站清洗器。** 在 `pr.post_review` 发布之前，扫描正文里凭据形状的字符串
+  （key 前缀、PEM 头、高熵 token），拒绝或脱敏并升级。这是"经评论外泄"的纵深防御；
+  注意 **`<untrusted_data>` 围栏是 prompt 指导，不是执行边界 —— H1/H2 才是边界。**
+- **H3 —— 最小权限身份与隔离。** 轮询器**不得**使用环境里的 `gh` 认证
+  （它可能持有很宽的权限）。要用**专用机器账号 + 细粒度 PAT**：仅限选定仓库、
+  PR 读写、别无其他 —— 且轮询器以一个**专用 OS 用户**身份运行，
+  它的环境里**只有**那个 PAT 和它自己的 LLM key，**没有**宿主的其他凭据。
+  这也让每一条被发布的评论都带上一个 bot 名字。
+- **H4 —— 自动运行中不允许 agent 控制的持久化写入。** 评审 agent 平时可以提出 skill
+  candidate（`skill_update_candidate`）；在自动运行下那是一条**从注入通向持久状态**的
+  路径，所以**自动触发的 run 禁用知识写入工具**。自动 run 是**纯读 + 报告**；
+  知识累积仍然是人工发起的流程。
 
-## Design options
+## 设计选项
 
-### A. GitHub Actions workflow in each target repo
+### A. 在每个目标仓库里放一个 GitHub Actions workflow
 
-`pull_request` (opened / ready_for_review) → install copilot → one-shot → post via repo token.
+`pull_request`（opened / ready_for_review）→ 安装 copilot → 一次性运行 → 用仓库 token 发布。
 
-- Pros: event-driven, visible/re-runnable by the team, per-repo opt-in.
-- Cons: fork PRs get no secrets and a read-only token on `pull_request`; `pull_request_target` would hand secrets to untrusted-PR-triggered runs — not acceptable before H1/H2 have soaked. Ephemeral runners reset the knowledge plane (debug memory, skill priors); only the committed profile briefing persists. LLM keys spread into each repo's Actions secrets.
+- 优点：事件驱动，团队可见、可重跑，逐仓库选择加入。
+- 缺点：fork PR 拿不到 secret，且 `pull_request` 上是只读 token；
+  `pull_request_target` 会把 secret 交给**由不可信 PR 触发**的 run ——
+  **在 H1/H2 充分浸泡之前不可接受**。临时 runner 会**重置知识平面**
+  （debug memory、skill 先验）；只有已入库的 profile briefing 会留存。
+  LLM key 会扩散进每个仓库的 Actions secret。
 
-### B. Poller on the copilot host (recommended start)
+### B. 在 copilot 宿主上放一个轮询器（推荐的起点）
 
-A `copilot-watch` script on a systemd timer on the machine already running the nightly rebase: per managed repo, list open PRs → eligibility filter → dedupe (below) → run one-shot → record + post (Phase 1+).
+在那台已经跑着夜跑 rebase 的机器上，放一个由 systemd timer 驱动的 `copilot-watch`
+脚本：逐个受管仓库，列出开放 PR → 资格过滤 → 去重（见下）→ 一次性运行 →
+记录 + 发布（Phase 1+）。
 
-- Pros: inherits the full setup (checkouts, worktree cache) and the persistent knowledge plane; no LLM secrets exported to GitHub; ~100–200 lines; same operational pattern as the nightly rebase.
-- Cons: trigger is invisible to the team (results aren't); single host; polling latency (below).
+- 优点：继承整套现成设置（checkout、worktree 缓存）和**持久的知识平面**；
+  **没有 LLM secret 被导出到 GitHub**；约 100–200 行；与夜跑 rebase 同一套运维模式。
+- 缺点：触发对团队不可见（结果是可见的）；单宿主；轮询延迟（见下）。
 
-### C. GitHub App / webhook service — explicit non-goal
+### C. GitHub App / webhook 服务 —— 明确的非目标
 
-The productized form; real hosting + auth surface. Not at our scale.
+那是产品化的形态；真实的托管 + 认证面。**不适合我们这个规模。**
 
-## Proposal
+## 提案
 
-**Phase 0 — report-only shadow (≥1 week).** Option B on team-nominated repos, H1–H4 landed. Shadow runs carry **no post intent at all** (a genuinely read-only TaskSpec — `ALLOW_POST=0` is the belt, not the mechanism). Reviews accumulate in run dirs; escalations email the operator. Humans adjudicate outputs (gate below).
+**Phase 0 —— 只报告的影子运行（≥1 周）。** 在团队提名的仓库上跑选项 B，H1–H4 已落地。
+影子 run **完全不带 post 意图**（一个**真正只读**的 TaskSpec ——
+`ALLOW_POST=0` 是保险带，**不是机制**）。评审累积在 run 目录里；升级邮件发给运维者。
+由人类裁决输出（见下方的门）。
 
-**Phase 1 — posting.** Flip `ALLOW_POST=1` per repo that passes the gate. Posted via `gh pr comment` under the bot identity with a signature footer (`copilot-review: <repo> #<pr> @ <head-sha> / <config-digest>`). Known limitation, deliberate: a *comment*, not a GitHub review submission — no APPROVE/REQUEST_CHANGES state, no inline threads. Upgrading to `gh pr review` (and whether a bot may ever set blocking state) is a separate later proposal.
+**Phase 1 —— 发布。** 对通过门的仓库逐个翻开 `ALLOW_POST=1`。
+以 bot 身份经 `gh pr comment` 发布，带签名页脚
+（`copilot-review: <repo> #<pr> @ <head-sha> / <config-digest>`）。
+**已知且刻意的限制**：这是一条**评论**，不是 GitHub review 提交 ——
+没有 APPROVE/REQUEST_CHANGES 状态，没有 inline thread。
+升级到 `gh pr review`（以及 bot 是否**可以**设置阻塞状态）是**另一份后续提案**。
 
-**Phase 2 — optional Actions front-end (sketch only).** For repos wanting team-visible triggers: same-repo PRs only (no `pull_request_target`), `/copilot review` comment command for re-runs with actor-permission validation before any secret use. **One trigger owner per repo**: a repo is served by the poller OR Actions, never both; migration moves ownership. Phase 2 is deliberately underspecified here — it gets its own RFC (trigger security, permission checks, workflow provenance) before any implementation; nothing in Phase 0/1 depends on it.
+**Phase 2 —— 可选的 Actions 前端（只是草图）。** 面向想要团队可见触发器的仓库：
+**仅同仓库 PR**（**不用 `pull_request_target`**），`/copilot review` 评论命令用于重跑，
+且在使用任何 secret **之前**先做发起者权限校验。
+**每个仓库只有一个触发归属**：一个仓库要么由轮询器服务、要么由 Actions 服务，
+**绝不同时**；迁移即转移归属。Phase 2 在这里**刻意写得不完整** ——
+它会有自己的 RFC（触发安全、权限检查、workflow 溯源）**再谈实现**；
+Phase 0/1 的任何东西都**不依赖它**。
 
-### Trigger & idempotency spec (Phase 0/1)
+### 触发与幂等规范（Phase 0/1）
 
-- **Eligibility**: open, non-draft, not merged/closed, opened after the repo's enablement timestamp (no historical backlog sweep).
-- **Dedupe key**: `(repo, pr_number)` — a PR is auto-reviewed **once**, at first eligibility. New pushes (`synchronize`, force-push) do NOT re-trigger; re-review is on-demand only (`/copilot review`, keyed to the new head SHA, commenters with write permission only). This keeps cost and comment noise linear in PRs, not pushes.
-- **Ledger is a cache; GitHub is the source of truth.** Transactional order: record `started` → run → re-resolve head SHA and PR state immediately before posting (advanced/closed ⇒ mark `stale`, don't post) → post → record `posted` + comment URL. On startup and on any crash-uncertainty, reconcile by querying the bot's signature comments — a crash between post and record therefore cannot double-post, and a `started`-but-dead entry retries instead of being suppressed. Record the reviewed SHA in the footer so humans can see review-vs-head drift.
-- **Run states & limits**: ledger entries move `started → reviewed → posted | stale | failed | post_unknown`. `failed` retries at most twice with backoff, then escalates —  a crashing PR cannot burn budget every cycle; `post_unknown` (posted but unrecorded) is resolved only by the signature-comment query. Hard per-run timeout (kill at 30 min), daily cost circuit breaker (configurable, e.g. $10/day across repos), run-dir retention cap.
-- **Queueing honesty**: reviews take 6–13 min; one worker, ≤4 new reviews per cycle, FIFO across repos. Latency is "~15 min under light load" and grows linearly in bursts — a queue-age alert (not just email) is part of the health story, alongside the existing `/status` and a weekly human glance at the ledger. API/rate-limit failures skip the cycle; ≥3 consecutive failures escalate by email.
-- **Loop prevention**: the trigger ignores PRs and comments authored by the bot account or any `[bot]` actor — the copilot never triggers on its own (or another bot's) output.
+- **资格**：开放、非 draft、未合并/未关闭、**在该仓库启用时间戳之后**打开
+  （**不做历史积压扫荡**）。
+- **去重键**：`(repo, pr_number)` —— 一个 PR **只被自动评审一次**，在它首次符合资格时。
+  新的 push（`synchronize`、force-push）**不会**重新触发；重评审**只按需**发生
+  （`/copilot review`，绑定新的 head SHA，且**仅限有写权限的评论者**）。
+  这让成本和评论噪声**随 PR 数线性增长，而不是随 push 数**。
+- **账本是缓存；GitHub 才是真相来源。** 事务顺序：记 `started` → 运行 →
+  **就在发布之前**重新解析 head SHA 与 PR 状态（已推进/已关闭 ⇒ 标 `stale`，不发布）→
+  发布 → 记 `posted` + 评论 URL。启动时以及任何崩溃不确定时，
+  通过查询 bot 的签名评论**对账** —— 因此"发布与记录之间崩溃"**不会重复发布**，
+  而一条 `started` 却死掉的条目会**重试**而不是被抑制。
+  把被评审的 SHA 写进页脚，好让人类看得见 review-vs-head 的漂移。
+- **run 状态与上限**：账本条目按
+  `started → reviewed → posted | stale | failed | post_unknown` 流转。
+  `failed` 最多带退避重试两次，然后升级 —— **一个持续崩溃的 PR 不能每个周期都烧预算**；
+  `post_unknown`（已发布但未记录）**只能**由签名评论查询来解决。
+  每次 run 硬超时（30 分钟杀掉）、每日成本熔断（可配，例如跨仓库 $10/天）、
+  run 目录保留上限。
+- **排队要诚实**：一次评审要 6–13 分钟；**一个 worker**、每周期 ≤4 次新评审、
+  跨仓库 FIFO。延迟是"轻载下约 15 分钟"，在突发时**线性增长** ——
+  队列年龄告警（不只是邮件）是健康叙事的一部分，与既有的 `/status` 和每周人工瞥一眼
+  账本并列。API/限流失败**跳过该周期**；连续 ≥3 次失败**发邮件升级**。
+- **防回环**：触发器忽略由 bot 账号或任何 `[bot]` 发起者撰写的 PR 与评论 ——
+  **copilot 绝不因自己（或别的 bot）的输出而触发。**
 
-### Phase-1 promotion gate (per repo)
+### Phase-1 晋升门（逐仓库）
 
-Report-only output is adjudicated by the repo owner + one other reviewer (disagreements resolve toward the stricter label): each finding labeled useful / neutral / wrong. Promote when, over ≥15 PRs AND ≥30 findings: useful-rate ≥ 0.75, ≥50% of PRs got at least one useful finding (a mostly silent reviewer must not pass), zero critical-wrong findings (a "wrong blocker" that would have misdirected a merge), and no unresolved injection/exfiltration incident. Recall is tracked but not gated — the copilot is additive. Sign-off: repo owner. This is a judgment gate, not a significance test — the floors exist to make the rate meaningful, and the owner can hold a repo in shadow longer on any doubt.
+只报告的输出由**仓库 owner + 另一位评审者**裁决（分歧向**更严格**的标签收敛）：
+每条发现被标为 有用 / 中性 / 错误。在 **≥15 个 PR 且 ≥30 条发现**上满足以下条件才晋升：
+有用率 ≥ 0.75；**≥50% 的 PR 至少收到一条有用发现**（一个大多沉默的评审者不得通过）；
+**零条严重错误发现**（那种会误导合并的"错误阻塞项"）；且没有未解决的注入/外泄事故。
+recall 被跟踪但**不设门** —— copilot 是**加法**。签字：仓库 owner。
+**这是一道判断门，不是显著性检验** —— 那些下限的存在是为了让"有用率"有意义，
+而 owner 可以在任何疑虑下让一个仓库**继续留在影子期**。
 
-### Policy defaults (debatable)
+### 策略默认值（可辩论）
 
-- Review depth `auto`; eco model path.
-- Issue auto-answering: off in Phase 0/1; separate proposal with its own gate — wrong PR comments waste reviewer minutes, wrong issue answers mislead users.
-- Write-capable kinds (pr_debug fixes, rebase pushes): permanently out of scope for auto-run.
+- 评审深度 `auto`；eco 模型路径。
+- issue 自动回答：Phase 0/1 **关闭**；单独提案、单独的门 ——
+  **错误的 PR 评论浪费评审者几分钟，错误的 issue 回答误导用户。**
+- 具备写能力的 kind（pr_debug 的修复、rebase 推送）：**永久排除**在自动运行之外。
 
-## Security considerations
+## 安全考量
 
-- Posting stays double-gated; auto-run changes *when* reviews run, not what they may do.
-- Injection worst case (post-H1/H2): a wrong or hostile *comment* — which can itself trigger other repos' comment-bots; the bot identity (H3) lets other automation filter it, and the scrubber bounds exfiltration.
-- Fork PRs: poller-only (H3 identity holds comment rights only); `pull_request_target` stays banned until explicitly revisited.
-- Secrets: Phase 0/1 keep all LLM keys on the copilot host; Phase 2 adds them only to participating repos' Actions secrets.
+- 发布**仍然是双闸的**；自动运行改变的是评审**何时**跑，不是它**被允许做什么**。
+- 注入的最坏情况（在 H1/H2 之后）：一条错误或敌意的**评论** ——
+  它本身可能触发别的仓库的评论 bot；bot 身份（H3）让其他自动化能过滤它，
+  而清洗器为外泄划定了边界。
+- fork PR：**仅轮询器**（H3 身份只持有评论权限）；
+  `pull_request_target` **保持禁用**，除非被显式重新讨论。
+- 密钥：Phase 0/1 把所有 LLM key 留在 copilot 宿主上；
+  Phase 2 才把它们加进参与仓库的 Actions secret。
 
-## Rollback
+## 回滚
 
-- `systemctl stop` the timer **and** the service unit (terminating any active worker/run), then revoke the bot PAT ⇒ no new runs and no in-flight posts.
-- Posted comments are NOT auto-retracted: rollback procedure includes bulk-minimizing the bot's comments (GraphQL `minimizeComment`) when the reason is quality/incident, and disabling `/copilot review` handling in config.
-- Phase 2: delete the workflow file; trigger ownership reverts per repo.
+- `systemctl stop` **timer 和 service unit**（终止任何活动 worker/run），
+  然后吊销 bot PAT ⇒ 没有新 run，也没有在途的发布。
+- **已发布的评论不会被自动撤回**：当原因是质量/事故时，回滚流程包括批量最小化 bot 的
+  评论（GraphQL `minimizeComment`），并在配置里关闭 `/copilot review` 处理。
+- Phase 2：删掉 workflow 文件；触发归属逐仓库回退。
 
-## Open questions for the team
+## 给团队的未决问题
 
-1. Which repos are in scope for Phase 0?
-2. Is the promotion gate (useful ≥0.75 over ≥10 PRs / ≥20 findings, zero critical-wrong) right, and who besides the repo owner adjudicates?
-3. Once-per-PR + on-command re-review: acceptable, or does anyone want re-review on every push despite the cost/noise?
-4. Should `/copilot review` land in Phase 1 (poller reads comments) rather than waiting for Phase 2?
-5. Who operates the poller host and owns the escalation inbox?
-6. Comment vs GitHub-review submission: is the no-status limitation fine for Phase 1, or is inline/review-state support a requirement before anyone relies on it?
+1. Phase 0 覆盖哪些仓库？
+2. 晋升门（≥10 PR / ≥20 条发现上有用率 ≥0.75、零严重错误）是否合适，
+   除仓库 owner 之外还由谁裁决？
+3. "每 PR 一次 + 按命令重评审"是否可接受，还是有人希望**每次 push 都重评审**
+   （不顾成本/噪声）？
+4. `/copilot review` 是否应该落在 Phase 1（轮询器读评论）而不是等 Phase 2？
+5. 谁运维轮询器宿主、谁负责升级收件箱？
+6. 评论 vs GitHub review 提交：Phase 1 里"没有状态"这个限制是否可接受，
+   还是在任何人依赖它之前，inline/review 状态支持就是必需项？
 
-## Review record
+## 评审记录
 
-Drafted with the copilot's analysis, then run twice through our external plan-review hook (gpt-5.6). Round 1 (verdict REVISE) surfaced, verified against source, and got folded: the absolute-path read gap (→ H1), the gate_check non-blocking misstatement, comment-vs-review-submission, the synchronize/ledger contradiction (→ once-per-PR keying), eval-caveat honesty, and the transactional posting order. Round 2 (verdict REVISE) added: skill-candidate writes as an injection path (→ H4), post-intent-free shadow runs, retry/timeout/cost limits, loop prevention, gate floors, and kill-active-workers rollback — all folded. Not adopted (logged for discussion, judged disproportionate at our scale): full container isolation with restricted egress, and blocking Phase 1 on GitHub-review- state posting. The reviewer's position on both is available on request.
+先由 copilot 的分析起草，然后**两次**经过我们的外部 plan-review 钩子（gpt-5.6）。
+第 1 轮（裁决 REVISE）浮现、对照源码核实并折入了：绝对路径读取缺口（→ H1）、
+gate_check 非阻塞的表述错误、评论 vs review 提交、synchronize/账本的矛盾
+（→ 每 PR 一次的键控）、评测告诫的诚实性，以及事务性发布顺序。
+第 2 轮（裁决 REVISE）补充了：skill candidate 写入作为一条注入路径（→ H4）、
+不带 post 意图的影子 run、重试/超时/成本上限、防回环、门的下限，
+以及"杀掉活动 worker"的回滚 —— 全部折入。
+**未采纳**（记录以备讨论，判定在我们这个规模上不成比例）：
+带受限出网的完整容器隔离，以及把 Phase 1 阻塞在 GitHub-review 状态发布上。
+评审者对这两点的立场可按需索取。

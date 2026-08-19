@@ -1,38 +1,37 @@
-# profiles/languages.py — spec
+# profiles/languages.py —— 规范
 
-<!-- verified-against: 2026-08-17 -->
+<!-- verified-against: 2026-08-18 -->
 
-`LOC ~50 · edge (shared data) · refactor-status: ok`
+`LOC ~50 · 边缘（共享数据） · refactor-status: ok`
 
-## Responsibility
-The single home for per-language rules (concision K2), previously triplicated.
+## 职责
+按语言规则的**唯一归处**（精简 K2），此前曾一式三份。
 
-## Public contract
-`suffixes(language) -> tuple[str, ...]`; `symbol_re(language) -> Pattern | None`;
-`sweep_re(language) -> (Pattern, Pattern) | None`.
+## 公开契约
+`suffixes(language) -> tuple[str, ...]`；`symbol_re(language) -> Pattern | None`；
+`sweep_re(language) -> (Pattern, Pattern) | None`。
 
-## Functionality
-Plain data maps (`_SUFFIXES`, `_SYMBOL_RE`, `_SWEEP_RE`) + tiny accessors.
+## 功能
+朴素数据映射（`_SUFFIXES`、`_SYMBOL_RE`、`_SWEEP_RE`）+ 极小的访问器。
 
-## Invariants
-- Unknown language returns empty/None so every consumer degrades honestly
-  (file-level sweep only / empty module scan / "use grep").
-- Pure data — no I/O, no state.
+## 不变量
+- 未知语言返回空/None，因此每个消费者都**诚实降级**（只做文件级 sweep / 空的模块扫描 /
+  "use grep"）。
+- 纯数据 —— 无 I/O、无状态。
 
-## Scope — not here
-No scanning/rendering logic — the consumers (`review._sweep_targets`,
-`establish.scan_modules`, `repo_map`) apply the rules.
+## 边界 —— 不属于这里
+不含扫描/渲染逻辑 —— 规则由消费者施加（`review._sweep_targets`、
+`establish.scan_modules`、`repo_map`）。
 
-## Dependencies (allowed)
-stdlib `re` only. Must stay a leaf (`_ARCHITECTURE.md` §4) — no imports of
-engine/profiles machinery.
+## 依赖（允许）
+仅 stdlib 的 `re`。**必须保持为叶子**（`_ARCHITECTURE.md` §4）—— 不得 import
+engine/profiles 的机器。
 
-## Tests
-Exercised via the three consumers' tests
-(`test_ci_and_repo_map.py`, `test_profile_steps.py`).
+## 测试
+经三个消费者各自的测试覆盖
+（`test_ci_and_repo_map.py`、`test_profile_steps.py`）。
 
-## Refactor notes
-Adding a language = one row in each of the three maps. Keep it plain data; do
-not grow it into a language-detection engine (detection stays in
-`fingerprint_repo`). This is the deduplication target of K2 — do not re-inline
-the rules into a consumer.
+## 重构备注
+新增一种语言 = 在三张映射里各加一行。保持它是**朴素数据**；不要让它长成语言检测引擎
+（检测留在 `fingerprint_repo`）。这是 K2 的去重目标 —— **不要**把规则再内联回某个
+消费者。

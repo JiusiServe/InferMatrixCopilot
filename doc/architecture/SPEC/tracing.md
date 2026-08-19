@@ -1,43 +1,38 @@
-# tracing.py — spec
+# tracing.py —— 规范
 
-<!-- verified-against: 2026-08-17 -->
+<!-- verified-against: 2026-08-18 -->
 
-`LOC ~652 · portable span-tree recorder · refactor-status: oversized`
+`LOC ~652 · 可移植的 span 树记录器 · refactor-status: oversized`
 
-## Responsibility
-Record a run as a tree of timing spans, with zero external dependencies.
+## 职责
+把一次 run 记录成一棵计时 span 树，**零外部依赖**。
 
-## Functionality
-OpenTelemetry-*shaped* spans (`trace_id`, `span_id`, `parent`, `start`, `end`,
-`attributes`) appended to a JSONL file, one line per span, written at close.
+## 功能
+OpenTelemetry **形状**的 span（`trace_id`、`span_id`、`parent`、`start`、`end`、
+`attributes`）追加进一个 JSONL 文件，**一行一个 span，在 span 关闭时写出**。
 
-## Public contract
-`span(...)` (context manager), the module-level tracer accessors, and the
-JSONL record shape.
+## 公开契约
+`span(...)`（上下文管理器）、模块级 tracer 访问器，以及那套 JSONL 记录形状。
 
-## Invariants (**E1**, **E3**)
-- **Write at span close, append-only.** A killed run keeps every span that had
-  finished — the reason this is not an in-memory tree flushed at exit.
-- **Sync and asyncio both safe.** `span()` is a plain context manager usable
-  around `await`; parent/child nesting is carried through `contextvars` and
-  copied per task, so **parallel agents get independent, correct trees** rather
-  than interleaving into one.
-- **Zero external dependencies** — deliberately not the OTel SDK. The shape is
-  compatible; the dependency is not taken.
-- `create()` is wrapped in `span("llm")` to record TTFT, tokens and concurrency.
-- Distinct from `run_trace.py`: this is **timing**, that is **facts**. Neither
-  enters a prompt by default.
+## 不变量（**E1**、**E3**）
+- **在 span 关闭时写、仅追加。** 被杀掉的 run 会保留**每一个已完成**的 span ——
+  这正是它不是"内存里建树、退出时冲刷"的原因。
+- **同步与 asyncio 双安全。** `span()` 是可以裹在 `await` 外面用的普通上下文管理器；
+  父子嵌套经 `contextvars` 承载并**按 task 复制**，因此**并行的 agent 会得到各自独立
+  且正确的树**，而不是交错成一棵。
+- **零外部依赖** —— **刻意不用** OTel SDK。形状是兼容的，依赖不引入。
+- `create()` 被裹在 `span("llm")` 里，用于记录 TTFT、token 和并发。
+- 与 `run_trace.py` 不同：这里是**计时**，那里是**事实**。两者默认都不进 prompt。
 
-## Scope — not here
-No fact recording (`run_trace.py`); no metrics computation (`metrics.py`); no
-export protocol.
+## 边界 —— 不属于这里
+不记录事实（`run_trace.py`）；不计算指标（`metrics.py`）；不含导出协议。
 
-## Dependencies (allowed)
-stdlib only (`contextvars`, `json`, `time`, `threading`).
+## 依赖（允许）
+仅 stdlib（`contextvars`、`json`、`time`、`threading`）。
 
-## Tests
-`test_tracing.py`, `test_trace_pack.py`.
+## 测试
+`test_tracing.py`、`test_trace_pack.py`。
 
-## Refactor notes
-At ~652 LOC it is the largest leaf module. The span model, the JSONL writer and
-the process-global tracer plumbing are three separable concerns if it grows.
+## 重构备注
+约 652 行，是最大的叶子模块。如果继续增长，span 模型、JSONL 写入器、进程级 tracer
+管道是三个可分离的关注点。

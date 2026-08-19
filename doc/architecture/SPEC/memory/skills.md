@@ -1,34 +1,32 @@
-# memory/skills.py — spec
+# memory/skills.py —— 规范
 
-<!-- verified-against: 2026-08-17 -->
+<!-- verified-against: 2026-08-18 -->
 
-`LOC ~120 · memory (procedural knowledge) · refactor-status: ok`
+`LOC ~120 · 记忆（程序性知识） · refactor-status: ok`
 
-## Responsibility
-Procedural knowledge, gated harder than debug memory.
+## 职责
+程序性知识，门禁比 debug memory 更严。
 
-## Public contract
-`SkillStore(dir)` with `find`, `propose`, `promote`, `candidates`,
-`load_all`, `render_for_prompt`; `Skill` (with a `trigger` for recall).
+## 公开契约
+`SkillStore(dir)`，带 `find`、`propose`、`promote`、`candidates`、`load_all`、
+`render_for_prompt`；以及 `Skill`（带用于召回的 `trigger`）。
 
-## Invariants (**D1**)
-- Agents may only `propose` (writes the candidates file); `promote` to an active
-  `SKILL.md` is a curator/human act.
-- `find` ranks by module hit + text hit + run_count; only `status: active`
-  skills load.
+## 不变量（**D1**）
+- agent **只能 `propose`**（写入 candidates 文件）；把它 `promote` 成一个生效的
+  `SKILL.md` 是**策展人/人类**的动作。
+- `find` 按 模块命中 + 文本命中 + run_count 排序；只有 `status: active` 的 skill
+  才会被加载。
 
-## Scope — not here
-No per-repo namespacing (applied by `_ScopedKnowledge`); no LLM; not the curator
-UI.
+## 边界 —— 不属于这里
+不做按仓库的命名空间隔离（由 `_ScopedKnowledge` 施加）；不含 LLM；不是策展 UI。
 
-## Dependencies (allowed)
-`pyyaml`; stdlib.
+## 依赖（允许）
+`pyyaml`；stdlib。
 
-## Tests
-`test_memory.py`.
+## 测试
+`test_memory.py`。
 
-## Refactor notes
-Clean propose→promote gate — do not add an agent-callable `promote`. The
-`trigger` field is the Devin-style recall cue; keep it first-class as more
-trigger-gated retrieval lands. Per-repo dir is caller-chosen
-(`adapter.skills_dir`) — keep path-agnostic.
+## 重构备注
+propose→promote 这道门很干净 —— **不要**加一个 agent 可调用的 `promote`。
+`trigger` 字段是 Devin 式的召回线索；随着更多触发式检索落地，请让它保持一等地位。
+按仓库的目录由调用方选择（`adapter.skills_dir`）—— 本类保持路径无关。

@@ -1,19 +1,16 @@
-# Use InferMatrixCopilot in Codex
+# 在 Codex 里使用 InferMatrixCopilot
 
-> **Host page — you may want the other one.** This is Codex as the *host*:
-> the copilot runs INSIDE Codex (Direct mode) and Codex's own model reads the
-> code. If you want the copilot to launch `codex exec` as a subprocess to run a
-> Strict agent step, that is Codex as a *backend* —
-> see [`../backends.md`](../backends.md). Comparison table in
-> [`README.md`](README.md).
+> **宿主端页面 —— 你要找的可能是另一篇。** 这里讲 Codex 作为**宿主**：copilot 跑在
+> Codex **里面**（Direct 模式），由 Codex 自己的模型读代码。如果你要的是让 copilot
+> 把 `codex exec` 作为子进程拉起来执行一个 Strict agent step，那是 Codex 作为
+> **后端**，见 [`../backends.md`](../backends.md)。对照表见 [`README.md`](README.md)。
 >
-> One-line test: **a host gives you a model to use; a backend is a model the
-> copilot goes and uses.**
+> 一句话判据：**宿主提供模型给你用；后端是 copilot 拿去用的模型。**
 
-The default MCP is a knowledge provider. Codex uses its currently selected
-model to review code, so there is no API key or model configuration.
+默认的 MCP 是一个**知识提供方**。Codex 用它当前选中的模型审代码，所以这条路径
+**不需要 API Key，也不需要配置模型**。
 
-## Install
+## 安装
 
 ```text
 # Windows
@@ -23,54 +20,49 @@ install.cmd
 ./install-mcp.sh
 ```
 
-The bootstrap detects Codex automatically. It uses the same MCP descriptor and
-Agent Skill as Claude, Cursor, and other compatible hosts.
+引导程序会自动识别 Codex。它与 Claude、Cursor 及其他兼容宿主使用**同一份** MCP
+描述符和 Agent Skill。
 
-Restart Codex, then paste:
+重启 Codex，然后粘贴：
 
 ```text
 Use InferMatrixCopilot to review
 https://github.com/vllm-project/vllm-omni/pull/5172.
 ```
 
-The plugin also adds the `imreview`, `imdesign`, `imcifix`, and `imupdate`
-skills, so the short review form is:
+插件还会装上 `imreview`、`imdesign`、`imcifix`、`imupdate` 四个 skill，所以最短的
+评审写法是：
 
 ```text
 $imreview https://github.com/vllm-project/vllm-omni/pull/5172
 ```
 
-Codex skills use `$name`, not `/name`; run `/skills` if the skill is not shown.
-For issue fixes, use:
+Codex 的 skill 用 `$name` 而不是 `/name`；没看到就先跑 `/skills`。修 issue 用：
 
 ```text
 $imcifix https://github.com/vllm-project/vllm-omni/issues/5023
 ```
 
-`imcifix` is a host-agent local patch workflow. It does not imply that the MCP
-server exposes an `issue_fix` background tool, and it does not commit, push,
-open a PR, or post comments unless explicitly asked.
+`imcifix` 是**宿主 agent 的本地补丁流程**。它不意味着 MCP 服务端暴露了什么
+`issue_fix` 后台工具，也不会 commit、push、开 PR 或发评论 —— 除非你明确要求。
 
-Codex calls `review`, receives the local `knowledge/AGENTS.md` path plus a
-compact first-review checklist, and follows that document's routing map itself.
-The MCP does not guess which owner applies and does not inject complete rule
-pages. After pinning the snapshot, Codex immediately reports the pinned head SHA,
-current CI, mergeability, and preliminary findings in the host conversation.
-It does this before reading knowledge, searching source, or running tests and
-does not wait for CI completion or resolved mergeability. Codex then calls
-Direct once with the collected title, body, and changed files, uses the embedded
-`quick_map` in each exact route without opening the full rule page, and runs
-knowledge/source and validation tracks concurrently. It reuses one in-review
-evidence packet and runs an import/version
-compatibility preflight before pytest. Validation results are bound to the head
-SHA and an environment fingerprint. The progress update is not an interim
-GitHub comment. Before the only final review comment, Codex calls
-`validate_direct_review`. A normal small fix uses `subtraction_signal="none"`
-without a minimality proof. Only a diff that adds or expands a helper, class,
-fallback, compatibility branch, or public behavior uses `"triggered"` and
-requires subtraction evidence.
+Codex 调用 `review`，拿到本地 `knowledge/AGENTS.md` 路径和一份精简的首轮评审
+checklist，然后**自己**按那份文档的路由图走。MCP 不猜哪个 owner 适用，也不注入
+完整规则页。
 
-The tool response is intentionally small:
+固定快照之后，Codex 会**立即**在宿主对话里报告 pinned head SHA、当前 CI、
+mergeability 和初步发现。这一步发生在读知识、搜源码、跑测试**之前**，并且不等
+CI 跑完、不等 mergeability 落定。随后 Codex 用收集到的 title、body 和 changed
+files 调用一次 Direct，使用每条精确路由里内嵌的 `quick_map`（不打开完整规则页），
+并让知识/源码与验证两条线并行推进。它复用同一份评审内证据包，并在 pytest 之前先
+跑一次 import/版本兼容性预检。验证结果绑定到 head SHA 和环境指纹。
+
+那条进度更新**不是** GitHub 上的中间评论。在唯一一条最终评审评论之前，Codex 会调用
+`validate_direct_review`。常规小修改用 `subtraction_signal="none"`，不需要最小性
+证明。只有当 diff 新增或扩张了 helper、类、fallback、兼容分支或公开行为时才用
+`"triggered"`，并且必须提供减法证据。
+
+工具返回**刻意做得很小**：
 
 ```json
 {
@@ -125,18 +117,17 @@ The tool response is intentionally small:
 }
 ```
 
-Strict uses the same installed MCP. The wheel already includes its playbooks,
-adapters, and skills. Configure the local checkout during installation:
+Strict 用的是**同一个**已安装的 MCP。wheel 里已经带了它需要的 playbook、adapter
+和 skill。安装时配置本地 checkout：
 
 ```text
 install.cmd --repo-path D:\path\to\vllm-omni
 ```
 
-Then set either `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` in
-`~/.infermatrix-copilot/.env`. Each provider also has an optional
-`ANTHROPIC_BASE_URL` or `OPENAI_BASE_URL` for a proxy or compatible gateway.
-With one key configured the provider is selected automatically; with both,
-set `LLM_PROVIDER=anthropic` or `LLM_PROVIDER=openai`. Restart Codex, and say:
+然后在 `~/.infermatrix-copilot/.env` 里填 `ANTHROPIC_API_KEY` 或 `OPENAI_API_KEY`
+之一。两个 provider 各自还有可选的 `ANTHROPIC_BASE_URL` / `OPENAI_BASE_URL`，用于
+代理或兼容网关。只填一个 key 时自动选择 provider；两个都填时用
+`LLM_PROVIDER=anthropic` 或 `LLM_PROVIDER=openai` 指定。重启 Codex，然后说：
 
 ```text
 Use InferMatrixCopilot in Strict mode to review
@@ -144,56 +135,45 @@ https://github.com/vllm-project/vllm-omni/pull/5172.
 Do not return a review until the strict run is complete.
 ```
 
-Strict runs the packaged `pr-review` playbook with its configured model,
-progress tracking, report generation, and publishing gates. Poll
-`get_review_result` until the run is terminal.
+Strict 会用它配置的模型运行打包好的 `pr-review` playbook，带进度跟踪、报告生成和
+发布门禁。轮询 `get_review_result` 直到 run 进入终态。
 
-Strict never posts implicitly. Posting still requires both an explicit
-`post=true` tool argument and server-side `ALLOW_POST=1`.
+**Strict 永不隐式发布。** 发布仍然需要显式的 `post=true` 调用参数**加上**服务端的
+`ALLOW_POST=1`。
 
-Restart Codex after installation. Use `/mcp` or `codex mcp list` to confirm that
-`infermatrix-copilot` is connected, and `/skills` to confirm that `imreview`,
-`imdesign`, `imcifix`, and `imupdate` are available.
+安装后重启 Codex。用 `/mcp` 或 `codex mcp list` 确认 `infermatrix-copilot` 已连接，
+用 `/skills` 确认 `imreview`、`imdesign`、`imcifix`、`imupdate` 可用。
 
-## What the default MCP exposes
+## 默认 MCP 暴露了什么
 
 - `review(target, repo?, mode="direct", post=false, title="", body="",
-  changed_files=[], review_depth="", repo_path="")`: after the host progress
-  update, Direct uses title/body to
-  return at most three exact owner/model routes with compact embedded
-  `quick_map` excerpts. Changed files normally only validate scope, but when no
-  returned route matches an owner they imply they select the routes instead and
-  the response says so (`status: scope_fallback`). The host does not open full
-  rule files unless a concrete ambiguity blocks source review — any route whose
-  `quick_map_status` is not `ok` (`unavailable`, or `truncated` when the section
-  exceeds the excerpt cap) is exactly that case, and the budget grants a read for
-  each — and
-  treats the returned docs/code `execution_budget` as a hard ceiling. A single
-  bounded extension is reserved for one stated unresolved P1/high-risk
-  contract.
-  Strict starts the packaged workflow and accepts `review_depth` plus an
-  optional local checkout override through `repo_path`.
+  changed_files=[], review_depth="", repo_path="")`：在宿主发出进度更新之后，
+  Direct 用 title/body 返回**至多三条**精确的 owner/model 路由，各自带内嵌的精简
+  `quick_map` 摘录。changed files 通常只做范围校验；但当返回的路由**没有一条**命中
+  它们推导出的 owner 时，改由 changed files 选路，并在响应里明说
+  （`status: scope_fallback`）。宿主不打开完整规则页 —— 除非有具体歧义卡住了源码
+  评审：`quick_map_status` 不是 `ok` 的路由（`unavailable`，或章节超过摘录上限时的
+  `truncated`）正是这种情况，预算会为每一条放行一次读取。返回的 docs/code
+  `execution_budget` 是**硬顶**；唯一一次有界扩展，只留给一个明确陈述的、尚未解决的
+  P1/高风险契约。Strict 分支启动打包好的工作流，接受 `review_depth`，并可通过
+  `repo_path` 临时覆盖本地 checkout。
 - `validate_direct_review(subtraction_signal, subtraction?, minimality_proof?,
-  final_comment_count=1, evidence_head_sha)`: `evidence_head_sha` must be the
-  frozen head commit every cited source file and validation result was read
-  at; evidence read from another local revision does not complete the review.
-  `none` completes an ordinary small fix without a
-  minimality proof. `triggered` requires anchored subtraction actions or
-  concrete evidence that the inspected scope is already minimal.
-- `update_knowledge(repo?)`: keeps `repo` only for call compatibility and
-  returns `knowledge/CONTRIBUTING.md`; the host model follows that document and
-  edits the Markdown files itself.
-- `get_review_result(run_id, offset?)`: polls and pages the Strict report.
-- `get_review_status(run_id)`: returns the Strict run's durable progress.
-- `doc_search(query, repo?)`: finds deeper model/component rules.
-- `doc_read(path, repo?)`: reads a selected knowledge page.
+  final_comment_count=1, evidence_head_sha)`：`evidence_head_sha` 必须是**本次固定的
+  head 提交**——每一个被引用的源文件和验证结果都读自它；读自其他本地版本的证据
+  不能完成评审。`none` 用于收尾常规小修改，不需要最小性证明；`triggered` 需要带锚点
+  的减法动作，或"所审范围已经最小"的具体证据。
+- `update_knowledge(repo?)`：`repo` 仅为调用兼容保留，返回
+  `doc/knowledge/CONTRIBUTING.md`；由宿主模型照那份文档自己改 Markdown。
+- `get_review_result(run_id, offset?)`：轮询并分页读取 Strict 报告。
+- `get_review_status(run_id)`：返回 Strict run 的持久化进度。
+- `doc_search(query, repo?)`：查找更深的模型/组件规则。
+- `doc_read(path, repo?)`：读取选中的知识页。
 
-Direct mode does not run another model, edit knowledge, post comments, or push
-code. Its deterministic router selects bounded knowledge owners from the PR
-description; Codex still owns scope validation and the truth of cited code
-evidence. The completion validator checks review structure.
+Direct 模式**不跑第二个模型、不改知识、不发评论、不推代码**。它的确定性路由器从 PR
+描述里选出有界的知识 owner；范围校验和被引用代码证据的真伪，仍然由 Codex 自己负责。
+完成校验器检查的是**评审结构**。
 
-## Optional autonomous BYOK workflow
+## 可选：autonomous BYOK 工作流
 
-The autonomous workflow has separate setup and documentation:
-[`../autonomous-workflow.md`](../autonomous-workflow.md).
+autonomous 工作流有独立的配置和文档：
+[`../autonomous-workflow.md`](../autonomous-workflow.md)。

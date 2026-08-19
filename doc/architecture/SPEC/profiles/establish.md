@@ -1,39 +1,37 @@
-# profiles/establish.py — spec
+# profiles/establish.py —— 规范
 
-<!-- verified-against: 2026-08-17 -->
+<!-- verified-against: 2026-08-18 -->
 
-`LOC ~107 · profiles (Stage 0–1.5 helpers) · refactor-status: ok`
+`LOC ~107 · profile（Stage 0–1.5 helper） · refactor-status: ok`
 
-## Responsibility
-Deterministic establishment helpers.
+## 职责
+确定性的建立期 helper。
 
-## Public contract
-`fact_id`, `build_doc_corpus`, `is_redundant`, `extract_directives`,
-`scan_modules`, `HUMAN_DOC_NAMES`.
+## 公开契约
+`fact_id`、`build_doc_corpus`、`is_redundant`、`extract_directives`、
+`scan_modules`、`HUMAN_DOC_NAMES`。
 
-## Invariants
-- `is_redundant` (6-word shingle vs README+docs) drops any briefing line the
-  repo's own docs already state (the ETH-study rule, **D5**).
-- `scan_modules` deterministic, language-keyed, skips non-code dirs.
-- `extract_directives` bounds line length (short imperative only).
+## 不变量
+- `is_redundant`（对 README+docs 做 6 词 shingle）会丢弃任何**仓库自己的文档已经写过**
+  的 briefing 行（ETH 研究那条规则，**D5**）。
+- `scan_modules` 是确定性的、按语言索引的，跳过非代码目录。
+- `extract_directives` 限制行长（只收短祈使句）。
 
-## Scope — not here
-Pure deterministic helpers — no LLM, no store writes, no step logic.
+## 边界 —— 不属于这里
+纯确定性 helper —— 不含 LLM、不写 store、不含 step 逻辑。
 
-## Dependencies (allowed)
-stdlib only.
+## 依赖（允许）
+仅 stdlib。
 
-## Tests
-`test_profile_steps.py` (redundancy filter, module scan, directive extraction).
+## 测试
+`test_profile_steps.py`（冗余过滤、模块扫描、指令抽取）。
 
-## Refactor notes
-Pure functions — easy to test and reuse. The redundancy filter is the
-load-bearing ETH-study defense; keep it deterministic.
+## 重构备注
+纯函数 —— 易测、易复用。冗余过滤器是承载 ETH 研究结论的关键防线；**保持它确定性**。
 
-## Concision — **K2** (shared language rules) — DONE
-This module used to own `LANGUAGE_SUFFIXES`, one of three copies of the
-per-language rule set (with `review._sweep_targets` and `repo_map`). The data
-now lives in the leaf `profiles/languages.py` behind small accessors
-(`suffixes` / `symbol_re` / `sweep_re`) and is consumed from there; the symbol
-is gone from this module's public contract. Preserved as designed: an unknown
-language yields an empty module scan rather than a guess.
+## 精简 —— **K2**（共享语言规则）—— 已完成
+本模块曾经拥有 `LANGUAGE_SUFFIXES`，那是按语言规则集的三份副本之一
+（另两份在 `review._sweep_targets` 和 `repo_map`）。数据现在住在叶子模块
+`profiles/languages.py`，藏在小访问器（`suffixes` / `symbol_re` / `sweep_re`）
+之后并从那里消费；这个符号已从本模块的公开契约中消失。按设计保留的一点：
+**未知语言产出空的模块扫描，而不是猜测**。

@@ -1,40 +1,38 @@
-# task_spec.py — spec
+# task_spec.py —— 规范
 
-<!-- verified-against: 2026-08-17 -->
+<!-- verified-against: 2026-08-18 -->
 
-`LOC ~70 · task layer, pure data · refactor-status: ok`
+`LOC ~70 · 任务层，纯数据 · refactor-status: ok`
 
-## Responsibility
-Define `TaskSpec` (the structured product of intent parsing) and derive its
-permission **tier** from the task kind.
+## 职责
+定义 `TaskSpec`（意图解析的结构化产物），并从任务 kind **推导**出它的权限 **tier**。
 
-## Functionality
-Holds kind/repo/pr/issue/flags; computes `tier`, `read_only`,
-`confirm_required`, and a human `describe()`.
+## 功能
+持有 kind/repo/pr/issue/flags；计算 `tier`、`read_only`、`confirm_required`，
+以及给人看的 `describe()`。
 
-## Public contract
-`TaskSpec(kind, repo, pr?, issue?, report_only, post, params)`; properties
-`tier`, `read_only`, `confirm_required`; `describe()`. Constants: `TaskKind`
-(7 kinds), `READ_ONLY_KINDS`, `KIND_TIER`.
+## 公开契约
+`TaskSpec(kind, repo, pr?, issue?, report_only, post, params)`；property
+`tier`、`read_only`、`confirm_required`；`describe()`。常量：`TaskKind`
+（7 种 kind）、`READ_ONLY_KINDS`、`KIND_TIER`。
 
-## Invariants
-- **C1**: no settable tier field; `tier = KIND_TIER[kind]` — text can't widen it.
-- `read_only` = `not post` for read-only kinds, else `report_only`;
-  `confirm_required = not read_only`.
+## 不变量
+- **C1**：**不存在可设置的 tier 字段**；`tier = KIND_TIER[kind]` —— 文本无法把它扩大。
+- 只读 kind 的 `read_only` = `not post`，其余为 `report_only`；
+  `confirm_required = not read_only`。
 
-## Scope — not here
-No parsing, no I/O, no execution, no repo knowledge. Pure data + derivation.
+## 边界 —— 不属于这里
+不解析、不做 I/O、不执行、不含仓库知识。纯数据 + 推导。
 
-## Dependencies (allowed)
-`pydantic` only.
+## 依赖（允许）
+仅 `pydantic`。
 
-## Extension points
-New kind → add to `TaskKind` + `KIND_TIER` (+ `READ_ONLY_KINDS` if read-only).
+## 扩展点
+新 kind → 加进 `TaskKind` + `KIND_TIER`（只读的话再加 `READ_ONLY_KINDS`）。
 
-## Tests
-`test_intent_taskspec.py`.
+## 测试
+`test_intent_taskspec.py`。
 
-## Refactor notes
-Clean and minimal — the canonical example of "one responsibility". Do not add
-behavior here; keep it a data+derivation module. It is the single source of
-truth for C1, so any permission logic elsewhere is a smell.
+## 重构备注
+干净、极简 —— "单一职责"的范例。**不要**在这里加行为；保持它是"数据 + 推导"模块。
+它是 C1 的唯一真相来源，所以任何**别处**出现的权限逻辑都是坏味道。

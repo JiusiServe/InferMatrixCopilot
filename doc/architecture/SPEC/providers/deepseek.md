@@ -1,67 +1,55 @@
-# providers/deepseek.py — spec
+# providers/deepseek.py —— 规范
 
-<!-- verified-against: 2026-08-17 -->
+<!-- verified-against: 2026-08-18 -->
 
-`LOC ~502 · harness transport (dsh, API-keyed) · refactor-status: oversized`
+`LOC ~502 · harness transport（dsh，API-keyed） · refactor-status: oversized`
 
-## Responsibility
-Run a whole agent step on DeepSeek's own agent harness (`dsh`) through its
-Python SDK — the backend that breaks two of the registry's harness assumptions,
-both deliberately and both disclosed.
+## 职责
+通过 DeepSeek 自己的 agent harness（`dsh`）的 Python SDK 跑完**一整个** agent step
+—— 这是**打破了注册表两条 harness 假设**的后端，两处都是刻意为之且都已声明。
 
-## Functionality
-Drives `deepseek-harness-sdk` (itself a subprocess SDK launching the bundled
-`dsh-jsonrpc-agent` over JSON-RPC/stdio), generating a per-session composition
-so the sandbox mode can be pinned per scope.
+## 功能
+驱动 `deepseek-harness-sdk`（它本身是个子进程 SDK，拉起捆绑的 `dsh-jsonrpc-agent`
+并通过 JSON-RPC/stdio 通信），**逐会话生成 composition**，以便按 scope 钉住沙箱模式。
 
-## Public contract
-`DeepSeekHarnessTransport` (`cli_path`, `require_cli`, `auth_gap`,
-`run_session`, `complete`), `spec = PROVIDERS["deepseek"]`.
+## 公开契约
+`DeepSeekHarnessTransport`（`cli_path`、`require_cli`、`auth_gap`、`run_session`、
+`complete`）、`spec = PROVIDERS["deepseek"]`。
 
-## Invariants (**C1**, **C2**, **E2**)
-- **It is API-keyed, not subscription-authed.** `base.md` states harnesses hold
-  their own auth and `Settings.tier_target` returns an empty key for harnesses
-  precisely for that reason. dsh is the exception: it needs a DeepSeek
-  credential, handed over `DeepSeekHarnessConfig.api_key`. For
-  cursor/claude-code/codex, injecting a key would be a **bug**; here it is the
-  only way the harness runs at all. The registry marks this `api_keyed`.
-- **It CANNOT use our tool bridge — a measured fact, not a choice.** The
-  bundled runtime compiles in 122 plugins and `@deepseek-ai/dsh-mcp-client` is
-  not among them (verified by scanning the executable). Sessions therefore run
-  on the harness's native `bash` + `str_replace_editor`, and our scoped tools —
-  including the archaeology set — are unreachable as named tools.
-  A `review.mcp_tool_bridge` `capability_gap` is traced on every session handed
-  a bridge spec it could not honour, and the outcome reports `mcp_bridged=False`.
-  **The registry must NOT declare `mcp_tools` for this provider** (it did until
-  2026-08-17; nothing branched on it, so the false claim only ever misled
-  readers).
-- **An arm must never be labelled "tools bridged" when it ran on native bash.**
-  This campaign has already measured three arms that were not the configuration
-  their label claimed.
-- **The sandbox mode is pinned, never inherited.** Upstream minimal ships
-  `mode: danger-full-access` and its own README says to use it only against a
-  disposable checkout. This machine is shared and `.env` holds live
-  credentials, so the generated composition pins the mode to the session's
-  scope.
-- **The step cap is 6× our in-process budget** (`_STEP_CAP_FACTOR`), not 1:1:
-  measured healthy lenses took ~40 steps against a budget of 14, so a 1:1 cap
-  would truncate normal sessions; 6× still stops a runaway an order of
-  magnitude short of the 558 steps observed.
-- `_assert_plugins_bundled` fails loudly if the runtime's plugin set stops
-  matching what the composition assumes.
+## 不变量（**C1**、**C2**、**E2**）
+- **它是 API-keyed，不是订阅认证的。** `base.md` 写明 harness 自己持有认证，
+  `Settings.tier_target` 对 harness 返回空 key 正是出于这个理由。dsh 是例外：
+  它需要一个 DeepSeek 凭据，经 `DeepSeekHarnessConfig.api_key` 交进去。
+  对 cursor/claude-code/codex 而言，注入 key 会是一个**缺陷**；在这里它却是 harness
+  能跑起来的唯一方式。注册表用 `api_keyed` 标出这一点。
+- **它用不了我们的工具桥 —— 这是实测事实，不是选择。** 捆绑的运行时编译进了 122 个
+  插件，`@deepseek-ai/dsh-mcp-client` 不在其中（扫描可执行文件验证过）。因此会话跑在
+  harness 原生的 `bash` + `str_replace_editor` 上，我们的 scoped 工具（含考古工具组）
+  **作为具名工具不可达**。每个拿到桥 spec 却无法履约的会话都会记一条
+  `review.mcp_tool_bridge` 的 `capability_gap`，结果里 `mcp_bridged=False`。
+  **注册表不得为这个 provider 声明 `mcp_tools`**（在 2026-08-17 之前它声明了；
+  没有任何分支读它，所以这条假声明只起到了误导读者的作用）。
+- **跑在原生 bash 上的 arm，绝不能被标成 "tools bridged"。** 本轮战役已经测到过三个
+  与其标签不符的 arm。
+- **沙箱模式是被钉住的，绝不继承。** 上游 minimal 出厂即 `mode: danger-full-access`，
+  它自己的 README 也说只应对一次性 checkout 使用。而这台机器是共享的、`.env` 里放着
+  真实凭据，所以生成的 composition 会把模式钉到该会话的 scope 上。
+- **step 上限是我们进程内预算的 6 倍**（`_STEP_CAP_FACTOR`），不是 1:1：实测健康的
+  lens 在预算 14 的情况下用了约 40 步，1:1 会截断正常会话；6× 仍然能在离实测到的
+  558 步一个数量级之外拦住失控。
+- 一旦运行时的插件集合与 composition 的假设不再匹配，`_assert_plugins_bundled` 会
+  **大声失败**。
 
-## Scope — not here
-No bridge implementation; no eval labelling policy (but see the labelling
-invariant above — it binds callers).
+## 边界 —— 不属于这里
+不含桥实现；不含评测标注策略（但上面那条标注不变量**约束调用方**）。
 
-## Dependencies (allowed)
-stdlib + `.base` + `.registry` + `..agent_loop` + `..llm` types + the dsh SDK
-(imported lazily).
+## 依赖（允许）
+stdlib + `.base` + `.registry` + `..agent_loop` + `..llm` 的类型 + dsh SDK（惰性 import）。
 
-## Tests
-`test_provider_deepseek.py`.
+## 测试
+`test_provider_deepseek.py`。
 
-## Refactor notes
-At ~502 LOC this is the largest transport by far, because it owns composition
-generation that the CLI-based transports get from the vendor. The composition
-builder (`_composition`, `_env`) is the natural split if it grows further.
+## 重构备注
+约 502 行，是目前**最大**的 transport，因为它要自己生成 composition —— 而基于 CLI 的
+那几个是从厂商那里拿到的。如果继续增长，composition 构建部分（`_composition`、`_env`）
+是天然的拆分点。

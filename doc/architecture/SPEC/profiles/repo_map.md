@@ -1,42 +1,38 @@
-# profiles/repo_map.py — spec
+# profiles/repo_map.py —— 规范
 
-<!-- verified-against: 2026-08-17 -->
+<!-- verified-against: 2026-08-18 -->
 
-`LOC ~138 · profiles (on-demand structure) · refactor-status: ok`
+`LOC ~138 · profile（按需结构） · refactor-status: ok`
 
-## Responsibility
-An on-demand, goal-ranked, budgeted symbol map (design §V2.0.2: structure is
-pulled, never pushed).
+## 职责
+按需、按目标排序、有预算上限的符号索引（设计 §V2.0.2：结构是**被拉取的，永不被推送**）。
 
-## Public contract
-`RepoMap(repo, language, cache_dir?)` with `supported`, `index()`,
-`render(query, budget_chars)`; `build_index`.
+## 公开契约
+`RepoMap(repo, language, cache_dir?)`，带 `supported`、`index()`、
+`render(query, budget_chars)`；以及 `build_index`。
 
-## Invariants
-- Regex symbol index per language; disk-cached keyed by HEAD (one HEAD, one
-  cache; rebuilds on drift).
-- `render` is query-ranked + budget-capped; zero-score tail dropped.
-- Unsupported language → honest "use grep" string (agent-runtime records a
-  `capability_gap`).
+## 不变量
+- 按语言的正则符号索引；按 HEAD 做磁盘缓存（一个 HEAD 一份缓存；漂移时重建）。
+- `render` 按查询排序 + 预算封顶；零分尾部被丢弃。
+- 语言不支持时返回诚实的 "use grep" 字符串（agent 运行时会记一条 `capability_gap`）。
 
-## Scope — not here
-Never injected into prompts — surfaced only as the `repo_map` tool
-(wired in `agent_runtime._repo_map_tool`).
+## 边界 —— 不属于这里
+**永远不注入 prompt** —— 只以 `repo_map` 工具的形式浮现
+（接线在 `agent_runtime._repo_map_tool`）。
 
-## Dependencies (allowed)
-stdlib `re`/`json`/`subprocess`.
+## 依赖（允许）
+stdlib 的 `re`/`json`/`subprocess`。
 
-## Tests
-`test_ci_and_repo_map.py`.
+## 测试
+`test_ci_and_repo_map.py`。
 
-## Refactor notes
-Regex-based (no tree-sitter dependency) — a deliberate simplicity/portability
-trade. If precision becomes a problem, a tree-sitter backend can slot behind the
-same `RepoMap.render` contract. Keep the "pulled on demand" stance — do not add
-a code path that injects the map into a prompt.
+## 重构备注
+基于正则（不依赖 tree-sitter）—— 这是**刻意的**简单性/可移植性取舍。如果精度成为问题，
+可以让 tree-sitter 后端接在同一个 `RepoMap.render` 契约后面。保持"按需拉取"的姿态 ——
+**不要**新增把这张图注入 prompt 的代码路径。
 
-## Concision — **K2** (shared language rules)
-`_SYMBOL_RES` + `_SUFFIXES` are the third copy of the per-language rule set
-(also `review._sweep_targets`, `profiles/establish`). Consume the shared
-`profiles/languages.py` (K2). Preserve: `supported` false + honest "use grep"
-for an unknown language.
+## 精简 —— **K2**（共享语言规则）
+`_SYMBOL_RES` + `_SUFFIXES` 是按语言规则集的第三份副本（另两份见
+`review._sweep_targets`、`profiles/establish`）。改为消费共享的
+`profiles/languages.py`（K2）。必须保留：未知语言时 `supported` 为 false + 诚实的
+"use grep"。

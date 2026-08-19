@@ -1,53 +1,49 @@
-# playbooks/*.yaml — spec
+# playbooks/*.yaml —— 规范
 
-<!-- verified-against: 2026-08-17 -->
+<!-- verified-against: 2026-08-18 -->
 
-`9 files · declarative orchestration data · refactor-status: ok`
+`9 个文件 · 声明式编排数据 · refactor-status: ok`
 
-> Current set: `pr-review`@6, `pr-debug`@2, `pr-rebase`@2, `issue-answer`@2,
-> `issue-triage`@2, `repo-profile`@1 (active); `repo-rebase`@2 (**locked**);
-> `repo-rebase-native`@1, `profile-consolidate`@1 (candidate). The inventory
-> with step chains lives in [`../../../GUIDE.md`](../../../GUIDE.md) §5 — not here.
+> 当前集合：`pr-review`@6、`pr-debug`@2、`pr-rebase`@2、`issue-answer`@2、
+> `issue-triage`@2、`repo-profile`@1（active）；`repo-rebase`@2（**locked**）；
+> `repo-rebase-native`@1、`profile-consolidate`@1（candidate）。带 step 链的完整清单
+> 在 [`../../../GUIDE.md`](../../../GUIDE.md) §5 —— **不在这里**。
 
-## Responsibility
-Declarative, ordered step lists (with `foreach`, `when:`, per-step `params`)
-realizing a task kind.
+## 职责
+用声明式的有序 step 列表（含 `foreach`、`when:`、逐 step `params`）实现一种任务 kind。
 
-## Contract per file
+## 每个文件的契约
 `name, version, status, task_kinds, repos, requires?, params, provenance,
-success, steps[]`.
+success, steps[]`。
 
-## The registered playbooks
-- `repo-rebase` — **locked**, L0, `requires: [orchestrator.external]`.
-  Byte-identical zero-regression — do NOT edit its step list.
-- `pr-rebase`/`pr-debug`/`pr-review`/`issue-answer`/`issue-triage` — active,
-  repo-neutral (`repos: []`, `requires: [repo.path]`).
-- `repo-profile` — active, repo-neutral (onboards a second repo).
-- `repo-rebase-native`, `profile-consolidate` — **candidates** (planner-
-  invisible; run only via `--playbook`).
+## 已注册的 playbook
+- `repo-rebase` —— **locked**，L0，`requires: [orchestrator.external]`。
+  逐字节零回归 —— **不要改它的 step 列表**。
+- `pr-rebase`/`pr-debug`/`pr-review`/`issue-answer`/`issue-triage` —— active，
+  仓库中立（`repos: []`、`requires: [repo.path]`）。
+- `repo-profile` —— active，仓库中立（用于接入第二个仓库）。
+- `repo-rebase-native`、`profile-consolidate` —— **candidate**
+  （planner 不可见；只能经 `--playbook` 运行）。
 
-## Invariants
-- Every step id unique; every `step` name registered (enforced by
-  `store.validate`).
-- Write/push steps appear only in vetted (non-generated) playbooks.
-- Locking is for code-modifying/pushing playbooks; promotion
-  candidate→active→locked is a human act with provenance.
-- **`candidate` is invisible to `find()`** — reachable only via
-  `--playbook <name>`. This is what keeps `profile-consolidate` a deliberate
-  cadence (continuous LLM rewriting measurably corrupts memory) and keeps
-  `repo-rebase-native` out of the nightly until validated side by side.
-- Repo-neutral playbooks declare `repos: []` + a `requires:` capability list;
-  an exact-repo playbook still wins when present.
+## 不变量
+- 每个 step id 唯一；每个 `step` 名字都必须已注册（由 `store.validate` 强制）。
+- 写/推送 step **只**出现在已审核（非生成）的 playbook 里。
+- locking 面向会改代码/会推送的 playbook；晋升 candidate→active→locked
+  是**带 provenance 的人类动作**。
+- **`candidate` 对 `find()` 不可见** —— 只能经 `--playbook <name>` 到达。
+  正是这一条让 `profile-consolidate` 保持"刻意的节奏"（连续的 LLM 重写**实测**会腐蚀
+  记忆），也让 `repo-rebase-native` 在并排验证通过前**不进夜跑**。
+- 仓库中立的 playbook 声明 `repos: []` + 一份 `requires:` 能力清单；
+  存在精确 repo 的 playbook 时仍然由它获胜。
 
-## Scope — not here
-No code, no repo knowledge beyond `repos`/`requires` matching.
+## 边界 —— 不属于这里
+不含代码；除 `repos`/`requires` 匹配外不含仓库知识。
 
-## Extension points
-A new task realized as a YAML file; a new repo reuses the repo-neutral playbooks
-(zero core change) once its profile satisfies `requires`.
+## 扩展点
+新任务 = 一个 YAML 文件；新仓库在其 profile 满足 `requires` 之后，
+**直接复用仓库中立的 playbook**（核心零改动）。
 
-## Refactor notes
-These are the "config" half of the reuse>adapt>generate model — keep them
-declarative. Resist adding conditional logic beyond `when:`/`foreach`; anything
-richer belongs in a step. When repo #2 onboards, it should need NO new playbook
-(that is the invariance test).
+## 重构备注
+它们是 reuse>adapt>generate 模型里的"配置"那一半 —— **保持声明式**。
+要顶住在 `when:`/`foreach` 之外加条件逻辑的冲动；更复杂的东西属于某个 step。
+**当第二个仓库接入时，它应该不需要任何新 playbook —— 那就是不变性测试。**

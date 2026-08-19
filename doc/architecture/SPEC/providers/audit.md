@@ -1,48 +1,40 @@
-# providers/audit.py — spec
+# providers/audit.py —— 规范
 
-<!-- verified-against: 2026-08-17 -->
+<!-- verified-against: 2026-08-18 -->
 
-`LOC ~109 · detective control (post-run session audit) · refactor-status: ok`
+`LOC ~109 · 侦测型控制（运行后会话审计） · refactor-status: ok`
 
-## Responsibility
-Audit a completed harness session for containment violations, for backends
-where no preventive control is available.
+## 职责
+对已完成的 harness 会话做容纳性违规审计 —— 服务于那些**没有预防型控制可用**的后端。
 
-## Functionality
-Given the session's tool events, checks that file reads stayed inside the
-containment roots (PR-time worktree + run dir) and that a read-only scope saw
-no write/edit calls. Returns findings; never mutates anything.
+## 功能
+给定该会话的工具事件，检查文件读取是否停留在容纳根内（PR-time worktree + run 目录），
+以及只读 scope 下是否出现过 write/edit 调用。**返回 findings；从不修改任何东西。**
 
-## Public contract
-`SessionAudit` (`ok`, `tool_calls`), `contained_in(path, roots)`,
-`audit_events(events, *, roots, ...)`.
+## 公开契约
+`SessionAudit`（`ok`、`tool_calls`）、`contained_in(path, roots)`、
+`audit_events(events, *, roots, ...)`。
 
-## Invariants (**C1**, **C2**, **E2**)
-- **Detective, not preventive** — the *disclosed fallback* of the tool
-  governance decision. It runs for cursor-agent, whose built-in tools cannot be
-  disabled. It does not stop anything; it reports.
-- **Findings are surfaced, never silently dropped.** Violations go to the
-  caller to trace and render in RUN_REPORT. A silent audit is worse than none,
-  because it implies a control that is not in force.
-- **Product policy only.** The eval arm layers an extra "no PR-discussion
-  access" rule on top; that is a ground-truth-leakage concern, not a product
-  one, and deliberately does NOT live here.
-- **One documented exemption:** cursor-agent spools MCP tool *results* into its
-  per-project state dir and reads them back with its native read tool
-  (`_CLI_TOOL_SPOOL`). That read-back is how bridge output is consumed, not
-  exfiltration — without the exemption every bridge-using session was flagged
-  (live-smoke finding).
+## 不变量（**C1**、**C2**、**E2**）
+- **侦测型，不是预防型** —— 它是工具治理决策**公开声明的兜底**。它服务于内置工具无法
+  关闭的 cursor-agent。**它不阻止任何事，它只报告。**
+- **findings 必须浮现，绝不静默丢弃。** 违规交给调用方记 trace 并渲染进 RUN_REPORT。
+  一次静默的审计**比没有审计更糟**，因为它暗示存在一个其实并未生效的控制。
+- **只放产品策略。** 评测臂在其之上叠加了一条额外的"不得访问 PR 讨论"规则；那是
+  ground-truth 泄漏问题，不是产品问题，**刻意不住在这里**。
+- **一条有记录的豁免：** cursor-agent 会把 MCP 工具的**结果**缓存进它按项目划分的状态
+  目录，再用自己的原生读工具读回来（`_CLI_TOOL_SPOOL`）。那次读回正是桥输出被消费的
+  方式，**不是外泄** —— 没有这条豁免，每个用了桥的会话都会被误报（实测发现）。
 
-## Scope — not here
-No enforcement; no vendor invocation; no eval-specific rules.
+## 边界 —— 不属于这里
+不做强制；不调用厂商；不含评测专属规则。
 
-## Dependencies (allowed)
-stdlib only. A leaf analysis module.
+## 依赖（允许）
+仅 stdlib。一个叶子分析模块。
 
-## Tests
-Covered via `test_provider_cursor.py`.
+## 测试
+经 `test_provider_cursor.py` 覆盖。
 
-## Refactor notes
-Productized from `eval/dataset/run_cursor_arm.py`, which caught a live
-out-of-bounds read (`~/.claude/skills/...`) through exactly this check. Keep it
-pure so the eval arm and the product path cannot diverge in judgement.
+## 重构备注
+从 `eval/dataset/run_cursor_arm.py` 产品化而来 —— 当初正是这项检查抓到了一次真实的越界
+读取（`~/.claude/skills/...`）。**保持它纯粹**，这样评测臂和产品路径的判断不会分叉。
