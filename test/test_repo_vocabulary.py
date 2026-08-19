@@ -77,6 +77,8 @@ _VOCAB_CEILINGS = {
     # name (vllm_commit) and its docstring mapping — this whole layer dies
     # with the PR4d migration when the adapter drops rebase.knowledge
     "rebase_engine/parent_compat.py": 3,
+    # PR4d migration (design D6): maps that same parent column once
+    "rebase_engine/knowledge_migrate.py": 1,
     # ceilinged v1-era defaults (also under test_repo_neutral_core)
     "config.py": 5,      # rebase_orchestrator_cmd + agent-root sibling name
     "task_spec.py": 2,   # default_repo literal

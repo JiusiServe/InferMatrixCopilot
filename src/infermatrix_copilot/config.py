@@ -144,6 +144,19 @@ class Settings(BaseSettings):
     rebase_ci_poll_sec: int = 120
     rebase_ci_timeout_sec: int = 10800  # per-build monitor budget
     rebase_ci_settle_sec: int = 60      # webhook-build settle before create
+    # PR4d runtime-dir cutover (completion design D3), REPO-SCOPED: a
+    # comma-separated list of repo names whose knowledge stores have been
+    # MIGRATED (state/<repo>/MIGRATION_COMPLETE.json validates at resolve
+    # time — a listed repo without the marker fails CLOSED). Unlisted
+    # repos keep the legacy locations byte-identically. Flip only after
+    # `infermatrix-copilot migrate-knowledge` succeeds (RUNBOOK step).
+    imx_knowledge_runtime: str = ""
+
+    @property
+    def knowledge_runtime_repos(self) -> set[str]:
+        """Repos with the PR4d cutover ACTIVE (parsed, whitespace-safe)."""
+        return {r.strip() for r in self.imx_knowledge_runtime.split(",")
+                if r.strip()}
 
     # Repo profiles (design v2 §V2.3)
     profile_stale_days: int = 90        # dormancy window for unconfirmed facts

@@ -53,23 +53,40 @@ class KnowledgePaths:
                 adapter_root: Path | None = None) -> "KnowledgePaths":
         """Resolve for `repo`. `adapter_root` is the repo adapter's directory
         when one is registered (callers already resolve the adapter; passing
-        None reproduces every no-adapter fallback exactly)."""
+        None reproduces every no-adapter fallback exactly).
+
+        With the PR4d cutover ACTIVATED for this repo
+        (`Settings.knowledge_runtime_repos`, repo-scoped), every debug
+        member converges on the per-repo state-dir store — but only after
+        the migration-complete marker validates; a listed repo without it
+        raises `KnowledgeStateError` (fail closed, never an empty-store
+        start). Unlisted repos resolve the legacy locations
+        byte-identically."""
         memory_db = Path(settings.memory_db)
         state = memory_db.parent / "state" / repo
-        adapter_db = (adapter_root / "store" / "debug_memory.db"
-                      if adapter_root is not None else None)
+        active = repo and repo in getattr(settings,
+                                          "knowledge_runtime_repos", set())
+        if active:
+            cls._require_migration_marker(state, repo)
+            state_db = state / "debug_memory.db"
+            adapter_db = state_db
+        else:
+            adapter_db = (adapter_root / "store" / "debug_memory.db"
+                          if adapter_root is not None else None)
         if adapter_root is not None:
             seed_skills = adapter_root / "skills"
-            read_layers: tuple = (adapter_db, memory_db)
-            repo_map_cache = adapter_root / "repo_map"
+            read_layers: tuple = ((state_db,) if active
+                                  else (adapter_db, memory_db))
+            repo_map_cache = (state / "repo_map" if active
+                              else adapter_root / "repo_map")
         else:
             seed_skills = Path(settings.skills_dir)
-            read_layers = (memory_db,)
-            repo_map_cache = None
+            read_layers = (state_db,) if active else (memory_db,)
+            repo_map_cache = state / "repo_map" if active else None
         return cls(
             repo=repo,
             state_dir=state,
-            rebase_backend_db=memory_db,
+            rebase_backend_db=state_db if active else memory_db,
             shared_write_db=adapter_db if adapter_db is not None else memory_db,
             debug_read_layers=read_layers,
             skills_seed_dir=seed_skills,
@@ -83,6 +100,65 @@ class KnowledgePaths:
             state_lock=state / "locks" / "state.lock",
             knowledge_run_lock=state / "locks" / "knowledge.lock",
         )
+
+    MIGRATION_MARKER = "MIGRATION_COMPLETE.json"
+
+    @classmethod
+    def _require_migration_marker(cls, state_dir: Path, repo: str) -> dict:
+        """Validate the durable migration-complete marker for an ACTIVATED
+        repo (design round-3 F8): missing/unparseable/incomplete marker,
+        a marker COPIED from another repo, an unknown schema version, or
+        a missing/corrupt target store ⇒ `KnowledgeStateError`. The
+        marker's recorded digest is deliberately NOT required to equal
+        the live store's — runs append knowledge after activation by
+        design, so digest equality would fail on the first legitimate
+        write; the fail-closed contract is about WIRING (right repo,
+        right schema, a real readable store), not frozen content.
+        Returns the parsed marker."""
+        import json
+        import sqlite3
+
+        marker = state_dir / cls.MIGRATION_MARKER
+        try:
+            data = json.loads(marker.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            raise KnowledgeStateError(
+                f"knowledge runtime ACTIVATED for {repo!r} but "
+                f"{marker} is missing — run `infermatrix-copilot "
+                "migrate-knowledge` first, or remove the repo from "
+                "IMX_KNOWLEDGE_RUNTIME")
+        except (OSError, ValueError) as exc:
+            raise KnowledgeStateError(
+                f"knowledge runtime ACTIVATED for {repo!r} but {marker} "
+                f"is unreadable: {exc}")
+        if str(data.get("schema")) != "v2" or not data.get("digests"):
+            raise KnowledgeStateError(
+                f"{marker} is incomplete or names an unknown schema "
+                f"({data.get('schema')!r}) — re-run the migration")
+        if str(data.get("repo") or "") != repo:
+            raise KnowledgeStateError(
+                f"{marker} belongs to repo {data.get('repo')!r}, not "
+                f"{repo!r} — a copied/stale marker never activates")
+        target_db = state_dir / "debug_memory.db"
+        try:
+            from .debug_memory import DebugMemory
+
+            DebugMemory.open_readonly(target_db)
+        except (OSError, sqlite3.Error) as exc:
+            raise KnowledgeStateError(
+                f"knowledge runtime ACTIVATED for {repo!r} but the "
+                f"migrated store {target_db} is missing or unreadable "
+                f"({exc}) — restore from backups or re-run the "
+                "migration")
+        return data
+
+
+class KnowledgeStateError(RuntimeError):
+    """The PR4d cutover is ACTIVATED for a repo whose migration-complete
+    marker is missing or invalid — resolving paths would silently start
+    with empty knowledge, so resolution fails CLOSED instead. The v3
+    prelude turns this into BLOCKED; generic consumers surface it through
+    their traced-degradation guards."""
 
 
 class KnowledgeLockHeld(RuntimeError):
