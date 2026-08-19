@@ -21,7 +21,16 @@ jobs:
   suite:
     runs-on: ubuntu-latest
     steps:
+      # Full history, not the default depth-1 shallow clone. check_spec_freshness
+      # dates each source file with `git log -1 -- <path>`, and in a shallow clone
+      # the single commit has no parent, so git reports EVERY tracked file as
+      # created in it. All 62 SPEC pages then read as modified today and the
+      # strict check fails wholesale. It only ever passed because the tip commit
+      # happened to predate the pages' verified-against: dates; the first commit
+      # made on a later day broke all 62 at once.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
