@@ -111,14 +111,18 @@ def build_report(args) -> tuple[str, bool]:
         ("--nat-start-head", args.nat_start_head),
         ("--ext-head", args.ext_head),
         ("--nat-head", args.nat_head),
+        ("--routing-golden", args.routing_golden),
     )
     for flag, value in required_evidence:
         if not value:
             problems.append(f"{flag} not supplied — freeze-table/"
                             "attestation evidence is a gate requirement")
-    if not (args.ext_wallclock_sec and args.nat_wallclock_sec):
-        problems.append("wall-clock durations not supplied — the 1.25x "
-                        "bound is a gate requirement")
+    import math
+    if not all(isinstance(v, (int, float)) and math.isfinite(v) and v > 0
+               for v in (args.ext_wallclock_sec, args.nat_wallclock_sec)):
+        problems.append("wall-clock durations missing or invalid (must "
+                        "be finite and > 0) — the 1.25x bound is a gate "
+                        "requirement")
     # opening-identity: BOTH worlds against the restored snapshot
     open_block = knowledge.get("open") or {}
     nat_open_db = (open_block.get("parent_debug_db") or {}).get(
@@ -200,17 +204,16 @@ def build_report(args) -> tuple[str, bool]:
 
     # ── per-module outcomes through the routing flavor ──────────────────
     route = _routing_map(args.routing_golden, problems)
-    if not args.routing_golden:
-        pending.append("routing golden not supplied (--routing-golden): "
-                       "ext module names shown unmapped")
     ext_modules = {route.get(k, k): (v or {}).get("status", v)
                    for k, v in (ext_state.get("modules") or {}).items()}
     nat_modules = {k: (v or {}).get("status", "?")
                    for k, v in (substate.get("modules") or {}).items()}
 
     # ── wall-clock ──────────────────────────────────────────────────────
-    wall_line = "durations not supplied — recorded as a gate blocker"
-    if args.ext_wallclock_sec and args.nat_wallclock_sec:
+    import math as _math
+    wall_line = "durations missing/invalid — recorded as a gate blocker"
+    if all(isinstance(v, (int, float)) and _math.isfinite(v) and v > 0
+           for v in (args.ext_wallclock_sec, args.nat_wallclock_sec)):
         ratio = args.nat_wallclock_sec / args.ext_wallclock_sec
         wall_line = (f"nat {args.nat_wallclock_sec:.0f}s / ext "
                      f"{args.ext_wallclock_sec:.0f}s = {ratio:.2f}x "

@@ -52,6 +52,10 @@ def _worlds(tmp_path, *, drift=False, slug_mismatch=False,
 
 
 def _args(ext_state, ext_manifest, nat_run, digest, **over):
+    golden = Path(nat_run).parent / "routing_golden.json"
+    if not golden.exists():
+        golden.write_text(json.dumps({"module_name_map": {}}),
+                          encoding="utf-8")
     base = dict(ext_state=str(ext_state), ext_manifest=str(ext_manifest),
                 nat_run=str(nat_run), frozen_target="a" * 40,
                 frozen_upstream="f" * 40, snapshot_digest=digest,
@@ -59,7 +63,7 @@ def _args(ext_state, ext_manifest, nat_run, digest, **over):
                 ext_open_digest=digest, ext_open_skills_digest="e" * 64,
                 ext_start_head="a" * 40, nat_start_head="a" * 40,
                 ext_head="1" * 40, nat_head="2" * 40,
-                routing_golden="", ext_wallclock_sec=100.0,
+                routing_golden=str(golden), ext_wallclock_sec=100.0,
                 nat_wallclock_sec=110.0, out="")
     base.update(over)
     import argparse
@@ -79,7 +83,7 @@ def test_gate_eligible_yes_when_evidence_matches(tmp_path):
      "did not open from the restored"),
     (dict(frozen_upstream=""), "--frozen-upstream not supplied"),
     (dict(nat_wallclock_sec=200.0), "exceeds the 1.25x bound"),
-    (dict(nat_wallclock_sec=0.0), "wall-clock durations not supplied"),
+    (dict(nat_wallclock_sec=0.0), "missing or invalid"),
     (dict(snapshot_skills_digest=""),
      "--snapshot-skills-digest not supplied"),
     (dict(ext_open_digest="9" * 64),
@@ -90,6 +94,9 @@ def test_gate_eligible_yes_when_evidence_matches(tmp_path):
     (dict(nat_start_head="b" * 40),
      "nat start head" ),
     (dict(nat_start_head=""), "--nat-start-head not supplied"),
+    (dict(routing_golden=""), "--routing-golden not supplied"),
+    (dict(nat_wallclock_sec=float("nan")), "missing or invalid"),
+    (dict(nat_wallclock_sec=-5.0), "missing or invalid"),
 ])
 def test_gate_fail_closed_on_mismatched_evidence(tmp_path, mutate, needle):
     report, eligible = compare_validation.build_report(
@@ -149,6 +156,9 @@ def _parent_fixture(tmp_path):
     # a token-bearing log: must be excluded from the TARBALL too
     (repo / "rebase_logs" / "env-dump.log").write_text(
         "api_key=leaked-in-a-log-000111\n")
+    # …and one whose credential sits DEEP past the old 64 KiB head-scan
+    (repo / "rebase_logs" / "deep.log").write_text(
+        ("benign line\n" * 8000) + "token=deep-secret-abcdef123456\n")
     db = repo / "agent" / "store" / "debug_memory.db"
     c = sqlite3.connect(db)
     c.execute("CREATE TABLE debug_entries (id INTEGER PRIMARY KEY, "
@@ -215,8 +225,11 @@ def test_archive_excludes_and_inventories_with_allowlist(tmp_path):
         names = tar.getnames()
     assert "rebase_logs/run.log" in names
     assert all("env-dump.log" not in n for n in names)
+    assert all("deep.log" not in n for n in names)  # whole-file scan
     assert "rebase_logs/env-dump.log" in inventory
+    assert "rebase_logs/deep.log" in inventory
     assert "leaked-in-a-log-000111" not in inventory
+    assert "deep-secret-abcdef123456" not in inventory
     # db copy is a REAL consistent copy
     db_copy = next(archive.glob("debug_memory-*.db"))
     n = sqlite3.connect(db_copy).execute(

@@ -80,12 +80,23 @@ def _is_secret_path(rel: str) -> bool:
 
 
 def _content_scan(path: Path) -> bool:
+    """Scan the WHOLE file incrementally (a credential deep inside a log
+    must not slip past a head-only scan); chunks overlap so a match
+    straddling a boundary is still seen."""
+    overlap = 256
+    tail = b""
     try:
-        head = path.read_bytes()[:65536]
+        with open(path, "rb") as fh:
+            while True:
+                chunk = fh.read(1 << 20)
+                if not chunk:
+                    return False
+                if SECRET_CONTENT_RX.search(tail + chunk):
+                    return True
+                tail = chunk[-overlap:]
     except OSError as exc:
         raise SystemExit(f"secrets scan could not read {path}: {exc} — "
                          "aborting (never archive blind)")
-    return bool(SECRET_CONTENT_RX.search(head))
 
 
 def classify_files(repo: Path, allowlist: set[str]):
