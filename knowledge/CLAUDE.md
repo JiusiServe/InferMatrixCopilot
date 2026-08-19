@@ -91,7 +91,7 @@
 
 ## 4. 知识写到哪里
 
-- **先定 owner，再选载体**：写任何正文前先按[写入前 owner 凭证](../doc/knowledge/contributing/layout.md#写入前-owner-凭证)记录内容、最近 owner、owner 证据和目标目录。不能因为现有 `rules.md` 方便追加就先选文件；工作主题不能覆盖源码 owner，父级只路由、不复制正文。
+- **先定 owner，再选载体**：先确定内容的最近 owner 和目标目录，再选 `rules.md`、`architecture.md` 或 `guides/`。不能因为现有 `rules.md` 方便追加就先选文件；工作主题不能覆盖源码 owner，父级只路由、不复制正文。
 - 能反复避免问题、改变下一次行为的结论 → 最近 owner 的 `rules.md`。跨仓库规则放 `general/<主题>/`，仓库规则放 `repos/<仓库>/`，模块或模型规则继续下沉到对应目录。
 - 稳定的数据流、职责和边界 → 最近 owner 的 `architecture.md`。
 - 需要展开说明但不是硬门禁的方法 → 对应主题的 `guides/`。
@@ -100,11 +100,14 @@
 
 用户要求“复盘”时，必须回答为什么发生、为什么原有规则或测试没有发现、怎样提前阻止，并在写文件前按语义分流。incident 默认不创建；只有规则和架构已完成、仍有其他载体无法保存的证据、且存在具体未来查询触发时才准入，不能用它收纳从规则中剔除的历史细节。
 
-长期知识禁止写入系统、全局或个人 memory 位置。新增、移动、拆分或删除 Markdown 前先读短入口 [CONTRIBUTING.md](../doc/knowledge/CONTRIBUTING.md)，再按任务只读它链接的一篇专题规范；同步最近的 `_index.md`，然后运行：
+长期知识禁止写入系统、全局或个人 memory 位置。新增、移动、拆分或删除 Markdown 前先读短入口 [CONTRIBUTING.md](../doc/knowledge/CONTRIBUTING.md)，再按任务只读它链接的一篇专题规范；同步最近的 `_index.md`，然后在仓库根运行：
 
 ```powershell
-python tools/check_knowledge_tree.py
+python knowledge/tools/check_knowledge_tree.py
+python knowledge/tools/check_wiki_lint.py
 ```
+
+改动 `repos/vllm-omni/` 的 owner 入口页、正文 SHA pin 或 `sources:` 时，这两个校验器看不见发版审计那道门；先读[同步与校验](../doc/knowledge/contributing/validation.md#vllm-omni-页面还有一道发版审计)。
 
 ## 5. Git 和公开修改
 

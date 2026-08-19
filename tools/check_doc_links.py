@@ -35,8 +35,7 @@ EXCLUDE_PARTS = {".venv", "node_modules", "__pycache__", ".pytest_cache",
 #   knowledge-templates — templates, not documents. Their relative links are
 #                   written to resolve AFTER the file is copied into
 #                   `knowledge/`, so they are correctly broken in place.
-EXCLUDE_TREES = ("eval/dataset", "doc/knowledge-templates",
-                 "doc/contributing/knowledge-templates")
+EXCLUDE_TREES = ("eval/dataset", "doc/knowledge/templates")
 
 # `[text](target)` — but not images with an empty target, and not reference defs.
 LINK = re.compile(r"\[[^\]]*\]\(\s*([^)\s]+?)\s*(?:\s+\"[^\"]*\")?\)")
