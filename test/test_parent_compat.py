@@ -705,6 +705,12 @@ def test_unindexed_parser_survives_quoted_comment_openers(tmp_path):
     spoof = ("CREATE VIRTUAL TABLE t /* USING fts5( */ "
              "USING fts4(a, b)")
     assert not is_fts5_table(spoof)
+    # quoted PUNCTUATION is payload, not structure: a column named ")"
+    # (or "(", or "a,b") must not terminate/split the scan before a
+    # later UNINDEXED declaration (hook round-4 iteration finding)
+    tricky = ('CREATE VIRTUAL TABLE t USING fts5('
+              '")", key UNINDEXED, "(", "a,b", module unindexed)')
+    assert fts5_unindexed_columns(tricky) == {"key", "module"}
 
 
 def test_skills_catalog_rejects_falsey_laundering(tmp_path):

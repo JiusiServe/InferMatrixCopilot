@@ -124,32 +124,35 @@ def fts5_unindexed_columns(create_sql: str) -> set[str]:
     args_start = _fts5_args_start(s)
     if args_start is None:
         return set()
-    args, depth, start, i = [], 1, args_start, args_start
-    while i < len(s) and depth:
-        ch = s[i]
-        if ch in "([":
+    # split args by walking TOKENS, not characters: a `)`/`(`/`,` inside
+    # a quoted identifier is payload, never punctuation — a column named
+    # `")"` must not terminate the scan before a later UNINDEXED
+    # declaration (hook round-4 iteration finding)
+    args: list[list[str]] = [[]]
+    depth = 1
+    for m in _SQL_TOKEN_RE.finditer(s, args_start):
+        tok = m.group(0)
+        if tok.isspace():
+            continue
+        if tok[0] in "'\"`[":
+            args[-1].append(tok)  # quoted token: opaque payload
+            continue
+        if tok in "([":
             depth += 1
-        elif ch in ")]":
+        elif tok in ")]":
             depth -= 1
             if depth == 0:
                 break
-        elif ch == "," and depth == 1:
-            args.append(s[start:i])
-            start = i + 1
-        i += 1
-    args.append(s[start:i])
-    out: set[str] = set()
-    for arg in args:
-        arg = arg.strip()
-        if not arg or "=" in arg:
-            continue  # an option (content=, tokenize=…), not a column
-        toks = re.findall(
-            r"'[^']*'|\"[^\"]*\"|`[^`]*`|\[[^\]]*\]|[A-Za-z_][A-Za-z0-9_]*",
-            arg)
-        if not toks:
+        elif tok == "," and depth == 1:
+            args.append([])
             continue
+        args[-1].append(tok)
+    out: set[str] = set()
+    for toks in args:
+        if not toks or "=" in toks:
+            continue  # an option (content=, tokenize=…), not a column
         name = toks[0].strip("'\"`[]").lower()
-        if any(tk.lower() == "unindexed" for tk in toks[1:]):
+        if name and any(tk.lower() == "unindexed" for tk in toks[1:]):
             out.add(name)
     return out
 
