@@ -402,6 +402,13 @@ def test_archive_refuses_fake_or_missing_target(tmp_path):
     assert "not a git worktree" in (r.stderr + r.stdout)
     assert not (tmp_path / "archive2").exists() or \
         not any((tmp_path / "archive2").iterdir())
+    # a SUBDIRECTORY of the real worktree also refuses (hook: git's
+    # --is-inside-work-tree accepted it, locking a different inode)
+    nested = target / "fake-nested"
+    (nested / "locks").mkdir(parents=True)
+    r = _run_archive(repo, nested, tmp_path / "archive3")
+    assert r.returncode != 0
+    assert "TOPLEVEL" in (r.stderr + r.stdout)
 
 
 def test_archive_requires_db_and_tag_fail_closed(tmp_path):

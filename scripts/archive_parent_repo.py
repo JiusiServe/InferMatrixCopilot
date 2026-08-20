@@ -73,12 +73,16 @@ def _acquire_checkout_lock(target_checkout: Path, lock_name: str):
 
     probe = subprocess.run(
         ["git", "-C", str(target_checkout), "rev-parse",
-         "--is-inside-work-tree"], capture_output=True, text=True)
-    if probe.returncode != 0 or probe.stdout.strip() != "true":
+         "--show-toplevel"], capture_output=True, text=True)
+    toplevel = probe.stdout.strip()
+    if probe.returncode != 0 or not toplevel or \
+            Path(toplevel).resolve() != Path(target_checkout).resolve():
         raise SystemExit(
-            f"--target-checkout {target_checkout} is not a git worktree "
-            "— an existing-but-fake directory could lock the wrong inode "
-            "while the real checkout is active (round-2 F11)")
+            f"--target-checkout {target_checkout} is not a git "
+            "worktree's TOPLEVEL — a nested or fake directory would lock "
+            "a different inode than the real checkout's participants "
+            "(round-2 F11; hook: --is-inside-work-tree accepted "
+            "subdirectories)")
     lock = CheckoutLock(Path(target_checkout), lock_name)
     if lock.acquire(blocking=False) is False:
         if "contention" == lock.last_failure.split(":")[0]:
