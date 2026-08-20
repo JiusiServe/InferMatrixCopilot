@@ -298,6 +298,45 @@ def test_restore_failure_restores_preserved_sidecars(tmp_path,
     assert restored == ka.debug_db_digest(db)
 
 
+def test_parent_probe_rejects_column_incomplete_fts(tmp_path):
+    """PR-boundary round-2 F4: a symptom-only FTS answers the join probe
+    but silently misses key/tag/root-cause/fix terms — the open must
+    refuse it."""
+    db = tmp_path / "thin.db"
+    c = sqlite3.connect(db)
+    c.executescript("""
+CREATE TABLE debug_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    module TEXT NOT NULL, key TEXT NOT NULL,
+    tags TEXT DEFAULT '', files TEXT DEFAULT '',
+    run_id TEXT DEFAULT '', timestamp TEXT DEFAULT '',
+    symptom TEXT DEFAULT '', root_cause TEXT DEFAULT '',
+    fix TEXT DEFAULT '', watch_outs TEXT DEFAULT '',
+    status TEXT DEFAULT 'active');
+CREATE VIRTUAL TABLE debug_entries_fts USING fts5(
+    symptom, content='debug_entries', content_rowid='id');""")
+    c.close()
+    with pytest.raises(sqlite3.DatabaseError, match="retrieval probe"):
+        ParentDebugMemory(db)
+
+
+def test_restore_guard_rejects_planted_symlink(tmp_path):
+    """PR-boundary round-2 F10: a planted symlink at the predictable
+    guard name is neither followed at creation (unique tmp + atomic
+    replace) nor consumed at self-heal."""
+    db = _parent_db(tmp_path / "p.db", [{"key": "k1", "symptom": "s1"}])
+    snap = tmp_path / "snap.db"
+    ka.snapshot_debug_db(db, snap)
+    victim = tmp_path / "victim.txt"
+    victim.write_text("do not overwrite", encoding="utf-8")
+    guard = tmp_path / "p.db.pre-restore-guard.db"
+    guard.symlink_to(victim)
+    with pytest.raises(OSError, match="not a regular file"):
+        ka.restore_debug_db(snap, db)
+    assert victim.read_text(encoding="utf-8") == "do not overwrite"
+    assert ka.debug_db_digest(db)  # target untouched and readable
+
+
 def test_restore_ignores_planted_staging_symlink(tmp_path):
     """PR-boundary F14: a pre-planted symlink at the old predictable
     staging name must neither redirect the staged write nor become the

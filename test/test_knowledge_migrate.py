@@ -520,6 +520,59 @@ def test_flag_on_requires_marker_and_is_repo_scoped(settings, tmp_path):
     assert p_on.skills_seed_dir == tmp_path / "a" / "skills"
 
 
+def test_activation_rejects_legacy_or_thin_fts_store(settings, tmp_path):
+    """PR-boundary round-2 F5: the marker gate verifies the STORE — a
+    legacy-schema db or a v2 db whose FTS mirror lacks the v2 columns
+    never activates, whatever the marker claims."""
+    state_dir = Path(settings.memory_db).parent / "state" / "widget-repo"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "MIGRATION_COMPLETE.json").write_text(json.dumps(
+        {"schema": "v2", "repo": "widget-repo",
+         "digests": {"target_db": "x"}}), encoding="utf-8")
+    settings.imx_knowledge_runtime = "widget-repo"
+    # legacy-schema store: refuses
+    c = sqlite3.connect(state_dir / "debug_memory.db")
+    c.executescript("""CREATE TABLE entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        repo TEXT, module TEXT, run_id TEXT, symptom TEXT, root_cause TEXT,
+        fix_summary TEXT, files TEXT, verification TEXT,
+        status TEXT DEFAULT 'active', created_at REAL);
+        CREATE VIRTUAL TABLE entries_fts USING fts5(
+        symptom, root_cause, fix_summary, module, repo,
+        content='entries', content_rowid='id');""")
+    c.close()
+    with pytest.raises(KnowledgeStateError, match="not schema v2"):
+        KnowledgePaths.resolve(settings, "widget-repo")
+    # v2 columns but a THIN mirror: refuses too
+    (state_dir / "debug_memory.db").unlink()
+    dm = DebugMemory(state_dir / "debug_memory.db")
+    dm._conn.executescript(
+        "DROP TABLE entries_fts;"
+        "CREATE VIRTUAL TABLE entries_fts USING fts5("
+        "symptom, content='entries', content_rowid='id');")
+    with pytest.raises(KnowledgeStateError, match="FTS mirror lacks"):
+        KnowledgePaths.resolve(settings, "widget-repo")
+
+
+def test_migration_validates_column_and_skills(settings, tmp_path):
+    """PR-boundary round-2 F6/F7: a mistyped parent_upstream_column and a
+    malformed declared skill each refuse the migration up front."""
+    repo, db, skills, adir = _world(settings, tmp_path, PARENT_ROWS)
+    manifest = yaml.safe_load((adir / "manifest.yaml").read_text())
+    manifest["rebase"]["knowledge"]["parent_upstream_column"] = "no_such"
+    (adir / "manifest.yaml").write_text(yaml.safe_dump(manifest))
+    with pytest.raises(MigrationError, match="retrieval-schema probe"):
+        migrate_knowledge(settings, "widget-repo")
+    manifest["rebase"]["knowledge"]["parent_upstream_column"] = \
+        "vllm_commit"
+    (adir / "manifest.yaml").write_text(yaml.safe_dump(manifest))
+    (skills / "broken").mkdir()
+    (skills / "broken" / "SKILL.md").write_text("no frontmatter\n",
+                                                encoding="utf-8")
+    with pytest.raises(MigrationError, match="skills invalid"):
+        migrate_knowledge(settings, "widget-repo")
+
+
 def test_full_cycle_migrate_then_activate(settings, tmp_path):
     repo, db, skills, adir = _world(settings, tmp_path, PARENT_ROWS)
     migrate_knowledge(settings, "widget-repo")
