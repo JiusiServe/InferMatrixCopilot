@@ -72,14 +72,44 @@ def skills_catalog(skills_dir: str | Path, *,
     if not root.is_dir():
         return {}
     out: dict[str, str] = {}
+    _seen_names: dict[str, str] = {}
     for p in sorted(root.glob("*/SKILL.md")):
         if validate:
             from ..memory.skills import _parse_skill
 
-            if _parse_skill(p) is None:
+            skill = _parse_skill(p)
+            if skill is None:
                 raise ValueError(
                     f"{p} does not parse as a skill — retrieval would "
                     "silently skip it; fix or remove it before attesting")
+            # operational schema over the RAW frontmatter (round-3
+            # F6): every field SkillStore.find consumes must carry its
+            # retrieval type — parse-time str() coercion would otherwise
+            # attest `description: [x]` as the literal string "['x']",
+            # and a list-typed name is unhashable at retrieval
+            import yaml as _yaml
+
+            meta = _yaml.safe_load(
+                p.read_text(encoding="utf-8").split("---", 2)[1]) or {}
+            name = meta.get("name", p.parent.name)
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError(f"{p}: skill name must be a non-empty "
+                                 "string")
+            for fld in ("description", "trigger", "status"):
+                if isinstance(meta.get(fld), (list, dict)):
+                    raise ValueError(
+                        f"{p}: skill {fld} must be a scalar string")
+            mods = meta.get("modules") or []
+            if not isinstance(mods, list) or \
+                    not all(isinstance(m, str) for m in mods):
+                raise ValueError(
+                    f"{p}: skill modules must be a list of strings")
+            if name in _seen_names:
+                raise ValueError(
+                    f"{p}: duplicate effective skill name "
+                    f"{name!r} (also {_seen_names[name]}) — "
+                    "retrieval collisions are silent")
+            _seen_names[name] = str(p)
         out[str(p.relative_to(root))] = hashlib.sha256(
             p.read_bytes()).hexdigest()
     return out
@@ -304,7 +334,23 @@ def restore_debug_db(snapshot: str | Path, target: str | Path) -> str:
                             "PRAGMA integrity_check").fetchone()[0] == "ok"
                     finally:
                         probe.close()
-                except sqlite3.Error:
+                except sqlite3.Error as probe_exc:
+                    # UNKNOWN is not corrupt (round-3 F8): only a
+                    # DEFINITIVE corruption verdict (NOTADB/CORRUPT —
+                    # restore's remedy case) may proceed guardless. A
+                    # transient/environmental error (locked, disk IO →
+                    # OperationalError/InterfaceError) leaves the
+                    # target's state unknown and must abort BEFORE any
+                    # sidecar move, never strip crash protection.
+                    definitive = (
+                        type(probe_exc) is sqlite3.DatabaseError
+                        or getattr(probe_exc, "sqlite_errorname", "")
+                        in ("SQLITE_NOTADB", "SQLITE_CORRUPT"))
+                    if not definitive:
+                        raise sqlite3.DatabaseError(
+                            "pre-restore guard failed and the target's "
+                            f"state is UNKNOWN ({probe_exc}) — refusing "
+                            "to touch its sidecars") from probe_exc
                     readable = False
                 if readable:
                     raise sqlite3.DatabaseError(

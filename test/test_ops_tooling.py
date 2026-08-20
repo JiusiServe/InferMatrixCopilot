@@ -226,7 +226,18 @@ def test_gate_fail_closed_on_empty_manifest(tmp_path):
     ext_manifest.write_text(json.dumps({"jobs": []}), encoding="utf-8")
     report, eligible = compare_validation.build_report(
         _args(ext_state, ext_manifest, nat_run, digest))
-    assert not eligible and "valid but EMPTY" in report
+    assert not eligible and "slug set is EMPTY" in report
+
+
+def test_gate_fail_closed_on_absent_manifest_object(tmp_path):
+    """Round-3 F1: a `{}` manifest used to skip the emptiness AND
+    equality checks entirely (both were guarded on manifest truthiness)
+    — with zero jobs the gate must refuse, unconditionally."""
+    ext_state, ext_manifest, nat_run, digest = _worlds(tmp_path)
+    ext_manifest.write_text("{}", encoding="utf-8")
+    report, eligible = compare_validation.build_report(
+        _args(ext_state, ext_manifest, nat_run, digest))
+    assert not eligible and "ext slug set is EMPTY" in report
 
 
 def test_gate_fail_closed_on_drift_and_slugs(tmp_path):
@@ -593,3 +604,37 @@ def test_knowledge_digest_cli_roundtrip(tmp_path):
         capture_output=True, text=True)
     assert r.returncode == 0 and digest in r.stdout
     assert ka.debug_db_digest(db) == digest
+
+
+def test_archive_scans_whitespace_named_files(tmp_path):
+    """Round-3 F2: a committed secret in a file whose NAME is pure
+    whitespace was skipped by the tree scan's `.strip()` emptiness
+    guard — only the terminal empty NUL field may be skipped."""
+    repo, target = _parent_fixture(tmp_path)
+    (repo / " ").write_text("password=whitespace-hidden-9876543\n")
+    _git(repo, "add", "--", " ")
+    _git(repo, "commit", "-qm", "whitespace-named file")
+    r = _run_archive(repo, target, tmp_path / "archive")
+    assert r.returncode == 5
+    assert "archival branch's COMMITTED tree" in r.stderr
+
+
+def test_archive_preflight_refuses_before_any_mutation(tmp_path):
+    """Round-3 F3: the tag/waiver refusal must fire BEFORE any parent
+    or archive mutation — a refused invocation leaves the live parent
+    byte-identical (no branch, no stash, no archive dir)."""
+    repo, target = _parent_fixture(tmp_path)
+    before = subprocess.run(["git", "branch"], cwd=repo,
+                            capture_output=True, text=True).stdout
+    archive = tmp_path / "archive"
+    r = subprocess.run(
+        [sys.executable, str(SCRIPTS / "archive_parent_repo.py"),
+         "--parent-repo", str(repo), "--target-checkout", str(target),
+         "--lock-name", "omni", "--archive-dir", str(archive)],
+        capture_output=True, text=True)  # NO tag, NO waiver
+    assert r.returncode == 7 and "pre-pr7-retirement" in r.stderr
+    assert not archive.exists()
+    after = subprocess.run(["git", "branch"], cwd=repo,
+                           capture_output=True, text=True).stdout
+    assert after == before
+    assert (repo / "code.py").read_text() == "print('changed')\n"

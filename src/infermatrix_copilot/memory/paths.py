@@ -164,6 +164,16 @@ class KnowledgePaths:
                     f"{target_db}'s FTS mirror lacks columns "
                     f"{sorted(required_fts - dm._fts_columns)} — re-run "
                     "the migration (its upgrade rebuilds the mirror)")
+            fts_sql = (dm._conn.execute(
+                "SELECT sql FROM sqlite_master WHERE name = "
+                "'entries_fts'").fetchone() or ("",))[0] or ""
+            import re as _re
+            if not _re.search(r"using\s+fts5\s*\(", fts_sql,
+                              _re.IGNORECASE) or \
+                    "unindexed" in fts_sql.lower():
+                raise KnowledgeStateError(
+                    f"{target_db}'s mirror is not a fully-indexed FTS5 "
+                    "table — re-run the migration (round-3 F4)")
             # …and the mirror must actually BE an FTS table: a plain
             # table masquerading as `entries_fts` carries the right
             # column names yet fails every MATCH (hook iteration-2

@@ -492,3 +492,143 @@ def test_attest_layers_fail_closed_and_catalog(tmp_path):
     with pytest.raises(Exception):
         ka.attest_layers(parent_debug_db=str(tmp_path / "nope.db"))
     assert ka.attest_layers() == {}  # nothing declared, nothing attested
+
+
+def test_parent_probe_rejects_inexact_upstream_column(tmp_path):
+    """Round-3 F5: a bare SELECT accepts rowid/oid aliases and case
+    variants of the declared upstream column, but get()'s dict pop is
+    exact — such rows would silently map upstream_commit to ''."""
+    db = _parent_db(tmp_path / "c.db", [])
+    for alias in ("ROWID", "oid", "VLLM_COMMIT"):
+        with pytest.raises(sqlite3.DatabaseError, match="exact column"):
+            ParentDebugMemory(db, upstream_column=alias)
+    assert ParentDebugMemory(db, upstream_column="vllm_commit").count() == 0
+
+
+_FULL_ENTRIES_DDL = """
+CREATE TABLE debug_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    module TEXT NOT NULL, key TEXT NOT NULL,
+    tags TEXT DEFAULT '', files TEXT DEFAULT '',
+    run_id TEXT DEFAULT '', timestamp TEXT DEFAULT '',
+    symptom TEXT DEFAULT '', root_cause TEXT DEFAULT '',
+    fix TEXT DEFAULT '', watch_outs TEXT DEFAULT '',
+    status TEXT DEFAULT 'active');
+"""
+
+
+def test_parent_probe_rejects_fts4_index(tmp_path):
+    """Round-3 F4: an FTS4 table with the full column set answers every
+    name-based probe yet lacks FTS5's rank/integrity-check semantics
+    the reader and attestation rely on — the open must refuse it."""
+    db = tmp_path / "f4.db"
+    c = sqlite3.connect(db)
+    c.executescript(_FULL_ENTRIES_DDL + """
+CREATE VIRTUAL TABLE debug_entries_fts USING fts4(
+    module, key, tags, symptom, root_cause, fix, watch_outs);""")
+    c.close()
+    with pytest.raises(sqlite3.DatabaseError, match="not an FTS5"):
+        ParentDebugMemory(db)
+
+
+def test_parent_probe_rejects_unindexed_required_column(tmp_path):
+    """Round-3 F4: an UNINDEXED required column exists by name and
+    answers a column-filtered MATCH with silent emptiness — searches
+    would miss every term in it; the open must refuse."""
+    db = tmp_path / "unidx.db"
+    c = sqlite3.connect(db)
+    c.executescript(_FULL_ENTRIES_DDL + """
+CREATE VIRTUAL TABLE debug_entries_fts USING fts5(
+    module, key UNINDEXED, tags, symptom, root_cause, fix, watch_outs,
+    content='debug_entries', content_rowid='id');""")
+    c.close()
+    with pytest.raises(sqlite3.DatabaseError, match="UNINDEXED"):
+        ParentDebugMemory(db)
+
+
+def test_skills_catalog_validates_types_and_uniqueness(tmp_path):
+    """Round-3 F6: `name: [broken]` parses as YAML but is unhashable at
+    retrieval (SkillStore.find crashes on it); two skills sharing an
+    effective name collide silently. validate=True refuses both."""
+    root = tmp_path / "skills"
+    (root / "a").mkdir(parents=True)
+    (root / "a" / "SKILL.md").write_text(
+        "---\nname: [broken]\ndescription: d\n---\nbody\n",
+        encoding="utf-8")
+    with pytest.raises(ValueError, match="non-empty string"):
+        ka.skills_catalog(root, validate=True)
+    (root / "a" / "SKILL.md").write_text(
+        "---\nname: same\ndescription: d\n---\nbody\n",
+        encoding="utf-8")
+    (root / "b").mkdir()
+    (root / "b" / "SKILL.md").write_text(
+        "---\nname: same\ndescription: d\n---\nbody\n",
+        encoding="utf-8")
+    with pytest.raises(ValueError, match="duplicate effective"):
+        ka.skills_catalog(root, validate=True)
+    # the pure digest path (validate=False) still hashes both files
+    assert len(ka.skills_catalog(root)) == 2
+
+
+def test_restore_aborts_when_target_state_unknown(tmp_path, monkeypatch):
+    """Round-3 F8: when the pre-restore guard fails AND the corruption
+    re-probe itself errors transiently (locked/IO — not a NOTADB/CORRUPT
+    verdict), the target's state is UNKNOWN: the restore must abort
+    BEFORE touching any sidecar, never proceed guardless."""
+    db = _parent_db(tmp_path / "p.db", [{"key": "k1", "symptom": "s1"}])
+    c = sqlite3.connect(db)
+    c.execute("PRAGMA journal_mode=WAL")
+    c.execute("INSERT INTO debug_entries (module, key) VALUES ('m','k2')")
+    c.commit()
+    wal = tmp_path / "p.db-wal"
+    assert wal.exists()
+    wal_bytes = wal.read_bytes()
+    snap = tmp_path / "snap.db"
+    ka.snapshot_debug_db(db, snap)
+    real_connect = sqlite3.connect
+
+    def flaky_connect(database, *a, **kw):
+        s = str(database)
+        # every open of the TARGET errors like a flaky disk; the staged
+        # `p.db.restore-*.tmp` copy stays reachable
+        if s.endswith("p.db") or "p.db?" in s:
+            raise sqlite3.OperationalError("disk I/O error")
+        return real_connect(database, *a, **kw)
+
+    monkeypatch.setattr(sqlite3, "connect", flaky_connect)
+    try:
+        with pytest.raises(sqlite3.DatabaseError, match="UNKNOWN"):
+            ka.restore_debug_db(snap, db)
+    finally:
+        monkeypatch.undo()
+    # nothing moved: live WAL intact at its true name, no aside copies,
+    # no leftover guard (checked before closing `c` — its close would
+    # checkpoint the WAL away)
+    assert wal.exists() and wal.read_bytes() == wal_bytes
+    assert not (tmp_path / "p.db-wal.pre-restore").exists()
+    assert not list(tmp_path.glob("*pre-restore-guard*"))
+    c.close()
+
+
+def test_parent_probe_rejects_unindexed_despite_formatting(tmp_path):
+    """Round-3 F4 hook iteration: UNINDEXED detection must survive DDL
+    formatting — extra whitespace, an interleaved comment, a quoted
+    column name — because sqlite_master stores the CREATE text verbatim."""
+    # (no comment/tab/newline variants: FTS5's own argument parser
+    # refuses those, so such DDL cannot exist in sqlite_master)
+    for i, coldef in enumerate((
+            "key     UNINDEXED",
+            "key unindexed",
+            '"key" UNINDEXED',
+            "[key] UNINDEXED",
+            "KEY UNINDEXED",
+            '"Key" UNINDEXED')):
+        db = tmp_path / f"fmt{i}.db"
+        c = sqlite3.connect(db)
+        c.executescript(_FULL_ENTRIES_DDL + f"""
+CREATE VIRTUAL TABLE debug_entries_fts USING fts5(
+    module, {coldef}, tags, symptom, root_cause, fix, watch_outs,
+    content='debug_entries', content_rowid='id');""")
+        c.close()
+        with pytest.raises(sqlite3.DatabaseError, match="UNINDEXED"):
+            ParentDebugMemory(db)

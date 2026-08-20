@@ -177,6 +177,25 @@ def main(argv=None) -> int:
                              "the copilot pre-pr7-retirement tag")
     args = parser.parse_args(argv)
 
+    # PREFLIGHT (round-3 F3): every owner-input refusal fires BEFORE any
+    # parent/archive mutation — a refused invocation must leave the live
+    # parent untouched
+    if not args.copilot_repo and not args.skip_copilot_check:
+        print("ABORT — the combined restore requires the copilot "
+              "pre-pr7-retirement tag: pass --copilot-repo to verify it, "
+              "or --skip-copilot-check to record the owner's waiver",
+              file=sys.stderr)
+        return 7
+    if args.copilot_repo:
+        tag_probe = subprocess.run(
+            ["git", "-C", args.copilot_repo, "tag", "-l",
+             "pre-pr7-retirement"], capture_output=True, text=True)
+        if tag_probe.returncode != 0 or not tag_probe.stdout.strip():
+            print("ABORT — --copilot-repo supplied but the "
+                  "pre-pr7-retirement tag does not exist; create it at "
+                  "the PR7 deletion commit first", file=sys.stderr)
+            return 7
+
     repo = Path(args.parent_repo).resolve()
     archive = Path(args.archive_dir).resolve()
     archive.mkdir(parents=True, exist_ok=True)
@@ -245,8 +264,8 @@ def main(argv=None) -> int:
             ["git", "ls-tree", "-r", "-z", "--name-only", "HEAD"],
             cwd=repo, capture_output=True, check=True).stdout
         for rel_b in tree_raw.split(b"\0"):
-            if not rel_b.strip():
-                continue
+            if not rel_b:  # only the terminal empty NUL field — an
+                continue   # all-whitespace FILENAME is a real tracked path
             rel = rel_b.decode("utf-8", "surrogateescape")
             blob = subprocess.run(
                 ["git", "cat-file", "blob", f"HEAD:{rel}"], cwd=repo,
@@ -357,22 +376,9 @@ def main(argv=None) -> int:
         # when the copilot side is in scope (PR-boundary F21): restore
         # instructions that reference a tag that does not exist are not
         # a restore path.
-        if not args.copilot_repo and not args.skip_copilot_check:
-            print("ABORT — the combined restore requires the copilot "
-                  "pre-pr7-retirement tag: pass --copilot-repo to verify "
-                  "it, or --skip-copilot-check to record the owner's "
-                  "waiver (round-2 F15)", file=sys.stderr)
-            return 7
-        copilot_tag_state = "owner-waived (--skip-copilot-check)"
-        if args.copilot_repo:
-            tags = run(["git", "tag", "-l", "pre-pr7-retirement"],
-                       Path(args.copilot_repo)).stdout.strip()
-            if not tags:
-                print("ABORT — --copilot-repo supplied but the "
-                      "pre-pr7-retirement tag does not exist; create it "
-                      "at the PR7 deletion commit first", file=sys.stderr)
-                return 7
-            copilot_tag_state = "present"
+        # (tag/waiver already validated in the pre-mutation preflight)
+        copilot_tag_state = "present" if args.copilot_repo \
+            else "owner-waived (--skip-copilot-check)"
         restore_sh = archive / "restore.sh"
         db_rel = db_copy.name if db_copy.exists() else ""
         restore_sh.write_text(f"""#!/usr/bin/env bash

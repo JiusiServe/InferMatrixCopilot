@@ -214,19 +214,25 @@ class SkillStore:
         run_count are returned as a default surface."""
         extra = extra_run_counts or {}
 
-        def score(s: Skill) -> tuple:
-            """Rank tuple for `s`: (module_hit, query-word overlap, run_count),
-            compared lexicographically so a module match dominates text overlap."""
+        def relevance(s: Skill) -> tuple:
+            """(module_hit, query-word overlap) — the RELEVANCE filter;
+            usage counts never make an unrelated skill relevant
+            (round-3 F7)."""
             module_hit = 1 if module and module in s.modules else 0
             text_hit = sum(
                 1 for w in query.lower().split()
                 if w in (s.description + " " + s.trigger).lower()
             )
-            return (module_hit, text_hit,
-                    s.run_count + int(extra.get(s.name, 0)))
+            return (module_hit, text_hit)
+
+        def score(s: Skill) -> tuple:
+            """Rank tuple: relevance first, then the usage prior
+            (frontmatter + journal) strictly as the tie-breaker."""
+            return (*relevance(s), s.run_count + int(extra.get(s.name, 0)))
 
         ranked = sorted(self.load_all(), key=score, reverse=True)
-        return [s for s in ranked[:k] if score(s) != (0, 0, 0) or not (query or module)]
+        return [s for s in ranked[:k]
+                if relevance(s) != (0, 0) or not (query or module)]
 
     # -- write gate: propose -> candidate; promote is curator/human ----------
     def propose(self, *, name: str, description: str, body: str,

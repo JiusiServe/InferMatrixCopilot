@@ -102,3 +102,17 @@ def test_debug_memory_recorded_from_step_helper(tmp_path):
     assert ok
     hits = DebugMemory(tmp_path / "mem.db").search("rc")
     assert hits and hits[0]["module"] == "ci"
+
+
+def test_skill_find_journal_count_never_creates_relevance(tmp_path):
+    """Round-3 F7: the usage-journal prior is strictly a tie-breaker —
+    a huge journal count on an UNRELATED skill must not push it past
+    the relevance filter or above a matching skill."""
+    store = SkillStore(tmp_path / "skills")
+    for name, desc in [("relevant", "fix scheduler drift"),
+                       ("unrelated", "telemetry census notes")]:
+        store.propose(name=name, description=desc, body="b", modules=[])
+        store.promote(name)
+    found = store.find(query="scheduler drift", k=5,
+                       extra_run_counts={"unrelated": 100})
+    assert [s.name for s in found] == ["relevant"]

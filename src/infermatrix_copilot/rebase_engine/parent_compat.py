@@ -33,6 +33,47 @@ _TOKEN_RE = re.compile(r"[A-Za-z0-9_]+")
 _NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
+def _fts5_unindexed_columns(create_sql: str) -> set[str]:
+    """Column names declared UNINDEXED in an FTS5 CREATE VIRTUAL TABLE
+    statement, parsed from the argument list itself (comments stripped,
+    args split at top-level commas) — a substring scan is formatting-
+    dependent and misses `col   UNINDEXED` or comment-separated forms.
+    Non-FTS5 SQL yields the empty set (the FTS5-ness check is separate)."""
+    s = re.sub(r"/\*.*?\*/", " ", create_sql, flags=re.S)
+    s = re.sub(r"--[^\n]*", " ", s)
+    m = re.search(r"using\s+fts5\s*\(", s, flags=re.I)
+    if not m:
+        return set()
+    args, depth, start, i = [], 1, m.end(), m.end()
+    while i < len(s) and depth:
+        ch = s[i]
+        if ch in "([":
+            depth += 1
+        elif ch in ")]":
+            depth -= 1
+            if depth == 0:
+                break
+        elif ch == "," and depth == 1:
+            args.append(s[start:i])
+            start = i + 1
+        i += 1
+    args.append(s[start:i])
+    out: set[str] = set()
+    for arg in args:
+        arg = arg.strip()
+        if not arg or "=" in arg:
+            continue  # an option (content=, tokenize=…), not a column
+        toks = re.findall(
+            r"'[^']*'|\"[^\"]*\"|`[^`]*`|\[[^\]]*\]|[A-Za-z_][A-Za-z0-9_]*",
+            arg)
+        if not toks:
+            continue
+        name = toks[0].strip("'\"`[]").casefold()
+        if any(tk.lower() == "unindexed" for tk in toks[1:]):
+            out.add(name)
+    return out
+
+
 class ParentDebugMemory:
     """Read-only view of a parent-schema debug store."""
 
@@ -56,6 +97,23 @@ class ParentDebugMemory:
         self._conn = sqlite3.connect(readonly_uri(path), uri=True)
         self._conn.row_factory = sqlite3.Row
         try:
+            # the index must BE fts5 with every required column INDEXED —
+            # column names alone can hide fts4 tables or UNINDEXED
+            # declarations whose searches silently miss (round-3 F4)
+            fts_sql = (self._conn.execute(
+                "SELECT sql FROM sqlite_master WHERE name = "
+                "'debug_entries_fts'").fetchone() or ("",))[0] or ""
+            if not re.search(r"using\s+fts5\s*\(", fts_sql,
+                             flags=re.I):
+                raise sqlite3.DatabaseError(
+                    "debug_entries_fts is not an FTS5 table")
+            bad = _fts5_unindexed_columns(fts_sql) & {
+                "module", "key", "tags", "symptom", "root_cause",
+                "fix", "watch_outs"}
+            if bad:
+                raise sqlite3.DatabaseError(
+                    f"FTS columns {sorted(bad)} are UNINDEXED — "
+                    "searches would silently miss them")
             # the exact search() join + every mapped column, incl. the
             # adapter-declared upstream column when present
             self._conn.execute(
@@ -79,9 +137,18 @@ class ParentDebugMemory:
             self._conn.execute("SELECT count(*) FROM debug_entries"
                                ).fetchone()
             if upstream_column:
-                self._conn.execute(
-                    f"SELECT {upstream_column} FROM debug_entries "
-                    "LIMIT 1").fetchone()
+                # EXACT declared-column membership (round-3): a bare
+                # SELECT accepts case variants of the name and
+                # rowid/oid/NULL-ish identifiers, but `get()`'s dict
+                # lookup is exact — every upstream commit would
+                # silently map to ""
+                cols = {r[1] for r in self._conn.execute(
+                    "PRAGMA table_xinfo(debug_entries)")}
+                if upstream_column not in cols:
+                    raise sqlite3.DatabaseError(
+                        f"declared upstream column {upstream_column!r} "
+                        "is not an exact column of debug_entries "
+                        f"({sorted(cols)[:8]})")
         except sqlite3.Error as exc:
             raise sqlite3.DatabaseError(
                 f"{path} is not a parent-schema debug store (retrieval "

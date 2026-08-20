@@ -281,7 +281,7 @@ def test_activation_refuses_masquerading_fts_table(settings, tmp_path):
          "digests": {"target_db": "x"}}), encoding="utf-8")
     settings.imx_knowledge_runtime = "widget-repo"
     with pytest.raises(KnowledgeStateError,
-                       match="missing, unreadable, or has no usable"):
+                       match="fully-indexed FTS5"):
         KnowledgePaths.resolve(settings, "widget-repo")
 
 
@@ -631,3 +631,59 @@ def test_unit_a_never_imports_unit_b():
         if "knowledge_migrate" in path.read_text(encoding="utf-8"):
             offenders.append(path.relative_to(src).as_posix())
     assert offenders == [], offenders
+
+
+def test_migration_rejects_pseudo_column_upstream(settings, tmp_path):
+    """Round-3 F5: `rowid` SELECTs fine on any rowid table, so the bare
+    probe accepted it — yet it is not a real debug_entries column and
+    every later dict lookup would miss. Exact table_xinfo membership
+    must refuse it."""
+    repo, db, skills, adir = _world(settings, tmp_path, PARENT_ROWS)
+    manifest = yaml.safe_load((adir / "manifest.yaml").read_text())
+    manifest["rebase"]["knowledge"]["parent_upstream_column"] = "rowid"
+    (adir / "manifest.yaml").write_text(yaml.safe_dump(manifest))
+    with pytest.raises(MigrationError, match="not an exact column"):
+        migrate_knowledge(settings, "widget-repo")
+
+
+def test_activation_refuses_fts4_with_fts5_named_column(settings,
+                                                        tmp_path):
+    """Commit-review hardening: an FTS4 mirror with an extra column
+    literally NAMED `fts5` defeated a substring engine check — the
+    activation gate must verify `USING fts5(` structurally."""
+    state_dir = Path(settings.memory_db).parent / "state" / "widget-repo"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    dm = DebugMemory(state_dir / "debug_memory.db")
+    dm._conn.executescript(
+        "DROP TABLE entries_fts;"
+        "CREATE VIRTUAL TABLE entries_fts USING fts4("
+        "symptom, root_cause, fix_summary, module, repo, key, tags, "
+        "watch_outs, fts5);")
+    dm._conn.commit()
+    (state_dir / "MIGRATION_COMPLETE.json").write_text(json.dumps(
+        {"schema": "v2", "repo": "widget-repo",
+         "digests": {"target_db": "x"}}), encoding="utf-8")
+    settings.imx_knowledge_runtime = "widget-repo"
+    with pytest.raises(KnowledgeStateError, match="fully-indexed FTS5"):
+        KnowledgePaths.resolve(settings, "widget-repo")
+
+
+def test_activation_refuses_unindexed_mirror_column(settings, tmp_path):
+    """Round-3 F4 (marker side): a v2 store whose FTS5 mirror declares a
+    required column UNINDEXED has the right names but silently misses
+    every term in that column — activation must refuse."""
+    state_dir = Path(settings.memory_db).parent / "state" / "widget-repo"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    dm = DebugMemory(state_dir / "debug_memory.db")
+    dm._conn.executescript(
+        "DROP TABLE entries_fts;"
+        "CREATE VIRTUAL TABLE entries_fts USING fts5("
+        "symptom, root_cause, fix_summary, module, repo, key, tags, "
+        "watch_outs UNINDEXED, content='entries', content_rowid='id');")
+    dm._conn.commit()
+    (state_dir / "MIGRATION_COMPLETE.json").write_text(json.dumps(
+        {"schema": "v2", "repo": "widget-repo",
+         "digests": {"target_db": "x"}}), encoding="utf-8")
+    settings.imx_knowledge_runtime = "widget-repo"
+    with pytest.raises(KnowledgeStateError, match="fully-indexed FTS5"):
+        KnowledgePaths.resolve(settings, "widget-repo")

@@ -220,12 +220,14 @@ def build_report(args) -> tuple[str, bool]:
     ext_slugs = _slug_set(ext_manifest)
     nat_slugs = _slug_set(nat_manifest)
     slug_equal = ext_slugs == nat_slugs and bool(ext_slugs)
-    for label, slugs, manifest in (("ext", ext_slugs, ext_manifest),
-                                   ("nat", nat_slugs, nat_manifest)):
-        if manifest and not slugs:
-            problems.append(f"{label} manifest is valid but EMPTY — zero "
-                            "jobs is not comparable evidence")
-    if ext_manifest and nat_manifest and not slug_equal:
+    for label, slugs in (("ext", ext_slugs), ("nat", nat_slugs)):
+        if not slugs:
+            problems.append(f"{label} slug set is EMPTY (missing or "
+                            "empty manifest) — zero jobs is never "
+                            "comparable evidence")
+    # equality is UNCONDITIONAL too (round-3 F1): guarding it on manifest
+    # truthiness let a `{}` manifest skip the comparison entirely
+    if ext_slugs != nat_slugs:
         problems.append(
             f"slug sets differ: only-ext={sorted(ext_slugs - nat_slugs)[:10]} "
             f"only-nat={sorted(nat_slugs - ext_slugs)[:10]}")
@@ -257,26 +259,40 @@ def build_report(args) -> tuple[str, bool]:
         if bad:
             problems.append(f"ext results carry non-terminal outcomes "
                             f"{bad} — only passed/failed are evidence")
-        if ext_slugs and set(ext_results) != ext_slugs:
+        if set(ext_results) != ext_slugs:
             problems.append(
                 "ext results do not cover EXACTLY the ext slug set "
                 f"(missing={sorted(ext_slugs - set(ext_results))[:10]} "
                 f"extra={sorted(set(ext_results) - ext_slugs)[:10]})")
     pipeline = ((substate.get("tests") or {}).get("pipeline") or {})
     nat_failed = {str(t) for t in pipeline.get("failed_tests") or []}
-    accounted = sum(int(pipeline.get(key) or 0)
-                    for key in ("passed", "failed", "skipped"))
+    # every count must be an EXPLICIT nonnegative JSON integer (round-3
+    # F2): a missing field is unproven (not zero), and booleans/strings/
+    # fractions coerced through int() would mark unproven outcomes
+    # accounted
+    counts: dict[str, int | None] = {}
+    for key in ("passed", "failed", "skipped"):
+        v = pipeline.get(key)
+        counts[key] = v if isinstance(v, int) \
+            and not isinstance(v, bool) and v >= 0 else None
+        if counts[key] is None:
+            problems.append(
+                f"nat pipeline count {key!r} is {v!r} — gate evidence "
+                "requires an explicit nonnegative JSON integer "
+                "(absent, boolean, string, or fractional counts are "
+                "unproven)")
+    counts_ok = all(v is not None for v in counts.values())
     # "not failed ⇒ passed" is a valid inference ONLY when the counts
     # prove every job terminated as pass or fail: zero skips, the failed
     # count matching the failed_tests list, and the sum matching the
     # built manifest. A skipped job is NOT gate evidence (an ext-passed
     # slug skipped in nat would otherwise satisfy equal-or-better), and
     # inconsistent counts mean the record cannot be trusted at all.
-    nat_accounted = (bool(nat_slugs)
-                     and accounted == len(nat_slugs)
-                     and int(pipeline.get("skipped") or 0) == 0
-                     and int(pipeline.get("failed") or 0)
-                     == len(nat_failed)
+    nat_accounted = (counts_ok
+                     and bool(nat_slugs)
+                     and sum(counts.values()) == len(nat_slugs)
+                     and counts["skipped"] == 0
+                     and counts["failed"] == len(nat_failed)
                      # a failure naming a slug OUTSIDE the built manifest
                      # (stale record) would let the complement wrongly
                      # infer as passed (hook iteration-2 finding)
