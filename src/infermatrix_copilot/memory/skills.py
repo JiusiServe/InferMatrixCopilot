@@ -15,6 +15,32 @@ from pathlib import Path
 import yaml
 
 
+def append_usage(journal: str | Path, name: str) -> None:
+    """Append one seed-skill usage record to the runtime usage journal
+    (flock + fsync). Seed `SKILL.md` files are READ-ONLY at run time
+    (Rev 8 §10) — the usage prior that `touch()` used to write into their
+    frontmatter accumulates here instead."""
+    try:
+        import fcntl
+    except ImportError:  # pragma: no cover - Windows
+        fcntl = None  # type: ignore
+    journal = Path(journal)
+    journal.parent.mkdir(parents=True, exist_ok=True)
+    entry = json.dumps({"name": name,
+                        "at": time.strftime("%Y-%m-%d %H:%M:%S")},
+                       ensure_ascii=False)
+    with open(journal, "a", encoding="utf-8") as fh:
+        if fcntl is not None:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+        try:
+            fh.write(entry + "\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+        finally:
+            if fcntl is not None:
+                fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+
+
 def _write_durable(path: Path, text: str) -> None:
     """Crash-safe file rewrite: UNIQUE same-directory temp + fsync(file) +
     atomic rename + fsync(dir). A crash mid-write leaves the old content

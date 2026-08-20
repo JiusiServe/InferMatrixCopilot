@@ -246,7 +246,13 @@ def test_per_repo_skills_rank_first_and_receive_proposals(settings, trace,
     assert names[0] == "repo-skill" and "shared-skill" in names
 
     store.propose(name="new-lesson", description="d", body="b")
-    assert (adapter_root / "skills" / "_candidates.json").exists()
+    # PR-boundary F3: proposals stay repo-scoped but land RUNTIME-side —
+    # the checked-in adapter tree is read-only at run time (Rev 8 §10)
+    from infermatrix_copilot.memory.paths import KnowledgePaths
+    runtime_dir = KnowledgePaths.resolve(
+        settings, "myrepo", adapter_root=adapter_root).skills_runtime_dir
+    assert (runtime_dir / "_candidates.json").exists()
+    assert not (adapter_root / "skills" / "_candidates.json").exists()
     assert not (settings.skills_dir / "_candidates.json").exists()
 
 
@@ -261,7 +267,13 @@ def test_no_adapter_falls_back_to_shared_pool(settings, trace, tmp_path, git_rep
     summaries, store = _retrieve_skills(ctx, "fix ci failures")
     assert [s["name"] for s in summaries] == ["shared-skill"]
     store.propose(name="new-lesson", description="d", body="b")
-    assert (settings.skills_dir / "_candidates.json").exists()
+    # PR-boundary F3: proposals are RUNTIME-side in every configuration —
+    # the shared pool (like the adapter tree) is read-only at run time
+    from infermatrix_copilot.memory.paths import KnowledgePaths
+    runtime_dir = KnowledgePaths.resolve(
+        settings, "unknown").skills_runtime_dir
+    assert (runtime_dir / "_candidates.json").exists()
+    assert not (settings.skills_dir / "_candidates.json").exists()
 
 
 # -- fix 5: adapter-sourced high-risk modules ------------------------------------

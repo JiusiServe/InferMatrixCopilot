@@ -342,13 +342,20 @@ class Copilot:
         # writer is alive (and so no run starts mid-migration).
         knowledge_lock = None
         if spec.repo:
-            from ..memory.paths import (KnowledgeLockHeld, KnowledgePaths,
-                                        KnowledgeRunLock)
+            from ..memory.paths import (KnowledgeLockHeld,
+                                        KnowledgePaths,
+                                        KnowledgeRunLock,
+                                        KnowledgeStateError)
             try:
                 knowledge_lock = KnowledgeRunLock(
                     KnowledgePaths.resolve(self.settings, spec.repo)
                     .knowledge_run_lock).acquire_shared()
-            except KnowledgeLockHeld as exc:
+            except (KnowledgeLockHeld, KnowledgeStateError) as exc:
+                # BOTH refusals take the terminal protocol: an invalid
+                # activation marker (KnowledgeStateError) must exit
+                # blocked/3 with the run lock RELEASED, never escape as
+                # a traceback that leaves the lock held in a long-lived
+                # process (PR-boundary F4)
                 if held_lock is None:
                     lock.release()
                 print(style("✋ ", "red", "bold") + str(exc))

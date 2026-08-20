@@ -60,13 +60,19 @@ def test_parent_search_maps_fields_and_filters_status(tmp_path):
         {"key": "dead-entry", "symptom": "caplog something",
          "fix": "old", "status": "stale"},
     ])
-    pm = ParentDebugMemory(db)
+    pm = ParentDebugMemory(db, upstream_column="vllm_commit")
     hits = pm.search("caplog empty assertion")
     assert [h["key"] for h in hits] == ["caplog-empty"]  # stale filtered
     assert hits[0]["fix_summary"] == "capture at the emitting logger"
     full = pm.get(hits[0]["id"])
     assert full["upstream_commit"] == "abc"
     assert "fix" not in full and "vllm_commit" not in full
+    # an UNDECLARED upstream column maps to "" (repo-neutral default)
+    assert ParentDebugMemory(db).get(1)["upstream_commit"] == ""
+    # a declared-but-absent column fails the schema probe at the gate
+    import pytest as _pytest
+    with _pytest.raises(sqlite3.DatabaseError):
+        ParentDebugMemory(db, upstream_column="no_such_column")
 
 
 def test_parent_open_fails_closed(tmp_path):
@@ -290,6 +296,67 @@ def test_restore_failure_restores_preserved_sidecars(tmp_path,
     # and a subsequent (unimpeded) restore succeeds
     restored = ka.restore_debug_db(snap, db)
     assert restored == ka.debug_db_digest(db)
+
+
+def test_restore_ignores_planted_staging_symlink(tmp_path):
+    """PR-boundary F14: a pre-planted symlink at the old predictable
+    staging name must neither redirect the staged write nor become the
+    target — staging is a unique O_EXCL temp file now."""
+    db = _parent_db(tmp_path / "p.db", [{"key": "k1", "symptom": "s1"}])
+    snap = tmp_path / "snap.db"
+    ka.snapshot_debug_db(db, snap)
+    victim = tmp_path / "victim.txt"
+    victim.write_text("do not overwrite", encoding="utf-8")
+    planted = tmp_path / "p.db.restore-tmp"  # the OLD predictable name
+    planted.symlink_to(victim)
+    restored = ka.restore_debug_db(snap, db)
+    assert restored == ka.debug_db_digest(db)
+    assert victim.read_text(encoding="utf-8") == "do not overwrite"
+    assert planted.is_symlink()  # untouched, and never installed
+
+
+def test_restore_self_heals_after_simulated_sigkill(tmp_path,
+                                                    monkeypatch):
+    """PR-boundary F15: a process death between sidecar-aside and replace
+    leaves the durable pre-restore GUARD on disk; the next restore call
+    self-heals the unreadable target from it before proceeding."""
+    db = _parent_db(tmp_path / "p.db", [{"key": "k1", "symptom": "s1"}])
+    c = sqlite3.connect(db)
+    c.execute("PRAGMA journal_mode=WAL")
+    c.execute("INSERT INTO debug_entries (module, key) VALUES ('m','k2')")
+    c.commit()  # k2 is WAL-resident; keep the connection open
+    live_digest = ka.debug_db_digest(db)
+    snap = tmp_path / "snap.db"
+    ka.snapshot_debug_db(db, snap)
+    # simulate the SIGKILL aftermath: guard written, sidecars gone, main
+    # left truncated mid-swap (no in-process rollback ran)
+    guard = tmp_path / "p.db.pre-restore-guard.db"
+    ka.snapshot_debug_db(db, guard)
+    c.close()
+    for side in (tmp_path / "p.db-wal", tmp_path / "p.db-shm"):
+        side.unlink(missing_ok=True)
+    db.write_bytes(b"truncated mid-swap")
+    # a FRESH restore call self-heals from the guard, then restores
+    restored = ka.restore_debug_db(snap, db)
+    assert restored == live_digest
+    keys = {r[0] for r in sqlite3.connect(db).execute(
+        "SELECT key FROM debug_entries")}
+    assert keys == {"k1", "k2"}  # the WAL-resident row survived the kill
+    assert not guard.exists()    # consumed/cleaned by the healed restore
+
+
+def test_attest_rejects_malformed_declared_skill(tmp_path):
+    """PR-boundary F2: a declared parent skill that does not PARSE would
+    be silently skipped at retrieval while its bytes attest — the gate
+    must refuse instead."""
+    db = _parent_db(tmp_path / "p.db", [{"key": "k"}])
+    skills = tmp_path / "skills"
+    (skills / "broken").mkdir(parents=True)
+    (skills / "broken" / "SKILL.md").write_text("no frontmatter at all\n",
+                                                encoding="utf-8")
+    with pytest.raises(ValueError, match="does not parse"):
+        ka.attest_layers(parent_debug_db=str(db),
+                         parent_skills_dir=str(skills))
 
 
 def test_attest_layers_fail_closed_and_catalog(tmp_path):

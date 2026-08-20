@@ -62,13 +62,20 @@ def _slug_set(manifest: dict) -> set[str]:
 
 
 def _routing_map(golden_path: str, problems: list) -> dict[str, str]:
-    """ext module name -> nat module name, through the golden's recorded
-    assignment_routing flavor (DRIFT #7). Absent golden: identity map with
-    a recorded pending note."""
+    """slug -> module through the golden's recorded `assignment_routing`
+    flavor (DRIFT #7; the REAL golden at
+    adapters/<repo>/rebase/shell_golden.json — provenance keys starting
+    with '_' are metadata, not routes)."""
     if not golden_path:
         return {}
     golden = _load_json(golden_path, problems, "routing golden")
-    return dict(golden.get("module_name_map") or {})
+    routing = {k: str(v) for k, v in
+               (golden.get("assignment_routing") or {}).items()
+               if not str(k).startswith("_")}
+    if golden and not routing:
+        problems.append("routing golden carries no assignment_routing "
+                        "map — wrong artifact?")
+    return routing
 
 
 def build_report(args) -> tuple[str, bool]:
@@ -123,8 +130,26 @@ def build_report(args) -> tuple[str, bool]:
         problems.append("wall-clock durations missing or invalid (must "
                         "be finite and > 0) — the 1.25x bound is a gate "
                         "requirement")
-    # opening-identity: BOTH worlds against the restored snapshot
+    # knowledge evidence must be COMPLETE (PR-boundary F16): drift is an
+    # explicit False, never an absence; the close block must exist and
+    # equal the open block per declared layer; both opening digests are
+    # required
+    if knowledge.get("drift") is not False:
+        problems.append("nat run does not record knowledge drift == "
+                        "False explicitly (absent/ambiguous evidence "
+                        "never passes)")
     open_block = knowledge.get("open") or {}
+    close_block = knowledge.get("close") or {}
+    if open_block and not close_block:
+        problems.append("nat run carries no CLOSING knowledge "
+                        "attestation (compare step did not record it)")
+    for layer, rec in open_block.items():
+        open_digest = (rec or {}).get("digest", "")
+        close_digest = (close_block.get(layer) or {}).get("digest", "")
+        if open_digest and close_digest != open_digest:
+            problems.append(
+                f"knowledge layer {layer}: close digest != open digest "
+                "(or missing from the close block)")
     nat_open_db = (open_block.get("parent_debug_db") or {}).get(
         "digest", "")
     nat_open_skills = (open_block.get("parent_skills_dir") or {}).get(
@@ -132,6 +157,9 @@ def build_report(args) -> tuple[str, bool]:
     if not nat_open_db:
         problems.append("nat run carries no opening knowledge "
                         "attestation (prelude provenance block absent)")
+    if not nat_open_skills:
+        problems.append("nat run carries no opening SKILLS attestation "
+                        "— the skills layer's fairness is unproven")
     checks = (
         ("nat opening debug digest", nat_open_db, args.snapshot_digest),
         ("nat opening skills digest", nat_open_skills,
@@ -202,12 +230,39 @@ def build_report(args) -> tuple[str, bool]:
             f"slug sets differ: only-ext={sorted(ext_slugs - nat_slugs)[:10]} "
             f"only-nat={sorted(nat_slugs - ext_slugs)[:10]}")
 
-    # ── per-module outcomes through the routing flavor ──────────────────
-    route = _routing_map(args.routing_golden, problems)
-    ext_modules = {route.get(k, k): (v or {}).get("status", v)
+    # ── per-module outcomes (module names are shared vocabulary) ────────
+    ext_modules = {k: (v or {}).get("status", v)
                    for k, v in (ext_state.get("modules") or {}).items()}
     nat_modules = {k: (v or {}).get("status", "?")
                    for k, v in (substate.get("modules") or {}).items()}
+
+    # ── PER-SLUG outcomes, equal-or-better (PR-boundary F17) ────────────
+    # ext per-slug results are REQUIRED artifact evidence (--ext-results:
+    # {slug: "passed"|"failed"}); nat failures come from substate; a slug
+    # the ext world passed and the nat world failed is a hard blocker.
+    route = _routing_map(args.routing_golden, problems)
+    slug_rows: list[str] = []
+    if not args.ext_results:
+        problems.append("--ext-results not supplied — per-slug "
+                        "equal-or-better cannot be judged")
+        ext_results: dict = {}
+    else:
+        ext_results = {k: str(v) for k, v in _load_json(
+            args.ext_results, problems, "ext results").items()}
+    nat_failed = {str(t) for t in
+                  ((substate.get("tests") or {}).get("pipeline") or {})
+                  .get("failed_tests") or []}
+    for slug in sorted(set(ext_results) | nat_failed):
+        ext_out = ext_results.get(slug, "(absent)")
+        nat_out = "failed" if slug in nat_failed else \
+            ("passed" if slug in nat_slugs else "(absent)")
+        module = route.get(slug, "(unmapped)")
+        slug_rows.append(f"- {slug} [{module}]: ext={ext_out} "
+                         f"nat={nat_out}")
+        if ext_out == "passed" and nat_out == "failed":
+            problems.append(f"per-slug regression: {slug} passed in ext "
+                            "but FAILED in nat (equal-or-better "
+                            "violated)")
 
     # ── wall-clock ──────────────────────────────────────────────────────
     import math as _math
@@ -258,8 +313,7 @@ def build_report(args) -> tuple[str, bool]:
               "## Slug set (each world's OWN built manifest)",
               f"- ext: {len(ext_slugs)} jobs; nat: {len(nat_slugs)} jobs; "
               f"identical: {slug_equal}",
-              "", "## Per-module outcomes (ext names mapped via routing "
-              "golden)"]
+              "", "## Per-module outcomes"]
     for module in sorted(set(ext_modules) | set(nat_modules)):
         e = ext_modules.get(module, "(absent)")
         n = nat_modules.get(module, "(absent)")
@@ -268,6 +322,9 @@ def build_report(args) -> tuple[str, bool]:
         lines.append(f"- {module}: ext={e} nat={n} — {verdict}")
     if not (ext_modules or nat_modules):
         lines.append("- (no module records on either side)")
+    lines += ["", "## Per-slug outcomes (modules via the golden's "
+              "assignment_routing; ext-pass/nat-fail blocks)"]
+    lines += slug_rows or ["- (no per-slug records)"]
     lines += ["", "## CI (equal-or-better obligation)"]
     ci = substate.get("ci") or {}
     if ci:
@@ -312,7 +369,12 @@ def main(argv: list[str] | None = None) -> int:
                         help="ext world's recorded post-run target HEAD")
     parser.add_argument("--nat-head", default="",
                         help="nat world's recorded post-run target HEAD")
-    parser.add_argument("--routing-golden", default="")
+    parser.add_argument("--routing-golden", default="",
+                        help="the adapter's shell_golden.json "
+                             "(assignment_routing slug→module map)")
+    parser.add_argument("--ext-results", default="",
+                        help="ext world's per-slug outcomes json "
+                             "({slug: passed|failed}) — required")
     parser.add_argument("--ext-wallclock-sec", type=float, default=0.0)
     parser.add_argument("--nat-wallclock-sec", type=float, default=0.0)
     parser.add_argument("--out", default="")

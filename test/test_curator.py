@@ -450,7 +450,8 @@ def test_phase5_report_and_compare_steps(settings, trace, tmp_path):
     comparison = (run_dir / "COMPARISON.md").read_text(encoding="utf-8")
     assert "no baseline supplied" in comparison
 
-    # with a baseline status file, the side-by-side lands
+    # with a baseline status file, the side-by-side lands — and RULES
+    # (PR-boundary F6): matching modules pass…
     baseline = tmp_path / "ext_status.json"
     baseline.write_text(json.dumps(
         {"modules": {"core": {"status": "done"}}}), encoding="utf-8")
@@ -459,6 +460,18 @@ def test_phase5_report_and_compare_steps(settings, trace, tmp_path):
     assert r.ok
     comparison = (run_dir / "COMPARISON.md").read_text(encoding="utf-8")
     assert "## Baseline" in comparison and "core: done" in comparison
+    # …a module the baseline had green but this run failed BLOCKS
+    # (needs-human, the soak's investigate-don't-average contract)
+    baseline.write_text(json.dumps(
+        {"modules": {"worker": {"status": "done"}}}), encoding="utf-8")
+    r = asyncio.run(registry.get("rebase.v3_compare").handler(
+        ctx({"baseline_status": str(baseline)})))
+    assert not r.ok and "worse-than-baseline" in r.summary
+    # …and an unreadable baseline is a typed failure, never prose
+    baseline.write_text("not json", encoding="utf-8")
+    r = asyncio.run(registry.get("rebase.v3_compare").handler(
+        ctx({"baseline_status": str(baseline)})))
+    assert not r.ok and "unreadable" in r.summary
 
 
 def test_compare_detects_parent_layer_drift(settings, trace, tmp_path):

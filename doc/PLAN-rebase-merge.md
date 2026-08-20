@@ -263,6 +263,21 @@ per-round findings ledgers) is archived alongside the transcripts as
 `*-rebase-completion-design-APPROVED.md`; where this plan is silent on a
 completion-work detail, that document governs.
 
+**Recorded owner positions from the PR-boundary review (round 1, 21
+findings — 19 implemented with regression tests, 2 recorded):**
+(a) *Wrapper Tier-2 LLM review*: the standalone pytest wrapper runs in
+the AGENT SHELL, whose credential scrub (Rev 8 §4) is a security
+invariant that outranks Tier-2 LLM review inside wrapper processes —
+the wrapper stays explicit-CONTINUE-recorded (its decisions still feed
+the learning pipeline); the assembly test loop carries the eco-tier
+reviewer. §6.20's "swaps in at PR4c" is refined to "in the assembly
+loop" accordingly. (b) *Archival history scanning*: the PR7 archive
+scans its WORKING-STATE surfaces, the archival branch's HEAD tree, the
+logs tarball members, and the debug-DB copy's bytes; full git HISTORY
+(the bundle) is deliberately not scanned — history predates archival
+and is governed by the repo's own hygiene; the NAME-only inventory
+covers env files.
+
 Delivered Rev 8 obligations previously under-delivered, now closed:
 §9-PR4c parent-store read-compat (as read-only layers with fail-closed
 prelude provenance — the §8 fairness gate's knowledge condition);

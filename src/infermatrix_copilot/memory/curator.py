@@ -127,7 +127,8 @@ class DebugMemoryCurator:
                  upstream_path: str = "",
                  current_upstream_commit: str = "",
                  skill_layers: tuple = (),
-                 propose_to: SkillStore | None = None):
+                 propose_to: SkillStore | None = None,
+                 survivor_key=None):
         if not dm.schema_v2:
             raise RuntimeError(
                 "curation requires the v2 schema — run ensure_schema_v2() "
@@ -143,6 +144,13 @@ class DebugMemoryCurator:
         self.current_upstream_commit = current_upstream_commit
         self.skill_layers = tuple(skill_layers)
         self.propose_to = propose_to
+        # merge-survivor order: default = newest id (parent parity);
+        # migration passes a source-precedence rank so a newly imported
+        # lower-priority parent/adapter row can never retire
+        # higher-priority runtime knowledge (PR-boundary F11). The
+        # callable maps an entry dict to a sort key; LOWEST wins.
+        self.survivor_key = survivor_key or \
+            (lambda e: (-int(e["id"]),))
 
     # ── entry point ─────────────────────────────────────────────────────
     def curate(self, recent_runs: list[str] | None = None) -> CuratorReport:
@@ -164,7 +172,7 @@ class DebugMemoryCurator:
         for group in self._cluster(self._entries(), self.sim_threshold):
             if len(group) < 2:
                 continue
-            group.sort(key=lambda e: e["id"], reverse=True)
+            group.sort(key=self.survivor_key)
             rep, others = group[0], group[1:]
             tags = _tags_of(rep)
             files = list(rep.get("files") or [])
@@ -260,6 +268,17 @@ class DebugMemoryCurator:
             if str(e.get("status")) != "active":
                 continue
             if e["id"] in updates and updates[e["id"]].get("status"):
+                continue
+            # MIGRATED rows carry run ids from a FOREIGN id space (the
+            # parent's), which can never appear in the copilot's run
+            # window — dormancy would mark every freshly migrated fact
+            # stale on the first curate (PR-boundary F12). Source-aware
+            # rule: migrated rows are exempt from the dormancy clock
+            # (staleness still applies via upstream-commit distance,
+            # which IS meaningful for them).
+            source_tag = str(e.get("source") or "").split("#", 1)[0]
+            if source_tag in ("parent-db", "copilot-global",
+                              "adapter-tree"):
                 continue
             seen = str(e.get("last_seen_run") or e.get("run_id") or "")
             if seen and seen not in window:

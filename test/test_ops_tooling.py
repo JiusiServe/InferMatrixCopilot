@@ -36,14 +36,16 @@ def _worlds(tmp_path, *, drift=False, slug_mismatch=False,
     nat_run.mkdir()
     digest = "d" * 64
     skills_digest = "e" * 64
+    open_block = {"parent_debug_db": {"digest": digest},
+                  "parent_skills_dir": {"digest": skills_digest}}
     (nat_run / "substate.json").write_text(json.dumps({
         "run_id": "run-n", "phase": nat_phase,
         "upstream_commit": "f" * 40,
         "modules": {"core_mod": {"status": "done"}},
-        "knowledge": {"open": {
-            "parent_debug_db": {"digest": digest},
-            "parent_skills_dir": {"digest": skills_digest}},
-            "close": {}, "drift": drift}}), encoding="utf-8")
+        "tests": {"pipeline": {"failed_tests": []}},
+        "knowledge": {"open": open_block,
+                      "close": dict(open_block),
+                      "drift": drift}}), encoding="utf-8")
     (nat_run / "test_manifest.json").write_text(json.dumps(
         {"jobs": [{"slug": "quick"},
                   {"slug": "different" if slug_mismatch else "soak"}]}),
@@ -54,8 +56,12 @@ def _worlds(tmp_path, *, drift=False, slug_mismatch=False,
 def _args(ext_state, ext_manifest, nat_run, digest, **over):
     golden = Path(nat_run).parent / "routing_golden.json"
     if not golden.exists():
-        golden.write_text(json.dumps({"module_name_map": {}}),
-                          encoding="utf-8")
+        golden.write_text(json.dumps({"assignment_routing": {
+            "quick": "core_mod", "soak": "core_mod"}}), encoding="utf-8")
+    ext_results = Path(nat_run).parent / "ext_results.json"
+    if not ext_results.exists():
+        ext_results.write_text(json.dumps(
+            {"quick": "passed", "soak": "passed"}), encoding="utf-8")
     base = dict(ext_state=str(ext_state), ext_manifest=str(ext_manifest),
                 nat_run=str(nat_run), frozen_target="a" * 40,
                 frozen_upstream="f" * 40, snapshot_digest=digest,
@@ -63,7 +69,8 @@ def _args(ext_state, ext_manifest, nat_run, digest, **over):
                 ext_open_digest=digest, ext_open_skills_digest="e" * 64,
                 ext_start_head="a" * 40, nat_start_head="a" * 40,
                 ext_head="1" * 40, nat_head="2" * 40,
-                routing_golden=str(golden), ext_wallclock_sec=100.0,
+                routing_golden=str(golden), ext_results=str(ext_results),
+                ext_wallclock_sec=100.0,
                 nat_wallclock_sec=110.0, out="")
     base.update(over)
     import argparse
@@ -102,6 +109,45 @@ def test_gate_fail_closed_on_mismatched_evidence(tmp_path, mutate, needle):
     report, eligible = compare_validation.build_report(
         _args(*_worlds(tmp_path), **mutate))
     assert not eligible and "GATE-ELIGIBLE: NO" in report and needle in report
+
+
+def test_gate_fail_closed_on_incomplete_knowledge_evidence(tmp_path):
+    """PR-boundary F16: absent drift, a missing close block, or a
+    mismatched close digest each block — evidence must be COMPLETE."""
+    import json as _json
+
+    ext_state, ext_manifest, nat_run, digest = _worlds(tmp_path)
+    sub = _json.loads((nat_run / "substate.json").read_text())
+    sub["knowledge"].pop("drift")
+    (nat_run / "substate.json").write_text(_json.dumps(sub))
+    report, eligible = compare_validation.build_report(
+        _args(ext_state, ext_manifest, nat_run, digest))
+    assert not eligible and "drift == False explicitly" in report
+    sub["knowledge"]["drift"] = False
+    sub["knowledge"]["close"] = {}
+    (nat_run / "substate.json").write_text(_json.dumps(sub))
+    report, eligible = compare_validation.build_report(
+        _args(ext_state, ext_manifest, nat_run, digest))
+    assert not eligible and "no CLOSING knowledge attestation" in report
+
+
+def test_gate_fail_closed_on_per_slug_regression(tmp_path):
+    """PR-boundary F17: a slug the ext world passed but the nat world
+    failed is a hard equal-or-better violation."""
+    import json as _json
+
+    ext_state, ext_manifest, nat_run, digest = _worlds(tmp_path)
+    sub = _json.loads((nat_run / "substate.json").read_text())
+    sub["tests"]["pipeline"]["failed_tests"] = ["quick"]
+    (nat_run / "substate.json").write_text(_json.dumps(sub))
+    report, eligible = compare_validation.build_report(
+        _args(ext_state, ext_manifest, nat_run, digest))
+    assert not eligible and "per-slug regression: quick" in report
+    assert "quick [core_mod]" in report  # routed via assignment_routing
+    # and missing ext results is itself a blocker
+    report, eligible = compare_validation.build_report(
+        _args(ext_state, ext_manifest, nat_run, digest, ext_results=""))
+    assert not eligible and "--ext-results not supplied" in report
 
 
 def test_gate_fail_closed_on_incomplete_nat_run(tmp_path):
@@ -173,6 +219,7 @@ def _parent_fixture(tmp_path):
     _git(repo, "commit", "-qm", "add tracked_key")
     target = tmp_path / "target"
     (target / "locks").mkdir(parents=True)
+    _git(target, "init", "-q")
     return repo, target
 
 
@@ -269,6 +316,78 @@ def test_archive_refuses_while_lock_held(tmp_path):
         assert r.returncode != 0 and "HELD" in (r.stderr + r.stdout)
     finally:
         _os.close(fd)
+
+
+def test_archive_refuses_fake_or_missing_target(tmp_path):
+    """PR-boundary F20: a typo'd/fake target must REFUSE (not-contention
+    setup failure through the shared hardened CheckoutLock), never let
+    the archive proceed while the real lock lives elsewhere."""
+    repo, target = _parent_fixture(tmp_path)
+    r = _run_archive(repo, tmp_path / "no-such-checkout",
+                     tmp_path / "archive")
+    assert r.returncode != 0
+    assert "REFUSED (not contention)" in (r.stderr + r.stdout)
+
+
+def test_archive_requires_db_and_tag_fail_closed(tmp_path):
+    """PR-boundary F21: a missing debug DB aborts without the explicit
+    waiver, and a supplied --copilot-repo without the pre-pr7-retirement
+    tag aborts instead of noting."""
+    repo, target = _parent_fixture(tmp_path)
+    (repo / "agent" / "store" / "debug_memory.db").unlink()
+    r = _run_archive(repo, target, tmp_path / "archive")
+    assert r.returncode == 6 and "--allow-missing-db" in r.stderr
+    r = _run_archive(repo, target, tmp_path / "archive2",
+                     ("--allow-missing-db",))
+    assert r.returncode == 0, r.stderr
+    # tag fail-closed: an un-tagged copilot repo aborts
+    copilot = tmp_path / "copilot"
+    copilot.mkdir()
+    _git(copilot, "init", "-q")
+    r = _run_archive(repo, target, tmp_path / "archive3",
+                     ("--allow-missing-db", "--copilot-repo",
+                      str(copilot)))
+    assert r.returncode == 7 and "pre-pr7-retirement" in r.stderr
+
+
+def test_restore_sh_round_trips(tmp_path):
+    """PR-boundary F21: the generated restore.sh actually restores the
+    parent world into a scratch path — clone at the archival branch,
+    logs unpacked, debug DB in place."""
+    repo, target = _parent_fixture(tmp_path)
+    archive = tmp_path / "archive"
+    r = _run_archive(repo, target, archive)
+    assert r.returncode == 0, r.stderr
+    restore_sh = archive / "restore.sh"
+    assert restore_sh.exists() and restore_sh.stat().st_mode & 0o111
+    dest = tmp_path / "restored"
+    rr = subprocess.run(["bash", str(restore_sh), str(dest)],
+                        capture_output=True, text=True)
+    assert rr.returncode == 0, rr.stderr
+    assert (dest / "code.py").read_text() == "print('changed')\n"
+    assert (dest / "rebase_logs" / "run.log").exists()
+    n = sqlite3.connect(dest / "agent" / "store" / "debug_memory.db"
+                        ).execute("SELECT count(*) FROM debug_entries"
+                                  ).fetchone()[0]
+    assert n == 1
+
+
+def test_archive_aborts_on_clean_committed_secret(tmp_path):
+    """PR-boundary F19: a secret committed CLEAN (no dirty status entry)
+    still reaches the archival branch's HEAD tree — the tree scan aborts
+    unless the path is allowlisted (history itself is a recorded owner
+    position, not scanned)."""
+    repo, target = _parent_fixture(tmp_path)
+    (repo / "committed_cred.txt").write_text(
+        "password=committed-long-ago-123\n")
+    _git(repo, "add", "committed_cred.txt")
+    _git(repo, "commit", "-qm", "old secret, clean tree")
+    r = _run_archive(repo, target, tmp_path / "archive")
+    assert r.returncode == 5
+    assert "committed_cred.txt" in r.stderr
+    r = _run_archive(repo, target, tmp_path / "archive2",
+                     ("--secret-allowlist", "committed_cred.txt"))
+    assert r.returncode == 0, r.stderr
 
 
 def test_knowledge_digest_cli_roundtrip(tmp_path):

@@ -218,6 +218,9 @@ mkdir -p $AG/backups/$TS
 $COP/scripts/knowledge_digest.py snapshot \
     --db <parent-debug-db> --dest $AG/backups/$TS/debug_memory.db
 cp -a <parent-skills-dir> $AG/backups/$TS/skills
+# the SKILLS digest is Phase-5 gate evidence — record it AT SNAPSHOT
+# time (recomputing later would attest a possibly-changed dir)
+$COP/scripts/knowledge_digest.py digest --skills $AG/backups/$TS/skills
 cp -a <parent-state-json> $AG/backups/$TS/state.json
 # validation branches from the frozen start SHA (one per world)
 git -C $TGT branch rebase-val-ext-$VAL <rebase-branch>
@@ -262,7 +265,14 @@ branch, frozen upstream. Its own flock on the target's
 
 ```bash
 git -C $TGT checkout rebase-val-ext-$VAL && git -C $TGT status --short  # clean
-# opening attestation for the ext world (record the printed digests)
+# START evidence, captured IMMEDIATELY before launch (the start head +
+# opening digests are Phase-5 gate inputs). The attest→launch window is
+# not lock-bridgeable for the ext world (its own EXT1 guard takes the
+# flock at startup) — the compensating controls are decision C (provider
+# schedules paused), the paused nightly, and the single-operator run-day
+# protocol: NOTHING else may be launched between these lines and the
+# orchestrator start. Record all three values in the values file.
+git -C $TGT rev-parse HEAD          # <ext-start-head>, must == frozen SHA
 $COP/scripts/knowledge_digest.py digest --db <parent-debug-db> \
     --skills <parent-skills-dir>
 cd $AG && <branch-override-env>=rebase-val-ext-$VAL \
@@ -280,7 +290,10 @@ $COP/scripts/knowledge_digest.py digest --db <parent-debug-db> \
       do not paper over; the comparison needs a completed baseline.
 - [ ] Archive the ext world into `$COP/validation/$VAL/ext/` (state
       file, its built test manifest, latest run dir,
-      `git -C $TGT rev-parse HEAD`, both attestation outputs).
+      `git -C $TGT rev-parse HEAD` (= `<ext-post-run-head>`), both
+      attestation outputs, and the per-slug results json extracted from
+      the ext run's own records as `ext_results.json`
+      ({slug: passed|failed} — Phase 5's `--ext-results` input).
 - [ ] **Restore for the v3 run — WHILE HOLDING the checkout flock**
       (a "locks free" pre-check alone is a race): take
       `locks/<lock_name>.lock`, then
@@ -295,6 +308,9 @@ $COP/scripts/knowledge_digest.py digest --db <parent-debug-db> \
 ### Phase 4 — supervised v3 full run (human attached, ALLOW_PUSH armed per-command)
 
 ```bash
+# START evidence for the nat world (same rule as Phase 3): record
+# immediately before launch; nothing else may touch the world between
+git -C $TGT rev-parse HEAD          # <nat-start-head>, must == frozen SHA
 cd $COP && ALLOW_PUSH=1 CUDA_VISIBLE_DEVICES=<gpu-device-set> \
     ./infermatrix-copilot --playbook repo-rebase-v3 --yes \
     --task-param rebase_mode=full \
@@ -338,7 +354,8 @@ $COP/scripts/compare_validation.py \
     --nat-start-head <nat-pre-run-target-head> \
     --ext-head <ext-post-run-target-head> \
     --nat-head <nat-post-run-target-head> \
-    --routing-golden test/goldens/shell_golden.json \
+    --ext-results $COP/validation/$VAL/ext/ext_results.json \
+    --routing-golden adapters/vllm_omni/rebase/shell_golden.json \
     --ext-wallclock-sec <ext-sec> --nat-wallclock-sec <nat-sec> \
     --out $COP/validation/$VAL/COMPARISON.md
 ```

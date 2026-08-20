@@ -137,7 +137,8 @@ def _synthesize_key(symptom: str) -> str:
     return "-".join(tokens)[:64] or "unkeyed"
 
 
-def _map_parent_row(row: dict, repo: str, report: MigrationReport) -> dict:
+def _map_parent_row(row: dict, repo: str, report: MigrationReport,
+                    upstream_column: str = "") -> dict:
     created = time.time()
     ts = str(row.get("timestamp") or "")
     if ts:
@@ -183,7 +184,8 @@ def _map_parent_row(row: dict, repo: str, report: MigrationReport) -> dict:
             str(row.get("symptom") or "")),
         tags=str(row.get("tags") or ""),
         watch_outs=str(row.get("watch_outs") or ""),
-        upstream_commit=str(row.get("vllm_commit") or ""),
+        upstream_commit=str(row.get(upstream_column) or ""
+                            ) if upstream_column else "",
         last_seen_run=str(row.get("last_seen_run") or ""),
         run_count=int(row.get("run_count") or 1),
     )
@@ -200,7 +202,10 @@ def _map_legacy_row(row: dict, report: MigrationReport) -> dict:
         "repo", "module", "run_id", "symptom", "root_cause", "fix_summary",
         "verification", "status", "created_at") if row.get(k) is not None}
     for k in ADDITIVE_COLUMNS:
-        if row.get(k) not in (None, ""):
+        # derived_from is a SOURCE-store row id — the ingest's lineage
+        # remap owns it (copying verbatim would point at an unrelated
+        # target row; PR-boundary F10)
+        if k != "derived_from" and row.get(k) not in (None, ""):
             out[k] = row[k]
     out["files"] = files or []
     if not out.get("key"):
@@ -244,21 +249,39 @@ def migrate_knowledge(settings, repo: str, *, dry_run: bool = False,
         name=repo.replace("-", "_"))
     if adapter is None:
         raise MigrationError(f"no adapter for repo {repo!r}")
-    kp = KnowledgePaths.resolve(settings, repo, adapter_root=adapter.root)
-    # NOTE deliberately resolved with the flag OFF semantics for targets:
-    # migration RUNS before activation. The target state db is the
-    # state-dir path regardless of the flag.
+    # deliberately resolved with FLAG-OFF semantics: migration must run
+    # both before activation AND on an activated repo whose marker a
+    # crashed rerun already invalidated (PR-boundary F13) — the marker
+    # gate protects RUNS, not the tool that recreates the marker
+    flagless = settings
+    if repo in getattr(settings, "knowledge_runtime_repos", set()):
+        flagless = settings.model_copy(
+            update={"imx_knowledge_runtime": ""})
+    kp = KnowledgePaths.resolve(flagless, repo, adapter_root=adapter.root)
     state_db = kp.state_dir / "debug_memory.db"
     manifest = adapter.manifest
     kn_cfg = (manifest.get("rebase") or {}).get("knowledge") or {}
     lock_name = str((manifest.get("rebase") or {}).get("lock_name") or "")
-    repo_path = expand_path(str((manifest.get("repo") or {})
-                                .get("path") or ""))
+    # the RUNTIME's repo-path authority first (settings.repo_paths), then
+    # the manifest with the .env-backed fallback — and a DECLARED lock
+    # name with an unresolvable checkout FAILS CLOSED (PR-boundary F7:
+    # silently skipping the shared flock would let migration race a live
+    # rebase run)
+    repo_path = str((getattr(settings, "repo_paths", None) or {})
+                    .get(repo, "")) or expand_path(
+        str((manifest.get("repo") or {}).get("path") or ""),
+        extra=settings.expansion_env())
 
     # ── locks: checkout flock + state lock + knowledge EXCLUSIVE ────────
     locks: list = []
     try:
-        if repo_path and lock_name and Path(repo_path).is_dir():
+        if lock_name:
+            if not repo_path or not Path(repo_path).is_dir():
+                raise MigrationError(
+                    f"adapter declares checkout lock {lock_name!r} but "
+                    f"the repo checkout is unresolved ({repo_path!r}) — "
+                    "refusing to migrate without the shared flock "
+                    "(set REPO_PATHS or the manifest repo.path env var)")
             checkout = CheckoutLock(Path(repo_path), lock_name)
             if checkout.acquire(blocking=False) is False:
                 raise MigrationError(
@@ -312,12 +335,21 @@ def _migrate_locked(settings, repo, adapter, kp: KnowledgePaths,
                     "or overwrite (round-3 F6); resolve by hand, then "
                     "delete the stale .migration-journal.json")
 
-    # ── sources, realpath-deduped, digest-bound ─────────────────────────
+    # ── sources, DECLARED ⇒ fail-closed, realpath-deduped ───────────────
+    # (PR-boundary F8: silently omitting a declared-but-unresolved parent
+    # source and then stamping MIGRATION_COMPLETE would activate a world
+    # missing the very knowledge the migration exists to carry over)
     candidates: list[tuple[str, Path, str]] = []  # (tag, path, family)
     _extra = settings.expansion_env()
-    parent_db = expand_path(str(kn_cfg.get("parent_debug_db") or ""),
-                            extra=_extra)
-    if parent_db and Path(parent_db).is_file():
+    if kn_cfg.get("parent_debug_db"):
+        parent_db = expand_path(str(kn_cfg["parent_debug_db"]),
+                                extra=_extra)
+        if not parent_db or not Path(parent_db).is_file():
+            raise MigrationError(
+                "declared parent_debug_db="
+                f"{kn_cfg['parent_debug_db']!r} did not resolve to an "
+                f"existing file ({parent_db!r}) — refusing a partial "
+                "migration")
         candidates.append(("parent-db", Path(parent_db), "parent"))
     legacy_global = Path(settings.memory_db)
     if legacy_global.is_file():
@@ -337,8 +369,16 @@ def _migrate_locked(settings, repo, adapter, kp: KnowledgePaths,
         sources.append((tag, Path(path), family,
                         ka.debug_db_digest(path)))
 
-    parent_skills = expand_path(str(kn_cfg.get("parent_skills_dir") or ""),
-                                extra=settings.expansion_env())
+    parent_skills = ""
+    if kn_cfg.get("parent_skills_dir"):
+        parent_skills = expand_path(str(kn_cfg["parent_skills_dir"]),
+                                    extra=_extra)
+        if not parent_skills or not Path(parent_skills).is_dir():
+            raise MigrationError(
+                "declared parent_skills_dir="
+                f"{kn_cfg['parent_skills_dir']!r} did not resolve to an "
+                f"existing directory ({parent_skills!r}) — refusing a "
+                "partial migration")
     planned_skills: list[dict] = []
     if parent_skills and Path(parent_skills).is_dir():
         existing = {p.parent.name for p in
@@ -363,7 +403,9 @@ def _migrate_locked(settings, repo, adapter, kp: KnowledgePaths,
 
     if dry_run:
         _plan_ingest(settings, repo, kp, state_db, sources, report,
-                     apply_to=None)
+                     apply_to=None,
+                     upstream_column=str(
+                         kn_cfg.get("parent_upstream_column") or ""))
         report.notes.append("DRY RUN — nothing written but this report")
         _durable_write(kp.state_dir / "MIGRATION_REPORT.md",
                        report.render())
@@ -397,7 +439,9 @@ def _migrate_locked(settings, repo, adapter, kp: KnowledgePaths,
     target = DebugMemory(tmp_db)
     target.ensure_schema_v2()
     _plan_ingest(settings, repo, kp, state_db, sources, report,
-                 apply_to=target)
+                 apply_to=target,
+                 upstream_column=str(
+                     kn_cfg.get("parent_upstream_column") or ""))
     _dedup_pass(target, repo, report)
     target._conn.commit()
     target._conn.close()
@@ -465,12 +509,21 @@ def _migrate_locked(settings, repo, adapter, kp: KnowledgePaths,
 
 
 def _plan_ingest(settings, repo, kp, state_db, sources, report,
-                 *, apply_to: DebugMemory | None) -> None:
+                 *, apply_to: DebugMemory | None,
+                 upstream_column: str = "") -> None:
     """Ingest source rows (or, with `apply_to=None`, only count what WOULD
     ingest — the dry-run path). Skip rule per row (round-3 F4): same
     source key + same row digest ⇒ skip; same `<tag>#<rowid>` prefix with
     a DIFFERENT digest ⇒ ingest the new version and retire the old target
-    row with lineage."""
+    row with lineage.
+
+    LINEAGE REMAP (PR-boundary F10): a source row's own `derived_from`
+    refers to a SOURCE-store row id — copying it verbatim would point at
+    an unrelated target row. Raw values are held aside during ingest and
+    remapped through the source-prefix → target-id map afterwards
+    (previously ingested rows participate via their stored `source`
+    keys); an unmappable reference is cleared with a report note, never
+    guessed."""
     existing: dict[str, tuple[int, str]] = {}
     probe = apply_to
     if probe is None and state_db.is_file():
@@ -481,6 +534,9 @@ def _plan_ingest(settings, repo, kp, state_db, sources, report,
             src = str(row["source"])
             prefix = src.split("@", 1)[0]
             existing[prefix] = (int(row["id"]), src)
+    src_to_target: dict[str, int] = {p: i for p, (i, _k) in
+                                     existing.items()}
+    raw_lineage: list[tuple[int, str, str]] = []
     for tag, path, family, digest in sources:
         rows = _parent_rows(path) if family == "parent" \
             else _legacy_rows(path, repo)
@@ -488,6 +544,21 @@ def _plan_ingest(settings, repo, kp, state_db, sources, report,
             prefix = f"{tag}#{raw.get('id')}"
             row_digest = _row_digest(raw)
             source_key = f"{prefix}@{row_digest}"
+
+            def _mapped() -> dict:
+                m = _fill_required(
+                    _map_parent_row(raw, repo, report,
+                                    upstream_column=upstream_column)
+                    if family == "parent"
+                    else _map_legacy_row(raw, report), tag)
+                m["source"] = source_key
+                raw_df = str(raw.get("derived_from") or "")
+                # never copy a source-store row id verbatim (F10)
+                m.pop("derived_from", None)
+                if raw_df:
+                    m["_raw_derived_from"] = raw_df
+                return m
+
             if prefix in existing:
                 old_id, old_key = existing[prefix]
                 if old_key == source_key:
@@ -496,24 +567,36 @@ def _plan_ingest(settings, repo, kp, state_db, sources, report,
                 # changed source row: version-and-retire
                 report.reversioned += 1
                 if apply_to is not None:
-                    mapped = _fill_required(
-                        _map_parent_row(raw, repo, report)
-                        if family == "parent"
-                        else _map_legacy_row(raw, report), tag)
-                    mapped["source"] = source_key
+                    mapped = _mapped()
+                    raw_df = mapped.pop("_raw_derived_from", "")
                     new_id = apply_to.record(**mapped)
+                    src_to_target[prefix] = new_id
+                    if raw_df:
+                        raw_lineage.append((new_id, tag, raw_df))
                     apply_to.apply_curation(
                         {old_id: {"status": "retired",
                                   "derived_from": str(new_id)}})
                 continue
             report.ingested += 1
             if apply_to is not None:
-                mapped = _fill_required(
-                    _map_parent_row(raw, repo, report)
-                    if family == "parent"
-                    else _map_legacy_row(raw, report), tag)
-                mapped["source"] = source_key
-                apply_to.record(**mapped)
+                mapped = _mapped()
+                raw_df = mapped.pop("_raw_derived_from", "")
+                new_id = apply_to.record(**mapped)
+                src_to_target[prefix] = new_id
+                if raw_df:
+                    raw_lineage.append((new_id, tag, raw_df))
+    if apply_to is not None and raw_lineage:
+        updates: dict[int, dict] = {}
+        for target_id, tag, raw_df in raw_lineage:
+            ref = src_to_target.get(f"{tag}#{raw_df}")
+            if ref is not None:
+                updates[target_id] = {"derived_from": str(ref)}
+            else:
+                report.notes.append(
+                    f"{tag}: derived_from={raw_df!r} not among ingested "
+                    "rows — lineage cleared (never copied verbatim)")
+        if updates:
+            apply_to.apply_curation(updates)
 
 
 def _dedup_pass(target: DebugMemory, repo: str,
@@ -549,7 +632,11 @@ def _dedup_pass(target: DebugMemory, repo: str,
             report.retired_by_dedup += 1
         updates[survivor["id"]] = {"run_count": run_count}
     target.apply_curation(updates)
-    # near-dup consolidation rides the shared curator (same thresholds)
-    curator = DebugMemoryCurator(target, repo=repo, sim_threshold=0.8)
+    # near-dup consolidation rides the shared curator with the SAME
+    # source-precedence survivor order (PR-boundary F11: the curator's
+    # default newest-id survivor would let a freshly imported
+    # lower-priority parent/adapter row retire runtime knowledge)
+    curator = DebugMemoryCurator(target, repo=repo, sim_threshold=0.8,
+                                 survivor_key=rank)
     merge_report = curator.curate()
     report.retired_by_dedup += merge_report.merged

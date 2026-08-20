@@ -123,6 +123,9 @@ rebase:
   knowledge:
     parent_debug_db: ${REBASE_AGENT_ROOT}/agent/store/debug_memory.db
     parent_skills_dir: ${REBASE_AGENT_ROOT}/agent/skills
+    # the parent store's own column carrying the upstream commit — repo
+    # data, so the neutral read-compat/migration code stays literal-free
+    parent_upstream_column: vllm_commit
   # the shared checkout flock name: v3, the v1 backend, EXT1's external
   # startup guard, and PR7 archival ALL take locks/<lock_name>.lock inside
   # the checkout, so exclusion is mutual (repo data — the core stays neutral)

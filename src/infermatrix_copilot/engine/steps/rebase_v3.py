@@ -316,7 +316,10 @@ def _build_backends(ctx: StepContext, manifest: dict, repo: str, target):
             return []
         try:
             from ...rebase_engine.parent_compat import ParentDebugMemory
-            return ParentDebugMemory(parent_db_path).search(query, k=k)
+            return ParentDebugMemory(
+                parent_db_path,
+                upstream_column=str(_knowledge_cfg.get(
+                    "parent_upstream_column") or "")).search(query, k=k)
         except Exception as exc:  # noqa: BLE001 — degrade open, traced
             ctx.trace.record("capability_note",
                              capability="rebase.knowledge.parent_debug_db",
@@ -712,12 +715,27 @@ async def _v3_prelude(ctx: StepContext) -> StepResult:
                               "did not expand (env var unset) — refusing an "
                               "unprovenanced run")
         kn_paths[kn_key] = expanded
+    kn_paths["parent_upstream_column"] = str(
+        kn_cfg.get("parent_upstream_column") or "")
     try:
         provenance = knowledge_attest.attest_layers(**kn_paths)
+        # the EFFECTIVE copilot store must also open read-only (a corrupt
+        # runtime db would make report_only's "stores readable"
+        # precondition a lie — PR-boundary F2); an absent store is a
+        # legitimate fresh world
+        from ...memory.debug_memory import DebugMemory as _DM
+        from ...memory.paths import KnowledgePaths as _KP0
+        _repo0 = (ctx.state.get("task_spec") or {}).get("repo", "")
+        _eff_db = _KP0.resolve(
+            ctx.settings, _repo0,
+            adapter_root=Path(ctx.settings.adapters_dir)
+            / _repo0.replace("-", "_")).rebase_backend_db
+        if Path(_eff_db).is_file():
+            _DM.open_readonly(_eff_db)
     except Exception as exc:  # noqa: BLE001 — every shape fails closed
         return StepResult(False, FailureKind.BLOCKED,
-                          "declared knowledge layer unreadable — refusing "
-                          f"an unprovenanced run: {exc}")
+                          "declared/effective knowledge store unreadable "
+                          f"— refusing an unprovenanced run: {exc}")
     if provenance:
         # the effective skill union's collision table (name → winning
         # layer, priority runtime > adapter seed > parent): fairness

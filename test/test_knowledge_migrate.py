@@ -53,7 +53,8 @@ def _world(settings, tmp_path, parent_rows=(), with_skills=True):
         "rebase": {"lock_name": "widget",
                    "knowledge": {
                        "parent_debug_db": str(db),
-                       "parent_skills_dir": str(skills)}}}))
+                       "parent_skills_dir": str(skills),
+                       "parent_upstream_column": "vllm_commit"}}}))
     return repo, db, skills, adir
 
 
@@ -187,6 +188,53 @@ def test_dedup_retires_with_lineage_across_sources(settings, tmp_path):
     assert len(live) == 1
     # precedence: copilot-global beats parent-db
     assert live[0]["source"].startswith("copilot-global#")
+
+
+def test_near_dup_dedup_honors_source_precedence(settings, tmp_path):
+    """PR-boundary F11: a freshly imported parent near-duplicate (with a
+    DIFFERENT key, so only the Jaccard pass sees it) must never retire
+    higher-priority runtime knowledge, even though it is newer."""
+    repo, db, skills, adir = _world(settings, tmp_path, [
+        {"key": "parent-flavor", "symptom": "watchdog kill on OOM growth "
+         "in warmup", "root_cause": "leaked pin buffers",
+         "fix": "parent fix"}])
+    legacy = DebugMemory(settings.memory_db)
+    legacy.record(repo="widget-repo", module="m",
+                  run_id="r", key="runtime-flavor",
+                  symptom="watchdog kill on OOM growth in warmup",
+                  root_cause="leaked pin buffers",
+                  fix_summary="runtime fix", files=["a.py"],
+                  verification="v", source="v3-agent")
+    migrate_knowledge(settings, "widget-repo")
+    state_dir = Path(settings.memory_db).parent / "state" / "widget-repo"
+    target = DebugMemory(state_dir / "debug_memory.db")
+    rows = {r["key"]: r for r in target.entries(
+        repo="widget-repo",
+        statuses=("active", "candidate", "stale", "retired"))}
+    live = [k for k, r in rows.items() if r["status"] != "retired"
+            and k in ("parent-flavor", "runtime-flavor")]
+    # the runtime-sourced row survives; the parent near-dup retires
+    assert live == ["runtime-flavor"], rows
+    assert rows["parent-flavor"]["status"] == "retired"
+
+
+def test_migrated_rows_exempt_from_dormancy(settings, tmp_path):
+    """PR-boundary F12: the first post-activation curate must not mark
+    freshly migrated parent facts stale — their run ids live in a foreign
+    id space that can never appear in the copilot's run window."""
+    from infermatrix_copilot.memory.curator import DebugMemoryCurator
+
+    repo, db, skills, adir = _world(settings, tmp_path, PARENT_ROWS[:1])
+    migrate_knowledge(settings, "widget-repo")
+    state_dir = Path(settings.memory_db).parent / "state" / "widget-repo"
+    target = DebugMemory(state_dir / "debug_memory.db")
+    report = DebugMemoryCurator(target, repo="widget-repo").curate(
+        recent_runs=[f"run-2026{i:04d}" for i in range(12)])
+    assert report.dormant == 0
+    rows = {r["key"]: r["status"] for r in target.entries(
+        repo="widget-repo",
+        statuses=("active", "candidate", "stale", "retired"))}
+    assert rows["caplog-empty"] == "active"
 
 
 def test_dry_run_writes_only_the_report(settings, tmp_path):
@@ -387,7 +435,7 @@ def test_flag_on_requires_marker_and_is_repo_scoped(settings, tmp_path):
     marker.write_text(json.dumps(
         {"schema": "v2", "repo": "widget-repo",
          "digests": {"target_db": "x"}}), encoding="utf-8")
-    with pytest.raises(KnowledgeStateError, match="missing or unreadable"):
+    with pytest.raises(KnowledgeStateError, match="missing, unreadable"):
         KnowledgePaths.resolve(settings, "widget-repo")
     # with a marker AND a real store the debug members converge on it
     DebugMemory(state_dir / "debug_memory.db")
@@ -409,6 +457,39 @@ def test_full_cycle_migrate_then_activate(settings, tmp_path):
                                 adapter_root=adir)
     dm = DebugMemory.open_readonly(kp.rebase_backend_db)
     assert dm.count() == 2  # the migrated knowledge is what runs now see
+
+
+def test_activation_error_exits_blocked_and_releases_run_lock(
+        settings, tmp_path, git_repo, capsys):
+    """PR-boundary F4: an invalid activation marker raised during the
+    knowledge-lock acquisition must exit blocked/3 with the RUN LOCK
+    released — never a traceback that leaves it held in a long-lived
+    process."""
+    import shutil
+
+    from infermatrix_copilot.cli import Copilot
+    from infermatrix_copilot.config import _REPO_ROOT
+    from infermatrix_copilot.engine.lifecycle import RunLock
+    from infermatrix_copilot.notify import BLOCKED_EXIT
+    from infermatrix_copilot.task_spec import TaskSpec
+
+    settings.playbooks_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(_REPO_ROOT / "playbooks" / "repo-rebase.yaml",
+                settings.playbooks_dir / "repo-rebase.yaml")
+    settings.repo_paths = {"vllm-omni": str(git_repo)}
+    settings.imx_knowledge_runtime = "vllm-omni"  # activated, NO marker
+    copilot = Copilot(settings)
+    spec = TaskSpec(kind="repo_rebase", repo="vllm-omni")
+    res = copilot.resolve(spec)
+    run_dir = Path(settings.run_root) / "run-actblocked"
+    run_dir.mkdir(parents=True)
+    code = copilot._execute(res.playbook, spec, run_dir)
+    assert code == BLOCKED_EXIT
+    out = capsys.readouterr().out
+    assert "migrate-knowledge" in out  # the KnowledgeStateError surfaced
+    # the run lock is reacquirable — nothing leaked
+    relock = RunLock(run_dir).acquire()
+    relock.release()
 
 
 # ── Unit-A independence (round-2 F1) ────────────────────────────────────────

@@ -131,10 +131,12 @@ class KnowledgePaths:
             raise KnowledgeStateError(
                 f"knowledge runtime ACTIVATED for {repo!r} but {marker} "
                 f"is unreadable: {exc}")
-        if str(data.get("schema")) != "v2" or not data.get("digests"):
+        if str(data.get("schema")) != "v2" \
+                or not (data.get("digests") or {}).get("target_db"):
             raise KnowledgeStateError(
-                f"{marker} is incomplete or names an unknown schema "
-                f"({data.get('schema')!r}) — re-run the migration")
+                f"{marker} is incomplete (schema/digests.target_db) or "
+                f"names an unknown schema ({data.get('schema')!r}) — "
+                "re-run the migration")
         if str(data.get("repo") or "") != repo:
             raise KnowledgeStateError(
                 f"{marker} belongs to repo {data.get('repo')!r}, not "
@@ -143,13 +145,26 @@ class KnowledgePaths:
         try:
             from .debug_memory import DebugMemory
 
-            DebugMemory.open_readonly(target_db)
+            dm = DebugMemory.open_readonly(target_db)
+            # the marker's schema CLAIM is not evidence — the store
+            # itself must carry the v2 columns and answer through its
+            # FTS mirror (a legacy or half-created store never
+            # activates; PR-boundary F9)
+            if not dm.schema_v2:
+                raise KnowledgeStateError(
+                    f"{target_db} is not schema v2 despite the marker's "
+                    "claim — re-run the migration")
+            dm._conn.execute(
+                "SELECT rowid FROM entries_fts "
+                "WHERE entries_fts MATCH '\"probe\"' LIMIT 1").fetchone()
+        except KnowledgeStateError:
+            raise
         except (OSError, sqlite3.Error) as exc:
             raise KnowledgeStateError(
                 f"knowledge runtime ACTIVATED for {repo!r} but the "
-                f"migrated store {target_db} is missing or unreadable "
-                f"({exc}) — restore from backups or re-run the "
-                "migration")
+                f"migrated store {target_db} is missing, unreadable, or "
+                f"has no usable FTS mirror ({exc}) — restore from "
+                "backups or re-run the migration")
         return data
 
 

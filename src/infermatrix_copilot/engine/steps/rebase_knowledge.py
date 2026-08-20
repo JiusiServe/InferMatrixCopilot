@@ -83,6 +83,8 @@ def _knowledge_layer_paths(manifest: dict, settings) -> dict | StepResult:
                               f"declared knowledge layer {key}={raw!r} did "
                               "not expand (env var unset)")
         out[key] = expanded
+    out["parent_upstream_column"] = str(
+        cfg.get("parent_upstream_column") or "")
     return out
 
 
@@ -302,26 +304,48 @@ async def _v3_compare(ctx: StepContext) -> StepResult:
     for name, spec in sorted((data.get("modules") or {}).items()):
         lines.append(f"- {name}: {(spec or {}).get('status', '?')}")
     baseline_file = str(_task_params(ctx).get("baseline_status") or "")
-    if baseline_file and Path(baseline_file).exists():
+    divergent: list[str] = []
+    if baseline_file:
         import json
+        # a SUPPLIED baseline is a ruling input, not prose (PR-boundary
+        # F6): unreadable ⇒ typed failure; a module the baseline had
+        # green that this run failed ⇒ BLOCKED (needs-human — the soak's
+        # investigate-don't-average contract)
         try:
             baseline = json.loads(Path(baseline_file)
                                   .read_text(encoding="utf-8"))
-            lines += ["", "## Baseline", f"- source: {baseline_file}"]
-            for name, spec in sorted((baseline.get("modules")
-                                      or {}).items()):
-                status = spec.get("status", spec) if isinstance(spec, dict) \
-                    else spec
-                lines.append(f"- {name}: {status}")
-        except ValueError as exc:
-            lines += ["", f"## Baseline unreadable: {exc}"]
+        except (OSError, ValueError) as exc:
+            return StepResult(False, summary=f"baseline_status "
+                              f"{baseline_file} unreadable: {exc}")
+        lines += ["", "## Baseline", f"- source: {baseline_file}"]
+        nat_modules = {n: str((s or {}).get("status", "?"))
+                       for n, s in (data.get("modules") or {}).items()}
+        for name, spec in sorted((baseline.get("modules") or {}).items()):
+            status = str(spec.get("status", spec)
+                         if isinstance(spec, dict) else spec)
+            lines.append(f"- {name}: {status}")
+            if status == "done" and \
+                    nat_modules.get(name) not in (None, "done", "skipped"):
+                divergent.append(
+                    f"{name}: baseline done, this run "
+                    f"{nat_modules.get(name)}")
+        if divergent:
+            lines += ["", "## DIVERGENT (worse than baseline)"]
+            lines += [f"- {d}" for d in divergent]
     else:
-        lines += ["", "## Baseline", "- no baseline supplied "
-                  "(pass --task-param baseline_status=<status.json> for the "
-                  "side-by-side; the §8 gate uses scripts/"
-                  "compare_validation.py over both worlds' artifacts)"]
+        lines += ["", "## Baseline", "- no baseline supplied — recorded "
+                  "(normal post-promotion shape; supply --task-param "
+                  "baseline_status=<status.json> during soak; the §8 gate "
+                  "uses scripts/compare_validation.py over both worlds' "
+                  "artifacts)"]
+    sub.update({"comparison": {"baseline": baseline_file or "none",
+                               "divergent": divergent}})
     (ctx.run_dir / "COMPARISON.md").write_text("\n".join(lines) + "\n",
                                                encoding="utf-8")
+    if divergent:
+        return StepResult(False, FailureKind.BLOCKED,
+                          "worse-than-baseline module outcomes need a "
+                          "human: " + "; ".join(divergent[:5]))
     if drift:
         return StepResult(True, summary="COMPARISON.md written; knowledge "
                                         "DRIFT detected (gate-ineligible)")

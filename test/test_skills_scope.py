@@ -35,13 +35,15 @@ def test_skill_lives_in_adapter_store_not_shared_pool():
 
 def test_repo_run_retrieves_skill_with_repo_priority():
     store = _knowledge_stores(_ctx({"task_spec": {"repo": "vllm-omni"}}))
-    assert len(store.stores) == 2  # adapter store first, shared pool second
+    # runtime (learned) first, adapter seed second, shared pool last
+    # (PR-boundary F3: writes are runtime-only, learned wins collisions)
+    assert len(store.stores) == 3
     hits = [s.name for s in store.find(query=_QUERY, k=5)]
     assert "model-adaptation-review" in hits
 
 
 def test_no_adapter_degrades_gracefully_without_cross_repo_bleed():
     store = _knowledge_stores(_ctx({}))
-    assert len(store.stores) == 1  # shared pool only — no crash without adapter
+    assert len(store.stores) == 2  # runtime + shared pool; no adapter store
     hits = [s.name for s in store.find(query=_QUERY, k=5)]
     assert "model-adaptation-review" not in hits

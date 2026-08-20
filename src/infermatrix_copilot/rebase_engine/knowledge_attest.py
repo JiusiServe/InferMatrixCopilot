@@ -59,15 +59,27 @@ def debug_db_digest(db_path: str | Path) -> str:
         conn.close()
 
 
-def skills_catalog(skills_dir: str | Path) -> dict[str, str]:
+def skills_catalog(skills_dir: str | Path, *,
+                   validate: bool = False) -> dict[str, str]:
     """{relative SKILL.md path: sha256} for every skill under `skills_dir`,
     sorted; an absent directory is an empty catalog (a DECLARED-but-missing
-    dir is the prelude's fail-closed check, not this function's)."""
+    dir is the prelude's fail-closed check, not this function's).
+    `validate=True` additionally requires every file to PARSE as a skill —
+    hashing bytes that `SkillStore` would silently skip at retrieval time
+    would attest knowledge the run can never actually read (PR-boundary
+    F2)."""
     root = Path(skills_dir)
     if not root.is_dir():
         return {}
     out: dict[str, str] = {}
     for p in sorted(root.glob("*/SKILL.md")):
+        if validate:
+            from ..memory.skills import _parse_skill
+
+            if _parse_skill(p) is None:
+                raise ValueError(
+                    f"{p} does not parse as a skill — retrieval would "
+                    "silently skip it; fix or remove it before attesting")
         out[str(p.relative_to(root))] = hashlib.sha256(
             p.read_bytes()).hexdigest()
     return out
@@ -82,7 +94,8 @@ def skills_catalog_digest(catalog: dict[str, str]) -> str:
 
 
 def attest_layers(*, parent_debug_db: str = "",
-                  parent_skills_dir: str = "") -> dict:
+                  parent_skills_dir: str = "",
+                  parent_upstream_column: str = "") -> dict:
     """The provenance block for the DECLARED parent layers: per-layer logical
     digests. Raises on a declared-but-unreadable layer (the prelude turns
     that into BLOCKED); an undeclared ("") layer is simply absent from the
@@ -94,7 +107,8 @@ def attest_layers(*, parent_debug_db: str = "",
     if parent_debug_db:
         from .parent_compat import ParentDebugMemory
 
-        probe = ParentDebugMemory(parent_debug_db)  # schema-validating open
+        probe = ParentDebugMemory(  # schema-validating open (exact shape)
+            parent_debug_db, upstream_column=parent_upstream_column)
         # index/content consistency via FTS5's OWN external-content
         # integrity check — the complete verification (hand-rolled
         # phrase/token probes kept failing review for a reason: phrase
@@ -134,7 +148,7 @@ def attest_layers(*, parent_debug_db: str = "",
         if not skills_root.is_dir():
             raise FileNotFoundError(
                 f"declared parent skills dir missing: {parent_skills_dir}")
-        catalog = skills_catalog(skills_root)
+        catalog = skills_catalog(skills_root, validate=True)
         block["parent_skills_dir"] = {
             "path": parent_skills_dir,
             "digest": skills_catalog_digest(catalog),
@@ -168,15 +182,51 @@ def restore_debug_db(snapshot: str | Path, target: str | Path) -> str:
     fully self-contained (a WAL-marked header would make the next open
     recreate sidecars; the store's owner re-enables WAL on its own next
     open). Caller must hold the world's exclusion lock (RUNBOOK: the
-    checkout flock) across the whole call. Returns the restored digest."""
+    checkout flock) across the whole call. Returns the restored digest.
+
+    Crash-safety (PR-boundary F15): before an uncheckpointable target's
+    sidecars are touched, a DURABLE consistent copy of the live target
+    (sqlite backup API — WAL rows included) lands at
+    `<target>.pre-restore-guard.db`; a SIGKILL anywhere later leaves that
+    guard on disk, and the next restore call SELF-HEALS an unreadable
+    target from it before proceeding. The guard is removed only after a
+    fully successful restore. Staging uses a unique O_EXCL temp file
+    (PR-boundary F14) — a pre-planted symlink at a predictable name can
+    neither redirect the staged write nor be installed as the target."""
     import os
+    import tempfile
 
     target = Path(target)
     target.parent.mkdir(parents=True, exist_ok=True)
+    guard = target.with_name(target.name + ".pre-restore-guard.db")
+    # SELF-HEAL a previous crash: a leftover guard plus an unreadable
+    # target means the crash hit between sidecar-aside and replace —
+    # the guard IS the pre-restore world
+    if guard.exists() and target.exists():
+        try:
+            conn = sqlite3.connect(readonly_uri(target), uri=True)
+            try:
+                ok = conn.execute(
+                    "PRAGMA integrity_check").fetchone()[0] == "ok"
+            finally:
+                conn.close()
+        except sqlite3.Error:
+            ok = False
+        if not ok:
+            os.replace(guard, target)
+            for suffix in ("-wal", "-shm"):
+                stale = Path(str(target) + suffix)
+                stale.unlink(missing_ok=True)
+                Path(str(target) + suffix + ".pre-restore").unlink(
+                    missing_ok=True)
     # STAGE AND VALIDATE FIRST: only after the staged copy proves readable
     # may the target's committed WAL data be touched — a missing/corrupt
     # snapshot must fail the restore with the target fully intact
-    tmp = target.with_name(target.name + ".restore-tmp")
+    fd, tmp_name = tempfile.mkstemp(dir=target.parent,
+                                    prefix=target.name + ".restore-",
+                                    suffix=".tmp")
+    os.close(fd)
+    tmp = Path(tmp_name)
     try:
         tmp.write_bytes(Path(snapshot).read_bytes())
         conn = sqlite3.connect(tmp)
@@ -217,6 +267,24 @@ def restore_debug_db(snapshot: str | Path, target: str | Path) -> str:
         except sqlite3.Error:
             checkpointed = False
         if not checkpointed:
+            # DURABLE guard BEFORE any sidecar move (F15): a consistent
+            # backup-API copy of the live target, WAL rows included —
+            # the self-heal source if the process dies mid-swap. A main
+            # file so corrupt the backup API itself refuses cannot be
+            # guarded (there is no consistent state to copy) — the
+            # exception-handler rollback still restores its sidecars.
+            try:
+                src = sqlite3.connect(readonly_uri(target), uri=True)
+                try:
+                    gconn = sqlite3.connect(guard)
+                    try:
+                        src.backup(gconn)
+                    finally:
+                        gconn.close()
+                finally:
+                    src.close()
+            except sqlite3.Error:
+                guard.unlink(missing_ok=True)
             try:
                 for suffix in ("-wal", "-shm"):
                     side = Path(str(target) + suffix)
@@ -230,6 +298,7 @@ def restore_debug_db(snapshot: str | Path, target: str | Path) -> str:
                 for side, aside in preserved:
                     if aside.exists():
                         os.replace(aside, side)
+                guard.unlink(missing_ok=True)
                 raise
     try:
         for suffix in ("-wal", "-shm"):
@@ -244,4 +313,5 @@ def restore_debug_db(snapshot: str | Path, target: str | Path) -> str:
         raise
     for _side, aside in preserved:
         aside.unlink(missing_ok=True)
+    guard.unlink(missing_ok=True)
     return staged_digest

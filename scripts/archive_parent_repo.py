@@ -60,18 +60,28 @@ def run(cmd, cwd, **kw):
                           text=True, **kw)
 
 
-def _flock(lock_path: Path):
-    import fcntl
+def _acquire_checkout_lock(target_checkout: Path, lock_name: str):
+    """The SHARED hardened checkout lock (PR-boundary F20): the same
+    `CheckoutLock` every v3/v1/EXT1 participant takes — it validates the
+    checkout is a real git worktree with canonical, symlink-safe lock
+    components, so a typo'd/fake target cannot 'succeed' while the real
+    lock is held elsewhere."""
+    repo_src = Path(__file__).resolve().parents[1] / "src"
+    if str(repo_src) not in sys.path:
+        sys.path.insert(0, str(repo_src))
+    from infermatrix_copilot.rebase_engine.runctx import CheckoutLock
 
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o644)
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
-        os.close(fd)
-        raise SystemExit(f"checkout lock {lock_path} is HELD — an external "
-                         "or v1 run is active; archive later")
-    return fd
+    lock = CheckoutLock(Path(target_checkout), lock_name)
+    if lock.acquire(blocking=False) is False:
+        if "contention" == lock.last_failure.split(":")[0]:
+            raise SystemExit(
+                f"checkout lock {lock_name!r} in {target_checkout} is "
+                "HELD — an external or v1 run is active; archive later")
+        raise SystemExit(
+            f"checkout lock REFUSED (not contention): {lock.last_failure}"
+            " — a typo'd/fake/symlinked target must never let the "
+            "archive proceed while the real lock is elsewhere")
+    return lock
 
 
 def _is_secret_path(rel: str) -> bool:
@@ -143,17 +153,27 @@ def main(argv=None) -> int:
                              "values-file archival_secret_allowlist)")
     parser.add_argument("--debug-db", default="agent/store/debug_memory.db")
     parser.add_argument("--logs-dir", default="rebase_logs")
+    parser.add_argument("--allow-missing-db", action="store_true",
+                        help="owner waiver: archive without the debug DB")
+    parser.add_argument("--allow-missing-logs", action="store_true",
+                        help="owner waiver: archive without the logs dir")
+    parser.add_argument("--accept-db-content", action="store_true",
+                        help="owner reviewed the debug DB's token-like "
+                             "content (debug rows may quote error text)")
     args = parser.parse_args(argv)
 
     repo = Path(args.parent_repo).resolve()
     archive = Path(args.archive_dir).resolve()
     archive.mkdir(parents=True, exist_ok=True)
-    ts = time.strftime("%Y%m%d-%H%M%S")
+    import uuid
+
+    # unique per invocation: same-second reruns (a refused first attempt,
+    # then a corrected one) must not collide on branch/tag names
+    ts = time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
     allowlist = {p.strip() for p in args.secret_allowlist.split(",")
                  if p.strip()}
-    lock_path = Path(args.target_checkout) / "locks" / \
-        f"{args.lock_name}.lock"
-    lock_fd = _flock(lock_path)  # held for the WHOLE capture
+    lock = _acquire_checkout_lock(Path(args.target_checkout),
+                                  args.lock_name)  # WHOLE capture
     try:
         # 1. archival branch: everything except secrets
         to_commit, excluded, allowlisted, aborts = classify_files(
@@ -192,6 +212,40 @@ def main(argv=None) -> int:
         tag = f"pr7-archive-{ts}"
         run(["git", "tag", tag], repo)
 
+        # 1b. the ARCHIVE'S OWN final surfaces obey the secret policy too
+        # (PR-boundary F19): the archival branch's HEAD TREE is scanned
+        # blob by blob — a CLEAN COMMITTED secret aborts unless
+        # allowlisted (it cannot be excluded without rewriting history;
+        # allowlisting records the owner's acceptance). Full HISTORY
+        # (the bundle) is deliberately NOT scanned — recorded owner
+        # position: history predates archival and is governed by the
+        # repo's own hygiene; the NAME inventory covers env files.
+        # CONTENT decides for committed blobs: the aggressive *key*/*token*
+        # path globs exist for working-state env files; on a whole tree
+        # they would flag benign names (keyboard.py) whose content is
+        # right there to scan.
+        committed_hits: list[str] = []
+        tree = run(["git", "ls-tree", "-r", "--name-only", "HEAD"],
+                   repo).stdout.splitlines()
+        for rel in tree:
+            if not rel.strip():
+                continue
+            blob = subprocess.run(
+                ["git", "cat-file", "blob", f"HEAD:{rel}"], cwd=repo,
+                capture_output=True).stdout
+            if SECRET_CONTENT_RX.search(blob):
+                if rel in allowlist:
+                    if rel not in allowlisted:
+                        allowlisted.append(rel)
+                else:
+                    committed_hits.append(rel)
+        if committed_hits:
+            print("ABORT — secret-bearing files in the archival branch's "
+                  "COMMITTED tree outside the allowlist:", file=sys.stderr)
+            for rel in committed_hits:
+                print(f"  {rel}", file=sys.stderr)
+            return 5
+
         # 2. independent copies
         clone_dir = archive / f"parent-clone-{ts}"
         run(["git", "clone", "--no-local", str(repo), str(clone_dir)],
@@ -199,14 +253,33 @@ def main(argv=None) -> int:
         run(["git", "bundle", "create",
              str(archive / f"parent-{ts}.bundle"), "--all"], repo)
 
-        # 3. consistent debug-DB copy
+        # 3. consistent debug-DB copy — REQUIRED unless the owner
+        # explicitly waives it (PR-boundary F21: archive success must
+        # guarantee a self-contained restore), and the CONSISTENT COPY's
+        # bytes obey the secret policy (WAL-only secrets consolidate into
+        # the backup — F19) unless --accept-db-content records the
+        # owner's review (debug rows legitimately QUOTE error text that
+        # can look token-like).
         db = repo / args.debug_db
+        db_copy = archive / f"debug_memory-{ts}.db"
         if db.is_file():
             src = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
-            dst = sqlite3.connect(archive / f"debug_memory-{ts}.db")
+            dst = sqlite3.connect(db_copy)
             src.backup(dst)
             dst.close()
             src.close()
+            if not args.accept_db_content and _content_scan(db_copy):
+                db_copy.unlink()
+                print("ABORT — the debug-DB copy contains token-like "
+                      "content; review the store and re-run with "
+                      "--accept-db-content to record acceptance",
+                      file=sys.stderr)
+                return 6
+        elif not args.allow_missing_db:
+            print(f"ABORT — debug DB {db} is missing; a restore without "
+                  "it is not self-contained (pass --allow-missing-db to "
+                  "record the waiver)", file=sys.stderr)
+            return 6
 
         # 4. logs tarball — the SAME secret policy applies to tar inputs
         # (an ignored/untracked token-bearing log must not ride into the
@@ -214,6 +287,11 @@ def main(argv=None) -> int:
         # from the commit)
         excluded_logs: list[str] = []
         logs = repo / args.logs_dir
+        if not logs.is_dir() and not args.allow_missing_logs:
+            print(f"ABORT — logs dir {logs} is missing; pass "
+                  "--allow-missing-logs to record the waiver",
+                  file=sys.stderr)
+            return 6
         if logs.is_dir():
             with tarfile.open(archive / f"rebase_logs-{ts}.tar.gz",
                               "w:gz") as tar:
@@ -245,14 +323,39 @@ def main(argv=None) -> int:
         (archive / "ENV_INVENTORY.md").write_text(
             "\n".join(inventory) + "\n", encoding="utf-8")
 
-        # 6-7. restore + rehearsal docs
+        # 6-7. restore script + docs. The copilot tag is FAIL-CLOSED
+        # when the copilot side is in scope (PR-boundary F21): restore
+        # instructions that reference a tag that does not exist are not
+        # a restore path.
         copilot_tag_state = "not checked (--copilot-repo not supplied)"
         if args.copilot_repo:
             tags = run(["git", "tag", "-l", "pre-pr7-retirement"],
                        Path(args.copilot_repo)).stdout.strip()
-            copilot_tag_state = ("present" if tags else
-                                 "ABSENT — create it at the PR7 deletion "
-                                 "commit before retiring")
+            if not tags:
+                print("ABORT — --copilot-repo supplied but the "
+                      "pre-pr7-retirement tag does not exist; create it "
+                      "at the PR7 deletion commit first", file=sys.stderr)
+                return 7
+            copilot_tag_state = "present"
+        restore_sh = archive / "restore.sh"
+        restore_sh.write_text(f"""#!/usr/bin/env bash
+# Self-contained parent-side restore (generated by archive_parent_repo).
+# Usage: restore.sh <destination-path>
+set -euo pipefail
+DEST="${{1:?usage: restore.sh <destination-path>}}"
+git clone "{archive / f'parent-clone-{ts}'}" "$DEST"
+git -C "$DEST" checkout "{branch}"
+tar -xzf "{archive / f'rebase_logs-{ts}.tar.gz'}" -C "$DEST" \
+    2>/dev/null || echo "note: no logs tarball archived"
+if [ -f "{db_copy}" ]; then
+  mkdir -p "$DEST/$(dirname "{args.debug_db}")"
+  cp "{db_copy}" "$DEST/{args.debug_db}"
+fi
+echo "parent restored to $DEST at branch {branch} (tag {tag})."
+echo "NEXT (manual): recreate the files in ENV_INVENTORY.md from the"
+echo "owner's secret store, and deploy the copilot pre-pr7-retirement tag."
+""", encoding="utf-8")
+        restore_sh.chmod(0o755)
         (archive / "RESTORE.md").write_text(f"""# Combined restore (both sides)
 
 1. Parent: `git clone {archive / f'parent-clone-{ts}'} <canonical-path>`
@@ -280,9 +383,7 @@ def main(argv=None) -> int:
               f"{len(allowlisted)} allowlisted")
         return 0
     finally:
-        import fcntl
-        fcntl.flock(lock_fd, fcntl.LOCK_UN)
-        os.close(lock_fd)
+        lock.release()
 
 
 if __name__ == "__main__":
