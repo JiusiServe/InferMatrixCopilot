@@ -729,3 +729,24 @@ def test_activation_rejects_quoted_identifier_fts5_spoof(settings,
     settings.imx_knowledge_runtime = "widget-repo"
     with pytest.raises(KnowledgeStateError, match="fully-indexed FTS5"):
         KnowledgePaths.resolve(settings, "widget-repo")
+
+
+def test_activation_quoted_paren_cannot_hide_unindexed(settings,
+                                                       tmp_path):
+    """Hook iteration (marker side): the quoted-`)` early-termination
+    spoof must not let an UNINDEXED mirror column activate."""
+    state_dir = Path(settings.memory_db).parent / "state" / "widget-repo"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    dm = DebugMemory(state_dir / "debug_memory.db")
+    dm._conn.executescript(
+        "DROP TABLE entries_fts;"
+        'CREATE VIRTUAL TABLE entries_fts USING fts5("x)", '
+        "repo UNINDEXED, symptom, root_cause, fix_summary, module, key, "
+        "tags, watch_outs);")
+    dm._conn.commit()
+    (state_dir / "MIGRATION_COMPLETE.json").write_text(json.dumps(
+        {"schema": "v2", "repo": "widget-repo",
+         "digests": {"target_db": "x"}}), encoding="utf-8")
+    settings.imx_knowledge_runtime = "widget-repo"
+    with pytest.raises(KnowledgeStateError, match="fully-indexed FTS5"):
+        KnowledgePaths.resolve(settings, "widget-repo")

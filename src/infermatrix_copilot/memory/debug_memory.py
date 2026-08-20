@@ -86,75 +86,71 @@ _SQL_TOKEN_RE = re.compile(
     r"|[A-Za-z_][A-Za-z0-9_]*|.", re.S)
 
 
-def _fts5_args_start(sql_no_comments: str) -> int | None:
-    """Index just past the `(` opening an FTS5 argument list, located by
-    TOKENIZING the DDL — quoted identifiers are single tokens, so a
-    column literally named `[USING fts5(]` inside FTS4 DDL can never
-    stand in for the table-level module clause. None when the statement
-    does not declare `USING fts5 (`. The FIRST bare `USING` token is the
-    table-level one: nothing before it but CREATE VIRTUAL TABLE and the
-    (possibly quoted) table name."""
-    toks = [(m.group(0), m.end()) for m in
-            _SQL_TOKEN_RE.finditer(sql_no_comments)
+def _fts5_arg_tokens(sql_no_comments: str) -> list[str] | None:
+    """Tokens of the FTS5 argument list (everything after the table-
+    level `USING fts5 (`), or None when the statement does not declare
+    one. TOKENIZED, never scanned: quoted identifiers are single atomic
+    tokens, so a column literally named `[USING fts5(]` in FTS4 DDL
+    cannot stand in for the module clause, and a quoted `")"` cannot
+    terminate the argument list early. The FIRST bare `USING` token is
+    the table-level one — nothing precedes it but CREATE VIRTUAL TABLE
+    and the (possibly quoted) table name."""
+    toks = [m.group(0) for m in _SQL_TOKEN_RE.finditer(sql_no_comments)
             if not m.group(0).isspace()]
-    for i, (tok, _end) in enumerate(toks):
+    for i, tok in enumerate(toks):
         if tok.lower() == "using":
-            if (i + 2 < len(toks) and toks[i + 1][0].lower() == "fts5"
-                    and toks[i + 2][0] == "("):
-                return toks[i + 2][1]
+            if (i + 2 < len(toks) and toks[i + 1].lower() == "fts5"
+                    and toks[i + 2] == "("):
+                return toks[i + 3:]
             return None
     return None
 
 
 def is_fts5_table(create_sql: str) -> bool:
     """True when `create_sql` declares an FTS5 virtual table — comment-
-    stripped and tokenized (see _fts5_args_start): neither a comment nor
+    stripped and tokenized (see _fts5_arg_tokens): neither a comment nor
     a quoted identifier carrying `USING fts5(` can spoof it."""
-    return _fts5_args_start(strip_sql_comments(create_sql)) is not None
+    return _fts5_arg_tokens(strip_sql_comments(create_sql)) is not None
 
 
 def fts5_unindexed_columns(create_sql: str) -> set[str]:
     """LOWERCASED names of columns declared UNINDEXED in an FTS5 CREATE
-    VIRTUAL TABLE statement, parsed from the argument list itself
-    (comments stripped, args split at top-level commas) — a substring
-    scan is formatting-dependent, and SQLite resolves FTS column names
-    case-insensitively, so callers compare against lowercase. Non-FTS5
-    SQL yields the empty set (FTS5-ness is is_fts5_table's job)."""
-    s = strip_sql_comments(create_sql)
-    args_start = _fts5_args_start(s)
-    if args_start is None:
+    VIRTUAL TABLE statement, parsed from the tokenized argument list —
+    args split at top-level bare commas, nesting tracked on bare parens
+    only, so quoted identifiers containing `)`/`,` can neither hide a
+    later UNINDEXED declaration nor invent one. SQLite resolves FTS
+    column names case-insensitively, hence lowercase. Non-FTS5 SQL
+    yields the empty set (FTS5-ness is is_fts5_table's job)."""
+    toks = _fts5_arg_tokens(strip_sql_comments(create_sql))
+    if toks is None:
         return set()
-    # split args by walking TOKENS, not characters: a `)`/`(`/`,` inside
-    # a quoted identifier is payload, never punctuation — a column named
-    # `")"` must not terminate the scan before a later UNINDEXED
-    # declaration (hook round-4 iteration finding)
-    args: list[list[str]] = [[]]
-    depth = 1
-    for m in _SQL_TOKEN_RE.finditer(s, args_start):
-        tok = m.group(0)
-        if tok.isspace():
-            continue
-        if tok[0] in "'\"`[":
-            args[-1].append(tok)  # quoted token: opaque payload
-            continue
-        if tok in "([":
+    out: set[str] = set()
+
+    def flush(arg: list[str]) -> None:
+        if not arg or "=" in arg:
+            return  # empty, or an option (content=, tokenize=…)
+        name = arg[0].strip("'\"`[]").lower()
+        if name and any(tk.lower() == "unindexed" for tk in arg[1:]):
+            out.add(name)
+
+    depth, arg = 1, []
+    for tok in toks:
+        if tok == "(":
             depth += 1
-        elif tok in ")]":
+            arg.append(tok)
+        elif tok == ")":
             depth -= 1
             if depth == 0:
                 break
+            arg.append(tok)
         elif tok == "," and depth == 1:
-            args.append([])
-            continue
-        args[-1].append(tok)
-    out: set[str] = set()
-    for toks in args:
-        if not toks or "=" in toks:
-            continue  # an option (content=, tokenize=…), not a column
-        name = toks[0].strip("'\"`[]").lower()
-        if name and any(tk.lower() == "unindexed" for tk in toks[1:]):
-            out.add(name)
+            flush(arg)
+            arg = []
+        else:
+            arg.append(tok)
+    flush(arg)
     return out
+
 
 
 class DebugMemory:

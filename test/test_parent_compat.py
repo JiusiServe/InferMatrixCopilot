@@ -737,3 +737,17 @@ def test_skills_catalog_rejects_falsey_laundering(tmp_path):
     skill.write_text("---\nname: a\ndescription: d\nmodules: [m]\n"
                      "---\nbody\n", encoding="utf-8")
     assert ka.skills_catalog(root, validate=True)
+
+
+def test_parent_probe_quoted_paren_cannot_hide_unindexed(tmp_path):
+    """Hook iteration: a quoted column named `x)` must not terminate the
+    argument-list scan early and hide a later UNINDEXED declaration —
+    punctuation counts only as bare tokens."""
+    db = tmp_path / "qparen.db"
+    c = sqlite3.connect(db)
+    c.executescript(_FULL_ENTRIES_DDL + """
+CREATE VIRTUAL TABLE debug_entries_fts USING fts5("x)", key UNINDEXED,
+    module, tags, symptom, root_cause, fix, watch_outs);""")
+    c.close()
+    with pytest.raises(sqlite3.DatabaseError, match="UNINDEXED"):
+        ParentDebugMemory(db)
