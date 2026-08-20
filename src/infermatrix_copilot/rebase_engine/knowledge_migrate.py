@@ -350,6 +350,19 @@ def _migrate_locked(settings, repo, adapter, kp: KnowledgePaths,
                 f"{kn_cfg['parent_debug_db']!r} did not resolve to an "
                 f"existing file ({parent_db!r}) — refusing a partial "
                 "migration")
+        # the schema-validating open probes the exact retrieval shape,
+        # INCLUDING the declared upstream column — a mistyped column
+        # must never silently map every upstream commit to ""
+        # (PR-boundary round-2 F6)
+        from .parent_compat import ParentDebugMemory
+
+        try:
+            ParentDebugMemory(parent_db, upstream_column=str(
+                kn_cfg.get("parent_upstream_column") or ""))
+        except Exception as exc:  # noqa: BLE001 — fail closed with why
+            raise MigrationError(
+                f"declared parent_debug_db failed the retrieval-schema "
+                f"probe: {exc}")
         candidates.append(("parent-db", Path(parent_db), "parent"))
     legacy_global = Path(settings.memory_db)
     if legacy_global.is_file():
@@ -379,6 +392,13 @@ def _migrate_locked(settings, repo, adapter, kp: KnowledgePaths,
                 f"{kn_cfg['parent_skills_dir']!r} did not resolve to an "
                 f"existing directory ({parent_skills!r}) — refusing a "
                 "partial migration")
+        # every declared skill must PARSE — copying files retrieval will
+        # silently skip and then stamping completion would strand that
+        # knowledge forever (PR-boundary round-2 F7)
+        try:
+            ka.skills_catalog(parent_skills, validate=True)
+        except ValueError as exc:
+            raise MigrationError(f"declared parent skills invalid: {exc}")
     planned_skills: list[dict] = []
     if parent_skills and Path(parent_skills).is_dir():
         existing = {p.parent.name for p in

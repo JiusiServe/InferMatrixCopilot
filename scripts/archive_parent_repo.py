@@ -71,6 +71,14 @@ def _acquire_checkout_lock(target_checkout: Path, lock_name: str):
         sys.path.insert(0, str(repo_src))
     from infermatrix_copilot.rebase_engine.runctx import CheckoutLock
 
+    probe = subprocess.run(
+        ["git", "-C", str(target_checkout), "rev-parse",
+         "--is-inside-work-tree"], capture_output=True, text=True)
+    if probe.returncode != 0 or probe.stdout.strip() != "true":
+        raise SystemExit(
+            f"--target-checkout {target_checkout} is not a git worktree "
+            "— an existing-but-fake directory could lock the wrong inode "
+            "while the real checkout is active (round-2 F11)")
     lock = CheckoutLock(Path(target_checkout), lock_name)
     if lock.acquire(blocking=False) is False:
         if "contention" == lock.last_failure.split(":")[0]:
@@ -160,6 +168,9 @@ def main(argv=None) -> int:
     parser.add_argument("--accept-db-content", action="store_true",
                         help="owner reviewed the debug DB's token-like "
                              "content (debug rows may quote error text)")
+    parser.add_argument("--skip-copilot-check", action="store_true",
+                        help="owner waiver: archive without verifying "
+                             "the copilot pre-pr7-retirement tag")
     args = parser.parse_args(argv)
 
     repo = Path(args.parent_repo).resolve()
@@ -225,14 +236,22 @@ def main(argv=None) -> int:
         # they would flag benign names (keyboard.py) whose content is
         # right there to scan.
         committed_hits: list[str] = []
-        tree = run(["git", "ls-tree", "-r", "--name-only", "HEAD"],
-                   repo).stdout.splitlines()
-        for rel in tree:
-            if not rel.strip():
+        name_flagged_tree: list[str] = []
+        tree_raw = subprocess.run(
+            ["git", "ls-tree", "-r", "-z", "--name-only", "HEAD"],
+            cwd=repo, capture_output=True, check=True).stdout
+        for rel_b in tree_raw.split(b"\0"):
+            if not rel_b.strip():
                 continue
+            rel = rel_b.decode("utf-8", "surrogateescape")
             blob = subprocess.run(
                 ["git", "cat-file", "blob", f"HEAD:{rel}"], cwd=repo,
-                capture_output=True).stdout
+                capture_output=True, check=True).stdout
+            if _is_secret_path(rel):
+                # a committed env-NAMED file is inventoried even when its
+                # content scans clean (round-2 F13) — the restore
+                # procedure must know it exists
+                name_flagged_tree.append(rel)
             if SECRET_CONTENT_RX.search(blob):
                 if rel in allowlist:
                     if rel not in allowlisted:
@@ -307,14 +326,21 @@ def main(argv=None) -> int:
         # 5. env-key NAME inventory + excluded-secret inventory
         inventory = ["# ENV/SECRET inventory (NAMES ONLY — values live in "
                      "the owner's secret store)", ""]
-        for env_name in ("agent/.env", ".env"):
+        env_like = sorted({str(q.relative_to(repo)) for q in
+                           list(repo.glob(".env*"))
+                           + list(repo.glob("*/.env*"))
+                           if q.is_file()}
+                          | set(name_flagged_tree))
+        for env_name in env_like:
             env_file = repo / env_name
-            if env_file.is_file():
-                keys = [ln.split("=", 1)[0].strip() for ln in
-                        env_file.read_text(encoding="utf-8").splitlines()
-                        if "=" in ln and not ln.lstrip().startswith("#")]
-                inventory.append(f"## {env_name}")
-                inventory += [f"- {k}" for k in keys] + [""]
+            if not env_file.is_file():
+                continue
+            keys = [ln.split("=", 1)[0].strip() for ln in
+                    env_file.read_text(encoding="utf-8",
+                                       errors="replace").splitlines()
+                    if "=" in ln and not ln.lstrip().startswith("#")]
+            inventory.append(f"## {env_name}")
+            inventory += [f"- {k}" for k in keys] + [""]
         if excluded or allowlisted or excluded_logs:
             inventory.append("## excluded secret-bearing files "
                              "(recreate from the secret store on restore)")
@@ -327,7 +353,13 @@ def main(argv=None) -> int:
         # when the copilot side is in scope (PR-boundary F21): restore
         # instructions that reference a tag that does not exist are not
         # a restore path.
-        copilot_tag_state = "not checked (--copilot-repo not supplied)"
+        if not args.copilot_repo and not args.skip_copilot_check:
+            print("ABORT — the combined restore requires the copilot "
+                  "pre-pr7-retirement tag: pass --copilot-repo to verify "
+                  "it, or --skip-copilot-check to record the owner's "
+                  "waiver (round-2 F15)", file=sys.stderr)
+            return 7
+        copilot_tag_state = "owner-waived (--skip-copilot-check)"
         if args.copilot_repo:
             tags = run(["git", "tag", "-l", "pre-pr7-retirement"],
                        Path(args.copilot_repo)).stdout.strip()
@@ -338,18 +370,33 @@ def main(argv=None) -> int:
                 return 7
             copilot_tag_state = "present"
         restore_sh = archive / "restore.sh"
+        db_rel = db_copy.name if db_copy.exists() else ""
         restore_sh.write_text(f"""#!/usr/bin/env bash
 # Self-contained parent-side restore (generated by archive_parent_repo).
-# Usage: restore.sh <destination-path>
+# Every artifact is addressed RELATIVE to this script, so the archive
+# directory can be moved/copied whole. Usage: restore.sh <destination>
 set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
 DEST="${{1:?usage: restore.sh <destination-path>}}"
-git clone "{archive / f'parent-clone-{ts}'}" "$DEST"
+git clone "$HERE/parent-clone-{ts}" "$DEST"
 git -C "$DEST" checkout "{branch}"
-tar -xzf "{archive / f'rebase_logs-{ts}.tar.gz'}" -C "$DEST" \
-    2>/dev/null || echo "note: no logs tarball archived"
-if [ -f "{db_copy}" ]; then
+TARBALL="$HERE/rebase_logs-{ts}.tar.gz"
+if [ -f "$TARBALL" ]; then
+  tar -xzf "$TARBALL" -C "$DEST"
+elif [ "{1 if args.allow_missing_logs else 0}" != "1" ]; then
+  echo "ERROR: required logs tarball missing from the archive" >&2
+  exit 1
+fi
+if [ -n "{db_rel}" ]; then
+  if [ ! -f "$HERE/{db_rel}" ]; then
+    echo "ERROR: required debug-DB copy missing from the archive" >&2
+    exit 1
+  fi
   mkdir -p "$DEST/$(dirname "{args.debug_db}")"
-  cp "{db_copy}" "$DEST/{args.debug_db}"
+  cp "$HERE/{db_rel}" "$DEST/{args.debug_db}"
+elif [ "{1 if args.allow_missing_db else 0}" != "1" ]; then
+  echo "ERROR: archive carries no debug-DB copy and no waiver" >&2
+  exit 1
 fi
 echo "parent restored to $DEST at branch {branch} (tag {tag})."
 echo "NEXT (manual): recreate the files in ENV_INVENTORY.md from the"

@@ -15,6 +15,28 @@ from pathlib import Path
 import yaml
 
 
+def read_usage_counts(journal: str | Path) -> dict[str, int]:
+    """{skill name: journal usage count} — the read side of the usage
+    prior (seed frontmatter run_count is frozen at run time, so ranking
+    adds these journal counts on top; a write-only journal would silently
+    remove the proven-skill tie-breaker)."""
+    journal = Path(journal)
+    if not journal.is_file():
+        return {}
+    counts: dict[str, int] = {}
+    for line in journal.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            name = str(json.loads(line).get("name") or "")
+        except ValueError:
+            continue  # torn tail tolerated, like every jsonl reader here
+        if name:
+            counts[name] = counts.get(name, 0) + 1
+    return counts
+
+
 def append_usage(journal: str | Path, name: str) -> None:
     """Append one seed-skill usage record to the runtime usage journal
     (flock + fsync). Seed `SKILL.md` files are READ-ONLY at run time
@@ -179,12 +201,18 @@ class SkillStore:
                     skills.append(s)
         return skills
 
-    def find(self, query: str = "", module: str = "", k: int = 3) -> list[Skill]:
+    def find(self, query: str = "", module: str = "", k: int = 3,
+             extra_run_counts: dict | None = None) -> list[Skill]:
         """Return up to `k` active skills ranked for the given `query`/`module`.
         Ranking key (descending): module match first, then count of query words
         found in description+trigger, then `run_count` as the usage tie-breaker.
-        With a query or module supplied, zero-relevance skills are dropped; with
-        neither, the top `k` by run_count are returned as a default surface."""
+        `extra_run_counts` adds journal-accumulated usage on top of the
+        frontmatter count (seed files are read-only at run time, so their
+        usage prior lives in the runtime journal — the read side the
+        write-only journal was missing). With a query or module supplied,
+        zero-relevance skills are dropped; with neither, the top `k` by
+        run_count are returned as a default surface."""
+        extra = extra_run_counts or {}
 
         def score(s: Skill) -> tuple:
             """Rank tuple for `s`: (module_hit, query-word overlap, run_count),
@@ -194,7 +222,8 @@ class SkillStore:
                 1 for w in query.lower().split()
                 if w in (s.description + " " + s.trigger).lower()
             )
-            return (module_hit, text_hit, s.run_count)
+            return (module_hit, text_hit,
+                    s.run_count + int(extra.get(s.name, 0)))
 
         ranked = sorted(self.load_all(), key=score, reverse=True)
         return [s for s in ranked[:k] if score(s) != (0, 0, 0) or not (query or module)]

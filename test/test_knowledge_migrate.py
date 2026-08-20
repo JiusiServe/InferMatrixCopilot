@@ -237,6 +237,77 @@ def test_migrated_rows_exempt_from_dormancy(settings, tmp_path):
     assert rows["caplog-empty"] == "active"
 
 
+def test_migration_validates_upstream_column_and_skills(settings,
+                                                        tmp_path):
+    """Round-2 F6/F7: a mistyped declared upstream column and a malformed
+    declared parent skill each REFUSE before any mutation — silently
+    mapping commits to "" or copying files retrieval skips would stamp a
+    completion that strands knowledge."""
+    repo, db, skills, adir = _world(settings, tmp_path, PARENT_ROWS)
+    manifest_path = adir / "manifest.yaml"
+    doc = yaml.safe_load(manifest_path.read_text())
+    doc["rebase"]["knowledge"]["parent_upstream_column"] = "no_such_col"
+    manifest_path.write_text(yaml.safe_dump(doc))
+    with pytest.raises(MigrationError, match="retrieval-schema probe"):
+        migrate_knowledge(settings, "widget-repo")
+    state_dir = Path(settings.memory_db).parent / "state" / "widget-repo"
+    assert not (state_dir / "MIGRATION_COMPLETE.json").exists()
+    # restore the column; break a skill instead
+    doc["rebase"]["knowledge"]["parent_upstream_column"] = "vllm_commit"
+    manifest_path.write_text(yaml.safe_dump(doc))
+    (skills / "broken").mkdir()
+    (skills / "broken" / "SKILL.md").write_text("no frontmatter\n",
+                                                encoding="utf-8")
+    with pytest.raises(MigrationError, match="skills invalid"):
+        migrate_knowledge(settings, "widget-repo")
+    assert not (state_dir / "MIGRATION_COMPLETE.json").exists()
+
+
+def test_activation_refuses_masquerading_fts_table(settings, tmp_path):
+    """Hook iteration-2 finding: a PLAIN table named entries_fts with the
+    right column names satisfies introspection but fails every MATCH —
+    the usability probe must keep it from activating."""
+    state_dir = Path(settings.memory_db).parent / "state" / "widget-repo"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    db_path = state_dir / "debug_memory.db"
+    dm = DebugMemory(db_path)
+    dm._conn.execute("DROP TABLE entries_fts")
+    dm._conn.execute(
+        "CREATE TABLE entries_fts (symptom, root_cause, fix_summary, "
+        "module, repo, key, tags, watch_outs)")
+    dm._conn.commit()
+    (state_dir / "MIGRATION_COMPLETE.json").write_text(json.dumps(
+        {"schema": "v2", "repo": "widget-repo",
+         "digests": {"target_db": "x"}}), encoding="utf-8")
+    settings.imx_knowledge_runtime = "widget-repo"
+    with pytest.raises(KnowledgeStateError,
+                       match="missing, unreadable, or has no usable"):
+        KnowledgePaths.resolve(settings, "widget-repo")
+
+
+def test_activation_refuses_legacy_fts_mirror(settings, tmp_path):
+    """Round-2 F5: a store whose entries are v2 but whose FTS mirror is
+    the LEGACY column set must not activate — retrieval would silently
+    miss key/tags/watch_outs terms."""
+    state_dir = Path(settings.memory_db).parent / "state" / "widget-repo"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    db_path = state_dir / "debug_memory.db"
+    dm = DebugMemory(db_path)  # fresh v2 store (v2 mirror)
+    # downgrade the MIRROR only
+    dm._conn.execute("DROP TABLE entries_fts")
+    dm._conn.execute(
+        """CREATE VIRTUAL TABLE entries_fts USING fts5(
+            symptom, root_cause, fix_summary, module, repo,
+            content='entries', content_rowid='id')""")
+    dm._conn.commit()
+    (state_dir / "MIGRATION_COMPLETE.json").write_text(json.dumps(
+        {"schema": "v2", "repo": "widget-repo",
+         "digests": {"target_db": "x"}}), encoding="utf-8")
+    settings.imx_knowledge_runtime = "widget-repo"
+    with pytest.raises(KnowledgeStateError, match="FTS mirror lacks"):
+        KnowledgePaths.resolve(settings, "widget-repo")
+
+
 def test_dry_run_writes_only_the_report(settings, tmp_path):
     repo, db, skills, adir = _world(settings, tmp_path, PARENT_ROWS)
     report = migrate_knowledge(settings, "widget-repo", dry_run=True)

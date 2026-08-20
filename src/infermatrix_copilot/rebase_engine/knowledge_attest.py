@@ -199,26 +199,24 @@ def restore_debug_db(snapshot: str | Path, target: str | Path) -> str:
     target = Path(target)
     target.parent.mkdir(parents=True, exist_ok=True)
     guard = target.with_name(target.name + ".pre-restore-guard.db")
-    # SELF-HEAL a previous crash: a leftover guard plus an unreadable
-    # target means the crash hit between sidecar-aside and replace —
-    # the guard IS the pre-restore world
-    if guard.exists() and target.exists():
-        try:
-            conn = sqlite3.connect(readonly_uri(target), uri=True)
-            try:
-                ok = conn.execute(
-                    "PRAGMA integrity_check").fetchone()[0] == "ok"
-            finally:
-                conn.close()
-        except sqlite3.Error:
-            ok = False
-        if not ok:
-            os.replace(guard, target)
-            for suffix in ("-wal", "-shm"):
-                stale = Path(str(target) + suffix)
-                stale.unlink(missing_ok=True)
-                Path(str(target) + suffix + ".pre-restore").unlink(
-                    missing_ok=True)
+    # SELF-HEAL a previous crash: guard removal is the SUCCESSFUL
+    # restore's last act, so any leftover guard means the previous
+    # attempt died mid-swap and the target's state is UNKNOWN — a
+    # structurally valid main file can still be missing committed
+    # WAL-resident rows (round-2 F9), so the heal is UNCONDITIONAL, not
+    # integrity-gated. A guard that is not a regular file (a planted
+    # symlink — round-2 F10) is hostile: refuse to consume it.
+    if guard.exists():
+        if guard.is_symlink() or not guard.is_file():
+            raise OSError(
+                f"pre-restore guard {guard} is not a regular file — "
+                "refusing to self-heal from a planted path")
+        os.replace(guard, target)
+        for suffix in ("-wal", "-shm"):
+            stale = Path(str(target) + suffix)
+            stale.unlink(missing_ok=True)
+            Path(str(target) + suffix + ".pre-restore").unlink(
+                missing_ok=True)
     # STAGE AND VALIDATE FIRST: only after the staged copy proves readable
     # may the target's committed WAL data be touched — a missing/corrupt
     # snapshot must fail the restore with the target fully intact
@@ -269,22 +267,50 @@ def restore_debug_db(snapshot: str | Path, target: str | Path) -> str:
         if not checkpointed:
             # DURABLE guard BEFORE any sidecar move (F15): a consistent
             # backup-API copy of the live target, WAL rows included —
-            # the self-heal source if the process dies mid-swap. A main
-            # file so corrupt the backup API itself refuses cannot be
-            # guarded (there is no consistent state to copy) — the
-            # exception-handler rollback still restores its sidecars.
+            # the self-heal source if the process dies mid-swap. Built
+            # at a UNIQUE temp path and atomically renamed onto the
+            # guard name, so a planted symlink at the predictable name
+            # is replaced, never followed (round-2 F10). A guard
+            # failure on a READABLE target ABORTS (proceeding without
+            # crash protection was the round-2 F9 fail-open); only a
+            # main file so corrupt the backup API itself refuses —
+            # where no consistent copy can exist — proceeds guardless,
+            # protected by the exception-handler sidecar rollback.
+            import tempfile as _tf
+
+            gfd, gtmp = _tf.mkstemp(dir=target.parent,
+                                    prefix=guard.name + ".",
+                                    suffix=".tmp")
+            os.close(gfd)
             try:
                 src = sqlite3.connect(readonly_uri(target), uri=True)
                 try:
-                    gconn = sqlite3.connect(guard)
+                    gconn = sqlite3.connect(gtmp)
                     try:
                         src.backup(gconn)
                     finally:
                         gconn.close()
                 finally:
                     src.close()
-            except sqlite3.Error:
-                guard.unlink(missing_ok=True)
+                guard.unlink(missing_ok=True)  # replace even a symlink
+                os.replace(gtmp, guard)
+            except sqlite3.Error as backup_exc:
+                Path(gtmp).unlink(missing_ok=True)
+                try:
+                    probe = sqlite3.connect(readonly_uri(target),
+                                            uri=True)
+                    try:
+                        readable = probe.execute(
+                            "PRAGMA integrity_check").fetchone()[0] == "ok"
+                    finally:
+                        probe.close()
+                except sqlite3.Error:
+                    readable = False
+                if readable:
+                    raise sqlite3.DatabaseError(
+                        "could not create the pre-restore guard for a "
+                        f"READABLE target ({backup_exc}) — refusing to "
+                        "swap without crash protection")
             try:
                 for suffix in ("-wal", "-shm"):
                     side = Path(str(target) + suffix)

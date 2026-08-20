@@ -345,6 +345,85 @@ def test_restore_self_heals_after_simulated_sigkill(tmp_path,
     assert not guard.exists()    # consumed/cleaned by the healed restore
 
 
+def test_parent_open_rejects_symptom_only_fts(tmp_path):
+    """Round-2 F4: an FTS index missing required columns (symptom-only)
+    would answer the join probe yet silently miss key/tag/root-cause/
+    fix/watch-out searches — the schema-validating open must refuse."""
+    db = tmp_path / "narrow.db"
+    c = sqlite3.connect(db)
+    c.executescript("""
+CREATE TABLE debug_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    module TEXT NOT NULL, key TEXT NOT NULL,
+    tags TEXT DEFAULT '', files TEXT DEFAULT '',
+    run_id TEXT DEFAULT '', timestamp TEXT DEFAULT '',
+    symptom TEXT DEFAULT '', root_cause TEXT DEFAULT '',
+    fix TEXT DEFAULT '', watch_outs TEXT DEFAULT '',
+    status TEXT DEFAULT 'active', run_count INTEGER DEFAULT 1,
+    last_seen_run TEXT DEFAULT '', vllm_commit TEXT DEFAULT '',
+    derived_from TEXT DEFAULT '');
+CREATE VIRTUAL TABLE debug_entries_fts USING fts5(
+    symptom, content='debug_entries', content_rowid='id');
+""")
+    c.close()
+    with pytest.raises(sqlite3.DatabaseError, match="retrieval probe"):
+        ParentDebugMemory(db)
+
+
+def test_restore_guard_failure_on_readable_target_aborts(tmp_path,
+                                                         monkeypatch):
+    """Round-2 F9: when the pre-restore guard cannot be created for a
+    READABLE target, the restore ABORTS — swapping without crash
+    protection was the fail-open."""
+    db = _parent_db(tmp_path / "p.db", [{"key": "k1", "symptom": "s1"}])
+    c = sqlite3.connect(db)
+    c.execute("PRAGMA journal_mode=WAL")
+    c.execute("INSERT INTO debug_entries (module, key) VALUES ('m','k2')")
+    c.commit()  # keep open: WAL alive + uncheckpointable via busy? no —
+    # force the uncheckpointable path by holding a read txn open
+    c.execute("BEGIN")
+    c.execute("SELECT count(*) FROM debug_entries")
+    before = ka.debug_db_digest(db)
+    snap = tmp_path / "snap.db"
+    ka.snapshot_debug_db(db, snap)
+    # fail exactly the GUARD's source open (the first ro open of the
+    # TARGET inside restore); the later integrity re-probe must succeed
+    # so the "readable target ⇒ abort" branch is exercised
+    real_uri = ka.readonly_uri
+    fails = {"armed": True}
+
+    def flaky_uri(path):
+        if fails["armed"] and str(path) == str(db):
+            fails["armed"] = False
+            return "file:/nonexistent-guard-source?mode=ro"
+        return real_uri(path)
+
+    monkeypatch.setattr(ka, "readonly_uri", flaky_uri)
+    with pytest.raises(sqlite3.DatabaseError, match="without crash "
+                                                    "protection"):
+        ka.restore_debug_db(snap, db)
+    monkeypatch.setattr(ka, "readonly_uri", real_uri)
+    c.close()
+    assert ka.debug_db_digest(db) == before  # target untouched
+
+
+def test_restore_refuses_planted_guard_symlink(tmp_path):
+    """Round-2 F10: a planted symlink at the predictable guard name must
+    never be consumed as the self-heal source (or followed as a write
+    target — guards are built at unique temps and renamed over)."""
+    db = _parent_db(tmp_path / "p.db", [{"key": "k1", "symptom": "s1"}])
+    snap = tmp_path / "snap.db"
+    ka.snapshot_debug_db(db, snap)
+    victim = tmp_path / "victim.db"
+    victim.write_text("attacker data", encoding="utf-8")
+    guard = tmp_path / "p.db.pre-restore-guard.db"
+    guard.symlink_to(victim)
+    with pytest.raises(OSError, match="not a regular file"):
+        ka.restore_debug_db(snap, db)
+    assert victim.read_text(encoding="utf-8") == "attacker data"
+    assert guard.is_symlink()  # untouched
+
+
 def test_attest_rejects_malformed_declared_skill(tmp_path):
     """PR-boundary F2: a declared parent skill that does not PARSE would
     be silently skipped at retrieval while its bytes attest — the gate

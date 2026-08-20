@@ -147,13 +147,27 @@ class KnowledgePaths:
 
             dm = DebugMemory.open_readonly(target_db)
             # the marker's schema CLAIM is not evidence — the store
-            # itself must carry the v2 columns and answer through its
-            # FTS mirror (a legacy or half-created store never
-            # activates; PR-boundary F9)
+            # itself must carry the v2 columns AND a v2 FTS mirror (a
+            # legacy, empty, or column-incomplete mirror would activate
+            # a store whose retrieval silently misses fields;
+            # PR-boundary F9 + round-2 F5). Column EXISTENCE is the
+            # check — a generic MATCH's empty result proves nothing on
+            # a fresh store.
             if not dm.schema_v2:
                 raise KnowledgeStateError(
                     f"{target_db} is not schema v2 despite the marker's "
                     "claim — re-run the migration")
+            required_fts = {"symptom", "root_cause", "fix_summary",
+                            "module", "repo", "key", "tags", "watch_outs"}
+            if not required_fts <= dm._fts_columns:
+                raise KnowledgeStateError(
+                    f"{target_db}'s FTS mirror lacks columns "
+                    f"{sorted(required_fts - dm._fts_columns)} — re-run "
+                    "the migration (its upgrade rebuilds the mirror)")
+            # …and the mirror must actually BE an FTS table: a plain
+            # table masquerading as `entries_fts` carries the right
+            # column names yet fails every MATCH (hook iteration-2
+            # finding) — the usability probe keeps that from activating
             dm._conn.execute(
                 "SELECT rowid FROM entries_fts "
                 "WHERE entries_fts MATCH '\"probe\"' LIMIT 1").fetchone()

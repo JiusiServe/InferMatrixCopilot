@@ -42,7 +42,8 @@ def _worlds(tmp_path, *, drift=False, slug_mismatch=False,
         "run_id": "run-n", "phase": nat_phase,
         "upstream_commit": "f" * 40,
         "modules": {"core_mod": {"status": "done"}},
-        "tests": {"pipeline": {"failed_tests": []}},
+        "tests": {"pipeline": {"failed_tests": [], "passed": 2,
+                               "failed": 0, "skipped": 0}},
         "knowledge": {"open": open_block,
                       "close": dict(open_block),
                       "drift": drift}}), encoding="utf-8")
@@ -138,7 +139,8 @@ def test_gate_fail_closed_on_per_slug_regression(tmp_path):
 
     ext_state, ext_manifest, nat_run, digest = _worlds(tmp_path)
     sub = _json.loads((nat_run / "substate.json").read_text())
-    sub["tests"]["pipeline"]["failed_tests"] = ["quick"]
+    sub["tests"]["pipeline"].update(failed_tests=["quick"], passed=1,
+                                    failed=1)
     (nat_run / "substate.json").write_text(_json.dumps(sub))
     report, eligible = compare_validation.build_report(
         _args(ext_state, ext_manifest, nat_run, digest))
@@ -148,6 +150,69 @@ def test_gate_fail_closed_on_per_slug_regression(tmp_path):
     report, eligible = compare_validation.build_report(
         _args(ext_state, ext_manifest, nat_run, digest, ext_results=""))
     assert not eligible and "--ext-results not supplied" in report
+
+
+def test_gate_fail_closed_on_inexact_per_slug_evidence(tmp_path):
+    """PR-boundary round-2 F1/F2: partial ext coverage, invented outcome
+    strings, unaccounted nat outcomes, and unmapped slugs each block."""
+    import json as _json
+
+    # partial ext coverage
+    ext_state, ext_manifest, nat_run, digest = _worlds(tmp_path)
+    partial = Path(nat_run).parent / "partial_results.json"
+    partial.write_text(_json.dumps({"quick": "passed"}), encoding="utf-8")
+    report, eligible = compare_validation.build_report(
+        _args(ext_state, ext_manifest, nat_run, digest,
+              ext_results=str(partial)))
+    assert not eligible and "cover EXACTLY the ext slug set" in report
+    # invented outcome value
+    bad = Path(nat_run).parent / "bad_results.json"
+    bad.write_text(_json.dumps({"quick": "passed", "soak": "skipped"}),
+                   encoding="utf-8")
+    report, eligible = compare_validation.build_report(
+        _args(ext_state, ext_manifest, nat_run, digest,
+              ext_results=str(bad)))
+    assert not eligible and "non-terminal outcomes" in report
+    # unaccounted nat outcomes (counts don't cover the manifest)
+    sub = _json.loads((nat_run / "substate.json").read_text())
+    sub["tests"]["pipeline"]["passed"] = 1  # 1+0+0 != 2 built jobs
+    (nat_run / "substate.json").write_text(_json.dumps(sub))
+    report, eligible = compare_validation.build_report(
+        _args(ext_state, ext_manifest, nat_run, digest))
+    assert not eligible and "unaccounted" in report
+    # unmapped slug in the routing golden
+    w2 = tmp_path / "w2"
+    w2.mkdir()
+    ext_state2, ext_manifest2, nat_run2, digest2 = _worlds(w2)
+    thin = Path(nat_run2).parent / "thin_golden.json"
+    thin.write_text(_json.dumps(
+        {"assignment_routing": {"quick": "core_mod"}}), encoding="utf-8")
+    report, eligible = compare_validation.build_report(
+        _args(ext_state2, ext_manifest2, nat_run2, digest2,
+              routing_golden=str(thin)))
+    assert not eligible and "unmapped in the routing golden" in report
+
+
+def test_gate_fail_closed_on_skipped_or_foreign_nat_outcomes(tmp_path):
+    """Hook iterations 1-2 on the round-2 commit: a SKIPPED nat job with
+    consistent-looking sums, and a failed_tests entry naming a slug
+    outside the built manifest, must both block — either would let the
+    complement wrongly infer as passed."""
+    import json as _json
+
+    ext_state, ext_manifest, nat_run, digest = _worlds(tmp_path)
+    sub = _json.loads((nat_run / "substate.json").read_text())
+    sub["tests"]["pipeline"].update(passed=1, failed=0, skipped=1)
+    (nat_run / "substate.json").write_text(_json.dumps(sub))
+    report, eligible = compare_validation.build_report(
+        _args(ext_state, ext_manifest, nat_run, digest))
+    assert not eligible and "ZERO skips" in report
+    sub["tests"]["pipeline"].update(passed=1, failed=1, skipped=0,
+                                    failed_tests=["not-a-built-slug"])
+    (nat_run / "substate.json").write_text(_json.dumps(sub))
+    report, eligible = compare_validation.build_report(
+        _args(ext_state, ext_manifest, nat_run, digest))
+    assert not eligible and "inside the built manifest" in report
 
 
 def test_gate_fail_closed_on_incomplete_nat_run(tmp_path):
@@ -224,6 +289,8 @@ def _parent_fixture(tmp_path):
 
 
 def _run_archive(repo, target, archive, extra=()):
+    if "--copilot-repo" not in extra:
+        extra = (*extra, "--skip-copilot-check")  # fixtures: owner waiver
     return subprocess.run(
         [sys.executable, str(SCRIPTS / "archive_parent_repo.py"),
          "--parent-repo", str(repo), "--target-checkout", str(target),
@@ -319,14 +386,22 @@ def test_archive_refuses_while_lock_held(tmp_path):
 
 
 def test_archive_refuses_fake_or_missing_target(tmp_path):
-    """PR-boundary F20: a typo'd/fake target must REFUSE (not-contention
-    setup failure through the shared hardened CheckoutLock), never let
-    the archive proceed while the real lock lives elsewhere."""
+    """PR-boundary F20 + round-2 F11: a missing target AND an
+    existing-but-non-git directory must both REFUSE before any lock is
+    taken — an existing fake dir could otherwise lock the wrong inode
+    while the real checkout is active."""
     repo, target = _parent_fixture(tmp_path)
     r = _run_archive(repo, tmp_path / "no-such-checkout",
                      tmp_path / "archive")
     assert r.returncode != 0
-    assert "REFUSED (not contention)" in (r.stderr + r.stdout)
+    assert "not a git worktree" in (r.stderr + r.stdout)
+    fake = tmp_path / "existing-fake"
+    (fake / "locks").mkdir(parents=True)  # plausible-looking, not a repo
+    r = _run_archive(repo, fake, tmp_path / "archive2")
+    assert r.returncode != 0
+    assert "not a git worktree" in (r.stderr + r.stdout)
+    assert not (tmp_path / "archive2").exists() or \
+        not any((tmp_path / "archive2").iterdir())
 
 
 def test_archive_requires_db_and_tag_fail_closed(tmp_path):
@@ -388,6 +463,103 @@ def test_archive_aborts_on_clean_committed_secret(tmp_path):
     r = _run_archive(repo, target, tmp_path / "archive2",
                      ("--secret-allowlist", "committed_cred.txt"))
     assert r.returncode == 0, r.stderr
+
+
+def test_gate_fail_closed_on_unaccounted_and_unmapped(tmp_path):
+    """Round-2 F1/F2: nat outcomes must be fully ACCOUNTED (counts sum
+    to the built manifest) and every slug must be routable; partial ext
+    coverage and invented outcome strings block too."""
+    import json as _json
+
+    ext_state, ext_manifest, nat_run, digest = _worlds(tmp_path)
+    sub = _json.loads((nat_run / "substate.json").read_text())
+    sub["tests"]["pipeline"]["passed"] = 1  # 1+0+0 != 2 built jobs
+    (nat_run / "substate.json").write_text(_json.dumps(sub))
+    report, eligible = compare_validation.build_report(
+        _args(ext_state, ext_manifest, nat_run, digest))
+    assert not eligible and "unaccounted" in report
+    # a SKIPPED job with consistent-looking sums still blocks (hook
+    # finding: passed=1, skipped=1 over 2 jobs must not read as 2 passes)
+    sub["tests"]["pipeline"].update(passed=1, failed=0, skipped=1)
+    (nat_run / "substate.json").write_text(_json.dumps(sub))
+    report, eligible = compare_validation.build_report(
+        _args(ext_state, ext_manifest, nat_run, digest))
+    assert not eligible and "ZERO skips" in report
+    # failed count disagreeing with failed_tests blocks too
+    sub["tests"]["pipeline"].update(passed=1, failed=1, skipped=0,
+                                    failed_tests=[])
+    (nat_run / "substate.json").write_text(_json.dumps(sub))
+    report, eligible = compare_validation.build_report(
+        _args(ext_state, ext_manifest, nat_run, digest))
+    assert not eligible and "unaccounted" in report
+    # partial ext coverage
+    w2 = tmp_path / "w2"
+    w2.mkdir()
+    ext_state, ext_manifest, nat_run, digest = _worlds(w2)
+    partial = w2 / "ext_results.json"
+    partial.write_text(_json.dumps({"quick": "passed"}), encoding="utf-8")
+    report, eligible = compare_validation.build_report(
+        _args(ext_state, ext_manifest, nat_run, digest,
+              ext_results=str(partial)))
+    assert not eligible and "EXACTLY the ext slug set" in report
+    # invented outcome value
+    partial.write_text(_json.dumps(
+        {"quick": "passed", "soak": "maybe"}), encoding="utf-8")
+    report, eligible = compare_validation.build_report(
+        _args(ext_state, ext_manifest, nat_run, digest,
+              ext_results=str(partial)))
+    assert not eligible and "non-terminal outcomes" in report
+    # unmapped slug
+    bare_golden = tmp_path / "w2" / "bare_golden.json"
+    bare_golden.write_text(_json.dumps(
+        {"assignment_routing": {"quick": "core_mod"}}), encoding="utf-8")
+    report, eligible = compare_validation.build_report(
+        _args(ext_state, ext_manifest, nat_run, digest,
+              routing_golden=str(bare_golden)))
+    assert not eligible and "unmapped in the routing" in report
+
+
+def test_archive_inventories_committed_env_files(tmp_path):
+    """Round-2 F13: a CLEAN committed env-named file (content passes the
+    scan) still reaches the clone — it must be inventoried by name so the
+    restore procedure knows it exists."""
+    repo, target = _parent_fixture(tmp_path)
+    (repo / ".env.local").write_text("SOME_SETTING=plainvalue\n")
+    _git(repo, "add", "-f", ".env.local")
+    _git(repo, "commit", "-qm", "committed env-named file, clean content")
+    archive = tmp_path / "archive"
+    r = _run_archive(repo, target, archive)
+    assert r.returncode == 0, r.stderr
+    inventory = (archive / "ENV_INVENTORY.md").read_text(encoding="utf-8")
+    assert ".env.local" in inventory and "SOME_SETTING" in inventory
+    assert "plainvalue" not in inventory  # names only, never values
+
+
+def test_restore_sh_survives_archive_relocation(tmp_path):
+    """Round-2 F14: the archive folder must be movable whole — restore.sh
+    addresses artifacts relative to itself, and a missing REQUIRED
+    artifact fails instead of being shrugged off."""
+    import shutil
+
+    repo, target = _parent_fixture(tmp_path)
+    archive = tmp_path / "archive"
+    r = _run_archive(repo, target, archive)
+    assert r.returncode == 0, r.stderr
+    moved = tmp_path / "moved-elsewhere" / "archive-copy"
+    shutil.copytree(archive, moved)
+    dest = tmp_path / "restored-from-moved"
+    rr = subprocess.run(["bash", str(moved / "restore.sh"), str(dest)],
+                        capture_output=True, text=True)
+    assert rr.returncode == 0, rr.stderr
+    assert (dest / "code.py").read_text() == "print('changed')\n"
+    # a REQUIRED artifact removed from the moved copy fails the restore
+    for tarball in moved.glob("rebase_logs-*.tar.gz"):
+        tarball.unlink()
+    dest2 = tmp_path / "restored-broken"
+    rr = subprocess.run(["bash", str(moved / "restore.sh"), str(dest2)],
+                        capture_output=True, text=True)
+    assert rr.returncode != 0
+    assert "required logs tarball missing" in (rr.stderr + rr.stdout)
 
 
 def test_knowledge_digest_cli_roundtrip(tmp_path):

@@ -249,19 +249,61 @@ def build_report(args) -> tuple[str, bool]:
     else:
         ext_results = {k: str(v) for k, v in _load_json(
             args.ext_results, problems, "ext results").items()}
-    nat_failed = {str(t) for t in
-                  ((substate.get("tests") or {}).get("pipeline") or {})
-                  .get("failed_tests") or []}
-    for slug in sorted(set(ext_results) | nat_failed):
+        # EXACT coverage with EXPLICIT terminal outcomes (round-2 F1):
+        # partial results or invented outcome strings must never let a
+        # skipped/never-run job read as gate evidence
+        bad = {k: v for k, v in ext_results.items()
+               if v not in ("passed", "failed")}
+        if bad:
+            problems.append(f"ext results carry non-terminal outcomes "
+                            f"{bad} — only passed/failed are evidence")
+        if ext_slugs and set(ext_results) != ext_slugs:
+            problems.append(
+                "ext results do not cover EXACTLY the ext slug set "
+                f"(missing={sorted(ext_slugs - set(ext_results))[:10]} "
+                f"extra={sorted(set(ext_results) - ext_slugs)[:10]})")
+    pipeline = ((substate.get("tests") or {}).get("pipeline") or {})
+    nat_failed = {str(t) for t in pipeline.get("failed_tests") or []}
+    accounted = sum(int(pipeline.get(key) or 0)
+                    for key in ("passed", "failed", "skipped"))
+    # "not failed ⇒ passed" is a valid inference ONLY when the counts
+    # prove every job terminated as pass or fail: zero skips, the failed
+    # count matching the failed_tests list, and the sum matching the
+    # built manifest. A skipped job is NOT gate evidence (an ext-passed
+    # slug skipped in nat would otherwise satisfy equal-or-better), and
+    # inconsistent counts mean the record cannot be trusted at all.
+    nat_accounted = (bool(nat_slugs)
+                     and accounted == len(nat_slugs)
+                     and int(pipeline.get("skipped") or 0) == 0
+                     and int(pipeline.get("failed") or 0)
+                     == len(nat_failed)
+                     # a failure naming a slug OUTSIDE the built manifest
+                     # (stale record) would let the complement wrongly
+                     # infer as passed (hook iteration-2 finding)
+                     and nat_failed <= nat_slugs)
+    if nat_slugs and not nat_accounted:
+        problems.append(
+            "nat per-slug outcomes unaccounted: counts "
+            f"(passed={pipeline.get('passed')}, "
+            f"failed={pipeline.get('failed')} vs {len(nat_failed)} "
+            f"failed_tests, skipped={pipeline.get('skipped')}) must sum "
+            f"to the {len(nat_slugs)} built jobs with ZERO skips and "
+            "every failed_tests entry inside the built manifest — a "
+            "skipped, unaccounted, or foreign-slug record is not "
+            "equal-or-better evidence")
+    for slug in sorted(set(ext_results) | nat_failed | nat_slugs):
+        if slug not in route:
+            problems.append(f"slug {slug!r} is unmapped in the routing "
+                            "golden — module attribution impossible")
         ext_out = ext_results.get(slug, "(absent)")
         nat_out = "failed" if slug in nat_failed else \
-            ("passed" if slug in nat_slugs else "(absent)")
-        module = route.get(slug, "(unmapped)")
-        slug_rows.append(f"- {slug} [{module}]: ext={ext_out} "
-                         f"nat={nat_out}")
-        if ext_out == "passed" and nat_out == "failed":
+            ("passed" if slug in nat_slugs and nat_accounted
+             else "(unaccounted)")
+        slug_rows.append(f"- {slug} [{route.get(slug, '(unmapped)')}]: "
+                         f"ext={ext_out} nat={nat_out}")
+        if ext_out == "passed" and nat_out != "passed":
             problems.append(f"per-slug regression: {slug} passed in ext "
-                            "but FAILED in nat (equal-or-better "
+                            f"but is {nat_out} in nat (equal-or-better "
                             "violated)")
 
     # ── wall-clock ──────────────────────────────────────────────────────

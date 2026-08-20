@@ -56,10 +56,17 @@ class _ScopedKnowledge:
         """Search the stores in priority order and return up to `k` skills,
         deduped by name (first store wins on a tie, so a learned runtime
         skill outranks a same-named seed one). `query`/`module` are passed
-        through to each store's own ranking."""
+        through to each store's own ranking, with the runtime usage
+        journal's counts layered onto the frozen seed frontmatter counts —
+        the usage prior the journal write-side feeds (round-2 F8)."""
+        from ...memory.skills import read_usage_counts
+
+        extra = read_usage_counts(self.usage_journal) \
+            if self.usage_journal is not None else {}
         out, seen = [], set()
         for store in self.stores:
-            for s in store.find(query=query, module=module, k=k):
+            for s in store.find(query=query, module=module, k=k,
+                                extra_run_counts=extra):
                 if s.name not in seen:
                     seen.add(s.name)
                     out.append(s)

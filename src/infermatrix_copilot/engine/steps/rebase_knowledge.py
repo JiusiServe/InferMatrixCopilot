@@ -324,11 +324,13 @@ async def _v3_compare(ctx: StepContext) -> StepResult:
             status = str(spec.get("status", spec)
                          if isinstance(spec, dict) else spec)
             lines.append(f"- {name}: {status}")
-            if status == "done" and \
-                    nat_modules.get(name) not in (None, "done", "skipped"):
+            # a baseline-green module that this run failed, SKIPPED, or
+            # never ran is an UNPROVEN regression — all three block
+            # (PR-boundary round-2 F3)
+            if status == "done" and nat_modules.get(name) != "done":
                 divergent.append(
                     f"{name}: baseline done, this run "
-                    f"{nat_modules.get(name)}")
+                    f"{nat_modules.get(name) or 'missing'}")
         if divergent:
             lines += ["", "## DIVERGENT (worse than baseline)"]
             lines += [f"- {d}" for d in divergent]

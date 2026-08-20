@@ -65,6 +65,17 @@ class ParentDebugMemory:
                 "JOIN debug_entries e ON e.id = f.rowid "
                 "WHERE debug_entries_fts MATCH '\"probe\"' LIMIT 1"
             ).fetchone()
+            # every INDEXED column search relies on must exist in the FTS
+            # table itself — a symptom-only index would answer the join
+            # probe yet silently miss key/tag/root-cause/fix/watch-out
+            # terms (PR-boundary round-2 F4); a column-filtered MATCH
+            # errors on a missing column
+            for col in ("module", "key", "tags", "symptom", "root_cause",
+                        "fix", "watch_outs"):
+                self._conn.execute(
+                    "SELECT rowid FROM debug_entries_fts WHERE "
+                    f"debug_entries_fts MATCH '{col}: \"probe\"' LIMIT 1"
+                ).fetchone()
             self._conn.execute("SELECT count(*) FROM debug_entries"
                                ).fetchone()
             if upstream_column:
