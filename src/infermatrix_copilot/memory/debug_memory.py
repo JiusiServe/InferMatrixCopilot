@@ -130,7 +130,10 @@ def fts5_unindexed_columns(create_sql: str) -> set[str]:
         if not arg or "=" in arg:
             return  # empty, or an option (content=, tokenize=…)
         name = arg[0].strip("'\"`[]").lower()
-        if name and any(tk.lower() == "unindexed" for tk in arg[1:]):
+        # SQLite DEQUOTES option tokens too: `module "UNINDEXED"` (any
+        # quote style) is a real UNINDEXED declaration (round-5 F1)
+        if name and any(tk.strip("'\"`[]").lower() == "unindexed"
+                        for tk in arg[1:]):
             out.add(name)
 
     depth, arg = 1, []

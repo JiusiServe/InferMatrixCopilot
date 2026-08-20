@@ -290,6 +290,7 @@ def test_restore_failure_restores_preserved_sidecars(tmp_path,
         # main deletes sidecars as its own cleanup)
         assert wal.exists() and wal.read_bytes() == wal_bytes
         assert not (tmp_path / "p.db-wal.pre-restore").exists()
+        assert not list(tmp_path.glob("p.db.restore-*"))  # round-5 F3
     finally:
         monkeypatch.undo()
         c.close()
@@ -616,6 +617,9 @@ def test_restore_aborts_when_target_state_unknown(tmp_path, monkeypatch,
     assert wal.exists() and wal.read_bytes() == wal_bytes
     assert not (tmp_path / "p.db-wal.pre-restore").exists()
     assert not list(tmp_path.glob("*pre-restore-guard*"))
+    # …and no snapshot-sized staging copy leaks either (round-5 F3):
+    # retries must not accumulate full DB copies
+    assert not list(tmp_path.glob("p.db.restore-*"))
     c.close()
 
 
@@ -631,7 +635,11 @@ def test_parent_probe_rejects_unindexed_despite_formatting(tmp_path):
             '"key" UNINDEXED',
             "[key] UNINDEXED",
             "KEY UNINDEXED",
-            '"Key" UNINDEXED')):
+            '"Key" UNINDEXED',
+            # SQLite dequotes OPTION tokens too (round-5 F1)
+            'key "UNINDEXED"',
+            "key 'unindexed'",
+            "key [UNINDEXED]")):
         db = tmp_path / f"fmt{i}.db"
         c = sqlite3.connect(db)
         c.executescript(_FULL_ENTRIES_DDL + f"""
@@ -732,6 +740,15 @@ def test_skills_catalog_rejects_falsey_laundering(tmp_path):
     skill.write_text("---\n- just\n- a-list\n---\nbody\n",
                      encoding="utf-8")
     with pytest.raises(ValueError, match="does not parse as a skill"):
+        ka.skills_catalog(root, validate=True)
+    # explicit `modules: null` is PRESENT and non-list (round-5 F2)
+    skill.write_text("---\nname: a\nmodules: null\n---\nbody\n",
+                     encoding="utf-8")
+    with pytest.raises(ValueError, match="list of strings"):
+        ka.skills_catalog(root, validate=True)
+    # null (empty) frontmatter is a malformed seed at the gate
+    skill.write_text("---\n\n---\nbody\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="non-empty mapping"):
         ka.skills_catalog(root, validate=True)
     # a plain healthy skill still validates
     skill.write_text("---\nname: a\ndescription: d\nmodules: [m]\n"

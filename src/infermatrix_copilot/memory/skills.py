@@ -136,11 +136,13 @@ def _parse_skill(path: Path) -> Skill | None:
         return None
     try:
         _, fm, body = text.split("---", 2)
-        meta = yaml.safe_load(fm) or {}
+        meta = yaml.safe_load(fm)
     except (ValueError, yaml.YAMLError):
         return None
+    if meta is None:
+        meta = {}  # genuinely empty frontmatter: field defaults apply
     if not isinstance(meta, dict):
-        return None  # a list/scalar frontmatter has no fields to read
+        return None  # list/scalar/falsey frontmatter has no fields
     return Skill(
         name=meta.get("name", path.parent.name),
         description=str(meta.get("description", "")),

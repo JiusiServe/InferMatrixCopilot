@@ -91,15 +91,14 @@ def skills_catalog(skills_dir: str | Path, *,
 
             meta = _yaml.safe_load(
                 p.read_text(encoding="utf-8").split("---", 2)[1])
-            if meta is None:
-                meta = {}
-            # STRICT raw types (round-4 F3): `or {}`/`or []` would
-            # launder falsey non-mappings; `status: false` would load,
-            # stringify to "False" and be silently dropped by
-            # SkillStore.load_all; `modules: false` loses targeting
-            if not isinstance(meta, dict):
+            # STRICT raw types (round-4 F3 / round-5 F2): no falsey or
+            # null laundering at the GATE — empty/null frontmatter is a
+            # malformed seed; `status: false` would load, stringify to
+            # "False" and be silently dropped by SkillStore.load_all
+            if meta is None or not isinstance(meta, dict):
                 raise ValueError(
-                    f"{p}: skill frontmatter must be a mapping")
+                    f"{p}: skill frontmatter must be a non-empty "
+                    "mapping")
             name = meta.get("name", p.parent.name)
             if not isinstance(name, str) or not name.strip():
                 raise ValueError(f"{p}: skill name must be a non-empty "
@@ -108,9 +107,9 @@ def skills_catalog(skills_dir: str | Path, *,
                 if fld in meta and not isinstance(meta[fld], str):
                     raise ValueError(
                         f"{p}: skill {fld} must be a scalar string")
-            mods = meta.get("modules")
-            if mods is None:
-                mods = []  # YAML's empty value — _parse_skill's semantics
+            # ABSENT modules is fine ([]); a PRESENT non-list —
+            # explicit null included — is not (round-5 F2)
+            mods = meta["modules"] if "modules" in meta else []
             if not isinstance(mods, list) or \
                     not all(isinstance(m, str) for m in mods):
                 raise ValueError(
@@ -281,120 +280,128 @@ def restore_debug_db(snapshot: str | Path, target: str | Path) -> str:
     except BaseException:
         tmp.unlink(missing_ok=True)
         raise
-    # Consolidate the target BEFORE touching its sidecars: a VERIFIED
-    # checkpoint folds WAL-resident committed rows into the main file, so
-    # a failed replace can no longer lose them (the caller holds the
-    # exclusion lock — no writers). `wal_checkpoint` reports busy=1
-    # without raising, so its result row is checked, not assumed. A
-    # target that cannot checkpoint keeps its sidecars PRESERVED ASIDE,
-    # and a failure at the final replace rolls them back — every failure
-    # path leaves the original target fully readable.
-    preserved: list[tuple] = []
-    if target.exists():
-        checkpointed = False
-        try:
-            conn = sqlite3.connect(target)
-            try:
-                row = conn.execute(
-                    "PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
-                conn.execute("PRAGMA journal_mode=DELETE")
-                conn.commit()
-                # a MISSING result row is unproven, not success
-                checkpointed = row is not None and int(row[0]) == 0
-            finally:
-                conn.close()
-        except sqlite3.Error:
-            checkpointed = False
-        if not checkpointed:
-            # DURABLE guard BEFORE any sidecar move (F15): a consistent
-            # backup-API copy of the live target, WAL rows included —
-            # the self-heal source if the process dies mid-swap. Built
-            # at a UNIQUE temp path and atomically renamed onto the
-            # guard name, so a planted symlink at the predictable name
-            # is replaced, never followed (round-2 F10). A guard
-            # failure on a READABLE target ABORTS (proceeding without
-            # crash protection was the round-2 F9 fail-open); only a
-            # main file so corrupt the backup API itself refuses —
-            # where no consistent copy can exist — proceeds guardless,
-            # protected by the exception-handler sidecar rollback.
-            import tempfile as _tf
-
-            gfd, gtmp = _tf.mkstemp(dir=target.parent,
-                                    prefix=guard.name + ".",
-                                    suffix=".tmp")
-            os.close(gfd)
-            try:
-                src = sqlite3.connect(readonly_uri(target), uri=True)
-                try:
-                    gconn = sqlite3.connect(gtmp)
-                    try:
-                        src.backup(gconn)
-                    finally:
-                        gconn.close()
-                finally:
-                    src.close()
-                guard.unlink(missing_ok=True)  # replace even a symlink
-                os.replace(gtmp, guard)
-            except sqlite3.Error as backup_exc:
-                Path(gtmp).unlink(missing_ok=True)
-                try:
-                    probe = sqlite3.connect(readonly_uri(target),
-                                            uri=True)
-                    try:
-                        readable = probe.execute(
-                            "PRAGMA integrity_check").fetchone()[0] == "ok"
-                    finally:
-                        probe.close()
-                except sqlite3.Error as probe_exc:
-                    # UNKNOWN is not corrupt (round-3 F8): only a
-                    # DEFINITIVE corruption verdict (NOTADB/CORRUPT —
-                    # restore's remedy case) may proceed guardless. A
-                    # transient/environmental error (locked, disk IO →
-                    # OperationalError/InterfaceError) leaves the
-                    # target's state unknown and must abort BEFORE any
-                    # sidecar move, never strip crash protection.
-                    code = getattr(probe_exc, "sqlite_errorcode",
-                                   None)
-                    definitive = code is not None and (code & 0xff) in (
-                        sqlite3.SQLITE_CORRUPT, sqlite3.SQLITE_NOTADB)
-                    if not definitive:
-                        raise sqlite3.DatabaseError(
-                            "pre-restore guard failed and the target's "
-                            f"state is UNKNOWN ({probe_exc}) — refusing "
-                            "to touch its sidecars") from probe_exc
-                    readable = False
-                if readable:
-                    raise sqlite3.DatabaseError(
-                        "could not create the pre-restore guard for a "
-                        f"READABLE target ({backup_exc}) — refusing to "
-                        "swap without crash protection")
-            try:
-                for suffix in ("-wal", "-shm"):
-                    side = Path(str(target) + suffix)
-                    if side.exists():
-                        aside = Path(str(side) + ".pre-restore")
-                        os.replace(side, aside)
-                        preserved.append((side, aside))
-            except BaseException:
-                # a PARTIAL preserve (wal moved, shm move failed) must not
-                # strand the wal aside — roll back what moved, then fail
-                for side, aside in preserved:
-                    if aside.exists():
-                        os.replace(aside, side)
-                guard.unlink(missing_ok=True)
-                raise
+    # From here the staged tmp must NEVER outlive the attempt: a
+    # guard abort, preserve failure, or failed final replace all
+    # leave a snapshot-sized .restore-*.tmp behind otherwise, and
+    # retries would accumulate full DB copies (round-5 F3)
     try:
-        for suffix in ("-wal", "-shm"):
-            side = Path(str(target) + suffix)
-            if side.exists():
-                side.unlink()
-        os.replace(tmp, target)
+        # Consolidate the target BEFORE touching its sidecars: a VERIFIED
+        # checkpoint folds WAL-resident committed rows into the main file, so
+        # a failed replace can no longer lose them (the caller holds the
+        # exclusion lock — no writers). `wal_checkpoint` reports busy=1
+        # without raising, so its result row is checked, not assumed. A
+        # target that cannot checkpoint keeps its sidecars PRESERVED ASIDE,
+        # and a failure at the final replace rolls them back — every failure
+        # path leaves the original target fully readable.
+        preserved: list[tuple] = []
+        if target.exists():
+            checkpointed = False
+            try:
+                conn = sqlite3.connect(target)
+                try:
+                    row = conn.execute(
+                        "PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+                    conn.execute("PRAGMA journal_mode=DELETE")
+                    conn.commit()
+                    # a MISSING result row is unproven, not success
+                    checkpointed = row is not None and int(row[0]) == 0
+                finally:
+                    conn.close()
+            except sqlite3.Error:
+                checkpointed = False
+            if not checkpointed:
+                # DURABLE guard BEFORE any sidecar move (F15): a consistent
+                # backup-API copy of the live target, WAL rows included —
+                # the self-heal source if the process dies mid-swap. Built
+                # at a UNIQUE temp path and atomically renamed onto the
+                # guard name, so a planted symlink at the predictable name
+                # is replaced, never followed (round-2 F10). A guard
+                # failure on a READABLE target ABORTS (proceeding without
+                # crash protection was the round-2 F9 fail-open); only a
+                # main file so corrupt the backup API itself refuses —
+                # where no consistent copy can exist — proceeds guardless,
+                # protected by the exception-handler sidecar rollback.
+                import tempfile as _tf
+
+                gfd, gtmp = _tf.mkstemp(dir=target.parent,
+                                        prefix=guard.name + ".",
+                                        suffix=".tmp")
+                os.close(gfd)
+                try:
+                    src = sqlite3.connect(readonly_uri(target), uri=True)
+                    try:
+                        gconn = sqlite3.connect(gtmp)
+                        try:
+                            src.backup(gconn)
+                        finally:
+                            gconn.close()
+                    finally:
+                        src.close()
+                    guard.unlink(missing_ok=True)  # replace even a symlink
+                    os.replace(gtmp, guard)
+                except sqlite3.Error as backup_exc:
+                    Path(gtmp).unlink(missing_ok=True)
+                    try:
+                        probe = sqlite3.connect(readonly_uri(target),
+                                                uri=True)
+                        try:
+                            readable = probe.execute(
+                                "PRAGMA integrity_check").fetchone()[0] == "ok"
+                        finally:
+                            probe.close()
+                    except sqlite3.Error as probe_exc:
+                        # UNKNOWN is not corrupt (round-3 F8): only a
+                        # DEFINITIVE corruption verdict (NOTADB/CORRUPT —
+                        # restore's remedy case) may proceed guardless. A
+                        # transient/environmental error (locked, disk IO →
+                        # OperationalError/InterfaceError) leaves the
+                        # target's state unknown and must abort BEFORE any
+                        # sidecar move, never strip crash protection.
+                        code = getattr(probe_exc, "sqlite_errorcode",
+                                       None)
+                        definitive = code is not None and (code & 0xff) in (
+                            sqlite3.SQLITE_CORRUPT, sqlite3.SQLITE_NOTADB)
+                        if not definitive:
+                            raise sqlite3.DatabaseError(
+                                "pre-restore guard failed and the target's "
+                                f"state is UNKNOWN ({probe_exc}) — refusing "
+                                "to touch its sidecars") from probe_exc
+                        readable = False
+                    if readable:
+                        raise sqlite3.DatabaseError(
+                            "could not create the pre-restore guard for a "
+                            f"READABLE target ({backup_exc}) — refusing to "
+                            "swap without crash protection")
+                try:
+                    for suffix in ("-wal", "-shm"):
+                        side = Path(str(target) + suffix)
+                        if side.exists():
+                            aside = Path(str(side) + ".pre-restore")
+                            os.replace(side, aside)
+                            preserved.append((side, aside))
+                except BaseException:
+                    # a PARTIAL preserve (wal moved, shm move failed) must not
+                    # strand the wal aside — roll back what moved, then fail
+                    for side, aside in preserved:
+                        if aside.exists():
+                            os.replace(aside, side)
+                    guard.unlink(missing_ok=True)
+                    raise
+        try:
+            for suffix in ("-wal", "-shm"):
+                side = Path(str(target) + suffix)
+                if side.exists():
+                    side.unlink()
+            os.replace(tmp, target)
+        except BaseException:
+            for side, aside in preserved:
+                if aside.exists():
+                    os.replace(aside, side)  # the old target is whole again
+            raise
+        for _side, aside in preserved:
+            aside.unlink(missing_ok=True)
+        guard.unlink(missing_ok=True)
+        return staged_digest
     except BaseException:
-        for side, aside in preserved:
-            if aside.exists():
-                os.replace(aside, side)  # the old target is whole again
+        tmp.unlink(missing_ok=True)
         raise
-    for _side, aside in preserved:
-        aside.unlink(missing_ok=True)
-    guard.unlink(missing_ok=True)
-    return staged_digest
