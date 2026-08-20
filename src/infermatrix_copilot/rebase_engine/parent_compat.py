@@ -27,51 +27,11 @@ import re
 import sqlite3
 from pathlib import Path
 
-from ..memory.debug_memory import readonly_uri
+from ..memory.debug_memory import (fts5_unindexed_columns,
+                                   is_fts5_table, readonly_uri)
 
 _TOKEN_RE = re.compile(r"[A-Za-z0-9_]+")
 _NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-
-
-def _fts5_unindexed_columns(create_sql: str) -> set[str]:
-    """Column names declared UNINDEXED in an FTS5 CREATE VIRTUAL TABLE
-    statement, parsed from the argument list itself (comments stripped,
-    args split at top-level commas) — a substring scan is formatting-
-    dependent and misses `col   UNINDEXED` or comment-separated forms.
-    Non-FTS5 SQL yields the empty set (the FTS5-ness check is separate)."""
-    s = re.sub(r"/\*.*?\*/", " ", create_sql, flags=re.S)
-    s = re.sub(r"--[^\n]*", " ", s)
-    m = re.search(r"using\s+fts5\s*\(", s, flags=re.I)
-    if not m:
-        return set()
-    args, depth, start, i = [], 1, m.end(), m.end()
-    while i < len(s) and depth:
-        ch = s[i]
-        if ch in "([":
-            depth += 1
-        elif ch in ")]":
-            depth -= 1
-            if depth == 0:
-                break
-        elif ch == "," and depth == 1:
-            args.append(s[start:i])
-            start = i + 1
-        i += 1
-    args.append(s[start:i])
-    out: set[str] = set()
-    for arg in args:
-        arg = arg.strip()
-        if not arg or "=" in arg:
-            continue  # an option (content=, tokenize=…), not a column
-        toks = re.findall(
-            r"'[^']*'|\"[^\"]*\"|`[^`]*`|\[[^\]]*\]|[A-Za-z_][A-Za-z0-9_]*",
-            arg)
-        if not toks:
-            continue
-        name = toks[0].strip("'\"`[]").casefold()
-        if any(tk.lower() == "unindexed" for tk in toks[1:]):
-            out.add(name)
-    return out
 
 
 class ParentDebugMemory:
@@ -103,11 +63,10 @@ class ParentDebugMemory:
             fts_sql = (self._conn.execute(
                 "SELECT sql FROM sqlite_master WHERE name = "
                 "'debug_entries_fts'").fetchone() or ("",))[0] or ""
-            if not re.search(r"using\s+fts5\s*\(", fts_sql,
-                             flags=re.I):
+            if not is_fts5_table(fts_sql):
                 raise sqlite3.DatabaseError(
                     "debug_entries_fts is not an FTS5 table")
-            bad = _fts5_unindexed_columns(fts_sql) & {
+            bad = fts5_unindexed_columns(fts_sql) & {
                 "module", "key", "tags", "symptom", "root_cause",
                 "fix", "watch_outs"}
             if bad:
@@ -121,8 +80,10 @@ class ParentDebugMemory:
                 "e.root_cause, e.fix, e.status "
                 "FROM debug_entries_fts f "
                 "JOIN debug_entries e ON e.id = f.rowid "
-                "WHERE debug_entries_fts MATCH '\"probe\"' LIMIT 1"
-            ).fetchone()
+                "WHERE debug_entries_fts MATCH '\"probe\"' "
+                "ORDER BY f.rank LIMIT 1"
+            ).fetchone()  # rank is FTS5-only: engine truth, not DDL
+            # text (qualified: debug_entries may itself expose rank)
             # every INDEXED column search relies on must exist in the FTS
             # table itself — a symptom-only index would answer the join
             # probe yet silently miss key/tag/root-cause/fix/watch-out
@@ -142,8 +103,11 @@ class ParentDebugMemory:
                 # rowid/oid/NULL-ish identifiers, but `get()`'s dict
                 # lookup is exact — every upstream commit would
                 # silently map to ""
-                cols = {r[1] for r in self._conn.execute(
-                    "PRAGMA table_xinfo(debug_entries)")}
+                # SELECT-* description, NOT table_xinfo: xinfo also
+                # lists a virtual table's HIDDEN columns (rank, the
+                # table-name column) that SELECT * omits (round-4 F2)
+                cols = {d[0] for d in self._conn.execute(
+                    "SELECT * FROM debug_entries LIMIT 0").description}
                 if upstream_column not in cols:
                     raise sqlite3.DatabaseError(
                         f"declared upstream column {upstream_column!r} "

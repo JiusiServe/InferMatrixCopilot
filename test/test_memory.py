@@ -116,3 +116,15 @@ def test_skill_find_journal_count_never_creates_relevance(tmp_path):
     found = store.find(query="scheduler drift", k=5,
                        extra_run_counts={"unrelated": 100})
     assert [s.name for s in found] == ["relevant"]
+
+
+def test_load_all_skips_non_mapping_frontmatter(tmp_path):
+    """Round-4 F3 side-find: a SKILL.md whose frontmatter parses to a
+    LIST crashed _parse_skill (meta.get on a list) — retrieval must skip
+    it like any other unparseable skill, never die."""
+    d = tmp_path / "skills" / "weird"
+    d.mkdir(parents=True)
+    (d / "SKILL.md").write_text("---\n- just\n- a-list\n---\nbody\n",
+                                encoding="utf-8")
+    store = SkillStore(tmp_path / "skills")
+    assert store.load_all() == []

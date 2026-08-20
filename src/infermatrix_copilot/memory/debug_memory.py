@@ -44,6 +44,116 @@ ADDITIVE_COLUMNS: dict[str, str] = {
 _FTS_V2_EXTRA = ("key", "tags", "watch_outs")
 
 
+def strip_sql_comments(sql: str) -> str:
+    """`sql` with /* */ and -- comments blanked, QUOTE-AWARE. sqlite_master
+    stores CREATE statements verbatim, so any check that regex-matches the
+    DDL text must strip comments first — `/* USING fts5( */ USING
+    fts4(...)` is valid SQL whose raw text passes a naive FTS5 test. And
+    the stripper itself must honor quoting: a column named `"a /*"` must
+    not open a comment, or the blanked span could swallow a real
+    UNINDEXED declaration (round-4 F1)."""
+    out, i, n = [], 0, len(sql)
+    while i < n:
+        ch = sql[i]
+        if ch in "'\"`[":
+            close = "]" if ch == "[" else ch
+            j = i + 1
+            while j < n:
+                if sql[j] == close:
+                    if close != "]" and j + 1 < n and sql[j + 1] == close:
+                        j += 2  # doubled quote stays inside the literal
+                        continue
+                    break
+                j += 1
+            out.append(sql[i:min(j + 1, n)])
+            i = j + 1
+        elif sql.startswith("/*", i):
+            j = sql.find("*/", i + 2)
+            i = n if j == -1 else j + 2
+            out.append(" ")
+        elif sql.startswith("--", i):
+            j = sql.find("\n", i)
+            i = n if j == -1 else j
+            out.append(" ")
+        else:
+            out.append(ch)
+            i += 1
+    return "".join(out)
+
+
+_SQL_TOKEN_RE = re.compile(
+    r"'(?:[^']|'')*'|\"(?:[^\"]|\"\")*\"|`(?:[^`]|``)*`|\[[^\]]*\]"
+    r"|[A-Za-z_][A-Za-z0-9_]*|.", re.S)
+
+
+def _fts5_args_start(sql_no_comments: str) -> int | None:
+    """Index just past the `(` opening an FTS5 argument list, located by
+    TOKENIZING the DDL — quoted identifiers are single tokens, so a
+    column literally named `[USING fts5(]` inside FTS4 DDL can never
+    stand in for the table-level module clause. None when the statement
+    does not declare `USING fts5 (`. The FIRST bare `USING` token is the
+    table-level one: nothing before it but CREATE VIRTUAL TABLE and the
+    (possibly quoted) table name."""
+    toks = [(m.group(0), m.end()) for m in
+            _SQL_TOKEN_RE.finditer(sql_no_comments)
+            if not m.group(0).isspace()]
+    for i, (tok, _end) in enumerate(toks):
+        if tok.lower() == "using":
+            if (i + 2 < len(toks) and toks[i + 1][0].lower() == "fts5"
+                    and toks[i + 2][0] == "("):
+                return toks[i + 2][1]
+            return None
+    return None
+
+
+def is_fts5_table(create_sql: str) -> bool:
+    """True when `create_sql` declares an FTS5 virtual table — comment-
+    stripped and tokenized (see _fts5_args_start): neither a comment nor
+    a quoted identifier carrying `USING fts5(` can spoof it."""
+    return _fts5_args_start(strip_sql_comments(create_sql)) is not None
+
+
+def fts5_unindexed_columns(create_sql: str) -> set[str]:
+    """LOWERCASED names of columns declared UNINDEXED in an FTS5 CREATE
+    VIRTUAL TABLE statement, parsed from the argument list itself
+    (comments stripped, args split at top-level commas) — a substring
+    scan is formatting-dependent, and SQLite resolves FTS column names
+    case-insensitively, so callers compare against lowercase. Non-FTS5
+    SQL yields the empty set (FTS5-ness is is_fts5_table's job)."""
+    s = strip_sql_comments(create_sql)
+    args_start = _fts5_args_start(s)
+    if args_start is None:
+        return set()
+    args, depth, start, i = [], 1, args_start, args_start
+    while i < len(s) and depth:
+        ch = s[i]
+        if ch in "([":
+            depth += 1
+        elif ch in ")]":
+            depth -= 1
+            if depth == 0:
+                break
+        elif ch == "," and depth == 1:
+            args.append(s[start:i])
+            start = i + 1
+        i += 1
+    args.append(s[start:i])
+    out: set[str] = set()
+    for arg in args:
+        arg = arg.strip()
+        if not arg or "=" in arg:
+            continue  # an option (content=, tokenize=…), not a column
+        toks = re.findall(
+            r"'[^']*'|\"[^\"]*\"|`[^`]*`|\[[^\]]*\]|[A-Za-z_][A-Za-z0-9_]*",
+            arg)
+        if not toks:
+            continue
+        name = toks[0].strip("'\"`[]").lower()
+        if any(tk.lower() == "unindexed" for tk in toks[1:]):
+            out.add(name)
+    return out
+
+
 class DebugMemory:
     """SQLite-backed store of failure/fix experiences with an FTS5 mirror for
     retrieval. Every entry must carry the full `REQUIRED_FIELDS` set (a fix with

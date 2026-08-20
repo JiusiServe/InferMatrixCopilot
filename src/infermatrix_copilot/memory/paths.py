@@ -167,10 +167,10 @@ class KnowledgePaths:
             fts_sql = (dm._conn.execute(
                 "SELECT sql FROM sqlite_master WHERE name = "
                 "'entries_fts'").fetchone() or ("",))[0] or ""
-            import re as _re
-            if not _re.search(r"using\s+fts5\s*\(", fts_sql,
-                              _re.IGNORECASE) or \
-                    "unindexed" in fts_sql.lower():
+            from .debug_memory import (fts5_unindexed_columns,
+                                       is_fts5_table)
+            if not is_fts5_table(fts_sql) or \
+                    fts5_unindexed_columns(fts_sql):
                 raise KnowledgeStateError(
                     f"{target_db}'s mirror is not a fully-indexed FTS5 "
                     "table — re-run the migration (round-3 F4)")
@@ -180,7 +180,8 @@ class KnowledgePaths:
             # finding) — the usability probe keeps that from activating
             dm._conn.execute(
                 "SELECT rowid FROM entries_fts "
-                "WHERE entries_fts MATCH '\"probe\"' LIMIT 1").fetchone()
+                "WHERE entries_fts MATCH '\"probe\"' "
+                "ORDER BY rank LIMIT 1").fetchone()  # rank: FTS5-only
         except KnowledgeStateError:
             raise
         except (OSError, sqlite3.Error) as exc:

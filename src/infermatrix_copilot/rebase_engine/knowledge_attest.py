@@ -90,16 +90,27 @@ def skills_catalog(skills_dir: str | Path, *,
             import yaml as _yaml
 
             meta = _yaml.safe_load(
-                p.read_text(encoding="utf-8").split("---", 2)[1]) or {}
+                p.read_text(encoding="utf-8").split("---", 2)[1])
+            if meta is None:
+                meta = {}
+            # STRICT raw types (round-4 F3): `or {}`/`or []` would
+            # launder falsey non-mappings; `status: false` would load,
+            # stringify to "False" and be silently dropped by
+            # SkillStore.load_all; `modules: false` loses targeting
+            if not isinstance(meta, dict):
+                raise ValueError(
+                    f"{p}: skill frontmatter must be a mapping")
             name = meta.get("name", p.parent.name)
             if not isinstance(name, str) or not name.strip():
                 raise ValueError(f"{p}: skill name must be a non-empty "
                                  "string")
             for fld in ("description", "trigger", "status"):
-                if isinstance(meta.get(fld), (list, dict)):
+                if fld in meta and not isinstance(meta[fld], str):
                     raise ValueError(
                         f"{p}: skill {fld} must be a scalar string")
-            mods = meta.get("modules") or []
+            mods = meta.get("modules")
+            if mods is None:
+                mods = []  # YAML's empty value — _parse_skill's semantics
             if not isinstance(mods, list) or \
                     not all(isinstance(m, str) for m in mods):
                 raise ValueError(
@@ -342,10 +353,10 @@ def restore_debug_db(snapshot: str | Path, target: str | Path) -> str:
                     # OperationalError/InterfaceError) leaves the
                     # target's state unknown and must abort BEFORE any
                     # sidecar move, never strip crash protection.
-                    definitive = (
-                        type(probe_exc) is sqlite3.DatabaseError
-                        or getattr(probe_exc, "sqlite_errorname", "")
-                        in ("SQLITE_NOTADB", "SQLITE_CORRUPT"))
+                    code = getattr(probe_exc, "sqlite_errorcode",
+                                   None)
+                    definitive = code is not None and (code & 0xff) in (
+                        sqlite3.SQLITE_CORRUPT, sqlite3.SQLITE_NOTADB)
                     if not definitive:
                         raise sqlite3.DatabaseError(
                             "pre-restore guard failed and the target's "

@@ -687,3 +687,45 @@ def test_activation_refuses_unindexed_mirror_column(settings, tmp_path):
     settings.imx_knowledge_runtime = "widget-repo"
     with pytest.raises(KnowledgeStateError, match="fully-indexed FTS5"):
         KnowledgePaths.resolve(settings, "widget-repo")
+
+
+def test_activation_strips_comments_before_fts5_check(settings, tmp_path):
+    """Hook iteration-2 (marker side): a comment carrying `USING fts5(`
+    ahead of the real `USING fts4` must not pass the mirror check."""
+    state_dir = Path(settings.memory_db).parent / "state" / "widget-repo"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    dm = DebugMemory(state_dir / "debug_memory.db")
+    dm._conn.executescript(
+        "DROP TABLE entries_fts;"
+        "CREATE VIRTUAL TABLE entries_fts /* USING fts5( */ USING fts4("
+        "symptom, root_cause, fix_summary, module, repo, key, tags, "
+        "watch_outs);")
+    dm._conn.commit()
+    (state_dir / "MIGRATION_COMPLETE.json").write_text(json.dumps(
+        {"schema": "v2", "repo": "widget-repo",
+         "digests": {"target_db": "x"}}), encoding="utf-8")
+    settings.imx_knowledge_runtime = "widget-repo"
+    with pytest.raises(KnowledgeStateError, match="fully-indexed FTS5"):
+        KnowledgePaths.resolve(settings, "widget-repo")
+
+
+def test_activation_rejects_quoted_identifier_fts5_spoof(settings,
+                                                         tmp_path):
+    """Hook iteration-3 (marker side): the quoted-identifier spoof —
+    an FTS4 mirror whose first column is named `[USING fts5(]` — must
+    not activate."""
+    state_dir = Path(settings.memory_db).parent / "state" / "widget-repo"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    dm = DebugMemory(state_dir / "debug_memory.db")
+    dm._conn.executescript(
+        "DROP TABLE entries_fts;"
+        "CREATE VIRTUAL TABLE entries_fts USING fts4([USING fts5(], "
+        "symptom, root_cause, fix_summary, module, repo, key, tags, "
+        "watch_outs);")
+    dm._conn.commit()
+    (state_dir / "MIGRATION_COMPLETE.json").write_text(json.dumps(
+        {"schema": "v2", "repo": "widget-repo",
+         "digests": {"target_db": "x"}}), encoding="utf-8")
+    settings.imx_knowledge_runtime = "widget-repo"
+    with pytest.raises(KnowledgeStateError, match="fully-indexed FTS5"):
+        KnowledgePaths.resolve(settings, "widget-repo")

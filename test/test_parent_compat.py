@@ -570,11 +570,20 @@ def test_skills_catalog_validates_types_and_uniqueness(tmp_path):
     assert len(ka.skills_catalog(root)) == 2
 
 
-def test_restore_aborts_when_target_state_unknown(tmp_path, monkeypatch):
-    """Round-3 F8: when the pre-restore guard fails AND the corruption
-    re-probe itself errors transiently (locked/IO — not a NOTADB/CORRUPT
-    verdict), the target's state is UNKNOWN: the restore must abort
-    BEFORE touching any sidecar, never proceed guardless."""
+@pytest.mark.parametrize("probe_exc", [
+    sqlite3.OperationalError("disk I/O error"),
+    # round-4 F4: an exact base DatabaseError WITHOUT a corruption
+    # errorcode is ambiguous, not a corruption verdict — abort too
+    sqlite3.DatabaseError("ambiguous failure, no errorcode"),
+])
+def test_restore_aborts_when_target_state_unknown(tmp_path, monkeypatch,
+                                                  probe_exc):
+    """Round-3 F8 + round-4 F4: when the pre-restore guard fails AND the
+    corruption re-probe itself errors WITHOUT a definitive
+    SQLITE_CORRUPT/SQLITE_NOTADB code (transient IO, locked, or an
+    uncoded base DatabaseError), the target's state is UNKNOWN: the
+    restore must abort BEFORE touching any sidecar, never proceed
+    guardless."""
     db = _parent_db(tmp_path / "p.db", [{"key": "k1", "symptom": "s1"}])
     c = sqlite3.connect(db)
     c.execute("PRAGMA journal_mode=WAL")
@@ -592,7 +601,7 @@ def test_restore_aborts_when_target_state_unknown(tmp_path, monkeypatch):
         # every open of the TARGET errors like a flaky disk; the staged
         # `p.db.restore-*.tmp` copy stays reachable
         if s.endswith("p.db") or "p.db?" in s:
-            raise sqlite3.OperationalError("disk I/O error")
+            raise probe_exc
         return real_connect(database, *a, **kw)
 
     monkeypatch.setattr(sqlite3, "connect", flaky_connect)
@@ -632,3 +641,93 @@ CREATE VIRTUAL TABLE debug_entries_fts USING fts5(
         c.close()
         with pytest.raises(sqlite3.DatabaseError, match="UNINDEXED"):
             ParentDebugMemory(db)
+
+
+def test_parent_probe_strips_comments_before_fts5_check(tmp_path):
+    """Hook iteration-2: sqlite_master stores CREATE text verbatim, so
+    `/* USING fts5( */ USING fts4(...)` fools a raw-text regex — the
+    FTS5-ness check must run on comment-stripped SQL."""
+    db = tmp_path / "trick.db"
+    c = sqlite3.connect(db)
+    c.executescript(_FULL_ENTRIES_DDL + """
+CREATE VIRTUAL TABLE debug_entries_fts /* USING fts5( */ USING fts4(
+    module, key, tags, symptom, root_cause, fix, watch_outs);""")
+    c.close()
+    with pytest.raises(sqlite3.DatabaseError, match="not an FTS5"):
+        ParentDebugMemory(db)
+
+
+def test_parent_probe_rejects_quoted_identifier_fts5_spoof(tmp_path):
+    """Hook iteration-3: a quoted FTS4 column literally named
+    `[USING fts5(]` puts the magic text into the DDL — the module check
+    must tokenize (quoted identifiers are single tokens), not regex the
+    raw statement."""
+    db = tmp_path / "spoof.db"
+    c = sqlite3.connect(db)
+    c.executescript(_FULL_ENTRIES_DDL + """
+CREATE VIRTUAL TABLE debug_entries_fts USING fts4([USING fts5(],
+    module, key, tags, symptom, root_cause, fix, watch_outs);""")
+    c.close()
+    with pytest.raises(sqlite3.DatabaseError, match="not an FTS5"):
+        ParentDebugMemory(db)
+
+
+def test_upstream_column_rejects_hidden_virtual_columns(tmp_path):
+    """Round-4 F2: PRAGMA table_xinfo lists a virtual table's HIDDEN
+    columns (`rank`, the table-name column) that `SELECT *` omits — a
+    parent whose debug_entries is itself an FTS5 table must not accept
+    `rank` as the upstream column (get() would emit "" forever)."""
+    db = tmp_path / "vt.db"
+    c = sqlite3.connect(db)
+    c.executescript("""
+CREATE VIRTUAL TABLE debug_entries USING fts5(
+    id, module, key, tags, files, run_id, timestamp,
+    symptom, root_cause, fix, watch_outs, status);
+CREATE VIRTUAL TABLE debug_entries_fts USING fts5(
+    module, key, tags, symptom, root_cause, fix, watch_outs);""")
+    c.close()
+    with pytest.raises(sqlite3.DatabaseError,
+                       match="not an exact column"):
+        ParentDebugMemory(db, upstream_column="rank")
+
+
+def test_unindexed_parser_survives_quoted_comment_openers(tmp_path):
+    """Round-4 F1: a comment-opener INSIDE a quoted column name must not
+    blank a span of real DDL — the crafted names below would otherwise
+    swallow the UNINDEXED declaration between them."""
+    from infermatrix_copilot.memory.debug_memory import (
+        fts5_unindexed_columns, is_fts5_table)
+    ddl = ('CREATE VIRTUAL TABLE t USING fts5('
+           '"a /*", key UNINDEXED, "*/ c")')
+    assert is_fts5_table(ddl)
+    assert "key" in fts5_unindexed_columns(ddl)
+    # and a REAL comment before the module clause still cannot spoof
+    spoof = ("CREATE VIRTUAL TABLE t /* USING fts5( */ "
+             "USING fts4(a, b)")
+    assert not is_fts5_table(spoof)
+
+
+def test_skills_catalog_rejects_falsey_laundering(tmp_path):
+    """Round-4 F3: `or {}`/`or []` laundering accepted falsey
+    non-mappings — `status: false` would load, stringify to "False" and
+    be silently dropped by SkillStore.load_all; `modules: false` loses
+    module targeting; a non-mapping frontmatter has no fields at all."""
+    root = tmp_path / "skills"
+    (root / "a").mkdir(parents=True)
+    skill = root / "a" / "SKILL.md"
+    skill.write_text("---\nname: a\nstatus: false\n---\nbody\n",
+                     encoding="utf-8")
+    with pytest.raises(ValueError, match="status must be a scalar"):
+        ka.skills_catalog(root, validate=True)
+    skill.write_text("---\nname: a\nmodules: false\n---\nbody\n",
+                     encoding="utf-8")
+    with pytest.raises(ValueError, match="list of strings"):
+        ka.skills_catalog(root, validate=True)
+    skill.write_text("---\n- just\n- a-list\n---\nbody\n",
+                     encoding="utf-8")
+    with pytest.raises(ValueError, match="does not parse as a skill"):
+        ka.skills_catalog(root, validate=True)
+    # a plain healthy skill still validates
+    skill.write_text("---\nname: a\ndescription: d\nmodules: [m]\n"
+                     "---\nbody\n", encoding="utf-8")
+    assert ka.skills_catalog(root, validate=True)
