@@ -140,7 +140,14 @@ def _parse_skill(path: Path) -> Skill | None:
     except (ValueError, yaml.YAMLError):
         return None
     if meta is None:
-        meta = {}  # genuinely empty frontmatter: field defaults apply
+        # safe_load returns None for BLANK frontmatter and for an
+        # explicit `null`/`~` scalar alike — only genuinely blank text
+        # earns the field defaults; a written-out null (or comment-only
+        # doc resolving to null) is skipped like any non-mapping
+        # (verification-round finding)
+        if fm.strip():
+            return None
+        meta = {}
     if not isinstance(meta, dict):
         return None  # list/scalar/falsey frontmatter has no fields
     return Skill(

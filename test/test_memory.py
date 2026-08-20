@@ -128,3 +128,24 @@ def test_load_all_skips_non_mapping_frontmatter(tmp_path):
                                 encoding="utf-8")
     store = SkillStore(tmp_path / "skills")
     assert store.load_all() == []
+
+
+def test_parse_skill_distinguishes_blank_from_explicit_null(tmp_path):
+    """Verification-round finding: yaml.safe_load returns None for BLANK
+    frontmatter and for an explicit `null`/`~` scalar alike — only the
+    blank form may load with field defaults; a written-out null must be
+    skipped, never loaded as a default-active skill."""
+    root = tmp_path / "skills"
+    blank = root / "blank"
+    blank.mkdir(parents=True)
+    (blank / "SKILL.md").write_text("---\n\n---\nbody\n",
+                                    encoding="utf-8")
+    store = SkillStore(root)
+    loaded = store.load_all()
+    assert [s.name for s in loaded] == ["blank"]  # dirname default
+    for i, scalar in enumerate(("null", "~")):
+        d = root / f"nullish{i}"
+        d.mkdir()
+        (d / "SKILL.md").write_text(f"---\n{scalar}\n---\nbody\n",
+                                    encoding="utf-8")
+    assert [s.name for s in store.load_all()] == ["blank"]
