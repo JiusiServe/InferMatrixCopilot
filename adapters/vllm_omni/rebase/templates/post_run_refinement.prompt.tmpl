@@ -1,0 +1,98 @@
+You are generating post-run self-refinement outputs for a rebase orchestrator.
+Quality: level-2 — concise, actionable, grounded **only** in {CONTEXT_FILE}.
+
+## Grounding rule (strict — applies to every bullet)
+
+Every claim, quote, and refinement must appear **verbatim** as an execution line in {CONTEXT_FILE} (orchestrator / `tasks/*.sh` / install / remote `[remote]`). Bundled markdown (including any `POST_RUN_REFINEMENT.md`) is **not** evidence.
+
+**Self-check before each bullet:** Can you quote the exact execution line substring that supports it? If not, omit it. Never carry forward prior-refinement bullets, narrative summaries, or metadata alone. Never invent phases, wave counts, GPU counts, `MISMATCH`/`BROKEN`, CI job names, drift targets, timestamps, or `[cursor_auth]` outcomes unless those substrings appear in the execution portion of {CONTEXT_FILE}. If uncertain, state what the log shows and stop.
+
+## Failure profile — classify the visible window first, skip irrelevant profiles
+
+Metadata `{PHASE}` may be `init` or a numeric phase. Map `init` to the early-phase profiles below (A or A1). Pick exactly one profile that best matches the visible window.
+
+- **(A) Early/init task failure:** `tasks/*.sh failed. Halting.`, `ERROR: L1 agent could not resolve`, `Merge conflicts detected in:`. No `Module progress:`, no pipeline `[k/N]`, no Buildkite. Quote the terminal `ERROR` line; if it names a file/task, include it. If `{FAILED_MODULES}` is empty, say so — do not guess module names.
+  - **(A1) Config/key validation failure (sub-profile of A):** `Missing or empty value for` plus a config key name in a shell-task error. The agent (L1/L2) produced incomplete output that failed shell-level validation. Name the key and the producing task (e.g. `tasks/35_sync_module_paths.sh`). If the producing agent step is visible (e.g. L2 wrote `path_sync_final_l2.json`), quote that line too.
+- **(B) Module rebase:** `Module progress: (N/M)`, heartbeats, `Timeout waiting for modules` or `Module rebase failed. Check signals`. Apply heartbeat/progress rules below.
+- **(C) Pipeline:** `Running [k/N]:`, `ERROR: FAILED:`, `Pipeline tests could not be fully resolved`. Apply Phase 3 rules below.
+- **(D) Push & Buildkite:** `Pushed commit:`, `Build state: failed`, `FAILED: :docker:`.
+- **(E) Finalization only:** Lifecycle lines only (`Generating final summary…`, `Summary written to:`, `=== Orchestrator finished ===`). Not a failure unless preceded by `ERROR:` in the same span.
+- **(F) Resume / lifecycle / mixed-run:** Mostly `=== … Orchestrator ===`, tmux kills, `Phase 1/2 already done`. No `ERROR:` / `FAILED:` / task halt → state lifecycle-heavy and point to deeper logs. Do not infer root cause from `{RUN_STATUS}` or `{FAILED_MODULES}` alone.
+
+## Window & scope rules (all profiles)
+
+- **Run-ID scoping:** When multiple `rebase-*` runs interleave in the log, prefer lines matching `{RUN_ID}`. Do not merge failure arcs from another run ID.
+- **One window, one arc:** Summarize only the visible window. Separate and quote distinct failure arcs. Do not stitch a resume block to a terminal `ERROR` as one causal story unless execution lines connect them.
+- **Execution vs summary:** No `ERROR:` / `FAILED:` / task halt → state resume/lifecycle-only. Do not infer root cause from metadata alone. Do not cite `[i/N]` slots or module slugs without matching execution quotes.
+- **Read in order:** An earlier failed check is not terminal if a later line shows it passed.
+
+## Phase-specific rules (apply only for matching profile)
+
+### Heartbeats & progress plateaus (profile B)
+- Alternating `Module progress: …` / `Module activity observed; idle timeout reset` = one stream: first/last timestamps only if both appear verbatim. Long unchanged `(N/M)` = **one plateau**.
+- Flat `(N/M)` with `failed` 0, then `ERROR: Timeout waiting for modules after …` → straggler timeout. Flat `(N-1)/M` with `failed` 0, then `(M/M)` with `failed` > 0 and `ERROR: Module rebase failed. Check signals` **without** `Timeout waiting for modules` → aggregate completion + error. State order and which line is last. If `ERROR` does not name a `module-*`, say so and point to signals.
+
+### Watchdog noise cycles (all profiles)
+- Repeated `[watchdog] Potential error detected` / `Agent verdict: CONTINUE` pairs for the same pattern → collapse into one mention. Flag only non-CONTINUE verdicts (e.g. `KILL — terminating pytest`). Watchdog agent death (`rc=143` with `defaulting to CONTINUE`) is noise — do not flag. If run ends on watchdog without a later `ERROR:`, flag only if the last verdict was not CONTINUE.
+
+### Phase 3 (pipeline)
+- Distinguish: `Cannot map CI test` / `needs_human` = unmapped job slug; `FAILED:` → `failed during pytest collection` / `Missing internal test helpers` / dotted `tests.*` paths = collection or missing-repo-files arc.
+- `ERROR: FAILED:` + `DEBUG SUPERVISOR: timeout waiting for repair agent` + `continuing with the next split` → watchdog KILL verdict that repair could not fix; split continues but failure counted in final hard-failure list.
+- `[k/N]` + fast `Pipeline tests could not be fully resolved` / `Rebase paused` with no `FAILED` and no debug step → resolution failed at job k.
+- `RESUME-SKIP [i/N]:` = resume noise unless it is the failure.
+
+### Phase 4 (Push & Buildkite)
+- Push outcome: `Pushed commit: … to origin/…` = success.
+- Buildkite: note `Build state: failed`, `FAILED: :docker: Build image` (or other step), and whether `RETRY` is dispatched.
+- **Critical — detect premature success:** If `RETRY '…' (attempt …)` / `Retry triggered` is immediately followed by `All CI jobs passed. Build is clean.` before the retry reaches a terminal state, flag as control-flow bug: retry dispatched but not awaited.
+
+### Phase 5 (Finalization)
+- Lifecycle lines only. Not a failure unless preceded by an `ERROR:` in the same span.
+
+## Log triage & pattern recognition
+- **Primary signals:** `ERROR: FAILED: <job>`, `failed during pytest collection`, `tasks/*.sh failed. Halting.`, `still failing after N debug`, `Rebase PAUSED`.
+- **Config/key validation:** `Missing or empty value for <KEY>` — the named agent (L1/L2) wrote incomplete config output that failed shell-level validation. Quote the key and the producing task. If the agent output file is named (e.g. `path_sync_final_l2.json`), include it.
+- **Metadata vs tail:** `{FAILED_MODULES}` may list many slugs while the visible tail shows one debug target — describe only what execution shows.
+- **Git / wheel / checker:** Long `create mode` / rename blocks are not the failure — find `ERROR:` and task halts. `Found wheel … (HTTP 200)` does not override later `No precompiled vllm wheel …`. Prefer checker outcomes over agent "success" chat. `SKIP …` in drift is not `MISMATCH` unless `MISMATCH` or a count appears. After `All upstream imports resolve`, if next lines dispatch broken-import fix without a fresh `BROKEN` block, quote that control-flow mismatch.
+- **Env/interop:** `uv` cache lock / `UV_LOCK_TIMEOUT` → tie to `Wheel install failed`. `SSH fetch failed; retrying via HTTPS` → transient, not primary. `gpu_lock.sh` integer expression warnings → known shell noise, not primary.
+- **Housekeeping:** `Sending failure notification email`, `Running post-run self-refinement`, model picker, refinement email, `Killed tmux session:`, `plan-daemon` sed failures → lifecycle or cleanup, not primary unless tied to a task `ERROR:` or halt.
+
+## Run metadata
+- Run ID: {RUN_ID} | Phase: {PHASE} | Exit: {EXIT_CODE} | Result: {RUN_STATUS}
+- CI result: {CI_RESULT} | CI attempts: {CI_ATTEMPTS} | Pipeline failed: {PIPELINE_FAILED}
+- Needs human test: {NEEDS_HUMAN} | Failed modules: {FAILED_MODULES}
+
+## Context logs
+- Read context from: {CONTEXT_FILE}
+
+## Output requirements (strict)
+
+### 1. Adaptive prompt additions → {ADAPTIVE_FILE}
+- Title: `# Adaptive Prompt Additions`
+- Write 4-8 one-line actionable bullet rules grounded **only** in patterns that appear in {CONTEXT_FILE} execution lines. Pick from whichever categories actually occur (omit the rest):
+  - Repeat failures; env/CLI issues; cache-lock vs wheel arch/index.
+  - CI slug ↔ `module-*` mappings; `pytest collection` / missing `tests.*` helpers.
+  - Merge conflict patterns; Dockerfile.ci / wheel-url ordering.
+  - Config/key validation drops (agent wrote incomplete config that failed shell check).
+  - Heartbeat plateau collapse; watchdog `KILL` vs process-death noise.
+  - Housekeeping patterns (plan-daemon sed, gpu_lock.sh noise).
+  - Buildkite retry-not-awaited; push/auth; Phase 4/5 lifecycle.
+  - Run-ID scoping; cursor_auth as noise.
+- Do not write bullets for patterns absent from execution text.
+
+### 2. Post-run summary → {SUMMARY_FILE}
+- Title: `# Post-Run Refinement`
+- **Run metadata:** All metadata field values. Add one extra bullet for the first actionable terminal failure / root symptom when execution shows it. Examples:
+  - L2 tasks halt with empty failed modules; config/key validation error with the dropped key and producing task.
+  - Wheel/uv lock; BROKEN imports; green import then spurious broken-import dispatch.
+  - Module wait timeout vs aggregate completion + error; "module not named on ERROR."
+  - Pipeline FAILED: collection vs unmapped job; "not fully resolved" with no FAILED.
+  - Push never reached remote; merge aborted vs later "success".
+  - Buildkite retry-not-awaited; Phase 4 build step failure.
+  - Watchdog KILL (test process rc=143) vs watchdog-agent death rc=143 with `defaulting to CONTINUE` (noise).
+  - No terminal task string → say resume/lifecycle-only and point to deeper logs.
+- **`## Prompt Refinements Applied`** — Each bullet maps to specific quoted execution lines. If execution is only heartbeats + `ERROR:`, refinements limited to plateau collapse, completion vs timeout, module-not-named. For config/key validation: quote the key and the agent that produced the incomplete output. For Phase 4/5: push outcome, Buildkite state, retry-not-awaited. For watchdog: collapse repeated CONTINUE pairs; flag non-CONTINUE verdicts.
+- **`## Potential Stability/Speed Opportunities`** — Exactly 3 concise bullets grounded in visible execution patterns (plateau log volume, repeated auth probes, watchdog noise cycles, Buildkite retry-not-awaited, L2 config key drops). Do not propose changes without execution-text support.
+
+## Constraints
+- Keep both outputs concise. No markdown code fences. No TODO/TBD placeholder text. Prefer one clear actionable read when logs repeat; do not rephrase the same error many times.

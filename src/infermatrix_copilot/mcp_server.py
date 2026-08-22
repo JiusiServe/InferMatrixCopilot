@@ -67,7 +67,7 @@ class CopilotMCP:
         rs.startup_reconcile(self.run_root)
         self._q: queue.Queue[tuple[str, bool]] = queue.Queue()
         self._worker = threading.Thread(target=self._worker_loop, daemon=True,
-                                        name="omni-mcp-worker")
+                                        name="imx-mcp-worker")
         self._worker.start()
 
     # -- worker: one run at a time, each an isolated subprocess ---------------
@@ -140,7 +140,10 @@ class CopilotMCP:
                 **popen_kwargs,
             )
             proc.wait()
-        rs.reconcile_after_wait(run_dir)
+        # BLOCKED_EXIT without a terminal status is the lock-loser signature:
+        # a genuinely blocked child writes its terminal state before exiting 3
+        rs.reconcile_after_wait(run_dir, child_pid=proc.pid,
+                                suspect_lock_loser=(proc.returncode == 3))
 
     # -- start (reserve + enqueue) -------------------------------------------
     def start(self, spec_dict: dict) -> str:

@@ -35,6 +35,9 @@ def test_trigger_matrix(settings):
         out_of_scope_files=["other.py"], full_file_writes=["f1.py"],
     )
     fired = evaluate_triggers(risky, settings, touched_modules=("scheduler",),
+                              high_risk_modules=["scheduler"],  # adapter-
+                              # declared (the settings default is now [],
+                              # repo-neutral — 2026-08-01 audit)
                               pre_push=True, knowledge_edit=True)
     assert set(fired) == {
         "out_of_scope_edits", "high_risk_modules", "large_diff",

@@ -90,8 +90,18 @@ def main(argv: list[str] | None = None) -> int:
     to sys.argv. Returns the process exit code."""
     parser = argparse.ArgumentParser(prog="infermatrix-copilot",
                                      description="Conversational repo-maintenance copilot")
-    parser.add_argument("command", nargs="?", choices=["doctor"],
-                        help="doctor: preflight diagnostics with exact fixes")
+    parser.add_argument("command", nargs="?",
+                        choices=["doctor", "migrate-knowledge"],
+                        help="doctor: preflight diagnostics with exact "
+                             "fixes; migrate-knowledge: the PR4d "
+                             "deployment-time knowledge migration "
+                             "(explicit owner action; see "
+                             "doc/RUNBOOK-rebase.md)")
+    parser.add_argument("--repo", default="",
+                        help="with migrate-knowledge: the target repo name")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="with migrate-knowledge: report only, write "
+                             "nothing else")
     parser.add_argument("--json", action="store_true",
                         help="with doctor: machine-readable output")
     parser.add_argument("--probe", action="store_true",
@@ -133,6 +143,32 @@ def main(argv: list[str] | None = None) -> int:
 
         return run_doctor(as_json=args.json, probe=args.probe)
 
+    if args.command == "migrate-knowledge":  # explicit owner action, no LLM
+        if not args.repo:
+            print("migrate-knowledge needs --repo <name>")
+            return 2
+        from ..config import Settings
+        from ..rebase_engine.knowledge_migrate import (MigrationError,
+                                                       migrate_knowledge)
+        try:
+            report = migrate_knowledge(Settings(), args.repo,
+                                       dry_run=args.dry_run)
+        except MigrationError as exc:
+            print(f"✋ migration refused: {exc}")
+            return 3
+        print(f"{'DRY RUN — ' if args.dry_run else ''}migration report: "
+              f"{report.ingested} ingested, "
+              f"{report.skipped_unchanged} unchanged, "
+              f"{report.reversioned} re-versioned, "
+              f"{report.retired_by_dedup} retired by dedup, "
+              f"{len(report.skills_added)} seed skills added, "
+              f"{report.candidates_merged} candidates merged — see "
+              "MIGRATION_REPORT.md in the state dir"
+              + ("" if args.dry_run else
+                 "; next: review the adapter git diff, then activate via "
+                 "IMX_KNOWLEDGE_RUNTIME (RUNBOOK)"))
+        return 0
+
     # per-invocation accounting (W7): intent parsing runs BEFORE any run dir
     # exists, so pre-run spend (clarify retries!) needs its own artifact. The
     # id is honored from env so eval harnesses can stamp each attempt and
@@ -144,11 +180,11 @@ def main(argv: list[str] | None = None) -> int:
 
     from .. import tracing as _tracing
 
-    inv_id = os.environ.get("OMNI_INVOCATION_ID") or f"inv-{_uuid.uuid4().hex[:8]}"
+    inv_id = os.environ.get("IMX_INVOCATION_ID") or f"inv-{_uuid.uuid4().hex[:8]}"
     inv_dir = _Path.home() / ".infermatrix-copilot" / "invocations"
     inv_dir.mkdir(parents=True, exist_ok=True)
     _tracing.init(inv_id, inv_dir / f"{inv_id}.trace.jsonl")
-    os.environ["OMNI_INVOCATION_ID"] = inv_id  # visible to the run subprocess/task
+    os.environ["IMX_INVOCATION_ID"] = inv_id  # visible to the run subprocess/task
 
     copilot = Copilot()
 

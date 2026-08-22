@@ -1,0 +1,491 @@
+[
+ {
+  "name": "run_shell",
+  "description": "Execute a bash command and return stdout, stderr, and exit code. Use for running tests, git operations, pre-commit hooks, import checks, and any other shell-based verification. The command runs in the vllm-omni workspace. Avoid destructive commands (rm -rf, force push, etc).",
+  "input_schema": {
+   "type": "object",
+   "properties": {
+    "command": {
+     "type": "string",
+     "description": "The bash command to execute."
+    },
+    "workdir": {
+     "type": "string",
+     "description": "Optional working directory (defaults to vllm-omni repo)."
+    },
+    "timeout": {
+     "type": "integer",
+     "description": "Timeout in seconds (default: 600)."
+    }
+   },
+   "required": [
+    "command"
+   ]
+  }
+ },
+ {
+  "name": "read_file",
+  "description": "Read the contents of a file at the given path. Returns the file content with line numbers. Use this to understand existing code before editing.",
+  "input_schema": {
+   "type": "object",
+   "properties": {
+    "file_path": {
+     "type": "string",
+     "description": "Absolute path to the file to read."
+    },
+    "offset": {
+     "type": "integer",
+     "description": "Optional line number to start reading from."
+    },
+    "limit": {
+     "type": "integer",
+     "description": "Optional maximum number of lines to read."
+    }
+   },
+   "required": [
+    "file_path"
+   ]
+  }
+ },
+ {
+  "name": "write_file",
+  "description": "Write or overwrite a file with the given content. Use this for creating new files or fully rewriting existing ones.",
+  "input_schema": {
+   "type": "object",
+   "properties": {
+    "file_path": {
+     "type": "string",
+     "description": "Absolute path to the file to write."
+    },
+    "content": {
+     "type": "string",
+     "description": "The full content to write to the file."
+    }
+   },
+   "required": [
+    "file_path",
+    "content"
+   ]
+  }
+ },
+ {
+  "name": "edit_file",
+  "description": "Perform an exact string replacement in a file. The old_string must match exactly one occurrence in the file. Use replace_all=true to replace all occurrences.",
+  "input_schema": {
+   "type": "object",
+   "properties": {
+    "file_path": {
+     "type": "string",
+     "description": "Absolute path to the file to edit."
+    },
+    "old_string": {
+     "type": "string",
+     "description": "The exact text to replace."
+    },
+    "new_string": {
+     "type": "string",
+     "description": "The replacement text."
+    },
+    "replace_all": {
+     "type": "boolean",
+     "description": "If true, replace all occurrences of old_string."
+    }
+   },
+   "required": [
+    "file_path",
+    "old_string",
+    "new_string"
+   ]
+  }
+ },
+ {
+  "name": "grep",
+  "description": "Search for a pattern in files. Returns matching files and line content. Use this to find where symbols, functions, or patterns are defined.",
+  "input_schema": {
+   "type": "object",
+   "properties": {
+    "pattern": {
+     "type": "string",
+     "description": "The regex pattern to search for."
+    },
+    "path": {
+     "type": "string",
+     "description": "Directory or file path to search (default: vllm-omni)."
+    },
+    "include": {
+     "type": "string",
+     "description": "Optional file pattern filter (e.g. '*.py')."
+    }
+   },
+   "required": [
+    "pattern"
+   ]
+  }
+ },
+ {
+  "name": "run_pytest",
+  "description": "Run pytest on specified test paths. Returns the test output and exit code. Use this to verify that code changes pass the relevant tests. Always run the module's import smoke test first, then its pytest suite.",
+  "input_schema": {
+   "type": "object",
+   "properties": {
+    "test_paths": {
+     "type": "string",
+     "description": "Space-separated test file paths or directories (e.g. 'tests/model_executor/')."
+    },
+    "markers": {
+     "type": "string",
+     "description": "Optional pytest -m marker filter (e.g. 'core_model and cuda')."
+    },
+    "run_level": {
+     "type": "string",
+     "description": "Optional --run-level flag value."
+    },
+    "timeout": {
+     "type": "integer",
+     "description": "Timeout in seconds (default: 1200)."
+    }
+   },
+   "required": [
+    "test_paths"
+   ]
+  }
+ },
+ {
+  "name": "run_import_check",
+  "description": "Run a Python import check to verify that module imports work correctly. Use this after making code changes to verify imports are not broken.",
+  "input_schema": {
+   "type": "object",
+   "properties": {
+    "import_code": {
+     "type": "string",
+     "description": "Python import statement(s) to execute (e.g. 'from vllm_omni.model_executor.models.registry import *; print(\"OK\")')."
+    }
+   },
+   "required": [
+    "import_code"
+   ]
+  }
+ },
+ {
+  "name": "git_show_test_baseline",
+  "description": "Show the origin/main version of a test file. Use this FIRST when a test fails — compare origin/main's test with omni's test before changing any product code.",
+  "input_schema": {
+   "type": "object",
+   "properties": {
+    "test_path": {
+     "type": "string",
+     "description": "Path to the test file (e.g. tests/diffusion/test_bagel.py)."
+    }
+   },
+   "required": [
+    "test_path"
+   ]
+  }
+ },
+ {
+  "name": "reproduce",
+  "description": "Hermetically reproduce a failing test on a CLEAN GPU. This is the ONLY sanctioned way to run a GPU test — it kills leaked stage/API processes, clears dead device locks, asserts free VRAM, and runs with CUDA_LAUNCH_BLOCKING=1 so a device-side assert points at the true kernel. Prefer this over raw run_shell pytest, which corrupts shared GPU state and produces phantom failures. Returns a structured outcome including whether the failure looks environmental (env_dirty) vs a real code bug.",
+  "input_schema": {
+   "type": "object",
+   "properties": {
+    "test_paths": {
+     "type": "string",
+     "description": "Test path(s) / -k target to run."
+    },
+    "markers": {
+     "type": "string",
+     "description": "Optional pytest -m marker filter."
+    },
+    "run_level": {
+     "type": "string",
+     "description": "Optional --run-level value."
+    },
+    "tier": {
+     "type": "string",
+     "description": "micro_repro | module_suite | full_job (default micro_repro)."
+    },
+    "timeout": {
+     "type": "integer",
+     "description": "Timeout seconds (default 900)."
+    }
+   },
+   "required": [
+    "test_paths"
+   ]
+  }
+ },
+ {
+  "name": "run_precommit",
+  "description": "Run pre-commit hooks on changed files. Use this as a final verification step after making code changes to ensure code style compliance.",
+  "input_schema": {
+   "type": "object",
+   "properties": {
+    "files": {
+     "type": "string",
+     "description": "Optional space-separated file paths to check (defaults to all changed files)."
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "git_show_upstream",
+  "description": "Show the content of a file from the upstream vLLM repo at a specific ref. Use this to see the current upstream API/signature for a file when reconciling omni changes with upstream changes.",
+  "input_schema": {
+   "type": "object",
+   "properties": {
+    "file_path": {
+     "type": "string",
+     "description": "Relative path to the file in the vLLM repo."
+    },
+    "ref": {
+     "type": "string",
+     "description": "Git ref or commit hash (default: HEAD)."
+    }
+   },
+   "required": [
+    "file_path"
+   ]
+  }
+ },
+ {
+  "name": "git_show_omni_main",
+  "description": "Show the content of a file from the vllm-omni main branch (origin/main). Use this to understand the original omni intent before the rebase, so you can preserve omni-specific logic while updating for upstream changes.",
+  "input_schema": {
+   "type": "object",
+   "properties": {
+    "file_path": {
+     "type": "string",
+     "description": "Relative path to the file in vllm-omni (e.g. 'vllm_omni/worker/gpu_ar_model_runner.py')."
+    }
+   },
+   "required": [
+    "file_path"
+   ]
+  }
+ },
+ {
+  "name": "git_log_upstream",
+  "description": "Show recent commit log for a file or directory in the upstream vLLM repo. Use this to understand what changed upstream since the last rebase.",
+  "input_schema": {
+   "type": "object",
+   "properties": {
+    "path": {
+     "type": "string",
+     "description": "File or directory path in vLLM repo."
+    },
+    "max_count": {
+     "type": "integer",
+     "description": "Maximum number of commits to show (default: 10)."
+    }
+   },
+   "required": [
+    "path"
+   ]
+  }
+ },
+ {
+  "name": "git_diff",
+  "description": "Show the git diff of current changes in vllm-omni. Use this to review what changes have been made so far.",
+  "input_schema": {
+   "type": "object",
+   "properties": {
+    "path": {
+     "type": "string",
+     "description": "Optional specific file or directory path."
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "git_diff_tests_upstream",
+  "description": "Show how origin/main changed test files: additions, deletions, renames, modifications. Use to understand test reorganization.",
+  "input_schema": {
+   "type": "object",
+   "properties": {},
+   "required": []
+  }
+ },
+ {
+  "name": "request_plan_review",
+  "description": "Submit your plan for L4 review BEFORE making any code edits. You MUST call this after writing plan JSON + MD files and before editing any code. Pass the exact paths you just wrote to — the reviewer only reads those files, so there is no ambiguity. The L4 reviewer is a fresh, independent session — it has no access to your conversation history. It will critique your plan and return a verdict (lgtm/revise/block). The review is advisory — you retain final authority but MUST write a decision file per critique before editing code.",
+  "input_schema": {
+   "type": "object",
+   "properties": {
+    "plan_json_path": {
+     "type": "string",
+     "description": "Absolute path to your plan JSON file (e.g. ${LOG_DIR}/plans/${SESSION}/dispatch_initial/plan-v0-abcd.json). This is the EXACT file you just wrote with write_file."
+    },
+    "plan_md_path": {
+     "type": "string",
+     "description": "Absolute path to your plan markdown file. Defaults to the .md sibling of plan_json_path."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Plan kind: 'rebase' (Phase 2 module work), 'debug' (fixing a failing test), 'repair' (fixing harness)."
+    },
+    "reviewer_model": {
+     "type": "string",
+     "description": "Model to use for the L4 reviewer. Defaults to the orchestrator's AGENT_MODEL_L4 setting (e.g. 'claude-haiku-4-5', 'gpt-5.1', 'claude-sonnet-4-6'). Prefix determines the API: 'claude-' or 'anthropic.' routes to Anthropic; 'gpt-' or 'openai.' routes to OpenAI."
+    },
+    "reviewer_provider": {
+     "type": "string",
+     "enum": [
+      "anthropic",
+      "openai",
+      "cursor"
+     ],
+     "description": "API provider: anthropic (Claude), openai (GPT direct), cursor (GPT via Cursor subscription). Auto-detected from model prefix if omitted."
+    }
+   },
+   "required": [
+    "plan_json_path"
+   ]
+  }
+ },
+ {
+  "name": "search_debug_memory",
+  "description": "Search past debug memory for similar failures and their proven fixes. Use this FIRST when you encounter an error — someone may have already fixed it in a previous run. Returns matching entries with symptom, root cause, and the exact fix applied.",
+  "input_schema": {
+   "type": "object",
+   "properties": {
+    "keyword": {
+     "type": "string",
+     "description": "Free-text search: error message, symbol name, or failure description."
+    },
+    "module": {
+     "type": "string",
+     "description": "Optional: filter by module name (worker_runner, model_executor, ...)."
+    },
+    "tags": {
+     "type": "string",
+     "description": "Optional: comma-separated tags to filter by."
+    },
+    "max_results": {
+     "type": "integer",
+     "description": "Maximum entries to return (default 5)."
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "record_debug_memory",
+  "description": "Record a debug memory entry after fixing a failure. This helps future runs find the same fix via search_debug_memory. Include the symptom, root cause, and the exact fix applied. Use after a successful fix.",
+  "input_schema": {
+   "type": "object",
+   "properties": {
+    "module": {
+     "type": "string",
+     "description": "Module name (worker_runner, model_executor, ...)"
+    },
+    "key": {
+     "type": "string",
+     "description": "Short error signature (e.g. 'routed_experts_noop_stub_cycle')"
+    },
+    "symptom": {
+     "type": "string",
+     "description": "What went wrong — error message, traceback summary"
+    },
+    "root_cause": {
+     "type": "string",
+     "description": "Why it went wrong — upstream change, missing API, etc."
+    },
+    "fix": {
+     "type": "string",
+     "description": "How you fixed it — what code was changed and why"
+    },
+    "tags": {
+     "type": "string",
+     "description": "Comma-separated tags (e.g. 'import,compat-shim,architectural-change')"
+    },
+    "files": {
+     "type": "string",
+     "description": "Comma-separated file paths that were modified"
+    },
+    "watch_outs": {
+     "type": "string",
+     "description": "Things to watch for — similar issues in other places"
+    }
+   },
+   "required": [
+    "module",
+    "key",
+    "symptom",
+    "fix"
+   ]
+  }
+ },
+ {
+  "name": "skill_manage",
+  "description": "Create or update a reusable SKILL — a distilled runbook for a recurring rebase/debug pattern. Use this AFTER you confirm a fix that is likely to recur (e.g. an upstream API drift you had to port). Skills are injected into future runs' prompts for the matching module. Prefer editing an existing skill (action=update) over creating near-duplicates.",
+  "input_schema": {
+   "type": "object",
+   "properties": {
+    "action": {
+     "type": "string",
+     "enum": [
+      "create",
+      "update"
+     ],
+     "description": "create a new skill or update an existing one by name."
+    },
+    "name": {
+     "type": "string",
+     "description": "Short kebab-case skill name (e.g. 'fix-shutdown-kwargs-mismatch')."
+    },
+    "description": {
+     "type": "string",
+     "description": "One-line summary of what this skill is for."
+    },
+    "trigger": {
+     "type": "string",
+     "description": "When this skill applies — the symptom/condition to match."
+    },
+    "modules": {
+     "type": "string",
+     "description": "Comma-separated modules this skill applies to (empty = all)."
+    },
+    "body": {
+     "type": "string",
+     "description": "Markdown body: '## Diagnose' steps and '## Fix' template/code."
+    },
+    "status": {
+     "type": "string",
+     "enum": [
+      "active",
+      "retired"
+     ],
+     "description": "Optional: set 'retired' to deactivate a stale skill."
+    }
+   },
+   "required": [
+    "action",
+    "name"
+   ]
+  }
+ },
+ {
+  "name": "search_skills",
+  "description": "List learned skills relevant to a module (and optionally matching a keyword). Skills for your module are already injected into this prompt; use this to look wider or confirm a skill exists before creating one.",
+  "input_schema": {
+   "type": "object",
+   "properties": {
+    "module": {
+     "type": "string",
+     "description": "Module name to filter by."
+    },
+    "keyword": {
+     "type": "string",
+     "description": "Optional free-text match on name/trigger/body."
+    },
+    "max_results": {
+     "type": "integer",
+     "description": "Max skills to return (default 5)."
+    }
+   },
+   "required": []
+  }
+ }
+]

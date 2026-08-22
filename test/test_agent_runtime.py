@@ -95,13 +95,36 @@ def test_read_only_run_never_touches_skill_files(settings, trace, tmp_path):
                      step_name="t.step testing")
     assert result.ok
     assert skill_file.read_text(encoding="utf-8") == before  # byte-identical
+    from infermatrix_copilot.memory.paths import KnowledgePaths
+
+    journal = KnowledgePaths.resolve(settings, "").skills_usage_journal
+    assert not journal.exists()  # read-only runs suppress usage entirely
 
     rw_state = {"task_spec": {"kind": "pr_rebase", "pr": 1}}
     result, _ = _run(_ctx(settings, trace, tmp_path, state=rw_state,
                           llm=ScriptedLLM([contract()])),
                      step_name="t.step testing")
     assert result.ok
-    assert "run_count: 1" in skill_file.read_text(encoding="utf-8")
+    # PR-boundary F3: seed SKILL.md files are read-only at run time in
+    # EVERY mode now — the usage prior accumulates in the runtime usage
+    # journal instead of rewriting checked-in frontmatter
+    assert skill_file.read_text(encoding="utf-8") == before
+    assert journal.exists()
+    assert "test-skill" in journal.read_text(encoding="utf-8")
+    # …and the journal has a READ side (round-2 F8): journal usage breaks
+    # ranking ties toward the proven skill, exactly like the old
+    # frontmatter bump did
+    from infermatrix_copilot.engine.agent_runtime.knowledge import (
+        _knowledge_stores)
+    from infermatrix_copilot.engine.step import StepContext as _SC
+    store.propose(name="rival-skill",
+                  description="guidance for t.step testing",
+                  body="## Fix\nother way")
+    store.promote("rival-skill")
+    ctx2 = _SC(settings=settings, state={"task_spec": {"pr": 1}},
+               params={}, run_dir=tmp_path / "run2", trace=trace)
+    ranked = _knowledge_stores(ctx2).find(query="t.step testing", k=2)
+    assert ranked and ranked[0].name == "test-skill"  # journal boost wins
 
 
 def test_skill_candidate_tool_is_gated(settings, trace, tmp_path):
@@ -114,9 +137,14 @@ def test_skill_candidate_tool_is_gated(settings, trace, tmp_path):
     ctx = _ctx(settings, trace, tmp_path, llm=llm)
     result, _ = _run(ctx)
     assert result.ok
-    store = SkillStore(settings.skills_dir)
-    assert "new-lesson" in store.candidates()   # candidate recorded
-    assert store.load_all() == []               # no active skill created
+    # PR-boundary F3: proposals land RUNTIME-side, never in the shared
+    # pool / adapter tree
+    from infermatrix_copilot.memory.paths import KnowledgePaths
+    runtime = SkillStore(
+        KnowledgePaths.resolve(settings, "").skills_runtime_dir)
+    assert "new-lesson" in runtime.candidates()  # candidate recorded
+    assert runtime.load_all() == []              # no active skill created
+    assert SkillStore(settings.skills_dir).candidates() == {}
     assert any(True for _ in trace.events("skill_candidate_proposed"))
 
 

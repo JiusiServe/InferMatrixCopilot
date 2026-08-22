@@ -413,6 +413,9 @@ def test_child_launch_preserves_strict_post_gate(
     captured = {}
 
     class FakeProcess:
+        pid = 424242
+        returncode = 0
+
         def wait(self):
             return 0
 

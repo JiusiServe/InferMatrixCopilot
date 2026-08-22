@@ -21,6 +21,7 @@ import yaml
 
 from ..config import Settings, TierNotConfiguredError
 from ..engine.executor import Executor
+from ..engine.lifecycle import RunLock, RunLockHeld, run_guarded
 from ..engine.planner import Planner, PlanningError, Resolution
 from ..engine.registry import StepRegistry
 from ..engine.steps import register_builtin_steps
@@ -54,6 +55,33 @@ class GateOutcome(NamedTuple):
         return cls(proceed=False, exit_code=exit_code)
 
 
+def _mode_review_context(playbook, spec) -> str:
+    """Plan-review context for MODE-AWARE playbooks: the reviewer sees the
+    raw yaml's FULL step list, but the `when:` gates resolve against the
+    ALREADY-RESOLVED mode (`resolve_effective_mode` runs before the review
+    gate) — without this context a report-only plan looks like it runs its
+    write/push steps and gets spuriously blocked. The active-step set is
+    the same mechanical truth the executor computes, never prose."""
+    if not getattr(playbook, "mode_aware", False):
+        return ""
+    mode = str((getattr(spec, "params", None) or {})
+               .get("rebase_mode", "") or "")
+    if not mode:
+        return ""
+    from ..engine.executor import _eval_when
+    from ..rebase_engine.modes import mode_state_flags
+
+    flags = {"task_spec": {}, **mode_state_flags(mode)}
+    active = [s.get("id", s.get("step", "?"))
+              for s in playbook_to_doc(playbook).get("steps", [])
+              if "when" not in s or _eval_when(s["when"], flags)]
+    return (f"\n\nResolved mode context (authoritative): "
+            f"rebase_mode={mode}. Under this mode the `when:` gates run "
+            f"ONLY these steps: {active}. Every other listed step is "
+            "statically gated OFF for this run — judge the plan for THIS "
+            "mode's step set.")
+
+
 class Copilot:
     """Orchestration core: resolves a TaskSpec to a playbook (reuse > adapt >
     generate), runs it through the plan-review gate + confirmation into the
@@ -84,8 +112,38 @@ class Copilot:
         capability set so the planner only reuses playbooks the target supports.
         Capabilities come from the repo's adapter (if any), plus `repo.path` when
         a path is resolvable even without a adapter (REPO_PATHS works adapter-less)."""
-        adapter = self._adapter_for(spec.repo)
-        capabilities = set(adapter.capabilities) if adapter is not None else set()
+        # Only genuine adapter ABSENCE takes the unknown-capabilities
+        # compatibility path — a malformed/unreadable KNOWN adapter must fail
+        # closed here, not fail open into capabilities=None and recall a
+        # playbook whose requirements were never established.
+        from ..adapters.base import AdapterError, AdapterNotFound, AdapterRegistry
+        adapter_name = spec.repo.replace("-", "_")
+        try:
+            adapter = AdapterRegistry(self.settings.adapters_dir).resolve(
+                name=adapter_name)
+        except AdapterNotFound:
+            # the registry resolves by DECLARED manifest name and skips
+            # manifest-less directories — so "not found" alone does not
+            # prove absence. Only a genuinely absent directory is the
+            # v1-compatible path; an existing directory that failed to
+            # load/resolve (deleted manifest, wrong name:) fails closed.
+            if (Path(self.settings.adapters_dir) / adapter_name).exists():
+                raise AdapterError(
+                    f"adapter directory {adapter_name!r} exists but did not "
+                    "load/resolve (missing manifest.yaml or mismatched "
+                    "name:) — refusing to plan with unknown capabilities")
+            adapter = None                # absence: v1-compatible
+        except FileNotFoundError:
+            adapter = None                # no adapters directory at all
+        if adapter is None:
+            # No adapter means capabilities are UNKNOWN, not zero — the
+            # store's requires-filter (now covering exact-repo playbooks too)
+            # skips on None, keeping adapter-less setups v1-compatible
+            # instead of silently dropping every playbook with a `requires:`.
+            if self._resolve_repo_path(spec.repo):
+                return self.planner.resolve(spec, capabilities=None)
+            return self.planner.resolve(spec, capabilities=set())
+        capabilities = set(adapter.capabilities)
         if self._resolve_repo_path(spec.repo):  # REPO_PATHS works adapter-less
             capabilities.add("repo.path")
         return self.planner.resolve(spec, capabilities=capabilities)
@@ -97,7 +155,10 @@ class Copilot:
         if not resolution.requires_review:
             return True
         doc = yaml.safe_dump(playbook_to_doc(resolution.playbook), sort_keys=False)
-        verdict = run_plan_review(self.llm, playbook_doc=doc, task=spec.describe(),
+        task_text = spec.describe() + _mode_review_context(
+            resolution.playbook, spec)
+        verdict = run_plan_review(self.llm, playbook_doc=doc,
+                                  task=task_text,
                                   model=self.settings.reviewer)
         if verdict.verdict == "unavailable":
             print("  ⚠ no reviewer LLM — your confirmation is the plan-review gate")
@@ -148,6 +209,21 @@ class Copilot:
             print(style("✋ cannot run: ", "red", "bold") + str(exc))
             return BLOCKED_EXIT
 
+        # Mode governance (Rev 8 §2.1): for mode-aware playbooks the ONE
+        # authority is params.rebase_mode, resolved + WRITTEN BACK before the
+        # plan echo and the confirmation gate (spec.report_only reflects the
+        # canonical mode, so every TaskSpec-derived consumer sees one truth).
+        # The locked delegating playbook does not declare mode_aware and is
+        # untouched — byte-identical behavior.
+        if getattr(resolution.playbook, "mode_aware", False):
+            from ..rebase_engine.modes import (ModeConflictError,
+                                               resolve_effective_mode)
+            try:
+                resolve_effective_mode(spec)
+            except ModeConflictError as exc:
+                print(style("✋ blocked: ", "red", "bold") + str(exc))
+                return BLOCKED_EXIT
+
         print(style("→ task: ", "bold", "cyan") + spec.describe())
         print(style("→ plan: ", "bold", "magenta") + f"{resolution.mode} {resolution.playbook.name}"
               f"@{resolution.playbook.version} ({resolution.playbook.status}) "
@@ -170,7 +246,7 @@ class Copilot:
         run_dir.mkdir(parents=True, exist_ok=True)
         (run_dir / "task.json").write_text(json.dumps({
             "spec": spec.model_dump(), "playbook": playbook_to_doc(resolution.playbook),
-            "invocation_id": os.environ.get("OMNI_INVOCATION_ID", ""),
+            "invocation_id": os.environ.get("IMX_INVOCATION_ID", ""),
         }, indent=2))
         return self._execute(resolution.playbook, spec, run_dir,
                              resolution_mode=resolution.mode, tier=resolution.tier)
@@ -209,6 +285,16 @@ class Copilot:
         if err:
             print(f"✋ {err} (pass e.g. --task-param pr=5134)")
             return BLOCKED_EXIT
+        # mode governance applies to explicit invocations too — the ONLY
+        # way to run the candidate v3/v1 playbooks today (Rev 8 §2.1)
+        if getattr(playbook, "mode_aware", False):
+            from ..rebase_engine.modes import (ModeConflictError,
+                                               resolve_effective_mode)
+            try:
+                resolve_effective_mode(spec)
+            except ModeConflictError as exc:
+                print(style("✋ blocked: ", "red", "bold") + str(exc))
+                return BLOCKED_EXIT
         print(style("→ task: ", "bold", "cyan") + spec.describe()
               + style("  [explicit playbook override]", "yellow"))
         print(style("→ plan: ", "bold", "magenta") + f"explicit {playbook.name}@{playbook.version} "
@@ -228,14 +314,14 @@ class Copilot:
         run_dir.mkdir(parents=True, exist_ok=True)
         (run_dir / "task.json").write_text(json.dumps({
             "spec": spec.model_dump(), "playbook": playbook_to_doc(playbook),
-            "invocation_id": os.environ.get("OMNI_INVOCATION_ID", ""),
+            "invocation_id": os.environ.get("IMX_INVOCATION_ID", ""),
         }, indent=2))
         return self._execute(playbook, spec, run_dir,
                              resolution_mode="explicit", tier=spec.tier)
 
     def _execute(self, playbook, spec: TaskSpec, run_dir: Path, *,
                  resolution_mode: str = "resume", tier: str = "?",
-                 resuming: bool = False) -> int:
+                 resuming: bool = False, held_lock: RunLock | None = None) -> int:
         """Run a resolved `playbook` to completion in `run_dir`: init tracing +
         notifier, seed the shared state (repo path, push policy, protected
         branches / high-risk modules from the adapter when present), drive the
@@ -243,52 +329,97 @@ class Copilot:
         status. `resuming` seeds the state so steps can pick up where they left
         off. Returns the exit code (0 done, BLOCKED_EXIT blocked, else 1)."""
         self.last_run_dir = run_dir
-        from .. import tracing
-        tracing.init(run_dir.name, run_dir / "trace.jsonl")
-        # Stamp the workflow into the span file itself, so a trace lifted out of
-        # its run directory still says which playbook and task produced it.
-        tracing.run_meta(playbook=f"{playbook.name}@{playbook.version}",
-                         task_kind=spec.kind, repo=spec.repo, tier=tier,
-                         mode=spec.mode, resolution=resolution_mode,
-                         report_only=spec.report_only, post=spec.post,
-                         resuming=resuming, params=spec.params)
-        trace = RunTrace(run_dir / "run_trace.jsonl")
-        notifier = Notifier(self.settings, run_dir, trace, run_dir.name)
-        trace.record("task", spec=spec.model_dump(), resolution=resolution_mode,
-                     playbook=playbook.name, tier=tier)
-        state: dict = {
-            "task_spec": spec.model_dump(),
-            "repo_path": self._resolve_repo_path(spec.repo),
-            "push_policy": PushPolicy(),  # steps may replace with a derived policy
-            "protected_branches": self.settings.protected_branches,
-            "resuming": resuming,
-        }
-        adapter = self._adapter_for(spec.repo)
-        if adapter is not None:
-            # repo knowledge from the adapter, not core settings (v2 P0 fix #5)
-            state["protected_branches"] = adapter.protected_branches
-            if adapter.high_risk_modules:
-                state["high_risk_modules"] = adapter.high_risk_modules
-        executor = Executor(self.registry, self.settings, run_dir=run_dir,
-                            trace=trace, llm=self.llm, notifier=notifier)
-        outcome = asyncio.run(executor.run(playbook, state))
+        lock = held_lock
+        if lock is None:
+            try:
+                # First, before any trace/status write: a losing concurrent
+                # invocation (second --resume) must leave the active run's
+                # artifacts completely untouched. execute_reserved holds the
+                # lock across its whole lifecycle and passes it in instead.
+                lock = RunLock(run_dir).acquire()
+            except RunLockHeld as exc:
+                print(style("✋ ", "red", "bold") + str(exc))
+                return BLOCKED_EXIT
+        # Per-repo knowledge lock, SHARED, held for the run's lifetime:
+        # never contends with other runs; it exists so the knowledge
+        # migration's EXCLUSIVE acquire can prove no potential store
+        # writer is alive (and so no run starts mid-migration).
+        knowledge_lock = None
+        if spec.repo:
+            from ..memory.paths import (KnowledgeLockHeld,
+                                        KnowledgePaths,
+                                        KnowledgeRunLock,
+                                        KnowledgeStateError)
+            try:
+                knowledge_lock = KnowledgeRunLock(
+                    KnowledgePaths.resolve(self.settings, spec.repo)
+                    .knowledge_run_lock).acquire_shared()
+            except (KnowledgeLockHeld, KnowledgeStateError) as exc:
+                # BOTH refusals take the terminal protocol: an invalid
+                # activation marker (KnowledgeStateError) must exit
+                # blocked/3 with the run lock RELEASED, never escape as
+                # a traceback that leaves the lock held in a long-lived
+                # process (PR-boundary F4)
+                if held_lock is None:
+                    lock.release()
+                print(style("✋ ", "red", "bold") + str(exc))
+                return BLOCKED_EXIT
+        try:
+            from .. import tracing
+            tracing.init(run_dir.name, run_dir / "trace.jsonl")
+            # Stamp the workflow into the span file itself, so a trace lifted out of
+            # its run directory still says which playbook and task produced it.
+            tracing.run_meta(playbook=f"{playbook.name}@{playbook.version}",
+                             task_kind=spec.kind, repo=spec.repo, tier=tier,
+                             mode=spec.mode, resolution=resolution_mode,
+                             report_only=spec.report_only, post=spec.post,
+                             resuming=resuming, params=spec.params)
+            trace = RunTrace(run_dir / "run_trace.jsonl")
+            notifier = Notifier(self.settings, run_dir, trace, run_dir.name)
+            trace.record("task", spec=spec.model_dump(), resolution=resolution_mode,
+                         playbook=playbook.name, tier=tier)
+            state: dict = {
+                "task_spec": spec.model_dump(),
+                "repo_path": self._resolve_repo_path(spec.repo),
+                "push_policy": PushPolicy(),  # steps may replace with a derived policy
+                "protected_branches": self.settings.protected_branches,
+                "resuming": resuming,
+            }
+            adapter = self._adapter_for(spec.repo)
+            if adapter is not None:
+                # repo knowledge from the adapter, not core settings (v2 P0 fix #5)
+                state["protected_branches"] = adapter.protected_branches
+                if adapter.high_risk_modules:
+                    state["high_risk_modules"] = adapter.high_risk_modules
+            executor = Executor(self.registry, self.settings, run_dir=run_dir,
+                                trace=trace, llm=self.llm, notifier=notifier)
+            # run_guarded finalizes inside the event loop: playbooks that
+            # register run finalizers (lifecycle.register_finalizer) get
+            # teardown on every exit path. Nothing registered == no-op.
+            outcome = asyncio.run(
+                run_guarded(executor.run(playbook, state), run_dir))
 
-        if self.settings.metrics_enabled:
-            try:  # metrics are facts about the run; never let them break it
-                from ..metrics import collect_run_metrics
-                m = collect_run_metrics(run_dir, self.settings, outcome.status)
-                print(format_metrics_line(m, run_dir))
-            except Exception as exc:
-                trace.record("metrics_error", error=f"{type(exc).__name__}: {exc}")
+            if self.settings.metrics_enabled:
+                try:  # metrics are facts about the run; never let them break it
+                    from ..metrics import collect_run_metrics
+                    m = collect_run_metrics(run_dir, self.settings, outcome.status)
+                    print(format_metrics_line(m, run_dir))
+                except Exception as exc:
+                    trace.record("metrics_error", error=f"{type(exc).__name__}: {exc}")
 
-        for step_id, r in outcome.step_results.items():
-            mark = style("✓", "green") if r.ok else style("✗", "red", "bold")
-            print(f"  {mark} {step_id}: {r.summary}")
-        print(f"run {run_dir.name}: {outcome.status}  ({run_dir})")
-        if outcome.status == "blocked":
-            print(style("  ⚠ ", "yellow", "bold") + f"{outcome.blocked_reason}\n  see {run_dir / 'ESCALATION.md'}")
-            return BLOCKED_EXIT
-        return 0 if outcome.status == "done" else 1
+            for step_id, r in outcome.step_results.items():
+                mark = style("✓", "green") if r.ok else style("✗", "red", "bold")
+                print(f"  {mark} {step_id}: {r.summary}")
+            print(f"run {run_dir.name}: {outcome.status}  ({run_dir})")
+            if outcome.status == "blocked":
+                print(style("  ⚠ ", "yellow", "bold") + f"{outcome.blocked_reason}\n  see {run_dir / 'ESCALATION.md'}")
+                return BLOCKED_EXIT
+            return 0 if outcome.status == "done" else 1
+        finally:
+            if knowledge_lock is not None:
+                knowledge_lock.release()
+            if held_lock is None:
+                lock.release()
 
     def run_queue(self, specs: list[TaskSpec], *, assume_yes: bool = False,
                   plan_only: bool = False) -> int:
@@ -395,10 +526,27 @@ class Copilot:
 
     def _execute_reserved(self, run_id: str, policy) -> int:
         """Shared reserved-run executor with an authoritative child policy."""
+        run_dir = self._contained_run_dir(run_id)
+        try:
+            # Lock the whole reserved-run lifecycle before the first status
+            # write: a duplicate child must not overwrite child_pid, flip
+            # run_status.json through PLANNING, or mark the active run
+            # BLOCKED while the winning process is still executing.
+            lock = RunLock(run_dir).acquire()
+        except RunLockHeld as exc:
+            print(style("✋ ", "red", "bold") + str(exc))
+            return BLOCKED_EXIT
+        try:
+            return self._execute_reserved_locked(run_dir, lock, policy)
+        finally:
+            lock.release()
+
+    def _execute_reserved_locked(self, run_dir: Path, lock: RunLock,
+                                 policy) -> int:
+        """The body of `_execute_reserved`, run while holding the run lock."""
         from .. import run_status as rs
         from ..mcp_policy import PolicyError
 
-        run_dir = self._contained_run_dir(run_id)
         rs.mark_child_started(run_dir, child_pid=os.getpid(), state=rs.PLANNING)
         try:
             raw = json.loads((run_dir / "request.json").read_text(encoding="utf-8"))
@@ -425,7 +573,8 @@ class Copilot:
         rs.mark(run_dir, rs.RUNNING)
         try:
             code = self._execute(resolution.playbook, spec, run_dir,
-                                 resolution_mode=resolution.mode, tier=resolution.tier)
+                                 resolution_mode=resolution.mode, tier=resolution.tier,
+                                 held_lock=lock)
         except Exception as exc:  # a crash still leaves a terminal record
             rs.mark(run_dir, rs.FAILED, note=f"{type(exc).__name__}: {exc}")
             raise

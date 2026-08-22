@@ -35,54 +35,79 @@ def _resolve_adapter(ctx: StepContext):
 
 
 class _ScopedKnowledge:
-    """Skill retrieval scoped per repo: the repo adapter's own store first, the
-    shared pool second (v2 P0 — the per-repo dirs existed on RepoAdapter but
-    were never wired in). Proposals land in the repo's namespace when one
-    exists, so knowledge never leaks across repos."""
+    """Skill retrieval scoped per repo: runtime (learned) first, the repo
+    adapter's seed store second, the shared pool last. WRITES are
+    runtime-side ONLY (Rev 8 §10, adapter tree read-only at run time —
+    PR-boundary F3): proposals land in the repo's runtime candidates, and
+    seed-skill usage appends to the runtime usage journal instead of
+    rewriting seed `SKILL.md` frontmatter in the checked-in tree."""
 
-    def __init__(self, stores: list[SkillStore]):
-        """Hold the ordered skill stores — repo store first, shared pool last —
-        so retrieval and proposals honor the per-repo scoping."""
-        self.stores = stores  # ordered: repo store first, shared pool last
+    def __init__(self, stores: list[SkillStore], *,
+                 runtime_store: SkillStore | None = None,
+                 usage_journal: Path | None = None):
+        """`stores` is the ordered READ list (runtime first when present);
+        `runtime_store` is the only write target; `usage_journal` takes
+        seed-usage records."""
+        self.stores = stores
+        self.runtime_store = runtime_store or stores[0]
+        self.usage_journal = usage_journal
 
     def find(self, query: str = "", module: str = "", k: int = 3):
         """Search the stores in priority order and return up to `k` skills,
-        deduped by name (first store wins on a tie, so the repo's own skill
-        outranks a same-named shared one). `query`/`module` are passed through
-        to each store's own ranking."""
+        deduped by name (first store wins on a tie, so a learned runtime
+        skill outranks a same-named seed one). `query`/`module` are passed
+        through to each store's own ranking, with the runtime usage
+        journal's counts layered onto the frozen seed frontmatter counts —
+        the usage prior the journal write-side feeds (round-2 F8)."""
+        from ...memory.skills import read_usage_counts
+
+        extra = read_usage_counts(self.usage_journal) \
+            if self.usage_journal is not None else {}
         out, seen = [], set()
         for store in self.stores:
-            for s in store.find(query=query, module=module, k=k):
+            for s in store.find(query=query, module=module, k=k,
+                                extra_run_counts=extra):
                 if s.name not in seen:
                     seen.add(s.name)
                     out.append(s)
         return out[:k]
 
     def propose(self, **kwargs) -> None:
-        """Record a skill-update candidate in the highest-priority store (the
-        repo's namespace when one exists), so proposals never leak across repos
-        and never touch active skills."""
-        self.stores[0].propose(**kwargs)
+        """Record a skill-update candidate in the RUNTIME store — proposals
+        never leak across repos and never touch the adapter tree."""
+        self.runtime_store.propose(**kwargs)
 
     def touch(self, name: str) -> None:
-        """Record one use of skill `name` in whichever store owns it — the
-        usage prior (`run_count`) that breaks retrieval ties toward proven
-        skills was a dead field until steps actually stamped it."""
-        for store in self.stores:
-            if store.touch(name):
-                return
+        """Record one use of skill `name`: a runtime-owned skill is touched
+        in place (runtime state, outside the adapter tree); a seed skill's
+        usage appends to the runtime usage journal — seed files stay
+        byte-identical at run time."""
+        if self.runtime_store.touch(name):
+            return
+        if self.usage_journal is not None:
+            from ...memory.skills import append_usage
+
+            append_usage(self.usage_journal, name)
 
 
 def _knowledge_stores(ctx: StepContext) -> _ScopedKnowledge:
-    """Build the per-repo `_ScopedKnowledge`: the active adapter's own skill
-    store first (when it differs from the shared dir), then the shared pool —
-    the ordering that gives repo skills retrieval and proposal priority."""
-    stores: list[SkillStore] = []
+    """Build the per-repo `_ScopedKnowledge`: the repo's RUNTIME store
+    first (learned knowledge wins collisions), the adapter seed store
+    second, the shared pool last — writes runtime-side only."""
+    from ...memory.paths import KnowledgePaths
+
     adapter = _resolve_adapter(ctx)
+    repo = str((ctx.state.get("task_spec") or {}).get("repo", ""))
+    kp = KnowledgePaths.resolve(
+        ctx.settings, repo,
+        adapter_root=adapter.root if adapter is not None else None)
+    runtime_store = SkillStore(kp.skills_runtime_dir)
+    stores: list[SkillStore] = [runtime_store]
     if adapter is not None and adapter.skills_dir != Path(ctx.settings.skills_dir):
         stores.append(SkillStore(adapter.skills_dir))
     stores.append(SkillStore(ctx.settings.skills_dir))
-    return _ScopedKnowledge(stores)
+    return _ScopedKnowledge(stores, runtime_store=runtime_store,
+                            usage_journal=kp.skills_usage_journal)
 
 
 def _retrieve_skills(ctx: StepContext, query: str) -> tuple[list[dict], "_ScopedKnowledge"]:
@@ -102,11 +127,14 @@ def _retrieve_memories(ctx: StepContext, query: str) -> list[str]:
     `[module] symptom -> fix` hits. The repo adapter's DB is searched before the
     shared one so repo-scoped memories rank first; duplicate lines are dropped
     and any DB error is swallowed (retrieval never fails a step)."""
-    dbs: list[Path] = []
+    from ...memory.paths import KnowledgePaths
+
     adapter = _resolve_adapter(ctx)
-    if adapter is not None:
-        dbs.append(Path(adapter.debug_memory_db))
-    dbs.append(Path(ctx.settings.memory_db))
+    repo = str((ctx.state.get("task_spec") or {}).get("repo", ""))
+    dbs = [Path(p) for p in KnowledgePaths.resolve(
+        ctx.settings, repo,
+        adapter_root=adapter.root if adapter is not None else None,
+    ).debug_read_layers]
     hits: list[str] = []
     seen: set[str] = set()
     for db in dbs:  # repo-scoped memories rank before the shared pool's
@@ -179,9 +207,14 @@ def _repo_map_tool(ctx: StepContext, adapter) -> dict[str, ToolDef]:
     language = "python"
     cache_dir = ctx.run_dir / "repo_map"
     if adapter is not None:
+        from ...memory.paths import KnowledgePaths
+
         language = str(adapter.manifest.get("repo", {}).get("language")
                        or "python")
-        cache_dir = adapter.root / "repo_map"
+        cache_dir = KnowledgePaths.resolve(
+            ctx.settings, str((ctx.state.get("task_spec") or {})
+                              .get("repo", "")),
+            adapter_root=adapter.root).repo_map_cache_dir
     rmap = RepoMap(repo, language, cache_dir=cache_dir)
     if not rmap.supported:
         ctx.trace.record("capability_gap", capability=f"repo_map.{language}",

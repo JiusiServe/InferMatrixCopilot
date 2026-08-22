@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -71,9 +72,34 @@ class Executor:
 
     def _save_progress(self, progress: dict) -> None:
         """Persist the checkpoint to progress.json (creating run_dir), so a later
-        resume skips completed steps. `default=str` tolerates non-JSON values."""
+        resume skips completed steps. `default=str` tolerates non-JSON values.
+        Written tmp-file + fsync + `os.replace` + directory fsync: a torn or
+        lost progress.json strands every resume path, so the checkpoint must
+        survive a crash at any point during the write."""
         self.run_dir.mkdir(parents=True, exist_ok=True)
-        self.progress_file.write_text(json.dumps(progress, indent=2, default=str))
+        data = json.dumps(progress, indent=2, default=str)
+        tmp = self.progress_file.with_name(self.progress_file.name + ".tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(data)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, self.progress_file)
+        try:
+            # directory fsync makes the rename itself durable
+            dir_fd = os.open(self.run_dir, os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+        except OSError as exc:
+            # opening/fsyncing a directory is unsupported on some platforms
+            # (Windows) and filesystems — those degrade to rename atomicity.
+            # Real storage failures (EIO) mean the durability guarantee is
+            # gone and MUST propagate rather than continue on a bad disk.
+            import errno
+            if exc.errno not in (errno.EINVAL, errno.ENOTSUP, errno.EACCES,
+                                 errno.EPERM, errno.EISDIR, errno.EBADF):
+                raise
 
     # -- execution ------------------------------------------------------------
     async def run(self, playbook: "Playbook", state: dict) -> RunOutcome:

@@ -22,6 +22,8 @@ from . import (  # noqa: F401,E402
     issue,
     profile,
     rebase_native,
+    rebase_v3,
+    rebase_knowledge,
 )
 
 

@@ -1,0 +1,86 @@
+# repo-rebase v3 — the FULLY MERGED pipeline (no external runs): rebase_engine
+# machinery end to end. CANDIDATE: invisible to the planner (find() only
+# recalls active/locked), runnable only via
+# `infermatrix-copilot --playbook repo-rebase-v3` until the §8 validation
+# gate passes and a human promotes it over the locked `repo-rebase`
+# (doc/PLAN-rebase-merge.md PR6).
+name: repo-rebase-v3
+version: 1
+status: candidate
+provenance:
+  created_by: human
+  source: full merge of vllm-omni-rebase-agent per doc/PLAN-rebase-merge.md
+    (Rev 8 normative contracts; delivery PR4c)
+task_kinds: [repo_rebase]
+# repo-NEUTRAL (2026-08-01 audit): recall is gated by `requires ⊆ the
+# adapter's capabilities`, not by repo name — a second repo onboards via
+# its adapter alone (status: candidate keeps it planner-invisible anyway)
+requires: [modules, upstream.fork_tracking, ci.provider]
+# mode governance (Rev 8 §2.1): resolve_effective_mode runs before plan echo
+# and confirmation; `when:` gates below use ONLY the seeded mode_* flags.
+# The §2.2 per-mode matrix, spelled out (composite flags precompute the
+# or-of-modes because `when:` is single-key):
+#   report_only : prelude, guard_check(read-only), scan, report, finalize
+#   local_ci    : prelude, guard, tests(local loop), precommit, report,
+#                 finalize (push gate VACUOUS — nothing gets pushed; §2.3)
+#   remote_ci   : prelude, guard, push_gate, ci, report, finalize
+#                 (NO local test loop — phase 4 is push+monitor; prelude
+#                 enforces the prepared-tree preconditions)
+#   full        : prelude, guard, wheel, assign, wave1, wave_gate, wave2,
+#                 tests, precommit, push_gate, ci, report, finalize
+mode_aware: true
+params:
+  rebase_mode: {type: str, default: ""}     # report_only|full|local_ci|remote_ci
+  main_ci_idx: {type: int, default: 0}
+  halt_on_module_failure: {type: bool, default: false}
+  halt_on_phase3_failures: {type: bool, default: false}
+  push_with_failures: {type: bool, default: false}
+  strict_push_gate: {type: bool, default: false}
+steps:
+  - {id: prelude, step: rebase.v3_prelude}
+  # report_only still validates the tree — but through the honestly read-only
+  # guard (check-only, never mutates merge state)
+  # locks/ survives a prior mutating run BY DESIGN (the shared flock file
+  # persists after release) — report-only must not read it as dirt
+  - {id: guard_check, step: workspace.guard_clean, when: mode_report_only,
+     params: {ignore_untracked_prefixes: [locks/]}}
+  # v3-owned wrapper: takes the checkout flocks BEFORE the self-cleaning
+  # guard mutates (first-mutator on resume) and injects the adapter's
+  # rebase.guard policy
+  - {id: guard, step: rebase.v3_guard, when: not mode_report_only}
+  # explicit schema-v2 preparation BEFORE any agent can record (design
+  # round-4 F4): one of the three sanctioned ensure_schema_v2 entry
+  # points; report_only never reaches it (stores stay read-only)
+  - {id: knowledge_prep, step: rebase.v3_knowledge_prep,
+     when: not mode_report_only}
+  - {id: scan, step: rebase.v3_scan, when: mode_report_only}
+  - {id: wheel, step: rebase.v3_wheel, when: mode_full}
+  - {id: assign, step: rebase.v3_assign, when: mode_full}
+  # wave ordering is a dependency contract: wave 1 completes before the gate
+  # rules, and only then does wave 2 fan out (the gate empties it on failure)
+  - {id: wave1, step: rebase.v3_module_rebase, foreach: wave1_modules,
+     when: mode_full}
+  - {id: wave_gate, step: rebase.v3_wave_gate, when: mode_full}
+  - {id: wave2, step: rebase.v3_module_rebase, foreach: wave2_modules,
+     when: mode_full}
+  - {id: tests, step: rebase.v3_test_loop, when: mode_runs_local_tests}
+  # phase 3.2 (parent parity: always follows the local loop) — its substate
+  # verdict is what makes the push gate's "red precommit" rule non-vacuous
+  - {id: precommit, step: rebase.v3_precommit, when: mode_runs_local_tests}
+  - {id: push_gate, step: rebase.v3_push_gate, when: mode_runs_push_gate}
+  - {id: ci, step: rebase.v3_ci, when: mode_runs_remote_ci}
+  # Rev 8 §2.2 tail, restored (completion design D5): the rebase-specific
+  # FINAL_SUMMARY lands first, then curation (runtime stores only; a
+  # curate failure is a REAL run failure and precedes the final report),
+  # then the closing knowledge attestation + baseline comparison, then
+  # the generic final report — so the report reflects curation AND drift.
+  - {id: phase5_report, step: rebase.v3_phase5_report, when: mode_full}
+  - {id: curate, step: rebase.v3_curate, when: mode_full}
+  - {id: compare, step: rebase.v3_compare, when: mode_full}
+  # report BEFORE finalize: the terminal-row ruling may end the run blocked
+  # (needs-human, exit 3) and RUN_REPORT must already exist when it does
+  - {id: report, step: report.final_summary}
+  - {id: finalize, step: rebase.v3_finalize}
+success: substate phase=done with zero unexplained module/test failures; in
+  full mode the push gate ruled and the transition table's terminal row was
+  honored (needs_human => blocked/exit 3, ruled AFTER the report is written)

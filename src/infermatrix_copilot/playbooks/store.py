@@ -45,6 +45,9 @@ class Playbook:
     steps: list[PlaybookStep]
     params: dict = field(default_factory=dict)  # declared adaptation surface
     requires: list[str] = field(default_factory=list)  # profile capabilities
+    # mode-governed playbooks (rebase v3/v1) opt into resolve_effective_mode;
+    # the locked delegating playbook stays byte-identical by NOT declaring it
+    mode_aware: bool = False
     provenance: dict = field(default_factory=dict)
     success: str = ""
 
@@ -102,6 +105,7 @@ def _parse(doc: dict, source: str) -> Playbook:
         task_kinds=list(doc["task_kinds"]), repos=list(doc.get("repos", [])),
         steps=steps, params=doc.get("params", {}) or {},
         requires=list(doc.get("requires", []) or []),
+        mode_aware=bool(doc.get("mode_aware", False)),
         provenance=doc.get("provenance", {}) or {}, success=doc.get("success", ""),
     )
 
@@ -152,10 +156,12 @@ class PlaybookStore:
              capabilities: set[str] | None = None) -> Playbook | None:
         """Recall: exact task-kind match, preferring repo match, locked > active.
 
-        Repo-neutral playbooks (`repos: []`) additionally declare `requires:` —
-        the profile capabilities they need (design §V2.2.3). With a known
-        capability set they only match when satisfied; `capabilities=None`
-        means "unknown" and skips the filter (v1-compatible)."""
+        Playbooks declare `requires:` — the profile capabilities they need
+        (design §V2.2.3). With a known capability set, BOTH exact-repo and
+        repo-neutral candidates only match when satisfied (an exact-repo
+        playbook whose adapter lost a capability must fall out of recall,
+        not fail mid-run); `capabilities=None` means "unknown" and skips the
+        filter (v1-compatible)."""
         candidates = [
             p for p in self._playbooks.values()
             if task_kind in p.task_kinds and p.status in ("active", "locked")
@@ -164,22 +170,28 @@ class PlaybookStore:
             scoped = [p for p in candidates if repo in p.repos]
             if not scoped:
                 scoped = [p for p in candidates if not p.repos]
-                if capabilities is not None:
-                    scoped = [p for p in scoped
-                              if set(p.requires) <= capabilities]
+            if capabilities is not None:
+                scoped = [p for p in scoped
+                          if set(p.requires) <= capabilities]
             candidates = scoped
         candidates.sort(key=lambda p: (p.status != "locked", -p.version))
         return candidates[0] if candidates else None
 
-    def missing_capabilities(self, task_kind: str,
-                             capabilities: set[str]) -> dict[str, list[str]]:
-        """Per repo-neutral playbook of this kind: the unmet requirements
-        (escalation material for capability_gap reporting)."""
+    def missing_capabilities(self, task_kind: str, capabilities: set[str],
+                             repo: str | None = None) -> dict[str, list[str]]:
+        """Per playbook of this kind the unmet requirements (escalation
+        material for capability_gap reporting). Repo-neutral playbooks
+        always report; exact-repo playbooks report only when they target the
+        REQUESTED `repo` — telling another repo's user to satisfy a
+        capability its selector can never match is noise, not guidance. An
+        exact-repo playbook that stopped matching must say WHY, not vanish
+        silently."""
         return {
             p.name: sorted(set(p.requires) - capabilities)
             for p in self._playbooks.values()
-            if task_kind in p.task_kinds and not p.repos
+            if task_kind in p.task_kinds
             and p.status in ("active", "locked")
+            and (not p.repos or (repo is not None and repo in p.repos))
             and not set(p.requires) <= capabilities
         }
 

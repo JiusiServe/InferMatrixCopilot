@@ -102,3 +102,50 @@ def test_debug_memory_recorded_from_step_helper(tmp_path):
     assert ok
     hits = DebugMemory(tmp_path / "mem.db").search("rc")
     assert hits and hits[0]["module"] == "ci"
+
+
+def test_skill_find_journal_count_never_creates_relevance(tmp_path):
+    """Round-3 F7: the usage-journal prior is strictly a tie-breaker —
+    a huge journal count on an UNRELATED skill must not push it past
+    the relevance filter or above a matching skill."""
+    store = SkillStore(tmp_path / "skills")
+    for name, desc in [("relevant", "fix scheduler drift"),
+                       ("unrelated", "telemetry census notes")]:
+        store.propose(name=name, description=desc, body="b", modules=[])
+        store.promote(name)
+    found = store.find(query="scheduler drift", k=5,
+                       extra_run_counts={"unrelated": 100})
+    assert [s.name for s in found] == ["relevant"]
+
+
+def test_load_all_skips_non_mapping_frontmatter(tmp_path):
+    """Round-4 F3 side-find: a SKILL.md whose frontmatter parses to a
+    LIST crashed _parse_skill (meta.get on a list) — retrieval must skip
+    it like any other unparseable skill, never die."""
+    d = tmp_path / "skills" / "weird"
+    d.mkdir(parents=True)
+    (d / "SKILL.md").write_text("---\n- just\n- a-list\n---\nbody\n",
+                                encoding="utf-8")
+    store = SkillStore(tmp_path / "skills")
+    assert store.load_all() == []
+
+
+def test_parse_skill_distinguishes_blank_from_explicit_null(tmp_path):
+    """Verification-round finding: yaml.safe_load returns None for BLANK
+    frontmatter and for an explicit `null`/`~` scalar alike — only the
+    blank form may load with field defaults; a written-out null must be
+    skipped, never loaded as a default-active skill."""
+    root = tmp_path / "skills"
+    blank = root / "blank"
+    blank.mkdir(parents=True)
+    (blank / "SKILL.md").write_text("---\n\n---\nbody\n",
+                                    encoding="utf-8")
+    store = SkillStore(root)
+    loaded = store.load_all()
+    assert [s.name for s in loaded] == ["blank"]  # dirname default
+    for i, scalar in enumerate(("null", "~")):
+        d = root / f"nullish{i}"
+        d.mkdir()
+        (d / "SKILL.md").write_text(f"---\n{scalar}\n---\nbody\n",
+                                    encoding="utf-8")
+    assert [s.name for s in store.load_all()] == ["blank"]

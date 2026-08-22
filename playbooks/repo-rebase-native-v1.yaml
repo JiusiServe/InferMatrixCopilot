@@ -1,9 +1,9 @@
 # Native decomposition of the nightly rebase — CANDIDATE: invisible to the
 # planner (find() only recalls active/locked), runnable only via
-# `infermatrix-copilot --playbook repo-rebase-native`. The nightly keeps using the
+# `infermatrix-copilot --playbook repo-rebase-native-v1`. The nightly keeps using the
 # locked `repo-rebase` until this is validated side-by-side and promoted
 # (candidate -> active -> locked; old playbook -> retired; rollback = revert).
-name: repo-rebase-native
+name: repo-rebase-native-v1
 version: 1
 status: candidate
 provenance:
@@ -13,7 +13,11 @@ provenance:
 task_kinds: [repo_rebase]
 repos: [vllm-omni]
 requires: [orchestrator.external]
+# v3 mode governance applies (resolve_effective_mode); v1 additionally
+# REJECTS every mode except explicit `full` at its prelude (plan §4).
+mode_aware: true
 params:
+  rebase_mode: {type: str, default: ""}
   report_only: {type: bool, default: true}
   local_ci_only: {type: bool, default: false}
   remote_ci_only: {type: bool, default: false}

@@ -194,14 +194,30 @@ def server_alive(run_root: str | Path, server_id: Optional[str]) -> bool:
 
 
 # ── reconciliation ────────────────────────────────────────────────────────────
-def reconcile_after_wait(run_dir: str | Path, *, note: str = "") -> Optional[dict]:
-    """Called by the launching parent immediately after `Popen.wait()` — the
-    child is already reaped, so we are the sole writer. If the run is still
-    non-terminal (the child died before writing a terminal state, e.g. SIGKILL),
-    mark it `interrupted`. A run that terminated cleanly is left as-is."""
+def reconcile_after_wait(run_dir: str | Path, *, note: str = "",
+                         child_pid: Optional[int] = None,
+                         suspect_lock_loser: bool = False) -> Optional[dict]:
+    """Called by the launching parent immediately after `Popen.wait()`. If the
+    run is still non-terminal (the child died before writing a terminal state,
+    e.g. SIGKILL), mark it `interrupted`. A run that terminated cleanly is
+    left as-is.
+
+    `child_pid` (the pid the caller just reaped) scopes the write: a
+    duplicate child that lost the run lock exits without touching
+    `run_status.json`, so the recorded `child_pid` still names the winning
+    process — reconciling then would mark the live winner's run interrupted.
+    Only the parent of the recorded child may reconcile. `suspect_lock_loser`
+    (caller saw the loser's exit code) additionally covers the window where
+    the winner holds the run lock but has not yet published its pid: an
+    unclaimed status is then left alone rather than treated as a crash."""
     def _fn(cur: dict) -> Optional[dict]:
         if not cur or cur.get("state") in TERMINAL:
             return None
+        recorded = cur.get("child_pid")
+        if child_pid is not None and recorded not in (None, child_pid):
+            return None  # a different (winning) child governs this status
+        if recorded is None and suspect_lock_loser:
+            return None  # winner pre-publish; a real crash never exits 3
         return {"state": INTERRUPTED,
                 "note": note or "child exited without a terminal status"}
     return _locked_update(run_dir, _fn)

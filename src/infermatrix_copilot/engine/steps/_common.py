@@ -243,11 +243,15 @@ def record_debug_memory(ctx, *, module: str, symptom: str, root_cause: str,
     and swallowed — closing the learning loop must never fail the fix itself."""
     try:
         from ...memory.debug_memory import DebugMemory
+        from ...memory.paths import KnowledgePaths
         from ..agent_runtime.knowledge import _resolve_adapter
 
         adapter = _resolve_adapter(ctx)
-        db = adapter.debug_memory_db if adapter is not None else ctx.settings.memory_db
         spec = ctx.state.get("task_spec") or {}
+        db = KnowledgePaths.resolve(
+            ctx.settings, str(spec.get("repo", "")),
+            adapter_root=adapter.root if adapter is not None else None,
+        ).shared_write_db
         DebugMemory(db).record(
             repo=str(spec.get("repo", "")), module=module,
             run_id=ctx.run_dir.name, symptom=symptom, root_cause=root_cause,

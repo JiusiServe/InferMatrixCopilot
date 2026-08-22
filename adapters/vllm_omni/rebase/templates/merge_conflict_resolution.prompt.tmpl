@@ -1,0 +1,107 @@
+You are resolving git merge conflicts after merging origin/main into vllm-omni.
+
+Repository root: {OMNI_PATH}
+Current branch: {BRANCH_NAME}
+Pre-merge vllm-omni HEAD: {OMNI_COMMIT_BEFORE}
+
+## Conflict files (only these)
+{CONFLICT_FILES}
+
+{OMNI_COMMIT_LOG}
+
+Edit **only** these paths unless the run explicitly expands the list. If a non-conflict file must be modified to make the merge work (e.g., adding a forwarded field to a shared helper called by the merged code), that is acceptable — document the reason in the report and stage it alongside conflict files.
+
+## Origin Analysis (MANDATORY — do this FIRST for every conflict)
+
+Before resolving any conflict, you MUST understand WHY the vllm-omni side differs from upstream. Every conflicting hunk in vllm-omni was put there deliberately — by a specific commit, for a specific purpose. Blindly accepting upstream (origin/main) or blindly keeping the omni side both risk regressions.
+
+### For each conflicting file, investigate:
+
+1. **Which vllm-omni commits touched this file?**
+   ```
+   git log origin/main..{OMNI_COMMIT_BEFORE} --oneline -- <file>
+   ```
+   This lists every vllm-omni commit that diverges from upstream and affects this file. Each commit hash and message tells you WHO made the change and WHY.
+
+2. **What was the purpose of each omni change?**
+   ```
+   git show <commit> -- <file>
+   git show <commit> --format=full
+   ```
+   Read the full commit message and diff. vllm-omni commits often reference PR numbers or describe specific omni features (e.g. "adapt for OmniModelConfig", "add Qwen3-Omni multimodal support", "wire up AR scheduler").
+
+3. **What does the upstream side look like?**
+   ```
+   git show origin/main:<file>
+   ```
+   This is the "theirs" side — the version on upstream main. Understand what changed upstream and why it conflicts.
+
+4. **What is the full vllm-omni delta for this file?**
+   ```
+   git diff origin/main...{OMNI_COMMIT_BEFORE} -- <file>
+   ```
+   This shows the complete set of omni modifications applied on top of the common ancestor. It gives you the big picture of how vllm-omni changed this file.
+
+### Conflict resolution principles:
+
+- **Never revert a vllm-omni PR by accident.** If a hunk on the omni side exists because of a specific omni feature (custom model config, AR scheduling, multimodal input pipeline, etc.), that functionality MUST survive the merge. The merged result must preserve the omni intent while incorporating upstream changes.
+
+- **When upstream refactored code that omni overrides:** Read the upstream commit messages (`git log origin/main --oneline -10 -- <file>`) to understand the refactor. Then apply the same refactor pattern to the omni-specific code. If upstream renamed a method, renamed a class, or changed a signature, the omni code must follow suit. **Trace each omni-specific field/parameter through the new code path** — if the new path omits a field omni depends on, add it to the new path rather than reverting to the old pattern.
+
+- **When upstream completely restructured an architectural pattern:** A deliberate omni design choice (e.g., two-pass initialization, specific ordering of operations) is part of omni intent, not just symbol-level changes. If the upstream restructuring silently drops this pattern, consider how to preserve it within the new structure or document the loss as a risk in the report.
+
+- **When both sides added new functionality:** Keep both. If omni added imports/calls for its feature and upstream added different imports/calls for its feature, the merged file must include both, wired correctly.
+
+- **When upstream deleted code that omni depends on:** Do NOT blindly accept the deletion. Read the upstream commit that deleted it to understand why. If the deletion was a move/rename, update the omni references. If the deletion removes functionality omni genuinely needs, consider keeping it or finding the upstream replacement.
+
+- **When you are unsure which side to keep:** Default to keeping the omni side's behavior intact, but adapted to any upstream API changes surrounding it. The omni side represents months of deliberate engineering — erring on the side of preservation is safer than accidentally reverting a PR.
+
+- **Verify after resolution:** For each resolved file, re-run:
+  ```
+  git diff origin/main...<resolved> -- <file>
+  ```
+  Mentally check that every omni feature area (config, serving, scheduling, model layers, input pipeline, benchmarks) that had custom code in this file before the merge still has it after.
+
+**This step:** Remove conflict markers, merge both sides, and `git add` resolved files until the index is clean for listed paths (plus any non-conflict files modified as dependencies). Finish **all** files in this pass — partial resolution leaves the merge paused.
+
+**Merge-stage context:** The orchestration logs show `Automatic merge failed; fix conflicts and then commit the result.` then `ERROR: Merge conflicts detected in:` with the same paths listed above. Success lines before that chain (e.g. vLLM install, Dockerfile.ci update) **did not** fail the merge — only unresolved conflicts block this step. Do not invent causal links from timestamp gaps unless an execution line ties them.
+
+**Out of scope — do not chase:** CI/debug rounds (import-check, API drift, pytest/CI, wheels, pre-commit/ruff, `debug_stage*.py`, commit-retrigger loops, `ERROR: Failed to commit CI debug fixes.`, Buildkite). Do not add or restore files **only** because logs show pytest collection failures, missing `tests.*` imports, or "restore helper under `{OMNI_PATH}`" hints — unless that path is listed above or required to finish a hunk in a listed file.
+
+**Log noise — do not use to widen edits, stop early, or fix unrelated work.**
+
+- Anchor to the **current** rebase run ID; ignore lines from other `rebase-*` runs.
+- Banners, `Using level-* agent model:`, watchdog lines, heartbeats, `[claude_auth]`/API key probes — ignore.
+- Progress lines (`Module progress: … (M/N)`) with `0 failed` mean other modules are still running — not a scope change for you. A real module failure reaches `(N/N)` with `failed > 0` and emits `ERROR: Module rebase failed` (often without a module name — do not guess from launch order).
+- Import verdicts: if early `BROKEN`/`ERROR: N broken` is followed by later `All upstream imports resolve`/`Upstream import check passed`, the **later** line is the in-run verdict. Do not treat early errors as final.
+- CI/push outcomes: optimistic lines (`ERROR: 0 CI failure(s) remain`, `Debug agents produced fixes.`) do **not** prove hooks or commits succeeded if the same excerpt later shows commit/pre-commit errors. Do not conclude CI/push outcomes from partial pastes.
+- Other phases: wave/benchmark lines, prompt-regeneration banners, `needs_human`, `Rebase paused`, `Timeout waiting for modules`, `RESUME-SKIP`, `Check signals`, failure emails, missing module/CI mappings — out of scope. A clean index after you finish does **not** mean downstream checks pass.
+- Do not stitch log chunks from different runs/waves into a failure narrative for this step.
+- Ignore as decision inputs (unless inside a conflict hunk you are editing): heartbeats; install/bootstrap/Phase banners; skip/restart lines (`Phase … already done`, `=== … Orchestrator ===`); `tmux: command not found`; detached HEAD; ROCm/amdsmi optional-import noise; tokenizer DeprecationWarnings; HF download/cache; remote/SSH noise; gated `IGNORE (… HF 401 …)` lines; `No CI→module mapping…`; contradictory import lines outside the same in-run final resolution. A `SKIP` in another gate that still ends compatibility OK is irrelevant here.
+
+**Done when:** no `<<<<<<<` / `=======` / `>>>>>>>`, and `git diff --name-only --diff-filter=U` is empty (and `git ls-files -u` is empty if you check it).
+
+{PLAN_REVIEW_CONTRACT}
+
+## Actions
+
+### Required (do these in order)
+1. **FIRST — Origin analysis.** For each conflicting file, run `git log origin/main..{OMNI_COMMIT_BEFORE} --oneline -- <file>` and `git show <relevant-commit>` to identify which vllm-omni PRs/commits introduced the conflicting code and what their purpose was. Document each finding in the Notes section.
+2. **Merge each file.** Prefer combining upstream (main) **and** vllm-omni behavior — not a blind pick. For **modify/delete** conflicts, follow git's message: choose keep/delete so the tree matches the intended merge. If the branch **deleted** a path but upstream **added** symbols there, use **static** read/search of imports under `{OMNI_PATH}`: when callers point at a replacement file (e.g. helpers → `conftest.py`), apply upstream's new symbols on that replacement instead of blindly restoring the deleted path.
+3. **Handle imports.** If a hunk touches `from vllm...` / `import vllm`, public types, or serving/entrypoint wiring, treat `{OMNI_PATH}/vllm` as source of truth when that tree exists (read/search there). If **absent**, use **static** search only under `{OMNI_PATH}` — no live import/runtime. If both sides add different imports and both are needed, keep both.
+4. **Strip conflict markers** from all resolved files.
+5. **`git add`** resolved files (including any non-conflict files modified as dependencies). Do not commit.
+
+### Constraints
+- **Do not** run pytest, import-check, drift checkers, CI, wheel reinstall, `python -c`, or any live import/runtime probe as a completion gate.
+- **Do not** "fix" optional environment noise (e.g. ROCm optional imports) unless the **merged hunk** requires it.
+- **Optional** on edited files only: syntax-only checks (e.g. YAML `safe_load`, Python `ast.parse`).
+
+## Output
+Write a short markdown report in **English** to: {REPORT_PATH}
+
+Sections (required):
+- **Summary** — one short paragraph: conflict markers removed, paths resolved, index clean per checks above (note if sandbox blocked staging).
+- **Origin Analysis** — for each conflicting file, list: (a) which vllm-omni commits touched it (`git log origin/main..{OMNI_COMMIT_BEFORE} --oneline`), (b) the purpose of each relevant omni change (PR/feature context), (c) how the resolution preserves each omni intent while incorporating upstream changes.
+- **Files Resolved** — bullet list of the paths you touched.
+- **Notes** — hunk-level facts from **this** step only. Justify symbol/API choices by **static** read/search under `{OMNI_PATH}/vllm` when that tree exists, else under `{OMNI_PATH}`. **No** `python -c`, live import probes, or quoted stderr/stdout from them. **No** speculation on CI, import-check, API drift, environment, or pipeline outcomes. If you reference orchestrator or import lines, prefer **final** in-run resolution over earlier `BROKEN` in the same log, and do not attribute failures to a different `rebase-*` run than the one in play. **No** blaming Phase 3 / CI mapping / `Pipeline tests could not be fully resolved` for this step unless conflict markers or unmerged paths were still present; other gates' SKIP/green lines are out of scope; "conflicts cleared" does not mean downstream checks passed. If you edited any non-conflict files as dependencies, call that out explicitly with rationale.

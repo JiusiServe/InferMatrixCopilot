@@ -1,0 +1,429 @@
+{
+ "model": "golden-model",
+ "max_tokens": 32000,
+ "tools": [
+  {
+   "name": "run_shell",
+   "description": "Execute a bash command and return stdout, stderr, and exit code. Use for running tests, git operations, pre-commit hooks, import checks, and any other shell-based verification. The command runs in the vllm-omni workspace. Avoid destructive commands (rm -rf, force push, etc).",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "command": {
+      "type": "string",
+      "description": "The bash command to execute."
+     },
+     "workdir": {
+      "type": "string",
+      "description": "Optional working directory (defaults to vllm-omni repo)."
+     },
+     "timeout": {
+      "type": "integer",
+      "description": "Timeout in seconds (default: 600)."
+     }
+    },
+    "required": [
+     "command"
+    ]
+   }
+  },
+  {
+   "name": "read_file",
+   "description": "Read the contents of a file at the given path. Returns the file content with line numbers. Use this to understand existing code before editing.",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "file_path": {
+      "type": "string",
+      "description": "Absolute path to the file to read."
+     },
+     "offset": {
+      "type": "integer",
+      "description": "Optional line number to start reading from."
+     },
+     "limit": {
+      "type": "integer",
+      "description": "Optional maximum number of lines to read."
+     }
+    },
+    "required": [
+     "file_path"
+    ]
+   }
+  },
+  {
+   "name": "write_file",
+   "description": "Write or overwrite a file with the given content. Use this for creating new files or fully rewriting existing ones.",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "file_path": {
+      "type": "string",
+      "description": "Absolute path to the file to write."
+     },
+     "content": {
+      "type": "string",
+      "description": "The full content to write to the file."
+     }
+    },
+    "required": [
+     "file_path",
+     "content"
+    ]
+   }
+  },
+  {
+   "name": "grep",
+   "description": "Search for a pattern in files. Returns matching files and line content. Use this to find where symbols, functions, or patterns are defined.",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "pattern": {
+      "type": "string",
+      "description": "The regex pattern to search for."
+     },
+     "path": {
+      "type": "string",
+      "description": "Directory or file path to search (default: vllm-omni)."
+     },
+     "include": {
+      "type": "string",
+      "description": "Optional file pattern filter (e.g. '*.py')."
+     }
+    },
+    "required": [
+     "pattern"
+    ]
+   }
+  },
+  {
+   "name": "run_import_check",
+   "description": "Run a Python import check to verify that module imports work correctly. Use this after making code changes to verify imports are not broken.",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "import_code": {
+      "type": "string",
+      "description": "Python import statement(s) to execute (e.g. 'from vllm_omni.model_executor.models.registry import *; print(\"OK\")')."
+     }
+    },
+    "required": [
+     "import_code"
+    ]
+   }
+  },
+  {
+   "name": "git_show_test_baseline",
+   "description": "Show the origin/main version of a test file. Use this FIRST when a test fails — compare origin/main's test with omni's test before changing any product code.",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "test_path": {
+      "type": "string",
+      "description": "Path to the test file (e.g. tests/diffusion/test_bagel.py)."
+     }
+    },
+    "required": [
+     "test_path"
+    ]
+   }
+  },
+  {
+   "name": "reproduce",
+   "description": "Hermetically reproduce a failing test on a CLEAN GPU. This is the ONLY sanctioned way to run a GPU test — it kills leaked stage/API processes, clears dead device locks, asserts free VRAM, and runs with CUDA_LAUNCH_BLOCKING=1 so a device-side assert points at the true kernel. Prefer this over raw run_shell pytest, which corrupts shared GPU state and produces phantom failures. Returns a structured outcome including whether the failure looks environmental (env_dirty) vs a real code bug.",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "test_paths": {
+      "type": "string",
+      "description": "Test path(s) / -k target to run."
+     },
+     "markers": {
+      "type": "string",
+      "description": "Optional pytest -m marker filter."
+     },
+     "run_level": {
+      "type": "string",
+      "description": "Optional --run-level value."
+     },
+     "tier": {
+      "type": "string",
+      "description": "micro_repro | module_suite | full_job (default micro_repro)."
+     },
+     "timeout": {
+      "type": "integer",
+      "description": "Timeout seconds (default 900)."
+     }
+    },
+    "required": [
+     "test_paths"
+    ]
+   }
+  },
+  {
+   "name": "git_show_upstream",
+   "description": "Show the content of a file from the upstream vLLM repo at a specific ref. Use this to see the current upstream API/signature for a file when reconciling omni changes with upstream changes.",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "file_path": {
+      "type": "string",
+      "description": "Relative path to the file in the vLLM repo."
+     },
+     "ref": {
+      "type": "string",
+      "description": "Git ref or commit hash (default: HEAD)."
+     }
+    },
+    "required": [
+     "file_path"
+    ]
+   }
+  },
+  {
+   "name": "git_show_omni_main",
+   "description": "Show the content of a file from the vllm-omni main branch (origin/main). Use this to understand the original omni intent before the rebase, so you can preserve omni-specific logic while updating for upstream changes.",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "file_path": {
+      "type": "string",
+      "description": "Relative path to the file in vllm-omni (e.g. 'vllm_omni/worker/gpu_ar_model_runner.py')."
+     }
+    },
+    "required": [
+     "file_path"
+    ]
+   }
+  },
+  {
+   "name": "git_log_upstream",
+   "description": "Show recent commit log for a file or directory in the upstream vLLM repo. Use this to understand what changed upstream since the last rebase.",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "File or directory path in vLLM repo."
+     },
+     "max_count": {
+      "type": "integer",
+      "description": "Maximum number of commits to show (default: 10)."
+     }
+    },
+    "required": [
+     "path"
+    ]
+   }
+  },
+  {
+   "name": "git_diff",
+   "description": "Show the git diff of current changes in vllm-omni. Use this to review what changes have been made so far.",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "Optional specific file or directory path."
+     }
+    },
+    "required": []
+   }
+  },
+  {
+   "name": "git_diff_tests_upstream",
+   "description": "Show how origin/main changed test files: additions, deletions, renames, modifications. Use to understand test reorganization.",
+   "input_schema": {
+    "type": "object",
+    "properties": {},
+    "required": []
+   }
+  },
+  {
+   "name": "request_plan_review",
+   "description": "Submit your plan for L4 review BEFORE making any code edits. You MUST call this after writing plan JSON + MD files and before editing any code. Pass the exact paths you just wrote to — the reviewer only reads those files, so there is no ambiguity. The L4 reviewer is a fresh, independent session — it has no access to your conversation history. It will critique your plan and return a verdict (lgtm/revise/block). The review is advisory — you retain final authority but MUST write a decision file per critique before editing code.",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "plan_json_path": {
+      "type": "string",
+      "description": "Absolute path to your plan JSON file (e.g. ${LOG_DIR}/plans/${SESSION}/dispatch_initial/plan-v0-abcd.json). This is the EXACT file you just wrote with write_file."
+     },
+     "plan_md_path": {
+      "type": "string",
+      "description": "Absolute path to your plan markdown file. Defaults to the .md sibling of plan_json_path."
+     },
+     "kind": {
+      "type": "string",
+      "description": "Plan kind: 'rebase' (Phase 2 module work), 'debug' (fixing a failing test), 'repair' (fixing harness)."
+     },
+     "reviewer_model": {
+      "type": "string",
+      "description": "Model to use for the L4 reviewer. Defaults to the orchestrator's AGENT_MODEL_L4 setting (e.g. 'claude-haiku-4-5', 'gpt-5.1', 'claude-sonnet-4-6'). Prefix determines the API: 'claude-' or 'anthropic.' routes to Anthropic; 'gpt-' or 'openai.' routes to OpenAI."
+     },
+     "reviewer_provider": {
+      "type": "string",
+      "enum": [
+       "anthropic",
+       "openai",
+       "cursor"
+      ],
+      "description": "API provider: anthropic (Claude), openai (GPT direct), cursor (GPT via Cursor subscription). Auto-detected from model prefix if omitted."
+     }
+    },
+    "required": [
+     "plan_json_path"
+    ]
+   }
+  },
+  {
+   "name": "search_debug_memory",
+   "description": "Search past debug memory for similar failures and their proven fixes. Use this FIRST when you encounter an error — someone may have already fixed it in a previous run. Returns matching entries with symptom, root cause, and the exact fix applied.",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "keyword": {
+      "type": "string",
+      "description": "Free-text search: error message, symbol name, or failure description."
+     },
+     "module": {
+      "type": "string",
+      "description": "Optional: filter by module name (worker_runner, model_executor, ...)."
+     },
+     "tags": {
+      "type": "string",
+      "description": "Optional: comma-separated tags to filter by."
+     },
+     "max_results": {
+      "type": "integer",
+      "description": "Maximum entries to return (default 5)."
+     }
+    },
+    "required": []
+   }
+  },
+  {
+   "name": "record_debug_memory",
+   "description": "Record a debug memory entry after fixing a failure. This helps future runs find the same fix via search_debug_memory. Include the symptom, root cause, and the exact fix applied. Use after a successful fix.",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "module": {
+      "type": "string",
+      "description": "Module name (worker_runner, model_executor, ...)"
+     },
+     "key": {
+      "type": "string",
+      "description": "Short error signature (e.g. 'routed_experts_noop_stub_cycle')"
+     },
+     "symptom": {
+      "type": "string",
+      "description": "What went wrong — error message, traceback summary"
+     },
+     "root_cause": {
+      "type": "string",
+      "description": "Why it went wrong — upstream change, missing API, etc."
+     },
+     "fix": {
+      "type": "string",
+      "description": "How you fixed it — what code was changed and why"
+     },
+     "tags": {
+      "type": "string",
+      "description": "Comma-separated tags (e.g. 'import,compat-shim,architectural-change')"
+     },
+     "files": {
+      "type": "string",
+      "description": "Comma-separated file paths that were modified"
+     },
+     "watch_outs": {
+      "type": "string",
+      "description": "Things to watch for — similar issues in other places"
+     }
+    },
+    "required": [
+     "module",
+     "key",
+     "symptom",
+     "fix"
+    ]
+   }
+  },
+  {
+   "name": "skill_manage",
+   "description": "Create or update a reusable SKILL — a distilled runbook for a recurring rebase/debug pattern. Use this AFTER you confirm a fix that is likely to recur (e.g. an upstream API drift you had to port). Skills are injected into future runs' prompts for the matching module. Prefer editing an existing skill (action=update) over creating near-duplicates.",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "action": {
+      "type": "string",
+      "enum": [
+       "create",
+       "update"
+      ],
+      "description": "create a new skill or update an existing one by name."
+     },
+     "name": {
+      "type": "string",
+      "description": "Short kebab-case skill name (e.g. 'fix-shutdown-kwargs-mismatch')."
+     },
+     "description": {
+      "type": "string",
+      "description": "One-line summary of what this skill is for."
+     },
+     "trigger": {
+      "type": "string",
+      "description": "When this skill applies — the symptom/condition to match."
+     },
+     "modules": {
+      "type": "string",
+      "description": "Comma-separated modules this skill applies to (empty = all)."
+     },
+     "body": {
+      "type": "string",
+      "description": "Markdown body: '## Diagnose' steps and '## Fix' template/code."
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "active",
+       "retired"
+      ],
+      "description": "Optional: set 'retired' to deactivate a stale skill."
+     }
+    },
+    "required": [
+     "action",
+     "name"
+    ]
+   }
+  },
+  {
+   "name": "search_skills",
+   "description": "List learned skills relevant to a module (and optionally matching a keyword). Skills for your module are already injected into this prompt; use this to look wider or confirm a skill exists before creating one.",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "module": {
+      "type": "string",
+      "description": "Module name to filter by."
+     },
+     "keyword": {
+      "type": "string",
+      "description": "Optional free-text match on name/trigger/body."
+     },
+     "max_results": {
+      "type": "integer",
+      "description": "Max skills to return (default 5)."
+     }
+    },
+    "required": []
+   }
+  }
+ ],
+ "messages": [
+  {
+   "role": "user",
+   "content": "You are rebasing vllm-omni module `model_config`.\n\nGoal: make `vllm_omni/config/model.py vllm_omni/engine/arg_utils.py` compatible with upstream while preserving vllm-omni intent from `origin/main`.\n\n## CRITICAL: Plan-Review-Decision Gate (MANDATORY)\n\nThe `edit_file`, `run_pytest`, and `run_precommit` tools are LOCKED until you\ncomplete the plan-review-decision pipeline. You CANNOT edit code or run tests\nuntil you write a .decision.md file. Use `read_file`, `grep`, `run_shell`,\n`git_show_upstream`, `git_show_omni_main` for exploration.\n\n### YOUR FIRST TASK: Write plan files, then call `request_plan_review`\n\nStep 1 — write_file → /fixed/logdir/plans/module-model_config/dispatch_initial/plan-v0-XXXX.json\n  (JSON: {\"version\":3,\"plan_id\":\"v0-XXXX\",\"intent\":\"...\",\"changes\":[...],\"verify\":[...],\"risks\":[...]})\n\nStep 1b — write_file → /fixed/logdir/plans/module-model_config/dispatch_initial/plan-v0-XXXX.md (full narrative)\n\nStep 2 — request_plan_review tool:\n  plan_json_path: \"/fixed/logdir/plans/module-model_config/dispatch_initial/plan-v0-XXXX.json\"\n  plan_md_path: \"/fixed/logdir/plans/module-model_config/dispatch_initial/plan-v0-XXXX.md\"\n  kind: \"rebase\"\n\nStep 3 — write_file → /fixed/logdir/plans/module-model_config/dispatch_initial/plan-v0-XXXX.decision.md (accept|partial|reject per critique)\n\nStep 4 — NOW edit_file, run_pytest, run_precommit are unlocked. Edit code.\n\nMax 2 revision rounds. If review fails, proceed anyway.\n\n## Environment\n- vLLM repo (read-only): /nonexistent/vllm-checkout (commit: )\n- vllm-omni repo (edit here only): /nonexistent/omni-checkout (commit: )\n- CUDA_VISIBLE_DEVICES=0,1\n- HF_HOME=/model\n\n### Execution mode: LOCAL\n\n## Execution flow\n1. **Plan first** (per contract above), then begin on `vllm_omni/config/model.py vllm_omni/engine/arg_utils.py`.\n2. Run **41** (check API drift) + **42** (check upstream imports) before deep pytest. If 42 first shows broken imports, **fix then full 42 re-run** before long pytest.\n3. Triage the **first real** failure: traceback, `FAILED`, `MISMATCH`, `BROKEN`—not watchdog-only chatter.\n4. **Minimal patch** in `vllm_omni/config/model.py vllm_omni/engine/arg_utils.py` (+ omni tests/fixtures needed).\n5. Re-run **that** check first; prefer **targeted** pytest when the runbook allows.\n6. Full required verification.\n7. **No-op fail-fast:** if output unchanged across **two** consecutive repair attempts, stop.\n8. Repeated identical `TypeError` / ctor args on one stack → **one** kwargs/wiring fix, then re-verify.\n\n**Engine / unpack:** Fix return-shape, kwargs, ordering at the real omni engine boundary; keep `shutdown` kwargs in sync with upstream.\n\n**Diffusion / subprocess:** `StageDiffusionProc died during handshake` → full worker traceback; handshake/init vs OOM; one controlled retry if GPU contention is plausible.\n\n**CUDA OOM with foreign PIDs:** resource contention—document; do not spend all `3` on identical code tweaks if GPU picture unchanged.\n\n**Attempt history:** attempt 0 noisy, attempt 1 **PASSED** → do not over-fit attempt 0.\n\n**Two pytest lines in one step:** map `FAILED` to the command whose stderr failed.\n\n**Registry / dynamic imports:** align every runtime entry (e.g. `registry.py`) with `/nonexistent/vllm-checkout`.\n\n**Phase 3 debug:** reply with traceback + `MODULE=model_config` + owning area.\n\n**CPU/merge pipeline:** optional-dep `ModuleNotFoundError`, bad LoRA `HTTPException`/400—fix deps/fixtures in `/nonexistent/omni-checkout`.\n\n## Parallel execution (Phase 2)\nOther module agents edit `/nonexistent/omni-checkout` concurrently.\n\n1. Dirty `git status` outside `vllm_omni/config/model.py vllm_omni/engine/arg_utils.py` is **expected**—ignore it.\n2. Never `git stash`, `git checkout`, or `git clean` paths outside `vllm_omni/config/model.py vllm_omni/engine/arg_utils.py` (you would destroy other agents' work).\n3. Do not ask the user to clean the workspace or wait for other modules.\n4. `tasks/01_guard_branch_clean.sh` already ran in Phase 1; do not re-verify globally.\n\n**Primary scope = `vllm_omni/config/model.py vllm_omni/engine/arg_utils.py`.** Repeated `Module progress: (k done, f failed, s skipped) (k/M)` with the **same tuple** = **plateau** (heartbeat), not new failures. A tuple change then `ERROR: Module rebase failed` **without** `Timeout waiting for modules` = aggregate wave outcome—check signals.\n\n**All-fail-in-one-poll:** `(0,0,0)` → `(0,N,0)` with all modules failing in the same tick is likely **systemic** (shared config, common import, env var, tmux failure). Check shared infrastructure first. **Single-module waves:** same systemic check before blaming your code.\n\n**Straggler avoidance:** Finish checks and write the completion contract promptly. In **single-module waves** (no parallel modules), the orchestrator waits only for you—write your verdict as soon as final.\n\n**Orchestrator restart/resume:** `Skipping <module> (already done)` = incremental relaunch. Do not assume all agents restart together.\n\n### Shared log hygiene\nAnchor on the **current run**—match `Resuming run: rebase-* (phase: …)` for **this** session. `[claude_auth]` / `API key probe OK` is CLI init—**not** a module failure. Repeated `Using level-1 agent model:` banners are **noise**—diagnose from `ERROR:` / phase banners / task names. Git boilerplate (`detached HEAD`, `git switch -c`) is scaffold—not merge outcome unless paired with conflict/error lines. `SSH fetch failed; retrying via HTTPS token auth` followed by HTTPS success is normal infrastructure fallback—**not** a module failure.\n\n### Autonomous scope extension\nFully unattended—**never** ask for guidance, confirmation, permission, or numbered options. Decide and act.\n\n**Plan review timeout:** If `## CRITICAL: Plan-Review-Decision Gate (MANDATORY)\n\nThe `edit_file`, `run_pytest`, and `run_precommit` tools are LOCKED until you\ncomplete the plan-review-decision pipeline. You CANNOT edit code or run tests\nuntil you write a .decision.md file. Use `read_file`, `grep`, `run_shell`,\n`git_show_upstream`, `git_show_omni_main` for exploration.\n\n### YOUR FIRST TASK: Write plan files, then call `request_plan_review`\n\nStep 1 — write_file → /fixed/logdir/plans/module-model_config/dispatch_initial/plan-v0-XXXX.json\n  (JSON: {\"version\":3,\"plan_id\":\"v0-XXXX\",\"intent\":\"...\",\"changes\":[...],\"verify\":[...],\"risks\":[...]})\n\nStep 1b — write_file → /fixed/logdir/plans/module-model_config/dispatch_initial/plan-v0-XXXX.md (full narrative)\n\nStep 2 — request_plan_review tool:\n  plan_json_path: \"/fixed/logdir/plans/module-model_config/dispatch_initial/plan-v0-XXXX.json\"\n  plan_md_path: \"/fixed/logdir/plans/module-model_config/dispatch_initial/plan-v0-XXXX.md\"\n  kind: \"rebase\"\n\nStep 3 — write_file → /fixed/logdir/plans/module-model_config/dispatch_initial/plan-v0-XXXX.decision.md (accept|partial|reject per critique)\n\nStep 4 — NOW edit_file, run_pytest, run_precommit are unlocked. Edit code.\n\nMax 2 revision rounds. If review fails, proceed anyway.` triggers a plan-and-review protocol that times out (no `.review_done` within the allotted wait), proceed with your plan. Do not treat review timeout as a module failure.\n\nIf a **required verification** fails and root cause is under `/nonexistent/omni-checkout` but outside `vllm_omni/config/model.py vllm_omni/engine/arg_utils.py`:\n1. **Follow the root cause**—minimal targeted fixes anywhere under `/nonexistent/omni-checkout`.\n2. Keep fixes **small**—align with `/nonexistent/vllm-checkout`; no unrelated refactors.\n3. **Document** every out-of-scope edit in the completion contract.\n4. Prefer **additive** changes if another agent may touch the same file.\n5. After **two** failed attempts on that out-of-scope fix, **stop** and write `.fail` with traceback.\n\n## Evaluation gates\n**Truth = the latest checker output: exit code, final banner, every `MISMATCH`/`BROKEN`.** Ignore fix-agent tmux chatter and lines like `Import fix agent reported success` until a **full** `41`/`42` run after that path confirms (exit 0, zero `MISMATCH`/`BROKEN`).\n\n- **Chronology:** Anchor on the **latest** full run. Old failures are void after a later run exits 0 with no `MISMATCH`/`BROKEN`.\n- **Success-before-failure:** Earlier green `41`/`42`/install lines before a later `ERROR:` still stand—do not blame install/Dockerfile unless that step also shows failure in the **same** segment.\n- **42 after fix:** After `ERROR: N broken upstream import(s)`, **re-run** `tasks/42_check_upstream_imports.sh` before treating imports as green.\n- **SKIP on green 41:** `SKIP` + exit **0** + `API drift check passed.` + no `MISMATCH` = pass. `SKIP` + non-zero exit or any `MISMATCH` = not green.\n- **42 noise:** `All upstream imports resolve correctly.` may be followed by `Broken imports detected.`—anchor on the **last full `42` block**: exit 0 + no `BROKEN` = pass. If ambiguous, re-run 42.\n- **SKIP when symbol absent:** Fix real imports/call sites per `/nonexistent/vllm-checkout`—no fake shims for drift only.\n- **First pass alignment:** Match `/nonexistent/vllm-checkout` early. If `41` prints `FORBIDDEN` imports, fix in the same drift pass.\n\nAfter edits, re-run **41** (zero `MISMATCH`) and **42** (zero `BROKEN`). ROCm/tokenizer/`TRANSFORMERS_CACHE` warnings are **noise** when checkers exit 0 green.\n\n**Phase 1 ops (not your concern unless blocked):** Wheel/install halts—read `vllm_install.log` end-to-end. **`Failed modules: none`** + wheel failure ⇒ no module wave. **Phase 1 merge:** `CONFLICT`, `Automatic merge failed` → orchestrator halted **before** Phase 2—not your failure. **Path sync:** `tasks/35_sync_module_paths.sh failed`, missing `path_sync_final_*.json` → mapping drift, not pytest failure.\n\n**Phase 1 complete ≠ Phase 2 done:** You must still finish verification and the completion contract.\n\n**Merge (your edits):** Resolve conflict markers **only** inside `vllm_omni/config/model.py vllm_omni/engine/arg_utils.py`. No `git merge`/`git stash` for the rest of the tree.\n\n## API drift (blocking before broad pytest)\n`tasks/41_check_api_drift.sh` is **hard.** Any `MISMATCH` or non-zero exit → not green. Read output end-to-end; confirm on the **latest** full run after each fix. Open `api_drift_check.md` (or logged report) and fix **every** listed mismatch.\n\nTypical fixes vs `/nonexistent/vllm-checkout`: `StageEngineCoreClient.shutdown` kwargs; `launch_core_engines` unpack/return-shape at the real omni↔upstream boundary. **`SKIP launch_core_engines unpack-check`** when the file does not inline `launch_core_engines` is fine on exit 0—no fake unpack.\n\n**Infra:** `BROKEN`/`MISMATCH` followed by `tmux: command not found`—fix cited code first; `tmux` missing is environment. **`ImportError` from `/nonexistent/vllm-checkout/vllm/_C.abi3.so` with `undefined symbol`** → stale/incompatible binary—reinstall from `/nonexistent/vllm-checkout` (e.g. `VLLM_USE_PRECOMPILED=1 uv pip install -e .`). Never edit upstream source. Bad wheel index: same triage via `vllm_install.log` + `platform_tag`.\n\n## Inputs\n### Module prompt source\n\n\n### Adaptive runbook\n(No adaptive rules yet.)\n\nUse the `search_debug_memory` tool to query past fixes. Do NOT read the debug_memory.md file directly.\n\n### Debug-memory workflow (mandatory)\nCross-run lessons at `/data/zhoutaichang/copilot/vllm-omni-rebase-agent/agent/memory/debug_memory.md` (pre-filtered for module=`model_config`). When a verification step fails or a non-trivial decision is made:\n\n1. **Read** the block above first; apply any matching past fix. Extend search:\n   python3 'Use `search_debug_memory` tool instead of CLI.' search --module=model_config --limit=5 \"<keyword>\"\n2. **Record** BEFORE writing `/fixed/signals/module.model_config.done` or `.fail`:\n   python3 'Use `search_debug_memory` tool instead of CLI.' record \\\n     --module=model_config \\\n     --key=\"<short error signature — same style as existing keys>\" \\\n     --tags=<csv> --files=<csv> --run=run-golden \\\n     --body-file=/tmp/debug_memory_entry.md\n   Body: `### Symptom` / `### Root cause` / `### Fix` / `### Watch-outs`.\n   For `.fail`, add `tags: dead-end` with what you tried and why.\n\n## Pre-diagnosed: Upstream architectural changes (Phase 1 detected)\n\nThese imports/functions were CHANGED or REMOVED by upstream vLLM commits.\nThe diff excerpts show what changed — do a proper port matching the new API.\nDo NOT create no-op stubs or compat shims.\n\n### x.py: `gone`\n**Removed/moved from**: `vllm.old.mod`\n**Commit**: `deadbee` moved it\n**Diff excerpt**:\n```diff\n-old\n+new\n```\n**All affected call sites** (must be updated):\n  - `x.py:10`\n\n\n## Tests you must pass\n\n### From Buildkite CI (must pass)\n- `slug_a`\n\n### Upstream test changes (compare with origin/main)\n- **RENAMED**: `tests/a.py` → `tests/b.py`\n\n\n### Relevant upstream commits\n(no relevant commits)\n\nIf `(no relevant commits)` is empty while notes imply commits: do not invent churn—flag misalignment. Preserve **cross-path** wiring when commits span executor, reasoning, tool parsers, `transformers_utils`, etc.\n\n### vllm-omni files to update\nvllm_omni/config/model.py vllm_omni/engine/arg_utils.py\n\n### Reference sources\n- Upstream vLLM target branch: /nonexistent/vllm-checkout\n  Key paths: vllm/config/ vllm/engine/arg_utils.py\n- vllm-omni baseline intent:\n  `git show origin/main:<path>` in /nonexistent/omni-checkout\n\n## Hard rules\n1. Edit only under /nonexistent/omni-checkout. Never modify /nonexistent/vllm-checkout.\n2. **Temporary files**: Create all helper scripts and scratch artifacts under `\\${AGENT_TMP}` (outside the repos). Never create temp files in `/nonexistent/omni-checkout` or `/nonexistent/vllm-checkout`.\n3. Use only env from this prompt: `CUDA_VISIBLE_DEVICES=0,1`, `HF_HOME=/model`. Ignore stale values in module prompt source.\n4. Preserve omni-specific behavior from `origin/main` while adapting to upstream APIs.\n5. Do not change copyright/license headers or license files.\n6. Execute only valid shell commands. Never run bare narrative tokens (example: `Resume`).\n7. **Never ask the user a question or wait for human input.**\n\n## Orchestrator / CI signals\nOn its own line (parser-friendly):\n`MODULE=model_config`\n\n**CI → module:** `Cannot map CI test`, unmapped jobs, `Pipeline tests could not be fully resolved` → routing/remote pipeline resolution—report exact job string + last error line + `MODULE=model_config`; do not burn `vllm_omni/config/model.py vllm_omni/engine/arg_utils.py` if no `FAILED`/`MISMATCH`/`BROKEN` tied to your edits.\n\n**Unmapped debug dispatch:** `No CI→module mapping`, `DEBUG DISPATCHED` → use downloaded job logs under the run's `buildkite/`; triage from that artifact.\n\n**CI debug commit chain:** `ERROR: 0 CI failure(s) remain unresolved.` + fixes exist ≠ git commit succeeded. `Failed to commit CI debug fixes` or `No fixes to push` = pre-commit/lint blocker—fix Ruff/format on touched files.\n\n**Phase 3 \"could not be fully resolved\":** Two subtypes:\n- **Stall (no pytest body):** `ERROR:` immediate after `Running [k/N]:` without captured `FAILED`/`ERROR: FAILED: …` → pipeline/remote resolution stall. Reply + `MODULE=model_config`; do **not** mass-rewrite omni.\n- **Unresolved failures:** Jobs completed but slug list shows unresolved failures. The slug enumeration after `ERROR: CI pipeline finished with N hard failure(s):` is authoritative. Find failure traceback in `tests/<N>_<slug>.log`.\n- **With debug wait:** `Sent message to agent session` + `Waiting for module agent` → debug-response stall.\n- **Resume/restart gaps:** `RESUME-SKIP [k/N]: <job>` = already passed. Anchor on latest Phase 3 block.\n- **Broken jobs (`state=broken`):** Cannot be retried. Escalate directly to debug.\n\n`CI_TESTS_KEEP_GOING_ON_FAIL=1`: Later passing run for the same test does **not** erase the earlier failure. The terminal slug enumeration after `ERROR: CI pipeline finished with N hard failure(s):` is the authoritative failure set. `Sending failure notification` / `Failure notification email sent.` / `Running post-run self-refinement` are cleanup steps, not failure arcs.\n\n**Wave / aggregate failure:** `ERROR: Module rebase failed. Check signals for details.`—list `/fixed/signals/module.*.done` and `module.*.fail` to identify failing modules. When `failed >= 1`, cat each `.fail` file and report which modules failed and why.\n\n**Default ownership:** `tests/entrypoints/test_omni_entrypoints.py`, async entrypoints, online-serving → online_serving. GPU/diffusion/orchestrator tracebacks → model_executor or module in trace.\n\n**Pytest truth:** `ERROR: FAILED: <job> (rc=…)`/`FAILED`/`ERROR` **override** `[watchdog] … CONTINUE` when `rc≠0`. `rc=143` SIGTERM; `rc=124` timeout; `rc=2` collection error.\n\n**Global timeout / stall:** `Build timed out` + frozen `Module progress` → parallel wave issue, not your `vllm_omni/config/model.py vllm_omni/engine/arg_utils.py`. Confirm your module wrote the completion marker.\n\n**Other signals to filter:**\n- `[MODEL DOWNLOAD]`, `IGNORE (gated model access / HF 401)`, remote container deps (`installing vllm-omni[dev]`) → infra noise unless pytest after recovery fails on your files.\n- `Debug SUPERVISOR: timeout waiting for repair agent` → repair agent timed out, not your module. Triage from test log.\n- Coverage retry (`Coverage plugin missing … retrying without --cov`) → authoritative outcome is the run **after** that retry.\n- `Timeout waiting for debug response from <module>` → last log lines + `MODULE=model_config`; hand off.\n- `plan-daemon` sed failure → non-critical housekeeping.\n- `Session ... no longer exists on disk; follow-up will start a fresh session` → Phase 2 sessions cleaned up before Phase 3; expected lifecycle. **Fresh session → re-read context** from test log—do not carry over prior session state.\n- Install (`Failed to uninstall … RECORD file` when completions pass) → ignore unless imports break.\n- uv cache lock → concurrency, not wheel issues.\n- Wheel URL mismatch in `Dockerfile.ci` → ops/config, report.\n- Post-green CI (`ECONNRESET`, push auth) → report exact line. Pre-commit: fix real Ruff/format in `/nonexistent/omni-checkout`.\n\n## Verification (must all pass)\n**Module pytest wrapper:** Every verification line uses `bash '…/run_module_pytest.sh' …`. **Do not replace with bare `pytest`.** It applies `test_watchdog.sh`, `TEST_TIMEOUT_SEC`, logs under `\\${LOG_DIR}/tests/module_*.log`, and shared GPU lock for **every** pytest line from Phase-2 sessions.\n\n**Long-running shell waits — avoid CLI auth-token expiry:** A single `shellToolCall` blocking idle for >~120 seconds crashes mid-run with `Invalid API key — Please run /login`. The wrapper retries but each retry restarts your session.\n- **Do not** issue `sleep 480 && tail …` to wait for long tests. Use `bash '…/run_module_pytest.sh' …` (has its own watchdog + log streaming).\n- For background tasks, prefer **short polled checks** (`for i in 1 2 3 …; do sleep 30; <check>; done`).\n- Cap per-call sleep at 60 s when waiting on a known-running pid; loop with status checks.\n- **Thinking stalls are equally dangerous.** Produce incremental output (file writes, short commands, debug memory entries) to maintain heartbeat visibility. Silent agents are timed out after 7200s with `No code changes from debug agents.`\n\nRun:\nbash '/data/zhoutaichang/copilot/vllm-omni-rebase-agent/agent/lib/run_module_pytest.sh' python -c 'from vllm_omni.config.model import OmniModelConfig; from vllm_omni.engine.arg_utils import OmniEngineArgs; print('OK')'\nbash '/data/zhoutaichang/copilot/vllm-omni-rebase-agent/agent/lib/run_module_pytest.sh' -vv -s tests/entrypoints/test_stage_utils.py\nbash '/data/zhoutaichang/copilot/vllm-omni-rebase-agent/agent/lib/run_module_pytest.sh' -vv -s tests/metrics/test_stats.py\n\nIf pytest fails `unrecognized arguments` on `--cov*` only, rerun **once** without `--cov*`; that result is authoritative.\n\nLint (omni): `ruff check` (and `ruff format` if used) on changed files; **E402** (imports not at top) blocks pre-commit—fix structure, not just silence.\n\n## Upstream import validation\nAfter edits, validate all `from vllm.*` imports in changed files **and** modules pytest/registry loads indirectly:\npython3 -c \"import ast, importlib, sys\nfor fpath in sys.argv[1:]:\n    with open(fpath) as f: tree = ast.parse(f.read())\n    for node in ast.walk(tree):\n        if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith('vllm.'):\n            mod = importlib.import_module(node.module)\n            for alias in node.names:\n                assert hasattr(mod, alias.name), f'BROKEN: {fpath}:{node.lineno} from {node.module} import {alias.name}'\n    print(f'  OK  {fpath}')\n\" <list of files you changed, plus registry/runtime deps if imports are indirect>\n\nIf broken, find the new symbol in /nonexistent/vllm-checkout and update omni. Same semantics as `tasks/42_check_upstream_imports.sh`.\n\n## Failure handling (up to 3 attempts)\n\n### MANDATORY: When a test fails, FIRST check origin/main baseline\n1. Call `git_show_test_baseline \"<failing_test_path>\"` — this shows how origin/main updated this test\n2. If origin/main CHANGED the test (new params, imports, assertions) → apply the SAME changes to omni\n3. If origin/main DELETED the test → check if omni still needs it\n4. If origin/main RENAMED/SPLIT the test → find the new file and port omni modifications there\n5. Only after aligning the test with origin/main, fix product code\n6. Do NOT change product code to make a stale test pass\n7. NEVER re-create or restore a test file that origin/main deleted or renamed\n   just because the rebase harness (config.sh / a CI test command) still\n   references the old path. Harness config is NOT ground truth: if a referenced\n   test path no longer exists (pytest rc=4, \"file or directory not found\"), use\n   the renamed `*_expansion.py`-style file and report the harness drift in your\n   module summary — resurrecting deleted tests reintroduces retired code paths.\n\n### General debugging\n1. Read **full** traceback / `MISMATCH` / `BROKEN` (not watchdog-only).\n2. Classify: `unrecognized arguments` → setup. Ruff after green pytest → still blocking. Unmapped CI → mapping. **`41`/`MISMATCH`** → signature/unpack. **`42`/`BROKEN`** → import path/symbol vs `/nonexistent/vllm-checkout`.\n3. **Time check:** If > 5 minutes of wall-clock work (not test wait) on the same failure without progress, write a `.fail` with what you tried and stop. Do not repeat the same fix pattern.\n   - **\"No code changes\" trap:** If root cause is infra/config/environment, not omni code, you must still produce output. Document what you checked and why no fix is possible. Silence wastes the debug round.\n4. Map failing omni call site ↔ upstream in `/nonexistent/vllm-checkout`; `git show origin/main` for intent.\n5. Minimal compatible fix in `/nonexistent/omni-checkout`.\n6. Re-run failing check, then full verification.\n7. Report: changed files, summary, latest results, `MODULE=model_config`.\n\nInfra (`rc=124`, GPU lock, OOM kill storms): one controlled retry with snapshot; then stop with traceback.\n\n**Dirty files from other modules:** ignore; never stash/revert/commit outside `vllm_omni/config/model.py vllm_omni/engine/arg_utils.py`.\n\nMerge conflicts in your files: report paths, markers cleared, strategy—do not blame pytest until verification fails.\n\n## Killing hung tests\nNever `pgrep -f | kill` alone (broad pattern). Use:\n  bash /data/zhoutaichang/copilot/vllm-omni-rebase-agent/agent/lib/kill_test_tree.sh \"pytest.*<test_pattern>\"\nor:\n  bash /data/zhoutaichang/copilot/vllm-omni-rebase-agent/agent/lib/kill_test_tree.sh --pid <pid>\n\n## Completion contract\nOn success, write exactly:\n`MODULE_DONE model_config`\nto:\n`/fixed/signals/module.model_config.done`\n\nIf you made **out-of-scope edits** (files outside `vllm_omni/config/model.py vllm_omni/engine/arg_utils.py` but inside `/nonexistent/omni-checkout`), append to the signal file these lines verbatim:\n\nOUT_OF_SCOPE_EDITS:\n- <file_path>: <one-line reason>\n\nIf tests still fail after 3, write a **detailed, self-contained** failure summary to:\n`/fixed/signals/module.model_config.fail`\nand stop. The orchestrator reads this file to diagnose failures, so include: (a) the failing command and exit code, (b) last 20 lines of traceback/error output, (c) out-of-scope edits attempted (if any), and (d) remaining root cause."
+  }
+ ]
+}

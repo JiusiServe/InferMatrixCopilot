@@ -201,6 +201,47 @@ class Settings(BaseSettings):
     # hardcoded machine path. Override with REBASE_AGENT_ROOT if it lives elsewhere.
     rebase_agent_root: Path = _REPO_ROOT.parent / "vllm-omni-rebase-agent"
     rebase_poll_interval: int = 30
+    # v3 module-agent plan reviewer (rebase_engine/plan_review.py): empty =
+    # review on the run's own tier model — never silently skipped
+    rebase_reviewer_model: str = ""
+    # v3 remote CI (rebase_engine/ci_loop.run_ci_rounds) — neutral knobs;
+    # pipeline identities live in the adapter. Defaults are the parent's.
+    rebase_ci_retries: int = 2          # push/rebuild rounds after the first
+    rebase_ci_job_retry_max: int = 2    # per-job flaky retries per round
+    rebase_ci_poll_sec: int = 120
+    rebase_ci_timeout_sec: int = 10800  # per-build monitor budget
+    rebase_ci_settle_sec: int = 60      # webhook-build settle before create
+    # PR4d runtime-dir cutover (completion design D3), REPO-SCOPED: a
+    # comma-separated list of repo names whose knowledge stores have been
+    # MIGRATED (state/<repo>/MIGRATION_COMPLETE.json validates at resolve
+    # time — a listed repo without the marker fails CLOSED). Unlisted
+    # repos keep the legacy locations byte-identically. Flip only after
+    # `infermatrix-copilot migrate-knowledge` succeeds (RUNBOOK step).
+    imx_knowledge_runtime: str = ""
+
+    @property
+    def knowledge_runtime_repos(self) -> set[str]:
+        """Repos with the PR4d cutover ACTIVE (parsed, whitespace-safe)."""
+        return {r.strip() for r in self.imx_knowledge_runtime.split(",")
+                if r.strip()}
+
+    def expansion_env(self) -> dict[str, str]:
+        """Manifest `${VAR}` FALLBACK values derived from this Settings
+        instance (upper-cased field names): the `.env` file's configuration
+        is loaded into Settings fields without being exported, so manifest
+        expansion would otherwise see only shell-exported variables.
+        Secret-bearing fields are excluded — a manifest path must never be
+        able to pull a credential into an error message or log line."""
+        secret_markers = ("key", "token", "secret", "password")
+        out: dict[str, str] = {}
+        for name, value in self.__dict__.items():
+            if name.startswith("_") or \
+                    any(m in name.lower() for m in secret_markers):
+                continue
+            if isinstance(value, (str, Path, int, float, bool)) and \
+                    str(value):
+                out[name.upper()] = str(value)
+        return out
 
     # Repo profiles (design v2 §V2.3)
     profile_stale_days: int = 90        # dormancy window for unconfirmed facts
@@ -426,7 +467,12 @@ class Settings(BaseSettings):
     # Patch-review trigger thresholds
     large_diff_lines: int = 400
     large_diff_files: int = 8
-    high_risk_modules: list[str] = ["worker_runner", "model_executor", "scheduler"]
+    # REPO-NEUTRAL default: which modules are risky is REPO knowledge — the
+    # adapter's declared tiers win and this is only the adapter-less
+    # fallback (an unknown repo makes no risk claim). The v1-era adapter-
+    # zero module names that used to sit here were a neutrality leak
+    # (2026-08-01 audit); the adapter manifest declares them.
+    high_risk_modules: list[str] = []
 
     # Metrics (eval/METRICS_RESEARCH.md) — per-run metrics.json: CATQ = Q·S/C.
     # Reference budgets are EXPLICIT deployment assumptions (RQS3e precedent):

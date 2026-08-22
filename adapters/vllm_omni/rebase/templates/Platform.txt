@@ -1,0 +1,99 @@
+You are performing a rebase of the vllm-omni platform module. This module
+maintains omni-specific platform overrides (CUDA/ROCM/XPU/NPU/MUSA) that
+inherit from upstream vLLM platform base classes.
+
+## What platform does
+
+vLLM's platform layer provides the abstraction that lets model runners work
+across different hardware (CUDA GPUs, ROCm GPUs, Intel XPUs, Ascend NPUs).
+Each platform implements:
+- Device capability detection (compute capability, memory)
+- Attention backend selection (FlashAttention, FlashInfer, etc.)
+- IR operation priority (for kernel fusion in vLLM 0.20.0+)
+- Worker class dispatch (which worker implementation to use)
+- Device-specific optimizations (e.g. `get_default_ir_op_priority`)
+
+vllm-omni extends these with:
+- Omni-specific attention backends (diffusion attention)
+- Omni-specific worker dispatch (AR workers, generation workers)
+- Default stage config paths
+- Platform-specific free memory queries
+
+## Key principle
+
+**Platform files are mostly additive** — omni adds methods to the upstream
+base classes. Overrides are rare and should be minimal. When upstream adds
+a new method to the platform base class, omni must check whether it needs
+to implement it.
+
+## Environment
+- vLLM repo: {VLLM_PATH}  (commit: {VLLM_COMMIT})
+- vllm-omni repo: {OMNI_PATH}  (commit: {OMNI_COMMIT})
+- CUDA_VISIBLE_DEVICES={CUDA_DEVICES}
+
+## Relevant upstream commits (platform only)
+{COMMIT_LIST}
+
+## Files to check
+{OMNI_FILES}
+
+## Reference sources
+- Upstream vLLM platform base classes: {UPSTREAM_FILES}
+- vllm-omni main branch: run `git show origin/main:<path>` in {OMNI_PATH}
+
+## What to do
+
+### Step 1: Diff upstream vs omni platform methods
+For each platform (cuda, rocm, xpu), compare the upstream base class
+methods against the omni subclass methods:
+
+```bash
+# List upstream methods
+grep -oP 'def \K\w+' {VLLM_PATH}/vllm/platforms/cuda.py | sort -u
+
+# List omni methods
+grep -oP 'def \K\w+' {OMNI_PATH}/vllm_omni/platforms/cuda/platform.py | sort -u
+```
+
+### Step 2: Classify each difference
+
+For each method in upstream that is NOT in omni:
+- **Must implement**: Abstract methods or methods without defaults that
+  other omni code calls. Typically: `get_default_ir_op_priority`,
+  `check_and_update_config`, new attention backend methods.
+- **Should implement**: Methods with defaults that affect performance
+  (like IR op priority settings).
+- **Optional**: Internal helpers (`_*`), CPU-specific methods,
+  methods omni genuinely doesn't need.
+
+For each method in omni that OVERRIDES upstream:
+- Compare the omni implementation against the CURRENT upstream version.
+- If the upstream implementation changed, update the omni override to match.
+- If omni intentionally diverges, document why in the plan.
+
+### Step 3: Implement or verify
+
+For **Must implement** methods:
+1. Read the upstream implementation in {VLLM_PATH}/vllm/platforms/<name>.py
+2. Copy the core logic, adapting defaults for omni's needs
+   (e.g. omni forces `vllm_c` kernel for rms_norm on CUDA)
+3. Follow the existing pattern in omni's platform files:
+   - `CudaOmniPlatform` inherits from BOTH `OmniPlatform` and `CudaPlatformBase`
+   - New methods should call `super()` where appropriate
+   - Log changes with `logger.info()` so CI output confirms the override
+
+For **Should implement** methods:
+- Implement if it affects omni's model runners
+- Skip if it's purely cosmetic
+
+### Step 4: Verify
+- Import check: {IMPORT_CHECK}
+- Check that omni platform classes still instantiate correctly
+- Check that existing omni-specific methods still work
+
+## Important rules
+- Do NOT modify upstream vLLM platform files ({VLLM_PATH}/vllm/platforms/*)
+- Keep overrides minimal — prefer inheriting upstream behavior
+- When copying code from upstream, keep the original comment and add
+  a note like "# Copied from vllm/platforms/<name>.py v<VERSION> with omni defaults"
+- The `interface.py` OmniPlatform base class should rarely change

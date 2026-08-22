@@ -1,0 +1,60 @@
+Fix MODULE_VLLM_PATHS drift. Each line in {MISSING_LIST} is `module:relative/path` **missing** from the current upstream vLLM tree.
+
+If {MISSING_LIST} is empty or absent, output only: "No drift detected — all paths valid." to {OUTPUT_REPORT} and stop.
+
+**Task** — One verdict **per** {MISSING_LIST} line, **same order**. Do not skip any missing entry. Edit **only** the path tokens those rows imply: no new keys, no edits to non-missing tokens, no other modules.
+
+**Evidence** — Three inputs only: {MISSING_LIST}, the **Tree** block below, and {MODULE_PATH_MAP}. A path is valid only if it appears as a **verbatim** full `*.py` line **inside** Tree (repo-relative, no `:line`). All other text is noise; disregard it.
+
+**Never** derive RENAMED/REMOVED verdicts from these non-evidence sources — ignore them entirely:
+- **Downstream reports**: `path_drift_check.md`, `POST_RUN_REFINEMENT.md`, `commits_assignment*.md`, `path_sync_report*.md`, `path_sync_review_l2*.md`. A "All paths valid" in path_drift_check.md does **not** override {MISSING_LIST} — if both exist, {MISSING_LIST} is authoritative.
+- **Orchestrator state/CI**: heartbeats, watchdog, `Wave/Phase/(N/N)`, `running/done/FAILED`, `Run ID:`, `RESUME-SKIP`, `needs_human`, CI pipeline status (`PASSED`/`FAILED`/`SKIP`/`ERROR: CI pipeline`/`Pipeline tests could not be fully resolved`), test names, pytest/`--cov`, bracket paths `[file.py:317]`, timeouts, OOM, `rc=`
+- **Infra errors**: `command not found`, `No module named`, missing tmux, launcher crash, `ERROR: … Halting.` (unless immediately followed by a verbatim Tree `*.py` line)
+- **Git/Omni traces**: git ops (unless full Tree `*.py` line), `10_pick_*`, `Switched to branch`, `tasks/*.sh`, dirty worktree, `vllm_omni/.../*.py:NN`, paths under `vllm-omni/` or `/rebase/vllm-omni/`
+- **Setup noise**: install/uv/HF/tmux/GPU, `vllm_install.log`, API tables, long git status/diff, pre-commit `(no files to check)Skipped`, `# Post-Run Refinement` sections
+- **Drift stderr**: `BROKEN`, `MISMATCH`, `SKIP`, `All upstream imports resolve`, `API drift check passed`, `exit_code`, `Result:`, `Failed modules:` — **never** Tree lines
+
+**Log ordering** — Log is chronological. Later `PASSED`/`API drift check passed`/`exit_code: 0`/`Result: success` do **not** retroactively clear earlier `BROKEN`/`MISMATCH`/`ERROR: … Halting.` lines. Those earlier lines remain **not** Tree evidence. Exception: within one atomic API drift pass, a trailing `API drift check passed` makes earlier `SKIP`/`MISMATCH` in that same pass obsolete for drift detection — but never turns them into Tree paths.
+
+**Infra halts** — If `ERROR: … Halting.` immediately follows tooling failure (`command not found`, missing tmux, `No module named`, launcher crash), the blocker is environment, not tree. Do not turn BROKEN traces or that ERROR into RENAMED paths without a full matching Tree line. A `POST_RUN_REFINEMENT` summary showing `Failed modules: none` next to a halting ERROR also does not override Tree.
+
+**Hard rule** — Any path you **add or swap** must be **exactly one full line** from Tree (verbatim repo-relative `*.py`). Never invent, guess, or substring-match from non-Tree text.
+
+**Truncation** — Tree is sorted and may be **truncated** (real files exist below last shown line). If a MISSING_LIST path's parent directory does not appear anywhere in Tree → **UNCERTAIN** for that row ("truncated — tree listing does not reach this path"). If Tree is entirely missing/empty → **UNCERTAIN** for all rows.
+
+Missing:
+{MISSING_LIST}
+
+Tree — upstream vLLM `*.py` paths (repo-relative, sorted; may be truncated).
+
+**RENAMED criteria** — Exactly **one** unambiguous Tree line substitute → copy **verbatim**. Priority:
+1. Same basename + same directory → **RENAMED**
+2. Same basename, different dir, no other same-basename match → **RENAMED**
+3. Same basename with **two+** matches → **UNCERTAIN**
+4. Different basename + same directory → **UNCERTAIN**
+5. Different basename + different directory → **UNCERTAIN**
+6. Truncation hides the file → **UNCERTAIN**
+
+{TREE_SNAPSHOT}
+
+Current MODULE_VLLM_PATHS:
+{MODULE_PATH_MAP}
+
+For **each** missing line (same order as {MISSING_LIST}), output exactly one verdict:
+
+- **RENAMED** — replace missing path with **that one** Tree line; update value in corrected block (match sibling token style; strip leading `./` if map does).
+- **REMOVED** — upstream dropped it **or** another token in that module's value already covers the same scope (e.g. ancestor dir or broader glob). Remove **only** that token; preserve all other tokens and spacing. If value emptied, emit `["key"]=""` — do not drop key.
+- **UNCERTAIN** — non-`*.py` moves, multiple candidates, no verbatim Tree line, or truncation. Give **one** concrete next step (e.g. widen listing, `git log --follow <old>`, ripgrep). **No** invented paths.
+
+Multi-token values: change **only** missing token(s); preserve spacing and all other tokens.
+
+Write a short markdown report to {OUTPUT_REPORT}:
+
+1) One subsection **per** missing entry (same order as {MISSING_LIST}): verdict + one-sentence rationale.
+
+2) One blank line after the last verdict, then **one contiguous block**: the **full** corrected MODULE_VLLM_PATHS as `[key]="value"` shell lines — every key from the current map appears **exactly once**, in **the same key order**. No headings, bullets, blank lines, or commentary. Do **not** wrap in markdown code fences — output **plain** lines only.
+
+**After writing, verify:**
+- Every key from the current {MODULE_PATH_MAP} appears in the corrected block. **Never drop a key** — preserve every key; use `["key"]=""` if all its tokens were REMOVED.
+- Every token in every value either (a) matches the current map unchanged, (b) is a verbatim Tree line cited in a RENAMED verdict, or (c) is absent because it was REMOVED (REMOVED tokens excluded from corrected block).
+- No tokens were introduced other than Tree lines from RENAMED verdicts. No keys were renamed.

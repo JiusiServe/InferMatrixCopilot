@@ -1,0 +1,136 @@
+{PLAN_REVIEW_CONTRACT}
+
+## Debug request for module: {MODULE_NAME}
+
+Pipeline test failed after rebase-related changes. Fix in vllm-omni only.
+
+### Failed test
+{TEST_PATH}
+
+### Traceback
+{TRACEBACK}
+
+{DEBUG_MEMORY}
+
+### Debug-memory workflow (mandatory)
+Persistent log: `{DEBUG_MEMORY_FILE}`. The block above is pre-filtered for module=`{MODULE_NAME}` and error-key=`{ERROR_KEY}`.
+
+1. **Read** the block. If an entry matches this `error_key`, same files, or the same symptom as `{TEST_PATH}`, apply that fix first. If you diverge, quote the entry in your `.fail` rationale.
+2. **Search** if the excerpt is thin (e.g. traceback keyword missing):
+   `python3 '{DEBUG_MEMORY_CLI}' search --module={MODULE_NAME} --limit=5 "<keyword from traceback>"`
+3. **Record** before writing `{SIGNAL_DIR}/debug_module.{MODULE_KEY}.done` or `.fail` (append-only, `flock`-safe):
+   ```
+   python3 '{DEBUG_MEMORY_CLI}' record \
+     --module={MODULE_NAME} \
+     --key="<short error signature — match style of existing keys>" \
+     --tags=<csv> --files=<csv> --run={RUN_ID} \
+     --body-file=/tmp/debug_memory_entry.md
+   ```
+   Body: `### Symptom`, `### Root cause`, `### Fix`, `### Watch-outs` (1–2 bullets). Terse: grasp in <60s.
+4. **Dead-ends:** If you `.fail`, record with `tags: dead-end` and what you tried.
+
+### Your task
+
+0. **Signal-staleness precheck** — Before any triage, check if this module was already resolved:
+   - If `{SIGNAL_DIR}/debug_module.{MODULE_KEY}.done` exists → write **`.fail`** with `tags: duplicate,dead-end` (the fix was applied in a previous dispatch).
+   - If `{SIGNAL_DIR}/debug_module.{MODULE_KEY}.fail` exists → read its content. If the same root cause still applies, write **`.fail`** with `tags: duplicate,dead-end` referencing the existing `.fail`. Do not re-debug a known dead-end.
+   - If `{SIGNAL_DIR}/debug_repair.module_debug.{MODULE_KEY}.*.done` exists (a prior repair was applied to the harness for this module), do NOT short-circuit on the checks above. A fix was applied to the harness/config; you MUST proceed to step 1, classify with fresh data, and re-run the test (step 4) to verify whether the repair resolved the issue before writing any signal. The old failure data may be stale.
+   - Also check `orchestrator.log` for your run ID for `Session … no longer exists on disk` containing your module key. If your session was cleaned up, write **`.fail`** immediately — the orchestrator has moved on and will not read your output.
+
+1. **Classify the failure lane** — anchor on `ERROR:`/`Halting`, `{SIGNAL_DIR}`, this traceback, `{TEST_PATH}`. Do **not** infer from:
+   - Heartbeats / keepalives (`Module progress` with **same** tuple + `idle timeout reset` = plateau, not new failure)
+   - Banner noise (`Using level-* agent model:` per task line)
+   - Earlier-phase completeness before a later error chain (`Phase 1 complete.` ≠ module wave done)
+   - Push success when downstream Buildkite later `FAILED:`
+   - `[watchdog] CONTINUE` when `rc≠0` or `FAILED:` exists
+   - Lines from a different `rebase-*` run ID
+   - Orchestrator restart mid-job: new banner + `Phase … already done. Skipping.` with no `PASSED`/`FAILED` for that job
+   - POST_RUN refinement / `Sending failure notification` — cleanup, not root cause
+
+   **Filter watchdog noise first (common benign patterns):**
+   Before classifying, check if all "errors" in scope are only these benign patterns:
+   - `[watchdog] Agent verdict: CONTINUE` chains with no `FAILED:` / `rc≠0` / `ERROR:` test output nearby
+   - `cache_position` docstring warnings (Qwen3TTS, etc.)
+   - `You are using a model of type … to instantiate a model of type` mismatch warnings
+   - `Shutdown complete` info messages
+   - Missing optional config files (`model_index.json`, `speech_tokenizer/config.json`) — these are not test failures
+   - `hf_utils.py` / `transfer_metadata` load warnings
+   - `DEBUG` / `INFO` lines from `[v1/engine/core.py]` or `[multiproc_executor.py]` during graceful shutdown
+
+   If **only** the above are visible (no pytest `FAILED`, no `ERROR:` with `rc≠0`, no traceback with omni frames), then the failure lies outside this window. Write **`.fail`** quoting the terminal `ERROR:` line — do not patch omni for an invisible failure.
+
+   **Common lanes:**
+
+   | Lane | How to recognize | Action |
+   |------|------------------|--------|
+   | **Aggregate / all-modules failure** | `ERROR: Module rebase failed. Check signals` + all modules fail **simultaneously** in one poll tick (e.g. `(0/6)` → `(6/6)` with no gradual accumulation, no `Timeout waiting for modules`). `{SIGNAL_DIR}` has **no** `module.{MODULE_KEY}.{done,fail}` — the agent was never dispatched or died before writing. | Read `{SIGNAL_DIR}` listing; check `orchestrator.log` for `Launched agent in tmux session: module-{MODULE_KEY}` activity. Check **2–3 other modules' `.fail`** files under `{SIGNAL_DIR}` for common patterns. If all show same infra error (e.g. `tmux: not found`, common `ModuleNotFoundError`), record `infra,dead-end` and **`.fail`** — do not patch omni for infrastructure failure. |
+   | **Merge conflict (Phase 1)** | `ERROR: Merge conflicts detected in:` + paths, `Automatic merge failed; fix conflicts`, `ERROR: L1 agent could not resolve all merge conflicts` | Resolve in `{OMNI_PATH}` only. **`.fail`** if out of scope. |
+   | **API drift (41)** | `MISMATCH` / non-zero exit from `tasks/41_check_api_drift.sh` | Fix every mismatch vs `{VLLM_PATH}`; re-run full 41. Reconcile **last** attempt — earlier `MISMATCH` void if later same-run 41 exits 0. |
+   | **Import break (42)** | `BROKEN` / `ERROR: N broken upstream import(s)` from `tasks/42_check_upstream_imports.sh`. **Last** attempt per run wins. | Fix import paths vs `{VLLM_PATH}`; re-run full 42. If `All upstream imports resolve` after a fix, the earlier `BROKEN` is stale — anchor on latest. |
+   | **CI mapping / routing** | `Cannot map CI test … to module`, `Marking needs_human` **without** omni pytest traceback, `Pipeline tests could not be fully resolved` without per-job `FAILED`/`PASSED` | **`.fail`** — quote `ERROR` lines; do not patch omni. |
+   | **Collection error (omni)** | `FAILED: … (rc=2)` naming dotted `tests.*` under `{OMNI_PATH}` with `expected:` paths | Restore missing files/packages via `cd {OMNI_PATH} && git show origin/main:<path>`. |
+   | **Commit hook / lint stall** | `ERROR: Failed to commit CI debug fixes`, `ERROR: No fixes to push` + `::error title=Ruff` / `trailing-whitespace` / `ruff-format` after agent edits. `ERROR: 0 CI failure(s) remain unresolved.` + `ERROR: Failed to commit` — later ERROR wins. | Fix lint/format in `{OMNI_PATH}`. Keep imports at module top (avoids **E402** after auto-format). |
+   | **Real omni test failure** | Pytest `FAILED` + traceback rooted in omni (or omni-called) frames | Proceed to step 2. |
+   | **Watchdog noise / benign pattern** | `[watchdog] Agent verdict: CONTINUE` chains with only benign messages: `Shutdown complete`, `cache_position` docstring warning, missing optional config, `You are using a model of type … to instantiate`, `hf_utils.py` load warnings, or `[v1/engine/core.py]` INFO lines. No `FAILED:`, `ERROR:` with `rc≠0`, or pytest traceback proximate. | **`.fail`** quoting the terminal `Pipeline tests could not be fully resolved` / `ERROR:` line. Do not patch omni — the root failure is outside this window. |
+   | **Signal death / killed** | `rc=143` (SIGTERM), `Killing pytest`, `watchdog KILL`, `rc=-15` | Read above kill for trigger. If `CRITICAL`/`EngineDeadError` preceded kill, proceed to step 2 (debug the trigger error). If bare `rc=143` with no preceding error, treat as infra timeout/OOM — retry once, then **`.fail`**. |
+   | **Infra / environment** | `tmux: command not found`, `FastAPI.state`, `Address already in use`, OOM (`rc=124`), GPU lock, `uv abort`, `CI test deps missing`, `Broken vLLM binary` / `undefined symbol` in `{VLLM_PATH}/vllm/_C.abi3.so`, supervisor dispatch error (`Error: Input must be provided`) | One retry (reinstall vLLM if binary issue); then **`.fail`**. Do not rewrite omni for infra. |
+   | **Secondary shell error** | `FAILED: … (rc=…)` + `test_runner.sh` / `integer expression expected` | Quote **both** primary and secondary in **`.fail`** — do not drop primary chain. |
+   | **Phase 1 pre-wave (other)** | Dirty tree / `01_guard_branch_clean` / L2 with paths only — no pytest, no `{TEST_PATH}` output | **`.fail`** with halt lines and paths. |
+   | **Phase 3 pipeline stall** | `Running [i/N]: …` + `Sent message…` + `Waiting for module agent …` + `Pipeline tests could not be fully resolved` **without** pytest `FAILED` for that job | **`.fail`** quoting last `Running [i/N]:` and `Sent…` / `Waiting…`. Do not patch omni on this banner alone. |
+   | **Tool-call plateau / approval locked** | Same tool call (e.g. Bash command) produces the same error (approval, permission, not-found) ≥3 times in a row with no different outcome. Or the agent is stuck retrying variants of the same blocked command. | Write **`.fail`** immediately — do not retry with different syntax. Record `tags: tool-blocked,dead-end` with what was attempted and the error shown. Do not patch omni for tool-access restrictions. |
+   | **Dead-end / cannot fix** | After `{MAX_DEBUG_RETRIES}`, out-of-scope blocker, or same diff same failure on re-attempt | **`.fail`** with traceback, what was tried, remaining root cause. |
+
+   **No signal from this module?** If `{SIGNAL_DIR}` is empty or has no `module.{MODULE_KEY}.{done,fail}`:
+   - The orchestrator never dispatched this agent, OR
+   - It died at startup, OR
+   - It ran but was killed before writing a signal (leaving the run script's fallback `MODULE_AGENT_EXITED_WITHOUT_SIGNAL` generic message).
+   Check `orchestrator.log` for `Launched agent in tmux session: module-{MODULE_KEY}`. If absent/followed by immediate ERROR, write **`.fail`** with the orchestrator dead-end excerpt — do not patch omni. If launched but no signal exists, the agent was likely stuck (e.g. tool-approval loop) and timed out — the fallback `.fail` already captures this; do **not** re-dispatch.
+
+   **Plateau in `.fail`:** one-line summary (first/last timestamp, stable tuple) — never a wall of per-minute lines.
+
+2. **Triage the failure (real omni tests)**
+   Anchor on the **first concrete** exception in omni frames. Read **last** `FAILED` / `rc=` / `ERROR:` + traceback for **this** run. Stderr must match the pytest invocation. **Watchdog:** `KILL` / `Killing pytest` ⇒ read immediately above for the trigger. `CRITICAL`/`EngineDeadError` before kill → debug that error; bare `rc=143` → infra timeout/OOM. **Pre-check:** missing `{TEST_PATH}` ⇒ **`.fail`** (mapping). **Orchestrator sync:** `Aborting` / `would be overwritten` ⇒ `cd {OMNI_PATH} && git log -1 --oneline` and merge state. **Job name** may differ from `{MODULE_NAME}` — follow this task's `module-*` session.
+
+3. **Fix**
+   - Edit **only** under `{OMNI_PATH}`. Never `{VLLM_PATH}`.
+   - Cross-module breaks ⇒ fix those files or explain in **`.fail`**.
+   - For upstream intent: `cd {OMNI_PATH} && git show origin/main:<path>`.
+   - Restore missing `tests/…` helpers when the runner expects paths under `{OMNI_PATH}`.
+   - Init / orchestrator / pipeline-resolution-only blockers ⇒ **`.fail`**, not unrelated omni churn.
+   - Preserve omni-specific behavior; no broad `try/except` hiding regressions.
+
+4. **Verify**
+   ```
+   bash '<agent>/lib/run_module_pytest.sh' -vv -s {TEST_PATH}
+   ```
+   Then:
+   {MODULE_TESTS}
+   - Prefer `-k` / single node id. Export `VLLM_PATH`/`OMNI_PATH` as `{VLLM_PATH}`/`{OMNI_PATH}` for helpers.
+   - **Import hygiene:** fix imports/fixtures; keep all imports at module top (avoids **E402** after hooks reorder). Ref: `tasks/42_check_upstream_imports.sh`.
+   - **Lint:** `ruff check` (`ruff format` if used) on changed files.
+   - **Same diff, same failure** ⇒ one **`.fail`**, not loops.
+   - If GPU repro cannot finish (timeout/OOM), still write a signal with verdict, exit code, shortest command, ~50 relevant lines, lock/timing context.
+
+5. **Signal promptly**
+   - **Do NOT stall the wave.** Missing a signal stalls the entire pipeline (Phase 3 `Waiting for module agent …`). The orchestrator waits until wall-clock timeout (~2h) before detecting a hung agent. Write **`.fail`** within 15 minutes if blocked — a verbose `.fail` is infinitely more useful than a silent hang.
+   - **Abort long operations.** If a test, GPU repro, or install runs >15 minutes without visible progress (new output lines), abort it and write **`.fail`** with partial output. Do not wait for completion.
+   - **Tool-call repetition guard:** If the same tool call produces the same error ≥3 times without a different intermediate result, write **`.fail`** with the attempted calls and error text. Do not try different syntax or flags for the same blocked command.
+   - **Fallback signal:** If you exit without writing `.done`/`.fail`, the run script writes a generic `MODULE_AGENT_EXITED_WITHOUT_SIGNAL` fallback. Your descriptive **`.fail`** is far more useful — write it before the session ends.
+   - Clean tree before signal: `cd {OMNI_PATH} && git status --porcelain`. Remove pytest strays (e.g. untracked `**/stage_configs/*_<digits>.yaml`); `git stash push -u` or delete; re-check.
+   - Write `.done`/`.fail` **as soon as** you have a fix, repro verdict, or blocker.
+   - Parent polls **only** `{SIGNAL_DIR}/debug_module.{MODULE_KEY}.done` or `.fail` — never under `{OMNI_PATH}`.
+
+### Rules
+- **Only edit files in {OMNI_PATH}.** Never modify {VLLM_PATH} (upstream read-only).
+- Do not modify copyright headers, license text, or license files.
+- **Temporary files**: Create helper scripts/test files under `\${AGENT_TMP}`, never in `{OMNI_PATH}` or `{VLLM_PATH}`. `\${AGENT_TMP}` is auto-cleaned.
+
+### On completion (orchestrator waits on these paths only)
+Parent polls **only** `{SIGNAL_DIR}/debug_module.{MODULE_KEY}.done` or `{SIGNAL_DIR}/debug_module.{MODULE_KEY}.fail`.
+
+- **Do not** create `{OMNI_PATH}/.done`, repo-root `touch .done`, or any `.done`/`.fail` under `{OMNI_PATH}` — **ignored**; run hangs until timeout.
+- **Success:** create exactly:
+  - Path: `{SIGNAL_DIR}/debug_module.{MODULE_KEY}.done`
+  - Content: `DEBUG_MODULE_DONE {MODULE_NAME}`
+  - Example: `printf '%s\n' 'DEBUG_MODULE_DONE {MODULE_NAME}' > '{SIGNAL_DIR}/debug_module.{MODULE_KEY}.done'`
+- **Cannot fix:** `{SIGNAL_DIR}/debug_module.{MODULE_KEY}.fail` (plain text).

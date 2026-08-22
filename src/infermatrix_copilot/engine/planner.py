@@ -78,7 +78,8 @@ class Planner:
         write-capable / template-less kind has no playbook. Returns a Resolution."""
         playbook = self.store.find(spec.kind, spec.repo, capabilities)
         if playbook is None and capabilities is not None:
-            gaps = self.store.missing_capabilities(spec.kind, capabilities)
+            gaps = self.store.missing_capabilities(spec.kind, capabilities,
+                                                   repo=spec.repo)
             if gaps and spec.kind not in READ_ONLY_KINDS:
                 # a vetted playbook exists but the repo profile can't feed it:
                 # declared degradation, not silent failure (§V2.2.4)
