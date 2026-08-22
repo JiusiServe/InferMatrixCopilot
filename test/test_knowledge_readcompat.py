@@ -87,6 +87,54 @@ def test_prelude_blocks_on_unexpanded_env_var(settings, trace, tmp_path,
     assert not r.ok and "did not expand" in r.summary
 
 
+def test_manifest_expansion_reads_adapter_declared_env_keys(
+        tmp_path, monkeypatch):
+    """Live-launch finding (2026-08-23): adapter-declared variables
+    (VLLM_OMNI_VENV-class) are NOT Settings fields — `extra="ignore"`
+    drops them at load — yet the manifest contract says `.env` is where
+    they live. `expansion_env` must re-read the raw env files for them:
+    same secret filter, Settings fields winning on a name collision."""
+    from infermatrix_copilot.adapters.base import expand_path
+    from infermatrix_copilot.config import Settings
+
+    env_file = tmp_path / "adapter.env"
+    env_file.write_text(
+        'TARGET_REPO_VENV="/ws/venv"\n'
+        'TARGET_SECRET_TOKEN="never-this"\n'
+        # indirection must not smuggle the secret through a benign name
+        'TARGET_INDIRECT="${TARGET_SECRET_TOKEN}"\n'
+        'REBASE_AGENT_ROOT="/from/the/file"\n', encoding="utf-8")
+
+    class FileSettings(Settings):
+        model_config = dict(Settings.model_config,
+                            env_file=(str(env_file),))
+
+    # pydantic's canonical single-path forms (bare str / Path) must load
+    # identically - never be iterated character-by-character
+    class StrFileSettings(Settings):
+        model_config = dict(Settings.model_config, env_file=str(env_file))
+
+    class PathFileSettings(Settings):
+        model_config = dict(Settings.model_config, env_file=env_file)
+
+    monkeypatch.delenv("TARGET_REPO_VENV", raising=False)
+    monkeypatch.delenv("REBASE_AGENT_ROOT", raising=False)
+    extra = FileSettings().expansion_env()
+    assert extra["TARGET_REPO_VENV"] == "/ws/venv"
+    assert "TARGET_SECRET_TOKEN" not in extra      # secret filter holds
+    # interpolation stays OFF: the reference is literal, never the secret
+    assert extra["TARGET_INDIRECT"] == "${TARGET_SECRET_TOKEN}"
+    for single_form in (StrFileSettings, PathFileSettings):
+        single = single_form().expansion_env()
+        assert single["TARGET_REPO_VENV"] == "/ws/venv"
+        assert "TARGET_SECRET_TOKEN" not in single
+    # a name that IS a Settings field resolves through the field (one
+    # source of truth for anything Settings owns)
+    assert extra["REBASE_AGENT_ROOT"] == "/from/the/file"
+    assert expand_path("${TARGET_REPO_VENV}/bin",
+                       extra=extra) == "/ws/venv/bin"
+
+
 def test_manifest_expansion_falls_back_to_settings(settings, tmp_path,
                                                    monkeypatch):
     """Live-smoke finding (2026-08-20): `.env` keys load into Settings

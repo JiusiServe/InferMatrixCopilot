@@ -231,9 +231,37 @@ class Settings(BaseSettings):
         is loaded into Settings fields without being exported, so manifest
         expansion would otherwise see only shell-exported variables.
         Secret-bearing fields are excluded — a manifest path must never be
-        able to pull a credential into an error message or log line."""
+        able to pull a credential into an error message or log line.
+
+        Adapter-declared variables (VLLM_OMNI_REPO, VLLM_OMNI_VENV, ...) are
+        NOT Settings fields — `extra="ignore"` drops them at load — yet the
+        manifest contract says `.env` is where they live. Re-read the raw
+        env files for those, same secret filter, Settings fields winning on
+        a name collision (they already reflect process-env precedence)."""
         secret_markers = ("key", "token", "secret", "password")
         out: dict[str, str] = {}
+        try:
+            from dotenv import dotenv_values
+        except ImportError:                      # pragma: no cover
+            dotenv_values = None
+        env_files = self.model_config.get("env_file") or ()
+        if isinstance(env_files, (str, Path)):
+            env_files = (env_files,)     # pydantic accepts a bare path too
+        if dotenv_values is not None:
+            # later files in model_config's env_file tuple override earlier
+            # ones, mirroring pydantic-settings' own precedence
+            for env_file in env_files:
+                try:
+                    # interpolate=False (pydantic-settings' own default):
+                    # `${OTHER}` references stay literal, so a secret can
+                    # never surface through a non-secret-named key
+                    raw = dotenv_values(env_file, interpolate=False)
+                except OSError:                  # pragma: no cover
+                    continue
+                for key, value in raw.items():
+                    if value and not any(m in key.lower()
+                                         for m in secret_markers):
+                        out[key.upper()] = value
         for name, value in self.__dict__.items():
             if name.startswith("_") or \
                     any(m in name.lower() for m in secret_markers):
