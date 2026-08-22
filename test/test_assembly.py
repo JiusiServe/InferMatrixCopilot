@@ -621,6 +621,11 @@ def test_v3_prelude_inits_runtime(v3_env, settings, trace, tmp_path,
     from infermatrix_copilot.rebase_engine.runctx import CheckoutLock
     _, _, repo, run_dir = v3_env
     monkeypatch.delenv("VLLM_UPSTREAM_REPO", raising=False)
+    # "without upstream" means absent from the process env AND the
+    # .env fallback (config.expansion_env) - isolate from the
+    # developer's file
+    monkeypatch.setattr(type(settings), "expansion_env",
+                        lambda self: {})
     registry = register_builtin_steps(StepRegistry())
     prelude = registry.get("rebase.v3_prelude")
     upstream = tmp_path / "upstream"
@@ -1226,6 +1231,11 @@ def test_v3_prelude_prepared_tree_preconditions(v3_env, settings, trace,
     from infermatrix_copilot.engine.steps import register_builtin_steps
     _, _, repo, run_dir = v3_env
     monkeypatch.delenv("VLLM_UPSTREAM_REPO", raising=False)
+    # "without upstream" means absent from the process env AND the
+    # .env fallback (config.expansion_env) - isolate from the
+    # developer's file
+    monkeypatch.setattr(type(settings), "expansion_env",
+                        lambda self: {})
     registry = register_builtin_steps(StepRegistry())
     prelude = registry.get("rebase.v3_prelude")
 
@@ -1695,6 +1705,9 @@ def test_v3_wheel_installs_into_target_venv(v3_env, settings, trace,
 
     # unconfigured venv: BLOCKED
     monkeypatch.delenv("VLLM_OMNI_VENV")
+    # "unconfigured" now means absent from the process env AND the .env
+    # fallback (config.expansion_env) - isolate from the developer's file
+    monkeypatch.setattr(type(settings), "expansion_env", lambda self: {})
     r = asyncio.run(registry.get("rebase.v3_wheel").handler(ctx_for("w2")))
     assert not r.ok and "venv" in r.summary
     asyncio.run(_finalize_run(tmp_path / "wheel-w2"))
@@ -1743,6 +1756,9 @@ def test_v3_test_loop_requires_target_venv(v3_env, settings, trace,
     from infermatrix_copilot.engine.steps import register_builtin_steps
     _, _, repo, _ = v3_env
     monkeypatch.delenv("VLLM_OMNI_VENV")
+    # "unconfigured" now means absent from the process env AND the .env
+    # fallback (config.expansion_env) - isolate from the developer's file
+    monkeypatch.setattr(type(settings), "expansion_env", lambda self: {})
     registry = register_builtin_steps(StepRegistry())
     rd = tmp_path / "novenv-run"
     rd.mkdir()

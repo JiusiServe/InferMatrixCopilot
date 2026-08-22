@@ -105,11 +105,13 @@ def _tier_client(ctx: StepContext):
     return AsyncAnthropic(**kwargs), target
 
 
-def _target_venv(manifest: dict) -> str:
+def _target_venv(manifest: dict, extra: dict | None = None) -> str:
     """The TARGET repo's virtualenv from adapter data (env-expanded).
-    Empty = not configured."""
+    Empty = not configured. `extra` is the Settings-derived fallback for
+    `${VAR}`s the shell did not export (adapter-declared `.env` keys)."""
     from ...adapters.base import expand_path
-    return expand_path((manifest.get("repo") or {}).get("venv", ""))
+    return expand_path((manifest.get("repo") or {}).get("venv", ""),
+                       extra=extra)
 
 
 def _venv_declared(manifest: dict) -> bool:
@@ -142,7 +144,7 @@ def _target_test_env(ctx: StepContext, manifest: dict,
     copilot's own virtualenv."""
     import os
     from ...testing.env_plan import build_subprocess_env
-    venv = _target_venv(manifest)
+    venv = _target_venv(manifest, extra=ctx.settings.expansion_env())
     return build_subprocess_env(
         venv=Path(venv) if venv else None,
         cuda_visible_devices=os.environ.get("CUDA_VISIBLE_DEVICES"),
@@ -161,7 +163,7 @@ def _agent_shell_env(ctx: StepContext, manifest: dict, repo_root: str,
     environment."""
     import os
     from ...testing.env_plan import build_subprocess_env
-    venv = _target_venv(manifest)
+    venv = _target_venv(manifest, extra=ctx.settings.expansion_env())
     # HF token only on the manifest's EXPLICIT opt-in (Rev 8 §4:
     # validation.requires_hf_token — gated-model verification needs it;
     # every other adapter keeps the token scrubbed)
@@ -768,7 +770,8 @@ async def _v3_prelude(ctx: StepContext) -> StepResult:
     from ...adapters.base import expand_path
     upstream = ctx.state.get("upstream_origin_path", "") \
         or ctx.state.get("upstream_path", "") or expand_path(
-        (manifest.get("upstream") or {}).get("repo_path", ""))
+        (manifest.get("upstream") or {}).get("repo_path", ""),
+        extra=ctx.settings.expansion_env())
     if upstream:
         updates["upstream_origin_path"] = upstream
         ctx.state.setdefault("upstream_origin_path", upstream)
@@ -915,7 +918,7 @@ async def _v3_wheel(ctx: StepContext) -> StepResult:
     upstream = _ensure_upstream_scratch(ctx)
     if isinstance(upstream, StepResult):
         return upstream
-    venv = _target_venv(manifest)
+    venv = _target_venv(manifest, extra=ctx.settings.expansion_env())
     if not venv:
         return StepResult(False, FailureKind.BLOCKED,
                           "the wheel workflow requires the target venv "
@@ -1233,7 +1236,8 @@ async def _v3_test_loop(ctx: StepContext) -> StepResult:
     import os
     from ...testing.runner import TestJob, TestRunner
     from ...testing.watchdog import WatchdogPatterns
-    if _venv_declared(manifest) and not _target_venv(manifest):
+    if _venv_declared(manifest) and not _target_venv(
+            manifest, extra=ctx.settings.expansion_env()):
         return StepResult(False, FailureKind.BLOCKED,
                           "the adapter DECLARES a runtime venv (repo.venv) "
                           "but its env var is unset — raw manifest commands "
@@ -1909,7 +1913,8 @@ async def _v3_ci(ctx: StepContext) -> StepResult:
         job = _local_jobs().get(slug)
         if not job or not is_runnable_command(job.get("command", "")):
             return "unavailable"
-        if _venv_declared(manifest) and not _target_venv(manifest):
+        if _venv_declared(manifest) and not _target_venv(
+                manifest, extra=ctx.settings.expansion_env()):
             return "unavailable"
         import os
         from ...testing.runner import TestRunner

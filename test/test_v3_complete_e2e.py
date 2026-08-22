@@ -113,6 +113,9 @@ def complete_env(settings, tmp_path, monkeypatch):
     # no parent checkout in this fixture world; a declared knowledge layer
     # would (correctly) fail the prelude closed
     manifest["rebase"].pop("knowledge", None)
+    # campaign pins name real upstream branches; the fixture upstream only
+    # has its default branch
+    (manifest.get("upstream") or {}).pop("target_branch", None)
     (adir / "manifest.yaml").write_text(yaml.safe_dump(manifest))
     shutil.copytree(REPO_ROOT / "adapters" / "vllm_omni" / "rebase",
                     adir / "rebase")
@@ -120,8 +123,18 @@ def complete_env(settings, tmp_path, monkeypatch):
     shutil.copy(REPO_ROOT / "playbooks" / "repo-rebase-v3.yaml",
                 settings.playbooks_dir / "repo-rebase-v3.yaml")
 
-    monkeypatch.setenv("VLLM_OMNI_VENV", str(tmp_path / "omni-venv"))
-    monkeypatch.setenv("VLLM_UPSTREAM_REPO", str(upstream))
+    # Deployment reality (live-launch finding 2026-08-23): adapter-declared
+    # vars live in `.env` ONLY — never exported — so Settings.expansion_env
+    # is the sole resolver. Exporting them here masked bare expand_path
+    # call sites; the fixture now provides them the way production does.
+    monkeypatch.delenv("VLLM_OMNI_VENV", raising=False)
+    monkeypatch.delenv("VLLM_UPSTREAM_REPO", raising=False)
+    base_expansion = type(settings).expansion_env
+    monkeypatch.setattr(
+        type(settings), "expansion_env",
+        lambda self: {**base_expansion(self),
+                      "VLLM_OMNI_VENV": str(tmp_path / "omni-venv"),
+                      "VLLM_UPSTREAM_REPO": str(upstream)})
     registry = register_builtin_steps(StepRegistry())
     store = PlaybookStore(settings.playbooks_dir, registry)
 

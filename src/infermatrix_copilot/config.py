@@ -233,11 +233,12 @@ class Settings(BaseSettings):
         Secret-bearing fields are excluded — a manifest path must never be
         able to pull a credential into an error message or log line.
 
-        Adapter-declared variables (VLLM_OMNI_REPO, VLLM_OMNI_VENV, ...) are
-        NOT Settings fields — `extra="ignore"` drops them at load — yet the
-        manifest contract says `.env` is where they live. Re-read the raw
-        env files for those, same secret filter, Settings fields winning on
-        a name collision (they already reflect process-env precedence)."""
+        Adapter-declared variables (a target repo path, its runtime venv,
+        an external agent root, ...) are NOT Settings fields —
+        `extra="ignore"` drops them at load — yet the manifest contract
+        says `.env` is where they live. Re-read the raw env files for
+        those, same secret filter, Settings fields winning on a name
+        collision (they already reflect process-env precedence)."""
         secret_markers = ("key", "token", "secret", "password")
         out: dict[str, str] = {}
         try:
