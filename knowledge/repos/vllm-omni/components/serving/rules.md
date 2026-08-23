@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-08-23
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #3576", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5157", "PR #6138", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/metrics/prometheus.py]
+sources: ["PR #3576", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5157", "PR #5670", "PR #6138", "PR #6202", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/metrics/prometheus.py]
 confidence: high
 ---
 
@@ -21,11 +21,11 @@ confidence: high
 |---|---|---|
 | `extra_body`、flattened/nested/canonical/legacy 输入、alias、`negative_prompt`、diffusion request extras | `request-contract`：`SERV-4a`–`4h` | `vllm_omni/entrypoints/openai/diffusion_request_utils.py::{normalize_diffusion_request_args,apply_normalized_diffusion_request_extra_args}` → `serving_chat.py::{OmniOpenAIServingChat._preprocess_chat,OmniOpenAIServingChat.generate_diffusion_images}` |
 | `chat_template_kwargs`、raw HTTP/SDK `extra_body`、text/audio modalities、choices、空音频 | `chat-multimodal-contract`：`SERV-4c` + 命中模型规则 | upstream `ChatCompletionRequest` → `serving_chat.py::{OmniOpenAIServingChat._preprocess_chat,OmniOpenAIServingChat.chat_completion_full_generator,OmniOpenAIServingChat._create_text_choice,OmniOpenAIServingChat._create_audio_choice}` |
-| endpoint restriction、unsupported route、capability、completions/chat/speech 400 | `endpoint-capability`：`SERV-4c`, `SERV-4d` | `config/endpoint_policy.py::{OmniServingCapability,shutdown_unsupported_routes}` → `config/config_factory.py::StageConfigFactory.get_pipeline_endpoint_restrictions` → `engine/async_omni_engine.py::AsyncOmniEngine.__init__` → `entrypoints/openai/api_server.py::build_app` |
+| endpoint restriction、route/app-state guard、capability、公开 400 | `endpoint-capability`：`SERV-4c`, `SERV-4d`, `SERV-5d` | endpoint policy → `api_server.py::build_app` assembled app → public handler |
 | sleep/wake、partial stage/tag、idempotency、ACK、generation admission | `engine-lifecycle`：`SERV-5a`, `SERV-5b` | `entrypoints/async_omni.py::{AsyncOmni.sleep,AsyncOmni.wake_up,AsyncOmni.generate}` → `worker/base.py::{handle_sleep_task,handle_wake_task}` / `diffusion/worker/diffusion_worker.py` |
 | serving class/factory 重构、optional adapter、diffusion/no-TTS 实例、warmup | `engine-lifecycle`：`SERV-5c` | `entrypoints/openai/serving_speech.py` 的所有 factory/`__new__` 路径 → `warmup`、voice upload/list、speech request caller |
 | SSE/streaming speech、audio format、PCM/WAV、speed、首 chunk 前校验 | `streaming-format`：`SERV-1a`, `SERV-1b` | `vllm_omni/entrypoints/openai/protocol/audio.py::{OpenAICreateSpeechRequest.validate_streaming_constraints,StreamingSpeechSessionConfig.validate_streaming_constraints}` → `serving_speech.py::{OmniOpenAIServingSpeech._validate_speech_streaming_request,OmniOpenAIServingSpeech.create_speech}` |
-| `ref_audio`、x-vector/ICL、artifact cache、readiness、失败后 engine 存活 | `artifact-readiness`：`SERV-3a`, `SERV-3b` | `vllm_omni/entrypoints/openai/serving_speech.py::{_qwen3_tts_can_use_ref_audio_artifact_only,_track_ref_audio_artifact_warmup,_mark_ref_audio_artifact_ready_for_request,_discard_ref_audio_artifact_ready_if_unreferenced}` |
+| `ref_audio`、x-vector/ICL、content identity、artifact cache/readiness | `artifact-readiness`：`SERV-3a`–`3c` | `serving_speech.py` reference resolve/decode/cache → adapter speaker cache → prefix salt |
 | Prometheus、waiting/running gauge、replica stats、throttle、collector lifecycle | `metrics-lifecycle`：`SERV-2a`, `SERV-2b` | `vllm_omni/entrypoints/omni_base.py::{OmniBase._log_summary_and_cleanup,OmniBase._process_stage_metrics_message}` → `vllm_omni/metrics/prometheus.py::{OmniPrometheusMetrics.__init__,set_running,set_waiting}` |
 
 | 审查组 | 什么时候触发 | 规则 ID |
@@ -33,9 +33,9 @@ confidence: high
 | `core` | 每次 serving 审查 | `SERV-4c` |
 | `streaming-format` | SSE、audio streaming、format/default/capability | `SERV-1a`, `SERV-1b` |
 | `metrics-lifecycle` | metrics、gauge、replica、collector | `SERV-2a`, `SERV-2b` |
-| `artifact-readiness` | artifact cache、capability、ready/mark/discard | `SERV-3a`, `SERV-3b` |
+| `artifact-readiness` | artifact/content cache、capability、ready/mark/discard | `SERV-3a`, `SERV-3b`, `SERV-3c` |
 | `chat-multimodal-contract` | chat template kwargs、SDK flatten、text/audio response shape | `SERV-4c` + 命中模型规则 |
-| `endpoint-capability` | endpoint restriction、unsupported route、公开 400 | `SERV-4c`, `SERV-4d` |
+| `endpoint-capability` | endpoint restriction、route/app-state guard、公开 400 | `SERV-4c`, `SERV-4d`, `SERV-5d` |
 | `engine-lifecycle` | sleep/wake、partial stage/tag、ACK、generation admission、factory 状态矩阵 | `SERV-5a`, `SERV-5b`, `SERV-5c` |
 | `request-contract` | 请求字段、来源、冲突、dispatcher、consumer view | `SERV-4a`, `SERV-4b`, `SERV-4c`, `SERV-4d`, `SERV-4e`, `SERV-4f`, `SERV-4g`, `SERV-4h` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `SERV-0a`, `SERV-0b` |
@@ -99,6 +99,17 @@ confidence: high
   counterfactual failure。
 - 验收：单测枚举状态迁移；E2E 复现原始坏顺序、证明修复后存活，并在回退修复代码时
   重新出现目标错误，避免测试空跑。 ^[PR #5157]
+
+### SERV-3c — 内容身份必须原子贯穿全部缓存层
+
+- 触发：本地/inline reference audio 或其他 locator 同时经过 decode、speaker/code 与 prefix cache。
+- 强制：先通过 allowed-local-media gate，再规范解析 URI/stat；本地身份至少含 size 与
+  `st_mtime_ns`。decoded payload 与 identity 一次计算、一起返回，并把同一身份贯穿每层 cache key
+  和 prefix salt；named voice 加 inline ref 按真实分支区分。
+- 禁止：raw locator 充当内容 salt；授权前 stat；两次独立 decode/stat；用 client-controlled
+  locator 建无界共享 side table；把完整 base64/路径写日志。
+- 验收：同长度覆盖、并发改写、named+inline、speaker cache 和 prefix hit 均不复用旧内容；
+  非法路径不 stat，日志只含截断值且命中真实 logger hierarchy。 ^[PR #5670]
 
 ## 请求输入合同
 
@@ -204,6 +215,15 @@ confidence: high
 - 验收：至少覆盖普通 adapter、无 adapter 和 bypass-`__init__` factory 三类实例，并实际调用
   startup warmup、voice list/upload 与对应 request route；每条路径保持重构前的成功或结构化
   错误合同，不得出现 `AttributeError`。 ^[PR #6138]
+
+### SERV-5d — 应用 wiring guard 检查可用性而非属性名
+
+- 触发：assembled app 的 route/middleware 依赖 `app.state` handler 或 factory wiring。
+- 强制：mandatory state 同时检查属性存在且非 `None`；guard 测试通过 assembled app/公开 handler
+  观察行为，并覆盖应用实际暴露的方法和 middleware inner-app 调用。
+- 禁止：`hasattr` 接受显式 `None`；测试绑定可搬迁私有 symbol/单 router；用恒真断言证明 wiring。
+- 验收：把 handler 置空、移除 route/method、绕过 inner app 三类 mutation 均使 guard 失败；
+  正常 app 的 HEAD/OPTIONS census 与必需 state key 完整。 ^[PR #6202]
 
 请求到 engine 的边界见 [Serving architecture](architecture.md)；公开协议通用检查见
 [review contracts](../../../../general/review/guides/reviewer-lens-contracts.md)。
