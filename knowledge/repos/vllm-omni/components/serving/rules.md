@@ -1,10 +1,10 @@
 ---
 title: "Serving 规则"
 created: 2026-07-20
-updated: 2026-07-31
+updated: 2026-08-23
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #3576", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5157", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/metrics/prometheus.py]
+sources: ["PR #3576", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5157", "PR #6138", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/metrics/prometheus.py]
 confidence: high
 ---
 
@@ -23,6 +23,7 @@ confidence: high
 | `chat_template_kwargs`、raw HTTP/SDK `extra_body`、text/audio modalities、choices、空音频 | `chat-multimodal-contract`：`SERV-4c` + 命中模型规则 | upstream `ChatCompletionRequest` → `serving_chat.py::{OmniOpenAIServingChat._preprocess_chat,OmniOpenAIServingChat.chat_completion_full_generator,OmniOpenAIServingChat._create_text_choice,OmniOpenAIServingChat._create_audio_choice}` |
 | endpoint restriction、unsupported route、capability、completions/chat/speech 400 | `endpoint-capability`：`SERV-4c`, `SERV-4d` | `config/endpoint_policy.py::{OmniServingCapability,shutdown_unsupported_routes}` → `config/config_factory.py::StageConfigFactory.get_pipeline_endpoint_restrictions` → `engine/async_omni_engine.py::AsyncOmniEngine.__init__` → `entrypoints/openai/api_server.py::build_app` |
 | sleep/wake、partial stage/tag、idempotency、ACK、generation admission | `engine-lifecycle`：`SERV-5a`, `SERV-5b` | `entrypoints/async_omni.py::{AsyncOmni.sleep,AsyncOmni.wake_up,AsyncOmni.generate}` → `worker/base.py::{handle_sleep_task,handle_wake_task}` / `diffusion/worker/diffusion_worker.py` |
+| serving class/factory 重构、optional adapter、diffusion/no-TTS 实例、warmup | `engine-lifecycle`：`SERV-5c` | `entrypoints/openai/serving_speech.py` 的所有 factory/`__new__` 路径 → `warmup`、voice upload/list、speech request caller |
 | SSE/streaming speech、audio format、PCM/WAV、speed、首 chunk 前校验 | `streaming-format`：`SERV-1a`, `SERV-1b` | `vllm_omni/entrypoints/openai/protocol/audio.py::{OpenAICreateSpeechRequest.validate_streaming_constraints,StreamingSpeechSessionConfig.validate_streaming_constraints}` → `serving_speech.py::{OmniOpenAIServingSpeech._validate_speech_streaming_request,OmniOpenAIServingSpeech.create_speech}` |
 | `ref_audio`、x-vector/ICL、artifact cache、readiness、失败后 engine 存活 | `artifact-readiness`：`SERV-3a`, `SERV-3b` | `vllm_omni/entrypoints/openai/serving_speech.py::{_qwen3_tts_can_use_ref_audio_artifact_only,_track_ref_audio_artifact_warmup,_mark_ref_audio_artifact_ready_for_request,_discard_ref_audio_artifact_ready_if_unreferenced}` |
 | Prometheus、waiting/running gauge、replica stats、throttle、collector lifecycle | `metrics-lifecycle`：`SERV-2a`, `SERV-2b` | `vllm_omni/entrypoints/omni_base.py::{OmniBase._log_summary_and_cleanup,OmniBase._process_stage_metrics_message}` → `vllm_omni/metrics/prometheus.py::{OmniPrometheusMetrics.__init__,set_running,set_waiting}` |
@@ -35,7 +36,7 @@ confidence: high
 | `artifact-readiness` | artifact cache、capability、ready/mark/discard | `SERV-3a`, `SERV-3b` |
 | `chat-multimodal-contract` | chat template kwargs、SDK flatten、text/audio response shape | `SERV-4c` + 命中模型规则 |
 | `endpoint-capability` | endpoint restriction、unsupported route、公开 400 | `SERV-4c`, `SERV-4d` |
-| `engine-lifecycle` | sleep/wake、partial stage/tag、ACK、generation admission | `SERV-5a`, `SERV-5b` |
+| `engine-lifecycle` | sleep/wake、partial stage/tag、ACK、generation admission、factory 状态矩阵 | `SERV-5a`, `SERV-5b`, `SERV-5c` |
 | `request-contract` | 请求字段、来源、冲突、dispatcher、consumer view | `SERV-4a`, `SERV-4b`, `SERV-4c`, `SERV-4d`, `SERV-4e`, `SERV-4f`, `SERV-4g`, `SERV-4h` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `SERV-0a`, `SERV-0b` |
 
@@ -191,6 +192,18 @@ confidence: high
 - 验收：失败 ACK 保留 sleeping 状态；支持 level-2 的 diffusion 路径仍能
   sleep → wake → generate，不支持的 stage 在调用 worker 前明确拒绝。
   ^[PR #4834] ^[PR #4905] ^[PR #4912]
+
+### SERV-5c — 共享服务类重构必须闭合全部构造状态
+
+- 触发：移动 model-specific capability 到 adapter、增加 factory/`__new__` 快路径，或让同一
+  serving class 同时承载普通、无对应 stage、diffusion-only 等实例。
+- 强制：列出每个生产构造入口及其必有/可选属性；所有公共 caller 通过统一 accessor 或显式
+  `None` 状态访问 optional capability，startup warmup 与 request route 使用同一状态合同。
+- 禁止：只测试目标 adapter 的正常构造；在 factory 实例上直接读取未初始化属性；用旧的
+  model-type early return 掩盖无 adapter 状态。
+- 验收：至少覆盖普通 adapter、无 adapter 和 bypass-`__init__` factory 三类实例，并实际调用
+  startup warmup、voice list/upload 与对应 request route；每条路径保持重构前的成功或结构化
+  错误合同，不得出现 `AttributeError`。 ^[PR #6138]
 
 请求到 engine 的边界见 [Serving architecture](architecture.md)；公开协议通用检查见
 [review contracts](../../../../general/review/guides/reviewer-lens-contracts.md)。

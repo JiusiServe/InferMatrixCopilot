@@ -1,7 +1,7 @@
 ---
 title: "Serving"
 created: 2026-07-10
-updated: 2026-07-31
+updated: 2026-08-23
 type: index
 tags: [vllm-omni, components, serving]
 sources: []
@@ -28,4 +28,4 @@ sources: []
 | 遇到什么 | 查看哪里 |
 |---|---|
 | 理解入口到 engine 的边界 | [architecture](architecture.md) |
-| 根据 PR 描述直达 request contract、streaming format、artifact readiness 或 metrics 的规则组与第一批源码 | [rules 与代码地图](rules.md) |
+| 根据 PR 描述直达 request contract、streaming format、artifact readiness、factory lifecycle 或 metrics 的规则组与第一批源码 | [rules 与代码地图](rules.md) |
