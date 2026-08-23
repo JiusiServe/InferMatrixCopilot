@@ -15,26 +15,26 @@ confidence: high
 
 ## Direct 代码快速入口
 
-- **DIFF-0a — PR 描述先选共享执行地图。** Direct review 先按 title/body 声明的 graph、RNG、checkpoint、HSDP、quantization 或质量语义命中下表，再用 pinned changed files 验证是否确属共享 diffusion owner。
-- **DIFF-0b — 共享 runner 与模型 pipeline 分层。** 先打开命中行的共享 producer；只有 live 调用链证明偏差属于某个模型 pipeline、checkpoint 或常量时才进入模型 owner，不能横向遍历所有 diffusion 模型。
+- **DIFF-0a — PR 描述先选共享执行地图。** 按 title/body 的 graph、RNG、checkpoint、HSDP、quantization 或质量信号命中下表，再用 pinned files 验证 owner。
+- **DIFF-0b — 共享 runner 与模型 pipeline 分层。** 先查命中行的共享 producer；只有 live 调用链落到单模型 pipeline/checkpoint/常量时才进入模型 owner，不横扫其他模型。
 
 | PR 描述在做什么 | 精确规则组 | 第一批 live 源码 |
 |---|---|---|
-| CUDA Graph、compile、fused scheduler/solver、cache path、eager parity | `execution-parity`：`DIFF-1a` | `vllm_omni/diffusion/compile.py::regionally_compile` → `vllm_omni/diffusion/worker/diffusion_model_runner.py::{DiffusionModelRunner.execute_model,execute_model_batch}` → 命中模型的 denoise/solver consumer |
-| seed、request-local generator、guidance=0、并发 RNG、batched generators | `execution-parity`：`DIFF-1b` | `vllm_omni/inputs/data.py::OmniDiffusionSamplingParams` → `diffusion_model_runner.py::DiffusionModelRunner._initialize_generator` → `request_batch.py::DiffusionRequestBatch.collate_sampling_param_generators` |
-| ModelOpt/checkpoint adapter、weight/scale remap、unknown tensor、resolution path | `checkpoint-distributed`：`DIFF-2a` | `vllm_omni/diffusion/model_loader/diffusers_loader.py::{DiffusersPipelineLoader._get_checkpoint_adapter,load_weights}` → `checkpoint_adapters/modelopt.py::{ModelOptFp8CheckpointAdapter._resolve_target_and_output_names,adapt}` |
-| host-weight artifact、source identity、layout/dtype policy、warm restore | `checkpoint-distributed`：`DIFF-2d` | `vllm_omni/diffusion/model_loader/host_weights/source_identity.py` → `contracts.py` / `identity_adapter.py` → 具体 representation policy 与 restorer |
-| HSDP/FSDP、`fully_shard`、DeviceMesh、packed/scalar parameter、FP8 | `checkpoint-distributed`：`DIFF-2b` | `vllm_omni/diffusion/distributed/hsdp.py::{apply_hsdp_to_model,shard_model}` → `model_loader/diffusers_loader.py::DiffusersPipelineLoader._load_model_with_hsdp` → `quantization/hsdp_fp8.py::prepare_fp8_layers_for_fsdp` |
-| component quantization、text encoder/transformer/VAE 独立配置、owner prefix、meta/offload | `checkpoint-distributed`：`DIFF-2c` | `vllm_omni/diffusion/data.py::OmniDiffusionConfig._propagate_quantization_from_tf_config` → `model_loader/diffusers_loader.py::{DiffusersPipelineLoader._get_weight_sources,_process_weights_after_loading}` → 命中 component 的真实 linear consumer |
-| LPIPS/PSNR/相似度阈值、CPU offload、量化质量证据 | `quality-evidence`：`DIFF-3a` | changed quality test 的 exact case → `vllm_omni/diffusion/worker/diffusion_model_runner.py::DiffusionModelRunner.execute_model` → 命中 pipeline；baseline/candidate 必须复用同一路径 |
-| paged KV/cache、block manager、显存预算、warmup/profile、scheduler admission | `system-runtime`：`DIFF-4a`, `DIFF-4b`, `DIFF-4c` | `diffusion_engine.py` 初始化顺序 → `diffusion_kv/initialization.py` → `worker/diffusion_worker.py::determine_available_kv_memory` → native config/allocator → `sched/base_scheduler.py` 的 enabled 请求、异常和清理路径 |
-| worker/RPC 执行异常、rank-status envelope、traceback 或 device cache 清理 | `system-runtime`：`DIFF-4d` | `worker/diffusion_worker.py::{WorkerProc._execute_rpc,WorkerProc._worker_busy_loop}` → raise/reply/status-envelope 各终止路径 |
+| CUDA Graph、compile、fused scheduler/solver、cache path、eager parity | `execution-parity`：`DIFF-1a` | `compile.py::regionally_compile` → `diffusion_model_runner.py::{execute_model,execute_model_batch}` → model denoise/solver |
+| seed、request-local generator、guidance=0、并发 RNG、batched generators | `execution-parity`：`DIFF-1b` | `inputs/data.py::OmniDiffusionSamplingParams` → runner `_initialize_generator` → request-batch generator collate |
+| ModelOpt/checkpoint adapter、weight/scale remap、unknown tensor、resolution path | `checkpoint-distributed`：`DIFF-2a` | `diffusers_loader.py::{_get_checkpoint_adapter,load_weights}` → `modelopt.py::{_resolve_target_and_output_names,adapt}` |
+| host-weight artifact、source identity、layout/dtype、warm restore | `checkpoint-distributed`：`DIFF-2d` | `model_loader/host_weights/{source_identity,contracts,identity_adapter}.py` → policy/restorer |
+| HSDP/FSDP、`fully_shard`、DeviceMesh、packed/scalar parameter、FP8 | `checkpoint-distributed`：`DIFF-2b` | `distributed/hsdp.py::{apply_hsdp_to_model,shard_model}` → loader `_load_model_with_hsdp` → `hsdp_fp8.py` |
+| component quantization、text encoder/transformer/VAE 独立配置、owner prefix、meta/offload | `checkpoint-distributed`：`DIFF-2c` | `data.py::_propagate_quantization_from_tf_config` → loader weight sources/post-load → component linear consumer |
+| LPIPS/PSNR/相似度阈值、CPU offload、量化质量证据 | `quality-evidence`：`DIFF-3a` | changed exact case → runner `execute_model` → model pipeline；A/B 同路径 |
+| paged KV/cache、block manager、显存预算、warmup/profile、scheduler admission | `system-runtime`：`DIFF-4a`, `DIFF-4b`, `DIFF-4c` | engine init → `diffusion_kv/initialization.py` → worker memory probe → native allocator → scheduler lifecycle |
+| worker/RPC 异常、rank-status、traceback/device cache 清理 | `system-runtime`：`DIFF-4d` | `diffusion_worker.py::{_execute_rpc,_worker_busy_loop}` 的 raise/reply/status 路径 |
 
 | 审查组 | 什么时候触发 | 规则 ID |
 |---|---|---|
 | `core` | 每次共享 diffusion 审查 | `DIFF-1a`, `DIFF-1b` |
 | `execution-parity` | graph/eager、solver、RNG、generator、zero/default | `DIFF-1a`, `DIFF-1b` |
-| `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP、host-weight artifact identity | `DIFF-2a`, `DIFF-2b`, `DIFF-2c`, `DIFF-2d` |
+| `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP、artifact identity | `DIFF-2a`, `DIFF-2b`, `DIFF-2c`, `DIFF-2d` |
 | `quality-evidence` | 质量阈值、offload、A/B case | `DIFF-3a` |
 | `system-runtime` | cache/资源预算、native 边界、feature gate、异常或并发调度 | `DIFF-4a`, `DIFF-4b`, `DIFF-4c`, `DIFF-4d` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `DIFF-0a`, `DIFF-0b` |
