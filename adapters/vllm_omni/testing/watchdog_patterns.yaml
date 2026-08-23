@@ -20,7 +20,11 @@ critical:
   - "Cannot re-initialize CUDA in forked subprocess"
   - "cuDNN error"
   - "CUBLAS_STATUS"
-  - "FATAL"
+  # (?<!non-) divergence from the parent (DRIFT_TRIAGE #8): compiled
+  # with re.I, bare FATAL tier-1-killed a HEALTHY job on the benign
+  # "Dropping uncorrelated non-fatal RPC error" WARNING (live full
+  # run 2026-08-23); tier 1 sees the raw tail, so noise cannot save it
+  - "(?<!non-)FATAL"
 
 # Tier 2: broad — an eco-tier agent decides KILL vs CONTINUE.
 review:

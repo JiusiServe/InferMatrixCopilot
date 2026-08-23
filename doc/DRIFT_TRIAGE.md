@@ -128,3 +128,17 @@ capture time they DISAGREE on 13 of 28 comparable slugs (e.g. the
 module plans and prompts). PR6 consequence: when comparing per-module
 outcomes against parent artifacts that used the declared labels, map
 through the golden's `assignment_routing`, not `CI_TEST_MODULE`.
+
+## 8. Tier-1 `FATAL` false kill on "non-fatal" prose (live run 2026-08-23) — DECIDED
+
+Watchdog critical patterns compile with `re.I`, so the parent's bare
+`FATAL` entry matches the benign vllm-omni WARNING `Dropping
+uncorrelated non-fatal RPC error ... request failed` and instantly
+kills a healthy job (observed: `simple_engineentrypoints_test` killed
+mid-pass during the v0.28.0 full run; surrounding tests were PASSING).
+Tier 1 matches the RAW tail — the learned-noise overlay only guards
+Tier 2 — so the seed itself must not match "non-fatal". Deliberate
+divergence: seed and golden both carry `(?<!non-)FATAL` (the
+`simulation_allowlist` `non_fatal` entry only covers simulated TEST
+NAMES, not engine log prose). The parent carries the same false-kill
+latently; parity here would preserve a bug.

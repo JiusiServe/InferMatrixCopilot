@@ -182,6 +182,21 @@ def test_learn_promote_appends_escaped_to_overlay(tmp_path):
     assert p.is_noise("odd (x) warning")
 
 
+def test_tier1_fatal_does_not_match_nonfatal_prose(patterns):
+    """DRIFT_TRIAGE #8 (live full run 2026-08-23): critical patterns
+    compile with re.I, so the parent's bare FATAL entry tier-1-killed a
+    HEALTHY job on the benign "non-fatal RPC error" WARNING. Tier 1 sees
+    the raw tail (noise cannot save it), so the seed itself must not
+    match "non-fatal" - while real FATAL lines must still kill."""
+    benign = ("WARNING 08-23 08:08:42 [rpc_result_router.py:79] Dropping "
+              "uncorrelated non-fatal RPC error request_id=other "
+              "stage_id=None: request failed")
+    assert patterns.last_match([benign], "critical") is None
+    assert patterns.last_match(["FATAL: engine core died"], "critical")
+    # re.I is the point: lower-case fatal prose still triggers
+    assert patterns.last_match(["fatal NCCL watchdog error"], "critical")
+
+
 def test_learn_promote_is_idempotent(tmp_path):
     import json
     logf = tmp_path / "d.jsonl"

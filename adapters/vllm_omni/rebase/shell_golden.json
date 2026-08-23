@@ -601,7 +601,7 @@
    "Cannot re-initialize CUDA in forked subprocess",
    "cuDNN error",
    "CUBLAS_STATUS",
-   "FATAL"
+   "(?<!non-)FATAL"
   ],
   "review": [
    "Traceback \\(most recent call last\\)",
