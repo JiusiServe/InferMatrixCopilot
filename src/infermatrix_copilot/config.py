@@ -193,6 +193,11 @@ class Settings(BaseSettings):
 
     # PR debug
     buildkite_api_token: str = ""
+    # GitHub token for the v3 remote-CI push: the push transport disables
+    # credential helpers BY DESIGN (header auth only, never the shared
+    # credential store), so without this the phase-4 push runs
+    # unauthenticated and fails against any private-write remote
+    github_token: str = ""
     pr_debug_max_groups: int = 6
 
     # External locked rebase pipeline (the existing 5-phase orchestrator)

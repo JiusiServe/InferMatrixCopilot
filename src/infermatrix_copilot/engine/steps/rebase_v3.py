@@ -1968,7 +1968,8 @@ async def _v3_ci(ctx: StepContext) -> StepResult:
                 author_email=author_email, protected_branches=protected,
                 wal_dir=ctx.run_dir / "push_wal",
                 op_id=f"{run_id}-push-r{op_index}", allowed=True,
-                allow_push=bool(ctx.settings.allow_push), remote=remote)
+                allow_push=bool(ctx.settings.allow_push), remote=remote,
+                token=getattr(ctx.settings, "github_token", ""))
         try:
             return _attempt()
         except push_to_ci.PushPreflightError as exc:

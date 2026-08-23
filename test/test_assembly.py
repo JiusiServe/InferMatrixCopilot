@@ -1485,6 +1485,56 @@ def test_v3_precommit_step(v3_env, settings, trace, monkeypatch):
     assert not d.allowed and any("precommit red" in x for x in d.reasons)
 
 
+def test_v3_ci_push_carries_the_settings_github_token(
+        v3_env, settings, trace, monkeypatch):
+    """The push transport disables credential helpers BY DESIGN (header
+    auth only, never the shared credential store), so the ci step MUST
+    hand Settings.github_token to commit_and_push - the live remote_ci
+    launch (2026-08-23) pushed tokenless and failed against the org
+    remote while a manual credential-helper push succeeded."""
+    import subprocess
+    from types import SimpleNamespace
+    from infermatrix_copilot.engine.registry import StepRegistry
+    from infermatrix_copilot.engine.step import StepContext
+    from infermatrix_copilot.engine.steps import register_builtin_steps
+    from infermatrix_copilot.engine.steps import rebase_v3
+    from infermatrix_copilot.rebase_engine import ci_loop, push_to_ci
+    _, _, repo, run_dir = v3_env
+    # the step pushes ONLY from the adapter-declared rebase branch
+    subprocess.run(["git", "checkout", "-qb", "dev/vllm-align"], cwd=repo,
+                   check=True)
+    monkeypatch.setattr(settings, "buildkite_api_token", "bk-tok",
+                        raising=False)
+    monkeypatch.setattr(settings, "github_token", "gh-push-tok",
+                        raising=False)
+    captured = {}
+
+    def fake_commit_and_push(*args, **kwargs):
+        captured.update(kwargs)
+        return push_to_ci.PushOutcome(True, pushed_commit="deadbeef")
+
+    async def fake_rounds(**kwargs):
+        kwargs["push_fn"](0)
+        return SimpleNamespace(result="failed", reason="stub",
+                               fixed_jobs=[], unfixed_jobs=[], rounds=[])
+
+    monkeypatch.setattr(push_to_ci, "commit_and_push", fake_commit_and_push)
+    monkeypatch.setattr(ci_loop, "run_ci_rounds", fake_rounds)
+    registry = register_builtin_steps(StepRegistry())
+    rd = run_dir.parent / "dir-ci-token"
+    rd.mkdir(exist_ok=True)
+    ctx = StepContext(
+        settings=settings, params={}, run_dir=rd, trace=trace,
+        state={"task_spec": {"repo": "vllm-omni",
+                             "params": {"rebase_mode": "remote_ci",
+                                        "upstream_commit": "f" * 40}},
+               "run_id": "run-ci-token", "repo_path": str(repo),
+               "upstream_commit": "f" * 40})
+    r = asyncio.run(registry.get("rebase.v3_ci").handler(ctx))
+    assert captured, f"push_fn never reached commit_and_push: {r.summary}"
+    assert captured["token"] == "gh-push-tok"
+
+
 def test_v3_precommit_not_declared(v3_env, settings, trace):
     from infermatrix_copilot.engine.registry import StepRegistry
     from infermatrix_copilot.engine.step import StepContext
