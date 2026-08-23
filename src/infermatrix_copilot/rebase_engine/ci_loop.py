@@ -784,6 +784,15 @@ def _foreign_active(active: Sequence[dict], owned_commits: set[str],
     return None
 
 
+class BuildCreationRefused(RuntimeError):
+    """A provider REFUSED build creation as POLICY (deterministic 4xx -
+    e.g. Buildkite 422 "Branches have been disabled for this pipeline"
+    when the org runs the pipeline schedule-only). Distinct from
+    transport errors: retrying can never succeed, so the round converts
+    it into the structured `refused` outcome instead of crashing the
+    step as an unhandled error (live remote_ci launch 2026-08-23)."""
+
+
 def _foreign_refusal(b: dict, branch: str) -> str:
     return (f"an active build (#{b.get('number', '?')}, state "
             f"{b.get('state', '?')}, commit "
@@ -882,10 +891,18 @@ def _acquire_build(client: CIClient, ops_dir: Path, *, run_id: str,
     foreign = _foreign_active(active, owned_commits, owned_ids)
     if foreign is not None:
         return None, _foreign_refusal(foreign, branch)
-    op = create_build_guarded(
-        client, ops_dir, op_id=f"{run_id}-ci-r{round_idx}", run_id=run_id,
-        purpose=purpose, branch=branch, commit=commit, message=message,
-        sleep=sleep)
+    try:
+        op = create_build_guarded(
+            client, ops_dir, op_id=f"{run_id}-ci-r{round_idx}",
+            run_id=run_id, purpose=purpose, branch=branch, commit=commit,
+            message=message, sleep=sleep)
+    except BuildCreationRefused as exc:
+        return None, (f"pipeline refused build creation: {exc} - the "
+                      "provider accepts no pushed-branch builds (schedule-"
+                      "only policy); wait for the next scheduled build at "
+                      "this commit (same-commit schedule builds are "
+                      "adopted), or have an org admin re-enable branch "
+                      "builds")
     return CIBuildRound(purpose=purpose, op_id=op.op_id,
                         build_id=op.build_id, build_url=op.build_url), ""
 

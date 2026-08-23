@@ -110,6 +110,20 @@ class BuildkiteCI:
         status, data = self._request("POST", f"{self.base}/builds", body,
                                      False)
         if status != 201 or not isinstance(data, dict):
+            # ONLY the specific branch-builds-disabled policy response is
+            # the typed refusal (422 + "disabled" in the message) - the
+            # round loop then reports the schedule-only guidance. Every
+            # other 4xx (401 auth, 403 authz, 404 pipeline, 400/422
+            # validation) is an operational error where that guidance
+            # would mislead, and stays BuildkiteError.
+            message = str((data or {}).get("message", "")) \
+                if isinstance(data, dict) else str(data)
+            if status == 422 and \
+                    "branches have been disabled" in message.lower():
+                from ..rebase_engine.ci_loop import BuildCreationRefused
+                raise BuildCreationRefused(
+                    f"create_build refused: HTTP {status} "
+                    f"{str(data)[:200]}")
             raise BuildkiteError(
                 f"create_build failed: HTTP {status} "
                 f"{str(data)[:200]}")

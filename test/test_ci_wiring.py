@@ -54,6 +54,73 @@ def test_buildkite_create_build_error_raises_before_op_created():
         bk.create_build(branch="b", commit="c", message="m", meta_data={})
 
 
+def test_buildkite_create_build_policy_4xx_is_typed_refusal():
+    """Live remote_ci launch (2026-08-23): the org disabled provider
+    branch builds (schedule-only pipeline) and create_build returned
+    HTTP 422 "Branches have been disabled for this pipeline" - which
+    crashed the ci step as an unhandled BuildkiteError. Deterministic
+    policy 4xx (retrying can never succeed) raises the typed
+    BuildCreationRefused; transport-class failures keep raising
+    BuildkiteError."""
+    from infermatrix_copilot.rebase_engine.ci_loop import (
+        BuildCreationRefused,
+    )
+    bk = BuildkiteCI("t", "o", "p", request=Recorder(
+        [(422, {"message": "Branches have been disabled for this "
+                           "pipeline"})]))
+    with pytest.raises(BuildCreationRefused, match="422"):
+        bk.create_build(branch="b", commit="c", message="m", meta_data={})
+    # every OTHER failure is operational and stays BuildkiteError: auth
+    # (401), authz (403), missing pipeline (404), malformed request
+    # (400), non-policy validation 422, rate limit (429), server (500)
+    for status, payload in ((400, {"message": "malformed"}),
+                            (401, {"message": "bad token"}),
+                            (403, {"message": "forbidden"}),
+                            (404, {"message": "no such pipeline"}),
+                            (422, {"message": "invalid commit"}),
+                            # an unrelated "disabled" 422 must NOT earn
+                            # the schedule-only guidance
+                            (422, {"message": "Pipeline has been "
+                                              "disabled"}),
+                            (429, {}), (500, {})):
+        bk = BuildkiteCI("t", "o", "p",
+                         request=Recorder([(status, payload)]))
+        with pytest.raises(BuildkiteError):
+            bk.create_build(branch="b", commit="c", message="m",
+                            meta_data={})
+
+
+def test_acquire_build_converts_policy_refusal_to_refused_outcome(
+        tmp_path):
+    """The round loop turns BuildCreationRefused into the structured
+    (None, reason) refusal - the same path as a foreign active build -
+    so the run terminates `refused` with guidance instead of an
+    unhandled-error crash."""
+    from infermatrix_copilot.rebase_engine.ci_loop import (
+        BuildCreationRefused, _acquire_build,
+    )
+
+    class RefusingClient:
+        def latest_builds(self, branch, states=None):
+            return []
+
+        def builds_for_commit(self, branch, commit):
+            return []
+
+        def create_build(self, **kwargs):
+            raise BuildCreationRefused("create_build refused: HTTP 422")
+
+        def get_build(self, build_id):
+            return {}
+
+    rec, reason = _acquire_build(
+        RefusingClient(), tmp_path, run_id="r1", round_idx=0,
+        purpose="initial", branch="dev/x", commit="c" * 40, message="m",
+        owned_commits=set(), owned_ids=set(), sleep=lambda s: None)
+    assert rec is None
+    assert "refused build creation" in reason and "schedule" in reason
+
+
 def test_buildkite_meta_lookup_raises_on_error_never_empty():
     """An API error must NEVER read as 'no matches' — guarded recovery
     would escalate correctly, but silently returning [] could eventually
