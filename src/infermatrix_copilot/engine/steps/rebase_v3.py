@@ -1407,6 +1407,73 @@ def _halt_on_phase3(ctx: StepContext, sub: Substate) -> StepResult | None:
                       "before any push/CI: " + "; ".join(problems[:5]))
 
 
+_PRECOMMIT_HOOK_ID_RE = None  # compiled lazily
+
+
+def _precommit_failed_hooks(outcome) -> frozenset | None:
+    """The set of pre-commit hook ids that FAILED, parsed from the run's
+    log (`- hook id: <id>` lines follow each Failed hook), or None when
+    the log is missing/unparseable - callers must then treat the failure
+    as structural rather than guess."""
+    global _PRECOMMIT_HOOK_ID_RE
+    import re
+    if _PRECOMMIT_HOOK_ID_RE is None:
+        _PRECOMMIT_HOOK_ID_RE = re.compile(r"^- hook id: (\S+)$", re.M)
+    if not outcome.log_file:
+        return None
+    try:
+        text = Path(outcome.log_file).read_text(encoding="utf-8",
+                                                errors="replace")
+    except OSError:
+        return None
+    ids = frozenset(_PRECOMMIT_HOOK_ID_RE.findall(text))
+    return ids or None
+
+
+def _precommit_baseline(ctx: StepContext, repo: str, pc: dict,
+                        command: str, manifest: dict):
+    """(rc, failed-hook-ids) of the same precommit command on the PRE-RUN
+    tree (a detached worktree of HEAD - module-agent changes are
+    uncommitted at phase 3.2), or None when the baseline cannot be built
+    or proves nothing (timeout). Same doctrine as the test loop's
+    pre-existing-failure baseline and remote CI's baseline pipeline: red
+    the run did NOT introduce is recorded distinctly, never invented into
+    a structural block that would gate every push on repo-wide debt
+    forever (live full run 2026-08-23: 31 upstream-main test files
+    missing CI marks)."""
+    import subprocess
+    from ...testing.runner import TestJob, TestRunner
+    wt = ctx.run_dir / "precommit_baseline_wt"
+    add = subprocess.run(["git", "-C", str(repo), "worktree", "add",
+                          "--detach", str(wt), "HEAD"],
+                         capture_output=True, text=True)
+    if add.returncode != 0:
+        ctx.trace.record("precommit_baseline_unavailable",
+                         error=(add.stderr or add.stdout).strip()[:500])
+        return None
+    try:
+        runner = TestRunner(repo_root=wt, tests_dir=ctx.run_dir / "tests",
+                            gpu_lock_dir=ctx.run_dir / "gpu_lock")
+        job = TestJob(key="__precommit_baseline__", command=command,
+                      timeout_sec=float(pc.get("timeout_sec") or 600),
+                      min_gpus=0, gpu_lock=False)
+        outcome = runner.run(job, _target_test_env(ctx, manifest))
+        if outcome.timed_out:
+            # a timed-out probe proves nothing about the baseline - treat
+            # it as unavailable so the original red stays STRUCTURAL
+            ctx.trace.record("precommit_baseline_unavailable",
+                             error="baseline probe timed out")
+            return None
+        failed = _precommit_failed_hooks(outcome) if outcome.rc != 0 \
+            else frozenset()
+        ctx.trace.record("precommit_baseline", rc=outcome.rc,
+                         failed_hooks=sorted(failed or ()))
+        return outcome.rc, failed
+    finally:
+        subprocess.run(["git", "-C", str(repo), "worktree", "remove",
+                        "--force", str(wt)], capture_output=True)
+
+
 @step("rebase.v3_precommit", "script", "write_workspace",
       "Phase-3.2 precommit workflow: run, retry once, record in substate.")
 async def _v3_precommit(ctx: StepContext) -> StepResult:
@@ -1458,12 +1525,33 @@ async def _v3_precommit(ctx: StepContext) -> StepResult:
         attempt = 1
         outcome = runner.run(job, _target_test_env(ctx, manifest))
     passed = outcome.rc == 0 and not outcome.timed_out
+    result = "passed" if passed else "failed"
+    baseline_rc = None
+    # A current-run TIMEOUT is infrastructure, structural regardless of
+    # the baseline; only a plain red is compared. `failed_preexisting`
+    # requires the current failed-hook set to be a SUBSET of the
+    # baseline's - a new failure riding on old debt stays structural
+    # (hook-id granularity: the finest level pre-commit output names
+    # reliably). Unparseable logs on either side stay structural.
+    if not passed and not outcome.timed_out:
+        current_failed = _precommit_failed_hooks(outcome)
+        baseline = _precommit_baseline(ctx, repo, pc, command, manifest)
+        if baseline is not None:
+            baseline_rc, baseline_failed = baseline
+            if (baseline_rc != 0 and current_failed and baseline_failed
+                    and current_failed <= baseline_failed):
+                result = "failed_preexisting"
     sub.update({"tests": {"precommit": {
-        "result": "passed" if passed else "failed",
-        "attempt": attempt, "last_log": outcome.log_file or None}}})
+        "result": result, "attempt": attempt, "baseline_rc": baseline_rc,
+        "last_log": outcome.log_file or None}}})
     halted = _halt_on_phase3(ctx, sub)
     if halted is not None:
         return halted
+    if result == "failed_preexisting":
+        return StepResult(True,
+                          summary=f"precommit red PRE-EXISTS the run "
+                                  f"(baseline rc={baseline_rc}); gate "
+                                  "flags, does not block")
     return StepResult(True,
                       summary="precommit "
                               + ("passed" if passed else

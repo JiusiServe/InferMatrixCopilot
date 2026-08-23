@@ -109,6 +109,13 @@ def test_push_gate_taxonomy():
     # strict makes them blocking
     d = evaluate_push_gate(asserts, {"strict_push_gate": True})
     assert not d.allowed and "strict gate" in d.reasons[0]
+    # pre-existing precommit red (baseline red too): flagged, not blocking
+    preex = {"modules": {}, "tests": {
+        "pipeline": {"failed_tests": []},
+        "precommit": {"result": "failed_preexisting", "baseline_rc": 1}}}
+    d = evaluate_push_gate(preex, {})
+    assert d.allowed and any("pre-exists" in f for f in d.flagged)
+    assert not evaluate_push_gate(preex, {"strict_push_gate": True}).allowed
     # infra failures are STRUCTURAL, never ordinary test failures
     infra = {"tests": {"infra_failures": ["harness crash"],
                        "pipeline": {}, "precommit": {}}}
@@ -1388,14 +1395,92 @@ def test_v3_precommit_step(v3_env, settings, trace, monkeypatch):
     assert pc["result"] == "passed" and pc["attempt"] == 1
     assert evaluate_push_gate(data, {}).allowed
 
-    # both attempts red: substate failed, push gate blocks (structural)
-    rcs[:] = [1, 1, 1]
+    # both attempts red, baseline (3rd run) ALSO red on the SAME hook set:
+    # the debt pre-exists the run - recorded distinctly, gate FLAGS
+    # instead of blocking
+    def hook_outcome(name, rc, hooks, timed_out=False):
+        log = run_dir.parent / f"{name}.log"
+        log.write_text("".join(
+            f"some hook...Failed\n- hook id: {h}\n" for h in hooks))
+        return runner_mod.TestOutcome(rc=rc, timed_out=timed_out,
+                                      log_file=str(log))
+
+    scripted = []
+
+    def scripted_run(self, job, env, *, baseline=False, dry_run=False):
+        ran.append(job.command)
+        return scripted[len(ran) - 1]
+
+    monkeypatch.setattr(runner_mod.TestRunner, "run", scripted_run)
     ran.clear()
+    scripted[:] = [hook_outcome("cur1", 1, ["check-test-ci-coverage"]),
+                   hook_outcome("cur2", 1, ["check-test-ci-coverage"]),
+                   hook_outcome("base1", 1, ["check-test-ci-coverage"])]
     r = asyncio.run(registry.get("rebase.v3_precommit").handler(
         ctx_for("run-pc2")))
-    assert r.ok and "FAILED" in r.summary            # substate data, step ok
+    assert r.ok and "PRE-EXISTS" in r.summary        # substate data, step ok
+    assert len(ran) == 3                             # retry + baseline probe
     data = Substate(run_dir.parent / "dir-run-pc2", "run-pc2").read()
+    assert data["tests"]["precommit"]["result"] == "failed_preexisting"
+    d = evaluate_push_gate(data, {})
+    assert d.allowed and any("pre-exists" in f for f in d.flagged)
+    # strict gate still makes the pre-existing red blocking
+    assert not evaluate_push_gate(data, {"strict_push_gate": True}).allowed
+
+    # a NEW failure riding on old debt is NOT pre-existing: the current
+    # failed-hook set must be a SUBSET of the baseline's
+    ran.clear()
+    scripted[:] = [hook_outcome("cur3", 1, ["check-test-ci-coverage",
+                                            "ruff"]),
+                   hook_outcome("cur4", 1, ["check-test-ci-coverage",
+                                            "ruff"]),
+                   hook_outcome("base2", 1, ["check-test-ci-coverage"])]
+    r = asyncio.run(registry.get("rebase.v3_precommit").handler(
+        ctx_for("run-pc-new")))
+    assert r.ok and "FAILED" in r.summary
+    data = Substate(run_dir.parent / "dir-run-pc-new", "run-pc-new").read()
     assert data["tests"]["precommit"]["result"] == "failed"
+    assert not evaluate_push_gate(data, {}).allowed
+
+    # unparseable logs (no hook ids recorded) stay structural
+    ran.clear()
+    scripted[:] = [runner_mod.TestOutcome(rc=1),
+                   runner_mod.TestOutcome(rc=1),
+                   hook_outcome("base3", 1, ["check-test-ci-coverage"])]
+    r = asyncio.run(registry.get("rebase.v3_precommit").handler(
+        ctx_for("run-pc-nolog")))
+    data = Substate(run_dir.parent / "dir-run-pc-nolog",
+                    "run-pc-nolog").read()
+    assert data["tests"]["precommit"]["result"] == "failed"
+    assert not evaluate_push_gate(data, {}).allowed
+    monkeypatch.setattr(runner_mod.TestRunner, "run", fake_run)
+
+    # both attempts red, baseline probe TIMED OUT: proves nothing -
+    # unavailable baseline keeps the red STRUCTURAL (fail closed)
+    ran.clear()
+    scripted[:] = [hook_outcome("cur5", 1, ["check-test-ci-coverage"]),
+                   hook_outcome("cur6", 1, ["check-test-ci-coverage"]),
+                   hook_outcome("base4", 1, ["check-test-ci-coverage"],
+                                timed_out=True)]
+    monkeypatch.setattr(runner_mod.TestRunner, "run", scripted_run)
+    r = asyncio.run(registry.get("rebase.v3_precommit").handler(
+        ctx_for("run-pc-to")))
+    assert r.ok and "FAILED" in r.summary
+    data = Substate(run_dir.parent / "dir-run-pc-to", "run-pc-to").read()
+    assert data["tests"]["precommit"]["result"] == "failed"
+    assert data["tests"]["precommit"]["baseline_rc"] is None
+    assert not evaluate_push_gate(data, {}).allowed
+    monkeypatch.setattr(runner_mod.TestRunner, "run", fake_run)
+
+    # both attempts red, baseline GREEN: the run introduced it - structural
+    rcs[:] = [1, 1, 0]
+    ran.clear()
+    r = asyncio.run(registry.get("rebase.v3_precommit").handler(
+        ctx_for("run-pc3")))
+    assert r.ok and "FAILED" in r.summary
+    data = Substate(run_dir.parent / "dir-run-pc3", "run-pc3").read()
+    assert data["tests"]["precommit"]["result"] == "failed"
+    assert data["tests"]["precommit"]["baseline_rc"] == 0
     d = evaluate_push_gate(data, {})
     assert not d.allowed and any("precommit red" in x for x in d.reasons)
 

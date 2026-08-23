@@ -2,10 +2,14 @@
 deterministically from substate before any push.
 
 - STRUCTURAL failures always block (unless `push_with_failures=true`,
-  explicit and logged): failed modules, red precommit, and phase-3
-  INFRASTRUCTURE failures (harness crashes, timeouts, missing dependencies,
-  corrupt/empty manifest, agent dispatch failures) — these are never
-  classified as ordinary test failures.
+  explicit and logged): failed modules, red precommit the run introduced,
+  and phase-3 INFRASTRUCTURE failures (harness crashes, timeouts, missing
+  dependencies, corrupt/empty manifest, agent dispatch failures) — these
+  are never classified as ordinary test failures. A precommit red that
+  PRE-EXISTS the run (`failed_preexisting`: the same command is red on
+  the pre-run baseline tree) passes through FLAGGED instead — repo-wide
+  debt the run did not create must not gate every push forever (live
+  full run 2026-08-23).
 - TEST ASSERTION failures pass through FLAGGED (parent-parity CI-feedback
   workflow); `strict_push_gate=true` makes them blocking.
 - Blocking ⇒ FORBIDDEN ⇒ the run terminates per the transition table
@@ -44,8 +48,12 @@ def _structural_failures(substate: Mapping) -> list[str]:
 
 def _assertion_failures(substate: Mapping) -> list[str]:
     pipeline = ((substate.get("tests") or {}).get("pipeline") or {})
-    return [f"test failure: {t}"
-            for t in (pipeline.get("failed_tests") or [])]
+    out = [f"test failure: {t}"
+           for t in (pipeline.get("failed_tests") or [])]
+    precommit = ((substate.get("tests") or {}).get("precommit") or {})
+    if precommit.get("result") == "failed_preexisting":
+        out.append("precommit red pre-exists the run (baseline red too)")
+    return out
 
 
 def evaluate_push_gate(substate: Mapping, params: Mapping) -> GateDecision:

@@ -142,3 +142,22 @@ divergence: seed and golden both carry `(?<!non-)FATAL` (the
 `simulation_allowlist` `non_fatal` entry only covers simulated TEST
 NAMES, not engine log prose). The parent carries the same false-kill
 latently; parity here would preserve a bug.
+
+## 9. Precommit red-on-baseline gates every push (live run 2026-08-23) — DECIDED
+
+The parent (and Rev 8 §2.3 as merged) treated ANY red phase-3.2
+precommit as a structural push block. The live v0.28.0 full run proved
+the failure mode: `pre-commit run --all-files` is red on the UNTOUCHED
+tree — 31 test files missing the CI-collection pytest marks, 30 of
+them byte-identical to upstream `origin/main` (upstream CI only checks
+changed files, so main stays green while `--all-files` is red). A
+repo-wide debt the run did not create would structurally block every
+push forever. Deliberate divergence, mirroring the doctrine the engine
+already applies to tests (pre-existing-failure baseline) and remote CI
+(baseline pipeline): when the retried precommit is red, the same
+command runs once more on a detached worktree of HEAD (the pre-run
+tree — module changes are uncommitted at phase 3.2). Baseline red ⇒
+`failed_preexisting`: the gate FLAGS it (blocking under
+`strict_push_gate=true`); baseline green ⇒ `failed` stays structural.
+The marks debt itself belongs upstream (vllm-omni main), not on the
+rebase branch.
