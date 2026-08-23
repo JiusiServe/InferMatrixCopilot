@@ -950,6 +950,48 @@ def test_rounds_refuses_foreign_active_build_before_push(tmp_path):
     assert push_calls == []             # nothing was pushed
 
 
+def test_rounds_prepush_exempts_adoptable_schedule_build(tmp_path):
+    """Live nightly-adopt run (2026-08-24): the org pipeline builds only
+    by schedule; the nightly built OUR pushed head, but the PRE-PUSH
+    foreign scan refused before _acquire_build's same-commit adoption
+    could run - with a clean tree the push is a ref no-op that cancels
+    nothing, so an adoption-qualifying build at the head must be exempt
+    from that scan and end up ADOPTED (monitor-only)."""
+    head = "h" * 40
+    running = {"id": "x9", "number": 9, "state": "running",
+               "commit": head, "source": "schedule", "web_url": "u/x9"}
+    finished = {"id": "x9", "state": "passed", "commit": head,
+                "source": "schedule", "web_url": "u/x9",
+                "jobs": [_job("Green", "passed", 0)]}
+    ci = RoundsCI([], active=[running], siblings=[finished])
+    result, push_calls = _rounds(ci, tmp_path,
+                                 push_results=[Push(commit=head)],
+                                 head_commit=head)
+    assert result.result == "passed"
+    assert [(r.purpose, r.adopted) for r in result.rounds] == \
+        [("adopted", True)]
+    assert ci.created == 0                      # monitor-only adoption
+    assert push_calls == [0]                    # the no-op push still ran
+
+
+def test_rounds_prepush_exemption_needs_clean_tree_and_schedule_source(
+        tmp_path):
+    """The exemption is NARROW: local changes mean the push would move
+    the ref (and could cancel the build), and a ui/manual build is
+    neither evidence nor ours - both keep the refusal."""
+    head = "h" * 40
+    sched = {"id": "x9", "number": 9, "state": "running",
+             "commit": head, "source": "schedule", "web_url": "u/x9"}
+    ci = RoundsCI([], active=[sched])
+    result, push_calls = _rounds(ci, tmp_path, head_commit=head,
+                                 changes=[True])
+    assert result.result == "refused" and push_calls == []
+    ui = dict(sched, source="ui")
+    ci = RoundsCI([], active=[ui])
+    result, push_calls = _rounds(ci, tmp_path, head_commit=head)
+    assert result.result == "refused" and push_calls == []
+
+
 def test_rounds_no_run_adopts_sibling_else_no_signal(tmp_path):
     sibling = {"id": "s1", "number": 3, "state": "passed",
                "commit": "c" * 40, "web_url": "u/s1",

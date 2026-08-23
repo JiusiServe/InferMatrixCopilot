@@ -1535,6 +1535,89 @@ def test_v3_ci_push_carries_the_settings_github_token(
     assert captured["token"] == "gh-push-tok"
 
 
+def test_v3_ci_arms_adoption_exemption_only_on_proven_remote_noop(
+        v3_env, settings, trace, monkeypatch, tmp_path):
+    """The pre-push adoption exemption may only arm when the push is a
+    PROVEN ref no-op: remote branch ref == local head. A clean tree with
+    an advanced remote must pass head_commit="" (exemption off) - a
+    lease-authorized push there would move the ref and could cancel the
+    very build the exemption spares (gate review 2026-08-24)."""
+    import subprocess
+    from types import SimpleNamespace
+    from infermatrix_copilot.engine.registry import StepRegistry
+    from infermatrix_copilot.engine.steps import register_builtin_steps
+    from infermatrix_copilot.engine.step import StepContext
+    from infermatrix_copilot.rebase_engine import ci_loop, push_to_ci
+    _, _, repo, run_dir = v3_env
+
+    def git(*args, cwd=repo):
+        subprocess.run(["git", *args], cwd=cwd, check=True,
+                       capture_output=True)
+
+    git("checkout", "-qb", "dev/vllm-align")
+    remote = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "-q", "--bare", str(remote)],
+                   check=True, capture_output=True)
+    git("remote", "add", "origin", str(remote))
+    git("push", "-q", "origin", "dev/vllm-align")
+
+    monkeypatch.setattr(settings, "buildkite_api_token", "bk",
+                        raising=False)
+    monkeypatch.setattr(settings, "github_token", "gh", raising=False)
+    monkeypatch.setattr(
+        push_to_ci, "commit_and_push",
+        lambda *a, **k: push_to_ci.PushOutcome(True,
+                                               pushed_commit="d" * 40))
+    captured = {}
+
+    async def fake_rounds(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(result="failed", reason="stub",
+                               fixed_jobs=[], unfixed_jobs=[], rounds=[])
+
+    monkeypatch.setattr(ci_loop, "run_ci_rounds", fake_rounds)
+    registry = register_builtin_steps(StepRegistry())
+
+    def run_step(name):
+        rd = run_dir.parent / name
+        rd.mkdir(exist_ok=True)
+        ctx = StepContext(
+            settings=settings, params={}, run_dir=rd, trace=trace,
+            state={"task_spec": {"repo": "vllm-omni",
+                                 "params": {"rebase_mode": "remote_ci",
+                                            "upstream_commit": "f" * 40}},
+                   "run_id": name, "repo_path": str(repo),
+                   "upstream_commit": "f" * 40})
+        return asyncio.run(registry.get("rebase.v3_ci").handler(ctx))
+
+    # remote == local head: the exemption arms with the proven head
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo,
+                          capture_output=True, text=True).stdout.strip()
+    run_step("dir-ci-noop")
+    assert captured["head_commit"] == head
+
+    # remote ADVANCES past the local head (clean local tree): off
+    clone = tmp_path / "advancer"
+    subprocess.run(["git", "clone", "-q", str(remote), str(clone)],
+                   check=True, capture_output=True)
+    # the bare remote's HEAD names no default branch; land on the real one
+    git("checkout", "-q", "dev/vllm-align", cwd=clone)
+    (clone / "advance.txt").write_text("x")
+    git("add", "-A", cwd=clone)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
+                    "commit", "-qm", "advance"], cwd=clone, check=True,
+                   capture_output=True)
+    git("push", "-q", "origin", "HEAD:dev/vllm-align", cwd=clone)
+    captured.clear()
+    # the first in-process handler call still holds the checkout flock
+    # (no executor lifecycle here); a fresh lock inode flocks independently
+    import shutil
+    shutil.rmtree(repo / "locks", ignore_errors=True)
+    r2 = run_step("dir-ci-diverged")
+    assert captured, f"step never reached rounds: {r2.summary}"
+    assert captured["head_commit"] == ""
+
+
 def test_v3_precommit_not_declared(v3_env, settings, trace):
     from infermatrix_copilot.engine.registry import StepRegistry
     from infermatrix_copilot.engine.step import StepContext

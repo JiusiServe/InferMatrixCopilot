@@ -941,6 +941,12 @@ async def run_ci_rounds(*, client: CIClient, ops_dir: Path, run_id: str,
                         timeout_sec: float = 4 * 3600,
                         job_retry_max: int = 2,
                         message: str = "ci build",
+                        # the checkout head, passed ONLY when the caller
+                        # has PROVEN the remote branch ref equals it (the
+                        # push is then a ref no-op) - it arms the narrow
+                        # pre-push adoption exemption below; empty keeps
+                        # the unconditional refusal
+                        head_commit: str = "",
                         op_base: int | None = None,
                         sleep: Callable[[float], None] = time.sleep,
                         asleep: Callable[..., Any] = asyncio.sleep,
@@ -1020,7 +1026,21 @@ async def run_ci_rounds(*, client: CIClient, ops_dir: Path, run_id: str,
                            "— cannot prove no unowned build would be "
                            "cancelled",
                     rounds=rounds, fixed_jobs=fixed_all)
-            foreign = _foreign_active(active, owned_commits, owned_ids)
+            scan = active
+            if head_commit and not changes_fn():
+                # Pre-push adoption exemption (live nightly-adopt run
+                # 2026-08-24): a schedule/api build at the CURRENT head
+                # is exactly what _acquire_build ADOPTS (monitor-only),
+                # and with nothing left to commit the push is a ref
+                # no-op that can neither create a webhook build nor
+                # cancel anything - the hazard this refusal protects
+                # against does not exist. Non-adoptable sources
+                # (ui/manual/trigger) and a dirty tree keep the refusal.
+                scan = [b for b in active
+                        if not (str(b.get("commit", "")) == head_commit
+                                and str(b.get("source", ""))
+                                in ("schedule", "api"))]
+            foreign = _foreign_active(scan, owned_commits, owned_ids)
             if foreign is not None:
                 return CIRunResult("refused",
                                    reason=_foreign_refusal(foreign, branch),

@@ -2110,9 +2110,29 @@ async def _v3_ci(ctx: StepContext) -> StepResult:
                           f"CI/push op ledger unreadable: {exc}")
 
     try:
+        head_oid = subprocess.run(
+            ["git", "-C", repo, "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=30).stdout.strip()
+        # The pre-push adoption exemption's premise is "the push is a ref
+        # no-op" - PROVE it, never assume it: a clean tree alone does not
+        # rule out a diverged/advanced remote (a lease-authorized push
+        # would then move the ref and could cancel the very build the
+        # exemption spares). The head is passed only when the remote
+        # branch ref already equals it; any lookup failure or mismatch
+        # disables the exemption (safe default), and the push machinery's
+        # own lease/WAL guards the residual check-to-push race.
+        ls = subprocess.run(
+            ["git", "-C", repo, "ls-remote", remote,
+             f"refs/heads/{branch}"],
+            capture_output=True, text=True, timeout=60)
+        remote_oid = (ls.stdout.split() or [""])[0] \
+            if ls.returncode == 0 else ""
+        adoption_head = head_oid \
+            if head_oid and remote_oid == head_oid else ""
         result = await ci_loop.run_ci_rounds(
             client=client, ops_dir=ops_dir, run_id=run_id,
             branch=branch, spec=spec, push_fn=push_fn,
+            head_commit=adoption_head,
             changes_fn=changes_fn, debug_fn=debug_fn,
             log_dir=ctx.run_dir / "ci_logs",
             max_retries=int(ctx.settings.rebase_ci_retries),
