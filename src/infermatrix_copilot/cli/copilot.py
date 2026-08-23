@@ -75,11 +75,21 @@ def _mode_review_context(playbook, spec) -> str:
     active = [s.get("id", s.get("step", "?"))
               for s in playbook_to_doc(playbook).get("steps", [])
               if "when" not in s or _eval_when(s["when"], flags)]
+    repo = str(getattr(spec, "repo", "") or "")
+    repo_line = (f"\nTarget repo (authoritative): {repo!r} — bound at "
+                 "runtime from the TaskSpec; the yaml `repos:` list is a "
+                 "planner RECALL FILTER where empty means repo-neutral, "
+                 "never untargeted." if repo else "")
     return (f"\n\nResolved mode context (authoritative): "
             f"rebase_mode={mode}. Under this mode the `when:` gates run "
             f"ONLY these steps: {active}. Every other listed step is "
             "statically gated OFF for this run — judge the plan for THIS "
-            "mode's step set.")
+            "mode's step set."
+            + repo_line +
+            "\nWrite/push governance (authoritative): the mode's own "
+            "push/CI steps are governed at runtime by the push-gate "
+            "ruling, guard_push, and the ALLOW_PUSH env double-gate — "
+            "the task tier does not forbid steps this mode activates.")
 
 
 class Copilot:

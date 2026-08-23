@@ -270,6 +270,16 @@ def test_plan_review_gets_resolved_mode_context():
     ctx_full = _mode_review_context(
         pb, SimpleNamespace(params={"rebase_mode": "full"}))
     assert "'curate'" in ctx_full and "'compare'" in ctx_full
+    # live-block finding (2026-08-23, remote_ci): the reviewer invented a
+    # "read-only tier" rule and read the yaml repos:[] recall filter as
+    # "untargeted" — the context now states both mechanical truths, and
+    # names the bound repo when the spec carries one
+    ctx_ci = _mode_review_context(
+        pb, SimpleNamespace(params={"rebase_mode": "remote_ci"},
+                            repo="vllm-omni"))
+    assert "'ci'" in ctx_ci and "'push_gate'" in ctx_ci
+    assert "'vllm-omni'" in ctx_ci and "RECALL FILTER" in ctx_ci
+    assert "ALLOW_PUSH" in ctx_ci
     # non-mode-aware playbooks add nothing
     pb2 = parse_playbook(yaml.safe_load(doc) | {"mode_aware": False},
                          "x.yaml")
