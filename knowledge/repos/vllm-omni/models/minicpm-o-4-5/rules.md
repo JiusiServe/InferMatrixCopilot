@@ -1,10 +1,10 @@
 ---
 title: "MiniCPM-o 4.5 规则"
 created: 2026-07-20
-updated: 2026-07-31
+updated: 2026-08-23
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #3642"]
+sources: ["PR #3642", "PR #6154", "PR #6170", "PR #6318"]
 confidence: high
 ---
 
@@ -20,6 +20,8 @@ confidence: high
 | tokenizer/processor、`trust_remote_code` | MCPMO-1a | pipeline/config factory → `model_executor/models/minicpmo_4_5/` loader |
 | TTS extra、backend 初始化、空音频 | MCPMO-1b | `minicpmo_4_5_omni_tts.py::MiniCPMO45OmniTTSForConditionalGeneration`、`minicpmo_4_5_token2wav.py::MiniCPMO45Token2wav` |
 | batch、`runtime_info`、stage handoff | MCPMO-3a/3b | `stage_input_processors/minicpmo_4_5_omni.py` → `minicpmo_4_5_omni.py::MiniCPMO45OmniForConditionalGeneration` → TTS/code2wav |
+| native duplex、Stage0 resume、LISTEN/SPEAK、server VAD | MCPMO-4a | `experimental/fullduplex/{minicpmo45,openai}/` → stage input processor |
+| instructions/persona/voice/mode update、prefill slots、context lock | MCPMO-4b | `experimental/fullduplex/minicpmo45/session.py` → runtime adapter/session runner |
 
 ## MCPMO-1a — trust_remote_code 服从用户选择
 
@@ -59,6 +61,27 @@ confidence: high
   `OmniOutput`/multimodal key。
 - 禁止：直接 TTS class 不读 runtime bridge；返回 tuple 让 runner 猜它是 hidden state。
 - 验收：真实 wrapper handoff 测试断言字段名、逐请求 shape、最终公开 payload。 ^[PR #3642]
+
+## MCPMO-4a — native duplex 保留可恢复 Stage0，VAD 只作显式策略
+
+- 触发：MiniCPM-o native duplex 的连续音频、LISTEN/SPEAK handoff 或 server VAD interruption。
+- 强制：模型说话时仍把音频单元追加到同一可恢复 Stage0，保留 KV/runtime state 和上一
+  terminator；LISTEN 是成功且不需要 Talker hidden state，SPEAK 才转交 Talker。server VAD
+  hard cancellation 必须显式 opt-in，阈值不得落到使 silence branch 不可达的边界。
+- 禁止：用 server VAD cancellation 冒充 native interruption；每轮重建 Stage0；让 LISTEN 因
+  无 Talker payload 失败。
+- 验收：native case 完成响应≥2、cancel/truncate=0、listen≥1；opt-in hard interrupt 恰好一次
+  terminal、fence 后无 stale delta、保留打断语句且后续响应成功。 ^[PR #6154] ^[PR #6170]
+
+## MCPMO-4b — session update 与派生 reservation 原子提交
+
+- 触发：运行中更新 instructions、persona、voice、native mode 或影响 prefill slot 的字段。
+- 强制：先重算并验证 `prefill_slots`/first-append context tokens 等派生状态，再 ACK 并原子提交；
+  `native_context_locked` 只在真实 append 成功后设置。route-defining native mode 在 session 内不可变。
+- 禁止：buffered/deferred/rejected append 提前锁定；配置已变而 reservation 保持旧值；用
+  true→false 绕过 native context lock。
+- 验收：成功更新同时改变派生状态；资源不足时无部分 mutation；buffer/defer/reject 均不锁，
+  append 成功才锁，mode flip 明确拒绝。 ^[PR #6318]
 
 共享 bridge/batch 规则见 [Model Executor rules](../../components/model-executor/rules.md)；
 公开入口完整性见 [model adaptation guardrails](../../review/guides/model-adaptation-guardrails.md)。
