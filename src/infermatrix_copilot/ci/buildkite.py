@@ -71,10 +71,18 @@ class BuildkiteCI:
 
     def __init__(self, token: str, org: str, pipeline: str,
                  build_env: Mapping[str, str] | None = None,
-                 request: RequestFn | None = None):
+                 request: RequestFn | None = None, *,
+                 ignore_branch_filters: bool = False):
         self.org = org
         self.pipeline = pipeline
         self.build_env = dict(build_env or {})
+        # Adapter opt-in (rebase.ci.ignore_branch_filters): send the
+        # documented `ignore_pipeline_branch_filters` override on create.
+        # Buildkite couples provider build_branches=false to ordinary API
+        # creation ("Branches have been disabled for this pipeline", 422);
+        # this override is the staff-documented remedy and needs only the
+        # write_builds scope. Step-level branch filters still apply.
+        self.ignore_branch_filters = bool(ignore_branch_filters)
         self._request: RequestFn = request or (
             lambda method, url, body=None, raw=False:
             _urllib_request(token, method, url, body, raw))
@@ -105,6 +113,8 @@ class BuildkiteCI:
                      meta_data: Mapping[str, str]) -> dict:
         body: dict = {"commit": commit, "branch": branch,
                       "message": message, "meta_data": dict(meta_data)}
+        if self.ignore_branch_filters:
+            body["ignore_pipeline_branch_filters"] = True
         if self.build_env:
             body["env"] = dict(self.build_env)
         status, data = self._request("POST", f"{self.base}/builds", body,

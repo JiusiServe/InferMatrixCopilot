@@ -1745,10 +1745,12 @@ async def _v3_module_rebase(ctx: StepContext) -> StepResult:
 
 
 def _make_ci_client(token: str, org: str, pipeline: str,
-                    build_env: dict[str, str]):
+                    build_env: dict[str, str],
+                    ignore_branch_filters: bool = False):
     """Provider-client factory — module-level so tests inject a fake."""
     from ...ci.buildkite import BuildkiteCI
-    return BuildkiteCI(token, org, pipeline, build_env=build_env)
+    return BuildkiteCI(token, org, pipeline, build_env=build_env,
+                       ignore_branch_filters=ignore_branch_filters)
 
 
 def _worktree_digest(repo) -> str:
@@ -1916,7 +1918,9 @@ async def _v3_ci(ctx: StepContext) -> StepResult:
     run_id = str(ctx.state.get("run_id") or ctx.run_dir.name)
 
     client = _make_ci_client(token, org, pipeline,
-                             dict(ci_cfg.get("build_env") or {}))
+                             dict(ci_cfg.get("build_env") or {}),
+                             ignore_branch_filters=bool(
+                                 ci_cfg.get("ignore_branch_filters")))
     baseline: tuple = ()
     baseline_log_fn = None
     baseline_pipeline = str(ci_cfg.get("baseline_pipeline") or "")

@@ -239,6 +239,10 @@ rebase:
     # the pipeline upload/load lanes, moved to structural: their failure
     # suppresses every dynamic test job, so ignoring it was a false-green
     # vector in the parent; deliberate divergence, 2026-08-01 review)
+    # the org runs this pipeline SCHEDULE-ONLY (provider branch builds
+    # disabled, 2026-08); API creates need the documented
+    # ignore_pipeline_branch_filters override (write_builds scope only)
+    ignore_branch_filters: true
     ignorable_name_patterns: ["(?i)testcase statistics",
                               "(?i)collection & email"]
     structural_name_patterns: ["(?i):pipeline:\\s*(upload|load)",

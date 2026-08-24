@@ -323,7 +323,8 @@ def _wire_remote_ci(env, settings, tmp_path, monkeypatch, fake,
                     branch], check=True)
     clients = []
 
-    def factory(token, org, pipeline, build_env):
+    def factory(token, org, pipeline, build_env,
+                ignore_branch_filters=False):
         clients.append((token, org, pipeline, dict(build_env)))
         return fake
 

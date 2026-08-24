@@ -54,6 +54,29 @@ def test_buildkite_create_build_error_raises_before_op_created():
         bk.create_build(branch="b", commit="c", message="m", meta_data={})
 
 
+def test_buildkite_create_build_branch_filter_override_is_opt_in():
+    """Schedule-only orgs (provider build_branches=false) refuse ordinary
+    API creates with 422; the documented remedy is the create-body
+    override `ignore_pipeline_branch_filters` (write_builds scope only).
+    Adapter data opts in (rebase.ci.ignore_branch_filters); the default
+    body must NOT carry the override."""
+    rec = Recorder([(201, {"number": 7, "state": "scheduled"})])
+    bk = BuildkiteCI("t", "o", "p", ignore_branch_filters=True, request=rec)
+    bk.create_build(branch="b", commit="c" * 40, message="m", meta_data={})
+    assert rec.calls[0][2]["ignore_pipeline_branch_filters"] is True
+    rec = Recorder([(201, {"number": 8, "state": "scheduled"})])
+    bk = BuildkiteCI("t", "o", "p", request=rec)
+    bk.create_build(branch="b", commit="c" * 40, message="m", meta_data={})
+    assert "ignore_pipeline_branch_filters" not in rec.calls[0][2]
+    # positional-compat: a 5th positional arg is still the request fn
+    # (the new option is keyword-only), and defaults leave the flag off
+    rec = Recorder([(201, {"number": 9, "state": "scheduled"})])
+    bk = BuildkiteCI("t", "o", "p", {"E": "1"}, rec)
+    bk.create_build(branch="b", commit="c" * 40, message="m", meta_data={})
+    assert rec.calls, "positional request fn was not used"
+    assert "ignore_pipeline_branch_filters" not in rec.calls[0][2]
+
+
 def test_buildkite_create_build_policy_4xx_is_typed_refusal():
     """Live remote_ci launch (2026-08-23): the org disabled provider
     branch builds (schedule-only pipeline) and create_build returned
