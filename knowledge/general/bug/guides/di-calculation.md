@@ -1,7 +1,7 @@
 ---
 title: "DI 计算说明"
 created: 2026-08-07
-updated: 2026-08-07
+updated: 2026-08-13
 type: guide
 tags: [general, bug]
 sources: []
@@ -17,9 +17,9 @@ sources: []
 | Bug 优先级分类 | 划分标准 | DI 值 | SLO |
 |---|---|---|---|
 | critical | 高优先级 | 10 | 1 天 |
-| high priority | CI Failure | 3 | 3 天 |
-| medium priority | 中优先级 | 1 | 5 天 |
-| low priority | 低优先级 | 0.1 | 10 天 |
+| high priority | CI Failure | 3 | 5 天 |
+| medium priority | 中优先级 | 1 | 10 天 |
+| low priority | 低优先级 | 0.1 | 14 天 |
 | invalid | 非问题 | 0 | / |
 
 ## 其他规则
