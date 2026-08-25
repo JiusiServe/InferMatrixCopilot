@@ -1,8 +1,8 @@
 # InferMatrixCopilot
 
-让 Codex、Claude Code、Cursor 等 Coding Agent 按
-**vLLM-Omni 的项目知识**审查和维护代码，而不只是做一遍通用检查。上游发版或
-目录变化后，还能更新这套知识，避免 Agent 继续按旧路径和旧清单工作。
+让 Codex、Claude Code、Cursor 等 Coding Agent 按**目标仓库的项目知识**
+审查和维护代码，而不只是做一遍通用检查。上游发版或目录变化后，还能更新
+这套知识，避免 Agent 继续按旧路径和旧清单工作。
 
 它提供四个常用 Skill：
 
@@ -12,6 +12,12 @@
 - `imcifix`：从 GitHub issue 出发，在本地复现、最小修复并针对性验证。
 - `imupdate`：上游变化后更新模型清单、registry、deploy、路径路由和
   source pin，避免继续按旧知识工作。
+
+copilot 本身与具体仓库无关：每个仓库的知识住在自己的 adapter
+（`adapters/<repo>/`）和知识切片（`knowledge/repos/<repo>/`）里，playbook
+按能力匹配任意仓库，接入新仓库不需要改核心代码（见「其它能力」的新仓库
+接入）。vLLM-Omni 是第一个接入的仓库（adapter zero），也是本文全部示例；
+afd-plugin 已按同样方式作为第二个仓库接入。
 
 先选使用方式：
 
@@ -173,7 +179,8 @@ python knowledge/tools/check_wiki_lint.py
 
 ## MCP 接口
 
-平时使用 Skill 命令即可；以下接口由 Agent 调用：
+平时使用 Skill 命令即可；以下接口由 Agent 调用。`repo` 参数默认 adapter
+zero（`vllm-omni`），可传任何已接入仓库的短名、别名或 owner/name：
 
 - `review(target, repo="vllm-omni", mode="direct", post=false,
   review_depth="", title="", body="", changed_files=[], repo_path="")`：
