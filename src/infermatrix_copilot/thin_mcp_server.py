@@ -945,8 +945,16 @@ def build_mcp(
     core: CopilotMCP | None = None,
 ):
     from mcp.server.fastmcp import FastMCP
+    from mcp.types import ToolAnnotations
 
     core = core or CopilotMCP(settings)
+
+    # Approval-gating hosts (codex asks per-call approval for tools without
+    # hints, and cancels them outright in headless runs) read these
+    # annotations, so they must stay truthful: `review` reserves run state
+    # and its Strict child reaches the network; everything else only reads.
+    read_only = ToolAnnotations(
+        readOnlyHint=True, idempotentHint=True, openWorldHint=False)
     mcp = FastMCP(
         "infermatrix-copilot",
         instructions=(
@@ -984,7 +992,10 @@ def build_mcp(
         ),
     )
 
-    @mcp.tool()
+    @mcp.tool(annotations=ToolAnnotations(
+        title="Start a Direct or Strict review",
+        readOnlyHint=False, destructiveHint=False, idempotentHint=False,
+        openWorldHint=True))
     def review(
         target: str,
         repo: str = "vllm-omni",
@@ -1140,7 +1151,7 @@ def build_mcp(
 
         return _guard(run)
 
-    @mcp.tool()
+    @mcp.tool(annotations=read_only)
     def validate_direct_review(
         subtraction_signal: str = "",
         subtraction: list[dict[str, str]] | None = None,
@@ -1182,7 +1193,7 @@ def build_mcp(
         }
         return result
 
-    @mcp.tool()
+    @mcp.tool(annotations=read_only)
     def get_review_result(run_id: str, offset: int = 0) -> dict:
         """Poll a Strict run and page its final report with ``next_offset``."""
         def run() -> dict:
@@ -1197,7 +1208,7 @@ def build_mcp(
 
         return _guard(run)
 
-    @mcp.tool()
+    @mcp.tool(annotations=read_only)
     def get_review_status(run_id: str) -> dict:
         """Return a Strict run's durable status and step progress."""
         def run() -> dict:
@@ -1212,12 +1223,12 @@ def build_mcp(
 
         return _guard(run)
 
-    @mcp.tool()
+    @mcp.tool(annotations=read_only)
     def update_knowledge(repo: str = "vllm-omni") -> dict:
         """Return the knowledge contribution entrypoint for the host to follow."""
         return _guard(lambda: {"knowledge_entry": _contributing_entry()})
 
-    @mcp.tool()
+    @mcp.tool(annotations=read_only)
     def doc_search(
         query: str,
         repo: str = "vllm-omni",
@@ -1248,7 +1259,7 @@ def build_mcp(
 
         return _guard(run)
 
-    @mcp.tool()
+    @mcp.tool(annotations=read_only)
     def doc_read(
         path: str,
         repo: str = "vllm-omni",
