@@ -1870,6 +1870,53 @@ def test_v3_backends_are_production(v3_env, settings, trace, tmp_path,
     assert top[0]["name"] == "runtime-one"
 
 
+def test_v3_wheel_failed_install_never_pins(v3_env, settings, trace,
+                                             tmp_path, monkeypatch):
+    """A failed install must leave the guard-checked target tree untouched:
+    the pin is the step's only tree mutation and must come AFTER the
+    install. Pinning first stranded a dirty Dockerfile on install failure
+    and the next run's guard refused to start (run-20260825-095137)."""
+    from infermatrix_copilot.engine.registry import StepRegistry
+    from infermatrix_copilot.engine.step import StepContext
+    from infermatrix_copilot.engine.steps import rebase_v3, \
+        register_builtin_steps
+    from infermatrix_copilot.rebase_engine.wheel import WheelInstallError
+    _, _, repo, run_dir = v3_env
+    upstream = tmp_path / "up"
+    upstream.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=upstream, check=True)
+    (upstream / "s.txt").write_text("s")
+    subprocess.run(["git", "add", "-A"], cwd=upstream, check=True)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
+                    "commit", "-qm", "s"], cwd=upstream, check=True)
+    pinned = []
+    monkeypatch.setattr(rebase_v3.wheel_mod, "pick_wheel_commit",
+                        lambda *a, **k: "f" * 40)
+    monkeypatch.setattr(rebase_v3.wheel_mod, "pin_dockerfile",
+                        lambda *a, **k: pinned.append(a) or True)
+    monkeypatch.setattr(rebase_v3.wheel_mod, "make_arch_probe",
+                        lambda spec: None)
+
+    def failing_install(*a, **k):
+        raise WheelInstallError("wheel install failed for commit ffffff")
+    monkeypatch.setattr(rebase_v3.wheel_mod, "ensure_wheel_installed",
+                        failing_install)
+    registry = register_builtin_steps(StepRegistry())
+    rd = tmp_path / "wheel-fail"
+    rd.mkdir()
+    ctx = StepContext(
+        settings=settings, params={}, run_dir=rd, trace=trace,
+        state={"task_spec": {"repo": "vllm-omni",
+                             "params": {"rebase_mode": "full"}},
+               "run_id": "wheel-fail", "repo_path": str(repo),
+               "upstream_origin_path": str(upstream),
+               "last_rebase_upstream_commit": "d" * 40})
+    r = asyncio.run(registry.get("rebase.v3_wheel").handler(ctx))
+    assert not r.ok and "wheel install failed" in r.summary
+    assert pinned == []          # tree untouched on the failure path
+    asyncio.run(_finalize_run(rd))
+
+
 def test_v3_wheel_installs_into_target_venv(v3_env, settings, trace,
                                             tmp_path, monkeypatch):
     """The wheel step ends with the package INSTALLED at the picked commit

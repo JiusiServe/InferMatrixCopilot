@@ -936,16 +936,22 @@ async def _v3_wheel(ctx: StepContext) -> StepResult:
             probe=wheel_mod.make_arch_probe(wheel_spec),
             baseline=ctx.state.get("last_rebase_upstream_commit", ""),
             force_commit=_task_params(ctx).get("force_upstream_commit", ""))
-        wheel_mod.pin_dockerfile(Path(repo), found, pin)
         # the selection contract ends with the package INSTALLED at the
         # picked commit in the TARGET venv — otherwise stale extensions or
-        # a different installed version drive every later module check
+        # a different installed version drive every later module check.
+        # INSTALL BEFORE PIN: the pin is this step's only mutation of the
+        # guard-checked target tree, while the install carries the real
+        # failure modes (network, venv, broken extensions). Pinning first
+        # stranded a dirty tree on install failure, and the NEXT run's
+        # guard then refused to start (run-20260825-095137) — mutating
+        # last keeps every failure path clean.
         installed = wheel_mod.ensure_wheel_installed(
             Path(upstream), found, wheel_spec,
             python=str(Path(venv) / "bin" / "python"),
             install_log=ctx.run_dir / "wheel_install.log",
             import_check_log=ctx.run_dir / "wheel_import_check.log",
             pre_checkout_head=pre_head)
+        wheel_mod.pin_dockerfile(Path(repo), found, pin)
     except wheel_mod.WheelPickError as exc:
         return StepResult(False, FailureKind.BLOCKED, str(exc))
     except wheel_mod.PinError as exc:
