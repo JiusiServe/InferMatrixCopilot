@@ -1,10 +1,10 @@
 ---
 title: "Model Executor 规则"
 created: 2026-07-10
-updated: 2026-07-31
+updated: 2026-08-23
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: [vllm_omni/worker/gpu_model_runner.py, tests/worker/test_omni_gpu_model_runner.py, vllm_omni/config/stage_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, "PR #3642", "PR #4730", "claude-workflow-starter-private@09dca46"]
+sources: [vllm_omni/worker/gpu_model_runner.py, tests/worker/test_omni_gpu_model_runner.py, vllm_omni/config/stage_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, "PR #3422", "PR #3642", "PR #4730", "PR #5074", "PR #5792", "claude-workflow-starter-private@09dca46"]
 ---
 
 # Model Executor 规则
@@ -19,14 +19,14 @@ sources: [vllm_omni/worker/gpu_model_runner.py, tests/worker/test_omni_gpu_model
 | strict stage config、known-fields/projection、service/stage 字段归属、runtime config | `strict-stage-config`：`EXEC-3a` | `vllm_omni/config/stage_config.py::{build_stage_runtime_overrides,_build_engine_args}` → `vllm_omni/config/omni_config.py::{_build_common_stage_config_kwargs,VllmOmniConfig.from_pipeline_config}` → 真实 startup consumer |
 | runner `_preprocess`、逐请求 metadata、prefill/decode phase、batch preprocess、MTP | `runner-preprocess`：本页“Runner 到模型的预处理合同” | `vllm_omni/worker/gpu_model_runner.py::{OmniGPUModelRunner._maybe_run_batch_preprocess,_preprocess,_build_model_kwargs_extra,_talker_mtp_forward}` → `vllm_omni/model_executor/models/<命中模型>` consumer |
 | stage TP/PP/DP、devices、replica、visible devices、worker 启动、容量 fail-fast | `stage-runtime`：本页“Stage 并行度和设备容量必须一起验收” | `vllm_omni/config/stage_config.py::build_stage_runtime_overrides` → `vllm_omni/engine/stage_runtime.py::{StageRuntime.initialize,StageRuntime._resolve_replica_physical_devices}` → `stage_engine_startup.py::{launch_stage_replica,get_headless_replica_devices}` |
-| `runtime_info`、`OmniOutput`、multimodal payload、跨 stage bridge、batch 串线 | `bridge-batch`：`EXEC-1a`, `EXEC-1b` | `vllm_omni/worker/gpu_model_runner.py::{extract_multimodal_outputs,_gather_runtime_additional_information,_build_model_kwargs_extra}` → `vllm_omni/model_executor/stage_input_processors/<命中模型>` |
+| `runtime_info`、request RNG、batch compaction、跨 stage bridge/串线 | `bridge-batch`：`EXEC-1a`–`1c` | shared runner request state → stage input processor → model consumer |
 | loader dtype、只取 checkpoint config、避免整仓权重下载 | `loader-contract`：`EXEC-2a` | `vllm_omni/model_executor/model_loader/weight_utils.py::download_weights_from_hf_specific` → `vllm_omni/model_executor/models/<命中模型>` loader |
 
 | 审查组 | 什么时候触发 | 规则 ID |
 |---|---|---|
 | `core` | 每次 model-executor 审查 | `EXEC-1a` |
 | `strict-stage-config` | stage schema、projection、known fields | `EXEC-3a` |
-| `bridge-batch` | runtime info、跨 stage payload、batch | `EXEC-1a`, `EXEC-1b` |
+| `bridge-batch` | runtime info、跨 stage payload、batch、request RNG | `EXEC-1a`, `EXEC-1b`, `EXEC-1c` |
 | `loader-contract` | dtype、checkpoint config 获取、loader | `EXEC-2a` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `EXEC-0a`, `EXEC-0b` |
 
@@ -87,6 +87,16 @@ Stage 拓扑错误的最小充分源码证据只有三段：一处最终配置�
 - 禁止：只消费 `runtime_info[0]`，或把单元素 waveform/metadata 广播给整个 batch。
 - 验收：至少两个不同输入的同批测试，分别断言 bridge、输出和错误归属；不能重复相同
   prompt 让串线不可见。 ^[PR #3642]
+
+### EXEC-1c — 请求随机状态跨 batching 和 yield 保持请求所有权
+
+- 触发：AR/talker adapter 接收 seed/sampling knob，或修改 batch compaction/reorder、逐 token loop。
+- 强制：请求值在 adapter/model 构造前到达真实 sampling consumer；使用 request-local generator。
+  若依赖必须临时改 global RNG，只能在无 yield 的窄上下文 save/restore。
+- 禁止：deploy 默认覆盖请求 seed；共享 generator；每步复制完整历史或创建无界
+  `batch*vocab` 临时量；global RNG 状态跨 yield 泄漏到兄弟请求。
+- 验收：同 seed 同输出、异 seed 不同输出，batch reorder/compaction 后逐请求结果稳定；全局 RNG
+  前后相同，计数器证明目标分支实际消费请求参数。 ^[PR #3422] ^[PR #5074] ^[PR #5792]
 
 ### EXEC-2a — loader 的 dtype 与 config 获取必须显式、最小化
 

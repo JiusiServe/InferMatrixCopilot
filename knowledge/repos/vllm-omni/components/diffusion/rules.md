@@ -1,10 +1,10 @@
 ---
 title: "Diffusion 共享规则"
 created: 2026-07-20
-updated: 2026-08-13
+updated: 2026-08-23
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #6094", vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/distributed/hsdp.py]
+sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5543", "PR #5848", "PR #5872", "PR #5981", "PR #6094", "PR #6102", "PR #6279", "PR #6385", "PR #6445", vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/distributed/hsdp.py]
 confidence: high
 ---
 
@@ -15,26 +15,28 @@ confidence: high
 
 ## Direct 代码快速入口
 
-- **DIFF-0a — PR 描述先选共享执行地图。** Direct review 先按 title/body 声明的 graph、RNG、checkpoint、HSDP、quantization 或质量语义命中下表，再用 pinned changed files 验证是否确属共享 diffusion owner。
-- **DIFF-0b — 共享 runner 与模型 pipeline 分层。** 先打开命中行的共享 producer；只有 live 调用链证明偏差属于某个模型 pipeline、checkpoint 或常量时才进入模型 owner，不能横向遍历所有 diffusion 模型。
+- **DIFF-0a — PR 描述先选共享执行地图。** 按 title/body 的 graph、RNG、checkpoint、HSDP、quantization 或质量信号命中下表，再用 pinned files 验证 owner。
+- **DIFF-0b — 共享 runner 与模型 pipeline 分层。** 先查命中行的共享 producer；只有 live 调用链落到单模型 pipeline/checkpoint/常量时才进入模型 owner，不横扫其他模型。
 
 | PR 描述在做什么 | 精确规则组 | 第一批 live 源码 |
 |---|---|---|
-| CUDA Graph、compile、fused scheduler/solver、cache path、eager parity | `execution-parity`：`DIFF-1a` | `vllm_omni/diffusion/compile.py::regionally_compile` → `vllm_omni/diffusion/worker/diffusion_model_runner.py::{DiffusionModelRunner.execute_model,execute_model_batch}` → 命中模型的 denoise/solver consumer |
-| seed、request-local generator、guidance=0、并发 RNG、batched generators | `execution-parity`：`DIFF-1b` | `vllm_omni/inputs/data.py::OmniDiffusionSamplingParams` → `diffusion_model_runner.py::DiffusionModelRunner._initialize_generator` → `request_batch.py::DiffusionRequestBatch.collate_sampling_param_generators` |
-| ModelOpt/checkpoint adapter、weight/scale remap、unknown tensor、resolution path | `checkpoint-distributed`：`DIFF-2a` | `vllm_omni/diffusion/model_loader/diffusers_loader.py::{DiffusersPipelineLoader._get_checkpoint_adapter,load_weights}` → `checkpoint_adapters/modelopt.py::{ModelOptFp8CheckpointAdapter._resolve_target_and_output_names,adapt}` |
-| HSDP/FSDP、`fully_shard`、DeviceMesh、packed/scalar parameter、FP8 | `checkpoint-distributed`：`DIFF-2b` | `vllm_omni/diffusion/distributed/hsdp.py::{apply_hsdp_to_model,shard_model}` → `model_loader/diffusers_loader.py::DiffusersPipelineLoader._load_model_with_hsdp` → `quantization/hsdp_fp8.py::prepare_fp8_layers_for_fsdp` |
-| component quantization、text encoder/transformer/VAE 独立配置、owner prefix、meta/offload | `checkpoint-distributed`：`DIFF-2c` | `vllm_omni/diffusion/data.py::OmniDiffusionConfig._propagate_quantization_from_tf_config` → `model_loader/diffusers_loader.py::{DiffusersPipelineLoader._get_weight_sources,_process_weights_after_loading}` → 命中 component 的真实 linear consumer |
-| LPIPS/PSNR/相似度阈值、CPU offload、量化质量证据 | `quality-evidence`：`DIFF-3a` | changed quality test 的 exact case → `vllm_omni/diffusion/worker/diffusion_model_runner.py::DiffusionModelRunner.execute_model` → 命中 pipeline；baseline/candidate 必须复用同一路径 |
-| paged KV/cache、block manager、显存预算、warmup/profile、scheduler admission | `system-runtime`：`DIFF-4a`, `DIFF-4b`, `DIFF-4c` | `diffusion_engine.py` 初始化顺序 → `diffusion_kv/initialization.py` → `worker/diffusion_worker.py::determine_available_kv_memory` → native config/allocator → `sched/base_scheduler.py` 的 enabled 请求、异常和清理路径 |
+| CUDA Graph、compile、fused solver、eager parity、tensor dtype/device | `execution-parity`：`DIFF-1a`–`1c` | `compile.py::regionally_compile` → runner batch → model denoise/solver |
+| seed、request-local generator、guidance=0、并发 RNG、batched generators | `execution-parity`：`DIFF-1b` | `inputs/data.py::OmniDiffusionSamplingParams` → runner `_initialize_generator` → request-batch generator collate |
+| ModelOpt/checkpoint adapter、weight/scale remap、unknown tensor、resolution path | `checkpoint-distributed`：`DIFF-2a` | `diffusers_loader.py::{_get_checkpoint_adapter,load_weights}` → `modelopt.py::{_resolve_target_and_output_names,adapt}` |
+| host-weight artifact、source identity、layout/dtype、warm restore | `checkpoint-distributed`：`DIFF-2d` | `model_loader/host_weights/{source_identity,contracts,identity_adapter}.py` → policy/restorer |
+| HSDP/FSDP、`fully_shard`、DeviceMesh、packed/scalar parameter、FP8 | `checkpoint-distributed`：`DIFF-2b` | `distributed/hsdp.py::{apply_hsdp_to_model,shard_model}` → loader `_load_model_with_hsdp` → `hsdp_fp8.py` |
+| component quantization、text encoder/transformer/VAE 独立配置、owner prefix、meta/offload | `checkpoint-distributed`：`DIFF-2c` | `data.py::_propagate_quantization_from_tf_config` → loader weight sources/post-load → component linear consumer |
+| LPIPS/PSNR/相似度阈值、CPU offload、量化质量证据 | `quality-evidence`：`DIFF-3a` | changed exact case → runner `execute_model` → model pipeline；A/B 同路径 |
+| paged KV/cache、backend/platform、GQA/layout、预算与 admission | `system-runtime`：`DIFF-4a`–`4f` | engine init → `diffusion_kv/{initialization,paged_attention_adapter}.py` → platform hook → scheduler |
+| worker/RPC 异常、rank-status、traceback/device cache 清理 | `system-runtime`：`DIFF-4d` | `diffusion_worker.py::{_execute_rpc,_worker_busy_loop}` 的 raise/reply/status 路径 |
 
 | 审查组 | 什么时候触发 | 规则 ID |
 |---|---|---|
-| `core` | 每次共享 diffusion 审查 | `DIFF-1a`, `DIFF-1b` |
-| `execution-parity` | graph/eager、solver、RNG、generator、zero/default | `DIFF-1a`, `DIFF-1b` |
-| `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP | `DIFF-2a`, `DIFF-2b`, `DIFF-2c` |
+| `core` | 每次共享 diffusion 审查 | `DIFF-1a`, `DIFF-1b`, `DIFF-1c` |
+| `execution-parity` | graph/eager、solver、RNG、generator、tensor dtype/device | `DIFF-1a`, `DIFF-1b`, `DIFF-1c` |
+| `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP、artifact identity | `DIFF-2a`, `DIFF-2b`, `DIFF-2c`, `DIFF-2d` |
 | `quality-evidence` | 质量阈值、offload、A/B case | `DIFF-3a` |
-| `system-runtime` | cache/资源预算、native 边界、feature gate、异常或并发调度 | `DIFF-4a`, `DIFF-4b`, `DIFF-4c` |
+| `system-runtime` | cache/预算、native/backend/platform、attention layout、异常与并发 | `DIFF-4a`–`4f` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `DIFF-0a`, `DIFF-0b` |
 
 ## 优化路径与 eager 的等价合同
@@ -59,6 +61,15 @@ confidence: high
   到达 consumer。Cosmos3 的落地约束见
   [Cosmos3 规则](../../models/cosmos3/rules.md)。 ^[PR #5001]
 
+### DIFF-1c — 新 tensor 从真实 consumer 派生 dtype 和 device
+
+- 触发：mixed precision pipeline 中新建 mask、index、constant、buffer 或预计算 tensor。
+- 强制：从输入或目标权重派生 device/dtype，整数 index 显式使用 consumer 要求的类型；
+  graph/eager 与 batch 重排后保持 shape、alias 和数值语义。
+- 禁止：依赖 process 默认 fp32/CPU 或隐式 cast/move；只测 shape 而不执行 BF16 consumer。
+- 验收：BF16、错长、batch reorder 和 graph/eager 用例断言 consumer 收到相同 device/dtype、
+  alias 与结果。 ^[PR #5067] ^[PR #5068] ^[PR #5174] ^[PR #5981]
+
 ## Checkpoint 与分布式加载
 
 ### DIFF-2a — checkpoint remap 必须追到已注册且真实消费的目标
@@ -69,7 +80,8 @@ confidence: high
 - 禁止：把 producer 有而当前 consumer 不支持的 tensor 静默过滤；必须 fold/map 或
   fail fast，并在错误中标明依赖的 upstream 版本边界。
 - 验收：测试覆盖已消费 key、未知 key、当前版本不支持的 scale 以及两条 resolution
-  path 的输出名。ModelOpt `pre_quant_scale` 是该规则的原始触发。 ^[PR #5087]
+  path 的输出名；fused mixed-FP8 还须覆盖 weight/scale/shard、gate/up 顺序、nested serialized
+  FP8 和 combined projection，缺 shard 不得默认 0。 ^[PR #5087] ^[PR #5848]
 
 ### DIFF-2b — HSDP/FSDP 修复必须执行真实 fully_shard
 
@@ -77,7 +89,8 @@ confidence: high
 - 强制：至少用单 rank Gloo + CPU DeviceMesh 执行一次真实 `fully_shard`。
 - 禁止：只断言传给 mock 的 kwargs 后声称分布式语义已覆盖。
 - 验收：普通 float parameter 变为 DTensor；packed uint8/scalar parameter 保持本地
-  identity，并覆盖 loader 的真实调用边界。 ^[PR #5088]
+  identity，并覆盖 loader 的真实调用边界；replicate size 非正值拒绝，1 用 1D、>1 用 2D
+  DeviceMesh，测试 world size 与参数一致。 ^[PR #5088] ^[PR #5872]
 
 ### DIFF-2c — component quantization 独立解析且保留完整 owner 前缀
 
@@ -89,7 +102,20 @@ confidence: high
   隐式覆盖其他组件；因为同属一个模型就量化全部 linear。
 - 验收：至少覆盖“只量化一个组件、其他组件保持 BF16”的真实构造与加载，逐层断言
   命中/排除集合，并验证 meta-device parameter 不会被提前 move。FLUX.2 的具体边界见
-  [FLUX.2 规则](../../models/flux2/rules.md)。 ^[PR #5136]
+  [FLUX.2 规则](../../models/flux2/rules.md)；新增 quantization×offload 组合需给兼容矩阵，
+  未验证 quantizer fail-closed，并核对 dtype/shape/stride。 ^[PR #5136] ^[PR #6279]
+
+### DIFF-2d — Artifact identity 只信任已验证的不可变来源
+
+- 触发：新增或修改 host-weight artifact、warm restore、source identity、layout/dtype policy。
+- 强制：共享 identity、restore 和 model ABI 保持 representation-neutral，dtype/layout 只属于
+  具体 policy/producer；只有同时验证 source kind、snapshot revision、repo topology 和 blob
+  位置的内容寻址仓库，才可用 blob 名代替内容哈希，其他本地文件和 symlink 必须按内容定身份。
+- 禁止：因 symlink 目标名看似 40/64 位十六进制就假设不可变；把 `bf16`、具体 layout 或首个
+  producer 名写进共享 identity/restorer API；用进程内 inode/mtime guard 代替跨启动身份校验。
+- 验收：第二种 synthetic representation 复用共享 identity/restorer；任意本地十六进制命名
+  symlink 在同大小内容被替换后产生不同 identity；合法 Hub snapshot→blob 拓扑仍走受控快捷路径。
+  ^[PR #6445]
 
 ## 质量阈值与资源辅助
 
@@ -101,7 +127,8 @@ confidence: high
 - 禁止：用 50-step A/B 数字为 10-step 测试阈值背书；只写“需要 offload”而不说明
   是资源前提还是功能行为。
 - 验收：运行测试文件中的 exact case，并在规则/配置旁保留最短资源原因；对称 baseline
-  证明质量差异来自目标量化变量。 ^[PR #5136]
+  证明质量差异来自目标量化变量。低 steps smoke 只能证明 runtime compatibility，不得声称
+  BF16 quality parity。 ^[PR #5136] ^[PR #6279]
 
 ## Paged cache、资源预算与系统运行时
 
@@ -139,6 +166,37 @@ confidence: high
   busy-loop 异常逃逸后留下永远等待的 stream。
 - 验收：path/lifecycle matrix 每行有 production-path 测试或明确 `MISSING_EVIDENCE`；enabled
   关键行缺失时审查只能是 partial，不能输出 clean/no findings。 ^[PR #6094]
+
+### DIFF-4d — 异常清理覆盖每种错误传递形态
+
+- 触发：worker/RPC 在异常后清 traceback、释放 device tensor/cache，或把异常转换成
+  reply、rank-status envelope、`DiffusionOutput`。
+- 强制：先保存对外所需的字符串化错误，再对 raise、普通错误回复和 collect-status 正常返回
+  三条路径逐一执行同一清理；调用方把异常折叠成成功返回形态时仍必须释放原异常引用。
+- 禁止：只在最外层 `except` 清理，却让内部状态封装路径正常返回；清理后继续从异常对象读取
+  message/traceback；用单一路径 mock 证明所有 RPC mode 都不会保留 device tensor。
+- 验收：测试分别覆盖 `collect_rank_status=true` 与抛出/错误回复路径，断言错误文本仍可见、
+  `exc.__traceback__ is None`、cache cleanup 被调用，后续健康 RPC 仍成功。 ^[PR #6385]
+
+### DIFF-4e — paged backend 在启动时按平台和逐层能力闭环
+
+- 触发：启用 paged scheduler、增加 diffusion attention backend 或平台 override。
+- 强制：启动阶段解析并验证每层实际 backend 与当前平台；走 Omni platform hook，保留
+  piecewise/SP 等能力。尚无生产 caller 的模式必须明确告警并文档化。
+- 禁止：未知平台继承 GPU 默认；分配 cache 后到首次 dispatch 才失败；静默占用 paged KV
+  却继续 dense；直接换用 upstream backend 丢失 Omni 能力。
+- 验收：unsupported platform/backend fail-fast；CUDA/NPU 对应 lane 和正式模型 E2E 证明
+  resolved backend；mixed-mask piecewise/SP 回归通过。 ^[PR #5543] ^[PR #6102]
+
+### DIFF-4f — paged attention metadata 不从 padding 猜逻辑布局
+
+- 触发：paged adapter 修改 GQA、prefix/current-token packing、LSE layout 或二维特例。
+- 强制：显式传递 Q/KV head 数、每请求 prefix/current span 和 layout；保持压缩 GQA 与 packed
+  current-token 语义，单 token/单 head 二维输入仍使用同一合同。
+- 禁止：从 padding 长度推断逻辑跨度；在 `sequence == heads` 时猜 LSE 维度；fallback 静默换
+  backend 或把 KV heads 扩成 Q heads。
+- 验收：32Q/8KV、异构 prefix、单 token/单 head、非对称等维 LSE 和 batch compaction 精确
+  对照 dense/reference 输出。 ^[PR #5543] ^[PR #6102]
 
 相关执行流见 [Diffusion architecture](architecture.md)；benchmark 证据合同见
 [performance evidence](../../benchmark/guides/performance-evidence.md)。

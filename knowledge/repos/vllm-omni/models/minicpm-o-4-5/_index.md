@@ -1,10 +1,10 @@
 ---
 title: "MiniCPM-o 4.5"
 created: 2026-07-20
-updated: 2026-07-31
+updated: 2026-08-23
 type: index
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #3642", vllm_omni/model_executor/models/minicpmo_4_5/]
+sources: ["PR #3642", "PR #6154", "PR #6170", "PR #6318", vllm_omni/model_executor/models/minicpmo_4_5/]
 confidence: high
 ---
 
@@ -32,6 +32,6 @@ runtime bridge 交给 TTS stage，再包装为 `OmniOutput.multimodal_outputs`�
 
 ## 什么时候查这里
 
-- 审查 MiniCPM-o 4.5 registry、remote-code gate、TTS dependency、batch 或 stage handoff。
+- 审查 MiniCPM-o 4.5 registry、remote-code gate、TTS dependency、batch/stage handoff 或 native duplex session。
 - 问题位于共享 bridge/batching 时转到
   [Model Executor rules](../../components/model-executor/rules.md)。

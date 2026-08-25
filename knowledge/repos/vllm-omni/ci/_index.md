@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni CI"
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-08-23
 type: index
 tags: [vllm-omni, ci]
 sources: []
@@ -21,5 +21,6 @@ sources: []
 
 | 遇到什么 | 查看哪里 |
 |---|---|
+| 审查硬件 lane、回归 fence、CI 工具供应链或 xdist/shared fixture | [CI rules](rules.md) |
 | 查看仓库特有 CI 陷阱 | [CI guides](guides/_index.md) |
 | 调查历史 CI 失败 | [CI incidents](incidents/_index.md) |

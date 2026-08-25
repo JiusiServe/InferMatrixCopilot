@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni 入口"
 created: 2026-07-10
-updated: 2026-07-31
+updated: 2026-08-23
 type: index
 tags: [vllm-omni]
 sources: []
@@ -23,6 +23,8 @@ PR title/body 先选择 owner；changed files 只校验实际范围。Direct 已
 | HTTP/OpenAI request、response、endpoint、engine lifecycle | [serving rules](components/serving/rules.md) |
 | checkpoint、tokenizer、processor、stage input/handoff | [model-executor rules](components/model-executor/rules.md) |
 | diffusion pipeline、denoise、VAE/DiT、图像生成 | [diffusion rules](components/diffusion/rules.md) |
+| host-weight artifact、lease、filesystem store、restore transaction | [host-weight rules](components/host-weight-runtime/rules.md) |
+| Buildkite、硬件 lane、CI guard、xdist/shared fixture | [CI rules](ci/rules.md) |
 | connector、collective、跨 stage 通信 | [distributed](components/distributed/_index.md) |
 | queue、token budget、prefix cache、调度 | [scheduler rules](components/scheduler/rules.md) |
 | 明确模型名或 registry key | 直接查看 [models 目录](models/_index.md) |
