@@ -1,8 +1,8 @@
 # tools.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-08-25 -->
 
-`LOC ~228 · 引擎（能力 + choke point） · refactor-status: ok`
+`LOC ~421 · 引擎（能力 + choke point） · refactor-status: ok`
 
 ## 职责
 原子能力，以及**唯一那个强制 scope 的 dispatch choke point**。
@@ -19,7 +19,13 @@
 - 每次内置调用都做 scope 检查；被拒 → **返回错误值**（绝不抛异常）。
 - 越界的写**会执行**但发出 `out_of_scope_edit`；整文件写 `.py` 发出 `full_file_write`。
 - **错误是观测结果，不是崩溃。**
-- 额外（由 step 提供的）工具绕过内置 allowlist，但**仍然被记 trace**。
+- 额外（由 step 提供的）工具绕过内置 allowlist，但**仍然被记 trace**；
+  声明了 `write_path_arg` 的 extra **选择加入**与内置同级的写路径强制
+  （只读拒绝、可写墙、越界记录）——未声明的 extra 保持历史直通行为。
+- `ToolDef.audit_ok`（可选分类器）：失败以普通返回值出现的工具
+  （父层形状的 `{"error": ...}` 字符串），传输层保持 ok=True（字节就是结果），
+  但 trace 事件按分类器判定记账 —— 缺文件/未接后端计为失败，不是成功；
+  分类器自身抛错**绝不**打断 dispatch。
 - **`read_file` 是窗口化的（48k 字符，用 `offset` 翻页），不是整文件读。**
   整文件读会吹爆会话历史、成倍增加未缓存 token，并把会话推出可靠缓存长度 ——
   这是**实测出来的成本，不是谨慎**。

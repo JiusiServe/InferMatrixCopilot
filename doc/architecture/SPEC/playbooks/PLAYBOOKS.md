@@ -1,6 +1,6 @@
 # playbooks/*.yaml —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-08-25 -->
 
 `8 个文件 · 声明式编排数据 · refactor-status: ok`
 
