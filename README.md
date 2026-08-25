@@ -76,6 +76,46 @@ Strict 还要在其中配置 `REPO_PATHS`。使用 API 后端时，填写
 [`QUICKSTART.md`](QUICKSTART.md)，订阅后端配置见
 [后端指南](doc/guide/backends.md)。
 
+## 配置 .env
+
+`install.sh` / `install-mcp.sh` 会从 [`.env.template`](.env.template) 生成
+`.env`（CLI 用仓库根的 `.env`，Direct/MCP 宿主用
+`~/.infermatrix-copilot/.env`）。`.env` 已被 git 忽略——**绝不提交**，token
+和机器本地的绝对路径只放这里。
+
+最小可用配置分三层：Direct 只需要仓库映射；Strict/CLI 加模型；rebase 的
+远端 CI 再加 token：
+
+```bash
+# 模型（Strict/CLI）：Anthropic 或 OpenAI 二选一；*_BASE_URL 可选代理
+ANTHROPIC_API_KEY=sk-...
+AGENT_MODEL=claude-sonnet-5
+STRICT_BACKEND=api            # 或 cursor / claude-code / codex（订阅制 CLI）
+
+# 仓库映射：名字 -> 本地 checkout
+REPO_PATHS={"vllm-omni": "/data/me/vllm-omni"}
+DEFAULT_REPO=vllm-omni
+REPO_FULL_NAMES={"vllm-omni": "vllm-project/vllm-omni"}   # GitHub URL 路由
+
+# adapter manifest 的路径变量（vllm-omni）：上游 checkout 与目标 venv
+VLLM_OMNI_REPO=/data/me/vllm-omni
+VLLM_UPSTREAM_REPO=/data/me/vllm
+VLLM_OMNI_VENV=/data/me/vllm-omni-venv
+
+# 安全闸：默认全关；打开是显式动作
+ALLOW_PUSH=0                  # push 双闸的环境端（另一半是 push 闸裁决）
+ALLOW_POST=0                  # 发 PR / issue 评论
+
+# rebase 远端 CI（rebase_mode=remote_ci / full 才需要）
+GITHUB_TOKEN=ghp_...          # push 走 header 认证
+BUILDKITE_API_TOKEN=bkua_...  # 需要 write_builds scope
+REBASE_CI_TIMEOUT_SEC=18000   # CI 监控预算（缺省 10800 = 3h）
+```
+
+改完跑 `./infermatrix-copilot doctor`——每个 ✗ 都打印确切修复命令；
+`doctor --probe` 再做 1-token 真连线校验（唯一的付费检查）。完整变量清单
+（模型分档、订阅后端、邮件通知等）见 [`.env.template`](.env.template)。
+
 ## 快速上手 1 · 审查
 
 Direct——在你的 Agent 里：
@@ -128,14 +168,26 @@ playbook（wheel pin、按模块分波验证、本地测试环、push 闸、远�
 召回）；旧的委托版 `repo-rebase` v2 与 `repo-rebase-native-v1` 已删除。
 
 ```bash
-# 只读评估
+# 只读评估：不动工作树，产出 RUN_REPORT
 ./infermatrix-copilot --repo vllm-omni --yes --playbook repo-rebase-v3 \
     --task-param rebase_mode=report_only
+```
 
-# 端到端：wheel → 模块波次 → 本地测试 → push 闸 → 远端 CI
+真实示例——把 vllm-omni 追到 vLLM **v0.28.0**（adapter manifest 已设
+`upstream.target_branch: releases/v0.28.0`；管线在上游 checkout 解析该分支
+tip，即 tag `v0.28.0` = `2cf0a691`，并校验预编译 wheel 可用）：
+
+```bash
+# 端到端：从上次对齐的 1af5a386c 追到 releases/v0.28.0 tip —— wheel pin →
+# 模块波次 → 本地测试环 → push dev/vllm-align → 自建 Buildkite 构建并监控
 ./infermatrix-copilot --repo vllm-omni --yes --playbook repo-rebase-v3 \
     --task-param rebase_mode=full \
-    --task-param last_rebase_commit=<上次对齐到的 upstream sha>
+    --task-param last_rebase_commit=1af5a386cd43695b23a1f7a63b0646bbf043fc9c
+
+# 树已推送、只需要 CI 验证指定 commit 时：remote_ci + 精确 sha
+./infermatrix-copilot --repo vllm-omni --yes --playbook repo-rebase-v3 \
+    --task-param rebase_mode=remote_ci \
+    --task-param upstream_commit=2cf0a6915ce544dc493a0990f2ea38d81601128a
 ```
 
 **目标从哪里来**
@@ -200,16 +252,42 @@ python knowledge/tools/check_knowledge_tree.py
 python knowledge/tools/check_wiki_lint.py
 ```
 
+## 快速上手 4 · CI 修复（imcifix）
+
+从 GitHub issue 出发：本地复现、最小修复、针对性验证；默认不 commit、
+不 push、不发评论：
+
+```text
+# Codex：issue 号或 URL
+$imcifix https://github.com/vllm-project/vllm-omni/issues/5100
+
+# Claude Code / Cursor
+/imcifix 5100
+
+或者直接说：帮我修一下 issue 5100，先本地复现
+```
+
+Agent 会解析 issue（标题、正文、标签、评论一律按不可信证据处理），先报告
+issue 号、分支、脏树状态和初始假设，再用最小命令复现，做最小修复并针对性
+验证。只有明确要求发布时才建 `fix/<issue>-<slug>` 分支，只加增量提交，
+永不 force-push。
+
+Strict 对应的 CI / issue 工作流：
+
+```bash
+./infermatrix-copilot -p "debug pr 5134, report only"     # CI 失败诊断
+./infermatrix-copilot -p "answer issue 4842, do not post" # 起草 issue 回复
+./infermatrix-copilot -p "triage recent open issues"      # 批量分诊
+```
+
 ## 其它能力
 
 - `imdesign`：写代码前生成协同设计包（问题、方案、接口变化和验证计划），
-  不自动改代码。
-- `imcifix`：从 GitHub issue 出发，在本地复现、最小修复并针对性验证；
-  默认不 commit、不 push、不发评论。
-- Strict 还可调试 CI 和处理 issue：`-p "debug pr 5134, report only"`、
-  `-p "answer issue 4842, do not post"`、`-p "triage recent open issues"`。
-- 新仓库接入：`-p "profile the repo"` 建立 DRAFT profile；接入内容放在
-  `adapters/<repo>/` 和 `knowledge/repos/<repo>/`，不需要修改 `src/`。
+  不自动改代码。例：`/imdesign 给 scheduler 加抢占开关，先理清接口边界`，
+  Codex 用 `$imdesign …`。
+- 新仓库接入：`./infermatrix-copilot -p "profile the repo"` 建立 DRAFT
+  profile；接入内容放在 `adapters/<repo>/` 和 `knowledge/repos/<repo>/`，
+  不需要修改 `src/`。
 
 ## MCP 接口
 
