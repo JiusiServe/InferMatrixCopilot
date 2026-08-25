@@ -159,6 +159,10 @@ def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
         for item in review["first_review_checklist"]
     )
     assert any(
+        "pins the original failure path" in item
+        for item in review["first_review_checklist"]
+    )
+    assert any(
         "consumers, trust boundaries, and lifecycle ownership" in item
         for item in review["first_review_checklist"]
     )
