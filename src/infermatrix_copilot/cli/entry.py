@@ -116,8 +116,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--resume", action="store_true",
                         help="resume the most recent run at its first incomplete step")
     parser.add_argument("--playbook",
-                        help="run a specific playbook by name (incl. candidates, "
-                             "e.g. repo-rebase-native for validation)")
+                        help="run a specific playbook by name "
+                             "(incl. planner-invisible candidates)")
     parser.add_argument("--report-only", action="store_true",
                         help="with --playbook: read-only variant of the task")
     parser.add_argument("--task-param", action="append", default=[],

@@ -1,8 +1,8 @@
 # engine/executor.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-08-25 -->
 
-`LOC ~267 · 引擎底座（那个循环） · refactor-status: ok`
+`LOC ~293 · 引擎底座（那个循环） · refactor-status: ok`
 
 ## 职责
 以与任务无关的保证运行一个 playbook 的各个 step：检查点/resume、`foreach` 扇出、
@@ -25,6 +25,9 @@ helper：`_eval_when`、`_merge`。
 - **B3**：`when:` 先读 TaskSpec 再读 state；**未知键 → 阻塞，绝不静默**。
 - **B1**：类型化路由；未处理的异常 → BLOCKED（**绝不吞掉**）。
 - 只对 RETRYABLE 重试，受 `max_step_retries` 限制。
+- **检查点是崩溃可幸存的**：progress.json 走 tmp 文件 + fsync + `os.replace` +
+  目录 fsync；不支持目录 fsync 的平台/文件系统退化为 rename 原子性，而真实存储
+  错误（EIO）**必须传播** —— 撕裂或丢失的 progress.json 会搁浅所有 resume 路径。
 - **run 级 task params 会到达每个 step**：`state["task_spec"]["params"]` 被合并在每个
   step 自己的 params **之下**，所以 `--task-param limit=5` 不会被静默丢弃。
   **playbook 自己的 params 在合并中获胜** —— 其中好几个是安全攸关的
