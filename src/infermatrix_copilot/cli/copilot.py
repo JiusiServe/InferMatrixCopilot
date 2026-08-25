@@ -265,8 +265,8 @@ class Copilot:
                      report_only: bool = False, assume_yes: bool = False,
                      plan_only: bool = False) -> int:
         """Explicit playbook override — the only way to execute a CANDIDATE
-        (e.g. repo-rebase-native for side-by-side validation). Always treated
-        as requiring review + confirmation."""
+        (candidates stay planner-invisible). Always treated as requiring
+        review + confirmation."""
         playbook = self.store.get(name)
         if playbook is None:
             print(f"✋ no playbook named {name!r} (see /playbooks)")

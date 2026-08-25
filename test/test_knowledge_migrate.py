@@ -597,9 +597,8 @@ def test_activation_error_exits_blocked_and_releases_run_lock(
     from infermatrix_copilot.notify import BLOCKED_EXIT
     from infermatrix_copilot.task_spec import TaskSpec
 
-    settings.playbooks_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy(_REPO_ROOT / "playbooks" / "repo-rebase.yaml",
-                settings.playbooks_dir / "repo-rebase.yaml")
+    from conftest import install_mini_rebase_playbook
+    install_mini_rebase_playbook(settings.playbooks_dir)
     settings.repo_paths = {"vllm-omni": str(git_repo)}
     settings.imx_knowledge_runtime = "vllm-omni"  # activated, NO marker
     copilot = Copilot(settings)

@@ -24,8 +24,7 @@ def stack():
 def test_adapter_zero_capabilities():
     adapter = load_adapter(REPO_ROOT / "adapters" / "vllm_omni")
     assert {"repo.path", "language.python", "ci.provider",
-            "upstream.fork_tracking", "modules",
-            "orchestrator.external"} <= adapter.capabilities
+            "upstream.fork_tracking", "modules"} <= adapter.capabilities
 
 
 def test_neutral_playbooks_match_second_repo(stack):
@@ -58,12 +57,12 @@ def test_missing_capability_degrades_read_only_to_generate(stack):
     assert res.mode == "generate" and res.requires_review
 
 
-def test_repo_scoped_playbook_still_wins_for_its_repo(stack):
+def test_neutral_rebase_engine_is_capability_gated(stack):
     store, _ = stack
     adapter = load_adapter(REPO_ROOT / "adapters" / "vllm_omni")
     pb = store.find("repo_rebase", "vllm-omni", adapter.capabilities)
-    assert pb is not None and pb.name == "repo-rebase" and pb.locked
-    # ...and never leaks to other repos (requires orchestrator.external)
+    assert pb is not None and pb.name == "repo-rebase-v3" and pb.locked
+    # ...and never leaks to repos lacking the declared capabilities
     assert store.find("repo_rebase", "other-repo", {"repo.path"}) is None
 
 

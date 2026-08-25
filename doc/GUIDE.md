@@ -410,8 +410,7 @@ capabilities)` 负责召回：精确 repo 优先；`repos: []` 的仓库无关 p
 | `issue-answer` | 2 | active | `issue_answer` | 任意 | `repo.path` |
 | `issue-triage` | 2 | active | `issue_filter` | 任意 | `repo.path` |
 | `repo-profile` | 1 | active | `repo_profile` | 任意 | — |
-| `repo-rebase` | 2 | **locked** | `repo_rebase` | vllm-omni | `orchestrator.external` |
-| `repo-rebase-native` | 1 | candidate | `repo_rebase` | vllm-omni | `orchestrator.external` |
+| `repo-rebase-v3` | 1 | **locked** | `repo_rebase` | 任意 | `modules`, `upstream.fork_tracking`, `ci.provider` |
 | `profile-consolidate` | 1 | candidate | `repo_profile` | 任意 | `repo.path` |
 
 ### 5.2 各自的 step 链
@@ -461,21 +460,20 @@ profile.fingerprint → profile.detect_drift → profile.decay_stale
   → [not report_only] agent.profile_consolidate → profile.judge → report.final_summary
 ```
 
-**`repo-rebase`**（locked）— 夜跑全量 rebase，L0 原样复用，永不改编或重新生成。
-它委托给已有的 5 阶段编排器，**零回归**：这个仓库只在成熟流水线*外面*加编排。
+**`repo-rebase-v3`**（locked）— 全仓库 rebase 引擎：rebase_engine 全量合并后的
+原生管线，仓库中立（能力门控召回）。2026-08-25 业主令 PR6+PR7 一体切换：晋升
+v3，删除委托版 v2 与 native-v1。L0 原样复用，永不改编或重新生成。四档
+`rebase_mode`（report_only / local_ci / remote_ci / full）经 `when:` 门控步骤：
 
 ```
-workspace.guard_clean → rebase.run_external → report.final_summary
-```
-
-**`repo-rebase-native`**（candidate）— 上面那条的原生分解版：包装父仓库自己的函数
-而不是重写，用于并排验证后再晋升。
-
-```
-workspace.guard_clean → rebase.prelude → rebase.phase1 → rebase.phase2_prepare
-  → rebase.module_rebase (foreach wave1_modules) → rebase.module_rebase (foreach wave2_modules)
-  → rebase.phase2_finalize → review.patch_gate → rebase.phase3 → rebase.phase4
-  → rebase.phase5 → rebase.compare_with_locked → report.final_summary
+rebase.v3_prelude → guard(_check) → v3_knowledge_prep
+  → [report_only] v3_scan
+  → [full] v3_wheel → v3_assign → v3_module_rebase (foreach wave1_modules)
+      → v3_wave_gate → v3_module_rebase (foreach wave2_modules)
+  → [本地测试] v3_test_loop → v3_precommit
+  → [push] v3_push_gate → [远端 CI] v3_ci
+  → [full] v3_phase5_report → v3_curate → v3_compare
+  → report.final_summary → v3_finalize
 ```
 
 ### 5.3 生命周期

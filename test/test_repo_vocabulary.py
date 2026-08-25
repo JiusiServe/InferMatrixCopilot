@@ -49,7 +49,6 @@ _FORBIDDEN = re.compile(
 # ceilings, like test_repo_neutral_core's) rather than a blanket skip —
 # they import/invoke the PARENT and die in PR7
 _FORBIDDEN_CEILINGS = {
-    "engine/steps/rebase_native.py": 1,   # main_ci pipeline URL (delegation)
     # thin MCP review-routing table (spec-freshness thin-mcp, merged from
     # main 2026-08): vllm_omni/model_executor/ scope prefixes — repo table
     # pending extraction to adapters/vllm_omni/
@@ -65,9 +64,6 @@ _VOCAB_RX = re.compile(r"(?<![A-Za-z])(omni|vllm)(?![A-Za-z])",
                        re.IGNORECASE)
 _VOCAB_CEILINGS = {
     # delegation (PR7 sunset)
-    "engine/steps/rebase_ext.py": 2,
-    "engine/steps/rebase_native.py": 30,
-    "rebase/monitor.py": 2,
     # parity vocabulary: parent-verbatim tool/handler names, prompt prose
     # locked by byte-parity goldens, imx-omni-pytest env contract
     "rebase_engine/module_rebase.py": 9,
@@ -78,7 +74,7 @@ _VOCAB_CEILINGS = {
     "rebase_engine/worktree.py": 2,
     "engine/steps/rebase_v3.py": 14,
     # ceilinged v1-era defaults (also under test_repo_neutral_core)
-    "config.py": 5,      # rebase_orchestrator_cmd + agent-root sibling name
+    "config.py": 4,      # agent-root sibling name (orchestrator cmd: PR7)
     "task_spec.py": 2,   # default_repo literal
     "intent.py": 4,      # default_repo parameter defaults
     "__init__.py": 2,    # package docstring

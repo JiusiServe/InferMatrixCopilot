@@ -1,12 +1,14 @@
-# repo-rebase v3 — the FULLY MERGED pipeline (no external runs): rebase_engine
-# machinery end to end. CANDIDATE: invisible to the planner (find() only
-# recalls active/locked), runnable only via
-# `infermatrix-copilot --playbook repo-rebase-v3` until the §8 validation
-# gate passes and a human promotes it over the locked `repo-rebase`
-# (doc/PLAN-rebase-merge.md PR6).
+# repo-rebase v3 — THE rebase engine (no external runs): rebase_engine
+# machinery end to end. LOCKED since 2026-08-25: the owner ordered the PR6
+# cutover and PR7 retirement as one unit after the live vLLM v0.28.0
+# campaign validated the pipeline end to end (full local runs, adopted and
+# self-created Buildkite builds, no regressions — doc/PLAN-rebase-merge.md
+# §5.4 / RUNBOOK). Recalled verbatim for repo_rebase (tier L0 reuse-locked),
+# never adapted or regenerated. The delegating repo-rebase v2 and
+# repo-rebase-native-v1 are deleted.
 name: repo-rebase-v3
 version: 1
-status: candidate
+status: locked
 provenance:
   created_by: human
   source: full merge of vllm-omni-rebase-agent per doc/PLAN-rebase-merge.md
@@ -14,7 +16,7 @@ provenance:
 task_kinds: [repo_rebase]
 # repo-NEUTRAL (2026-08-01 audit): recall is gated by `requires ⊆ the
 # adapter's capabilities`, not by repo name — a second repo onboards via
-# its adapter alone (status: candidate keeps it planner-invisible anyway)
+# its adapter alone
 requires: [modules, upstream.fork_tracking, ci.provider]
 # mode governance (Rev 8 §2.1): resolve_effective_mode runs before plan echo
 # and confirmation; `when:` gates below use ONLY the seeded mode_* flags.

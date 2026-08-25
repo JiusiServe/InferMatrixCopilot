@@ -43,11 +43,9 @@ def tool_use(name, args, tid="t1", preamble=""):
 
 @pytest.fixture()
 def copilot(settings, git_repo):
-    settings.playbooks_dir.mkdir(parents=True)
-    shutil.copy(_REPO_ROOT / "playbooks" / "repo-rebase.yaml",
-                settings.playbooks_dir / "repo-rebase.yaml")
+    from conftest import install_mini_rebase_playbook
+    install_mini_rebase_playbook(settings.playbooks_dir)
     settings.repo_paths = {"vllm-omni": str(git_repo)}
-    settings.rebase_orchestrator_cmd = "echo chat-rebase-ok"
     return Copilot(settings)
 
 
@@ -71,7 +69,7 @@ def test_chat_runs_task_and_reports_result(copilot):
     tool_result = session.messages[-2]["content"][0]
     assert tool_result["type"] == "tool_result"
     assert "exit=0" in tool_result["content"]
-    assert "completed_steps=['guard', 'rebase', 'report']" in tool_result["content"]
+    assert "completed_steps=['guard', 'report']" in tool_result["content"]
     # a real run dir exists — the task actually executed
     assert copilot.last_run_dir and (copilot.last_run_dir / "RUN_REPORT.md").exists()
     # the tool call was surfaced to the user
@@ -115,7 +113,7 @@ def test_chat_read_jail(copilot, git_repo, tmp_path):
 def test_chat_status_logs_playbooks_tools(copilot):
     session, _ = _session(copilot, [])
     assert "no runs yet" in session._dispatch_tool("get_status", {})
-    assert "repo-rebase@2 [locked]" in session._dispatch_tool("list_playbooks", {})
+    assert "repo-rebase-mini@1 [locked]" in session._dispatch_tool("list_playbooks", {})
     assert session._dispatch_tool("unknown_tool", {}) == "unknown tool: unknown_tool"
 
 

@@ -3,7 +3,7 @@ name: afd_plugin
 status: active
 created_by: human
 schema_version: 1
-capabilities: [orchestrator.external]
+capabilities: []
 
 repo:
   path: ${AFD_PLUGIN_REPO}
