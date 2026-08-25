@@ -420,12 +420,20 @@ def ensure_wheel_installed(repo: Path, commit: str, spec: WheelSpec, *,
         # parent died; release it before uninstalling — scoped to THIS repo
         release_editable_install_locks(repo)
 
-        rc, out, err = run([uv, "pip", "uninstall", spec.package], cwd=repo)
+        # Every uv call must name the TARGET venv explicitly: without
+        # --python, uv resolves the environment from VIRTUAL_ENV / a .venv in
+        # cwd, i.e. from the LAUNCHER's shell state — a copilot started from a
+        # clean shell got "No virtual environment found" while the same run
+        # worked when the operator happened to have the venv activated. The
+        # target venv is adapter data (`python`); the shell must not matter.
+        rc, out, err = run([uv, "pip", "uninstall", "--python", python,
+                            spec.package], cwd=repo)
         _append(install_log, f"--- uv pip uninstall {spec.package} ---\n{out}{err}")
 
         env = dict(os.environ)
         env.update(spec.install_env)
-        rc, out, err = run([uv, "pip", "install", "-e", "."], cwd=repo, env=env,
+        rc, out, err = run([uv, "pip", "install", "--python", python,
+                            "-e", "."], cwd=repo, env=env,
                            timeout=3600)
         _append(install_log, "--- uv pip install -e . (precompiled) ---\n"
                              f"{out}{err}")
@@ -434,7 +442,8 @@ def ensure_wheel_installed(repo: Path, commit: str, spec: WheelSpec, *,
                 # The release-branch tip may have no precompiled wheel: fall
                 # back to a source build (only path where that is expected).
                 log("Precompiled wheel not available; building from source...")
-                rc, out, err = run([uv, "pip", "install", "-e", "."], cwd=repo,
+                rc, out, err = run([uv, "pip", "install", "--python",
+                                    python, "-e", "."], cwd=repo,
                                    env=dict(os.environ), timeout=7200)
                 _append(install_log, "--- uv pip install -e . (source) ---\n"
                                      f"{out}{err}")

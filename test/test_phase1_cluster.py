@@ -215,6 +215,32 @@ def test_install_skips_when_healthy(tmp_path, monkeypatch):
     assert not any(c[0] == "uv" for c in calls)
 
 
+def test_install_targets_declared_venv_not_shell(tmp_path, monkeypatch):
+    """Every uv invocation must carry --python <target venv python>: uv
+    otherwise resolves the environment from the launcher's shell
+    (VIRTUAL_ENV / cwd .venv), so a copilot started from a clean shell
+    failed with "No virtual environment found" (run-20260825-094028)."""
+    monkeypatch.setattr(wheel, "release_editable_install_locks",
+                        lambda repo, **k: [])
+
+    def run(cmd, **kw):
+        if cmd[0] == "python3" and "import importlib" in cmd[2]:
+            return 0, "ok", ""
+        if cmd[0] == "python3":
+            return 0, "0.1\n", ""           # version mismatch -> reinstall
+        calls.append(cmd)
+        return 0, "", ""
+    calls = []
+    wheel.ensure_wheel_installed(
+        tmp_path, "d" * 40, SPEC, python="python3",
+        install_log=tmp_path / "i.log", import_check_log=tmp_path / "c.log",
+        pre_checkout_head="d" * 40, run=run)
+    uv_calls = [c for c in calls if c[0] == "uv"]
+    assert uv_calls, "expected uv pip calls on the reinstall path"
+    for c in uv_calls:
+        assert c[3:5] == ["--python", "python3"], c
+
+
 def test_install_retries_only_import_failures(tmp_path, monkeypatch):
     """Install failure aborts immediately; import-check failure retries with a
     stale-artifact clean between attempts."""
