@@ -122,15 +122,32 @@ Strict 在固定到 PR head 的 checkout 上运行，并按改动规模和风险
 `ALLOW_PUSH=1`；否则只显示“本来会做什么”。force 只使用
 `--force-with-lease`，且只针对 PR 的 head 分支。
 
-全仓库 rebase（夜跑）：
+全仓库 rebase：当前管线是 `repo-rebase-v3` —— rebase_engine 全量合并后的
+原生实现，wheel pin、按模块分波验证、本地测试环、push 闸、远端 CI 监控都在
+playbook 内完成，不再委托外部编排器：
 
 ```bash
-./infermatrix-copilot --playbook repo-rebase --yes
+# 只读评估
+./infermatrix-copilot --yes --playbook repo-rebase-v3 \
+    --task-param rebase_mode=report_only
+
+# 端到端：wheel → 模块波次 → 本地测试 → push 闸 → 远端 CI
+./infermatrix-copilot --yes --playbook repo-rebase-v3 \
+    --task-param rebase_mode=full \
+    --task-param last_rebase_commit=<上次对齐到的 upstream sha>
 ```
 
-`repo-rebase` 是 **locked** playbook：它委托给已验证的 5 阶段编排器，必须
-原样复用，永不改编或重新生成。`repo-rebase-native` 是与它并排验证的原生分解
-候选，对 planner 不可见，只能用 `--playbook` 点名运行。
+`rebase_mode` 有四档：`report_only`（只读）、`local_ci`（本地测试环，不
+push）、`remote_ci`（push + 远端 CI 监控，需要
+`--task-param upstream_commit=<sha>`）、`full`（端到端）。push 仍受双闸
+（push 闸裁决 + `ALLOW_PUSH=1`）。远端 CI 会优先领养同 commit 的 schedule
+构建；对 schedule-only 的流水线，也能按 adapter 声明
+（`rebase.ci.ignore_branch_filters`）直接创建构建。
+
+三个 playbook 并存：`repo-rebase-v3` 与 `repo-rebase-native-v1` 都是
+**candidate**——对 planner 不可见，只能用 `--playbook` 点名运行；
+`repo-rebase` 仍是 **locked** 的旧委托入口（转交已验证的 5 阶段编排器，
+必须原样复用），在 §8 验证闸通过、由人工促升 v3 之前保持不变。
 
 ## 快速上手 3 · 更新知识库
 
