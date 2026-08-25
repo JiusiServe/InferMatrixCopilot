@@ -9,15 +9,14 @@ from infermatrix_copilot.task_spec import TaskSpec
 
 @pytest.fixture()
 def copilot(settings, git_repo):
-    # ship the real playbooks into the sandbox store
-    settings.playbooks_dir.mkdir(parents=True)
-    shutil.copy(_REPO_ROOT / "playbooks" / "repo-rebase.yaml",
-                settings.playbooks_dir / "repo-rebase.yaml")
+    # a minimal locked repo_rebase playbook in the sandbox store
+    from conftest import install_mini_rebase_playbook
+    install_mini_rebase_playbook(settings.playbooks_dir)
     settings.repo_paths = {"vllm-omni": str(git_repo)}
     return Copilot(settings)
 
 
-def test_shipped_repo_rebase_playbook_resolves_L0(copilot):
+def test_locked_repo_rebase_playbook_resolves_L0(copilot):
     res = copilot.resolve(TaskSpec(kind="repo_rebase"))
     assert res.mode == "reuse" and res.tier == "L0" and res.playbook.locked
 
@@ -26,18 +25,16 @@ def test_plan_only_never_executes(copilot, capsys):
     code = copilot.run_task(TaskSpec(kind="repo_rebase"), plan_only=True)
     assert code == 0
     out = capsys.readouterr().out
-    assert "reuse repo-rebase@2 (locked)" in out
+    assert "reuse repo-rebase-mini@1 (locked)" in out
     assert not (copilot.settings.run_root.exists()
                 and list(copilot.settings.run_root.iterdir()))
 
 
 def test_end_to_end_locked_run(copilot, capsys, monkeypatch):
-    # make the external orchestrator a harmless echo for the test
-    copilot.settings.rebase_orchestrator_cmd = "echo dry-run-rebase-ok"
     code = copilot.run_task(TaskSpec(kind="repo_rebase"), assume_yes=True)
     assert code == 0
     out = capsys.readouterr().out
-    assert "✓ guard" in out and "✓ rebase" in out and "✓ report" in out
+    assert "✓ guard" in out and "✓ report" in out
     run_dirs = list(copilot.settings.run_root.iterdir())
     assert len(run_dirs) == 1
     assert (run_dirs[0] / "RUN_REPORT.md").exists()

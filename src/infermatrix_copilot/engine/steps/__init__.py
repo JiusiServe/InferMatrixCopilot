@@ -15,13 +15,11 @@ from . import _common
 # side-effect imports: each module registers its steps into the collection.
 from . import (  # noqa: F401,E402
     workspace,
-    rebase_ext,
     review,
     report,
     pr,
     issue,
     profile,
-    rebase_native,
     rebase_v3,
     rebase_knowledge,
 )

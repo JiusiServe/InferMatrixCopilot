@@ -97,12 +97,11 @@ def test_compound_command_parsing_carries_target():
 
 @pytest.fixture()
 def copilot(settings, git_repo):
-    settings.playbooks_dir.mkdir(parents=True)
-    for pb in ("repo-rebase", "pr-review"):
-        shutil.copy(_REPO_ROOT / "playbooks" / f"{pb}.yaml",
-                    settings.playbooks_dir / f"{pb}.yaml")
+    from conftest import install_mini_rebase_playbook
+    install_mini_rebase_playbook(settings.playbooks_dir)
+    shutil.copy(_REPO_ROOT / "playbooks" / "pr-review.yaml",
+                settings.playbooks_dir / "pr-review.yaml")
     settings.repo_paths = {"vllm-omni": str(git_repo)}
-    settings.rebase_orchestrator_cmd = "echo ok"
     return Copilot(settings)
 
 
@@ -125,7 +124,7 @@ def test_resume_reenters_first_incomplete_step(copilot, git_repo, capsys):
     code = copilot.resume_last()
     assert code == 0
     out = capsys.readouterr().out
-    assert "resuming" in out and "✓ rebase" in out
+    assert "resuming" in out and "✓ report" in out
     # still only one run dir: resume reused it
     run_dirs = list(copilot.settings.run_root.iterdir())
     assert len(run_dirs) == 1
@@ -165,9 +164,9 @@ def test_all_shipped_playbooks_validate():
 
     store = PlaybookStore(_REPO_ROOT / "playbooks", registry)
     names = {p.name for p in store.all()}
-    assert {"repo-rebase", "pr-rebase", "pr-debug", "pr-review",
+    assert {"repo-rebase-v3", "pr-rebase", "pr-debug", "pr-review",
             "issue-answer", "issue-triage"} <= names
-    assert store.get("repo-rebase").locked
+    assert store.get("repo-rebase-v3").locked
     for kind in ("repo_rebase", "pr_rebase", "pr_debug", "pr_review",
                  "issue_answer", "issue_filter"):
         assert store.find(kind) is not None, f"no playbook recalls {kind}"

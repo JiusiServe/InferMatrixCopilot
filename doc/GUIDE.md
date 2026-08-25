@@ -410,8 +410,7 @@ capabilities)` 负责召回：精确 repo 优先；`repos: []` 的仓库无关 p
 | `issue-answer` | 2 | active | `issue_answer` | 任意 | `repo.path` |
 | `issue-triage` | 2 | active | `issue_filter` | 任意 | `repo.path` |
 | `repo-profile` | 1 | active | `repo_profile` | 任意 | — |
-| `repo-rebase` | 2 | **locked** | `repo_rebase` | vllm-omni | `orchestrator.external` |
-| `repo-rebase-native` | 1 | candidate | `repo_rebase` | vllm-omni | `orchestrator.external` |
+| `repo-rebase-v3` | 1 | **locked** | `repo_rebase` | 任意 | `modules`, `upstream.fork_tracking`, `ci.provider` |
 | `profile-consolidate` | 1 | candidate | `repo_profile` | 任意 | `repo.path` |
 
 ### 5.2 各自的 step 链
@@ -461,21 +460,20 @@ profile.fingerprint → profile.detect_drift → profile.decay_stale
   → [not report_only] agent.profile_consolidate → profile.judge → report.final_summary
 ```
 
-**`repo-rebase`**（locked）— 夜跑全量 rebase，L0 原样复用，永不改编或重新生成。
-它委托给已有的 5 阶段编排器，**零回归**：这个仓库只在成熟流水线*外面*加编排。
+**`repo-rebase-v3`**（locked）— 全仓库 rebase 引擎：rebase_engine 全量合并后的
+原生管线，仓库中立（能力门控召回）。2026-08-25 业主令 PR6+PR7 一体切换：晋升
+v3，删除委托版 v2 与 native-v1。L0 原样复用，永不改编或重新生成。四档
+`rebase_mode`（report_only / local_ci / remote_ci / full）经 `when:` 门控步骤：
 
 ```
-workspace.guard_clean → rebase.run_external → report.final_summary
-```
-
-**`repo-rebase-native`**（candidate）— 上面那条的原生分解版：包装父仓库自己的函数
-而不是重写，用于并排验证后再晋升。
-
-```
-workspace.guard_clean → rebase.prelude → rebase.phase1 → rebase.phase2_prepare
-  → rebase.module_rebase (foreach wave1_modules) → rebase.module_rebase (foreach wave2_modules)
-  → rebase.phase2_finalize → review.patch_gate → rebase.phase3 → rebase.phase4
-  → rebase.phase5 → rebase.compare_with_locked → report.final_summary
+rebase.v3_prelude → guard(_check) → v3_knowledge_prep
+  → [report_only] v3_scan
+  → [full] v3_wheel → v3_assign → v3_module_rebase (foreach wave1_modules)
+      → v3_wave_gate → v3_module_rebase (foreach wave2_modules)
+  → [本地测试] v3_test_loop → v3_precommit
+  → [push] v3_push_gate → [远端 CI] v3_ci
+  → [full] v3_phase5_report → v3_curate → v3_compare
+  → report.final_summary → v3_finalize
 ```
 
 ### 5.3 生命周期
@@ -494,11 +492,11 @@ candidate ──人工晋升──▶ active ──▶ locked        回滚 = gi
 
 ## 6. Steps
 
-38 个 step 在 `engine/steps/` 就地 `@step` 自注册（`rebase_native.py` / `issue.py` /
+45 个 step 在 `engine/steps/` 就地 `@step` 自注册（`rebase_v3.py` / `issue.py` /
 `pr/publish.py` 里有几个用 `register_step` 直接注册）。每个 step 声明两个属性：
 
-- **kind**——`deterministic`（17）· `agent`（8）· `script`（7）· `validation`（3）·
-  `report`（3）。`kind == "agent"` 是有语义的：它意味着这个 step 走统一的
+- **kind**——`deterministic`（25）· `agent`（8）· `script`（8）· `validation`（2）·
+  `report`（2）。`kind == "agent"` 是有语义的：它意味着这个 step 走统一的
   `run_agent_step` 运行时治理（dispatch context、证据围栏、scope、结构化输出契约、
   完整 trace），由一个参数化测试钉死。
 - **risk**——`read` · `knowledge` · `write_workspace` · `push` · `report`。
@@ -506,7 +504,7 @@ candidate ──人工晋升──▶ active ──▶ locked        回滚 = gi
 失败是**值不是异常**：`StepResult.failure` 是六种 `FailureKind` 之一，
 BLOCKED / ESCALATE / FORBIDDEN 会通知并停机，只有 RETRYABLE 会有界重试。
 
-### 6.1 deterministic（17）— 不花模型调用
+### 6.1 deterministic（25）— 不花模型调用
 
 | step | risk | 做什么 |
 |---|---|---|
@@ -524,9 +522,17 @@ BLOCKED / ESCALATE / FORBIDDEN 会通知并停机，只有 RETRYABLE 会有界�
 | `profile.ingest_docs` | knowledge | 摄入 AGENTS.md/CLAUDE.md 式人工指令（文档冗余行丢弃） |
 | `profile.detect_drift` | read | Stage 4 漂移报告——刷新材料，绝不自动修 |
 | `profile.decay_stale` | knowledge | Stage 4 休眠衰减：未确认的 fact 转 stale（排除但**不删**） |
-| `rebase.prelude` | read | 父运行时设置 + wave 列表 |
-| `rebase.phase2_prepare` | read | 预检 curator + phase-2 进度初始化 |
-| `rebase.phase2_finalize` | read | 两个 wave 完成后推进父标记 |
+| `workspace.guard_clean_rebase` | write_workspace | rebase 专用脏树守卫（adapter 策略委托） |
+| `rebase.v3_prelude` | read | 模式解析写回、substate/锁/终局 finalizer、知识开账 |
+| `rebase.v3_guard` | write_workspace | 幂等重取 checkout flock + 注入 rebase 守卫策略 |
+| `rebase.v3_scan` | read | 动态测试清单（CI YAML + 活测试树 + diff 分类） |
+| `rebase.v3_wheel` | write_workspace | 选 upstream commit → 装进声明 venv → 最后 pin |
+| `rebase.v3_assign` | read | commit→模块归类 + path-sync 后按 wave 分派 |
+| `rebase.v3_wave_gate` | read | wave-1 失败裁决 wave-2 / 按配置升级 |
+| `rebase.v3_push_gate` | read | 推送闸：结构性 vs 断言失败的确定性分类 |
+| `rebase.v3_knowledge_prep` | knowledge | 知识层解析 + schema v2 保障（声明未展开 ⇒ BLOCKED） |
+| `rebase.v3_phase5_report` | read | phase-5 汇总进 substate |
+| `rebase.v3_finalize` | read | 终局裁决：substate 有失败 ⇒ BLOCKED needs-human |
 
 ### 6.2 agent（8）— 走统一运行时治理
 
@@ -541,30 +547,29 @@ BLOCKED / ESCALATE / FORBIDDEN 会通知并停机，只有 RETRYABLE 会有界�
 | `agent.profile_consolidate` | knowledge | Stage 4：**唯一**允许 rewrite/merge 的层，强制稳定性门禁 |
 | `profile.judge` | read | Stage 4 只读审计 → JUDGE_REPORT.md，findings 只呈现不自动应用 |
 
-### 6.3 script（7）— 委托或对外写
+### 6.3 script（8）— 委托或对外写
 
 | step | risk | 做什么 |
 |---|---|---|
 | `ci.push` | **push** | 受门禁的 push（PushPolicy ∧ 保护分支双闸，默认 dry-run） |
 | `pr.post_review` | **push** | 单条 GitHub review + inline threads（显式 post 标志 + `ALLOW_POST`） |
 | `issue.post_answer` | **push** | 发布 issue 回复（同样双闸） |
-| `rebase.phase4` | **push** | 父 Phase 4（push + Buildkite CI），走 copilot 的 push guard |
-| `rebase.run_external` | write_workspace | 委托给已有 5 阶段编排器（locked 流水线） |
-| `rebase.phase1` | write_workspace | 父 Phase 1（init） |
-| `rebase.module_rebase` | write_workspace | 单模块 rebase，委托父仓库自己的 `node_rebase_module` |
+| `rebase.v3_ci` | **push** | phase-4 push + CI 轮次（WAL、双闸、op-id 台账） |
+| `rebase.v3_module_rebase` | write_workspace | 单模块 rebase 单元（foreach；同 checkout 串行） |
+| `rebase.v3_test_loop` | write_workspace | phase-3 本地测试环（逐测试恢复、baseline 分流） |
+| `rebase.v3_precommit` | write_workspace | precommit 轮（passed/failed/failed_preexisting） |
+| `rebase.v3_curate` | knowledge | 运行时知识策展 + watchdog 收割（只写 runtime 侧） |
 
 > 全库只有这 4 个 `risk == "push"` 的 step，全部经 `push.py::guard_push`。
 
-### 6.4 validation（3）与 report（3）
+### 6.4 validation（2）与 report（2）
 
 | step | kind | risk | 做什么 |
 |---|---|---|---|
 | `review.patch_gate` | validation | read | 条件式 patch review，push 前 fail-closed |
 | `agent.verify_module` | validation | read | 逐模块 rebase 损伤检查——纯 LLM 建议，**不是**受治理 agent step |
-| `rebase.phase3` | validation | write_workspace | 父 Phase 3（本地流水线测试 + SDK debug 循环） |
 | `report.final_summary` | report | report | 写 `RUN_REPORT.md` + `DIAGNOSTICS.md` |
-| `rebase.phase5` | report | report | 父 Phase 5 最终摘要 + 运行后 curator |
-| `rebase.compare_with_locked` | report | report | `COMPARISON.md`：原生 run vs locked 基线（晋升证据） |
+| `rebase.v3_compare` | report | read | 与基线对比裁决（劣于 baseline ⇒ BLOCKED） |
 
 ---
 

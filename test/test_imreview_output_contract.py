@@ -35,6 +35,10 @@ def test_imreview_returns_github_style_findings(prompt_path: Path) -> None:
     assert "before reading knowledge, searching source, or running tests" in prompt
     assert "bounded `rg` searches" in prompt
     assert "import/version compatibility preflight" in prompt
+    assert (
+        "If the preflight fails, skip tests, continue the source review, "
+        "and record the skipped validation as an explicit verification gap"
+    ) in prompt
     assert "head SHA and an environment fingerprint" in prompt
     assert "at the pinned head SHA" in prompt
     assert "fetch the PR head ref" in prompt

@@ -201,7 +201,6 @@ class Settings(BaseSettings):
     pr_debug_max_groups: int = 6
 
     # External locked rebase pipeline (the existing 5-phase orchestrator)
-    rebase_orchestrator_cmd: str = "omni-rebase-orchestrator --dry-run"
     # Sibling checkout by default, derived from this file's location — never a
     # hardcoded machine path. Override with REBASE_AGENT_ROOT if it lives elsewhere.
     rebase_agent_root: Path = _REPO_ROOT.parent / "vllm-omni-rebase-agent"

@@ -1,12 +1,12 @@
 # playbooks/*.yaml —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-08-25 -->
 
-`9 个文件 · 声明式编排数据 · refactor-status: ok`
+`8 个文件 · 声明式编排数据 · refactor-status: ok`
 
 > 当前集合：`pr-review`@6、`pr-debug`@2、`pr-rebase`@2、`issue-answer`@2、
-> `issue-triage`@2、`repo-profile`@1（active）；`repo-rebase`@2（**locked**）；
-> `repo-rebase-native`@1、`profile-consolidate`@1（candidate）。带 step 链的完整清单
+> `issue-triage`@2、`repo-profile`@1（active）；`repo-rebase-v3`@1（**locked**）；
+> `profile-consolidate`@1（candidate）。带 step 链的完整清单
 > 在 [`../../../GUIDE.md`](../../../GUIDE.md) §5 —— **不在这里**。
 
 ## 职责
@@ -17,12 +17,14 @@
 success, steps[]`。
 
 ## 已注册的 playbook
-- `repo-rebase` —— **locked**，L0，`requires: [orchestrator.external]`。
-  逐字节零回归 —— **不要改它的 step 列表**。
+- `repo-rebase-v3` —— **locked**，L0，仓库中立（`repos: []`、
+  `requires: [modules, upstream.fork_tracking, ci.provider]`）。全仓库
+  rebase 引擎（2026-08-25 切换；委托版 v2 与 native-v1 已删除）——
+  **不要改它的 step 列表**。
 - `pr-rebase`/`pr-debug`/`pr-review`/`issue-answer`/`issue-triage` —— active，
   仓库中立（`repos: []`、`requires: [repo.path]`）。
 - `repo-profile` —— active，仓库中立（用于接入第二个仓库）。
-- `repo-rebase-native`、`profile-consolidate` —— **candidate**
+- `profile-consolidate` —— **candidate**
   （planner 不可见；只能经 `--playbook` 运行）。
 
 ## 不变量
@@ -32,7 +34,7 @@ success, steps[]`。
   是**带 provenance 的人类动作**。
 - **`candidate` 对 `find()` 不可见** —— 只能经 `--playbook <name>` 到达。
   正是这一条让 `profile-consolidate` 保持"刻意的节奏"（连续的 LLM 重写**实测**会腐蚀
-  记忆），也让 `repo-rebase-native` 在并排验证通过前**不进夜跑**。
+  记忆）。
 - 仓库中立的 playbook 声明 `repos: []` + 一份 `requires:` 能力清单；
   存在精确 repo 的 playbook 时仍然由它获胜。
 

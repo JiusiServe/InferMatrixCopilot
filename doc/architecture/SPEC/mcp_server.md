@@ -1,8 +1,8 @@
 # mcp_server.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-08-25 -->
 
-`LOC ~392 · Strict 后台机器（start/poll） · refactor-status: ok`
+`LOC ~421 · Strict 后台机器（start/poll） · refactor-status: ok`
 
 ## 职责
 为 MCP 宿主运行 Strict 工作流：预约、拉起、跟踪、供给结果 ——
@@ -26,7 +26,9 @@
   （`python -m infermatrix_copilot --execute-reserved <id>`）。两个理由都很关键：
   copilot 的 stdout 必须离开本进程的 JSON-RPC stdio 通道（子进程 stdout →
   `<run_dir>/console.log`），且进程级全局 tracer / `last_run_dir` **由此天然按 run 隔离**。
-- **run 由单个 worker 线程串行执行。**
+- **run 由单个 worker 线程串行执行。** worker 等待子进程后把退出码交给对账：
+  退出码 3 且无终态即 lock-loser 签名（真正 BLOCKED 的子进程会先写终态再退出），
+  以 `suspect_lock_loser` 传入 `reconcile_after_wait`。
 - 跨重启、跨多个并发 server 的轮询正确性，来自 `run_status.py` 的持久记录 + 按属主
   对账，**而不是内存状态**。
 - **`mcp` SDK 是可选 import**，藏在 `[mcp]` extra 之后，且**绝不能**被核心包 import

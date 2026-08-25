@@ -59,10 +59,10 @@
 |---|---|
 | 接口 / 任务 | `task_spec` `intent` `cli` `chat` `ui` `config` |
 | 引擎底座 | `engine/step` `engine/registry` `engine/executor` `engine/planner` `engine/agent_runtime` `agent_loop` `tools` `scopes` `llm` |
-| Step 库 | `engine/steps/__init__` `engine/steps/_common` `engine/steps/{workspace,rebase_ext,review,report,pr,issue,profile,rebase_native}` |
+| Step 库 | `engine/steps/__init__` `engine/steps/_common` `engine/steps/{workspace,review,report,pr,issue,profile,rebase_v3,rebase_knowledge}` |
 | 规划数据 | `playbooks/store` `playbooks/PLAYBOOKS`（yaml） |
 | 边缘 —— 语言 | `profiles/languages`（按语言的规则，共享） |
-| 边缘 | `adapters/base` `ci/normalize` `ci/providers` `rebase/monitor` |
+| 边缘 | `adapters/base` `ci/normalize` `ci/providers` `ci/buildkite` |
 | 安全原语 | `scopes` `push` |
 | Profile | `profiles/store` `profiles/establish` `profiles/repo_map` `profiles/consolidate` |
 | 跨切 | `review/{diff_summary,triggers,reviewer}` `memory/{debug_memory,skills}` `run_trace` `notify` `metrics` |

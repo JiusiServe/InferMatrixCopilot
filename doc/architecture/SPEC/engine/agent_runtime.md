@@ -1,8 +1,8 @@
 # engine/agent_runtime/ —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-08-25 -->
 
-`LOC ~1100（7 个文件） · 引擎（受治理的 agent 运行时） · refactor-status: ok`
+`LOC ~1690（7 个文件） · 引擎（受治理的 agent 运行时） · refactor-status: ok`
 
 ## 职责
 每个 `kind == "agent"` step 的**唯一**受治理入口，外加评审质量 ensemble。
@@ -35,8 +35,10 @@
 - **唯一入口**：agent step 只能经 `run_agent_step` 做 agentic 工作 ——
   **不允许**为了调查而临时 `ctx.llm.create()`。
 - 证据逐项封顶 + 归档 + `<untrusted_data>` 围栏（**C7**）。
-- `_ScopedKnowledge`：仓库 skill+memory 优先于共享池；提案落在仓库命名空间，
-  **且只能是 candidate**（**D1/D2**）。
+- `_ScopedKnowledge`：读取三层有序——runtime（已学得）→ adapter seed → 共享池，
+  重名时 runtime 获胜；**写入只落 runtime 侧**（Rev 8 §10：adapter 树在运行时
+  只读——提案进仓库 runtime candidates，seed skill 的使用计数走 runtime usage
+  journal，seed 文件保持逐字节不变），**且提案只能是 candidate**（**D1/D2**）。
 - `_repo_map_tool`：按需拉取，**绝不作为散文注入**；语言不支持 → `capability_gap`。
 - briefing 只在 `profile_briefing_enabled` 时进 prompt（消融开关）。
 - 输出：base+extension schema、一轮修复、状态→FailureKind；预算耗尽会**强制最终答复**。

@@ -1,8 +1,8 @@
 # chat.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-08-25 -->
 
-`LOC ~440 · 接口（对话式 REPL） · refactor-status: split-candidate`
+`LOC ~497 · 接口（对话式 REPL） · refactor-status: split-candidate`
 
 ## 职责
 Claude-Code 风格的对话式 REPL（配置了 LLM 时的默认形态）：一个持续的对话，
