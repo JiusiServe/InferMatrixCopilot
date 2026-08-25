@@ -21,24 +21,34 @@ def _fake_mcp(monkeypatch):
     class FakeMCP:
         def __init__(self, *_args, **_kwargs):
             self.tools = {}
+            self.tool_annotations = {}
 
-        def tool(self):
+        def tool(self, **kwargs):
             def register(fn):
                 self.tools[fn.__name__] = fn
+                self.tool_annotations[fn.__name__] = kwargs.get("annotations")
                 return fn
 
             return register
 
+    class FakeToolAnnotations:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
     fastmcp_module.FastMCP = FakeMCP
+    types_module = ModuleType("mcp.types")
+    types_module.ToolAnnotations = FakeToolAnnotations
     mcp_module = ModuleType("mcp")
     mcp_module.__path__ = []
     server_module = ModuleType("mcp.server")
     server_module.__path__ = []
     mcp_module.server = server_module
+    mcp_module.types = types_module
     server_module.fastmcp = fastmcp_module
     monkeypatch.setitem(sys.modules, "mcp", mcp_module)
     monkeypatch.setitem(sys.modules, "mcp.server", server_module)
     monkeypatch.setitem(sys.modules, "mcp.server.fastmcp", fastmcp_module)
+    monkeypatch.setitem(sys.modules, "mcp.types", types_module)
 
     class FakeCore:
         def __init__(self):
@@ -65,6 +75,31 @@ def _fake_mcp(monkeypatch):
 
     core = FakeCore()
     return build_mcp(core=core), core
+
+
+def test_tool_annotations_mark_the_read_only_surface(monkeypatch):
+    """Approval-gating hosts (codex) read these hints; keep them truthful.
+
+    Unannotated tools trigger a per-call approval dialog in codex and are
+    auto-cancelled in its headless runs (#86), so every tool declares its
+    hints: `review` is the only tool that mutates state (reserves a Strict
+    run) or reaches the network; everything else only reads.
+    """
+    mcp, _core = _fake_mcp(monkeypatch)
+
+    assert set(mcp.tool_annotations) == set(mcp.tools)
+    review = mcp.tool_annotations["review"]
+    assert review is not None
+    assert review.readOnlyHint is False
+    assert review.destructiveHint is False
+    assert review.openWorldHint is True
+    for name in ("validate_direct_review", "get_review_result",
+                 "get_review_status", "update_knowledge", "doc_search",
+                 "doc_read"):
+        hints = mcp.tool_annotations[name]
+        assert hints is not None, name
+        assert hints.readOnlyHint is True, name
+        assert hints.openWorldHint is False, name
 
 
 def test_direct_entrypoints_do_not_resolve_repo(monkeypatch):
