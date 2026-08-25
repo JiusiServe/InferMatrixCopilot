@@ -1,8 +1,8 @@
 # cli/ —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-08-25 -->
 
-`LOC ~1000（5 个文件） · 接口 + 编排门面 · refactor-status: ok`
+`LOC ~1240（6 个文件） · 接口 + 编排门面 · refactor-status: ok`
 
 ## 职责
 flag CLI 与 `Copilot` 门面：解析 → 过门 → 执行；并持有 run 目录、RunTrace、notifier
@@ -18,6 +18,8 @@ flag CLI 与 `Copilot` 门面：解析 → 过门 → 执行；并持有 run 目
   的调用）。
 - `utils.py` —— 纯格式化器：`parse_task_params`、`format_metrics_line`。
 - `doctor.py` —— 预检诊断（2026-07 新增）：逐项 ✓/✗，每个失败给出**唯一**确切的修复命令。
+- 子命令：`doctor` 与 `migrate-knowledge`（PR4d 部署期知识迁移；**显式 owner
+  动作，零 LLM**，需 `--repo <name>`，支持 report-only；见 RUNBOOK）。
 
 ## 公开契约（可从 `infermatrix_copilot.cli` import）
 `main(argv)`；`Copilot`（`resolve`、`run_task`、`run_playbook`、`run_queue`、
@@ -33,6 +35,12 @@ flag CLI 与 `Copilot` 门面：解析 → 过门 → 执行；并持有 run 目
 - 仓库知识（保护分支、高风险模块）由 adapter 进入 run state（**A5**）；
   被阻塞 → 退出码 3（`BLOCKED_EXIT`）。
 - `--playbook` 是运行 candidate 的**唯一**方式。
+- **rebase_mode 是带权威写回的**：`params.rebase_mode` 在过门前经
+  `rebase_engine.modes` 解析并写回（`mode_state_flags` 决定 `when:` 门），
+  冲突抛 `ModeConflictError` —— review 上下文向 reviewer 说明该模式下
+  哪些 step 会跑。
+- **每仓库知识锁（SHARED）持有整个 run 的生命周期**：run 之间不互斥，
+  只与 `migrate-knowledge` 的 EXCLUSIVE 锁互斥 —— 迁移绝不与活跃 run 并发。
 - **`doctor` 只读，且永不打印密钥的值** —— 只打印它的名字。除非传 `--probe`，
   否则它不做任何付费 LLM 调用；`--probe` 是唯一的付费检查（每个已配置档位一个 token）。
   `--json` 供 CI 使用，而**在没有凭据时以非零码退出正是 CI 里的预期状态**。

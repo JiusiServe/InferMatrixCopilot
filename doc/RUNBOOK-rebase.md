@@ -4,6 +4,15 @@ The operational companion to `doc/PLAN-rebase-merge.md` (§3.3 rollback,
 §8 validation/staged enablement). Everything here is human-executed; the
 plan doc holds the contracts, this holds the switches and checklists.
 
+> **EXECUTED for adapter zero (vllm-omni), 2026-08-25** — owner-ordered
+> PR6 promotion + PR7 retirement as ONE unit: `repo-rebase-v3` →
+> **locked**; the delegating `repo-rebase` v2, `repo-rebase-native-v1`,
+> the external-orchestrator step/monitor and the v1 env bridge are
+> **deleted**. The rollback-to-v1 rehearsal path below no longer exists —
+> rollback is now `git revert` of the cutover commit. Validation
+> evidence: the live vLLM v0.28.0 campaign (plan §5.4; the owner waived
+> the formal COMPARISON.md in favor of the campaign record).
+
 **This file is REPO-NEUTRAL** — the process ANY adapter's cutover
 follows. Every `<angle-bracket>` placeholder resolves in the adapter's
 values file, `adapters/<repo>/doc/RUNBOOK-values.md`, which also holds

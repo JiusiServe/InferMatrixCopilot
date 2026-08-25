@@ -29,7 +29,7 @@ pytest -k ensemble                 # by name
 ./infermatrix-copilot doctor --probe   # 1-token live probe per tier (the ONLY paid doctor check)
 ./infermatrix-copilot -p "review pr 4830" --plan-only    # resolve + print plan, no execution
 ./infermatrix-copilot -p "review pr 4830" --yes          # headless one-shot
-./infermatrix-copilot --playbook repo-rebase-native --yes --task-param local_ci_only=true
+./infermatrix-copilot --yes --playbook repo-rebase-v3 --task-param rebase_mode=report_only
 ./infermatrix-copilot --resume     # re-enter the last run at its first incomplete step
 ./infermatrix-copilot              # conversational chat REPL (default when an LLM is configured)
 ```
@@ -146,12 +146,12 @@ even if the suite you ran was green.
   tree with its own routing, owner-scoping, and forbidden destinations. Read
   `doc/PLAN-knowledge-reorg.md` + `knowledge/CONTRIBUTING.md` + the one matching
   contribution topic first, then run both validators after the complete batch.
-- **The locked `repo-rebase` playbook must stay byte-identical in behavior.**
-  It delegates to the external 5-phase orchestrator (`REBASE_ORCHESTRATOR_CMD`)
-  and is only *monitored*, never forked. `repo-rebase-native` is the candidate
-  replacement with an explicit promotion path in
-  `doc/IMPLEMENTATION_STATUS.md` — it stays invisible to the planner until a
-  human flips it.
+- **The locked `repo-rebase-v3` playbook is THE rebase engine (tier L0
+  reuse-locked).** Owner-ordered cutover 2026-08-25 (PR6 promotion + PR7
+  retirement as one unit): the delegating `repo-rebase` v2,
+  `repo-rebase-native-v1`, the external-orchestrator step/monitor and the
+  v1 env bridge are deleted. The planner recalls v3 verbatim; never adapt
+  or regenerate its steps — rollback is `git revert` of the cutover commit.
 - **Do not ship unmeasured "improvements" to review/agent behavior.** Judge
   noise is ±0.1 RQS3 per roll; scoring is on replicate means
   (`eval/run_replicates.sh` + `score_replicates.py`). Several plausible

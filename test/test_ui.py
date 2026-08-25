@@ -48,9 +48,8 @@ def test_fancy_ui_smoke_without_tty():
 
 def test_chat_session_with_fancy_ui(settings, git_repo):
     """A full scripted turn through the FancyUI path (headless console)."""
-    settings.playbooks_dir.mkdir(parents=True)
-    shutil.copy(_REPO_ROOT / "playbooks" / "repo-rebase.yaml",
-                settings.playbooks_dir / "repo-rebase.yaml")
+    from conftest import install_mini_rebase_playbook
+    install_mini_rebase_playbook(settings.playbooks_dir)
     settings.repo_paths = {"vllm-omni": str(git_repo)}
     copilot = Copilot(settings)
 

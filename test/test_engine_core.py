@@ -728,9 +728,8 @@ def test_resolve_fails_closed_on_malformed_known_adapter(tmp_path, settings,
     from infermatrix_copilot.cli import Copilot
     from infermatrix_copilot.config import _REPO_ROOT
     from infermatrix_copilot.task_spec import TaskSpec
-    settings.playbooks_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy(_REPO_ROOT / "playbooks" / "repo-rebase.yaml",
-                settings.playbooks_dir / "repo-rebase.yaml")
+    from conftest import install_mini_rebase_playbook
+    install_mini_rebase_playbook(settings.playbooks_dir)
     settings.repo_paths = {"vllm-omni": str(git_repo)}
     bad = Path(settings.adapters_dir) / "vllm_omni"
     bad.mkdir(parents=True, exist_ok=True)

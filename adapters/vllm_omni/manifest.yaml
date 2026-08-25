@@ -4,7 +4,7 @@ status: active
 created_by: human
 schema_version: 1
 # explicit capabilities beyond the derived ones (repo.path, ci.provider, ...)
-capabilities: [orchestrator.external]
+capabilities: []
 
 repo:
   # Portable: expanded via ${VAR}/~ at read time. REPO_PATHS in .env (gitignored)

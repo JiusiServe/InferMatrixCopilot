@@ -217,7 +217,7 @@ class Executor:
         attempts = 1 + max(0, self.settings.max_step_retries)
         last: StepResult | None = None
         # `step` alone cannot identify the work: a playbook may run the same spec
-        # twice (repo-rebase-native uses rebase.module_rebase for both waves) and
+        # twice (repo-rebase-v3 runs its module-rebase spec for both waves) and
         # foreach fans it out again, so record the playbook step id and the item.
         ident = {"step_id": step_id} if step_id else {}
         if item is not None:

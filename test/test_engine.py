@@ -169,7 +169,7 @@ def test_handler_exception_becomes_blocked(env):
 
 def test_step_span_records_step_id_and_foreach_item(env, tmp_path):
     """A step span must say which playbook step and which foreach item it was:
-    repo-rebase-native runs rebase.module_rebase for BOTH waves and fans each
+    repo-rebase-v3 runs its module-rebase spec for BOTH waves and fans each
     out, so `step` alone cannot tell those spans apart."""
     import infermatrix_copilot.tracing as tracing
     registry, executor, _ = env
