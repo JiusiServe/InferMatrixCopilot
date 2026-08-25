@@ -1,6 +1,6 @@
 # thin_mcp_server.py —— 规范
 
-<!-- verified-against: 2026-08-19 -->
+<!-- verified-against: 2026-08-25 -->
 
 `LOC ~1286 · 默认 MCP：Direct 路由 + Strict 入口 · refactor-status: oversized`
 

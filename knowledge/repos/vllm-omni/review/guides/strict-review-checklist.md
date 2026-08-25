@@ -1,7 +1,7 @@
 ---
 title: "Strict 审查触发式检查单"
 created: 2026-08-12
-updated: 2026-08-15
+updated: 2026-08-25
 type: guide
 tags: [vllm-omni, review]
 sources: []
@@ -113,6 +113,15 @@ Train-distilled trigger→check lines (20-PR campaign + teacher traces
   apply at capture only) — a fix branch merging upstream can create a
   semantic merge conflict here (double resample) that invalidates the PR's
   own WER numbers; on any merge commit, re-verify reported numbers at HEAD.
+
+## Bugfix PR regression coverage
+
+Only when the PR is a bugfix (title/labels/linked issue): demand a regression
+test pinning the ORIGINAL failure path — failing before the fix, matching the
+root cause, not a happy path (a test that cannot fail counts as missing).
+Check same-class entrypoints and boundaries; an accepted gap must state reason
+and residual risk. Conclude by naming the covering test/case or filing an
+explicit blocking / non-blocking finding — never silence.
 
 ## Process norms maintainers enforce
 
