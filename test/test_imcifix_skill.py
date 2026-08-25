@@ -23,7 +23,7 @@ def test_docs_expose_imcifix() -> None:
     codex = (ROOT / "doc" / "guide" / "hosts" / "codex.md").read_text(encoding="utf-8")
     cursor = (ROOT / "integrations" / "cursor" / "imcifix.md").read_text(encoding="utf-8")
 
-    assert "$imcifix https://github.com/vllm-project/vllm-omni/issues/5023" in readme
-    assert "/imcifix <issue-or-url>" in readme
+    assert "$imcifix https://github.com/vllm-project/vllm-omni/issues/5100" in readme
+    assert "/imcifix 5100" in readme
     assert "$imcifix https://github.com/vllm-project/vllm-omni/issues/5023" in codex
     assert "Do not commit, push, open a PR, or post an issue comment" in cursor

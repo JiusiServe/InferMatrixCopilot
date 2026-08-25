@@ -44,6 +44,11 @@
 - **Strict 绝不启动注定失败的 run**：Strict 分支先查 `strict_readiness`，
   改为返回缺失项。
 - `update_knowledge` 只返回知识贡献入口 —— 它**不是** `imupdate` 的发版审计器。
+- **每个工具都声明 `ToolAnnotations`，且提示必须真实。** 审批门控的宿主（codex 对
+  无注解工具逐次弹批准框，headless 下自动取消，见 #86）靠这些提示放行只读面：
+  `review` 是唯一保留状态变更（预留 Strict run）与触网（Strict 子进程）的工具，
+  其余六个全部 `readOnlyHint=true`。把一个会写的工具标成只读，比不标更糟。
+  （要求 `mcp>=1.8`，注解类型自该版本起可用。）
 
 ## 边界 —— 不属于这里
 Direct 路径里不调模型；不含 Strict 后台机器（`mcp_server.py`）；不定义策略

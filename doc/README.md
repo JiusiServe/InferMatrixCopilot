@@ -19,6 +19,7 @@
 | [`guide/backends.md`](guide/backends.md) | **后端**：五个 provider 怎么选、怎么配、权限如何保持（Strict） |
 | [`guide/hosts/`](guide/hosts/README.md) | **宿主端**：在 Codex / Claude Code / Cursor 里使用 copilot（Direct） |
 | [`guide/mcp.md`](guide/mcp.md) | MCP 安装与七个工具接口 |
+| [`guide/metrics.md`](guide/metrics.md) | 每次运行的 `metrics.json` 消费契约（看板/统计用） |
 | [`guide/autonomous-workflow.md`](guide/autonomous-workflow.md) | 独立执行器（默认不注册） |
 | [`guide/knowledge-maintainer.md`](knowledge/maintainer-walkthrough.md) | 知识维护实操 |
 | [`guide/samples/`](knowledge/samples) | 三个知识贡献示例 |

@@ -158,10 +158,9 @@ Adapter zero（`adapters/vllm_omni/manifest.yaml`）声明了 `push.allowed: fal
 ```
 
 已注册：`pr-review`、`pr-debug`、`pr-rebase`、`issue-assist`、`issue-triage`、
-`repo-rebase`（**locked** —— 委托给已验证的 5 阶段夜跑编排器）、
-`repo-rebase-native`（candidate）、`repo-profile`、`profile-consolidate`
-（candidate；Stage-4 维护）。candidate 对 planner **不可见**，只能用
-`--playbook` 显式运行。
+`repo-rebase-v3`（**locked** —— 全仓库 rebase 引擎，四档 `rebase_mode`）、
+`repo-profile`、`profile-consolidate`（candidate；Stage-4 维护）。candidate
+对 planner **不可见**，只能用 `--playbook` 显式运行。
 
 ## 9. 接入一个新仓库（profile）
 

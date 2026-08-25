@@ -173,6 +173,22 @@ Direct 模式**不跑第二个模型、不改知识、不发评论、不推代�
 描述里选出有界的知识 owner；范围校验和被引用代码证据的真伪，仍然由 Codex 自己负责。
 完成校验器检查的是**评审结构**。
 
+## 已知行为：MCP 工具审批
+
+Codex 会对 MCP 工具调用弹出**逐次批准**对话框（elicitation）。两个后果：
+
+- **交互式（TUI）**：第一次调用 `review` 时会先看到批准框，批准后才执行。若你的
+  Codex 版本在这个批准框上崩溃，请升级 Codex —— server 侧此时**尚未开始**任何工作
+  （run 目录都不会创建），崩溃发生在 Codex 自己的审批 UI 里。
+- **headless（`codex exec`，approval=never）**：需要审批的调用会被自动取消，
+  报 `user cancelled MCP tool call` —— 这不是 server 错误，而是 Codex 把
+  "从不询问"解释为"取消一切需要询问的调用"。
+
+server 已为每个工具声明 MCP `ToolAnnotations`：除 `review`（预留 Strict run、
+子进程触网）以外，全部 `readOnlyHint=true`，让按注解放行只读面的 Codex 版本可以
+自动批准。另注意首次启动经由 `uvx` 拉包较慢——安装器已把该 server 的
+`startup_timeout_sec` 设为 120。
+
 ## 可选：autonomous BYOK 工作流
 
 autonomous 工作流有独立的配置和文档：

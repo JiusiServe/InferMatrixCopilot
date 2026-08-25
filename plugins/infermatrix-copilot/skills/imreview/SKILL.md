@@ -33,7 +33,9 @@ Before pytest, run a short import/version compatibility preflight. Bind every
 validation command and result to the head SHA and an environment fingerprint;
 reuse an environment only when its dependency fingerprint matches. After the
 preflight passes, run targeted tests and low-cost static checks alongside the
-source review.
+source review. If the preflight fails, skip tests, continue the source review,
+and record the skipped validation as an explicit verification gap in the final
+report.
 Stop when every changed semantic path has a supported finding or an explicit
 no-issue conclusion; do not add searches only for confidence.
 After source review independently verifies and freezes its candidate findings,

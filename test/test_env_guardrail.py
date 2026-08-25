@@ -3,11 +3,11 @@
 AST census over `src/infermatrix_copilot/`: every mutation of the process
 environment — subscript assignment/deletion on `os.environ` (alias-aware),
 mutating method calls (`update`/`setdefault`/`pop`/`clear`), and
-`os.putenv`/`os.unsetenv` — is forbidden EXCEPT the pinned census below:
-exactly the v1 backend's recorded bridge sites (`rebase_native.py`, the
-owner-accepted exception with a PR7 sunset). The census is exact per
-site-kind and count, so a NEW mutation inside the exempt module fails too,
-and the list can only shrink (PR7 empties it). Dynamic circumvention
+`os.putenv`/`os.unsetenv` — is forbidden EXCEPT the pinned census below.
+PR7 (executed 2026-08-25) deleted the v1 backend's env bridge
+(`rebase_native.py`), emptying its census entry; only the CLI bootstrap
+site remains. The census is exact per site-kind and count, so a NEW
+mutation anywhere fails, and the list can only shrink. Dynamic circumvention
 (getattr strings, exec) is out of scope — the runtime guardrail fixtures
 remain the second layer.
 """
@@ -19,12 +19,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SRC = REPO_ROOT / "src" / "infermatrix_copilot"
 
 # the recorded census — {relpath: {mutation-kind: count}}:
-# * rebase_native.py: the v1 env bridge (plan §4 exception 1; sunset PR7)
 # * cli/entry.py: process-START bootstrap stamping the invocation id into
 #   the CLI's own env before any run exists (self-identity propagation to
 #   run subprocesses — not a run-time mutation; pre-existing, recorded)
 EXEMPT_CENSUS = {
-    "engine/steps/rebase_native.py": {"subscript-assign": 7},
     "cli/entry.py": {"subscript-assign": 1},
 }
 

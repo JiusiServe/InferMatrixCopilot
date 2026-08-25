@@ -292,6 +292,55 @@ def _install_cursor(config_root: Path) -> None:
     _install_skills(cursor_root / "skills")
 
 
+def _install_zcode(config_root: Path) -> None:
+    zcode_root = config_root / ".zcode"
+    config_path = zcode_root / "cli" / "config.json"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if config_path.exists():
+        try:
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise InstallError(
+                f"ZCode config is invalid and was not changed: {config_path}"
+            ) from exc
+        if not isinstance(config, dict):
+            raise InstallError(f"ZCode config must be an object: {config_path}")
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        shutil.copy2(
+            config_path,
+            config_path.with_name(f"{config_path.name}.{timestamp}.bak"),
+        )
+    else:
+        config = {}
+
+    # ZCode nests MCP servers under `mcp.servers` (that file also carries
+    # hooks/plugin state, so only this one server entry is touched).
+    mcp = config.setdefault("mcp", {})
+    if not isinstance(mcp, dict):
+        raise InstallError(f"ZCode mcp section must be an object: {config_path}")
+    servers = mcp.setdefault("servers", {})
+    if not isinstance(servers, dict):
+        raise InstallError(
+            f"ZCode mcp.servers must be an object: {config_path}"
+        )
+    servers[SERVER_NAME] = {
+        "type": "stdio",
+        "command": SERVER_COMMAND[0],
+        "args": SERVER_COMMAND[1:],
+    }
+    config_path.write_text(
+        json.dumps(config, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    # User-scope skills take precedence over ~/.agents/skills.
+    _install_skills(zcode_root / "skills")
+
+
+def _zcode_installed(config_root: Path) -> bool:
+    return bool(shutil.which("zcode")) or (config_root / ".zcode").exists()
+
+
 def _cursor_installed(config_root: Path) -> bool:
     if shutil.which("cursor") or shutil.which("cursor-agent"):
         return True
@@ -311,6 +360,8 @@ def _detect_agents(config_root: Path) -> list[str]:
         agents.append("claude")
     if _cursor_installed(config_root):
         agents.append("cursor")
+    if _zcode_installed(config_root):
+        agents.append("zcode")
     return agents
 
 
@@ -339,7 +390,7 @@ def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--agent",
         action="append",
-        choices=("codex", "claude", "cursor"),
+        choices=("codex", "claude", "cursor", "zcode"),
         help="Override automatic Agent detection. May be repeated.",
     )
     parser.add_argument(
@@ -392,6 +443,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "codex": _install_codex,
         "claude": _install_claude,
         "cursor": _install_cursor,
+        "zcode": _install_zcode,
     }
     for agent in agents:
         try:
@@ -415,7 +467,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         )
     if any(agent != "codex" for agent in agents):
         print(
-            "Claude/Cursor: restart, then run: /imreview <PR URL>, "
+            "Claude/Cursor/ZCode: restart, then run: /imreview <PR URL>, "
             "/imcifix <issue URL>, or /imupdate <repository>"
         )
     return 0

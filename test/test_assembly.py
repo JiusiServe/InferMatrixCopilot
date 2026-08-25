@@ -78,10 +78,8 @@ def test_locked_playbook_is_not_mode_governed(tmp_path):
     from infermatrix_copilot.playbooks.store import PlaybookStore
     store = PlaybookStore(REPO_ROOT / "playbooks",
                           register_builtin_steps(StepRegistry()))
-    assert store.get("repo-rebase").mode_aware is False
     assert store.get("repo-rebase-v3").mode_aware is True
-    assert store.get("repo-rebase-native-v1").mode_aware is True
-    assert store.get("repo-rebase-v3").status == "candidate"  # planner-invisible
+    assert store.get("repo-rebase-v3").status == "locked"  # planner-visible
 
 
 # -- push gate taxonomy --------------------------------------------------------
