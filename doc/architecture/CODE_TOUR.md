@@ -271,13 +271,11 @@ re-export,公开导入面不变)。
   待裁决 skill candidate 队列)与 `DIAGNOSTICS.md`(逐 step 诊断,评审曾被三重
   渲染并混入 blockers/confidence 噪声,现隔离)。
 
-- **委托/夜跑支流**(数据流出到父流水线):
-  **`engine/steps/rebase_ext.py`**(115)——`rebase.run_external`:锁定夜跑的
-  受监控子进程委托。**`engine/steps/rebase_native.py`**(443)——原生分解候选
-  (wrap 父包函数、不重写;`repo-rebase-native` playbook,candidate)。
-  **`rebase/monitor.py`**(163)——只读消费父 orchestrator 的 `state.json`
-  (phase/module/test 进度)→ copilot 进度事件 + 失败分类 + 升级材料,绝不写
-  父文件;`rebase/__init__.py`(13)导出。
+- **rebase 支流**(2026-08-25 cutover 后):委托版 `rebase_ext`、包装版
+  `rebase_native` 与父流水线监视器 `rebase/monitor.py` 已随 v1/v2 退役删除。
+  现行实现是 **`engine/steps/rebase_v3.py`** + **`engine/steps/rebase_knowledge.py`**
+  (step 装配)与 **`rebase_engine/`** 包(原语:worktree/推送 WAL/CI 轮次/
+  测试环境/知识迁移;见 `SPEC/rebase_engine.md`)。
 
 - **profile 建立支流**(通向 §6):**`engine/steps/profile.py`**(441)——
   `profile.fingerprint` → `structure_scan` → `ingest_docs` → `agent.profile_repo`
