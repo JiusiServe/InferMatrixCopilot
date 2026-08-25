@@ -122,32 +122,49 @@ Strict 在固定到 PR head 的 checkout 上运行，并按改动规模和风险
 `ALLOW_PUSH=1`；否则只显示“本来会做什么”。force 只使用
 `--force-with-lease`，且只针对 PR 的 head 分支。
 
-全仓库 rebase：当前管线是 `repo-rebase-v3` —— rebase_engine 全量合并后的
-原生实现，wheel pin、按模块分波验证、本地测试环、push 闸、远端 CI 监控都在
-playbook 内完成，不再委托外部编排器：
+全仓库 rebase：引擎是 `repo-rebase-v3` —— rebase_engine 全量合并后的原生
+playbook（wheel pin、按模块分波验证、本地测试环、push 闸、远端 CI 监控全部
+在内，无外部编排器）。2026-08-25 起为 **locked**（L0 原样复用，planner 直接
+召回）；旧的委托版 `repo-rebase` v2 与 `repo-rebase-native-v1` 已删除。
 
 ```bash
 # 只读评估
-./infermatrix-copilot --yes --playbook repo-rebase-v3 \
+./infermatrix-copilot --repo vllm-omni --yes --playbook repo-rebase-v3 \
     --task-param rebase_mode=report_only
 
 # 端到端：wheel → 模块波次 → 本地测试 → push 闸 → 远端 CI
-./infermatrix-copilot --yes --playbook repo-rebase-v3 \
+./infermatrix-copilot --repo vllm-omni --yes --playbook repo-rebase-v3 \
     --task-param rebase_mode=full \
     --task-param last_rebase_commit=<上次对齐到的 upstream sha>
 ```
 
-`rebase_mode` 有四档：`report_only`（只读）、`local_ci`（本地测试环，不
-push）、`remote_ci`（push + 远端 CI 监控，需要
-`--task-param upstream_commit=<sha>`）、`full`（端到端）。push 仍受双闸
-（push 闸裁决 + `ALLOW_PUSH=1`）。远端 CI 会优先领养同 commit 的 schedule
-构建；对 schedule-only 的流水线，也能按 adapter 声明
-（`rebase.ci.ignore_branch_filters`）直接创建构建。
+**目标从哪里来**
 
-三个 playbook 并存：`repo-rebase-v3` 与 `repo-rebase-native-v1` 都是
-**candidate**——对 planner 不可见，只能用 `--playbook` 点名运行；
-`repo-rebase` 仍是 **locked** 的旧委托入口（转交已验证的 5 阶段编排器，
-必须原样复用），在 §8 验证闸通过、由人工促升 v3 之前保持不变。
+| 目标 | 来源 | 说明 |
+| --- | --- | --- |
+| 目标仓库 | `--repo <名字>`（缺省 `DEFAULT_REPO`） | 名字经 `.env` 的 `REPO_PATHS`（JSON）映射到本地 checkout；仓库必须有 `adapters/<repo>/` 适配器 |
+| 上游分支 | 适配器 manifest 的 `upstream.target_branch`（如 `releases/v0.28.0`） | 管线在上游 checkout 上解析该分支 tip 作为 rebase 目标，并校验预编译 wheel 可用 |
+| 上游 checkout / 目标 venv | manifest 声明的路径变量，经 `.env` 展开（vllm-omni：`VLLM_UPSTREAM_REPO`、`VLLM_OMNI_VENV`） | full 模式要求两者就绪 |
+
+**task 参数**（`--task-param k=v`，可重复）
+
+| 参数 | 适用模式 | 说明 |
+| --- | --- | --- |
+| `rebase_mode` | 必填 | `report_only`（只读）/ `local_ci`（本地测试环，不 push）/ `remote_ci`（push + 远端 CI 监控）/ `full`（端到端） |
+| `last_rebase_commit` | full | 上次对齐到的 upstream sha（基线；run state 已有记录时可省略） |
+| `upstream_commit` | remote_ci 必填 | 要推送并监控的目标 upstream sha |
+| `force_upstream_commit` | full | 跳过分支 tip 解析，强制指定目标 sha |
+| `main_ci_idx` | remote_ci / full | 多条 CI 流水线时选主流水线（缺省 0） |
+| `halt_on_module_failure` | full | 模块失败即停（缺省 false：wave 门只清空 wave 2） |
+| `halt_on_phase3_failures` | full | 本地测试环失败即停（缺省 false） |
+| `push_with_failures` | remote_ci / full | 允许带失败推送（缺省 false） |
+| `strict_push_gate` | remote_ci / full | 更严的 push 闸（缺省 false） |
+
+**环境闸（`.env`）**：push 受双闸 —— push 闸裁决**且** `ALLOW_PUSH=1`；push
+认证走 `GITHUB_TOKEN`，远端 CI 需要 `BUILDKITE_API_TOKEN`；CI 监控预算
+`REBASE_CI_TIMEOUT_SEC`（缺省 3h）。远端 CI 优先领养同 commit 的 schedule
+构建；对 schedule-only 流水线，按 adapter 声明
+（`rebase.ci.ignore_branch_filters`）直接创建构建。
 
 ## 快速上手 3 · 更新知识库
 
