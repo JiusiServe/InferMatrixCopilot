@@ -172,12 +172,6 @@ def test_orchestrator_main_ordering():
              main_src.index("settings = detect_baseline(settings)"),
              main_src.index("# Resume detection")]
     assert order == sorted(order), order
-    # v1: the in-process backend orders identically
-    from infermatrix_copilot.engine.steps import rebase_native
-    v1_src = Path(rebase_native.__file__).read_text()
-    build_src = v1_src[v1_src.index("def _ensure_runtime("):]
-    assert build_src.index("_ensure_omni_lock(ctx, settings)") \
-        < build_src.index("orch.detect_baseline(settings)")
 
 
 def test_unreadable_git_metadata_fails_closed(tmp_path):

@@ -1,8 +1,8 @@
 # adapters/base.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-08-25 -->
 
-`LOC ~368 · 边缘（仓库知识） · refactor-status: ok`
+`LOC ~423 · 边缘（仓库知识） · refactor-status: ok`
 
 ## 职责
 `RepoAdapter`（住在边缘的仓库知识）、adapter 注册表，以及确定性的 Phase-0 引导。
@@ -14,6 +14,7 @@
 （见 DESIGN 的命名说明）。
 
 ## 公开契约
+`expand_path(value, extra?)`、`AdapterError` 与其子类 `AdapterNotFound`；
 `RepoAdapter`（属性 `status`、`repo_path`、`protected_branches`、`modules`、
 `high_risk_modules`、`capabilities`、`skills_dir`、`debug_memory_db`、
 `profile_dir`、`briefing()`；方法 `module_for_path`）；`load_adapter`、
@@ -21,7 +22,12 @@
 `draft_adapter`。
 
 ## 不变量
-- **D2**：`update_manifest` **拒绝** agent 对 `push`/`repo`/`upstream` 的写入。
+- **D2**：`update_manifest` **拒绝** agent 对 `push`/`repo`/`upstream`/`rebase` 的写入。
+- `expand_path` 先展开进程 env，再用 `extra`（典型是 `Settings.expansion_env()`，
+  即 `.env` 里 pydantic 吃进 Settings 而未 export 的键）做**回退**；进程 env 永远
+  获胜且**绝不被修改**；仍未解析的变量 → 返回 ""（fail-closed，能力缺口路径）。
+- **未知 adapter 名抛 `AdapterNotFound`**（子类）；把"不存在"当兼容路径的调用方
+  只能捕获这个子类 —— 已知 adapter 的畸形 manifest 必须仍是硬失败。
 - `capabilities` 由 manifest 推导（repo.path/language.*/ci.provider/upstream.*/
   modules）+ 显式的 `capabilities:` —— 与 playbook 的 `requires:` 匹配。
 - `high_risk_modules` = 标了 `risk: high` 的模块（喂给 patch-review，**A5**）。

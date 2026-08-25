@@ -16,7 +16,7 @@ params:
   report_only: {type: bool}
 steps:
   - {id: guard, step: workspace.guard_clean}
-  - {id: rebase, step: rebase.run_external}
+  - {id: rebase, step: report.final_summary}
   - {id: report, step: report.final_summary}
 """
 

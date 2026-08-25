@@ -62,19 +62,6 @@ def test_guard_clean_step(settings, trace, tmp_path, git_repo):
     assert not result.ok and result.failure is FailureKind.BLOCKED
 
 
-def test_external_rebase_step_runs_command(settings, trace, tmp_path):
-    registry = register_builtin_steps(StepRegistry())
-    step = registry.get("rebase.run_external")
-    ctx = _ctx(settings, trace, tmp_path, params={"command": "echo hello-rebase"})
-    result = asyncio.run(step.handler(ctx))
-    assert result.ok and "hello-rebase" in result.outputs["tail"]
-
-    # exit 1 with no parent state.json at all -> blocked at/before init
-    ctx = _ctx(settings, trace, tmp_path, params={"command": "false"})
-    result = asyncio.run(step.handler(ctx))
-    assert not result.ok and result.failure is FailureKind.BLOCKED
-
-
 def test_agent_step_blocked_without_llm(settings, trace, tmp_path):
     registry = register_builtin_steps(StepRegistry())
     step = registry.get("agent.review_diff")

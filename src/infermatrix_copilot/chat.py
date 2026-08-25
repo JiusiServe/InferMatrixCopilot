@@ -85,7 +85,7 @@ TOOL_DEFS: list[dict] = [
     {
         "name": "run_playbook",
         "description": "Run a playbook by explicit name (including candidates, "
-                       "e.g. repo-rebase-native for validation runs).",
+                       "which the planner never recalls).",
         "input_schema": {
             "type": "object",
             "properties": {
