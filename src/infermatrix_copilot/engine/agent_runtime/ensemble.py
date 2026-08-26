@@ -36,6 +36,25 @@ def outcome_blocked(result: Any, output: dict | None) -> bool:
     return status in ("blocked", "failed") or not getattr(result, "ok", True)
 
 
+def member_unreachable(result: Any, output: dict | None) -> bool:
+    """True only when the seat DID NOT RUN — a transport-level death.
+
+    Narrower than `outcome_blocked`, and the difference is load-bearing. A
+    transport failure surfaces as a CONTRACT-SHAPED `blocked`/`failed` output
+    with no tool work. An empty `output` ({}) is a different animal: it is the
+    one path where `_coerce_output` returned None (`runner.py`), reached when a
+    pass ran its tool loop and then burned the whole completion ceiling — the
+    seat is alive and merely truncated. `outcome_blocked` answers True for both
+    (a falsy `output` carries `result.ok=False`), so routing decisions must use
+    THIS predicate: rerouting a truncated seat to the tier model silently
+    changes the arm's configuration, which is exactly the 2026-08-16 defect the
+    route-preservation invariant exists to prevent."""
+    out = output or {}
+    if not out:
+        return False            # ran, no usable final — keep its route, re-ask
+    return outcome_blocked(result, out)
+
+
 def lens_backend_member(settings: Any, lens_name: str):
     """The harness Member a pass/lens should ride per
     `settings.review_lens_backends`, or None for the run's normal backend.
@@ -179,9 +198,21 @@ async def run_agent_step_ensemble(
 
         def _member_died(phase: str, reason: str) -> None:
             """Record a route change. NEVER silent: an arm mislabelled after
-            the fact is how 18 of 28 holdout seats once degraded invisibly."""
+            the fact is how 18 of 28 holdout seats once degraded invisibly.
+            Both route identities are CONCRETE — "effective: tier" alone does
+            not say what actually served the seat, and when the member and the
+            tier resolve to the same model the fallback changes nothing at
+            all, which a reader must be able to see."""
+            tier_model = ""
+            try:
+                tier_model = str(ctx.settings.tier_target(
+                    str(spec0.get("mode", "eco"))).model or "")
+            except Exception:  # noqa: BLE001 — telemetry must never sink a run
+                tier_model = ""
             ctx.trace.record("moa_member_fallback", lens=str(lens["name"]),
-                             phase=phase, member=member, effective="tier",
+                             phase=phase, member=member,
+                             requested=member, effective=tier_model or "tier",
+                             same_model=bool(member and member == tier_model),
                              reason=reason[:200],
                              error=reason[:200])  # kept: existing consumers
 
@@ -189,20 +220,19 @@ async def run_agent_step_ensemble(
         # raise, while harness transports convert a dead session into an empty
         # typed outcome ("a dead harness is an outcome"). Both mean the seat did
         # not run, so both fall back to the tier model exactly once.
-        member_failed = False
         try:
             result, output = await _attempt("", lens_guidance, route)
         except Exception as exc:
             if not route:
                 raise
             _member_died("first", f"{type(exc).__name__}: {exc}")
-            route, member_failed = {}, True
+            route = {}
             result, output = await _attempt("/tier", lens_guidance, route)
         else:
-            if route and outcome_blocked(result, output):
+            if route and member_unreachable(result, output):
                 _member_died("first", "typed non-OK outcome — the seat did "
                                       "not run (harness transports do not raise)")
-                route, member_failed = {}, True
+                route = {}
                 result, output = await _attempt("/tier", lens_guidance, route)
         # `output` is {} when the lens produced no contract-conformant final —
         # the ONLY path where _coerce_output returns None, reached when a pass
@@ -215,9 +245,14 @@ async def run_agent_step_ensemble(
         # to: re-asking it duplicates cost and buries the typed failure the
         # caller needs to see. (A tier fallback that RAN and merely found
         # nothing is a normal quiet pass and still earns its one re-ask.)
-        fallback_also_blocked = member_failed and outcome_blocked(result, output)
+        # Nothing left to change: the pass that just ran DID NOT RUN and there
+        # is no route left to fall back from (the member was already cleared,
+        # or there never was one). Re-asking it duplicates cost and buries the
+        # typed failure the caller needs. A TRUNCATED seat is not this case —
+        # it ran, so it still earns its one re-ask, on its own route.
+        nothing_left = member_unreachable(result, output) and not route
         if (ctx.settings.ensemble_zero_yield_retry
-                and not fallback_also_blocked
+                and not nothing_left
                 and not ((output or {}).get(merge_key) or [])):
             # zero-yield lens: one cheap single-lens re-ask beats the full
             # 8-lens ensemble retry it used to trigger (T3 forensics #6).
@@ -230,7 +265,7 @@ async def run_agent_step_ensemble(
             # seats degraded this way while the run still reported success).
             # It does NOT re-try a member already proven dead above: `route`
             # is empty by then, and re-asking a 403 seat only sank the run.
-            seat_dead = outcome_blocked(result, output) and bool(overrides)
+            seat_dead = member_unreachable(result, output) and bool(overrides)
             ctx.trace.record("lens_zero_yield_retry", lens=str(lens["name"]),
                              routed=bool(route), seat_failed=seat_dead)
             if seat_dead:
@@ -268,7 +303,7 @@ async def run_agent_step_ensemble(
                 result, output = await _attempt("/retry/tier", retry_guidance,
                                                 route)
             else:
-                if route and outcome_blocked(result, output):
+                if route and member_unreachable(result, output):
                     _member_died("retry", "typed non-OK outcome on the retry")
                     route = {}
                     result, output = await _attempt("/retry/tier",

@@ -1254,8 +1254,11 @@ def test_first_pass_typed_failure_falls_back_to_tier(settings, trace, tmp_path,
         "a typed non-OK from a routed member must fall back to the tier model")
     ev = list(trace.events("moa_member_fallback"))
     assert ev and ev[0].get("phase") == "first"
-    assert ev[0].get("member") == "composer-2.5"
-    assert ev[0].get("effective") == "tier"
+    assert ev[0].get("requested") == "composer-2.5"
+    # CONCRETE, not the word "tier": a reader must be able to see what actually
+    # served the seat, and whether the fallback changed anything at all
+    assert ev[0].get("effective") not in ("", "tier", None)
+    assert ev[0].get("same_model") is False
 
 
 def test_retry_exception_is_guarded_not_raised(settings, trace, tmp_path,
@@ -1329,3 +1332,51 @@ def test_a_dead_member_and_a_dead_tier_stop_after_two_calls(
         f"expected the routed pass + one tier fallback, got {seen}")
     assert seen[1].endswith("/tier")
     assert not any(str(s).endswith("/retry") for s in seen)
+
+
+def test_a_truncated_seat_keeps_its_route(settings, trace, tmp_path, git_repo,
+                                          monkeypatch):
+    """A seat that RAN its tool loop and then blew the reply ceiling returns
+    (StepResult(False), {}) from runner.py — `outcome_blocked` says True for
+    that, but the seat is ALIVE. Routing on that signal rerouted a merely
+    truncated seat onto the tier model, silently changing the arm's
+    configuration: the exact 2026-08-16 defect the invariant forbids."""
+    from infermatrix_copilot.engine.step import FailureKind, StepResult
+    seen: list = []
+
+    async def fake_step(ctx, **kw):
+        seen.append((kw.get("step_name"), kw.get("model_override")))
+        # the empty-final shape: ran, no contract-conformant output
+        return StepResult(False, FailureKind.RETRYABLE, "no output"), {}
+
+    _routed_run(settings, trace, tmp_path, fake_step, monkeypatch)
+    assert not any(str(s[0]).endswith("/tier") for s in seen), (
+        "a truncated seat must NOT be rerouted to the tier model")
+    retry = [s for s in seen if str(s[0]).endswith("/retry")]
+    assert retry and retry[0][1] == "composer-2.5", (
+        "the re-ask must stay on the seat's own route")
+    assert not list(trace.events("moa_member_fallback"))
+
+
+def test_an_unrouted_dead_tier_is_not_re_asked(settings, trace, tmp_path,
+                                               git_repo, monkeypatch):
+    """No route was ever configured and the tier itself did not run: there is
+    nothing to fall back to, so re-asking it only duplicates cost and buries
+    the typed failure."""
+    settings.ensemble_zero_yield_retry = True
+    settings.review_lens_backends = {}           # unrouted lens
+    seen: list = []
+
+    async def fake_step(ctx, **kw):
+        seen.append(kw.get("step_name"))
+        return _blocked()
+
+    from infermatrix_copilot.engine.agent_runtime import ensemble as ens
+    monkeypatch.setattr(ens, "run_agent_step", fake_step)
+    asyncio.run(ens.run_agent_step_ensemble(
+        _ctx(settings, trace, tmp_path, {"task_spec": {"pr": 1}},
+             llm=ScriptedLLM([])),
+        step_name="t.step", purpose="p", evidence={"e": "x"},
+        lenses=[{"name": "b", "focus": "look at B"}], merge_key="items",
+        output_extension={"items": "list"}))
+    assert len(seen) == 1, f"a dead unrouted tier must not be re-asked: {seen}"
