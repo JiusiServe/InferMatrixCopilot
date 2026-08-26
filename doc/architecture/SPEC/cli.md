@@ -1,6 +1,6 @@
 # cli/ —— 规范
 
-<!-- verified-against: 2026-08-25 -->
+<!-- verified-against: 2026-08-26 -->
 
 `LOC ~1240（6 个文件） · 接口 + 编排门面 · refactor-status: ok`
 
@@ -31,6 +31,12 @@ flag CLI 与 `Copilot` 门面：解析 → 过门 → 执行；并持有 run 目
 - `resolve` 把能力（adapter + REPO_PATHS）喂给 planner。
 - 确认之前先过 plan-review 门；除非 `--yes`，`confirm_required or requires_review`
   时触发确认（`_gate_and_confirm`，K6）。
+- **plan-review 门在无人时失败关闭（C6）。** `block` 永远停机；非 `lgtm` 的其余裁决
+  （`revise`、`unavailable`）只是**呈现**给人看——真正把门的是随后的 `[y/N]`。因此
+  `--yes` 抹掉那个人时，同一裁决必须改为停机，而不是凭一个已经不存在的确认放行。
+  交互路径不变（照旧打印裁决再问确认）。反例是实测出来的：一次无法解析的评审回复
+  让四个后端里的三个把同一份 pr-rebase 计划一路跑到推送门，而评审回复解析正常的那个
+  后端**阻断**了它。
 - `_execute` 是**唯一**的执行路径（task / 显式 playbook / resume）。
 - 仓库知识（保护分支、高风险模块）由 adapter 进入 run state（**A5**）；
   被阻塞 → 退出码 3（`BLOCKED_EXIT`）。

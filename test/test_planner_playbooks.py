@@ -118,3 +118,62 @@ def test_real_pr_review_playbook_reuses_with_review_depth():
         capabilities={"repo.path"})
     assert res.mode == "reuse" and not res.requires_review
     assert res.playbook.name == "pr-review"
+
+
+# -- plan-review gate: no human ⇒ no pass (PR1) -------------------------------
+# A non-`lgtm` verdict is only ever SURFACED — the human `[y/N]` is what gates
+# it. `--yes` deletes that human, so the same verdict must stop the run.
+# Measured on the release matrix: an unparseable reviewer reply ("revise") let
+# three of four backends run a pr-rebase plan through to its push gate, while
+# the one backend whose reviewer parsed cleanly BLOCKED the very same plan.
+
+def _gate(settings, verdict_kind, *, assume_yes, monkeypatch):
+    """Drive Copilot._plan_review_gate with a scripted plan reviewer over a
+    resolution that requires review (adapted/generated plans and explicit
+    --playbook overrides; exact reuse never reaches this gate)."""
+    from infermatrix_copilot.cli import Copilot
+    from infermatrix_copilot.cli import copilot as copilot_mod
+    from infermatrix_copilot.engine.planner import Resolution
+    from infermatrix_copilot.review.reviewer import ReviewVerdict
+    from infermatrix_copilot.task_spec import TaskSpec
+
+    monkeypatch.setattr(
+        copilot_mod, "run_plan_review",
+        lambda *a, **kw: ReviewVerdict(verdict_kind, ["scripted"]))
+    settings.playbooks_dir.mkdir(parents=True, exist_ok=True)
+    (settings.playbooks_dir / "pr-debug.yaml").write_text(ACTIVE_PB)
+    registry = register_builtin_steps(StepRegistry())
+    store = PlaybookStore(settings.playbooks_dir, registry)
+    resolution = Resolution(mode="adapt", playbook=store.get("pr-debug"),
+                            tier="L1", requires_review=True)
+    return Copilot(settings)._plan_review_gate(
+        resolution, TaskSpec(kind="pr_debug", pr=1), assume_yes)
+
+
+@pytest.mark.parametrize("verdict_kind", ["revise", "unavailable"])
+def test_headless_run_is_blocked_by_a_non_lgtm_plan_review(
+        settings, monkeypatch, verdict_kind):
+    assert _gate(settings, verdict_kind, assume_yes=True,
+                 monkeypatch=monkeypatch) is False, (
+        f"--yes + {verdict_kind} must not execute an unvetted plan: there is "
+        "no human left to read the verdict it was surfaced to")
+
+
+def test_headless_run_still_proceeds_on_lgtm(settings, monkeypatch):
+    assert _gate(settings, "lgtm", assume_yes=True,
+                 monkeypatch=monkeypatch) is True
+
+
+def test_block_stops_regardless_of_the_human(settings, monkeypatch):
+    for assume_yes in (True, False):
+        assert _gate(settings, "block", assume_yes=assume_yes,
+                     monkeypatch=monkeypatch) is False
+
+
+@pytest.mark.parametrize("verdict_kind", ["revise", "unavailable"])
+def test_interactive_run_surfaces_and_defers_to_the_confirm(
+        settings, monkeypatch, verdict_kind):
+    """Unchanged interactively: the verdict is printed and the user's [y/N]
+    remains the gate — this fix removes nothing a human still sees."""
+    assert _gate(settings, verdict_kind, assume_yes=False,
+                 monkeypatch=monkeypatch) is True
