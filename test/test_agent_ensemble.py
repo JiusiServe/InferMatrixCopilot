@@ -1200,3 +1200,132 @@ def test_empty_final_lens_is_retried_not_discarded(settings, trace, tmp_path):
     assert result.ok
     assert {i["name"] for i in output["items"]} == {"recovered", "b"}
     assert any(e for e in trace.events("lens_zero_yield_retry"))
+
+
+# -- a dead routed member must never sink the ensemble (PR5) ------------------
+# A member dies in TWO shapes: raw-API members RAISE (PermissionDeniedError on
+# a revoked key), harness transports convert a dead session into an empty typed
+# outcome ("a dead harness is an outcome"). The first pass guarded only the
+# raise; the zero-yield retry guarded neither, so a 403 seat raised through
+# asyncio.gather and failed the whole review step.
+
+def _routed_run(settings, trace, tmp_path, fake_step, monkeypatch):
+    from infermatrix_copilot.engine.agent_runtime import ensemble as ens
+
+    settings.ensemble_zero_yield_retry = True
+    settings.review_lens_backends = {"b": "cursor:composer-2.5"}
+    monkeypatch.setattr(ens, "run_agent_step", fake_step)
+    return asyncio.run(ens.run_agent_step_ensemble(
+        _ctx(settings, trace, tmp_path, {"task_spec": {"pr": 1}},
+             llm=ScriptedLLM([])),
+        step_name="t.step", purpose="p", evidence={"e": "x"},
+        lenses=[{"name": "b", "focus": "look at B"}], merge_key="items",
+        output_extension={"items": "list"}))
+
+
+def _ok(items=()):
+    from infermatrix_copilot.engine.step import StepResult
+    return StepResult(True, summary="ok"), {"status": "success",
+                                            "items": list(items),
+                                            "_tools_used": ["grep"]}
+
+
+def _blocked():
+    """The dead-harness shape: contract-shaped, zero counters, no raise."""
+    from infermatrix_copilot.engine.step import StepResult
+    return StepResult(True, summary="ok"), {"status": "blocked",
+                                            "items": [], "_tools_used": []}
+
+
+def test_first_pass_typed_failure_falls_back_to_tier(settings, trace, tmp_path,
+                                                     git_repo, monkeypatch):
+    """The ACTUAL dsh failure shape — a typed non-OK, not an exception. The
+    old guard only caught raises, so this walked on with a dead seat."""
+    seen: list = []
+
+    async def fake_step(ctx, **kw):
+        seen.append((kw.get("step_name"), kw.get("model_override")))
+        if kw.get("model_override"):        # the routed member is dead
+            return _blocked()
+        return _ok()
+
+    _routed_run(settings, trace, tmp_path, fake_step, monkeypatch)
+    assert any(s[0].endswith("/tier") for s in seen), (
+        "a typed non-OK from a routed member must fall back to the tier model")
+    ev = list(trace.events("moa_member_fallback"))
+    assert ev and ev[0].get("phase") == "first"
+    assert ev[0].get("member") == "composer-2.5"
+    assert ev[0].get("effective") == "tier"
+
+
+def test_retry_exception_is_guarded_not_raised(settings, trace, tmp_path,
+                                               git_repo, monkeypatch):
+    """The codex-run failure: the member survived the first pass, yielded
+    nothing, and the zero-yield retry re-asked the same seat — which 403'd and
+    raised through asyncio.gather, failing the whole step."""
+    async def fake_step(ctx, **kw):
+        if str(kw.get("step_name", "")).endswith("/retry") \
+                and kw.get("model_override"):
+            raise RuntimeError("PermissionDeniedError: 403 Unpurchased")
+        if str(kw.get("step_name", "")).endswith("/retry/tier"):
+            return _ok()
+        return _ok()                        # ran fine, but zero candidates
+
+    _routed_run(settings, trace, tmp_path, fake_step, monkeypatch)
+    ev = [e for e in trace.events("moa_member_fallback")
+          if e.get("phase") == "retry"]
+    assert ev, "a raise on the retry must fall back, not sink the ensemble"
+
+
+def test_retry_typed_failure_is_guarded_too(settings, trace, tmp_path,
+                                            git_repo, monkeypatch):
+    """Same as above in the harness shape: non-OK instead of a raise."""
+    async def fake_step(ctx, **kw):
+        name = str(kw.get("step_name", ""))
+        if name.endswith("/retry") and kw.get("model_override"):
+            return _blocked()
+        if name.endswith("/retry/tier"):
+            return _ok()
+        return _ok()
+
+    _routed_run(settings, trace, tmp_path, fake_step, monkeypatch)
+    ev = [e for e in trace.events("moa_member_fallback")
+          if e.get("phase") == "retry"]
+    assert ev, "a typed non-OK on the retry must fall back to tier"
+
+
+def test_a_quiet_seat_keeps_its_route(settings, trace, tmp_path, git_repo,
+                                      monkeypatch):
+    """The other half of the invariant: a seat that RAN and simply found
+    nothing is not dead, so its retry must stay on the routed member."""
+    seen: list = []
+
+    async def fake_step(ctx, **kw):
+        seen.append((kw.get("step_name"), kw.get("model_override")))
+        return _ok()                        # success, zero candidates, tools used
+
+    _routed_run(settings, trace, tmp_path, fake_step, monkeypatch)
+    retry = [s for s in seen if str(s[0]).endswith("/retry")]
+    assert retry and retry[0][1] == "composer-2.5", (
+        "a quiet seat must keep its route — dropping it silently is how an "
+        "arm gets mislabelled")
+    assert not list(trace.events("moa_member_fallback")), (
+        "a quiet seat is not a dead member and must not record a fallback")
+
+
+def test_a_dead_member_and_a_dead_tier_stop_after_two_calls(
+        settings, trace, tmp_path, git_repo, monkeypatch):
+    """When the tier fallback ALSO did not run there is nothing left to fall
+    back to: re-asking it duplicates cost and buries the typed failure. A tier
+    that RAN and merely found nothing still earns its re-ask (covered above)."""
+    seen: list = []
+
+    async def fake_step(ctx, **kw):
+        seen.append(kw.get("step_name"))
+        return _blocked()                   # member dead, then tier dead too
+
+    _routed_run(settings, trace, tmp_path, fake_step, monkeypatch)
+    assert len(seen) == 2, (
+        f"expected the routed pass + one tier fallback, got {seen}")
+    assert seen[1].endswith("/tier")
+    assert not any(str(s).endswith("/retry") for s in seen)

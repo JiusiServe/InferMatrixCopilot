@@ -162,26 +162,48 @@ async def run_agent_step_ensemble(
             "priority; report other issues only if they surface on the way. "
             "Peer agents cover the other lenses.")
         overrides = _lens_overrides(lens_i, str(lens.get("name") or ""))
-        try:
-            result, output = await run_agent_step(
-                ctx, step_name=f"{step_name}#{lens['name']}{suffix}",
+        # `route` is the EFFECTIVE route. It starts as the seat's routing and
+        # is emptied only once the member is PROVEN dead, so a seat that merely
+        # found nothing keeps its route (the 2026-08-16 invariant) while a seat
+        # that could not run stops being re-tried.
+        route = dict(overrides)
+        member = str(overrides.get("model_override") or "") if overrides else ""
+
+        async def _attempt(step_suffix: str, guidance_text: str, route: dict):
+            return await run_agent_step(
+                ctx, step_name=f"{step_name}#{lens['name']}{suffix}{step_suffix}",
                 purpose=purpose,
-                evidence=evidence, guidance=lens_guidance, expected=expected,
+                evidence=evidence, guidance=guidance_text, expected=expected,
                 output_extension=output_extension, scope=scope,
-                extra_tools=extra_tools, max_iters=budget, **overrides)
-        except Exception as exc:
-            if not overrides:
-                raise
-            # member failure (W6): this lens re-runs ONCE on the tier model —
-            # baseline-path cost, recorded, never sinks the ensemble
+                extra_tools=extra_tools, max_iters=budget, **route)
+
+        def _member_died(phase: str, reason: str) -> None:
+            """Record a route change. NEVER silent: an arm mislabelled after
+            the fact is how 18 of 28 holdout seats once degraded invisibly."""
             ctx.trace.record("moa_member_fallback", lens=str(lens["name"]),
-                             error=f"{type(exc).__name__}: {exc}"[:200])
-            result, output = await run_agent_step(
-                ctx, step_name=f"{step_name}#{lens['name']}{suffix}/tier",
-                purpose=purpose,
-                evidence=evidence, guidance=lens_guidance, expected=expected,
-                output_extension=output_extension, scope=scope,
-                extra_tools=extra_tools, max_iters=budget)
+                             phase=phase, member=member, effective="tier",
+                             reason=reason[:200],
+                             error=reason[:200])  # kept: existing consumers
+
+        # -- first pass. A dead member arrives in TWO shapes: raw-API members
+        # raise, while harness transports convert a dead session into an empty
+        # typed outcome ("a dead harness is an outcome"). Both mean the seat did
+        # not run, so both fall back to the tier model exactly once.
+        member_failed = False
+        try:
+            result, output = await _attempt("", lens_guidance, route)
+        except Exception as exc:
+            if not route:
+                raise
+            _member_died("first", f"{type(exc).__name__}: {exc}")
+            route, member_failed = {}, True
+            result, output = await _attempt("/tier", lens_guidance, route)
+        else:
+            if route and outcome_blocked(result, output):
+                _member_died("first", "typed non-OK outcome — the seat did "
+                                      "not run (harness transports do not raise)")
+                route, member_failed = {}, True
+                result, output = await _attempt("/tier", lens_guidance, route)
         # `output` is {} when the lens produced no contract-conformant final —
         # the ONLY path where _coerce_output returns None, reached when a pass
         # burns its whole completion ceiling and returns empty text. Both
@@ -189,21 +211,28 @@ async def run_agent_step_ensemble(
         # through BOTH and the lens was dropped silently: measured 2026-08-16,
         # five whole review passes and ~2.1M input tokens of investigation
         # discarded across one holdout, three of them on its worst item.
+        # A tier fallback that ALSO did not run has nothing left to fall back
+        # to: re-asking it duplicates cost and buries the typed failure the
+        # caller needs to see. (A tier fallback that RAN and merely found
+        # nothing is a normal quiet pass and still earns its one re-ask.)
+        fallback_also_blocked = member_failed and outcome_blocked(result, output)
         if (ctx.settings.ensemble_zero_yield_retry
+                and not fallback_also_blocked
                 and not ((output or {}).get(merge_key) or [])):
             # zero-yield lens: one cheap single-lens re-ask beats the full
             # 8-lens ensemble retry it used to trigger (T3 forensics #6).
-            # The retry KEEPS this lens's routing (`**overrides`): dropping it
-            # silently moved a routed seat onto the default backend, so an arm
-            # labelled "Fable in the adversary seat" was measured running
-            # DeepSeek there — the seat's whole purpose, erased without a
-            # trace signal (2026-08-16: a Fable-5 quota exhaustion made every
-            # routed session return is_error, and 18 of 28 holdout seats
-            # degraded this way while the run still reported success).
-            seat_dead = (outcome_blocked(result, output)
-                         and bool(overrides))
+            # The retry KEEPS this lens's routing whenever the seat actually
+            # RAN: dropping it silently moved a routed seat onto the default
+            # backend, so an arm labelled "Fable in the adversary seat" was
+            # measured running DeepSeek there — the seat's whole purpose,
+            # erased without a trace signal (2026-08-16: a quota exhaustion
+            # made every routed session return is_error, and 18 of 28 holdout
+            # seats degraded this way while the run still reported success).
+            # It does NOT re-try a member already proven dead above: `route`
+            # is empty by then, and re-asking a 403 seat only sank the run.
+            seat_dead = outcome_blocked(result, output) and bool(overrides)
             ctx.trace.record("lens_zero_yield_retry", lens=str(lens["name"]),
-                             routed=bool(overrides), seat_failed=seat_dead)
+                             routed=bool(route), seat_failed=seat_dead)
             if seat_dead:
                 # a ROUTED seat that produced nothing at all is a capability
                 # gap, not a shy model — say so loudly enough that an arm
@@ -211,24 +240,39 @@ async def run_agent_step_ensemble(
                 ctx.trace.record(
                     "capability_gap", capability="review.routed_seat",
                     step=f"{step_name}#{lens['name']}{suffix}",
-                    effect=f"routed seat produced no output; retrying on the "
-                           f"same route (model={overrides.get('model_override')})")
-            result, output = await run_agent_step(
-                ctx, step_name=f"{step_name}#{lens['name']}{suffix}/retry",
-                purpose=purpose, evidence=evidence,
-                guidance=lens_guidance + (
-                    "\n\nYour first pass produced NO USABLE FINAL — most "
-                    "likely it ran past the reply ceiling. Investigate less "
-                    "and FILE: your final JSON must fit, so keep evidence to "
-                    "one quoted line per comment and findings to 15 lines."
-                    if not output else
-                    "\n\nYour first pass yielded zero candidates. Re-check "
-                    "your two highest-risk hunks; emit every plausible "
-                    "candidate (do not self-censor) or a [validated] finding "
-                    "for each checklist item you cleared."),
-                expected=expected, output_extension=output_extension,
-                scope=scope, extra_tools=extra_tools, max_iters=budget,
-                **overrides)
+                    effect="routed seat produced no output; retrying on "
+                           + (f"the same route (model={member})" if route
+                              else "the tier model (member proven dead)"))
+            retry_guidance = lens_guidance + (
+                "\n\nYour first pass produced NO USABLE FINAL — most "
+                "likely it ran past the reply ceiling. Investigate less "
+                "and FILE: your final JSON must fit, so keep evidence to "
+                "one quoted line per comment and findings to 15 lines."
+                if not output else
+                "\n\nYour first pass yielded zero candidates. Re-check "
+                "your two highest-risk hunks; emit every plausible "
+                "candidate (do not self-censor) or a [validated] finding "
+                "for each checklist item you cleared.")
+            # The retry is guarded exactly like the first pass — it used to be
+            # bare, so a routed member that died here raised straight through
+            # asyncio.gather and failed the whole step. Whichever shape the
+            # failure takes, it falls back to tier ONCE; a tier result that is
+            # itself non-OK is returned as the typed failure, never re-tried.
+            try:
+                result, output = await _attempt("/retry", retry_guidance, route)
+            except Exception as exc:
+                if not route:
+                    raise
+                _member_died("retry", f"{type(exc).__name__}: {exc}")
+                route = {}
+                result, output = await _attempt("/retry/tier", retry_guidance,
+                                                route)
+            else:
+                if route and outcome_blocked(result, output):
+                    _member_died("retry", "typed non-OK outcome on the retry")
+                    route = {}
+                    result, output = await _attempt("/retry/tier",
+                                                    retry_guidance, route)
         return str(lens["name"]), result, output
 
     # lenses (and repeat samples of each lens — a single sample's item list is

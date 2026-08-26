@@ -1,6 +1,6 @@
 # engine/agent_runtime/ —— 规范
 
-<!-- verified-against: 2026-08-25 -->
+<!-- verified-against: 2026-08-26 -->
 
 `LOC ~1690（7 个文件） · 引擎（受治理的 agent 运行时） · refactor-status: ok`
 
@@ -56,6 +56,15 @@
 - **按 pass 的后端路由**（`review_lens_backends`）可以把某个 seat 放到另一个 provider 上。
   路由必须**在重试中保持**，无法履约时必须**大声回退** ——
   一个被静默改道的 seat，会让这条 arm **不再是它标签所声称的配置**。
+  判据是 seat **有没有跑起来**，不是它有没有产出：
+  - **跑了但零产出**（安静的 seat）→ 重问**保持原路由**。
+  - **压根没跑起来**（proven dead）→ 改跑档位模型，并记 `moa_member_fallback`
+    （带 `phase`/`member`/`effective`/`reason`），绝不再问一次已死的成员。
+  死亡有**两种形态**，两种都必须接住：裸 API 成员**抛异常**，而 harness transport
+  会把一次死掉的会话转成**类型化的非 OK 结果**（"a dead harness is an outcome"），
+  由 `outcome_blocked` 判定。首轮与**零产出重问**都要各自守住这两种形态；重问那一处
+  曾经完全没有守卫，于是一个 403 的成员直接穿过 `asyncio.gather` 把整个 step 打成
+  BLOCKED。回退每处至多一次，档位模型自己再失败就按类型化失败返回，**不递归**。
 - MoA 成员本身也可以骑上 provider 注册表里的某个 harness（`transport_for_id`），
   与本次 run 自己的 `STRICT_BACKEND` 无关。
 
