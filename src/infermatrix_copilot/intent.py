@@ -341,9 +341,16 @@ def _parse_llm(text: str, llm: LLM, default_repo: str, model: str | None) -> Int
     question at every soft spot — non-numeric/low confidence (<0.7), an
     explicit clarify field, or a payload that won't build a TaskSpec — so a
     doubtful command is never executed on a guess."""
+    # 8000, not 500: a REASONING model spends the completion budget thinking
+    # before any JSON appears, so at 500 it returns empty text and the CLI
+    # answers "I couldn't parse that" for a command it understood perfectly.
+    # `review/planner.py` hit this exact bug and fixed it at 8000; intent never
+    # got the same fix, and it silently failed every LLM-classified phrase on
+    # the raw-API path (measured: `triage recent open issues`, `rebase pr N`).
+    # One-shot and tiny either way — the ceiling only pays for what is thought.
     reply = llm.create(system=_LLM_SYSTEM,
                        messages=[{"role": "user", "content": text}], model=model,
-                       max_tokens=500, role="intent")
+                       max_tokens=8_000, role="intent")
     obj = parse_json_reply(reply.text)
     if not obj and (reply.text or "").strip():
         # one repair round: re-ask for strictly the JSON object (D3 pattern —
@@ -352,7 +359,9 @@ def _parse_llm(text: str, llm: LLM, default_repo: str, model: str | None) -> Int
             system="Reply with ONLY the JSON object for this classification, "
                    "no prose:\n" + _LLM_SYSTEM,
             messages=[{"role": "user", "content": text}], model=model,
-            max_tokens=500)
+            max_tokens=8_000)  # same ceiling as above — the repair round is
+                               # where a starved reasoning model lands, so
+                               # leaving it at 500 would keep the bug alive
         obj = parse_json_reply(fix.text)
     if not obj:
         return IntentResult(clarify="I couldn't parse that — can you rephrase?")
