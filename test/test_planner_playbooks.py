@@ -177,3 +177,67 @@ def test_interactive_run_surfaces_and_defers_to_the_confirm(
     remains the gate — this fix removes nothing a human still sees."""
     assert _gate(settings, verdict_kind, assume_yes=False,
                  monkeypatch=monkeypatch) is True
+
+
+# The gate's PUBLIC outcome, not just its private boolean: `_gate_and_confirm`
+# is what the CLI actually calls, and a regression there (a swapped exit code,
+# a confirm that no longer fires) would slip past the tests above.
+def _gate_and_confirm(settings, verdict_kind, *, assume_yes, monkeypatch,
+                      answer="y"):
+    from infermatrix_copilot.cli import Copilot
+    from infermatrix_copilot.cli import copilot as copilot_mod
+    from infermatrix_copilot.engine.planner import Resolution
+    from infermatrix_copilot.review.reviewer import ReviewVerdict
+    from infermatrix_copilot.task_spec import TaskSpec
+
+    monkeypatch.setattr(
+        copilot_mod, "run_plan_review",
+        lambda *a, **kw: ReviewVerdict(verdict_kind, ["scripted"]))
+    asked: list = []
+
+    def fake_input(prompt=""):
+        asked.append(prompt)
+        return answer
+
+    monkeypatch.setattr("builtins.input", fake_input)
+    settings.playbooks_dir.mkdir(parents=True, exist_ok=True)
+    (settings.playbooks_dir / "pr-debug.yaml").write_text(ACTIVE_PB)
+    registry = register_builtin_steps(StepRegistry())
+    store = PlaybookStore(settings.playbooks_dir, registry)
+    resolution = Resolution(mode="adapt", playbook=store.get("pr-debug"),
+                            tier="L1", requires_review=True)
+    outcome = Copilot(settings)._gate_and_confirm(
+        resolution, TaskSpec(kind="pr_debug", pr=1), assume_yes)
+    return outcome, asked
+
+
+@pytest.mark.parametrize("verdict_kind", ["revise", "unavailable", "block"])
+def test_headless_non_lgtm_returns_the_blocked_exit_code(
+        settings, monkeypatch, verdict_kind):
+    from infermatrix_copilot.notify import BLOCKED_EXIT
+
+    outcome, asked = _gate_and_confirm(settings, verdict_kind, assume_yes=True,
+                                       monkeypatch=monkeypatch)
+    assert outcome.proceed is False
+    assert outcome.exit_code == BLOCKED_EXIT
+    assert not asked, "--yes must never prompt"
+
+
+def test_headless_lgtm_proceeds_without_prompting(settings, monkeypatch):
+    outcome, asked = _gate_and_confirm(settings, "lgtm", assume_yes=True,
+                                       monkeypatch=monkeypatch)
+    assert outcome.proceed is True and not asked
+
+
+@pytest.mark.parametrize("verdict_kind", ["lgtm", "revise", "unavailable"])
+def test_interactive_still_asks_and_honours_the_answer(settings, monkeypatch,
+                                                       verdict_kind):
+    """The whole point of the headless block is that a human sees the verdict.
+    Interactively that human is still asked — and their 'no' still aborts."""
+    outcome, asked = _gate_and_confirm(settings, verdict_kind, assume_yes=False,
+                                       monkeypatch=monkeypatch, answer="y")
+    assert outcome.proceed is True and asked, "the confirm must still fire"
+
+    outcome, _ = _gate_and_confirm(settings, verdict_kind, assume_yes=False,
+                                   monkeypatch=monkeypatch, answer="n")
+    assert outcome.proceed is False and outcome.exit_code == 1

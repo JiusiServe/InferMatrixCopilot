@@ -50,7 +50,11 @@ metrics 与升级，提供带类型字段和安全默认值；外加 PR4d 知识
 不调模型。
 
 ## 依赖（允许）
-仅 `pydantic-settings`。
+`pydantic-settings`；外加 `tier_target` 内部**函数级**引入的
+`providers.registry`（只读 `PROVIDERS[...].default_model`）。后者是刻意的：
+provider 的缺省模型必须在**这一处**解析，否则 `ResolvedTarget.model` 会报 `""`
+而 transport 实跑另一个模型——即不变量 7 要防的贴错标签。函数级 import 保持模块
+导入期只依赖 pydantic-settings，不成环。
 
 ## 扩展点
 新可调项 → 一个带安全默认值的类型字段，并用一行注释写明含义与单位。
