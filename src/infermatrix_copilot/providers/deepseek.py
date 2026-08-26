@@ -291,7 +291,7 @@ class DeepSeekHarnessTransport(HarnessTransport):
         env.update({
             "DSH_CWD": str(cwd),
             "DSH_MODEL": model or self.settings.strict_backend_model
-            or "deepseek-v4-pro",
+            or self.spec.default_model,
             "DSH_SYSTEM_PROMPT": system,
             "DSH_SESSION_ROOT": str(session_root),
         })
@@ -347,7 +347,11 @@ class DeepSeekHarnessTransport(HarnessTransport):
             read_only=req.scope.read_only,
             bridge_spec_path=req.bridge_spec_path)
         key, base_url = self._credential()
-        model = req.model or self.settings.strict_backend_model
+        # `or self.spec.default_model`: tier_target already resolves it, but a
+        # direct transport caller must not be able to construct dsh with an
+        # empty model — that dies mid-session with "has no provider/model".
+        model = (req.model or self.settings.strict_backend_model
+                 or self.spec.default_model)
 
         finish = ""
         result = None
@@ -468,7 +472,8 @@ class DeepSeekHarnessTransport(HarnessTransport):
 
         scratch = Path(tempfile.mkdtemp(prefix="imc-dsh-oneshot-"))
         key, base_url = self._credential()
-        selected = model or self.settings.strict_backend_model
+        selected = (model or self.settings.strict_backend_model
+                    or self.spec.default_model)
         text, finish = "", ""
         try:
             cordis = self._composition(

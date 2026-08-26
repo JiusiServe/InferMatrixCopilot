@@ -1,6 +1,6 @@
 # providers/registry.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-08-26 -->
 
 `LOC ~107 · 后端解析（唯一那张表） · refactor-status: ok`
 
@@ -18,6 +18,11 @@
 `transport_for_id(settings, provider_id)`。
 
 ## 不变量（**C2**、**B1**）
+- **模型缺省值是注册表数据，不是 transport 里的字面量。**
+  `ProviderSpec.default_model` 声明某后端在 `STRICT_BACKEND_MODEL` 缺省时服务的模型（订阅制 CLI 为空 —— 它们自己挑）。
+  它由 `Settings.tier_target` 解析，于是**请求的模型**与**实际服务的模型**在 target、`DSH_MODEL`、
+  构造参数和 trace 里是同一个字符串；放进 transport 会让 target 继续报 `""`，而那正是
+  不变量 7 要防的贴错标签。
 - **唯一一条解析路径。** 原有的裸 API 路径就是这张表里的 provider `api` —— 不是一条
   平行分支。用 `api` 时，行为与注册表出现之前**逐字节一致**（平价棘轮）。
 - **未知 id 绝不静默解析。** `resolve_provider` 抛错并列出合法集合；`Settings` 也在

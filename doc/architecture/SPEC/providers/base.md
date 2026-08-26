@@ -1,6 +1,6 @@
 # providers/base.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-08-26 -->
 
 `LOC ~161 · provider 层契约 + 子进程环境白名单 · refactor-status: ok`
 
@@ -13,6 +13,8 @@
 请求/用量数据类、带共享二进制解析的 `HarnessTransport` 基类，以及 `sanitized_env()`。
 
 ## 公开契约
+<!-- default_model: 见 registry 规范的同名不变量 —— 声明在 ProviderSpec 上，由
+     Settings.tier_target 解析，transport 只做防御性兜底。 -->
 `ProviderSpec`、`AgentSessionRequest`、`SessionUsage`、`HarnessTransport`
 （`cli_path`、`require_cli`、`auth_gap`、`run_session`、`complete`）、
 `sanitized_env()`、`flatten_messages()`。
