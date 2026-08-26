@@ -161,7 +161,10 @@ class Copilot:
     def _plan_review_gate(self, resolution: Resolution, spec: TaskSpec,
                           assume_yes: bool) -> bool:
         """Inline Plan-Review for adapted/generated plans. LLM verdict shown in
-        the session; block stops; no reviewer -> the human confirm IS the gate."""
+        the session; block stops. A non-`lgtm` verdict is only ever *surfaced*
+        — the human `[y/N]` is what actually gates it — so when `--yes` removes
+        that human, the same verdict must stop the run instead
+        (`ReviewVerdict.passing`, SPEC C6: only `lgtm` passes)."""
         if not resolution.requires_review:
             return True
         doc = yaml.safe_dump(playbook_to_doc(resolution.playbook), sort_keys=False)
@@ -170,15 +173,29 @@ class Copilot:
         verdict = run_plan_review(self.llm, playbook_doc=doc,
                                   task=task_text,
                                   model=self.settings.reviewer)
-        if verdict.verdict == "unavailable":
-            print("  ⚠ no reviewer LLM — your confirmation is the plan-review gate")
-            return True
-        print(f"  plan review: {verdict.verdict}"
-              + (f" — {verdict.critiques}" if verdict.critiques else ""))
+        if verdict.verdict != "unavailable":
+            print(f"  plan review: {verdict.verdict}"
+                  + (f" — {verdict.critiques}" if verdict.critiques else ""))
         if verdict.verdict == "block":
             print("✋ plan blocked by reviewer.")
             return False
-        return True  # lgtm, or revise surfaced to the user before their confirm
+        if verdict.passing:
+            return True
+        # Everything below is non-passing: `revise`, or `unavailable`. Both used
+        # to return True on the strength of a confirmation that `--yes` had
+        # already deleted, so an unattended run executed an unvetted plan on an
+        # unread verdict. Measured on the release matrix: an unparseable review
+        # let three of four backends run a pr-rebase plan through to its push
+        # gate, while the one backend whose reviewer parsed cleanly BLOCKED the
+        # very same plan.
+        if assume_yes:
+            reason = ("no reviewer LLM" if verdict.verdict == "unavailable"
+                      else f"plan review returned {verdict.verdict}")
+            print(f"✋ {reason} and --yes leaves no human to gate it — blocked.")
+            return False
+        if verdict.verdict == "unavailable":
+            print("  ⚠ no reviewer LLM — your confirmation is the plan-review gate")
+        return True  # revise/unavailable, surfaced to the user before their confirm
 
     def _gate_and_confirm(self, resolution: Resolution, spec: TaskSpec,
                           assume_yes: bool, *, prompt: str = "Proceed?",
