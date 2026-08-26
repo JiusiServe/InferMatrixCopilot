@@ -1,6 +1,6 @@
 # intent.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-08-26 -->
 
 `LOC ~379 · 任务层 · refactor-status: ok`
 
@@ -26,6 +26,10 @@ LLM 把命令（kind / pr / issue / flags）分类成 `TaskSpec`；低于置信�
 - **双路径 `mode` 在这里设定**：默认 `eco`，只有用户显式要求时才是 `performance`
   （确定性短语正则 **或** 分类器的 `performance` 标志）。
   **成本敏感的决策绝不靠猜。**
+- **分类调用的补全预算必须容得下"思考"**（两处调用都是 `max_tokens=8_000`）。
+  推理模型会先把预算花在思考上，500 的上限下它**一个 JSON 字符都吐不出来**，于是一条
+  完全清楚的命令被答成"I couldn't parse that"。`review/planner.py` 踩过同一个坑并定在
+  8000；**修复轮同样要给足**——那正是被饿死的模型会落到的地方。
 - 空命令或未配置 LLM → 澄清（绝不猜测）。
 - **有歧义就澄清 —— 绝不猜测**：LLM 置信度 < 0.7、显式澄清、畸形回复、未知 kind，
   全都 → 澄清。
