@@ -102,3 +102,47 @@ def test_confirmation_rules():
     assert TaskSpec(kind="repo_rebase", report_only=True).confirm_required is False
     assert TaskSpec(kind="pr_review", pr=1).confirm_required is False  # read-only
     assert TaskSpec(kind="pr_review", pr=1, post=True).confirm_required  # outward write
+
+
+# -- completion budget (PR2) -------------------------------------------------
+class _BudgetLLM:
+    """Records every create() call and, like a reasoning model, emits JSON only
+    when the ceiling leaves room after the thinking budget."""
+    available = True
+
+    def __init__(self, think_cost: int, payload: dict):
+        self.think_cost, self.payload = think_cost, payload
+        self.calls: list[int] = []
+
+    def create(self, **kwargs):
+        budget = int(kwargs.get("max_tokens") or 0)
+        self.calls.append(budget)
+        text = "" if budget <= self.think_cost else json.dumps(self.payload)
+        return Reply(blocks=[Block(type="text", text=text)])
+
+
+def test_reasoning_model_is_not_starved_by_the_completion_ceiling():
+    """At 500 a reasoning model spends the whole budget thinking and returns
+    empty text, so a perfectly clear command answered "I couldn't parse that".
+    `review/planner.py` fixed the identical bug at 8000; intent must match."""
+    llm = _BudgetLLM(think_cost=2_000,
+                     payload={"kind": "pr_review", "pr": 4830,
+                              "confidence": 0.95})
+    r = parse_intent("review pr 4830 with the knowledge base", llm=llm)
+    assert r.spec and r.spec.kind == "pr_review", (
+        "a reasoning model must get enough budget to emit its JSON")
+    assert llm.calls[0] >= 8_000
+
+
+def test_the_repair_round_gets_the_same_ceiling():
+    """The repair round is exactly where a starved model lands, so leaving it
+    at 500 while raising only the first call would keep the bug alive."""
+    class _AlwaysProse(_BudgetLLM):
+        def create(self, **kwargs):
+            self.calls.append(int(kwargs.get("max_tokens") or 0))
+            return Reply(blocks=[Block(type="text", text="I think you mean...")])
+
+    llm = _AlwaysProse(think_cost=0, payload={})
+    parse_intent("review pr 4830", llm=llm)
+    assert len(llm.calls) == 2, "unparseable prose must trigger the repair round"
+    assert llm.calls[1] >= 8_000, "the repair round must not stay at 500"
