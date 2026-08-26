@@ -1,6 +1,6 @@
 # providers/harness_llm.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-08-26 -->
 
 `LOC ~66 · 套在 harness 之上的 LLM 形状适配器（仅限无工具） · refactor-status: ok`
 
@@ -20,6 +20,13 @@ CLI 调用。
   —— 而这里的一声大响，正是防止在厂商循环之外**悄悄再跑一个不受治理的第二工具循环**的
   守卫。**这就是本模块之所以长成这个形状的唯一理由。**
 - 调用点不变：`create()` 保持签名，所以没有任何调用方需要知道当前是哪个后端。
+- **`create()` 的 `model` 参数在 harness 下被忽略。** 模型选择只有一个来源：
+  `STRICT_BACKEND_MODEL`，缺省时取该 provider 的 `ProviderSpec.default_model`
+  （订阅制 CLI 为空 —— 它们自己挑模型）。调用点持有的是 **api 档**的模型 id
+  （`INTENT_MODEL` / `REVIEWER_MODEL`），厂商 CLI 服务不了它，而且**不会**报成错误：
+  它把拒绝**当作正文**从正常回复通道返回，于是上游只看到一句"回复无法解析"，真正的
+  原因就此丢失。这正是签名保持不变（调用方无需知道后端）的代价必须在**这一层**付掉的
+  地方。
 - `for_member` 是 MoA 的接缝（混合成员在 api 后端的 run 内部骑上某个 harness）。
 
 ## 边界 —— 不属于这里

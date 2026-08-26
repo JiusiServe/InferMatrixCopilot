@@ -6,6 +6,10 @@ a harness backend those tool-less calls become one-shot CLI invocations.
 Any call that passes tools raises: agent steps must route through
 `run_session` (the harness owns its loop), and a loud error here is the
 guard against silently running a second, ungoverned tool loop.
+
+Model selection: a harness serves `STRICT_BACKEND_MODEL` (else its
+`ProviderSpec.default_model`). Per-call API-tier model ids are ignored — see
+`create()`.
 """
 
 from __future__ import annotations
@@ -47,19 +51,36 @@ class HarnessLLM:
 
         return LLM(self.settings).for_member(member)
 
+    @property
+    def _harness_model(self) -> str:
+        """The model this harness serves: `STRICT_BACKEND_MODEL`, else the
+        provider's registry default (empty for the subscription CLIs, which
+        pick their own)."""
+        return (self.settings.strict_backend_model
+                or self._transport.spec.default_model)
+
     def create(self, *, system: str, messages: list[dict],
                tools: list[dict] | None = None, model: str | None = None,
                max_tokens: int | None = None, on_text=None, role: str = ""):
         """Tool-less one-shot completion via the harness CLI. `tools` raises
-        by design (see module docstring)."""
+        by design (see module docstring).
+
+        The caller's `model` is IGNORED. Call sites pass an API-tier id
+        (`INTENT_MODEL`, `REVIEWER_MODEL`) chosen for the raw-API path; a
+        vendor CLI cannot serve it and rejects it **as prose in the ordinary
+        reply channel**, which upstream then reports as an unparseable reply
+        rather than a model error. Measured on the release matrix: every
+        LLM-classified command phrase failed on all three CLI harnesses with
+        "I couldn't parse that", while the one harness whose configured id it
+        happened to match classified fine. `STRICT_BACKEND_MODEL` (else the
+        provider default) is the only model selector under a harness."""
         if tools:
             raise RuntimeError(
                 "harness backend supports tool-less create() only — agent "
                 "steps run through the provider's run_session "
                 "(doc/features/provider-registry.md)")
         reply = self._transport.complete(
-            system=system, messages=messages,
-            model=model or self.settings.strict_backend_model,
+            system=system, messages=messages, model=self._harness_model,
             max_tokens=max_tokens, role=role)
         if on_text is not None and reply.text:
             on_text(reply.text)

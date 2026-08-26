@@ -14,6 +14,7 @@ from infermatrix_copilot.providers import (
     resolve_provider,
     transport_for,
 )
+from infermatrix_copilot.providers.registry import PROVIDERS
 from infermatrix_copilot.scopes import read_only_scope
 
 
@@ -22,6 +23,10 @@ def _settings(**kw) -> Settings:
 
 
 class FakeTransport:
+    # a real transport always carries its ProviderSpec (HarnessTransport.spec);
+    # HarnessLLM reads `spec.default_model` to resolve the harness's model
+    spec = PROVIDERS["cursor"]
+
     def __init__(self):
         self.calls = []
         self.cli = "/fake/cursor-agent"
@@ -199,3 +204,47 @@ def test_run_harness_step_pins_explicit_provider_and_model(tmp_path, monkeypatch
     assert outcome.text == '{"status": "success"}'
     assert seen["provider_id"] == "cursor"
     assert transport.calls[0].model == "composer-2.5"
+
+
+# -- harness model selection (PR3) -------------------------------------------
+# Call sites hold API-tier model settings (INTENT_MODEL, REVIEWER_MODEL) chosen
+# for the raw-API path. Forwarding one to a vendor CLI does not fail loudly: the
+# CLI rejects it as PROSE in the ordinary reply channel, so the caller reports an
+# unparseable reply and the real cause is lost. Measured on the release matrix:
+# every LLM-classified command phrase failed on all three CLI harnesses.
+
+def test_caller_api_model_id_is_never_forwarded_to_a_harness():
+    transport = FakeTransport()
+    adapter = HarnessLLM(
+        _settings(strict_backend="cursor", strict_backend_model="composer-1"),
+        transport)
+    adapter.create(system="s", messages=[{"role": "user", "content": "hi"}],
+                   model="deepseek-v4-flash")   # an INTENT_MODEL-shaped id
+    assert transport.calls[0]["model"] == "composer-1", (
+        "the caller's API-tier id must not reach the vendor CLI")
+
+
+def test_unset_backend_model_falls_back_to_the_provider_default():
+    """A harness that REQUIRES a model (dsh) must get its registry default
+    rather than "" once the caller's id is ignored."""
+    class _DshTransport(FakeTransport):
+        spec = PROVIDERS["deepseek"]
+
+    transport = _DshTransport()
+    adapter = HarnessLLM(
+        _settings(strict_backend="deepseek", strict_backend_model=""),
+        transport)
+    adapter.create(system="s", messages=[{"role": "user", "content": "hi"}],
+                   model="deepseek-v4-flash")
+    assert transport.calls[0]["model"] == "deepseek-v4-pro"
+
+
+def test_subscription_harness_with_no_model_sends_empty_not_the_caller_id():
+    """The CLI harnesses pick their own model; empty is the correct signal and
+    is NOT an invitation to substitute the caller's API-tier id."""
+    transport = FakeTransport()
+    adapter = HarnessLLM(
+        _settings(strict_backend="cursor", strict_backend_model=""), transport)
+    adapter.create(system="s", messages=[{"role": "user", "content": "hi"}],
+                   model="deepseek-v4-flash")
+    assert transport.calls[0]["model"] == ""
