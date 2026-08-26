@@ -1,6 +1,6 @@
 # providers/deepseek.py —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-08-26 -->
 
 `LOC ~502 · harness transport（dsh，API-keyed） · refactor-status: oversized`
 
@@ -13,6 +13,9 @@
 并通过 JSON-RPC/stdio 通信），**逐会话生成 composition**，以便按 scope 钉住沙箱模式。
 
 ## 公开契约
+<!-- 模型：dsh 没有内建缺省，空 model 会让每一轮以 "has no provider/model" 失败。
+     缺省值 deepseek-v4-pro 声明在 ProviderSpec.default_model，由 tier_target 解析；
+     本 transport 只对直接调用方做同源的防御性兜底。 -->
 `DeepSeekHarnessTransport`（`cli_path`、`require_cli`、`auth_gap`、`run_session`、
 `complete`）、`spec = PROVIDERS["deepseek"]`。
 

@@ -1,6 +1,6 @@
 # config.py —— 规范
 
-<!-- verified-against: 2026-08-25 -->
+<!-- verified-against: 2026-08-26 -->
 
 `LOC ~630 · 配置 · refactor-status: oversized`
 

@@ -581,8 +581,18 @@ class Settings(BaseSettings):
             # Harness target (doc/features/provider-registry.md): the vendor CLI
             # holds the subscription credential, so base_url/api_key stay
             # empty and per-tier API backends do not apply — the harness
-            # serves both modes (its model comes from STRICT_BACKEND_MODEL).
-            return ResolvedTarget(role, self.strict_backend_model, "", "",
+            # serves both modes (its model comes from STRICT_BACKEND_MODEL,
+            # else the provider's registry default for backends that require
+            # one). Resolving that default HERE and not in the transport is
+            # what keeps the requested model and the served model identical:
+            # a transport-private fallback left this target reporting "" while
+            # dsh actually ran deepseek-v4-pro.
+            from .providers.registry import PROVIDERS
+
+            spec = PROVIDERS.get(backend)
+            model = self.strict_backend_model or (
+                spec.default_model if spec else "")
+            return ResolvedTarget(role, model, "", "",
                                   f"backend:{backend}",
                                   self.resolved_llm_provider,
                                   provider_id=backend, kind="harness")

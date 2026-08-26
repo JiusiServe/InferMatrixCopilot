@@ -48,12 +48,18 @@ PROVIDERS: dict[str, ProviderSpec] = {
         # and `base.ProviderSpec` defines these as "flags the integration can
         # rely on". Nothing branches on it today, which is exactly why the
         # false claim survived: it only ever misled readers.
+        # `default_model`: dsh has no built-in default — constructing it with
+        # an empty model kills every turn with "has no provider/model", so an
+        # unset STRICT_BACKEND_MODEL must resolve to something here rather
+        # than inside the transport, where the resolved target would keep
+        # reporting "" while the harness actually served this model.
         ProviderSpec(
             id="deepseek", kind="harness",
             display="DeepSeek Harness (dsh) via deepseek-harness-sdk",
             cli_names=(),
             capabilities=frozenset({
-                "sandbox_read_only", "system_prompt", "api_keyed"})),
+                "sandbox_read_only", "system_prompt", "api_keyed"}),
+            default_model="deepseek-v4-pro"),
     )
 }
 

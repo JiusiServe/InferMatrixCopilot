@@ -86,11 +86,18 @@ trace 词汇。**用 `api` 时行为逐字节不变**（平价棘轮）。
 ```bash
 # ~/.infermatrix-copilot/.env
 STRICT_BACKEND=api            # api | cursor | claude-code | codex | deepseek
-# STRICT_BACKEND_MODEL=       # harness 内部的模型 id（可选）
+# STRICT_BACKEND_MODEL=       # harness 内部的模型 id（可选，见下）
 # STRICT_BACKEND_CONCURRENCY=2  # 并发 harness 会话数
 # STRICT_BACKEND_CLI=         # 二进制路径覆盖（否则走 PATH 查找）
 # STRICT_BACKEND_TIMEOUT_S=1800 # 单会话墙钟上限
 ```
+
+**`STRICT_BACKEND_MODEL` 留空时谁来定模型。** 三个订阅制 CLI
+（`cursor`/`claude-code`/`codex`）自己挑模型，留空即可。**`deepseek`（dsh）没有内建
+缺省**——空模型会让每一轮以 `has no provider/model` 失败，所以它在 provider 注册表里
+声明了 `default_model: deepseek-v4-pro`，由 `Settings.tier_target` 解析。因此留空时
+run 报告的模型与实际服务的模型仍然是同一个（不会出现 target 记 `""`、dsh 实跑
+`deepseek-v4-pro` 这种贴错标签）。想换模型就显式填这一项。
 
 **显式选择，硬报错。** 未知 id 在 `Settings` 校验阶段就被拒（会列出合法取值）；
 Strict 启动前 `strict_readiness` 先查缺项，**绝不启动一个注定失败的后台任务**。

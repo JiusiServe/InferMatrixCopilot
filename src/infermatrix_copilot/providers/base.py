@@ -48,13 +48,21 @@ class ProviderSpec:
     integration can rely on (``mcp_tools``, ``builtin_tools_off``,
     ``max_turns``, ``system_prompt``, ``usage_reporting``,
     ``cost_reporting``). `cli_names` are the binaries probed on PATH for
-    harness kinds."""
+    harness kinds.
+
+    `default_model` is the model a backend serves when `STRICT_BACKEND_MODEL`
+    is unset. It is empty for backends that pick their own (the subscription
+    CLIs) and set only where the backend REQUIRES one — declaring it here
+    rather than inside a transport keeps `Settings.tier_target` the single
+    place a model is resolved, so the requested model and the served model
+    are the same string in the target, the trace and the metrics."""
 
     id: str
     kind: Literal["api", "harness"]
     display: str
     cli_names: tuple[str, ...] = ()
     capabilities: frozenset[str] = frozenset()
+    default_model: str = ""
 
 
 @dataclass

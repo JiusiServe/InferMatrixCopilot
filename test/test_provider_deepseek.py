@@ -72,8 +72,8 @@ def _settings(**kw):
     # _env_file=None: the repo .env holds a real DeepSeek key, and a test that
     # silently picks it up would pass for the wrong reason (and could spend).
     kw.setdefault("anthropic_api_key", "sk-test")
-    return Settings(_env_file=None, strict_backend="deepseek",
-                    strict_backend_model="deepseek-v4-pro", **kw)
+    kw.setdefault("strict_backend_model", "deepseek-v4-pro")
+    return Settings(_env_file=None, strict_backend="deepseek", **kw)
 
 
 def _request(tmp_path, *, bridge=True, read_only=True):
@@ -269,3 +269,62 @@ def test_runaway_session_is_stopped_by_the_step_cap(fake_sdk, tmp_path):
     out = DeepSeekHarnessTransport(_settings()).run_session(req)
     assert closed["n"] >= 1, "the watchdog never closed the runaway harness"
     assert out.refusals and "step cap" in out.refusals[0]
+
+
+# -- model resolution (PR4) --------------------------------------------------
+# dsh is the one backend with no built-in default: constructing it with an
+# empty model kills every turn with "has no provider/model". The default lives
+# in the registry (ProviderSpec.default_model) and is resolved by
+# Settings.tier_target, so the REQUESTED model and the SERVED model are the
+# same string in the target, DSH_MODEL, the constructor and the trace — a
+# transport-private fallback would leave the target reporting "".
+
+def test_tier_target_fills_the_registry_default_when_unset():
+    t = Settings(_env_file=None, anthropic_api_key="sk-test",
+                 strict_backend="deepseek",
+                 strict_backend_model="").tier_target("eco")
+    assert t.model == "deepseek-v4-pro", (
+        "an unset STRICT_BACKEND_MODEL must resolve to the provider default "
+        "in the TARGET, not silently inside the transport")
+    assert t.kind == "harness"
+
+
+def test_explicit_backend_model_wins_over_the_default():
+    t = Settings(_env_file=None, anthropic_api_key="sk-test",
+                 strict_backend="deepseek",
+                 strict_backend_model="deepseek-v4-flash").tier_target("eco")
+    assert t.model == "deepseek-v4-flash"
+
+
+def test_subscription_harnesses_keep_an_empty_model():
+    """Only backends that REQUIRE a model declare one; the vendor CLIs pick
+    their own, and inventing a default for them would misreport the run."""
+    for backend in ("claude-code", "codex", "cursor"):
+        t = Settings(_env_file=None, anthropic_api_key="sk-test",
+                     strict_backend=backend,
+                     strict_backend_model="").tier_target("eco")
+        assert t.model == "", f"{backend} must not gain a fabricated default"
+
+
+def test_run_session_never_constructs_an_empty_model(fake_sdk, tmp_path):
+    req = _request(tmp_path)
+    req.model = ""                                   # direct-caller path
+    DeepSeekHarnessTransport(
+        _settings(strict_backend_model="")).run_session(req)
+    assert fake_sdk.captured["model"] == "deepseek-v4-pro"
+
+
+def test_complete_never_constructs_an_empty_model(fake_sdk, tmp_path):
+    DeepSeekHarnessTransport(_settings(strict_backend_model="")).complete(
+        system="S", messages=[{"role": "user", "content": "hi"}])
+    assert fake_sdk.captured["model"] == "deepseek-v4-pro"
+
+
+def test_env_model_matches_the_constructed_model(fake_sdk, tmp_path):
+    """DSH_MODEL and the constructor must agree — they are the two places the
+    served model is stated, and a disagreement is how a run mislabels itself."""
+    req = _request(tmp_path)
+    req.model = ""
+    DeepSeekHarnessTransport(
+        _settings(strict_backend_model="")).run_session(req)
+    assert fake_sdk.captured["env"]["DSH_MODEL"] == fake_sdk.captured["model"]
