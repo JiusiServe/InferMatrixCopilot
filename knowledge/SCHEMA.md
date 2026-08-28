@@ -37,7 +37,7 @@ contradictions: [相对路径]         # 可选：与本页冲突的页面
 
 - 归属：`general`、`vllm-omni`、`afd-plugin`
 - 工作主题：`review`、`ci`、`docs`、`git`、`debug`、`bug`、`benchmark`、`environment`、
-  `remote`、`agents`、`planning`、`dev`、`rebase`
+  `remote`、`agents`、`planning`、`dev`、`rebase`、`release`
 - 代码/模型轴：`components`、`models`、`diffusion`、`model-executor`、`serving`、
   `scheduler`、`distributed`、`config`、`hunyuan-image3`、`ltx2`、`qwen-omni`、
   `plugin-boundary`、`attention-runtime`、`ffn-runtime`、`connectors`、

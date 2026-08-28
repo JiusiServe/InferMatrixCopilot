@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni 入口"
 created: 2026-07-10
-updated: 2026-07-31
+updated: 2026-08-28
 type: index
 tags: [vllm-omni]
 sources: []
@@ -42,3 +42,4 @@ owner 仍不明确时才看 [components 职责表](components/_index.md)；模�
 | benchmark / profiling | [benchmark](benchmark/_index.md) |
 | 远端验证 | [remote](remote/_index.md) |
 | 关键模型与负责人 | [owners](owners/_index.md) |
+| Release 门禁与发布规范 | [rules](rules/_index.md) |
