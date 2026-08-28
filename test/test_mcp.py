@@ -89,16 +89,73 @@ def test_policy_rejects_invalid_review_depth():
             allowed_repos=ALLOW)
 
 
-def test_strict_policy_is_old_eco_review_with_explicit_post_only():
+def test_strict_policy_is_the_old_eco_review_and_never_posts():
     spec = enforce_strict_review_policy(
         {"kind": "pr_review", "repo": "vllm-omni", "pr": 7,
-         "mode": "performance", "post": True,
+         "mode": "performance",
          "params": {"review_depth": "FULL", "force_push": True}},
         allowed_repos=ALLOW)
 
     assert spec == TaskSpec(
-        kind="pr_review", repo="vllm-omni", pr=7, mode="eco", post=True,
+        kind="pr_review", repo="vllm-omni", pr=7, mode="eco", post=False,
         params={"review_depth": "full"})
+
+
+def test_strict_refuses_an_explicit_post_rather_than_dropping_it():
+    """Strict used to force post=False for the shared gate and then restore the
+    caller's value, making it the one MCP path that could publish. Design
+    requires a single publisher — two would mean two review markers and two head
+    gates on one PR — and a capability flag would not have stopped a caller from
+    asking. It is an error, not a silent drop, so a caller that believes it is
+    publishing learns here rather than from the absence of a comment."""
+    with pytest.raises(PolicyError, match="cannot post"):
+        enforce_strict_review_policy(
+            {"kind": "pr_review", "repo": "vllm-omni", "pr": 7, "post": True},
+            allowed_repos=ALLOW)
+
+
+HEAD = "a" * 40
+
+
+def test_policy_carries_expected_head_sha_through():
+    spec = enforce_mcp_policy(
+        {"kind": "pr_review", "repo": "vllm-omni", "pr": 7,
+         "expected_head_sha": HEAD.upper()},  # case-normalized, not rejected
+        allowed_repos=ALLOW)
+    assert spec.expected_head_sha == HEAD
+
+
+def test_strict_policy_carries_expected_head_sha_through():
+    # the binding must survive the Strict path too — this is the one that pins
+    spec = enforce_strict_review_policy(
+        {"kind": "pr_review", "repo": "vllm-omni", "pr": 7,
+         "expected_head_sha": HEAD},
+        allowed_repos=ALLOW)
+    assert spec.expected_head_sha == HEAD
+
+
+def test_policy_defaults_expected_head_sha_to_unpinned():
+    spec = enforce_mcp_policy({"kind": "pr_review", "repo": "vllm-omni", "pr": 7},
+                              allowed_repos=ALLOW)
+    assert spec.expected_head_sha == ""
+
+
+@pytest.mark.parametrize("bad", ["a" * 39, "a" * 41, "g" * 40, "abc1234", 12345,
+                                 ["a" * 40]])
+def test_policy_refuses_non_full_expected_head_sha(bad):
+    # a prefix is refused rather than normalized: accepting one would mean
+    # comparing a prefix against a full sha somewhere downstream
+    with pytest.raises(PolicyError, match="expected_head_sha"):
+        enforce_mcp_policy(
+            {"kind": "pr_review", "repo": "vllm-omni", "pr": 7,
+             "expected_head_sha": bad}, allowed_repos=ALLOW)
+
+
+def test_task_spec_itself_rejects_a_short_head_sha():
+    # the model is the last line of defense for non-MCP construction paths
+    with pytest.raises(ValueError, match="expected_head_sha"):
+        TaskSpec(kind="pr_review", repo="vllm-omni", pr=7,
+                 expected_head_sha="abc1234")
 
 
 def test_strict_policy_cannot_widen_beyond_pr_review():
@@ -170,8 +227,10 @@ def test_reconcile_if_dead_respects_live_owner(tmp_path):
 # ── reserve / execute_reserved (the child path) ───────────────────────────────
 def test_reserve_run_is_fast_and_persists_queued(settings):
     cop = Copilot(settings)
-    run_id = cop.reserve_run(TaskSpec(kind="pr_review", repo="vllm-omni", pr=1),
-                             owner_server_id="S1", owner_server_pid=1234)
+    run_id, created = cop.reserve_run(
+        TaskSpec(kind="pr_review", repo="vllm-omni", pr=1),
+        owner_server_id="S1", owner_server_pid=1234)
+    assert created is True  # an unkeyed reservation always creates
     run_dir = settings.run_root / run_id
     assert rs.read_status(run_dir)["state"] == rs.QUEUED
     req = run_dir / "request.json"
@@ -183,8 +242,9 @@ def test_reserve_run_is_fast_and_persists_queued(settings):
 
 def test_execute_reserved_refuses_tampered_request_in_process(settings):
     cop = Copilot(settings)
-    run_id = cop.reserve_run(TaskSpec(kind="pr_review", repo="vllm-omni", pr=2),
-                             owner_server_id="S1", owner_server_pid=1234)
+    run_id, _ = cop.reserve_run(
+        TaskSpec(kind="pr_review", repo="vllm-omni", pr=2),
+        owner_server_id="S1", owner_server_pid=1234)
     run_dir = settings.run_root / run_id
     # a same-user process rewrites the reserved request to a write-capable task
     (run_dir / "request.json").write_text(json.dumps(
@@ -384,30 +444,67 @@ def test_mcp_docs_support_afd_plugin_scope(settings, tmp_path):
     core.close()
 
 
+def test_start_review_forwards_the_snapshot_binding(settings, monkeypatch):
+    """The pin has to be reachable from the public tool, not just from a spec
+    built by hand below the boundary."""
+    pytest.importorskip("mcp")
+    from infermatrix_copilot import mcp_server
+
+    seen: list[dict] = []
+    monkeypatch.setattr(mcp_server.CopilotMCP, "start",
+                        lambda self, req: seen.append(req) or "run-1")
+    mcp = mcp_server.build_mcp(settings)
+    tools = {t.name: t for t in asyncio.run(mcp.list_tools())}
+    assert "expected_head_sha" in tools["start_review"].inputSchema["properties"]
+
+    asyncio.run(mcp.call_tool("start_review",
+                              {"pr": 7, "expected_head_sha": HEAD}))
+    assert seen and seen[0]["expected_head_sha"] == HEAD
+
+
+def test_strict_review_request_carries_the_snapshot_binding(settings):
+    """Same for the Direct MCP's Strict path, which is what the reviewbot calls."""
+    from infermatrix_copilot.thin_mcp_server import _strict_review_request
+
+    req = _strict_review_request("7", "vllm-omni", post=False, review_depth="",
+                                 settings=settings, expected_head_sha=HEAD)
+    assert req["expected_head_sha"] == HEAD
+    # and it stays a first-class field, never smuggled in as a step knob
+    assert "expected_head_sha" not in req.get("params", {})
+
+    unpinned = _strict_review_request("7", "vllm-omni", post=False,
+                                      review_depth="", settings=settings)
+    assert "expected_head_sha" not in unpinned
+
+
 def test_exposed_tools_are_read_only_only(settings):
     pytest.importorskip("mcp")
     from infermatrix_copilot.mcp_server import build_mcp
 
     mcp = build_mcp(settings)
     names = sorted(t.name for t in asyncio.run(mcp.list_tools()))
-    assert names == ["doc_read", "doc_search", "get_result", "get_status",
-                     "list_playbooks",
+    assert names == ["doc_read", "doc_search", "get_capabilities", "get_result",
+                     "get_status", "list_playbooks",
                      "start_issue_answer", "start_issue_triage", "start_review"]
     assert not any(bad in n for n in names
                    for bad in ("post", "push", "debug", "rebase"))
 
 
 @pytest.mark.parametrize(
-    ("strict_compat", "allow_post", "expected"),
-    [(False, True, "0"), (True, False, "0"), (True, True, "1")],
+    ("strict_compat", "allow_post"),
+    [(False, True), (True, False), (True, True)],
 )
-def test_child_launch_preserves_strict_post_gate(
-        settings, monkeypatch, strict_compat, allow_post, expected):
+def test_child_launch_never_opens_the_post_gate(
+        settings, monkeypatch, strict_compat, allow_post):
+    """No MCP child may write outward, Strict included — not even when this
+    server's own ALLOW_POST is on. Strict used to inherit it, because Strict
+    specs could carry post=True; the policy now refuses that, so leaving the env
+    gate open would only preserve a path to a second publisher on one PR."""
     from infermatrix_copilot import mcp_server
 
     core = _core(settings)
     core.settings.allow_post = allow_post
-    run_id = core.copilot.reserve_run(
+    run_id, _ = core.copilot.reserve_run(
         TaskSpec(kind="pr_review", repo="vllm-omni", pr=3),
         owner_server_id=core.server_id, owner_server_pid=core.pid)
     captured = {}
@@ -427,7 +524,7 @@ def test_child_launch_preserves_strict_post_gate(
     monkeypatch.setattr(mcp_server.subprocess, "Popen", fake_popen)
     core._launch(run_id, strict_compat=strict_compat)
 
-    assert captured["env"]["ALLOW_POST"] == expected
+    assert captured["env"]["ALLOW_POST"] == "0"
     assert captured["env"]["ALLOW_PUSH"] == "0"
     expected_arg = (
         "--execute-strict-reserved" if strict_compat else "--execute-reserved")
@@ -440,7 +537,7 @@ def test_subprocess_tamper_defense(settings):
     re-enforces policy on a rewritten request.json and terminalizes to failed,
     with its stdout isolated to console.log."""
     core = _core(settings)
-    run_id = core.copilot.reserve_run(
+    run_id, _ = core.copilot.reserve_run(
         TaskSpec(kind="pr_review", repo="vllm-omni", pr=3),
         owner_server_id=core.server_id, owner_server_pid=core.pid)
     rd = settings.run_root / run_id

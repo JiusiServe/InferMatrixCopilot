@@ -149,6 +149,16 @@ class Settings(BaseSettings):
     # page so a report is never dumped unbounded over the stdio protocol.
     mcp_repo_allowlist: list[str] = []
     mcp_report_max_bytes: int = 65536
+    # Roots under which a caller-supplied `repo_path` may live
+    # (MCP_ALLOWED_REPO_ROOTS env JSON). Empty means "the configured checkouts
+    # only" — least privilege, so a per-call path cannot point the review at an
+    # arbitrary clone. Widening this is an operator decision, not a caller's.
+    mcp_allowed_repo_roots: list[str] = []
+    # How long an idempotency entry survives after its run finishes. The mapping
+    # is deliberately retained across terminal completion (that is what makes a
+    # lost-response retry return the finished run instead of re-reviewing), so
+    # it has to be bounded explicitly. Far longer than any retry window.
+    idem_retention_days: int = 30
 
     # Strict execution backend (doc/features/provider-registry.md): which provider
     # powers runs. REQUIRED for Strict — `strict_readiness` names the exact
@@ -638,3 +648,11 @@ class Settings(BaseSettings):
         """The configured filesystem path for repo `name`, or None if unknown."""
         p = self.repo_paths.get(name)
         return Path(p) if p else None
+
+    @property
+    def allowed_repo_roots(self) -> list[str]:
+        """Effective roots for a caller-supplied `repo_path`: the configured
+        list, or the configured checkouts themselves when unset (so the default
+        permits exactly the repos this install already knows about)."""
+        roots = [str(r) for r in self.mcp_allowed_repo_roots if str(r).strip()]
+        return roots or [str(p) for p in self.repo_paths.values() if str(p).strip()]

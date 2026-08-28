@@ -6,9 +6,10 @@ can never widen permissions (§3.Y.4).
 
 from __future__ import annotations
 
+import re
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 TaskKind = Literal[
     "repo_rebase", "pr_rebase", "pr_debug", "pr_review", "issue_answer", "issue_filter",
@@ -29,6 +30,11 @@ KIND_TIER: dict[str, str] = {
     # (adapters/<repo>/) — confirm-gated like other write-capable kinds
     "repo_profile": "L2",
 }
+
+# A git commit id in full form. Callers that pin a snapshot (the MCP Strict
+# path) always hold the full sha from the GitHub API, so requiring 40 removes
+# prefix-normalization ambiguity instead of comparing a prefix to a full sha.
+FULL_SHA_RE = re.compile(r"\A[0-9a-f]{40}\Z")
 
 
 class TaskSpec(BaseModel):
@@ -52,6 +58,22 @@ class TaskSpec(BaseModel):
     report_only: bool = False
     post: bool = False  # outward writes (PR comments / issue replies) — explicit only
     params: dict = Field(default_factory=dict)
+    # Snapshot binding: when set, the run must review exactly this head or stop
+    # as stale. Inert data — it narrows what a run accepts, never what it may do.
+    expected_head_sha: str = ""
+    # The canonical checkout this run is bound to, frozen at reservation and
+    # authorized by `mcp_policy.authorize_repo_path`. Empty means "resolve from
+    # ambient settings", which is every CLI run.
+    repo_path: str = ""
+
+    @field_validator("expected_head_sha")
+    @classmethod
+    def _check_head_sha(cls, v: str) -> str:
+        if v and not FULL_SHA_RE.match(v):
+            raise ValueError(
+                "expected_head_sha must be exactly 40 lowercase hex chars, "
+                f"got {v!r}")
+        return v
 
     @property
     def tier(self) -> str:

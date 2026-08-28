@@ -138,8 +138,10 @@ Do not return a review until the strict run is complete.
 Strict 会用它配置的模型运行打包好的 `pr-review` playbook，带进度跟踪、报告生成和
 发布门禁。轮询 `get_review_result` 直到 run 进入终态。
 
-**Strict 永不隐式发布。** 发布仍然需要显式的 `post=true` 调用参数**加上**服务端的
-`ALLOW_POST=1`。
+**Strict 永不发布。** MCP 侧一律不对外写：一个 PR 的评审标记和 head 门禁必须只有
+一个发布者，所以 `mode="strict"` 配 `post=true` 会被直接拒绝（不是静默忽略）。
+读 `get_review_result` 返回的结构化结果，自己发布；需要人工发布时走 CLI
+（`--yes` 加 `ALLOW_POST=1`）。
 
 安装后重启 Codex。用 `/mcp` 或 `codex mcp list` 确认 `infermatrix-copilot` 已连接，
 用 `/skills` 确认 `imreview`、`imdesign`、`imcifix`、`imupdate` 可用。
@@ -147,7 +149,8 @@ Strict 会用它配置的模型运行打包好的 `pr-review` playbook，带进�
 ## 默认 MCP 暴露了什么
 
 - `review(target, repo?, mode="direct", post=false, title="", body="",
-  changed_files=[], review_depth="", repo_path="")`：在宿主发出进度更新之后，
+  changed_files=[], review_depth="", repo_path="", expected_head_sha="",
+  idempotency_key="")`：在宿主发出进度更新之后，
   Direct 用 title/body 返回**至多三条**精确的 owner/model 路由，各自带内嵌的精简
   `quick_map` 摘录。changed files 通常只做范围校验；但当返回的路由**没有一条**命中
   它们推导出的 owner 时，改由 changed files 选路，并在响应里明说
@@ -156,7 +159,11 @@ Strict 会用它配置的模型运行打包好的 `pr-review` playbook，带进�
   `truncated`）正是这种情况，预算会为每一条放行一次读取。返回的 docs/code
   `execution_budget` 是**硬顶**；唯一一次有界扩展，只留给一个明确陈述的、尚未解决的
   P1/高风险契约。Strict 分支启动打包好的工作流，接受 `review_depth`，并可通过
-  `repo_path` 临时覆盖本地 checkout。
+  `repo_path` 指定本次 run 绑定的本地 checkout（会校验它确实是该仓库的 clone、
+  且位于允许的根目录下）。`expected_head_sha` 传完整 40 位 head，PR 在此期间发生
+  移动就以 stale 停下、绝不改审别的快照；`idempotency_key` 传一个稳定的 attempt
+  id，重试会拿回**同一个 run**（包括已完成的，直接读它的结果），而不是再评一遍。
+  `post` 只对 Direct 有效，Strict 永不发布。
 - `validate_direct_review(subtraction_signal, subtraction?, minimality_proof?,
   final_comment_count=1, evidence_head_sha)`：`evidence_head_sha` 必须是**本次固定的
   head 提交**——每一个被引用的源文件和验证结果都读自它；读自其他本地版本的证据

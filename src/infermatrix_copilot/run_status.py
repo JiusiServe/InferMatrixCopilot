@@ -118,10 +118,70 @@ def mark_child_started(run_dir: str | Path, *, child_pid: int,
                        state: str = PLANNING) -> dict:
     """The child's FIRST write: record its own pid and enter `planning`. Doing
     this first (rather than the parent recording the pid after Popen) keeps the
-    single-writer invariant — the parent never writes while the child lives."""
+    single-writer invariant — the parent never writes while the child lives.
+
+    Unconditional. Reserved runs use `claim_for_execution` instead, because a
+    reserved run can legitimately be enqueued twice."""
     return _locked_update(run_dir, lambda _cur: {
         "child_pid": int(child_pid), "state": state,
     })  # type: ignore[return-value]
+
+
+def claim_for_execution(run_dir: str | Path, *, child_pid: int) -> bool:
+    """Atomically claim a reserved run for execution: `queued -> planning`.
+
+    True when this caller won and must execute; False when someone already has,
+    and the caller must exit without touching the run.
+
+    A compare-and-set, not a write, because `RunLock` excludes *concurrent*
+    children but not *serial* ones. The window it closes: the server spawns
+    child A and dies before A records its pid, so the status is still `queued`
+    with a null `child_pid`; a retry legitimately reclaims the reservation and
+    enqueues child B; A then wakes, takes the lock, runs the whole review, marks
+    it `done` and releases — and B acquires the now-free lock and walks `done`
+    straight back to `planning`, reviewing the PR a second time. Nothing about
+    who holds a lock can catch that; only what state the run is in when the
+    holder arrives.
+
+    Re-claiming by the same pid is idempotent so a retried entry point is not
+    mistaken for a duplicate."""
+    def _cas(cur: dict) -> Optional[dict]:
+        recorded = cur.get("child_pid")
+        if cur.get("state") == PLANNING and recorded == int(child_pid):
+            return None  # already ours: idempotent, nothing to change
+        if cur.get("state") != QUEUED or recorded not in (None, int(child_pid)):
+            return None  # someone else owns it, or it already ran
+        return {"child_pid": int(child_pid), "state": PLANNING}
+
+    after = _locked_update(run_dir, _cas) or {}
+    return (after.get("state") == PLANNING
+            and after.get("child_pid") == int(child_pid))
+
+
+def reclaim_queued(run_dir: str | Path, *, owner_server_id: str,
+                   owner_server_pid: int) -> bool:
+    """Re-arm a reservation that never became a run: `interrupted -> queued`,
+    re-stamped with the current server's ownership. True when re-armed.
+
+    A deliberate, narrow exception to "TERMINAL states never transition again",
+    admissible only because `interrupted` with a null `child_pid` is not an
+    outcome: it is a reservation whose owner died before any child started, and
+    `interrupted` is a label `reconcile_if_dead` applied on its behalf. An
+    `interrupted` run that DID start a child did partial work and stays
+    terminal — a genuine second attempt is a new idempotency key, not a rewind.
+
+    Callers hold the per-key idempotency lock across this, so a second retry
+    observing `queued` with a live owner is told the run already exists and does
+    not enqueue it again."""
+    def _rearm(cur: dict) -> Optional[dict]:
+        if cur.get("state") != INTERRUPTED or cur.get("child_pid") is not None:
+            return None
+        return {"state": QUEUED, "note": "",
+                "owner_server_id": owner_server_id,
+                "owner_server_pid": int(owner_server_pid)}
+
+    after = _locked_update(run_dir, _rearm) or {}
+    return after.get("state") == QUEUED and after.get("child_pid") is None
 
 
 def mark(run_dir: str | Path, state: str, *, note: str = "") -> dict:

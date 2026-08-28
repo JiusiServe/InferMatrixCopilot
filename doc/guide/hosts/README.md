@@ -94,8 +94,9 @@ Use InferMatrixCopilot in Direct mode to review this PR.
   → 输出单条合并结论
 ```
 
-结论**只出现在当前对话**，不会自动发到 GitHub。要发布需要显式要求，且服务端
-配置 `ALLOW_POST=1`。
+结论**只出现在当前对话**，不会自动发到 GitHub。Direct 发布需要显式要求，且服务端
+配置 `ALLOW_POST=1`；Strict 则一律不发布——一个 PR 只能有一个发布者，所以读结构化
+结果自己发，或走 CLI 做人工发布。
 
 想要完整后台工作流时明说 Strict——那会用到后端，见
 [`../backends.md`](../backends.md)。

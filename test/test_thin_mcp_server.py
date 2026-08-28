@@ -61,10 +61,8 @@ def _fake_mcp(monkeypatch):
             self.requests.append(request)
             return "run-20260730-120000-abc123"
 
-        def configure_strict_repo(self, repo, repo_path=""):
+        def strict_readiness(self, repo, repo_path=""):
             self.repo_configurations.append((repo, repo_path))
-
-        def strict_readiness(self, repo):
             return []
 
         def get_result(self, run_id, offset=0):
@@ -705,13 +703,12 @@ def test_same_repo_name_under_another_owner_is_rejected():
         _docs("another-owner/vllm-omni")
 
 
-def test_strict_maps_to_old_eco_request_and_preserves_explicit_post(monkeypatch):
+def test_strict_maps_to_the_old_eco_request(monkeypatch):
     mcp, core = _fake_mcp(monkeypatch)
 
     result = mcp.tools["review"](
         target="https://github.com/vllm-project/vllm-omni/pull/5172",
         mode="strict",
-        post=True,
         review_depth="full",
     )
 
@@ -720,7 +717,7 @@ def test_strict_maps_to_old_eco_request_and_preserves_explicit_post(monkeypatch)
         "run_id": "run-20260730-120000-abc123",
         "mode": "strict",
         "execution_mode": "eco",
-        "post": True,
+        "post": False,
     }
     assert set(diagnostics["timing_ms"]) == {"start_strict_review", "total"}
     assert core.requests == [{
@@ -728,10 +725,26 @@ def test_strict_maps_to_old_eco_request_and_preserves_explicit_post(monkeypatch)
         "repo": "vllm-omni",
         "pr": 5172,
         "mode": "eco",
-        "post": True,
+        "post": False,
         "params": {"review_depth": "full"},
     }]
     assert core.repo_configurations == [("vllm-omni", "")]
+
+
+def test_strict_refuses_an_explicit_post_at_the_public_surface(monkeypatch):
+    """Refused here as well as in the policy, so the caller gets the reason
+    rather than a generic rejection from deeper in the stack — and no run is
+    reserved for a request that could never have published."""
+    mcp, core = _fake_mcp(monkeypatch)
+
+    result = mcp.tools["review"](
+        target="https://github.com/vllm-project/vllm-omni/pull/5172",
+        mode="strict",
+        post=True,
+    )
+
+    assert "cannot post" in result["error"]
+    assert core.requests == []  # nothing was started
 
 
 def test_strict_does_not_post_by_default(monkeypatch):
@@ -746,7 +759,7 @@ def test_strict_does_not_post_by_default(monkeypatch):
 
 def test_strict_reports_setup_gaps_before_starting(monkeypatch):
     mcp, core = _fake_mcp(monkeypatch)
-    core.strict_readiness = lambda repo: [
+    core.strict_readiness = lambda repo, repo_path="": [
         "model credential missing",
         "checkout missing",
     ]

@@ -143,6 +143,12 @@ class ReviewPlan:
     signals: DiffSignals | None = None
     input_tokens: int = 0            # gray-zone planner call usage
     output_tokens: int = 0
+    # Why the gray-zone LLM call did not produce a plan, when it did not. Empty
+    # on every deterministic path. `planner="llm-fallback"` alone said only THAT
+    # the call failed; a missing API key, a transport error and a model that
+    # answered off-contract are three different operational problems and were
+    # indistinguishable.
+    planner_error: str = ""
 
 
 def _risk_match(path: str, high_risk_paths: Sequence[str]) -> bool:
@@ -285,7 +291,8 @@ def classify(sig: DiffSignals, settings: Any) -> tuple[str, str] | None:
 
 def _validated(depth: str, lenses: Sequence[str], lens_names: Sequence[str],
                reason: str, planner: str, sig: DiffSignals | None,
-               tokens: tuple[int, int] = (0, 0)) -> ReviewPlan:
+               tokens: tuple[int, int] = (0, 0),
+               planner_error: str = "") -> ReviewPlan:
     """Enforce the depth invariants regardless of plan source: light ⇒ no
     lenses; full ⇒ every lens; standard ⇒ 2-3 valid names (padded from the
     fail-safe pair when the source under-picked)."""
@@ -306,17 +313,30 @@ def _validated(depth: str, lenses: Sequence[str], lens_names: Sequence[str],
             depth, chosen = "full", tuple(vocab)
     return ReviewPlan(depth=depth, lens_names=chosen, reason=reason,
                       planner=planner, signals=sig,
-                      input_tokens=tokens[0], output_tokens=tokens[1])
+                      input_tokens=tokens[0], output_tokens=tokens[1],
+                      planner_error=planner_error)
 
 
 def _plan_llm(sig: DiffSignals, diff_text: str, lens_names: Sequence[str],
               lens_focus: dict[str, str], llm: Any,
-              model: str) -> ReviewPlan | None:
+              model: str) -> tuple[ReviewPlan | None, str]:
     """One gray-zone planner call. The contract only admits standard|full —
-    the model may escalate but never downgrade to light. Returns None on any
-    failure (caller falls back deterministically); no repair round."""
+    the model may escalate but never downgrade to light. Returns
+    `(plan, cause)`; `plan is None` means the caller falls back
+    deterministically and `cause` says why, in one of five sanitized forms:
+
+    * `unavailable` — no planner client configured at all
+    * `transport:<ExcType>: <msg>` — the call itself failed
+    * `empty_reply (stop_reason=…)` — answered with nothing usable
+    * `unparseable: <clipped>` — answered, but not as the JSON contract
+    * `rejected_depth:<value>` — answered a depth outside the contract
+
+    The distinction matters operationally: `unavailable` is a configuration
+    fact and `rejected_depth` is a guardrail doing its job, while the middle
+    three mean a configured planner is misbehaving. Causes are clipped and
+    carry no credentials."""
     if llm is None or not getattr(llm, "available", False):
-        return None
+        return None, "unavailable"
     focus = "\n".join(f"- {n}: {lens_focus.get(n, '')[:160]}"
                       for n in lens_names)
     system = (
@@ -344,21 +364,25 @@ def _plan_llm(sig: DiffSignals, diff_text: str, lens_names: Sequence[str],
         reply = llm.create(system=system,
                            messages=[{"role": "user", "content": prompt}],
                            model=model, max_tokens=8_000, role="planner")
-    except Exception:
-        return None
-    obj = parse_json_reply(reply.text or "")
+    except Exception as exc:  # noqa: BLE001 — any transport failure falls back
+        return None, f"transport:{type(exc).__name__}: {str(exc)[:120]}"
+    text = reply.text or ""
+    if not text.strip():
+        stop = getattr(reply, "stop_reason", None) or "?"
+        return None, f"empty_reply (stop_reason={stop})"
+    obj = parse_json_reply(text)
     if not isinstance(obj, dict):
-        return None
+        return None, f"unparseable: {text.strip()[:120]}"
     depth = str(obj.get("depth", "")).lower()
     if depth not in ("standard", "full"):
-        return None
+        return None, f"rejected_depth:{depth[:40] or '(missing)'}"
     usage = getattr(reply, "usage", None) or {}
     lenses = [str(n) for n in (obj.get("lenses") or [])
               if isinstance(n, str)]
     return _validated(depth, lenses, lens_names,
                       str(obj.get("reason", ""))[:200], "llm", sig,
                       (usage.get("input_tokens", 0),
-                       usage.get("output_tokens", 0)))
+                       usage.get("output_tokens", 0))), ""
 
 
 def plan_review(diff_text: str, *, settings: Any,
@@ -382,9 +406,11 @@ def plan_review(diff_text: str, *, settings: Any,
         depth, reason = ruled
         return _validated(depth, list(lens_names), lens_names, reason,
                           "rules", sig)
-    plan = _plan_llm(sig, diff_text, lens_names, lens_focus or {}, llm, model)
+    plan, cause = _plan_llm(sig, diff_text, lens_names, lens_focus or {},
+                            llm, model)
     if plan is not None:
         return plan
     return _validated("standard", list(DEFAULT_STANDARD_LENSES), lens_names,
                       "gray zone; planner unavailable/unparseable — "
-                      "deterministic standard fallback", "llm-fallback", sig)
+                      "deterministic standard fallback", "llm-fallback", sig,
+                      planner_error=cause)

@@ -35,11 +35,14 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal
 
+from . import contract
+from . import idempotency as idem
 from . import run_status as rs
 from .config import Settings
 from .knowledge_docs import KnowledgeDocs, KnowledgeDocsError
 from .mcp_policy import (
     PolicyError,
+    authorize_repo_path,
     enforce_mcp_policy,
     enforce_strict_review_policy,
 )
@@ -65,10 +68,37 @@ class CopilotMCP:
         self.pid = os.getpid()
         rs.register_server(self.run_root, self.server_id, self.pid)
         rs.startup_reconcile(self.run_root)
+        self._reap()
         self._q: queue.Queue[tuple[str, bool]] = queue.Queue()
         self._worker = threading.Thread(target=self._worker_loop, daemon=True,
                                         name="imx-mcp-worker")
         self._worker.start()
+
+    # one worker thread drains the queue, so Strict runs are strictly serial.
+    # The handshake reports this rather than letting a bot infer concurrency
+    # from the fact that `start` returns immediately.
+    MAX_STRICT_WORKERS = 1
+
+    def _reap(self) -> None:
+        """Bound what the idempotency index and PR-time worktrees accumulate.
+
+        Best-effort by construction: this runs at startup and after each
+        terminal run, and a sweep that cannot complete must never stop a server
+        from serving or a run from finishing."""
+        try:
+            idem.reap_stale(self.run_root,
+                            retention_days=self.settings.idem_retention_days,
+                            repo_paths=list(self.settings.repo_paths.values()))
+        except Exception:  # noqa: BLE001 — housekeeping, never load-bearing
+            pass
+
+    def capabilities(self) -> dict:
+        """The version/capability handshake — see `contract.capabilities`."""
+        from .engine.lifecycle import fcntl as _fcntl
+
+        return contract.capabilities(
+            max_strict_workers=self.MAX_STRICT_WORKERS,
+            supports_file_locking=_fcntl is not None)
 
     # -- worker: one run at a time, each an isolated subprocess ---------------
     def _worker_loop(self) -> None:
@@ -89,16 +119,16 @@ class CopilotMCP:
 
     def _launch(self, run_id: str, *, strict_compat: bool = False) -> None:
         """Run one reserved run as `python -m infermatrix_copilot --execute-reserved
-        <id>`, child stdout+stderr -> console.log. The workflow MCP forces
-        outward writes off; Strict preserves the explicit post/config gate.
-        After `.wait()` the child is reaped, so we reconcile as sole writer."""
+        <id>`, child stdout+stderr -> console.log. No MCP child may write
+        outward, Strict included. After `.wait()` the child is reaped, so we
+        reconcile as sole writer."""
         run_dir = self.run_root / run_id
         env = dict(os.environ)
-        # The standalone workflow MCP stays structurally read-only. Strict
-        # preserves the dual post gate (explicit task intent plus this server's
-        # ALLOW_POST setting).
-        env["ALLOW_POST"] = (
-            "1" if strict_compat and self.settings.allow_post else "0")
+        # Belt to the policy's braces. Strict used to be handed ALLOW_POST=1
+        # when this server allowed it, because Strict specs could carry
+        # post=True; the policy now refuses that, so leaving the env gate open
+        # would only preserve a path to a second publisher on the same PR.
+        env["ALLOW_POST"] = "0"
         env["ALLOW_PUSH"] = "0"
         # The Windows Store Python runtime otherwise inherits the machine's
         # legacy console code page (commonly GBK). Reports legitimately contain
@@ -114,6 +144,11 @@ class CopilotMCP:
         env["DEFAULT_REPO"] = self.settings.default_repo
         env["REPO_PATHS"] = json.dumps(self.settings.repo_paths)
         env["REPO_FULL_NAMES"] = json.dumps(self.settings.repo_full_names)
+        # The child re-authorizes the request's `repo_path`, so it must judge it
+        # against the SAME roots and identities this server did — otherwise the
+        # re-check silently validates against different config than the parent.
+        env["MCP_ALLOWED_REPO_ROOTS"] = json.dumps(
+            self.settings.allowed_repo_roots)
         popen_kwargs: dict[str, Any] = {}
         if os.name == "nt":
             # Codex/Claude launch the MCP server over stdio.  Without a new
@@ -144,40 +179,46 @@ class CopilotMCP:
         # a genuinely blocked child writes its terminal state before exiting 3
         rs.reconcile_after_wait(run_dir, child_pid=proc.pid,
                                 suspect_lock_loser=(proc.returncode == 3))
+        self._reap()  # the run is terminal; sweep what it left behind
 
     # -- start (reserve + enqueue) -------------------------------------------
     def start(self, spec_dict: dict) -> str:
-        """Boundary policy enforcement + reserve + enqueue; returns the run id."""
+        """Boundary policy enforcement + reserve + enqueue; returns the run id.
+
+        No idempotency key here by design: `start` also serves `issue_answer`
+        and `issue_filter`, which carry no PR and no head, so any spec-derived
+        key would collapse every issue task in a repo onto one entry."""
         spec = enforce_mcp_policy(spec_dict, allowed_repos=self.settings.mcp_allowed_repos, settings=self.settings)
-        run_id = self.copilot.reserve_run(
+        run_id, created = self.copilot.reserve_run(
             spec, owner_server_id=self.server_id, owner_server_pid=self.pid)
-        self._q.put((run_id, False))
+        if created:
+            self._q.put((run_id, False))
         return run_id
 
     def start_strict_review(self, spec_dict: dict) -> str:
-        """Reserve a packaged Strict review workflow."""
+        """Reserve a packaged Strict review workflow.
+
+        Enqueues only a run this call actually created. Returning an existing id
+        while still enqueueing would deduplicate the *id* and not the
+        *execution* — the second child would review the same PR again."""
         spec = enforce_strict_review_policy(
             spec_dict, allowed_repos=self.settings.mcp_allowed_repos,
             settings=self.settings)
-        run_id = self.copilot.reserve_run(
-            spec, owner_server_id=self.server_id, owner_server_pid=self.pid)
-        self._q.put((run_id, True))
+        run_id, created = self.copilot.reserve_run(
+            spec, owner_server_id=self.server_id, owner_server_pid=self.pid,
+            idempotency_key=str(spec_dict.get("idempotency_key") or ""))
+        if created:
+            self._q.put((run_id, True))
         return run_id
 
-    def configure_strict_repo(self, repo: str, repo_path: str = "") -> None:
-        """Apply an explicit per-call checkout before Strict preflight."""
-        if not repo_path:
-            return
-        path = Path(repo_path).expanduser().resolve()
-        if not path.is_dir() or not (path / ".git").exists():
-            raise ValueError(f"repo_path is not a Git checkout: {path}")
-        self.settings.repo_paths = {
-            **self.settings.repo_paths,
-            repo: str(path),
-        }
+    def strict_readiness(self, repo: str, repo_path: str = "") -> list[str]:
+        """Return actionable setup gaps before reserving a Strict run.
 
-    def strict_readiness(self, repo: str) -> list[str]:
-        """Return actionable setup gaps before reserving a Strict run."""
+        `repo_path` validates THAT explicit checkout. The deleted
+        `configure_strict_repo` used to mutate `settings.repo_paths` so this
+        method would see it — process-global state written per call, so two
+        concurrent Strict requests for different checkouts could each preflight
+        against the other's."""
         missing = []
         # Backend selection is EXPLICIT for Strict (doc/RFC-provider-registry
         # .md): unset refuses with the exact fix, never falls back silently.
@@ -210,7 +251,14 @@ class CopilotMCP:
                     gap = transport.auth_gap()
                     if gap:
                         missing.append(gap)
-        repo_path = self.copilot._resolve_repo_path(repo)
+        if repo_path:
+            try:
+                repo_path = authorize_repo_path(repo, repo_path, self.settings)
+            except PolicyError as exc:
+                missing.append(str(exc))
+                repo_path = ""
+        else:
+            repo_path = self.copilot._resolve_repo_path(repo)
         if not repo_path or not Path(repo_path).is_dir():
             missing.append(
                 f"checkout for {repo!r} missing; run the installer with "
@@ -244,8 +292,20 @@ class CopilotMCP:
         """Lazy-reconcile then return the run state; once terminal, attach a
         size-capped page of the report (RUN_REPORT.md, or ESCALATION.md when
         blocked) with `next_offset` + `report_path` for paging — never an
-        unbounded dump over the protocol."""
-        run_dir = self.copilot._contained_run_dir(run_id)
+        unbounded dump over the protocol.
+
+        Terminal responses also carry `result`: the structured form from
+        `contract.build_review_result`, so a machine consumer reads the verdict
+        and findings as data instead of scraping them back out of the Markdown.
+        The `report` paging stays for back-compat with existing hosts."""
+        # A well-formed id this server has never heard of is answered, not
+        # raised, so a bot holding a stale id can tell "lost" from "still
+        # running". A malformed or escaping id is still an error.
+        run_dir = self.copilot._contained_run_dir(run_id, must_exist=False)
+        if not run_dir.exists():
+            return {"run_id": run_id, "state": "unknown", "note": "",
+                    "report": None, "report_path": None, "next_offset": None,
+                    "result": contract.unknown_run_result(run_id)}
         rs.reconcile_if_dead(run_dir, self.run_root)
         status = rs.read_status(run_dir) or {}
         state = status.get("state")
@@ -253,6 +313,7 @@ class CopilotMCP:
                                "note": status.get("note", "")}
         if state not in rs.TERMINAL:
             return out  # still queued/planning/running — poll again
+        out["result"] = contract.build_review_result(run_dir)
         report_path = run_dir / "RUN_REPORT.md"
         if state == rs.BLOCKED and (run_dir / "ESCALATION.md").exists():
             report_path = run_dir / "ESCALATION.md"
@@ -343,15 +404,21 @@ def build_mcp(settings: Settings | None = None):
 
     @mcp.tool()
     def start_review(pr: int, repo: str = "", review_depth: str = "",
-                     mode: Literal["eco", "performance"] = "eco") -> dict:
+                     mode: Literal["eco", "performance"] = "eco",
+                     expected_head_sha: str = "") -> dict:
         """Start a read-only review of PR `pr` in eco or performance mode.
         Returns {run_id}; poll get_result. `review_depth` optionally pins the
-        adaptive depth (light|standard|full|auto; policy-validated)."""
+        adaptive depth (light|standard|full|auto; policy-validated).
+        `expected_head_sha` optionally pins the review to one snapshot: pass the
+        full 40-hex head you observed and the run stops as stale rather than
+        reviewing a different commit if the PR moved in between."""
         req: dict = {"kind": "pr_review",
                      "repo": repo or core.settings.default_repo,
                      "pr": pr, "mode": mode}
         if review_depth:
             req["params"] = {"review_depth": review_depth}
+        if expected_head_sha:
+            req["expected_head_sha"] = expected_head_sha
         return _guard(lambda: {"run_id": core.start(req)})
 
     @mcp.tool()
@@ -367,6 +434,14 @@ def build_mcp(settings: Settings | None = None):
         poll get_result."""
         return _guard(lambda: {"run_id": core.start(
             {"kind": "issue_filter", "repo": repo or core.settings.default_repo})})
+
+    @mcp.tool()
+    def get_capabilities() -> dict:
+        """This copilot's contract version and capability flags. Call it once in
+        your preflight: it is how a client detects an incompatible or
+        unprotected deployment before a review fails on it, and
+        `max_strict_workers` says how many reviews actually run at a time."""
+        return _guard(core.capabilities)
 
     @mcp.tool()
     def get_result(run_id: str, offset: int = 0) -> dict:

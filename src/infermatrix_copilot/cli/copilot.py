@@ -19,6 +19,8 @@ from typing import NamedTuple
 
 import yaml
 
+from .. import idempotency as idem
+from .. import run_status as rs
 from ..config import Settings, TierNotConfiguredError
 from ..engine.executor import Executor
 from ..engine.lifecycle import RunLock, RunLockHeld, run_guarded
@@ -115,6 +117,9 @@ class Copilot:
         self.store = PlaybookStore(self.settings.playbooks_dir, self.registry)
         self.planner = Planner(self.store, self.registry)
         self.last_run_dir: Path | None = None
+        # why the last execution stopped, when it stopped blocked — read by
+        # `_execute_reserved_locked`, which owns the terminal run_status write
+        self.last_blocked_reason: str = ""
 
     # -- planning ---------------------------------------------------------------
     def resolve(self, spec: TaskSpec) -> Resolution:
@@ -150,11 +155,11 @@ class Copilot:
             # store's requires-filter (now covering exact-repo playbooks too)
             # skips on None, keeping adapter-less setups v1-compatible
             # instead of silently dropping every playbook with a `requires:`.
-            if self._resolve_repo_path(spec.repo):
+            if self._repo_path_for(spec):
                 return self.planner.resolve(spec, capabilities=None)
             return self.planner.resolve(spec, capabilities=set())
         capabilities = set(adapter.capabilities)
-        if self._resolve_repo_path(spec.repo):  # REPO_PATHS works adapter-less
+        if self._repo_path_for(spec):  # REPO_PATHS works adapter-less
             capabilities.add("repo.path")
         return self.planner.resolve(spec, capabilities=capabilities)
 
@@ -354,8 +359,11 @@ class Copilot:
         branches / high-risk modules from the adapter when present), drive the
         Executor, then print per-step marks, optional run metrics, and the final
         status. `resuming` seeds the state so steps can pick up where they left
-        off. Returns the exit code (0 done, BLOCKED_EXIT blocked, else 1)."""
+        off. Returns the exit code (0 done, BLOCKED_EXIT blocked, else 1), and
+        records `last_blocked_reason` for the reserved-run caller, which has only
+        the code but owns the terminal `run_status.json` write."""
         self.last_run_dir = run_dir
+        self.last_blocked_reason = ""
         lock = held_lock
         if lock is None:
             try:
@@ -407,7 +415,7 @@ class Copilot:
                          playbook=playbook.name, tier=tier)
             state: dict = {
                 "task_spec": spec.model_dump(),
-                "repo_path": self._resolve_repo_path(spec.repo),
+                "repo_path": self._repo_path_for(spec),
                 "push_policy": PushPolicy(),  # steps may replace with a derived policy
                 "protected_branches": self.settings.protected_branches,
                 "resuming": resuming,
@@ -439,6 +447,7 @@ class Copilot:
                 print(f"  {mark} {step_id}: {r.summary}")
             print(f"run {run_dir.name}: {outcome.status}  ({run_dir})")
             if outcome.status == "blocked":
+                self.last_blocked_reason = str(outcome.blocked_reason or "")
                 print(style("  ⚠ ", "yellow", "bold") + f"{outcome.blocked_reason}\n  see {run_dir / 'ESCALATION.md'}")
                 return BLOCKED_EXIT
             return 0 if outcome.status == "done" else 1
@@ -500,28 +509,96 @@ class Copilot:
         """A fresh unique run id (`run-<ts>-<uuid6>`; same format the CLI uses)."""
         return f"run-{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
 
-    def _contained_run_dir(self, run_id: str) -> Path:
+    def _contained_run_dir(self, run_id: str, *, must_exist: bool = True) -> Path:
         """Validate `run_id` and resolve it to a directory strictly contained
         under `run_root` — rejecting path traversal from an untrusted MCP arg.
-        Raises ValueError on a bad pattern, escape, or missing run."""
+        Raises ValueError on a bad pattern, an escape, or (unless
+        `must_exist=False`) a missing run.
+
+        `must_exist=False` is for the poll path, which must distinguish a
+        well-formed id whose run this server has never heard of — answered as
+        `state: unknown` so a client can tell "lost" from "still running" — from
+        a malformed or escaping id, which stays an error."""
         if not self._RUN_ID_RE.match(run_id or ""):
             raise ValueError(f"invalid run_id: {run_id!r}")
         root = self.settings.run_root.resolve()
         run_dir = (self.settings.run_root / run_id).resolve()
         if run_dir.parent != root:
             raise ValueError(f"run_id escapes run_root: {run_id!r}")
-        if not run_dir.exists():
+        if must_exist and not run_dir.exists():
             raise ValueError(f"no such run: {run_id!r}")
         return run_dir
 
     def reserve_run(self, spec: TaskSpec, *, owner_server_id: str,
-                    owner_server_pid: int) -> str:
-        """MCP-only: reserve a run and return its id **without** planning or
-        executing (no LLM), so the tool call returns in ms and the caller polls.
-        Persists `request.json` (0600) + an initial `queued` `run_status.json`
-        stamped with the owning server; planning happens later in the child."""
-        from .. import run_status as rs
+                    owner_server_pid: int,
+                    idempotency_key: str = "") -> tuple[str, bool]:
+        """MCP-only: reserve a run and return `(run_id, created)` **without**
+        planning or executing (no LLM), so the tool call returns in ms and the
+        caller polls. Persists `request.json` (0600) + an initial `queued`
+        `run_status.json` stamped with the owning server; planning happens later
+        in the child.
 
+        `created` is what the caller enqueues on. Deduplicating the id alone
+        would not deduplicate execution — the start path would hand back an
+        existing id and still launch a second child for it.
+
+        With an `idempotency_key`, a retry that lost the original response gets
+        the same run — including a finished one, whose result it can then read
+        instead of re-reviewing the same commit. See `idempotency.py` for why a
+        spec hash alone cannot do this and why the scope is Strict-only.
+
+        A `repo_path` on the spec is authorized and canonicalized HERE, so the
+        persisted request names one immutable checkout for the life of the run.
+        The child re-authorizes it anyway — `request.json` is untrusted — but
+        freezing it at reservation is what stops two concurrent per-call repos
+        from racing through shared settings, which is how the deleted
+        `configure_strict_repo` worked."""
+        from ..mcp_policy import authorize_repo_path
+
+        if spec.repo_path:
+            spec = spec.model_copy(update={"repo_path": authorize_repo_path(
+                spec.repo, spec.repo_path, self.settings)})
+        key = idem.validate_key(idempotency_key)
+        if not key:
+            return self._reserve_new(spec, owner_server_id, owner_server_pid), True
+        with idem.key_lock(self.settings.run_root, key):
+            return self._reserve_keyed(spec, key, owner_server_id,
+                                       owner_server_pid)
+
+    def _reserve_keyed(self, spec: TaskSpec, key: str, owner_server_id: str,
+                       owner_server_pid: int) -> tuple[str, bool]:
+        """Resolve or create the run for `key`. Caller holds the key lock."""
+        fingerprint = idem.spec_fingerprint(spec.model_dump())
+        entry = idem.read_entry(self.settings.run_root, key)
+        if entry:
+            run_dir = self.settings.run_root / str(entry.get("run_id") or "")
+            # The index is a cache; the persisted request is the authority. A
+            # key presented with a DIFFERENT spec is a caller error — serving
+            # the old run would quietly review the wrong thing under a name the
+            # caller believes means something else.
+            recorded = str(entry.get("spec_fingerprint") or "")
+            if run_dir.exists() and recorded and recorded != fingerprint:
+                raise idem.IdempotencyError(
+                    f"idempotency_key {key!r} was already used for a different "
+                    "request; use a new key for a new attempt")
+            if run_dir.exists() and idem.resolvable(run_dir):
+                return run_dir.name, False
+            if run_dir.exists() and idem.relaunchable(run_dir):
+                # Reserved but never launched — the owner died between
+                # publishing this entry and starting a child. Re-arm and report
+                # it as created so the caller enqueues it; the re-stamp is what
+                # stops a SECOND retry from enqueueing it again.
+                if rs.reclaim_queued(run_dir, owner_server_id=owner_server_id,
+                                     owner_server_pid=owner_server_pid):
+                    return run_dir.name, True
+                return run_dir.name, False
+        run_id = self._reserve_new(spec, owner_server_id, owner_server_pid)
+        idem.write_entry(self.settings.run_root, key, run_id, fingerprint)
+        return run_id, True
+
+    def _reserve_new(self, spec: TaskSpec, owner_server_id: str,
+                     owner_server_pid: int) -> str:
+        """Create the run directory, request and initial status."""
         run_id = self._new_run_id()
         run_dir = self.settings.run_root / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
@@ -571,10 +648,19 @@ class Copilot:
     def _execute_reserved_locked(self, run_dir: Path, lock: RunLock,
                                  policy) -> int:
         """The body of `_execute_reserved`, run while holding the run lock."""
-        from .. import run_status as rs
         from ..mcp_policy import PolicyError
 
-        rs.mark_child_started(run_dir, child_pid=os.getpid(), state=rs.PLANNING)
+        # The claim, not the lock, is what makes execution at-most-once.
+        # `RunLock` excludes concurrent children; it says nothing about a second
+        # child that arrives after the first finished and released. A losing
+        # child exits here without planning, executing, or writing status — it
+        # is a duplicate, not a failure.
+        if not rs.claim_for_execution(run_dir, child_pid=os.getpid()):
+            state = (rs.read_status(run_dir) or {}).get("state", "?")
+            print(style("↷ ", "yellow") +
+                  f"run {run_dir.name} is already claimed (state={state}) — "
+                  "not executing it twice")
+            return 0
         try:
             raw = json.loads((run_dir / "request.json").read_text(encoding="utf-8"))
             spec = policy(
@@ -605,7 +691,13 @@ class Copilot:
         except Exception as exc:  # a crash still leaves a terminal record
             rs.mark(run_dir, rs.FAILED, note=f"{type(exc).__name__}: {exc}")
             raise
-        rs.mark(run_dir, {0: rs.DONE, BLOCKED_EXIT: rs.BLOCKED}.get(code, rs.FAILED))
+        # Carry WHY it stopped into the terminal record. An MCP client only ever
+        # sees `run_status.json`, and a bare `blocked` with no note gives it
+        # nothing to distinguish a stale-head refusal from a missing tier or a
+        # failed checkout — the reason was previously printed to the child's
+        # console and discarded.
+        rs.mark(run_dir, {0: rs.DONE, BLOCKED_EXIT: rs.BLOCKED}.get(code, rs.FAILED),
+                note=self.last_blocked_reason if code == BLOCKED_EXIT else "")
         return code
 
     def _adapter_for(self, repo: str):
@@ -618,9 +710,25 @@ class Copilot:
         except Exception:
             return None
 
+    def _repo_path_for(self, spec: TaskSpec) -> str:
+        """The checkout THIS spec runs against: its frozen `repo_path` first,
+        else the ambient resolution by alias.
+
+        Every place a run learns its checkout must agree. Resolution derives the
+        `repo.path` capability from this, and `_execute` seeds `state` from it:
+        with an explicit path but no ambient `REPO_PATHS` and no adapter
+        `repo.path`, an alias-only lookup would drop the capability and fail to
+        resolve a playbook that requires it — while a perfectly valid checkout
+        sat in the spec. With both configured and differing, planning would
+        evaluate one checkout and execution would run against another."""
+        return spec.repo_path or self._resolve_repo_path(spec.repo)
+
     def _resolve_repo_path(self, repo: str) -> str:
         """REPO_PATHS first; fall back to the repo's adapter manifest (adapter zero
-        declares repo.path), so runs work even without a .env in reach."""
+        declares repo.path), so runs work even without a .env in reach.
+
+        Alias-only: callers that hold a TaskSpec want `_repo_path_for`, which
+        honors a frozen per-run path."""
         p = self.settings.repo_path(repo)
         if p:
             return str(p)

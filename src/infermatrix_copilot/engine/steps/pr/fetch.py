@@ -11,6 +11,7 @@ import json
 import re
 from pathlib import Path
 
+from ... import worktrees
 from ...step import FailureKind, StepContext, StepResult
 from .._common import from_state, require_repo, step
 from .._common import gh as _gh
@@ -18,107 +19,135 @@ from .._common import git as _git
 from .._common import repo_path as _repo_path
 
 
-def _worktree_at(repo: Path, sha: str, dest: Path) -> tuple[bool, str]:
-    """Materialize a detached worktree of `repo` at `sha` under `dest`,
-    reusing an existing one already pinned to the same sha. Returns
-    `(ok, detail)`; never raises — callers degrade to the live checkout."""
+# `_pinned_diff` sentinel: the head is already contained in the base (a merged
+# PR), so there is nothing for a local three-dot diff to show. Distinct from a
+# real error because the caller's response differs — see `_diff_at_head`.
+CONTAINED_HEAD = "head is contained in the base (merged PR)"
+
+
+def _pinned_refs(run_id: str) -> tuple[str, str]:
+    """This run's private `(base_ref, head_ref)` fetch destinations.
+
+    Run-scoped, not PR-scoped. The refspecs below are forced, so a PR-keyed name
+    would let two concurrent runs on one PR at different heads overwrite each
+    other's "pinned" base between fetch and diff — reintroducing the race this
+    whole path removes. They also anchor both commits against a concurrent
+    `git gc`, which a FETCH_HEAD-only fetch does not, and live outside
+    `refs/heads` / `refs/remotes` so nothing mistakes them for branches."""
+    return f"refs/imx/{run_id}/base", f"refs/imx/{run_id}/head"
+
+
+def _resolve_pr_head(repo: Path, pr: int) -> tuple[str, str, str]:
+    """Resolve the PR's `(base_ref, head_sha, error)` in ONE call.
+
+    Everything downstream — the stale gate, the fetch, the diff and the worktree
+    — is then governed by this single answer. The old flow asked twice (`gh pr
+    diff` resolves the head server-side; `_pr_time_checkout` resolved it again
+    via `gh pr view`), so a push landing between them produced a diff and a
+    review tree from different commits."""
+    code, out = _gh(["pr", "view", str(pr), "--json", "baseRefName,commits"],
+                    cwd=repo)
+    if code != 0:
+        return "", "", f"pr view failed: {out[:200]}"
     try:
-        if dest.exists():
-            code, head = _git(dest, "rev-parse", "HEAD")
-            if code == 0 and head.strip() == sha:
-                return True, f"reused worktree @ {sha[:12]}"
-            _git(repo, "worktree", "remove", "--force", str(dest))
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        code, out = _git(repo, "worktree", "add", "--detach", str(dest), sha)
-        if code != 0:
-            return False, f"worktree add failed: {out[:300]}"
-        return True, f"created worktree @ {sha[:12]}"
-    except Exception as exc:  # noqa: BLE001 — never break the fetch step
-        return False, f"worktree error: {exc}"
+        data = json.loads(out or "{}")
+    except json.JSONDecodeError:
+        return "", "", "pr view returned non-JSON"
+    base_ref = str(data.get("baseRefName") or "")
+    commits = data.get("commits") or []
+    # `headRefOid` is not exposed by every gh version — the last commit's oid is
+    # the PR head and is universally available
+    head_sha = str(commits[-1].get("oid") or "") if commits else ""
+    if not head_sha:
+        return base_ref, "", "PR head unresolvable from pr view"
+    return base_ref, head_sha, ""
 
 
-def _pr_time_checkout(ctx: StepContext, repo: Path, pr: int) -> tuple[str, str]:
-    """Pin the review tree to the PR head (PR-TIME state): resolve headRefOid,
-    fetch `pull/<n>/head` (works for open AND merged PRs), and create/reuse a
-    detached worktree. Returns `(repo_path, checkout_note)` — the live checkout
-    with a loud note when pinning is impossible, so reviews on post-merge main
-    know a zero-survivor grep proves nothing about PR-time state.
+def _fetch_pinned(repo: Path, pr: int, base_ref: str, head_sha: str,
+                  run_id: str) -> tuple[str, str]:
+    """Fetch base and head into this run's own refs; return `(base_sha, error)`.
+
+    The destinations are explicit and forced. `git fetch origin <base>
+    pull/N/head` — what this file used to do — gives `pull/N/head` no
+    destination, so it lands in FETCH_HEAD, and the refresh of
+    `refs/remotes/origin/<base>` is only git's *opportunistic* tracking-ref
+    update: contingent on the conventional `remote.origin.fetch` refspec and
+    suppressible by configuration. A merge-base taken against that possibly
+    stale ref shows unrelated upstream churn as if it were the PR's work."""
+    base_dest, head_dest = _pinned_refs(run_id)
+    code, out = _git(repo, "fetch", "--no-tags", "origin",
+                     f"+refs/heads/{base_ref}:{base_dest}",
+                     f"+refs/pull/{pr}/head:{head_dest}", timeout=300)
+    if code != 0:
+        return "", f"git fetch failed: {out[:200]}"
+    code, out = _git(repo, "rev-parse", head_dest)
+    if code != 0:
+        return "", f"fetched head unresolvable: {out[:200]}"
+    fetched_head = out.strip()
+    if fetched_head != head_sha:
+        # the head moved between `gh pr view` and the fetch — git's own,
+        # independent confirmation of what the API told us a moment ago
+        return "", (f"PR head moved during fetch: {head_sha[:12]} -> "
+                    f"{fetched_head[:12]}")
+    code, out = _git(repo, "rev-parse", base_dest)
+    if code != 0:
+        return "", f"fetched base unresolvable: {out[:200]}"
+    return out.strip(), ""
+
+
+def _pinned_diff(repo: Path, base_sha: str,
+                 head_sha: str) -> tuple[str, str, str]:
+    """`merge-base(base_sha, head)..head` — the same three-dot semantics the API
+    diff endpoint uses, but from the base commit THIS run fetched.
+
+    Returns `(diff_text, detail, error)`. The error is separate from the text
+    because an empty diff is a legitimate result (a PR that only deletes, or one
+    whose changes are already in the base) and must not read as a failure.
+
+    Computing the diff locally is also what makes the >20k-line case work: the
+    API diff endpoint hard-fails those with HTTP 406, which is why a local
+    reconstruction existed as a fallback before it became the primary path."""
+    code, out = _git(repo, "merge-base", base_sha, head_sha)
+    if code != 0:
+        return "", "", f"merge-base failed: {out[:200]}"
+    merge_base = out.strip()
+    if merge_base == head_sha:
+        # The head is an ANCESTOR of the base — the ordinary state of a merged
+        # PR, where main now contains its commits. The three-dot diff is empty
+        # by definition, so computing it here would review nothing at all. This
+        # is not a failure: the caller falls back to the API diff, which is safe
+        # precisely because a contained head cannot move any more.
+        return "", "", CONTAINED_HEAD
+    code, out = _git(repo, "diff", f"{merge_base}..{head_sha}", timeout=300)
+    if code != 0:
+        return "", "", f"git diff failed: {out[:200]}"
+    return out, f"local git diff {merge_base[:12]}..{head_sha[:12]}", ""
+
+
+def _pr_time_checkout(ctx: StepContext, repo: Path, pr: int,
+                      sha: str) -> tuple[str, str, bool]:
+    """Materialize the review tree at `sha` (PR-TIME state). Returns
+    `(repo_path, checkout_note, pinned)` — the live checkout with a loud note
+    when pinning is impossible, so reviews on post-merge main know a
+    zero-survivor grep proves nothing about PR-time state.
 
     The latent-gap eval class (#4810 -> #4891) exists because reviewing on
     post-merge main hides exactly the sites the PR missed; a checklist rule
     could not fix what needed a mechanism."""
-    injected = ctx.state.get("pr_head_sha")  # offline-test injection point
-    sha = str(injected) if injected else ""
-    if not sha:
-        # `headRefOid` is not exposed by every gh version — the last commit's
-        # oid is the PR head and is universally available
-        code, out = _gh(["pr", "view", str(pr), "--json", "commits"], cwd=repo)
-        if code == 0:
-            commits = (json.loads(out or "{}").get("commits") or [])
-            if commits:
-                sha = str(commits[-1].get("oid") or "")
-    if not sha:
-        ctx.trace.record("capability_gap", capability="pr.head_sha",
-                         step="pr.fetch_diff",
-                         effect="reviewing post-merge main, not PR-time state")
-        return str(repo), ("checkout: CURRENT MAIN (PR head unresolvable) — "
-                           "the tree may already contain post-PR fixes; a "
-                           "clean grep does NOT clear PR-time state")
-    ctx.state["pr_head_sha"] = sha
-    if not injected:
-        code, out = _git(repo, "fetch", "origin", f"pull/{pr}/head")
-        if code != 0:
-            ctx.trace.record("capability_gap", capability="pr.head_fetch",
-                             step="pr.fetch_diff", effect=out[:200])
-            return str(repo), ("checkout: CURRENT MAIN (head fetch failed) — "
-                               "post-PR fixes may be present; a clean grep "
-                               "does NOT clear PR-time state")
-    dest = Path.home() / ".infermatrix-copilot" / "worktrees" / f"{repo.name}-pr{pr}"
-    ok, detail = _worktree_at(repo, sha, dest)
+    dest = worktrees.dest_for(repo, pr, sha)
+    ok, detail = worktrees.materialize(repo, sha, dest, _git)
     if not ok:
         ctx.trace.record("capability_gap", capability="pr.worktree",
                          step="pr.fetch_diff", effect=detail)
         return str(repo), ("checkout: CURRENT MAIN (worktree failed) — "
                            "post-PR fixes may be present; a clean grep does "
-                           "NOT clear PR-time state")
+                           "NOT clear PR-time state"), False
+    worktrees.hold(dest, ctx.run_dir)
     ctx.trace.record("pr_time_checkout", pr=pr, sha=sha, path=str(dest),
                      detail=detail)
     return str(dest), (f"checkout: PR-TIME TREE (head {sha[:12]}) — the tree "
                        "matches the diff exactly; repo-wide greps DO reflect "
-                       "PR-time state")
-
-
-def _local_diff_fallback(repo: Path, pr: int) -> tuple[str, str]:
-    """Reconstruct the PR diff locally when the gh/API diff endpoint refuses it
-    (HTTP 406 on >20k-line diffs): resolve base+head from `gh pr view`, fetch
-    both refs, and diff `merge-base(origin/<base>, head)..head` — the same
-    three-dot semantics the API endpoint uses. Returns `(diff_text, detail)`;
-    empty `diff_text` means the fallback also failed and `detail` says why."""
-    code, out = _gh(["pr", "view", str(pr), "--json", "baseRefName,commits"],
-                    cwd=repo)
-    if code != 0:
-        return "", f"pr view failed: {out[:200]}"
-    try:
-        data = json.loads(out or "{}")
-    except json.JSONDecodeError:
-        return "", "pr view returned non-JSON"
-    base_ref = str(data.get("baseRefName") or "")
-    commits = data.get("commits") or []
-    head_sha = str(commits[-1].get("oid") or "") if commits else ""
-    if not (base_ref and head_sha):
-        return "", "base/head unresolvable from pr view"
-    code, out = _git(repo, "fetch", "origin", base_ref, f"pull/{pr}/head",
-                     timeout=300)
-    if code != 0:
-        return "", f"git fetch failed: {out[:200]}"
-    code, out = _git(repo, "merge-base", f"origin/{base_ref}", head_sha)
-    if code != 0:
-        return "", f"merge-base failed: {out[:200]}"
-    base_sha = out.strip()
-    code, out = _git(repo, "diff", f"{base_sha}..{head_sha}", timeout=300)
-    if code != 0:
-        return "", f"git diff failed: {out[:200]}"
-    return out, f"local git diff {base_sha[:12]}..{head_sha[:12]}"
+                       "PR-time state"), True
 
 
 _LINKED_ISSUE = re.compile(r"(?:fix(?:es|ed)?|close[sd]?|resolve[sd]?)\s*:?\s*#(\d+)",
@@ -272,13 +301,130 @@ def _pr_context_bundle(ctx: StepContext, repo: str, pr: int) -> str:
     return "\n\n".join(p for p in parts if p)
 
 
+def _stale(ctx: StepContext, pr: int, expected: str, actual: str) -> StepResult:
+    """Stop as stale, recording BOTH shas where a failed step cannot lose them.
+
+    The executor checkpoints only successful steps, so `state_updates` on a
+    failed StepResult never reaches `progress.json`. `run_trace.jsonl` is
+    append-only and survives, so the structured-result assembler reads the facts
+    from there."""
+    ctx.trace.record("expected_head_mismatch", pr=pr, expected=expected,
+                     actual=actual, step="pr.fetch_diff")
+    return StepResult(
+        False, FailureKind.BLOCKED,
+        f"PR #{pr} head is {actual[:12] or 'unresolvable'}, not the requested "
+        f"{expected[:12]} — refusing to review a different snapshot")
+
+
+def _fetch_at_one_head(ctx: StepContext, repo: Path, pr: int, expected: str):
+    """Resolve the head once, then derive the diff and the review tree from that
+    single sha. Returns `(diff, diff_note, head_sha, repo_path, checkout_note)`
+    or a BLOCKED StepResult.
+
+    `expected` set is the strict contract: stale ⇒ stop before any fetch, and
+    any failure to pin ⇒ BLOCKED rather than a quiet degrade to the live
+    checkout. `expected` empty is the CLI/interactive path, which keeps today's
+    tolerant behaviour — the reorder still applies, but a fetch or
+    materialization failure degrades with the existing loud note instead of
+    blocking, so the common path does not regress."""
+    injected = str(ctx.state.get("pr_head_sha") or "")  # offline-test injection
+    base_ref, head_sha, err = ("", injected, "") if injected \
+        else _resolve_pr_head(repo, pr)
+
+    if expected and head_sha != expected:
+        # the gate fires BEFORE any fetch or materialization: a pinned request
+        # must not touch the network or the disk for a snapshot it will refuse
+        return _stale(ctx, pr, expected, head_sha)
+    if not head_sha:
+        ctx.trace.record("capability_gap", capability="pr.head_sha",
+                         step="pr.fetch_diff", effect=err or "head unresolvable")
+    else:
+        ctx.state["pr_head_sha"] = head_sha
+
+    diff = _diff_at_head(ctx, repo, pr, base_ref, head_sha, expected,
+                         skip_fetch=bool(injected))
+    if isinstance(diff, StepResult):
+        return diff
+    diff_text, diff_note = diff
+
+    if not head_sha:  # unpinned and unresolvable: today's loud-note degrade
+        note = ("checkout: CURRENT MAIN (PR head unresolvable) — the tree may "
+                "already contain post-PR fixes; a clean grep does NOT clear "
+                "PR-time state")
+        return diff_text, diff_note, "", str(repo), note
+
+    wt_path, note, pinned = _pr_time_checkout(ctx, repo, pr, head_sha)
+    if expected and not pinned:
+        return StepResult(
+            False, FailureKind.BLOCKED,
+            f"cannot materialize PR #{pr} at {expected[:12]} — refusing to "
+            "review the live checkout for a pinned request")
+    return diff_text, diff_note, head_sha, wt_path, note
+
+
+def _diff_at_head(ctx: StepContext, repo: Path, pr: int, base_ref: str,
+                  head_sha: str, expected: str, *, skip_fetch: bool):
+    """The diff for `head_sha`, preferring the pinned local computation.
+
+    Returns `(diff_text, note)` or a BLOCKED StepResult. `gh pr diff` is the
+    fallback: it resolves the head server-side, so for an OPEN PR it can
+    disagree with the tree we just materialized — the very TOCTOU window this
+    reorder closes — and a pinned run must not take it. The one exception is a
+    head already contained in the base (a merged PR), where the local three-dot
+    diff is empty by definition and the head can no longer move, so the API diff
+    is both necessary and safe."""
+    if head_sha and not skip_fetch:
+        base_sha, err = _fetch_pinned(repo, pr, base_ref, head_sha,
+                                      ctx.run_dir.name)
+        if not err:
+            text, detail, derr = _pinned_diff(repo, base_sha, head_sha)
+            if not derr:
+                return text, f" via {detail}"
+            err = derr
+        if err == CONTAINED_HEAD:
+            ctx.trace.record("diff_fallback", pr=pr, detail="gh pr diff (merged)",
+                             reason=CONTAINED_HEAD)
+            code, out = _gh(["pr", "diff", str(pr)], cwd=repo)
+            if code != 0:
+                return StepResult(False, FailureKind.BLOCKED,
+                                  f"PR #{pr} is already merged into the base and "
+                                  f"gh pr diff failed: {out[:300]}")
+            return out, " via gh pr diff (merged PR: head is in the base)"
+        if expected:
+            return StepResult(False, FailureKind.BLOCKED,
+                              f"cannot pin PR #{pr} to {expected[:12]}: {err}")
+        ctx.trace.record("capability_gap", capability="pr.head_fetch",
+                         step="pr.fetch_diff", effect=err[:200])
+    elif expected and not skip_fetch:
+        return StepResult(False, FailureKind.BLOCKED,
+                          f"PR #{pr} head unresolvable — cannot honor the "
+                          f"requested {expected[:12]}")
+
+    code, out = _gh(["pr", "diff", str(pr)], cwd=repo)
+    if code != 0:
+        return StepResult(False, FailureKind.BLOCKED,
+                          f"gh pr diff failed: {out[:300]}")
+    if not skip_fetch:
+        ctx.trace.record("diff_fallback", pr=pr, detail="gh pr diff (unpinned)")
+        return out, " via gh pr diff (unpinned)"
+    return out, ""
+
+
 @step("pr.fetch_diff", "deterministic", "read",
       "Fetch a PR diff via gh (read-only).")
 async def _pr_fetch_diff(ctx: StepContext) -> StepResult:
-    """Fetch a PR's unified diff via `gh pr diff` for the downstream reviewers.
-    Reads the PR number from `task_spec`; returns injected `diff_text` from state
-    verbatim when present (offline testing). A missing PR number or a failed `gh`
-    call degrades to BLOCKED rather than raising.
+    """Fetch a PR's unified diff for the downstream reviewers, pinned to one
+    resolved head. Reads the PR number and `expected_head_sha` from `task_spec`;
+    returns injected `diff_text` from state verbatim when present (offline
+    testing). A missing PR number or a failed `gh` call degrades to BLOCKED
+    rather than raising.
+
+    **One head governs everything.** The head is resolved once, up front, and
+    the stale gate, the fetch, the diff and the worktree all use that answer.
+    When `expected_head_sha` is set and the PR has moved, the step stops as
+    stale *before* any fetch or materialization, and never degrades to the live
+    checkout: a pinned request that silently reviewed the wrong tree would be
+    worse than one that stopped.
 
     Publishes `diff_text` to state (B2 `state_updates`)."""
     cached = from_state(ctx, "diff_text")
@@ -288,23 +434,15 @@ async def _pr_fetch_diff(ctx: StepContext) -> StepResult:
     pr = spec.get("pr") if isinstance(spec, dict) else None
     if not pr:
         return StepResult(False, FailureKind.BLOCKED, "no PR number in task spec")
+    expected = str(spec.get("expected_head_sha") or "") if isinstance(spec, dict) else ""
     repo = require_repo(ctx)
     if isinstance(repo, StepResult):
         return repo
-    code, out = _gh(["pr", "diff", str(pr)], cwd=repo)
-    diff_note = ""
-    if code != 0:
-        # the API diff endpoint hard-fails on >20k-line diffs (HTTP 406
-        # too_large) — reconstruct the diff from local git before giving up
-        gh_err = out[:500]
-        out, detail = _local_diff_fallback(Path(repo), int(pr))
-        if not out:
-            return StepResult(False, FailureKind.BLOCKED,
-                              f"gh pr diff failed: {gh_err}; "
-                              f"local fallback failed: {detail}")
-        ctx.trace.record("diff_fallback", pr=int(pr), detail=detail,
-                         gh_error=gh_err[:200])
-        diff_note = f" via {detail}"
+
+    fetched = _fetch_at_one_head(ctx, Path(repo), int(pr), expected)
+    if isinstance(fetched, StepResult):
+        return fetched
+    out, diff_note, head_sha, wt_path, note = fetched
     raw_chars = len(out)
     out, binary_summaries = _strip_binary_patches(out)
     if binary_summaries:
@@ -323,9 +461,6 @@ async def _pr_fetch_diff(ctx: StepContext) -> StepResult:
     # partial bundle on any sub-fetch failure; never blocks the run.
     pr_context = _pr_context_bundle(ctx, repo, int(pr))
     ctx.state["pr_context"] = pr_context
-    # pin the review tree to PR-time state (latent-gap mechanism); fall back
-    # to the live checkout with a loud note when pinning is impossible
-    wt_path, note = _pr_time_checkout(ctx, Path(repo), int(pr))
     ctx.state["repo_path"] = wt_path
     ctx.state["checkout_note"] = note
     return StepResult(
@@ -335,8 +470,7 @@ async def _pr_fetch_diff(ctx: StepContext) -> StepResult:
         outputs={"state_updates": {"diff_text": out, "pr_context": pr_context,
                                    "repo_path": wt_path,
                                    "checkout_note": note,
-                                   "pr_head_sha":
-                                       ctx.state.get("pr_head_sha", "")}})
+                                   "pr_head_sha": head_sha}})
 
 
 @step("pr.gate_check", "deterministic", "read",
