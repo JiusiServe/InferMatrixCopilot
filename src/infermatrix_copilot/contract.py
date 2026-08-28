@@ -30,7 +30,27 @@ from pathlib import Path
 from typing import Any
 
 from . import run_status as rs
+from .direct_routing import (
+    direct_completion_result,
+    direct_execution_budget,
+    direct_knowledge_routes,
+    direct_mandatory_review_guides,
+)
 from .run_trace import RunTrace
+
+__all__ = [
+    "COMMENT_FIELDS",
+    "DIRECT_API_VERSION",
+    "STRICT_API_VERSION",
+    "build_review_result",
+    "capabilities",
+    "direct_completion_result",
+    "direct_execution_budget",
+    "direct_knowledge_routes",
+    "direct_mandatory_review_guides",
+    "sanitize_comments",
+    "unknown_run_result",
+]
 
 # Bumped when the shape below changes in a way a consumer must notice.
 STRICT_API_VERSION = "1.0.0"

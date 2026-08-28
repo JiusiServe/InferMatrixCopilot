@@ -249,6 +249,46 @@ def test_contract_imports_no_server_module():
     assert not {"mcp_server", "thin_mcp_server"} & imported
 
 
+def test_direct_helpers_have_a_public_home_on_the_contract():
+    """The coupling this module exists to retire: a downstream consumer imported
+    four `_direct_*` privates out of `thin_mcp_server` through importlib, so a
+    rename inside a server module broke another repository at runtime with no
+    build-time signal. They are public names here now."""
+    for name in ("direct_knowledge_routes", "direct_execution_budget",
+                 "direct_completion_result", "direct_mandatory_review_guides"):
+        assert callable(getattr(contract, name)), name
+        assert name in contract.__all__
+
+
+def test_direct_routing_does_not_import_a_server_module():
+    """Same acyclicity requirement as `contract` itself — `contract` re-exports
+    from it, so a server import here would reintroduce the cycle one level
+    down."""
+    import ast
+
+    from infermatrix_copilot import direct_routing
+
+    src = Path(direct_routing.__file__).read_text(encoding="utf-8")
+    imported: set[str] = set()
+    for node in ast.walk(ast.parse(src)):
+        if isinstance(node, ast.Import):
+            imported.update(a.name for a in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            imported.add(node.module or "")
+            imported.update(a.name for a in node.names)
+    assert not {"mcp_server", "thin_mcp_server", "contract"} & imported
+
+
+def test_contract_stays_repo_neutral():
+    """The routing tables live in `direct_routing`, not here. `contract` is the
+    module every consumer imports; embedding one repo's owner table in it is
+    exactly what invariant 6 forbids."""
+    import re
+
+    src = Path(contract.__file__).read_text(encoding="utf-8")
+    assert not re.search(r"vllm[_\- ]?omni", src, re.IGNORECASE)
+
+
 def test_get_result_attaches_the_structured_result(settings, tmp_path):
     """The additive `result` key, alongside the report paging kept for hosts
     that already page it."""

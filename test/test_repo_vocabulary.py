@@ -49,10 +49,12 @@ _FORBIDDEN = re.compile(
 # ceilings, like test_repo_neutral_core's) rather than a blanket skip —
 # they import/invoke the PARENT and die in PR7
 _FORBIDDEN_CEILINGS = {
-    # thin MCP review-routing table (spec-freshness thin-mcp, merged from
+    # Direct's review-routing table (spec-freshness thin-mcp, merged from
     # main 2026-08): vllm_omni/model_executor/ scope prefixes — repo table
-    # pending extraction to adapters/vllm_omni/
-    "thin_mcp_server.py": 2,
+    # pending extraction to adapters/vllm_omni/. It moved out of
+    # thin_mcp_server.py into direct_routing.py so contract.py, the module
+    # consumers import, could stay repo-neutral; the debt moved with it.
+    "direct_routing.py": 2,
 }
 
 # class 2: files ALLOWED to use the standalone `omni`/`vllm` parity
@@ -84,8 +86,11 @@ _VOCAB_CEILINGS = {
     "testing/env_plan.py": 2,
     # thin MCP server (merged from main 2026-08): embedded vllm-omni
     # review-routing/doc table + instructions prose — same pending adapter
-    # extraction as its _FORBIDDEN ceiling above
-    "thin_mcp_server.py": 60,
+    # extraction as the _FORBIDDEN ceiling above. The routing table moved to
+    # direct_routing.py so contract.py could be a repo-neutral public surface;
+    # 60 became 52 + 8, relocated rather than grown.
+    "direct_routing.py": 52,
+    "thin_mcp_server.py": 8,
 }
 
 
