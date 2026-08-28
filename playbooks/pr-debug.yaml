@@ -20,5 +20,9 @@ steps:
   - {id: debug, step: agent.debug_group, foreach: failure_groups, when: not report_only}
   - {id: gate, step: review.patch_gate, params: {pre_push: true}, when: not report_only}
   - {id: push, step: ci.push, when: not report_only}
+  # Landed-fix learning loop: drops a bugfix-run record for external
+  # knowledge intake; a no-op unless knowledge_intake_dir is configured
+  # and the push above was real (not dry-run).
+  - {id: harvest, step: pr.harvest_debug_knowledge, when: not report_only}
   - {id: report, step: report.final_summary}
 success: each failure group fixed at root cause or escalated; additive push only
