@@ -1,6 +1,6 @@
 # providers/base.py —— 规范
 
-<!-- verified-against: 2026-08-26 -->
+<!-- verified-against: 2026-08-28 -->
 
 `LOC ~161 · provider 层契约 + 子进程环境白名单 · refactor-status: ok`
 

@@ -1,8 +1,8 @@
 # config.py —— 规范
 
-<!-- verified-against: 2026-08-26 -->
+<!-- verified-against: 2026-08-28 -->
 
-`LOC ~630 · 配置 · refactor-status: oversized`
+`LOC ~658 · 配置 · refactor-status: oversized`
 
 ## 职责
 从 env / `.env` 加载的 `Settings`（pydantic-settings），以及把本次 run 的档位与后端
@@ -13,12 +13,18 @@
 （reviewer 模型、远端 CI 轮次/预算、`github_token` 推送凭据）、agent 运行时、
 ensemble、MoA、评审深度与按 pass 路由、Strict 后端选择、profile、patch 触发器、
 metrics 与升级，提供带类型字段和安全默认值；外加 PR4d 知识运行时 cutover
-（`imx_knowledge_runtime`）与 manifest 展开回退（`expansion_env()`）。
+（`imx_knowledge_runtime`）、manifest 展开回退（`expansion_env()`），以及
+MCP `repo_path` 授权面与 idempotency 保留期：
+`mcp_allowed_repo_roots`（`MCP_ALLOWED_REPO_ROOTS`，空 = 只有已配置的
+checkout —— 最小权限；放宽是**运维**决定，不是调用方的）与
+`idem_retention_days`（默认 30，圈住 `.idem/` 索引）。
 
 ## 公开契约
 带全部可调项的 `Settings`；`reviewer` / `intent`（回退到 `agent_model`）；
 `repo_path(name)`；`model_for(mode)`；`tier_target(role)` → `ResolvedTarget`；
-`expansion_env()`；`knowledge_runtime_repos`；以及 `strict_backend` 校验器。
+`expansion_env()`；`knowledge_runtime_repos`；`allowed_repo_roots`
+（配置列表，未设时 = 已配置 checkout 本身 —— `mcp_policy.authorize_repo_path`
+的圈禁判据即此属性）；以及 `strict_backend` 校验器。
 
 ## 不变量（**A5**、**C2**、**B1**）
 - 密钥只经 env / `.env`（被 git 忽略，**绝不提交**）。

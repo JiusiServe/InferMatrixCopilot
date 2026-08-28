@@ -1,6 +1,6 @@
 # engine/agent_runtime/ —— 规范
 
-<!-- verified-against: 2026-08-26 -->
+<!-- verified-against: 2026-08-28 -->
 
 `LOC ~1690（7 个文件） · 引擎（受治理的 agent 运行时） · refactor-status: ok`
 
@@ -61,10 +61,15 @@
   - **压根没跑起来**（proven dead）→ 改跑档位模型，并记 `moa_member_fallback`
     （带 `phase`/`member`/`effective`/`reason`），绝不再问一次已死的成员。
   死亡有**两种形态**，两种都必须接住：裸 API 成员**抛异常**，而 harness transport
-  会把一次死掉的会话转成**类型化的非 OK 结果**（"a dead harness is an outcome"），
-  由 `outcome_blocked` 判定。首轮与**零产出重问**都要各自守住这两种形态；重问那一处
-  曾经完全没有守卫，于是一个 403 的成员直接穿过 `asyncio.gather` 把整个 step 打成
-  BLOCKED。回退每处至多一次，档位模型自己再失败就按类型化失败返回，**不递归**。
+  会把一次死掉的会话转成**类型化的非 OK 结果**（"a dead harness is an outcome"）。
+  **路由判据是 `member_unreachable`（seat 压根没跑，传输级死亡），不是
+  `outcome_blocked`（"有没有产出"—— 对死掉的和被截断但活着的 seat 都答 True）**：
+  用后者做路由决定，正是 2026-08-16 把 18/28 个 holdout seat 静默改道的缺陷。
+  首轮与**零产出重问**统一走 `_attempt`/`_member_died` 守卫路径（重问那一处
+  曾经完全没有守卫，于是一个 403 的成员直接穿过 `asyncio.gather` 把整个 step
+  打成 BLOCKED）；`_member_died` 还比对 `member == tier_model`（trace 的
+  `same_model` 字段）—— 解析成同一个模型的回退在 trace 里可见为 no-op。
+  回退每处至多一次，档位模型自己再失败就按类型化失败返回，**不递归**。
 - MoA 成员本身也可以骑上 provider 注册表里的某个 harness（`transport_for_id`），
   与本次 run 自己的 `STRICT_BACKEND` 无关。
 

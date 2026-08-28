@@ -1,8 +1,8 @@
 # engine/steps/_common.py —— 规范
 
-<!-- verified-against: 2026-08-25 -->
+<!-- verified-against: 2026-08-28 -->
 
-`LOC ~264 · step 库基础设施 · refactor-status: ok`
+`LOC ~300 · step 库基础设施 · refactor-status: ok`
 
 ## 职责
 step 的自注册面，以及各 step 文件共享的跨模块 helper。
@@ -21,6 +21,14 @@ helper：`repo_path`、`require_repo`、`task_spec`、`from_state`、`published`
 - 这是 step 共享 helper 的**唯一**归处 —— step 模块从这里 import，
   **绝不互相 import**（**A2**）。
 - helper 保持轻薄、对副作用诚实、且仓库中立。
+- **`repo_path(ctx)` 不再是纯访问器** —— 两处刻意的变化都要知道：
+  (1) 三级优先序 `ctx.params → ctx.state → state["task_spec"]["repo_path"]`
+  （最后一级是预约时冻结、`authorize_repo_path` 授过权的绑定 —— executor
+  state seed 之外触达的 step 也与规划看到的 checkout 一致）；
+  (2) 解析出的路径落在 `worktrees.worktree_root()` 之下时经
+  `_hold_if_worktree` 取共享 worktree 持有 —— 挂在**使用**而非创建上
+  （`--resume` 跳过已完成 step 的函数体，见 `engine/worktrees.md`）；
+  取不到持有**绝不抛**（那是被回收的风险，不是评审错误）。
 
 ## 边界 —— 不属于这里
 不含 step handler；不含领域逻辑。**只有基础设施 + 共享 IO。**

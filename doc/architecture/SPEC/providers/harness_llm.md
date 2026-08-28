@@ -1,6 +1,6 @@
 # providers/harness_llm.py —— 规范
 
-<!-- verified-against: 2026-08-26 -->
+<!-- verified-against: 2026-08-28 -->
 
 `LOC ~66 · 套在 harness 之上的 LLM 形状适配器（仅限无工具） · refactor-status: ok`
 

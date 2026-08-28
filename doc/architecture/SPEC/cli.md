@@ -1,8 +1,8 @@
 # cli/ —— 规范
 
-<!-- verified-against: 2026-08-26 -->
+<!-- verified-against: 2026-08-28 -->
 
-`LOC ~1240（6 个文件） · 接口 + 编排门面 · refactor-status: ok`
+`LOC ~1420（6 个文件） · 接口 + 编排门面 · refactor-status: ok`
 
 ## 职责
 flag CLI 与 `Copilot` 门面：解析 → 过门 → 执行；并持有 run 目录、RunTrace、notifier
@@ -54,6 +54,19 @@ flag CLI 与 `Copilot` 门面：解析 → 过门 → 执行；并持有 run 目
   **抬高档位永远不会扩大权限**（`tier` 仍然由 `kind` 推导）。
 - CLI 主路径在**创建 run 目录之前**过门，所以被放弃的计划不留下任何东西。
   MCP 的预约形状（先建、后规划）是**刻意不同**的 —— 见 `mcp_server.md`。
+- **`reserve_run` 返回 `(run_id, created)`，签名变更是契约的一部分**：
+  调用方只在 `created` 为真时入队（idempotency：命中既有键返回既有 run）。
+  预约时即经 `mcp_policy.authorize_repo_path` 授权/固化 `spec.repo_path`；
+  带键的预约走 `_reserve_keyed`/`_reserve_new`（重拉-冲突-已决三分）。
+- **执行的 at-most-once 是 claim，不是锁**：`_execute_reserved_locked`
+  先 `rs.claim_for_execution(run_dir, child_pid)` —— 输掉 claim 的子进程
+  不规划、不执行、不写状态，打印后 0 码退出（关掉"server 死后重试 +
+  旧子进程醒来"的双评审竞态）。
+- **冻结的 `spec.repo_path` 压过环境解析**：`_repo_path_for(spec)` 先看
+  冻结绑定、再落回 alias 解析（`_resolve_repo_path` 现在只管 alias）；
+  `resolve()` 与 `_execute` 的 state seed 都走它。
+- 阻塞原因随终局落盘：`last_blocked_reason` 进入 `run_status.json` 的
+  note —— 以前只打在子进程 console 上就被丢掉。
 
 ## 边界 —— 不属于这里
 不含 step 逻辑、不含仓库知识字面量、不含 LLM prompt。**只做编排接线。**
@@ -68,7 +81,9 @@ flag CLI 与 `Copilot` 门面：解析 → 过门 → 执行；并持有 run 目
 新的纯格式化器 → utils.py。
 
 ## 测试
-`test_cli.py`、`test_phase_b.py`、`test_chat.py`、`test_ui.py`。
+`test_cli.py`、`test_phase_b.py`、`test_chat.py`、`test_ui.py`；
+预约/claim/repo_path 冻结：`test_mcp.py`、`test_idempotency.py`、
+`test_contract.py`。
 
 ## 重构备注
 拆分**已完成**（它曾是内聚拆分候选）。`Copilot` 类完整留在 `copilot.py`，

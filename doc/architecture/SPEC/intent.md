@@ -1,6 +1,6 @@
 # intent.py —— 规范
 
-<!-- verified-against: 2026-08-26 -->
+<!-- verified-against: 2026-08-28 -->
 
 `LOC ~379 · 任务层 · refactor-status: ok`
 

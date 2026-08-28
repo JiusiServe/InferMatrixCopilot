@@ -1,6 +1,6 @@
 # providers/deepseek.py —— 规范
 
-<!-- verified-against: 2026-08-26 -->
+<!-- verified-against: 2026-08-28 -->
 
 `LOC ~502 · harness transport（dsh，API-keyed） · refactor-status: oversized`
 

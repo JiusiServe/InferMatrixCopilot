@@ -1,6 +1,6 @@
 # engine/steps/review/ —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-08-28 -->
 
 `LOC ~900（6 个文件） · step 库（评审） · refactor-status: ok`
 
@@ -27,6 +27,16 @@
 ## 不变量
 - patch 门：廉价摘要**常开**，只有触发时才跑 LLM 评审；**fail-closed**（**C6**）；
   高风险模块来自 adapter，settings 只作兜底（**A5**）。
+- **`review_verdict` 是发布的 state 字段，不是散文**：由
+  `_review_verdict(review_comments, pr_state)` 计算（**与渲染器同一个
+  helper，绝不第二份校准规则**），随 `review_text`/`review_summary`/
+  `review_comments` 一起进 `state_updates`（B2）——
+  `contract.build_review_result` 读的 `verdict` 就是它；此前裁决只活在
+  Markdown 的 `**Verdict:**` 散文里，机器消费方只能刮取。
+- **planner 失职是显式 `capability_gap`**：`plan.planner_error` 非空且不匹配
+  `_EXPECTED_PLANNER_CAUSES`（`unavailable` / `rejected_depth:`）时记
+  trace 缺口 —— 配置了的 planner 答非所问（transport / 空回复 / 不可解析）
+  与"没配"和"守卫在履职"是三件事（见 `review/planner.md` 的 5 种 cause）。
 - 评审：领域 checklist 由 profile 的 `review.md` 扩展；`_sweep_targets` 以
   `repo.language` 为键，**诚实降级**；裁决自洽（任何 ≥minor 的评论 ⇒ REQUEST CHANGES）；
   确定性的按严重度排序的评论上限。
