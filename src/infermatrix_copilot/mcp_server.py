@@ -35,6 +35,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal
 
+from . import contract
 from . import run_status as rs
 from .config import Settings
 from .knowledge_docs import KnowledgeDocs, KnowledgeDocsError
@@ -69,6 +70,19 @@ class CopilotMCP:
         self._worker = threading.Thread(target=self._worker_loop, daemon=True,
                                         name="imx-mcp-worker")
         self._worker.start()
+
+    # one worker thread drains the queue, so Strict runs are strictly serial.
+    # The handshake reports this rather than letting a bot infer concurrency
+    # from the fact that `start` returns immediately.
+    MAX_STRICT_WORKERS = 1
+
+    def capabilities(self) -> dict:
+        """The version/capability handshake — see `contract.capabilities`."""
+        from .engine.lifecycle import fcntl as _fcntl
+
+        return contract.capabilities(
+            max_strict_workers=self.MAX_STRICT_WORKERS,
+            supports_file_locking=_fcntl is not None)
 
     # -- worker: one run at a time, each an isolated subprocess ---------------
     def _worker_loop(self) -> None:
@@ -244,8 +258,20 @@ class CopilotMCP:
         """Lazy-reconcile then return the run state; once terminal, attach a
         size-capped page of the report (RUN_REPORT.md, or ESCALATION.md when
         blocked) with `next_offset` + `report_path` for paging — never an
-        unbounded dump over the protocol."""
-        run_dir = self.copilot._contained_run_dir(run_id)
+        unbounded dump over the protocol.
+
+        Terminal responses also carry `result`: the structured form from
+        `contract.build_review_result`, so a machine consumer reads the verdict
+        and findings as data instead of scraping them back out of the Markdown.
+        The `report` paging stays for back-compat with existing hosts."""
+        # A well-formed id this server has never heard of is answered, not
+        # raised, so a bot holding a stale id can tell "lost" from "still
+        # running". A malformed or escaping id is still an error.
+        run_dir = self.copilot._contained_run_dir(run_id, must_exist=False)
+        if not run_dir.exists():
+            return {"run_id": run_id, "state": "unknown", "note": "",
+                    "report": None, "report_path": None, "next_offset": None,
+                    "result": contract.unknown_run_result(run_id)}
         rs.reconcile_if_dead(run_dir, self.run_root)
         status = rs.read_status(run_dir) or {}
         state = status.get("state")
@@ -253,6 +279,7 @@ class CopilotMCP:
                                "note": status.get("note", "")}
         if state not in rs.TERMINAL:
             return out  # still queued/planning/running — poll again
+        out["result"] = contract.build_review_result(run_dir)
         report_path = run_dir / "RUN_REPORT.md"
         if state == rs.BLOCKED and (run_dir / "ESCALATION.md").exists():
             report_path = run_dir / "ESCALATION.md"
@@ -373,6 +400,14 @@ def build_mcp(settings: Settings | None = None):
         poll get_result."""
         return _guard(lambda: {"run_id": core.start(
             {"kind": "issue_filter", "repo": repo or core.settings.default_repo})})
+
+    @mcp.tool()
+    def get_capabilities() -> dict:
+        """This copilot's contract version and capability flags. Call it once in
+        your preflight: it is how a client detects an incompatible or
+        unprotected deployment before a review fails on it, and
+        `max_strict_workers` says how many reviews actually run at a time."""
+        return _guard(core.capabilities)
 
     @mcp.tool()
     def get_result(run_id: str, offset: int = 0) -> dict:

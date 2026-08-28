@@ -115,6 +115,9 @@ class Copilot:
         self.store = PlaybookStore(self.settings.playbooks_dir, self.registry)
         self.planner = Planner(self.store, self.registry)
         self.last_run_dir: Path | None = None
+        # why the last execution stopped, when it stopped blocked — read by
+        # `_execute_reserved_locked`, which owns the terminal run_status write
+        self.last_blocked_reason: str = ""
 
     # -- planning ---------------------------------------------------------------
     def resolve(self, spec: TaskSpec) -> Resolution:
@@ -354,8 +357,11 @@ class Copilot:
         branches / high-risk modules from the adapter when present), drive the
         Executor, then print per-step marks, optional run metrics, and the final
         status. `resuming` seeds the state so steps can pick up where they left
-        off. Returns the exit code (0 done, BLOCKED_EXIT blocked, else 1)."""
+        off. Returns the exit code (0 done, BLOCKED_EXIT blocked, else 1), and
+        records `last_blocked_reason` for the reserved-run caller, which has only
+        the code but owns the terminal `run_status.json` write."""
         self.last_run_dir = run_dir
+        self.last_blocked_reason = ""
         lock = held_lock
         if lock is None:
             try:
@@ -439,6 +445,7 @@ class Copilot:
                 print(f"  {mark} {step_id}: {r.summary}")
             print(f"run {run_dir.name}: {outcome.status}  ({run_dir})")
             if outcome.status == "blocked":
+                self.last_blocked_reason = str(outcome.blocked_reason or "")
                 print(style("  ⚠ ", "yellow", "bold") + f"{outcome.blocked_reason}\n  see {run_dir / 'ESCALATION.md'}")
                 return BLOCKED_EXIT
             return 0 if outcome.status == "done" else 1
@@ -500,17 +507,23 @@ class Copilot:
         """A fresh unique run id (`run-<ts>-<uuid6>`; same format the CLI uses)."""
         return f"run-{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
 
-    def _contained_run_dir(self, run_id: str) -> Path:
+    def _contained_run_dir(self, run_id: str, *, must_exist: bool = True) -> Path:
         """Validate `run_id` and resolve it to a directory strictly contained
         under `run_root` — rejecting path traversal from an untrusted MCP arg.
-        Raises ValueError on a bad pattern, escape, or missing run."""
+        Raises ValueError on a bad pattern, an escape, or (unless
+        `must_exist=False`) a missing run.
+
+        `must_exist=False` is for the poll path, which must distinguish a
+        well-formed id whose run this server has never heard of — answered as
+        `state: unknown` so a client can tell "lost" from "still running" — from
+        a malformed or escaping id, which stays an error."""
         if not self._RUN_ID_RE.match(run_id or ""):
             raise ValueError(f"invalid run_id: {run_id!r}")
         root = self.settings.run_root.resolve()
         run_dir = (self.settings.run_root / run_id).resolve()
         if run_dir.parent != root:
             raise ValueError(f"run_id escapes run_root: {run_id!r}")
-        if not run_dir.exists():
+        if must_exist and not run_dir.exists():
             raise ValueError(f"no such run: {run_id!r}")
         return run_dir
 
@@ -605,7 +618,13 @@ class Copilot:
         except Exception as exc:  # a crash still leaves a terminal record
             rs.mark(run_dir, rs.FAILED, note=f"{type(exc).__name__}: {exc}")
             raise
-        rs.mark(run_dir, {0: rs.DONE, BLOCKED_EXIT: rs.BLOCKED}.get(code, rs.FAILED))
+        # Carry WHY it stopped into the terminal record. An MCP client only ever
+        # sees `run_status.json`, and a bare `blocked` with no note gives it
+        # nothing to distinguish a stale-head refusal from a missing tier or a
+        # failed checkout — the reason was previously printed to the child's
+        # console and discarded.
+        rs.mark(run_dir, {0: rs.DONE, BLOCKED_EXIT: rs.BLOCKED}.get(code, rs.FAILED),
+                note=self.last_blocked_reason if code == BLOCKED_EXIT else "")
         return code
 
     def _adapter_for(self, repo: str):

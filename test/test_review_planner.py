@@ -331,3 +331,47 @@ def test_gray_zone_failures_fall_back_deterministically(settings, llm):
     plan = plan_review(GRAY, settings=settings, lens_names=NAMES, llm=llm)
     assert plan.planner == "llm-fallback"
     assert plan.depth == "standard" and plan.lens_names == DEFAULT_STANDARD_LENSES
+
+
+# ---- planner_error: WHY the gray-zone call produced no plan -----------------
+# `planner=="llm-fallback"` said only THAT it failed. A missing client, a
+# transport error and a model answering off-contract are three different
+# operational problems, and the silent `except Exception: return None` made them
+# indistinguishable — which is how an 8000-token ceiling bug hid across two
+# campaigns behind a deliberate-looking standard fallback.
+@pytest.mark.parametrize(("llm", "expected"), [
+    (None, "unavailable"),
+    (OneShotLLM(RuntimeError("api down")), "transport:RuntimeError: api down"),
+    (OneShotLLM(_reply("")), "empty_reply (stop_reason="),
+    (OneShotLLM(_reply("no json here, just prose")),
+     "unparseable: no json here"),
+    (OneShotLLM(_reply({"depth": "light", "lenses": []})),
+     "rejected_depth:light"),
+])
+def test_planner_error_distinguishes_every_failure_cause(settings, llm, expected):
+    plan = plan_review(GRAY, settings=settings, lens_names=NAMES, llm=llm)
+    assert plan.planner == "llm-fallback"
+    assert plan.planner_error.startswith(expected)
+
+
+def test_planner_error_is_empty_on_deterministic_paths(settings):
+    """Rules and override are not failures and must not look like ones."""
+    ruled = plan_review(_diff("docs/x.md"), settings=settings, lens_names=NAMES)
+    assert ruled.planner in ("rules", "override") and ruled.planner_error == ""
+    forced = plan_review(GRAY, settings=settings, lens_names=NAMES,
+                         override="full")
+    assert forced.planner == "override" and forced.planner_error == ""
+
+
+def test_planner_error_is_empty_when_the_call_succeeds(settings):
+    llm = OneShotLLM(_reply({"depth": "full", "lenses": list(NAMES)}))
+    plan = plan_review(GRAY, settings=settings, lens_names=NAMES, llm=llm)
+    assert plan.planner == "llm" and plan.planner_error == ""
+
+
+def test_planner_error_clips_and_carries_no_payload(settings):
+    """Causes are truncated: a planner error is a diagnostic line in a run
+    report, not a channel for an unbounded model reply."""
+    llm = OneShotLLM(_reply("x" * 5_000))
+    plan = plan_review(GRAY, settings=settings, lens_names=NAMES, llm=llm)
+    assert len(plan.planner_error) < 200

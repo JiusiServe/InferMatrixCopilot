@@ -43,9 +43,16 @@ from .utils import (
     _SEVERITY_ORDER,
     _render_review_md,
     _render_review_summary,
+    _review_verdict,
     _same_finding,
     _sweep_targets,
 )
+
+
+# Planner causes that are NOT a capability gap: no client configured at all, and
+# the depth guardrail rejecting an out-of-contract answer. Everything else means
+# a configured planner misbehaved and is surfaced in the run report.
+_EXPECTED_PLANNER_CAUSES = re.compile(r"\A(unavailable|rejected_depth:)")
 
 
 @step("review.patch_gate", "validation", "read",
@@ -719,7 +726,18 @@ async def _review_diff(ctx: StepContext) -> StepResult:
             "review_plan", depth=plan.depth, planner=plan.planner,
             reason=plan.reason, lenses=list(plan.lens_names),
             signals=plan.signals.as_dict() if plan.signals else None,
-            input_tokens=plan.input_tokens, output_tokens=plan.output_tokens)
+            input_tokens=plan.input_tokens, output_tokens=plan.output_tokens,
+            planner_error=plan.planner_error)
+        if plan.planner_error and not _EXPECTED_PLANNER_CAUSES.match(
+                plan.planner_error):
+            # A configured planner that answered, but not to contract, is a
+            # declared capability gap (invariant 7) — it surfaces in the run
+            # report instead of hiding behind a silent standard fallback. No
+            # client at all (`unavailable`) and the depth guardrail firing
+            # (`rejected_depth`) are a configuration fact and a guard doing its
+            # job; neither is a gap.
+            ctx.trace.record("capability_gap", capability="review.planner",
+                             step="review.diff", effect=plan.planner_error)
         ctx.state["_review_depth"] = plan.depth  # MoA eligibility signal (W6)
         if plan.depth == "light":
             # the light tier is the only reviewer surface that ran with no
@@ -868,10 +886,17 @@ async def _review_diff(ctx: StepContext) -> StepResult:
         review_summary = _render_review_summary(
             output, pr_state=str(ctx.state.get("pr_state", "")))
         review_comments = output.get("review_comments") or []
+        # The verdict has existed only as a rendered `**Verdict:** …` line inside
+        # the Markdown. A machine consumer would have to scrape it back out of
+        # prose to learn the outcome, so publish it as a field — from the SAME
+        # helper the renderer calls, never a second copy of the calibration rules.
+        review_verdict = _review_verdict(
+            review_comments, str(ctx.state.get("pr_state", "")))
         ctx.state.update({
             "review_text": review_md,
             "review_summary": review_summary,
             "review_comments": review_comments,
+            "review_verdict": review_verdict,
         })
         result.outputs["review_text"] = review_md
         result.outputs["review_summary"] = review_summary
@@ -880,6 +905,7 @@ async def _review_diff(ctx: StepContext) -> StepResult:
             "review_text": review_md,
             "review_summary": review_summary,
             "review_comments": review_comments,
+            "review_verdict": review_verdict,
         })
         depth_note = f"; depth={plan.depth} via {plan.planner}" if plan else ""
         result.summary = (f"review produced ({len(output.get('review_comments') or [])} "

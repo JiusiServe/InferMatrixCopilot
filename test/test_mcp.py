@@ -467,8 +467,8 @@ def test_exposed_tools_are_read_only_only(settings):
 
     mcp = build_mcp(settings)
     names = sorted(t.name for t in asyncio.run(mcp.list_tools()))
-    assert names == ["doc_read", "doc_search", "get_result", "get_status",
-                     "list_playbooks",
+    assert names == ["doc_read", "doc_search", "get_capabilities", "get_result",
+                     "get_status", "list_playbooks",
                      "start_issue_answer", "start_issue_triage", "start_review"]
     assert not any(bad in n for n in names
                    for bad in ("post", "push", "debug", "rebase"))
