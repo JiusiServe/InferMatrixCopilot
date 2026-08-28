@@ -101,6 +101,50 @@ def test_strict_policy_is_old_eco_review_with_explicit_post_only():
         params={"review_depth": "full"})
 
 
+HEAD = "a" * 40
+
+
+def test_policy_carries_expected_head_sha_through():
+    spec = enforce_mcp_policy(
+        {"kind": "pr_review", "repo": "vllm-omni", "pr": 7,
+         "expected_head_sha": HEAD.upper()},  # case-normalized, not rejected
+        allowed_repos=ALLOW)
+    assert spec.expected_head_sha == HEAD
+
+
+def test_strict_policy_carries_expected_head_sha_through():
+    # the binding must survive the Strict path too — this is the one that pins
+    spec = enforce_strict_review_policy(
+        {"kind": "pr_review", "repo": "vllm-omni", "pr": 7,
+         "expected_head_sha": HEAD},
+        allowed_repos=ALLOW)
+    assert spec.expected_head_sha == HEAD
+
+
+def test_policy_defaults_expected_head_sha_to_unpinned():
+    spec = enforce_mcp_policy({"kind": "pr_review", "repo": "vllm-omni", "pr": 7},
+                              allowed_repos=ALLOW)
+    assert spec.expected_head_sha == ""
+
+
+@pytest.mark.parametrize("bad", ["a" * 39, "a" * 41, "g" * 40, "abc1234", 12345,
+                                 ["a" * 40]])
+def test_policy_refuses_non_full_expected_head_sha(bad):
+    # a prefix is refused rather than normalized: accepting one would mean
+    # comparing a prefix against a full sha somewhere downstream
+    with pytest.raises(PolicyError, match="expected_head_sha"):
+        enforce_mcp_policy(
+            {"kind": "pr_review", "repo": "vllm-omni", "pr": 7,
+             "expected_head_sha": bad}, allowed_repos=ALLOW)
+
+
+def test_task_spec_itself_rejects_a_short_head_sha():
+    # the model is the last line of defense for non-MCP construction paths
+    with pytest.raises(ValueError, match="expected_head_sha"):
+        TaskSpec(kind="pr_review", repo="vllm-omni", pr=7,
+                 expected_head_sha="abc1234")
+
+
 def test_strict_policy_cannot_widen_beyond_pr_review():
     with pytest.raises(PolicyError, match="only permits PR reviews"):
         enforce_strict_review_policy(
@@ -382,6 +426,39 @@ def test_mcp_docs_support_afd_plugin_scope(settings, tmp_path):
     with pytest.raises(ValueError, match="outside the selected"):
         core.doc_read("repos/vllm-omni/rules.md", repo="afd-plugin")
     core.close()
+
+
+def test_start_review_forwards_the_snapshot_binding(settings, monkeypatch):
+    """The pin has to be reachable from the public tool, not just from a spec
+    built by hand below the boundary."""
+    pytest.importorskip("mcp")
+    from infermatrix_copilot import mcp_server
+
+    seen: list[dict] = []
+    monkeypatch.setattr(mcp_server.CopilotMCP, "start",
+                        lambda self, req: seen.append(req) or "run-1")
+    mcp = mcp_server.build_mcp(settings)
+    tools = {t.name: t for t in asyncio.run(mcp.list_tools())}
+    assert "expected_head_sha" in tools["start_review"].inputSchema["properties"]
+
+    asyncio.run(mcp.call_tool("start_review",
+                              {"pr": 7, "expected_head_sha": HEAD}))
+    assert seen and seen[0]["expected_head_sha"] == HEAD
+
+
+def test_strict_review_request_carries_the_snapshot_binding(settings):
+    """Same for the Direct MCP's Strict path, which is what the reviewbot calls."""
+    from infermatrix_copilot.thin_mcp_server import _strict_review_request
+
+    req = _strict_review_request("7", "vllm-omni", post=False, review_depth="",
+                                 settings=settings, expected_head_sha=HEAD)
+    assert req["expected_head_sha"] == HEAD
+    # and it stays a first-class field, never smuggled in as a step knob
+    assert "expected_head_sha" not in req.get("params", {})
+
+    unpinned = _strict_review_request("7", "vllm-omni", post=False,
+                                      review_depth="", settings=settings)
+    assert "expected_head_sha" not in unpinned
 
 
 def test_exposed_tools_are_read_only_only(settings):

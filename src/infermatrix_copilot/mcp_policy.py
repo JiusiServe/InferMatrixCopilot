@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .task_spec import READ_ONLY_KINDS, TaskSpec
+from .task_spec import FULL_SHA_RE, READ_ONLY_KINDS, TaskSpec
 
 # params a V1 tool may legitimately carry through to the playbook. Anything else
 # in an incoming `params` map is dropped (not an error — stripped) so a tampered
@@ -30,6 +30,12 @@ from .task_spec import READ_ONLY_KINDS, TaskSpec
 # permissions.
 _ALLOWED_PARAMS: frozenset[str] = frozenset({"review_depth"})
 _REVIEW_DEPTHS = ("auto", "light", "standard", "full")
+
+# `expected_head_sha` is deliberately NOT a param. `_ALLOWED_PARAMS` is a security
+# allow-set whose job is stopping a tampered request from smuggling a step knob;
+# widening it to carry a snapshot binding would weaken exactly that. It is a
+# first-class TaskSpec field, validated here and carried through — a gate that
+# stripped it would silently unpin the run it was asked to pin.
 
 
 class PolicyError(ValueError):
@@ -50,6 +56,10 @@ def enforce_mcp_policy(raw: dict[str, Any], *, allowed_repos: list[str],
     - `pr` / `issue`, when present, MUST be positive integers.
     - `params` is stripped to the allow-set (currently empty) so no step knob
       can be injected.
+    - `expected_head_sha`, when present, MUST be a full 40-hex commit id, and is
+      **carried through** rather than stripped: it only ever narrows the run
+      (review this head or stop as stale), so dropping it would silently unpin
+      a request that asked to be pinned.
     """
     if not isinstance(raw, dict):
         raise PolicyError("request is not an object")
@@ -94,11 +104,14 @@ def enforce_mcp_policy(raw: dict[str, Any], *, allowed_repos: list[str],
         raise PolicyError(
             f"mode {mode!r} is invalid; allowed: ['eco', 'performance']")
 
+    expected_head_sha = _full_sha_or_empty(raw.get("expected_head_sha"))
+
     # Build through the validated model. post is hard-forced False; report_only
     # is irrelevant for READ_ONLY_KINDS (they are read-only unless post), but we
     # normalize it off too for a clean record.
     return TaskSpec(kind=kind, mode=mode, repo=repo, pr=pr, issue=issue,
-                    report_only=False, post=False, params=params)
+                    report_only=False, post=False, params=params,
+                    expected_head_sha=expected_head_sha)
 
 
 def enforce_strict_review_policy(raw: dict[str, Any], *,
@@ -108,7 +121,8 @@ def enforce_strict_review_policy(raw: dict[str, Any], *,
 
     Strict is the public name for the previous Eco PR-review workflow. It may
     preserve an explicit post request, but cannot select the performance tier
-    or widen the task beyond ``pr_review``.
+    or widen the task beyond ``pr_review``. `expected_head_sha` rides through
+    the shared gate below, so the snapshot binding survives on this path too.
     """
     if not isinstance(raw, dict):
         raise PolicyError("request is not an object")
@@ -126,6 +140,25 @@ def enforce_strict_review_policy(raw: dict[str, Any], *,
         raise PolicyError("post must be a boolean")
     spec.post = post
     return spec
+
+
+def _full_sha_or_empty(value: Any) -> str:
+    """Coerce an optional `expected_head_sha` to "" or a full 40-hex sha.
+
+    A prefix is refused rather than normalized: the only caller that pins a head
+    (the reviewbot) holds the full sha from the GitHub API, and accepting a
+    prefix would mean comparing it against a full sha somewhere downstream."""
+    if value in (None, ""):
+        return ""
+    if not isinstance(value, str):
+        raise PolicyError(
+            f"expected_head_sha must be a string, got {type(value).__name__}")
+    sha = value.strip().lower()
+    if not FULL_SHA_RE.match(sha):
+        raise PolicyError(
+            "expected_head_sha must be exactly 40 hex chars (the full commit "
+            f"id), got {value!r}")
+    return sha
 
 
 def _positive_or_none(value: Any, field: str) -> int | None:

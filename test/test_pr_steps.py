@@ -348,22 +348,68 @@ def test_post_review_api_failure_escalates_with_payload(
     assert Path(result.outputs["artifacts"][0]).is_file()
 
 
-def test_worktree_at_creates_and_reuses(git_repo, tmp_path):
-    """_worktree_at pins a detached worktree at a sha, reuses a matching one,
+def test_worktree_materialize_creates_and_reuses(git_repo, tmp_path):
+    """materialize pins a detached worktree at a sha, reuses a matching one,
     and swaps a stale one; failures return (False, why) instead of raising."""
     import subprocess
 
-    from infermatrix_copilot.engine.steps.pr.fetch import _worktree_at
+    from infermatrix_copilot.engine import worktrees
+    from infermatrix_copilot.engine.steps._common import git as _git
 
     sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=git_repo,
                          capture_output=True, text=True).stdout.strip()
     dest = tmp_path / "wt"
-    ok, detail = _worktree_at(git_repo, sha, dest)
+    ok, detail = worktrees.materialize(git_repo, sha, dest, _git)
     assert ok and "created" in detail and (dest / "mod_a.py").exists()
-    ok, detail = _worktree_at(git_repo, sha, dest)
+    ok, detail = worktrees.materialize(git_repo, sha, dest, _git)
     assert ok and "reused" in detail
-    ok, detail = _worktree_at(git_repo, "0" * 40, dest)
+    ok, detail = worktrees.materialize(git_repo, "0" * 40, dest, _git)
     assert not ok and "failed" in detail
+
+
+def test_worktree_key_separates_same_basename_repos(tmp_path):
+    """Two clones whose directories share a basename must not share a tree.
+
+    The old key was `<basename>-pr<n>`, so a fork and its upstream checked out
+    as `a/vllm-omni` and `b/vllm-omni` collided — and at the same sha the
+    collision was silent, since HEAD matched and the tree was reused."""
+    from infermatrix_copilot.engine import worktrees
+
+    a = tmp_path / "a" / "repo"
+    b = tmp_path / "b" / "repo"
+    a.mkdir(parents=True)
+    b.mkdir(parents=True)
+    sha = "c" * 40
+    assert worktrees.dest_for(a, 7, sha) != worktrees.dest_for(b, 7, sha)
+    # and distinct heads of one repo stay distinct, so no cross-run force-remove
+    assert worktrees.dest_for(a, 7, sha) != worktrees.dest_for(a, 7, "d" * 40)
+
+
+def test_worktree_reuse_refuses_a_foreign_tree(git_repo, tmp_path):
+    """A path whose tree belongs to another repository is not reused on name."""
+    import subprocess
+
+    from infermatrix_copilot.engine import worktrees
+    from infermatrix_copilot.engine.steps._common import git as _git
+
+    other = tmp_path / "other"
+    subprocess.run(["git", "init", "-q", str(other)], check=True)
+    subprocess.run(["git", "-C", str(other), "config", "user.email", "t@e.x"],
+                   check=True)
+    subprocess.run(["git", "-C", str(other), "config", "user.name", "t"],
+                   check=True)
+    (other / "f.txt").write_text("x")
+    subprocess.run(["git", "-C", str(other), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(other), "commit", "-qm", "c"], check=True)
+    other_sha = subprocess.run(["git", "-C", str(other), "rev-parse", "HEAD"],
+                               capture_output=True, text=True).stdout.strip()
+
+    dest = tmp_path / "wt"
+    ok, _ = worktrees.materialize(other, other_sha, dest, _git)
+    assert ok
+    # same path, same HEAD, different owning repository -> not ours
+    owned, why = worktrees.owned_by(git_repo, dest, other_sha, _git)
+    assert not owned and "different repository" in why
 
 
 def test_strip_binary_patches_preserves_headers_and_omits_body():
@@ -410,9 +456,11 @@ def test_fetch_diff_pins_pr_time_checkout(settings, trace, tmp_path, git_repo,
     from infermatrix_copilot.engine.steps.pr import fetch as fetch_mod
     from infermatrix_copilot.run_trace import RunTrace
 
+    from infermatrix_copilot.engine import worktrees as wt_mod
+
     monkeypatch.setattr(fetch_mod, "_gh",
                         lambda args, cwd=None: (0, "diff --git a/x b/x"))
-    monkeypatch.setattr(fetch_mod.Path, "home", staticmethod(lambda: tmp_path))
+    monkeypatch.setattr(wt_mod.Path, "home", staticmethod(lambda: tmp_path))
     sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=git_repo,
                          capture_output=True, text=True).stdout.strip()
     registry = register_builtin_steps(StepRegistry())
@@ -427,5 +475,226 @@ def test_fetch_diff_pins_pr_time_checkout(settings, trace, tmp_path, git_repo,
     upd = result.outputs["state_updates"]
     assert "PR-TIME TREE" in upd["checkout_note"]
     assert upd["pr_head_sha"] == sha
-    assert upd["repo_path"].endswith("-pr7")
+    # keyed on repo identity AND head, not just the PR number
+    assert upd["repo_path"].endswith(f"-pr7-{sha[:12]}")
     assert (tmp_path / ".infermatrix-copilot" / "worktrees").exists()
+
+
+def _pr_upstream(tmp_path):
+    """A bare upstream + a clone, with `refs/pull/7/head` branched from the CURRENT
+    base tip, and the clone's `refs/remotes/origin/main` left deliberately stale
+    one commit behind. Returns `(work, base_tip, pr_head)`."""
+    import subprocess
+
+    up = tmp_path / "up.git"
+    work = tmp_path / "work"
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(up)],
+                   check=True)
+
+    def g(*args, cwd=work):
+        return subprocess.run(["git", *args], cwd=str(cwd), check=True,
+                              capture_output=True, text=True).stdout.strip()
+
+    subprocess.run(["git", "clone", "-q", str(up), str(work)], check=True)
+    g("config", "user.email", "t@e.x")
+    g("config", "user.name", "t")
+    (work / "base.py").write_text("A = 1\n")
+    g("add", "-A")
+    g("commit", "-qm", "base")
+    g("push", "-q", "origin", "main")
+    stale = g("rev-parse", "HEAD")
+    # upstream moves on: this churn belongs to main, NOT to the PR
+    (work / "churn.py").write_text("CHURN = 1\n")
+    g("add", "-A")
+    g("commit", "-qm", "churn")
+    g("push", "-q", "origin", "main")
+    base_tip = g("rev-parse", "HEAD")
+    # the PR branches from the CURRENT tip, so a stale base would attribute the
+    # churn commit to it
+    g("checkout", "-q", "-b", "pr7")
+    (work / "pr.py").write_text("PR = 1\n")
+    g("add", "-A")
+    g("commit", "-qm", "pr work")
+    pr_head = g("rev-parse", "HEAD")
+    g("push", "-q", "origin", "HEAD:refs/pull/7/head")
+    g("checkout", "-q", "main")
+    g("update-ref", "refs/remotes/origin/main", stale)  # the stale tracking ref
+    return work, base_tip, pr_head
+
+
+def test_pinned_diff_ignores_a_stale_origin_tracking_ref(tmp_path):
+    """The base comes from the ref THIS run fetched, never `origin/<base>`.
+
+    `git fetch origin <base> pull/N/head` gave `pull/N/head` no destination, so
+    it landed in FETCH_HEAD while the refresh of `refs/remotes/origin/<base>` was
+    only git's opportunistic tracking-ref update. A merge-base against that
+    possibly-stale ref attributes unrelated upstream churn to the PR."""
+    from infermatrix_copilot.engine.steps._common import git as _git
+    from infermatrix_copilot.engine.steps.pr.fetch import (
+        _fetch_pinned,
+        _pinned_diff,
+    )
+
+    work, base_tip, pr_head = _pr_upstream(tmp_path)
+
+    # the control: what the old stale-ref computation would have produced
+    stale_base = _git(work, "rev-parse", "refs/remotes/origin/main")[1].strip()
+    stale_mb = _git(work, "merge-base", stale_base, pr_head)[1].strip()
+    stale_diff = _git(work, "diff", f"{stale_mb}..{pr_head}")[1]
+    assert "churn.py" in stale_diff  # upstream's work, credited to the PR
+
+    base_sha, err = _fetch_pinned(work, 7, "main", pr_head, "run-test-1")
+    assert not err, err
+    assert base_sha == base_tip  # the commit this fetch retrieved
+    text, detail, derr = _pinned_diff(work, base_sha, pr_head)
+    assert not derr, derr
+    assert "pr.py" in text and "churn.py" not in text
+
+
+def test_merged_pr_falls_back_to_the_api_diff(settings, trace, tmp_path,
+                                              monkeypatch):
+    """A merged PR's head is an ancestor of the base, so the three-dot diff is
+    empty by definition. Reviewing nothing would be worse than the TOCTOU the
+    local path exists to close — and a contained head cannot move, so the API
+    diff is safe here even for a pinned request."""
+    import asyncio
+    import subprocess
+
+    from infermatrix_copilot.engine import worktrees as wt_mod
+    from infermatrix_copilot.engine.registry import StepRegistry
+    from infermatrix_copilot.engine.step import StepContext
+    from infermatrix_copilot.engine.steps import register_builtin_steps
+    from infermatrix_copilot.engine.steps.pr import fetch as fetch_mod
+    from infermatrix_copilot.run_trace import RunTrace
+
+    work, _base_tip, pr_head = _pr_upstream(tmp_path)
+    # merge the PR so main contains its head, exactly like a merged PR
+    subprocess.run(["git", "merge", "-q", "--ff", pr_head], cwd=work, check=True)
+    subprocess.run(["git", "push", "-q", "origin", "main"], cwd=work, check=True)
+
+    def fake_gh(args, cwd=None):
+        if args[:2] == ["pr", "view"]:
+            return 0, json.dumps({"baseRefName": "main",
+                                  "commits": [{"oid": pr_head}]})
+        return 0, "diff --git a/pr.py b/pr.py\n+PR = 1\n"
+
+    monkeypatch.setattr(fetch_mod, "_gh", fake_gh)
+    monkeypatch.setattr(wt_mod.Path, "home", staticmethod(lambda: tmp_path))
+    registry = register_builtin_steps(StepRegistry())
+    trace_path = tmp_path / "t.jsonl"
+    state = {"task_spec": {"kind": "pr_review", "pr": 7, "repo": "vllm-omni",
+                           "expected_head_sha": pr_head},
+             "repo_path": str(work)}
+    ctx = StepContext(settings=settings, state=state, params={},
+                      run_dir=tmp_path / "run", trace=RunTrace(trace_path),
+                      llm=None)
+    result = asyncio.run(registry.get("pr.fetch_diff").handler(ctx))
+
+    assert result.ok, result.summary
+    assert "pr.py" in result.outputs["state_updates"]["diff_text"]
+    assert "merged" in result.summary
+    fallbacks = list(RunTrace(trace_path).events("diff_fallback"))
+    assert fallbacks and fallbacks[0]["reason"] == fetch_mod.CONTAINED_HEAD
+
+
+def test_pinned_refs_are_run_scoped(tmp_path):
+    """Two runs on one PR must not overwrite each other's pinned refs.
+
+    The refspecs are forced, so a PR-keyed name would let the second run silently
+    repoint the first run's base between its fetch and its diff."""
+    from infermatrix_copilot.engine.steps._common import git as _git
+    from infermatrix_copilot.engine.steps.pr.fetch import _fetch_pinned
+
+    work, base_tip, pr_head = _pr_upstream(tmp_path)
+    for run_id in ("run-a", "run-b"):
+        base_sha, err = _fetch_pinned(work, 7, "main", pr_head, run_id)
+        assert not err and base_sha == base_tip
+    for run_id in ("run-a", "run-b"):
+        code, out = _git(work, "rev-parse", f"refs/imx/{run_id}/head")
+        assert code == 0 and out.strip() == pr_head
+
+
+def test_fetch_pinned_detects_a_head_that_moved(tmp_path):
+    """git's own confirmation of the head gate: if what we fetched is not the sha
+    the API just reported, the PR moved and the run must not proceed."""
+    from infermatrix_copilot.engine.steps.pr.fetch import _fetch_pinned
+
+    work, _base_tip, pr_head = _pr_upstream(tmp_path)
+    base_sha, err = _fetch_pinned(work, 7, "main", "f" * 40, "run-moved")
+    assert not base_sha and "head moved during fetch" in err
+    assert pr_head[:12] in err
+
+
+def test_fetch_diff_blocks_on_a_stale_expected_head(settings, trace, tmp_path,
+                                                    git_repo, monkeypatch):
+    """A pinned request whose PR has moved stops before any fetch or worktree,
+    and records both shas in the trace — where a failed step cannot lose them."""
+    import asyncio
+    import json as _json
+
+    from infermatrix_copilot.engine.registry import StepRegistry
+    from infermatrix_copilot.engine.step import FailureKind, StepContext
+    from infermatrix_copilot.engine.steps import register_builtin_steps
+    from infermatrix_copilot.engine.steps.pr import fetch as fetch_mod
+    from infermatrix_copilot.run_trace import RunTrace
+
+    actual, expected = "a" * 40, "b" * 40
+    calls: list[list[str]] = []
+
+    def fake_gh(args, cwd=None):
+        calls.append(list(args))
+        if args[:2] == ["pr", "view"]:
+            return 0, _json.dumps({"baseRefName": "main",
+                                   "commits": [{"oid": actual}]})
+        return 0, "diff --git a/x b/x"
+
+    monkeypatch.setattr(fetch_mod, "_gh", fake_gh)
+    monkeypatch.setattr(fetch_mod, "_git",
+                        lambda *a, **k: pytest.fail("no git before the gate"))
+    registry = register_builtin_steps(StepRegistry())
+    trace_path = tmp_path / "t.jsonl"
+    state = {"task_spec": {"kind": "pr_review", "pr": 7, "repo": "vllm-omni",
+                           "expected_head_sha": expected},
+             "repo_path": str(git_repo)}
+    ctx = StepContext(settings=settings, state=state, params={},
+                      run_dir=tmp_path / "run", trace=RunTrace(trace_path),
+                      llm=None)
+    result = asyncio.run(registry.get("pr.fetch_diff").handler(ctx))
+
+    assert not result.ok and result.failure is FailureKind.BLOCKED
+    assert expected[:12] in result.summary and actual[:12] in result.summary
+    assert ["pr", "diff", "7"] not in calls  # never asked for a diff
+    mismatch = list(RunTrace(trace_path).events("expected_head_mismatch"))
+    assert mismatch and mismatch[0]["expected"] == expected
+    assert mismatch[0]["actual"] == actual
+
+
+def test_fetch_diff_matching_expected_head_proceeds(settings, trace, tmp_path,
+                                                    git_repo, monkeypatch):
+    """The gate is a filter, not a blocker: the right head reviews normally."""
+    import asyncio
+    import subprocess
+
+    from infermatrix_copilot.engine import worktrees as wt_mod
+    from infermatrix_copilot.engine.registry import StepRegistry
+    from infermatrix_copilot.engine.step import StepContext
+    from infermatrix_copilot.engine.steps import register_builtin_steps
+    from infermatrix_copilot.engine.steps.pr import fetch as fetch_mod
+    from infermatrix_copilot.run_trace import RunTrace
+
+    monkeypatch.setattr(fetch_mod, "_gh",
+                        lambda args, cwd=None: (0, "diff --git a/x b/x"))
+    monkeypatch.setattr(wt_mod.Path, "home", staticmethod(lambda: tmp_path))
+    sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=git_repo,
+                         capture_output=True, text=True).stdout.strip()
+    registry = register_builtin_steps(StepRegistry())
+    state = {"task_spec": {"kind": "pr_review", "pr": 7, "repo": "vllm-omni",
+                           "expected_head_sha": sha},
+             "repo_path": str(git_repo), "pr_head_sha": sha}
+    ctx = StepContext(settings=settings, state=state, params={},
+                      run_dir=tmp_path / "run", trace=RunTrace(tmp_path / "t.jsonl"),
+                      llm=None)
+    result = asyncio.run(registry.get("pr.fetch_diff").handler(ctx))
+
+    assert result.ok, result.summary
+    assert result.outputs["state_updates"]["pr_head_sha"] == sha

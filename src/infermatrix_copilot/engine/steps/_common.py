@@ -56,9 +56,35 @@ def collected() -> list[StepSpec]:
 
 def repo_path(ctx: StepContext) -> Path | None:
     """The repo checkout path for this step: the step's `repo_path` param first,
-    else the run-state `repo_path`, as a Path — or None when neither is set."""
+    else the run-state `repo_path`, as a Path — or None when neither is set.
+
+    Taking the PR-time worktree's shared hold here, rather than where the tree is
+    created, is deliberate. `--resume` does not re-run a completed step: the
+    executor replays its `state_updates` and skips the body, so a hold acquired
+    inside `pr.fetch_diff` would exist on the first run and never on a resumed
+    one — while the downstream review steps go on reading the tree the reaper is
+    allowed to remove. Attaching it to *use* covers both, and the call is
+    idempotent (a per-process memo), so the repeated hits this accessor takes
+    cost one `dict` lookup."""
     p = ctx.params.get("repo_path") or ctx.state.get("repo_path")
-    return Path(p) if p else None
+    if not p:
+        return None
+    path = Path(p)
+    _hold_if_worktree(ctx, path)
+    return path
+
+
+def _hold_if_worktree(ctx: StepContext, path: Path) -> None:
+    """Hold `path` for the rest of the run if it is a PR-time worktree. Never
+    raises: a hold that cannot be taken is a reaping risk, not a review error."""
+    try:
+        from .. import worktrees
+
+        root = worktrees.canonical(worktrees.worktree_root())
+        if worktrees.canonical(path).startswith(root + "/"):
+            worktrees.hold(path, ctx.run_dir)
+    except (OSError, ValueError):
+        pass
 
 
 def require_repo(ctx: StepContext, *, must_exist: bool = True):

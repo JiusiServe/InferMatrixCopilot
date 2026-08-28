@@ -31,6 +31,26 @@ Finalizer = Callable[[Any], Awaitable[None]]
 _finalizers: dict[str, list[Finalizer]] = {}
 
 
+class FileLockingUnavailable(RuntimeError):
+    """This platform has no `fcntl`, so cross-process locking cannot be honored."""
+
+
+def require_file_locking() -> None:
+    """Raise unless POSIX advisory locking is available.
+
+    The `fcntl = None` fallback above makes every lock in this file a silent
+    no-op. That is tolerable for a single-process CLI run, where no cross-process
+    lock was protecting anything anyway, but not for the paths whose *correctness*
+    is the lock — worktree materialization, and (later) the idempotency index and
+    its reaper. Those must fail closed rather than run unprotected and report a
+    guarantee they are not providing (invariant 7)."""
+    if fcntl is None:
+        raise FileLockingUnavailable(
+            "POSIX file locking (fcntl) is unavailable on this platform, so "
+            "concurrent-safe worktrees and run reservations cannot be "
+            "guaranteed; this surface refuses to run unprotected")
+
+
 class RunLockHeld(RuntimeError):
     """Another process already holds this run's lock."""
 

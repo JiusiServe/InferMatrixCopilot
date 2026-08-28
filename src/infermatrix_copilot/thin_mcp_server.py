@@ -904,6 +904,7 @@ def _strict_review_request(
     post: bool,
     review_depth: str,
     settings: Settings,
+    expected_head_sha: str = "",
 ) -> dict:
     """Translate the Strict public surface to the internal review TaskSpec."""
     target = str(target).strip()
@@ -938,6 +939,10 @@ def _strict_review_request(
     }
     if review_depth:
         request["params"] = {"review_depth": review_depth}
+    if expected_head_sha:
+        # carried as a first-class field, not a param: the policy gate validates
+        # it as a full 40-hex sha and refuses anything else
+        request["expected_head_sha"] = str(expected_head_sha).strip().lower()
     return request
 
 
@@ -1007,6 +1012,7 @@ def build_mcp(
         body: str = "",
         changed_files: list[str] | None = None,
         repo_path: str = "",
+        expected_head_sha: str = "",
     ) -> dict:
         """Begin a Direct or Strict review.
 
@@ -1020,6 +1026,9 @@ def build_mcp(
         ``"truncated"`` (only part of one) — must be opened, and the budget grants a
         read for each. Strict runs the packaged PR-review
         workflow and accepts an optional local checkout through ``repo_path``.
+        ``expected_head_sha`` (Strict only) pins the review to one snapshot: pass
+        the full 40-hex head you observed, and the run stops as stale rather than
+        reviewing a different commit if the PR moved in between.
         ``post`` still requires explicit intent and server-side ``ALLOW_POST=1``.
         """
         def run() -> dict:
@@ -1126,7 +1135,7 @@ def build_mcp(
             strict_started = time.perf_counter()
             request = _strict_review_request(
                 target, repo, post=post, review_depth=review_depth,
-                settings=core.settings)
+                settings=core.settings, expected_head_sha=expected_head_sha)
             core.configure_strict_repo(request["repo"], repo_path)
             missing = core.strict_readiness(request["repo"])
             if missing:
