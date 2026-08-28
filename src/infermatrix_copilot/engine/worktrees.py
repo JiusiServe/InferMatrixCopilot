@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import time
 from pathlib import Path
 from typing import Callable
@@ -79,6 +80,19 @@ def dest_for(repo: Path | str, pr: int, sha: str, *,
     for — is preserved."""
     base = Path(root) if root is not None else worktree_root()
     return base / f"{Path(repo).name}-{owner_tag(repo)}-pr{int(pr)}-{sha[:12]}"
+
+
+# A destination this module produced: `<name>-<owner8>-pr<n>-<sha12>`. The
+# reaper removes ONLY these. The worktrees root is a shared scratch directory
+# that has held other tooling's trees under other naming schemes for a long
+# time, and a sweep that deleted anything it found there would destroy work it
+# knows nothing about — as one did, before this guard existed.
+_MANAGED_DEST = re.compile(r"-[0-9a-f]{8}-pr\d+-[0-9a-f]{12}\Z")
+
+
+def is_managed_dest(dest: Path | str) -> bool:
+    """Whether `dest` is a worktree this module keys, and may therefore reap."""
+    return bool(_MANAGED_DEST.search(Path(dest).name))
 
 
 def lock_path(dest: Path | str) -> Path:

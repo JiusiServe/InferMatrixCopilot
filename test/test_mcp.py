@@ -214,8 +214,10 @@ def test_reconcile_if_dead_respects_live_owner(tmp_path):
 # ── reserve / execute_reserved (the child path) ───────────────────────────────
 def test_reserve_run_is_fast_and_persists_queued(settings):
     cop = Copilot(settings)
-    run_id = cop.reserve_run(TaskSpec(kind="pr_review", repo="vllm-omni", pr=1),
-                             owner_server_id="S1", owner_server_pid=1234)
+    run_id, created = cop.reserve_run(
+        TaskSpec(kind="pr_review", repo="vllm-omni", pr=1),
+        owner_server_id="S1", owner_server_pid=1234)
+    assert created is True  # an unkeyed reservation always creates
     run_dir = settings.run_root / run_id
     assert rs.read_status(run_dir)["state"] == rs.QUEUED
     req = run_dir / "request.json"
@@ -227,8 +229,9 @@ def test_reserve_run_is_fast_and_persists_queued(settings):
 
 def test_execute_reserved_refuses_tampered_request_in_process(settings):
     cop = Copilot(settings)
-    run_id = cop.reserve_run(TaskSpec(kind="pr_review", repo="vllm-omni", pr=2),
-                             owner_server_id="S1", owner_server_pid=1234)
+    run_id, _ = cop.reserve_run(
+        TaskSpec(kind="pr_review", repo="vllm-omni", pr=2),
+        owner_server_id="S1", owner_server_pid=1234)
     run_dir = settings.run_root / run_id
     # a same-user process rewrites the reserved request to a write-capable task
     (run_dir / "request.json").write_text(json.dumps(
@@ -484,7 +487,7 @@ def test_child_launch_preserves_strict_post_gate(
 
     core = _core(settings)
     core.settings.allow_post = allow_post
-    run_id = core.copilot.reserve_run(
+    run_id, _ = core.copilot.reserve_run(
         TaskSpec(kind="pr_review", repo="vllm-omni", pr=3),
         owner_server_id=core.server_id, owner_server_pid=core.pid)
     captured = {}
@@ -517,7 +520,7 @@ def test_subprocess_tamper_defense(settings):
     re-enforces policy on a rewritten request.json and terminalizes to failed,
     with its stdout isolated to console.log."""
     core = _core(settings)
-    run_id = core.copilot.reserve_run(
+    run_id, _ = core.copilot.reserve_run(
         TaskSpec(kind="pr_review", repo="vllm-omni", pr=3),
         owner_server_id=core.server_id, owner_server_pid=core.pid)
     rd = settings.run_root / run_id

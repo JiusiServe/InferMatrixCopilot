@@ -906,6 +906,7 @@ def _strict_review_request(
     settings: Settings,
     expected_head_sha: str = "",
     repo_path: str = "",
+    idempotency_key: str = "",
 ) -> dict:
     """Translate the Strict public surface to the internal review TaskSpec."""
     target = str(target).strip()
@@ -948,6 +949,8 @@ def _strict_review_request(
         # rides on the request so it is frozen per run, rather than written into
         # process-global settings where a concurrent call would see it
         request["repo_path"] = str(repo_path)
+    if idempotency_key:
+        request["idempotency_key"] = str(idempotency_key)
     return request
 
 
@@ -1018,6 +1021,7 @@ def build_mcp(
         changed_files: list[str] | None = None,
         repo_path: str = "",
         expected_head_sha: str = "",
+        idempotency_key: str = "",
     ) -> dict:
         """Begin a Direct or Strict review.
 
@@ -1034,6 +1038,10 @@ def build_mcp(
         ``expected_head_sha`` (Strict only) pins the review to one snapshot: pass
         the full 40-hex head you observed, and the run stops as stale rather than
         reviewing a different commit if the PR moved in between.
+        ``idempotency_key`` (Strict only) makes a retry safe: pass a stable id for
+        the attempt and a repeated call returns the SAME run — including a
+        finished one, whose result you can read — instead of starting a second
+        review. Use a new key for a genuinely new attempt.
         ``post`` still requires explicit intent and server-side ``ALLOW_POST=1``.
         """
         def run() -> dict:
@@ -1141,7 +1149,7 @@ def build_mcp(
             request = _strict_review_request(
                 target, repo, post=post, review_depth=review_depth,
                 settings=core.settings, expected_head_sha=expected_head_sha,
-                repo_path=repo_path)
+                repo_path=repo_path, idempotency_key=idempotency_key)
             missing = core.strict_readiness(request["repo"], repo_path)
             if missing:
                 raise ValueError(

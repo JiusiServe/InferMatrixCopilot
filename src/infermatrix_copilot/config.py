@@ -154,6 +154,11 @@ class Settings(BaseSettings):
     # only" — least privilege, so a per-call path cannot point the review at an
     # arbitrary clone. Widening this is an operator decision, not a caller's.
     mcp_allowed_repo_roots: list[str] = []
+    # How long an idempotency entry survives after its run finishes. The mapping
+    # is deliberately retained across terminal completion (that is what makes a
+    # lost-response retry return the finished run instead of re-reviewing), so
+    # it has to be bounded explicitly. Far longer than any retry window.
+    idem_retention_days: int = 30
 
     # Strict execution backend (doc/features/provider-registry.md): which provider
     # powers runs. REQUIRED for Strict — `strict_readiness` names the exact

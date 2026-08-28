@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from . import contract
+from . import idempotency as idem
 from . import run_status as rs
 from .config import Settings
 from .knowledge_docs import KnowledgeDocs, KnowledgeDocsError
@@ -67,6 +68,7 @@ class CopilotMCP:
         self.pid = os.getpid()
         rs.register_server(self.run_root, self.server_id, self.pid)
         rs.startup_reconcile(self.run_root)
+        self._reap()
         self._q: queue.Queue[tuple[str, bool]] = queue.Queue()
         self._worker = threading.Thread(target=self._worker_loop, daemon=True,
                                         name="imx-mcp-worker")
@@ -76,6 +78,19 @@ class CopilotMCP:
     # The handshake reports this rather than letting a bot infer concurrency
     # from the fact that `start` returns immediately.
     MAX_STRICT_WORKERS = 1
+
+    def _reap(self) -> None:
+        """Bound what the idempotency index and PR-time worktrees accumulate.
+
+        Best-effort by construction: this runs at startup and after each
+        terminal run, and a sweep that cannot complete must never stop a server
+        from serving or a run from finishing."""
+        try:
+            idem.reap_stale(self.run_root,
+                            retention_days=self.settings.idem_retention_days,
+                            repo_paths=list(self.settings.repo_paths.values()))
+        except Exception:  # noqa: BLE001 — housekeeping, never load-bearing
+            pass
 
     def capabilities(self) -> dict:
         """The version/capability handshake — see `contract.capabilities`."""
@@ -164,24 +179,36 @@ class CopilotMCP:
         # a genuinely blocked child writes its terminal state before exiting 3
         rs.reconcile_after_wait(run_dir, child_pid=proc.pid,
                                 suspect_lock_loser=(proc.returncode == 3))
+        self._reap()  # the run is terminal; sweep what it left behind
 
     # -- start (reserve + enqueue) -------------------------------------------
     def start(self, spec_dict: dict) -> str:
-        """Boundary policy enforcement + reserve + enqueue; returns the run id."""
+        """Boundary policy enforcement + reserve + enqueue; returns the run id.
+
+        No idempotency key here by design: `start` also serves `issue_answer`
+        and `issue_filter`, which carry no PR and no head, so any spec-derived
+        key would collapse every issue task in a repo onto one entry."""
         spec = enforce_mcp_policy(spec_dict, allowed_repos=self.settings.mcp_allowed_repos, settings=self.settings)
-        run_id = self.copilot.reserve_run(
+        run_id, created = self.copilot.reserve_run(
             spec, owner_server_id=self.server_id, owner_server_pid=self.pid)
-        self._q.put((run_id, False))
+        if created:
+            self._q.put((run_id, False))
         return run_id
 
     def start_strict_review(self, spec_dict: dict) -> str:
-        """Reserve a packaged Strict review workflow."""
+        """Reserve a packaged Strict review workflow.
+
+        Enqueues only a run this call actually created. Returning an existing id
+        while still enqueueing would deduplicate the *id* and not the
+        *execution* — the second child would review the same PR again."""
         spec = enforce_strict_review_policy(
             spec_dict, allowed_repos=self.settings.mcp_allowed_repos,
             settings=self.settings)
-        run_id = self.copilot.reserve_run(
-            spec, owner_server_id=self.server_id, owner_server_pid=self.pid)
-        self._q.put((run_id, True))
+        run_id, created = self.copilot.reserve_run(
+            spec, owner_server_id=self.server_id, owner_server_pid=self.pid,
+            idempotency_key=str(spec_dict.get("idempotency_key") or ""))
+        if created:
+            self._q.put((run_id, True))
         return run_id
 
     def strict_readiness(self, repo: str, repo_path: str = "") -> list[str]:

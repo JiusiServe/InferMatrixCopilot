@@ -19,6 +19,8 @@ from typing import NamedTuple
 
 import yaml
 
+from .. import idempotency as idem
+from .. import run_status as rs
 from ..config import Settings, TierNotConfiguredError
 from ..engine.executor import Executor
 from ..engine.lifecycle import RunLock, RunLockHeld, run_guarded
@@ -528,11 +530,22 @@ class Copilot:
         return run_dir
 
     def reserve_run(self, spec: TaskSpec, *, owner_server_id: str,
-                    owner_server_pid: int) -> str:
-        """MCP-only: reserve a run and return its id **without** planning or
-        executing (no LLM), so the tool call returns in ms and the caller polls.
-        Persists `request.json` (0600) + an initial `queued` `run_status.json`
-        stamped with the owning server; planning happens later in the child.
+                    owner_server_pid: int,
+                    idempotency_key: str = "") -> tuple[str, bool]:
+        """MCP-only: reserve a run and return `(run_id, created)` **without**
+        planning or executing (no LLM), so the tool call returns in ms and the
+        caller polls. Persists `request.json` (0600) + an initial `queued`
+        `run_status.json` stamped with the owning server; planning happens later
+        in the child.
+
+        `created` is what the caller enqueues on. Deduplicating the id alone
+        would not deduplicate execution — the start path would hand back an
+        existing id and still launch a second child for it.
+
+        With an `idempotency_key`, a retry that lost the original response gets
+        the same run — including a finished one, whose result it can then read
+        instead of re-reviewing the same commit. See `idempotency.py` for why a
+        spec hash alone cannot do this and why the scope is Strict-only.
 
         A `repo_path` on the spec is authorized and canonicalized HERE, so the
         persisted request names one immutable checkout for the life of the run.
@@ -540,12 +553,52 @@ class Copilot:
         freezing it at reservation is what stops two concurrent per-call repos
         from racing through shared settings, which is how the deleted
         `configure_strict_repo` worked."""
-        from .. import run_status as rs
         from ..mcp_policy import authorize_repo_path
 
         if spec.repo_path:
             spec = spec.model_copy(update={"repo_path": authorize_repo_path(
                 spec.repo, spec.repo_path, self.settings)})
+        key = idem.validate_key(idempotency_key)
+        if not key:
+            return self._reserve_new(spec, owner_server_id, owner_server_pid), True
+        with idem.key_lock(self.settings.run_root, key):
+            return self._reserve_keyed(spec, key, owner_server_id,
+                                       owner_server_pid)
+
+    def _reserve_keyed(self, spec: TaskSpec, key: str, owner_server_id: str,
+                       owner_server_pid: int) -> tuple[str, bool]:
+        """Resolve or create the run for `key`. Caller holds the key lock."""
+        fingerprint = idem.spec_fingerprint(spec.model_dump())
+        entry = idem.read_entry(self.settings.run_root, key)
+        if entry:
+            run_dir = self.settings.run_root / str(entry.get("run_id") or "")
+            # The index is a cache; the persisted request is the authority. A
+            # key presented with a DIFFERENT spec is a caller error — serving
+            # the old run would quietly review the wrong thing under a name the
+            # caller believes means something else.
+            recorded = str(entry.get("spec_fingerprint") or "")
+            if run_dir.exists() and recorded and recorded != fingerprint:
+                raise idem.IdempotencyError(
+                    f"idempotency_key {key!r} was already used for a different "
+                    "request; use a new key for a new attempt")
+            if run_dir.exists() and idem.resolvable(run_dir):
+                return run_dir.name, False
+            if run_dir.exists() and idem.relaunchable(run_dir):
+                # Reserved but never launched — the owner died between
+                # publishing this entry and starting a child. Re-arm and report
+                # it as created so the caller enqueues it; the re-stamp is what
+                # stops a SECOND retry from enqueueing it again.
+                if rs.reclaim_queued(run_dir, owner_server_id=owner_server_id,
+                                     owner_server_pid=owner_server_pid):
+                    return run_dir.name, True
+                return run_dir.name, False
+        run_id = self._reserve_new(spec, owner_server_id, owner_server_pid)
+        idem.write_entry(self.settings.run_root, key, run_id, fingerprint)
+        return run_id, True
+
+    def _reserve_new(self, spec: TaskSpec, owner_server_id: str,
+                     owner_server_pid: int) -> str:
+        """Create the run directory, request and initial status."""
         run_id = self._new_run_id()
         run_dir = self.settings.run_root / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
@@ -595,10 +648,19 @@ class Copilot:
     def _execute_reserved_locked(self, run_dir: Path, lock: RunLock,
                                  policy) -> int:
         """The body of `_execute_reserved`, run while holding the run lock."""
-        from .. import run_status as rs
         from ..mcp_policy import PolicyError
 
-        rs.mark_child_started(run_dir, child_pid=os.getpid(), state=rs.PLANNING)
+        # The claim, not the lock, is what makes execution at-most-once.
+        # `RunLock` excludes concurrent children; it says nothing about a second
+        # child that arrives after the first finished and released. A losing
+        # child exits here without planning, executing, or writing status — it
+        # is a duplicate, not a failure.
+        if not rs.claim_for_execution(run_dir, child_pid=os.getpid()):
+            state = (rs.read_status(run_dir) or {}).get("state", "?")
+            print(style("↷ ", "yellow") +
+                  f"run {run_dir.name} is already claimed (state={state}) — "
+                  "not executing it twice")
+            return 0
         try:
             raw = json.loads((run_dir / "request.json").read_text(encoding="utf-8"))
             spec = policy(
