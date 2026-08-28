@@ -426,7 +426,8 @@ pr.fetch_diff → pr.gate_check → agent.review_diff → [post] pr.post_review 
 ```
 workspace.guard_clean → pr.checkout_branch → pr.fetch_ci_failures → pr.group_failures
   → [not report_only] agent.debug_group (foreach failure_groups)
-  → [not report_only] review.patch_gate → [not report_only] ci.push → report.final_summary
+  → [not report_only] review.patch_gate → [not report_only] ci.push
+  → [not report_only] pr.harvest_debug_knowledge → report.final_summary
 ```
 
 **`pr-rebase`** — push 只针对 PR head 分支，force 仅 with-lease。

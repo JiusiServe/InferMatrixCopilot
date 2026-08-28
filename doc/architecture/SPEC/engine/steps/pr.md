@@ -2,7 +2,7 @@
 
 <!-- verified-against: 2026-08-28 -->
 
-`LOC ~1300（6 个文件） · step 库（PR） · refactor-status: ok`
+`LOC ~1390（6 个文件） · step 库（PR） · refactor-status: ok`
 
 ## 职责
 受守卫的推送、只读的 PR 抓取/门禁、PR rebase、PR debug、受门禁的评审发布。
@@ -15,13 +15,14 @@
 - `rebase.py` —— `pr.checkout_branch`、`pr.rebase_onto_base`、`pr.analyze_diff`、
   `agent.verify_module`。
 - `debug.py` —— `pr.fetch_ci_failures`（+ `_enrich_ci_logs`）、`pr.group_failures`、
-  `agent.debug_group`。
+  `agent.debug_group`、`pr.harvest_debug_knowledge`。
 - `publish.py` —— 对外写入（risk=push）：`ci.push`、`pr.post_review`。
 - `utils.py` —— 纯函数 `extract_signature`（及其正则）。
 
-## Steps（11 个）
+## Steps（12 个）
 `ci.push`（script/push）；`pr.fetch_diff`、`pr.gate_check`、`pr.checkout_branch`、
 `pr.analyze_diff`、`pr.fetch_ci_failures`、`pr.group_failures`（deterministic/read）；
+`pr.harvest_debug_knowledge`（deterministic/knowledge）；
 `pr.rebase_onto_base`、`agent.debug_group`（agent/write_workspace）；
 `agent.verify_module`（validation/read）；`pr.post_review`（script/push）。
 
@@ -58,6 +59,14 @@
 - `pr.fetch_ci_failures` 经 profile 选定的 CI provider 富化日志，否则记一条
   `capability_gap`（**E2**）；`pr.group_failures` 按**归一化后**的签名分组。
 - `pr.post_review` 是**双闸**的（**C5**）。
+- `pr.harvest_debug_knowledge` **只在真实推送后落盘**（push 输出存在且非 dry-run，
+  且至少一组修复同时有 root_cause 与 verification —— 与 debug memory 同一门槛），
+  写入 `settings.knowledge_intake_dir`（空 = 关闭，默认）。它是**刻意 fail-open**
+  的：目录未配、dry-run、无已验证修复、写失败（trace
+  `knowledge_intake_write_failed` 后吞掉）都返回 ok —— 关闭学习回路
+  **绝不能**让已落地的修复失败。它消费 executor 维护的 `state["outputs"]`，
+  该表在 resume 时由 checkpoint 恢复（见 `test_knowledge_harvest.py` 的
+  crash-then-resume 用例）。设计记录：`doc/RFC-knowledge-intake.md`。
 
 ## 边界 —— 不属于这里
 不含推送授权逻辑（那是 `push`）；不含 CI 日志抓取机制（那是 `ci/providers`）；
@@ -70,6 +79,7 @@
 ## 测试
 `test_pr_steps.py`（含钉 ref run 域隔离、head 移动检测、stale expected_head
 BLOCK、worktree 分键/拒外来树）、`test_push_and_steps.py`、
+`test_knowledge_harvest.py`（harvest step + executor crash-then-resume）、
 `test_ci_and_repo_map.py`（注意：`test_ci_and_repo_map` monkeypatch 的是
 `pr.debug._gh`，即 `pr.fetch_ci_failures` 绑定 `gh` 的那个子模块）；
 端到端：`test_thin_mcp_server.py`（评审跑在钉住的 worktree 上、head 移动
