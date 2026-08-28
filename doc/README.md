@@ -36,6 +36,7 @@
 | [`features/strict-review-deep-engine.md`](features/strict-review-deep-engine.md) | 已实现（默认开） |
 | [`features/review-recall.md`](features/review-recall.md) | 已实现（默认开）——v14/v15 召回攻坚 |
 | [`features/auto-run.md`](features/auto-run.md) | **draft，未实现**——GitHub 事件触发 |
+| [`RFC-knowledge-intake.md`](RFC-knowledge-intake.md) | 已实现（默认关，shadow 起步）——合并 PR 与 bugfix 学习经 reviewbot 蒸馏，以 fork PR 回流知识库，人审合并即晋升 |
 
 ## architecture/ —— 维护者
 
