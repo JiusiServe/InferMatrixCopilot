@@ -18,8 +18,8 @@ vLLM-Omni 版本 **release 前**必须满足以下门禁。标注 `(Guide)` 的�
 |---|---|---|---|
 | 1 | UT coverage meets this iteration requirement | Guide | 单元测试覆盖率达到当期迭代要求；具体阈值与举证方式以当期 Guide 为准 |
 | 2 | Performance regression < 10% | Guide | 性能回退小于 10%；对比基线、指标与证据口径以当期 Guide 为准 |
-| 3 | Latest CUDA L2 & L3 & L4 & L5 (excluding Non-critical) pass rate = 100% | Gate | 最新一轮 CUDA L2/L3/L4/L5 中，排除 Non-critical 后通过率必须为 100% |
-| 4 | Latest NPU L2 & L4 pass rate = 100% | Gate | 最新一轮 NPU L2/L4 通过率必须为 100% |
+| 3 | Latest CUDA L1& L2 & L3 & L4 & L5 (excluding Non-critical) pass rate = 100% | Gate | 最新一轮 CUDA L1/L2/L3/L4/L5 中，排除 Non-critical 后通过率必须为 100% |
+| 4 | Latest NPU L1 & L2 & L4 pass rate = 100% | Gate | 最新一轮 NPU L2/L4 通过率必须为 100% |
 | 5 | Requirement completion rate > 85% | Gate | 需求完成率大于 85% |
 | 6 | Remaining DI < 30 | Gate | 剩余 DI 小于 30；DI 计算见 [DI 计算说明](../../../general/bug/guides/di-calculation.md) |
 | 7 | No remaining critical issues | Gate | 无未关闭的 critical 问题 |
