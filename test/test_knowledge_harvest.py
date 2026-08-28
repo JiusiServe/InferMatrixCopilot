@@ -99,6 +99,103 @@ def test_write_failure_is_swallowed(registry, settings, trace, tmp_path):
     assert "intake_error" in result.outputs
 
 
+def _executor_env(settings, trace, tmp_path, calls=None):
+    """A real Executor over the real registry plus two stand-ins for the
+    debug/push steps' externals — the e2e boundary is the process edge
+    (agent LLM, git push), not the engine."""
+    from infermatrix_copilot.engine import Executor, StepResult, StepSpec
+    from infermatrix_copilot.notify import Notifier
+
+    registry = register_builtin_steps(StepRegistry())
+
+    async def debug_sim(ctx):
+        if calls is not None:
+            calls.append("debug")
+        return StepResult(
+            True, summary="fixed",
+            outputs={"root_cause": "flaky fixture reuse",
+                     "fix_summary": "isolated the fixture",
+                     "verification": "pytest -k fixture passed",
+                     "files_modified": ["tests/conftest.py"],
+                     "state_updates": {
+                         "failure_groups": [{"signature": "FixtureError",
+                                             "jobs": ["unit"]}]}})
+
+    async def push_sim(ctx):
+        return StepResult(True, summary="pushed", outputs={})
+
+    registry.register(StepSpec("test.debug_sim", "deterministic", "read",
+                               debug_sim))
+    registry.register(StepSpec("test.push_sim", "deterministic", "read",
+                               push_sim))
+    run_dir = tmp_path / "run-e2e"
+    notifier = Notifier(settings, run_dir, trace, "run-e2e")
+    executor = Executor(registry, settings, run_dir=run_dir, trace=trace,
+                        notifier=notifier)
+    return executor
+
+
+def _harvest_playbook(*, include_harvest=True):
+    from infermatrix_copilot.playbooks.store import Playbook, PlaybookStep
+
+    steps = [PlaybookStep("debug", "test.debug_sim"),
+             PlaybookStep("push", "test.push_sim")]
+    if include_harvest:
+        steps.append(PlaybookStep("harvest", "pr.harvest_debug_knowledge"))
+    return Playbook(name="e2e-debug", version=1, status="active",
+                    task_kinds=["pr_debug"], repos=[], steps=steps)
+
+
+def test_e2e_executor_runs_harvest_after_push(settings, trace, tmp_path):
+    """Whole-pipeline path: the executor's own outputs map (not hand-built
+    state) feeds the harvest step, and the drop lands with the checkpoint
+    contract intact."""
+    settings.knowledge_intake_dir = str(tmp_path / "intake")
+    settings.repo_full_names = {"demo": "owner/demo"}
+    executor = _executor_env(settings, trace, tmp_path)
+    outcome = asyncio.run(executor.run(
+        _harvest_playbook(),
+        {"task_spec": {"kind": "pr_debug", "repo": "demo", "pr": 42}},
+    ))
+    assert outcome.status == "done"
+    drops = list((tmp_path / "intake").glob("*.json"))
+    assert len(drops) == 1
+    record = json.loads(drops[0].read_text(encoding="utf-8"))
+    assert record["repo"] == "owner/demo"
+    assert record["groups"][0]["root_cause"] == "flaky fixture reuse"
+    assert record["run_id"] == "run-e2e"
+
+
+def test_e2e_resume_restores_outputs_for_harvest(settings, trace, tmp_path):
+    """Crash-before-harvest then --resume: the harvest step consumes the
+    executor-restored outputs map from progress.json, so a resumed run
+    still drops the record (invariant #2's restore path, exercised end to
+    end rather than with hand-built state)."""
+    settings.knowledge_intake_dir = str(tmp_path / "intake")
+    settings.repo_full_names = {"demo": "owner/demo"}
+    calls = []
+    executor = _executor_env(settings, trace, tmp_path, calls)
+    state = {"task_spec": {"kind": "pr_debug", "repo": "demo", "pr": 42}}
+    # Phase 1: the run completes debug+push, then "crashes" before harvest
+    # (the step simply is not in this playbook revision).
+    outcome = asyncio.run(executor.run(
+        _harvest_playbook(include_harvest=False), dict(state)))
+    assert outcome.status == "done"
+    assert calls == ["debug"]
+    assert not (tmp_path / "intake").exists()
+    # Phase 2: resume over the same run dir with FRESH state — completed
+    # steps short-circuit from the checkpoint and only harvest executes.
+    executor2 = _executor_env(settings, trace, tmp_path, calls)
+    outcome = asyncio.run(executor2.run(
+        _harvest_playbook(), dict(state)))
+    assert outcome.status == "done"
+    assert calls == ["debug"]  # the checkpoint replayed; no re-execution
+    drops = list((tmp_path / "intake").glob("*.json"))
+    assert len(drops) == 1
+    record = json.loads(drops[0].read_text(encoding="utf-8"))
+    assert record["groups"][0]["root_cause"] == "flaky fixture reuse"
+
+
 def test_playbook_wires_the_harvest_after_push(settings):
     import yaml
     from pathlib import Path
