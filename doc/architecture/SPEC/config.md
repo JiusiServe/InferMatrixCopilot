@@ -17,7 +17,9 @@ metrics 与升级，提供带类型字段和安全默认值；外加 PR4d 知识
 MCP `repo_path` 授权面与 idempotency 保留期：
 `mcp_allowed_repo_roots`（`MCP_ALLOWED_REPO_ROOTS`，空 = 只有已配置的
 checkout —— 最小权限；放宽是**运维**决定，不是调用方的）与
-`idem_retention_days`（默认 30，圈住 `.idem/` 索引）。
+`idem_retention_days`（默认 30，圈住 `.idem/` 索引）；以及
+知识回流落盘目录 `knowledge_intake_dir`（`KNOWLEDGE_INTAKE_DIR`，默认空 = 关闭；
+消费方见 `doc/RFC-knowledge-intake.md`）。
 
 ## 公开契约
 带全部可调项的 `Settings`；`reviewer` / `intent`（回退到 `agent_model`）；

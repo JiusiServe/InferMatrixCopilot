@@ -9,6 +9,7 @@ is a recorded capability gap (debug degrades to name grouping), never a failure.
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 from ....scopes import post_plan_scope
@@ -182,3 +183,82 @@ async def _pr_debug_group(ctx: StepContext) -> StepResult:
     else:
         result.summary = f"'{sig}': {result.summary[:250]}"
     return result
+
+
+@step("pr.harvest_debug_knowledge", "deterministic", "knowledge",
+      "Drop a bugfix-run record for external knowledge intake.")
+async def _pr_harvest_debug_knowledge(ctx: StepContext) -> StepResult:
+    """After a pr_debug run whose fixes actually landed (a real, non-dry-run
+    push), write one JSON record — failure signatures with their verified root
+    causes and fixes — into `settings.knowledge_intake_dir`, where an external
+    consumer (the reviewbot's knowledge-intake scanner) batches it into a
+    knowledge PR for human promotion.
+
+    Deliberately fail-open as a no-op: unset directory, dry-run push, or zero
+    verified fixes each return ok with an honest summary, and a write failure
+    is traced and swallowed (`knowledge_intake_write_failed`) — closing the
+    learning loop must never fail the landed fix."""
+    intake_dir = str(ctx.settings.knowledge_intake_dir or "").strip()
+    if not intake_dir:
+        return StepResult(True, summary="knowledge intake disabled "
+                                        "(knowledge_intake_dir unset)")
+    outputs_map = ctx.state.get("outputs") or {}
+    push_outputs = outputs_map.get("push")
+    if push_outputs is None or push_outputs.get("dry_run"):
+        return StepResult(True, summary="no landed fix (push missing or "
+                                        "dry-run) — nothing to harvest")
+    groups = ctx.state.get("failure_groups") or []
+    debug_outputs = outputs_map.get("debug") or {}
+    # foreach with one item returns the agent's outputs unmerged; more items
+    # arrive keyed by index (executor._merge).
+    indexed = ({"0": debug_outputs} if "root_cause" in debug_outputs
+               else {k: v for k, v in debug_outputs.items() if k.isdigit()})
+    fixes = []
+    for index, group in enumerate(groups):
+        out = indexed.get(str(index)) or {}
+        if not (out.get("root_cause") and out.get("verification")):
+            continue  # same bar as debug memory: unverified fixes don't teach
+        fixes.append({
+            "signature": str(group.get("signature", ""))[:300],
+            "jobs": [str(j)[:120] for j in (group.get("jobs") or [])[:10]],
+            "root_cause": str(out.get("root_cause", ""))[:2_000],
+            "fix_summary": str(out.get("fix_summary", ""))[:2_000],
+            "verification": str(out.get("verification", ""))[:1_000],
+            "files": [str(f)[:300]
+                      for f in (out.get("files_modified") or [])[:20]],
+        })
+    if not fixes:
+        return StepResult(True, summary="no verified fixes to harvest")
+    spec = ctx.state.get("task_spec") or {}
+    alias = str(spec.get("repo", ""))
+    record = {
+        "run_id": ctx.run_dir.name,
+        # Full GitHub identity when configured, so the consumer keys the
+        # event correctly; the local alias otherwise.
+        "repo": ctx.settings.repo_full_names.get(alias, alias),
+        "pr": spec.get("pr"),
+        "kind": "bugfix_run",
+        "title": f"pr_debug fixes for PR #{spec.get('pr')}",
+        "groups": fixes,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    try:
+        directory = Path(intake_dir).expanduser()
+        directory.mkdir(parents=True, exist_ok=True)
+        final = directory / f"{ctx.run_dir.name}.json"
+        tmp = final.with_suffix(".tmp")
+        tmp.write_text(json.dumps(record, ensure_ascii=False, indent=1),
+                       encoding="utf-8")
+        tmp.replace(final)
+    except OSError as exc:
+        ctx.trace.record("knowledge_intake_write_failed",
+                         error=str(exc)[:300])
+        return StepResult(True, summary=f"intake drop failed (traced): {exc}",
+                          outputs={"intake_error": str(exc)[:300]})
+    ctx.trace.record("knowledge_intake_dropped", path=str(final),
+                     fixes=len(fixes))
+    return StepResult(True,
+                      summary=f"dropped {len(fixes)} verified fix record(s) "
+                              "for knowledge intake",
+                      outputs={"intake_path": str(final),
+                               "fixes": len(fixes)})
