@@ -89,16 +89,29 @@ def test_policy_rejects_invalid_review_depth():
             allowed_repos=ALLOW)
 
 
-def test_strict_policy_is_old_eco_review_with_explicit_post_only():
+def test_strict_policy_is_the_old_eco_review_and_never_posts():
     spec = enforce_strict_review_policy(
         {"kind": "pr_review", "repo": "vllm-omni", "pr": 7,
-         "mode": "performance", "post": True,
+         "mode": "performance",
          "params": {"review_depth": "FULL", "force_push": True}},
         allowed_repos=ALLOW)
 
     assert spec == TaskSpec(
-        kind="pr_review", repo="vllm-omni", pr=7, mode="eco", post=True,
+        kind="pr_review", repo="vllm-omni", pr=7, mode="eco", post=False,
         params={"review_depth": "full"})
+
+
+def test_strict_refuses_an_explicit_post_rather_than_dropping_it():
+    """Strict used to force post=False for the shared gate and then restore the
+    caller's value, making it the one MCP path that could publish. Design
+    requires a single publisher — two would mean two review markers and two head
+    gates on one PR — and a capability flag would not have stopped a caller from
+    asking. It is an error, not a silent drop, so a caller that believes it is
+    publishing learns here rather than from the absence of a comment."""
+    with pytest.raises(PolicyError, match="cannot post"):
+        enforce_strict_review_policy(
+            {"kind": "pr_review", "repo": "vllm-omni", "pr": 7, "post": True},
+            allowed_repos=ALLOW)
 
 
 HEAD = "a" * 40
@@ -478,11 +491,15 @@ def test_exposed_tools_are_read_only_only(settings):
 
 
 @pytest.mark.parametrize(
-    ("strict_compat", "allow_post", "expected"),
-    [(False, True, "0"), (True, False, "0"), (True, True, "1")],
+    ("strict_compat", "allow_post"),
+    [(False, True), (True, False), (True, True)],
 )
-def test_child_launch_preserves_strict_post_gate(
-        settings, monkeypatch, strict_compat, allow_post, expected):
+def test_child_launch_never_opens_the_post_gate(
+        settings, monkeypatch, strict_compat, allow_post):
+    """No MCP child may write outward, Strict included — not even when this
+    server's own ALLOW_POST is on. Strict used to inherit it, because Strict
+    specs could carry post=True; the policy now refuses that, so leaving the env
+    gate open would only preserve a path to a second publisher on one PR."""
     from infermatrix_copilot import mcp_server
 
     core = _core(settings)
@@ -507,7 +524,7 @@ def test_child_launch_preserves_strict_post_gate(
     monkeypatch.setattr(mcp_server.subprocess, "Popen", fake_popen)
     core._launch(run_id, strict_compat=strict_compat)
 
-    assert captured["env"]["ALLOW_POST"] == expected
+    assert captured["env"]["ALLOW_POST"] == "0"
     assert captured["env"]["ALLOW_PUSH"] == "0"
     expected_arg = (
         "--execute-strict-reserved" if strict_compat else "--execute-reserved")

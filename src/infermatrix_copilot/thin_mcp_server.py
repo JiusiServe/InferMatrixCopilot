@@ -1002,7 +1002,10 @@ def build_mcp(
             "Strict runs the packaged background review workflow with the "
             "configured model, returns a run_id, and must be "
             "polled with get_review_result until terminal. Posting is never "
-            "implicit; pass post=true only when the user explicitly asks."
+            "implicit. For Direct, pass post=true only when the user "
+            "explicitly asks. Strict never posts and refuses post=true: exactly "
+            "one publisher owns a PR's review marker and head gate, so read the "
+            "structured result from get_review_result and publish it yourself."
         ),
     )
 
@@ -1042,7 +1045,10 @@ def build_mcp(
         the attempt and a repeated call returns the SAME run — including a
         finished one, whose result you can read — instead of starting a second
         review. Use a new key for a genuinely new attempt.
-        ``post`` still requires explicit intent and server-side ``ALLOW_POST=1``.
+        ``post`` applies to Direct only. Strict never publishes: exactly one
+        publisher must own a PR's review marker and head gate, so read the
+        structured result and post it yourself (``post=true`` with
+        ``mode="strict"`` is refused rather than silently ignored).
         """
         def run() -> dict:
             started = time.perf_counter()
@@ -1145,6 +1151,15 @@ def build_mcp(
                     },
                 }
 
+            if post:
+                # Refused at the surface as well as in the policy, so the
+                # caller gets the reason instead of a generic rejection from
+                # deeper in the stack. Exactly one publisher must own a PR's
+                # review marker and head gate.
+                raise ValueError(
+                    "strict mode cannot post: read the structured result and "
+                    "publish it yourself, or use the CLI with ALLOW_POST=1 for "
+                    "a human-driven post")
             strict_started = time.perf_counter()
             request = _strict_review_request(
                 target, repo, post=post, review_depth=review_depth,

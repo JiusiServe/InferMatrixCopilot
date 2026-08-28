@@ -181,27 +181,45 @@ def enforce_strict_review_policy(raw: dict[str, Any], *,
                                  settings: Any = None) -> TaskSpec:
     """Validate the Direct MCP's Strict compatibility path.
 
-    Strict is the public name for the previous Eco PR-review workflow. It may
-    preserve an explicit post request, but cannot select the performance tier
-    or widen the task beyond ``pr_review``. `expected_head_sha` rides through
-    the shared gate below, so the snapshot binding survives on this path too.
-    """
+    Strict is the public name for the previous Eco PR-review workflow. It cannot
+    select the performance tier or widen the task beyond ``pr_review``, and it
+    cannot post. `expected_head_sha` rides through the shared gate below, so the
+    snapshot binding survives on this path too.
+
+    **`post` is refused, not restored.** This path used to force `post=False`
+    for the shared gate and then put the caller's value back, making Strict the
+    one MCP surface that could publish. A single publisher is a design
+    requirement — two publishers mean two review markers and two head gates on
+    one PR — and a capability flag advertising `supports_post_false` would not
+    have stopped a caller from passing `post=true`. Removing the restore does
+    not create an anomaly, it removes one: `enforce_mcp_policy` already
+    hard-forces `post=False` for every other kind, and Strict was the outlier.
+    Human-driven posting is unaffected; it lives on the CLI (`--yes` with
+    `ALLOW_POST=1`), which is the surface that has a human on it.
+
+    An explicit `post=true` is an error rather than a silent drop, so a caller
+    that believes it is publishing finds out here instead of from the absence of
+    a comment."""
     if not isinstance(raw, dict):
         raise PolicyError("request is not an object")
     if raw.get("kind") != "pr_review":
         raise PolicyError("strict mode only permits PR reviews")
 
-    normalized = dict(raw)
-    normalized["mode"] = "eco"
-    normalized["post"] = False
-    spec = enforce_mcp_policy(
-        normalized, allowed_repos=allowed_repos, settings=settings)
-
     post = raw.get("post", False)
     if not isinstance(post, bool):
         raise PolicyError("post must be a boolean")
-    spec.post = post
-    return spec
+    if post:
+        raise PolicyError(
+            "strict mode cannot post: the MCP surface is never the publisher, "
+            "so exactly one publisher owns a PR's review marker and head gate. "
+            "Read the structured result and publish it yourself, or use the CLI "
+            "with ALLOW_POST=1 for a human-driven post.")
+
+    normalized = dict(raw)
+    normalized["mode"] = "eco"
+    normalized["post"] = False
+    return enforce_mcp_policy(
+        normalized, allowed_repos=allowed_repos, settings=settings)
 
 
 def _full_sha_or_empty(value: Any) -> str:

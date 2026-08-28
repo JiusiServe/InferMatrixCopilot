@@ -119,16 +119,16 @@ class CopilotMCP:
 
     def _launch(self, run_id: str, *, strict_compat: bool = False) -> None:
         """Run one reserved run as `python -m infermatrix_copilot --execute-reserved
-        <id>`, child stdout+stderr -> console.log. The workflow MCP forces
-        outward writes off; Strict preserves the explicit post/config gate.
-        After `.wait()` the child is reaped, so we reconcile as sole writer."""
+        <id>`, child stdout+stderr -> console.log. No MCP child may write
+        outward, Strict included. After `.wait()` the child is reaped, so we
+        reconcile as sole writer."""
         run_dir = self.run_root / run_id
         env = dict(os.environ)
-        # The standalone workflow MCP stays structurally read-only. Strict
-        # preserves the dual post gate (explicit task intent plus this server's
-        # ALLOW_POST setting).
-        env["ALLOW_POST"] = (
-            "1" if strict_compat and self.settings.allow_post else "0")
+        # Belt to the policy's braces. Strict used to be handed ALLOW_POST=1
+        # when this server allowed it, because Strict specs could carry
+        # post=True; the policy now refuses that, so leaving the env gate open
+        # would only preserve a path to a second publisher on the same PR.
+        env["ALLOW_POST"] = "0"
         env["ALLOW_PUSH"] = "0"
         # The Windows Store Python runtime otherwise inherits the machine's
         # legacy console code page (commonly GBK). Reports legitimately contain
