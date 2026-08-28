@@ -1,6 +1,6 @@
 # providers/registry.py —— 规范
 
-<!-- verified-against: 2026-08-26 -->
+<!-- verified-against: 2026-08-28 -->
 
 `LOC ~107 · 后端解析（唯一那张表） · refactor-status: ok`
 

@@ -1,8 +1,8 @@
 # engine/lifecycle.py —— 规范
 
-<!-- verified-against: 2026-08-25 -->
+<!-- verified-against: 2026-08-28 -->
 
-`LOC ~121 · 引擎底座（run 生命周期原语） · refactor-status: ok`
+`LOC ~141 · 引擎底座（run 生命周期原语） · refactor-status: ok`
 
 ## 职责
 executor 自己给不了的两条**进程级**保证：同一 run 的互斥锁，与 run 离开事件
@@ -19,9 +19,13 @@ executor 自己给不了的两条**进程级**保证：同一 run 的互斥锁�
 `RunLock(run_dir).acquire()/release()`（context manager）；`RunLockHeld`；
 `register_finalizer(run_dir, fn)`（`fn(outcome)`，outcome 是 RunOutcome，或
 executor 在产出之前就抛时为 None）；`finalize(run_dir, outcome)`；
-`run_guarded(run, run_dir) -> outcome`。调用方：`cli/copilot.py` 在
-run/resume 全程持锁并用 `run_guarded` 包 `executor.run`；目前唯一的注册者是
-rebase 流水线（flock 释放、scratch 清理、终局报告、CI abort 清理）。
+`run_guarded(run, run_dir) -> outcome`；`require_file_locking()` 与
+`FileLockingUnavailable`（POSIX advisory 锁不可用时抛出的 fail-closed 门）。
+调用方：`cli/copilot.py` 在 run/resume 全程持锁并用 `run_guarded` 包
+`executor.run`；finalizer 注册者是 rebase 流水线（flock 释放、scratch 清理、
+终局报告、CI abort 清理）与 `engine/worktrees.py` 的共享持有释放；
+`require_file_locking` 由 `engine/worktrees.py::materialize` 和
+`idempotency.py`（`key_lock`/`reap_stale`）消费。
 
 ## 不变量
 - `flock` 争用按 open file description 计：同进程内对同一路径的第二次
@@ -29,6 +33,12 @@ rebase 流水线（flock 释放、scratch 清理、终局报告、CI abort 清�
 - 锁文件释放后**留在原地**：它的存在不携带语义，只有 flock 本身算数。
 - 非 POSIX（无 fcntl，与 `run_status.py` 同款守卫）：无 advisory 锁，
   `acquire` 直接成功 —— 注释声明的刻意降级（保住 run 可用；无 trace 事件）。
+- **降级与 fail-closed 是两条刻意分开的路径**：`RunLock` 的静默降级只对
+  "单进程 CLI run 可用性"成立；对**正确性就是锁本身**的路径（worktree
+  materialize、idempotency 索引与 reaper），`require_file_locking()` 直接抛
+  `FileLockingUnavailable` —— 宁可拒绝，也不在无保护下运行并谎报保证
+  （不变量 7）。`contract.capabilities()` 会如实上报
+  `supports_file_locking=False`。
 - finalizer **恰好一次**：`finalize` 先 pop 再跑，第二次调用是 no-op；
   按注册顺序执行。
 - 一个抛异常的 finalizer（**含 `CancelledError`** —— BaseException，不点名

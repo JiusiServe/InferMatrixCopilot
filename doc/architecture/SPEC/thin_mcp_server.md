@@ -1,8 +1,8 @@
 # thin_mcp_server.py —— 规范
 
-<!-- verified-against: 2026-08-25 -->
+<!-- verified-against: 2026-08-28 -->
 
-`LOC ~1286 · 默认 MCP：Direct 路由 + Strict 入口 · refactor-status: oversized`
+`LOC ~627 · 默认 MCP：Direct 门面 + Strict 入口 · refactor-status: ok`
 
 ## 职责
 安装器**实际注册**的那个 MCP 门面：以**零模型**提供 Direct 模式的知识路由，
@@ -19,6 +19,16 @@
 ## 不变量（**C1**、**C2**、**D1**）
 - **Direct 在这个 server 里不跑任何模型。** 它返回知识路由和一份治理契约；阅读由
   **宿主自己的模型**完成。执行主脊完全不参与。
+- **路由表与机制已迁出**（上一版预告的拆分点已经发生）：`_direct_*` 全家
+  现在**住在 `direct_routing.py`**、经 `contract.py` 作为公开面再导出；
+  本模块以下划线别名 import 它们，保持既有调用点/测试不变，**只向下**
+  委托 —— 没有任何东西从那两个模块向上 import 回 server。下面关于
+  quick-map fail-closed、路由不静默替换、仓库守卫先跑的不变量**仍然为真**，
+  但其实现体在 `direct_routing.py`（规范见其页）。
+- **Strict 分支透传快照绑定**：`_strict_review_request` 把
+  `expected_head_sha`、`repo_path`、`idempotency_key` 一并送进内部请求；
+  `review()` 的 Strict 路径按 `strict_readiness(repo, repo_path)`（两参，
+  按调用校验 —— `configure_strict_repo` 的进程全局突变已删除）预检。
 - **治理靠数据，因为 server 管不住宿主。** "该怎么审"被编码成随返回值一起下发的结构化
   字段：≤3 条路由（内嵌 `quick_map`，3.5k 封顶）、一个硬性的 `execution_budget`、
   一份 checklist，以及 `mandatory_review_guides` —— 跨 owner 的强制评审程序
@@ -55,14 +65,18 @@ Direct 路径里不调模型；不含 Strict 后台机器（`mcp_server.py`）�
 （`mcp_policy.py`）。
 
 ## 依赖（允许）
-stdlib + `mcp` extra + `.adapters` + `.config` + `.intent.resolve_repo_alias` +
+stdlib + `mcp` extra + `.direct_routing`（下划线别名 re-import）+
+`.adapters` + `.config` + `.intent.resolve_repo_alias` +
 `.knowledge_docs` + `.mcp_policy` + `.mcp_server`。
 
 ## 测试
-`test_thin_mcp_server.py`、`test_thin_mcp.py`、`test_imreview_output_contract.py`。
+`test_thin_mcp_server.py`（42 例，别名保持调用点不变）、`test_thin_mcp.py`、
+`test_imreview_output_contract.py`；外加 `test_contract.py`
+（`_direct_*` 的公开家与再导出仍然成立）与 `test_e2e_strict_mock.py`
+（Strict 快照绑定端到端）。
 
 ## 重构备注
-约 1286 行，是包里**最大**的模块，且自上次核对以来又长了约 480 行；Direct 路由
-helper（`_direct_*`，现有 6 个）是一个内聚单元，如果再次增长，那就是显而易见的
-拆分点。**拆分时务必保住"server 不跑模型"这条
-性质 —— 它就是 Direct 模式的产品承诺。**
+拆分**已发生**（→ `contract.py` / `direct_routing.py`，约 1420 → 627 行）；
+留在这里的是 Strict 桥接、checklist/progress 常量与工具接线本身。
+拆分保住了"server 不跑模型"—— 它仍是 Direct 模式的产品承诺；
+后续增长优先落到 `direct_routing`/adapter 数据面，不回到这里。

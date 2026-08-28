@@ -1,8 +1,8 @@
 # engine/steps/pr/ —— 规范
 
-<!-- verified-against: 2026-08-18 -->
+<!-- verified-against: 2026-08-28 -->
 
-`LOC ~1100（6 个文件） · step 库（PR） · refactor-status: ok`
+`LOC ~1300（6 个文件） · step 库（PR） · refactor-status: ok`
 
 ## 职责
 受守卫的推送、只读的 PR 抓取/门禁、PR rebase、PR debug、受门禁的评审发布。
@@ -30,12 +30,24 @@
 
 ## 不变量
 - `ci.push` 把全部安全判断委托给 `guard_push`（**C4**）。
-- **`pr.fetch_diff` 把评审树 pin 到 PR head**（`_pr_time_checkout`）：head sha 取自
-  最后一个 commit 的 oid，`git fetch origin pull/N/head`（对**开放和已合并**的 PR 都
-  有效），detached worktree 复用于 `~/.infermatrix-copilot/worktrees/`。
-  它经 `state_updates` 发布 `repo_path` / `checkout_note`，于是**每个 lens 调查的都是
-  PR 那一刻的代码**，而不是本地 checkout 恰好停在哪个分支。失败时降级回 live checkout，
-  并带**响亮**的注记加一条 `capability_gap` trace。
+- **`pr.fetch_diff`：一个 head 统治一切**（PR2 重构后）。head 由
+  `_resolve_pr_head` **恰好解析一次**，stale 门、fetch、diff、worktree 全部
+  从这一个答案推导（`_fetch_at_one_head`）。fetch 走 run 域强制目的 ref
+  `refs/imx/<run_id>/{base,head}`（取代旧的机会主义 tracking ref +
+  `FETCH_HEAD` —— 对着可能陈旧的 `origin/<base>` 取 merge-base 会把无关的
+  上游漂移当成 PR 的工作），且 `_fetch_pinned` 把取到的 head 与 API 报告的
+  head 复核、不符即**响亮失败**（"head 在 view 与 fetch 之间动了"）。
+  `_pinned_diff` 是**主**diff 路径；`gh pr diff` 只是回退（已合并 PR /
+  未钉请求的钉取失败）。worktree 的身份/验证/存活模型整体委托
+  `engine/worktrees.py`（见其页）；经 `state_updates` 发布
+  `repo_path`/`checkout_note`/`pr_head_sha`，于是**每个 lens 调查的都是 PR
+  那一刻的代码**。未钉请求失败时仍降级回 live checkout 并带响亮注记 +
+  `capability_gap` trace。
+- **`expected_head_sha` 是快照绑定的硬门**：spec 携带它时，解析出的 head
+  不符 → 在任何 fetch/物化**之前**就以 BLOCKED 停下（`_stale()`，trace
+  事件 `expected_head_mismatch`，`contract.build_review_result` 据此上报
+  stale）；且每条"降级回 live checkout"的路径都变成硬 BLOCK —— 钉了快照
+  还静默评错树，比停下更糟。
 - **`pr.post_review` 只发一条 GitHub review + inline thread**，且先把每条发现的位置
   对照已抓取的 diff 校验过 —— **绝不是一串独立评论**。
 - `diff_text` 和 `gate_report` 都可以经 state 注入，因此网络之下的每条路径都可离线测试；
@@ -56,9 +68,12 @@
 `..agent_runtime`。
 
 ## 测试
-`test_pr_steps.py`、`test_push_and_steps.py`、`test_ci_and_repo_map.py`
-（注意：`test_ci_and_repo_map` monkeypatch 的是 `pr.debug._gh`，
-即 `pr.fetch_ci_failures` 绑定 `gh` 的那个子模块）。
+`test_pr_steps.py`（含钉 ref run 域隔离、head 移动检测、stale expected_head
+BLOCK、worktree 分键/拒外来树）、`test_push_and_steps.py`、
+`test_ci_and_repo_map.py`（注意：`test_ci_and_repo_map` monkeypatch 的是
+`pr.debug._gh`，即 `pr.fetch_ci_failures` 绑定 `gh` 的那个子模块）；
+端到端：`test_thin_mcp_server.py`（评审跑在钉住的 worktree 上、head 移动
+在评审前停下）。
 
 ## 重构备注
 拆分**已完成**。各子模块只共享 `._common` 的 helper，所以拆分**没有制造交叉 import**。
