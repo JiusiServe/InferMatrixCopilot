@@ -66,7 +66,14 @@ def repo_path(ctx: StepContext) -> Path | None:
     allowed to remove. Attaching it to *use* covers both, and the call is
     idempotent (a per-process memo), so the repeated hits this accessor takes
     cost one `dict` lookup."""
-    p = ctx.params.get("repo_path") or ctx.state.get("repo_path")
+    spec = ctx.state.get("task_spec")
+    frozen = spec.get("repo_path") if isinstance(spec, dict) else None
+    # Precedence: the step's own param (a playbook pointing one step at a
+    # scratch clone), then run state (which `pr.fetch_diff` overwrites with the
+    # PR-time worktree — a run bound to a checkout still reviews the pinned tree
+    # cut from it), then the spec's frozen path, so a step reached outside the
+    # executor's state seed still agrees with the checkout planning saw.
+    p = ctx.params.get("repo_path") or ctx.state.get("repo_path") or frozen
     if not p:
         return None
     path = Path(p)

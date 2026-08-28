@@ -153,11 +153,11 @@ class Copilot:
             # store's requires-filter (now covering exact-repo playbooks too)
             # skips on None, keeping adapter-less setups v1-compatible
             # instead of silently dropping every playbook with a `requires:`.
-            if self._resolve_repo_path(spec.repo):
+            if self._repo_path_for(spec):
                 return self.planner.resolve(spec, capabilities=None)
             return self.planner.resolve(spec, capabilities=set())
         capabilities = set(adapter.capabilities)
-        if self._resolve_repo_path(spec.repo):  # REPO_PATHS works adapter-less
+        if self._repo_path_for(spec):  # REPO_PATHS works adapter-less
             capabilities.add("repo.path")
         return self.planner.resolve(spec, capabilities=capabilities)
 
@@ -413,7 +413,7 @@ class Copilot:
                          playbook=playbook.name, tier=tier)
             state: dict = {
                 "task_spec": spec.model_dump(),
-                "repo_path": self._resolve_repo_path(spec.repo),
+                "repo_path": self._repo_path_for(spec),
                 "push_policy": PushPolicy(),  # steps may replace with a derived policy
                 "protected_branches": self.settings.protected_branches,
                 "resuming": resuming,
@@ -532,9 +532,20 @@ class Copilot:
         """MCP-only: reserve a run and return its id **without** planning or
         executing (no LLM), so the tool call returns in ms and the caller polls.
         Persists `request.json` (0600) + an initial `queued` `run_status.json`
-        stamped with the owning server; planning happens later in the child."""
-        from .. import run_status as rs
+        stamped with the owning server; planning happens later in the child.
 
+        A `repo_path` on the spec is authorized and canonicalized HERE, so the
+        persisted request names one immutable checkout for the life of the run.
+        The child re-authorizes it anyway — `request.json` is untrusted — but
+        freezing it at reservation is what stops two concurrent per-call repos
+        from racing through shared settings, which is how the deleted
+        `configure_strict_repo` worked."""
+        from .. import run_status as rs
+        from ..mcp_policy import authorize_repo_path
+
+        if spec.repo_path:
+            spec = spec.model_copy(update={"repo_path": authorize_repo_path(
+                spec.repo, spec.repo_path, self.settings)})
         run_id = self._new_run_id()
         run_dir = self.settings.run_root / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
@@ -637,9 +648,25 @@ class Copilot:
         except Exception:
             return None
 
+    def _repo_path_for(self, spec: TaskSpec) -> str:
+        """The checkout THIS spec runs against: its frozen `repo_path` first,
+        else the ambient resolution by alias.
+
+        Every place a run learns its checkout must agree. Resolution derives the
+        `repo.path` capability from this, and `_execute` seeds `state` from it:
+        with an explicit path but no ambient `REPO_PATHS` and no adapter
+        `repo.path`, an alias-only lookup would drop the capability and fail to
+        resolve a playbook that requires it — while a perfectly valid checkout
+        sat in the spec. With both configured and differing, planning would
+        evaluate one checkout and execution would run against another."""
+        return spec.repo_path or self._resolve_repo_path(spec.repo)
+
     def _resolve_repo_path(self, repo: str) -> str:
         """REPO_PATHS first; fall back to the repo's adapter manifest (adapter zero
-        declares repo.path), so runs work even without a .env in reach."""
+        declares repo.path), so runs work even without a .env in reach.
+
+        Alias-only: callers that hold a TaskSpec want `_repo_path_for`, which
+        honors a frozen per-run path."""
         p = self.settings.repo_path(repo)
         if p:
             return str(p)

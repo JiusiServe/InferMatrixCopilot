@@ -129,6 +129,109 @@ def test_capabilities_reports_missing_file_locking():
         "supports_file_locking"] is False
 
 
+# ── per-run repo binding (item 8) ─────────────────────────────────────────────
+def _clone_of(tmp_path: Path, name: str, origin: str) -> Path:
+    """A git checkout whose `origin` is `origin`."""
+    import subprocess
+
+    path = tmp_path / name
+    path.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q", str(path)], check=True)
+    subprocess.run(["git", "-C", str(path), "remote", "add", "origin",
+                    f"https://github.com/{origin}.git"], check=True)
+    return path
+
+
+@pytest.fixture(autouse=True)
+def _no_remote_cache():
+    """`intent._remote_full_name` caches per path for the process; these tests
+    build fresh checkouts at fresh paths but clear it to stay independent."""
+    from infermatrix_copilot import intent
+
+    intent._remote_cache.clear()
+    yield
+    intent._remote_cache.clear()
+
+
+def test_repo_path_must_be_a_checkout_of_the_named_repo(tmp_path, settings):
+    """A root allowlist alone is not enough: an allowed alias paired with a
+    different checkout under the same root would review the wrong repository
+    while every other guard said yes."""
+    from infermatrix_copilot.mcp_policy import PolicyError, authorize_repo_path
+
+    right = _clone_of(tmp_path, "right", "acme/widget")
+    wrong = _clone_of(tmp_path, "wrong", "acme/other")
+    settings.repo_full_names = {"widget": "acme/widget"}
+    settings.mcp_allowed_repo_roots = [str(tmp_path)]
+
+    assert authorize_repo_path("widget", str(right), settings) == str(right)
+    with pytest.raises(PolicyError, match="checkout of acme/other"):
+        authorize_repo_path("widget", str(wrong), settings)
+
+
+def test_repo_path_outside_the_allowed_roots_is_refused(tmp_path, settings):
+    """A genuine clone of the right repo in an arbitrary place is still an
+    operator decision, not a caller's."""
+    from infermatrix_copilot.mcp_policy import PolicyError, authorize_repo_path
+
+    elsewhere = _clone_of(tmp_path / "elsewhere", "widget", "acme/widget")
+    settings.repo_full_names = {"widget": "acme/widget"}
+    settings.mcp_allowed_repo_roots = [str(tmp_path / "allowed")]
+    with pytest.raises(PolicyError, match="outside the allowed roots"):
+        authorize_repo_path("widget", str(elsewhere), settings)
+
+
+def test_repo_path_with_unverifiable_identity_fails_closed(tmp_path, settings):
+    from infermatrix_copilot.mcp_policy import PolicyError, authorize_repo_path
+
+    path = _clone_of(tmp_path, "c", "acme/widget")
+    settings.repo_full_names = {}
+    settings.repo_paths = {}
+    settings.mcp_allowed_repo_roots = [str(tmp_path)]
+    with pytest.raises(PolicyError, match="no known GitHub identity"):
+        authorize_repo_path("widget", str(path), settings)
+
+
+def test_frozen_repo_path_reaches_resolution_and_execution(tmp_path, settings):
+    """The hole a `_common.repo_path` change alone would have left: with no
+    ambient REPO_PATHS and no adapter `repo.path`, an alias-only lookup drops
+    the `repo.path` capability while a perfectly valid checkout sits on the
+    spec."""
+    from infermatrix_copilot.cli.copilot import Copilot
+    from infermatrix_copilot.task_spec import TaskSpec
+
+    checkout = _clone_of(tmp_path, "widget", "acme/widget")
+    settings.repo_paths = {}
+    copilot = Copilot(settings)
+    spec = TaskSpec(kind="pr_review", repo="widget", pr=1,
+                    repo_path=str(checkout))
+    assert copilot._repo_path_for(spec) == str(checkout)
+    assert copilot._resolve_repo_path("widget") == ""  # ambient knows nothing
+
+
+def test_frozen_repo_path_wins_over_a_different_ambient_one(tmp_path, settings):
+    """With both configured, planning must not evaluate one checkout while
+    execution runs against another."""
+    from infermatrix_copilot.cli.copilot import Copilot
+    from infermatrix_copilot.task_spec import TaskSpec
+
+    frozen = _clone_of(tmp_path, "frozen", "acme/widget")
+    ambient = _clone_of(tmp_path, "ambient", "acme/widget")
+    settings.repo_paths = {"widget": str(ambient)}
+    copilot = Copilot(settings)
+    spec = TaskSpec(kind="pr_review", repo="widget", pr=1,
+                    repo_path=str(frozen))
+    assert copilot._repo_path_for(spec) == str(frozen)
+
+
+def test_configure_strict_repo_is_gone(settings):
+    """It mutated process-global `settings.repo_paths` per call, so two
+    concurrent Strict requests could each preflight against the other's repo."""
+    from infermatrix_copilot.mcp_server import CopilotMCP
+
+    assert not hasattr(CopilotMCP, "configure_strict_repo")
+
+
 # ── import direction ──────────────────────────────────────────────────────────
 def test_contract_imports_no_server_module():
     """The servers import down into `contract`, never the reverse. A cycle here

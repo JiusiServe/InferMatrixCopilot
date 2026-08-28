@@ -19,6 +19,8 @@ notion of what is read-only.
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import Any
 
 from .task_spec import FULL_SHA_RE, READ_ONLY_KINDS, TaskSpec
@@ -40,6 +42,61 @@ _REVIEW_DEPTHS = ("auto", "light", "standard", "full")
 
 class PolicyError(ValueError):
     """Raised when a request cannot be reduced to a safe read-only V1 task."""
+
+
+def authorize_repo_path(repo: str, raw_path: Any, settings: Any) -> str:
+    """Canonicalize and authorize a caller-supplied checkout for `repo`, or "".
+
+    Two checks, both required, because either alone leaves a real hole:
+
+    1. **Identity** — the checkout's `origin` must be the alias's configured
+       GitHub identity. A root allowlist alone would let an allowed alias be
+       paired with a *different* checkout sitting under the same root, and the
+       run would review the wrong repository entirely while every other guard
+       said yes.
+    2. **Containment** — the canonical path must sit under an allowed root, so a
+       genuine clone of the right repository in an arbitrary location is still
+       refused. Which clone a bot may point at is an operator's decision.
+
+    Fails closed: an unverifiable identity (no configured full name and no
+    parseable origin) is refused rather than assumed."""
+    if raw_path in (None, ""):
+        return ""
+    if not isinstance(raw_path, str):
+        raise PolicyError(
+            f"repo_path must be a string, got {type(raw_path).__name__}")
+    if settings is None:
+        raise PolicyError("repo_path cannot be authorized without settings")
+
+    path = Path(raw_path).expanduser().resolve()
+    if not path.is_dir() or not (path / ".git").exists():
+        raise PolicyError(f"repo_path is not a Git checkout: {path}")
+
+    from .intent import _remote_full_name, repo_identity
+
+    want = repo_identity(repo, settings)
+    if not want:
+        raise PolicyError(
+            f"repo {repo!r} has no known GitHub identity (set REPO_FULL_NAMES "
+            "or configure its checkout), so an explicit repo_path cannot be "
+            "verified to belong to it")
+    got = _remote_full_name(str(path))
+    if not got:
+        raise PolicyError(
+            f"repo_path {path} has no parseable origin remote, so it cannot be "
+            f"verified as a checkout of {want}")
+    if got.lower() != str(want).lower():
+        raise PolicyError(
+            f"repo_path {path} is a checkout of {got}, not {want}")
+
+    roots = [str(Path(r).expanduser().resolve())
+             for r in (settings.allowed_repo_roots or [])]
+    if not any(str(path) == r or str(path).startswith(r + os.sep)
+               for r in roots):
+        raise PolicyError(
+            f"repo_path {path} is outside the allowed roots {sorted(roots)}; "
+            "set MCP_ALLOWED_REPO_ROOTS to permit it")
+    return str(path)
 
 
 def enforce_mcp_policy(raw: dict[str, Any], *, allowed_repos: list[str],
@@ -105,13 +162,18 @@ def enforce_mcp_policy(raw: dict[str, Any], *, allowed_repos: list[str],
             f"mode {mode!r} is invalid; allowed: ['eco', 'performance']")
 
     expected_head_sha = _full_sha_or_empty(raw.get("expected_head_sha"))
+    # Re-authorized here on BOTH passes by design: the boundary check binds the
+    # request, and the child's check re-derives it from `request.json`, which is
+    # untrusted — a same-user host could rewrite the path between reservation
+    # and execution.
+    repo_path = authorize_repo_path(repo, raw.get("repo_path"), settings)
 
     # Build through the validated model. post is hard-forced False; report_only
     # is irrelevant for READ_ONLY_KINDS (they are read-only unless post), but we
     # normalize it off too for a clean record.
     return TaskSpec(kind=kind, mode=mode, repo=repo, pr=pr, issue=issue,
                     report_only=False, post=False, params=params,
-                    expected_head_sha=expected_head_sha)
+                    expected_head_sha=expected_head_sha, repo_path=repo_path)
 
 
 def enforce_strict_review_policy(raw: dict[str, Any], *,

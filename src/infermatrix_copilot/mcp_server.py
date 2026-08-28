@@ -41,6 +41,7 @@ from .config import Settings
 from .knowledge_docs import KnowledgeDocs, KnowledgeDocsError
 from .mcp_policy import (
     PolicyError,
+    authorize_repo_path,
     enforce_mcp_policy,
     enforce_strict_review_policy,
 )
@@ -128,6 +129,11 @@ class CopilotMCP:
         env["DEFAULT_REPO"] = self.settings.default_repo
         env["REPO_PATHS"] = json.dumps(self.settings.repo_paths)
         env["REPO_FULL_NAMES"] = json.dumps(self.settings.repo_full_names)
+        # The child re-authorizes the request's `repo_path`, so it must judge it
+        # against the SAME roots and identities this server did — otherwise the
+        # re-check silently validates against different config than the parent.
+        env["MCP_ALLOWED_REPO_ROOTS"] = json.dumps(
+            self.settings.allowed_repo_roots)
         popen_kwargs: dict[str, Any] = {}
         if os.name == "nt":
             # Codex/Claude launch the MCP server over stdio.  Without a new
@@ -178,20 +184,14 @@ class CopilotMCP:
         self._q.put((run_id, True))
         return run_id
 
-    def configure_strict_repo(self, repo: str, repo_path: str = "") -> None:
-        """Apply an explicit per-call checkout before Strict preflight."""
-        if not repo_path:
-            return
-        path = Path(repo_path).expanduser().resolve()
-        if not path.is_dir() or not (path / ".git").exists():
-            raise ValueError(f"repo_path is not a Git checkout: {path}")
-        self.settings.repo_paths = {
-            **self.settings.repo_paths,
-            repo: str(path),
-        }
+    def strict_readiness(self, repo: str, repo_path: str = "") -> list[str]:
+        """Return actionable setup gaps before reserving a Strict run.
 
-    def strict_readiness(self, repo: str) -> list[str]:
-        """Return actionable setup gaps before reserving a Strict run."""
+        `repo_path` validates THAT explicit checkout. The deleted
+        `configure_strict_repo` used to mutate `settings.repo_paths` so this
+        method would see it — process-global state written per call, so two
+        concurrent Strict requests for different checkouts could each preflight
+        against the other's."""
         missing = []
         # Backend selection is EXPLICIT for Strict (doc/RFC-provider-registry
         # .md): unset refuses with the exact fix, never falls back silently.
@@ -224,7 +224,14 @@ class CopilotMCP:
                     gap = transport.auth_gap()
                     if gap:
                         missing.append(gap)
-        repo_path = self.copilot._resolve_repo_path(repo)
+        if repo_path:
+            try:
+                repo_path = authorize_repo_path(repo, repo_path, self.settings)
+            except PolicyError as exc:
+                missing.append(str(exc))
+                repo_path = ""
+        else:
+            repo_path = self.copilot._resolve_repo_path(repo)
         if not repo_path or not Path(repo_path).is_dir():
             missing.append(
                 f"checkout for {repo!r} missing; run the installer with "

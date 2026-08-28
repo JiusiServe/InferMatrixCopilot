@@ -905,6 +905,7 @@ def _strict_review_request(
     review_depth: str,
     settings: Settings,
     expected_head_sha: str = "",
+    repo_path: str = "",
 ) -> dict:
     """Translate the Strict public surface to the internal review TaskSpec."""
     target = str(target).strip()
@@ -943,6 +944,10 @@ def _strict_review_request(
         # carried as a first-class field, not a param: the policy gate validates
         # it as a full 40-hex sha and refuses anything else
         request["expected_head_sha"] = str(expected_head_sha).strip().lower()
+    if repo_path:
+        # rides on the request so it is frozen per run, rather than written into
+        # process-global settings where a concurrent call would see it
+        request["repo_path"] = str(repo_path)
     return request
 
 
@@ -1135,9 +1140,9 @@ def build_mcp(
             strict_started = time.perf_counter()
             request = _strict_review_request(
                 target, repo, post=post, review_depth=review_depth,
-                settings=core.settings, expected_head_sha=expected_head_sha)
-            core.configure_strict_repo(request["repo"], repo_path)
-            missing = core.strict_readiness(request["repo"])
+                settings=core.settings, expected_head_sha=expected_head_sha,
+                repo_path=repo_path)
+            missing = core.strict_readiness(request["repo"], repo_path)
             if missing:
                 raise ValueError(
                     "Strict mode is not ready: " + "; ".join(missing)

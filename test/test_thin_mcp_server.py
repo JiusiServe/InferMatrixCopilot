@@ -61,10 +61,8 @@ def _fake_mcp(monkeypatch):
             self.requests.append(request)
             return "run-20260730-120000-abc123"
 
-        def configure_strict_repo(self, repo, repo_path=""):
+        def strict_readiness(self, repo, repo_path=""):
             self.repo_configurations.append((repo, repo_path))
-
-        def strict_readiness(self, repo):
             return []
 
         def get_result(self, run_id, offset=0):
@@ -746,7 +744,7 @@ def test_strict_does_not_post_by_default(monkeypatch):
 
 def test_strict_reports_setup_gaps_before_starting(monkeypatch):
     mcp, core = _fake_mcp(monkeypatch)
-    core.strict_readiness = lambda repo: [
+    core.strict_readiness = lambda repo, repo_path="": [
         "model credential missing",
         "checkout missing",
     ]

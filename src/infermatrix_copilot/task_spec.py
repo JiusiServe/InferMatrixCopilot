@@ -61,6 +61,10 @@ class TaskSpec(BaseModel):
     # Snapshot binding: when set, the run must review exactly this head or stop
     # as stale. Inert data — it narrows what a run accepts, never what it may do.
     expected_head_sha: str = ""
+    # The canonical checkout this run is bound to, frozen at reservation and
+    # authorized by `mcp_policy.authorize_repo_path`. Empty means "resolve from
+    # ambient settings", which is every CLI run.
+    repo_path: str = ""
 
     @field_validator("expected_head_sha")
     @classmethod
