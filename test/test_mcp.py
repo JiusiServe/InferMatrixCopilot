@@ -293,6 +293,32 @@ def test_strict_readiness_reports_setup_gaps(settings):
     assert any("pr-review playbook missing" in item for item in missing)
 
 
+def test_strict_reservation_reports_idempotent_reuse_accurately(
+        settings, monkeypatch):
+    core = _core(settings)
+    queued = []
+    monkeypatch.setattr(core._q, "put", queued.append)
+    monkeypatch.setattr(
+        core.copilot,
+        "reserve_run",
+        lambda *_args, **_kwargs: ("run-20260829-010101-abcdef", False),
+    )
+
+    run_id, created = core.reserve_strict_review({
+        "kind": "pr_review",
+        "repo": "vllm-omni",
+        "pr": 7,
+        "post": False,
+        "params": {"review_depth": "standard"},
+        "expected_head_sha": "a" * 40,
+        "idempotency_key": "attempt-1",
+    })
+
+    assert run_id == "run-20260829-010101-abcdef"
+    assert created is False
+    assert queued == []
+
+
 def test_strict_readiness_requires_explicit_backend(settings, monkeypatch):
     # doc/features/provider-registry.md: selection is explicit — unset refuses
     # with the exact fix, never a silent api fallback

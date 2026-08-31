@@ -1,28 +1,34 @@
 # contract.py —— 规范
 
-<!-- verified-against: 2026-08-28 -->
+<!-- verified-against: 2026-08-31 -->
 
-`LOC ~181 · 跨仓库公开契约面 · refactor-status: ok`
+`LOC ~185 · 旧版跨仓库契约兼容层 · refactor-status: compatibility-shim`
 
 ## 职责
-本 copilot 的**对外消费契约**：一个 review bot（或任何宿主）被允许 import 的
-一切都住在这里，此外的任何 import 都不受支持。它的存在源于一次真实事故：
+本 copilot 的**旧版对外消费契约兼容层**。新宿主只允许 import
+`infermatrix_copilot.sdk.v1`；本模块继续服务既有 MCP 与尚未迁移的调用者。
+它的存在源于一次真实事故：
 下游仓库曾经用 `importlib` 伸进 `thin_mcp_server` 拿四个 `_direct_*` 私有名，
 一次重命名就让另一个仓库在运行期断裂、且没有任何构建期信号。
 
 ## 公开契约（`__all__`）
-`DIRECT_API_VERSION` / `STRICT_API_VERSION`（`"1.0.0"`，形状变化到消费方
-必须察觉时递增）；`capabilities(max_strict_workers=1,
-supports_file_locking=True) -> dict`（版本/能力握手：`supports_expected_head`、
+`SDK_API_VERSION` / `DIRECT_API_VERSION` / `STRICT_API_VERSION` /
+`KNOWLEDGE_API_VERSION`（当前均为 `"1.0.0"`，且都从 `sdk.v1.models`
+取唯一值）。`capabilities(max_strict_workers=1,
+supports_file_locking=True) -> dict` 委托 SDK typed handshake 再投影为兼容
+dict；它包含 distribution/SDK/Direct/Strict/Knowledge 版本、resource
+revision、supported repositories，以及 `supports_expected_head`、
 `supports_structured_result`、`supports_post_false`、`supports_file_locking`、
-`max_strict_workers`）；`build_review_result(run_dir) -> dict`（结构化评审
+`supports_idempotent_strict_start`、`supports_knowledge_curation`、
+`max_strict_workers`。其余兼容导出包括 `build_review_result(run_dir) -> dict`（结构化评审
 结果：`contract_version`、`run_id`、`state`、`reviewed_head_sha`、`verdict`、
 `summary_markdown`、`comments`、`stale`/`expected_head_sha`/
 `actual_head_sha`、`diagnostics`）；`unknown_run_result(run_id)`（显式
 `state: unknown`，绝不抛错 —— 丢响应和还在跑必须可区分）；
 `sanitize_comments` 与 `COMMENT_FIELDS`；以及从 `direct_routing` 再导出的
 `direct_knowledge_routes` / `direct_execution_budget` /
-`direct_completion_result` / `direct_mandatory_review_guides`。
+`direct_completion_result` / `direct_mandatory_review_guides` / 完整的
+`direct_review_plan`。
 
 ## 不变量
 - **依赖方向单向、由测试钉住**：本模块 import 数据层（`run_status`、
@@ -38,6 +44,8 @@ supports_file_locking=True) -> dict`（版本/能力握手：`supports_expected_
   （`_verified`、`corroborated_by` 等）绝不泄进消费方输出。
 - 本模块自身保持仓库中立；仓库专属的 Direct 路由表住在
   `direct_routing.py`（见其页）。
+- 能力身份的权威实现在 `sdk.v1.get_capabilities`；这里不维护第二份版本或
+  resource-revision 算法。
 
 ## 边界 —— 不属于这里
 不调模型、不执行 run、不做策略强制（`mcp_policy`）、不实现 Direct 路由

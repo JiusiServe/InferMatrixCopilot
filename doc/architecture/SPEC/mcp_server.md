@@ -1,8 +1,8 @@
 # mcp_server.py —— 规范
 
-<!-- verified-against: 2026-08-28 -->
+<!-- verified-against: 2026-08-31 -->
 
-`LOC ~496 · Strict 后台机器（start/poll） · refactor-status: ok`
+`LOC ~506 · Strict 后台机器（reserve/start/poll） · refactor-status: ok`
 
 ## 职责
 为 MCP 宿主运行 Strict 工作流：预约、拉起、跟踪、供给结果 ——
@@ -19,7 +19,9 @@
 `get_capabilities()`（包 `contract.capabilities`，含
 `MAX_STRICT_WORKERS=1` 与文件锁能力上报）。`start_review` 接受
 `expected_head_sha`；`start_strict_review` 接受 `idempotency_key` 并把
-`(run_id, created)` 语义（见下）落到入队决定上。
+`(run_id, created)` 语义（见下）落到入队决定上。新增内部
+`reserve_strict_review` 原样返回该 tuple，供 typed SDK 准确报告幂等复用；
+`start_strict_review` 继续只返 `run_id`，保持 MCP/既有调用兼容。
 
 ## 不变量（**C2**、**C3**、**E1**）
 - **安全是结构性的，不是"信任宿主"。** `enforce_mcp_policy` 在这里跑一次，

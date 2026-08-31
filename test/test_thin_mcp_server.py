@@ -825,8 +825,8 @@ def test_every_routed_page_yields_a_quick_map():
 
 def test_missing_quick_map_fails_closed_at_runtime(tmp_path, monkeypatch):
     """The conformance test above only covers the shipped tree.
-    INFERMATRIX_KNOWLEDGE_DIR can point anywhere, so the runtime must degrade to
-    "open the page" rather than emit an empty map."""
+    Explicit compatibility/test paths must degrade to "open the page" rather
+    than emit an empty map."""
     from infermatrix_copilot import thin_mcp_server as tms
 
     page = tmp_path / "rules.md"

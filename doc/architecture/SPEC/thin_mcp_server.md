@@ -1,8 +1,8 @@
 # thin_mcp_server.py —— 规范
 
-<!-- verified-against: 2026-08-28 -->
+<!-- verified-against: 2026-08-31 -->
 
-`LOC ~627 · 默认 MCP：Direct 门面 + Strict 入口 · refactor-status: ok`
+`LOC ~490 · 默认 MCP：Direct 门面 + Strict 入口 · refactor-status: ok`
 
 ## 职责
 安装器**实际注册**的那个 MCP 门面：以**零模型**提供 Direct 模式的知识路由，
@@ -20,7 +20,8 @@
 - **Direct 在这个 server 里不跑任何模型。** 它返回知识路由和一份治理契约；阅读由
   **宿主自己的模型**完成。执行主脊完全不参与。
 - **路由表与机制已迁出**（上一版预告的拆分点已经发生）：`_direct_*` 全家
-  现在**住在 `direct_routing.py`**、经 `contract.py` 作为公开面再导出；
+  现在**住在 `direct_routing.py`**、完整 bundle 由 `direct_review_plan`
+  生成、经 `contract.py` 作为兼容公开面再导出；
   本模块以下划线别名 import 它们，保持既有调用点/测试不变，**只向下**
   委托 —— 没有任何东西从那两个模块向上 import 回 server。下面关于
   quick-map fail-closed、路由不静默替换、仓库守卫先跑的不变量**仍然为真**，
@@ -77,6 +78,7 @@ stdlib + `mcp` extra + `.direct_routing`（下划线别名 re-import）+
 
 ## 重构备注
 拆分**已发生**（→ `contract.py` / `direct_routing.py`，约 1420 → 627 行）；
-留在这里的是 Strict 桥接、checklist/progress 常量与工具接线本身。
+留在这里的是 Strict 桥接与工具接线；checklist/progress 已随完整 policy bundle
+迁到 `direct_routing`，避免 MCP 和 Python SDK 各拼一份协议。
 拆分保住了"server 不跑模型"—— 它仍是 Direct 模式的产品承诺；
 后续增长优先落到 `direct_routing`/adapter 数据面，不回到这里。

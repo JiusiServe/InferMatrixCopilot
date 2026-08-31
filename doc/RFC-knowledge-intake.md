@@ -1,11 +1,14 @@
 # RFC — Knowledge intake: merged-PR and bugfix learnings return as reviewed knowledge PRs
 
-- Status: implemented, shadow-first and default-off — copilot side in
-  PR #110 (`pr.harvest_debug_knowledge`), reviewbot side in
-  zuiho-kai/omni-reviewbot#21 (intake ledger) and #22 (daily distiller)
-- Owner: knowledge plane (`knowledge/`, `AGENTS.md` contract) on this side;
-  `omni_reviewbot.knowledge_intake` / `knowledge_distiller` on the bot side
+- Status: implemented, shadow-first and default-off — producer intake in
+  PR #110 (`pr.harvest_debug_knowledge`), provider domain contract in public
+  SDK 0.2.0 (`infermatrix_copilot.sdk.v1.KnowledgeCurator`), and ReviewBot
+  orchestration in zuiho-kai/omni-reviewbot#21/#22
+- Owner: this repo uniquely owns knowledge policy, catalog/prompt/proposal/apply
+  semantics and validators; ReviewBot owns evidence/model/Git/ledger/publication
+  orchestration and consumes the versioned public SDK only
 - Evidence: `test/test_knowledge_harvest.py` (step + executor/resume e2e),
+  `test/test_sdk_knowledge_v1.py` (provider boundary, rollback and locking),
   reviewbot `tests/test_knowledge_intake.py`, `tests/test_knowledge_distiller.py`,
   `tests/test_e2e_knowledge_flow.py` (cross-repo contract pinned)
 
@@ -54,23 +57,29 @@ Three stages, deliberately decoupled so each can fail without losing events.
 
 ### 2. Distillation (expensive, at most once a day)
 
-- The model **only proposes**: it reads a dedicated work clone of this repo
-  (never the live checkout the Direct bridge imports) and returns
-  catalog-constrained structured output — target `rules.md` page from the
-  scanned catalog, a new auditable rule id, one complete section in the
-  page's own language and format, cited sources. Source events are fenced
-  as `<untrusted_data>`; instructions never come from them.
-- Code **applies mechanically and append-only**: new sections plus an
-  `updated:` frontmatter bump. Existing sections are never rewritten —
-  merging and pruning stay human/curator work. Proposals that miss the
-  catalog, collide with an existing rule id, or fail shape checks are
-  dropped and counted.
-- The **validators are the gate**: `check_knowledge_tree.py` and
-  `check_wiki_lint.py` run in the clone; a failure — or a missing
-  validator — fails the batch closed. Rows stay `pending` and retry on the
-  next daily batch, bounded by an attempt cap that parks poison rows
-  visibly as `error`. The vllm-omni release audit runs in CI on the PR, as
-  it does for any knowledge edit.
+- ReviewBot converts pending rows into typed `KnowledgeEvidenceEvent` values
+  and one bounded `KnowledgeEvidenceBatch`. It creates `KnowledgeCurator`
+  over a dedicated work clone of this repo — never the immutable knowledge
+  resources shipped inside the runtime wheel — then asks the SDK to build the catalog-constrained
+  prompt and strict JSON schema. ReviewBot invokes the configured model; the
+  model **only proposes**.
+- The SDK treats all source events and model output as untrusted. Evidence is
+  fenced as `<untrusted_data>`; catalog membership, proposal shape, rule ID,
+  one complete heading, source citations, duplicate IDs and target-page SHA
+  are checked mechanically. Accepted proposals receive content-addressed IDs;
+  rejected model indexes and stable reasons are returned to the host.
+- `KnowledgeCurator.apply()` **applies mechanically and append-only**: complete
+  new sections plus the one `updated:` frontmatter bump. Existing sections are
+  never rewritten. The SDK serializes writers across threads/processes and
+  rechecks target SHAs after acquiring the lock, so a stale daily worker cannot
+  overwrite a concurrent edit.
+- The **validators are the gate**: the SDK runs exactly
+  `check_knowledge_tree.py`, then `check_wiki_lint.py`, inside the clone. A
+  missing validator fails before any write; a failed, timed-out or unlaunchable
+  validator restores every target page byte-for-byte and raises a typed error.
+  ReviewBot leaves rows `pending` for retry, bounded by its attempt cap. The
+  vllm-omni release audit additionally runs in CI on the PR, as for any
+  knowledge edit.
 
 ### 3. Publication (fork-based, double-gated)
 
@@ -100,9 +109,13 @@ Three stages, deliberately decoupled so each can fail without losing events.
   branch recovery was considered and skipped: it trades real complexity
   for saving one day of latency on an already-daily loop.
 
-## The cross-repo contract
+## The cross-repo contracts
 
-The drop record is the only coupling between the two repos:
+There are two narrow, versioned seams; neither repo imports the other's private
+modules.
+
+The first is the producer drop record written by a Copilot run and consumed by
+ReviewBot:
 
 ```json
 {"run_id": "...", "repo": "owner/repo", "pr": 123, "kind": "bugfix_run",
@@ -122,6 +135,33 @@ The drop record is the only coupling between the two repos:
   side's test but not the other's; the contract therefore changes only in
   lockstep, with this section as the reference.
 
+The second is the installed public Python SDK used by ReviewBot's adapter. The
+call order is deliberately small:
+
+```python
+curator = KnowledgeCurator(dedicated_clone)
+batch = KnowledgeEvidenceBatch(...)
+prompt = curator.build_prompt(batch)
+model_json = reviewbot_model_call(
+    prompt, output_schema=curator.proposal_schema(max_rules=batch.max_rules)
+)
+validation = curator.validate_proposals(model_json, batch)
+result = curator.apply(validation)
+```
+
+All values crossing that seam have lossless `to_dict()` projections and contain
+document IDs, never provider absolute paths. ReviewBot uses `accepted_indexes`
+and `rejected_indexes` to account for model rows. Malformed requests raise
+`InvalidRequestError`; catalog/integrity/stale-writer failures raise
+`KnowledgeCurationError`; validator failures raise `KnowledgeValidatorError`
+whose `.result` records validator status/output and whether bytes were rolled
+back. ReviewBot catches these public errors and owns retry/artifact decisions.
+
+The SDK explicitly has no clone, model, ledger, commit, push, pull-request or
+scheduling operation. Conversely, ReviewBot has no local catalog/prompt/parser/
+apply/validator implementation: knowledge policy changes are released here and
+adopted by pinning a new wheel version.
+
 ## Fit with this repo's invariants
 
 - **Repo neutrality**: the harvest step contains no repo literal; the drop
@@ -132,6 +172,9 @@ The drop record is the only coupling between the two repos:
 - **Read-wide/write-narrow**: the tree is still written only by humans
   merging PRs; the automation's write surface is a drop directory and a
   fork.
+- **Single policy owner**: knowledge domain rules live behind this repo's
+  public SDK; the ReviewBot adapter is orchestration-only. Runtime state and
+  publication credentials never flow into the provider library.
 
 ## Alternatives considered
 
@@ -141,10 +184,13 @@ The drop record is the only coupling between the two repos:
 - **Direct writes to the tree (or pushing to this repo)** — rejected
   outright: it deletes the human promotion step the knowledge plane is
   built on, and would require granting the bot write access here.
-- **Copilot-hosted distiller** — this repo has no daemon; the reviewbot
-  already runs a poll loop with maintenance gating, budgets, and crash
-  recovery, so the scheduled half lives there and this repo stays a
-  library plus one playbook step.
+- **Copilot-hosted daemon/orchestrator** — rejected: this repo has no daemon;
+  ReviewBot already runs a poll loop with maintenance gating, budgets and crash
+  recovery. **Copilot-owned domain library** is the chosen split: policy stays
+  beside the governed knowledge tree without moving scheduling or publication.
+- **Duplicated distillation helpers in ReviewBot** — rejected: catalog, prompt,
+  validation and append logic would drift independently from `knowledge/`
+  governance. The versioned SDK makes that dependency explicit and testable.
 - **Stopping at skill candidates / debug memory** — that is where learnings
   already go today; both are run-scoped proposals with no path into the
   human-curated tree. This design is that missing path, not a replacement
@@ -152,15 +198,19 @@ The drop record is the only coupling between the two repos:
 
 ## Rollout
 
-1. Reviewbot: `KNOWLEDGE_INTAKE_ENABLED=true` — merged-PR recording plus
-   daily shadow batches; inspect artifacts and `knowledge-batch` output.
-2. Wire the bugfix channel: point this repo's `KNOWLEDGE_INTAKE_DIR` and
+1. Build and pin InferMatrixCopilot SDK `0.2.0` in ReviewBot; its adapter must
+   import only `infermatrix_copilot.sdk.v1` and exercise the full call order in
+   a temp-clone integration test.
+2. ReviewBot: `KNOWLEDGE_INTAKE_ENABLED=true` — merged-PR recording plus daily
+   shadow batches; inspect typed curation results, artifacts and
+   `knowledge-batch` output.
+3. Wire the bugfix channel: point this repo's `KNOWLEDGE_INTAKE_DIR` and
    the reviewbot's `COPILOT_INTAKE_DIR` at the **same directory** (v1
    assumes a shared host). Without this pair, everything else works but
    `pr_debug` learnings are silently absent from batches — both values
    default to empty/off.
-3. Create the bot's fork of this repo; set `KNOWLEDGE_FORK_SLUG`.
-4. `KNOWLEDGE_PR_ENABLED=true` under `POST_MODE=review` — PRs start; every
+4. Create the bot's fork of this repo; set `KNOWLEDGE_FORK_SLUG`.
+5. `KNOWLEDGE_PR_ENABLED=true` under `POST_MODE=review` — PRs start; every
    one is reviewed like any other knowledge edit.
 
 Rollback at any stage is turning the flag off; nothing in the tree changes

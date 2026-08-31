@@ -66,7 +66,63 @@ jobs:
           /tmp/clean/bin/pip install --quiet dist/*.whl
           cd /tmp   # import the INSTALLED package, never the source checkout
           /tmp/clean/bin/python - <<'PY'
+          import importlib.metadata
+          import importlib.resources
           import sys
+          import tempfile
+          from pathlib import Path
+          from infermatrix_copilot import __version__
+          from infermatrix_copilot.sdk.v1 import (
+              ChangedPath, DirectClient, DirectReviewRequest,
+              KNOWLEDGE_API_VERSION,
+              KnowledgeCurator, KnowledgeEvidenceBatch,
+              KnowledgeEvidenceEvent, RepositoryRef, StrictRuntime,
+              get_capabilities,
+          )
+          forbidden = {
+              "infermatrix_copilot.config",
+              "infermatrix_copilot.contract",
+              "infermatrix_copilot.direct_routing",
+              "infermatrix_copilot.mcp_server",
+          }
+          loaded = sorted(forbidden.intersection(sys.modules))
+          if loaded:
+              sys.exit(f"public SDK import loaded private implementation: {loaded}")
+          caps = get_capabilities()
+          dist_version = importlib.metadata.version("infermatrix-copilot")
+          if not (__version__ == dist_version == caps.distribution_version == "0.2.0"):
+              sys.exit(
+                  "version mismatch: "
+                  f"module={__version__}, metadata={dist_version}, "
+                  f"capabilities={caps.distribution_version}"
+              )
+          if not caps.resource_revision.startswith("sha256:"):
+              sys.exit("SDK capabilities have no resource revision")
+          if not caps.supports_knowledge_curation:
+              sys.exit("SDK capabilities omit knowledge curation")
+          if not (
+              caps.knowledge_api_version == KNOWLEDGE_API_VERSION == "1.0.0"
+          ):
+              sys.exit("installed SDK knowledge API version mismatch")
+          if KnowledgeCurator.proposal_schema(max_rules=3)["properties"][
+              "rules"
+          ]["maxItems"] != 3:
+              sys.exit("installed SDK has a broken knowledge proposal schema")
+          evidence = KnowledgeEvidenceBatch(
+              batch_id="wheel-smoke",
+              repository=RepositoryRef(alias="vllm-omni"),
+              events=(KnowledgeEvidenceEvent(
+                  event_id="event-1", source_kind="merged_pr",
+                  source_reference="PR #1", title="wheel smoke",
+              ),),
+          )
+          if evidence.to_dict()["events"][0]["event_id"] != "event-1":
+              sys.exit("installed SDK knowledge models are not serializable")
+          if not importlib.resources.files("infermatrix_copilot").joinpath(
+              "py.typed"
+          ).is_file():
+              sys.exit("wheel does not ship py.typed")
+
           from infermatrix_copilot.config import _resource_dir, _RESOURCE_MARKERS
           # resolve through the production probe and require its marker to exist:
           # a present-but-empty directory would satisfy a bare is_dir() check
@@ -79,6 +135,33 @@ jobs:
                   bad.append(f"{name}: {d} has no {marker}")
           if bad:
               sys.exit("wheel runtime data broken: " + "; ".join(bad))
+          client = DirectClient()
+          for repo, changed in (
+              ("vllm-omni", "vllm_omni/core/sched/scheduler.py"),
+              ("afd-plugin", "afd_plugin/compat/vllm.py"),
+          ):
+              plan = client.plan(DirectReviewRequest(
+                  review_id="wheel-smoke",
+                  repository=RepositoryRef(alias=repo),
+                  pr_number=1,
+                  expected_head_sha="a" * 40,
+                  title="runtime change",
+                  body="exercise the installed SDK",
+                  changed_paths=(ChangedPath(changed),),
+              ))
+              if not plan.knowledge_routes:
+                  sys.exit(f"installed SDK did not route {repo}")
+              if any("/" == ref.document.document_id[:1]
+                     for ref in plan.knowledge_routes):
+                  sys.exit("installed SDK leaked an absolute document path")
+              if Path(plan.navigation_policy["fallback_document_id"]).is_absolute():
+                  sys.exit("installed SDK leaked an absolute fallback path")
+          with tempfile.TemporaryDirectory() as run_root:
+              with StrictRuntime(settings_overrides={
+                  "_env_file": None, "run_root": run_root,
+              }) as strict:
+                  if strict.capabilities().distribution_version != "0.2.0":
+                      sys.exit("Strict facade capabilities mismatch")
           print("packaged runtime data resolves via _resource_dir:",
                 ", ".join(_RESOURCE_MARKERS))
           PY
