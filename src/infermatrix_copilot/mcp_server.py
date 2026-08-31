@@ -44,6 +44,7 @@ from .mcp_policy import (
     PolicyError,
     authorize_repo_path,
     enforce_mcp_policy,
+    enforce_quality_review_policy,
     enforce_strict_review_policy,
 )
 from .task_spec import READ_ONLY_KINDS
@@ -221,6 +222,23 @@ class CopilotMCP:
             self._q.put((run_id, True))
         return run_id, created
 
+    def start_quality_review(self, spec_dict: dict) -> str:
+        """Reserve the dedicated, idempotent PR quality workflow."""
+        run_id, _created = self.reserve_quality_review(spec_dict)
+        return run_id
+
+    def reserve_quality_review(self, spec_dict: dict) -> tuple[str, bool]:
+        """Reserve quality work and report whether this call created it."""
+        spec = enforce_quality_review_policy(
+            spec_dict, allowed_repos=self.settings.mcp_allowed_repos,
+            settings=self.settings)
+        run_id, created = self.copilot.reserve_run(
+            spec, owner_server_id=self.server_id, owner_server_pid=self.pid,
+            idempotency_key=str(spec_dict.get("idempotency_key") or ""))
+        if created:
+            self._q.put((run_id, False))
+        return run_id, created
+
     def strict_readiness(self, repo: str, repo_path: str = "") -> list[str]:
         """Return actionable setup gaps before reserving a Strict run.
 
@@ -282,6 +300,18 @@ class CopilotMCP:
             )
         return missing
 
+    def quality_readiness(self, repo: str, repo_path: str = "") -> list[str]:
+        """Return setup gaps for the quality workflow and its model backend."""
+        missing = [
+            item for item in self.strict_readiness(repo, repo_path)
+            if "packaged pr-review playbook" not in item
+        ]
+        if self.copilot.store.get("pr-quality") is None:
+            missing.append(
+                "packaged pr-quality playbook missing; reinstall "
+                "InferMatrixCopilot")
+        return missing
+
     # -- poll -----------------------------------------------------------------
     def get_status(self, run_id: str) -> dict:
         """Lazy-reconcile then return `run_status.json` + `progress.json` (when
@@ -337,6 +367,28 @@ class CopilotMCP:
             out["next_offset"] = nxt if nxt < len(text) else None
         else:
             out.update(report=None, report_path=None, next_offset=None)
+        return out
+
+    def get_quality_result(self, run_id: str) -> dict:
+        """Poll one quality run, returning its dedicated typed contract."""
+        run_dir = self.copilot._contained_run_dir(run_id, must_exist=False)
+        if not run_dir.exists():
+            return {
+                "run_id": run_id,
+                "state": "unknown",
+                "note": "",
+                "result": contract.unknown_quality_result(run_id),
+            }
+        rs.reconcile_if_dead(run_dir, self.run_root)
+        status = rs.read_status(run_dir) or {}
+        state = status.get("state")
+        out: dict[str, Any] = {
+            "run_id": run_id,
+            "state": state,
+            "note": status.get("note", ""),
+        }
+        if state in rs.TERMINAL:
+            out["result"] = contract.build_quality_result(run_dir)
         return out
 
     def list_playbooks(self) -> dict:

@@ -12,11 +12,13 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field, field_validator
 
 TaskKind = Literal[
-    "repo_rebase", "pr_rebase", "pr_debug", "pr_review", "issue_answer", "issue_filter",
-    "repo_profile",
+    "repo_rebase", "pr_rebase", "pr_debug", "pr_review", "pr_quality",
+    "issue_answer", "issue_filter", "repo_profile",
 ]
 
-READ_ONLY_KINDS: frozenset[str] = frozenset({"pr_review", "issue_answer", "issue_filter"})
+READ_ONLY_KINDS: frozenset[str] = frozenset({
+    "pr_review", "pr_quality", "issue_answer", "issue_filter",
+})
 
 # blast-radius tier per kind (design §3.2): L0 reuse-locked, L1 adapt-vetted, L2 generate
 KIND_TIER: dict[str, str] = {
@@ -24,6 +26,7 @@ KIND_TIER: dict[str, str] = {
     "pr_rebase": "L1",
     "pr_debug": "L1",
     "pr_review": "L2",
+    "pr_quality": "L2",
     "issue_answer": "L2",
     "issue_filter": "L2",
     # profile establishment reads the target repo but writes knowledge

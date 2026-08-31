@@ -1,6 +1,6 @@
 # task_spec.py —— 规范
 
-<!-- verified-against: 2026-08-28 -->
+<!-- verified-against: 2026-08-31 -->
 
 `LOC ~104 · 任务层，纯数据 · refactor-status: ok`
 
@@ -14,7 +14,8 @@
 ## 公开契约
 `TaskSpec(kind, repo, pr?, issue?, report_only, post, params,
 expected_head_sha?, repo_path?)`；property `tier`、`read_only`、
-`confirm_required`；`describe()`。常量：`TaskKind`（7 种 kind）、
+`confirm_required`；`describe()`。常量：`TaskKind`（8 种 kind，含只读的
+`pr_quality`）、
 `READ_ONLY_KINDS`、`KIND_TIER`、`FULL_SHA_RE`（40 位十六进制全长 SHA 的
 唯一真相正则，`mcp_policy.py` 复用它校验）。
 

@@ -13,10 +13,10 @@
 
 ## 公开契约（`__all__`）
 `SDK_API_VERSION` / `DIRECT_API_VERSION` / `STRICT_API_VERSION` /
-`KNOWLEDGE_API_VERSION`（当前均为 `"1.0.0"`，且都从 `sdk.v1.models`
+`QUALITY_API_VERSION` / `KNOWLEDGE_API_VERSION`（当前均为 `"1.0.0"`，且都从 `sdk.v1.models`
 取唯一值）。`capabilities(max_strict_workers=1,
 supports_file_locking=True) -> dict` 委托 SDK typed handshake 再投影为兼容
-dict；它包含 distribution/SDK/Direct/Strict/Knowledge 版本、resource
+dict；它包含 distribution/SDK/Direct/Strict/Quality/Knowledge 版本、resource
 revision、supported repositories，以及 `supports_expected_head`、
 `supports_structured_result`、`supports_post_false`、`supports_file_locking`、
 `supports_idempotent_strict_start`、`supports_knowledge_curation`、
@@ -29,6 +29,10 @@ revision、supported repositories，以及 `supports_expected_head`、
 `direct_knowledge_routes` / `direct_execution_budget` /
 `direct_completion_result` / `direct_mandatory_review_guides` / 完整的
 `direct_review_plan`。
+质量面另有 `build_quality_result` / `unknown_quality_result`：返回
+`reviewed_head_sha`、`ready|concerns|needs_rework`、置信度、摘要及白名单化的
+`criterion/evidence/path/line` reasons；能力握手暴露
+`quality_api_version` 与 `supports_quality_review`。
 
 ## 不变量
 - **依赖方向单向、由测试钉住**：本模块 import 数据层（`run_status`、

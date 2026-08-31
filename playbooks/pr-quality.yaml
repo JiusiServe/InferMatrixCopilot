@@ -1,0 +1,19 @@
+# Fast, read-only review-readiness assessment for automation consumers.
+# Mechanical signals supplied by a caller are hints only; the LLM must ground
+# its decision in the exact head's context and diff.
+name: pr-quality
+version: 1
+status: active
+provenance:
+  created_by: human
+  source: dedicated quality workflow for omni-reviewbot
+task_kinds: [pr_quality]
+repos: []
+requires: [repo.path]
+params:
+  deterministic_signals: "optional bounded list of fallible rule hints"
+steps:
+  - {id: fetch, step: pr.fetch_diff}
+  - {id: assess, step: agent.assess_pr_quality}
+  - {id: report, step: report.final_summary}
+success: structured, head-bound review-readiness verdict; never posts

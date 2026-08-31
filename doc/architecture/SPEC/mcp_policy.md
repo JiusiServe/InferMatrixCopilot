@@ -1,6 +1,6 @@
 # mcp_policy.py —— 规范
 
-<!-- verified-against: 2026-08-28 -->
+<!-- verified-against: 2026-08-31 -->
 
 `LOC ~254 · 安全原语（MCP 结构性门） · refactor-status: ok`
 
@@ -12,6 +12,8 @@
 `enforce_mcp_policy(raw) -> TaskSpec`（拒绝时抛错）；
 `enforce_strict_review_policy(raw) -> TaskSpec`（Strict 兼容路径：限
 `pr_review`、强制 `mode="eco"`）；
+`enforce_quality_review_policy(raw) -> TaskSpec`（质量路径：限
+`pr_quality`、强制 `mode="eco"`、永不发布）；
 `authorize_repo_path(repo, raw_path, settings) -> str`（对调用方提供的
 checkout 路径做**身份 + 圈禁**双重校验，返回 canonical 路径）。
 
@@ -22,6 +24,8 @@ checkout 路径做**身份 + 圈禁**双重校验，返回 canonical 路径）�
   与执行之间把它改写。
 - `kind` 必须 ∈ `READ_ONLY_KINDS`；`post` 被**硬置为 `False`**；`repo` 必须在 allowlist
   内；`pr`/`issue` 必须为正；未知 params 被**剥除**而不是透传。
+- `pr_quality` 唯一可多带一个 `deterministic_signals`：至多 12 条、每条至多
+  500 字符。它们只是供模型核验的可错假设，不能直接成为质量裁决。
 - **Strict 路径上 `post` 是被拒绝，不是被恢复。** 这条路径曾经"共享门里
   强制 `post=False`、事后把调用方原值放回去"，使 Strict 成为唯一能发布的
   MCP 面。显式 `post=True` 现在直接抛 `PolicyError` —— 移除这个恢复不是

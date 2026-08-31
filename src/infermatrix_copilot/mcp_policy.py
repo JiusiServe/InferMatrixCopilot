@@ -30,7 +30,9 @@ from .task_spec import FULL_SHA_RE, READ_ONLY_KINDS, TaskSpec
 # request can't smuggle a knob (e.g. force_push) into a step. Allowed params are
 # strictly value-validated below — a knob may modulate cost/depth, never widen
 # permissions.
-_ALLOWED_PARAMS: frozenset[str] = frozenset({"review_depth"})
+_ALLOWED_PARAMS: frozenset[str] = frozenset({
+    "review_depth", "deterministic_signals",
+})
 _REVIEW_DEPTHS = ("auto", "light", "standard", "full")
 
 # `expected_head_sha` is deliberately NOT a param. `_ALLOWED_PARAMS` is a security
@@ -111,8 +113,8 @@ def enforce_mcp_policy(raw: dict[str, Any], *, allowed_repos: list[str],
     - `post` is forced False (no outward writes over MCP, ever, in V1).
     - `repo` MUST be in `allowed_repos`.
     - `pr` / `issue`, when present, MUST be positive integers.
-    - `params` is stripped to the allow-set (currently empty) so no step knob
-      can be injected.
+    - `params` is stripped to the allow-set; the quality-only bounded signal list
+      can guide assessment but cannot grant a step knob or write authority.
     - `expected_head_sha`, when present, MUST be a full 40-hex commit id, and is
       **carried through** rather than stripped: it only ever narrows the run
       (review this head or stop as stale), so dropping it would silently unpin
@@ -155,6 +157,19 @@ def enforce_mcp_policy(raw: dict[str, Any], *, allowed_repos: list[str],
                 f"review_depth {params['review_depth']!r} is not one of "
                 f"{list(_REVIEW_DEPTHS)}")
         params["review_depth"] = str(params["review_depth"]).lower()
+    if "deterministic_signals" in params:
+        if kind != "pr_quality":
+            params.pop("deterministic_signals")
+        else:
+            signals = params["deterministic_signals"]
+            if not isinstance(signals, list) or not all(
+                    isinstance(item, str) for item in signals):
+                raise PolicyError("deterministic_signals must be a list of strings")
+            if len(signals) > 12 or any(len(item) > 500 for item in signals):
+                raise PolicyError(
+                    "deterministic_signals must contain at most 12 items of "
+                    "at most 500 characters each")
+            params["deterministic_signals"] = [item.strip() for item in signals]
 
     mode = raw.get("mode", "eco")
     if mode not in {"eco", "performance"}:
@@ -215,6 +230,28 @@ def enforce_strict_review_policy(raw: dict[str, Any], *,
             "Read the structured result and publish it yourself, or use the CLI "
             "with ALLOW_POST=1 for a human-driven post.")
 
+    normalized = dict(raw)
+    normalized["mode"] = "eco"
+    normalized["post"] = False
+    return enforce_mcp_policy(
+        normalized, allowed_repos=allowed_repos, settings=settings)
+
+
+def enforce_quality_review_policy(raw: dict[str, Any], *,
+                                  allowed_repos: list[str],
+                                  settings: Any = None) -> TaskSpec:
+    """Validate the dedicated read-only PR quality workflow.
+
+    The caller may provide bounded deterministic signals as hypotheses for the
+    model to verify. They never widen permissions and are not themselves a
+    quality verdict. Posting remains structurally impossible.
+    """
+    if not isinstance(raw, dict):
+        raise PolicyError("request is not an object")
+    if raw.get("kind") != "pr_quality":
+        raise PolicyError("quality mode only permits PR quality assessments")
+    if raw.get("post", False):
+        raise PolicyError("quality mode cannot post; the caller owns publishing")
     normalized = dict(raw)
     normalized["mode"] = "eco"
     normalized["post"] = False

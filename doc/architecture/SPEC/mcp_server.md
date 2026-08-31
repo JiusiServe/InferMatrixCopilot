@@ -21,7 +21,11 @@
 `expected_head_sha`；`start_strict_review` 接受 `idempotency_key` 并把
 `(run_id, created)` 语义（见下）落到入队决定上。新增内部
 `reserve_strict_review` 原样返回该 tuple，供 typed SDK 准确报告幂等复用；
-`start_strict_review` 继续只返 `run_id`，保持 MCP/既有调用兼容。
+`start_strict_review` 继续只返 `run_id`，保持 MCP/既有调用兼容；
+`reserve_quality_review` 保留 `(run_id, created)` 供 SDK 维持真实幂等语义；
+`start_quality_review` / `get_quality_result` 是专用的、同样钉 head 且
+幂等的兼容工作流对，`quality_readiness` 在预约前验证模型、checkout 与
+`pr-quality` playbook。
 
 ## 不变量（**C2**、**C3**、**E1**）
 - **安全是结构性的，不是"信任宿主"。** `enforce_mcp_policy` 在这里跑一次，
@@ -57,6 +61,9 @@
   run_id 返回 `contract.unknown_run_result`（`state: unknown`）而不是抛错
   —— 丢响应和还在跑可区分；终局响应同时附带
   `contract.build_review_result` 的结构化 `result`（分页 `report` 保留）。
+- `pr_quality` 与 Strict 共用同一个串行 worker 和隔离子进程，但用普通的
+  `--execute-reserved` 权威复检；结果由 `get_quality_result` 装配为独立质量契约，
+  不会把 code-review findings 数量误当质量结论。
 
 ## 边界 —— 不属于这里
 不含 Direct 模式逻辑（`thin_mcp_server.py`）；不定义策略（`mcp_policy.py`）；

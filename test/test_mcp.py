@@ -18,6 +18,7 @@ from infermatrix_copilot.cli.copilot import Copilot
 from infermatrix_copilot.mcp_policy import (
     PolicyError,
     enforce_mcp_policy,
+    enforce_quality_review_policy,
     enforce_strict_review_policy,
 )
 from infermatrix_copilot.task_spec import TaskSpec
@@ -28,6 +29,7 @@ ALLOW = ["vllm-omni"]
 # ── policy gate (the structural read-only guarantee) ──────────────────────────
 def test_policy_accepts_read_only_kinds_and_forces_post_off():
     for kind, extra in [("pr_review", {"pr": 5}),
+                        ("pr_quality", {"pr": 5}),
                         ("issue_answer", {"issue": 9}),
                         ("issue_filter", {})]:
         spec = enforce_mcp_policy({"kind": kind, "repo": "vllm-omni", **extra},
@@ -79,6 +81,31 @@ def test_policy_allows_validated_review_depth():
          "params": {"review_depth": "FULL", "force_push": True}},
         allowed_repos=ALLOW)
     assert spec.params == {"review_depth": "full"}  # normalized; rest stripped
+
+
+def test_quality_policy_keeps_only_bounded_rule_hints():
+    spec = enforce_quality_review_policy(
+        {"kind": "pr_quality", "repo": "vllm-omni", "pr": 7,
+         "mode": "performance", "params": {
+             "deterministic_signals": ["Q1: short", "Q2: no tests"],
+             "force_push": True,
+         }},
+        allowed_repos=ALLOW,
+    )
+    assert spec.kind == "pr_quality" and spec.mode == "eco"
+    assert spec.params == {
+        "deterministic_signals": ["Q1: short", "Q2: no tests"]
+    }
+    assert spec.post is False
+
+
+def test_quality_policy_rejects_unbounded_or_non_string_hints():
+    with pytest.raises(PolicyError, match="deterministic_signals"):
+        enforce_quality_review_policy(
+            {"kind": "pr_quality", "repo": "vllm-omni", "pr": 7,
+             "params": {"deterministic_signals": [1]}},
+            allowed_repos=ALLOW,
+        )
 
 
 def test_policy_rejects_invalid_review_depth():

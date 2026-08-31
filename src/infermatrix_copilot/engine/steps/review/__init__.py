@@ -10,7 +10,7 @@ so existing `from ..steps.review import X` importers are unchanged.
 
 from __future__ import annotations
 
-from . import steps  # noqa: F401  (side-effect: registers the two steps)
+from . import quality, steps  # noqa: F401  (side-effect: registers steps)
 from .prompts import _REVIEW_LENSES  # noqa: F401
 from .utils import _render_review_md, _sweep_targets  # noqa: F401
 

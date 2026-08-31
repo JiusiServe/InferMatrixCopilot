@@ -1,10 +1,10 @@
 # playbooks/*.yaml —— 规范
 
-<!-- verified-against: 2026-08-28 -->
+<!-- verified-against: 2026-08-31 -->
 
-`8 个文件 · 声明式编排数据 · refactor-status: ok`
+`9 个文件 · 声明式编排数据 · refactor-status: ok`
 
-> 当前集合：`pr-review`@6、`pr-debug`@2、`pr-rebase`@2、`issue-answer`@2、
+> 当前集合：`pr-review`@6、`pr-quality`@1、`pr-debug`@2、`pr-rebase`@2、`issue-answer`@2、
 > `issue-triage`@2、`repo-profile`@1（active）；`repo-rebase-v3`@1（**locked**）；
 > `profile-consolidate`@1（candidate）。带 step 链的完整清单
 > 在 [`../../../GUIDE.md`](../../../GUIDE.md) §5 —— **不在这里**。
@@ -21,7 +21,7 @@ success, steps[]`。
   `requires: [modules, upstream.fork_tracking, ci.provider]`）。全仓库
   rebase 引擎（2026-08-25 切换；委托版 v2 与 native-v1 已删除）——
   **不要改它的 step 列表**。
-- `pr-rebase`/`pr-debug`/`pr-review`/`issue-answer`/`issue-triage` —— active，
+- `pr-rebase`/`pr-debug`/`pr-review`/`pr-quality`/`issue-answer`/`issue-triage` —— active，
   仓库中立（`repos: []`、`requires: [repo.path]`）。
 - `repo-profile` —— active，仓库中立（用于接入第二个仓库）。
 - `profile-consolidate` —— **candidate**

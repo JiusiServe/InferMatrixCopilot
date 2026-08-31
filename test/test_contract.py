@@ -113,6 +113,28 @@ def test_unknown_run_is_explicit_not_an_error():
     assert result["state"] == "unknown" and result["run_id"] == "run-nope"
 
 
+def test_quality_result_has_its_own_typed_contract(tmp_path):
+    run_dir = _run(tmp_path, updates={
+        "pr_head_sha": "d" * 40,
+        "quality_verdict": "needs_rework",
+        "quality_confidence": "high",
+        "quality_summary": "Not ready.",
+        "quality_reasons": [
+            {"criterion": "validation", "evidence": "No failure-path test",
+             "path": "a.py", "line": 3, "private": "drop me"},
+        ],
+    })
+    result = contract.build_quality_result(run_dir)
+    assert result["contract_version"] == contract.QUALITY_API_VERSION
+    assert result["reviewed_head_sha"] == "d" * 40
+    assert result["verdict"] == "needs_rework"
+    assert result["confidence"] == "high"
+    assert result["reasons"] == [{
+        "criterion": "validation", "evidence": "No failure-path test",
+        "path": "a.py", "line": 3,
+    }]
+
+
 # ── handshake ─────────────────────────────────────────────────────────────────
 def test_capabilities_reports_the_real_worker_count():
     """The MCP server drains its queue with one worker, so Strict requests
@@ -121,6 +143,8 @@ def test_capabilities_reports_the_real_worker_count():
     assert caps["max_strict_workers"] == 1
     assert caps["strict_api_version"] == contract.STRICT_API_VERSION
     assert caps["knowledge_api_version"] == contract.KNOWLEDGE_API_VERSION
+    assert caps["quality_api_version"] == contract.QUALITY_API_VERSION
+    assert caps["supports_quality_review"] is True
     assert caps["supports_expected_head"] is True
     assert caps["supports_structured_result"] is True
     assert caps["supports_knowledge_curation"] is True

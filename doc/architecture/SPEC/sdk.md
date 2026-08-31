@@ -13,7 +13,7 @@
 ## 公开契约
 
 - `get_capabilities()` / `DirectClient.capabilities()` 返回 typed
-  `Capabilities`：distribution/SDK/Direct/Strict/Knowledge 版本、resource revision、支持仓库、
+  `Capabilities`：distribution/SDK/Direct/Strict/Quality/Knowledge 版本、resource revision、支持仓库、
   expected-head/structured-result/post-false/file-lock/idempotency 能力与 worker 上限。
 - Direct：`DirectReviewRequest` → `DirectClient.plan()` → `DirectReviewPlan`；
   `read_document(document_id, offset, max_bytes)`；
@@ -21,6 +21,9 @@
 - Strict：`StrictRuntime(settings_overrides=...)`，以及
   `capabilities` / `readiness` / `reserve_review`（`start_review` 别名）/
   `get_status` / `get_result` / `close`。
+- Quality：同一 `StrictRuntime` 接受 typed `QualityReviewRequest`，提供
+  `quality_readiness` / `reserve_quality_review`（`start_quality_review` 别名）/
+  `get_quality_result`；机械信号只是 bounded hints，结果固定绑定 expected head。
 - Knowledge：宿主把不可信输入投影成 `KnowledgeEvidenceEvent` / `KnowledgeEvidenceBatch`，
   再依次调用 `KnowledgeCurator.build_prompt()`、自己的 model adapter、
   `validate_proposals()` 与 `apply()`。返回值为 typed
@@ -62,7 +65,7 @@
   push、开 PR 或 schedule。ReviewBot 必须向 `KnowledgeCurator` 传 dedicated work
   checkout，并继续拥有重试、artifact 与 fork publication；SDK 也绝不写 packaged
   knowledge tree。
-- SDK、Direct、Strict、Knowledge API 版本常量均为 `1.0.0`，distribution 为
+- SDK、Direct、Strict、Quality、Knowledge API 版本常量均为 `1.0.0`，distribution 为
   `0.2.0`；`Capabilities.knowledge_api_version` 与
   `supports_knowledge_curation` 组成 ReviewBot 的 paired-release 握手，避免只按
   wheel 名称误接缺失知识 API 的 artifact。后者只有完整 apply 所需的 process file

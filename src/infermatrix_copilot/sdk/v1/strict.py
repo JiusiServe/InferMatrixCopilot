@@ -7,6 +7,9 @@ from typing import Any, Self
 from .direct import get_capabilities
 from .models import (
     Capabilities,
+    QualityPollResult,
+    QualityReviewRequest,
+    QualityRunHandle,
     StrictPollResult,
     StrictReviewRequest,
     StrictRunHandle,
@@ -52,6 +55,35 @@ class StrictRuntime:
         """Alias for hosts that name the reserve-and-enqueue operation start."""
         return self.reserve_review(request)
 
+    def quality_readiness(self, repo: str, repo_path: str = "") -> tuple[str, ...]:
+        """Return setup gaps for the dedicated review-readiness workflow."""
+        return tuple(self._core.quality_readiness(repo, repo_path))
+
+    def reserve_quality_review(
+        self, request: QualityReviewRequest
+    ) -> QualityRunHandle:
+        """Reserve one exact-head quality workflow without publishing."""
+        payload = {
+            "kind": "pr_quality",
+            "repo": request.repository.alias,
+            "pr": request.pr_number,
+            "post": False,
+            "params": {
+                "deterministic_signals": list(request.deterministic_signals),
+            },
+            "expected_head_sha": request.expected_head_sha,
+            "repo_path": request.repo_path,
+            "idempotency_key": request.idempotency_key,
+        }
+        run_id, created = self._core.reserve_quality_review(payload)
+        return QualityRunHandle(run_id=str(run_id), created=bool(created))
+
+    def start_quality_review(
+        self, request: QualityReviewRequest
+    ) -> QualityRunHandle:
+        """Alias for the reserve-and-enqueue quality operation."""
+        return self.reserve_quality_review(request)
+
     def get_status(self, run_id: str) -> StrictPollResult:
         payload = dict(self._core.get_status(run_id))
         status = payload.get("status") or {}
@@ -64,6 +96,15 @@ class StrictRuntime:
         # provider's private run-directory path does not.
         payload.pop("report_path", None)
         return StrictPollResult(
+            run_id=run_id,
+            state=str(payload.get("state") or "unknown"),
+            payload=payload,
+        )
+
+    def get_quality_result(self, run_id: str) -> QualityPollResult:
+        """Return the typed envelope for one quality workflow poll."""
+        payload = dict(self._core.get_quality_result(run_id))
+        return QualityPollResult(
             run_id=run_id,
             state=str(payload.get("state") or "unknown"),
             payload=payload,

@@ -18,6 +18,7 @@ from .._resources import adapters_root, knowledge_root
 from .models import (
     DIRECT_API_VERSION,
     KNOWLEDGE_API_VERSION,
+    QUALITY_API_VERSION,
     SDK_API_VERSION,
     STRICT_API_VERSION,
     Capabilities,
@@ -100,6 +101,7 @@ def get_capabilities(
         sdk_api_version=SDK_API_VERSION,
         direct_api_version=DIRECT_API_VERSION,
         strict_api_version=STRICT_API_VERSION,
+        quality_api_version=QUALITY_API_VERSION,
         knowledge_api_version=KNOWLEDGE_API_VERSION,
         resource_revision=_resource_revision(str(knowledge), str(adapters)),
         supported_repositories=repositories,
@@ -108,6 +110,7 @@ def get_capabilities(
         supports_post_false=True,
         supports_file_locking=locking,
         supports_idempotent_strict_start=locking,
+        supports_quality_review=True,
         supports_knowledge_curation=locking and _apply_supported(),
         max_strict_workers=int(max_strict_workers),
     )

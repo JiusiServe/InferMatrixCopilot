@@ -8,6 +8,7 @@ from typing import Any, Literal
 SDK_API_VERSION = "1.0.0"
 DIRECT_API_VERSION = "1.0.0"
 STRICT_API_VERSION = "1.0.0"
+QUALITY_API_VERSION = "1.0.0"
 KNOWLEDGE_API_VERSION = "1.0.0"
 
 
@@ -162,6 +163,7 @@ class Capabilities(_Serializable):
     sdk_api_version: str
     direct_api_version: str
     strict_api_version: str
+    quality_api_version: str
     knowledge_api_version: str
     resource_revision: str
     supported_repositories: tuple[str, ...]
@@ -170,6 +172,7 @@ class Capabilities(_Serializable):
     supports_post_false: bool
     supports_file_locking: bool
     supports_idempotent_strict_start: bool
+    supports_quality_review: bool
     supports_knowledge_curation: bool
     max_strict_workers: int
 
@@ -249,6 +252,33 @@ class StrictRunHandle(_Serializable):
 
 @dataclass(frozen=True)
 class StrictPollResult(_Serializable):
+    run_id: str
+    state: str
+    payload: dict[str, Any]
+
+    @property
+    def terminal(self) -> bool:
+        return self.state not in {"queued", "planning", "running"}
+
+
+@dataclass(frozen=True)
+class QualityReviewRequest(_Serializable):
+    repository: RepositoryRef
+    pr_number: int
+    expected_head_sha: str
+    repo_path: str
+    idempotency_key: str
+    deterministic_signals: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class QualityRunHandle(_Serializable):
+    run_id: str
+    created: bool
+
+
+@dataclass(frozen=True)
+class QualityPollResult(_Serializable):
     run_id: str
     state: str
     payload: dict[str, Any]

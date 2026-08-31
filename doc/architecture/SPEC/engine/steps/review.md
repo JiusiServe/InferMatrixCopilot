@@ -1,11 +1,12 @@
 # engine/steps/review/ —— 规范
 
-<!-- verified-against: 2026-08-28 -->
+<!-- verified-against: 2026-08-31 -->
 
 `LOC ~900（6 个文件） · step 库（评审） · refactor-status: ok`
 
 ## 职责
-条件式 patch 门 + PR 评审 agent step 及其仓库中立的 prompt 体系。
+条件式 patch 门 + PR 评审 agent step + 有界的 PR review-readiness 质量 step，
+以及它们仓库中立的 prompt 体系。
 它曾是一个 341 行的模块；现在是一个把评测调优过的 prompt 数据、handler、
 确定性 helper 三者分开的包。
 
@@ -19,6 +20,8 @@
   `agent.review_diff`（agent/read）。
 - `anchor.py` —— 基于代码片段的评论锚定（2026-08 新增）。
 - `repo_tools.py` —— 只读的变更考古工具组（2026-08 新增）。
+- `quality.py` —— `agent.assess_pr_quality`：一次 tool-less、只读模型调用，
+  把机械规则当可错提示，并输出 `ready|concerns|needs_rework` 的结构化结果。
 
 ## 公开契约（可从 `engine.steps.review` import）
 `_REVIEW_LENSES`、`_render_review_md`、`_sweep_targets` —— 由包的 `__init__` 再导出，
@@ -41,6 +44,9 @@
   `repo.language` 为键，**诚实降级**；裁决自洽（任何 ≥minor 的评论 ⇒ REQUEST CHANGES）；
   确定性的按严重度排序的评论上限。
 - prompt 是仓库中立的（**A5**）。
+- 质量 step **fail-closed**：枚举/JSON/模型不可用即 BLOCKED；
+  `needs_rework` 少于两条完整依据会机械降为低置信度 `concerns`。短描述、标题、
+  体量、文件数或没有测试修改任何一项都不得单独成为 needs-rework 理由。
 - **要引用，不要行号**（`anchor.py`）。模型给错行号的频率高到发布时必须降级该发现；
   修法是**换一个问题** —— 让模型引用它在说的代码，位置由程序自己算。校验器**仍然最后
   跑**，所以"绝不发布错锚点"的保证不变；变的是**只有行号错**的发现能保住自己的 inline

@@ -405,6 +405,7 @@ capabilities)` 负责召回：精确 repo 优先；`repos: []` 的仓库无关 p
 | playbook | ver | status | kind | repos | requires |
 |---|---|---|---|---|---|
 | `pr-review` | 6 | active | `pr_review` | 任意 | `repo.path` |
+| `pr-quality` | 1 | active | `pr_quality` | 任意 | `repo.path` |
 | `pr-debug` | 2 | active | `pr_debug` | 任意 | `repo.path` |
 | `pr-rebase` | 2 | active | `pr_rebase` | 任意 | `repo.path` |
 | `issue-answer` | 2 | active | `issue_answer` | 任意 | `repo.path` |
@@ -419,6 +420,13 @@ capabilities)` 负责召回：精确 repo 优先；`repos: []` 的仓库无关 p
 
 ```
 pr.fetch_diff → pr.gate_check → agent.review_diff → [post] pr.post_review → report.final_summary
+```
+
+**`pr-quality`** — ReviewBot 的只读 review-readiness 核验。机械信号仅作为
+fallible hints；单次 LLM 调用必须在 exact-head context/diff 中给出 grounded reasons。
+
+```
+pr.fetch_diff → agent.assess_pr_quality → report.final_summary
 ```
 
 **`pr-debug`** — `report_only` 时停在分组，成为独立可用的只读 triage。

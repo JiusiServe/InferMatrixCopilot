@@ -41,6 +41,7 @@ from .run_trace import RunTrace
 from .sdk.v1.models import (
     DIRECT_API_VERSION,
     KNOWLEDGE_API_VERSION,
+    QUALITY_API_VERSION,
     SDK_API_VERSION,
     STRICT_API_VERSION,
 )
@@ -49,8 +50,10 @@ __all__ = [
     "COMMENT_FIELDS",
     "DIRECT_API_VERSION",
     "KNOWLEDGE_API_VERSION",
+    "QUALITY_API_VERSION",
     "SDK_API_VERSION",
     "STRICT_API_VERSION",
+    "build_quality_result",
     "build_review_result",
     "capabilities",
     "direct_completion_result",
@@ -60,8 +63,8 @@ __all__ = [
     "direct_review_plan",
     "sanitize_comments",
     "unknown_run_result",
+    "unknown_quality_result",
 ]
-
 # The only comment keys that cross the boundary. A review comment accumulates
 # internal bookkeeping on real runs (`_verified`, `_anchor_unverified`,
 # `corroborated_by`); publishing those would leak pipeline internals into a bot's
@@ -174,6 +177,54 @@ def build_review_result(run_dir: Path | str) -> dict[str, Any]:
     }
 
 
+def _quality_reasons(value: Any) -> list[dict[str, Any]]:
+    """Project persisted model output onto the public quality schema."""
+    fields = ("criterion", "evidence", "path", "line")
+    return [
+        {key: item.get(key) for key in fields}
+        for item in value if isinstance(item, dict)
+    ] if isinstance(value, list) else []
+
+
+def build_quality_result(run_dir: Path | str) -> dict[str, Any]:
+    """Build the machine-readable result of a PR quality workflow."""
+    run_dir = Path(run_dir)
+    status = rs.read_status(run_dir) or {}
+    updates = _state_updates(run_dir)
+    trace = RunTrace(run_dir / "run_trace.jsonl")
+    mismatch_events = [
+        {key: value for key, value in event.items()
+         if key not in ("ts", "kind")}
+        for event in trace.events("expected_head_mismatch")
+    ]
+    mismatch = (mismatch_events or [None])[0]
+    diagnostics: dict[str, Any] = {}
+    if mismatch_events:
+        diagnostics["expected_head_mismatch"] = mismatch_events
+    assessments = [
+        {key: value for key, value in event.items()
+         if key not in ("ts", "kind")}
+        for event in trace.events("quality_assessment")
+    ]
+    if assessments:
+        diagnostics["quality_assessment"] = assessments
+    return {
+        "contract_version": QUALITY_API_VERSION,
+        "run_id": status.get("run_id") or run_dir.name,
+        "state": status.get("state") or "unknown",
+        "note": status.get("note") or "",
+        "reviewed_head_sha": str(updates.get("pr_head_sha") or ""),
+        "verdict": str(updates.get("quality_verdict") or ""),
+        "confidence": str(updates.get("quality_confidence") or ""),
+        "summary": str(updates.get("quality_summary") or ""),
+        "reasons": _quality_reasons(updates.get("quality_reasons")),
+        "stale": bool(mismatch),
+        "expected_head_sha": str((mismatch or {}).get("expected") or ""),
+        "actual_head_sha": str((mismatch or {}).get("actual") or ""),
+        "diagnostics": diagnostics,
+    }
+
+
 def unknown_run_result(run_id: str) -> dict[str, Any]:
     """The result for an id this server has never heard of.
 
@@ -185,3 +236,22 @@ def unknown_run_result(run_id: str) -> dict[str, Any]:
             "verdict": "", "summary_markdown": "", "comments": [],
             "stale": False, "expected_head_sha": "", "actual_head_sha": "",
             "diagnostics": {}}
+
+
+def unknown_quality_result(run_id: str) -> dict[str, Any]:
+    """The typed quality result for an unknown run id."""
+    return {
+        "contract_version": QUALITY_API_VERSION,
+        "run_id": run_id,
+        "state": "unknown",
+        "note": "",
+        "reviewed_head_sha": "",
+        "verdict": "",
+        "confidence": "",
+        "summary": "",
+        "reasons": [],
+        "stale": False,
+        "expected_head_sha": "",
+        "actual_head_sha": "",
+        "diagnostics": {},
+    }

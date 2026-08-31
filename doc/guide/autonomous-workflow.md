@@ -6,6 +6,11 @@ MCP 是两回事**。
 autonomous 工作流**跑自己的模型**，支持更长的仓库维护 playbook —— 评审、issue 处理、
 CI 调试、rebase。因此它需要模型凭据和仓库配置。
 
+自动化宿主还可以通过 `CopilotMCP.start_quality_review` 启动专用的
+`pr-quality` 工作流：它只评估 PR 是否已准备好进入维护者评审，不复用完整
+`pr-review` 的 findings 数量作质量分数。调用方钉住 head、轮询
+`get_quality_result`，并且仍由调用方独占所有对外发布。
+
 ## 安装
 
 ```bash

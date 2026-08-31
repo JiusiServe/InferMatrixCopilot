@@ -16,6 +16,7 @@ from infermatrix_copilot.sdk.v1 import (
     DirectClient,
     DirectCompletionRequest,
     DirectReviewRequest,
+    QualityReviewRequest,
     RepositoryRef,
     StrictReviewRequest,
     StrictRuntime,
@@ -169,8 +170,10 @@ def test_capabilities_identify_package_protocols_and_resources():
     assert caps.distribution_version == __version__ == "0.2.0"
     assert caps.direct_api_version
     assert caps.strict_api_version
+    assert caps.quality_api_version == "1.0.0"
     assert caps.knowledge_api_version == KNOWLEDGE_API_VERSION == "1.0.0"
     assert caps.supports_idempotent_strict_start is True
+    assert caps.supports_quality_review is True
     assert caps.supports_knowledge_curation is True
     assert caps.resource_revision.startswith("sha256:")
     assert {"vllm-omni", "afd-plugin"} <= set(caps.supported_repositories)
@@ -234,9 +237,16 @@ class _FakeStrictCore:
     def strict_readiness(self, repo, repo_path=""):
         return []
 
+    def quality_readiness(self, repo, repo_path=""):
+        return []
+
     def reserve_strict_review(self, payload):
         self.requests.append(payload)
         return "run-20260829-010101-abcdef", self.created
+
+    def reserve_quality_review(self, payload):
+        self.requests.append(payload)
+        return "run-quality-20260831-abcdef", self.created
 
     def get_status(self, run_id):
         return {
@@ -254,6 +264,19 @@ class _FakeStrictCore:
             "next_offset": None,
             "result": {"verdict": "APPROVE"},
             "offset_seen": offset,
+        }
+
+    def get_quality_result(self, run_id):
+        return {
+            "run_id": run_id,
+            "state": "done",
+            "result": {
+                "contract_version": "1.0.0",
+                "reviewed_head_sha": HEAD,
+                "verdict": "ready",
+                "confidence": "high",
+                "reasons": [],
+            },
         }
 
     def close(self):
@@ -287,6 +310,34 @@ def test_strict_facade_preserves_idempotency_and_hides_private_paths():
     assert result.payload["offset_seen"] == 12
     assert "report_path" not in result.payload
     assert runtime.capabilities().distribution_version == "0.2.0"
+
+
+def test_quality_facade_is_typed_idempotent_and_head_bound():
+    runtime = object.__new__(StrictRuntime)
+    core = _FakeStrictCore()
+    runtime._core = core
+    request = QualityReviewRequest(
+        repository=RepositoryRef("vllm-omni"),
+        pr_number=7,
+        expected_head_sha=HEAD,
+        repo_path="/authorized/checkout",
+        idempotency_key="quality-attempt-1",
+        deterministic_signals=("Q2: no test changes",),
+    )
+
+    first = runtime.reserve_quality_review(request)
+    core.created = False
+    retry = runtime.start_quality_review(request)
+    result = runtime.get_quality_result(first.run_id)
+
+    assert first.created is True and retry.created is False
+    assert core.requests[0]["kind"] == "pr_quality"
+    assert core.requests[0]["post"] is False
+    assert core.requests[0]["expected_head_sha"] == HEAD
+    assert core.requests[0]["params"] == {
+        "deterministic_signals": ["Q2: no test changes"],
+    }
+    assert result.terminal and result.payload["result"]["verdict"] == "ready"
 
 
 def test_strict_runtime_public_capabilities_smoke(tmp_path):
