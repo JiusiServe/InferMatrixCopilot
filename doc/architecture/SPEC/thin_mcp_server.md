@@ -1,6 +1,6 @@
 # thin_mcp_server.py —— 规范
 
-<!-- verified-against: 2026-08-29 -->
+<!-- verified-against: 2026-08-31 -->
 
 `LOC ~490 · 默认 MCP：Direct 门面 + Strict 入口 · refactor-status: ok`
 

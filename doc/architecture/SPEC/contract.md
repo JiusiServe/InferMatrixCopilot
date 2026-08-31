@@ -1,6 +1,6 @@
 # contract.py —— 规范
 
-<!-- verified-against: 2026-08-29 -->
+<!-- verified-against: 2026-08-31 -->
 
 `LOC ~185 · 旧版跨仓库契约兼容层 · refactor-status: compatibility-shim`
 

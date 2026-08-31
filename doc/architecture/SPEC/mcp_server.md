@@ -1,6 +1,6 @@
 # mcp_server.py —— 规范
 
-<!-- verified-against: 2026-08-29 -->
+<!-- verified-against: 2026-08-31 -->
 
 `LOC ~506 · Strict 后台机器（reserve/start/poll） · refactor-status: ok`
 

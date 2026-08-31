@@ -1,6 +1,6 @@
 # sdk/ —— 规范
 
-<!-- verified-against: 2026-08-29 -->
+<!-- verified-against: 2026-08-31 -->
 
 `Python SDK v1 · 跨仓库唯一 typed 边界 · refactor-status: ok`
 

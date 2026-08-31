@@ -1,6 +1,6 @@
 # direct_routing.py —— 规范
 
-<!-- verified-against: 2026-08-29 -->
+<!-- verified-against: 2026-08-31 -->
 
 `LOC ~917 · Direct 模式完整策略包与知识路由 · refactor-status: known-debt`
 
