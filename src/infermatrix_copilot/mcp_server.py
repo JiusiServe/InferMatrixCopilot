@@ -201,6 +201,16 @@ class CopilotMCP:
         Enqueues only a run this call actually created. Returning an existing id
         while still enqueueing would deduplicate the *id* and not the
         *execution* — the second child would review the same PR again."""
+        run_id, _created = self.reserve_strict_review(spec_dict)
+        return run_id
+
+    def reserve_strict_review(self, spec_dict: dict) -> tuple[str, bool]:
+        """Reserve Strict work and expose whether this call created the run.
+
+        ``start_strict_review`` retains its string-only compatibility contract;
+        the typed SDK uses this operation so an idempotent retry is never
+        mislabeled as a newly created run.
+        """
         spec = enforce_strict_review_policy(
             spec_dict, allowed_repos=self.settings.mcp_allowed_repos,
             settings=self.settings)
@@ -209,7 +219,7 @@ class CopilotMCP:
             idempotency_key=str(spec_dict.get("idempotency_key") or ""))
         if created:
             self._q.put((run_id, True))
-        return run_id
+        return run_id, created
 
     def strict_readiness(self, repo: str, repo_path: str = "") -> list[str]:
         """Return actionable setup gaps before reserving a Strict run.

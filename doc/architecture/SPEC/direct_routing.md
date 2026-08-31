@@ -1,8 +1,8 @@
 # direct_routing.py —— 规范
 
-<!-- verified-against: 2026-08-28 -->
+<!-- verified-against: 2026-08-29 -->
 
-`LOC ~768 · Direct 模式知识路由（表 + 机制） · refactor-status: known-debt`
+`LOC ~917 · Direct 模式完整策略包与知识路由 · refactor-status: known-debt`
 
 ## 职责
 Direct 模式的知识路由：owner/model 路由表和选路机制。从
@@ -12,7 +12,8 @@ Direct 模式的知识路由：owner/model 路由表和选路机制。从
 `adapters/<repo>/` 是**未被这次搬迁改变的既有欠账**。
 
 ## 公开契约
-经 `contract.py` 再导出的四个名字：`direct_knowledge_routes`、
+经 `contract.py` 再导出的五个名字：`direct_review_plan`（完整、一次性的
+Direct policy bundle）、`direct_knowledge_routes`、
 `direct_execution_budget`、`direct_completion_result`、
 `direct_mandatory_review_guides`。其余全部下划线私有 —— 仅供
 `thin_mcp_server` 既有调用点/测试使用（它继续直接 import 下划线名）。
@@ -26,6 +27,11 @@ Direct 模式的知识路由：owner/model 路由表和选路机制。从
   与缺图同罪、且更难察觉；`_direct_route` 据此置
   `read_required = status != "ok"`（"自己去打开"是真回退，"什么都不给
   又不许看"不是）。
+- adapter-backed changed-file 路由同样拆开 `(quick_map, status)`，绝不把 tuple
+  当成文本跨边界，也绝不把 unavailable 误报成无需读取。
+- knowledge/adapters 根由 `sdk._resources` 的 `importlib.resources` 解析，editable
+  source 与安装 wheel 走同一标记校验；仓库路径只留在本模块内部的旧版 dict，
+  `sdk.v1.DirectClient` 对外转换为 document ID。
 - **changed files 校验选择、绝不静默替换选择**：title/body 选 owner，
   diff 只报告支持或矛盾；scope-fallback 是最后手段且永远显式
   （`status="scope_fallback"`）。
@@ -44,7 +50,8 @@ Direct 模式的知识路由：owner/model 路由表和选路机制。从
 `_normalize_repo`/`_adapter_for_repo` 走 `adapters/`。
 
 ## 依赖（允许）
-stdlib + `.adapters`（AdapterError / AdapterRegistry / RepoAdapter）。
+stdlib + `.adapters`（AdapterError / AdapterRegistry / RepoAdapter）+
+`.sdk._resources`。
 位于 `contract.py` 和 `thin_mcp_server.py` 之下。
 
 ## 扩展点

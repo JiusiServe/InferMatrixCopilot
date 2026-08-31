@@ -120,13 +120,17 @@ def test_capabilities_reports_the_real_worker_count():
     caps = contract.capabilities(max_strict_workers=1)
     assert caps["max_strict_workers"] == 1
     assert caps["strict_api_version"] == contract.STRICT_API_VERSION
+    assert caps["knowledge_api_version"] == contract.KNOWLEDGE_API_VERSION
     assert caps["supports_expected_head"] is True
     assert caps["supports_structured_result"] is True
+    assert caps["supports_knowledge_curation"] is True
+    assert contract.KNOWLEDGE_API_VERSION == "1.0.0"
 
 
 def test_capabilities_reports_missing_file_locking():
-    assert contract.capabilities(supports_file_locking=False)[
-        "supports_file_locking"] is False
+    caps = contract.capabilities(supports_file_locking=False)
+    assert caps["supports_file_locking"] is False
+    assert caps["supports_knowledge_curation"] is False
 
 
 # ── per-run repo binding (item 8) ─────────────────────────────────────────────

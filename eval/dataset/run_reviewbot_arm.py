@@ -24,14 +24,17 @@ sequentially (the bot's artifact name repeats per head, and each artifact
 is moved out immediately), items run with small parallelism (ARM_JOBS).
 
 Env: ARM_TAG (required) · GEN_REPLICATES=3 · ONLY_ITEMS=4893,4810 ·
-ARM_JOBS=2 · REVIEWBOT_DIR (default: sibling omni-reviewbot checkout) ·
-REVIEWBOT_PYTHON (default <dir>/.venv/bin/python, else python3) ·
-REVIEWBOT_ENV_FILE (default <dir>/.env; loaded first, hard overrides win) ·
-REVIEWBOT_TIMEOUT_S=1800 · REVIEWBOT_EVAL_ROOT (tests only)
+ARM_JOBS=2 · REVIEWBOT_PYTHON (required installed release venv Python) ·
+REVIEWBOT_RELEASE_MANIFEST (optional only when safely discoverable beside that
+venv) · REVIEWBOT_ENV_FILE (optional; loaded first, hard overrides win) ·
+REVIEWBOT_TIMEOUT_S=1800 · REVIEWBOT_EVAL_ROOT (tests only) ·
+REVIEWBOT_EVAL_ALLOW_UNPAIRED=1 (non-month throwaway runs only)
 Flags: --dry-run (print the plan, touch nothing) · --preflight (doctor only)
 """
 from __future__ import annotations
 
+import email.parser
+import hashlib
 import json
 import os
 import re
@@ -40,8 +43,11 @@ import subprocess
 import sys
 import threading
 import time
+import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+from tempfile import TemporaryDirectory
+from typing import Any
 
 import yaml
 
@@ -54,9 +60,42 @@ STATE_DIR = HERE.parent / "raw" / "reviewbot_state"
 JUDGE_CAP = 24_000  # judge_val.py silently truncates candidates here
 
 _MARKER = re.compile(r"<!--.*?-->", re.DOTALL)
-_CONTEXT_LINE = re.compile(r"^review_context: (\S+) \((\d+) threads\)$", re.M)
-_CHANGED_LINE = re.compile(r"^changed_files: (\d+)$", re.M)
-_STATUS_LINE = re.compile(r"^status: (\S+)$", re.M)
+_CONTEXT_LINE = re.compile(
+    r"^review_context: (\S+) \((\d+) threads\)$", re.MULTILINE
+)
+_CHANGED_LINE = re.compile(r"^changed_files: (\d+)$", re.MULTILINE)
+_STATUS_LINE = re.compile(r"^status: (\S+)$", re.MULTILINE)
+_SHA = re.compile(r"[0-9a-f]{40}\Z")
+_DIGEST = re.compile(r"[0-9a-f]{64}\Z")
+_MONTH_TAG = re.compile(r"reviewbot_\d{4}-\d{2}\Z")
+_MANIFEST_LIMIT = 2 * 1024 * 1024
+_REQUIRED_CAPABILITIES = {
+    "supports_expected_head",
+    "supports_structured_result",
+    "supports_post_false",
+    "supports_file_locking",
+    "supports_idempotent_strict_start",
+    "supports_knowledge_curation",
+}
+_RUNTIME_PROBE = r"""
+import inspect
+import json
+import sys
+from importlib.metadata import version
+
+import omni_reviewbot
+import infermatrix_copilot.sdk.v1 as provider_sdk
+
+print(json.dumps({
+    "python": f"{sys.version_info.major}.{sys.version_info.minor}",
+    "prefix": sys.prefix,
+    "reviewbot_module": inspect.getfile(omni_reviewbot),
+    "provider_module": inspect.getfile(provider_sdk),
+    "reviewbot_version": version("omni-reviewbot"),
+    "provider_version": version("infermatrix-copilot"),
+    "provider_capabilities": provider_sdk.get_capabilities().to_dict(),
+}, sort_keys=True))
+"""
 
 
 def sanitize(body: str) -> str:
@@ -93,53 +132,457 @@ def dataset_items() -> list[int]:
 _BEHAVIOR_KEYS = (
     "AGENT_PROVIDER", "REVIEW_MODEL", "CURSOR_MODEL", "CODEX_COMMAND",
     "CODEX_TIMEOUT_SECONDS", "CURSOR_TIMEOUT_SECONDS",
-    "GITHUB_REPOSITORY", "INFERMATRIX_PATH",
+    "GITHUB_REPOSITORY",
 )
 
 
-def git_state(path: Path) -> tuple[str, bool]:
-    """(sha, dirty) for a checkout; ("unknown", True) when not a repo."""
-    try:
-        sha = subprocess.run(
-            ["git", "-C", str(path), "rev-parse", "HEAD"],
-            capture_output=True, text=True, timeout=30, check=True,
-        ).stdout.strip()
-        dirty = bool(subprocess.run(
-            ["git", "-C", str(path), "status", "--porcelain"],
-            capture_output=True, text=True, timeout=60, check=True,
-        ).stdout.strip())
-        return sha, dirty
-    except Exception:
-        return "unknown", True
+class ReleaseValidationError(RuntimeError):
+    """The selected interpreter is not the manifest's paired artifact."""
 
 
-def build_config(child_env: dict[str, str], bot_dir: Path) -> dict:
-    """The arm's identity: bot revision, InferMatrix revision (its knowledge
-    tree feeds the Direct routes), and the behavior-affecting env. A dirty
-    or unknown source state is refused — a resumed campaign must never mix
-    outputs from different implementations behind one manifest."""
-    bot_sha, bot_dirty = git_state(bot_dir)
-    im_path = child_env.get("INFERMATRIX_PATH", "")
-    im_sha, im_dirty = (
-        git_state(Path(im_path)) if im_path else ("unset", True)
-    )
-    if (bot_dirty or bot_sha == "unknown" or im_dirty) and not os.environ.get(
-        "REVIEWBOT_EVAL_ALLOW_DIRTY"
-    ):
-        raise SystemExit(
-            f"source state is not clean/pinned (bot {bot_sha[:12]} "
-            f"dirty={bot_dirty}, infermatrix {im_sha[:12]} "
-            f"dirty={im_dirty}) — commit or stash first, or set "
-            "REVIEWBOT_EVAL_ALLOW_DIRTY=1 for a throwaway run"
-        )
+def build_config(child_env: dict[str, str], release: dict[str, Any]) -> dict:
+    """Stable arm identity from paired artifacts and behavior-only settings."""
     return {
-        "bot_sha": bot_sha,
-        "bot_dirty": bot_dirty,
-        "infermatrix_sha": im_sha,
-        "infermatrix_dirty": im_dirty,
+        "release": release,
         "review_context_mode": "no_discussion",
         "post_mode": "shadow",
         "env": {key: child_env.get(key, "") for key in _BEHAVIOR_KEYS},
+    }
+
+
+def _canonical_distribution(value: str) -> str:
+    return re.sub(r"[-_.]+", "-", value).lower()
+
+
+def _file_digest(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _wheel_metadata(path: Path) -> tuple[str, str]:
+    try:
+        with zipfile.ZipFile(path) as archive:
+            names = [
+                name for name in archive.namelist()
+                if name.endswith(".dist-info/METADATA")
+            ]
+            if len(names) != 1:
+                raise ReleaseValidationError(
+                    f"{path.name}: expected one wheel METADATA file"
+                )
+            metadata = email.parser.BytesParser().parsebytes(
+                archive.read(names[0])
+            )
+    except (OSError, zipfile.BadZipFile) as exc:
+        raise ReleaseValidationError(f"invalid wheel: {path.name}") from exc
+    name, version = metadata.get("Name"), metadata.get("Version")
+    if not name or not version:
+        raise ReleaseValidationError(f"{path.name}: incomplete wheel metadata")
+    return name, version
+
+
+def _release_python(value: str) -> Path:
+    if not value:
+        raise ReleaseValidationError("REVIEWBOT_PYTHON is required")
+    path = Path(value).expanduser()
+    if (
+        not path.is_absolute()
+        or ".." in path.parts
+        or path.parent.name != "bin"
+        or path.parent.parent.name != ".venv"
+        or not path.name.startswith("python")
+    ):
+        raise ReleaseValidationError(
+            "REVIEWBOT_PYTHON must be an absolute <release>/.venv/bin/python"
+        )
+    if not path.is_file() or not os.access(path, os.X_OK):
+        raise ReleaseValidationError("REVIEWBOT_PYTHON is not executable")
+    return path
+
+
+def _release_manifest_path(python: Path, configured: str) -> Path:
+    app_root = python.parent.parent.parent
+    if configured:
+        candidate = Path(configured).expanduser()
+        if not candidate.is_absolute() or ".." in candidate.parts:
+            raise ReleaseValidationError(
+                "REVIEWBOT_RELEASE_MANIFEST must be an absolute path"
+            )
+    else:
+        candidate = app_root / "manifest.json"
+    if candidate.is_symlink() or not candidate.is_file():
+        raise ReleaseValidationError("paired release manifest is missing")
+    resolved = candidate.resolve()
+    if resolved.parent != app_root.resolve():
+        raise ReleaseValidationError(
+            "paired release manifest is outside the release app root"
+        )
+    return resolved
+
+
+def _runtime_identity(
+    python: Path, child_env: dict[str, str]
+) -> dict[str, Any]:
+    completed = subprocess.run(
+        [str(python), "-I", "-c", _RUNTIME_PROBE],
+        cwd=python.parent.parent.parent,
+        env=child_env,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout).strip()[-1000:]
+        raise ReleaseValidationError(
+            f"installed release identity probe failed: {detail}"
+        )
+    try:
+        runtime = json.loads(completed.stdout)
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise ReleaseValidationError(
+            "installed release identity probe returned invalid JSON"
+        ) from exc
+    if not isinstance(runtime, dict):
+        raise ReleaseValidationError("installed release identity is not an object")
+    expected_prefix = python.parent.parent.resolve()
+    try:
+        prefix = Path(runtime["prefix"]).resolve()
+        modules = (
+            Path(runtime["reviewbot_module"]).resolve(),
+            Path(runtime["provider_module"]).resolve(),
+        )
+        for module in modules:
+            module.relative_to(prefix)
+    except (KeyError, OSError, ValueError, TypeError) as exc:
+        raise ReleaseValidationError(
+            "runtime modules are not installed inside the selected release venv"
+        ) from exc
+    if prefix != expected_prefix:
+        raise ReleaseValidationError(
+            "REVIEWBOT_PYTHON resolved a different runtime prefix"
+        )
+    return runtime
+
+
+def _safe_wheel(root: Path, value: Any) -> Path:
+    if not isinstance(value, str):
+        raise ReleaseValidationError("manifest wheel path must be a string")
+    pure = PurePosixPath(value)
+    if (
+        len(pure.parts) != 2
+        or pure.parts[0] != "wheelhouse"
+        or pure.is_absolute()
+        or ".." in pure.parts
+        or not pure.name.endswith(".whl")
+    ):
+        raise ReleaseValidationError(f"unsafe manifest wheel path: {value!r}")
+    candidate = root.joinpath(*pure.parts)
+    if candidate.is_symlink() or not candidate.is_file():
+        raise ReleaseValidationError(f"manifest wheel is missing: {value}")
+    resolved = candidate.resolve()
+    try:
+        resolved.relative_to(root)
+    except ValueError as exc:
+        raise ReleaseValidationError("manifest wheel escapes release root") from exc
+    return resolved
+
+
+def validate_paired_release(
+    manifest_path: Path, runtime: dict[str, Any]
+) -> dict[str, Any]:
+    raw = manifest_path.read_bytes()
+    if not raw or len(raw) > _MANIFEST_LIMIT:
+        raise ReleaseValidationError("paired release manifest size is invalid")
+    try:
+        manifest = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ReleaseValidationError("paired release manifest is invalid JSON") from exc
+    required_top = {
+        "schema_version", "release_id", "created_at", "python", "reviewbot",
+        "provider", "api_expectations", "provider_capabilities", "wheelhouse",
+    }
+    if (
+        not isinstance(manifest, dict)
+        or set(manifest) != required_top
+        or manifest.get("schema_version") != 1
+    ):
+        raise ReleaseValidationError("unsupported paired release manifest")
+
+    components: dict[str, dict[str, Any]] = {}
+    for name, distribution in (
+        ("reviewbot", "omni-reviewbot"),
+        ("provider", "infermatrix-copilot"),
+    ):
+        component = manifest.get(name)
+        fields = {"distribution", "version", "git_sha", "wheel", "sha256"}
+        if not isinstance(component, dict) or set(component) != fields:
+            raise ReleaseValidationError(f"malformed {name} component")
+        if _canonical_distribution(str(component["distribution"])) != distribution:
+            raise ReleaseValidationError(f"unexpected {name} distribution")
+        if not _SHA.fullmatch(str(component["git_sha"])):
+            raise ReleaseValidationError(f"invalid {name} git SHA")
+        if not _DIGEST.fullmatch(str(component["sha256"])):
+            raise ReleaseValidationError(f"invalid {name} wheel hash")
+        components[name] = component
+    release_id = (
+        f"{components['reviewbot']['git_sha']}-"
+        f"{components['provider']['git_sha']}"
+    )
+    if manifest["release_id"] != release_id:
+        raise ReleaseValidationError("release ID does not bind both component SHAs")
+
+    capabilities = runtime.get("provider_capabilities")
+    if not isinstance(capabilities, dict):
+        raise ReleaseValidationError("runtime has no public provider capabilities")
+    if runtime.get("python") != manifest["python"]:
+        raise ReleaseValidationError("runtime Python differs from manifest")
+    if runtime.get("reviewbot_version") != components["reviewbot"]["version"]:
+        raise ReleaseValidationError("installed ReviewBot version differs from manifest")
+    if runtime.get("provider_version") != components["provider"]["version"]:
+        raise ReleaseValidationError("installed provider version differs from manifest")
+    if capabilities != manifest["provider_capabilities"]:
+        raise ReleaseValidationError(
+            "runtime public capabilities differ from paired manifest"
+        )
+    if capabilities.get("distribution_version") != runtime.get("provider_version"):
+        raise ReleaseValidationError(
+            "runtime provider version differs from public capabilities"
+        )
+    if not re.fullmatch(r"sha256:[0-9a-f]{64}", str(
+        capabilities.get("resource_revision", "")
+    )):
+        raise ReleaseValidationError("runtime resource revision is invalid")
+    expectations = manifest.get("api_expectations")
+    if not isinstance(expectations, dict):
+        raise ReleaseValidationError("manifest has no API expectations")
+    for kind in ("direct", "strict", "knowledge"):
+        key = f"{kind}_api_version"
+        if expectations.get(key) != capabilities.get(key):
+            raise ReleaseValidationError(f"runtime {kind} API differs from manifest")
+    required = expectations.get("required_capabilities")
+    if set(required or ()) != _REQUIRED_CAPABILITIES or any(
+        capabilities.get(key) is not True for key in _REQUIRED_CAPABILITIES
+    ):
+        raise ReleaseValidationError("runtime capability handshake is incomplete")
+
+    root = manifest_path.parent.resolve()
+    entries: dict[str, dict[str, Any]] = {}
+    wheelhouse = manifest.get("wheelhouse")
+    if not isinstance(wheelhouse, list) or len(wheelhouse) < 2:
+        raise ReleaseValidationError("manifest wheelhouse is incomplete")
+    for item in wheelhouse:
+        fields = {"path", "distribution", "version", "sha256", "size"}
+        if not isinstance(item, dict) or set(item) != fields:
+            raise ReleaseValidationError("malformed wheelhouse entry")
+        path = _safe_wheel(root, item["path"])
+        if item["path"] in entries:
+            raise ReleaseValidationError("duplicate wheelhouse path")
+        if (
+            _file_digest(path) != item["sha256"]
+            or path.stat().st_size != item["size"]
+        ):
+            raise ReleaseValidationError(f"wheel artifact mismatch: {path.name}")
+        entries[item["path"]] = item
+    actual = {
+        f"wheelhouse/{path.name}"
+        for path in (root / "wheelhouse").glob("*.whl")
+        if path.is_file() and not path.is_symlink()
+    }
+    if actual != set(entries):
+        raise ReleaseValidationError("wheelhouse files differ from manifest")
+    for name, component in components.items():
+        item = entries.get(component["wheel"])
+        if item is None or any(
+            item[key] != component[key]
+            for key in ("distribution", "version", "sha256")
+        ):
+            raise ReleaseValidationError(f"{name} wheel is not hash-bound")
+        wheel = _safe_wheel(root, component["wheel"])
+        distribution, version = _wheel_metadata(wheel)
+        if (
+            _canonical_distribution(distribution)
+            != _canonical_distribution(component["distribution"])
+            or version != component["version"]
+        ):
+            raise ReleaseValidationError(f"{name} wheel metadata differs")
+
+    return {
+        "paired": True,
+        "throwaway": False,
+        "manifest_fingerprint": "sha256:" + hashlib.sha256(raw).hexdigest(),
+        "release_id": release_id,
+        "python": manifest["python"],
+        "reviewbot": {
+            key: components["reviewbot"][key]
+            for key in ("version", "git_sha", "sha256")
+        },
+        "provider": {
+            **{
+                key: components["provider"][key]
+                for key in ("version", "git_sha", "sha256")
+            },
+            "resource_revision": capabilities["resource_revision"],
+        },
+    }
+
+
+def _declared_runtime(manifest_path: Path) -> dict[str, Any]:
+    """Project manifest claims through the normal validator before staging."""
+    try:
+        manifest = json.loads(manifest_path.read_bytes())
+        return {
+            "python": manifest["python"],
+            "reviewbot_version": manifest["reviewbot"]["version"],
+            "provider_version": manifest["provider"]["version"],
+            "provider_capabilities": manifest["provider_capabilities"],
+        }
+    except (KeyError, TypeError, json.JSONDecodeError) as exc:
+        raise ReleaseValidationError(
+            "paired release manifest cannot declare a runtime"
+        ) from exc
+
+
+def _stage_release(manifest_path: Path, destination: Path) -> Path:
+    """Copy the already-validated wheelhouse into a private immutable input."""
+    raw = manifest_path.read_bytes()
+    if not raw or len(raw) > _MANIFEST_LIMIT:
+        raise ReleaseValidationError("paired release manifest size is invalid")
+    try:
+        manifest = json.loads(raw)
+    except json.JSONDecodeError as exc:  # defensive; caller validated it
+        raise ReleaseValidationError("paired release manifest changed") from exc
+    wheelhouse = manifest.get("wheelhouse") if isinstance(manifest, dict) else None
+    if not isinstance(wheelhouse, list) or len(wheelhouse) < 2:
+        raise ReleaseValidationError("manifest wheelhouse is incomplete")
+    destination.mkdir(mode=0o700, parents=True)
+    staged_manifest = destination / "manifest.json"
+    staged_manifest.write_bytes(raw)
+    staged_wheels = destination / "wheelhouse"
+    staged_wheels.mkdir(mode=0o700)
+    root = manifest_path.parent.resolve()
+    for item in wheelhouse:
+        fields = {"path", "distribution", "version", "sha256", "size"}
+        if not isinstance(item, dict) or set(item) != fields:
+            raise ReleaseValidationError("malformed wheelhouse entry")
+        source = _safe_wheel(root, item["path"])
+        target = staged_wheels / source.name
+        shutil.copyfile(source, target)
+        target.chmod(0o600)
+        if (
+            _file_digest(target) != item["sha256"]
+            or target.stat().st_size != item["size"]
+        ):
+            raise ReleaseValidationError(
+                f"wheel changed while staging: {source.name}"
+            )
+    return staged_manifest
+
+
+def _run_release_command(
+    command: list[str],
+    *,
+    cwd: Path,
+    env: dict[str, str],
+    purpose: str,
+    timeout: int = 600,
+) -> None:
+    completed = subprocess.run(
+        command,
+        cwd=cwd,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        check=False,
+    )
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout).strip()[-1500:]
+        raise ReleaseValidationError(f"{purpose} failed: {detail}")
+
+
+def _fresh_release_venv(
+    bootstrap_python: Path,
+    manifest_path: Path,
+    child_env: dict[str, str],
+) -> tuple[TemporaryDirectory[str], Path, Path]:
+    """Install the checked pair offline; this interpreter runs the campaign."""
+    temporary = TemporaryDirectory(prefix="reviewbot-eval-release-")
+    root = Path(temporary.name)
+    try:
+        release_root = root / "release"
+        staged_manifest = _stage_release(manifest_path, release_root)
+        # Validate the private snapshot, not paths that could change between
+        # validation and pip. No artifact executes before this completes.
+        validate_paired_release(
+            staged_manifest, _declared_runtime(staged_manifest)
+        )
+        manifest = json.loads(staged_manifest.read_text(encoding="utf-8"))
+        venv = release_root / ".venv"
+        _run_release_command(
+            [str(bootstrap_python), "-I", "-m", "venv", str(venv)],
+            cwd=release_root,
+            env=child_env,
+            purpose="fresh release venv creation",
+        )
+        python = _release_python(str(venv / "bin" / "python"))
+        install_env = {
+            key: value
+            for key, value in child_env.items()
+            if not key.startswith("PIP_")
+        }
+        install_env.update({
+            "PIP_CONFIG_FILE": os.devnull,
+            "PIP_NO_INDEX": "1",
+            "PIP_NO_CACHE_DIR": "1",
+            "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+        })
+        wheelhouse = release_root / "wheelhouse"
+        roots = [
+            str(_safe_wheel(release_root, manifest[name]["wheel"]))
+            for name in ("reviewbot", "provider")
+        ]
+        _run_release_command(
+            [
+                str(python), "-I", "-m", "pip", "install",
+                "--disable-pip-version-check", "--no-input", "--no-index",
+                "--no-cache-dir", "--only-binary=:all:",
+                "--find-links", str(wheelhouse),
+                *roots,
+            ],
+            cwd=release_root,
+            env=install_env,
+            purpose="offline paired-wheel installation",
+        )
+        _run_release_command(
+            [str(python), "-I", "-m", "pip", "check"],
+            cwd=release_root,
+            env=install_env,
+            purpose="fresh release dependency check",
+            timeout=120,
+        )
+        return temporary, python, staged_manifest
+    except Exception:
+        temporary.cleanup()
+        raise
+
+
+def _unpaired_release(runtime: dict[str, Any], reason: str) -> dict[str, Any]:
+    capabilities = runtime.get("provider_capabilities") or {}
+    return {
+        "paired": False,
+        "throwaway": True,
+        "manifest_fingerprint": "unpaired",
+        "release_id": "unpaired",
+        "reason": reason[:300],
+        "reviewbot": {"version": str(runtime.get("reviewbot_version", "unknown"))},
+        "provider": {
+            "version": str(runtime.get("provider_version", "unknown")),
+            "resource_revision": str(capabilities.get("resource_revision", "unknown")),
+        },
     }
 
 
@@ -164,27 +607,34 @@ class Runner:
         self.gen_reps = int(os.environ.get("GEN_REPLICATES", "3"))
         self.jobs = int(os.environ.get("ARM_JOBS", "2"))
         self.timeout = int(os.environ.get("REVIEWBOT_TIMEOUT_S", "1800"))
-        self.bot_dir = Path(
-            os.environ.get("REVIEWBOT_DIR")
-            or HERE.parent.parent.parent / "omni-reviewbot"
-        ).resolve()
-        venv_python = self.bot_dir / ".venv" / "bin" / "python"
-        self.python = os.environ.get("REVIEWBOT_PYTHON") or (
-            str(venv_python) if venv_python.exists() else "python3"
+        self.python = os.environ.get("REVIEWBOT_PYTHON", "").strip()
+        self.release_manifest = os.environ.get(
+            "REVIEWBOT_RELEASE_MANIFEST", ""
+        ).strip()
+        self.allow_unpaired = (
+            os.environ.get("REVIEWBOT_EVAL_ALLOW_UNPAIRED") == "1"
         )
-        env_file = Path(
-            os.environ.get("REVIEWBOT_ENV_FILE") or self.bot_dir / ".env"
-        )
-        # The bot's .env first, hard overrides LAST — the measurement
-        # contract must win over whatever the operator's file says.
+        env_file_value = os.environ.get("REVIEWBOT_ENV_FILE", "").strip()
+        env_file = Path(env_file_value).expanduser() if env_file_value else None
+        # An explicitly selected env file loads first; the measurement contract
+        # wins last. Provider source overrides never enter the child process.
         child = dict(os.environ)
-        child.update(_parse_env_file(env_file))
+        if env_file is not None:
+            child.update(_parse_env_file(env_file))
+        child = {
+            key: value
+            for key, value in child.items()
+            if not key.startswith("INFERMATRIX_")
+        }
+        child.pop("PYTHONPATH", None)
+        child.pop("PYTHONHOME", None)
         child.update(
             {
                 "POST_MODE": "shadow",
                 "REVIEW_CONTEXT_MODE": "no_discussion",
                 "REVIEWBOT_STATE_DIR": str(STATE_DIR),
-                "PYTHONPATH": str(self.bot_dir / "src"),
+                "PYTHONNOUSERSITE": "1",
+                "PYTHONSAFEPATH": "1",
             }
         )
         self.child_env = child
@@ -195,11 +645,67 @@ class Runner:
         self.failures: list[str] = []
         self._lock = threading.Lock()
         self.config: dict | None = None
+        self._release_temp: TemporaryDirectory[str] | None = None
 
     def ensure_config(self) -> dict:
         if self.config is None:
-            self.config = build_config(self.child_env, self.bot_dir)
+            fresh_temp: TemporaryDirectory[str] | None = None
+            try:
+                bootstrap_python = _release_python(self.python)
+                manifest = _release_manifest_path(
+                    bootstrap_python, self.release_manifest
+                )
+                fresh_temp, python, staged_manifest = _fresh_release_venv(
+                    bootstrap_python, manifest, self.child_env
+                )
+                runtime = _runtime_identity(python, self.child_env)
+                release = validate_paired_release(staged_manifest, runtime)
+            except (OSError, ReleaseValidationError) as exc:
+                if fresh_temp is not None:
+                    fresh_temp.cleanup()
+                if not self.allow_unpaired:
+                    sys.exit(
+                        "paired ReviewBot release validation failed: "
+                        f"{exc}; set REVIEWBOT_EVAL_ALLOW_UNPAIRED=1 only "
+                        "for a non-month throwaway run"
+                    )
+                if _MONTH_TAG.fullmatch(self.tag):
+                    sys.exit(
+                        "REVIEWBOT_EVAL_ALLOW_UNPAIRED=1 is forbidden for "
+                        "monthly campaign tags"
+                    )
+                try:
+                    python = _release_python(self.python)
+                    runtime = _runtime_identity(python, self.child_env)
+                except (OSError, ReleaseValidationError) as runtime_exc:
+                    sys.exit(
+                        "unpaired mode still requires an installed ReviewBot "
+                        f"release: {runtime_exc}"
+                    )
+                release = _unpaired_release(runtime, str(exc))
+                print(
+                    "[arm] WARNING: unpaired throwaway release; results are "
+                    "not eligible for the monthly series",
+                    flush=True,
+                )
+            else:
+                self._release_temp = fresh_temp
+            self.python = str(python)
+            if self._release_temp is not None:
+                venv = Path(self.python).parent.parent
+                self.child_env["VIRTUAL_ENV"] = str(venv)
+                self.child_env["PATH"] = (
+                    str(venv / "bin")
+                    + os.pathsep
+                    + self.child_env.get("PATH", "")
+                )
+            self.config = build_config(self.child_env, release)
         return self.config
+
+    def close(self) -> None:
+        if self._release_temp is not None:
+            self._release_temp.cleanup()
+            self._release_temp = None
 
     # --- manifests ---
 
@@ -270,10 +776,11 @@ class Runner:
                 sys.exit(f"pr{n} missing from {EXPECTED_HEADS}")
             if not (GT / f"pr{n}.diff").is_file():
                 sys.exit(f"gt/pr{n}.diff missing — cannot validate diff range")
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
         doctor = subprocess.run(
             [self.python, "-m", "omni_reviewbot", "doctor"],
-            cwd=self.bot_dir, env=self.child_env,
-            capture_output=True, text=True, timeout=300,
+            cwd=STATE_DIR, env=self.child_env,
+            capture_output=True, text=True, timeout=300, check=False,
         )
         if doctor.returncode != 0:
             sys.exit(
@@ -288,8 +795,8 @@ class Runner:
             return
         completed = subprocess.run(
             [self.python, "-m", "omni_reviewbot", "review", "--pr", str(pr)],
-            cwd=self.bot_dir, env=self.child_env,
-            capture_output=True, text=True, timeout=self.timeout,
+            cwd=STATE_DIR, env=self.child_env,
+            capture_output=True, text=True, timeout=self.timeout, check=False,
         )
         output = (completed.stdout or "") + (completed.stderr or "")
         if completed.returncode != 0:
@@ -358,7 +865,7 @@ class Runner:
         ]
         print(
             f"[arm] tag={self.tag} items={len(self.items)} "
-            f"reps={self.gen_reps} bot={self.bot_dir} "
+            f"reps={self.gen_reps} python={self.python or '<execution-required>'} "
             f"provider={self.child_env.get('AGENT_PROVIDER', 'codex')}"
         )
         print("\n".join(plan))
@@ -387,11 +894,14 @@ class Runner:
 
 def main() -> int:
     runner = Runner()
-    if "--preflight" in sys.argv:
-        runner.preflight()
-        print("[arm] preflight ok")
-        return 0
-    return runner.run(dry_run="--dry-run" in sys.argv)
+    try:
+        if "--preflight" in sys.argv:
+            runner.preflight()
+            print("[arm] preflight ok")
+            return 0
+        return runner.run(dry_run="--dry-run" in sys.argv)
+    finally:
+        runner.close()
 
 
 if __name__ == "__main__":

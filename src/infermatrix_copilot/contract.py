@@ -35,12 +35,21 @@ from .direct_routing import (
     direct_execution_budget,
     direct_knowledge_routes,
     direct_mandatory_review_guides,
+    direct_review_plan,
 )
 from .run_trace import RunTrace
+from .sdk.v1.models import (
+    DIRECT_API_VERSION,
+    KNOWLEDGE_API_VERSION,
+    SDK_API_VERSION,
+    STRICT_API_VERSION,
+)
 
 __all__ = [
     "COMMENT_FIELDS",
     "DIRECT_API_VERSION",
+    "KNOWLEDGE_API_VERSION",
+    "SDK_API_VERSION",
     "STRICT_API_VERSION",
     "build_review_result",
     "capabilities",
@@ -48,13 +57,10 @@ __all__ = [
     "direct_execution_budget",
     "direct_knowledge_routes",
     "direct_mandatory_review_guides",
+    "direct_review_plan",
     "sanitize_comments",
     "unknown_run_result",
 ]
-
-# Bumped when the shape below changes in a way a consumer must notice.
-STRICT_API_VERSION = "1.0.0"
-DIRECT_API_VERSION = "1.0.0"
 
 # The only comment keys that cross the boundary. A review comment accumulates
 # internal bookkeeping on real runs (`_verified`, `_anchor_unverified`,
@@ -77,15 +83,15 @@ def capabilities(*, max_strict_workers: int = 1,
     `max_strict_workers` is reported, not assumed: the MCP server drains its
     queue with a single worker, so a bot that fans out Strict requests should
     know they serialize rather than infer concurrency that does not exist."""
-    return {
-        "direct_api_version": DIRECT_API_VERSION,
-        "strict_api_version": STRICT_API_VERSION,
-        "supports_expected_head": True,
-        "supports_structured_result": True,
-        "supports_post_false": True,
-        "supports_file_locking": bool(supports_file_locking),
-        "max_strict_workers": int(max_strict_workers),
-    }
+    # Compatibility shim: new consumers import ``infermatrix_copilot.sdk.v1``;
+    # existing MCP and cross-repo callers keep receiving the legacy dict shape,
+    # now with the distribution/SDK/resource identity added.
+    from .sdk.v1 import get_capabilities
+
+    return get_capabilities(
+        max_strict_workers=max_strict_workers,
+        supports_file_locking=supports_file_locking,
+    ).to_dict()
 
 
 def _read_json(path: Path) -> dict:
