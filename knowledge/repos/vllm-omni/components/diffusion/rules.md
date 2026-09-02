@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5255", "PR #5543", "PR #5720", "PR #5737", "PR #5764", "PR #5801", "PR #5802", "PR #5839", "PR #5848", "PR #5872", "PR #5981", "PR #6094", "PR #6102", "PR #6279", "PR #6385", "PR #6445", vllm_omni/diffusion/attention/backends/ring/ring_kernels.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/offloader/, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/quantization/component_config.py, vllm_omni/quantization/factory.py, tests/diffusion/attention/test_attention_sp.py, tests/diffusion/attention/test_ulysses_uaa.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/offloader/test_distributed_layerwise_backend.py]
+sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5255", "PR #5344", "PR #5543", "PR #5720", "PR #5737", "PR #5764", "PR #5801", "PR #5802", "PR #5839", "PR #5848", "PR #5872", "PR #5981", "PR #6094", "PR #6102", "PR #6279", "PR #6385", "PR #6445", vllm_omni/diffusion/attention/backends/flashinfer_attn.py, vllm_omni/diffusion/attention/backends/ring/ring_kernels.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/offloader/, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/quantization/component_config.py, vllm_omni/quantization/factory.py, tests/diffusion/attention/test_attention_sp.py, tests/diffusion/attention/test_ulysses_uaa.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/offloader/test_distributed_layerwise_backend.py]
 confidence: high
 ---
 
@@ -29,7 +29,7 @@ confidence: high
 | component quantization、text encoder/transformer/VAE 独立配置、owner prefix、meta/offload | `checkpoint-distributed`：`DIFF-2c` | `quantization/factory.py::{build_quant_config,resolve_quant_config_from_disk}` → `component_config.py::ComponentQuantizationConfig.resolve` → `data.py::_propagate_quantization_from_tf_config` → component linear consumer |
 | modular/multi-DiT、`_dit_modules`、Cache-DiT/compile/SP/LoRA/offload lifecycle | `checkpoint-distributed`：`DIFF-2f` | pipeline runtime component list → registry/runner/cache/LoRA/module discovery consumers |
 | LPIPS/PSNR/相似度阈值、CPU offload、量化质量证据 | `quality-evidence`：`DIFF-3a` | changed exact case → runner `execute_model` → model pipeline；A/B 同路径 |
-| paged KV/cache、backend/platform、GQA/layout、Ring/Ulysses、预算与 admission | `system-runtime`：`DIFF-4a`–`4g` | engine init → attention parallel/backend → platform hook → scheduler |
+| paged KV/cache、backend/platform、GQA/layout、Ring/Ulysses、FlashInfer quant、预算与 admission | `system-runtime`：`DIFF-4a`–`4h` | engine init → attention parallel/backend → platform hook → scheduler |
 | worker/RPC 异常、rank-status、traceback/device cache 清理 | `system-runtime`：`DIFF-4d` | `diffusion_worker.py::{_execute_rpc,_worker_busy_loop}` 的 raise/reply/status 路径 |
 
 | 审查组 | 什么时候触发 | 规则 ID |
@@ -38,7 +38,7 @@ confidence: high
 | `execution-parity` | graph/eager、solver、RNG、generator、tensor dtype/device、fused layer、async output readiness | `DIFF-1a`–`1e` |
 | `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP、artifact identity、distributed offload、multi-DiT lifecycle | `DIFF-2a`–`2f` |
 | `quality-evidence` | 质量阈值、offload、A/B case | `DIFF-3a` |
-| `system-runtime` | cache/预算、native/backend/platform、attention layout、异常与并发 | `DIFF-4a`–`4g` |
+| `system-runtime` | cache/预算、native/backend/platform、attention layout、异常与并发 | `DIFF-4a`–`4h` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `DIFF-0a`, `DIFF-0b` |
 
 ## 优化路径与 eager 的等价合同
@@ -315,6 +315,33 @@ confidence: high
   target 未复测。修正为 4 heads 的 Hybrid 25.30s pass 只见 final PR body，未附 hardware/SHA/log。
   因此目标 pin 有局部数值证据和未来 L4 gate wiring，但没有附带 L4 run 产物，Hybrid
   guard/positive 也未被该新 job 覆盖。^[PR #5255]
+
+### DIFF-4h — FlashInfer mixed-dtype plan 必须绑定完整 runtime shape 与 mask 内容
+
+- 触发：修改 `FLASHINFER_ATTN`、`BatchPrefillWithRaggedKVCacheWrapper`、QK16/V8、backend
+  selection、ragged indptr/plan cache 或 custom mask fallback。
+- 强制：输入保持初始化时 CUDA device；Q/K 只允许 fp16/bf16 override，V 另允许
+  fp8_e4m3，wrapper 输出恢复原 query dtype。auto backend 按 compute capability 选 major>=10
+  `cute-dsl`、major>=9 `fa3`、否则 `fa2`；non-CuTe 才接受 custom mask，CuTe nontrivial mask、
+  causal+explicit mask 或无法 pack 的 mask 必须回退原始输入的 Torch SDPA。
+- 强制：plan key 至少绑定 batch、Q/KV length、Q/KV heads、QK/K/VO head dim、Q/K/V/output
+  dtype、causal、scale 与是否有 mask；shape/dtype 改变重建 indptr/plan，unmasked 同 key 可复用。
+  mask shape 相同也可能内容不同，所以每次 masked call 都必须重新 plan，不能只按 pointer/shape
+  cache。Q/K/V cast 留在 compile-visible path，wrapper plan/run 边界才 disable compiler。目标 key
+  虽记录 `head_dim_k`，plan 只接收 `head_dim_qk` 与 `head_dim_vo`，且未断言 Q/K head dim 相等；
+  caller 必须保持 `D_q == D_k`，并补 mismatch fail-fast test，不能把 key 字段误当 backend 已消费。
+- 禁止：把本 PR 早期 Sage/TRTLLM kernels 当成 merged scope（review 后删除并转交 TRTLLM
+  backend）；把 activation 直接 cast 成 FP8 描述成带 scale 的 checkpoint quantization；用
+  `supports_attention_mask=True` 推断 CuTe 支持任意 mask。
+- 验收：mixed QK/V dtype 只能在 FlashInfer >=0.6.16rc1；目标对可解析的 <=0.6.15 fail-fast，
+  但没有 dependency pin，只有 docs/code gate。该 gate 比较配置 override：两者均为 None 时立即
+  返回，即使 caller 实际传入 mixed Q/K 与 V tensor 也不拦；capability 必须最终按 plan 中真实
+  q/k/v dtype 校验。缺失/非法 `flashinfer.__version__` 也会直接放行，是未封闭 gap。须补测试覆盖
+  dtype allowlist、old/missing version、auto backend、device mismatch、plan reuse/replan、同 shape
+  不同 mask、CuTe/causal fallback、GQA 与 output dtype；本 PR 没有新增 repo test，只有外部 smoke。
+  PR 的 Cosmos3 1280×720、35 steps、seed42，B200/B300 DiT timing 与 Nano 前24帧 LPIPS=0.051496
+  只绑定 vLLM-Omni `4ce23c33` + FlashInfer `d0889c7c` 的 pre-final 环境；final config/version gate
+  commit 后无复测，且这些不是端到端 latency、稳定 speedup 或通用质量阈值。^[PR #5344]
 
 相关执行流见 [Diffusion architecture](architecture.md)；benchmark 证据合同见
 [performance evidence](../../benchmark/guides/performance-evidence.md)。
