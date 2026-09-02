@@ -4,12 +4,12 @@ created: 2026-07-21
 updated: 2026-08-10
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: [vllm_omni/model_executor/models/ming_flash_omni/, vllm_omni/diffusion/models/ming_flash_omni/, vllm_omni/model_executor/stage_input_processors/ming_flash_omni.py, vllm_omni/entrypoints/openai/tts_adapters/ming_flash_omni_tts.py, "PR #5746"]
+sources: [vllm_omni/model_executor/models/ming_flash_omni/, vllm_omni/diffusion/models/ming_flash_omni/, vllm_omni/model_executor/stage_input_processors/ming_flash_omni.py, vllm_omni/entrypoints/openai/tts_adapters/__init__.py, vllm_omni/entrypoints/openai/tts_adapters/ming_flash_omni_tts.py, tools/pre_commit/check_tts_adapter.py, "PR #5746", "PR #5843"]
 ---
 
 # Ming-flash-omni
 
-以下事实在 `main @ 11f633aa` 复核。
+以下事实在 `main @ 33dd9a5a` 复核。
 
 ## 名称与范围
 
@@ -62,9 +62,8 @@ sources: [vllm_omni/model_executor/models/ming_flash_omni/, vllm_omni/diffusion/
 
 - 审查 ming_flash_omni 任一拓扑、BailingMM2 名字路由或 serving 消歧。talker-only speech
   已由 `MingFlashOmniTTSAdapter(stage_keys={"ming_tts"})` 负责请求校验和 prompt 构建；它继续
-  调用 server 上的 `_build_ming_flash_omni_prompt()`，是提取而非 prompt 合同改写。检测端仍有
-  同名高优先级 legacy detector 保护 `ming_tts` 与 Ming dense architecture 的消歧；不要因已注册
-  adapter 就假定 legacy detector 已移除，也不要把模型分支重新塞回共享 dispatcher。此过渡态
-  与 detection suite 的“legacy detector 不得同时有 adapter”不变量冲突；后续修复应把优先级
-  转移给 adapter 并移除同名 legacy 条目，同时验证 Ming dense architecture 仍正确消歧。
+  调用 server 上的 `_build_ming_flash_omni_prompt()`，是提取而非 prompt 合同改写。检测端的同名
+  legacy detector 已移除，`LEGACY_TTS_DETECTORS=()`；`ming_tts` stage key 由 adapter 自身检测，
+  其默认 priority 100 先于 Ming dense architecture fallback 的 200。不要把模型分支重新塞回共享
+  dispatcher。
 - 语义验收见 [model-validation](../../review/guides/model-validation.md)。

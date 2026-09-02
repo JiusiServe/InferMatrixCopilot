@@ -10,7 +10,7 @@ sources: []
 # Diffusion
 
 - 源码入口：`vllm_omni/diffusion/` 全树，含 16 个子模块：attention、cache、distributed、executor、hooks、layers、lora、model_loader、models、offloader、postprocess、profiler、quantization、sched、utils、worker
-- 源码校验：以上子模块均已在 `main @ c588208c` 验证存在；本轮新增/扩展的
+- 源码校验：以上子模块均已在 `main @ 33dd9a5a` 验证存在；本轮新增/扩展的
   async output、distributed layerwise offload 和 MiniMax H3 仍按各自模型/机制规则审查
 - 主要职责：多个 diffusion 模型共用的 pipeline、执行循环、scheduler 接入和运行机制
 
@@ -34,6 +34,7 @@ sources: []
 | local FlashAttention deterministic opt-in、dense/non-dense dispatch 与 config propagation | [attention rules](rules-attention.md) |
 | DLO DP collective wave、per-worker result queue、async pump、SHM ownership 与 shutdown | [multiprocess runtime rules](rules-output-lifecycle.md) |
 | diffusion step 与 request/continuous batching | [step and batching](step-and-batching.md) |
+| request-wave admission coalescing、stable window、deadline 与 finite config | [admission wait rules](rules-admission-wait.md) |
 | Scheduler-managed diffusion KV 的请求控制面、Hunyuan layout 与未实现边界 | [paged KV control plane](paged-kv-control-plane.md) |
 | Cache-DiT、TeaCache 和 prefix cache | [cache acceleration](cache-acceleration.md) |
 | TP/PP/SP/CFG/VAE/HSDP 等并行策略 | [parallelism](parallelism.md) |

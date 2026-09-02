@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["Issue #5369", "PR #3576", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5085", "PR #5157", "PR #5374", "PR #5670", "PR #5682", "PR #5713", "PR #5732", "PR #5746", "PR #5752", "PR #6138", "PR #6202", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_chat.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/entrypoints/openai/tts_adapters/, vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/cfg_companion_tracker.py, vllm_omni/metrics/prometheus.py, tests/entrypoints/test_async_omni.py, tests/entrypoints/openai_api/test_audex_serving_guards.py, tests/entrypoints/openai_api/test_omni_sleep_wakeup.py, tests/entrypoints/openai_api/test_tts_detection.py, tests/entrypoints/openai_api/test_video_api_utils.py, tests/entrypoints/openai_api/test_video_server.py, tests/tools/test_check_tts_adapter.py, tools/pre_commit/check_tts_adapter.py]
+sources: ["Issue #5369", "PR #3576", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5085", "PR #5157", "PR #5374", "PR #5670", "PR #5682", "PR #5713", "PR #5732", "PR #5746", "PR #5752", "PR #5843", "PR #6138", "PR #6202", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_chat.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/entrypoints/openai/tts_adapters/, vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/cfg_companion_tracker.py, vllm_omni/metrics/prometheus.py, tests/entrypoints/test_async_omni.py, tests/entrypoints/openai_api/test_audex_serving_guards.py, tests/entrypoints/openai_api/test_omni_sleep_wakeup.py, tests/entrypoints/openai_api/test_tts_detection.py, tests/entrypoints/openai_api/test_video_api_utils.py, tests/entrypoints/openai_api/test_video_server.py, tests/tools/test_check_tts_adapter.py, tools/pre_commit/check_tts_adapter.py]
 confidence: high
 ---
 
@@ -307,8 +307,8 @@ confidence: high
   `(detect_priority, name)` 确定性排序，等优先级 detector 不得重叠。stage-key 候选、仅靠
   architecture 定位的 AR entry stage、最终 model type 都从该并集派生；非集合规则覆写
   `matches()`，拓扑能力覆写 `stage_serves_speech()`，不要回填 `serving_speech.py` 分支。
-- 边界：VoxCPM2 talker architecture 是高优先级权威匹配；Ming flash 的 `ming_tts` legacy
-  stage 先于 Ming dense 的 architecture fallback；CoVo 的通用 `fused_thinker_talker` 还需
+- 边界：VoxCPM2 talker architecture 是高优先级权威匹配；Ming flash adapter 的 `ming_tts`
+  stage-key 以默认 priority 100 先于 Ming dense 的 architecture fallback priority 200；CoVo 的通用 `fused_thinker_talker` 还需
   architecture 确认；Audex omni 还需同部署的 `audex_code2wav`。纯 diffusion 的
   `for_diffusion()` 直接绕过 adapter detection，当前 `DiffusionTTSAdapter` 没有生产 subclass。
 - 验收：冻结旧 ladder 作为 oracle，覆盖 in-tree pipeline stage、adapter 声明 architecture、
@@ -321,13 +321,10 @@ confidence: high
   `initial_codec_chunk_frames`、`ref_audio`/`ref_text` 和非正 `max_new_tokens`；`build()` 继续委托
   server 的 `_build_ming_flash_omni_prompt()`，并返回空 `tts_params` 与固定 model type。公开校验
   和 generation preparation 都必须经 `resolve_adapter()`，不要把同一分支加回
-  `serving_speech.py`。#5746 仍保留同名、priority 50 的 legacy detector，所以当前只是**执行
-  adapter 提取**：检测仍由 legacy 条目先命中，随后以相同 model-type 名解析到 adapter；清理
-  detector 时必须先用 detection union/oracle 证明 `ming_tts` 对 Ming dense architecture 的优先级
-  不变。当前 target 还违反 `test_tts_detection.py::test_legacy_detectors_have_no_adapter` 的全局
-  不变量（legacy 名必须 `resolve_adapter(...) is None`）；只删除旧的
-  `test_ming_flash_omni_not_migrated` 不能修复它。验收必须移除该同名 legacy 条目并让 adapter
-  自身保留所需 priority，或显式重定义并成套更新 union 不变量测试。^[PR #5746]
+  `serving_speech.py`。`LEGACY_TTS_DETECTORS` 当前为空，branch/legacy AST ratchet 是 27/0；
+  Ming Flash 只由 adapter 的 `ming_tts` stage key 检测，且 legacy 名不得同时注册 adapter。
+  验收仍须证明 `ming_tts` stage key 与 Ming dense architecture fallback 的消歧不变。
+  ^[PR #5746] ^[PR #5843]
 - 证据：CPU oracle/ratchet suite 支撑检测等价；L20X VoxCPM2 只证明 architecture path 到达
   warmup，随后因基线同样复现的 vLLM skew 退出，未证明成功 speech endpoint/audio E2E。
 

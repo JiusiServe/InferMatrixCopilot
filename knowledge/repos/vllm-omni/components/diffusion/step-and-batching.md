@@ -45,8 +45,9 @@ batching 设计页及两份用户指南已删除；迁移依赖 MkDocs redirects
   （`vllm_omni/diffusion/sched/`、`worker/`）。
 
 request mode 的 `max_num_seqs>1` 要求 pipeline 显式声明 `supports_request_batch=True`，否则
-engine 初始化失败。`request_batch_max_wait_ms` 只在 request mode、支持 request batch、当前
-没有 running request 且等待值大于零时帮助突发请求成批；它用首请求延迟换 batch formation。
+engine 初始化失败（DLO DP concurrent 保留已有例外）。`request_batch_max_wait_ms` 的具体启停、
+stable window 与 deadline 已归 `RequestScheduler`；见
+[admission wait rules](rules-admission-wait.md)。它用首请求延迟换 batch formation。
 
 ## step capability 必须验证 grouped contract
 
