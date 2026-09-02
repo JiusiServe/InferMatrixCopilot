@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5723", "PR #5764", "PR #5836", "PR #5863", "PR #5896", "PR #5946", "PR #5969", docs/models/supported_models.md, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/utils/fa.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/offloader/, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/platforms/rocm/platform.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/entrypoints/openai_api/test_video_server.py]
+sources: ["PR #5723", "PR #5764", "PR #5836", "PR #5863", "PR #5896", "PR #5946", "PR #5969", "PR #5972", docs/models/supported_models.md, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/utils/fa.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/offloader/, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/platforms/rocm/platform.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/entrypoints/openai_api/test_video_server.py]
 confidence: high
 ---
 
@@ -102,7 +102,8 @@ measurement；模型输入、执行与加载合同返回 [MiniMax H3 rules](rule
 
 ## MMH3-3e — GB10 unified memory 容量证据不等于离散 GPU offload 合同
 
-- 触发：引用 DGX Spark/GB10 可运行性、97.7 GiB peak、36 分钟 latency，或推荐 offload/FP8。
+- 触发：引用 DGX Spark/GB10 可运行性、97.7/102.8 GiB allocator peak、T2VA/Ref2VA latency，
+  或推荐 offload/FP8。
 - 强制：只启动一个约 135 GiB FL2VA/Ref2VA partition；约 121 GiB 可用 unified memory 下必须用
   online FP8（仅 DiT 约 62→31 GiB，encoder/VAE 仍 BF16），禁用 CPU/DLO offload，因为 host/device
   共用物理池，DLO 观察到启动后 exit -9。用 eager、CUDNN_ATTN，并保持 TP/USP/ring/VAE patch
@@ -111,10 +112,29 @@ measurement；模型输入、执行与加载合同返回 [MiniMax H3 rules](rule
   单次 50-step T2VA 写成 throughput。960×576、8 s、50 steps 的 text/denoise/decode/mux/E2E 约
   0.25/2088/70/4.84/2169.4 s，部分 stage 来自另一次 10-step run；相同 10-step denoise 波动
   397–490 s，只能绑定该机器/配置。^[PR #5946]
-- 验收：probe 确认 HTTP 200、H.264 geometry/24 FPS 与 32 kHz stereo AAC，并记录 commit、allocator
-  及整机内存。目标仅新增 recipe、无自动测试；正文实测是 T2VA。评论称 Ref2VA“相同”但无命令、
-  输入、峰值或 artifact，FL2VA 也无独立证据，不能升级为已验证模式。recipe 声称 sync timeout
-  默认 1800 s，但 target `api_server.py` 默认是 600 s；2169 s full run 必须显式设置更大值。
+- 强制：Ref2VA 新证据只绑定同一单机 GB10/aarch64、单 Ref2VA partition、online FP8/eager/
+  CUDNN_ATTN/tiled VAE、parallel degrees 全 1、单请求、单 reference image、960×576、24 FPS、
+  8 s、flow shift 12、seed 1101。三次 10-step E2E 为 770.3–861.1 s，单次 50-step 为
+  4157.0 s；50-step denoise/per-step/decode 为 4039.6/80.79/69.4 s，allocator peak 102.8 GiB。
+  与相同 shape/steps 的 T2VA 2169.4 s 比值 1.92×只是这两个单次 observation，不是 mode 固有倍率。
+  10-step per-step 66.55–74.88 s、长请求 80.79 s 的热态差异要求容量规划用较慢端，不能承诺
+  cold-run 66 s。^[PR #5972]
+- 禁止：把 `X-Peak-Memory-MB: 105318.000` 当 GB10 整池峰值；它是
+  `torch.cuda.max_memory_reserved`。recipe 的 1 Hz `/proc/meminfo` 交叉检查只对该 50-step
+  单图请求成立：121.7 GiB 总池、`MemAvailable` 最低 7.4 GiB，推算约 114.3 GiB 已占用。
+  因此不能外推到更多图片、reference video、更大输出、并发或第二进程；这些均未测。6883-token
+  presentation 和 1.90× per-step 是该单图 prompt/log observation；“这些 attention tokens 导致
+  denoise 变慢”没有受控对照，只是 recipe 的合理推断，不是任意 Ref2VA 输入定律。两次后续热态
+  run 接近也没有温度/功耗 sensor 证据，不能据此证明稳定 thermal state。
+- 验收：probe 确认 HTTP 200、H.264 960×576/24 FPS、32 kHz stereo AAC 和约 8.032 s artifact，
+  并记录 exact commit、partition、reference count/type、shape/steps、stage-header、server-log mux、
+  allocator 与整机内存。FL2VA 仍无独立完成证据。PR #5972 只有 recipe diff、无可执行回归；
+  其 driver 仍是 placeholder，且版本说明同时写 vLLM 0.26.0、
+  vLLM-Omni `main @ e1aa6eae` 与“newer than v0.26.0”，复现时必须分别锁定两项目版本。recipe 又称
+  sync timeout 默认 1800 s，但 target `api_server.py` 默认是 600 s；T2VA/Ref2VA full run 都必须
+  显式设置更大值。raw log/header、reference image、输出 artifact 与 quality metric 均未提交或链接，
+  所以 HTTP/codec 描述不能替代可复核质量证据。当前文件还多出未配对的末尾 code fence，且版本
+  句含 malformed `.suggestion is v0.26.1`，发布前需修复。^[PR #5972]
 
 ## MMH3-3f — RTX PRO 6000 scaling 只绑定单机 T2VA 协议
 
