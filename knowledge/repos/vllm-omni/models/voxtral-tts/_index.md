@@ -1,15 +1,15 @@
 ---
 title: "Voxtral TTS（Mistral 两 stage 流式 TTS）"
 created: 2026-07-21
-updated: 2026-07-31
+updated: 2026-09-02
 type: index
 tags: [vllm-omni, models]
-sources: [vllm_omni/model_executor/models/voxtral_tts/, vllm_omni/deploy/voxtral_tts.yaml]
+sources: ["PR #5175", vllm_omni/model_executor/models/voxtral_tts/, vllm_omni/deploy/voxtral_tts.yaml]
 ---
 
 # Voxtral TTS
 
-以下事实在 `main @ 807db6ef` 复核（源码派生页,尚无本模型的运行经验沉淀）。
+以下事实在 `main @ 53afbf3a` 复核。
 
 ## 名称与范围
 
@@ -40,4 +40,5 @@ sources: [vllm_omni/model_executor/models/voxtral_tts/, vllm_omni/deploy/voxtral
 
 - 审查 voxtral_tts 的 mistral 加载三件套一致性、acoustic CUDA-graph 或
   async-chunk 改动；XPU 路径回归检查同一 deploy YAML 的 platform override。
+- hot-path graph/sync/cache 边界见 [Voxtral-TTS rules](rules.md)。
 - 语义验收见 [model-validation](../../review/guides/model-validation.md)。
