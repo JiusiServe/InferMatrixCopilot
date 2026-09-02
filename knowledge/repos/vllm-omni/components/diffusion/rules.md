@@ -192,8 +192,11 @@ confidence: high
   覆盖，PR 的 8×NPU H3 E2E 说明也缺少已填写的 commit 证据，不能升级为验证结论。 ^[PR #5802]
   DP concurrent wave 只可在 DLO+AllGather 开启，并从 `sampling_params.extra_args` 比较 canonical
   signature；no-AllGather 的 TP-local request 不得误走 fused batch。文档 compatibility matrix 中
-  “accepted” 只代表配置/源码 guard：TP+no-AllGather、HSDP+SP+no-AllGather、DP+SP 等尚无完整
-  model×hardware E2E 数值覆盖，不得升级为 production support。^[PR #5764] ^[PR #5839]
+  “accepted” 默认只代表配置/源码 guard；PR #5836 的 predecessor partition-path commit 为 H3
+  USP4+HSDP4+no-AllGather+8 resident layers 提供一次 4×H100、3/3 completion/perf run，故该 exact
+  组合不再是纯 config evidence，但没有 ordinary-offload 数值/输出质量对照，且 profiler 开启、
+  final repo-root modular route 未复测，仍不得升级为 production support。TP+no-AllGather、一般
+  DP+SP 等其他组合仍缺完整 model×hardware E2E。^[PR #5764] ^[PR #5839] ^[PR #5836]
 
 ### DIFF-2f — 多 DiT pipeline 的 component list 是所有共享 lifecycle 的唯一集合
 

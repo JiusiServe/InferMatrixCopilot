@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5706", "PR #5720", "PR #5737", "PR #5752", "PR #5764", "PR #5779", "PR #5801", "PR #5829", "PR #5837", vllm_omni/config/model.py, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/quantization/int8_config.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/diffusion/quantization/test_int8_config.py, tests/entrypoints/openai_api/test_video_server.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md]
+sources: ["PR #5703", "PR #5706", "PR #5720", "PR #5737", "PR #5752", "PR #5764", "PR #5779", "PR #5801", "PR #5829", "PR #5836", "PR #5837", benchmarks/diffusion/backends.py, benchmarks/diffusion/diffusion_benchmark_serving.py, vllm_omni/config/model.py, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/quantization/int8_config.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/diffusion/quantization/test_int8_config.py, tests/entrypoints/openai_api/test_video_server.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md]
 confidence: high
 ---
 
@@ -28,6 +28,7 @@ confidence: high
 | modular checkpoint、combined/partition task、两套 DiT、shared component | `MMH3-2d` | model index discovery → startup task selection → task-specific transformer/cache lifecycle |
 | DLO、TP-local、resident layers、encoder/VAE staging | `MMH3-3a` | H3 `_offload_plan` → shared DLO backend → pipeline encode/denoise/decode stage contexts |
 | RTX 5090/4090、24/32 GiB、consumer profile | `MMH3-3b` | recipe measurement commit/run record → exact target topology → quality/capacity validation |
+| 4×H100、DFX perf、T2V/TI2V/V2V、synthetic H.264 reference | `MMH3-3c` | nightly lane → perf JSON → benchmark request encoder/result artifact |
 
 ## MMH3-1a — component namespace 与 checkpoint transform 必须在 active loader 前闭合
 
@@ -268,6 +269,36 @@ load 完成时 dynamic quantize，text encoder、VAE 和非 eligible projection 
   分别记录 allocator peak、重复 latency 和 joint video/audio quality。目标 pin 引用的
   `examples/offline_inference/minimax_h3/run_h3_2gpu_all_tasks.sh` 实际不存在，因此不能把其
   four-task/MP4 validation 描述成可执行入口；补文件或改文档后再验收。^[PR #5764]
+
+## MMH3-3c — H100 DFX fixture 只证明 exact nightly workload 与 payload path
+
+- 触发：引用 H3 4×H100 latency、throughput、peak memory、DLO 节省，或修改 X2V perf lane、
+  random video reference 与 model-path resolution。
+- 强制：H100 测量只绑定 PR 中较早的 partition-path commit `e8c343d5`：4×H100 80 GiB、
+  USP4+HSDP4+encoder TP4+VAE PP4 tile、FLASH_ATTN、1344×768、209 frames、24 fps、8 steps、
+  seed 42、1 warmup、3 measured prompts、concurrency 1。后续 `4767c524` 才将 final cases 改成
+  repo-root modular model + `--task-type`，PR 没展示 switch 后复测；final nightly 只是预期采集。
+  target config 中 T2V/TI2V/V2V/DLO baseline 分别是 latency mean
+  38.3252/38.1385/105.7508/38.2089 s，peak-memory mean 54219.6/54622.8/55180.8/36218.4 MB；
+  它们是 result metadata，当前 completed-count gate 不消费这些阈值，不能称为 regression guard。
+  predecessor partition-path 实测值为 42.5836/42.3761/117.5009/42.4543 s、
+  60244/60692/61312/40242.67 MB、
+  0.0235/0.0236/0.0085/0.0236 qps，且 profiler 开启；不得外推为 no-profiler/production 数字。
+  config 对三类 metric 都存 0.9×实测；对越小越好的 latency/memory，这不是“允许 +10%”的
+  正确 upper bound，即使未来恢复断言也必须先修 directionality/threshold。
+- 强制：Ref2VA synthetic clip 先用 OpenCV 生成，再尽力用 ffmpeg/libx264 转 H.264；H3 request
+  必须走 `video_reference` data URL，使 server 持久化 `source_path` 给 ffprobe/ffmpeg consumer。
+  缺 ffmpeg 时 fallback `mp4v`，但 H3 要求 H.264/H.265，因此该 fallback 不是有效 H3 兼容路径。
+- 禁止：把上述 predecessor 数字当成 final repo-root modular route 的实测，或泛化到 50-step、
+  并发及其他 topology；final diff 也没有 PR body 所述 RoPE 代码修复。特殊 payload
+  当前靠 resolved model 字符串包含大小写敏感的 `MiniMax-H3` 判断；materialized env/cache path
+  若不含该 token 会退回 multipart `input_reference`，所以 lane 接入本身不证明 V2V 稳定执行。
+- 验收：nightly 必须证明四个 pytest case 均实际 collected、3/3 completed、artifact/log 上传，
+  并在 materialized root、offline snapshot 与 repo-id 三种 model resolution 下断言 Ref2VA 都走
+  `video_reference` 且 ffprobe 为 H.264/H.265；final diff 没有为新增 re-encode/model-routing helper
+  增加单测，PR 所报 77 个 video-server tests 只是既有 server/API suite。性能 gate 若启用需另
+  定义 metric directionality。
+  ^[PR #5836]
 
 共享 component quantization、checkpoint mapping 与 quality evidence 见
 [Diffusion rules](../../components/diffusion/rules.md)。
