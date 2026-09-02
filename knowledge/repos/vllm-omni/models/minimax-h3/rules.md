@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5706", "PR #5737", "PR #5752", "PR #5764", "PR #5801", "PR #5829", "PR #5837", vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/quantization/int8_config.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/diffusion/quantization/test_int8_config.py, tests/entrypoints/openai_api/test_video_server.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md]
+sources: ["PR #5703", "PR #5706", "PR #5737", "PR #5752", "PR #5764", "PR #5779", "PR #5801", "PR #5829", "PR #5837", vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/quantization/int8_config.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/diffusion/quantization/test_int8_config.py, tests/entrypoints/openai_api/test_video_server.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md]
 confidence: high
 ---
 
@@ -21,6 +21,7 @@ confidence: high
 | FP8 quality、audio metric、layerwise offload | `MMH3-1b` | quantization quality test → recipe/support matrix → nightly lane |
 | RMSNorm、RoPE、96/128 rotary dim、fused backend | `MMH3-1c` | `MiniMaxH3Attention` → shared `RMSNorm`/`RotaryEmbedding` → platform dispatch |
 | RainFusion、block sparse、video layout、NPU INT8 | `MMH3-1d` | packed sequence → attention metadata/backend plan；quant config → prefixed linear → loader/post-load |
+| TRTLLM、ragged packed metadata、SAGE、Skip-Softmax、Blackwell default | `MMH3-1e` | H3 metadata/roles → TRTLLM packed trim/quant gate → platform default |
 | FL2VA keyframe、Ref2VA mixed reference、shape/output matrix | `MMH3-2a` | `pipeline_minimax_h3.py::{_resolve_fl2va_keyframe_indices,_validate_ref2va_reference_counts,_resolve_shape}` |
 | media limit、typed/multipart reference、HTTP 400、temp source | `MMH3-2b` | `api_server.py` video handlers → `serving_video.py::_run_and_extract` → `reference_video.py` |
 | conditioned VAE、fixed seed、`fork_rng`、MUSA/device RNG | `MMH3-2c` | `pipeline_minimax_h3.py` condition encode caller → `vae.py::{encode_image,encode_video}` |
@@ -102,6 +103,34 @@ load 完成时 dynamic quantize，text encoder、VAE 和非 eligible projection 
   为 `2e-3`；它不证明 `sparsity=0.8` 质量 parity。PR 的 Atlas 800I A3 8×NPU、
   CANN 9.0.1、T2VA 209-frame 三种生成仅证明这些 exact 配置能完成；视频样例不是质量阈值，
   没有 latency/repeats，不能宣称稳定加速或 FL2VA/Ref2VA 支持。^[PR #5706]
+
+## MMH3-1e — H3 TRTLLM 必须从 packed 结构裁掉 padding 并隔离短序列 role
+
+- 触发：修改 H3 的 TRTLLM default、packed `cu_seqlens`/mask、SAGE quant、Skip-Softmax、
+  token-refiner role 或 denoise timestep context。
+- 强制：H3 只在支持的 datacenter Blackwell SM100/103、head_dim=128、FlashInfer kernel 可用且
+  声明 compatible packed/mask-free path 时默认 dense BF16 TRTLLM；SM120/121、缺依赖、错误
+  head dim 或需要任意 mask 的路径保留平台 fallback，默认不自动开启 SAGE/Skip-Softmax。
+- 强制：四个 packed metadata key 必须完整、Q/K batch/terminal 覆盖一致；只接受 prefix-valid
+  structural padding mask，按 boundary 裁掉无效 suffix 后再 quantize/attention，并把输出补零到
+  Ulysses 物理 shape。`[0,N,N]` 必须折叠尾部空 sequence；任意 mask、缺失或矛盾 metadata
+  fail closed。`attention_mask_free=True` 是 compatible packed-path capability，不表示物理 mask
+  永远为空。AllGather-KV 的 local-Q/global-KV metadata 不对称合同在初始化时明确拒绝，真正
+  支持按 review 明确延期。
+- 强制：main DiT 与 `minimax_h3.token_refiner` 使用独立 role；任一 KV sequence 短于 SAGE
+  `k_block_size` 时该 input 告警并走 dense TRTLLM，不能让 14-token refiner 产生 non-finite，
+  也不能因此关闭 main DiT 的 SAGE。H3 将 scheduler 的降序 sigma（1→0）发布为
+  `normalized_timestep`；Skip-Softmax 在 sigma 大于 `disabled_until_timestep` 时保持 dense，
+  到达或低于阈值才启用。
+- 禁止：把 structural prefix mask 泛化为任意 mask；让 padding 进入 SAGE block quantization；
+  把 combined packed-H3 优化视频归因于本 PR 单一改动。请求级 `set_forward_context` wrapper
+  会在 `finally` 恢复 prior context，因此 loop 内的 step mutation 不会泄漏到后续请求。
+- 验收：测试覆盖 ragged batch、suffix trim/zero restore、empty terminal、invalid mask/metadata、
+  short-role dense fallback、AllGather rejection 与 non-finite regression。PR 的 4×B300 SM103、
+  1248×768、209 frames、50 steps FA4/TRTLLM 对比仅绑定该 prompt/seed/topology：PSNR 27.10、
+  SSIM 0.8880 不是质量 gate；83.854→71.990 s diffusion、88.558→76.176 s wall 的 warmed A/B
+  来自 review follow-up 外部分支 commit `20cc23ae`，其 artifacts 明确是 combined packed-H3
+  optimization evidence，并非目标 commit 的隔离实验，不能泛化为稳定 14% 保证。^[PR #5779]
 
 ## MMH3-2a — task、reference、shape 与多输出必须作为一个输入矩阵维护
 
