@@ -20,6 +20,7 @@ confidence: high
 | PR 描述在做什么 | 精确规则组 | 第一批 live 源码 |
 |---|---|---|
 | `extra_body`、flattened/nested/canonical/legacy 输入、alias、`negative_prompt`、diffusion request extras | `request-contract`：`SERV-4a`–`4h` | `vllm_omni/entrypoints/openai/diffusion_request_utils.py::{normalize_diffusion_request_args,apply_normalized_diffusion_request_extra_args}` → `serving_chat.py::{OmniOpenAIServingChat._preprocess_chat,OmniOpenAIServingChat.generate_diffusion_images}` |
+| batched chat、fan-out/fan-in、sub-request ID、choice collapse、whole-batch error | `batch-chat-contract`：`SERV-4i`–`4k` | `api_server.py::create_batch_chat_completion` → `batch_serving.py::OmniOpenAIServingChatBatch` → ordinary chat completion children |
 | `chat_template_kwargs`、raw HTTP/SDK `extra_body`、text/audio modalities、choices、空音频 | `chat-multimodal-contract`：`SERV-4c` + 命中模型规则 | upstream `ChatCompletionRequest` → `serving_chat.py::{OmniOpenAIServingChat._preprocess_chat,OmniOpenAIServingChat.chat_completion_full_generator,OmniOpenAIServingChat._create_text_choice,OmniOpenAIServingChat._create_audio_choice}` |
 | endpoint restriction、route/app-state guard、capability、公开 400 | `endpoint-capability`：`SERV-4c`, `SERV-4d`, `SERV-5d` | endpoint policy → `api_server.py::build_app` assembled app → public handler |
 | sleep/wake、partial stage/tag、idempotency、ACK、generation admission | `engine-lifecycle`：`SERV-5a`, `SERV-5b` | `entrypoints/async_omni.py::{AsyncOmni.sleep,AsyncOmni.wake_up,AsyncOmni.generate}` → `worker/base.py::{handle_sleep_task,handle_wake_task}` / `diffusion/worker/diffusion_worker.py` |
@@ -41,6 +42,7 @@ confidence: high
 | `engine-lifecycle` | sleep/wake、partial stage/tag、ACK、generation admission、factory 状态矩阵 | `SERV-5a`, `SERV-5b`, `SERV-5c` |
 | `full-duplex` | duplex opt-in、stage prewarm/fence、async-chunk、CFG companion lifecycle | `SERV-6a`–`SERV-6c` |
 | `request-contract` | 请求字段、来源、冲突、dispatcher、consumer view | `SERV-4a`, `SERV-4b`, `SERV-4c`, `SERV-4d`, `SERV-4e`, `SERV-4f`, `SERV-4g`, `SERV-4h` |
+| `batch-chat-contract` | frontend fan-out、identity、choice cardinality、error/cancellation | `SERV-4i`, `SERV-4j`, `SERV-4k` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `SERV-0a`, `SERV-0b` |
 
 ## SERV-1a — 所有可预判错误在第一个 streaming chunk 前返回
