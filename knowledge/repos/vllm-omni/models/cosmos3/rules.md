@@ -1,10 +1,10 @@
 ---
 title: "Cosmos3 规则"
 created: 2026-07-20
-updated: 2026-07-31
+updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5001"]
+sources: ["PR #5001", "PR #5634", recipes/cosmos3/Cosmos3-Nano.md, vllm_omni/platforms/rocm/platform.py]
 confidence: high
 ---
 
@@ -21,6 +21,7 @@ confidence: high
 | seed/generator、逐步噪声 | COSMOS-2a | `pipeline_cosmos3.py::Cosmos3OmniDiffusersPipeline` 的 request-local sampling 路径 |
 | `guidance=0`、request extra | COSMOS-2b | `model_extras/cosmos3.py` → pipeline sampling params |
 | online/offload/HSDP/VAE parallel 支持声明 | COSMOS-3a | capability 文档/recipe → 对应公开入口与实现路径 |
+| ROCm、MI350X、AITER、latency/peak memory | COSMOS-3b | recipe 的 measurement commit/protocol → `platforms/rocm/platform.py` backend gate → 目标配置复测 |
 
 若描述只写 Cosmos3，先从 registry 的 class key 进入 pipeline；只有命中共享 RNG、graph
 或 offload 机制时再加 [Diffusion owner](../../components/diffusion/rules.md)。
@@ -64,6 +65,22 @@ confidence: high
   不得提前标完整支持。
 - 禁止：用 offline unit test 支撑 online/HSDP/offload 多项 claim。
 - 验收：公开矩阵逐项引用当前 head 证据；pending 项明确未验证或暂不声明。 ^[PR #5001]
+
+## COSMOS-3b — 硬件 recipe 数字必须绑定测量 commit、协议和未覆盖维度
+
+- 触发：引用 Cosmos3 ROCm latency、显存、determinism、backend 或最低硬件声明。
+- 强制：PR #5634 的数值只绑定 vLLM-Omni `b3f4fbf9`、单张 MI350X/gfx950、HIP 7.2、
+  guardrails off、Nano T2I/T2V、每配置一次 warmup 加一次 measured run。T2I 1024²/50 steps
+  报告约 2.7 s、49.5 GiB reserved；T2V 1280×720/189 frames/35 steps 报告 161 s、
+  120 GiB reserved/95 GiB allocated；tiling、layerwise offload、FP8 分别报告约
+  183 s/38/36 GiB、163 s/84/69 GiB、149 s/107/82 GiB。数字是该协议的观察值，
+  不是 merge target `b4581b29` 的复测结果。
+- 禁止：把单次 measured run 变成稳定性能界、从 38 GiB peak 推断已验证 40 GiB 可运行，
+  或把同配置 byte-identical 外推为跨 flags/hardware determinism。ROCm platform 的 AITER gate
+  包含 gfx942/gfx950，但 PR 只实测 gfx950；gfx942、multi-GPU、Cosmos3-Super 均不得标已验证。
+- 验收：任何 target-head 或硬件矩阵 claim 都重新记录 commit、完整软件栈、warm/cold、样本数、
+  reserved/allocated 定义、backend assertion 与输出检查；quality 必须有独立 metric/golden。
+  PR #5634 只验证尺寸、帧数和同配置复现，明确没有 quality evaluation。^[PR #5634]
 
 共享 RNG/graph 规则见 [Diffusion rules](../../components/diffusion/rules.md)；公开证据分层见
 [model adaptation guardrails](../../review/guides/model-adaptation-guardrails.md)。
