@@ -4,7 +4,7 @@ created: 2026-08-05
 updated: 2026-09-02
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5709", "PR #5737", "PR #5740", "PR #5756", .buildkite/cuda/test-nightly.yml, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/, docs/user_guide/quantization/fp8.md, vllm_omni/diffusion/models/minimax_h3/, vllm_omni/diffusion/registry.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, tests/diffusion/models/minimax_h3/, tests/e2e/accuracy/minimax_h3/, tests/e2e/features/comfyui/test_comfyui_integration.py, vllm_omni/entrypoints/openai/video_api_utils.py]
+sources: ["PR #5709", "PR #5737", "PR #5740", "PR #5752", "PR #5756", .buildkite/cuda/test-nightly.yml, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/, docs/user_guide/quantization/fp8.md, vllm_omni/diffusion/models/minimax_h3/, vllm_omni/diffusion/registry.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, tests/diffusion/models/minimax_h3/, tests/e2e/accuracy/minimax_h3/, tests/e2e/features/comfyui/test_comfyui_integration.py, vllm_omni/entrypoints/openai/video_api_utils.py]
 confidence: high
 ---
 
@@ -16,10 +16,11 @@ confidence: high
   `MiniMaxH3Pipeline`，实现位于 `diffusion/models/minimax_h3/`。
 - 支持 `t2va`、`fl2va`、`ref2va` 三种 joint video+audio 条件模式；一个 server 进程
   一次只加载 `FL2VA` 或 `Ref2VA` 分区，不能把两个分区当成同一份权重同时服务。
-- 输出是带同步音频的 MP4；参考视频、图像和音频的预处理合同由 pipeline 与 video API
-  共同决定，不能仅凭 endpoint 名称推断输入组合。
-- 生成合同固定为 24 FPS 视频与 32 kHz 音频；空间尺寸必须按 32 对齐，宽高比限制在
-  `1:4` 到 `4:1`，这些约束在 request validation 阶段执行而不是由 VAE 静默修正。
+- 输出是带同步音频的 MP4；FL2VA 接受首帧、尾帧或有序首尾帧，Ref2VA 支持 image-only
+  及有 visual reference 的 image/video/audio mixed matrix。完整计数、媒体和 API 合同见
+  MMH3-2a/2b。
+- 生成合同固定为 24 FPS 视频与 32 kHz 音频；官方输出 duration、named ratio、768
+  short-edge 与 32-pixel canvas policy 在 request validation 阶段执行，而不是由 VAE 静默修正。
 
 ## 并行与加载约束
 
@@ -62,5 +63,5 @@ PSNR >= 20 dB gate 完整输出；nightly lane 使用 4x H100、USP4、HSDP4、t
 
 ## 审查入口
 
-H3 online FP8 的 component namespace、loader 顺序、joint quality 与 offload 边界见
+H3 input matrix/media ingress 以及 online FP8 的 component namespace、loader 顺序、joint quality 与 offload 边界见
 [MiniMax H3 rules](rules.md#direct-代码快速入口)。
