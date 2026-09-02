@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ af3faa6c`（2026-08-11）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ 06e733d3`（2026-08-11）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -36,7 +36,7 @@ adapter。已有专属知识 owner 可从 [models index](_index.md) 按名称进
 | 注册点 | 位置 | 计数 |
 |---|---|---|
 | AR/omni 架构 | `model_executor/models/registry.py` `_OMNI_MODELS` | 79 个架构名 / 28 个模型族目录 |
-| Diffusion pipeline | `diffusion/registry.py` `_DIFFUSION_MODELS` | 58 条 pipeline / 38 个模型族目录 |
+| Diffusion pipeline | `diffusion/registry.py` `_DIFFUSION_MODELS` | 60 条 pipeline / 39 个模型族目录 |
 | Pipeline（model_type） | `config/pipeline_registry.py` `OMNI_PIPELINES` | 52 个 key |
 | Deploy YAML | `vllm_omni/deploy/*.yaml` | 80 份 |
 
@@ -61,7 +61,7 @@ voxcpm2、voxtral_tts
 audiox、bagel、boogu_image、cosmos3、diffusers_adapter（通用 diffusers 桥）、dreamid_omni、
 dreamzero、ernie_image、flux、flux2、flux2_klein、glm_image、gr00t、helios、
 hidream_image、hunyuan_image3、hunyuan_video、internvla_a1、krea2、lance、
-lingbot_video、longcat_image、ltx2、magi_human、ming_flash_omni、nextstep_1_1、omnigen2、
+lingbot_video、longcat_image、longcat_video、ltx2、magi_human、ming_flash_omni、nextstep_1_1、omnigen2、
 omnivoice、ovis_image、qwen_image、sd3、sdxl、sensenova_u1、soulx_singer、
 stable_audio、wan2_2、z_image、minimax_h3
 
@@ -89,8 +89,8 @@ voxtral_tts、wan2_2_ti2v、nemotron_labs_audex
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from 322600bf \
-  --to af3faa6c \
+  --from af3faa6c \
+  --to 06e733d3 \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```
