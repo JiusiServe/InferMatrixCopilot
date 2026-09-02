@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #3642", "PR #5382", "PR #5638", "PR #6154", "PR #6170", "PR #6318", vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py, tests/model_executor/models/minicpmo_4_5/test_audio_chunk_mask.py]
+sources: ["PR #3642", "PR #5165", "PR #5382", "PR #5638", "PR #6154", "PR #6170", "PR #6318", vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py, tests/model_executor/models/minicpmo_4_5/test_audio_chunk_mask.py, tests/model_executor/models/minicpmo_4_5/test_vision_flash_attention.py]
 confidence: high
 ---
 
@@ -18,6 +18,7 @@ confidence: high
 |---|---|---|
 | MiniCPM-o 4.5、`minicpmo_4_5`、版本识别 | MCPMO-2a | `config/pipeline_registry.py::OMNI_PIPELINES["minicpmo_4_5"]` → `model_executor/models/minicpmo_4_5/pipeline.py`；`model_executor/models/registry.py::_OMNI_MODELS` |
 | Whisper/APM、chunk attention mask、left context/lookahead | MCPMO-2b | `minicpmo_4_5_omni_llm.py::{get_audio_hidden_states,subsequent_chunk_mask}` → audio encoder；row-by-row oracle test |
+| SigLIP、FlashAttention、padding/unpad metadata、varlen vision | MCPMO-2c | `SiglipEncoder.forward` → `SiglipEncoderLayer` → `SiglipFlashAttention2._upad_input` |
 | tokenizer/processor、`trust_remote_code` | MCPMO-1a | pipeline/config factory → `model_executor/models/minicpmo_4_5/` loader |
 | TTS extra、backend 初始化、空音频 | MCPMO-1b | `minicpmo_4_5_omni_tts.py::MiniCPMO45OmniTTSForConditionalGeneration`、`minicpmo_4_5_token2wav.py::MiniCPMO45Token2wav` |
 | Code2Wav TensorRT、DiT/Campplus、engine cache/profile | MCPMO-1c | `minicpmo_4_5_code2wav.py::MiniCPMO45Code2Wav` → `batched_token2wav.py::BatchedToken2Wav._estimator_step`；共享实现 `step_audio2/step_audio2_dit_trt.py` |
@@ -84,6 +85,34 @@ confidence: high
   但不覆盖 CUDA kernel 数、完整 audio embedding 或 serving。PR 的 CUDA timing/bitwise embedding
   证据来自 `ee33954dff27da317be597449a6c1b5a5df4052b`，不是 merge target `9235b0ae` 的复测，
   因而只能作为外部局部性能证据。^[PR #5382]
+
+## MCPMO-2c — vision unpadding metadata 只在同一次 encoder forward 内复用
+
+- 触发：修改 MiniCPM-o 4.5 SigLIP FlashAttention mask、`_get_unpad_data`、Q/K/V layout 或
+  encoder layer 调用链。
+- 强制：只有 FlashAttention2 且 `attention_mask is not None` 时，`SiglipEncoder.forward` 才从
+  当前 mask 计算一次 `(indices, cu_seqlens, max_seqlen)`，并把同一 tuple identity 传给该次
+  forward 的所有 encoder layers。下一次 forward 必须从新 mask 重算；不得做 global、实例级或
+  cross-request cache。直接调用 `SiglipFlashAttention2` 且未传 metadata 时，`_upad_input` 保留
+  per-call fallback；dense mask=None path 不计算 metadata。显式传入的 metadata 不会校验是否与
+  `attention_mask` 匹配，因此 custom/direct caller 必须成对持有；安全 owner 是 encoder 当前
+  forward 的 mask，禁止外部或 stale cache。
+- 强制：metadata 复用必须保持 padded batch 输出与逐 sample unpadded、以及逐 layer 重算 path
+  数值一致。Q/K/V projection 的 view→transpose→transpose 原本就形成共享 projection storage 的
+  contiguous BSHD；本 PR 没改 layout，新 storage/stride test 只是冻结该既有 zero-copy 合同，
+  不能把它计入 metadata 优化收益。
+- 禁止：把 mask shape 相同当成内容相同而跨 forward 复用；将该局部优化泛化成 dense image、
+  equal-length video、端到端 serving 或 throughput 提升。review 中短暂加入的 profiler scripts/raw
+  JSON 已在 final commit history 删除，不是仓库内可复现 benchmark fixture。
+- 验收：CPU spy 覆盖 padded 一次、dense 零次、不同 mask 重算与 tuple identity；L4/FA2 BF16
+  覆盖 encoder reuse 对 per-layer recompute bitwise parity、unpadded 对 eager、两种 padding 程度
+  对逐 sample unpadded（容差 2e-2）。PR 的 2×RTX PRO 6000 Blackwell、27 layers、5 warmups、
+  30 paired samples 中 varlen 约 21.697→13.790 ms / 22.162→14.113 ms，只绑定测试 commit
+  `895cb303`、该环境与 vision-encoder latency；作者说明 rebase 后 source-file hash 未变，但它
+  仍不是 merge target 的 end-to-end 复测。dense/equal-length video 不计算 metadata且近零变化。
+  当前测试未覆盖 `gradient_checkpointing and training`：新 tuple（两 tensor + Python int）会作为
+  位置参数穿过 `_gradient_checkpointing_func`，补该 path 前不能假设训练/checkpoint 兼容。
+  ^[PR #5165]
 
 ## MCPMO-3a — TTS stage 的 batch 能力与 runtime_info 消费一致
 
