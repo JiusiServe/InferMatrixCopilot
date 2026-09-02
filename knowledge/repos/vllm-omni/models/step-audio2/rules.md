@@ -1,0 +1,57 @@
+---
+title: "Step-Audio2 设备边界与流式性能规则"
+created: 2026-09-02
+updated: 2026-09-02
+type: rule
+tags: [vllm-omni, models]
+sources: ["PR #5067", vllm_omni/model_executor/models/step_audio2/step_audio2_thinker.py, vllm_omni/model_executor/models/step_audio2/step_audio2_token2wav.py, tests/model_executor/models/step_audio2/test_step_audio2_token2wav_async_chunk.py, tests/platforms/npu/test_step_audio2_token2wav.py]
+---
+
+# Step-Audio2 设备边界与流式性能规则
+
+以下规则在 `main @ 12a5f6fb` 复核；主要约束 Step-Audio2 的 thinker/token2wav
+路径。共享 `Token2Wav` core 的 blast radius 在下文显式列出，runtime 的通用规则
+仍归组件 owner。
+
+## STEPA2-1a：流式 token 的设备常驻与所有权
+
+- 触发：修改 `_forward_async_chunk`、`stream_chunk_for`、设备/dtype 转换或
+  `_StreamState` 生命周期。
+- 必须：外层用 `numel()` 判空，非空 tensor 保持为 tensor 传到
+  `stream_chunk_for`；内层整形为 `[1, T]`、转到 core device/
+  `int32` 后无条件 `clone()`。`clone` 是所有权边界：`.to()` 在已匹配
+  device/dtype 时可返回别名，外部 `inference_chunk` 不得污染调用方
+  `input_ids`。列表入口仍需兼容 MiniCPM-o 等现有 caller。
+- 不得声称“零拷贝/零传输”：设备已匹配时仍有 clone 分配，设备不同时
+  仍有一次设备传输，最终 waveform 仍通过 `detach().cpu().contiguous()`
+  回到 host。该变更只移除 Step-Audio2 token 的 D2H Python list 再 H2D 往返。
+- 验收：添加真实 tensor 分支测试，让 fake `inference_chunk` 就地改写
+  参数并证明 caller tensor 未变；覆盖 device/dtype/shape、list 兼容、
+  空 EOF、last/error 后状态重置。CPU 外的 CUDA/NPU/XPU 结论需各平台
+  证据，不得从通用 `.to()` 推导已验证。
+
+## STEPA2-1b：ragged audio-feature 长度只做一次 host 同步
+
+- 触发：修改 thinker `_process_audio_input` 中 encoder 输出的 ragged 切片。
+- 必须：encoder 后先将整批 `audio_feature_lens.tolist()` 一次转为
+  Python 整数，再按原 batch 顺序切片；长度、数量和空 batch 语义不变。
+  该代码位于 multimodal-encoder 的 eager prefill 路径，不得移入 decode
+  CUDA graph。
+- 边界：`.tolist()` 仍是一次 host 同步；CUDA/XPU/NPU 上都不应表述为
+  “无同步”，CPU 上则没有 accelerator 同步问题。本次无测试改动，
+  现有 async-chunk 测试也未证明 tensor 参数、设备常驻或非别名。
+
+## 性能证据的可用边界
+
+- PR 作者报告 ASR 8 并发 D2H 计数 `17→2`、transcript 字节相同，
+  但未给 vLLM/vLLM-Omni SHA、计数脚本、原始产物或硬件；只可用于
+  支持“同步次数方向下降”，不可作通用输出等价或性能基线。
+- reviewer 在 L20X、vLLM 0.26、TP2、默认 async YAML 上做的精确 A/B
+  为 3 次/组，中位数 `2.87 s` 与 `2.88 s`、输出同为 `316844 B`；
+  它支持该情景下“未见回归、未见可测加速”。TTS 不走 thinker
+  audio-input 分支，且 `max_num_seqs=1` 无 batch 压力，因此不能验证
+  `audio_feature_lens.tolist()` 改动或并发收益。
+- blast radius：thinker 改动仅 Step-Audio2；`stream_chunk_for` core 也被
+  MiniCPM-o 4.5/NPU wrapper 使用。MiniCPM 显式传 list，继续走旧分支；
+  Step-Audio2 NPU wrapper 转发 tensor 并继承新分支。评审共享 core 时
+  不得把两者当作同样的性能受益方。

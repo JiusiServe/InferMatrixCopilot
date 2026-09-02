@@ -4,12 +4,12 @@ created: 2026-07-21
 updated: 2026-09-02
 type: index
 tags: [vllm-omni, models]
-sources: ["PR #5638", "PR #5869", vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/step_audio2/, vllm_omni/deploy/step_audio_2.yaml, vllm_omni/model_executor/stage_input_processors/step_audio2.py, tests/model_executor/models/step_audio2/test_hift_parity.py]
+sources: ["PR #5067", "PR #5638", "PR #5869", vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/step_audio2/, vllm_omni/deploy/step_audio_2.yaml, vllm_omni/model_executor/stage_input_processors/step_audio2.py, tests/model_executor/models/step_audio2/test_hift_parity.py]
 ---
 
 # Step-Audio2
 
-以下事实在 `main @ fc8946fc` 复核。
+以下事实在 `main @ 12a5f6fb` 复核。
 
 ## 名称与范围
 
@@ -50,6 +50,7 @@ sources: ["PR #5638", "PR #5869", vllm_omni/model_executor/models/cosyvoice3/cod
 | 遇到什么 | 查看哪里 | 说明 |
 |---|---|---|
 | token 过滤桥、25+3 lookahead、流式状态 | [architecture](architecture.md) | 数据流与 reviewer 陷阱 |
+| 设备常驻 token、ragged 长度同步与性能证据边界 | [rules](rules.md) | Step-Audio2 专属审查规则 |
 
 ## 配置与 checkpoint 差异（三变体）
 

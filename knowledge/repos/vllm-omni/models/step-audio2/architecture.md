@@ -4,12 +4,13 @@ created: 2026-07-21
 updated: 2026-09-02
 type: architecture
 tags: [vllm-omni, models]
-sources: ["PR #5638", "PR #5869", vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/step_audio2/step_audio2_thinker.py, vllm_omni/model_executor/models/step_audio2/step_audio2_token2wav.py, vllm_omni/model_executor/models/step_audio2/step_audio2_dit_trt.py, vllm_omni/model_executor/models/step_audio2/step_audio2_constants.py, vllm_omni/model_executor/stage_input_processors/step_audio2.py, tests/model_executor/models/step_audio2/test_hift_parity.py]
+sources: ["PR #5067", "PR #5638", "PR #5869", vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/step_audio2/step_audio2_thinker.py, vllm_omni/model_executor/models/step_audio2/step_audio2_token2wav.py, vllm_omni/model_executor/models/step_audio2/step_audio2_dit_trt.py, vllm_omni/model_executor/models/step_audio2/step_audio2_constants.py, vllm_omni/model_executor/stage_input_processors/step_audio2.py, tests/model_executor/models/step_audio2/test_hift_parity.py]
 ---
 
 # Step-Audio2 架构
 
-事实在 `main @ fc8946fc` 复核;变体/入口速览见 [index](_index.md)。
+事实在 `main @ 12a5f6fb` 复核;变体/入口速览见 [index](_index.md)，
+设备边界与同步验收见 [rules](rules.md)。
 
 ## 模型专有部分与共享模块的边界
 
