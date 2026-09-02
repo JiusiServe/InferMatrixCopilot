@@ -19,8 +19,8 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/config/pipeline
 - deploy YAML：`qwen2_5_omni.yaml`（1×H100 验证）、`qwen3_omni_moe.yaml`
   （2×H100 验证）、`qwen3_omni_moe_mori_intranode.yaml`、`qwen3_tts.yaml`
   （+ `_forced_aligner`、`_high_concurrency` 变体）
-- 官方文档：`docs/design/module/async_omni_architecture.md`（以 Qwen3-Omni 为
-  worked example 的分层运行时 spec）、
+- 官方历史文档：`docs/design/module/archive/async_omni_architecture.md`（以 Qwen3-Omni 为
+  worked example 的分层运行时快照，非 active spec）、
   `docs/design/qwen3_omni_tts_performance_optimization.md`（性能优化实录）
 
 ## 什么时候查这里

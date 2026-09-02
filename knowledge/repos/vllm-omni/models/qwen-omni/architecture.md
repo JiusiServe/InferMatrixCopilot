@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-07-16
 type: architecture
 tags: [vllm-omni, models, qwen-omni]
-sources: [docs/design/qwen3_omni_tts_performance_optimization.md, docs/design/module/async_omni_architecture.md, vllm_omni/model_executor/models/registry.py]
+sources: [docs/design/qwen3_omni_tts_performance_optimization.md, docs/design/module/engine_orchestration.md, docs/design/module/stage_runtime.md, docs/design/module/archive/async_omni_architecture.md, vllm_omni/model_executor/models/registry.py]
 ---
 
 # Qwen-Omni 家族拓扑与性能结论
@@ -37,8 +37,10 @@ sources: [docs/design/qwen3_omni_tts_performance_optimization.md, docs/design/mo
 
 ## 运行时参照
 
-家族是 `docs/design/module/async_omni_architecture.md` 分层运行时（API →
+家族曾以 `docs/design/module/archive/async_omni_architecture.md` 的分层运行时（API →
 Engine → Orchestration → Communication → Execution）的官方 worked example；
+该页现为历史快照，active draft source map 是 `module/engine_orchestration.md` 与
+`module/stage_runtime.md`，所以 worked example 必须对当前源码复核；
 相关共享机制：talker 的 prefix-cache 关键 key 合同见
 [Scheduler 规则 SCHED-1a](../../components/scheduler/rules.md)，`talker_mtp`
 路由与 runner 预处理合同见

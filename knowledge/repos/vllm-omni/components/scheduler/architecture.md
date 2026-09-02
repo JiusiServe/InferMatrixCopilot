@@ -4,13 +4,14 @@ created: 2026-07-16
 updated: 2026-09-02
 type: architecture
 tags: [vllm-omni, components, scheduler]
-sources: [docs/design/module/ar_module.md, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/output.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/prefix_cache.py, vllm_omni/worker/gpu_ar_model_runner.py]
+sources: [docs/design/module/ar_runtime.md, docs/design/module/archive/ar_module.md, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/output.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/prefix_cache.py, vllm_omni/worker/gpu_ar_model_runner.py]
 ---
 
 # Scheduler 共享架构
 
-以下事实在 `main @ 5215e03a` 复核；官方叙述见
-`docs/design/module/ar_module.md`（含继承 classDiagram 与请求流转 flowchart）。
+以下事实在 `main @ 5215e03a` 复核；active draft source map 是
+`docs/design/module/ar_runtime.md`。继承 classDiagram 与请求流转 flowchart 仅存于
+`docs/design/module/archive/ar_module.md`，属于历史叙述，仍须对当前代码复核。
 
 ## 继承链（对 vLLM 的扩展方式）
 
