@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5255", "PR #5344", "PR #5543", "PR #5720", "PR #5737", "PR #5764", "PR #5801", "PR #5802", "PR #5839", "PR #5848", "PR #5872", "PR #5981", "PR #6094", "PR #6102", "PR #6279", "PR #6385", "PR #6445", vllm_omni/diffusion/attention/backends/flashinfer_attn.py, vllm_omni/diffusion/attention/backends/ring/ring_kernels.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/offloader/, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/quantization/component_config.py, vllm_omni/quantization/factory.py, tests/diffusion/attention/test_attention_sp.py, tests/diffusion/attention/test_ulysses_uaa.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/offloader/test_distributed_layerwise_backend.py]
+sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5255", "PR #5344", "PR #5543", "PR #5720", "PR #5737", "PR #5764", "PR #5801", "PR #5802", "PR #5838", "PR #5839", "PR #5848", "PR #5872", "PR #5981", "PR #6094", "PR #6102", "PR #6279", "PR #6385", "PR #6445", vllm_omni/diffusion/attention/backends/flashinfer_attn.py, vllm_omni/diffusion/attention/backends/ring/ring_kernels.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/offloader/, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/quantization/component_config.py, vllm_omni/quantization/factory.py, tests/diffusion/attention/test_attention_sp.py, tests/diffusion/attention/test_ulysses_uaa.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/offloader/test_distributed_layerwise_backend.py, tests/diffusion/test_diffusion_config_propagation.py]
 confidence: high
 ---
 
@@ -29,7 +29,7 @@ confidence: high
 | component quantization、text encoder/transformer/VAE 独立配置、owner prefix、meta/offload | `checkpoint-distributed`：`DIFF-2c` | `quantization/factory.py::{build_quant_config,resolve_quant_config_from_disk}` → `component_config.py::ComponentQuantizationConfig.resolve` → `data.py::_propagate_quantization_from_tf_config` → component linear consumer |
 | modular/multi-DiT、`_dit_modules`、Cache-DiT/compile/SP/LoRA/offload lifecycle | `checkpoint-distributed`：`DIFF-2f` | pipeline runtime component list → registry/runner/cache/LoRA/module discovery consumers |
 | LPIPS/PSNR/相似度阈值、CPU offload、量化质量证据 | `quality-evidence`：`DIFF-3a` | changed exact case → runner `execute_model` → model pipeline；A/B 同路径 |
-| paged KV/cache、backend/platform、GQA/layout、Ring/Ulysses、FlashInfer quant、预算与 admission | `system-runtime`：`DIFF-4a`–`4h` | engine init → attention parallel/backend → platform hook → scheduler |
+| paged KV/cache、backend/platform、GQA/layout、Ring/Ulysses、FlashInfer quant、预算与 admission | `system-runtime`：`DIFF-4a`–`4i` | engine init → metadata/config → attention parallel/backend → platform hook → scheduler/serving |
 | worker/RPC 异常、rank-status、traceback/device cache 清理 | `system-runtime`：`DIFF-4d` | `diffusion_worker.py::{_execute_rpc,_worker_busy_loop}` 的 raise/reply/status 路径 |
 
 | 审查组 | 什么时候触发 | 规则 ID |
@@ -38,7 +38,7 @@ confidence: high
 | `execution-parity` | graph/eager、solver、RNG、generator、tensor dtype/device、fused layer、async output readiness | `DIFF-1a`–`1e` |
 | `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP、artifact identity、distributed offload、multi-DiT lifecycle | `DIFF-2a`–`2f` |
 | `quality-evidence` | 质量阈值、offload、A/B case | `DIFF-3a` |
-| `system-runtime` | cache/预算、native/backend/platform、attention layout、异常与并发 | `DIFF-4a`–`4h` |
+| `system-runtime` | cache/预算、native/backend/platform、attention layout、能力 metadata、异常与并发 | `DIFF-4a`–`4i` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `DIFF-0a`, `DIFF-0b` |
 
 ## 优化路径与 eager 的等价合同
@@ -342,6 +342,26 @@ confidence: high
   PR 的 Cosmos3 1280×720、35 steps、seed42，B200/B300 DiT timing 与 Nano 前24帧 LPIPS=0.051496
   只绑定 vLLM-Omni `4ce23c33` + FlashInfer `d0889c7c` 的 pre-final 环境；final config/version gate
   commit 后无复测，且这些不是端到端 latency、稳定 speedup 或通用质量阈值。^[PR #5344]
+
+### DIFF-4i — 模型能力 metadata 必须跨 architecture 与 pipeline 两个 key space 解析
+
+- 触发：修改 diffusion registry、HF `architectures`、`model_class_name` 或共享
+  `DiffusionModelMetadata`，尤其是多图数量、mixed-reference 与 attention-mask-free 能力。
+- 强制：先接受 metadata 表中的 direct pipeline key；未命中时只通过 registry 的
+  `architecture → pipeline class` 映射解析一次，再查 metadata。unknown architecture、`None`，以及
+  registry 映射到没有 metadata 的 pipeline 都保持空 defaults；registry tuple 用解包读取，使布局
+  变化显式失败。此 helper 返回整份 metadata，影响 config、AsyncOmni serving view、视频 mixed
+  reference 和 attention backend，不得把修改只当作 image-count 局部修复。
+- 禁止：因 architecture 已注册就假定其 pipeline 有 metadata；递归猜测别名；让 direct key 被
+  registry 映射覆盖；或把 defaults 的 `supports_multimodal_inputs=false` 当成“数量未知”——image-edit
+  admission 会把它解释为最多一张图，而 `supports=true, max=None` 才是不设上限。
+- 验收：同时覆盖 direct pipeline key、architecture→metadata-bearing pipeline、unknown/`None`、
+  以及 architecture→无 metadata pipeline；通过 `OmniDiffusionConfig.update_multimodal_support()`
+  断言整份能力传播，并在 serving 边界验证 false→1、true+整数上限与无上限行为。PR #5838 只新增
+  Qwen direct 与 Hunyuan architecture→pipeline 的手动 config 测试；未执行真实 architecture 解析、
+  AsyncOmni 或 HTTP edit 路径，也没有 registry/metadata census 和 negative alias 回归。其 E2E 结果
+  只有截图，缺命令文本日志、vLLM 版本、upstream SHA 与重复次数。helper 仍 function-local import
+  私有 `_DIFFUSION_MODELS`，review 提议公开改名但 final 未采用。^[PR #5838]
 
 相关执行流见 [Diffusion architecture](architecture.md)；benchmark 证据合同见
 [performance evidence](../../benchmark/guides/performance-evidence.md)。
