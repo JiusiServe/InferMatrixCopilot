@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ c27623c2`（2026-08-11）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ ee118ab4`（2026-08-11）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -89,8 +89,8 @@ voxtral_tts、wan2_2_ti2v、nemotron_labs_audex
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from f8fa86fb \
-  --to c27623c2 \
+  --from c27623c2 \
+  --to ee118ab4 \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```
