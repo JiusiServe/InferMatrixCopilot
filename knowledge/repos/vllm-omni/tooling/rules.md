@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni]
-sources: ["PR #5756", apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/nodes.py, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/api_client.py, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/models.py, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/types.py, tests/e2e/features/comfyui/test_comfyui_integration.py]
+sources: ["PR #5756", "PR #6031", apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/nodes.py, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/api_client.py, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/models.py, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/types.py, examples/offline_inference/text_to_image/text_to_image.py, tests/e2e/features/comfyui/test_comfyui_integration.py, tests/examples/offline_inference/test_text_to_image.py]
 confidence: high
 ---
 
@@ -18,6 +18,7 @@ confidence: high
 |---|---|---|
 | ComfyUI video node、frame/reference、multipart payload | `OMNI-TOOL-1a` | `nodes.py` → `utils/types.py` → `utils/api_client.py` |
 | ComfyUI model path、partition、params builder | `OMNI-TOOL-1b` | `utils/models.py` → `utils/api_client.py` → integration test |
+| offline T2I NumPy output、PIL、artifact save | `OMNI-TOOL-2a` | `text_to_image.py::{_normalize_images_for_save,main}` → README example test |
 
 ## OMNI-TOOL-1a — reference 输入状态与 multipart 字段必须一起验证
 
@@ -41,3 +42,23 @@ confidence: high
 - 验收：Hub ID、本地绝对路径及两个 partition 都命中同一 model spec，并断言 builder 收到
   正确 keyword 和最终字段层级。PR review 曾直接发现 basename lookup 与错误 builder keyword，
   因此这两项必须作为回归 fence。 ^[PR #5756]
+
+## OMNI-TOOL-2a — NumPy image 只在离线示例的 artifact 边界转为 PIL
+
+- 触发：修改共享 text-to-image 示例的 output selection、fallback extraction、输出类型或最终
+  artifact 保存。
+- 强制：示例先按既有优先级选择非空 `output.images`、`request_output.images`，否则调用共享
+  extractor；确认结果非空后，才逐个把直接 `np.ndarray` 元素经 Diffusers `numpy_to_pil`
+  转换并展平返回的 PIL list，既有非 ndarray 元素原样保留，随后才逐图 `.save()`。这是离线
+  artifact adapter，不改变 producer、production serving 或共享 `extract_images_from_outputs()`
+  合同；当前已证明的 NumPy producer 是 LingBot T2I 的非空 `list[np.ndarray]`。
+- 禁止：把非空 NumPy list 直接当作 PIL 保存；为修示例而全局强制 production output 为 PIL；
+  把此 helper 推广为任意 array/tensor/object 的通用 coercion。bare ndarray 在现有 selection 的
+  truthiness 判断仍可能报 ambiguous truth value；direct tensor 与其他不支持 `.save()` 的对象会
+  原样通过 normalization，仍可在保存处失败。
+- 验收：至少覆盖 `[0,1]` HWC float ndarray 转换后的可保存性、尺寸/mode，以及 PIL passthrough；
+  mixed list、batched ndarray、非法 shape/dtype、bare ndarray 和 direct tensor 应作为明确回归矩阵。
+  PR #6031 的单张 L20X 前后对照用 checksum 固定的 LingBot 1.3B revision，证明相同请求由保存处
+  `AttributeError` 变为 320×192 RGB PNG；它是有界的 LingBot E2E artifact 证据，不证明共享
+  utility、在线 serving 或其他 producer。目标提交没有新增 helper 自动化测试，README full-model
+  case 也不能替代上述类型矩阵。^[PR #6031]
