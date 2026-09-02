@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-02
 type: index
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #3642", "PR #5382", "PR #5524", "PR #5638", "PR #5792", "PR #5869", "PR #6154", "PR #6170", "PR #6318", tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py]
+sources: ["PR #3642", "PR #5382", "PR #5524", "PR #5638", "PR #5792", "PR #5869", "PR #6056", "PR #6154", "PR #6170", "PR #6318", tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py]
 confidence: high
 ---
 
@@ -45,6 +45,9 @@ Talker 只收集 sampling-eligible active rows 批量执行 codec projection 与
 
 Daily-Omni、Seed-TTS simplex/realtime duplex 已进入 accuracy/perf harness；阈值、逐轮 metrics、
 单卡 H100 perf 与“baseline 不是 regression gate”的证据边界见 MCPMO-5a。
+
+Online serving CI 的 core suite 固定 async chunk，expansion 分开覆盖 sync/async，native duplex
+fixture 不再覆盖 eager/KV cap 并固定 active-speech turn window；验证证据边界见 MCPMO-5b。
 
 描述直达源码与模型专有门禁见 [rules](rules.md#direct-代码快速入口)；新模型语义验证见
 [model validation](../../review/guides/model-validation.md)。

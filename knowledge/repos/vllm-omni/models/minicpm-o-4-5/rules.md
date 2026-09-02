@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #3642", "PR #5165", "PR #5382", "PR #5524", "PR #5638", "PR #5792", "PR #5869", "PR #6154", "PR #6170", "PR #6318", tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, vllm_omni/benchmarks/data_modules/seed_tts_dataset.py, vllm_omni/benchmarks/data_modules/seed_tts_eval.py, vllm_omni/benchmarks/patch/patch.py, vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/experimental/fullduplex/client.py, vllm_omni/experimental/fullduplex/openai/chat_fallback.py, vllm_omni/experimental/fullduplex/openai/serving.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/cuda_graph_wrapper.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_code2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_tts.py, tests/model_executor/models/minicpmo_4_5/test_audio_chunk_mask.py, tests/model_executor/models/minicpmo_4_5/test_code2wav_batching.py, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_pipeline.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, tests/model_executor/models/minicpmo_4_5/test_vision_flash_attention.py]
+sources: ["PR #3642", "PR #5165", "PR #5382", "PR #5524", "PR #5638", "PR #5792", "PR #5869", "PR #6056", "PR #6154", "PR #6170", "PR #6318", tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, vllm_omni/benchmarks/data_modules/seed_tts_dataset.py, vllm_omni/benchmarks/data_modules/seed_tts_eval.py, vllm_omni/benchmarks/patch/patch.py, vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/experimental/fullduplex/client.py, vllm_omni/experimental/fullduplex/openai/chat_fallback.py, vllm_omni/experimental/fullduplex/openai/serving.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/cuda_graph_wrapper.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_code2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_tts.py, tests/model_executor/models/minicpmo_4_5/test_audio_chunk_mask.py, tests/model_executor/models/minicpmo_4_5/test_code2wav_batching.py, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_pipeline.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, tests/model_executor/models/minicpmo_4_5/test_vision_flash_attention.py]
 confidence: high
 ---
 
@@ -28,6 +28,7 @@ confidence: high
 | native duplex、Stage0 resume、LISTEN/SPEAK、server VAD | MCPMO-4a | `experimental/fullduplex/{minicpmo45,openai}/` → stage input processor |
 | instructions/persona/voice/mode update、prefill slots、context lock | MCPMO-4b | `experimental/fullduplex/minicpmo45/session.py` → runtime adapter/session runner |
 | Daily-Omni/Seed-TTS accuracy、simplex/duplex perf、TTFT/TTFP/RTF | MCPMO-5a | `tests/e2e/accuracy/minicpmo_4_5/`、`tests/dfx/perf/tests/test_minicpmo_4_5*.json` → `run_benchmark.py` |
+| online serving CI、async/sync chunk matrix、duplex fixture、local ref audio | MCPMO-5b | `tests/e2e/online_serving/test_minicpmo_4_5*.py` → `helpers/minicpmo_4_5_duplex.py` |
 
 ## MCPMO-1a — trust_remote_code 服从用户选择
 
@@ -188,7 +189,9 @@ confidence: high
 - 禁止：用 server VAD cancellation 冒充 native interruption；每轮重建 Stage0；让 LISTEN 因
   无 Talker payload 失败。
 - 验收：native case 完成响应≥2、cancel/truncate=0、listen≥1；opt-in hard interrupt 恰好一次
-  terminal、fence 后无 stale delta、保留打断语句且后续响应成功。 ^[PR #6154] ^[PR #6170]
+  terminal、fence 后无 stale delta、保留打断语句且后续响应成功。response-required fixture 若要求
+  每轮 SPEAK，应重放已验证的完整 active-speech window；任意较短 mid-utterance slice 合法返回
+  LISTEN，不能把它当模型失败或修改生产决策阈值。 ^[PR #6056] ^[PR #6154] ^[PR #6170]
 
 ## MCPMO-4b — session update 与派生 reservation 原子提交
 
@@ -223,6 +226,26 @@ confidence: high
   日志环境：数据/模型 revision 未固定，Daily 首次受损坏 decord 失败后重跑，kernel warmup 另有
   未提交 patch，证据脚本还吞掉 step failure，且把版本号写作 commit。因而不能从这些数字声称
   merge target 的可复现质量/性能通过。^[PR #5524]
+
+## MCPMO-5b — online serving CI 必须显式区分 chunk 模式与 duplex fixture 语义
+
+- 触发：修改 MiniCPM-o 4.5 online serving、expansion、native duplex 测试或其 deploy helper。
+- 强制：core online suite 显式启动 `--async-chunk`，并把 bounded sampling 保持在 fixture-local
+  派生配置；expansion suite 以两个独立 parametrization 覆盖 `--no-async-chunk` 与
+  `--async-chunk`。不得用 deploy 默认值或参数 ID 猜实际模式。audio→text+audio case 若要稳定
+  验证 TTS，必须显式请求 text/audio modalities、`use_tts_template=True`、
+  `enable_thinking=False` 并断言目标关键词。
+- duplex fixture 保留 Talker `max_model_len=4096`，但不覆盖三个 stage 的 KV sizing，不另造 eager-only
+  server；protocol smoke 与 response tests 使用同一 server config。response-required 多轮测试每轮
+  重放同一 active-speech window，避免较短的 mid-utterance slice 合法地产生 LISTEN。reference audio
+  先接受本地 checkpoint 目录（包括绝对 `MODEL` 路径），不存在时才从本地 HF cache 解析。
+- 禁止：把删除测试专用 KV cap 解释成生产 deploy 资源变更；把移除 assertion 的 JSON failure
+  message 解释成行为放宽；或在输入与 oracle 已改变后声称复现并修复原始 mixed-input
+  audio-similarity 故障。
+- 验收：至少收集 core async、expansion sync/async、duplex protocol 与 advanced session cases，
+  并记录实际执行结果及硬件；local checkpoint 与 cache fallback 各一例。changed tests、marker
+  或 parametrization 只能证明 collection 意图；没有实际 runtime 结果时，不能声称 CUDA/NPU、
+  音频质量或 flake 已闭环。^[PR #6056]
 
 共享 bridge/batch 规则见 [Model Executor rules](../../components/model-executor/rules.md)；
 公开入口完整性见 [model adaptation guardrails](../../review/guides/model-adaptation-guardrails.md)。

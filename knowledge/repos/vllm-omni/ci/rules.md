@@ -4,7 +4,7 @@ created: 2026-08-23
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, ci]
-sources: ["PR #3422", "PR #5074", "PR #5255", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5836", "PR #5845", "PR #5872", "PR #6008", "PR #6048", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6339", "PR #6343", .buildkite/cuda/test-nightly.yml, .buildkite/npu/test-npu-nightly.yml, .pre-commit-config.yaml, tests/dfx/perf/scripts/run_benchmark.py, tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tools/pre_commit/check_tts_adapter.py, tests/tools/test_check_tts_adapter.py]
+sources: ["PR #3422", "PR #5074", "PR #5255", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5836", "PR #5845", "PR #5872", "PR #6008", "PR #6048", "PR #6056", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6339", "PR #6343", .buildkite/cuda/test-nightly.yml, .buildkite/npu/test-npu-nightly.yml, .pre-commit-config.yaml, tests/dfx/perf/scripts/run_benchmark.py, tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, tools/pre_commit/check_tts_adapter.py, tests/tools/test_check_tts_adapter.py]
 confidence: high
 ---
 
@@ -40,6 +40,11 @@ confidence: high
   `__init__.py`、缺依赖、坏 registry 或错误 marker 时 lane 必须红。 ^[PR #3422]
   ^[PR #5310] ^[PR #5524] ^[PR #5543] ^[PR #5780]
   ^[PR #5872] ^[PR #6048] ^[PR #6096] ^[PR #6102]
+
+MiniCPM-o online suite 的具体矩阵必须从 server args 读取：core 只跑 async chunk，expansion
+分别跑 sync/async，duplex 又有自己的共享 server fixture。marker 与 parametrization 只能证明
+collection 意图；没有实际 runtime 结果时，不能证明目标硬件行为。模型专属 fixture 合同见
+[MCPMO-5b](../models/minicpm-o-4-5/rules.md#mcpmo-5b-online-serving-ci-必须显式区分-chunk-模式与-duplex-fixture-语义)。^[PR #6056]
 
 ## OMNI-CI-1b — 回归 fence 必须锚定可观察合同且非空转
 
