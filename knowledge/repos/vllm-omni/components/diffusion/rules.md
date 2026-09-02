@@ -20,14 +20,15 @@ confidence: high
 
 | PR 描述在做什么 | 精确规则组 | 第一批 live 源码 |
 |---|---|---|
-| CUDA Graph、compile、fused solver/norm/RoPE、FA determinism、eager parity、tensor dtype/device、async output | `execution-parity`：`DIFF-1a`–`1f` | `compile.py::regionally_compile` → shared layer/backend → model denoise/solver/output pump |
+| CUDA Graph、compile、fused solver/norm/RoPE、FA determinism、eager parity、tensor dtype/device、async output/teardown | `execution-parity`：`DIFF-1a`–`1h` | `compile.py::regionally_compile` → shared layer/backend → model denoise/output pump/shutdown |
 | seed、request-local generator、guidance=0、并发 RNG、batched generators | `execution-parity`：`DIFF-1b` | `inputs/data.py::OmniDiffusionSamplingParams` → runner `_initialize_generator` → request-batch generator collate |
 | ModelOpt/checkpoint adapter、weight/scale remap、unknown tensor、resolution path | `checkpoint-distributed`：`DIFF-2a` | `diffusers_loader.py::{_get_checkpoint_adapter,load_weights}` → `modelopt.py::{_resolve_target_and_output_names,adapt}` |
 | host-weight artifact、source identity、layout/dtype、warm restore | `checkpoint-distributed`：`DIFF-2d` | `model_loader/host_weights/{source_identity,contracts,identity_adapter}.py` → policy/restorer |
 | HSDP/FSDP、`fully_shard`、DeviceMesh、packed/scalar parameter、FP8 | `checkpoint-distributed`：`DIFF-2b` | `distributed/hsdp.py::{apply_hsdp_to_model,shard_model}` → loader `_load_model_with_hsdp` → `hsdp_fp8.py` |
 | distributed layerwise offload、AllGather、异构 block、shared buffer | `checkpoint-distributed`：`DIFF-2e` | `offloader/distributed_layerwise_backend.py::{DistributedLayerwiseOffloadHook.initialize_hook,prefetch_layer,DistributedLayerwiseOffloadBackend._allocate_shared_buffers}` |
+| DLO+AllGather、DP concurrent collective wave、per-worker result queue、shutdown | `checkpoint-distributed`/`execution-parity`：`DIFF-2k`, `DIFF-1d/1g/1h` | request compatibility key → multi-rank RPC → worker-owned queue/pump → bounded teardown |
 | component quantization、text encoder/transformer/VAE 独立配置、owner prefix、meta/offload | `checkpoint-distributed`：`DIFF-2c` | `quantization/factory.py::{build_quant_config,resolve_quant_config_from_disk}` → `component_config.py::ComponentQuantizationConfig.resolve` → `data.py::_propagate_quantization_from_tf_config` → component linear consumer |
-| modular/multi-DiT、`_dit_modules`、request-scoped Cache-DiT/compile/SP/LoRA/offload lifecycle | `checkpoint-distributed`：`DIFF-2f`–`2j` | request batch key → model policy → cache runtime；pipeline component list → shared consumers |
+| modular/multi-DiT、`_dit_modules`、request-scoped Cache-DiT/compile/SP/LoRA/offload lifecycle | `checkpoint-distributed`：`DIFF-2f`–`2j` | request batch key → model policy/cache runtime；pipeline component list → shared consumers |
 | LPIPS/PSNR/相似度阈值、CPU offload、量化质量证据 | `quality-evidence`：`DIFF-3a` | changed exact case → runner `execute_model` → model pipeline；A/B 同路径 |
 | paged KV/cache、backend/platform、GQA/layout、Ring/Ulysses、FlashInfer quant、预算与 admission | `system-runtime`：`DIFF-4a`–`4i` | engine init → metadata/config → attention parallel/backend → platform hook → scheduler/serving |
 | worker/RPC 异常、rank-status、traceback/device cache 清理 | `system-runtime`：`DIFF-4d` | `diffusion_worker.py::{_execute_rpc,_worker_busy_loop}` 的 raise/reply/status 路径 |
@@ -35,8 +36,8 @@ confidence: high
 | 审查组 | 什么时候触发 | 规则 ID |
 |---|---|---|
 | `core` | 每次共享 diffusion 审查 | `DIFF-1a`, `DIFF-1b`, `DIFF-1c`, `DIFF-1d`, `DIFF-1e` |
-| `execution-parity` | graph/eager、solver、RNG、generator、tensor dtype/device、fused layer、FA determinism、async output readiness | `DIFF-1a`–`1f` |
-| `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP、artifact identity、distributed offload、multi-DiT/cache lifecycle | `DIFF-2a`–`2j` |
+| `execution-parity` | graph/eager、solver、RNG、generator、tensor dtype/device、fused layer、FA determinism、async output/shutdown | `DIFF-1a`–`1h` |
+| `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP、artifact identity、distributed offload、multi-DiT/cache lifecycle | `DIFF-2a`–`2k` |
 | `quality-evidence` | 质量阈值、offload、A/B case | `DIFF-3a` |
 | `system-runtime` | cache/预算、native/backend/platform、attention layout、能力 metadata、异常与并发 | `DIFF-4a`–`4i` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `DIFF-0a`, `DIFF-0b` |
@@ -74,19 +75,8 @@ confidence: high
 - 禁止：依赖 process 默认 fp32/CPU 或隐式 cast/move；只测 shape 而不执行 BF16 consumer。
 - 验收：BF16、错长、batch reorder 和 graph/eager 用例断言 consumer 收到相同 device/dtype、
   alias 与结果。 ^[PR #5067] ^[PR #5068] ^[PR #5174] ^[PR #5981]
-### DIFF-1d — async output 的 compute 与 output-ready 必须分成两个可观察阶段
-
-- 触发：把 diffusion D2H/SHM packing 移到 worker 后台线程，或修改
-  `ResultPumpThread`、`collective_rpc`、batch output split。
-- 强制：GPU compute 完成只释放下一次 forward；最终输出必须等 side-stream event、D2H
-  和 SHM packing 完成后再 resolve。`result_mq` 由唯一 pump reader 分发，batch 结果按
-  request 映射拆分；step-mode 保留同步路径。
-- 禁止：在 compute-done 时把未完成的 device tensor 当成最终 artifact；让多个线程同时
-  消费 result queue；用同步 `.cpu()` 掩盖 stream ordering 或让下一 step 重写源 buffer。
-- 验收：分别覆盖 compute-done、output-ready、RPC error、batch split 和 queue cleanup；
-  在非 CUDA/step-mode 下证明同步 fallback 仍可构造。首批测试看
-  `tests/diffusion/test_async_output_worker.py`、`test_result_pump.py` 和
-  `tests/diffusion/test_ipc_async.py`。
+async output readiness、per-worker result channel 与 shutdown 合同见
+[DIFF-1d/1g/1h 专页](rules-output-lifecycle.md)。
 
 ### DIFF-1e — fused layer 必须保留精度、布局与平台分派合同
 
@@ -193,8 +183,8 @@ confidence: high
   不同 block size 验证 small/large hook 都满足 collective size equality、重建权重和 repoint。
   当前回归用 mocked collective 检查 8/32-element、dp=2 合同；没有真实 multi-rank collective
   覆盖，PR 的 8×NPU H3 E2E 说明也缺少已填写的 commit 证据，不能升级为验证结论。 ^[PR #5802]
-  DP concurrent wave 只可在 DLO+AllGather 开启，并从 `sampling_params.extra_args` 比较 canonical
-  signature；no-AllGather 的 TP-local request 不得误走 fused batch。文档 compatibility matrix 中
+  DLO DP collective-wave admission 见 [DIFF-2k](rules-output-lifecycle.md)；no-AllGather 的
+  TP-local request 不得误走 fused batch。文档 compatibility matrix 中
   “accepted” 默认只代表配置/源码 guard；PR #5836 的 predecessor partition-path commit 为 H3
   USP4+HSDP4+no-AllGather+8 resident layers 提供一次 4×H100、3/3 completion/perf run，故该 exact
   组合不再是纯 config evidence，但没有 ordinary-offload 数值/输出质量对照，且 profiler 开启、
