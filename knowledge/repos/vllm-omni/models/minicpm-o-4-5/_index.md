@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-02
 type: index
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #3642", "PR #5382", "PR #5638", "PR #6154", "PR #6170", "PR #6318", vllm_omni/model_executor/models/minicpmo_4_5/]
+sources: ["PR #3642", "PR #5382", "PR #5638", "PR #5869", "PR #6154", "PR #6170", "PR #6318", vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/]
 confidence: high
 ---
 
@@ -31,6 +31,10 @@ Code2Wav 在所有平台使用树内 `MiniCPMO45Token2wav`。CUDA 可显式开�
 Campplus TensorRT；这是可关闭的局部加速，不替换 encoder/HiFT，也不会自动启用
 Step-Audio2 的 token2wav。engine cache/profile 与 fallback 门禁见 MCPMO-1c。
 
+四份 bundled deploy 在 CUDA 上另默认开启 HiFT graph：只 capture pre-iSTFT 子图，按 connector
+chunk/cache shape 预捕并限量 lazy capture，且不服从 stage `enforce_eager`；非 CUDA 回 eager。
+shape、显存、并发与部分-graph 性能证据边界见 MCPMO-1d。
+
 Thinker 的 Whisper/APM audio encoder 仍构造 dense `[B,1,T,T]` mask；chunk mask 已用
 broadcasted query/key index 代替逐 row Python fill，但不改变 chunk/left-context/lookahead
 边界，也不消除 O(T²) storage。语义与证据门禁见 MCPMO-2b。
@@ -40,7 +44,7 @@ broadcasted query/key index 代替逐 row Python fill，但不改变 chunk/left-
 
 ## 什么时候查这里
 
-- 审查 MiniCPM-o 4.5 registry、remote-code gate、TTS dependency、Code2Wav TensorRT、
+- 审查 MiniCPM-o 4.5 registry、remote-code gate、TTS dependency、Code2Wav TensorRT/HiFT graph、
   batch/stage handoff 或 native duplex session。
 - 问题位于共享 bridge/batching 时转到
   [Model Executor rules](../../components/model-executor/rules.md)。

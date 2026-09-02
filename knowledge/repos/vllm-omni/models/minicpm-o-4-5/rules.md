@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #3642", "PR #5165", "PR #5382", "PR #5638", "PR #6154", "PR #6170", "PR #6318", vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py, tests/model_executor/models/minicpmo_4_5/test_audio_chunk_mask.py, tests/model_executor/models/minicpmo_4_5/test_vision_flash_attention.py]
+sources: ["PR #3642", "PR #5165", "PR #5382", "PR #5638", "PR #5869", "PR #6154", "PR #6170", "PR #6318", vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/cuda_graph_wrapper.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_code2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py, tests/model_executor/models/minicpmo_4_5/test_audio_chunk_mask.py, tests/model_executor/models/minicpmo_4_5/test_code2wav_batching.py, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_pipeline.py, tests/model_executor/models/minicpmo_4_5/test_vision_flash_attention.py]
 confidence: high
 ---
 
@@ -22,6 +22,7 @@ confidence: high
 | tokenizer/processor、`trust_remote_code` | MCPMO-1a | pipeline/config factory → `model_executor/models/minicpmo_4_5/` loader |
 | TTS extra、backend 初始化、空音频 | MCPMO-1b | `minicpmo_4_5_omni_tts.py::MiniCPMO45OmniTTSForConditionalGeneration`、`minicpmo_4_5_token2wav.py::MiniCPMO45Token2wav` |
 | Code2Wav TensorRT、DiT/Campplus、engine cache/profile | MCPMO-1c | `minicpmo_4_5_code2wav.py::MiniCPMO45Code2Wav` → `batched_token2wav.py::BatchedToken2Wav._estimator_step`；共享实现 `step_audio2/step_audio2_dit_trt.py` |
+| HiFT CUDA Graph、chunk bucket、lazy capture、iSTFT | MCPMO-1d | `cuda_graph_wrapper.py::HiFTGraphWrapper` → `BatchedToken2Wav._hift_inference` → shared `HiFTGenerator` |
 | batch、`runtime_info`、stage handoff | MCPMO-3a/3b | `stage_input_processors/minicpmo_4_5_omni.py` → `minicpmo_4_5_omni.py::MiniCPMO45OmniForConditionalGeneration` → TTS/code2wav |
 | native duplex、Stage0 resume、LISTEN/SPEAK、server VAD | MCPMO-4a | `experimental/fullduplex/{minicpmo45,openai}/` → stage input processor |
 | instructions/persona/voice/mode update、prefill slots、context lock | MCPMO-4b | `experimental/fullduplex/minicpmo45/session.py` → runtime adapter/session runner |
@@ -62,6 +63,28 @@ confidence: high
 - 验收：分别覆盖关闭/开启、非 CUDA 忽略、torch/TRT 数值与音频 parity、首次构建和 cache
   复用、不同 SM 不共享 plan、CFG 后 batch 越界以及 chunk/cache 越界。PR 未新增自动化测试，
   因而这些仍是后续改动必须补证的验证缺口。 ^[PR #5638]
+
+## MCPMO-1d — HiFT graph 只捕获稳定 pre-iSTFT 子图并限界 shape cache
+
+- 触发：`enable_hift_graph`、capture batch/chunk 配置、HiFT inference 分段或 streaming cache shape。
+- 强制：只在 parameter device 为 CUDA 时启用；非 CUDA 回 eager。capture bucket 由 codec chunk、
+  left context、Flow lookahead、token→mel ratio 与 mel/source cache 推导；启动预捕 uncached/cached
+  shape，未知 final shape 最多 lazy capture 8 个，超限或无可容纳 batch 时回 eager。active stream
+  capture 中禁止嵌套 capture/replay并回 eager；静态输入先清零再复制真实 batch，输出 slice 后 clone。
+- 强制：graph 只覆盖 `_inference_pre_istft`；`torch.istft` 的 NOLA CPU-GPU sync 与 waveform clamp
+  留在 eager `_finalize_decode`。HiFT window/harmonic IDs 必须是随 module device 移动的 non-persistent
+  buffers。开关独立于 stage `enforce_eager`；四份 bundled MiniCPM-o deploy 默认开启。
+- 禁止：无 connector 配置、非正 chunk、负 left context、source/mel cache 不整除时静默 capture；
+  将未来 `initial_codec_chunk_frames` 当已预捕（当前会 lazy capture）；把 lazy graph limit 说成总显存
+  上界，因为启动 graphs、global pool、static tensors 与其他 graph owners 仍驻留。active-capture
+  分支虽绕过 nested replay，却调用包含 NOLA sync 的完整 eager decode；未做真实 outer-graph 测试前，
+  不能把日志中的 “fallback” 当成可捕获保证。custom `capture_batch_sizes` 也尚未校验正数/去重。
+- 验收：CUDA test 比较 cached/uncached graph 与 eager，CPU/mock 覆盖 lazy capture/limit fallback，
+  deploy test 固定默认开关；另测非 CUDA disable、invalid config、unsupported batch、nested capture 和
+  variable final chunk。static input/output 与 lazy graph map 为无锁可变状态；并发 replay/capture 需先
+  证明被上层串行化或增加互斥与重叠调用测试。PR 的单 A800 profile 约 30→5 ms/chunk、
+  250→43 ms/request，只绑定部分 graph、
+  单 prompt/commit `8fa28d88`，无 repeats/端到端质量，不能泛化为稳定 speedup。^[PR #5869]
 
 ## MCPMO-2a — registry 使用 4.5 config/version predicate
 

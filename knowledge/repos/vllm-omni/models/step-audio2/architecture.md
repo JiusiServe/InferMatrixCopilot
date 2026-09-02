@@ -4,12 +4,12 @@ created: 2026-07-21
 updated: 2026-09-02
 type: architecture
 tags: [vllm-omni, models]
-sources: ["PR #5638", vllm_omni/model_executor/models/step_audio2/step_audio2_thinker.py, vllm_omni/model_executor/models/step_audio2/step_audio2_token2wav.py, vllm_omni/model_executor/models/step_audio2/step_audio2_dit_trt.py, vllm_omni/model_executor/models/step_audio2/step_audio2_constants.py, vllm_omni/model_executor/stage_input_processors/step_audio2.py]
+sources: ["PR #5638", "PR #5869", vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/step_audio2/step_audio2_thinker.py, vllm_omni/model_executor/models/step_audio2/step_audio2_token2wav.py, vllm_omni/model_executor/models/step_audio2/step_audio2_dit_trt.py, vllm_omni/model_executor/models/step_audio2/step_audio2_constants.py, vllm_omni/model_executor/stage_input_processors/step_audio2.py, tests/model_executor/models/step_audio2/test_hift_parity.py]
 ---
 
 # Step-Audio2 架构
 
-事实在 `main @ f201b717` 复核;变体/入口速览见 [index](_index.md)。
+事实在 `main @ fc8946fc` 复核;变体/入口速览见 [index](_index.md)。
 
 ## 模型专有部分与共享模块的边界
 
@@ -23,7 +23,7 @@ sources: ["PR #5638", vllm_omni/model_executor/models/step_audio2/step_audio2_th
   硬编码 backbone 类）;音频嵌入并入 `<audio_patch>`（id 151690）位置。
 - 专有 token2wav（`step_audio2_token2wav.py`）：CosyVoice 风格栈——
   s3tokenizer（prompt wav 语音 token）+ ONNX 说话人嵌入 + hyperpyyaml 加载的
-  flow-matching（10 步 ODE）+ flashcosyvoice HiFT 声码器 → 24 kHz;树内带说话人
+  flow-matching（10 步 ODE）+ 树内 CosyVoice3 HiFT/mel 实现 → 24 kHz;树内带说话人
   wav——`assets/default_female.wav` 是默认,`default_male.wav` 是备选。
 - 共享加速实现：`step_audio2_dit_trt.py` 提供流式 DiT ONNX export/TRT stepper，
   `step_audio2_token2wav.py` 提供 Campplus TRT helper；在此 pin 上只有 MiniCPM-o 的

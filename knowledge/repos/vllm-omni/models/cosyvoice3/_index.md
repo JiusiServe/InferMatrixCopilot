@@ -1,15 +1,15 @@
 ---
 title: "CosyVoice3（单架构双 stage,RAS 合并停止,TRT 加速）"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-02
 type: index
 tags: [vllm-omni, models]
-sources: [vllm_omni/model_executor/models/cosyvoice3/, vllm_omni/deploy/cosyvoice3.yaml, vllm_omni/model_executor/stage_input_processors/cosyvoice3.py]
+sources: ["PR #5869", vllm_omni/model_executor/models/cosyvoice3/, vllm_omni/deploy/cosyvoice3.yaml, vllm_omni/model_executor/stage_input_processors/cosyvoice3.py]
 ---
 
 # CosyVoice3
 
-以下事实在 `main @ 5d44868e` 复核。
+以下事实在 `main @ fc8946fc` 复核。
 
 ## 名称与范围
 
@@ -38,6 +38,15 @@ sources: [vllm_omni/model_executor/models/cosyvoice3/, vllm_omni/deploy/cosyvoic
 - 依赖共享模块：[Diffusion 组件](../../components/diffusion/_index.md)的
   Attention 层、SharedMemoryConnector（stage 间码流）、
   [Config 组件](../../components/configuration/architecture.md)。
+- 树内 `code2wav_core/hifigan.py::HiFTGenerator` 也是 Step-Audio2 与 MiniCPM-o graph wrapper 的
+  shared consumer：pre-iSTFT magnitude/phase 与 eager iSTFT/clamp 必须保持同一 inference 合同，
+  修改时三家一起做 state-dict、音频与 graph/eager parity。^[PR #5869]
+- 目标 pin 有未闭合的 causal consumer：base `_stft/_istft` 已移除每次
+  `stft_window.to(device)`，但 `CausalHiFTGenerator.__init__` 绕过 base initializer，并把 window
+  作为普通 tensor 而非 registered buffer；module `.to(cuda)` 不会迁移它，继承的 STFT 路径可能
+  CPU/CUDA device mismatch。新增 Step-Audio2 parity 与 MiniCPM graph 测试只实例化 noncausal base；
+  修复必须让 causal window 注册/迁移，并增加 CosyVoice3 CUDA causal inference 回归，同时复核
+  base 的 MiniCPM、Step-Audio2 与 GLM-TTS consumers。^[PR #5869]
 
 ## 目录内容
 
