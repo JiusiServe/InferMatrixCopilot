@@ -4,7 +4,7 @@ created: 2026-08-23
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, ci]
-sources: ["PR #3422", "PR #5074", "PR #5310", "PR #5524", "PR #5543", "PR #5670", "PR #5780", "PR #5872", "PR #6048", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6339", "PR #6343"]
+sources: ["PR #3422", "PR #5074", "PR #5310", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5872", "PR #6048", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6339", "PR #6343"]
 confidence: high
 ---
 
@@ -20,6 +20,7 @@ confidence: high
 | regression/guard、route census、middleware、mutation test | `OMNI-CI-1b` | 公开 app/handler → guard test；先证明旧实现会失败 |
 | pre-commit、SPDX、shellcheck、stability marker | `OMNI-CI-2a` | `.pre-commit-config.yaml`、`.buildkite/**`、`tools/**` |
 | xdist、共享 worker、下载 fixture、进程池 | `OMNI-CI-2b` | `tests/conftest.py`、`tests/helpers/**`、`tests/model_tests/**` |
+| 重模型 cold start、共享 engine/server fixture、sleep/wake | `OMNI-CI-2c` | `tests/entrypoints/test_omni_sleep_mode.py`、OmniServer fixture scope/lock |
 
 ## OMNI-CI-1a — 硬件 lane 必须真实收集并执行目标路径
 
@@ -43,12 +44,15 @@ confidence: high
 
 - 触发：新增 bug regression、API guard、route census 或 middleware fence。
 - 强制：从 assembled app/公开 handler 观察行为，只改变目标变量；必需 state 不仅检查存在，
-  还要检查非 `None`。测试须在旧实现或代表性 mutation 上失败，在修复后通过。
+  还要检查非 `None`。测试须在旧实现或代表性 mutation 上失败，在修复后通过。mock engine
+  自己抛出的异常只能证明 route 不吞异常；真实 backend 状态与 HTTP mapping 必须另由 live
+  server 触发生产操作验证，不能把 mock-authored type/message 当成 backend contract。
 - 禁止：绑定可搬迁私有符号或单个 router；用恒真类型断言、错误参数的提前失败、宽泛
   `>=400`、不同文本或长度冒充目标分支证据。
 - 验收：mutation 分别置空 wiring、移除目标 route/method、绕过 inner middleware，fence 均失败；
-  route census 覆盖应用实际暴露的 HEAD/OPTIONS 和依赖 state key。 ^[PR #3422] ^[PR #5074]
-  ^[PR #5670] ^[PR #6202]
+  route census 覆盖应用实际暴露的 HEAD/OPTIONS 和依赖 state key。异常路径分别用 CPU mock
+  证明 route propagation，并用 live assembled app 触发真实 backend condition、核对结构化
+  status/body 与失败后的 state。 ^[PR #3422] ^[PR #5074] ^[PR #5670] ^[PR #5713] ^[PR #6202]
 
 ## OMNI-CI-2a — CI 工具、schema 和 hook 是可复现供应链
 
@@ -70,3 +74,17 @@ confidence: high
   活对象隐式跨进程传递。
 - 验收：OOM、普通异常和 BrokenProcessPool 分别验证隔离/重试；online/offline xdist 均通过，
   并发 cache miss 只产生一个完整文件。 ^[PR #6208] ^[PR #6339]
+
+## OMNI-CI-2c — 昂贵 engine fixture 复用必须恢复状态并隔离拓扑
+
+- 触发：为减少 checkpoint cold start，把 function-scoped engine/server 提升到 class/module
+  scope，或合并 sleep/wake 等重模型 case。
+- 强制：不兼容 topology 使用不同 class-scoped fixture，保证同一时刻只有一个 heavy engine；
+  module 前后各做一次 device cleanup；每个 case 在 `finally` 将共享 engine wake/reset 到可用
+  状态。不可逆的 level-2 sleep case 放在独立 module-scoped server 的最后，结束后只 teardown。
+- 禁止：共享 engine 后依赖测试顺序留下的 sleep/tag/cache 状态；在 module-scoped
+  `omni_server` 持有 fixture lock 时再创建 function-scoped server，造成锁等待或 GPU 争用；
+  为省 cold start 删除 topology、TP 或 post-wake generation 的独立覆盖。
+- 验收：分别覆盖 LLM、diffusion 与 multi-stage topology；每个可恢复 case 后下一 case 从 awake
+  开始；level-2 terminal case 之后不再复用 server；统计目标 lane 确实只初始化预期数量的
+  engine，且 cleanup 后无 worker/device state 遗留。^[PR #5713]

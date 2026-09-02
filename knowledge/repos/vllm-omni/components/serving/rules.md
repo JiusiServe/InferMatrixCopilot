@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #3576", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5085", "PR #5157", "PR #5670", "PR #6138", "PR #6202", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/cfg_companion_tracker.py, vllm_omni/metrics/prometheus.py, tests/entrypoints/openai_api/test_video_server.py]
+sources: ["PR #3576", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5085", "PR #5157", "PR #5670", "PR #5713", "PR #6138", "PR #6202", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/cfg_companion_tracker.py, vllm_omni/metrics/prometheus.py, tests/entrypoints/openai_api/test_omni_sleep_wakeup.py, tests/entrypoints/openai_api/test_video_server.py]
 confidence: high
 ---
 
@@ -219,7 +219,10 @@ confidence: high
 - 禁止：错误 ACK 也清 tag；用 engine 全局禁令误伤已经支持 restore 的 diffusion worker。
 - 验收：失败 ACK 保留 sleeping 状态；支持 level-2 的 diffusion 路径仍能
   sleep → wake → generate，不支持的 stage 在调用 worker 前明确拒绝。
-  ^[PR #4834] ^[PR #4905] ^[PR #4912]
+  assembled app 对不支持的 level-2 wake 保留 sleeping state，并把既有
+  `NotImplementedError` 映射为 OpenAI-style structured HTTP 501；bare route mock 只证明
+  exception propagation，不能代替这条 live contract。^[PR #4834] ^[PR #4905]
+  ^[PR #4912] ^[PR #5713]
 
 ### SERV-5c — 共享服务类重构必须闭合全部构造状态
 
