@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/engine/stage_init_utils.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py, docs/design/feature/omni_async_output_materialization.md, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/experimental/fullduplex/, tests/e2e/features/fullduplex/, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, "PR #3422", "PR #3642", "PR #4730", "PR #4958", "PR #5074", "PR #5310", "PR #5610", "PR #5777", "PR #5792", "claude-workflow-starter-private@09dca46"]
+sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/engine/stage_init_utils.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py, docs/design/feature/omni_async_output_materialization.md, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/experimental/fullduplex/, tests/e2e/features/fullduplex/, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, "PR #3422", "PR #3642", "PR #4730", "PR #4958", "PR #5074", "PR #5310", "PR #5610", "PR #5777", "PR #5792", "PR #5824", "claude-workflow-starter-private@09dca46"]
 ---
 
 # Model Executor 规则
@@ -21,7 +21,7 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 | stage TP/PP/DP、devices、replica、visible devices、worker 启动、容量 fail-fast | `stage-runtime`：本页“Stage 并行度和设备容量必须一起验收” | `vllm_omni/config/stage_config.py::build_stage_runtime_overrides` → `vllm_omni/engine/stage_runtime.py::{StageRuntime.initialize,StageRuntime._resolve_replica_physical_devices}` → `stage_engine_startup.py::{launch_stage_replica,get_headless_replica_devices}` |
 | `runtime_info`、request RNG、batch compaction、跨 stage bridge/串线 | `bridge-batch`：`EXEC-1a`–`1c` | shared runner request state → stage input processor → model consumer |
 | loader dtype、只取 checkpoint config、避免整仓权重下载 | `loader-contract`：`EXEC-2a` | `vllm_omni/model_executor/model_loader/weight_utils.py::download_weights_from_hf_specific` → `vllm_omni/model_executor/models/<命中模型>` loader |
-| 准备引入 fused projection、HF shard 拼装、consumer 委托、packed TP | `loader-contract`：`EXEC-2b` | 先确认目标 main 是否已有 fused parameter；当前 Qwen3 code predictor 为分离 projection |
+| fused projection、HF source shard 完整性、consumer 委托、packed TP | `loader-contract`：`EXEC-2b` | H3 text encoder fused owner；其他模型先确认目标 main 是否已有 fused parameter |
 | async Omni output、background builder、D2H snapshot、connector drain/fallback | `async-output`：`EXEC-5a` | `worker/gpu_ar_model_runner.py::{_should_use_async_omni_output,OmniAsyncGPUModelRunnerOutput}` → platform runner → connector output |
 
 | 审查组 | 什么时候触发 | 规则 ID |
@@ -169,17 +169,18 @@ Stage 拓扑错误的最小充分源码证据只有三段：一处最终配置�
   记录峰值显存和 dtype。Krea 2 的具体约束见
   [Krea 2 规则](../../models/krea2/rules.md)。 ^[PR #4730]
 
-### EXEC-2b — 未来引入 fused shard 时必须按布局数值闭环
+### EXEC-2b — fused shard 必须按 source 完整性与布局数值闭环
 
-> 当前 `main @ 78c144f3` 的 Qwen3 code predictor 使用分离 q/k/v 和 gate/up projection；
-> PR #4958 的 fused 实现已因 CI failure 被 PR #5777 整体回退。本规则是对未来再引入
-> 类似优化的门禁，不描述当前 runtime 机制。
+> H3 text encoder 当前有 fused QKV 与 gate/up owner；Qwen3 code predictor 仍使用分离
+> projection，其 PR #4958 fusion 已由 PR #5777 回退，不能把 H3 现状外推给 Qwen。
 
 - 触发：准备合并 q/k/v、gate/up 等 projection，修改 HF shard 映射、wrapper/talker
   loader、packed projection TP plan 或平台 override。
 - 强制：weight 与可选 bias 都按 forward split 的同一顺序数值拼装；部分 shard 和
-  整组 shard 缺失都硬失败。所有声明同一 fused module 的 consumer 必须委托给共享
-  loader，wrapper 并恢复 returned loaded-name 的模型前缀；平台 override 同步使用新
+  整组 shard 缺失都硬失败。bookkeeping 必须按 source shard id；expected 集合从实际 fused
+  owner 预置，才能捕获零 shard，不能以任一 source 命中的 target name 代表完整。所有声明
+  同一 fused module 的 consumer 必须委托给共享 loader，wrapper 并恢复 returned loaded-name
+  的模型前缀；平台 override 同步使用新
   fused 属性与共享 split helper。
 - 禁止：不得用逐 tensor `default_weight_loader` 绕过 fused assembler；不得只记录 skipped
   shard 后让随机初始参数继续；不得只用 shape 或 returned-name 断言顺序正确。GQA
@@ -187,4 +188,6 @@ Stage 拓扑错误的最小充分源码证据只有三段：一处最终配置�
   未有 TP-aware packing/loading/split 与 TP=2 测试时，TP plan 保持空。
 - 验收：数值比较 fused 参数与 `cat([q,k,v])`/`cat([gate,up])`，覆盖 bias、
   部分/整组缺 shard、每个 consumer 的委托和前缀；以非等 q/KV width 证明 split 能识别
-  GQA 错序。平台测试或静态 guard 证明不再引用已删除的 projection 属性。 ^[PR #4958] ^[PR #5777]
+  GQA 错序。平台测试或静态 guard 证明不再引用已删除的 projection 属性。H3 eager text
+  encoder 还须对任何未加载 plain retained parameter 在启动时硬失败；unknown checkpoint key
+  可继续告警，因为它不会留下 model parameter 未初始化。^[PR #4958] ^[PR #5777] ^[PR #5824]

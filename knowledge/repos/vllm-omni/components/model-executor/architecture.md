@@ -64,7 +64,7 @@ KV-only sender 可只保留 KV manager，不另外创建无 consumer 的 payload
 和 `gate_proj`/`up_proj`，HF 同名参数由普通 loader 直接写入，TP plan 也指向这些
 分离名称。只有 310P 平台 overlay 在 `prepare_qkv_weights()` 内为本地执行临时拼接
 QKV weight/bias；这不表示共享模型或 checkpoint loader 已改为 fused parameter。未来再引入
-共享 fusion 时的验收门禁见 [EXEC-2b](rules.md#exec-2b-未来引入-fused-shard-时必须按布局数值闭环)。
+共享 fusion 时的验收门禁见 [EXEC-2b](rules.md#exec-2b-fused-shard-必须按-source-完整性与布局数值闭环)。
 
 ## 怎样判断问题归属
 
