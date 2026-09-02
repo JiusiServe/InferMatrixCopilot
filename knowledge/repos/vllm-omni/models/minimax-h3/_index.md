@@ -4,7 +4,7 @@ created: 2026-08-05
 updated: 2026-09-02
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5709", "PR #5737", "PR #5740", "PR #5752", "PR #5756", "PR #5764", "PR #5785", "PR #5801", "PR #5829", .buildkite/cuda/test-nightly.yml, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/, docs/user_guide/quantization/fp8.md, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/models/minimax_h3/, vllm_omni/diffusion/registry.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/, tests/e2e/accuracy/minimax_h3/, tests/e2e/features/comfyui/test_comfyui_integration.py, vllm_omni/entrypoints/openai/video_api_utils.py]
+sources: ["PR #5703", "PR #5709", "PR #5737", "PR #5740", "PR #5752", "PR #5756", "PR #5764", "PR #5785", "PR #5801", "PR #5829", "PR #5837", .buildkite/cuda/test-nightly.yml, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/, docs/user_guide/quantization/fp8.md, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/models/minimax_h3/, vllm_omni/diffusion/registry.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/, tests/e2e/accuracy/minimax_h3/, tests/e2e/features/comfyui/test_comfyui_integration.py, vllm_omni/entrypoints/openai/video_api_utils.py]
 confidence: high
 ---
 
@@ -41,9 +41,10 @@ confidence: high
 - 音频加载优先使用 torchaudio；当 TorchCodec/torchaudio 在 CPU-only aarch64 环境不可用
   时，`reference_video.load_audio_file` 回退到 soundfile，再对 libsndfile 不支持的格式
   通过 ffmpeg 转 WAV。该回退保持 `(channels, samples)` float32 与原始 sample rate 合同。
-- conditioned image/video VAE 用固定内部 seed，并在 `fork_rng` 中播种 CPU 与参数所在设备后
-  恢复 state；MUSA recipe 记录 MTT S5000 验证。目标实现实际接纳所有非 CPU device，而实机
-  RNG 证据只覆盖 CUDA/MUSA；支持边界与并发缺口见 MMH3-2c。
+- conditioned image/video VAE 用固定内部 seed，并把 parameter 的真实 `device_type` 传给
+  `fork_rng`，以保存/恢复 CPU 与对应 accelerator RNG；MUSA recipe 记录 MTT S5000，PR #5837
+  另报告 Ascend NPU smoke/FL2VA 成功。目标实现接纳已注册的非 CPU device module，但持续
+  回归、XPU/ROCm 与并发边界仍见 MMH3-2c。
 - H3 q/k 使用共享 RMSNorm（BF16 gamma、native FP32 accumulation）与 NeoX RoPE；每个
   128 维 head 只旋转前 96 维并保留后 32 维，平台布局和验证边界见 MMH3-1c。
 - 2×consumer-GPU profile 使用 TP-local no-AllGather DLO、VAE patch parallel、cuDNN attention
