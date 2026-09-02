@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #3576", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5085", "PR #5157", "PR #5670", "PR #5713", "PR #5752", "PR #6138", "PR #6202", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/cfg_companion_tracker.py, vllm_omni/metrics/prometheus.py, tests/entrypoints/openai_api/test_omni_sleep_wakeup.py, tests/entrypoints/openai_api/test_video_server.py]
+sources: ["PR #3576", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5085", "PR #5157", "PR #5670", "PR #5713", "PR #5732", "PR #5752", "PR #6138", "PR #6202", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/cfg_companion_tracker.py, vllm_omni/metrics/prometheus.py, tests/entrypoints/openai_api/test_omni_sleep_wakeup.py, tests/entrypoints/openai_api/test_video_api_utils.py, tests/entrypoints/openai_api/test_video_server.py]
 confidence: high
 ---
 
@@ -25,7 +25,7 @@ confidence: high
 | sleep/wake、partial stage/tag、idempotency、ACK、generation admission | `engine-lifecycle`：`SERV-5a`, `SERV-5b` | `entrypoints/async_omni.py::{AsyncOmni.sleep,AsyncOmni.wake_up,AsyncOmni.generate}` → `worker/base.py::{handle_sleep_task,handle_wake_task}` / `diffusion/worker/diffusion_worker.py` |
 | serving class/factory 重构、optional adapter、diffusion/no-TTS 实例、warmup | `engine-lifecycle`：`SERV-5c` | `entrypoints/openai/serving_speech.py` 的所有 factory/`__new__` 路径 → `warmup`、voice upload/list、speech request caller |
 | SSE/streaming speech、audio format、PCM/WAV、speed、首 chunk 前校验 | `streaming-format`：`SERV-1a`, `SERV-1b` | `vllm_omni/entrypoints/openai/protocol/audio.py::{OpenAICreateSpeechRequest.validate_streaming_constraints,StreamingSpeechSessionConfig.validate_streaming_constraints}` → `serving_speech.py::{OmniOpenAIServingSpeech._validate_speech_streaming_request,OmniOpenAIServingSpeech.create_speech}` |
-| video reference 解码、mixed media、capability、bounded upload、空帧 | `media-ingress`：`SERV-1c/1d` | `entrypoints/openai/video_api_utils.py::{OmniVideoBackend,_decode_video_bytes}`、`serving_video.py::supports_mixed_reference_inputs` → video server callers |
+| video reference 解码、mixed media、frame conversion/mux、bounded memory | `media-ingress`：`SERV-1c`–`1e` | `entrypoints/openai/video_api_utils.py` decode/coerce/encode helpers → video server callers |
 | `ref_audio`、x-vector/ICL、content identity、artifact cache/readiness | `artifact-readiness`：`SERV-3a`–`3c` | `serving_speech.py` reference resolve/decode/cache → adapter speaker cache → prefix salt |
 | Prometheus、waiting/running gauge、replica stats、throttle、collector lifecycle | `metrics-lifecycle`：`SERV-2a`, `SERV-2b` | `vllm_omni/entrypoints/omni_base.py::{OmniBase._log_summary_and_cleanup,OmniBase._process_stage_metrics_message}` → `vllm_omni/metrics/prometheus.py::{OmniPrometheusMetrics.__init__,set_running,set_waiting}` |
 
@@ -33,7 +33,7 @@ confidence: high
 |---|---|---|
 | `core` | 每次 serving 审查 | `SERV-4c` |
 | `streaming-format` | SSE、audio streaming、format/default/capability | `SERV-1a`, `SERV-1b` |
-| `media-ingress` | video reference、decoder registry/backend、mixed capability、bounded upload | `SERV-1c`, `SERV-1d` |
+| `media-ingress` | video reference、decoder registry/backend、mixed capability、bounded upload/conversion | `SERV-1c`–`1e` |
 | `metrics-lifecycle` | metrics、gauge、replica、collector | `SERV-2a`, `SERV-2b` |
 | `artifact-readiness` | artifact/content cache、capability、ready/mark/discard | `SERV-3a`, `SERV-3b`, `SERV-3c` |
 | `chat-multimodal-contract` | chat template kwargs、SDK flatten、text/audio response shape | `SERV-4c` + 命中模型规则 |
@@ -88,6 +88,23 @@ confidence: high
   oversize/bad format 与 pipeline count/shape 错误保持同一 client-error 合同。typed URL/data URL
   是否同样 bounded 必须单独证明；本 pin 的 helper 仍完整读取。模型专有 allowlist、temp-file
   与 input matrix 见 [MiniMax H3 rules](../../models/minimax-h3/rules.md)。 ^[PR #5752]
+
+## SERV-1e — 长视频转换只保留必要的全视频 buffer，并逐帧保持旧语义
+
+- 触发：修改 video output 的 normalize、float→uint8、RGBA strip、mux 或 fragmented encode。
+- 强制：预分配最终 contiguous uint8 video，逐帧 clip/scale/round 写入，禁止先 `np.stack`
+  全量 float frames 再产生全量转换临时量；这只消除额外副本，原 normalized float frames、最终
+  uint8 buffer 及上游 device→host 分配仍存在，不能称为 O(1) memory。
+- 强制：所有 frame shape 相同；只有 rank-3 HWC 且 C=4 才去 alpha，二维 width=4 灰度不能
+  截断。mixed float dtype 先用 `np.result_type` 得到 common dtype，再逐帧计算，以保持 legacy
+  stack 的 promotion/rounding/checksum；不得原地改输入。当前 uint8 fast branch 因 normalization
+  先转 float32 而实际上不可达，不能拿它作为性能或语义证明。
+- 验收：回归测试禁止 float path 调用 `np.stack`，并覆盖 input immutability、RGBA、width-4
+  grayscale、mixed float16/float32 与 exact uint8 output。性能证据必须分开报告 conversion 和
+  未改动的 MP4 encode：PR #5732 的可复现实验仅绑定 209×1344×768 float32 RGB、24 FPS、
+  ultrafast、fresh process、3 次 median/RSS 10 ms；conversion 1201.15→529.47 ms、conversion+MP4
+  1808.96→1235.26 ms、peak RSS 8.874→4.141 GiB、above-resident 5.393→0.660 GiB，两个 hashes
+  相同。PR body 的 362-frame 与 4×MI300X E2E 是另一组观察，不能混合或泛化。^[PR #5732]
 
 ## SERV-2a — 指标节流和 gauge 按 scheduler/stage/replica owner 隔离
 
