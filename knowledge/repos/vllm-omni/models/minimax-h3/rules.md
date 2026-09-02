@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5706", "PR #5720", "PR #5737", "PR #5764", "PR #5779", "PR #5801", "PR #5824", "PR #5829", "PR #5836", "PR #5837", "PR #5840", "PR #5853", "PR #5881", "PR #5891", "PR #5896", "PR #5997", "PR #6000", benchmarks/diffusion/backends.py, benchmarks/diffusion/diffusion_benchmark_serving.py, docs/user_guide/diffusion/attention_backends.md, vllm_omni/config/model.py, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/cache/teacache/, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/quantization/int8_config.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_cache_dit_request_runtime.py, tests/diffusion/cache/test_teacache_extractors.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quality_policy.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/diffusion/quantization/test_int8_config.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/engine/async_omni_engine.py]
+sources: ["PR #5703", "PR #5706", "PR #5720", "PR #5737", "PR #5764", "PR #5779", "PR #5801", "PR #5824", "PR #5829", "PR #5836", "PR #5837", "PR #5840", "PR #5853", "PR #5881", "PR #5891", "PR #5896", "PR #5991", "PR #5997", "PR #6000", benchmarks/diffusion/backends.py, benchmarks/diffusion/diffusion_benchmark_serving.py, docs/user_guide/diffusion/attention_backends.md, vllm_omni/config/model.py, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/cache/teacache/, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/time_request.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/sched/sigma_schedule.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/quantization/int8_config.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_cache_dit_request_runtime.py, tests/diffusion/cache/test_teacache_extractors.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quality_policy.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/diffusion/quantization/test_int8_config.py, tests/diffusion/sched/test_dmd2_sigma_schedule.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/engine/async_omni_engine.py]
 confidence: high
 ---
 
@@ -31,6 +31,7 @@ confidence: high
 | request `quality`、lossless/high、dynamic Cache-DiT | `MMH3-2e` | request sampling → quality policy → request Cache-DiT runtime → denoise |
 | force-refresh hint、once/repeat、reinstall key | `MMH3-2f` | H3 `extra_args` validation → immutable cache config → installation key/refresh context |
 | TeaCache、FL2VA coefficients、0.17、combined/Ref2VA | `MMH3-2g` | custom enabler → H3 extractor → module-resident hook state / per-generation reset |
+| distilled、DMD2、`base_schedule`、4-step、sigma boundary | `MMH3-2h` | partition model metadata → `DMD2SigmaSchedule` → H3 video/audio shifted sigmas |
 | DLO、TP-local、resident layers、encoder/VAE staging | [MMH3-3a](rules-deployment.md#mmh3-3a-h3-dlo-必须保持-loader-layout-与-component-stage-配对) | H3 `_offload_plan` → shared DLO backend → pipeline encode/denoise/decode stage contexts |
 | RTX 5090/4090、24/32 GiB、consumer profile | [MMH3-3b](rules-deployment.md#mmh3-3b-consumer-gpu-profile-是有边界的容量证据) | recipe measurement commit/run record → exact target topology → quality/capacity validation |
 | 4×H100、DFX perf、T2V/TI2V/V2V、synthetic H.264 reference | [MMH3-3c](rules-deployment.md#mmh3-3c-h100-dfx-fixture-只证明-exact-nightly-workload-与-payload-path) | nightly lane → perf JSON → benchmark request encoder/result artifact |
@@ -274,6 +275,35 @@ confidence: high
   omitted/lossless/high，断言只存在一个 hook/backend 或明确拒绝。module state 若可交错还需并发隔离
   证明。单 H100 online/offline、
   Cache-DiT default/conservative 数据无多 prompt/repeats，不能升级为 gate。
+
+## MMH3-2h — distilled sigma schedule 按 partition 所有且以区间计步
+
+- 触发：H3 partition `model_index.json` 的 `_minimax_h3.base_schedule`、显式
+  `num_inference_steps`、video/audio flow shift 或 combined FL2VA+Ref2VA。
+- 强制：缺少 metadata key 或显式 null 都表示未蒸馏，保持旧
+  `num_inference_steps or 50` 的 uniform-point 构造（默认 50 个点实际是 49 个 solver
+  intervals）；explicit empty list 必须拒绝。调度至少两个有限点，严格
+  从 1.0 递减到 0.0，并逐对验证相邻位置。
+- 强制：5 个 sigma boundaries 只有 4 个 denoise intervals；`num_inference_steps`、
+  Cache-DiT quality policy 和请求验证均使用 `len(base_schedule)-1`，solver 仍接收
+  完整 boundary list。用户省略 step 时自动采用 checkpoint 步数；显式值只有
+  精确相等才接受，否则 `OmniClientError`。同一 continuous base positions 分别
+  应用 video/audio shift（默认 12/3），不得改用单模态 integer timesteps。
+- 强制：schedule 从各 partition metadata 分别读取；`t2va`/`fl2va` 选 FL2VA，
+  `ref2va` 选 Ref2VA。distilled FL2VA 不得拖普通 Ref2VA 进 4-step。类级空 map
+  是 partially constructed pipeline 的 legacy fallback，避免 `object.__new__`/dummy fixture
+  读未初始化属性。
+- 边界：共享 `DMD2SigmaSchedule` 在 `diffusion/sched` 定义，但此 pin 只有
+  H3 消费；现有 `DMD2PipelineMixin` 仍是 scheduler-backed，用
+  `DMD2EulerScheduler`/integer `denoising_timesteps`，本次未接入新 utility。不得由
+  `[NPU]` title 推导 NPU 实机已验：无 platform/deploy/recipe 改动，PR hardware
+  与 branch-head 也留空；附件视频只是 smoke，无数值 teacher/student quality gate。
+- 共享 boundary/interval、metadata null/empty 与 shift 有限性合同见
+  [DIFF-4j](../../components/diffusion/sigma-schedules.md#diff-4j-continuous-sigma-boundaries-不得与-scheduler-integer-timesteps-混同)。
+- 验收：shared class 覆盖长度/端点/单调/非有限/shift≤0、缺 key 与空 key；
+  H3 覆盖双 shift 精确值、combined partition 隔离、4-step 传入 solver/quality、
+  matching/mismatched explicit step 和 legacy/partially-constructed fallback。仍缺真实 distilled
+  checkpoint 的 CUDA/NPU E2E 与 teacher/student 质量阈值。^[PR #5991]
 
 共享 component quantization、checkpoint mapping 与 quality evidence 见
 [Diffusion rules](../../components/diffusion/rules.md)。
