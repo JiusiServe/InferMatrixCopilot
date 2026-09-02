@@ -1,10 +1,10 @@
 ---
 title: "Model Executor 共享架构"
 created: 2026-07-10
-updated: 2026-08-05
+updated: 2026-09-02
 type: architecture
 tags: [vllm-omni, components, model-executor]
-sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, tests/worker/test_omni_gpu_model_runner.py]
+sources: ["PR #5610", docs/design/feature/omni_async_output_materialization.md, vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py]
 ---
 
 # Model Executor 共享架构
@@ -34,6 +34,21 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/config/stage_config.py
 - 共享 runner 回归测试：`tests/worker/test_omni_gpu_model_runner.py`；具体模型怎样消费 metadata：`tests/model_executor/models/`。
 
 启动类错误优先沿“最终 stage 配置 → runtime devices → 启动前校验 → worker rank”读取这四段。只有其中一段把错误状态交给其他模块时才横向展开。
+
+## AR async Omni output materialization
+
+`GPUARModelRunner` 可把 `OmniModelRunnerOutput` 的 D2H、逐请求切片和 payload 构造从
+decode critical path 移到 background builder；采样 token feedback 与下一步要读的
+postprocess state 仍须同步完成。进入下一 decode step 前，scheduler/request mapping、token
+span 和可复用 CUDA output 都要形成 step-owned snapshot，CUDA tensor 要 clone 后在独立
+stream 搬到 pinned host buffer，并用 event 标记 ready。
+
+snapshot 不包含 connector output：background builder 是该 output cycle 的唯一 drain
+consumer，读取 live connector signal；`get_output()` join builder，同时是完成与异常传播边界。
+启用条件是 AR async scheduling、`async_chunk`、model opt-in 且没有 prefix cache、speculative
+decode、routed-expert output 等冲突状态；条件不满足时回退同步构造。CUDA/ROCm 是已验证范围，
+不是代码里的 platform guard；XPU/MUSA 可能通过共享 GPU runner 进入但尚未验证，Ascend NPU
+使用独立 runner 并保持同步 materialization。
 
 ## 怎样判断问题归属
 

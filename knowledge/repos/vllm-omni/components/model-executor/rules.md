@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-08-23
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/engine/stage_init_utils.py, tests/worker/test_omni_gpu_model_runner.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/experimental/fullduplex/, tests/e2e/features/fullduplex/, "PR #3422", "PR #3642", "PR #4730", "PR #5074", "PR #5792", "claude-workflow-starter-private@09dca46"]
+sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/engine/stage_init_utils.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py, docs/design/feature/omni_async_output_materialization.md, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/experimental/fullduplex/, tests/e2e/features/fullduplex/, "PR #3422", "PR #3642", "PR #4730", "PR #5074", "PR #5610", "PR #5792", "claude-workflow-starter-private@09dca46"]
 ---
 
 # Model Executor 规则
@@ -21,6 +21,7 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 | stage TP/PP/DP、devices、replica、visible devices、worker 启动、容量 fail-fast | `stage-runtime`：本页“Stage 并行度和设备容量必须一起验收” | `vllm_omni/config/stage_config.py::build_stage_runtime_overrides` → `vllm_omni/engine/stage_runtime.py::{StageRuntime.initialize,StageRuntime._resolve_replica_physical_devices}` → `stage_engine_startup.py::{launch_stage_replica,get_headless_replica_devices}` |
 | `runtime_info`、request RNG、batch compaction、跨 stage bridge/串线 | `bridge-batch`：`EXEC-1a`–`1c` | shared runner request state → stage input processor → model consumer |
 | loader dtype、只取 checkpoint config、避免整仓权重下载 | `loader-contract`：`EXEC-2a` | `vllm_omni/model_executor/model_loader/weight_utils.py::download_weights_from_hf_specific` → `vllm_omni/model_executor/models/<命中模型>` loader |
+| async Omni output、background builder、D2H snapshot、connector drain/fallback | `async-output`：`EXEC-5a` | `worker/gpu_ar_model_runner.py::{_should_use_async_omni_output,OmniAsyncGPUModelRunnerOutput}` → platform runner → connector output |
 
 | 审查组 | 什么时候触发 | 规则 ID |
 |---|---|---|
@@ -28,6 +29,7 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 | `strict-stage-config` | stage schema、projection、known fields | `EXEC-3a` |
 | `bridge-batch` | runtime info、跨 stage payload、batch、request RNG | `EXEC-1a`, `EXEC-1b`, `EXEC-1c` |
 | `loader-contract` | dtype、checkpoint config 获取、loader | `EXEC-2a` |
+| `async-output` | AR async output、snapshot/live state、平台与 guard/fallback | `EXEC-5a` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `EXEC-0a`, `EXEC-0b` |
 
 ## 严格配置校验
@@ -86,6 +88,25 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 - MTP 内部行为：只修改 `_talker_mtp_forward` 内部的采样参数、空 batch、output key、graph wrapper 或 generator 生命周期时，使用最近生产 owner 的针对性测试；只有它同时改变逐行 phase 或 `_preprocess` 路由时，才强制上述 mixed-batch 合同回归。
 - 平台边界：查 GPU generation/AR runner 和 NPU 等平台是继承共享实现还是覆盖它；没有 live 继承或调用链证据时，不得声称所有平台合同已经一致。
 - 文档与兼容：已向 out-of-tree 模型开放的字段必须从 model-contribution 入口可发现，并明确旧 runtime 和新 consumer 需要怎样配套升级；不能用某个 in-tree 模型的 fallback 充当公开合同。
+
+## Async Omni output materialization
+
+### EXEC-5a — snapshot、live drain 与 fallback 必须构成同一个 output-cycle 合同
+
+- 触发：修改 `GPUARModelRunner` async output、background builder、D2H copy、connector
+  output、model opt-in/postprocess，或 prefix cache/spec decode/routed-expert/platform guard。
+- 强制：下一 decode step 会覆盖或 mutate 的 scheduler metadata、request mapping、token span
+  和 CUDA output 必须先做 step-owned snapshot；可复用 tensor 要 clone，并由独立 stream、
+  pinned host buffer 和 ready event 固定 D2H 生命周期。采样 token feedback 与下一步所需的
+  model postprocess state 保持 eager。未 snapshot 的 connector signal 必须只有 background
+  builder 一个 drain consumer；`get_output()` 必须 join builder 并传播 background exception。
+- 禁止：把 live connector state 写进 snapshot 清单；让同步路径和 background path 重复 drain；
+  把“CUDA/ROCm 已验证”写成不存在的 platform guard；在 prefix cache、speculative decode、
+  routed-expert output 或非 eager stateful postprocess 下强开异步路径。
+- 验收：覆盖 reusable buffer 被下一 step 覆盖、逐请求 snapshot 隔离、connector drain 次数/
+  顺序、builder exception 和每个 compatibility guard 的 synchronous fallback。平台结论按真实
+  runner 分开：CUDA/ROCm 已验证，XPU/MUSA 可能进入共享 GPU path 但未验证，Ascend NPU 的
+  独立 runner 仍同步 materialize。 ^[PR #5610]
 
 ## Stage 并行度和设备容量必须一起验收
 
