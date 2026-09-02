@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5543", "PR #5720", "PR #5737", "PR #5764", "PR #5801", "PR #5802", "PR #5839", "PR #5848", "PR #5872", "PR #5981", "PR #6094", "PR #6102", "PR #6279", "PR #6385", "PR #6445", vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/offloader/, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/quantization/component_config.py, vllm_omni/quantization/factory.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/offloader/test_distributed_layerwise_backend.py]
+sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5255", "PR #5543", "PR #5720", "PR #5737", "PR #5764", "PR #5801", "PR #5802", "PR #5839", "PR #5848", "PR #5872", "PR #5981", "PR #6094", "PR #6102", "PR #6279", "PR #6385", "PR #6445", vllm_omni/diffusion/attention/backends/ring/ring_kernels.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/offloader/, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/quantization/component_config.py, vllm_omni/quantization/factory.py, tests/diffusion/attention/test_attention_sp.py, tests/diffusion/attention/test_ulysses_uaa.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/offloader/test_distributed_layerwise_backend.py]
 confidence: high
 ---
 
@@ -29,7 +29,7 @@ confidence: high
 | component quantization、text encoder/transformer/VAE 独立配置、owner prefix、meta/offload | `checkpoint-distributed`：`DIFF-2c` | `quantization/factory.py::{build_quant_config,resolve_quant_config_from_disk}` → `component_config.py::ComponentQuantizationConfig.resolve` → `data.py::_propagate_quantization_from_tf_config` → component linear consumer |
 | modular/multi-DiT、`_dit_modules`、Cache-DiT/compile/SP/LoRA/offload lifecycle | `checkpoint-distributed`：`DIFF-2f` | pipeline runtime component list → registry/runner/cache/LoRA/module discovery consumers |
 | LPIPS/PSNR/相似度阈值、CPU offload、量化质量证据 | `quality-evidence`：`DIFF-3a` | changed exact case → runner `execute_model` → model pipeline；A/B 同路径 |
-| paged KV/cache、backend/platform、GQA/layout、预算与 admission | `system-runtime`：`DIFF-4a`–`4f` | engine init → `diffusion_kv/{initialization,paged_attention_adapter}.py` → platform hook → scheduler |
+| paged KV/cache、backend/platform、GQA/layout、Ring/Ulysses、预算与 admission | `system-runtime`：`DIFF-4a`–`4g` | engine init → attention parallel/backend → platform hook → scheduler |
 | worker/RPC 异常、rank-status、traceback/device cache 清理 | `system-runtime`：`DIFF-4d` | `diffusion_worker.py::{_execute_rpc,_worker_busy_loop}` 的 raise/reply/status 路径 |
 
 | 审查组 | 什么时候触发 | 规则 ID |
@@ -38,7 +38,7 @@ confidence: high
 | `execution-parity` | graph/eager、solver、RNG、generator、tensor dtype/device、fused layer、async output readiness | `DIFF-1a`–`1e` |
 | `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP、artifact identity、distributed offload、multi-DiT lifecycle | `DIFF-2a`–`2f` |
 | `quality-evidence` | 质量阈值、offload、A/B case | `DIFF-3a` |
-| `system-runtime` | cache/预算、native/backend/platform、attention layout、异常与并发 | `DIFF-4a`–`4f` |
+| `system-runtime` | cache/预算、native/backend/platform、attention layout、异常与并发 | `DIFF-4a`–`4g` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `DIFF-0a`, `DIFF-0b` |
 
 ## 优化路径与 eager 的等价合同
@@ -289,6 +289,32 @@ confidence: high
   backend 或把 KV heads 扩成 Q heads。
 - 验收：32Q/8KV、异构 prefix、单 token/单 head、非对称等维 LSE 和 batch compaction 精确
   对照 dense/reference 输出。 ^[PR #5543] ^[PR #6102]
+
+### DIFF-4g — Ring GQA 只在通信后扩展，Hybrid Ulysses 不把 padding 当真 head
+
+- 触发：修改 Ring SDPA、GQA/MQA head 数、LSE accumulation、Ulysses all-to-all 或
+  `advanced_uaa` head padding。
+- 强制：Ring 始终以原始 `H_kv` 通信 K/V；仅在本 rank 的 aten SDPA 调用前，当
+  `H_q != H_kv` 时要求 `H_q % H_kv == 0`，再用 `repeat_interleave(H_q/H_kv)` 将 K/V 扩成
+  Q head 数。该 local materialization 增加 kernel 输入计算/显存，但不增加 ring 通信量；不能
+  提前到 send/recv 前。之所以不能直接用 `enable_gqa`，是该 path 需要 aten flash/efficient
+  SDPA 返回 LSE 供 ring accumulation，而这些调用没有该参数。实现以 K head 数计算 factor 并
+  同样 repeat V，却未显式检查 `H_v == H_k`；现有测试始终令两者相等，future caller/backend 必须
+  保持或提前断言该 invariant，不能等 SDPA 在更深处 cryptic failure。
+- 强制：`advanced_uaa` + Hybrid Ulysses/ Ring 时，在 Ulysses all-to-all 前检查 key 和 value
+  原始 head 数均可被 `ulysses_degree` 整除；否则 fail-fast。padding 出来的 zero K/V head 若交给
+  Ring 再 replicate 会被当成真实 group，不能作为合法 MQA/GQA。pure Ring（Ulysses=1）仍支持
+  1 或多 KV heads；valid Hybrid positive fixture 必须使用可整除布局。
+- 禁止：用默认 backend 的绿测证明 SDPA 修复（安装 FA/FA3 时会绕过）；用 num_heads=3、
+  Ulysses=2 的 padded case 当 Hybrid 正向测试；从通信量不变推断端到端性能不变。
+- 验收：4-card test 显式设 `TORCH_SDPA`，以 single-rank baseline 对 pure Ring GQA(8Q/2KV)、
+  MQA(8Q/1KV) 和既有 Ulysses+Ring/AllGather-KV 输出，BF16 容差 5e-2；CPU guard 覆盖 Hybrid
+  padded-MQA 拒绝，另以 4Q heads、Ulysses2×Ring2 验证 valid Hybrid。ready CI 的 L4×4 job
+  已收集 `test_attention_sp.py`，但不收集 `test_ulysses_uaa.py`；PR comment 的 primary matrix
+  是 pre-final head `e6857888` 在 4×B300 上 4 passed、max abs 0.015625，runtime fix 已在但 final
+  target 未复测。修正为 4 heads 的 Hybrid 25.30s pass 只见 final PR body，未附 hardware/SHA/log。
+  因此目标 pin 有局部数值证据和未来 L4 gate wiring，但没有附带 L4 run 产物，Hybrid
+  guard/positive 也未被该新 job 覆盖。^[PR #5255]
 
 相关执行流见 [Diffusion architecture](architecture.md)；benchmark 证据合同见
 [performance evidence](../../benchmark/guides/performance-evidence.md)。
