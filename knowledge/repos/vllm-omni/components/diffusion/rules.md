@@ -1,10 +1,10 @@
 ---
 title: "Diffusion 共享规则"
 created: 2026-07-20
-updated: 2026-08-23
+updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5543", "PR #5737", "PR #5848", "PR #5872", "PR #5981", "PR #6094", "PR #6102", "PR #6279", "PR #6385", "PR #6445", vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/offloader/]
+sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5543", "PR #5737", "PR #5802", "PR #5848", "PR #5872", "PR #5981", "PR #6094", "PR #6102", "PR #6279", "PR #6385", "PR #6445", vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/offloader/, tests/diffusion/offloader/test_distributed_layerwise_backend.py]
 confidence: high
 ---
 
@@ -25,6 +25,7 @@ confidence: high
 | ModelOpt/checkpoint adapter、weight/scale remap、unknown tensor、resolution path | `checkpoint-distributed`：`DIFF-2a` | `diffusers_loader.py::{_get_checkpoint_adapter,load_weights}` → `modelopt.py::{_resolve_target_and_output_names,adapt}` |
 | host-weight artifact、source identity、layout/dtype、warm restore | `checkpoint-distributed`：`DIFF-2d` | `model_loader/host_weights/{source_identity,contracts,identity_adapter}.py` → policy/restorer |
 | HSDP/FSDP、`fully_shard`、DeviceMesh、packed/scalar parameter、FP8 | `checkpoint-distributed`：`DIFF-2b` | `distributed/hsdp.py::{apply_hsdp_to_model,shard_model}` → loader `_load_model_with_hsdp` → `hsdp_fp8.py` |
+| distributed layerwise offload、AllGather、异构 block、shared buffer | `checkpoint-distributed`：`DIFF-2e` | `offloader/distributed_layerwise_backend.py::{DistributedLayerwiseOffloadHook.initialize_hook,prefetch_layer,DistributedLayerwiseOffloadBackend._allocate_shared_buffers}` |
 | component quantization、text encoder/transformer/VAE 独立配置、owner prefix、meta/offload | `checkpoint-distributed`：`DIFF-2c` | `data.py::_propagate_quantization_from_tf_config` → loader weight sources/post-load → component linear consumer |
 | LPIPS/PSNR/相似度阈值、CPU offload、量化质量证据 | `quality-evidence`：`DIFF-3a` | changed exact case → runner `execute_model` → model pipeline；A/B 同路径 |
 | paged KV/cache、backend/platform、GQA/layout、预算与 admission | `system-runtime`：`DIFF-4a`–`4f` | engine init → `diffusion_kv/{initialization,paged_attention_adapter}.py` → platform hook → scheduler |
@@ -34,7 +35,7 @@ confidence: high
 |---|---|---|
 | `core` | 每次共享 diffusion 审查 | `DIFF-1a`, `DIFF-1b`, `DIFF-1c`, `DIFF-1d` |
 | `execution-parity` | graph/eager、solver、RNG、generator、tensor dtype/device、async output readiness | `DIFF-1a`, `DIFF-1b`, `DIFF-1c`, `DIFF-1d` |
-| `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP、artifact identity | `DIFF-2a`, `DIFF-2b`, `DIFF-2c`, `DIFF-2d` |
+| `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP、artifact identity、distributed offload | `DIFF-2a`, `DIFF-2b`, `DIFF-2c`, `DIFF-2d`, `DIFF-2e` |
 | `quality-evidence` | 质量阈值、offload、A/B case | `DIFF-3a` |
 | `system-runtime` | cache/预算、native/backend/platform、attention layout、异常与并发 | `DIFF-4a`–`4f` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `DIFF-0a`, `DIFF-0b` |
@@ -141,11 +142,18 @@ confidence: high
   `OffloadPlan` 或 block discovery。
 - 强制：明确 rank 本地 CPU shard、固定双 GPU buffer、H2D/AllGather stream 和模型
   block list 的 owner；`dlo_use_allgather=false` 走每 rank full-weight 路径，开启
-  AllGather 时不得再叠加已 DTensor-sharded 的 HSDP 参数。
+  AllGather 时不得再叠加已 DTensor-sharded 的 HSDP 参数。共享 output buffer 可按所有 hook
+  的最大 block 分配，但每个 hook 调 collective 前必须按 dtype 截成自己的
+  `_ag_output_sizes[dtype] == dp_size * local_shard.numel()` 前缀；block-flat-relative repoint
+  offset 只能在这段实际 block buffer 内解释。
 - 禁止：用 heuristic 找不到 block 时静默假装 offload 已启用；对 HSDP 参数二次分片；
-  把 CPU 内存、AllGather 同步和设备显存开销隐藏在一个泛化的 `enable_cpu_offload` 开关。
+  把 CPU 内存、AllGather 同步和设备显存开销隐藏在一个泛化的 `enable_cpu_offload` 开关；
+  把 max-sized shared buffer 原样交给较小 block 的 `all_gather_into_tensor`。
 - 验收：CPU/Gloo 单 rank 覆盖 DTensor wrapper、shard padding、双 buffer 和 disable
-  cleanup；配置测试覆盖 AllGather+HSDP 的明确失败及 no-AllGather 的允许路径。
+  cleanup；配置测试覆盖 AllGather+HSDP 的明确失败及 no-AllGather 的允许路径。另以至少两个
+  不同 block size 验证 small/large hook 都满足 collective size equality、重建权重和 repoint。
+  当前回归用 mocked collective 检查 8/32-element、dp=2 合同；没有真实 multi-rank collective
+  覆盖，PR 的 8×NPU H3 E2E 说明也缺少已填写的 commit 证据，不能升级为验证结论。 ^[PR #5802]
 
 ## 质量阈值与资源辅助
 
