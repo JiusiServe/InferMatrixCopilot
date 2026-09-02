@@ -4,7 +4,7 @@ created: 2026-08-05
 updated: 2026-09-02
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5709", "PR #5737", "PR #5740", .buildkite/cuda/test-nightly.yml, docs/user_guide/quantization/fp8.md, vllm_omni/diffusion/models/minimax_h3/, vllm_omni/diffusion/registry.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, tests/diffusion/models/minimax_h3/, tests/e2e/accuracy/minimax_h3/, vllm_omni/entrypoints/openai/video_api_utils.py]
+sources: ["PR #5709", "PR #5737", "PR #5740", "PR #5756", .buildkite/cuda/test-nightly.yml, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/, docs/user_guide/quantization/fp8.md, vllm_omni/diffusion/models/minimax_h3/, vllm_omni/diffusion/registry.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, tests/diffusion/models/minimax_h3/, tests/e2e/accuracy/minimax_h3/, tests/e2e/features/comfyui/test_comfyui_integration.py, vllm_omni/entrypoints/openai/video_api_utils.py]
 confidence: high
 ---
 
@@ -40,6 +40,12 @@ confidence: high
 - 音频加载优先使用 torchaudio；当 TorchCodec/torchaudio 在 CPU-only aarch64 环境不可用
   时，`reference_video.load_audio_file` 回退到 soundfile，再对 libsndfile 不支持的格式
   通过 ffmpeg 转 WAV。该回退保持 `(channels, samples)` float32 与原始 sample rate 合同。
+
+## ComfyUI 请求路由
+
+MiniMax H3 的 `t2va`、`fl2va` 和 `ref2va` frontend 选择、reference multipart 字段及
+Hub/local model lookup 合同由 [ComfyUI tooling rules](../../tooling/rules.md) 负责；模型页不复制
+客户端规则。
 
 ## 验证入口
 
