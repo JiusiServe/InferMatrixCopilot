@@ -4,7 +4,7 @@ created: 2026-08-23
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, ci]
-sources: ["PR #3422", "PR #5074", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5872", "PR #6048", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6339", "PR #6343"]
+sources: ["PR #3422", "PR #5074", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5845", "PR #5872", "PR #6048", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6339", "PR #6343"]
 confidence: high
 ---
 
@@ -93,15 +93,24 @@ confidence: high
 ## OMNI-CI-3a — DFX baseline artifact 与性能回归 gate 是两个合同
 
 - 触发：修改 perf JSON 的 `baseline`、硬件 label/marker、benchmark result schema，或恢复性能阈值断言。
-- 强制：当前 runner 用 `copy.deepcopy` 将输入中的原始 `baseline` 对象原样写入 result artifact；
-  硬件 marker/resource label 只路由执行，runner 不按它选择 baseline，也不按 sweep/concurrency
-  解析阈值。新配置应使用 `{hardware: {metric: threshold}}` 的硬件嵌套结构，并把缺失 bucket
-  当作显式缺口；下游报告工具可以另行选择 bucket，但须声明选择合同。
-- 禁止：把 result 中存在 baseline 描述成 active regression gate；从 `npu: "A3"` marker 推断存在
-  A3 阈值；声称当前 runner 实现了文档所说的“按 runtime hardware label 选择”或 flat baseline
-  兼容。目标 pin 中这些文档措辞是滞后/前瞻描述：选择与断言 helper、`--assert-baseline` 和
-  `skip-performance-assertion` 已删除，flat 输入至多会被不透明地复制，未被 runner 解释。
-- 验收：当前 CI 只用 `completed == num_prompt(s)` gate 请求完成数，baseline artifact round-trip
-  保持输入结构和值；若重新引入性能 gate，必须有显式 consumer、硬件 bucket 选择、metric
-  directionality 与失败测试。目标 pin 的已迁移 baseline bucket 全是 H100；九个 A3-marked 配置
-  没有任何 A3 baseline bucket，这是待补 gap，不是 NPU 性能 gate。^[PR #5402]
+- 强制：baseline 只接受 `{hardware: {metric: threshold}}` 的硬件嵌套结构；顶层 hardware 必须是
+  `pyproject.toml` 中带 `[hardware-resource]` 标签的 pytest marker，每个 bucket 非空。metric 名可
+  自定义，值只能是单点 scalar 或与 `request_rate` / `max_concurrency` 顺序严格对齐的 list。
+  runner 在每个 sweep step 写 result 前按 `sweep_index` 将所有 hardware bucket 的 list 收窄为
+  当前 scalar，scalar 原样保留；结果仍保留所有 bucket，留给下游 consumer 选择实际硬件。
+- 禁止：把 result 中存在 baseline 描述成 active regression gate；从执行 marker 推断同名阈值
+  bucket 存在；使用 flat metric map、以 concurrency 为键的 metric dict、未知/alias-only hardware
+  label，或让 baseline list 与 sweep 顺序脱节。`_RUNTIME_DEVICE_ALIASES` 只服务 result filename
+  与运行时身份，不扩展 baseline allowlist；runtime 也不自动选择 baseline bucket。
+- 验收：当前 CI 仍只用 `completed == num_prompt(s)` gate 请求完成数；baseline artifact 是描述性
+  元数据而非阈值断言。单测须覆盖 omni/diffusion sweep 的逐步收窄、所有 hardware bucket 保留、
+  自定义 metric/scalar，以及 flat、未知 label、dict value、缺 index、越界失败。若重新引入性能
+  gate，必须有显式 consumer、hardware bucket 选择、metric directionality 与失败测试。
+  当前实现没有 upfront list-length 校验：短 list 到被访问的 index 才失败，多余值静默不用；若
+  QPS 与 concurrency 同时配置，同一 list 会按两个独立 loop 的位置复用。因此配置 review 必须
+  人工核对 mode、list 长度和顺序。`[hardware-resource]` 也只代表 baseline key 可解析，不代表
+  `hardware_marks()` 能调度该资源：当前 H200/B200 尚未进入 CUDA resource 分支。另有四个
+  Hunyuan 配置只保留 H200 baseline，却仍标记 H100/A3 执行，当前因无阈值断言而被掩盖。
+  runtime alias 匹配还应保持最长 token 优先；目标 pin 中 `B200` 早于 `GB200`，会把 GB200 名称
+  归一化成 B200，修复前不可把 filename label 当精确设备证据。
+  ^[PR #5402] ^[PR #5845]
