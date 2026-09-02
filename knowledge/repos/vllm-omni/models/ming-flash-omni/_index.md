@@ -1,15 +1,15 @@
 ---
 title: "Ming-flash-omni（BailingMM2,4 拓扑全模态）"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-08-10
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: [vllm_omni/model_executor/models/ming_flash_omni/, vllm_omni/diffusion/models/ming_flash_omni/, vllm_omni/model_executor/stage_input_processors/ming_flash_omni.py]
+sources: [vllm_omni/model_executor/models/ming_flash_omni/, vllm_omni/diffusion/models/ming_flash_omni/, vllm_omni/model_executor/stage_input_processors/ming_flash_omni.py, vllm_omni/entrypoints/openai/tts_adapters/ming_flash_omni_tts.py, "PR #5746"]
 ---
 
 # Ming-flash-omni
 
-以下事实在 `main @ 5d44868e` 复核。
+以下事实在 `main @ 11f633aa` 复核。
 
 ## 名称与范围
 
@@ -43,6 +43,7 @@ sources: [vllm_omni/model_executor/models/ming_flash_omni/, vllm_omni/diffusion/
 | 遇到什么 | 查看哪里 | 说明 |
 |---|---|---|
 | 文本桥 vs hidden 桥、CFG 伴随、ByT5 字形路径 | [architecture](architecture.md) | 数据流与 reviewer 陷阱 |
+| speech API 的 detection/adapter union | [Serving SERV-5e](../../components/serving/rules.md#serv-5e-tts-detection-从-adapter-metadata-的有序并集派生) | `ming_tts` 消歧、请求校验和 prompt delegation |
 
 ## 配置与 checkpoint 差异
 
@@ -59,7 +60,11 @@ sources: [vllm_omni/model_executor/models/ming_flash_omni/, vllm_omni/diffusion/
 
 ## 什么时候查这里
 
-- 审查 ming_flash_omni 任一拓扑、BailingMM2 名字路由或 serving 消歧;
-  serving_speech 注释明示本家族**刻意不迁**到 TTS adapter 框架——别"顺手
-  统一"。
+- 审查 ming_flash_omni 任一拓扑、BailingMM2 名字路由或 serving 消歧。talker-only speech
+  已由 `MingFlashOmniTTSAdapter(stage_keys={"ming_tts"})` 负责请求校验和 prompt 构建；它继续
+  调用 server 上的 `_build_ming_flash_omni_prompt()`，是提取而非 prompt 合同改写。检测端仍有
+  同名高优先级 legacy detector 保护 `ming_tts` 与 Ming dense architecture 的消歧；不要因已注册
+  adapter 就假定 legacy detector 已移除，也不要把模型分支重新塞回共享 dispatcher。此过渡态
+  与 detection suite 的“legacy detector 不得同时有 adapter”不变量冲突；后续修复应把优先级
+  转移给 adapter 并移除同名 legacy 条目，同时验证 Ming dense architecture 仍正确消歧。
 - 语义验收见 [model-validation](../../review/guides/model-validation.md)。
