@@ -1,19 +1,19 @@
 ---
 title: "Scheduler（AR/生成请求调度）"
 created: 2026-07-16
-updated: 2026-08-05
+updated: 2026-09-02
 type: index
 tags: [vllm-omni, components, scheduler]
-sources: [vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/prefix_cache.py, docs/design/module/ar_module.md]
+sources: [vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/output.py, vllm_omni/core/prefix_cache.py, docs/design/module/ar_module.md]
 ---
 
 # Scheduler（AR/生成请求调度）
 
 - 源码入口：`vllm_omni/core/sched/`（`omni_ar_scheduler.py`、`omni_generation_scheduler.py`、
   `omni_scheduler_mixin.py`、`omni_scheduling_coordinator.py`）和 `vllm_omni/core/prefix_cache.py`
-- 源码校验：以上路径与下列类均已在 `main @ d5d47e9b` 验证存在：`OmniARScheduler`（:50）、
-  `OmniARAsyncScheduler`（:928）、`KVCacheTransferData`（:40）、`OmniGenerationScheduler`（:42）、
-  `OmniSchedulerMixin`（:40）、`OmniTensorPrefixCache`（prefix_cache.py:33）
+- 源码校验：以上路径与下列类均已在 `main @ 5215e03a` 验证存在：`OmniARScheduler`（:73）、
+  `OmniARAsyncScheduler`（:815）、`OmniGenerationScheduler`（:29）、
+  `OmniSchedulerMixin`（:64）、`OmniTensorPrefixCache`（prefix_cache.py:33）
 - 官方设计文档：`docs/design/module/ar_module.md`（继承关系、请求流转图）
 - 测试入口：`tests/core/`
 - 主要职责：AR/生成 stage 的请求调度（继承 vLLM Scheduler）、跨 stage KV transfer 的调度面、
@@ -22,7 +22,8 @@ sources: [vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/prefix_cache
 ## 什么时候查这里
 
 - 调查请求调度、waiting/running 状态转换、`WAITING_FOR_CHUNK`/`WAITING_FOR_INPUT`。
-- 排查跨 stage KV transfer 的调度侧（`KVCacheTransferData`、kv_ready）。
+- 排查跨 stage KV transfer 的调度侧（transfer criteria、request lifecycle、kv_ready）；
+  serialized `KVCacheTransferData` 本体属于 [Distributed](../distributed/_index.md)。
 - 排查 `OmniTensorPrefixCache` 引起的跨 stage payload 截断或缓存 miss。
 
 ## 不放什么

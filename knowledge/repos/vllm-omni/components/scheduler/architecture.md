@@ -1,35 +1,40 @@
 ---
 title: "Scheduler 共享架构"
 created: 2026-07-16
-updated: 2026-08-05
+updated: 2026-09-02
 type: architecture
 tags: [vllm-omni, components, scheduler]
-sources: [docs/design/module/ar_module.md, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/prefix_cache.py, vllm_omni/worker/gpu_ar_model_runner.py]
+sources: [docs/design/module/ar_module.md, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/output.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/prefix_cache.py, vllm_omni/worker/gpu_ar_model_runner.py]
 ---
 
 # Scheduler 共享架构
 
-以下事实在 `v0.26.0 @ a4ea67a2` 复核；官方叙述见
+以下事实在 `main @ 5215e03a` 复核；官方叙述见
 `docs/design/module/ar_module.md`（含继承 classDiagram 与请求流转 flowchart）。
 
 ## 继承链（对 vLLM 的扩展方式）
 
-- `OmniARScheduler(OmniSchedulerMixin, VLLMScheduler)` —— `vllm_omni/core/sched/omni_ar_scheduler.py:50`。
-  `schedule()` 调 `super().schedule()` 后，把 base `NewRequestData` 重包成
-  `OmniNewRequestData`，附上 `prompt_embeds` 与 `additional_information`（跨 stage
-  载荷）；`update_from_output()` 保持 vLLM 原语义。异步变体
-  `OmniARAsyncScheduler(OmniARScheduler, AsyncVLLMScheduler)`（:928）。
+- `OmniARScheduler(OmniSchedulerMixin, VLLMScheduler)` —— `vllm_omni/core/sched/omni_ar_scheduler.py:73`。
+  `schedule()` 调 `super().schedule()` 后，通过 `OmniNewRequestData.from_base()` 保留 base
+  dataclass 的每个字段，再附加 `external_req_id`、`additional_information` 与
+  `model_intermediate_buffer`；已经是 Omni entry 的 fast path 不重建。异步变体
+  `OmniARAsyncScheduler(OmniARScheduler, AsyncVLLMScheduler)`（:815）。
 - `OmniGenerationScheduler(OmniSchedulerMixin, VLLMScheduler)`
-  （`omni_generation_scheduler.py:42`）—— 非 AR/单步架构（Conv/LSTM、code2wav 等）的
+  （`omni_generation_scheduler.py:29`）—— 非 AR/单步架构（Conv/LSTM、code2wav 等）的
   快路径：`schedule()` 一次性为请求分配全部输入 token（预算不足回退默认调度）；
   `update_from_output()` 单步后直接置 `FINISHED_STOPPED` 并 `_free_request`。
-- `OmniSchedulerMixin`（`omni_scheduler_mixin.py:40`）承载两者共享的 omni 调度行为。
+- `OmniSchedulerMixin` 承载两者共享的 Omni I/O 生命周期：初始化 chunk/full-payload
+  协调状态、消费 pending input、恢复临时停放队列、无损重包 `NewRequestData`、清理完成
+  请求，以及汇总 KV stats/events、finished sets 和 scheduler stats。AR 与 generation
+  scheduler 仍各自拥有调度策略和 finished-ID 语义；AR 的 synthetic-abort output 是显式
+  本地策略，不能被共享 helper 隐式扩散。
 
 ## 跨 stage KV transfer（调度面）
 
-`KVCacheTransferData`（`omni_ar_scheduler.py:40`）是 AR scheduler 携带的跨 stage KV
-迁移合同；调度器决定"何时可发/何时已就绪"，实际搬运由
-[Distributed 组件](../distributed/_index.md)的 connector/KV-transfer 管理面执行。
+AR scheduler 的 transfer criteria 与 request lifecycle 决定“何时可发/何时已就绪”；
+serialized `KVCacheTransferData` 位于
+`distributed/omni_connectors/kv_transfer_manager.py:146`，实际搬运由
+[Distributed 组件](../distributed/_index.md)的 connector/KV-transfer 数据面执行。
 真实案例（只链接不复制）：
 [HunyuanImage3 KV reuse 事故](../../models/hunyuan-image3/incidents/2026-05-13-kv-reuse-orchestrator.md)
 中 `omni_ar_scheduler.py` 的 kv_ready 发射与 `_mark_request_for_kv_transfer` 是根因链的一环。

@@ -1,10 +1,10 @@
 ---
 title: "Scheduler 规则"
 created: 2026-07-16
-updated: 2026-08-05
+updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, scheduler]
-sources: ["vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, "PR #4106"]
+sources: ["vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/output.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5461"]
 ---
 
 # Scheduler 规则
@@ -126,8 +126,16 @@ modules=[online_serving, worker_runner]，status=active，run_count=38，2026-06
   `update_from_output`/异步调度、kv-connector 统计等挂点）是否有签名、时序或语义
   变化，逐条登记后再改代码；曾发生 `kv_connector_stats` 提取时序在上游更新后错位、
   需要移到 `_update_from_kv_xfer_finished` 之后的案例（omni_ar_scheduler.py 与
-  omni_generation_scheduler.py 都要改）。
-- 禁止：只跑单测绿灯就认定调度语义未变（单测常用 `object.__new__` 绕过真实构造）。
+  omni_generation_scheduler.py 都要改）。base `NewRequestData` 重包必须按 live dataclass
+  字段无损复制后再附 Omni payload；共享 mixin 只集中机械 lifecycle，AR/generation 的
+  admission、cached-payload 和 synthetic-abort 等差异用调用参数保留为显式本地策略。
+- 禁止：只跑单测绿灯就认定调度语义未变；不能用缺少真实 mixin helper 的
+  `SimpleNamespace`/`object.__new__` stub 绕过共享调用链，也不能手列一份会随 upstream
+  schema 漂移的 base output/request 字段。
+- 验收：枚举 live `NewRequestData.__dataclass_fields__` 逐字段断言 identity/equality，覆盖
+  Omni fast path 不重建与 generation fallback；AR/generation 分别验证 pending-input、queue
+  restore、finished-set/abort policy。直接调用 scheduler 方法的轻量 stub 必须继承 mixin 或
+  显式绑定本次方法真实依赖，使断言确实到达目标分支。 ^[PR #5461]
 
 ## SCHED-4a — side-stream 复制必须拥有源 buffer 的完成期
 
