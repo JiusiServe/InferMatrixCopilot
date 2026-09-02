@@ -1,10 +1,10 @@
 ---
 title: "MiniCPM-o 4.5"
 created: 2026-07-20
-updated: 2026-08-23
+updated: 2026-09-02
 type: index
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #3642", "PR #6154", "PR #6170", "PR #6318", vllm_omni/model_executor/models/minicpmo_4_5/]
+sources: ["PR #3642", "PR #5638", "PR #6154", "PR #6170", "PR #6318", vllm_omni/model_executor/models/minicpmo_4_5/]
 confidence: high
 ---
 
@@ -27,11 +27,16 @@ MiniCPM-o 多个版本共享通用 `MiniCPMO` architecture 名称，4.5 不能�
 runtime bridge 交给 TTS stage，再包装为 `OmniOutput.multimodal_outputs`；deploy 变体改变
 资源拓扑，不改变数据合同。
 
+Code2Wav 在所有平台使用树内 `MiniCPMO45Token2wav`。CUDA 可显式开启 DiT estimator +
+Campplus TensorRT；这是可关闭的局部加速，不替换 encoder/HiFT，也不会自动启用
+Step-Audio2 的 token2wav。engine cache/profile 与 fallback 门禁见 MCPMO-1c。
+
 描述直达源码与模型专有门禁见 [rules](rules.md#direct-代码快速入口)；新模型语义验证见
 [model validation](../../review/guides/model-validation.md)。
 
 ## 什么时候查这里
 
-- 审查 MiniCPM-o 4.5 registry、remote-code gate、TTS dependency、batch/stage handoff 或 native duplex session。
+- 审查 MiniCPM-o 4.5 registry、remote-code gate、TTS dependency、Code2Wav TensorRT、
+  batch/stage handoff 或 native duplex session。
 - 问题位于共享 bridge/batching 时转到
   [Model Executor rules](../../components/model-executor/rules.md)。

@@ -1,15 +1,15 @@
 ---
 title: "Step-Audio2（音频 token 内嵌 LM 词表的语音对话）"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-02
 type: index
 tags: [vllm-omni, models]
-sources: [vllm_omni/model_executor/models/step_audio2/, vllm_omni/deploy/step_audio_2.yaml, vllm_omni/model_executor/stage_input_processors/step_audio2.py]
+sources: ["PR #5638", vllm_omni/model_executor/models/step_audio2/, vllm_omni/deploy/step_audio_2.yaml, vllm_omni/model_executor/stage_input_processors/step_audio2.py]
 ---
 
 # Step-Audio2
 
-以下事实在 `main @ 5d44868e` 复核。
+以下事实在 `main @ f201b717` 复核。
 
 ## 名称与范围
 

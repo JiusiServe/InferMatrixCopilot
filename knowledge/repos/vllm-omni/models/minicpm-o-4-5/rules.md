@@ -1,10 +1,10 @@
 ---
 title: "MiniCPM-o 4.5 规则"
 created: 2026-07-20
-updated: 2026-08-23
+updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #3642", "PR #6154", "PR #6170", "PR #6318"]
+sources: ["PR #3642", "PR #5638", "PR #6154", "PR #6170", "PR #6318"]
 confidence: high
 ---
 
@@ -19,6 +19,7 @@ confidence: high
 | MiniCPM-o 4.5、`minicpmo_4_5`、版本识别 | MCPMO-2a | `config/pipeline_registry.py::OMNI_PIPELINES["minicpmo_4_5"]` → `model_executor/models/minicpmo_4_5/pipeline.py`；`model_executor/models/registry.py::_OMNI_MODELS` |
 | tokenizer/processor、`trust_remote_code` | MCPMO-1a | pipeline/config factory → `model_executor/models/minicpmo_4_5/` loader |
 | TTS extra、backend 初始化、空音频 | MCPMO-1b | `minicpmo_4_5_omni_tts.py::MiniCPMO45OmniTTSForConditionalGeneration`、`minicpmo_4_5_token2wav.py::MiniCPMO45Token2wav` |
+| Code2Wav TensorRT、DiT/Campplus、engine cache/profile | MCPMO-1c | `minicpmo_4_5_code2wav.py::MiniCPMO45Code2Wav` → `batched_token2wav.py::BatchedToken2Wav._estimator_step`；共享实现 `step_audio2/step_audio2_dit_trt.py` |
 | batch、`runtime_info`、stage handoff | MCPMO-3a/3b | `stage_input_processors/minicpmo_4_5_omni.py` → `minicpmo_4_5_omni.py::MiniCPMO45OmniForConditionalGeneration` → TTS/code2wav |
 | native duplex、Stage0 resume、LISTEN/SPEAK、server VAD | MCPMO-4a | `experimental/fullduplex/{minicpmo45,openai}/` → stage input processor |
 | instructions/persona/voice/mode update、prefill slots、context lock | MCPMO-4b | `experimental/fullduplex/minicpmo45/session.py` → runtime adapter/session runner |
@@ -38,6 +39,27 @@ confidence: high
 - 禁止：catch-all 后返回空 waveform，让请求看似成功。
 - 验收：缺 extra、坏配置和 backend 初始化失败分别得到可诊断错误；正常路径返回非空
   且格式正确的音频。 ^[PR #3642]
+
+## MCPMO-1c — Code2Wav TensorRT 是 CUDA-only 的显式可逆替换
+
+- 触发：`token2wav_trt` / `MINICPMO_TOKEN2WAV_TRT=1`，或修改 Code2Wav 的 DiT、
+  Campplus、ONNX/TRT engine cache 与 optimization profile。
+- 强制：所有平台都先构造树内 `MiniCPMO45Token2wav`；开关只在 CUDA 同时启用 DiT
+  estimator 与 Campplus 的 TensorRT 路径，非 CUDA 忽略开关，关闭开关保留完整 torch
+  路径。DiT 只替换 `BatchedToken2Wav._estimator_step` 的逐步 estimator 调用，encoder 与
+  HiFT 仍走 torch；engine 在调用者当前 CUDA stream 上执行。
+- 强制：强类型精度来自所选 dtype 的 ONNX graph，export 深拷贝已加载 DiT 后再 cast，
+  不改变 live torch estimator 的 dtype。ONNX cache 是动态、可移植 graph；plan cache key
+  必须精确包含 depth、dtype、`token2wav_trt_max_batch`、GPU SM 与 TensorRT version。
+- 强制：ONNX/plan 首次生成使用 PID 唯一临时文件并原子替换；step 在执行前检查 profile：
+  batch 上限为配置值且包含 classifier-free guidance 展开的 `2B`，chunk 固定上限 3000，
+  attention cache 固定上限 1000，越界给出可操作错误。Campplus 合同保持 `[T,80]` →
+  `[1,192]` fp32，并从 `_resolve_model_dir()` 已解析的本地模型目录取资产。
+- 禁止：把共享 `step_audio2_dit_trt.py` 的存在解释成 Step-Audio2 用户自动获得 TRT；
+  当前开关只由 MiniCPM-o wiring 调用。也禁止把讨论中的通用 vocoder backend 当成已实现。
+- 验收：分别覆盖关闭/开启、非 CUDA 忽略、torch/TRT 数值与音频 parity、首次构建和 cache
+  复用、不同 SM 不共享 plan、CFG 后 batch 越界以及 chunk/cache 越界。PR 未新增自动化测试，
+  因而这些仍是后续改动必须补证的验证缺口。 ^[PR #5638]
 
 ## MCPMO-2a — registry 使用 4.5 config/version predicate
 
