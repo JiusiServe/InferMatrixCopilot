@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-02
 type: architecture
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #4958", "PR #5610", "PR #5744", docs/design/feature/omni_async_output_materialization.md, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local.py, vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, vllm_omni/platforms/npu/_310p/patch/qwen3_tts.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, tests/model_executor/models/moss_tts/test_moss_fused_load.py, tests/model_executor/models/qwen3_tts/test_code_predictor_dtype.py, tests/worker/test_omni_connector_mixin.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py]
+sources: ["PR #5610", "PR #5744", docs/design/feature/omni_async_output_materialization.md, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, vllm_omni/platforms/npu/_310p/patch/qwen3_tts.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, tests/worker/test_omni_connector_mixin.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py]
 ---
 
 # Model Executor 共享架构
@@ -58,16 +58,13 @@ decode、routed-expert output 等冲突状态；条件不满足时回退同步�
 KV-only sender 可只保留 KV manager，不另外创建无 consumer 的 payload transport。
 可执行验收见 [Distributed DIST-1c](../distributed/rules.md#dist-1c-payload-connector-按-edge-所有权创建且不与-kv-manager-捆绑)。
 
-## 共享 fused code-predictor loader 合同
+## Qwen3 code predictor 当前投影布局
 
-Qwen3-TTS、Qwen3-Omni 和 MOSS-TTS Realtime 复用 `qwen3_code_predictor.py`。每层将
-HF q/k/v 行按该顺序拼成 plain `nn.Linear` `qkv_proj`，将 gate/up 拼成
-`gate_up_proj`；forward 必须按同样边界拆分，并在 SDPA 前把 packed k/v slice
-重新物化为 contiguous。这保持线性代数，但 GPU kernel/累加顺序变化仍可导致
-bit-level drift。
-
-该表示的 loader、consumer、TP 与 platform 可执行验收合同见
-[EXEC-2b](rules.md#exec-2b-fused-shard-必须按布局数值闭环且所有-consumer-委托共享-loader)。
+`main @ 78c144f3` 的共享 code predictor 保持分离 `q_proj`/`k_proj`/`v_proj`
+和 `gate_proj`/`up_proj`，HF 同名参数由普通 loader 直接写入，TP plan 也指向这些
+分离名称。只有 310P 平台 overlay 在 `prepare_qkv_weights()` 内为本地执行临时拼接
+QKV weight/bias；这不表示共享模型或 checkpoint loader 已改为 fused parameter。未来再引入
+共享 fusion 时的验收门禁见 [EXEC-2b](rules.md#exec-2b-未来引入-fused-shard-时必须按布局数值闭环)。
 
 ## 怎样判断问题归属
 

@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/engine/stage_init_utils.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py, docs/design/feature/omni_async_output_materialization.md, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/experimental/fullduplex/, tests/e2e/features/fullduplex/, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local.py, vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, vllm_omni/platforms/npu/_310p/patch/qwen3_tts.py, tests/model_executor/models/moss_tts/test_moss_fused_load.py, tests/model_executor/models/qwen3_tts/test_code_predictor_dtype.py, "PR #3422", "PR #3642", "PR #4730", "PR #4958", "PR #5074", "PR #5610", "PR #5792", "claude-workflow-starter-private@09dca46"]
+sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/engine/stage_init_utils.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py, docs/design/feature/omni_async_output_materialization.md, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/experimental/fullduplex/, tests/e2e/features/fullduplex/, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, "PR #3422", "PR #3642", "PR #4730", "PR #4958", "PR #5074", "PR #5610", "PR #5777", "PR #5792", "claude-workflow-starter-private@09dca46"]
 ---
 
 # Model Executor 规则
@@ -21,7 +21,7 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 | stage TP/PP/DP、devices、replica、visible devices、worker 启动、容量 fail-fast | `stage-runtime`：本页“Stage 并行度和设备容量必须一起验收” | `vllm_omni/config/stage_config.py::build_stage_runtime_overrides` → `vllm_omni/engine/stage_runtime.py::{StageRuntime.initialize,StageRuntime._resolve_replica_physical_devices}` → `stage_engine_startup.py::{launch_stage_replica,get_headless_replica_devices}` |
 | `runtime_info`、request RNG、batch compaction、跨 stage bridge/串线 | `bridge-batch`：`EXEC-1a`–`1c` | shared runner request state → stage input processor → model consumer |
 | loader dtype、只取 checkpoint config、避免整仓权重下载 | `loader-contract`：`EXEC-2a` | `vllm_omni/model_executor/model_loader/weight_utils.py::download_weights_from_hf_specific` → `vllm_omni/model_executor/models/<命中模型>` loader |
-| fused projection、HF shard 拼装、consumer 委托、packed TP | `loader-contract`：`EXEC-2b` | `models/common/qwen3_code_predictor.py::CodePredictorBaseModel.load_weights` → Qwen3/MOSS consumer → platform override |
+| 准备引入 fused projection、HF shard 拼装、consumer 委托、packed TP | `loader-contract`：`EXEC-2b` | 先确认目标 main 是否已有 fused parameter；当前 Qwen3 code predictor 为分离 projection |
 | async Omni output、background builder、D2H snapshot、connector drain/fallback | `async-output`：`EXEC-5a` | `worker/gpu_ar_model_runner.py::{_should_use_async_omni_output,OmniAsyncGPUModelRunnerOutput}` → platform runner → connector output |
 
 | 审查组 | 什么时候触发 | 规则 ID |
@@ -167,9 +167,13 @@ Stage 拓扑错误的最小充分源码证据只有三段：一处最终配置�
   记录峰值显存和 dtype。Krea 2 的具体约束见
   [Krea 2 规则](../../models/krea2/rules.md)。 ^[PR #4730]
 
-### EXEC-2b — fused shard 必须按布局数值闭环且所有 consumer 委托共享 loader
+### EXEC-2b — 未来引入 fused shard 时必须按布局数值闭环
 
-- 触发：合并/拆分 q/k/v、gate/up 等 projection，修改 HF shard 映射、wrapper/talker
+> 当前 `main @ 78c144f3` 的 Qwen3 code predictor 使用分离 q/k/v 和 gate/up projection；
+> PR #4958 的 fused 实现已因 CI failure 被 PR #5777 整体回退。本规则是对未来再引入
+> 类似优化的门禁，不描述当前 runtime 机制。
+
+- 触发：准备合并 q/k/v、gate/up 等 projection，修改 HF shard 映射、wrapper/talker
   loader、packed projection TP plan 或平台 override。
 - 强制：weight 与可选 bias 都按 forward split 的同一顺序数值拼装；部分 shard 和
   整组 shard 缺失都硬失败。所有声明同一 fused module 的 consumer 必须委托给共享
@@ -181,4 +185,4 @@ Stage 拓扑错误的最小充分源码证据只有三段：一处最终配置�
   未有 TP-aware packing/loading/split 与 TP=2 测试时，TP plan 保持空。
 - 验收：数值比较 fused 参数与 `cat([q,k,v])`/`cat([gate,up])`，覆盖 bias、
   部分/整组缺 shard、每个 consumer 的委托和前缀；以非等 q/KV width 证明 split 能识别
-  GQA 错序。平台测试或静态 guard 证明不再引用已删除的 projection 属性。 ^[PR #4958]
+  GQA 错序。平台测试或静态 guard 证明不再引用已删除的 projection 属性。 ^[PR #4958] ^[PR #5777]
