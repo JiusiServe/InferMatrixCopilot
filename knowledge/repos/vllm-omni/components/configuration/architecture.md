@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-02
 type: architecture
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", "PR #5647", vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/diffusion/data.py, vllm_omni/entrypoints/cli/serve.py]
+sources: ["claude-workflow-starter-private@296ea45", "PR #5647", "PR #5678", vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/diffusion/data.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/entrypoints/cli/serve.py]
 ---
 
 # vLLM-Omni 配置构造架构
@@ -58,6 +58,13 @@ direct kwargs ---------------------------------------> direct normalize + strict
 ```
 
 structured 与 legacy 可以有不同的最终对象，但不能有不同的字段语义。它们必须在第一位 consumer 前共享 normalization 和 full-key validation；差异只允许发生在校验之后的 typed projection 或对象构造。
+
+`main @ 3d7fc3b9` 的运行边界仍是过渡态：`VllmOmniConfig` 已能构造 typed stage，且
+`build_engine_args_dict_from_omni_stage_config()` 可将它投影为 backend flat args；但生产
+`StageRuntime`、headless serve 和 diffusion startup 仍把 legacy OmegaConf stage 交给稳定的
+`build_engine_args_dict()`，后者委托 `build_legacy_engine_args_dict()`。因此 typed projection 是
+cutover 前的兼容适配器和测试 oracle，不是当前 live startup source of truth；目标 pin 中
+typed builder 与 `StageConfigFactory.create_from_model` 都没有 non-test caller。
 
 ## 值状态合同
 

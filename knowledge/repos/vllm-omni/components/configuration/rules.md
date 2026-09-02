@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-08-05
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/]
+sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/engine/stage_init_utils.py, tests/engine/test_stage_engine_args.py]
 ---
 
 # vLLM-Omni 配置开发门禁
@@ -20,7 +20,7 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "zu
 
 | PR 描述在做什么 | 精确规则组 | 第一批 live 源码 |
 |---|---|---|
-| strict schema、unknown field、alias、flat→nested、structured/legacy/direct parity、typed projection | `strict-normalization`：`VOMNI-CFG-1a`–`1g` | `vllm_omni/config/stage_config.py::{build_stage_runtime_overrides,strip_parent_engine_args}` → `vllm_omni/config/omni_config.py::{_build_diffusion_config_projection,VllmOmniConfig.from_pipeline_config}` → `vllm_omni/diffusion/data.py::{normalize_omni_diffusion_kwargs,OmniDiffusionConfig.from_kwargs}` |
+| strict schema、unknown field、alias、flat→nested、structured/legacy/direct parity、typed projection | `strict-normalization`：`VOMNI-CFG-1a`–`1h` | `vllm_omni/config/stage_config.py::{build_stage_runtime_overrides,strip_parent_engine_args}` → `vllm_omni/config/omni_config.py::{_build_diffusion_config_projection,VllmOmniConfig.from_pipeline_config}` → `vllm_omni/engine/stage_init_utils.py::{build_engine_args_dict,build_engine_args_dict_from_omni_stage_config}` |
 | deploy YAML、`base_config`、pipeline/stage overlay、headless/offline parity、最终逐 stage config | `deploy-topology`：`CONF-3a`, `CONF-4b`, `CONF-5a` | `vllm_omni/config/stage_config.py::{resolve_deploy_yaml,load_deploy_config,merge_pipeline_deploy,build_stage_runtime_overrides,_build_engine_args}` → `vllm_omni/config/config_factory.py::{StageConfigFactory.create_from_model,StageConfigFactory._merge_cli_overrides}` |
 | composable strategy、axis、routing、load balancing、`strategy-config` | `composable-strategy`：`CONF-4a` | `vllm_omni/config/composable_parallel/strategy_loader.py::{parse_strategy_specs,load_strategy_specs}` → `translator.py::translate_strategy_stack` → `apply.py::apply_strategy_specs` → `config_factory.py::{StageConfigFactory._apply_strategy_specs,StageConfigFactory._reconcile_strategy_with_cli}` |
 | `gpu_memory_utilization`、`kv_cache_memory_bytes`、多 stage 共卡、小显存 OOM | `deploy-memory`：`CONF-1a`, `CONF-2a` | `vllm_omni/config/stage_config.py::{build_stage_runtime_overrides,_build_engine_args}` → `vllm_omni/config/omni_config.py::{_build_runtime_config,_build_parallel_config,VllmOmniConfig.from_pipeline_config}` |
@@ -28,7 +28,7 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "zu
 | 审查组 | 什么时候触发 | 规则 ID |
 |---|---|---|
 | `core` | 每次配置审查 | `VOMNI-CFG-1b`, `VOMNI-CFG-1c` |
-| `strict-normalization` | schema、alias、unknown field、structured/legacy/direct 路径 | `VOMNI-CFG-1a`, `VOMNI-CFG-1b`, `VOMNI-CFG-1c`, `VOMNI-CFG-1d`, `VOMNI-CFG-1e`, `VOMNI-CFG-1f`, `VOMNI-CFG-1g` |
+| `strict-normalization` | schema、alias、unknown field、structured/legacy/direct 路径 | `VOMNI-CFG-1a`, `VOMNI-CFG-1b`, `VOMNI-CFG-1c`, `VOMNI-CFG-1d`, `VOMNI-CFG-1e`, `VOMNI-CFG-1f`, `VOMNI-CFG-1g`, `VOMNI-CFG-1h` |
 | `deploy-memory` | 显存预算、KV pin、多 stage 共卡 | `CONF-1a`, `CONF-2a` |
 | `deploy-topology` | deploy、overlay、headless、topology wiring | `CONF-3a`, `CONF-4b`, `CONF-5a` |
 | `composable-strategy` | strategy axis、routing、load balancing | `CONF-4a` |
@@ -43,6 +43,22 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "zu
 - **VOMNI-CFG-1e — 严格配置固定按“归一化、验 owner、分区、构造”执行。** deploy/stage/CLI overlay、alias 和 flat→nested 转换必须先产出一份规范化映射；mixed CLI/orchestrator namespace 只允许先路由已明确声明的非 stage scope，剩余 stage 候选必须以完整 key 集合进入 ownership validator。validator 不能同时改值、路由字段或先丢 `None`；校验通过后的规范化结果就是后续分区和构造唯一可消费的 owner artifact，禁止只调用 validator 却继续传 raw mapping，也禁止末端重新做 alias、default、precedence 或静默过滤。structured、legacy startup 和仍公开可调用的 direct factory 必须复用同一组 normalization/validation primitive。
 - **VOMNI-CFG-1f — key 是否已知与 value 是否有效必须分开判定。** 缺失、已知字段的 `None`、显式 `False`/`0`、未知字段的 `None` 和两个非空来源冲突是五种不同状态：只有明确 owner 可以把已知 `None` 解释为 unset，`False`/`0` 不得被 truthiness merge 吃掉，未知 key 即使为 `None` 也必须按 strict contract 报错，alias 只在 legacy 与 canonical 都提供非 `None` 值时冲突。验收至少覆盖本轮会改变分支的这些状态，并断言错误或最终 consumer。
 - **VOMNI-CFG-1g — rebase 或 schema 扩张后重新做配置归属审计。** 上游新增 dataclass 字段、默认 factory 参数、pipeline-wide 字段或 owner 集合变化时，把自动合并结果当作新的语义 diff；重新比较 base/head 的字段集合、序列化边界、默认-stage 透传和所有严格入口。默认 factory 的扩展字段应由 schema metadata 或单一声明集合驱动，禁止再加一份手写白名单。只有最新 base 上的真实 factory/legacy/structured 路径都保留合法非默认值并继续拒绝未知字段，才算 rebase 完成。
+- **VOMNI-CFG-1h — typed engine projection 与生产 cutover 是两个 merge condition。**
+  `build_engine_args_dict_from_omni_stage_config` 从 model/load/cache/scheduler/runtime/connector/
+  parallel/quantization/diffusion typed owner 深拷贝非 `None` 字段，再与 legacy 共用 model/tokenizer
+  precedence、connector injection、worker resolution、generation cache defaults 与 diffusion attention
+  normalization；不允许增加 catch-all `engine_args`。但在 target `3d7fc3b9`，稳定入口
+  `build_engine_args_dict` 仍明确委托 `build_legacy_engine_args_dict`，runtime/headless/diffusion startup
+  仍传 legacy stage shape；`StageConfigFactory.create_from_model` 与
+  `build_engine_args_dict_from_omni_stage_config` 均无 non-test caller，所以 typed path 是纯
+  preparatory/test-only，不能声称生产已经“从 VllmOmniConfig 读取”。
+  cutover 前须把 strategy/replica/startup-plan 一并改为 typed input，并用 live startup 测试证明。
+  review 暴露的 typed-only defaults、unowned field 静默丢失、model/tokenizer subdir 与 omni-KV
+  precedence 问题，final 以“保留 unset backend default、合并后按 execution type 验 owner、未知
+  owner 拒绝、全 backend field 双向 effective parity”修正；新增字段后该 exhaustive census 必须
+  重新运行，不能只维护几个 deferred-default 白名单。但 registry parity test 会跳过没有具体 HF
+  config 就无法 `resolve_pipeline_config` 的 callable entry（当前包括 `qwen3_omni_moe`），并非字面
+  exhaustive；cutover 前每种 resolver variant 都须补 concrete HF-config fixture。^[PR #5678]
 
 ## 部署配置与资源预算
 
