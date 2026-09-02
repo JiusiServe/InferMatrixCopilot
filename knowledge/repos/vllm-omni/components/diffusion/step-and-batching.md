@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-02
 type: guide
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5599", docs/design/feature/diffusion_continuous_batching.md, docs/user_guide/diffusion/execution_modes.md, vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/models/interface.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/sched/step_scheduler.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_step_pipeline.py]
+sources: ["PR #5599", "PR #6045", docs/design/feature/diffusion_continuous_batching.md, docs/user_guide/diffusion/execution_modes.md, vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/models/interface.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/sched/step_scheduler.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_step_pipeline.py]
 ---
 
 # Step 执行合同与 batching 模式

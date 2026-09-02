@@ -4,7 +4,7 @@ created: 2026-08-10
 updated: 2026-08-10
 type: rule
 tags: [vllm-omni, docs]
-sources: [.claude/skills/quantization/references/modelopt-fp8.md, docs/.nav.yml, docs/mkdocs/hooks/generate_examples.py, docs/models/supported_models.md, docs/user_guide/examples/online_serving/diffusers_pipeline_adapter.md, examples/online_serving/diffusers_pipeline_adapter/README.md, recipes/README.md, tests/docs/test_generate_examples.py, "PR #5969", "PR #5987", "PR #5998"]
+sources: [.claude/skills/quantization/references/modelopt-fp8.md, docs/.nav.yml, docs/mkdocs/hooks/generate_examples.py, docs/models/supported_models.md, docs/user_guide/examples/online_serving/diffusers_pipeline_adapter.md, examples/online_serving/diffusers_pipeline_adapter/README.md, recipes/README.md, tests/docs/test_generate_examples.py, "PR #5969", "PR #5987", "PR #5998", "PR #6045", docs/features/README.md, docs/design/index.md, docs/user_guide/diffusion/startup_and_loading.md, docs/user_guide/diffusion_features.md, docs/user_guide/quantization/bitsandbytes.md, docs/user_guide/quantization/gguf.md]
 ---
 
 # Generated docs and supported-model evidence rules
@@ -73,3 +73,17 @@ sources: [.claude/skills/quantization/references/modelopt-fp8.md, docs/.nav.yml,
   的显式硬件证据；未 linked rows 的硬件列不随本轮 audit 改动。#5969 审计的变化范围仅是
   Qwen3-Omni、Qwen-Image、Qwen-Image-2512、Qwen3-TTS CustomVoice、Higgs Audio V3 TTS 的
   NVIDIA，以及 MiniMax H3 的 NVIDIA+AMD；这不是其他 row 的平台支持 census。^[PR #5969]
+
+## DOCGEN-1c — Feature taxonomy 只拥有可发现性，不生成 support 事实
+
+- 触发：修改 Features nav/index、design taxonomy、compatibility matrix，或把内容迁到新 guide。
+- 强制：User Guide 按 Runtime and Stage Execution、cross-model Quantization、Diffusion Acceleration、
+  Experimental 分组，Custom Pipeline/ComfyUI 归 Integrations；design 定义内部合同，user guide 定义
+  启用/兼容入口，recipe 绑定模型/硬件。Communication 留在 Developer Guide；未稳定的 Pipeline
+  Parallelism 可 direct-link 但不进入主导航。迁移必须让新页入 nav，并保留旧 heading anchor。
+- 禁止：从任一文档层或 nav presence 单独推出 production support；把 quantization 缩成 diffusion-only；
+  把已迁到 OOT plugin 的 GGUF 重新包装成 core-owned 主导航 feature，或因移除主入口而删除仍由
+  quantization overview 直达的保留 guide；漏掉仍实现/测试且无其他 discoverability 的 BitsAndBytes。
+- 验收：strict MkDocs + link/nav census；兼容表逐项回 live owner。HunyuanImage3/Helios step 边界分别
+  是 grouped 仅 TORCH_SDPA、仅 `max_num_seqs=1`；HSDP 与 Ulysses/CFG 可组合但与 TP 不兼容；local
+  layerwise offload 与 multi-device DLO 分表。docs-only build 不证明 runtime。^[PR #6045]
