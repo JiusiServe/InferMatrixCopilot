@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5706", "PR #5720", "PR #5737", "PR #5752", "PR #5764", "PR #5779", "PR #5801", "PR #5824", "PR #5829", "PR #5836", "PR #5837", "PR #5840", "PR #5853", "PR #5896", benchmarks/diffusion/backends.py, benchmarks/diffusion/diffusion_benchmark_serving.py, vllm_omni/config/model.py, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/cache/teacache/, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/inputs/data.py, vllm_omni/quantization/int8_config.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_cache_dit_request_runtime.py, tests/diffusion/cache/test_teacache_extractors.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quality_policy.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/diffusion/quantization/test_int8_config.py, tests/entrypoints/openai_api/test_video_server.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/engine/async_omni_engine.py]
+sources: ["PR #5703", "PR #5706", "PR #5720", "PR #5737", "PR #5752", "PR #5764", "PR #5779", "PR #5801", "PR #5824", "PR #5829", "PR #5836", "PR #5837", "PR #5840", "PR #5853", "PR #5881", "PR #5896", benchmarks/diffusion/backends.py, benchmarks/diffusion/diffusion_benchmark_serving.py, vllm_omni/config/model.py, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/cache/teacache/, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/inputs/data.py, vllm_omni/quantization/int8_config.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_cache_dit_request_runtime.py, tests/diffusion/cache/test_teacache_extractors.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quality_policy.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/diffusion/quantization/test_int8_config.py, tests/entrypoints/openai_api/test_video_server.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/engine/async_omni_engine.py]
 confidence: high
 ---
 
@@ -58,12 +58,18 @@ confidence: high
 
 - 触发：修改 H3 q/k norm、RoPE frequency packing、head dim 或 shared fused-layer dispatch。
 - 强制：H3 使用共享 `RMSNorm`，gamma 保持 BF16，而 native reduction/scale 在 FP32 累加后
-  cast 回输入 dtype。CUDA/HIP eager 与 MUSA 继承的 CUDA 路径尝试 fused RMSNorm、异常时回退
-  native，compile tracing 直接 native；XPU 走 native，NPU 直接调用 `npu_rms_norm` 且没有该
+  cast 回输入 dtype。CUDA/HIP eager 尝试 fused RMSNorm、异常时回退 native，compile tracing
+  直接 native；MUSA 独立走 `F.rms_norm` 以保留 dynamic Inductor 可融合 graph；XPU 走 native，
+  NPU 直接调用 `npu_rms_norm` 且没有该
   fallback。RoPE 使用 NeoX `RotaryEmbedding(half_head_dim=False)`：128 维 head 只旋转前 96 维
   并原样保留末 32 维；CUDA/HIP/native 把 H3 的 tiled full frequencies 转为 half kernel layout，
-  XPU/MUSA 明确走 native，MindIE 接收 full layout。H3 `_apply_rope` 的 q/k 是 3D `[S,H,D]`；
+  XPU 走 native；MUSA 对这个 full-dim、非 interleaved NeoX case 走 inline full-frequency 公式，
+  其他 layout 回 native；MindIE 接收 full layout。H3 `_apply_rope` 的 q/k 是 3D `[S,H,D]`；
   MindIE-SD kernel 只收 4D，因此 shared adapter 必须临时变为 `[1,S,H,D]` 并把输出恢复到 3D。
+- 强制：H3 旋转宽度从 config 静态派生为 `rot_dim = 6 * rope_inv_freq_len`，默认 16 得到 96，
+  不再在 forward 从 `freqs.shape[-1]` 读取动态 symbol。这样 compile 保持静态 slice，但 caller 仍
+  只调用 shared `RotaryEmbedding`、不含平台分支；config 与 frequency producer 不一致必须由 parity
+  test 暴露，不能静默旋转另一宽度。^[PR #5881]
 - 禁止：把任意 96 维随机 frequency 当成 H3 producer 合同；合法 full layout 是同一 48 维
   half 的拼接。也不能从 CPU/reference 与 mocked NPU/MindIE wiring 推断真实 fused-kernel parity。
   PR #5896 的新增 mock 只断言 MindIE 收到 4D、输出恢复 3D 且 identity 回传不变；没有执行真实
@@ -74,6 +80,15 @@ confidence: high
   `5215e03a` 且缺硬件与重复次数，只能作为有界外部观察，不能写成稳定 3.35% 保证。PR #5896
   body 报告 8×Ascend 910B3、USP8/Ring1/DLO、50-step T2VA 完成并附视频，但 commit 只写
   `main`、无数值对照或重复测量；它只补充运行完成证据。^[PR #5801] ^[PR #5896]
+- 验收：MUSA 性能证据只绑定 1×MTT S5000、driver 3.3.5-server、immutable container digest、
+  BF16 packed QKV、S=96000、7 local heads、head_dim 128/rot_dim 96、
+  `torch.compile(fullgraph=True,dynamic=True)`，5 warmups、2 discarded pilots、20 个带 512 MiB
+  cache flush 的交错样本。该 exact Q/K RMSNorm+RoPE region 的 event median
+  30.0062→1.6323 ms（18.38×），同步 wall 30.0695→1.6893 ms（17.80×）；不是 TP8、端到端
+  request、其他 shape/dtype/layout 或其他 MUSA SKU 的保证。finite/shape/BF16 gate 与 direct-inline
+  接近只覆盖该 A/B，且未给 correctness tolerance/reference、benchmark script 或 raw artifact；
+  当前自动测试没有 MUSA dispatch/parity，CPU reference 只验证 96 维旋转和 32 维
+  passthrough。^[PR #5881]
 
 ## MMH3-1d — RainFusion 只在完整、对齐的 H3 video tail 上稀疏
 
