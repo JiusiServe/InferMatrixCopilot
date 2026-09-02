@@ -1,10 +1,10 @@
 ---
 title: "Wan 2.2 架构"
 created: 2026-07-21
-updated: 2026-08-10
+updated: 2026-09-02
 type: architecture
 tags: [vllm-omni, models, diffusion]
-sources: [vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2.py, vllm_omni/diffusion/models/wan2_2/wan2_2_transformer.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_s2v.py, vllm_omni/diffusion/models/dmd2/mixin.py, "PR #5969"]
+sources: ["PR #2783", "PR #5969", vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_i2v.py, vllm_omni/diffusion/models/wan2_2/wan2_2_transformer.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_s2v.py, vllm_omni/diffusion/models/dmd2/mixin.py]
 ---
 
 # Wan 2.2 架构
@@ -44,6 +44,10 @@ diffusion 设施见 [Diffusion 组件](../../components/diffusion/_index.md)。
   extra_args 里剥掉 `sample_solver`/`flow_shift`**——防止基类把 scheduler
   换回去。给 DMD2 变体"加回 CFG/负向"的 PR 违反此合同。
 - 量化:每 transformer 独立解析 `quantization_config`,双专家可各自量化。
+- distilled LoRA 同样按 architecture-declared transformer ownership 分开：T2V/I2V 及其 DMD2
+  子类的 mixin 读取 `has_transformer_2`，要求位置 0/1 分别对应 `transformer`/`transformer_2`，
+  并通过具名 getter 避免两个 delta 都落到第一 transformer。boundary 即使少加载一个 target 也不
+  减少 path cardinality；该 startup fusion 是 server-lifetime 状态，不改变请求协议，VACE/S2V 未接入。
 
 ## 从输入到输出的主要流程
 

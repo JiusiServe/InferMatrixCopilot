@@ -1,10 +1,10 @@
 ---
 title: "Wan 2.2（六架构视频家族:T2V/I2V/VACE/S2V/DMD2×2）"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-02
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: [vllm_omni/diffusion/models/wan2_2/, vllm_omni/deploy/wan2_2_ti2v.yaml, vllm_omni/diffusion/models/dmd2/mixin.py]
+sources: ["PR #2783", vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/models/wan2_2/, vllm_omni/deploy/wan2_2_ti2v.yaml, vllm_omni/diffusion/models/dmd2/mixin.py, tests/diffusion/lora/test_loader.py]
 ---
 
 # Wan 2.2
@@ -61,6 +61,10 @@ sources: [vllm_omni/diffusion/models/wan2_2/, vllm_omni/deploy/wan2_2_ti2v.yaml,
   transformer)——省显存开关,评审时别当普通超参改。
 - S2V 无捆绑 deploy YAML（flow_shift 3.0 只在代码里）——部署设置 pin 上无
   文档。
+- distilled LoRA 只在 `Wan22Pipeline` 与 `Wan22I2VPipeline` 显式接入；双专家按位置把 high/low-noise
+  两个具体文件分别融合进 `transformer`/`transformer_2`；DMD2 子类继承该能力，VACE/S2V 不继承。
+  双专家即使因 boundary 少加载一个 target 仍要求两个 path，未加载者 warning 后跳过；精确门禁见
+  [DIFF-2n](../../components/diffusion/rules-lora.md#diff-2n-wan-多文件必须逐位置绑定-architecture-declared-transformer)。
 
 ## 什么时候查这里
 
