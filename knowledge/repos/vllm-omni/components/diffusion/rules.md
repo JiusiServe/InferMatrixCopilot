@@ -20,7 +20,7 @@ confidence: high
 
 | PR 描述在做什么 | 精确规则组 | 第一批 live 源码 |
 |---|---|---|
-| CUDA Graph、compile、fused solver/norm/RoPE、eager parity、tensor dtype/device、async output | `execution-parity`：`DIFF-1a`–`1e` | `compile.py::regionally_compile` → shared layer/backend → model denoise/solver/output pump |
+| CUDA Graph、compile、fused solver/norm/RoPE、FA determinism、eager parity、tensor dtype/device、async output | `execution-parity`：`DIFF-1a`–`1f` | `compile.py::regionally_compile` → shared layer/backend → model denoise/solver/output pump |
 | seed、request-local generator、guidance=0、并发 RNG、batched generators | `execution-parity`：`DIFF-1b` | `inputs/data.py::OmniDiffusionSamplingParams` → runner `_initialize_generator` → request-batch generator collate |
 | ModelOpt/checkpoint adapter、weight/scale remap、unknown tensor、resolution path | `checkpoint-distributed`：`DIFF-2a` | `diffusers_loader.py::{_get_checkpoint_adapter,load_weights}` → `modelopt.py::{_resolve_target_and_output_names,adapt}` |
 | host-weight artifact、source identity、layout/dtype、warm restore | `checkpoint-distributed`：`DIFF-2d` | `model_loader/host_weights/{source_identity,contracts,identity_adapter}.py` → policy/restorer |
@@ -35,7 +35,7 @@ confidence: high
 | 审查组 | 什么时候触发 | 规则 ID |
 |---|---|---|
 | `core` | 每次共享 diffusion 审查 | `DIFF-1a`, `DIFF-1b`, `DIFF-1c`, `DIFF-1d`, `DIFF-1e` |
-| `execution-parity` | graph/eager、solver、RNG、generator、tensor dtype/device、fused layer、async output readiness | `DIFF-1a`–`1e` |
+| `execution-parity` | graph/eager、solver、RNG、generator、tensor dtype/device、fused layer、FA determinism、async output readiness | `DIFF-1a`–`1f` |
 | `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP、artifact identity、distributed offload、multi-DiT/cache lifecycle | `DIFF-2a`–`2j` |
 | `quality-evidence` | 质量阈值、offload、A/B case | `DIFF-3a` |
 | `system-runtime` | cache/预算、native/backend/platform、attention layout、能力 metadata、异常与并发 | `DIFF-4a`–`4i` |
@@ -51,7 +51,10 @@ confidence: high
 - 禁止：只比较 shape、无 NaN 或“能运行”；这些不能证明数值和请求语义等价。
 - 验收：固定输入和 request-local generator，对 eager/优化路径逐步比较关键状态并覆盖
   零值和最后一步边界。Ming-TTS 的具体反例见
-  [Ming-Omni-TTS 规则](../../models/ming-omni-tts/rules.md)。 ^[PR #4341]
+  [Ming-Omni-TTS 规则](../../models/ming-omni-tts/rules.md)；local FlashAttention deterministic
+  opt-in 的共享合同见 [DIFF-1f](rules-attention.md)，Qwen accuracy 边界见
+  [Qwen-Image 规则](../../models/qwen-image/rules.md)。
+  ^[PR #4341]
 
 ### DIFF-1b — 随机状态属于请求，零值不是缺省值
 

@@ -45,3 +45,5 @@ sources: [vllm_omni/diffusion/models/qwen_image/, vllm_omni/diffusion/registry.p
 - 审查 qwen_image 任一变体的 CFG-parallel、分布式 VAE 或 DMD2 改动——五变体
   共栈,单变体改动先扫其余四个;共享 mixin 见
   [Diffusion 组件](../../components/diffusion/_index.md)。
+- 审查 accuracy、regional compile 或 FlashAttention 确定性时见
+  [Qwen-Image 规则](rules.md)。
