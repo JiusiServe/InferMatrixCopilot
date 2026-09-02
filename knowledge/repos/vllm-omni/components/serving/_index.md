@@ -10,7 +10,7 @@ sources: []
 # Serving
 
 - 主要源码入口：`vllm_omni/entrypoints/`（cli、openai、openpi 及 omni/async_omni 入口）和 `vllm_omni/engine/`（orchestrator、stage engine core、stage pool/runtime、output processor）
-- 源码校验：以上路径均已在 `main @ 584d78c6` 验证存在
+- 源码校验：以上路径均已在 `main @ 2ce15ab7` 验证存在
 - 主要职责：用户入口、请求解析、在线服务和 engine 边界
 
 ## 什么时候查这里
@@ -29,5 +29,6 @@ sources: []
 |---|---|
 | 理解入口到 engine 的边界 | [architecture](architecture.md) |
 | 根据 PR 描述直达 request contract、streaming format、artifact readiness、factory lifecycle 或 metrics 的规则组与第一批源码 | [rules 与代码地图](rules.md) |
+| upstream launcher shutdown、renderer warmup 与多 replica compile-cache 隔离 | [upstream 兼容规则](rules-upstream-compat.md) |
 | stage/replica 死亡、request-local failure、readiness/liveness 或驱逐后 cleanup | [fault-isolation rules](rules-fault-isolation.md) |
 | batched chat frontend fan-out、choice cardinality、whole-batch error/cancellation | [batch chat rules](rules-batch-chat.md) |

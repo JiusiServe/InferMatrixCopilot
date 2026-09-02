@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, scheduler]
-sources: ["vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461"]
+sources: ["PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461"]
 ---
 
 # Scheduler 规则
@@ -222,6 +222,17 @@ modules=[online_serving, worker_runner]，status=active，run_count=38，2026-06
   请求静默放行；用无限等待掩盖 replica loss 或 abort。
 - 验收：覆盖完整 pair、不同进度、missing/split、parent abort 和 companion abort，
   断言请求不会挂死、错误归属保持 request-local、队列和 connector state 都释放。
+
+## SCHED-6a — async discard 的计数单位必须与 stale drain 一致
+
+- 触发：上游 scheduler 改动异步占位、stale output 或 streaming segment replacement。
+- 强制：每个 discard site 用 `num_in_flight_tokens`（scheduled-token 单位）累加
+  `num_stale_output_tokens`；每个迟到 frame 先按本次 `num_tokens_scheduled` 结算 in-flight 与 stale
+  两个同单位 counter，再在 append/emit 前丢弃。placeholder rollback 与 stale drain 分开记账。
+- 禁止：用 `num_output_placeholders` 初始化 stale counter；清零 placeholder 后仍让迟到输出进入
+  placeholder/computed-token 的正常结果更新；把 scheduler 修复宣称为音频 WER 修复。
+- 验收：AR 与 generation 路径覆盖多 token frame、prefill 无 placeholder、连续旧/新 segment，
+  断言 stale counter 恰好归零且首个新 segment 输出不被吞；真实质量指标必须另行验证。^[PR #5976]
 
 ## 相关
 

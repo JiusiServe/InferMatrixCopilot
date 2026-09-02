@@ -4,7 +4,7 @@ created: 2026-08-10
 updated: 2026-08-10
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: [vllm_omni/diffusion/models/lingbot_video/request_utils.py, vllm_omni/diffusion/models/lingbot_video/image_condition.py, vllm_omni/diffusion/models/lingbot_video/pipeline_lingbot_video.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/model_extras/lingbot_video.py, vllm_omni/model_extras/registry.py, tests/diffusion/models/lingbot_video/test_request_utils.py, tests/diffusion/models/lingbot_video/test_image_condition.py, tests/diffusion/models/lingbot_video/test_pipeline_lingbot_video.py, tests/entrypoints/openai_api/test_image_server.py, tests/entrypoints/openai_api/test_video_server.py, "PR #5311", "Issue #5883"]
+sources: [vllm_omni/diffusion/models/lingbot_video/request_utils.py, vllm_omni/diffusion/models/lingbot_video/image_condition.py, vllm_omni/diffusion/models/lingbot_video/pipeline_lingbot_video.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/model_extras/lingbot_video.py, vllm_omni/model_extras/registry.py, tests/diffusion/models/lingbot_video/test_request_utils.py, tests/diffusion/models/lingbot_video/test_image_condition.py, tests/diffusion/models/lingbot_video/test_pipeline_lingbot_video.py, tests/entrypoints/openai_api/test_image_server.py, tests/entrypoints/openai_api/test_video_server.py, "PR #5311", "PR #5976", "Issue #5883"]
 ---
 
 # LingBot-Video 规则
@@ -48,6 +48,10 @@ sources: [vllm_omni/diffusion/models/lingbot_video/request_utils.py, vllm_omni/d
   `seconds` 与 `duration` 同时出现拒绝；显式 `num_frames` 胜过 duration。fps/steps 必须正整数，
   guidance 非负有限数，shift 正有限数，output type 只允许 `pt|np|latent`。尺寸来源互斥：
   `width+height`、`size=WIDTHxHEIGHT`、或成对 `resolution+ratio` 三选一，结果必须是 16 的倍数。
+  解析先对每一种尺寸字段做 source merge：online `/v1/videos` 的 `sampling.extra_args` 优先于
+  prompt mapping，offline prompt mapping 仅作 fallback；合并后再按表示优先级选择
+  `width/height` > `size` > `resolution+ratio`。两条入口必须复用同一个 resolver，不能把某来源
+  整体覆盖另一来源而丢掉未冲突字段。
 - 禁止：在 serving 再造 dimension resolver/model-specific width/height alias；把 sampling
   `num_frames=1` 当成可靠的显式单帧 video——它当前是 image API 的“省略”哨兵，因此会落到默认
   81 帧，而 model prompt/extra 的 1 仍是显式值。
@@ -56,7 +60,9 @@ sources: [vllm_omni/diffusion/models/lingbot_video/request_utils.py, vllm_omni/d
   `(832,480)`，经 resolver 返回标准 `(width,height)=(480,832)`，实际是 portrait；`9:16` 同理
   反向。现有测试冻结了该值，不能证明 ratio 名与标准 width:height 语义一致；修复需覆盖全
   preset、direct resolver、离线 builder 和两个在线 endpoint 的最终尺寸。sampling sentinel 的
-  不对称也必须先统一 omitted 表示再修改。
+  不对称也必须先统一 omitted 表示再修改。另须用同字段冲突值断言 extra_args 胜过 prompt，并用
+  跨表示冲突冻结 merge 后的 `width/height` > `size` > `resolution+ratio`，同时保留只有 prompt 的
+  offline control。^[PR #5976]
 
 ## LBV-2a — TI2V 的 VLM 与 VAE 必须共享一次几何对齐及同一 RNG 顺序
 

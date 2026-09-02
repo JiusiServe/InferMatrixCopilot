@@ -143,6 +143,11 @@ modules:
   quantization:
     local_paths: [vllm_omni/quantization/]
     wave: 1
+  runtime_patch:
+    local_paths: [vllm_omni/patch.py]
+    test_paths: [tests/diffusion/test_inductor_divisibility_patch.py]
+    wave: 1
+    risk: high
   sampling:
     local_paths: [vllm_omni/sample/]
     wave: 1
@@ -160,6 +165,9 @@ modules:
     wave: 2
 
 review_routes:
+- prefix: vllm_omni/patch.py
+  owner: tooling
+  doc: repos/vllm-omni/tooling/rules.md
 - prefix: vllm_omni/config/
   owner: config
   doc: repos/vllm-omni/components/configuration/rules.md

@@ -4,7 +4,7 @@ created: 2026-08-23
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, ci]
-sources: ["PR #3422", "PR #5074", "PR #5255", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5823", "PR #5836", "PR #5845", "PR #5872", "PR #6008", "PR #6048", "PR #6056", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6339", "PR #6343", .buildkite/cuda/test-nightly.yml, .buildkite/npu/test-npu-nightly.yml, .pre-commit-config.yaml, tests/dfx/perf/scripts/run_benchmark.py, tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_flux_kontext_expansion.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, tests/model_tests/diffusion/diff_model_builders.py, tests/model_tests/diffusion/model_settings.py, tests/model_tests/diffusion/test_alignment.py, tools/pre_commit/check_tts_adapter.py, tests/tools/test_check_tts_adapter.py]
+sources: ["PR #3422", "PR #5074", "PR #5255", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5823", "PR #5836", "PR #5976", docker/Dockerfile.ci, .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, "PR #5845", "PR #5872", "PR #6008", "PR #6048", "PR #6056", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6339", "PR #6343", .buildkite/cuda/test-nightly.yml, .buildkite/npu/test-npu-nightly.yml, .pre-commit-config.yaml, tests/dfx/perf/scripts/run_benchmark.py, tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_flux_kontext_expansion.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, tests/model_tests/diffusion/diff_model_builders.py, tests/model_tests/diffusion/model_settings.py, tests/model_tests/diffusion/test_alignment.py, tools/pre_commit/check_tts_adapter.py, tests/tools/test_check_tts_adapter.py]
 confidence: high
 ---
 
@@ -125,6 +125,17 @@ collection 意图；没有实际 runtime 结果时，不能证明目标硬件行
   random BF16 weights，只证明 construction、routing 与 control-flow，不证明真实 checkpoint 加载、
   输出质量、显存或吞吐。^[PR #5823]
 
+## OMNI-CI-2e — release rebase 的 image、容器资源与实际辅助负载必须成套对齐
+
+- 触发：升级 vLLM/torch base image，或新版本在 startup 增加资源检查、编译缓存与 warmup 行为。
+- 强制：正式 release 直接使用同版本 base image 的自洽依赖集；只有目标是未发布 SHA 时才恢复
+  wheel 重装及其 torch/CUDA/NumPy ABI 修复。容器显式满足新 startup check（共享内存等），硬件数
+  同时计入测试辅助模型：主模型占卡时，Whisper 等 grader 需要 spare accelerator 才能避免 CPU 超时。
+- 禁止：在 release image 上保留补偿旧 image 的依赖手术；用 Docker 默认 `/dev/shm`；只按被测模型
+  卡数配置 lane 而忽略 grader；把部分 nightly green 当全部兼容问题已关闭。
+- 验收：image tag 与目标 release 一致；startup 通过共享内存 preflight；目标 lane 证明实际 grader
+  device；每个残余失败独立记录，尤其数值/质量回归不能由 API 兼容测试替代。^[PR #5976]
+
 ## OMNI-CI-3a — DFX baseline artifact 与性能回归 gate 是两个合同
 
 - 触发：修改 perf JSON 的 `baseline`、硬件 label/marker、benchmark result schema，或恢复性能阈值断言。
@@ -153,3 +164,14 @@ collection 意图；没有实际 runtime 结果时，不能证明目标硬件行
   response。配置里的 H100 baseline 因此只是结果 artifact，既不能证明回归阈值，也不能外推到
   A3；PR 文本中的“双卡”描述也不能覆盖最终 lane/YAML 的单卡事实。^[PR #5524]
   ^[PR #5402] ^[PR #5845]
+
+## OMNI-CI-3b — patched upstream benchmark 必须保持参数与 output subtype 兼容
+
+- 触发：upstream `benchmarks/serve.py` 增参，或 Omni 聚合字段只存在于扩展 output subtype。
+- 强制：patched copy 逐版本同步公开参数及控制流；background probe 从独立的最小请求生成，主 workload
+  完成后显式停止。Omni-only duplex metrics 用 tolerant attribute reads 聚合，plain-vLLM output 缺字段
+  等价于空集合，不能抹掉已经成功的主结果。
+- 禁止：以“看似无关”删除 upstream 新参数；把 probe 混入 throughput/latency 主样本；直接读取扩展字段
+  导致普通 backend 的结果整体 fallback 成 completed=0。
+- 验收：签名/控制流与 pinned upstream 对照；probe rate 0 与正值覆盖启动/停止；plain 与 Omni output
+  混合列表都保留完成数，只有存在时才写 duplex metrics。^[PR #5976]

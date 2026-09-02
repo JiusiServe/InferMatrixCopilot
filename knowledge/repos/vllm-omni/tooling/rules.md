@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni]
-sources: ["PR #5756", "PR #6031", apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/nodes.py, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/api_client.py, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/models.py, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/types.py, examples/offline_inference/text_to_image/text_to_image.py, tests/e2e/features/comfyui/test_comfyui_integration.py, tests/examples/offline_inference/test_text_to_image.py]
+sources: ["PR #5756", "PR #5976", "PR #6031", apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/nodes.py, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/api_client.py, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/models.py, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/utils/types.py, examples/offline_inference/text_to_image/text_to_image.py, vllm_omni/patch.py, tests/diffusion/test_inductor_divisibility_patch.py, tests/e2e/features/comfyui/test_comfyui_integration.py, tests/examples/offline_inference/test_text_to_image.py]
 confidence: high
 ---
 
@@ -62,3 +62,14 @@ confidence: high
   `AttributeError` 变为 320×192 RGB PNG；它是有界的 LingBot E2E artifact 证据，不证明共享
   utility、在线 serving 或其他 producer。目标提交没有新增 helper 自动化测试，README full-model
   case 也不能替代上述类型矩阵。^[PR #6031]
+
+## OMNI-TOOL-3a — 全局 runtime patch 必须是单调、可自熄的窄证明
+
+- 触发：上游 torch/vLLM 升级后需要 monkey-patch 编译器、allocator 或其他进程级对象。
+- 强制：先用 canonical probe 判断上游是否已具备能力；wrapper 只能增加经严格数学/类型条件证明
+  安全的结果，其余全部委托原实现，并带幂等标记。当前 inductor divisibility 补丁只接受不超过
+  20 个符号的 polynomial，且 `cancel(numerator/denominator)` 必须得到整数系数 polynomial。
+- 禁止：吞掉 lazy compile error 后长期静默 eager fallback；对 FloorDiv/ModularIndexing 或非
+  polynomial 猜测；补丁安装失败时改变原方法。
+- 验收：覆盖原方法 True、可精确因式消除、非整系数/零分母/非 polynomial/符号上限、重复安装，
+  以及“上游已能证明”时不替换方法。真实 FLUX FP8 smoke 另行验证图编译。^[PR #5976]

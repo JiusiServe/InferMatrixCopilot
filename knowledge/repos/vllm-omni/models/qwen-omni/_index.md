@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-02
 type: index
 tags: [vllm-omni, models, qwen-omni]
-sources: ["PR #5073", "PR #5671", vllm_omni/model_executor/models/registry.py, vllm_omni/model_executor/models/qwen2_5_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/qwen3_omni_moe.yaml, docs/design/qwen3_omni_tts_performance_optimization.md]
+sources: ["PR #5073", "PR #5671", "PR #5976", vllm_omni/model_executor/models/qwen2_5_omni/qwen2_5_omni_thinker.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni_moe_thinker.py, vllm_omni/model_executor/models/registry.py, vllm_omni/model_executor/models/qwen2_5_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/qwen3_omni_moe.yaml, docs/design/qwen3_omni_tts_performance_optimization.md]
 ---
 
 # Qwen-Omni 家族（Qwen2.5-Omni / Qwen3-Omni / Qwen3-TTS）
@@ -24,6 +24,10 @@ sources: ["PR #5073", "PR #5671", vllm_omni/model_executor/models/registry.py, v
 - Qwen3-Omni 的 MUSA ModelOpt FP8 边界是 Thinker 保留量化、Talker/Code2Wav 通过 deploy
   overlay 显式清除 root quantization metadata，并仅关闭不安全的 Talker-MTP FULL graph
   wrapper；精确三态与验证边界归下方 architecture 入口。
+- vLLM 0.27 后 upstream 与 Omni registry 有同名 architecture：Omni 必须覆盖全局 entry；plain
+  `vllm serve` 缺 `model_stage` 时 Qwen2.5/Qwen3 默认 thinker，Qwen3 thinker 在非 staged 模式返回
+  bare tensor，只有 staged talker consumer 才请求 captured layers；共享验收见
+  [EXEC-1e](../../components/model-executor/rules.md#exec-1e-upstream-registry-重名时-omni-override-与-plain-vllm-forward-必须同时成立)。^[PR #5976]
 - 官方历史文档：`docs/design/module/archive/async_omni_architecture.md`（以 Qwen3-Omni 为
   worked example 的分层运行时快照，非 active spec）、
   `docs/design/qwen3_omni_tts_performance_optimization.md`（性能优化实录）

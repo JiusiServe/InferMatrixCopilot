@@ -4,7 +4,7 @@ created: 2026-08-05
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, distributed]
-sources: ["PR #5744", vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py]
+sources: ["PR #5744", "PR #5976", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py]
 confidence: high
 ---
 
@@ -48,3 +48,13 @@ confidence: high
   receiver/非 sender+无 hook→创建，并覆盖安全 shutdown。Bagel/Hunyuan KV-only 和
   Qwen3-Omni/MiniCPM-o payload 路径各做真实拓扑 smoke。该矩阵不证明 issue #5595 中独立的
   shutdown/orphan 问题已解决。 ^[PR #5744]
+
+## DIST-2a — diffusion EP group 必须满足运行中 MoE backend 的 communicator 合同
+
+- 触发：上游 MoE factory/oracle 或 `init_model_parallel_group` 增加 all-to-all manager 要求。
+- 强制：EP group 在运行版本支持 `use_all2all` 时显式启用；兼容旧版本用签名能力检测，不能按版本
+  字符串猜测。非 EP group 保持原参数，避免扩大 communicator 行为。
+- 禁止：创建普通 device communicator 后等 weight load 才触发 manager assert；向不支持该 kwarg
+  的旧 vLLM 无条件传参；把 TP/EP 配置存在当作 manager 已初始化。
+- 验收：mock 新旧签名分别断言 EP 转发/旧版省略，普通 group 不启用；目标环境用真实 MoE DiT
+  TP+EP smoke 验证 manager 非空。^[PR #5976]

@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/musa/platform.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/engine/stage_init_utils.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py, docs/design/feature/omni_async_output_materialization.md, vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/experimental/fullduplex/, tests/e2e/features/fullduplex/, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/engine/test_arg_utils.py, "PR #3422", "PR #3642", "PR #4730", "PR #4958", "PR #5073", "PR #5074", "PR #5310", "PR #5610", "PR #5671", "PR #5777", "PR #5792", "PR #5824", "claude-workflow-starter-private@09dca46"]
+sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/musa/platform.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/engine/stage_init_utils.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py, docs/design/feature/omni_async_output_materialization.md, vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/experimental/fullduplex/, tests/e2e/features/fullduplex/, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/engine/test_arg_utils.py, "PR #3422", "PR #3642", "PR #4730", "PR #4958", "PR #5073", "PR #5074", "PR #5310", "PR #5610", "PR #5671", "PR #5777", "PR #5792", "PR #5824", "PR #5976", vllm_omni/engine/arg_utils.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni_moe_thinker.py, vllm_omni/model_executor/models/qwen2_5_omni/qwen2_5_omni_thinker.py, vllm_omni/model_executor/models/dynin_omni/dynin_omni.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/worker/base.py, vllm_omni/worker/gpu_generation_model_runner.py, tests/model_executor/models/qwen3_omni/test_qwen3_omni_forward_contract.py, "claude-workflow-starter-private@09dca46"]
 ---
 
 # Model Executor 规则
@@ -200,6 +200,29 @@ Stage 拓扑错误的最小充分源码证据只有三段：一处最终配置�
 - 验收：mock 下载层证明只请求目标 config，loader 测试断言各子模块 dtype；真实 smoke
   记录峰值显存和 dtype。Krea 2 的具体约束见
   [Krea 2 规则](../../models/krea2/rules.md)。 ^[PR #4730]
+
+### EXEC-1e — upstream registry 重名时 Omni override 与 plain-vLLM forward 必须同时成立
+
+- 触发：上游开始注册 Omni 同名 architecture，或 model runner/forward/capture/dummy-run 接口变化。
+- 强制：全局 registry 无条件重注册 Omni owner；非 staged 模式为 Qwen Omni 选择 thinker，并返回
+  stock runner 可消费的 bare tensor；只有 staged talker consumer 存在时才 capture hidden layers。
+  runner override 必须接受上游新增 kwargs；text/MoE dummy input 可按 upstream 要求 randomize，但
+  code2wav 等结构化 codec id 只能接受参数而不得随机化。worker profiling 同步保存上游新增结果字段。
+- 禁止：因 upstream 已有同名 arch 就跳过 Omni 注册；plain serve 返回 staged tuple；把 vocab-uniform
+  id 喂给 codec codebook；用 `**kwargs` 隐藏未审查的签名漂移。
+- 验收：registry collision 解析到 Omni class；Qwen2.5/Qwen3 plain thinker 与 staged capture 分别断言
+  output shape，PP intermediate 原样透传；dummy-run 覆盖 text randomize 与 generation no-randomize，
+  并对 profiling result 做字段 parity。^[PR #5976]
+
+### EXEC-1f — multimodal wrapper 与 hash algorithm 必须通过 live context 传播
+
+- 触发：upstream multimodal input 开始保留原始 bytes、修改 hash 签名或 processor item wrapper。
+- 强制：所有 `get_mm_hashes` / direct `MultiModalHasher.hash_kwargs` 调用传当前 multimodal config 的
+  algorithm；processor 通过公开 `get(index)` 解包 `MediaWithBytes`，再把 frames/metadata 交给 HF。
+- 禁止：直接遍历 `.data` 绕过 unwrap；让 stage/replica UUID 前缀替代 content hash algorithm；只修
+  一个模型而不 census 自定义 processor 与 direct hasher caller。
+- 验收：不同 algorithm 进入 hash consumer；wrapped/unwrapped video 都生成同一 HF input，metadata
+  保留；stage+replica scope 只包裹 base UUID 且用户 UUID 优先。^[PR #5976]
 
 ### EXEC-2b — fused shard 必须按 source 完整性与布局数值闭环
 
