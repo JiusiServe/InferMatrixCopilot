@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5737", "PR #5752", "PR #5764", vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/entrypoints/openai/serving_video.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/entrypoints/openai_api/test_video_server.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md]
+sources: ["PR #5703", "PR #5737", "PR #5752", "PR #5764", "PR #5829", vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/entrypoints/openai/serving_video.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/entrypoints/openai_api/test_video_server.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md]
 confidence: high
 ---
 
@@ -47,13 +47,17 @@ confidence: high
 - 触发：改变 H3 FP8 layer scope、kernel/loader、quality threshold、offload 或 nightly lane。
 - 强制：H3 online FP8 与 layerwise offload 当前标为 incompatible；resident FP8 可与 TP、VAE
   tiling 组合。BF16/FP8 A/B 使用同一 immutable checkpoint、prompt、seed、size、frames、
-  steps 与并行/资源设置；joint output 同时检查 video LPIPS 和 32 kHz audio 的 spectral
-  cosine/RMS ratio。PSNR、MAE 与 peak memory 是 report-only 指标，不能冒充 gate。
+  steps、输入合同与并行/资源设置；T2VA case 即使显式给出 width/height，也必须在
+  `sampling_params.extra_args` 带合法 named `aspect_ratio`。joint output 同时检查 video LPIPS
+  和 32 kHz audio 的 spectral cosine/RMS ratio。PSNR、MAE 与 peak memory 是 report-only
+  指标，不能冒充 gate。
 - 禁止：只验视频就宣称 H3 joint-output quality；把一次 22% memory observation 写成稳定
   上界；让 FP8+layerwise offload 到 Cutlass kernel 才因 flattened-weight stride 失败。
 - 验收：当前 2x H100 case 的 gates 是 LPIPS <= 0.20、audio spectral cosine >= 0.80、
   RMS ratio 在 0.50–2.00，且 sample rate 为 32000；单测还要证明 phase-tolerant metric
-  接受相移但拒绝 spectral drift。 ^[PR #5737]
+  接受相移但拒绝 spectral drift。质量 test 的 T2VA `aspect_ratio="16:9"` 是同一 case 的
+  必填输入，不是量化变量；输入合同演进后应修正 fixture，不能靠跳过 case 或放宽质量 gate
+  恢复 CI。^[PR #5737] ^[PR #5829]
 
 ## MMH3-2a — task、reference、shape 与多输出必须作为一个输入矩阵维护
 
@@ -64,9 +68,10 @@ confidence: high
   image/video visual reference；image≤9、video≤3、standalone audio≤3、总数≤12，允许
   image-only 及 image/video/audio mixed matrix，但拒绝 audio-only。
 - 强制：输出固定 24 FPS、32 kHz audio、duration 4–15 秒。省略 width/height 时
-  `short_edge` 只能为 768；T2VA 必须显式选择 `21:9`、`16:9`、`4:3`、`1:1`、`3:4`、
-  `9:16`，FL2VA 跟随首图 geometry 并忽略通用 ratio override，Ref2VA 默认 `16:9`，
-  `adaptive`/`auto` 是该默认的 alias。
+  `short_edge` 只能为 768；T2VA 即使同时给出 width/height，仍必须显式选择 `21:9`、
+  `16:9`、`4:3`、`1:1`、`3:4`、`9:16`，因为 named ratio 在 explicit-dimension branch
+  之前解析。FL2VA 跟随首图 geometry 并忽略通用 ratio override，Ref2VA 默认 `16:9`，
+  `adaptive`/`auto` 是该默认的 alias。^[PR #5829]
 - 强制：`num_outputs_per_prompt` 仅为 1–10，各输出 seed 是 `seed + output_index`；pipeline
   tensor output 与未被公开 caller 使用的 `generate_videos()` 保留 fan-out。此 pin 上 public
   async job 与 `/v1/videos/sync` 都调用 `generate_video_bytes()`，多输出时告警并只持久化/返回
