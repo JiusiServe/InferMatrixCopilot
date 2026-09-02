@@ -4,7 +4,7 @@ created: 2026-08-23
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, ci]
-sources: ["PR #3422", "PR #5074", "PR #5310", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5872", "PR #6048", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6339", "PR #6343"]
+sources: ["PR #3422", "PR #5074", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5872", "PR #6048", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6339", "PR #6343"]
 confidence: high
 ---
 
@@ -21,6 +21,7 @@ confidence: high
 | pre-commit、SPDX、shellcheck、stability marker | `OMNI-CI-2a` | `.pre-commit-config.yaml`、`.buildkite/**`、`tools/**` |
 | xdist、共享 worker、下载 fixture、进程池 | `OMNI-CI-2b` | `tests/conftest.py`、`tests/helpers/**`、`tests/model_tests/**` |
 | 重模型 cold start、共享 engine/server fixture、sleep/wake | `OMNI-CI-2c` | `tests/entrypoints/test_omni_sleep_mode.py`、OmniServer fixture scope/lock |
+| perf baseline、hardware label、DFX result artifact、assert-baseline | `OMNI-CI-3a` | `tests/dfx/conftest.py`、`tests/dfx/perf/scripts/run_benchmark.py`、`run_diffusion_benchmark.py`、`tests/dfx/perf/tests/**` |
 
 ## OMNI-CI-1a — 硬件 lane 必须真实收集并执行目标路径
 
@@ -88,3 +89,19 @@ confidence: high
 - 验收：分别覆盖 LLM、diffusion 与 multi-stage topology；每个可恢复 case 后下一 case 从 awake
   开始；level-2 terminal case 之后不再复用 server；统计目标 lane 确实只初始化预期数量的
   engine，且 cleanup 后无 worker/device state 遗留。^[PR #5713]
+
+## OMNI-CI-3a — DFX baseline artifact 与性能回归 gate 是两个合同
+
+- 触发：修改 perf JSON 的 `baseline`、硬件 label/marker、benchmark result schema，或恢复性能阈值断言。
+- 强制：当前 runner 用 `copy.deepcopy` 将输入中的原始 `baseline` 对象原样写入 result artifact；
+  硬件 marker/resource label 只路由执行，runner 不按它选择 baseline，也不按 sweep/concurrency
+  解析阈值。新配置应使用 `{hardware: {metric: threshold}}` 的硬件嵌套结构，并把缺失 bucket
+  当作显式缺口；下游报告工具可以另行选择 bucket，但须声明选择合同。
+- 禁止：把 result 中存在 baseline 描述成 active regression gate；从 `npu: "A3"` marker 推断存在
+  A3 阈值；声称当前 runner 实现了文档所说的“按 runtime hardware label 选择”或 flat baseline
+  兼容。目标 pin 中这些文档措辞是滞后/前瞻描述：选择与断言 helper、`--assert-baseline` 和
+  `skip-performance-assertion` 已删除，flat 输入至多会被不透明地复制，未被 runner 解释。
+- 验收：当前 CI 只用 `completed == num_prompt(s)` gate 请求完成数，baseline artifact round-trip
+  保持输入结构和值；若重新引入性能 gate，必须有显式 consumer、硬件 bucket 选择、metric
+  directionality 与失败测试。目标 pin 的已迁移 baseline bucket 全是 H100；九个 A3-marked 配置
+  没有任何 A3 baseline bucket，这是待补 gap，不是 NPU 性能 gate。^[PR #5402]
