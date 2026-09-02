@@ -4,12 +4,12 @@ created: 2026-07-21
 updated: 2026-09-02
 type: architecture
 tags: [vllm-omni, models]
-sources: [vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py, vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_codec.py, vllm_omni/model_executor/models/moss_tts_nano/modeling_moss_tts_nano.py, vllm_omni/model_executor/models/moss_tts/pipeline.py, vllm_omni/model_executor/stage_input_processors/moss_tts.py, vllm_omni/deploy/moss_voice_generator.yaml]
+sources: ["PR #5635", vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py, vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_codec.py, vllm_omni/model_executor/models/moss_tts/audio_tokenizer.py, vllm_omni/model_executor/models/moss_tts_nano/modeling_moss_tts_nano.py, vllm_omni/model_executor/models/moss_tts/pipeline.py, vllm_omni/model_executor/stage_input_processors/moss_tts.py, vllm_omni/deploy/moss_voice_generator.yaml]
 ---
 
 # MOSS-TTS 架构
 
-事实在 `main @ 78c144f3` 复核;变体/deploy 速查见 [index](_index.md)。
+事实在 `main @ 740cb35a` 复核;变体/deploy 速查见 [index](_index.md)。
 
 ## 模型专有部分与共享模块的边界
 
@@ -24,7 +24,9 @@ sources: [vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py, 
   `text_lm_head` 加载但不用（binary 停止头判停）。
 - 共享 codec `MossTTSCodecDecoder`：**同一解码器里装两代 audio tokenizer**
   （v1 24 kHz;v2 48 kHz 立体声,带 `RingKVCache` 流式基建）+ 两个 CUDA-graph
-  wrapper（批解码 vs 流式解码）;按 codec checkpoint config 运行期选代。
+  wrapper（批解码 vs 流式解码）;按 raw codec config 的 `number_channels` 运行期选代，
+  字段缺失/单通道走 v1，≥2 走 v2。projection 的 Linear/Identity topology 同样属于
+  checkpoint ABI，具体门禁见 [rules](rules.md)。
 - 共享框架面：[Config 组件](../../components/configuration/architecture.md)、
   SharedMemoryConnector、speaker cache（`reference_encoder.py`,树内注明援引
   Fish/CosyVoice3/Qwen3-TTS 先例）。
@@ -67,4 +69,4 @@ sources: [vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py, 
   权威映射）;recipe `recipes/OpenMOSS/MOSS-TTS.md`。
 - 已知未决：delay 路下 connector 级 `codec_chunk_frames` 是否还有残余作用
   未追;`moss_tts_local_codec` 与 `moss_tts_codec` 在 serving 侧的分流细节
-  未逐行读;v1/v2 tokenizer 运行期选代逻辑未细读。
+  未逐行读。v1/v2 选择与 projection topology 已复核，但 pin 上没有对应自动化 regression。

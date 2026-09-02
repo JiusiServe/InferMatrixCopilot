@@ -1,15 +1,15 @@
 ---
 title: "MOSS-TTS 家族（Delay/Realtime/Local/Nano,一族八 deploy）"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-02
 type: index
 tags: [vllm-omni, models]
-sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/config/pipeline_registry.py, vllm_omni/model_executor/models/moss_tts/, vllm_omni/model_executor/models/moss_tts_nano/, vllm_omni/model_executor/stage_input_processors/moss_tts.py, vllm_omni/deploy/]
+sources: ["PR #5635", vllm_omni/model_executor/models/registry.py, vllm_omni/config/pipeline_registry.py, vllm_omni/model_executor/models/moss_tts/, vllm_omni/model_executor/models/moss_tts_nano/, vllm_omni/model_executor/stage_input_processors/moss_tts.py, vllm_omni/deploy/]
 ---
 
 # MOSS-TTS 家族
 
-以下事实在 `main @ 5d44868e` 复核。
+以下事实在 `main @ 740cb35a` 复核。
 
 ## 名称与范围
 
@@ -48,6 +48,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/config/pipeline
 | 遇到什么 | 查看哪里 | 说明 |
 |---|---|---|
 | delay 生命周期、伪文本 logits、双代 tokenizer | [architecture](architecture.md) | 数据流与 reviewer 陷阱 |
+| codec v1/v2 选择、projection/checkpoint topology | [rules](rules.md#direct-代码快速入口) | loader 门禁与测试缺口 |
 
 ## 配置与 checkpoint 差异（8 份 deploy 速查）
 
@@ -68,6 +69,6 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/config/pipeline
 
 ## 什么时候查这里
 
-- 审查任一 MOSS 变体的码流、CUDA-graph 开关或 serving 适配;新增变体时先对
+- 审查任一 MOSS 变体的码流、codec checkpoint 代际、CUDA-graph 开关或 serving 适配;新增变体时先对
   这 8 份 YAML 的差异矩阵。
 - 语义验收见 [model-validation](../../review/guides/model-validation.md)。
