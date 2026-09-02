@@ -1,10 +1,10 @@
 ---
 title: "vLLM-Omni 配置构造架构"
 created: 2026-07-16
-updated: 2026-08-05
+updated: 2026-09-02
 type: architecture
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/diffusion/data.py]
+sources: ["claude-workflow-starter-private@296ea45", "PR #5647", vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/diffusion/data.py, vllm_omni/entrypoints/cli/serve.py]
 ---
 
 # vLLM-Omni 配置构造架构
@@ -90,13 +90,13 @@ structured 与 legacy 可以有不同的最终对象，但不能有不同的字�
 
 ## PipelineConfig 与 deploy YAML 的具体结构
 
-以下事实在 `v0.26.0 @ a4ea67a2` 复核；源码会变化，动手前仍须刷新 live 版本。
+以下事实在 `main @ 7a2007cc` 复核；源码会变化，动手前仍须刷新 live 版本。
 
 - **`PipelineConfig`**（模型的冻结 stage 拓扑）由模型的 `pipeline.py` 注册；
   **deploy YAML**（`vllm_omni/deploy/*.yaml`）只描述“这些 stage 怎么跑”。
-  未迁移模型仍走 legacy `--stage-configs-path` + `stage_args` schema
-  （`vllm_omni/model_executor/stage_configs/*.yaml`）。
-- 未显式给 `--deploy-config`/`--stage-configs-path` 时，registry 按 `model_type`
+  public `vllm serve --omni` 只接受 `--deploy-config`；offline/programmatic API 仍保留
+  `stage_configs_path` 读取 legacy `stage_args` schema。
+- serve 未显式给 `--deploy-config` 时，registry 按 `model_type`
   自动解析 pipeline + bundled deploy YAML；单 stage diffusion 模型不在 registry，
   走 `async_omni_engine.py` 的 `_create_default_diffusion_stage_cfg` 兜底。
 - deploy 顶层字段包括 `base_config`、`async_chunk`、`connectors`/`edges`、`stages`、
@@ -129,5 +129,6 @@ out-of-tree 注册。
 - `endpoint_policy.py` 的 `OmniServingCapability` 与
   `shutdown_unsupported_routes` 允许 pipeline 关闭不支持的 serving 路由。
 - `composable_parallel/` 的 `--strategy-config` 在合并后的 stage 上叠加逐 stage
-  并行轴；已接线与 reserved axis 必须区分，且不能与 legacy
-  `--stage-configs-path` 静默混用。
+  并行轴；已接线与 reserved axis 必须区分。Public serve 已移除 legacy flag；
+  offline/programmatic resolver 仍须拒绝 `stage_configs_path` 与 `deploy_config_path`
+  同时出现。

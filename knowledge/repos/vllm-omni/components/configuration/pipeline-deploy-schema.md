@@ -1,15 +1,15 @@
 ---
 title: "PipelineConfig 与 deploy YAML 详细 schema"
 created: 2026-07-16
-updated: 2026-08-05
+updated: 2026-09-02
 type: guide
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/stage_config.py, docs/configuration/stage_configs.md]
+sources: ["claude-workflow-starter-private@296ea45", "PR #5647", vllm_omni/config/stage_config.py, vllm_omni/entrypoints/cli/serve.py, docs/configuration/stage_configs.md]
 ---
 
 # PipelineConfig 与 deploy YAML 详细 schema
 
-以下事实在 `v0.26.0 @ a4ea67a2` 复核；当前稳定职责见
+以下事实在 `main @ 7a2007cc` 复核；当前稳定职责见
 [Configuration architecture](architecture.md)，官方 spec 见
 `docs/configuration/stage_configs.md`
 （schema 全表）与 `composable_parallel.md`。
@@ -18,9 +18,9 @@ sources: ["claude-workflow-starter-private@296ea45", vllm_omni/config/stage_conf
 
 - **`PipelineConfig`**（模型的冻结 stage 拓扑）由模型的 `pipeline.py` 注册；
   **deploy YAML**（`vllm_omni/deploy/*.yaml`，79 个）只描述"这些 stage 怎么跑"。
-  未迁移模型仍走 legacy `--stage-configs-path` + `stage_args` schema
-  （`vllm_omni/model_executor/stage_configs/*.yaml`）。
-- 未显式给 `--deploy-config`/`--stage-configs-path` 时，registry 按 `model_type`
+  public serve 已删除 `--stage-configs-path`；legacy `stage_args` schema 只通过仍存在的
+  offline/programmatic `stage_configs_path` 合同读取。
+- `vllm serve --omni` 未显式给 `--deploy-config` 时，registry 按 `model_type`
   自动解析 pipeline + bundled deploy YAML（如 `qwen2_5_omni.yaml` 在 1×H100、
   `qwen3_omni_moe.yaml` 在 2×H100 验证过）。
 - deploy 顶层字段：`base_config`（overlay 父配置，`stages:`/`platforms:` 按 stage_id
@@ -67,7 +67,8 @@ callable（如 `resolve_qwen3_omni_pipeline`）；HF `model_type` 冲突用
 - `composable_parallel/`：`--strategy-config` 把逐 stage 并行轴栈
   （tp/dp/pp/ep/stage_replica 已接线；sp/cfg/vae_pp/hsdp 等保留位）以声明式 overlay
   叠加到合并后的 stage 上、先于 CLI override；显式 deploy 值与 strategy 派生值冲突时
-  fail fast，并在 worker 创建前检查 devices 与 `tp × dp × pp` world size；**不能**与
-  legacy `--stage-configs-path` 组合。
+  fail fast，并在 worker 创建前检查 devices 与 `tp × dp × pp` world size。Public serve
+  已没有 legacy CLI 组合；offline/programmatic resolver 同时收到 `stage_configs_path` 和
+  `deploy_config_path` 时仍必须拒绝。
 
 源码会变化，具体函数与行号在改代码前必须以目标仓库当前版本为准。

@@ -1,29 +1,30 @@
 ---
 title: "vLLM-Omni deploy YAML 实操"
 created: 2026-07-16
-updated: 2026-08-05
+updated: 2026-09-02
 type: guide
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", vllm_omni/deploy/]
+sources: ["claude-workflow-starter-private@296ea45", "PR #5647", vllm_omni/deploy/, vllm_omni/entrypoints/cli/serve.py]
 ---
 
 # Deploy YAML 写作实操
 
 面向"要给模型写/改部署配置"的场景；schema 语义 owner 是
 [Configuration](architecture.md)（本页不复制字段表）。
-`v0.26.0 @ a4ea67a2` 复核。
+`main @ 7a2007cc` 复核。
 
 ## 何时需要 YAML，何时 CLI 就够
 
 - bundled 默认：registry 按 `model_type` 自动加载 `vllm_omni/deploy/<model>.yaml`
-  ——不给 `--deploy-config`/`--stage-configs-path` 时就用它；只调个别 stage 参数时
+  ——public `vllm serve --omni` 不给 `--deploy-config` 时就用它；只调个别 stage 参数时
   优先 CLI/per-stage override，不新写 YAML。
 - 需要新 YAML 的信号：新模型/新 stage 拓扑变体（参照 bagel 的三形态）、平台覆盖
   （`platforms: npu/rocm/xpu`）、connector 拓扑改变、或要固化一组经过验证的资源
   参数（如 voxcpm2 的 KV pin）。
-- legacy 未迁移模型仍走 `--stage-configs-path` + `stage_args` schema
-  （`model_executor/stage_configs/*.yaml`，如 mimo_audio、step_audio_2、
-  hunyuan_video_15、wan2_2 的 dit_fp8 配置）。
+- public `vllm serve --omni` 已删除 `--stage-configs-path`，在线启动和 Helm 统一使用
+  `--deploy-config` / `deployConfigPath`；旧 Helm key 非空时必须 fail fast 并给出替代项。
+  Offline/programmatic API 仍可用 `stage_configs_path` 读取 legacy `stage_args` schema
+  （`model_executor/stage_configs/*.yaml`），不要把 public CLI 删除误写成内部合同已删除。
 
 ## 写作时必查的字段（事故来源）
 
