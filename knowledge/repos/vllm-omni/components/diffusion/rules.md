@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5543", "PR #5720", "PR #5737", "PR #5764", "PR #5801", "PR #5802", "PR #5848", "PR #5872", "PR #5981", "PR #6094", "PR #6102", "PR #6279", "PR #6385", "PR #6445", vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/offloader/, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/offloader/test_distributed_layerwise_backend.py]
+sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5543", "PR #5720", "PR #5737", "PR #5764", "PR #5801", "PR #5802", "PR #5839", "PR #5848", "PR #5872", "PR #5981", "PR #6094", "PR #6102", "PR #6279", "PR #6385", "PR #6445", vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/offloader/, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/quantization/component_config.py, vllm_omni/quantization/factory.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/offloader/test_distributed_layerwise_backend.py]
 confidence: high
 ---
 
@@ -26,7 +26,7 @@ confidence: high
 | host-weight artifact、source identity、layout/dtype、warm restore | `checkpoint-distributed`：`DIFF-2d` | `model_loader/host_weights/{source_identity,contracts,identity_adapter}.py` → policy/restorer |
 | HSDP/FSDP、`fully_shard`、DeviceMesh、packed/scalar parameter、FP8 | `checkpoint-distributed`：`DIFF-2b` | `distributed/hsdp.py::{apply_hsdp_to_model,shard_model}` → loader `_load_model_with_hsdp` → `hsdp_fp8.py` |
 | distributed layerwise offload、AllGather、异构 block、shared buffer | `checkpoint-distributed`：`DIFF-2e` | `offloader/distributed_layerwise_backend.py::{DistributedLayerwiseOffloadHook.initialize_hook,prefetch_layer,DistributedLayerwiseOffloadBackend._allocate_shared_buffers}` |
-| component quantization、text encoder/transformer/VAE 独立配置、owner prefix、meta/offload | `checkpoint-distributed`：`DIFF-2c` | `data.py::_propagate_quantization_from_tf_config` → loader weight sources/post-load → component linear consumer |
+| component quantization、text encoder/transformer/VAE 独立配置、owner prefix、meta/offload | `checkpoint-distributed`：`DIFF-2c` | `quantization/factory.py::{build_quant_config,resolve_quant_config_from_disk}` → `component_config.py::ComponentQuantizationConfig.resolve` → `data.py::_propagate_quantization_from_tf_config` → component linear consumer |
 | modular/multi-DiT、`_dit_modules`、Cache-DiT/compile/SP/LoRA/offload lifecycle | `checkpoint-distributed`：`DIFF-2f` | pipeline runtime component list → registry/runner/cache/LoRA/module discovery consumers |
 | LPIPS/PSNR/相似度阈值、CPU offload、量化质量证据 | `quality-evidence`：`DIFF-3a` | changed exact case → runner `execute_model` → model pipeline；A/B 同路径 |
 | paged KV/cache、backend/platform、GQA/layout、预算与 admission | `system-runtime`：`DIFF-4a`–`4f` | engine init → `diffusion_kv/{initialization,paged_attention_adapter}.py` → platform hook → scheduler |
@@ -112,6 +112,12 @@ confidence: high
 - 验收：测试覆盖已消费 key、未知 key、当前版本不支持的 scale 以及两条 resolution
   path 的输出名；fused mixed-FP8 还须覆盖 weight/scale/shard、gate/up 顺序、nested serialized
   FP8 和 combined projection，缺 shard 不得默认 0。 ^[PR #5087] ^[PR #5737] ^[PR #5848]
+- 强制：读取 transformer-local `config.json` 时，disk method 与 active method 归一化后不一致
+  必须失败；disk 声明 serialized、`data_type=mx_fp` 或不同 `ignored_layers` 时应按该 component
+  重建 config，不能用 online/default 配置解释 serialized 权重。目标 pin 的
+  `resolve_quant_config_from_disk` 只有 Wan2.2 一个 live caller，且无 helper 直测；在补齐多模型
+  caller 与 mismatch/serialized/ignored-layers 测试前，这只是局部 loading guard，不是全局自动
+  checkpoint reconciliation 支持。^[PR #5839]
 
 ### DIFF-2b — HSDP/FSDP 修复必须执行真实 fully_shard
 
@@ -129,6 +135,9 @@ confidence: high
   保留 `text_encoder` 等完整 component owner prefix 到持权 layer，要么 pipeline 先 resolve
   单一 component，再让内部 layer 使用 component-relative prefix。只量化明确支持的 linear，
   embedding、LM head、patch/final projection 等排除项必须显式保持未量化。
+- 强制：`ComponentQuantizationConfig.resolve()` 只对 `get_quant_method` 收到的 runtime prefix 做
+  longest-prefix match，未命中才落到 default；它不会自动感知 checkpoint `WeightsMapper`。
+  因此 mapper、pipeline 与 layer 必须显式维持同一 namespace，并测试重叠 prefix 的最长匹配。
 - 禁止：半途裁掉 owner prefix；resolve component 后又要求 ignored layer 带 owner；用一个
   组件配置隐式覆盖其他组件；因为同属一个模型就量化全部 linear。
 - 验收：至少覆盖“只量化一个组件、其他组件保持 BF16”的真实构造与加载，逐层断言
@@ -161,6 +170,13 @@ confidence: high
   的最大 block 分配，但每个 hook 调 collective 前必须按 dtype 截成自己的
   `_ag_output_sizes[dtype] == dp_size * local_shard.numel()` 前缀；block-flat-relative repoint
   offset 只能在这段实际 block buffer 内解释。
+- 强制：AllGather 权重组复用既有 topology：DP>1 优先 DP group；DP=1 且 SP>1 才用 SP group。
+  TP 不作为 DLO AllGather group；进入 mmap path 时 TP>1 必须因绕过 TP-aware weight-loader
+  callback 而拒绝。no-AllGather 只关闭 DLO 新增的权重 collective，不关闭 standard loader
+  已建立的 TP/HSDP/SP 语义，也不提供跨 rank host-weight 节省。DP=SP=1 不能从“无 process
+  group”推断为可用的 rank-local AllGather 模式：目标 pin 的 loader 在 DLO+AllGather、支持 mmap
+  时会跳过 `load_weights()`，但 backend 只有 `dp_size>1` 才执行 mmap load，两个 gate 不一致；
+  修复并回归前单 rank 应使用 no-AllGather 或普通 layerwise offload。
 - 强制：非 DiT component 的 staging 必须由 `OffloadPlan` 显式声明：encoder block group
   rank-local streaming 不借用 DiT AllGather group，on-demand component 由 pipeline 在真实
   encode/decode stage 成对 load/offload，resident layer 只对声明的 DiT path 生效。no-AllGather
@@ -175,7 +191,9 @@ confidence: high
   当前回归用 mocked collective 检查 8/32-element、dp=2 合同；没有真实 multi-rank collective
   覆盖，PR 的 8×NPU H3 E2E 说明也缺少已填写的 commit 证据，不能升级为验证结论。 ^[PR #5802]
   DP concurrent wave 只可在 DLO+AllGather 开启，并从 `sampling_params.extra_args` 比较 canonical
-  signature；no-AllGather 的 TP-local request 不得误走 fused batch。^[PR #5764]
+  signature；no-AllGather 的 TP-local request 不得误走 fused batch。文档 compatibility matrix 中
+  “accepted” 只代表配置/源码 guard：TP+no-AllGather、HSDP+SP+no-AllGather、DP+SP 等尚无完整
+  model×hardware E2E 数值覆盖，不得升级为 production support。^[PR #5764] ^[PR #5839]
 
 ### DIFF-2f — 多 DiT pipeline 的 component list 是所有共享 lifecycle 的唯一集合
 
