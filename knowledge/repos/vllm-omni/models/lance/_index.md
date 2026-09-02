@@ -1,7 +1,7 @@
 ---
 title: "Lance（BAGEL 谱系统一模型,单 DIFFUSION stage 全模态）"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-02
 type: index
 tags: [vllm-omni, models, diffusion]
 sources: [vllm_omni/diffusion/models/lance/, vllm_omni/model_executor/models/lance/pipeline.py, vllm_omni/deploy/lance.yaml]
@@ -39,6 +39,8 @@ sources: [vllm_omni/diffusion/models/lance/, vllm_omni/model_executor/models/lan
 - 依赖共享模块：bagel 家族的 `Bagel.generate_image` 去噪
   （`scheduler=None`,timestep-shift flow）、
   [Diffusion 组件](../../components/diffusion/_index.md)。
+- Lance 的 `(3,S)` mRoPE position ID 也经过 Bagel 的 CFG 分支合并；修改该路径时
+  必须满足 [BAGEL-1](../bagel/rules.md)，不能把三条模态轴拼成 `(3N,S)`。
 
 ## 目录内容
 

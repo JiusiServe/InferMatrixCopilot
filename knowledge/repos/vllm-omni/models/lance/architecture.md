@@ -1,7 +1,7 @@
 ---
 title: "Lance 架构"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-02
 type: architecture
 tags: [vllm-omni, models, diffusion]
 sources: [vllm_omni/diffusion/models/lance/pipeline_lance.py, vllm_omni/diffusion/models/lance/lance_transformer.py, vllm_omni/diffusion/models/lance/wan_vae.py, vllm_omni/diffusion/models/lance/prompts.py]
@@ -52,7 +52,9 @@ sources: [vllm_omni/diffusion/models/lance/pipeline_lance.py, vllm_omni/diffusio
    Lance 对齐;`_extract_user_instruction` 从渲染后模板抽回原始用户文本。
 3. **CFG 是 BAGEL 式双 KV 上下文**（`cfg_text_context` 维护负向/无条件
    prompt 的第二套 past-KV,一起交给 `generate_image`）——**不是**
-  CFGParallelMixin,无 rank 切分。
+  CFGParallelMixin,无 rank 切分。各分支 mRoPE position ID 是 `(3,S)`；共享
+  Bagel forward 合并分支时沿 dim 1 扩展序列，保留三条模态轴，详见
+  [BAGEL-1](../bagel/rules.md)。
 4. 视频路:3D latent + `LanceWanVAE.decode_video`。
 - **bring-up 状态（pin 上如实记录,docstring 与代码有陈旧差）**：docstring
   称 t2i 端到端验证（B300,~6 s@1024²）、x2t 立即 EOS（缺 mRoPE 端到端位置
@@ -67,6 +69,10 @@ pin 上仅识别到一个 lance 测试路径
 （`tests/e2e/online_serving/test_lance.py`,其路由覆盖面未从来源确认）;
 示例 `examples/{offline_inference,online_serving}/lance/`（含 gradio）。
 本次调查未发现精度基线或性能 gate——相关结论需另行实测。
+
+`c9f2e5ad` 修复的 CFG/mRoPE 拼接仅以 shape tracing、ruff 和一次 reviewer approval
+验收；作者没有 CUDA GPU，未跑 Lance 端到端。后续修改需同时覆盖 1-D/2-D position
+ID 与 rotary 下游 shape，并把 Lance GPU E2E 视为仍待补的验证边界。
 
 - 已知未决：`get_lance_pre_process_func` 未注册是否有意;
   `Qwen2MoTConfig/ForCausalLM` 是 lance_transformer 定义还是从 bagel 转

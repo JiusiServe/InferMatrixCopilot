@@ -1,10 +1,10 @@
 ---
 title: "BAGEL 架构"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-02
 type: architecture
 tags: [vllm-omni, models, diffusion]
-sources: [vllm_omni/model_executor/models/bagel/bagel.py, vllm_omni/diffusion/models/bagel/pipeline_bagel.py, vllm_omni/model_executor/stage_input_processors/bagel.py]
+sources: [vllm_omni/model_executor/models/bagel/bagel.py, vllm_omni/diffusion/models/bagel/bagel_transformer.py, vllm_omni/diffusion/models/bagel/pipeline_bagel.py, vllm_omni/model_executor/stage_input_processors/bagel.py]
 ---
 
 # BAGEL 架构
@@ -65,6 +65,9 @@ sources: [vllm_omni/model_executor/models/bagel/bagel.py, vllm_omni/diffusion/mo
 4. DiT stage 用 `NaiveCache.from_object` 重建主 KV,`collect_cfg_kv_caches`
    收伴随 KV;`Bagel.generate_image` 去噪;可选轨迹记录
    （`return_trajectory_latents`,RL 用）→ PIL Image。
+- 顺序 CFG 把各分支 query/cache 合并为一次 LLM forward 时，position ID 的拼接
+  轴取决于表示秩：BAGEL 标量 RoPE 的 `(S,)` 沿 dim 0 拼；Lance mRoPE 的
+  `(3,S)` 沿 dim 1 拼。可执行验收见 [BAGEL 规则 BAGEL-1](rules.md)。
 - RNG 陷阱：`_regen_init_noise_on_device` 按请求在 CUDA 上重播 init noise
   （对齐 Lance 噪声流）;`forward` 单 prompt（多了只取第一个并告警）;分辨率超
   `max_latent_size × latent_downsample` 直接 raise。
