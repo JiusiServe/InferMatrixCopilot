@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, docs]
-sources: ["PR #6029", .claude/skills/readme.md, .claude/skills/add-diffusion-model/SKILL.md, .claude/skills/add-tts-model/SKILL.md, .claude/skills/diffusion-perf-opt/SKILL.md, .claude/skills/precheck-pr/SKILL.md, .claude/skills/quantization/SKILL.md, .claude/skills/review-pr/SKILL.md, .claude/skills/vllm-omni-npu-upgrade/SKILL.md, .claude/skills/vllm-omni-test/SKILL.md, docs/contributing/README.md]
+sources: ["PR #6029", "PR #6046", .claude/skills/readme.md, .claude/skills/add-diffusion-model/SKILL.md, .claude/skills/add-tts-model/SKILL.md, .claude/skills/diffusion-perf-opt/SKILL.md, .claude/skills/precheck-pr/SKILL.md, .claude/skills/precheck-pr/references/checklists.md, .claude/skills/precheck-pr/references/examples-policy.md, .claude/skills/quantization/SKILL.md, .claude/skills/review-pr/SKILL.md, .claude/skills/vllm-omni-npu-upgrade/SKILL.md, .claude/skills/vllm-omni-test/SKILL.md, docs/contributing/README.md]
 confidence: high
 ---
 
@@ -19,7 +19,7 @@ confidence: high
 - 触发：增删/重命名 `.claude/skills/*`、修改 frontmatter `name`，或更新 contributor task-to-skill
   table 与 `.claude/skills/readme.md`。
 - 强制：以目标 revision 的目录与每份 `SKILL.md` frontmatter 为准，分别校验链接路径和 invocation
-  name。`main @ c4a14091` 恰有 8 个目录且都有 `SKILL.md`：`add-diffusion-model`、
+  name。`main @ a15b5b4b` 恰有 8 个目录且都有 `SKILL.md`：`add-diffusion-model`、
   `add-tts-model`、`diffusion-perf-opt`、`precheck-pr`、`quantization`、`review-pr`、
   `vllm-omni-npu-upgrade`、`vllm-omni-test`。NPU 的目录/链接名是
   `vllm-omni-npu-upgrade`，frontmatter 与展示的调用名是
@@ -51,3 +51,19 @@ confidence: high
 - 验收：交付记录 task authority、选用的 skill 与理由、实际命令/结果、未运行项、diff review 和
   reviewer owner；若要声称跨 agent 可发现/执行，必须增加至少一个受支持 agent 的 pinned-version
   behavioral eval。PR #6029 没有此类 agent eval，因此只建立 contributor guidance。^[PR #6029]
+
+## DOCSKILL-1c — Python example policy 只审新增路径并共享一份分类合同
+
+- 触发：`precheck-pr` 或 `review-pr` 遇到在 `examples/` 下新增、复制或重命名的 Python
+  destination path。
+- 强制：从目标 revision 的 merge base 以 `ACR` path census 选出候选，再读取文件行为而不只看
+  文件名；model、checkpoint、vendor 或 family 专属的 prompt、request/output adaptation 与 launch
+  config 必须回 production model module 或 `model_extras`，用户命令和验证证据进 task docs/recipe。
+  两个 skill 必须引用同一份 canonical policy；shared image runner 的生产边界继续服从
+  [EXEC-6a](../components/model-executor/rules.md#exec-6a-shared-image-example-先建-canonical-envelopemodel-extra-只做特化变换)。
+- 禁止：报告仅修改或删除的既有 model-specific example 债务；因文件名看似 generic 就接受内部只
+  实现一个模型合同的脚本；复制 policy 到 reviewer workflow 后分别演化；把 skill blocker 描述为
+  已有 CI gate。
+- 验收：分别覆盖 add、copy、rename、modify、delete，且 generic-looking model-specific 脚本必须
+  block；真正 model-neutral、由配置选择模型的 task/protocol entrypoint 可通过。检查两个 skill 的
+  reference 都解析到 canonical policy，并把结果作为独立 examples-policy 维度报告。^[PR #6046]
