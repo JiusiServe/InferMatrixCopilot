@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/engine/stage_init_utils.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py, docs/design/feature/omni_async_output_materialization.md, vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/experimental/fullduplex/, tests/e2e/features/fullduplex/, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/engine/test_arg_utils.py, "PR #3422", "PR #3642", "PR #4730", "PR #4958", "PR #5073", "PR #5074", "PR #5310", "PR #5610", "PR #5777", "PR #5792", "PR #5824", "claude-workflow-starter-private@09dca46"]
+sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/musa/platform.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/engine/stage_init_utils.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py, docs/design/feature/omni_async_output_materialization.md, vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/experimental/fullduplex/, tests/e2e/features/fullduplex/, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/engine/test_arg_utils.py, "PR #3422", "PR #3642", "PR #4730", "PR #4958", "PR #5073", "PR #5074", "PR #5310", "PR #5610", "PR #5671", "PR #5777", "PR #5792", "PR #5824", "claude-workflow-starter-private@09dca46"]
 ---
 
 # Model Executor 规则
@@ -24,6 +24,7 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 | loader dtype、只取 checkpoint config、避免整仓权重下载 | `loader-contract`：`EXEC-2a` | `vllm_omni/model_executor/model_loader/weight_utils.py::download_weights_from_hf_specific` → `vllm_omni/model_executor/models/<命中模型>` loader |
 | fused projection、HF source shard 完整性、consumer 委托、packed TP | `loader-contract`：`EXEC-2b` | H3 text encoder fused owner；其他模型先确认目标 main 是否已有 fused parameter |
 | async Omni output、background builder、D2H snapshot、connector drain/fallback | `async-output`：`EXEC-5a` | `worker/gpu_ar_model_runner.py::{_should_use_async_omni_output,OmniAsyncGPUModelRunnerOutput}` → platform runner → connector output |
+| Talker-MTP FULL graph、平台 capture 能力、显式 opt-out | `mtp-graph`：`EXEC-4c` | `platforms/interface.py::supports_talker_mtp_graph_capture` → platform override → model `talker_mtp_graph_safe` → `OmniGPUModelRunner._init_talker_mtp` |
 
 | 审查组 | 什么时候触发 | 规则 ID |
 |---|---|---|
@@ -32,6 +33,7 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 | `bridge-batch` | runtime info、跨 stage payload、batch、request RNG | `EXEC-1a`, `EXEC-1b`, `EXEC-1c`, `EXEC-1d` |
 | `loader-contract` | dtype、checkpoint config 获取、loader、fused shard 拼装 | `EXEC-2a`, `EXEC-2b` |
 | `async-output` | AR async output、snapshot/live state、平台与 guard/fallback | `EXEC-5a` |
+| `mtp-graph` | Talker-MTP FULL graph、平台能力与 tri-state fallback | `EXEC-4c` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `EXEC-0a`, `EXEC-0b` |
 
 ## 严格配置校验
@@ -80,6 +82,21 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
   generic runner policy 替换 MiniCPM/Audex 等模型自己的 native policy。
 - 验收：覆盖 blank override、多子目录 checkpoint、hook 调用顺序和 mixed-batch
   request-local metadata；初始化失败必须在 scheduler/worker 继续运行前暴露。
+
+### EXEC-4c — Talker-MTP graph 能力必须保留 tri-state 语义
+
+- 触发：修改 Talker-MTP 的 FULL graph wrapper、模型 `talker_mtp_graph_safe`、平台 graph
+  capability，或把 talker 与其他 stage 共用同一层 wrapper。
+- 强制：只有实际 Talker stage 从平台声明模型能力；runner 读取能力时保留三态：未声明
+  `None` 回退到既有 `has_separate_talker`，显式 `True` 允许 wrapper，显式 `False` 即使存在
+  separate talker 也必须阻止 wrapper。上述判断只控制 dedicated Talker-MTP FULL graph
+  wrapper，不能跳过 MTP buffer 初始化或关闭该 stage 其余 compile/capture 路径。
+- 禁止：用 `has_separate_talker or talker_mtp_graph_safe` 吃掉显式 `False`；把 platform
+  默认支持误写成所有模型未声明时一律开启；因一个算子 capture 失败而全局切 eager。
+- 验收：CPU runner 测试至少覆盖 explicit false、未声明且 separate talker、explicit true，
+  以及无 separate talker 的非 Talker stage。MUSA 当前 override 为 false，因为其 stream
+  capture 到 `torch.multinomial` 会报 `operation not permitted when stream is capturing`；
+  其他平台沿接口默认 true，但仍受模型声明与 FULL graph mode 共同约束。^[PR #5671]
 
 ## Runner 到模型的预处理合同
 

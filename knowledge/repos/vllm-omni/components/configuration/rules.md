@@ -1,10 +1,10 @@
 ---
 title: "vLLM-Omni 配置开发门禁"
 created: 2026-07-16
-updated: 2026-08-05
+updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py]
+sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py]
 ---
 
 # vLLM-Omni 配置开发门禁
@@ -108,8 +108,12 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
   或 `engine_extras` 各层说法不一致。
 - 强制：以 `resolve_deploy_yaml → load_deploy_config → merge_pipeline_deploy →
   build_stage_runtime_overrides` 展开后的最终逐 stage 配置为唯一事实，逐字段打印核对。
+  overlay 中的显式 `null` 也是有语义的值：例如 MUSA Qwen3-Omni profile 在 Talker 与
+  Code2Wav 用 `hf_overrides.quantization_config: null` 清除 checkpoint root 的 ModelOpt
+  metadata，避免 BF16 audio stage 被自动识别为量化；Thinker 与非 MUSA base 保持不变。
 - 禁止：拿某一层 YAML 原文当生效值；用默认值脑补缺失字段。
-- 验收：争议字段在最终逐 stage 对象中可读回，并与第一位 consumer 一致。
+- 验收：争议字段在最终逐 stage 对象中可读回，并与第一位 consumer 一致；平台 overlay
+  必须同时断言受影响 stage 和未覆盖 control，不能只验证 YAML 原文。^[PR #5671]
 
 ### CONF-4a — composable strategy 只暴露已经接通的 axis
 

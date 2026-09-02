@@ -1,15 +1,15 @@
 ---
 title: "Qwen-Omni 家族拓扑与性能结论"
 created: 2026-07-16
-updated: 2026-07-16
+updated: 2026-09-02
 type: architecture
 tags: [vllm-omni, models, qwen-omni]
-sources: ["PR #5073", docs/design/qwen3_omni_tts_performance_optimization.md, docs/design/module/engine_orchestration.md, docs/design/module/stage_runtime.md, docs/design/module/archive/async_omni_architecture.md, vllm_omni/config/model.py, vllm_omni/model_executor/models/qwen2_5_omni/pipeline.py, vllm_omni/model_executor/models/registry.py, vllm_omni/worker/gpu_ar_model_runner.py]
+sources: ["PR #5073", "PR #5671", docs/design/qwen3_omni_tts_performance_optimization.md, docs/design/module/engine_orchestration.md, docs/design/module/stage_runtime.md, docs/design/module/archive/async_omni_architecture.md, vllm_omni/config/model.py, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen2_5_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/model_executor/models/registry.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/musa/platform.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/worker/gpu_model_runner.py]
 ---
 
 # Qwen-Omni 家族拓扑与性能结论
 
-以下事实在 `main @ 593b4045` 复核。
+以下事实在 `main @ e04210d6` 复核。
 
 ## Stage 拓扑
 
@@ -45,6 +45,26 @@ sources: ["PR #5073", docs/design/qwen3_omni_tts_performance_optimization.md, do
   accuracy 分别下降 1.17 与 3.5 percentage points；这些是 case-bound 取舍，不是质量或加速保证。
   更早的表来自旧 commit backport/旧依赖，不能当最终 head 证据。最终 diff 也缺 Qwen2.5
   ingress≠internal 的直接 unit test。^[PR #5073]
+
+## Qwen3-Omni 在 MUSA 上的 ModelOpt FP8 边界
+
+- MUSA deploy profile 只在 stage 1 Talker 与 stage 2 Code2Wav 合并
+  `hf_overrides.quantization_config: null`，显式清除 checkpoint root 的 ModelOpt metadata；
+  stage 0 Thinker 保留 ModelOpt FP8，非 MUSA base profile 不变。该语义位于 deploy overlay，
+  没有扩张通用 arg/config resolver；合并门禁见 [CONF-3a](../../components/configuration/rules.md#conf-3a-争议以展开后的最终配置为准)。
+- Qwen3 wrapper 只在 `model_stage == "talker"` 时从当前平台写入
+  `talker_mtp_graph_safe`。共享 runner 保留 tri-state：未声明时仅沿用 separate-talker legacy
+  行为，false 阻止 dedicated Talker-MTP FULL graph wrapper，true 才允许；buffer 初始化及其他
+  compile/capture 路径不受影响。MUSA false 的具体原因是 `torch.multinomial` 在 stream capture
+  中报不允许该操作，而非整个 Qwen stage 必须 eager；共享门禁见
+  [EXEC-4c](../../components/model-executor/rules.md#exec-4c-talker-mtp-graph-能力必须保留-tri-state-语义)。
+- PR 最终 diff 没有 code-predictor `forward_musa` override：review 确认当前 `CustomOp`
+  MUSA dispatch 已委托 `forward_cuda`，cached RoPE `_lookup` 可复用。旧 v0.24.1 集成里的
+  on-the-fly native matmul workaround 不属于当前实现，不能按 PR 初版描述复活。
+- 外部证据仅是一套 2×MTT S5000、MUSA 5.2 compatibility image 上的单次 text+audio smoke：
+  HTTP 200、有限音频值且日志无 stage/engine failure。环境含外部兼容改动，image digest 仅记录
+  截断值，也没有 BF16 baseline、质量或性能对比，因此只能支持可运行性，不能泛化为精度/吞吐
+  结论。^[PR #5671]
 
 ## 官方性能优化结论（docs/design/qwen3_omni_tts_performance_optimization.md）
 

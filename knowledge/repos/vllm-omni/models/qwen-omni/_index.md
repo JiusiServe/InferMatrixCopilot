@@ -1,17 +1,17 @@
 ---
 title: "Qwen-Omni 家族（Qwen2.5-Omni / Qwen3-Omni / Qwen3-TTS）"
 created: 2026-07-16
-updated: 2026-07-16
+updated: 2026-09-02
 type: index
 tags: [vllm-omni, models, qwen-omni]
-sources: ["PR #5073", vllm_omni/model_executor/models/registry.py, vllm_omni/model_executor/models/qwen2_5_omni/pipeline.py, vllm_omni/config/pipeline_registry.py, docs/design/qwen3_omni_tts_performance_optimization.md]
+sources: ["PR #5073", "PR #5671", vllm_omni/model_executor/models/registry.py, vllm_omni/model_executor/models/qwen2_5_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/config/pipeline_registry.py, vllm_omni/deploy/qwen3_omni_moe.yaml, docs/design/qwen3_omni_tts_performance_optimization.md]
 ---
 
 # Qwen-Omni 家族（Qwen2.5-Omni / Qwen3-Omni / Qwen3-TTS）
 
 - 常见别名：`qwen2_5_omni`、`qwen3_omni_moe`、`qwen3_tts`（家族目录：同一 thinker/
   talker/code2wav 谱系的多个 checkpoint/代际，按别名规则共用本目录）
-- 源码模型族（`main @ 593b4045` 验证）：`model_executor/models/qwen2_5_omni/`、
+- 源码模型族（`main @ e04210d6` 验证）：`model_executor/models/qwen2_5_omni/`、
   `qwen3_omni/`、`qwen3_tts/`；pipeline registry key `qwen2_5_omni`、
   `qwen2_5_omni_thinker_only`、`qwen3_omni_moe`（resolver
   `resolve_qwen3_omni_pipeline`，位于 `models/qwen3_omni/pipeline.py`，由
@@ -21,6 +21,9 @@ sources: ["PR #5073", vllm_omni/model_executor/models/registry.py, vllm_omni/mod
   （+ `_forced_aligner`、`_high_concurrency` 变体）
 - Qwen2.5 thinker-only 的 ModelOpt NVFP4 W4A4 checkpoint 支持、stage sub-config、Talker
   ingress/internal width 与硬件/accuracy 证据边界归下方 architecture 入口。
+- Qwen3-Omni 的 MUSA ModelOpt FP8 边界是 Thinker 保留量化、Talker/Code2Wav 通过 deploy
+  overlay 显式清除 root quantization metadata，并仅关闭不安全的 Talker-MTP FULL graph
+  wrapper；精确三态与验证边界归下方 architecture 入口。
 - 官方历史文档：`docs/design/module/archive/async_omni_architecture.md`（以 Qwen3-Omni 为
   worked example 的分层运行时快照，非 active spec）、
   `docs/design/qwen3_omni_tts_performance_optimization.md`（性能优化实录）
