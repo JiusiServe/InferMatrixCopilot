@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #3576", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5085", "PR #5157", "PR #5670", "PR #5682", "PR #5713", "PR #5732", "PR #5746", "PR #5752", "PR #6138", "PR #6202", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/entrypoints/openai/tts_adapters/, vllm_omni/engine/orchestrator.py, vllm_omni/engine/cfg_companion_tracker.py, vllm_omni/metrics/prometheus.py, tests/entrypoints/openai_api/test_audex_serving_guards.py, tests/entrypoints/openai_api/test_omni_sleep_wakeup.py, tests/entrypoints/openai_api/test_tts_detection.py, tests/entrypoints/openai_api/test_video_api_utils.py, tests/entrypoints/openai_api/test_video_server.py, tests/tools/test_check_tts_adapter.py, tools/pre_commit/check_tts_adapter.py]
+sources: ["Issue #5369", "PR #3576", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5085", "PR #5157", "PR #5374", "PR #5670", "PR #5682", "PR #5713", "PR #5732", "PR #5746", "PR #5752", "PR #6138", "PR #6202", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_chat.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/entrypoints/openai/tts_adapters/, vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/cfg_companion_tracker.py, vllm_omni/metrics/prometheus.py, tests/entrypoints/test_async_omni.py, tests/entrypoints/openai_api/test_audex_serving_guards.py, tests/entrypoints/openai_api/test_omni_sleep_wakeup.py, tests/entrypoints/openai_api/test_tts_detection.py, tests/entrypoints/openai_api/test_video_api_utils.py, tests/entrypoints/openai_api/test_video_server.py, tests/tools/test_check_tts_adapter.py, tools/pre_commit/check_tts_adapter.py]
 confidence: high
 ---
 
@@ -26,6 +26,7 @@ confidence: high
 | sleep/wake、partial stage/tag、idempotency、ACK、generation admission | `engine-lifecycle`：`SERV-5a`, `SERV-5b` | `entrypoints/async_omni.py::{AsyncOmni.sleep,AsyncOmni.wake_up,AsyncOmni.generate}` → `worker/base.py::{handle_sleep_task,handle_wake_task}` / `diffusion/worker/diffusion_worker.py` |
 | serving class/factory 重构、optional adapter、diffusion/no-TTS 实例、warmup | `engine-lifecycle`：`SERV-5c` | `entrypoints/openai/serving_speech.py` 的所有 factory/`__new__` 路径 → `warmup`、voice upload/list、speech request caller |
 | TTS model detection、`stage_keys`/`model_archs`、adapter priority/topology、legacy migration | `engine-lifecycle`：`SERV-5e` | `tts_adapters/__init__.py::{iter_tts_detectors,detect_tts_model_type,all_tts_stage_keys,tts_entry_stage_archs}` → `serving_speech.py::_find_tts_stage` |
+| request-level LoRA、AR-only/multistage、streaming input update、stage cardinality | `request-contract`：`SERV-4l` | `serving_chat.py` LoRA resolve → `AsyncOmni.generate` → `AsyncOmniEngine._build_add_request_message` → stage-0 input processor |
 | SSE/streaming speech、audio format、PCM/WAV、speed、首 chunk 前校验 | `streaming-format`：`SERV-1a`, `SERV-1b` | `vllm_omni/entrypoints/openai/protocol/audio.py::{OpenAICreateSpeechRequest.validate_streaming_constraints,StreamingSpeechSessionConfig.validate_streaming_constraints}` → `serving_speech.py::{OmniOpenAIServingSpeech._validate_speech_streaming_request,OmniOpenAIServingSpeech.create_speech}` |
 | video reference 解码、mixed media、frame conversion/mux、bounded memory | `media-ingress`：`SERV-1c`–`1e` | `entrypoints/openai/video_api_utils.py` decode/coerce/encode helpers → video server callers |
 | `ref_audio`、x-vector/ICL、content identity、artifact cache/readiness | `artifact-readiness`：`SERV-3a`–`3c` | `serving_speech.py` reference resolve/decode/cache → adapter speaker cache → prefix salt |
@@ -42,7 +43,7 @@ confidence: high
 | `endpoint-capability` | endpoint restriction、route/app-state guard、公开 400 | `SERV-4c`, `SERV-4d`, `SERV-5d` |
 | `engine-lifecycle` | sleep/wake、partial stage/tag、ACK、generation admission、factory 状态矩阵、TTS adapter detection | `SERV-5a`, `SERV-5b`, `SERV-5c`, `SERV-5e` |
 | `full-duplex` | duplex opt-in、stage prewarm/fence、async-chunk、CFG companion lifecycle | `SERV-6a`–`SERV-6c` |
-| `request-contract` | 请求字段、来源、冲突、dispatcher、consumer view | `SERV-4a`, `SERV-4b`, `SERV-4c`, `SERV-4d`, `SERV-4e`, `SERV-4f`, `SERV-4g`, `SERV-4h` |
+| `request-contract` | 请求字段、来源、冲突、dispatcher、consumer view | `SERV-4a`, `SERV-4b`, `SERV-4c`, `SERV-4d`, `SERV-4e`, `SERV-4f`, `SERV-4g`, `SERV-4h`, `SERV-4l` |
 | `batch-chat-contract` | frontend fan-out、identity、choice cardinality、error/cancellation | `SERV-4i`, `SERV-4j`, `SERV-4k` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `SERV-0a`, `SERV-0b` |
 
@@ -232,6 +233,26 @@ confidence: high
   重新确认唯一最终产物、删除清单和规模上限。
 - 禁止：继续堆 helper、compatibility branch 或 reviewer-specific patch。
 - 验收：恢复编码前 owner、consumer、删除项和 diff 预算都有可检查记录。
+
+### SERV-4l — request-level LoRA 必须贯穿每种 stage-0 submission 形态
+
+- 触发：修改 chat adapter 解析、`AsyncOmni.generate`、ordinary/streaming request submission、
+  stage-0 input processing 或 LoRA request 类型。
+- 强制：OpenAI chat `_maybe_get_adapters()` 得到的同一个 request-level `LoRARequest` 必须传入
+  `AsyncOmni.generate`，再贯穿普通 `add_request_async`、streaming 首 chunk、每个
+  `add_streaming_update_async` 与无 chunk/final marker，最终由
+  `AsyncOmniEngine._build_add_request_message` 传给**非 diffusion stage 0** 的 vLLM input
+  processor。`None` 同样原样传播，不能复用上一请求 adapter。
+- 禁止：只修非流式提交；把单个 request-level LoRA 广播成每 stage adapter；绕过既有
+  `resolve_sampling_params_list` 的 stage cardinality 校验；以 adapter 已加载证明 request 已选择
+  它。该参数在 target 的 engine APIs 仍标作 `Any`，不是类型安全合同；评审明确要求收窄类型，
+  后续应统一为 `LoRARequest | None` 而非继续扩散 `Any`。
+- 验收：用 identity sentinel 分别覆盖普通 prompt、streaming 有 chunk、streaming 空输入/final
+  marker 与 `None`；单 stage sampling 参数包成长度 1，多 stage 参数长度必须等于 stage 数。
+  断言 stage-0 input processor 收到同一对象，并另外验证 downstream stage 的 LoRA 仍由对应
+  `sampling_params_list[i].lora_request` 拥有，默认参数对象不被污染。GPU 验收必须先确认 adapter
+  ID 已加载，再证明 deterministic token/logprob 与 base 不同；#5369 另报的 `AsyncOmni.add_lora`
+  control-RPC 反序列化成 list 问题不在本修复范围。^[PR #5374]
 
 ## Engine 生命周期合同
 
