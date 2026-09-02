@@ -1,10 +1,10 @@
 ---
 title: "Serving 共享架构"
 created: 2026-07-10
-updated: 2026-07-23
+updated: 2026-09-02
 type: architecture
 tags: [vllm-omni, components, serving]
-sources: [vllm_omni/entrypoints/, vllm_omni/engine/orchestrator.py]
+sources: ["PR #5085", vllm_omni/entrypoints/, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/engine/orchestrator.py, tests/entrypoints/openai_api/test_video_server.py]
 ---
 
 # Serving 共享架构
@@ -24,6 +24,12 @@ Serving 层把用户输入转换成内部请求，选择 online/offline 执行�
   `membership_controller.py`。
 
 Serving 只公开有明确请求语义和下游 consumer 的字段。Sampling dataclass、engine state 或 pipeline state 可以包含 tensor、KV 状态和运行时中间量，但这些内部字段不会因此自动成为请求字段。
+
+Video reference 字节在 `video_api_utils.py` 通过 vLLM `VIDEO_LOADER_REGISTRY` 的
+`omni` backend 解码。该 backend 只定义顺序 first-N/last-N 帧索引，`_decode_video_bytes`
+将 `max_frames` 映射为 `num_frames`，从 loader metadata 恢复 fps，并将数组转为 RGB
+PIL frames。当前 loader 调用固定 `backend="pyav"`；注册表复用不等于用户已能
+选择 opencv/torchcodec 等 decoder。
 
 ## 主要源码和调用入口
 

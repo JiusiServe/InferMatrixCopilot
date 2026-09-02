@@ -1,10 +1,10 @@
 ---
 title: "Serving 规则"
 created: 2026-07-20
-updated: 2026-08-23
+updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #3576", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5157", "PR #5670", "PR #6138", "PR #6202", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/cfg_companion_tracker.py, vllm_omni/metrics/prometheus.py]
+sources: ["PR #3576", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5085", "PR #5157", "PR #5670", "PR #6138", "PR #6202", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/cfg_companion_tracker.py, vllm_omni/metrics/prometheus.py, tests/entrypoints/openai_api/test_video_server.py]
 confidence: high
 ---
 
@@ -25,6 +25,7 @@ confidence: high
 | sleep/wake、partial stage/tag、idempotency、ACK、generation admission | `engine-lifecycle`：`SERV-5a`, `SERV-5b` | `entrypoints/async_omni.py::{AsyncOmni.sleep,AsyncOmni.wake_up,AsyncOmni.generate}` → `worker/base.py::{handle_sleep_task,handle_wake_task}` / `diffusion/worker/diffusion_worker.py` |
 | serving class/factory 重构、optional adapter、diffusion/no-TTS 实例、warmup | `engine-lifecycle`：`SERV-5c` | `entrypoints/openai/serving_speech.py` 的所有 factory/`__new__` 路径 → `warmup`、voice upload/list、speech request caller |
 | SSE/streaming speech、audio format、PCM/WAV、speed、首 chunk 前校验 | `streaming-format`：`SERV-1a`, `SERV-1b` | `vllm_omni/entrypoints/openai/protocol/audio.py::{OpenAICreateSpeechRequest.validate_streaming_constraints,StreamingSpeechSessionConfig.validate_streaming_constraints}` → `serving_speech.py::{OmniOpenAIServingSpeech._validate_speech_streaming_request,OmniOpenAIServingSpeech.create_speech}` |
+| video reference 解码、frame selection、decoder backend、空帧 | `media-ingress`：`SERV-1c` | `entrypoints/openai/video_api_utils.py::{OmniVideoBackend,_decode_video_bytes}` → video server callers |
 | `ref_audio`、x-vector/ICL、content identity、artifact cache/readiness | `artifact-readiness`：`SERV-3a`–`3c` | `serving_speech.py` reference resolve/decode/cache → adapter speaker cache → prefix salt |
 | Prometheus、waiting/running gauge、replica stats、throttle、collector lifecycle | `metrics-lifecycle`：`SERV-2a`, `SERV-2b` | `vllm_omni/entrypoints/omni_base.py::{OmniBase._log_summary_and_cleanup,OmniBase._process_stage_metrics_message}` → `vllm_omni/metrics/prometheus.py::{OmniPrometheusMetrics.__init__,set_running,set_waiting}` |
 
@@ -32,6 +33,7 @@ confidence: high
 |---|---|---|
 | `core` | 每次 serving 审查 | `SERV-4c` |
 | `streaming-format` | SSE、audio streaming、format/default/capability | `SERV-1a`, `SERV-1b` |
+| `media-ingress` | video reference、decoder registry/backend、first/last frames | `SERV-1c` |
 | `metrics-lifecycle` | metrics、gauge、replica、collector | `SERV-2a`, `SERV-2b` |
 | `artifact-readiness` | artifact/content cache、capability、ready/mark/discard | `SERV-3a`, `SERV-3b`, `SERV-3c` |
 | `chat-multimodal-contract` | chat template kwargs、SDK flatten、text/audio response shape | `SERV-4c` + 命中模型规则 |
@@ -59,6 +61,20 @@ confidence: high
 - 禁止：把 backend 不支持的格式列为合法值，再靠中途 fallback；不同文件各复制列表。
 - 验收：每个公开格式都有 encoder smoke；移除格式只改 canonical owner，协议和校验测试
   同步反映。 ^[PR #4718]
+
+## SERV-1c — media decoder 参数只在真实入口可达时对外声明
+
+- 触发：替换 video/image reference decoder、接入 loader registry、新增 backend/fps/
+  frame-selection 参数或改变坏媒体错误。
+- 强制：只有请求/配置入口能把值传到 loader 时才声明参数可配；否则在最近
+  loader 调用处固定实际值。frame sampling 只消费真正传入的 target metadata；decoder
+  返回零帧必须继续映射为 `InvalidInputReferenceError`，不能因共享 loader 只记 warning
+  就返回空 `VideoFrames`。
+- 禁止：不得留下没有 caller 传入的 backend/fps 形参或死分支；不得因 registry 存在
+  多 backend 就宣称 vLLM-Omni 已支持运行时选择；不得丢失替换前的非空帧 fail-safe。
+- 验收：同一合成视频分别断言 first-N 与 last-N 顺序、数量和 fps；覆盖非法
+  `keep`、非正 `max_frames`、无效字节与 loader 零帧，且真实 Qwen multimodal/video
+  请求仍通过公开入口。 ^[PR #5085]
 
 ## SERV-2a — 指标节流和 gauge 按 scheduler/stage/replica owner 隔离
 
