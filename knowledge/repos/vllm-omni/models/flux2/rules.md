@@ -1,10 +1,10 @@
 ---
 title: "FLUX.2 规则"
 created: 2026-07-20
-updated: 2026-07-31
+updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5136"]
+sources: ["PR #4645", "PR #5136", vllm_omni/diffusion/models/flux2/flux2_transformer.py]
 confidence: high
 ---
 
@@ -19,6 +19,7 @@ confidence: high
 | FLUX.2 pipeline/transformer | FLUX2-1b | `diffusion/registry.py::_DIFFUSION_MODELS["Flux2Pipeline"]` → `diffusion/models/flux2/pipeline_flux2.py::Flux2Pipeline`、`flux2_transformer.py::Flux2Transformer2DModel` |
 | Mistral text encoder、FP8、component namespace | FLUX2-1a | `diffusion/models/mistral_encoder/` → component quantization selector/loader |
 | meta parameter、CPU offload、BF16 baseline | FLUX2-1b | FLUX.2 component loader/materialization 路径 → `Flux2Pipeline` |
+| SP auto-padding、`mask_sp_padding`、dense/varlen | [SPPAD-1a](../../components/diffusion/rules-sp-padding.md#sppad-1a-padding-mask-是显式正确性性能策略不是无损优化) | Flux2 `_sp_plan` → forward context → `hidden_states_mask` → attention |
 
 FLUX.1 和 FLUX.2-Klein 不自动归到本页；必须由描述/registry key 明确命中对应 owner。
 

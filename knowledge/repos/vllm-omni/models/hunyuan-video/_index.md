@@ -1,10 +1,10 @@
 ---
 title: "HunyuanVideo-1.5（T2V/I2V,meanflow 旗标蒸馏）"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-02
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: [vllm_omni/diffusion/models/hunyuan_video/, vllm_omni/deploy/hunyuan_video_15.yaml, vllm_omni/config/pipeline_registry.py]
+sources: ["PR #4645", vllm_omni/diffusion/models/hunyuan_video/, vllm_omni/deploy/hunyuan_video_15.yaml, vllm_omni/config/pipeline_registry.py]
 ---
 
 # HunyuanVideo-1.5
@@ -38,6 +38,9 @@ diffusion 视频,AR registry 无入口;image3 的结构见该页）。
 - 依赖共享模块：[Diffusion 组件](../../components/diffusion/_index.md)
   （CFGParallelMixin、SP `_sp_plan`、分布式/瓦片 VAE、cache-dit adapter）、
   `diffusion/models/t5_encoder.py`（glyph 路的共享 `T5EncoderModel`）。
+- SP 不可整除时仍由 `_sp_plan` auto-pad；默认 `mask_sp_padding=False` 不把尾部零 token 交给
+  attention mask，以避开 varlen path，strict opt-in 与证据边界见
+  [SP padding rules](../../components/diffusion/rules-sp-padding.md)。
 
 ## 目录内容
 
