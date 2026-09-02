@@ -1,10 +1,10 @@
 ---
 title: "HunyuanImage3"
 created: 2026-07-10
-updated: 2026-07-30
+updated: 2026-09-02
 type: index
 tags: [vllm-omni, models, hunyuan-image3]
-sources: []
+sources: ["PR #5541", vllm_omni/diffusion/models/hunyuan_image3/pipeline_hunyuan_image3.py, vllm_omni/diffusion/models/hunyuan_image3/request_layout.py]
 ---
 
 # HunyuanImage3
@@ -25,6 +25,7 @@ sources: []
 | 遇到什么 | 查看哪里 |
 |---|---|
 | 修改公开入口、prompt、AR→DiT、`model_extras`、shared task examples、条件图、size 或 seed | [开发快速入口和 rules](rules.md#direct-开发快速入口) |
+| Scheduler-managed paged KV、prepared layout、CFG logical prefix 或空 hash 边界 | [shared paged KV control plane](../../components/diffusion/paged-kv-control-plane.md) |
 | 理解模型和 vLLM-Omni 代码地图 | [architecture](architecture.md) |
 | HF 接入常见偏差 | [HF alignment pitfalls](hf-alignment-pitfalls.md) |
 | 运行 HF baseline | [HF baseline runbook](hf-baseline-runbook.md) |
