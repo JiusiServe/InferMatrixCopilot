@@ -4,7 +4,7 @@ created: 2026-08-10
 updated: 2026-08-10
 type: rule
 tags: [vllm-omni, docs]
-sources: [.claude/skills/quantization/references/modelopt-fp8.md, docs/.nav.yml, docs/mkdocs/hooks/generate_examples.py, docs/models/supported_models.md, recipes/README.md, tests/docs/test_generate_examples.py, "PR #5969"]
+sources: [.claude/skills/quantization/references/modelopt-fp8.md, docs/.nav.yml, docs/mkdocs/hooks/generate_examples.py, docs/models/supported_models.md, recipes/README.md, tests/docs/test_generate_examples.py, "PR #5969", "PR #5987"]
 ---
 
 # Generated docs and supported-model evidence rules
@@ -12,28 +12,41 @@ sources: [.claude/skills/quantization/references/modelopt-fp8.md, docs/.nav.yml,
 只有 `DOCGEN-数字字母` 是可审计规则 ID。模型实际能力仍回 model/component owner；本页只拥有
 生成文档的 URL/navigation 与 supported-model recipe 证据边界。
 
-## DOCGEN-1a — 页面 URL 与 navigation 分类是两个独立合同
+## DOCGEN-1a — Serving sidebar 只生成共享 task 入口
 
-- 触发：移动 example 分类、修改 `generate_examples.py`、MkDocs Features/Examples navigation，
-  或增删 quantization example source。
-- 强制：generated page URL 始终从 source category/stem 派生；改变导航归属不能改旧 URL。
-  `examples/quantization/<name>` 的页面若存在，仍生成到
-  `user_guide/examples/quantization/<name>.md`，但 nav 只挂在 User Guide → Features →
-  Quantization → Generated Examples，不能同时创建 Examples → Quantization。
-- 禁止：用 nav 目标目录重写生成 URL；覆盖 hand-authored Quantization items；重复 build 累加
-  Generated Examples；目标 Features/Quantization 缺失时退回错误的 Examples 分类。
-- 验收：连续运行两次仍只有一个 hook-owned group，保留 Overview 等手写项；下一次无
-  quantization source 时清掉 stale generated group；目标 section 缺失时不挂载并记录 warning。
-  当前 `examples/quantization/*.py` 已全部删除，因此 target build 不应生成这些页面或链接；规则
-  保护未来重新增加 source 时的旧 URL。^[PR #5969]
+- 触发：增删 serving example、修改 `GENERAL_EXAMPLE_SLUGS`/`is_general_example`、改变
+  `generate_examples.py` 的扫描/生成顺序，或手改 User Guide → Examples navigation。
+- 强制：`offline_inference` 与 `online_serving` 只有固定 shared-task slug 可生成页面并进入 nav：
+  `image_to_image`、`image_to_video`、`speech_to_video`、`text_to_audio`、`text_to_image`、
+  `text_to_speech`、`text_to_video`、`x_to_text`、`x_to_video_audio`。过滤必须在 page write 与 nav
+  update 之前执行；model-specific serving source 继续留在 `examples/`，不能重新与 task 入口混排；
+  若要从文档侧发现它，必须由相应 shared task page 显式链接，不能只依赖 source directory 存在。
+  非 serving category 会全部通过 filter，仍按 category/stem 生成
+  `docs/user_guide/examples/<category>/<stem>.md`。^[PR #5987]
+- 强制：hook 重建 Examples 下的 generated categories，但保留不以
+  `user_guide/examples/` 开头的顶层 string item（当前 `examples/README.md`）；category 和 item 均按
+  稳定顺序输出。checked-in `.nav.yml` 必须与这套 whitelist 同步，新增 shared task 要同时补 source、
+  slug、shared page 内容与测试。
+- 禁止：靠 `model_display_names.yml` 把 model-specific slug 留在 sidebar；它仍只负责被构造的
+  `Example` 标题校验，不覆盖 filter。不得恢复已删除的 quantization 特殊路由：target 已移除
+  `EXAMPLE_NAV_TARGETS`/Features → Quantization → Generated Examples；未来非 serving
+  quantization source 会按通用 category 进入 Examples，除非重新设计明确合同。
+- 验收：逐个 whitelist slug 验证 offline/online 中实际存在者会生成且进入 nav，model-specific
+  serving slug 不生成/不入 nav且能从相应 shared page 到达，非 serving category 保持生成；再验证
+  重复 nav rebuild、preserved string 与 source-derived URL。target test 只用 synthetic
+  `text_to_image`/`qwen3_omni` 检查 predicate 两端，没有执行 page generation、nav serialization、
+  完整 whitelist、shared-page link coverage 或真实树 census。
+  ^[PR #5987]
 
 ### 已知完整性缺口
 
 - target 的 `.claude/skills/quantization/references/modelopt-fp8.md` 仍要求运行已删除的
-  `examples/quantization/check_modelopt_fp8_export.py`。现有
-  `tests/docs/test_generate_examples.py` 用构造的 `SimpleNamespace.path` 验证 nav mutation，
-  不会发现这种 repository 内的悬空引用。完成该清理需要更新 skill reference，并增加覆盖真实
-  仓库路径/链接存在性的检查；在此之前不能把“删除 quantization examples”视为引用完整性已验收。
+  `examples/quantization/check_modelopt_fp8_export.py`。target tests 不做 repository link census，
+  不会发现这种悬空引用；完成清理需更新 skill reference 并增加真实路径存在性检查。
+- 被 filter 掉的 model-specific generated Markdown 仍作为 tracked file 留在
+  `docs/user_guide/examples/`，hook 既不刷新也不删除；quickstart、design 与 feature 文档仍有直接
+  链接。因此当前链接可达不等于内容会随 source 更新。需要明确迁移链接到 shared task page，或给
+  stale generated pages 定义删除/刷新策略及 link-integrity test。
 
 ## DOCGEN-1b — Recipe link 与硬件 checkmark 必须共享可审计证据
 
