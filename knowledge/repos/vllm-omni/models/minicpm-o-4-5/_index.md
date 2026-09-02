@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-02
 type: index
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #3642", "PR #5638", "PR #6154", "PR #6170", "PR #6318", vllm_omni/model_executor/models/minicpmo_4_5/]
+sources: ["PR #3642", "PR #5382", "PR #5638", "PR #6154", "PR #6170", "PR #6318", vllm_omni/model_executor/models/minicpmo_4_5/]
 confidence: high
 ---
 
@@ -30,6 +30,10 @@ runtime bridge 交给 TTS stage，再包装为 `OmniOutput.multimodal_outputs`�
 Code2Wav 在所有平台使用树内 `MiniCPMO45Token2wav`。CUDA 可显式开启 DiT estimator +
 Campplus TensorRT；这是可关闭的局部加速，不替换 encoder/HiFT，也不会自动启用
 Step-Audio2 的 token2wav。engine cache/profile 与 fallback 门禁见 MCPMO-1c。
+
+Thinker 的 Whisper/APM audio encoder 仍构造 dense `[B,1,T,T]` mask；chunk mask 已用
+broadcasted query/key index 代替逐 row Python fill，但不改变 chunk/left-context/lookahead
+边界，也不消除 O(T²) storage。语义与证据门禁见 MCPMO-2b。
 
 描述直达源码与模型专有门禁见 [rules](rules.md#direct-代码快速入口)；新模型语义验证见
 [model validation](../../review/guides/model-validation.md)。

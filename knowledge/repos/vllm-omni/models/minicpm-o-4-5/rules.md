@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #3642", "PR #5638", "PR #6154", "PR #6170", "PR #6318"]
+sources: ["PR #3642", "PR #5382", "PR #5638", "PR #6154", "PR #6170", "PR #6318", vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py, tests/model_executor/models/minicpmo_4_5/test_audio_chunk_mask.py]
 confidence: high
 ---
 
@@ -17,6 +17,7 @@ confidence: high
 | PR 描述信号 | 规则组 | 第一批源码 |
 |---|---|---|
 | MiniCPM-o 4.5、`minicpmo_4_5`、版本识别 | MCPMO-2a | `config/pipeline_registry.py::OMNI_PIPELINES["minicpmo_4_5"]` → `model_executor/models/minicpmo_4_5/pipeline.py`；`model_executor/models/registry.py::_OMNI_MODELS` |
+| Whisper/APM、chunk attention mask、left context/lookahead | MCPMO-2b | `minicpmo_4_5_omni_llm.py::{get_audio_hidden_states,subsequent_chunk_mask}` → audio encoder；row-by-row oracle test |
 | tokenizer/processor、`trust_remote_code` | MCPMO-1a | pipeline/config factory → `model_executor/models/minicpmo_4_5/` loader |
 | TTS extra、backend 初始化、空音频 | MCPMO-1b | `minicpmo_4_5_omni_tts.py::MiniCPMO45OmniTTSForConditionalGeneration`、`minicpmo_4_5_token2wav.py::MiniCPMO45Token2wav` |
 | Code2Wav TensorRT、DiT/Campplus、engine cache/profile | MCPMO-1c | `minicpmo_4_5_code2wav.py::MiniCPMO45Code2Wav` → `batched_token2wav.py::BatchedToken2Wav._estimator_step`；共享实现 `step_audio2/step_audio2_dit_trt.py` |
@@ -67,6 +68,22 @@ confidence: high
 - 强制：结合 4.5 专有 architecture/config 字段判定；旧 1.0/2.6 不得落入 4.5 pipeline。
 - 禁止：仅用 architecture 集合相交。
 - 验收：4.5、旧版和无版本字段 fixture 分别命中 4.5、旧 pipeline 或明确失败。 ^[PR #3642]
+
+## MCPMO-2b — audio chunk mask 向量化必须保持逐行边界语义
+
+- 触发：修改 Whisper/APM `subsequent_chunk_mask`、chunk size、left-context 或 lookahead。
+- 强制：对每个 query row，end 保持 `min((row // chunk_size + 1) * chunk_size +
+  num_lookhead, size)`；`num_left_chunks < 0` 从 key 0 开始，否则 start 保持
+  `max((row // chunk_size - num_left_chunks) * chunk_size, 0)`。可用 query/key index
+  broadcast 一次构造 dense bool `[T,T]` mask，但不得改变 caller 与 padding mask 的 OR/取反语义。
+- 禁止：把移除 O(T) Python row loop 描述成移除 O(T²) mask storage/attention；把 reviewer
+  建议的 `@staticmethod` 当成已合并（目标仍保留 instance-method interface）；或声称所有 TTFT
+  case 都改善。PR 自己记录短输入/较大 batch 的 scheduler noise 会淹没局部节省。
+- 验收：row-by-row oracle 覆盖 size 0、chunk 边界两侧、无限/有限/零 left context 与 lookahead，
+  并在真实 caller 组合 padding mask。目标提交的 CPU 参数化测试覆盖 216 组纯 mask parity，
+  但不覆盖 CUDA kernel 数、完整 audio embedding 或 serving。PR 的 CUDA timing/bitwise embedding
+  证据来自 `ee33954dff27da317be597449a6c1b5a5df4052b`，不是 merge target `9235b0ae` 的复测，
+  因而只能作为外部局部性能证据。^[PR #5382]
 
 ## MCPMO-3a — TTS stage 的 batch 能力与 runtime_info 消费一致
 
