@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/engine/stage_init_utils.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py, docs/design/feature/omni_async_output_materialization.md, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/experimental/fullduplex/, tests/e2e/features/fullduplex/, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, "PR #3422", "PR #3642", "PR #4730", "PR #4958", "PR #5074", "PR #5310", "PR #5610", "PR #5777", "PR #5792", "PR #5824", "claude-workflow-starter-private@09dca46"]
+sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/engine/stage_init_utils.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py, docs/design/feature/omni_async_output_materialization.md, vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/experimental/fullduplex/, tests/e2e/features/fullduplex/, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/engine/test_arg_utils.py, "PR #3422", "PR #3642", "PR #4730", "PR #4958", "PR #5073", "PR #5074", "PR #5310", "PR #5610", "PR #5777", "PR #5792", "PR #5824", "claude-workflow-starter-private@09dca46"]
 ---
 
 # Model Executor 规则
@@ -20,6 +20,7 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 | runner `_preprocess`、逐请求 metadata、prefill/decode phase、batch preprocess、MTP | `runner-preprocess`：本页“Runner 到模型的预处理合同” | `vllm_omni/worker/gpu_model_runner.py::{OmniGPUModelRunner._maybe_run_batch_preprocess,_preprocess,_build_model_kwargs_extra,_talker_mtp_forward}` → `vllm_omni/model_executor/models/<命中模型>` consumer |
 | stage TP/PP/DP、devices、replica、visible devices、worker 启动、容量 fail-fast | `stage-runtime`：本页“Stage 并行度和设备容量必须一起验收” | `vllm_omni/config/stage_config.py::build_stage_runtime_overrides` → `vllm_omni/engine/stage_runtime.py::{StageRuntime.initialize,StageRuntime._resolve_replica_physical_devices}` → `stage_engine_startup.py::{launch_stage_replica,get_headless_replica_devices}` |
 | `runtime_info`、request RNG、batch compaction、跨 stage bridge/串线 | `bridge-batch`：`EXEC-1a`–`1c` | shared runner request state → stage input processor → model consumer |
+| cross-stage embedding width、pre-projection buffer | `bridge-batch`：`EXEC-1d` | stage HF config → `get_inputs_embeds_size()` → `GPUARModelRunner.inputs_embeds` → model projection |
 | loader dtype、只取 checkpoint config、避免整仓权重下载 | `loader-contract`：`EXEC-2a` | `vllm_omni/model_executor/model_loader/weight_utils.py::download_weights_from_hf_specific` → `vllm_omni/model_executor/models/<命中模型>` loader |
 | fused projection、HF source shard 完整性、consumer 委托、packed TP | `loader-contract`：`EXEC-2b` | H3 text encoder fused owner；其他模型先确认目标 main 是否已有 fused parameter |
 | async Omni output、background builder、D2H snapshot、connector drain/fallback | `async-output`：`EXEC-5a` | `worker/gpu_ar_model_runner.py::{_should_use_async_omni_output,OmniAsyncGPUModelRunnerOutput}` → platform runner → connector output |
@@ -28,7 +29,7 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 |---|---|---|
 | `core` | 每次 model-executor 审查 | `EXEC-1a` |
 | `strict-stage-config` | stage schema、projection、known fields | `EXEC-3a` |
-| `bridge-batch` | runtime info、跨 stage payload、batch、request RNG | `EXEC-1a`, `EXEC-1b`, `EXEC-1c` |
+| `bridge-batch` | runtime info、跨 stage payload、batch、request RNG | `EXEC-1a`, `EXEC-1b`, `EXEC-1c`, `EXEC-1d` |
 | `loader-contract` | dtype、checkpoint config 获取、loader、fused shard 拼装 | `EXEC-2a`, `EXEC-2b` |
 | `async-output` | AR async output、snapshot/live state、平台与 guard/fallback | `EXEC-5a` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `EXEC-0a`, `EXEC-0b` |
@@ -159,6 +160,20 @@ Stage 拓扑错误的最小充分源码证据只有三段：一处最终配置�
   `batch*vocab` 临时量；global RNG 状态跨 yield 泄漏到兄弟请求。
 - 验收：同 seed 同输出、异 seed 不同输出，batch reorder/compaction 后逐请求结果稳定；全局 RNG
   前后相同，计数器证明目标分支实际消费请求参数。 ^[PR #3422] ^[PR #5074] ^[PR #5792]
+
+### EXEC-1d — cross-stage embedding buffer 必须按 ingress width 分配
+
+- 触发：stage 的输入 embedding 在 model forward 或 preprocess 内投影，或修改 shared AR runner
+  的 `inputs_embeds` buffer。
+- 强制：buffer second dimension 来自 `model_config.get_inputs_embeds_size()`；它表示进入 stage
+  时的 pre-projection width，与内部 `hf_text_config.hidden_size` 分开。没有 stage override 时
+  helper 必须回退到内部 hidden size，保持其他 AR stage 的既有行为。
+- 禁止：把内部 hidden size 当跨 stage wire shape；反过来用某模型的外部宽度扩大所有 stage；
+  只测 config helper 而不覆盖发生宽度差异的正向 runner/model path。
+- 验收：至少一个 ingress≠internal 的正向 case 与一个无 override control，断言真实 buffer shape
+  和 projection consumer。Qwen2.5 Talker 当前接收 3584-wide Thinker state，并在 forward 内投影
+  到 896；Qwen3 在 preprocessing 先投影，因此走 hidden-size fallback。PR #5073 的最终单测只有
+  Qwen3 control，没有直接钉住 Qwen2.5 正向 buffer，后者仍是回归缺口。^[PR #5073]
 
 ### EXEC-2a — loader 的 dtype 与 config 获取必须显式、最小化
 

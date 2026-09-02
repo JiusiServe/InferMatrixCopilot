@@ -4,12 +4,12 @@ created: 2026-07-16
 updated: 2026-07-16
 type: architecture
 tags: [vllm-omni, models, qwen-omni]
-sources: [docs/design/qwen3_omni_tts_performance_optimization.md, docs/design/module/engine_orchestration.md, docs/design/module/stage_runtime.md, docs/design/module/archive/async_omni_architecture.md, vllm_omni/model_executor/models/registry.py]
+sources: ["PR #5073", docs/design/qwen3_omni_tts_performance_optimization.md, docs/design/module/engine_orchestration.md, docs/design/module/stage_runtime.md, docs/design/module/archive/async_omni_architecture.md, vllm_omni/config/model.py, vllm_omni/model_executor/models/qwen2_5_omni/pipeline.py, vllm_omni/model_executor/models/registry.py, vllm_omni/worker/gpu_ar_model_runner.py]
 ---
 
 # Qwen-Omni 家族拓扑与性能结论
 
-以下事实在 `main @ 5c390096` 复核。
+以下事实在 `main @ 593b4045` 复核。
 
 ## Stage 拓扑
 
@@ -25,6 +25,26 @@ sources: [docs/design/qwen3_omni_tts_performance_optimization.md, docs/design/mo
 - Qwen3-Omni 的 pipeline 由 resolver（`models/qwen3_omni/pipeline.py::
   resolve_qwen3_omni_pipeline`）按 checkpoint 结构动态决定，而不是冻结的
   `PipelineConfig` 字面量。
+
+## Qwen2.5-Omni ModelOpt NVFP4 边界
+
+- `qwen2_5_omni` full pipeline 和 `qwen2_5_omni_thinker_only` 的 Thinker 都显式用
+  `thinker_config`；full Talker 用 `talker_config`，Code2Wav 用 `thinker_config`。同一个
+  `hf_config_name` 同时选择 stage text config、architecture/quantization view 与 input width。
+- thinker-only ModelOpt NVFP4 W4A4 不增加 kernel 或 Qwen2.5 专用 resolver：checkpoint root 的
+  `quantization_config` 进入 vLLM 既有 `ModelOptNvFp4Config`，ignore/exclude 保持 audio/visual
+  encoder、embedding、LM head、Talker、Token2Wav/Code2Wav 和 KV cache 为 BF16；只有 Thinker
+  language-backbone linear 命中现有 FlashInfer Cutlass NVFP4 kernel。支持声明因此绑定 ModelOpt
+  checkpoint metadata 与排除规则，不能泛化成所有 Qwen2.5 stage 或任意 FP4 checkpoint。
+- Qwen2.5 Talker 的外部 3584 width 在 forward 内投影到内部 896；shared runner 的 buffer 必须按
+  `get_inputs_embeds_size()` 分配。Qwen3 在 preprocessing 已投影，未 override 时仍回退 internal
+  hidden size。共享门禁见 [EXEC-1d](../../components/model-executor/rules.md#exec-1d-cross-stage-embedding-buffer-必须按-ingress-width-分配)。
+- 最终 head 的外部验证只覆盖单张 RTX PRO 6000 Blackwell、TP1、特定 vLLM/PyTorch/
+  Transformers/FlashInfer 栈：full three-stage server 启动、仅 Thinker 选 NVFP4 kernel，以及
+  deterministic text smoke。accuracy/perf 也是同一硬件上的 text-output workload，且相对 BF16
+  accuracy 分别下降 1.17 与 3.5 percentage points；这些是 case-bound 取舍，不是质量或加速保证。
+  更早的表来自旧 commit backport/旧依赖，不能当最终 head 证据。最终 diff 也缺 Qwen2.5
+  ingress≠internal 的直接 unit test。^[PR #5073]
 
 ## 官方性能优化结论（docs/design/qwen3_omni_tts_performance_optimization.md）
 

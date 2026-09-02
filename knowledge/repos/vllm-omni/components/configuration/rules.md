@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-08-05
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/engine/stage_init_utils.py, tests/engine/test_stage_engine_args.py]
+sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py]
 ---
 
 # vLLM-Omni 配置开发门禁
@@ -24,6 +24,7 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 | deploy YAML、`base_config`、pipeline/stage overlay、headless/offline parity、最终逐 stage config | `deploy-topology`：`CONF-3a`, `CONF-4b`, `CONF-5a` | `vllm_omni/config/stage_config.py::{resolve_deploy_yaml,load_deploy_config,merge_pipeline_deploy,build_stage_runtime_overrides,_build_engine_args}` → `vllm_omni/config/config_factory.py::{StageConfigFactory.create_from_model,StageConfigFactory._merge_cli_overrides}` |
 | composable strategy、axis、routing、load balancing、`strategy-config` | `composable-strategy`：`CONF-4a` | `vllm_omni/config/composable_parallel/strategy_loader.py::{parse_strategy_specs,load_strategy_specs}` → `translator.py::translate_strategy_stack` → `apply.py::apply_strategy_specs` → `config_factory.py::{StageConfigFactory._apply_strategy_specs,StageConfigFactory._reconcile_strategy_with_cli}` |
 | `gpu_memory_utilization`、`kv_cache_memory_bytes`、多 stage 共卡、小显存 OOM | `deploy-memory`：`CONF-1a`, `CONF-2a` | `vllm_omni/config/stage_config.py::{build_stage_runtime_overrides,_build_engine_args}` → `vllm_omni/config/omni_config.py::{_build_runtime_config,_build_parallel_config,VllmOmniConfig.from_pipeline_config}` |
+| multi-stage HF sub-config、stage quantization view、`hf_config_name` | `stage-model-config`：`VOMNI-CFG-1i` | pipeline stage declaration → `OmniModelConfig::{draw_hf_text_config,get_model_arch_config}` → vLLM quantization selection |
 
 | 审查组 | 什么时候触发 | 规则 ID |
 |---|---|---|
@@ -32,6 +33,7 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 | `deploy-memory` | 显存预算、KV pin、多 stage 共卡 | `CONF-1a`, `CONF-2a` |
 | `deploy-topology` | deploy、overlay、headless、topology wiring | `CONF-3a`, `CONF-4b`, `CONF-5a` |
 | `composable-strategy` | strategy axis、routing、load balancing | `CONF-4a` |
+| `stage-model-config` | HF nested config、stage-specific quantization/text config | `VOMNI-CFG-1i` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `VOMNI-CFG-0a`, `VOMNI-CFG-0b` |
 
 ## 配置归一化与新老路径一致性
@@ -59,6 +61,22 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
   重新运行，不能只维护几个 deferred-default 白名单。但 registry parity test 会跳过没有具体 HF
   config 就无法 `resolve_pipeline_config` 的 callable entry（当前包括 `qwen3_omni_moe`），并非字面
   exhaustive；cutover 前每种 resolver variant 都须补 concrete HF-config fixture。^[PR #5678]
+
+### VOMNI-CFG-1i — multi-stage 模型必须显式选择同一份 stage HF config
+
+- 触发：nested HF config 的模型新增/修改 `hf_config_name`、text config、quantization metadata、
+  embedding width，或 pipeline stage 拆分。
+- 强制：每个 stage 的 `hf_config_name` 必须同时驱动 `draw_hf_text_config()`、
+  `get_model_arch_config()` 和 input-embedding width 查询，不能让三者各自回退到 root 的默认
+  text config。top-level quantization config 继续走通用 vLLM resolver；stage sub-config 与
+  ignore/exclude 规则共同决定实际 quantized modules，不增加 model-type string 特判。
+- 禁止：因为 root 默认返回 Thinker 就省略 Talker/Code2Wav 声明；给每个模型复制 quantization
+  resolver；仅断言 pipeline 字段存在而不追到 quant config、text hidden size 与 runner consumer。
+- 验收：逐 stage 断言选中的 sub-config 与 architecture/quantization view；覆盖一个无 embedding
+  override 的 AR control，证明 input width 回退到该 stage text hidden size。Qwen2.5-Omni 当前为
+  Thinker=`thinker_config`、Talker=`talker_config`、Code2Wav=`thinker_config`，thinker-only 也用
+  `thinker_config`。最终 diff 只测 stage 名与 Qwen3 无 override control，未直接单测 Qwen2.5
+  Talker overridden-width runner path；该缺口见 [EXEC-1d](../model-executor/rules.md#exec-1d-cross-stage-embedding-buffer-必须按-ingress-width-分配)。^[PR #5073]
 
 ## 部署配置与资源预算
 
