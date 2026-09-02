@@ -4,12 +4,12 @@ created: 2026-07-16
 updated: 2026-09-02
 type: guide
 tags: [vllm-omni, docs]
-sources: ["PR #5139", "PR #5833", "PR #5839", docs/.nav.yml, docs/design/index.md, docs/design/module/, docs/design/module/archive/README.md, docs/design/ar_diffusion_pipeline_capability.md, docs/design/architecture_overview.md, docs/design/feature/diffusion_continuous_batching.md, docs/design/feature/distributed_layerwise_offload.md, docs/design/feature/omni_async_output_materialization.md, docs/design/feature/quantization.md, docs/user_guide/diffusion/execution_modes.md]
+sources: ["PR #5139", "PR #5833", "PR #5839", "PR #5914", docs/.nav.yml, docs/design/index.md, docs/design/module/, docs/design/module/archive/README.md, docs/design/ar_diffusion_pipeline_capability.md, docs/design/architecture_overview.md, docs/design/feature/diffusion_continuous_batching.md, docs/design/feature/distributed_layerwise_offload.md, docs/design/feature/omni_async_output_materialization.md, docs/design/feature/quantization.md, docs/user_guide/diffusion/execution_modes.md]
 ---
 
 # 官方设计文档地图（docs/design/**）
 
-`main @ fd0e9218` 复核。官方 `docs/design/index.md` 与 `docs/.nav.yml` 按 architecture、feature、
+`main @ 9159cedb` 复核。官方 `docs/design/index.md` 与 `docs/.nav.yml` 按 architecture、feature、
 infrastructure/performance 和 21 个 module 页面编排。module frontmatter 的 owner、代码路径、依赖与
 验证路径可作 review 首跳 source map；但本批页面全部是 `status: draft`，其中 invariant 编号也明确
 只是 candidate，不能覆盖当前代码与测试。尤其 `module/vllm_omni_config.md` 是
@@ -25,9 +25,19 @@ infrastructure/performance 和 21 个 module 页面编排。module frontmatter �
 尚未支持，placement-group/actor helpers 也没有 live caller，不能据残留宣称 runtime support。
 `docs/design/ar_diffusion_pipeline_capability.md` 仍未列入索引，找 spec 时还须检查实际文件树。
 
+#5914 将 overview 从 `OmniRouter` 和三类 AR/DiT 图改为 stage-based 地图：四个代表模型、指标词汇、
+engine/orchestrator/runtime/connector ownership、五层 config/runtime resolution、feature 与 public
+interface。它是跨 owner 导航，不是新 runtime 支持证据：MiniMax-H3 的 encoder/DiT/VAE 仍是同一
+registered diffusion stage 内的 component/phase，独立 placement 需要未来 multi-stage pipeline；
+Cosmos3 reasoner/generator 同样在一个 diffusion stage。overview 的 typed config 图是 conceptual；
+目标代码中 `create_from_model()` 委托 `VllmOmniConfig.from_pipeline_config()`，但稳定生产 startup
+仍走 legacy stage 构造，所以不能据图宣称 typed cutover 完成。duplex 也仍是 experimental。
+PR 只报告 strict MkDocs build（仍有既存 navigation/link warnings）与 diff hygiene，没有 runtime
+测试；代表模型的 batching/attention/parallelism/quantization 表须回各 live owner 验证。^[PR #5914]
+
 | 官方文档 | 一句话 | 知识树 owner |
 |---|---|---|
-| `architecture_overview.md` | 三类模型拓扑（DiT 主/AR 主/AR+DiT）、OmniRouter/EntryPoints/AR/Diffusion/OmniConnector、E/P/D/G 解耦、CFG companion 流 | [serving](../components/serving/architecture.md) + [distributed](../components/distributed/architecture.md) |
+| `architecture_overview.md` | stage 定义、Qwen3-Omni/HunyuanImage-3.0/MiniMax-H3/Cosmos3 代表映射、指标词汇、system/config/interface 概念图；具体 support 仍回 live owner | [serving](../components/serving/architecture.md)、[configuration](../components/configuration/architecture.md)、[distributed](../components/distributed/architecture.md) + [Qwen](../models/qwen-omni/_index.md)/[Hunyuan](../models/hunyuan-image3/_index.md)/[MiniMax](../models/minimax-h3/_index.md)/[Cosmos3](../models/cosmos3/_index.md) |
 | `module/{entrypoints,vllm_omni_config,input_output_modality_contracts,error_contracts,engine_orchestration,stage_runtime,omni_connector,model_integration,ar_runtime}.md` | serving/config/I-O/error/engine/stage/connector/model/AR 的 draft ownership 与 source map；candidate invariant 尚非规范 | 对应 [serving](../components/serving/_index.md)、[configuration](../components/configuration/_index.md)、[distributed](../components/distributed/_index.md)、[scheduler](../components/scheduler/_index.md)、[model-executor](../components/model-executor/_index.md) |
 | `feature/omni_async_output_materialization.md` | AR decode 关键路径外的异步 D2H 与 Omni payload 构造；含 live connector ownership、平台验证范围和同步 fallback | [model-executor](../components/model-executor/_index.md) |
 | `module/diffusion/{index,diffusion_runtime,diffusion_model_integration,continuous_batching,parallelism,offloader}.md` | diffusion draft module 边界与首跳路径 | [diffusion](../components/diffusion/architecture.md) |

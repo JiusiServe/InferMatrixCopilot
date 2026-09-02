@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-02
 type: architecture
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", "PR #5647", "PR #5678", vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/diffusion/data.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/entrypoints/cli/serve.py]
+sources: ["claude-workflow-starter-private@296ea45", "PR #5647", "PR #5678", "PR #5914", docs/design/architecture_overview.md, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/diffusion/data.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/entrypoints/cli/serve.py]
 ---
 
 # vLLM-Omni 配置构造架构
@@ -65,6 +65,12 @@ structured 与 legacy 可以有不同的最终对象，但不能有不同的字�
 `build_engine_args_dict()`，后者委托 `build_legacy_engine_args_dict()`。因此 typed projection 是
 cutover 前的兼容适配器和测试 oracle，不是当前 live startup source of truth；目标 pin 中
 typed builder 与 `StageConfigFactory.create_from_model` 都没有 non-test caller。
+
+`docs/design/architecture_overview.md` 的五层图是目标架构的 conceptual map，不改变上述 live
+边界。图中的 authoring→resolve→transport-safe config→launch plan→engine materialization 可用于
+定位 owner，但 target `9159cedb` 仍不能据此宣称 structured typed startup 已完成 production
+cutover；review 后的文档使用真实 `BaseVllmOmniStageConfig`、`StageConfigFactory.create_from_model()`
+与 `VllmOmniConfig.from_pipeline_config()` 名称，不存在额外 resolver API。^[PR #5914]
 
 ## 值状态合同
 
