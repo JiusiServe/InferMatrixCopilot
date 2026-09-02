@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, scheduler]
-sources: ["PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461"]
+sources: ["PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461"]
 ---
 
 # Scheduler 规则
@@ -235,6 +235,15 @@ modules=[online_serving, worker_runner]，status=active，run_count=38，2026-06
   断言 stale counter 恰好归零且首个新 segment 输出不被吞；真实质量指标必须另行验证。^[PR #5976]
 
 ## 相关
+
+## SCHED-6b — request-end full payload 是显式 admission capability
+
+- 触发：新增或修改只在 request end 消费完整上游 sequence 的 stage。
+- 强制：coordinator allowlist 与模型 capability 同步；完成前零传输，完成时只 enqueue 一次完整 sequence，
+  consumer 使用 non-async-chunk topology。IndexTTS 2.5 的精确键是
+  `("IndexTTS25S2MelDecoder", "indextts2_5_s2mel_decoder")`。
+- 禁止：按模型名猜测、扩大到整个家族，或逐 token 重复搬运。
+- 验收：allowlisted/non-allowlisted 对照、完成时一次传输、abort 无残留。^[PR #5957]
 
 - 机制与边界见 [architecture](architecture.md)；跨 stage 数据面见
   [Distributed 组件](../distributed/_index.md)。

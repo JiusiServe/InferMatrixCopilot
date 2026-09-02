@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/musa/platform.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/engine/stage_init_utils.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py, docs/design/feature/omni_async_output_materialization.md, vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/experimental/fullduplex/, tests/e2e/features/fullduplex/, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/engine/test_arg_utils.py, "PR #3422", "PR #3642", "PR #4730", "PR #4958", "PR #5073", "PR #5074", "PR #5310", "PR #5610", "PR #5671", "PR #5777", "PR #5792", "PR #5824", "PR #5976", vllm_omni/engine/arg_utils.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni_moe_thinker.py, vllm_omni/model_executor/models/qwen2_5_omni/qwen2_5_omni_thinker.py, vllm_omni/model_executor/models/dynin_omni/dynin_omni.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/worker/base.py, vllm_omni/worker/gpu_generation_model_runner.py, tests/model_executor/models/qwen3_omni/test_qwen3_omni_forward_contract.py, "claude-workflow-starter-private@09dca46"]
+sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/musa/platform.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/utils/mm_outputs.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py, docs/design/feature/omni_async_output_materialization.md, vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/experimental/fullduplex/, tests/e2e/features/fullduplex/, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/engine/test_arg_utils.py, "PR #3422", "PR #3642", "PR #4730", "PR #4958", "PR #5073", "PR #5074", "PR #5310", "PR #5610", "PR #5671", "PR #5777", "PR #5792", "PR #5824", "PR #5957", "PR #5976", vllm_omni/engine/arg_utils.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni_moe_thinker.py, vllm_omni/model_executor/models/qwen2_5_omni/qwen2_5_omni_thinker.py, vllm_omni/model_executor/models/dynin_omni/dynin_omni.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/worker/base.py, vllm_omni/worker/gpu_generation_model_runner.py, tests/model_executor/models/qwen3_omni/test_qwen3_omni_forward_contract.py, "claude-workflow-starter-private@09dca46"]
 ---
 
 # Model Executor 规则
@@ -246,3 +246,13 @@ Stage 拓扑错误的最小充分源码证据只有三段：一处最终配置�
   GQA 错序。平台测试或静态 guard 证明不再引用已删除的 projection 属性。H3 eager text
   encoder 还须对任何未加载 plain retained parameter 在启动时硬失败；unknown checkpoint key
   可继续告警，因为它不会留下 model parameter 未初始化。^[PR #4958] ^[PR #5777] ^[PR #5824]
+
+### EXEC-1g — request-end payload 延迟 D2H 必须先取得 device snapshot
+
+- 触发：模型设置 `omni_payload_at_request_end`，或修改 full-payload accumulation、CUDA graph
+  和 D2H 策略。
+- 强制：只在显式 opt-in、无 prefix cache 且下游消费完整 payload 时延迟 D2H；每步
+  clone device tensor，相容 list 可 pack 后以 views 复原，结束才跨设备，中间 output 为 `None`。
+- 禁止：累计 graph/input-buffer alias，或扩散到普通逐步 payload。
+- 验收：覆盖 source 被下一 step 覆写、ragged list shape/value/alias、普通路径与
+  finish/abort 清理。^[PR #5957]

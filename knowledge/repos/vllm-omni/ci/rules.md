@@ -4,7 +4,7 @@ created: 2026-08-23
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, ci]
-sources: ["PR #3422", "PR #5074", "PR #5255", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5823", "PR #5836", "PR #5976", docker/Dockerfile.ci, .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, "PR #5845", "PR #5872", "PR #6008", "PR #6048", "PR #6056", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6339", "PR #6343", .buildkite/cuda/test-nightly.yml, .buildkite/npu/test-npu-nightly.yml, .pre-commit-config.yaml, tests/dfx/perf/scripts/run_benchmark.py, tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_flux_kontext_expansion.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, tests/model_tests/diffusion/diff_model_builders.py, tests/model_tests/diffusion/model_settings.py, tests/model_tests/diffusion/test_alignment.py, tools/pre_commit/check_tts_adapter.py, tests/tools/test_check_tts_adapter.py]
+sources: ["PR #3422", "PR #5074", "PR #5255", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5823", "PR #5836", "PR #5957", "PR #5976", docker/Dockerfile.ci, docker/Dockerfile.xpu, .buildkite/intel/scripts/run-xpu-test.sh, .buildkite/cuda/test-merge.yml, .buildkite/cuda/test-ready.yml, "PR #5845", "PR #5872", "PR #6008", "PR #6048", "PR #6056", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6339", "PR #6343", .buildkite/cuda/test-nightly.yml, .buildkite/npu/test-npu-nightly.yml, .pre-commit-config.yaml, tests/dfx/perf/scripts/run_benchmark.py, tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_flux_kontext_expansion.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, tests/model_tests/diffusion/diff_model_builders.py, tests/model_tests/diffusion/model_settings.py, tests/model_tests/diffusion/test_alignment.py, tools/pre_commit/check_tts_adapter.py, tests/tools/test_check_tts_adapter.py]
 confidence: high
 ---
 
@@ -175,3 +175,16 @@ collection 意图；没有实际 runtime 结果时，不能证明目标硬件行
   导致普通 backend 的结果整体 fallback 成 completed=0。
 - 验收：签名/控制流与 pinned upstream 对照；probe rate 0 与正值覆盖启动/停止；plain 与 Omni output
   混合列表都保留完成数，只有存在时才写 duplex metrics。^[PR #5976]
+
+## OMNI-CI-3c — XPU release image 从同版 upstream target 构建
+
+- 触发：升级 XPU vLLM/torch/Inductor 镜像，或为 compiler 故障改变 model/stage eager gate。
+- 强制：从精确 release tag 的 upstream `Dockerfile.xpu` 构建 `vllm-openai` target 后再叠 Omni；torch、oneCCL、
+  triton-xpu 成套 pin。v0.27 使用 triton-xpu 3.7.2并保留 upstream oneCCL。
+- 强制：新 API 未支持时用平台 gate 保留 eager。PyTorch 2.13 XPU Dynamo 的 duplicate-handler
+  workaround 只覆盖 Qwen2.5 Thinker/Talker 和 Qwen3 shared code predictor，不得扩展成全局
+  XPU eager。
+- 禁止：用旧 Omni base target 冒充新版 upstream、卸掉 oneCCL 只补 triton，或以 CUDA
+  通过外推 XPU。
+- 验收：核对 image provenance、XPU import/startup，以及这三条路径 compile 未被调用而
+  其他模型保留原能力。^[PR #5957]

@@ -79,7 +79,7 @@ modules:
     wave: 1
     risk: high
   input_output:
-    local_paths: [vllm_omni/inputs/, vllm_omni/outputs/, vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/serialization.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/engine/stage_engine_core_client.py, vllm_omni/engine/output_processor.py, vllm_omni/request.py]
+    local_paths: [vllm_omni/inputs/, vllm_omni/outputs/, vllm_omni/utils/mm_outputs.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/serialization.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/engine/stage_engine_core_client.py, vllm_omni/engine/output_processor.py, vllm_omni/request.py]
     upstream_paths: [vllm/inputs/, vllm/v1/engine/input_processor.py, vllm/v1/engine/output_processor.py, vllm/v1/request.py]
     test_paths: [tests/entrypoints/test_omni_new_request_data.py, tests/engine/test_async_omni_engine_input.py, tests/test_outputs.py]
     import_check: "from vllm_omni.inputs.data import *; from vllm_omni.inputs.preprocess import *; from vllm_omni.engine.async_omni_engine import AsyncOmniEngine; from vllm_omni.engine.orchestrator import Orchestrator; from vllm_omni.engine.serialization import serialize_additional_information; print('Input/Output imports OK')"
