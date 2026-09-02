@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5723", "PR #5764", "PR #5836", "PR #5863", "PR #5891", "PR #5896", "PR #5946", "PR #5969", "PR #5972", docs/models/supported_models.md, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/utils/fa.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/offloader/, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/platforms/npu/platform.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/entrypoints/openai_api/test_video_server.py]
+sources: ["PR #5723", "PR #5764", "PR #5836", "PR #5850", "PR #5863", "PR #5891", "PR #5896", "PR #5946", "PR #5969", "PR #5972", docs/models/supported_models.md, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-4090.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/utils/fa.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/offloader/, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/platforms/npu/platform.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/entrypoints/openai_api/test_video_server.py]
 confidence: high
 ---
 
@@ -37,15 +37,30 @@ measurement；模型输入、执行与加载合同返回 [MiniMax H3 rules](rule
 - 触发：引用 H3 2×RTX 5090/4090 可运行性、延迟、峰值或 resident-layer 默认值。
 - 强制：5090 证据只绑定 vLLM-Omni `ae6577ea` 的一次 2×32 GiB、T2VA、1344×768、
   124 frames、50 steps run：8m38s，约 22.6 GiB/GPU 是 sampled `nvidia-smi`，不是 allocator
-  high-water。4090 的 2×24 GiB/1024×576/12 resident layers 只来自 2×B300 的 5-step
-  capacity proxy；它不是 RTX 4090 latency 或 full-run validation。
-- 禁止：把单次未 warmed 的 5090 run 写成 benchmark，把 B300 proxy 写成 target hardware，
-  或从 HBM fit 推断 host fit。每个 FL2VA/Ref2VA partition 约 135 GiB，no-AllGather worker 的
-  pinned CPU master 不因 resident layers 增加而消失；recipe 要求至少 200 GiB available RAM。
-- 验收：目标硬件用单一 partition、exact TP2/no-AllGather/VAE PP2/cuDNN/eager topology 复测，
-  分别记录 allocator peak、重复 latency 和 joint video/audio quality。目标 pin 引用的
+  high-water。早期 4090 容量依据只是 2×B300 的 5-step proxy；PR #5850 后新增的目标硬件
+  证据绑定 vLLM-Omni `81b48e83`（不是 merge target）、vLLM 0.26.0、PyTorch 2.11+cu130、
+  driver 580.126.09、BF16/CUDNN/eager、TP2、no-AllGather DLO、12 resident layers、单 partition、
+  1024×576、124 frames@24 FPS、60 steps、seed 1101、video/audio shift 12/3。
+- 强制：2×4090 使用 USP1、text-encoder TP2、VAE PP2；T2VA 两次约 435/429 s、rank-0 allocator
+  reserved high-water 15.3 GiB，Ref2VA 两次约 892/892 s、14.6 GiB，两者均报告完整 ffmpeg decode。
+  4×4090 使用 USP2、text-encoder TP4、VAE PP4；T2VA 两次约 274/270 s、rank-0 15.2 GiB并完整
+  decode；Ref2VA 只有一次 HTTP 200，约 545 s、rank-0 16.1 GiB，未声明完整 decode。后续 Ref2VA
+  虽完成 diffusion，却在 D2H 阶段触发 engine hardcoded 30 s async-output wait，因此 4 卡 Ref2VA
+  repeatability 不成立。header peak 只表示 rank 0 `torch.cuda.max_memory_reserved`，不是所有 rank
+  最大值；USP 不进一步 shard DiT weight，只能按该 workload 描述 per-GPU observation。
+- 禁止：把单次未 warmed 的 5090 run 写成 benchmark，把 B300 proxy 写成 target hardware，或从
+  HBM fit 推断 host fit。每个 FL2VA/Ref2VA partition 约 135 GiB、至少 200 GiB available RAM与
+  推荐 384 GiB 只是 recipe 声明，未给 checkpoint revision/checksum 或 host high-water；
+  no-AllGather worker 的 pinned CPU master 不因 resident layers 增加而消失。两次输出大小相差不超过
+  115 bytes 不证明数值、感知或 A/V 质量一致；这些是 single-request latency，不是 concurrent
+  throughput。单卡 4090 未测；5090 的 26.5 GiB 单卡 profile 超过 24 GiB，而降低 resident layers
+  的替代方案也未测。
+- 验收：新硬件/拓扑用单一 partition 与 exact config，记录 immutable model/environment、all-rank
+  allocator/整机峰值、warmup/repeats、stage/E2E latency 和 joint video/audio quality。recipe 的
+  “after #5720 lands” 已过期，因为 modular H3 在该 target 已存在；partition-path 命令本身仍保持
+  单 partition，无需据此推断 combined route。目标 pin 引用的
   `examples/offline_inference/minimax_h3/run_h3_2gpu_all_tasks.sh` 实际不存在，因此不能把其
-  four-task/MP4 validation 描述成可执行入口；补文件或改文档后再验收。^[PR #5764]
+  four-task/MP4 validation 描述成可执行入口；补文件或改文档后再验收。^[PR #5764] ^[PR #5850]
 
 ## MMH3-3c — H100 DFX fixture 只证明 exact nightly workload 与 payload path
 
