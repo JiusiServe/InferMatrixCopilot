@@ -1,10 +1,10 @@
 ---
 title: "LingBot-Video 规则"
 created: 2026-08-10
-updated: 2026-08-10
+updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: [vllm_omni/diffusion/models/lingbot_video/request_utils.py, vllm_omni/diffusion/models/lingbot_video/image_condition.py, vllm_omni/diffusion/models/lingbot_video/pipeline_lingbot_video.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/model_extras/lingbot_video.py, vllm_omni/model_extras/registry.py, tests/diffusion/models/lingbot_video/test_request_utils.py, tests/diffusion/models/lingbot_video/test_image_condition.py, tests/diffusion/models/lingbot_video/test_pipeline_lingbot_video.py, tests/entrypoints/openai_api/test_image_server.py, tests/entrypoints/openai_api/test_video_server.py, "PR #5311", "PR #5976", "Issue #5883"]
+sources: [vllm_omni/diffusion/models/lingbot_video/request_utils.py, vllm_omni/diffusion/models/lingbot_video/image_condition.py, vllm_omni/diffusion/models/lingbot_video/pipeline_lingbot_video.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/model_extras/lingbot_video.py, vllm_omni/model_extras/registry.py, examples/offline_inference/text_to_image/text_to_image.py, examples/offline_inference/image_to_video/image_to_video.py, tests/diffusion/models/lingbot_video/test_request_utils.py, tests/diffusion/models/lingbot_video/test_image_condition.py, tests/diffusion/models/lingbot_video/test_pipeline_lingbot_video.py, tests/entrypoints/openai_api/test_image_server.py, tests/entrypoints/openai_api/test_video_server.py, "PR #5311", "PR #5976", "PR #6049", "Issue #5883"]
 ---
 
 # LingBot-Video 规则
@@ -27,8 +27,8 @@ sources: [vllm_omni/diffusion/models/lingbot_video/request_utils.py, vllm_omni/d
 - 强制：`modalities=["image"]` 且无输入图是 T2I；`["video"]` 无图是 T2V、恰好一图是 TI2V。
   image output 不接收参考图，TI2V 不接收多图；reference video/audio 均拒绝。
   modality 缺失且无图仅作 legacy T2V fallback，并 `warning_once`；有图却缺 modality 必须拒绝，
-  不能猜 I2V。model-extras 的 T2I/TI2V builder 必须写显式 modality，且 TI2V 只收一个 PIL
-  image。
+  不能猜 I2V。shared task example 必须写显式 modality；`model_extras` 不再复制 LingBot generic
+  T2I/TI2V builder，单图 cardinality 与其余 validation 由 pipeline normalization 拥有。
   prompt 可是 plain string 或 mapping。mapping 的 `caption` 为标量字符串时保持原文，为结构时
   做紧凑 JSON；没有 `caption` 时去除 runtime fields 后把其余结构序列化。空 caption、空结构或
   不可序列化值 fail closed。
@@ -62,7 +62,8 @@ sources: [vllm_omni/diffusion/models/lingbot_video/request_utils.py, vllm_omni/d
   preset、direct resolver、离线 builder 和两个在线 endpoint 的最终尺寸。sampling sentinel 的
   不对称也必须先统一 omitted 表示再修改。另须用同字段冲突值断言 extra_args 胜过 prompt，并用
   跨表示冲突冻结 merge 后的 `width/height` > `size` > `resolution+ratio`，同时保留只有 prompt 的
-  offline control。^[PR #5976]
+  offline control。Canonical envelope 的共享 ownership 与 identity/custom builder 测试见
+  [EXEC-6a](../../components/model-executor/rules.md#exec-6a-shared-image-example-先建-canonical-envelopemodel-extra-只做特化变换)。^[PR #5976] ^[PR #6049]
 
 ## LBV-2a — TI2V 的 VLM 与 VAE 必须共享一次几何对齐及同一 RNG 顺序
 

@@ -1,10 +1,10 @@
 ---
 title: "Generated docs and supported-model evidence rules"
 created: 2026-08-10
-updated: 2026-08-10
+updated: 2026-09-02
 type: rule
 tags: [vllm-omni, docs]
-sources: [.claude/skills/quantization/references/modelopt-fp8.md, docs/.nav.yml, docs/mkdocs/hooks/generate_examples.py, docs/models/supported_models.md, docs/user_guide/examples/online_serving/diffusers_pipeline_adapter.md, examples/online_serving/diffusers_pipeline_adapter/README.md, recipes/README.md, tests/docs/test_generate_examples.py, "PR #5969", "PR #5987", "PR #5998", "PR #6045", docs/features/README.md, docs/design/index.md, docs/user_guide/diffusion/startup_and_loading.md, docs/user_guide/diffusion_features.md, docs/user_guide/quantization/bitsandbytes.md, docs/user_guide/quantization/gguf.md]
+sources: [.claude/skills/quantization/references/modelopt-fp8.md, docs/.nav.yml, docs/mkdocs/hooks/generate_examples.py, docs/models/supported_models.md, docs/user_guide/examples/online_serving/diffusers_pipeline_adapter.md, examples/online_serving/diffusers_pipeline_adapter/README.md, examples/online_serving/text_to_image/, examples/online_serving/image_to_video/, recipes/README.md, tests/docs/test_generate_examples.py, "PR #5969", "PR #5987", "PR #5998", "PR #6045", "PR #6049", docs/features/README.md, docs/design/index.md, docs/user_guide/diffusion/startup_and_loading.md, docs/user_guide/diffusion_features.md, docs/user_guide/quantization/bitsandbytes.md, docs/user_guide/quantization/gguf.md]
 ---
 
 # Generated docs and supported-model evidence rules
@@ -87,3 +87,14 @@ sources: [.claude/skills/quantization/references/modelopt-fp8.md, docs/.nav.yml,
 - 验收：strict MkDocs + link/nav census；兼容表逐项回 live owner。HunyuanImage3/Helios step 边界分别
   是 grouped 仅 TORCH_SDPA、仅 `max_num_seqs=1`；HSDP 与 Ulysses/CFG 可组合但与 TP 不兼容；local
   layerwise offload 与 multi-device DLO 分表。docs-only build 不证明 runtime。^[PR #6045]
+
+## DOCGEN-1d — shared task example 不得把模型默认伪装成通用合同
+
+- 触发：修改 shared T2I/I2V README、Python client、Gradio 或 launch script。
+- 强制：名称与说明按 task 而非某个默认模型表述；通用 client 的 size、steps、CFG、seed 未显式提供时
+  省略，让 server/model default 生效。模型专属 curl recipe 可保留，但必须标清范围。canonical task
+  envelope 的代码 owner 见 [EXEC-6a](../components/model-executor/rules.md#exec-6a-shared-image-example-先建-canonical-envelopemodel-extra-只做特化变换)。
+- 禁止：在 shared client 默认发送 Qwen-specific CFG/尺寸/steps，或因脚本默认 model 是 Qwen 就把 UI
+  宣称为 Qwen-only；不得把 runner/pipeline synthetic smoke 写成 released-weight quality 证据。
+- 验收：README/CLI/UI/server script 名称一致；optional 字段省略与显式零/空分别测试；shell `bash -n`，
+  canonical CPU tests，至少一个真实模型 task smoke。^[PR #6049]

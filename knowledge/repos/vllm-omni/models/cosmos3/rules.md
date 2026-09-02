@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #4657", "PR #5001", "PR #5634", docs/features/session_state_manager.md, recipes/cosmos3/Cosmos3-Nano.md, vllm_omni/diffusion/models/cosmos3/, vllm_omni/experimental/world_models/adapters/state_cosmos3_adapter.py, vllm_omni/platforms/rocm/platform.py, tests/cosmos3/test_session_memory_equivalence.py, tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py]
+sources: ["PR #4657", "PR #5001", "PR #5634", "PR #6049", docs/features/session_state_manager.md, recipes/cosmos3/Cosmos3-Nano.md, vllm_omni/diffusion/models/cosmos3/, vllm_omni/model_extras/cosmos3.py, vllm_omni/model_extras/registry.py, vllm_omni/experimental/world_models/adapters/state_cosmos3_adapter.py, vllm_omni/platforms/rocm/platform.py, tests/cosmos3/test_session_memory_equivalence.py, tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py]
 confidence: high
 ---
 
@@ -19,7 +19,7 @@ confidence: high
 | Cosmos3/Edge、layerwise offload、专有 block | COSMOS-1a | `diffusion/registry.py::_DIFFUSION_MODELS`；`diffusion/models/cosmos3/transformer_cosmos3_edge.py::Cosmos3EdgeVFMTransformer` |
 | Distilled、SDE scheduler、`t_list` | COSMOS-1b | `diffusion/models/cosmos3/pipeline_cosmos3.py::Cosmos3OmniDiffusersPipeline` 及 scheduler config consumer |
 | seed/generator、逐步噪声 | COSMOS-2a | `pipeline_cosmos3.py::Cosmos3OmniDiffusersPipeline` 的 request-local sampling 路径 |
-| `guidance=0`、request extra | COSMOS-2b | `model_extras/cosmos3.py` → pipeline sampling params |
+| `guidance=0`、request extra | COSMOS-2b | `model_extras/cosmos3.py` → pipeline sampling params；canonical task envelope 由 shared example 拥有 |
 | session manager、UND K/V、`freqs_gen`、CFG branch、request ID | COSMOS-2c | `state_cosmos3_adapter.py` → `pipeline_cosmos3.py` → `transformer_cosmos3.py` |
 | online/offload/HSDP/VAE parallel 支持声明 | COSMOS-3a | capability 文档/recipe → 对应公开入口与实现路径 |
 | ROCm、MI350X、AITER、latency/peak memory | COSMOS-3b | recipe 的 measurement commit/protocol → `platforms/rocm/platform.py` backend gate → 目标配置复测 |
@@ -57,7 +57,9 @@ confidence: high
 - 强制：仅以 `is None` 判断未提供；保留显式 `0.0` 并沿 request → sampling params →
   pipeline 断言。
 - 禁止：`value or default`、truthy sentinel。
-- 验收：未提供使用默认，`0.0` 保持零，普通正值保持不变，三类测试都到 consumer。 ^[PR #5001]
+- 验收：未提供使用默认，`0.0` 保持零，普通正值保持不变，三类测试都到 consumer。Cosmos3 T2I
+  builder 已删除：shared example 写 `modalities=["image"]`，registry identity-return，pipeline 保留模型
+  validation/normalization；不得把 extra-body registry 误当 task-envelope owner。^[PR #5001] ^[PR #6049]
 
 ## COSMOS-2c — session manager 缓存必须按 branch/layer 完整装卸
 
