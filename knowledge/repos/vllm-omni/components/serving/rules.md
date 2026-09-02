@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["Issue #5369", "PR #3576", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5085", "PR #5157", "PR #5374", "PR #5670", "PR #5682", "PR #5713", "PR #5732", "PR #5746", "PR #5752", "PR #5843", "PR #6138", "PR #6202", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_chat.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/entrypoints/openai/tts_adapters/, vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/cfg_companion_tracker.py, vllm_omni/metrics/prometheus.py, tests/entrypoints/test_async_omni.py, tests/entrypoints/openai_api/test_audex_serving_guards.py, tests/entrypoints/openai_api/test_omni_sleep_wakeup.py, tests/entrypoints/openai_api/test_tts_detection.py, tests/entrypoints/openai_api/test_video_api_utils.py, tests/entrypoints/openai_api/test_video_server.py, tests/tools/test_check_tts_adapter.py, tools/pre_commit/check_tts_adapter.py]
+sources: ["Issue #5369", "PR #3576", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5085", "PR #5157", "PR #5374", "PR #5670", "PR #5682", "PR #5713", "PR #5732", "PR #5746", "PR #5752", "PR #5843", "PR #6008", "PR #6138", "PR #6202", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", .pre-commit-config.yaml, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_chat.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/entrypoints/openai/tts_adapters/, vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/cfg_companion_tracker.py, vllm_omni/metrics/prometheus.py, tests/entrypoints/test_async_omni.py, tests/entrypoints/openai_api/test_audex_serving_guards.py, tests/entrypoints/openai_api/test_omni_sleep_wakeup.py, tests/entrypoints/openai_api/test_tts_detection.py, tests/entrypoints/openai_api/test_video_api_utils.py, tests/entrypoints/openai_api/test_video_server.py, tests/tools/test_check_tts_adapter.py, tools/pre_commit/check_tts_adapter.py]
 confidence: high
 ---
 
@@ -313,8 +313,11 @@ confidence: high
   `for_diffusion()` 直接绕过 adapter detection，当前 `DiffusionTTSAdapter` 没有生产 subclass。
 - 验收：冻结旧 ladder 作为 oracle，覆盖 in-tree pipeline stage、adapter 声明 architecture、
   stage 集合等价、entry-arch 范围、无歧义/稳定顺序和 topology guard。`LegacyDetector` 只能缩减；
-  AST ratchet 的 branch/legacy budget 也只能下降，但 table dispatch 是已固定的漏检形态，不能把
-  pre-commit 通过解释为不可绕过。`omnivoice_generator` 未被 pipeline 发出，是保留兼容事实而非
+  AST ratchet 中超过 branch/legacy budget 失败，等于上限静默通过，少于上限则通过
+  并显示收紧 reminder；下降本身不能让该 pre-commit hook 红灯，但未同步更新的 exact-equality
+  pytest 仍会失败。在人工调低 constant 前存在可回增 slack，table dispatch 也是已固定的漏检形态，
+  不能把 pre-commit 通过解释为不可绕过。
+  `omnivoice_generator` 未被 pipeline 发出，是保留兼容事实而非
   可达性证据。^[PR #5682]
 - adapter 提取保持共享 dispatcher 单一：Ming Flash 的 `validate()` 原样拒绝空 input、过长/非
   字符串 instructions、`task_type`/`language`/`x_vector_only_mode`/
@@ -324,7 +327,7 @@ confidence: high
   `serving_speech.py`。`LEGACY_TTS_DETECTORS` 当前为空，branch/legacy AST ratchet 是 27/0；
   Ming Flash 只由 adapter 的 `ming_tts` stage key 检测，且 legacy 名不得同时注册 adapter。
   验收仍须证明 `ming_tts` stage key 与 Ming dense architecture fallback 的消歧不变。
-  ^[PR #5746] ^[PR #5843]
+  ^[PR #5746] ^[PR #5843] ^[PR #6008]
 - 证据：CPU oracle/ratchet suite 支撑检测等价；L20X VoxCPM2 只证明 architecture path 到达
   warmup，随后因基线同样复现的 vLLM skew 退出，未证明成功 speech endpoint/audio E2E。
 

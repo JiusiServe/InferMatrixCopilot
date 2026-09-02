@@ -4,7 +4,7 @@ created: 2026-08-23
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, ci]
-sources: ["PR #3422", "PR #5074", "PR #5255", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5836", "PR #5845", "PR #5872", "PR #6048", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6339", "PR #6343"]
+sources: ["PR #3422", "PR #5074", "PR #5255", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5836", "PR #5845", "PR #5872", "PR #6008", "PR #6048", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6339", "PR #6343", .pre-commit-config.yaml, tools/pre_commit/check_tts_adapter.py, tests/tools/test_check_tts_adapter.py]
 confidence: high
 ---
 
@@ -65,6 +65,16 @@ confidence: high
 - 验收：当前 main schema/pre-commit、DCO 和 marker collection 通过；篡改摘要、Windows 路径、
   shell header 或非法 stability 参数分别被对应 gate 拒绝。 ^[PR #3422] ^[PR #6273]
   ^[PR #6293] ^[PR #6343]
+- pre-commit ratchet 不能把债务下降当成 hook 失败：`actual > budget` 才返回 1，
+  相等静默通过，
+  `actual < budget` 必须返回 0 并打印收紧上限的 reminder。passing hook 需 `verbose: true`
+  才能让提示可见；hook 的 `files` 还必须包含 checker 自身，使 budget 修改也会
+  触发审计。下降后未及时收紧会留出 slack，被检测分支只要不超旧上限就可
+  回增；直接提高 budget 也只会通过并打印 slack notice，所以“上限只能下降”仍由
+  reviewer 审核。手写 repo-wide constant 还使 verdict 受 merge order 影响，不是
+  merge-base-relative 合同。
+  现有 unit test 另外直接断言 count 等于 budget，所以下降但未改 constant 时 hook 会通过，
+  而该 test 若被收集仍会失败；两者应统一为同一非递增语义。^[PR #6008]
 
 ## OMNI-CI-2b — 并行测试基础设施隔离任务失败和共享状态
 
