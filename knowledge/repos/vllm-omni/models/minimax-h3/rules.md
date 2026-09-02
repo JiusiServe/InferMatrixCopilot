@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5737", "PR #5752", vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/entrypoints/openai/serving_video.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/entrypoints/openai_api/test_video_server.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md]
+sources: ["PR #5703", "PR #5737", "PR #5752", "PR #5764", vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/entrypoints/openai/serving_video.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/entrypoints/openai_api/test_video_server.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md]
 confidence: high
 ---
 
@@ -22,6 +22,8 @@ confidence: high
 | FL2VA keyframe、Ref2VA mixed reference、shape/output matrix | `MMH3-2a` | `pipeline_minimax_h3.py::{_resolve_fl2va_keyframe_indices,_validate_ref2va_reference_counts,_resolve_shape}` |
 | media limit、typed/multipart reference、HTTP 400、temp source | `MMH3-2b` | `api_server.py` video handlers → `serving_video.py::_run_and_extract` → `reference_video.py` |
 | conditioned VAE、fixed seed、`fork_rng`、MUSA/device RNG | `MMH3-2c` | `pipeline_minimax_h3.py` condition encode caller → `vae.py::{encode_image,encode_video}` |
+| DLO、TP-local、resident layers、encoder/VAE staging | `MMH3-3a` | H3 `_offload_plan` → shared DLO backend → pipeline encode/denoise/decode stage contexts |
+| RTX 5090/4090、24/32 GiB、consumer profile | `MMH3-3b` | recipe measurement commit/run record → exact target topology → quality/capacity validation |
 
 ## MMH3-1a — component namespace 与 checkpoint transform 必须在 active loader 前闭合
 
@@ -120,6 +122,40 @@ confidence: high
   覆盖，并加入重叠调用 fence。PR 中拟议的专用 VAE 单测按 review 被删除，目标 commit 没有
   新增测试；PR body 的 focused/实机结果只能作为外部验证，不能冒充已提交回归覆盖。
   ^[PR #5703]
+
+## MMH3-3a — H3 DLO 必须保持 loader layout 与 component stage 配对
+
+- 触发：H3 `OffloadPlan`、`dlo_no_use_allgather`、resident layer、text encoder/VAE staging
+  或 DLO 与 CPU/layerwise offload 组合。
+- 强制：H3 先走 regular loader 形成 TP-local grouped-QKV/fused-MLP layout，再以 no-AllGather
+  H2D streaming 使用它；`_supports_mmap_loading=False` 是安全门，不能绕过。plan 将
+  `token_refiner.blocks` 独立 stream，text encoder 的 vision/text block rank-local stream，
+  video/audio VAE 按 encode/decode stage on-demand，leading `transformer` blocks 只在 denoise
+  stage resident 并在 decode 前释放。`dlo_resident_layers>0` 必须与 no-AllGather 配对。
+- 禁止：让 encoder TP shard 进入 DiT AllGather；把 DLO+CPU offload 的早期分支优先级交给
+  generic CPU-offload hook；只因 component 有 `offload_to_cpu` 就推断每个 caller 都正确 staging。
+  目标 pin 的 `_encode_audio_conditions(standalone_audios)` 没有进入 `_component_on_device`，
+  会在前一个 embedded-audio context 已关闭后直接使用 CPU-bound audio VAE；没有外层 stage
+  context 或专属测试证明 image+standalone-audio Ref2VA 的 DLO device/performance 合同。
+- 验收：分别覆盖 text、image、video、embedded audio、standalone audio 与 decode 的
+  load→use→finally-offload 次序，异常也释放；regular-loader transform sentinel 到 TP-local stream
+  后仍正确；resident layers 只围住 denoise。补齐上述 standalone-audio gap 前，不能用其他
+  component staging 单测宣称所有 Ref2VA 输入已覆盖。^[PR #5764]
+
+## MMH3-3b — consumer-GPU profile 是有边界的容量证据
+
+- 触发：引用 H3 2×RTX 5090/4090 可运行性、延迟、峰值或 resident-layer 默认值。
+- 强制：5090 证据只绑定 vLLM-Omni `ae6577ea` 的一次 2×32 GiB、T2VA、1344×768、
+  124 frames、50 steps run：8m38s，约 22.6 GiB/GPU 是 sampled `nvidia-smi`，不是 allocator
+  high-water。4090 的 2×24 GiB/1024×576/12 resident layers 只来自 2×B300 的 5-step
+  capacity proxy；它不是 RTX 4090 latency 或 full-run validation。
+- 禁止：把单次未 warmed 的 5090 run 写成 benchmark，把 B300 proxy 写成 target hardware，
+  或从 HBM fit 推断 host fit。每个 FL2VA/Ref2VA partition 约 135 GiB，no-AllGather worker 的
+  pinned CPU master 不因 resident layers 增加而消失；recipe 要求至少 200 GiB available RAM。
+- 验收：目标硬件用单一 partition、exact TP2/no-AllGather/VAE PP2/cuDNN/eager topology 复测，
+  分别记录 allocator peak、重复 latency 和 joint video/audio quality。目标 pin 引用的
+  `examples/offline_inference/minimax_h3/run_h3_2gpu_all_tasks.sh` 实际不存在，因此不能把其
+  four-task/MP4 validation 描述成可执行入口；补文件或改文档后再验收。^[PR #5764]
 
 共享 component quantization、checkpoint mapping 与 quality evidence 见
 [Diffusion rules](../../components/diffusion/rules.md)。

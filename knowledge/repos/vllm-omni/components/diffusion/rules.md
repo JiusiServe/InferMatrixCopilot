@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5543", "PR #5737", "PR #5802", "PR #5848", "PR #5872", "PR #5981", "PR #6094", "PR #6102", "PR #6279", "PR #6385", "PR #6445", vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/offloader/, tests/diffusion/offloader/test_distributed_layerwise_backend.py]
+sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5543", "PR #5737", "PR #5764", "PR #5802", "PR #5848", "PR #5872", "PR #5981", "PR #6094", "PR #6102", "PR #6279", "PR #6385", "PR #6445", vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/offloader/, tests/diffusion/offloader/test_distributed_layerwise_backend.py]
 confidence: high
 ---
 
@@ -141,11 +141,17 @@ confidence: high
 - 触发：新增 `enable_distributed_layerwise_offload`、`dlo_use_allgather`、模型
   `OffloadPlan` 或 block discovery。
 - 强制：明确 rank 本地 CPU shard、固定双 GPU buffer、H2D/AllGather stream 和模型
-  block list 的 owner；`dlo_use_allgather=false` 走每 rank full-weight 路径，开启
+  block list 的 owner；`dlo_use_allgather=false` 保留 standard loader 已生成的每-rank
+  ready-to-run layout（没有其他分片维度时才是 full weight，TP 下则是 TP-local shard），开启
   AllGather 时不得再叠加已 DTensor-sharded 的 HSDP 参数。共享 output buffer 可按所有 hook
   的最大 block 分配，但每个 hook 调 collective 前必须按 dtype 截成自己的
   `_ag_output_sizes[dtype] == dp_size * local_shard.numel()` 前缀；block-flat-relative repoint
   offset 只能在这段实际 block buffer 内解释。
+- 强制：非 DiT component 的 staging 必须由 `OffloadPlan` 显式声明：encoder block group
+  rank-local streaming 不借用 DiT AllGather group，on-demand component 由 pipeline 在真实
+  encode/decode stage 成对 load/offload，resident layer 只对声明的 DiT path 生效。no-AllGather
+  路径保留 standard loader 产生的 TP-local layout；若模型 loader 还做 QKV/MLP transform，
+  mmap 必须显式 opt out，直到 transform-before-shard 等价性有测试。
 - 禁止：用 heuristic 找不到 block 时静默假装 offload 已启用；对 HSDP 参数二次分片；
   把 CPU 内存、AllGather 同步和设备显存开销隐藏在一个泛化的 `enable_cpu_offload` 开关；
   把 max-sized shared buffer 原样交给较小 block 的 `all_gather_into_tensor`。
@@ -154,6 +160,8 @@ confidence: high
   不同 block size 验证 small/large hook 都满足 collective size equality、重建权重和 repoint。
   当前回归用 mocked collective 检查 8/32-element、dp=2 合同；没有真实 multi-rank collective
   覆盖，PR 的 8×NPU H3 E2E 说明也缺少已填写的 commit 证据，不能升级为验证结论。 ^[PR #5802]
+  DP concurrent wave 只可在 DLO+AllGather 开启，并从 `sampling_params.extra_args` 比较 canonical
+  signature；no-AllGather 的 TP-local request 不得误走 fused batch。^[PR #5764]
 
 ## 质量阈值与资源辅助
 
