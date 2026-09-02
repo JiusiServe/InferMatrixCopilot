@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5723", "PR #5764", "PR #5836", "PR #5850", "PR #5863", "PR #5891", "PR #5896", "PR #5946", "PR #5969", "PR #5972", docs/models/supported_models.md, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-4090.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/utils/fa.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/offloader/, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/platforms/npu/platform.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/entrypoints/openai_api/test_video_server.py]
+sources: ["PR #5723", "PR #5764", "PR #5836", "PR #5850", "PR #5857", "PR #5863", recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-5000.md, "PR #5891", "PR #5896", "PR #5946", "PR #5969", "PR #5972", docs/models/supported_models.md, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-4090.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/utils/fa.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/offloader/, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/platforms/npu/platform.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/entrypoints/openai_api/test_video_server.py]
 confidence: high
 ---
 
@@ -189,3 +189,24 @@ measurement；模型输入、执行与加载合同返回 [MiniMax H3 rules](rule
   `server_test/{fl2va,ref2va}` scripts 不在 commit，raw profiler/benchmark artifact 也未提交；其 output
   video 只覆盖 Ref2VA Laser case，不是数值 quality gate。后续仍需 same-seed E2E comparison 和重抓
   snapshot 证明 churn/reserved 实际下降。^[PR #5891]
+
+## MMH3-3h — RTX PRO 5000 recipe 的 topology 与证据必须逐 workload 绑定
+
+- 触发：引用 2/4/8×72 GiB RTX PRO 5000 的 H3 capacity、latency、device order 或 DLO/resident 推荐。
+- 强制：2 卡只绑定 TP1×Ulysses2、rank-local no-AllGather DLO、20 resident layers、TE-TP2、VAE
+  patch2、CUDNN/eager；4 卡绑定 TP2×Ulysses2/TE-TP4/VAE4，8 卡 production 推荐绑定
+  TP4×Ulysses2/TE-TP8/VAE8，后二者 resident 且不加 eager。物理 GPU ID 只是已测双 NUMA/PCIe host
+  的映射示例，复现必须先按 `nvidia-smi topo -m` 重建同等 group locality。
+- 禁止：把 4/8 卡 latency winner 表中其他 topology 写成最终 recipe 推荐；从 20 resident layers 推导
+  host master 减少；把 FL2VA first-frame 或相同 encoder/decoder/DiT shape 外推成 Ref2VA 已测。
+- 验收：只把最终 recipe 表内 T2VA 与 first-frame FL2VA 的单 host、单请求、固定 shape/frames/steps
+  observation 作为有界证据：PyTorch 2.11+cu130、CUDA 13、driver 580.95.05、1344×768、124 frames、
+  50 requested→49 denoise updates。2/4/8 卡推荐路线的 T2VA E2E/denoise/per-update/external peak 分别为
+  515.57/504.69 s/10,300 ms/36.38 GiB、284.01/278.73 s/5,688 ms/67.58 GiB、
+  163.20/159.40 s/3,253 ms/45.83 GiB；first-frame FL2VA 分别为
+  553.45/541.90 s/11,059 ms/36.38 GiB、305.72/299.85 s/6,119 ms/67.58 GiB、
+  171.62/167.25 s/3,413 ms/45.83 GiB。final recipe 写两次 warmup，但 PR body 只明确绑定 4/8 卡，
+  因而 2 卡 warmup 范围不能视为已澄清；没有 repeat/variance、immutable image/source/checkpoint pin
+  或可复核 quality artifact，且 PR 只有 markdown/pre-commit。review 明确 Ref2VA 未测试，因此
+  `MODEL=Ref2VA` 重启说明只是配置建议。重测仍须记录 exact image/SHA、rank groups、NUMA policy、
+  all-rank peak 与 artifact/quality。^[PR #5857]
