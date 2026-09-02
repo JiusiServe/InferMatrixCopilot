@@ -1,10 +1,10 @@
 ---
 title: "独立审查执行合同"
 created: 2026-07-13
-updated: 2026-07-31
+updated: 2026-09-02
 type: guide
 tags: [general, review]
-sources: ["InferMatrixCopilot Issue #17", "InferMatrixCopilot Issue #24", "zuiho-kai/claude-workflow-starter@c217fc6"]
+sources: ["InferMatrixCopilot Issue #17", "InferMatrixCopilot Issue #24", "vllm-project/vllm-omni PR #5871", "zuiho-kai/claude-workflow-starter@c217fc6"]
 ---
 
 # 独立审查执行合同
@@ -45,6 +45,12 @@ sources: ["InferMatrixCopilot Issue #17", "InferMatrixCopilot Issue #24", "zuiho
 三条轨共用当前审查的一份证据包。已读文件、搜索结果、caller、测试、repo-map、知识路由和 finding 不重复获取；搜索必须限定目录、glob 或输出量，不用无边界全仓递归扫描。Direct 不新增持久缓存、后台调度器或 progress API。
 
 CI 默认只作为状态证据；只有首个失败异常与 frozen diff 重叠或阻塞判决时才打开日志。纯文档改动跳过依赖预检和 pytest，只做 diff hygiene、链接/构建检查以及对被引用 live contract 的有界核对。
+
+远端 head 必须物化为隔离快照或只用 SHA-addressed read；detached worktree 只冻结身份，不是
+安全边界。fork/untrusted head 的 import、测试、build、hook 和 repo-configurable tool 只有在
+无 secret、限制文件系统/网络/资源且用后销毁的 sandbox 中才可执行，否则只做静态读取与已有 CI。
+快照指纹必须覆盖 tracked、index、任务内 untracked 与 ignored bytes，并在每组可能改写文件的验证
+前后及交付前复核；只断言 `HEAD` 或只记录 untracked 文件名不足以证明证据未漂移。^[vLLM-Omni PR #5871]
 
 验证记录必须包含 `{repo, head_sha, command, result, environment_fingerprint}`。环境指纹至少覆盖依赖锁摘要、Python 和平台；只有依赖指纹匹配才复用环境。head 变化使旧测试结果失效，但依赖没有变化时不重建环境。预检失败就报告具体不兼容项，不继续运行或声称 pytest 已验证。预检通过后，目标测试和静态检查应与源码审查并行，不能等模型审完才启动。每条变化语义已有 finding 或明确 no-issue 结论后停止，不为增加信心继续追加搜索。
 
