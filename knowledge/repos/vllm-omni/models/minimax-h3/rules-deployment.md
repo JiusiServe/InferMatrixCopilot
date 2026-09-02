@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5723", "PR #5764", "PR #5836", "PR #5863", "PR #5896", "PR #5946", "PR #5969", "PR #5972", docs/models/supported_models.md, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/utils/fa.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/offloader/, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/platforms/rocm/platform.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/entrypoints/openai_api/test_video_server.py]
+sources: ["PR #5723", "PR #5764", "PR #5836", "PR #5863", "PR #5891", "PR #5896", "PR #5946", "PR #5969", "PR #5972", docs/models/supported_models.md, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/utils/fa.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/offloader/, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/platforms/npu/platform.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/entrypoints/openai_api/test_video_server.py]
 confidence: high
 ---
 
@@ -152,3 +152,25 @@ measurement；模型输入、执行与加载合同返回 [MiniMax H3 rules](rule
   output/quality；每个 topology 当前仅两次 warmup 后测一个请求，无 repeats/variance。recipe-only diff
   无自动回归，4/8 GPU scaling 和首次请求 19% 慢均为单机观察。SM120 显式 CUDNN 合理，因为 target
   TRTLLM auto-default 只覆盖 compute major 10；这不构成其他 SM120 backend 的比较证据。
+
+## MMH3-3g — Ascend mask-free 数字只绑定报告的 H3 packed workload
+
+- 触发：引用 NPU quadratic mask churn、packed varlen/Laser latency、A3 HBM 或 H3 mask-free E2E。
+- 强制：memory snapshot 只绑定报告的 T2VA packed S=63232、约 100 attention/step×50 steps：旧
+  `full_qk` 行产生 3.72/14.90 GiB transient mask、累计 45.6 TiB allocation churn，并使 57 GiB
+  reserved 中约 33.7 GiB 成为 idle segments；这是 profiler observation，不是所有 shape 的 allocator
+  定律。single-kernel 20-iteration average 只覆盖 USP8 per-rank 的四个 T/N/D shape，最大一行
+  63232/7/128 为 170.8→90.6 ms；per-call peak 18.86→0.44 GiB。^[PR #5891]
+- 强制：E2E 数字只绑定 8×Ascend 910、batch1/BF16/50 steps/flow shift12/24 FPS、USP8/Ring1/
+  HSDP8/TE-TP8/VAE tile-patch8、768p、每格两次均值。varlen→Laser 分别是 T2VA 10 s
+  450→337 s、FL2VA 8 s keyframe 316→244 s、Ref2VA 5 s video+audio 642→473 s；Laser+Cache-DiT
+  的 226/143/249 s 是叠加另一机制，不归因本 PR。recipe 另报 DLO 下 Ref2VA 13.88 s input→15 s
+  1344×768 output 约 45 GB/device；不能与 HSDP E2E topology 合并成同一 capacity/perf case。
+- 禁止：把这些值写成 Ascend/NPU 通用收益，或声称 PR 已证实整请求从旧 mask path 的 speedup；E2E
+  表比较的是新 varlen、Laser 和可选 Cache-DiT，没有 old-mask E2E control。rank0 reserved
+  40–44 GB 与 recipe DLO 45 GB 也不是所有 rank/任务峰值上界。
+- 验收：复现必须补 exact source commit、immutable environment/image、Atlas/Ascend SKU、输入 artifact/
+  prompt/seed、warmup、逐 run raw headers/logs、all-rank memory 与 same-seed output metric。PR body 引用的
+  `server_test/{fl2va,ref2va}` scripts 不在 commit，raw profiler/benchmark artifact 也未提交；其 output
+  video 只覆盖 Ref2VA Laser case，不是数值 quality gate。后续仍需 same-seed E2E comparison 和重抓
+  snapshot 证明 churn/reserved 实际下降。^[PR #5891]
