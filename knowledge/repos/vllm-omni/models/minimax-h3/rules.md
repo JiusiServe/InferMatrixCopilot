@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5737", "PR #5752", "PR #5764", "PR #5801", "PR #5829", "PR #5837", vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/entrypoints/openai/serving_video.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/entrypoints/openai_api/test_video_server.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md]
+sources: ["PR #5703", "PR #5706", "PR #5737", "PR #5752", "PR #5764", "PR #5801", "PR #5829", "PR #5837", vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/quantization/int8_config.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/diffusion/quantization/test_int8_config.py, tests/entrypoints/openai_api/test_video_server.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md]
 confidence: high
 ---
 
@@ -20,6 +20,7 @@ confidence: high
 | grouped QKV、fused MLP、weight loader、TP | `MMH3-1a` | `minimax_h3_transformer.py::MiniMaxH3DiTModel.load_weights` → active vLLM loader |
 | FP8 quality、audio metric、layerwise offload | `MMH3-1b` | quantization quality test → recipe/support matrix → nightly lane |
 | RMSNorm、RoPE、96/128 rotary dim、fused backend | `MMH3-1c` | `MiniMaxH3Attention` → shared `RMSNorm`/`RotaryEmbedding` → platform dispatch |
+| RainFusion、block sparse、video layout、NPU INT8 | `MMH3-1d` | packed sequence → attention metadata/backend plan；quant config → prefixed linear → loader/post-load |
 | FL2VA keyframe、Ref2VA mixed reference、shape/output matrix | `MMH3-2a` | `pipeline_minimax_h3.py::{_resolve_fl2va_keyframe_indices,_validate_ref2va_reference_counts,_resolve_shape}` |
 | media limit、typed/multipart reference、HTTP 400、temp source | `MMH3-2b` | `api_server.py` video handlers → `serving_video.py::_run_and_extract` → `reference_video.py` |
 | conditioned VAE、fixed seed、`fork_rng`、MUSA/device RNG | `MMH3-2c` | `pipeline_minimax_h3.py` condition encode caller → `vae.py::{encode_image,encode_video}` |
@@ -42,6 +43,12 @@ confidence: high
 - 验收：枚举默认 quantized/full-precision prefix 集合，逐个验证 exact ignored leaf；QKV
   与 gate/up sentinel 断言传给 active loader 的顺序和 shard id，至少覆盖 TP 与 online FP8。
   ^[PR #5737]
+
+NPU INT8 online 同样复用 component-relative prefix 与 active loader：BF16 checkpoint 在逐层
+load 完成时 dynamic quantize，text encoder、VAE 和非 eligible projection 保持未量化；
+`ignored_layers` 必须能用 fused owner 名（如 `blocks.0.attn.qkv_proj`）精确跳过。NPU
+`QuantBatchMatmulV3` 的 65535 output 限制只按 per-partition width 判断，超限 layer 回退
+`UnquantizedLinearMethod`，更高 TP 可能让同一层重新满足 INT8。^[PR #5706]
 
 ## MMH3-1b — joint video/audio quality 与 offload 兼容性必须一起验收
 
@@ -75,6 +82,26 @@ confidence: high
   passthrough；另测 BF16 gamma/FP32 accumulation、compile native path 与各平台参数 wiring。
   真实 kernel 性能与数值结论需目标硬件复测；PR 报告的 491014→475070 ms 来自非目标
   `5215e03a` 且缺硬件与重复次数，只能作为有界外部观察，不能写成稳定 3.35% 保证。^[PR #5801]
+
+## MMH3-1d — RainFusion 只在完整、对齐的 H3 video tail 上稀疏
+
+- 触发：修改 `RAINFUSION_ATTN`、`block_sparse`、packed video geometry、attention layout、
+  denoise step/layer skip 或 NPU backend resolution。
+- 强制：显式选择时所有平台在构造模型前检查 backend platform/dependency；RainFusion 仅支持
+  Ascend NPU、要求 MindIE-SD，且不兼容 Ring（用 Ulysses）。H3 attention 显式声明 BSND，
+  `VideoTokenLayout(prefix_len, latent_grid)` 必须证明 video 是 packed document 0 的 tail。
+- 强制：只有 sparsity>0、step>=start_step、非 skip layer、video>=32×128 rows 且 video rows
+  为 128 的倍数时调用 `rf_v2`；prefix/text/reference/audio 保持 dense。无 layout、无
+  `max_seqlen_q`、长度不闭合、短序列、未声明 layout 或未对齐 geometry 一律走 NPU Flash dense
+  fallback，不能 padding，因为 kernel 忽略 mask，padding key 会改变 softmax denominator。
+- 禁止：把 nominal sparsity 当 realized sparsity或质量保证；未声明 layout 时不能让 sparse path
+  假设 BSND 而 dense fallback 解释成 BNSD。INT8、RainFusion、no-AllGather DLO 可组合，但 online
+  quantization 不得与 DLO+AllGather 组合；本 PR 没有证明 HSDP 或其他 quantizer 的组合语义。
+- 验收：CPU plan tests 覆盖 aligned/misaligned、tail closure、min length、layout 和 skip/step；
+  NPU 条件数值测试以 `sparsity=0` 直接调用 kernel 对 dense reference，mean relative error 阈值
+  为 `2e-3`；它不证明 `sparsity=0.8` 质量 parity。PR 的 Atlas 800I A3 8×NPU、
+  CANN 9.0.1、T2VA 209-frame 三种生成仅证明这些 exact 配置能完成；视频样例不是质量阈值，
+  没有 latency/repeats，不能宣称稳定加速或 FL2VA/Ref2VA 支持。^[PR #5706]
 
 ## MMH3-2a — task、reference、shape 与多输出必须作为一个输入矩阵维护
 
