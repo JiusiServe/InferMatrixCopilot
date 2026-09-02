@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-02
 type: guide
 tags: [vllm-omni, docs]
-sources: ["PR #5139", "PR #5833", "PR #5839", "PR #5914", docs/.nav.yml, docs/design/index.md, docs/design/module/, docs/design/module/archive/README.md, docs/design/ar_diffusion_pipeline_capability.md, docs/design/architecture_overview.md, docs/design/feature/diffusion_continuous_batching.md, docs/design/feature/distributed_layerwise_offload.md, docs/design/feature/omni_async_output_materialization.md, docs/design/feature/quantization.md, docs/user_guide/diffusion/execution_modes.md]
+sources: ["PR #5139", "PR #5833", "PR #5839", "PR #5914", "PR #5958", .github/CODEOWNERS, docs/.nav.yml, docs/design/index.md, docs/design/module/, docs/design/module/archive/README.md, docs/design/ar_diffusion_pipeline_capability.md, docs/design/architecture_overview.md, docs/design/feature/diffusion_continuous_batching.md, docs/design/feature/distributed_layerwise_offload.md, docs/design/feature/omni_async_output_materialization.md, docs/design/feature/quantization.md, docs/user_guide/diffusion/execution_modes.md]
 ---
 
 # 官方设计文档地图（docs/design/**）
@@ -18,6 +18,12 @@ infrastructure/performance 和 21 个 module 页面编排。module frontmatter �
 旧四页已移入 `module/archive/` 并从导航移除，只能作为历史叙述；有用结论须先与当前代码/测试复核。
 上游刻意没有为旧 URL 留 redirect，因此外部深链会 404。owner 与 `required_reviewers` 是不同角色，
 不能用 document steward/technical owner 冒充独立验证批准。
+
+module frontmatter 的 `owners` + `primary_code_paths` 现在是 `vllm_omni/**` ownership 的 edit-first
+source map，少数 `primary_code_path_owners` 为子路径追加 owners；`.github/CODEOWNERS` 是
+last-match-wins 的 GitHub 执行投影。它没有自动生成/parity test，具体维护与冲突边界见
+[ownership projection rules](../owners/rules.md)。ownership metadata 的变化不改变下表
+runtime owner 的行为合同；仍须回 live code/tests 验证。^[PR #5958]
 
 此前 #5833/#5839 增加 DLO 与 quantization design；`cpu_offload_diffusion.md` 重命名为
 `cpu_offload.md` 且保留 MkDocs redirect，并删除误导性的 `ray_based_execution.md`。目标 pin 仍有
