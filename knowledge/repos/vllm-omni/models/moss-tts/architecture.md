@@ -1,15 +1,15 @@
 ---
 title: "MOSS-TTS 架构"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-09-02
 type: architecture
 tags: [vllm-omni, models]
-sources: [vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py, vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_codec.py, vllm_omni/model_executor/models/moss_tts_nano/modeling_moss_tts_nano.py, vllm_omni/model_executor/models/moss_tts/pipeline.py, vllm_omni/model_executor/stage_input_processors/moss_tts.py, vllm_omni/deploy/moss_voice_generator.yaml]
+sources: ["PR #4958", vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local.py, vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py, vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_codec.py, vllm_omni/model_executor/models/moss_tts_nano/modeling_moss_tts_nano.py, vllm_omni/model_executor/models/moss_tts/pipeline.py, vllm_omni/model_executor/stage_input_processors/moss_tts.py, vllm_omni/deploy/moss_voice_generator.yaml]
 ---
 
 # MOSS-TTS 架构
 
-事实在 `main @ 5d44868e` 复核;变体/deploy 速查见 [index](_index.md)。
+事实在 `main @ 6fdc4ca6` 复核;变体/deploy 速查见 [index](_index.md)。
 
 ## 模型专有部分与共享模块的边界
 
@@ -36,6 +36,12 @@ sources: [vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py, 
 - CUDA-graph 安全不对称：8B delay talker 可开 stage-0 graph;VoiceGenerator
   必须 eager(每请求 GPU 缓冲不 graph 安全);codec graph 只在 `moss_tts.yaml`
   开。
+- Realtime 的 local depth transformer 复用共享 `CodePredictorBaseModel`，因此 checkpoint 中
+  q/k/v 和 gate/up shard 不能经由 talker 的逐 tensor `default_weight_loader`。talker 必须将
+  `local_transformer.model.*` 委托给 `MossTTSRealtimeLocalTransformer.load_weights()`，由共享
+  fused loader 完成拼装并检查完整性。否则 unfused shard 只会被记为 skipped，fused
+  参数保持随机初始值却不报错。拼装、缺 shard、returned prefix 和 TP 的共享验收合同见
+  [Model Executor EXEC-2b](../../components/model-executor/rules.md#exec-2b-fused-shard-必须按布局数值闭环且所有-consumer-委托共享-loader)。
 
 ## 从输入到输出的主要流程
 

@@ -1,10 +1,10 @@
 ---
 title: "Model Executor 规则"
 created: 2026-07-10
-updated: 2026-08-23
+updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/engine/stage_init_utils.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py, docs/design/feature/omni_async_output_materialization.md, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/experimental/fullduplex/, tests/e2e/features/fullduplex/, "PR #3422", "PR #3642", "PR #4730", "PR #5074", "PR #5610", "PR #5792", "claude-workflow-starter-private@09dca46"]
+sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/engine/stage_init_utils.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py, docs/design/feature/omni_async_output_materialization.md, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/experimental/fullduplex/, tests/e2e/features/fullduplex/, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local.py, vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, vllm_omni/platforms/npu/_310p/patch/qwen3_tts.py, tests/model_executor/models/moss_tts/test_moss_fused_load.py, tests/model_executor/models/qwen3_tts/test_code_predictor_dtype.py, "PR #3422", "PR #3642", "PR #4730", "PR #4958", "PR #5074", "PR #5610", "PR #5792", "claude-workflow-starter-private@09dca46"]
 ---
 
 # Model Executor 规则
@@ -21,6 +21,7 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 | stage TP/PP/DP、devices、replica、visible devices、worker 启动、容量 fail-fast | `stage-runtime`：本页“Stage 并行度和设备容量必须一起验收” | `vllm_omni/config/stage_config.py::build_stage_runtime_overrides` → `vllm_omni/engine/stage_runtime.py::{StageRuntime.initialize,StageRuntime._resolve_replica_physical_devices}` → `stage_engine_startup.py::{launch_stage_replica,get_headless_replica_devices}` |
 | `runtime_info`、request RNG、batch compaction、跨 stage bridge/串线 | `bridge-batch`：`EXEC-1a`–`1c` | shared runner request state → stage input processor → model consumer |
 | loader dtype、只取 checkpoint config、避免整仓权重下载 | `loader-contract`：`EXEC-2a` | `vllm_omni/model_executor/model_loader/weight_utils.py::download_weights_from_hf_specific` → `vllm_omni/model_executor/models/<命中模型>` loader |
+| fused projection、HF shard 拼装、consumer 委托、packed TP | `loader-contract`：`EXEC-2b` | `models/common/qwen3_code_predictor.py::CodePredictorBaseModel.load_weights` → Qwen3/MOSS consumer → platform override |
 | async Omni output、background builder、D2H snapshot、connector drain/fallback | `async-output`：`EXEC-5a` | `worker/gpu_ar_model_runner.py::{_should_use_async_omni_output,OmniAsyncGPUModelRunnerOutput}` → platform runner → connector output |
 
 | 审查组 | 什么时候触发 | 规则 ID |
@@ -28,7 +29,7 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 | `core` | 每次 model-executor 审查 | `EXEC-1a` |
 | `strict-stage-config` | stage schema、projection、known fields | `EXEC-3a` |
 | `bridge-batch` | runtime info、跨 stage payload、batch、request RNG | `EXEC-1a`, `EXEC-1b`, `EXEC-1c` |
-| `loader-contract` | dtype、checkpoint config 获取、loader | `EXEC-2a` |
+| `loader-contract` | dtype、checkpoint config 获取、loader、fused shard 拼装 | `EXEC-2a`, `EXEC-2b` |
 | `async-output` | AR async output、snapshot/live state、平台与 guard/fallback | `EXEC-5a` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `EXEC-0a`, `EXEC-0b` |
 
@@ -165,3 +166,19 @@ Stage 拓扑错误的最小充分源码证据只有三段：一处最终配置�
 - 验收：mock 下载层证明只请求目标 config，loader 测试断言各子模块 dtype；真实 smoke
   记录峰值显存和 dtype。Krea 2 的具体约束见
   [Krea 2 规则](../../models/krea2/rules.md)。 ^[PR #4730]
+
+### EXEC-2b — fused shard 必须按布局数值闭环且所有 consumer 委托共享 loader
+
+- 触发：合并/拆分 q/k/v、gate/up 等 projection，修改 HF shard 映射、wrapper/talker
+  loader、packed projection TP plan 或平台 override。
+- 强制：weight 与可选 bias 都按 forward split 的同一顺序数值拼装；部分 shard 和
+  整组 shard 缺失都硬失败。所有声明同一 fused module 的 consumer 必须委托给共享
+  loader，wrapper 并恢复 returned loaded-name 的模型前缀；平台 override 同步使用新
+  fused 属性与共享 split helper。
+- 禁止：不得用逐 tensor `default_weight_loader` 绕过 fused assembler；不得只记录 skipped
+  shard 后让随机初始参数继续；不得只用 shape 或 returned-name 断言顺序正确。GQA
+  下错误偏移仍可形状合法。plain packed `nn.Linear` 不得声明泛化 colwise TP；
+  未有 TP-aware packing/loading/split 与 TP=2 测试时，TP plan 保持空。
+- 验收：数值比较 fused 参数与 `cat([q,k,v])`/`cat([gate,up])`，覆盖 bias、
+  部分/整组缺 shard、每个 consumer 的委托和前缀；以非等 q/KV width 证明 split 能识别
+  GQA 错序。平台测试或静态 guard 证明不再引用已删除的 projection 属性。 ^[PR #4958]

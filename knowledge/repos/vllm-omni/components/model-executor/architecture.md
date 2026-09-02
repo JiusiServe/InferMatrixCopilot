@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-02
 type: architecture
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #5610", docs/design/feature/omni_async_output_materialization.md, vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py]
+sources: ["PR #4958", "PR #5610", docs/design/feature/omni_async_output_materialization.md, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local.py, vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, vllm_omni/platforms/npu/_310p/patch/qwen3_tts.py, vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, tests/model_executor/models/moss_tts/test_moss_fused_load.py, tests/model_executor/models/qwen3_tts/test_code_predictor_dtype.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py]
 ---
 
 # Model Executor 共享架构
@@ -49,6 +49,17 @@ consumer，读取 live connector signal；`get_output()` join builder，同时�
 decode、routed-expert output 等冲突状态；条件不满足时回退同步构造。CUDA/ROCm 是已验证范围，
 不是代码里的 platform guard；XPU/MUSA 可能通过共享 GPU runner 进入但尚未验证，Ascend NPU
 使用独立 runner 并保持同步 materialization。
+
+## 共享 fused code-predictor loader 合同
+
+Qwen3-TTS、Qwen3-Omni 和 MOSS-TTS Realtime 复用 `qwen3_code_predictor.py`。每层将
+HF q/k/v 行按该顺序拼成 plain `nn.Linear` `qkv_proj`，将 gate/up 拼成
+`gate_up_proj`；forward 必须按同样边界拆分，并在 SDPA 前把 packed k/v slice
+重新物化为 contiguous。这保持线性代数，但 GPU kernel/累加顺序变化仍可导致
+bit-level drift。
+
+该表示的 loader、consumer、TP 与 platform 可执行验收合同见
+[EXEC-2b](rules.md#exec-2b-fused-shard-必须按布局数值闭环且所有-consumer-委托共享-loader)。
 
 ## 怎样判断问题归属
 
