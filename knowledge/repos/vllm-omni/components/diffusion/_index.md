@@ -1,7 +1,7 @@
 ---
 title: "Diffusion"
 created: 2026-07-10
-updated: 2026-08-23
+updated: 2026-09-02
 type: index
 tags: [vllm-omni, components, diffusion]
 sources: []
@@ -10,7 +10,7 @@ sources: []
 # Diffusion
 
 - 源码入口：`vllm_omni/diffusion/` 全树，含 16 个子模块：attention、cache、distributed、executor、hooks、layers、lora、model_loader、models、offloader、postprocess、profiler、quantization、sched、utils、worker
-- 源码校验：以上子模块均已在 `main @ 9159cedb` 验证存在；本轮新增/扩展的
+- 源码校验：以上子模块均已在 `main @ 8e2e9b6b` 验证存在；本轮新增/扩展的
   async output、distributed layerwise offload 和 MiniMax H3 仍按各自模型/机制规则审查
 - 主要职责：多个 diffusion 模型共用的 pipeline、执行循环、scheduler 接入和运行机制
 
@@ -36,3 +36,4 @@ sources: []
 | diffusion step 与 request/continuous batching | [step and batching](step-and-batching.md) |
 | Cache-DiT、TeaCache 和 prefix cache | [cache acceleration](cache-acceleration.md) |
 | TP/PP/SP/CFG/VAE/HSDP 等并行策略 | [parallelism](parallelism.md) |
+| 实验性 world-model session 生命周期、LRU 与内存统计边界 | [session state](session-state.md) |

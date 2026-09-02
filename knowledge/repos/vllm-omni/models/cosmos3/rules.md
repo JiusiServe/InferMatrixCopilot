@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5001", "PR #5634", recipes/cosmos3/Cosmos3-Nano.md, vllm_omni/platforms/rocm/platform.py]
+sources: ["PR #4657", "PR #5001", "PR #5634", docs/features/session_state_manager.md, recipes/cosmos3/Cosmos3-Nano.md, vllm_omni/diffusion/models/cosmos3/, vllm_omni/experimental/world_models/adapters/state_cosmos3_adapter.py, vllm_omni/platforms/rocm/platform.py, tests/cosmos3/test_session_memory_equivalence.py, tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py]
 confidence: high
 ---
 
@@ -20,6 +20,7 @@ confidence: high
 | Distilled、SDE scheduler、`t_list` | COSMOS-1b | `diffusion/models/cosmos3/pipeline_cosmos3.py::Cosmos3OmniDiffusersPipeline` 及 scheduler config consumer |
 | seed/generator、逐步噪声 | COSMOS-2a | `pipeline_cosmos3.py::Cosmos3OmniDiffusersPipeline` 的 request-local sampling 路径 |
 | `guidance=0`、request extra | COSMOS-2b | `model_extras/cosmos3.py` → pipeline sampling params |
+| session manager、UND K/V、`freqs_gen`、CFG branch、request ID | COSMOS-2c | `state_cosmos3_adapter.py` → `pipeline_cosmos3.py` → `transformer_cosmos3.py` |
 | online/offload/HSDP/VAE parallel 支持声明 | COSMOS-3a | capability 文档/recipe → 对应公开入口与实现路径 |
 | ROCm、MI350X、AITER、latency/peak memory | COSMOS-3b | recipe 的 measurement commit/protocol → `platforms/rocm/platform.py` backend gate → 目标配置复测 |
 
@@ -57,6 +58,22 @@ confidence: high
   pipeline 断言。
 - 禁止：`value or default`、truthy sentinel。
 - 验收：未提供使用默认，`0.0` 保持零，普通正值保持不变，三类测试都到 consumer。 ^[PR #5001]
+
+## COSMOS-2c — session manager 缓存必须按 branch/layer 完整装卸
+
+- 触发：启用 session-state manager，或修改 UND cached K/V、`freqs_gen`、CFG/request key。
+- 强制：每层以 conditional `und_kv/{i}` 或 unconditional `und_kv_neg/{i}` 分支存 native
+  `(K,V)` 引用，并随分支保存 M-RoPE cos/sin；仅未初始化分支可 capture，标准与 RoboLab/action
+  路径都必须传 request ID。generation 开始 reset，整个 dispatch 用 `finally` drop session。
+- 禁止：capture 新分支时接受缺 K/V 或缺 freqs，或 load 只初始化部分 layer K/V；已有完整
+  K/V 但没有 cached freqs 时允许装载，并由 transformer 独立重算 freqs。flag 开启时
+  `diffuse_transfer()` 必须 fail closed，`_bde_kv_state` 非空也必须拒绝，因为当前没有
+  writer。默认关闭时保留原有 transformer-instance cache 行为。^[PR #4657]
+- CFG：sequential CFG 可在同 GPU 保留 cond+uncond，CFG-parallel 每 rank 只保留自身分支，
+  no-CFG 只保留 cond；UND K/V 随 SP rank 复制。该 state 隔离不等于 pipeline 并发安全。
+- 验收：CPU adapter/mocked pipeline 测试覆盖 branch round-trip、encode-once、freqs restore、
+  partial rejection、reset/LRU pin、RoboLab key、Transfer guard 与首次 step 前异常清理；真实
+  GPU/model flag-on equivalence 和 peak-memory A/B 仍是缺口，错误 env var 下的早期零差异不能引用。
 
 ## COSMOS-3a — 支持表中的每个能力都有独立证据
 

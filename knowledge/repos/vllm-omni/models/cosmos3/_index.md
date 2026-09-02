@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-02
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5001", "PR #5634", recipes/cosmos3/Cosmos3-Nano.md, vllm_omni/diffusion/models/cosmos3/, vllm_omni/platforms/rocm/platform.py]
+sources: ["PR #4657", "PR #5001", "PR #5634", docs/features/session_state_manager.md, recipes/cosmos3/Cosmos3-Nano.md, vllm_omni/diffusion/models/cosmos3/, vllm_omni/experimental/world_models/adapters/state_cosmos3_adapter.py, vllm_omni/platforms/rocm/platform.py]
 confidence: high
 ---
 
@@ -37,6 +37,13 @@ ROCm recipe 的 MI350X latency/显存只来自 `b3f4fbf9` 上单卡 gfx950、Nan
 guardrails off 的一次 warmup + 一次测量，不是当前 pin 或通用 ROCm 保证。gfx942 只命中
 platform 的 AITER capability gate，未在该 PR 实测；质量、multi-GPU 与 Cosmos3-Super 也未覆盖。
 引用具体数字或扩展支持矩阵时按本页审查入口中的 `COSMOS-3b` 复核。
+
+## Session-state opt-in
+
+实验 flag 可把 UND text K/V 与分支 `freqs_gen` 接入共享 manager；默认关闭，并且只在一次
+request 的 denoise 生命周期内使用，不提供跨请求记忆或并发安全。具体 branch/layer 合同见
+本页审查入口中的 `COSMOS-2c`，共享 LRU、
+统计与引用存活边界见 [world-model session state](../../components/diffusion/session-state.md)。
 
 ## 什么时候查这里
 
