@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5706", "PR #5720", "PR #5737", "PR #5752", "PR #5764", "PR #5779", "PR #5801", "PR #5824", "PR #5829", "PR #5836", "PR #5837", "PR #5840", "PR #5853", "PR #5881", "PR #5891", "PR #5896", "PR #5997", "PR #6000", benchmarks/diffusion/backends.py, benchmarks/diffusion/diffusion_benchmark_serving.py, docs/user_guide/diffusion/attention_backends.md, vllm_omni/config/model.py, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/cache/teacache/, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/inputs/data.py, vllm_omni/quantization/int8_config.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_cache_dit_request_runtime.py, tests/diffusion/cache/test_teacache_extractors.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quality_policy.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/diffusion/quantization/test_int8_config.py, tests/entrypoints/openai_api/test_video_server.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/engine/async_omni_engine.py]
+sources: ["PR #5703", "PR #5706", "PR #5720", "PR #5737", "PR #5764", "PR #5779", "PR #5801", "PR #5824", "PR #5829", "PR #5836", "PR #5837", "PR #5840", "PR #5853", "PR #5881", "PR #5891", "PR #5896", "PR #5997", "PR #6000", benchmarks/diffusion/backends.py, benchmarks/diffusion/diffusion_benchmark_serving.py, docs/user_guide/diffusion/attention_backends.md, vllm_omni/config/model.py, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/cache/teacache/, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/quantization/int8_config.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_cache_dit_request_runtime.py, tests/diffusion/cache/test_teacache_extractors.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quality_policy.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/diffusion/quantization/test_int8_config.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/engine/async_omni_engine.py]
 confidence: high
 ---
 
@@ -24,8 +24,8 @@ confidence: high
 | TRTLLM、ragged packed metadata、SAGE、Skip-Softmax、Blackwell default | `MMH3-1e` | H3 metadata/roles → TRTLLM packed trim/quant gate → platform default |
 | text encoder、missing q/k/v 或 gate/up、eager load bookkeeping | [MMH3-1f](rules-loading.md#mmh3-1f-text-encoder-eager-load-必须证明每个-source-shard-完整) | `encoder.py::_load_weights` → `pipeline_minimax_h3.py::load_weights` strict report |
 | NPU packed varlen、quadratic mask、LaserAttention、prefix K/V | `MMH3-1g` | H3 packed producer → backend capability/metadata → NPU FlashAttention fallback |
-| FL2VA keyframe、Ref2VA mixed reference、shape/output matrix | `MMH3-2a` | `pipeline_minimax_h3.py::{_resolve_fl2va_keyframe_indices,_validate_ref2va_reference_counts,_resolve_shape}` |
-| media limit、typed/multipart reference、HTTP 400、temp source | `MMH3-2b` | `api_server.py` video handlers → `serving_video.py::_run_and_extract` → `reference_video.py` |
+| FL2VA keyframe、Ref2VA mixed reference/时域限界、shape/output matrix | [MMH3-2a](rules-media.md#mmh3-2a-taskreferenceshape-与多输出必须作为一个输入矩阵维护) | `pipeline_minimax_h3.py` → `reference_video.py` |
+| media limit、typed/multipart reference、HTTP 400、temp source | [MMH3-2b](rules-media.md#mmh3-2b-media-ingress-在解码前限界request-错误保持-http-400) | `api_server.py` → `serving_video.py` → `reference_video.py` |
 | conditioned VAE、fixed seed、`fork_rng`、MUSA/device RNG | `MMH3-2c` | `pipeline_minimax_h3.py` condition encode caller → `vae.py::{encode_image,encode_video}` |
 | modular checkpoint、combined/partition task、两套 DiT、shared component | `MMH3-2d` | model index discovery → startup task selection → task-specific transformer/cache lifecycle |
 | request `quality`、lossless/high、dynamic Cache-DiT | `MMH3-2e` | request sampling → quality policy → request Cache-DiT runtime → denoise |
@@ -164,56 +164,6 @@ confidence: high
   tests 再覆盖 malformed fallback 和 Laser math。真实 Ascend parity/内存/延迟证据不能由 CPU mock
   替代；同 seed E2E output comparison 与重新抓 memory snapshot 在 PR 中仍列为 follow-up。
   ^[PR #5891] ^[PR #5997]
-
-## MMH3-2a — task、reference、shape 与多输出必须作为一个输入矩阵维护
-
-- 触发：H3 `t2va`/`fl2va`/`ref2va`、reference 计数、frame index、canvas、duration 或
-  `num_outputs_per_prompt`。
-- 强制：FL2VA 接受一张首/尾帧或两张有序首尾帧，signature 仅为 `[0]`、`[-1]`、
-  `[0,-1]`，未显式给出时一张默认 `[0]`、两张默认 `[0,-1]`。Ref2VA 必须至少有一项
-  image/video visual reference；image≤9、video≤3、standalone audio≤3、总数≤12，允许
-  image-only 及 image/video/audio mixed matrix，但拒绝 audio-only。
-- 强制：输出固定 24 FPS、32 kHz audio、duration 4–15 秒。省略 width/height 时
-  `short_edge` 只能为 768；T2VA 即使同时给出 width/height，仍必须显式选择 `21:9`、
-  `16:9`、`4:3`、`1:1`、`3:4`、`9:16`，因为 named ratio 在 explicit-dimension branch
-  之前解析。FL2VA 跟随首图 geometry 并忽略通用 ratio override，Ref2VA 默认 `16:9`，
-  `adaptive`/`auto` 是该默认的 alias。^[PR #5829]
-- 强制：`num_outputs_per_prompt` 仅为 1–10，各输出 seed 是 `seed + output_index`；pipeline
-  tensor output 与未被公开 caller 使用的 `generate_videos()` 保留 fan-out。此 pin 上 public
-  async job 与 `/v1/videos/sync` 都调用 `generate_video_bytes()`，多输出时告警并只持久化/返回
-  `artifacts.videos[0]`；不得把 recipe 的“async 返回全部”描述当成实现证据。
-- 禁止：把 partition 名当输入能力；FL2VA/Ref2VA 权重分区仍需与 task 匹配。不得把长
-  reference clip 截成输出长度；reference 自己的 segment/duration 合同由 MMH3-2b 约束。
-- 验收：以 F1/F2、R1–R10、G1–G4 matrix 覆盖正反例，包含 mixed reference、audio-only、
-  ratio/default、duration 边界、pipeline fan-out、seed 顺序与两个 public endpoint 的 first-only
-  行为；文档与实现冲突必须显式暴露。 ^[PR #5752]
-
-## MMH3-2b — media ingress 在解码前限界，request 错误保持 HTTP 400
-
-- 触发：typed `image_reference`/`video_reference`/`audio_reference`、multipart
-  `input_reference(s)`、URL/data URL 下载、ffprobe/transcode 或 `start_time_seconds`。
-- 强制：typed 字段接受单对象或有序 list；multipart 按 MIME/suffix 分类并保持每种媒体的
-  顺序。仅 H3 multipart `input_reference(s)` 在读取/解码前执行 bounded read 与 allowlist：
-  image≤30 MiB（JPEG/PNG/WEBP/HEIC/HEIF）、
-  video≤50 MiB（MP4/MOV，H.264/H.265，若有 audio 则 AAC/MP3）、audio≤15 MiB（WAV/MP3，
-  PCM/MP3）。image/video dimension 为 256–5760、ratio 为 0.4–2.5；video FPS 23.976–60。
-- 强制：每个 video/audio reference 时长 2–15 秒；video 总时长≤15 秒，embedded video
-  audio 与 standalone audio 合并后的 conditioning 总时长也≤15 秒。每个 video 的
-  `start_time_seconds` 必须落在 source duration 内并剩余至少 2 秒。只容忍官方双视频
-  container probe 的微小 rounding overflow，并裁到剩余总时长；真实 overflow 仍拒绝。
-- 强制：typed URL/data-URL video 必须 materialize 为 request-scoped 临时 MP4 source，再交给
-  只收 path 的 preparation，成功/异常都清理；path-backed typed video/audio 在下载后由模型
-  preparation 检查 file metadata。mixed image+video 只有 model metadata 明示 capability 才放行；
-  分布式非零 DiT rank 用已广播的全局 `video_count` 判断 visual 是否存在。
-- 禁止：PIL/ffmpeg 转换后才检查原始格式/大小；把 request-facing `ValueError` 变成 HTTP 500；
-  用 fake engine 的成功代替 source-path、cleanup 或 cross-model capability 证明。
-- 验收：非法计数、multipart 格式/大小及 path-backed media metadata/segment 均在生成前返回
-  `OmniClientError`/HTTP 400；覆盖 typed URL/data URL、multipart mixed、unsupported model、
-  temp cleanup 和多 rank video+audio。此 pin 的 typed URL/data URL helper 仍先完整
-  download/base64 decode；typed image
-  还会丢失原始 size/format，因此 multipart 的 bounded/predecode 证明不可外推，属于验证与
-  hardening 缺口。API server 中的 H3 专用 helper 也仍有 reviewer 指出的后续泛化重构债务。
-  ^[PR #5752]
 
 ## MMH3-2c — conditioned VAE 的固定种子必须按实际设备隔离并恢复
 

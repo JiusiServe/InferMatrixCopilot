@@ -4,7 +4,7 @@ created: 2026-08-05
 updated: 2026-09-02
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5706", "PR #5709", "PR #5720", "PR #5723", "PR #5737", "PR #5740", "PR #5752", "PR #5756", "PR #5764", "PR #5779", "PR #5785", "PR #5801", "PR #5824", "PR #5829", "PR #5837", "PR #5840", "PR #5881", "PR #5891", "PR #5896", "PR #5914", "PR #5946", "PR #5972", "PR #5863", .buildkite/cuda/test-nightly.yml, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/, docs/design/architecture_overview.md, docs/models/supported_models.md, docs/user_guide/quantization/fp8.md, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/teacache/, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/platforms/npu/platform.py, vllm_omni/platforms/rocm/platform.py, vllm_omni/quantization/int8_config.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_teacache_extractors.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/, tests/diffusion/quantization/test_int8_config.py, tests/e2e/accuracy/minimax_h3/, tests/e2e/features/comfyui/test_comfyui_integration.py, vllm_omni/entrypoints/openai/video_api_utils.py]
+sources: ["PR #5703", "PR #5706", "PR #5709", "PR #5720", "PR #5723", "PR #5737", "PR #5740", "PR #5752", "PR #5756", "PR #5764", "PR #5779", "PR #5785", "PR #5801", "PR #5824", "PR #5829", "PR #5837", "PR #5840", "PR #5881", "PR #5891", "PR #5896", "PR #5914", "PR #5946", "PR #5972", "PR #5978", "PR #5863", .buildkite/cuda/test-nightly.yml, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/, docs/design/architecture_overview.md, docs/models/supported_models.md, docs/user_guide/quantization/fp8.md, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/teacache/, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/platforms/npu/platform.py, vllm_omni/platforms/rocm/platform.py, vllm_omni/quantization/int8_config.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_teacache_extractors.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/, tests/diffusion/quantization/test_int8_config.py, tests/e2e/accuracy/minimax_h3/, tests/e2e/features/comfyui/test_comfyui_integration.py, vllm_omni/entrypoints/openai/video_api_utils.py]
 confidence: high
 ---
 
@@ -90,12 +90,13 @@ Hub/local model lookup 合同由 [ComfyUI tooling rules](../../tooling/rules.md)
 ## 验证入口
 
 模型专属 contract、packing 和 parallel 测试在 `tests/diffusion/models/minimax_h3/`。
-T2VA full-model accuracy 入口在 `tests/e2e/accuracy/minimax_h3/`：模型 snapshot 固定在
-`73372e6c`，但该 revision 没有参考视频，official `assets/t2va.mp4` 实际从 Hugging Face
-`resolve/main` 下载，不能把 golden 写成 revision-immutable。用例固定 1344x768/24 FPS/
-243 帧/50 steps/seed 0，除视频和 AAC 32 kHz stereo metadata 外，还以 SSIM >= 0.82、
-PSNR >= 20 dB gate 完整输出；nightly lane 使用 4x H100、USP4、HSDP4、text-encoder TP4
-和 VAE patch parallel 4。该用例是精度/媒体合同，不是性能基线。
+full-model accuracy/nightly 入口现保留 I2VA 与 Ref2VA，两者都从
+Hugging Face `main` 下载模型分区与 SHA-256 固定的 official assets；模型
+`main` 仍可漂移。两例固定 1344x768/24 FPS/AAC 32 kHz stereo/50 steps/
+seed 0，帧数分别 192/124，共用 SSIM>=0.97、PSNR>=34 dB gate。nightly
+lane 声明 4x H100，PR 数值则来自 4x B300，不得混为同一硬件证据。
+T2VA 因当前严格 gate 未达标被移出；这表示“无 retained pixel-level gate”，
+不是 T2VA 功能不支持。该用例是精度/媒体合同，不是性能基线。^[PR #5978]
 硬件 recipe 只记录已验证的 GPU/NPU 形状；性能数字不能从 recipe 的配置示例泛化为全硬件
 保证。目标 pin 的 MUSA Ref2VA recipe 已改为 `MODEL_ROOT/Ref2VA` + `--task-type ref2va`；
 它只验证单分区启动，不能外推 combined 双 DiT 的容量或性能。共享 offloader、并行和请求合同分别归 [Diffusion](../../components/diffusion/_index.md)、
@@ -104,6 +105,6 @@ PSNR >= 20 dB gate 完整输出；nightly lane 使用 4x H100、USP4、HSDP4、t
 ## 审查入口
 
 H3 input matrix/media ingress，以及 text-encoder completeness、online FP8 的 component namespace、loader 顺序、joint quality 与 offload 边界见
-[MiniMax H3 rules](rules.md#direct-代码快速入口)；checkpoint transform、quantized loader 与
+[media rules](rules-media.md) 与 [MiniMax H3 rules](rules.md#direct-代码快速入口)；checkpoint transform、quantized loader 与
 text-encoder fused-source 完整性正文见 [loading rules](rules-loading.md)；DLO、consumer/H100/ROCm
 部署和硬件证据正文见 [deployment rules](rules-deployment.md)。

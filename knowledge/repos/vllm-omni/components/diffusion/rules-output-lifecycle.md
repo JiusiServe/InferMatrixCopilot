@@ -1,14 +1,14 @@
 ---
-title: "Diffusion multiprocess runtime 规则"
+title: "Diffusion output 与 multiprocess runtime 规则"
 created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5864", vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/inline_stage_diffusion_client.py, vllm_omni/diffusion/ipc.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/worker/diffusion_worker.py, tests/diffusion/test_async_output_worker.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_ipc.py, tests/diffusion/test_inline_stage_diffusion_client.py, tests/diffusion/test_ipc_async.py, tests/diffusion/test_multiproc_engine_concurrency.py, tests/diffusion/test_result_pump.py]
+sources: ["PR #5864", "PR #5978", vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/inline_stage_diffusion_client.py, vllm_omni/diffusion/ipc.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/utils/media_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, tests/diffusion/test_async_output_worker.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_ipc.py, tests/diffusion/test_inline_stage_diffusion_client.py, tests/diffusion/test_ipc_async.py, tests/diffusion/test_multiproc_engine_concurrency.py, tests/diffusion/test_result_pump.py, tests/entrypoints/openai_api/test_video_server.py]
 confidence: high
 ---
 
-# Diffusion multiprocess runtime 规则
+# Diffusion output 与 multiprocess runtime 规则
 
 ## DIFF-1d — async output 的 compute 与 output-ready 必须分成两个可观察阶段
 
@@ -68,3 +68,15 @@ confidence: high
   2×B300 evidence 覆盖 ordinary TP2 与 H3 DLO DP2 的错误 wave→同 engine recovery→无 active child；
   仍只绑定 eager+CUDNN exact topology，不能推广到一般 DP/SP 或替代 per-replica SP/mmap redesign。
   ^[PR #5864]
+
+## DIFF-1i — AAC mux 必须显式标记输入时间零点
+
+- 触发：修改共享 mux 的 audio-frame timestamp、codec/container 或 video API 输出。
+- 强制：共享 `mux_video_audio_bytes()` 在构造 AAC frame 时设 `pts=0`、
+  `time_base=1/sample_rate`，让 MP4 以负 priming timestamp 表达 encoder delay，
+  避免把 delay 暴露成前导静音。这是共享 mux caller 的 blast radius，不是
+  MiniMax H3 专属。
+- 禁止：从负 AAC packet PTS 外推其他 codec/container、audio sample/duration/
+  content、唇音同步或完整 A/V alignment。
+- 验收：目标 focused test 解 mux 后断言第一个有 PTS 的 AAC packet `PTS<0`；
+  样本和 A/V 对齐结论仍需独立的端到端波形/时序验收。^[PR #5978]
