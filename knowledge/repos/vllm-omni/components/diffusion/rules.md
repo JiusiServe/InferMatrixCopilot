@@ -30,6 +30,7 @@ confidence: high
 | component quantization、text encoder/transformer/VAE 独立配置、owner prefix、meta/offload | `checkpoint-distributed`：`DIFF-2c` | `quantization/factory.py::{build_quant_config,resolve_quant_config_from_disk}` → `component_config.py::ComponentQuantizationConfig.resolve` → `data.py::_propagate_quantization_from_tf_config` → component linear consumer |
 | modular/multi-DiT、`_dit_modules`、request-scoped Cache-DiT/compile/SP/LoRA/offload lifecycle | `checkpoint-distributed`：`DIFF-2f`–`2j` | request batch key → model policy/cache runtime；pipeline component list → shared consumers |
 | LPIPS/PSNR/相似度阈值、CPU offload、量化质量证据 | `quality-evidence`：`DIFF-3a` | changed exact case → runner `execute_model` → model pipeline；A/B 同路径 |
+| Wan VAE spatial shard、gather/trim/reshard、empty tail、attention extent | `distributed-vae`：`DIFF-3b` | `distributed/autoencoders/wan_spatial_shard.py` → patched decoder attention/conv → gather final frame |
 | paged KV/cache、backend/platform、GQA/layout、Ring/Ulysses、FlashInfer quant、预算与 admission | `system-runtime`：`DIFF-4a`–`4j` | engine init → metadata/config → attention parallel/backend → platform hook → scheduler/serving |
 | worker/RPC 异常、rank-status、traceback/device cache 清理 | `system-runtime`：`DIFF-4d` | `diffusion_worker.py::{_execute_rpc,_worker_busy_loop}` 的 raise/reply/status 路径 |
 
@@ -39,6 +40,7 @@ confidence: high
 | `execution-parity` | graph/eager、solver、RNG、generator、tensor dtype/device、fused layer、FA determinism、async output/shutdown | `DIFF-1a`–`1j` |
 | `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP、artifact identity、distributed offload、multi-DiT/cache lifecycle | `DIFF-2a`–`2n` |
 | `quality-evidence` | 质量阈值、offload、A/B case | `DIFF-3a` |
+| `distributed-vae` | Wan VAE spatial height/width shard、rank context、extent/padding | `DIFF-3b` |
 | `system-runtime` | cache/预算、native/backend/platform、attention layout、能力 metadata、异常与并发 | `DIFF-4a`–`4j` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `DIFF-0a`, `DIFF-0b` |
 

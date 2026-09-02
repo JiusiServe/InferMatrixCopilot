@@ -43,6 +43,9 @@ sources: ["PR #2783", vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/mo
 - 依赖共享模块：[Diffusion 组件](../../components/diffusion/_index.md)
   （CFG-parallel、SP、PP mixin、分布式 VAE）、`diffusion/models/dmd2/`
   蒸馏 mixin。
+- Wan VAE spatial height/width gather→trim→reshard 的 empty/partial-tail、rank context 与 attention
+  extent 合同由共享 [DIFF-3b](../../components/diffusion/rules-wan-spatial-shard.md#diff-3b-trimmed-global-extent-必须可逆地-reshard-为固定-local-shape) 拥有；
+  该 VAE patch 会影响所有复用 Wan autoencoder 的 pipeline，不应只在本家族内修。^[PR #6062]
 
 ## 目录内容
 
