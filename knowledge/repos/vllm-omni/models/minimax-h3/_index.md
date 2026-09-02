@@ -4,7 +4,7 @@ created: 2026-08-05
 updated: 2026-09-02
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5709", "PR #5740", .buildkite/cuda/test-nightly.yml, vllm_omni/diffusion/models/minimax_h3/, vllm_omni/diffusion/registry.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, tests/diffusion/models/minimax_h3/, tests/e2e/accuracy/minimax_h3/, vllm_omni/entrypoints/openai/video_api_utils.py]
+sources: ["PR #5709", "PR #5737", "PR #5740", .buildkite/cuda/test-nightly.yml, docs/user_guide/quantization/fp8.md, vllm_omni/diffusion/models/minimax_h3/, vllm_omni/diffusion/registry.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, tests/diffusion/models/minimax_h3/, tests/e2e/accuracy/minimax_h3/, vllm_omni/entrypoints/openai/video_api_utils.py]
 confidence: high
 ---
 
@@ -28,6 +28,15 @@ confidence: high
   并且必须同时整除 Qwen3-VL 的 64 个 attention heads 与 8 个 KV heads。
 - 单卡 accuracy 路径使用 CPU offload；多卡部署可使用 Ulysses、text-encoder TP、VAE
   tile/patch parallel 或 layerwise offload，但每个组合都必须按最终并行拓扑和设备数验证。
+- H3 DiT 支持加载时 online FP8：默认覆盖 token-refiner/主 block 的 attention、MLP、
+  condition projection 和 AdaLN projection；video/audio patch、timestep MLP、最终输出头、
+  text encoder 与 VAE 保持 BF16/FP32。`ignored_layers` 按 DiT 内部的精确 runtime prefix
+  匹配，不带 `transformer.` owner prefix。checkpoint 的 grouped-QKV reorder 和 fused-MLP
+  gate/up split 在 `MiniMaxH3DiTModel.load_weights()` 内先执行，再交给当前 vLLM loader，
+  以保留 TP shard 与 FP8 online-processing wrapper。
+- H3 online FP8 当前不得与 layerwise offload 组合：offload 产生的 weight stride
+  会被 Cutlass FP8 kernel 拒绝。变更量化覆盖范围时，除逐层命中/排除与加载转换测试外，
+  必须同时保护 joint video/audio 质量；peak memory 只作为同 case report，不是稳定上界。
 - 音频加载优先使用 torchaudio；当 TorchCodec/torchaudio 在 CPU-only aarch64 环境不可用
   时，`reference_video.load_audio_file` 回退到 soundfile，再对 libsndfile 不支持的格式
   通过 ffmpeg 转 WAV。该回退保持 `(channels, samples)` float32 与原始 sample rate 合同。
@@ -44,3 +53,8 @@ PSNR >= 20 dB gate 完整输出；nightly lane 使用 4x H100、USP4、HSDP4、t
 硬件 recipe 只记录已验证的 GPU/NPU 形状；性能数字不能从 recipe 的配置示例泛化为全硬件
 保证。共享 offloader、并行和请求合同分别归 [Diffusion](../../components/diffusion/_index.md)、
 [Configuration](../../components/configuration/_index.md) 和 [Serving](../../components/serving/_index.md)。
+
+## 审查入口
+
+H3 online FP8 的 component namespace、loader 顺序、joint quality 与 offload 边界见
+[MiniMax H3 rules](rules.md#direct-代码快速入口)。

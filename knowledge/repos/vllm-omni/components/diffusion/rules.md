@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-08-23
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5543", "PR #5848", "PR #5872", "PR #5981", "PR #6094", "PR #6102", "PR #6279", "PR #6385", "PR #6445", vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/offloader/]
+sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5543", "PR #5737", "PR #5848", "PR #5872", "PR #5981", "PR #6094", "PR #6102", "PR #6279", "PR #6385", "PR #6445", vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/offloader/]
 confidence: high
 ---
 
@@ -89,12 +89,14 @@ confidence: high
 
 - 触发：增加或修改 weight mapper、scale 名称、quantization adapter 或 key resolution。
 - 强制：从序列化 key 追到目标 layer 注册的 parameter/buffer 和 forward consumer；
-  多条 resolution path 必须返回对称、由合同解释的目标名。
+  多条 resolution path 必须返回对称、由合同解释的目标名。模型专属 grouped-QKV reorder、
+  fused gate/up split 等布局变换必须在调用 active weight loader 前完成，让 quantization wrapper
+  与 TP shard 接收最终语义布局。
 - 禁止：把 producer 有而当前 consumer 不支持的 tensor 静默过滤；必须 fold/map 或
   fail fast，并在错误中标明依赖的 upstream 版本边界。
 - 验收：测试覆盖已消费 key、未知 key、当前版本不支持的 scale 以及两条 resolution
   path 的输出名；fused mixed-FP8 还须覆盖 weight/scale/shard、gate/up 顺序、nested serialized
-  FP8 和 combined projection，缺 shard 不得默认 0。 ^[PR #5087] ^[PR #5848]
+  FP8 和 combined projection，缺 shard 不得默认 0。 ^[PR #5087] ^[PR #5737] ^[PR #5848]
 
 ### DIFF-2b — HSDP/FSDP 修复必须执行真实 fully_shard
 
@@ -105,18 +107,21 @@ confidence: high
   identity，并覆盖 loader 的真实调用边界；replicate size 非正值拒绝，1 用 1D、>1 用 2D
   DeviceMesh，测试 world size 与参数一致。 ^[PR #5088] ^[PR #5872]
 
-### DIFF-2c — component quantization 独立解析且保留完整 owner 前缀
+### DIFF-2c — component quantization 独立解析且 namespace 端到端一致
 
 - 触发：diffusion pipeline 为 text encoder、transformer、VAE 等组件增加独立量化配置。
-- 强制：每个组件独立解析量化配置，并把包含 component owner 的完整模块名前缀传到
-  真正持有权重的 layer；只量化明确支持的 attention/MLP linear，embedding、LM head
-  等排除项必须显式保持未量化。
-- 禁止：先裁掉 `text_encoder` 等 owner 前缀再匹配 component 规则；用一个组件的配置
-  隐式覆盖其他组件；因为同属一个模型就量化全部 linear。
+- 强制：每个组件独立解析量化配置，并选择一个端到端一致的 namespace：要么 selector
+  保留 `text_encoder` 等完整 component owner prefix 到持权 layer，要么 pipeline 先 resolve
+  单一 component，再让内部 layer 使用 component-relative prefix。只量化明确支持的 linear，
+  embedding、LM head、patch/final projection 等排除项必须显式保持未量化。
+- 禁止：半途裁掉 owner prefix；resolve component 后又要求 ignored layer 带 owner；用一个
+  组件配置隐式覆盖其他组件；因为同属一个模型就量化全部 linear。
 - 验收：至少覆盖“只量化一个组件、其他组件保持 BF16”的真实构造与加载，逐层断言
   命中/排除集合，并验证 meta-device parameter 不会被提前 move。FLUX.2 的具体边界见
-  [FLUX.2 规则](../../models/flux2/rules.md)；新增 quantization×offload 组合需给兼容矩阵，
-  未验证 quantizer fail-closed，并核对 dtype/shape/stride。 ^[PR #5136] ^[PR #6279]
+  [FLUX.2 规则](../../models/flux2/rules.md)，component-relative 变体见
+  [MiniMax H3 规则](../../models/minimax-h3/rules.md)；新增 quantization×offload 组合需给兼容矩阵，
+  未验证 quantizer fail-closed，并核对 dtype/shape/stride。 ^[PR #5136] ^[PR #5737]
+  ^[PR #6279]
 
 ### DIFF-2d — Artifact identity 只信任已验证的不可变来源
 
