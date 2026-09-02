@@ -11,7 +11,7 @@ sources: [vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/prefix_cache
 
 - 源码入口：`vllm_omni/core/sched/`（`omni_ar_scheduler.py`、`omni_generation_scheduler.py`、
   `omni_scheduler_mixin.py`、`omni_scheduling_coordinator.py`）和 `vllm_omni/core/prefix_cache.py`
-- 源码校验：以上路径与下列类均已在 `main @ 9f9f9f27` 验证存在：`OmniARScheduler`（:50）、
+- 源码校验：以上路径与下列类均已在 `main @ 30cba842` 验证存在：`OmniARScheduler`（:50）、
   `OmniARAsyncScheduler`（:928）、`KVCacheTransferData`（:40）、`OmniGenerationScheduler`（:42）、
   `OmniSchedulerMixin`（:40）、`OmniTensorPrefixCache`（prefix_cache.py:33）
 - 官方设计文档：`docs/design/module/ar_module.md`（继承关系、请求流转图）
