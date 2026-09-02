@@ -1,10 +1,10 @@
 ---
 title: "vLLM-Omni CI 规则"
 created: 2026-08-23
-updated: 2026-08-23
+updated: 2026-09-02
 type: rule
 tags: [vllm-omni, ci]
-sources: ["PR #3422", "PR #5074", "PR #5524", "PR #5543", "PR #5670", "PR #5872", "PR #6048", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6339", "PR #6343"]
+sources: ["PR #3422", "PR #5074", "PR #5524", "PR #5543", "PR #5670", "PR #5780", "PR #5872", "PR #6048", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6339", "PR #6343"]
 confidence: high
 ---
 
@@ -25,11 +25,16 @@ confidence: high
 
 - 触发：增加模型、硬件路径、nightly/ready/merge lane，或升级运行时/镜像。
 - 强制：资源数、pytest marker、pipeline 路由和共享 stage registry 同步；必需依赖、模型初始化
-  或 collection 失败必须让 job 失败，并证明目标测试数大于零且原失败在对应硬件消失。
+  或 collection 失败必须让 job 失败，并证明目标测试数大于零且原失败在对应硬件消失。默认
+  `prepend` import mode 下，whole-tree collection 遇到同名叶子目录时，所有中间父目录必须用
+  `__init__.py` 保持规范限定包名，不能让不同子树都退化成同一个顶层包。
 - 禁止：初始化失败后 skip-green；用 CPU 静态检查代替 CUDA/NPU 执行；只改模型目录而漏掉
   共享 registry/路由；把临时硬件硬编码留到合并。
-- 验收：当前 head 的目标 lane 记录硬件、依赖版本、collection 数和执行结果；注入缺依赖、坏
-  registry 或错误 marker 时 lane 必须红。 ^[PR #3422] ^[PR #5524] ^[PR #5543]
+- 验收：当前 head 按真实 lane 的 whole-tree/marker scope 记录硬件、依赖版本、collection 数和
+  执行结果，而非只收目标测试文件；同名叶子包必须解析为不同规范名（如
+  `tests.e2e.accuracy.minimax_h3` 与 `tests.diffusion.models.minimax_h3`）。注入缺
+  `__init__.py`、缺依赖、坏 registry 或错误 marker 时 lane 必须红。 ^[PR #3422]
+  ^[PR #5524] ^[PR #5543] ^[PR #5780]
   ^[PR #5872] ^[PR #6048] ^[PR #6096] ^[PR #6102]
 
 ## OMNI-CI-1b — 回归 fence 必须锚定可观察合同且非空转
