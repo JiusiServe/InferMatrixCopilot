@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/engine/stage_init_utils.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py, docs/design/feature/omni_async_output_materialization.md, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/experimental/fullduplex/, tests/e2e/features/fullduplex/, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, "PR #3422", "PR #3642", "PR #4730", "PR #4958", "PR #5074", "PR #5610", "PR #5777", "PR #5792", "claude-workflow-starter-private@09dca46"]
+sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/engine/stage_init_utils.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py, docs/design/feature/omni_async_output_materialization.md, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/experimental/fullduplex/, tests/e2e/features/fullduplex/, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, "PR #3422", "PR #3642", "PR #4730", "PR #4958", "PR #5074", "PR #5310", "PR #5610", "PR #5777", "PR #5792", "claude-workflow-starter-private@09dca46"]
 ---
 
 # Model Executor 规则
@@ -146,7 +146,9 @@ Stage 拓扑错误的最小充分源码证据只有三段：一处最终配置�
 - 强制：输出按请求索引与输入一一对应；无法安全逐请求处理时把并发上限显式收紧为 1。
 - 禁止：只消费 `runtime_info[0]`，或把单元素 waveform/metadata 广播给整个 batch。
 - 验收：至少两个不同输入的同批测试，分别断言 bridge、输出和错误归属；不能重复相同
-  prompt 让串线不可见。 ^[PR #3642]
+  prompt 让串线不可见。partial downstream subset 必须保留原 `req_id_to_index`：跳过
+  中间请求后，后续请求的 tensor slice 和 list-valued payload 仍取原 batch index，不能
+  压缩到 downstream position。 ^[PR #3642] ^[PR #5310]
 
 ### EXEC-1c — 请求随机状态跨 batching 和 yield 保持请求所有权
 

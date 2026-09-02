@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, scheduler]
-sources: ["vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/output.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5461"]
+sources: ["vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461"]
 ---
 
 # Scheduler 规则
@@ -20,7 +20,7 @@ PR 描述先命中下表，再打开对应规则组和首批源码；changed fil
 
 | PR 描述信号 | 规则组 | 第一批源码 |
 |---|---|---|
-| prefix cache、truncated prefill、mm key、deferred payload | SCHED-1a | `core/prefix_cache.py::OmniTensorPrefixCache.maybe_init_missing_mm_cache_keys`；`worker/gpu_model_runner.py::initialize_metadata_builders`；`worker/gpu_ar_model_runner.py::_deferred_prefix_cache_mm_keys` |
+| prefix cache、truncated prefill、mm key、deferred/passthrough payload | SCHED-1a/1b | `core/prefix_cache.py::OmniTensorPrefixCache`；`utils/mm_outputs.py::{build_mm_cpu,to_payload_element}`；`worker/gpu_ar_model_runner.py::_deferred_prefix_cache_mm_keys` |
 | `max_num_batched_tokens`、prefill throttle、低预算 GPU hang | SCHED-2a | `core/sched/omni_ar_scheduler.py::OmniARScheduler.schedule`；`core/sched/omni_generation_scheduler.py::OmniGenerationScheduler.schedule`；触发它的 deploy/test 配置 |
 | vLLM bump、scheduler rebase、KV connector stats | SCHED-3a | 两个 scheduler 的 `schedule` / `update_from_output` 与 live upstream `vllm/v1/core/sched/` |
 | side-stream D2H、pinned host tensor、源 buffer 复用 | SCHED-4a/4b | `worker/gpu_ar_model_runner.py::_copy_tensor_payload_to_cpu`、`_get_or_create_omni_payload_copy_stream`；`core/prefix_cache.py` 的 async copy 路径 |
@@ -101,6 +101,24 @@ modules=[worker_runner, model_executor]，status=active，run_count=54，2026-06
   机制，机制变了要复查；绕过 cap 的缓存住在主机内存（本例每 key ~2.6 GiB）——TB 级内存的 CI 主机
   可承受，小内存主机要标注。^[SK-fix-talker-truncated-prefill-prefix-cache-key-cap]
 
+## SCHED-1b — prefix-cache passthrough 必须保留逐请求边界与载荷语义
+
+- 触发：修改 `build_mm_cpu`、`to_payload_element`、prefix-cache merge/deferred payload，
+  或 runner 对 combined multimodal output 的拆包。
+- 强制：token-aligned tensor（首维等于本步 scheduled token 总数）按每个请求的
+  `start:end` 切片；非 token-aligned tensor 给每个请求完整独立 clone；prefix-cache
+  merge 中的 list（如 `codes.ref`）保持整表并逐请求 clone，直到 runner 用**原 batch
+  index** `_unwrap_lists`。D2H 后每个嵌套 tensor leaf 必须在 CPU、detached、contiguous，
+  并保持 dtype/shape/value；dict/list 与非 tensor leaf 的结构和值不变。
+- 生命周期：abort/discard 必须删除 staged chunks，之后的 commit 是 no-op；同 req-id
+  重用从空状态开始，不能混入旧 chunk。
+- 禁止：把所有 passthrough tensor 一律按 token 切；在 merge 阶段提前按 downstream
+  subset index 拆 list；用 float staging buffer 改写 int metadata；把本规则解释为后续 W2
+  优化已经实现——`f24a6165` 只增加当前行为的 characterization tests。
+- 验收：mixed hit/miss + 不等 scheduled length 同时覆盖 1-D/2-D token-aligned、多个
+  非对齐 shape、per-request tensor list 和 int32/int8 metadata；修改一请求结果不影响
+  其他请求或源值。另测 discard→late commit、discard→req-id reuse。^[PR #5310]
+
 ## SCHED-2a — 极小 max_num_batched_tokens 与并发 prefill 会挂死 GPU
 
 skill 元数据：`gpu-hang-low-max-num-batched-tokens`，
@@ -143,10 +161,13 @@ modules=[online_serving, worker_runner]，status=active，run_count=38，2026-06
   的 `slot_mapping`/hidden/mm tensor。
 - 强制：源 tensor 在 copy event 完成前保持有效且不可被重写；使用显式 stream ordering、
   retain/`record_stream` 或消费屏障。drain/early-return 也必须完成或转移生命周期责任。
+  单 pending-write 流水线中 event 未 ready 时 drain 必须不触碰 cache；ready 后恰好消费
+  一次；调度第 N+1 次 write 前必须先消费第 N 次，不能覆盖 pending state。
 - 禁止：仅同步目标 CPU tensor，却允许下一 step 复用源 GPU buffer；这会得到合法 shape
   但错误行内容。
 - 验收：连续两 step 写入不同 sentinel，在人为延迟 side stream 下证明第一轮 CPU 结果
-  不被第二轮覆盖。 ^[PR #4106]
+  不被第二轮覆盖；强制 event query false→true，断言 0→1→0 次 drain，并验证未显式
+  drain 时下一次 schedule 仍先落盘上一轮。 ^[PR #4106] ^[PR #5310]
 
 ## SCHED-4b — pinned CPU 分配必须先判断 CUDA 能力
 
