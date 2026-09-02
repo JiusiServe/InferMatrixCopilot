@@ -219,13 +219,17 @@ confidence: high
   evaluator 分配两卡资源；资源 allocation 不等于模型 stage 用卡数。最终 simplex/duplex perf 是
   单卡 H100，baseline 只有 H100 bucket，runner 只检查完成数，duplex 再检查四轮 audio count；没有
   性能阈值 consumer，故 baseline、TTFT/TTFP/RTF 只构成测量 artifact，不能证明回归或 A3 性能。
+  ready 的 trimmed simplex config 仅保留 concurrency 1/4 与 prompts 10/40；CUDA `h100_1`、NPU
+  `a3_npu_2` 都运行同一 JSON，但 JSON 的 case cardinality 是一张卡且只含 H100 baseline。该 config
+  与 runner 没有 threshold consumer；因此 “ready gate” 只表示请求完成 gate 已接线，不是性能
+  regression threshold，也不能单凭配置存在声称 H100/A3 实测通过。
 - 禁止：把结果 artifact 中存在 baseline 描述成 active performance gate；把 PR 的“双卡”文字覆盖到
   最终单卡 lane/YAML；或从 H100 bucket 外推 A3 的性能与阈值。
 - 验收：固定上述 collection、阈值、逐轮 cardinality 与 fallback；分别故障注入缺轮、重复音频、
   非单调时间和错误 backend。PR 报告的 Daily-Omni 78.53%、Seed-TTS WER 0.0332/0.0255 只能绑定其
   日志环境：数据/模型 revision 未固定，Daily 首次受损坏 decord 失败后重跑，kernel warmup 另有
   未提交 patch，证据脚本还吞掉 step failure，且把版本号写作 commit。因而不能从这些数字声称
-  merge target 的可复现质量/性能通过。^[PR #5524]
+  merge target 的可复现质量/性能通过。^[PR #5524] ^[PR #6079]
 
 ## MCPMO-5b — online serving CI 必须显式区分 chunk 模式与 duplex fixture 语义
 

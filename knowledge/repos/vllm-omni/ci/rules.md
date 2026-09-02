@@ -163,6 +163,17 @@ collection 意图；没有实际 runtime 结果时，不能证明目标硬件行
   runner 命令没有阈值开关；simplex 只 gate 完成请求数，duplex 另要求每 session 恰好四个音频
   response。配置里的 H100 baseline 因此只是结果 artifact，既不能证明回归阈值，也不能外推到
   A3；PR 文本中的“双卡”描述也不能覆盖最终 lane/YAML 的单卡事实。^[PR #5524]
+  ready perf 复用同一合同：Seed-TTS English、`openai-chat-omni`、text+audio、关闭 thinking 并启用
+  TTS template，sweep 是 `(concurrency,num_prompts)=(1,10),(4,40)`。CUDA lane 分配 `h100_1`；NPU
+  lane 分配 `a3_npu_2`，但 JSON hardware mark 声明每 case `num_cards: 1`，资源 allocation 不等于
+  模型 stage 用卡数。两边都直接调用 runner、没有 `--assert-baseline`，所以仍只 gate
+  `completed == num_prompts`；H100 metrics bucket 在 A3 run 中也只是 artifact，不能构成 A3 threshold。
+  ^[PR #6079]
+- ready 的 `source_file_dependencies` 只列 perf JSON、MiniCPM deploy/model/stage processor；shared
+  `run_benchmark.py`/DFX conftest 由 nightly 覆盖，故不触发这个高成本 model job。functional
+  offline/online/duplex jobs 不可因 perf job 存在而删除：perf 只发 Seed-TTS text prompt，不覆盖 offline、
+  non-stream text content assertion 或 image/video/audio multimodal ingestion。若要降成本，应收窄各自
+  workload，而不是声称 perf 是 functional superset。^[PR #6079]
   ^[PR #5402] ^[PR #5845]
 
 ## OMNI-CI-3b — patched upstream benchmark 必须保持参数与 output subtype 兼容
