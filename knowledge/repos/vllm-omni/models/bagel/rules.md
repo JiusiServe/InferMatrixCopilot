@@ -46,7 +46,7 @@ refresh/summary 时重新解析该 path，故 enable 后不得替换 `language_m
 declaration 同时列出两个 alias，也会重复 enable，因为当前 discovery 不按 identity 去重。
 
 **验收**：真实 Bagel component tree 覆盖 Cache-DiT enable→repeated request refresh→summary，断言
-hook/context 始终绑定同一 nested model；目标 cache backend 没有 disable API，future 若增加 worker
-shutdown/teardown 必须验证清理同一 target。对 compile、SP、LoRA 与 offload 分别验证同一 object
-identity 和 missing-middle 行为。当前 mock 测试只覆盖 Cache-DiT dotted enable/refresh/summary，
-不构成真实 cross-consumer 或 teardown 证据。^[PR #5884]
+hook/context 始终绑定同一 nested model，disable 清理安装时记录的 target。对 compile、SP、LoRA 与
+offload 分别验证同一 object identity 和 missing-middle 行为。当前 mock 测试覆盖 dotted
+enable/refresh/summary；multi-target disable 虽有 mock 覆盖，但没有真实 cross-consumer、异常或
+worker shutdown 证据。^[PR #5884]

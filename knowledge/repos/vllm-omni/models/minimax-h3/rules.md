@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5706", "PR #5720", "PR #5737", "PR #5752", "PR #5764", "PR #5779", "PR #5801", "PR #5829", "PR #5836", "PR #5837", benchmarks/diffusion/backends.py, benchmarks/diffusion/diffusion_benchmark_serving.py, vllm_omni/config/model.py, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/quantization/int8_config.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/diffusion/quantization/test_int8_config.py, tests/entrypoints/openai_api/test_video_server.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md]
+sources: ["PR #5703", "PR #5706", "PR #5720", "PR #5737", "PR #5752", "PR #5764", "PR #5779", "PR #5801", "PR #5829", "PR #5836", "PR #5837", "PR #5853", benchmarks/diffusion/backends.py, benchmarks/diffusion/diffusion_benchmark_serving.py, vllm_omni/config/model.py, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/inputs/data.py, vllm_omni/quantization/int8_config.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_cache_dit_request_runtime.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quality_policy.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/diffusion/quantization/test_int8_config.py, tests/entrypoints/openai_api/test_video_server.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md]
 confidence: high
 ---
 
@@ -26,6 +26,8 @@ confidence: high
 | media limit、typed/multipart reference、HTTP 400、temp source | `MMH3-2b` | `api_server.py` video handlers → `serving_video.py::_run_and_extract` → `reference_video.py` |
 | conditioned VAE、fixed seed、`fork_rng`、MUSA/device RNG | `MMH3-2c` | `pipeline_minimax_h3.py` condition encode caller → `vae.py::{encode_image,encode_video}` |
 | modular checkpoint、combined/partition task、两套 DiT、shared component | `MMH3-2d` | model index discovery → startup task selection → task-specific transformer/cache lifecycle |
+| request `quality`、lossless/high、dynamic Cache-DiT | `MMH3-2e` | request sampling → quality policy → request Cache-DiT runtime → denoise |
+| force-refresh hint、once/repeat、reinstall key | `MMH3-2f` | H3 `extra_args` validation → immutable cache config → installation key/refresh context |
 | DLO、TP-local、resident layers、encoder/VAE staging | `MMH3-3a` | H3 `_offload_plan` → shared DLO backend → pipeline encode/denoise/decode stage contexts |
 | RTX 5090/4090、24/32 GiB、consumer profile | `MMH3-3b` | recipe measurement commit/run record → exact target topology → quality/capacity validation |
 | 4×H100、DFX perf、T2V/TI2V/V2V、synthetic H.264 reference | `MMH3-3c` | nightly lane → perf JSON → benchmark request encoder/result artifact |
@@ -235,6 +237,38 @@ load 完成时 dynamic quantize，text encoder、VAE 和非 eligible projection 
   selector。PR body 的顺序 T2VA→Ref2VA 视频使用 `duration=2.0`，低于目标 pin 已生效的 4 秒
   下限，因此不能证明 final merge 的 combined 路径；148.27/158.67 GiB combined 与 86.27 GiB
   single-load 等数字来自缺硬件/协议/重复次数的 issue comment，不能作为容量保证。^[PR #5720]
+
+## MMH3-2e — quality 映射只决定 request 的 Cache-DiT 目标
+
+- 触发：修改公共 `quality` 值、H3 quality policy、startup cache adoption 或 denoise 前 prepare。
+- 强制：公共层只接受 `None`、`lossless`、`high`，并保留 omitted 与 explicit lossless 的区别。
+  H3 中 `lossless` 总是无 cache；`high` 总是选择 model-owned conservative profile，即使启动时没有
+  cache backend；omitted 仅在启动配置为 Cache-DiT 时恢复 server generic profile，否则无 cache。
+  pipeline 必须在参数/任务/step 解析完成后、真实 denoise 紧邻之前 apply plan。
+- 禁止：沿用 PR 早期描述，把无 startup cache 的 `high` 拒绝；让 unsupported quality 静默落入
+  lossless；在 request 未显式提供 quality 时由 sync/streaming serving 覆盖 model default。recipe
+  把同一组 quality 数字标为 4×H200，而 PR evidence 把它归于 4×L20X SP4；hardware provenance
+  未统一前不得引用该表作为任一硬件的可靠 benchmark，更不能外推通用 speedup/quality。
+- 验收：offline、chat、sync video、streaming video 都覆盖 omitted/lossless/high/非法值及显式字段
+  传播；startup cache on/off × 三种 intent 验证 exact installation key，并断言 prepare 先于 diffuse。
+  当前测试广泛覆盖 validation/routing/policy 和 mock 顺序，但真实 Cache-DiT transition 的并发、取消、
+  failure rollback 仍缺证据；独立 reviewer 的单卡 B300 观察也显示 `high` 的质量/延迟与四卡表明显
+  不同，只能支持 topology-dependent 边界。共享状态机与 batch 合同见
+  [DIFF-2i–2j](../../components/diffusion/rules-component-lifecycle.md)。^[PR #5853]
+
+## MMH3-2f — force-refresh hint 属于 active profile identity
+
+- 触发：H3 request `extra_args` 使用 `force_refresh_step_hint` 或 `force_refresh_step_policy`。
+- 强制：hint 是 1-based positive integer 且不超过 `num_inference_steps`，policy 只接受 once/repeat，
+  省略 policy 默认 once；没有 active cache target 时两者都拒绝。用 dataclass replace 生成 request-local
+  config，不修改 startup generic config；installation key 必须包含 hint+policy，因为 Cache-DiT 的
+  incremental refresh 把 `None` 解释为保留旧 hint，变更或移除 hint 必须 reinstall hooks。
+- 禁止：接受 bool 作为整数；只给 policy；跨 request 原地修改共享 config；same-key repeated request
+  忘记重置 once hint，导致它只在首个 request 生效。
+- 验收：边界 1/steps、0/越界/bool/非法 policy、无 target、hint add/change/remove、once/repeat 和
+  repeated same-key request；断言每次 refresh 重建 hint context、generic config 不变，key 变化发生
+  disable→enable。当前覆盖为 mock/config 合同，未证明不同 topology 下 hint 对质量/命中率的效果。
+  ^[PR #5853]
 
 ## MMH3-3a — H3 DLO 必须保持 loader layout 与 component stage 配对
 
