@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #3642", "PR #5165", "PR #5382", "PR #5638", "PR #5869", "PR #6154", "PR #6170", "PR #6318", vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/cuda_graph_wrapper.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_code2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py, tests/model_executor/models/minicpmo_4_5/test_audio_chunk_mask.py, tests/model_executor/models/minicpmo_4_5/test_code2wav_batching.py, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_pipeline.py, tests/model_executor/models/minicpmo_4_5/test_vision_flash_attention.py]
+sources: ["PR #3642", "PR #5165", "PR #5382", "PR #5638", "PR #5792", "PR #5869", "PR #6154", "PR #6170", "PR #6318", vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/cuda_graph_wrapper.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_code2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_tts.py, tests/model_executor/models/minicpmo_4_5/test_audio_chunk_mask.py, tests/model_executor/models/minicpmo_4_5/test_code2wav_batching.py, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_pipeline.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, tests/model_executor/models/minicpmo_4_5/test_vision_flash_attention.py]
 confidence: high
 ---
 
@@ -24,6 +24,7 @@ confidence: high
 | Code2Wav TensorRT、DiT/Campplus、engine cache/profile | MCPMO-1c | `minicpmo_4_5_code2wav.py::MiniCPMO45Code2Wav` → `batched_token2wav.py::BatchedToken2Wav._estimator_step`；共享实现 `step_audio2/step_audio2_dit_trt.py` |
 | HiFT CUDA Graph、chunk bucket、lazy capture、iSTFT | MCPMO-1d | `cuda_graph_wrapper.py::HiFTGraphWrapper` → `BatchedToken2Wav._hift_inference` → shared `HiFTGenerator` |
 | batch、`runtime_info`、stage handoff | MCPMO-3a/3b | `stage_input_processors/minicpmo_4_5_omni.py` → `minicpmo_4_5_omni.py::MiniCPMO45OmniForConditionalGeneration` → TTS/code2wav |
+| Talker codec sampling、repetition penalty、request RNG/compaction | MCPMO-3c | `minicpmo_4_5_omni_tts.py::{make_omni_output,_sample_audio_codes,_apply_batched_repetition_penalty}` → `test_talker_batching.py` |
 | native duplex、Stage0 resume、LISTEN/SPEAK、server VAD | MCPMO-4a | `experimental/fullduplex/{minicpmo45,openai}/` → stage input processor |
 | instructions/persona/voice/mode update、prefill slots、context lock | MCPMO-4b | `experimental/fullduplex/minicpmo45/session.py` → runtime adapter/session runner |
 
@@ -152,6 +153,30 @@ confidence: high
   `OmniOutput`/multimodal key。
 - 禁止：直接 TTS class 不读 runtime bridge；返回 tuple 让 runner 猜它是 hidden state。
 - 验收：真实 wrapper handoff 测试断言字段名、逐请求 shape、最终公开 payload。 ^[PR #3642]
+
+## MCPMO-3c — Talker 批量 logit 处理必须保留逐请求采样与输出索引
+
+- 触发：修改 Talker `make_omni_output`、codec projection、repetition penalty、top-k/top-p、
+  multinomial、terminal 或 compaction。
+- 强制：只把有效 span、未 finished 且 sampling-eligible 的 row 收集为 pending samples；一次批量
+  执行 head projection、frequency-aware repetition penalty、top-k/top-p 与 softmax。每个 pending
+  item 必须携带原 `output_index`、request ID、history、step 与 state，采样结果再按该原索引写回
+  codec delta、terminal 和 stop row。无效 info/span 与 incomplete prefill 保持 continue、空 delta，
+  且不推进 request RNG/state；此前或本次 terminal 的请求才 stop。
+- RNG：`torch.multinomial` 每次只接收一个 generator，因此必须保留逐 row 调用各自 request-local
+  generator；禁止为了完全向量化而改成共享 generator。batch reorder、其他请求结束和 compaction
+  均不得改变单请求序列。所有 row 采完后再把 concatenated tensor 一次搬到 CPU `.tolist()`，
+  避免逐请求 `.item()` 同步。
+- workspace：repetition penalty 可保留 full-batch logits/result，但 encoded history 与
+  `bincount` 必须最多按 16 rows 分块；token 编码为 `token + local_row*vocab`，count minlength
+  只到 `chunk_rows*vocab`，使 int64 count 临时空间不随总并发一次放大。penalty=1 与空 batch
+  保持 fast path，logits 必须为 2D且 histories/request IDs/steps 与 batch row 数一致。
+- 验收：逐 row oracle 对比正负 logits 与空 history，跨 16/16/1 chunk 固定 bincount workspace；
+  reorder、compaction 与 standalone 对照 request RNG；mixed eligible/ineligible/finished rows 断言
+  原索引 delta、stop、EOS/min/max token、duplex metadata 和只调用一次 batched sampler。CPU 单测
+  证明这些离散合同，但没有硬件上的 batched GEMM/logit 与旧 serial GEMV 数值/音频 parity；PR
+  也没有 NPU concurrency 1/4 的 latency、吞吐或内存数据，因此不得宣称性能或质量不变/提升。
+  ^[PR #5792]
 
 ## MCPMO-4a — native duplex 保留可恢复 Stage0，VAD 只作显式策略
 

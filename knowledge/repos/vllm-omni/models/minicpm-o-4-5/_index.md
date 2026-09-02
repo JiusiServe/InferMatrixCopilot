@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-02
 type: index
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #3642", "PR #5382", "PR #5638", "PR #5869", "PR #6154", "PR #6170", "PR #6318", vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/]
+sources: ["PR #3642", "PR #5382", "PR #5638", "PR #5792", "PR #5869", "PR #6154", "PR #6170", "PR #6318", vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py]
 confidence: high
 ---
 
@@ -38,6 +38,10 @@ shape、显存、并发与部分-graph 性能证据边界见 MCPMO-1d。
 Thinker 的 Whisper/APM audio encoder 仍构造 dense `[B,1,T,T]` mask；chunk mask 已用
 broadcasted query/key index 代替逐 row Python fill，但不改变 chunk/left-context/lookahead
 边界，也不消除 O(T²) storage。语义与证据门禁见 MCPMO-2b。
+
+Talker 只收集 sampling-eligible active rows 批量执行 codec projection 与 logit transforms，
+同时保留逐请求 generator 的 row-wise multinomial；request alignment、terminal 与 workspace
+边界见 MCPMO-3c。
 
 描述直达源码与模型专有门禁见 [rules](rules.md#direct-代码快速入口)；新模型语义验证见
 [model validation](../../review/guides/model-validation.md)。
