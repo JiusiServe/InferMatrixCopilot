@@ -1,15 +1,15 @@
 ---
 title: "HunyuanVideo-1.5 架构"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-08-10
 type: architecture
 tags: [vllm-omni, models, diffusion]
-sources: [vllm_omni/diffusion/models/hunyuan_video/pipeline_hunyuan_video_1_5.py, vllm_omni/diffusion/models/hunyuan_video/pipeline_hunyuan_video_1_5_i2v.py, vllm_omni/diffusion/models/hunyuan_video/hunyuan_video_15_transformer.py]
+sources: [vllm_omni/diffusion/models/hunyuan_video/pipeline_hunyuan_video_1_5.py, vllm_omni/diffusion/models/hunyuan_video/pipeline_hunyuan_video_1_5_i2v.py, vllm_omni/diffusion/models/hunyuan_video/hunyuan_video_15_transformer.py, "PR #5969"]
 ---
 
 # HunyuanVideo-1.5 架构
 
-事实在 `main @ 5d44868e` 复核;入口/变体速览见 [index](_index.md)。
+事实在 `main @ b98b7c85` 复核;入口/变体速览见 [index](_index.md)。
 
 ## 模型专有部分与共享模块的边界
 
@@ -61,7 +61,8 @@ pin 上只有**功能面**验证入口;无精度基线或性能 gate 证据,相�
 - 单测：`tests/diffusion/models/hunyuan_video/test_hunyuan_video_quant_config_propagation.py`;
   e2e `tests/e2e/online_serving/test_hunyuan_video_15_expansion.py`;示例
   `examples/online_serving/{text_to_video,image_to_video}/run_server_hunyuan_video_15.sh`
-  与对应 `run_curl_hunyuan_video_15.sh` 客户端脚本;量化脚本
-  `examples/quantization/quantize_hunyuanvideo_15_modelopt_fp8.py`。
+  与对应 `run_curl_hunyuan_video_15.sh` 客户端脚本。树内已无原 ModelOpt FP8 exporter，也没有
+  该模型专用的 quantization export example；审查与验证不得继续引用已删除的 example 路径。
+  ^[PR #5969]
 - 已知未决：checkpoint 如何选 I2V 架构（推测经 model_index.json
   `_class_name`,解析链未追）;serving 文档是否期待用户显式传 YAML。

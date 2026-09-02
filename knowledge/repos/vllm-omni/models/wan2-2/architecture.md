@@ -1,15 +1,15 @@
 ---
 title: "Wan 2.2 架构"
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-08-10
 type: architecture
 tags: [vllm-omni, models, diffusion]
-sources: [vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2.py, vllm_omni/diffusion/models/wan2_2/wan2_2_transformer.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_s2v.py, vllm_omni/diffusion/models/dmd2/mixin.py]
+sources: [vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2.py, vllm_omni/diffusion/models/wan2_2/wan2_2_transformer.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_s2v.py, vllm_omni/diffusion/models/dmd2/mixin.py, "PR #5969"]
 ---
 
 # Wan 2.2 架构
 
-事实在 `main @ 5d44868e` 复核;变体/入口速览见 [index](_index.md);共享
+事实在 `main @ b98b7c85` 复核;变体/入口速览见 [index](_index.md);共享
 diffusion 设施见 [Diffusion 组件](../../components/diffusion/_index.md)。
 
 ## 模型专有部分与共享模块的边界
@@ -69,8 +69,9 @@ e2e（t2v 离线/在线、W4A16）、**accuracy**
 （perf/reliability/stability）。上列家族测试中未见 DMD2 专属测试（未做穷举
 核对）。
 
-- 量化脚本 `examples/quantization/quantize_wan2_2_modelopt_fp8.py`;副本
-  数据并行示例 `examples/online_serving/replica_data_parallel/wan2_2_ti2v_dp.yaml`。
+- 树内已无原 Wan2.2 ModelOpt FP8 exporter，也没有该模型专用的 quantization export example；
+  审查与验证不得继续引用已删除的 example 路径。副本数据并行示例仍为
+  `examples/online_serving/replica_data_parallel/wan2_2_ti2v_dp.yaml`。^[PR #5969]
 - 已知未决：六架构如何按 checkpoint 选择（解析链在家族外）;
   `wan2_2_ti2v` key 是否用于 A14B 双专家 checkpoint 是配置惯例问题,代码不
   强制。

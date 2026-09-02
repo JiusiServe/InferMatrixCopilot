@@ -23,6 +23,7 @@ sources: ["PR #5715", README.md, docs/configuration/README.md, docs/getting_star
 |---|---|
 | 判断 RFC 是否仍在进行 | [RFC status](rfcs/_index.md) |
 | 找上游官方设计文档与其知识树 owner | [design-doc map](design-doc-map.md) |
+| generated example URL/nav、supported-model recipe 与硬件证据 | [generation and support rules](generation-and-support-rules.md) |
 
 ## 发布与安装边界
 

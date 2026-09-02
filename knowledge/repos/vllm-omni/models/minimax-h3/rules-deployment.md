@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5723", "PR #5764", "PR #5836", "PR #5896", "PR #5946", "PR #5863", docs/models/supported_models.md, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/utils/fa.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/offloader/, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/platforms/rocm/platform.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/entrypoints/openai_api/test_video_server.py]
+sources: ["PR #5723", "PR #5764", "PR #5836", "PR #5863", "PR #5896", "PR #5946", "PR #5969", docs/models/supported_models.md, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/utils/fa.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/offloader/, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/platforms/rocm/platform.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/entrypoints/openai_api/test_video_server.py]
 confidence: high
 ---
 
@@ -94,10 +94,11 @@ measurement；模型输入、执行与加载合同返回 [MiniMax H3 rules](rule
   “约 2× SDPA”外推，因为 final evidence table 没有 gfx950 四卡协议/结果或 A/B；也不能用可变
   `minimax-h3` tag 代替 image digest。评论中的旧 digest 缺后续 soundfile/TorchCodec/ffmpeg 状态，
   更新镜像的回复没有给新 digest。
-- 验收：support table 的 AMD cell、footnote 与 recipe 必须一致；目标 pin 中 footnote 声称已支持，
-  但 H3 行 AMD cell 仍为空，修正前不能称矩阵已完整发布。新增 SKU/task/topology 逐项记录 immutable
-  image/commit、软件栈、warmup/repeats、输入、各阶段时间、输出/质量检查；recipe-only diff 没有 CI
-  或可执行测试，外部 gfx942 数据与 gfx950 functional observation 不能冒充持续回归 gate。
+- 验收：support table 的 AMD cell、footnote 与 recipe 必须一致；当前 H3 行已标记 AMD 并链接
+  published recipe，但这只修复 recipe-evidence 展示，不能扩大既有 SKU/task/topology 证据。
+  新增组合须逐项记录 immutable image/commit、软件栈、warmup/repeats、输入、各阶段时间、输出/质量
+  检查；recipe-only diff 没有 CI 或可执行测试，外部 gfx942 数据与 gfx950 functional observation
+  不能冒充持续回归 gate。^[PR #5969]
 
 ## MMH3-3e — GB10 unified memory 容量证据不等于离散 GPU offload 合同
 
