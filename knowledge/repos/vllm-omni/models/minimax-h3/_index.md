@@ -4,7 +4,7 @@ created: 2026-08-05
 updated: 2026-09-02
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5709", .buildkite/cuda/test-nightly.yml, vllm_omni/diffusion/models/minimax_h3/, vllm_omni/diffusion/registry.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, tests/diffusion/models/minimax_h3/, tests/e2e/accuracy/minimax_h3/, vllm_omni/entrypoints/openai/video_api_utils.py]
+sources: ["PR #5709", "PR #5740", .buildkite/cuda/test-nightly.yml, vllm_omni/diffusion/models/minimax_h3/, vllm_omni/diffusion/registry.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, tests/diffusion/models/minimax_h3/, tests/e2e/accuracy/minimax_h3/, vllm_omni/entrypoints/openai/video_api_utils.py]
 confidence: high
 ---
 
@@ -35,10 +35,12 @@ confidence: high
 ## 验证入口
 
 模型专属 contract、packing 和 parallel 测试在 `tests/diffusion/models/minimax_h3/`。
-T2VA full-model accuracy 入口在 `tests/e2e/accuracy/minimax_h3/`：它固定模型与官方参考视频
-revision、1344x768/24 FPS/243 帧/50 steps/seed 0，除视频和 AAC 32 kHz stereo metadata
-外，还以 SSIM >= 0.82、PSNR >= 20 dB gate 完整输出；nightly lane 使用 4x H100、USP4、
-HSDP4、text-encoder TP4 和 VAE patch parallel 4。该用例是精度/媒体合同，不是性能基线。
+T2VA full-model accuracy 入口在 `tests/e2e/accuracy/minimax_h3/`：模型 snapshot 固定在
+`73372e6c`，但该 revision 没有参考视频，official `assets/t2va.mp4` 实际从 Hugging Face
+`resolve/main` 下载，不能把 golden 写成 revision-immutable。用例固定 1344x768/24 FPS/
+243 帧/50 steps/seed 0，除视频和 AAC 32 kHz stereo metadata 外，还以 SSIM >= 0.82、
+PSNR >= 20 dB gate 完整输出；nightly lane 使用 4x H100、USP4、HSDP4、text-encoder TP4
+和 VAE patch parallel 4。该用例是精度/媒体合同，不是性能基线。
 硬件 recipe 只记录已验证的 GPU/NPU 形状；性能数字不能从 recipe 的配置示例泛化为全硬件
 保证。共享 offloader、并行和请求合同分别归 [Diffusion](../../components/diffusion/_index.md)、
 [Configuration](../../components/configuration/_index.md) 和 [Serving](../../components/serving/_index.md)。
