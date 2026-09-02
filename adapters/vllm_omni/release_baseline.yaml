@@ -2,9 +2,9 @@ schema_version: 1
 
 upstream:
   repository: vllm-project/vllm-omni
-  previous_audited_sha: 8e2e9b6b53e86e6a479ed2c0a53782f655f60e04
+  previous_audited_sha: ebe93f5d1e794202598e652a45fa74a29a7f698b
   audited_ref: main
-  audited_sha: ebe93f5d1e794202598e652a45fa74a29a7f698b
+  audited_sha: 592637015ffccec514401b700548768232d9590c
 
 # These fingerprints are generated from sorted registry/deploy inventories.
 # They make the baseline exact without duplicating hundreds of entries here.

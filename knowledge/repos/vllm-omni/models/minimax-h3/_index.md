@@ -4,7 +4,7 @@ created: 2026-08-05
 updated: 2026-09-02
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5706", "PR #5709", "PR #5720", "PR #5737", "PR #5740", "PR #5752", "PR #5756", "PR #5764", "PR #5779", "PR #5785", "PR #5801", "PR #5824", "PR #5829", "PR #5837", "PR #5914", .buildkite/cuda/test-nightly.yml, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/, docs/design/architecture_overview.md, docs/user_guide/quantization/fp8.md, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/quantization/int8_config.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/, tests/diffusion/quantization/test_int8_config.py, tests/e2e/accuracy/minimax_h3/, tests/e2e/features/comfyui/test_comfyui_integration.py, vllm_omni/entrypoints/openai/video_api_utils.py]
+sources: ["PR #5703", "PR #5706", "PR #5709", "PR #5720", "PR #5737", "PR #5740", "PR #5752", "PR #5756", "PR #5764", "PR #5779", "PR #5785", "PR #5801", "PR #5824", "PR #5829", "PR #5837", "PR #5896", "PR #5914", .buildkite/cuda/test-nightly.yml, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/, docs/design/architecture_overview.md, docs/user_guide/quantization/fp8.md, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/quantization/int8_config.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/, tests/diffusion/quantization/test_int8_config.py, tests/e2e/accuracy/minimax_h3/, tests/e2e/features/comfyui/test_comfyui_integration.py, vllm_omni/entrypoints/openai/video_api_utils.py]
 confidence: high
 ---
 
@@ -56,7 +56,8 @@ confidence: high
   另报告 Ascend NPU smoke/FL2VA 成功。目标实现接纳已注册的非 CPU device module，但持续
   回归、XPU/ROCm 与并发边界仍见 MMH3-2c。
 - H3 q/k 使用共享 RMSNorm（BF16 gamma、native FP32 accumulation）与 NeoX RoPE；每个
-  128 维 head 只旋转前 96 维并保留后 32 维，平台布局和验证边界见 MMH3-1c。
+  128 维 head 只旋转前 96 维并保留后 32 维；MindIE-SD 前还要把 H3 的 3D q/k 临时补成
+  4D batch layout，再恢复原 shape。平台布局和验证边界见 MMH3-1c。
 - Ascend NPU 可选择 RainFusion 稀疏 video tail，并从 BF16 checkpoint 做 online INT8；两者只在
   exact T2VA/Ulysses/no-AllGather DLO 配置有完成证据，几何 fallback、TP width 与组合边界见
   MMH3-1a/1d。
