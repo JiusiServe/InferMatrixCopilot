@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5706", "PR #5720", "PR #5737", "PR #5752", "PR #5764", "PR #5779", "PR #5801", "PR #5824", "PR #5829", "PR #5836", "PR #5837", "PR #5853", "PR #5896", benchmarks/diffusion/backends.py, benchmarks/diffusion/diffusion_benchmark_serving.py, vllm_omni/config/model.py, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/inputs/data.py, vllm_omni/quantization/int8_config.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_cache_dit_request_runtime.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quality_policy.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/diffusion/quantization/test_int8_config.py, tests/entrypoints/openai_api/test_video_server.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md]
+sources: ["PR #5703", "PR #5706", "PR #5720", "PR #5737", "PR #5752", "PR #5764", "PR #5779", "PR #5801", "PR #5824", "PR #5829", "PR #5836", "PR #5837", "PR #5840", "PR #5853", "PR #5896", benchmarks/diffusion/backends.py, benchmarks/diffusion/diffusion_benchmark_serving.py, vllm_omni/config/model.py, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/cache/teacache/, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/quality_policy.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/inputs/data.py, vllm_omni/quantization/int8_config.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_cache_dit_request_runtime.py, tests/diffusion/cache/test_teacache_extractors.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quality_policy.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/diffusion/quantization/test_int8_config.py, tests/entrypoints/openai_api/test_video_server.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/engine/async_omni_engine.py]
 confidence: high
 ---
 
@@ -29,6 +29,7 @@ confidence: high
 | modular checkpoint、combined/partition task、两套 DiT、shared component | `MMH3-2d` | model index discovery → startup task selection → task-specific transformer/cache lifecycle |
 | request `quality`、lossless/high、dynamic Cache-DiT | `MMH3-2e` | request sampling → quality policy → request Cache-DiT runtime → denoise |
 | force-refresh hint、once/repeat、reinstall key | `MMH3-2f` | H3 `extra_args` validation → immutable cache config → installation key/refresh context |
+| TeaCache、FL2VA coefficients、0.17、combined/Ref2VA | `MMH3-2g` | custom enabler → H3 extractor → module-resident hook state / per-generation reset |
 | DLO、TP-local、resident layers、encoder/VAE staging | [MMH3-3a](rules-deployment.md#mmh3-3a-h3-dlo-必须保持-loader-layout-与-component-stage-配对) | H3 `_offload_plan` → shared DLO backend → pipeline encode/denoise/decode stage contexts |
 | RTX 5090/4090、24/32 GiB、consumer profile | [MMH3-3b](rules-deployment.md#mmh3-3b-consumer-gpu-profile-是有边界的容量证据) | recipe measurement commit/run record → exact target topology → quality/capacity validation |
 | 4×H100、DFX perf、T2V/TI2V/V2V、synthetic H.264 reference | [MMH3-3c](rules-deployment.md#mmh3-3c-h100-dfx-fixture-只证明-exact-nightly-workload-与-payload-path) | nightly lane → perf JSON → benchmark request encoder/result artifact |
@@ -226,8 +227,9 @@ confidence: high
 
 - 触发：修改公共 `quality` 值、H3 quality policy、startup cache adoption 或 denoise 前 prepare。
 - 强制：公共层只接受 `None`、`lossless`、`high`，并保留 omitted 与 explicit lossless 的区别。
-  H3 中 `lossless` 总是无 cache；`high` 总是选择 model-owned conservative profile，即使启动时没有
-  cache backend；omitted 仅在启动配置为 Cache-DiT 时恢复 server generic profile，否则无 cache。
+  对 request-scoped Cache-DiT，`lossless` 产生空 target；`high` 总是选择 model-owned conservative
+  profile，即使启动时没有 cache backend；omitted 仅在启动配置为 Cache-DiT 时恢复 server generic
+  profile，否则不安装 Cache-DiT。
   pipeline 必须在参数/任务/step 解析完成后、真实 denoise 紧邻之前 apply plan。
 - 禁止：沿用 PR 早期描述，把无 startup cache 的 `high` 拒绝；让 unsupported quality 静默落入
   lossless；在 request 未显式提供 quality 时由 sync/streaming serving 覆盖 model default。recipe
@@ -253,6 +255,31 @@ confidence: high
   repeated same-key request；断言每次 refresh 重建 hint context、generic config 不变，key 变化发生
   disable→enable。当前覆盖为 mock/config 合同，未证明不同 topology 下 hint 对质量/命中率的效果。
   ^[PR #5853]
+
+## MMH3-2g — H3 TeaCache 只绑定 FL2VA 校准与 request state
+
+- 触发：H3 选择 `tea_cache`、修改 extractor、polynomial coefficients、threshold 或 partition。
+- 强制：只允许 `fl2va`/`combined`，Ref2VA-only fail fast；combined 只 hook FL2VA `transformer` 并
+  告警 Ref2VA 不缓存。extractor 必须复刻 `_embed`、packed/SP block kwargs、final row selection 与
+  video/audio update masks；缺/多 kwargs、空 blocks、shape/length 不闭合立即失败。runner 在每次
+  generation 前 reset module-resident hook state；first step 强制计算，后续按累积距离计算或复用
+  residual，目标 hook 没有 last-step 强制计算分支。
+- 强制：H3 coefficients 只由 70 prompts、seed 42–111、256×448、107 frames、50 steps 的 3360
+  adjacent pairs 校准；`TeaCacheConfig` 收到 `None` 时模型默认 0.17，自定义 coefficients/正 threshold
+  可覆盖。但 public `AsyncOmniEngine._normalize_cache_config` 在省略 cache config 时仍先注入 0.2，
+  因此 CLI/public omitted 路径没有获得 0.17；recipe 显式 0.17 不受影响。
+- 禁止：把 FL2VA coefficients 用于 Ref2VA，或宣称 selector 已在 request 层强制互斥。目标 pin 中
+  TeaCache 由 runner 持有；`quality=lossless` 只清除 Cache-DiT target、不会卸载 TeaCache，
+  `quality=high` 还会尝试在同一 transformer 安装 Cache-DiT。修复或拒绝该组合前，TeaCache server
+  不得用 request `quality` 承诺 lossless 或双 backend 安全。0.2 单 H100 A/B 虽约 1.20×，LPIPS
+  0.3162 是显著视觉差异；0.17 在同 prompt 仅约 3% wall reduction、LPIPS 0.0134，均非通用保证。
+  ^[PR #5840]
+- 验收：CPU extractor tests 覆盖 native parity、packed kwargs、mask/SP 与错误路径；backend tests
+  覆盖 partition/default/override。模型 E2E 仅两 steps 并检查输出 shape，未断言真实 cache hit；
+  还必须从 public omitted config 断言最终 H3 threshold，不能只直接构造 backend；覆盖 TeaCache ×
+  omitted/lossless/high，断言只存在一个 hook/backend 或明确拒绝。module state 若可交错还需并发隔离
+  证明。单 H100 online/offline、
+  Cache-DiT default/conservative 数据无多 prompt/repeats，不能升级为 gate。
 
 共享 component quantization、checkpoint mapping 与 quality evidence 见
 [Diffusion rules](../../components/diffusion/rules.md)。
