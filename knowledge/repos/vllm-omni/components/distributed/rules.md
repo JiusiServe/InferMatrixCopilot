@@ -1,10 +1,10 @@
 ---
 title: "Distributed 传输规则"
 created: 2026-08-05
-updated: 2026-08-05
+updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, distributed]
-sources: [vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py]
+sources: ["PR #5744", vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py]
 confidence: high
 ---
 
@@ -34,3 +34,17 @@ confidence: high
   connector 没有新数据时无限占用 active window 或静默丢掉 terminal update。
 - 验收：覆盖非空→空→非空、upstream exhaustion、stage completion、重复 terminal
   update 和窗口恢复；首批测试看 `test_chunk_transfer_adapter.py`。
+
+## DIST-1c — payload connector 按 edge 所有权创建且不与 KV manager 捆绑
+
+- 触发：修改 AR/DiT 解耦、stage connector role、`custom_process_next_stage_input_func`、
+  runner connector 初始化或 KV-only edge。
+- 强制：receiver/非 sender 即使无 downstream hook 也创建 payload connector；sender 只在
+  `custom_process_next_stage_input_func` 是非空字符串时创建，空值或非字符串都表示
+  KV manager 独自拥有该 edge。KV manager 与 payload connector 必须独立初始化和关闭。
+- 禁止：不得只因已配 connector/role 就创建 payload transport；不得从“无 outgoing
+  hook”推导 receiver 也不需要 connector；不得用 consumer-side hook 反推 sender 所有权。
+- 验收：参数化锁定 sender+空/非字符串→不创建、sender+非空字符串→创建、
+  receiver/非 sender+无 hook→创建，并覆盖安全 shutdown。Bagel/Hunyuan KV-only 和
+  Qwen3-Omni/MiniCPM-o payload 路径各做真实拓扑 smoke。该矩阵不证明 issue #5595 中独立的
+  shutdown/orphan 问题已解决。 ^[PR #5744]

@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-02
 type: architecture
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #4958", "PR #5610", docs/design/feature/omni_async_output_materialization.md, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local.py, vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, vllm_omni/platforms/npu/_310p/patch/qwen3_tts.py, vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, tests/model_executor/models/moss_tts/test_moss_fused_load.py, tests/model_executor/models/qwen3_tts/test_code_predictor_dtype.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py]
+sources: ["PR #4958", "PR #5610", "PR #5744", docs/design/feature/omni_async_output_materialization.md, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local.py, vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, vllm_omni/platforms/npu/_310p/patch/qwen3_tts.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, tests/model_executor/models/moss_tts/test_moss_fused_load.py, tests/model_executor/models/qwen3_tts/test_code_predictor_dtype.py, tests/worker/test_omni_connector_mixin.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py]
 ---
 
 # Model Executor 共享架构
@@ -49,6 +49,14 @@ consumer，读取 live connector signal；`get_output()` join builder，同时�
 decode、routed-expert output 等冲突状态；条件不满足时回退同步构造。CUDA/ROCm 是已验证范围，
 不是代码里的 platform guard；XPU/MUSA 可能通过共享 GPU runner 进入但尚未验证，Ascend NPU
 使用独立 runner 并保持同步 materialization。
+
+## Payload 与 KV connector 所有权
+
+`OmniConnectorModelRunnerMixin` 把 runner payload 传输与 `OmniKVTransferManager` 管理的 KV
+传输视为独立数据面。receiver 总是创建 payload connector；sender 只在声明了非空
+`custom_process_next_stage_input_func` 时才拥有 payload connector。因此 Bagel/Hunyuan 这类
+KV-only sender 可只保留 KV manager，不另外创建无 consumer 的 payload transport。
+可执行验收见 [Distributed DIST-1c](../distributed/rules.md#dist-1c-payload-connector-按-edge-所有权创建且不与-kv-manager-捆绑)。
 
 ## 共享 fused code-predictor loader 合同
 
