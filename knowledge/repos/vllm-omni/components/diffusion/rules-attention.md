@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5887", "PR #5891", "PR #5897", "PR #5997", vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/data.py, vllm_omni/engine/arg_utils.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/platforms/npu/platform.py, tests/config/test_omni_config.py, tests/diffusion/attention/test_flash_attn.py, tests/diffusion/cache/test_teacache_extractors.py]
+sources: ["PR #5887", "PR #5891", "PR #5897", "PR #5997", "PR #6000", docs/user_guide/diffusion/attention_backends.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/data.py, vllm_omni/engine/arg_utils.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/platforms/npu/platform.py, tests/config/test_omni_config.py, tests/diffusion/attention/test_flash_attn.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/cache/test_teacache_extractors.py]
 confidence: high
 ---
 
@@ -55,3 +55,24 @@ confidence: high
   extractor coverage。该修复只改 test double，没有给 production consumer 加 default-safe access，也
   没有证明 third-party registry override 或未继承 base class 的 backend 完成了 capability
   census；这些实现仍须继承合同或显式实现 method。^[PR #5891] ^[PR #5997]
+
+## DIFF-1h — RainFusion irregular tail 由 MindIE-SD 保护，不能 padding 伪对齐
+
+- 触发：修改 `RAINFUSION_ATTN`、`rf_v2`、`VideoTokenLayout`、block size、MindIE-SD
+  依赖或 packed video shape。
+- 强制：resolver 传入真实 `prefix_len`、`latent_shape=[t,h,w]` 和
+  `used_len=prefix_len+t*h*w`；只裁掉 document-0 后的物理 padding，kernel 输出再补零回
+  query shape。video rows 不再要求 128 整除；新 MindIE-SD 在空间重排后把不规则的
+  真实 video suffix 提升到 always-kept segment，使余下 video 按 128-row block 稀疏。
+  不能用人工 padding 替代，因为 `rf_v2` 不消费 padding mask，pad key 会污染 softmax。
+- 边界：`sparsity<=0`、未到 `start_step`、skip layer、无/未声明 BSND layout、无
+  video layout/无 `max_seqlen_q`、`prefix+t*h*w` 不闭合 document 0，或 video 少于
+  32×128 rows 均保持 FlashAttention dense fallback；显式错 layout、causal 或 Ring>1
+  仍 fail closed。非 8×8 空间网格的 residual 被 always-kept，因而 realized sparsity 低于
+  nominal；潜空间 h/w 为 8 的倍数（输入高宽为 256 的倍数）仍是性能首选。
+- 禁止：只因 `mindiesd` 可 import 就断言 irregular-tail 合同可用；当前 availability
+  只检查 module 存在，没有 version/feature gate，旧 `rf_v2` 与新 planner 组合仍有风险。
+- 验收：CPU plan 同时接受 128-aligned 与 irregular grid，并保持所有其他 fallback/
+  rejection；真实 Ascend + updated MindIE-SD 用 irregular grid 对 dense reference。目标 NPU test
+  仅以 `sparsity=0` 证明 protected-tail 几何下全 block 等价，不证明稀疏选择的质量、
+  realized sparsity 或加速。^[PR #6000]
