@@ -4,7 +4,7 @@ created: 2026-08-05
 updated: 2026-09-02
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5709", "PR #5737", "PR #5740", "PR #5752", "PR #5756", .buildkite/cuda/test-nightly.yml, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/, docs/user_guide/quantization/fp8.md, vllm_omni/diffusion/models/minimax_h3/, vllm_omni/diffusion/registry.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, tests/diffusion/models/minimax_h3/, tests/e2e/accuracy/minimax_h3/, tests/e2e/features/comfyui/test_comfyui_integration.py, vllm_omni/entrypoints/openai/video_api_utils.py]
+sources: ["PR #5703", "PR #5709", "PR #5737", "PR #5740", "PR #5752", "PR #5756", .buildkite/cuda/test-nightly.yml, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/, docs/user_guide/quantization/fp8.md, vllm_omni/diffusion/models/minimax_h3/, vllm_omni/diffusion/registry.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, tests/diffusion/models/minimax_h3/, tests/e2e/accuracy/minimax_h3/, tests/e2e/features/comfyui/test_comfyui_integration.py, vllm_omni/entrypoints/openai/video_api_utils.py]
 confidence: high
 ---
 
@@ -41,6 +41,9 @@ confidence: high
 - 音频加载优先使用 torchaudio；当 TorchCodec/torchaudio 在 CPU-only aarch64 环境不可用
   时，`reference_video.load_audio_file` 回退到 soundfile，再对 libsndfile 不支持的格式
   通过 ffmpeg 转 WAV。该回退保持 `(channels, samples)` float32 与原始 sample rate 合同。
+- conditioned image/video VAE 用固定内部 seed，并在 `fork_rng` 中播种 CPU 与参数所在设备后
+  恢复 state；MUSA recipe 记录 MTT S5000 验证。目标实现实际接纳所有非 CPU device，而实机
+  RNG 证据只覆盖 CUDA/MUSA；支持边界与并发缺口见 MMH3-2c。
 
 ## ComfyUI 请求路由
 
@@ -58,7 +61,9 @@ T2VA full-model accuracy 入口在 `tests/e2e/accuracy/minimax_h3/`：模型 sna
 PSNR >= 20 dB gate 完整输出；nightly lane 使用 4x H100、USP4、HSDP4、text-encoder TP4
 和 VAE patch parallel 4。该用例是精度/媒体合同，不是性能基线。
 硬件 recipe 只记录已验证的 GPU/NPU 形状；性能数字不能从 recipe 的配置示例泛化为全硬件
-保证。共享 offloader、并行和请求合同分别归 [Diffusion](../../components/diffusion/_index.md)、
+保证。目标 pin 的 MUSA recipe 把 launch 描述成 validated Ref2VA 配置，却在命令中导出
+`MODEL="${MODEL_ROOT}/FL2VA"`；按分区合同它不能服务 `task=ref2va`，执行示例前必须改为
+`Ref2VA` 分区，不能把原 snippet 当成可运行的 Ref2VA profile。共享 offloader、并行和请求合同分别归 [Diffusion](../../components/diffusion/_index.md)、
 [Configuration](../../components/configuration/_index.md) 和 [Serving](../../components/serving/_index.md)。
 
 ## 审查入口

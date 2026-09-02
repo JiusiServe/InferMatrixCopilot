@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5737", "PR #5752", vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/entrypoints/openai/serving_video.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/entrypoints/openai_api/test_video_server.py, recipes/MiniMaxAI/MiniMax-H3.md]
+sources: ["PR #5703", "PR #5737", "PR #5752", vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/entrypoints/openai/serving_video.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/entrypoints/openai_api/test_video_server.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md]
 confidence: high
 ---
 
@@ -21,6 +21,7 @@ confidence: high
 | FP8 quality、audio metric、layerwise offload | `MMH3-1b` | quantization quality test → recipe/support matrix → nightly lane |
 | FL2VA keyframe、Ref2VA mixed reference、shape/output matrix | `MMH3-2a` | `pipeline_minimax_h3.py::{_resolve_fl2va_keyframe_indices,_validate_ref2va_reference_counts,_resolve_shape}` |
 | media limit、typed/multipart reference、HTTP 400、temp source | `MMH3-2b` | `api_server.py` video handlers → `serving_video.py::_run_and_extract` → `reference_video.py` |
+| conditioned VAE、fixed seed、`fork_rng`、MUSA/device RNG | `MMH3-2c` | `pipeline_minimax_h3.py` condition encode caller → `vae.py::{encode_image,encode_video}` |
 
 ## MMH3-1a — component namespace 与 checkpoint transform 必须在 active loader 前闭合
 
@@ -100,6 +101,25 @@ confidence: high
   还会丢失原始 size/format，因此 multipart 的 bounded/predecode 证明不可外推，属于验证与
   hardening 缺口。API server 中的 H3 专用 helper 也仍有 reviewer 指出的后续泛化重构债务。
   ^[PR #5752]
+
+## MMH3-2c — conditioned VAE 的固定种子必须按实际设备隔离并恢复
+
+- 触发：修改 H3 image/video reference 的 VAE encode、固定 keyframe seed、`fork_rng`、设备
+  generator 或 accelerator backend 支持。
+- 强制：`encode_image()`/`encode_video()` 在采样前暂时把 VAE 转成 FP32，在
+  `torch.random.fork_rng(devices=...)` 内同时播种 CPU default generator 与 active-device
+  generator，退出时恢复 RNG state，并在 `finally` 恢复原 dtype；image path 还必须恢复
+  `parallel_tiling`。这个 seed 是 conditioned VAE 的固定内部 seed，不能描述成 request seed。
+- 禁止：把 PR 文本中的 CUDA+MUSA allowlist 当成目标实现。目标代码实际以
+  `parameter.device.type != "cpu"` 为条件，把所有非 CPU device 交给 `torch.get_device_module()`；
+  现有实机证据只覆盖 CUDA/MUSA，不能外推 XPU、NPU 或 ROCm RNG 语义。也不能因
+  `fork_rng` 最终恢复 state 就宣称并发安全：context 内仍会暂时改写 process-global CPU/device
+  generator，重叠调用需要序列化或独立并发证明。
+- 验收：同 seed 的 image/video condition latent 可重复，正常和 encode 异常后 CPU、目标设备
+  RNG state、dtype 及 image tiling state 都恢复；CPU 与每个声称支持的 accelerator 分支分别
+  覆盖，并加入重叠调用 fence。PR 中拟议的专用 VAE 单测按 review 被删除，目标 commit 没有
+  新增测试；PR body 的 focused/实机结果只能作为外部验证，不能冒充已提交回归覆盖。
+  ^[PR #5703]
 
 共享 component quantization、checkpoint mapping 与 quality evidence 见
 [Diffusion rules](../../components/diffusion/rules.md)。
