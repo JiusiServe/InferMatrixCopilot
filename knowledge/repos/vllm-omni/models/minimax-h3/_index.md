@@ -4,7 +4,7 @@ created: 2026-08-05
 updated: 2026-09-02
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5706", "PR #5709", "PR #5720", "PR #5737", "PR #5740", "PR #5752", "PR #5756", "PR #5764", "PR #5779", "PR #5785", "PR #5801", "PR #5824", "PR #5829", "PR #5837", "PR #5896", "PR #5914", .buildkite/cuda/test-nightly.yml, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/, docs/design/architecture_overview.md, docs/user_guide/quantization/fp8.md, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/quantization/int8_config.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/, tests/diffusion/quantization/test_int8_config.py, tests/e2e/accuracy/minimax_h3/, tests/e2e/features/comfyui/test_comfyui_integration.py, vllm_omni/entrypoints/openai/video_api_utils.py]
+sources: ["PR #5703", "PR #5706", "PR #5709", "PR #5720", "PR #5723", "PR #5737", "PR #5740", "PR #5752", "PR #5756", "PR #5764", "PR #5779", "PR #5785", "PR #5801", "PR #5824", "PR #5829", "PR #5837", "PR #5896", "PR #5914", .buildkite/cuda/test-nightly.yml, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/, docs/design/architecture_overview.md, docs/models/supported_models.md, docs/user_guide/quantization/fp8.md, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/platforms/rocm/platform.py, vllm_omni/quantization/int8_config.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/, tests/diffusion/quantization/test_int8_config.py, tests/e2e/accuracy/minimax_h3/, tests/e2e/features/comfyui/test_comfyui_integration.py, vllm_omni/entrypoints/openai/video_api_utils.py]
 confidence: high
 ---
 
@@ -61,6 +61,8 @@ confidence: high
 - Ascend NPU 可选择 RainFusion 稀疏 video tail，并从 BF16 checkpoint 做 online INT8；两者只在
   exact T2VA/Ulysses/no-AllGather DLO 配置有完成证据，几何 fallback、TP width 与组合边界见
   MMH3-1a/1d。
+- ROCm BF16 的 gfx942/MI300X 四卡与 gfx950/MI350 单卡 functional evidence、AITER backend gate、
+  mutable image 和 support-table 不一致边界见 MMH3-3d；不得从 gfx architecture 名直接扩展 SKU。
 - datacenter Blackwell 上 H3 可默认 dense BF16 TRTLLM；packed suffix trim、SAGE 短序列 role、
   mask/metadata fail-closed、AllGather-KV 禁用及性能证据边界见 MMH3-1e。
 - 2×consumer-GPU profile 使用 TP-local no-AllGather DLO、VAE patch parallel、cuDNN attention
@@ -91,4 +93,5 @@ PSNR >= 20 dB gate 完整输出；nightly lane 使用 4x H100、USP4、HSDP4、t
 
 H3 input matrix/media ingress，以及 text-encoder completeness、online FP8 的 component namespace、loader 顺序、joint quality 与 offload 边界见
 [MiniMax H3 rules](rules.md#direct-代码快速入口)；checkpoint transform、quantized loader 与
-text-encoder fused-source 完整性正文见 [loading rules](rules-loading.md)。
+text-encoder fused-source 完整性正文见 [loading rules](rules-loading.md)；DLO、consumer/H100/ROCm
+部署和硬件证据正文见 [deployment rules](rules-deployment.md)。
