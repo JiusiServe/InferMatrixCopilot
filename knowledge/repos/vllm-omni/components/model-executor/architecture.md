@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-02
 type: architecture
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #5610", "PR #5744", docs/design/feature/omni_async_output_materialization.md, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, vllm_omni/platforms/npu/_310p/patch/qwen3_tts.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, tests/worker/test_omni_connector_mixin.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py]
+sources: ["PR #5610", "PR #5744", "PR #6058", docs/design/feature/omni_async_output_materialization.md, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/musa/platform.py, vllm_omni/platforms/npu/_310p/patch/qwen3_tts.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/entrypoints/stage_utils.py, tests/worker/test_omni_connector_mixin.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py]
 ---
 
 # Model Executor 共享架构
@@ -34,6 +34,20 @@ sources: ["PR #5610", "PR #5744", docs/design/feature/omni_async_output_material
 - 共享 runner 回归测试：`tests/worker/test_omni_gpu_model_runner.py`；具体模型怎样消费 metadata：`tests/model_executor/models/`。
 
 启动类错误优先沿“最终 stage 配置 → runtime devices → 启动前校验 → worker rank”读取这四段。只有其中一段把错误状态交给其他模块时才横向展开。
+
+## MUSA 平台接口边界
+
+`MUSAOmniPlatform` 必须把共享 stage/runtime 接口落到 MUSA 自己的 runtime，而不是借用
+CUDA 名称：设备能力来自 `torch.musa.get_device_capability()`；stage visibility 的 set/unset
+成对操作 `MUSA_VISIBLE_DEVICES`。后者被 `entrypoints/stage_utils.py` 的逻辑→物理设备映射和
+`stage_engine_startup.py` 的 scoped subprocess spawn 直接消费，因此既要支持设置，也要在异常
+路径恢复原值或删除变量。传入值在调用链中已归一化为 `str`；平台签名虽沿共享接口保留
+`str | int | None`，不能据此声称任意 `None` 可直接写入 `os.environ`。
+
+本次只做平台实现对齐，没有新增 MUSA runtime/unit 测试；PR 作者仅运行 compileall、
+pre-commit 与 diff check，并明确本地缺少 torch/vLLM/vllm_musa。设备 capability 查询、真实 spawn 隔离和
+capability 驱动的 FlashAttention 选择因此仍需 MUSA 环境验证。diffusion worker 的 IR-op
+priority 合同见 [DIFFPLAT-1a](../diffusion/rules-platform-runtime.md#diffplat-1a-platform-ir-op-priority-必须区分-inductor-与-eager)。^[PR #6058]
 
 ## AR async Omni output materialization
 

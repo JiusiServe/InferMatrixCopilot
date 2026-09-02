@@ -10,7 +10,7 @@ sources: []
 # Diffusion
 
 - 源码入口：`vllm_omni/diffusion/` 全树，含 16 个子模块：attention、cache、distributed、executor、hooks、layers、lora、model_loader、models、offloader、postprocess、profiler、quantization、sched、utils、worker
-- 源码校验：以上子模块均已在 `main @ e04210d6` 验证存在；本轮新增/扩展的
+- 源码校验：以上子模块均已在 `main @ 22dd96ec` 验证存在；本轮新增/扩展的
   async output、distributed layerwise offload 和 MiniMax H3 仍按各自模型/机制规则审查
 - 主要职责：多个 diffusion 模型共用的 pipeline、执行循环、scheduler 接入和运行机制
 
@@ -30,6 +30,7 @@ sources: []
 |---|---|
 | 理解共享职责和数据流 | [architecture](architecture.md) |
 | 根据 PR 描述直达 execution parity、checkpoint/artifact identity、quality evidence 或 system-runtime 异常清理规则组与第一批源码 | [rules 与代码地图](rules.md) |
+| 平台 IR-op priority、Inductor/eager 默认顺序与模型 hook 合并 | [platform runtime rules](rules-platform-runtime.md) |
 | multi-DiT、dotted `_dit_modules` 与跨 Cache-DiT/compile/LoRA/offload lifecycle | [component lifecycle rules](rules-component-lifecycle.md) |
 | local FlashAttention deterministic opt-in、NPU packed mask-free/laser fallback 与 config propagation | [attention rules](rules-attention.md) |
 | SP auto-padding、`mask_sp_padding`、dense/varlen 与 advanced UAA 边界 | [SP padding rules](rules-sp-padding.md) |
