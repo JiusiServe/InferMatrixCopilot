@@ -35,6 +35,7 @@ confidence: high
 | 4×H100、DFX perf、T2V/TI2V/V2V、synthetic H.264 reference | [MMH3-3c](rules-deployment.md#mmh3-3c-h100-dfx-fixture-只证明-exact-nightly-workload-与-payload-path) | nightly lane → perf JSON → benchmark request encoder/result artifact |
 | ROCm、gfx942/gfx950、AITER、BF16、support matrix | [MMH3-3d](rules-deployment.md#mmh3-3d-rocm-support-必须按-sku镜像拓扑和测量协议限界) | support table/footnote → recipe protocol → ROCm backend gate → exact hardware evidence |
 | DGX Spark、GB10、unified memory、FP8、offload/OOM | [MMH3-3e](rules-deployment.md#mmh3-3e-gb10-unified-memory-容量证据不等于离散-gpu-offload-合同) | single-partition recipe → allocator/header evidence → output probe |
+| RTX PRO 6000、TP2、Ulysses、2/4/8 GPU、PCIe | [MMH3-3f](rules-deployment.md#mmh3-3f-rtx-pro-6000-scaling-只绑定单机-t2va-协议) | topology → exact warmed T2VA measurements → memory method |
 
 ## MMH3-1b — joint video/audio quality 与 offload 兼容性必须一起验收
 

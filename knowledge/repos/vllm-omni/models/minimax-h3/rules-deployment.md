@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5723", "PR #5764", "PR #5836", "PR #5896", "PR #5946", docs/models/supported_models.md, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/utils/fa.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/offloader/, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/platforms/rocm/platform.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/entrypoints/openai_api/test_video_server.py]
+sources: ["PR #5723", "PR #5764", "PR #5836", "PR #5896", "PR #5946", "PR #5863", docs/models/supported_models.md, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/utils/fa.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/offloader/, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/platforms/rocm/platform.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/entrypoints/openai_api/test_video_server.py]
 confidence: high
 ---
 
@@ -114,3 +114,20 @@ measurement；模型输入、执行与加载合同返回 [MiniMax H3 rules](rule
   及整机内存。目标仅新增 recipe、无自动测试；正文实测是 T2VA。评论称 Ref2VA“相同”但无命令、
   输入、峰值或 artifact，FL2VA 也无独立证据，不能升级为已验证模式。recipe 声称 sync timeout
   默认 1800 s，但 target `api_server.py` 默认是 600 s；2169 s full run 必须显式设置更大值。
+
+## MMH3-3f — RTX PRO 6000 scaling 只绑定单机 T2VA 协议
+
+- 触发：引用 2/4/8×RTX PRO 6000 latency、96 GiB capacity、TP/Ulysses scaling 或 device order。
+- 强制：证据只绑定 YLX Y762、8×96 GiB、driver 580.105.08/CUDA 13.0、BF16/CUDNN_ATTN、
+  1344×768、5 s、50 steps、seed 1101、两次 warmup、单请求、默认 device order/no NUMA binding。
+  2/4/8 GPU 分别 TP2×USP1/2/4，E2E 284.76/172.32/90.48 s，1 Hz `nvidia-smi` peak
+  77.49/66.44/61.07 GiB/GPU；这些不是 allocator high-water。^[PR #5863]
+- 禁止：把 PCIe/NUMA 重排或 TP4 headroom variant 当已测；权重 residency 由 TP、activation 由 USP
+  主导，但三点拟合的约 55 GiB floor 不是跨 shape/concurrency 定律。两 server 布局未测，且会把
+  host RAM/storage 需求翻倍。Ref2VA latency/memory 明确未测；review 回复的成功附件无协议/峰值，
+  不能把 T2VA 数字外推。recipe 只给可变 `vllm/vllm-omni:minimax-h3` tag，没有 vLLM SHA、image
+  digest 或 PyTorch version；复现前必须补齐，不能把 linked issue #5901 的关闭归因于 docs-only diff。
+- 验收：新 topology 记录实际 rank groups、device order、warmup、stage/E2E、per-rank peak 与 joint
+  output/quality；每个 topology 当前仅两次 warmup 后测一个请求，无 repeats/variance。recipe-only diff
+  无自动回归，4/8 GPU scaling 和首次请求 19% 慢均为单机观察。SM120 显式 CUDNN 合理，因为 target
+  TRTLLM auto-default 只覆盖 compute major 10；这不构成其他 SM120 backend 的比较证据。
