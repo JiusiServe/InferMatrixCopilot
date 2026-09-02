@@ -4,7 +4,7 @@ created: 2026-08-05
 updated: 2026-09-02
 type: index
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5706", "PR #5709", "PR #5737", "PR #5740", "PR #5752", "PR #5756", "PR #5764", "PR #5779", "PR #5785", "PR #5801", "PR #5829", "PR #5837", .buildkite/cuda/test-nightly.yml, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/, docs/user_guide/quantization/fp8.md, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/models/minimax_h3/, vllm_omni/diffusion/registry.py, vllm_omni/quantization/int8_config.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/, tests/diffusion/quantization/test_int8_config.py, tests/e2e/accuracy/minimax_h3/, tests/e2e/features/comfyui/test_comfyui_integration.py, vllm_omni/entrypoints/openai/video_api_utils.py]
+sources: ["PR #5703", "PR #5706", "PR #5709", "PR #5720", "PR #5737", "PR #5740", "PR #5752", "PR #5756", "PR #5764", "PR #5779", "PR #5785", "PR #5801", "PR #5829", "PR #5837", .buildkite/cuda/test-nightly.yml, apps/ComfyUI-vLLM-Omni/comfyui_vllm_omni/, docs/user_guide/quantization/fp8.md, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/quantization/int8_config.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/, tests/diffusion/quantization/test_int8_config.py, tests/e2e/accuracy/minimax_h3/, tests/e2e/features/comfyui/test_comfyui_integration.py, vllm_omni/entrypoints/openai/video_api_utils.py]
 confidence: high
 ---
 
@@ -14,8 +14,14 @@ confidence: high
 
 - checkpoint：`MiniMaxAI/MiniMax-H3`；纯 diffusion registry architecture 是
   `MiniMaxH3Pipeline`，实现位于 `diffusion/models/minimax_h3/`。
-- 支持 `t2va`、`fl2va`、`ref2va` 三种 joint video+audio 条件模式；一个 server 进程
-  一次只加载 `FL2VA` 或 `Ref2VA` 分区，不能把两个分区当成同一份权重同时服务。
+- root `modular_model_index.json` 可解析为 `MiniMaxH3ModularPipeline` alias：combined 默认加载
+  FL2VA/Ref2VA 两套 DiT 并共享 text encoder 与 VAE；`--task-type` 可限制到单分区，完整
+  discovery、task、capability 与多 DiT lifecycle 合同见 MMH3-2d。目标 pin 的 modular alias
+  遗漏 TRTLLM auto-default 所需 capability，默认 combined 服务需显式 backend 或先修 metadata。
+- combined root 同一进程服务 `t2va`、`fl2va`、`ref2va`；启动时 `--task-type t2va/fl2va`
+  选择 FL2VA-only，`ref2va` 选择 Ref2VA-only。combined 省略 request task 时，无媒体→t2va、
+  image-only→fl2va、video/audio→ref2va（因此 image-only Ref2VA 必须显式 task）；Ref2VA-only
+  省略时固定→ref2va。
 - 输出是带同步音频的 MP4；FL2VA 接受首帧、尾帧或有序首尾帧，Ref2VA 支持 image-only
   及有 visual reference 的 image/video/audio mixed matrix。完整计数、媒体和 API 合同见
   MMH3-2a/2b。
@@ -72,9 +78,8 @@ T2VA full-model accuracy 入口在 `tests/e2e/accuracy/minimax_h3/`：模型 sna
 PSNR >= 20 dB gate 完整输出；nightly lane 使用 4x H100、USP4、HSDP4、text-encoder TP4
 和 VAE patch parallel 4。该用例是精度/媒体合同，不是性能基线。
 硬件 recipe 只记录已验证的 GPU/NPU 形状；性能数字不能从 recipe 的配置示例泛化为全硬件
-保证。目标 pin 的 MUSA recipe 把 launch 描述成 validated Ref2VA 配置，却在命令中导出
-`MODEL="${MODEL_ROOT}/FL2VA"`；按分区合同它不能服务 `task=ref2va`，执行示例前必须改为
-`Ref2VA` 分区，不能把原 snippet 当成可运行的 Ref2VA profile。共享 offloader、并行和请求合同分别归 [Diffusion](../../components/diffusion/_index.md)、
+保证。目标 pin 的 MUSA Ref2VA recipe 已改为 `MODEL_ROOT/Ref2VA` + `--task-type ref2va`；
+它只验证单分区启动，不能外推 combined 双 DiT 的容量或性能。共享 offloader、并行和请求合同分别归 [Diffusion](../../components/diffusion/_index.md)、
 [Configuration](../../components/configuration/_index.md) 和 [Serving](../../components/serving/_index.md)。
 
 ## 审查入口

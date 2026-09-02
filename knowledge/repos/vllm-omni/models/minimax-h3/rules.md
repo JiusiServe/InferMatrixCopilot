@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5703", "PR #5706", "PR #5737", "PR #5752", "PR #5764", "PR #5779", "PR #5801", "PR #5829", "PR #5837", vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/quantization/int8_config.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/diffusion/quantization/test_int8_config.py, tests/entrypoints/openai_api/test_video_server.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md]
+sources: ["PR #5703", "PR #5706", "PR #5720", "PR #5737", "PR #5752", "PR #5764", "PR #5779", "PR #5801", "PR #5829", "PR #5837", vllm_omni/config/model.py, vllm_omni/config/omni_config.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/attention/backends/trtllm_attn.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/utils/hf_utils.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/quantization/int8_config.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/attention/test_trtllm_attn.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/diffusion/models/minimax_h3/test_minimax_h3_parallel.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization.py, tests/diffusion/models/minimax_h3/test_minimax_h3_quantization_quality.py, tests/diffusion/quantization/test_int8_config.py, tests/entrypoints/openai_api/test_video_server.py, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-MUSA.md, recipes/MiniMaxAI/MiniMax-H3-NPU.md]
 confidence: high
 ---
 
@@ -25,6 +25,7 @@ confidence: high
 | FL2VA keyframe、Ref2VA mixed reference、shape/output matrix | `MMH3-2a` | `pipeline_minimax_h3.py::{_resolve_fl2va_keyframe_indices,_validate_ref2va_reference_counts,_resolve_shape}` |
 | media limit、typed/multipart reference、HTTP 400、temp source | `MMH3-2b` | `api_server.py` video handlers → `serving_video.py::_run_and_extract` → `reference_video.py` |
 | conditioned VAE、fixed seed、`fork_rng`、MUSA/device RNG | `MMH3-2c` | `pipeline_minimax_h3.py` condition encode caller → `vae.py::{encode_image,encode_video}` |
+| modular checkpoint、combined/partition task、两套 DiT、shared component | `MMH3-2d` | model index discovery → startup task selection → task-specific transformer/cache lifecycle |
 | DLO、TP-local、resident layers、encoder/VAE staging | `MMH3-3a` | H3 `_offload_plan` → shared DLO backend → pipeline encode/denoise/decode stage contexts |
 | RTX 5090/4090、24/32 GiB、consumer profile | `MMH3-3b` | recipe measurement commit/run record → exact target topology → quality/capacity validation |
 
@@ -206,6 +207,33 @@ load 完成时 dynamic quantize，text encoder、VAE 和非 eligible projection 
   覆盖，并加入重叠调用 fence。PR 中拟议的专用 VAE 单测按 review 被删除，目标 commit 没有
   新增测试；PR #5837 也只改两处参数，未提交 CPU/NPU 回归测试，其 NPU smoke、serving 结果
   与 CUDA 不变性说明只能作为外部证据，不能冒充持续回归覆盖。^[PR #5703] ^[PR #5837]
+
+## MMH3-2d — modular H3 的 task selector 必须同步权重、能力与所有 DiT lifecycle
+
+- 触发：修改 `modular_model_index.json`、`MiniMaxH3ModularPipeline`、`--task-type`、combined
+  FL2VA/Ref2VA 服务、`_dit_modules` 或 shared text/VAE components。
+- 强制：模型发现同时识别 `model_index.json` 与 `modular_model_index.json`，registry alias 与
+  postprocess 都映射到同一 H3 pipeline。`auto/combined` 从 root 加载 FL2VA `transformer` 与
+  Ref2VA `transformers_ref`，但共享 text encoder、video/audio VAE；单 task 只加载所需 DiT。
+  request task 必须属于启动时 `supported_tasks`；combined 省略 task 时按无媒体→t2va、image-only
+  →fl2va、video/audio→ref2va 推断，因此 image-only Ref2VA 必须显式给 task；Ref2VA-only
+  省略 task 时保留 implicit ref2va。
+- 强制：modular alias 复制 9-image/mixed-reference admission capability；所有基于
+  `_dit_modules` 的 consumer（loader strictness、Cache-DiT enable/refresh/summary、LoRA/offload）
+  遍历实际 DiT，不硬编码 `transformer`/`transformer_2`。共享 `--task-type` 放宽后，非 H3
+  owner 仍 model-aware 校验；Qwen3-TTS 只接受既有三值。
+- 缺口：目标 pin 的 modular metadata 虽修复 admission 字段，仍遗漏 canonical H3 的
+  `attention_mask_free=True`。HF root 的两个 index 都解析成 modular alias，因此默认
+  combined 服务在 Blackwell 不会自动选 TRTLLM，与 recipe 声明冲突；alias 必须校验全部能力
+  字段 parity，不能只复制 review 点名的字段。
+- 禁止：从 combined 注册推断双 DiT 性能已验证；recipe 最终只描述配置，没有 combined
+  warm latency/throughput/output-parity qualification。也不能用单 DiT Cache-DiT 测试证明
+  `transformers_ref` lifecycle。
+- 验收：覆盖 local/Hub index discovery、snapshot allow-pattern、combined/单分区初始化、缺
+  partition、task default/membership、modular admission、两 DiT cache lifecycle 与非法 TTS
+  selector。PR body 的顺序 T2VA→Ref2VA 视频使用 `duration=2.0`，低于目标 pin 已生效的 4 秒
+  下限，因此不能证明 final merge 的 combined 路径；148.27/158.67 GiB combined 与 86.27 GiB
+  single-load 等数字来自缺硬件/协议/重复次数的 issue comment，不能作为容量保证。^[PR #5720]
 
 ## MMH3-3a — H3 DLO 必须保持 loader layout 与 component stage 配对
 

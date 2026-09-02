@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5543", "PR #5737", "PR #5764", "PR #5801", "PR #5802", "PR #5848", "PR #5872", "PR #5981", "PR #6094", "PR #6102", "PR #6279", "PR #6385", "PR #6445", vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/offloader/, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/offloader/test_distributed_layerwise_backend.py]
+sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5543", "PR #5720", "PR #5737", "PR #5764", "PR #5801", "PR #5802", "PR #5848", "PR #5872", "PR #5981", "PR #6094", "PR #6102", "PR #6279", "PR #6385", "PR #6445", vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/offloader/, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/offloader/test_distributed_layerwise_backend.py]
 confidence: high
 ---
 
@@ -27,6 +27,7 @@ confidence: high
 | HSDP/FSDP、`fully_shard`、DeviceMesh、packed/scalar parameter、FP8 | `checkpoint-distributed`：`DIFF-2b` | `distributed/hsdp.py::{apply_hsdp_to_model,shard_model}` → loader `_load_model_with_hsdp` → `hsdp_fp8.py` |
 | distributed layerwise offload、AllGather、异构 block、shared buffer | `checkpoint-distributed`：`DIFF-2e` | `offloader/distributed_layerwise_backend.py::{DistributedLayerwiseOffloadHook.initialize_hook,prefetch_layer,DistributedLayerwiseOffloadBackend._allocate_shared_buffers}` |
 | component quantization、text encoder/transformer/VAE 独立配置、owner prefix、meta/offload | `checkpoint-distributed`：`DIFF-2c` | `data.py::_propagate_quantization_from_tf_config` → loader weight sources/post-load → component linear consumer |
+| modular/multi-DiT、`_dit_modules`、Cache-DiT/compile/SP/LoRA/offload lifecycle | `checkpoint-distributed`：`DIFF-2f` | pipeline runtime component list → registry/runner/cache/LoRA/module discovery consumers |
 | LPIPS/PSNR/相似度阈值、CPU offload、量化质量证据 | `quality-evidence`：`DIFF-3a` | changed exact case → runner `execute_model` → model pipeline；A/B 同路径 |
 | paged KV/cache、backend/platform、GQA/layout、预算与 admission | `system-runtime`：`DIFF-4a`–`4f` | engine init → `diffusion_kv/{initialization,paged_attention_adapter}.py` → platform hook → scheduler |
 | worker/RPC 异常、rank-status、traceback/device cache 清理 | `system-runtime`：`DIFF-4d` | `diffusion_worker.py::{_execute_rpc,_worker_busy_loop}` 的 raise/reply/status 路径 |
@@ -35,7 +36,7 @@ confidence: high
 |---|---|---|
 | `core` | 每次共享 diffusion 审查 | `DIFF-1a`, `DIFF-1b`, `DIFF-1c`, `DIFF-1d`, `DIFF-1e` |
 | `execution-parity` | graph/eager、solver、RNG、generator、tensor dtype/device、fused layer、async output readiness | `DIFF-1a`–`1e` |
-| `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP、artifact identity、distributed offload | `DIFF-2a`, `DIFF-2b`, `DIFF-2c`, `DIFF-2d`, `DIFF-2e` |
+| `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP、artifact identity、distributed offload、multi-DiT lifecycle | `DIFF-2a`–`2f` |
 | `quality-evidence` | 质量阈值、offload、A/B case | `DIFF-3a` |
 | `system-runtime` | cache/预算、native/backend/platform、attention layout、异常与并发 | `DIFF-4a`–`4f` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `DIFF-0a`, `DIFF-0b` |
@@ -175,6 +176,17 @@ confidence: high
   覆盖，PR 的 8×NPU H3 E2E 说明也缺少已填写的 commit 证据，不能升级为验证结论。 ^[PR #5802]
   DP concurrent wave 只可在 DLO+AllGather 开启，并从 `sampling_params.extra_args` 比较 canonical
   signature；no-AllGather 的 TP-local request 不得误走 fused batch。^[PR #5764]
+
+### DIFF-2f — 多 DiT pipeline 的 component list 是所有共享 lifecycle 的唯一集合
+
+- 触发：pipeline 增加第二个 DiT、task-dependent transformer，或修改 `_dit_modules`。
+- 强制：registry SP injection、loader strictness、Cache-DiT enable/refresh/summary、regional
+  compile、LoRA、offloader/module collection 都遍历运行时实际存在的 `_dit_modules`；允许实例按
+  task 收窄 list，不得由 class 默认预建不存在的组件。模型规则只补 task/权重选择与 residency。
+- 禁止：硬编码 `transformer`/`transformer_2` 或把非 canonical attribute 静默漏掉；不能用
+  第一个 DiT 成功推断第二个已启用 cache/compile/offload。
+- 验收：用非 canonical 第二属性覆盖每个 consumer 的 enable/refresh/summary/discovery，并覆盖
+  task 收窄后的缺省属性；至少一个真实双 DiT pipeline 逐 route 验证。^[PR #5720]
 
 ## 质量阈值与资源辅助
 
