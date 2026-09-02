@@ -4,7 +4,7 @@ created: 2026-08-10
 updated: 2026-08-10
 type: rule
 tags: [vllm-omni, docs]
-sources: [.claude/skills/quantization/references/modelopt-fp8.md, docs/.nav.yml, docs/mkdocs/hooks/generate_examples.py, docs/models/supported_models.md, recipes/README.md, tests/docs/test_generate_examples.py, "PR #5969", "PR #5987"]
+sources: [.claude/skills/quantization/references/modelopt-fp8.md, docs/.nav.yml, docs/mkdocs/hooks/generate_examples.py, docs/models/supported_models.md, docs/user_guide/examples/online_serving/diffusers_pipeline_adapter.md, examples/online_serving/diffusers_pipeline_adapter/README.md, recipes/README.md, tests/docs/test_generate_examples.py, "PR #5969", "PR #5987", "PR #5998"]
 ---
 
 # Generated docs and supported-model evidence rules
@@ -47,6 +47,16 @@ sources: [.claude/skills/quantization/references/modelopt-fp8.md, docs/.nav.yml,
   `docs/user_guide/examples/`，hook 既不刷新也不删除；quickstart、design 与 feature 文档仍有直接
   链接。因此当前链接可达不等于内容会随 source 更新。需要明确迁移链接到 shared task page，或给
   stale generated pages 定义删除/刷新策略及 link-integrity test。
+- `diffusers_pipeline_adapter.md` 直接证明该边界：它已被 serving whitelist 排除却仍可访问并需手工
+  修补。source README 位于 `examples/online_serving/diffusers_pipeline_adapter/`，其中
+  `../../../docs/user_guide/diffusion/attention_backends.md` 按 source base 正确；相同字面路径若复制到
+  `docs/user_guide/examples/online_serving/` 会解析成不存在的 `docs/docs/...`，rendered page 必须用
+  `../../diffusion/attention_backends.md` 或经过显式 absolute rewrite。不得假设 source-relative link
+  可原样搬到另一个输出目录。^[PR #5998]
+- 验收 tracked stale/generated page 时，link checker 必须分别以 source 与 rendered file 的目录为
+  base，并跑 clean strict MkDocs 覆盖不在 nav 的可达页面；只测试 generator predicate 或只检查 source
+  README 不足。该修复报告 strict build 通过但未增加自动 link regression，因此后续手工同步仍可能
+  再漂移。attention backend 段落未改，不能把 link-only diff 当 Diffusers adapter runtime 新证据。
 
 ## DOCGEN-1b — Recipe link 与硬件 checkmark 必须共享可审计证据
 
