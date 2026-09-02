@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5864", "PR #5978", vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/inline_stage_diffusion_client.py, vllm_omni/diffusion/ipc.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/utils/media_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, tests/diffusion/test_async_output_worker.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_ipc.py, tests/diffusion/test_inline_stage_diffusion_client.py, tests/diffusion/test_ipc_async.py, tests/diffusion/test_multiproc_engine_concurrency.py, tests/diffusion/test_result_pump.py, tests/entrypoints/openai_api/test_video_server.py]
+sources: ["PR #5550", "PR #5864", "PR #5978", vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/inline_stage_diffusion_client.py, vllm_omni/diffusion/ipc.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/utils/media_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, tests/diffusion/test_async_output_worker.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_engine_cleanup.py, tests/diffusion/test_diffusion_ipc.py, tests/diffusion/test_inline_stage_diffusion_client.py, tests/diffusion/test_ipc_async.py, tests/diffusion/test_multiproc_engine_concurrency.py, tests/diffusion/test_result_pump.py, tests/entrypoints/openai_api/test_video_server.py]
 confidence: high
 ---
 
@@ -50,6 +50,16 @@ confidence: high
   虽保留 result queue，却仍先调用 `worker.shutdown()`，model teardown 可能与 live output thread 竞态，
   且没有后续强制 thread/SHM/queue 回收证明。final 2×B300 rerun提供一次普通 TP2 与
   DLO DP2 clean exit，但不替代 fault matrix。^[PR #5864]
+
+## DIFF-1j — Engine 构造失败必须释放已启动的 Executor
+
+- 触发：`DiffusionEngine.__init__` 在 executor 已启动后初始化 Scheduler、runtime state、execute
+  function 或 logging。
+- 强制：任一步失败都 best-effort 关闭已赋值 Scheduler、shutdown executor，再原样重抛根因；
+  cleanup 异常只能记录。此时同步状态可能尚未建立，不能调用完整 `close()`。
+- 禁止：构造异常直接逃逸并遗留 worker/monitor/GPU allocation，或用 cleanup 异常遮蔽初始错误。
+- 验收：注入 Scheduler initialization failure，断言 close/shutdown 各一次且异常 identity 不变；
+  另覆盖 cleanup 自身失败不遮蔽根因。^[PR #5550]
 
 ## DIFF-2k — DLO AllGather DP wave 必须完整兼容或不可复用地 fail closed
 

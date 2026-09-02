@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, diffusion, scheduler]
-sources: ["PR #5541", vllm_omni/config/omni_config.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/diffusion_kv/config.py, vllm_omni/diffusion/diffusion_kv/request.py, vllm_omni/diffusion/models/hunyuan_image3/pipeline_hunyuan_image3.py, vllm_omni/diffusion/models/hunyuan_image3/request_layout.py, vllm_omni/diffusion/request.py, vllm_omni/diffusion/sched/base_scheduler.py, vllm_omni/diffusion/sched/interface.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/diffusion/worker/utils.py, tests/config/test_omni_config.py, tests/diffusion/diffusion_kv/test_config.py, tests/diffusion/diffusion_kv/test_request.py, tests/diffusion/models/hunyuan_image3/test_diffusion_kv_request.py, tests/diffusion/models/hunyuan_image3/test_hunyuan_image3_step_execution.py, tests/diffusion/test_diffusion_config_propagation.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_model_runner.py, tests/diffusion/test_diffusion_scheduler.py]
+sources: ["PR #5541", "PR #5550", vllm_omni/config/omni_config.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/diffusion_kv/config.py, vllm_omni/diffusion/diffusion_kv/metadata.py, vllm_omni/diffusion/diffusion_kv/request.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/models/hunyuan_image3/pipeline_hunyuan_image3.py, vllm_omni/diffusion/models/hunyuan_image3/request_layout.py, vllm_omni/diffusion/request.py, vllm_omni/diffusion/sched/base_scheduler.py, vllm_omni/diffusion/sched/interface.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/diffusion/worker/utils.py, tests/config/test_omni_config.py, tests/diffusion/diffusion_kv/test_config.py, tests/diffusion/diffusion_kv/test_metadata.py, tests/diffusion/diffusion_kv/test_request.py, tests/diffusion/diffusion_kv/test_worker_contract.py, tests/diffusion/models/hunyuan_image3/test_diffusion_kv_request.py, tests/diffusion/models/hunyuan_image3/test_hunyuan_image3_step_execution.py, tests/diffusion/test_diffusion_config_propagation.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_engine_cleanup.py, tests/diffusion/test_diffusion_model_runner.py, tests/diffusion/test_diffusion_scheduler.py]
 ---
 
 # Diffusion paged KV control plane
@@ -68,10 +68,34 @@ sources: ["PR #5541", vllm_omni/config/omni_config.py, vllm_omni/diffusion/data.
   native manager facade test 不得冒充 Scheduler allocation、BlockTable、slot mapping、paged attention
   或跨请求正确性。^[PR #5541]
 
+## DIFFKV-2c — Worker 只接收请求级 allocation snapshot，不接收 Scheduler 可变状态
+
+- 触发：增加 `DiffusionKVMetadata`、`NewRequestData` 字段，或修改 request/batch/step 的
+  Scheduler→Executor→Worker→ModelRunner RPC。snapshot 在 request scope 保存 generation、sequence
+  的 prefix/target/full length、可引用的独立 context，以及每个 native cache group 的 block ID；
+  多个 CFG sequence 可引用同一个 context，也可引用各自 context。
+- 强制：metadata 与已初始化 request 原子放在同一个 new-request envelope，且 envelope ID、实际转发
+  的 `req.request_id`、metadata ID 在任何 model work/RPC 前一致。request mode 只在 metadata 存在时
+  追加第四个 RPC 位置参数，保持 dense 历史三参数 shape；batch/step 则随完整
+  `DiffusionSchedulerOutput` 传输。`prepared_layout` 仍是独立的 model-owned payload，不能从它派生
+  block ID。Worker wrapper 也只在非空时向旧 runner 增加 keyword，避免破坏 dense/custom runner。
+- 强制：W0 尚无 allocator/installer，因此 `paged_scheduler` 接受 metadata 但不得强制要求；
+  `dense_legacy` 必须拒绝 metadata。带 metadata 的多请求 wave 不能走 DLO 的 list-request 快捷 RPC，
+  因为该路径没有逐请求 snapshot 参数；应退回逐请求 dispatch。^[PR #5550]
+- 禁止：把这些可变 dataclass 当成已验证的安全边界。当前只验证 mode 与顶层 request identity，
+  不检查 generation/sequence/block ID 正数、`prefix+target<=seq_len`、精确 sequence/context 集合、
+  cache-group 数/顺序、block-table 长度/范围或 null block。上述检查必须由未来 Scheduler producer
+  对照 `SchedulerRequestState.diffusion_kv_requests`，再由 Worker installer 对照 rank-local native
+  `KVCacheConfig` 与 generation registry，而不是用 DTO 自证正确。
+- 验收：request/batch/step 覆盖 metadata 缺省、传播与三方 ID mismatch；dense metadata fail-fast，
+  DLO metadata wave 不进入 list-request 分支，legacy positional shape 与 `prepared_layout` identity
+  保持。严格 layout/range/generation 测试只能在独立 truth owner 落地后升级为已实现合同。
+
 ## 证据边界
 
-- 目标实现只提供 logical request/control-plane contracts 与 native-manager conformance tests；没有
-  cache manager、physical allocation、Scheduler→Worker KV metadata、BlockTable、slot mapping 或
-  paged attention。
+- 目标实现只提供 logical request/control-plane contracts、request-scoped Scheduler→Worker metadata
+  DTO/RPC 与 native-manager conformance tests；没有 cache manager、physical allocation、Worker
+  installer/registry、BlockTable、slot mapping 或 paged attention。metadata 可选且未被消费，内部
+  数值字段也未做严格校验，因此不能把“到达 runner”解释为 allocation 可用。
 - 目标 Hunyuan E2E 运行 `dense_legacy`，只证明既有 dense path；不能作为 Scheduler-managed paged
   data plane、attention 或 cross-request caching 正确性的证据。
