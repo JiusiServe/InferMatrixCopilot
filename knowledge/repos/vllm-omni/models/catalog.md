@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ 854bff7f`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ 3c3989ed`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -45,8 +45,8 @@ OMNI_PIPELINES 46→51，deploy 71→79。新增 AR 家族是 `audex`；diffusio
 `minimax_h3`，同时 LTX-2/LTX-2.3 的五个旧 registry names 合并为两个入口。新增
 pipeline keys 是四个 Audex 模式和 `nemotron_labs_audex` alias；deploy 新增八个
 Audex files 与 `qwen3_omni_moe_thinking.yaml`，删除 `minicpmo_4_5_batching.yaml`。
-本次相对 `b792578d` 四个 inventory 均无变化；PR #6062 修正 Wan VAE distributed spatial
-reshard boundary，不得从 inventory 不变推断并行数值合同不变。
+本次相对 `854bff7f` 四个 inventory 均无变化；PR #6074 只对齐 quantization overview 与
+导航中的 BitsAndBytes/GGUF 可发现性，不是 runtime registry 或支持范围变更。
 
 ## AR/omni 模型族（29）
 
@@ -89,8 +89,8 @@ voxtral_tts、wan2_2_ti2v、nemotron_labs_audex、indextts2_5
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from b792578d \
-  --to 854bff7f \
+  --from 854bff7f \
+  --to 3c3989ed \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```

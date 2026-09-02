@@ -4,7 +4,7 @@ created: 2026-08-10
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, docs]
-sources: [.claude/skills/quantization/references/modelopt-fp8.md, docs/.nav.yml, docs/mkdocs/hooks/generate_examples.py, docs/models/supported_models.md, docs/user_guide/examples/online_serving/diffusers_pipeline_adapter.md, examples/online_serving/diffusers_pipeline_adapter/README.md, examples/online_serving/text_to_image/, examples/online_serving/image_to_video/, recipes/README.md, tests/docs/test_generate_examples.py, "PR #5969", "PR #5987", "PR #5998", "PR #6045", "PR #6049", docs/features/README.md, docs/design/index.md, docs/user_guide/diffusion/startup_and_loading.md, docs/user_guide/diffusion_features.md, docs/user_guide/quantization/bitsandbytes.md, docs/user_guide/quantization/gguf.md]
+sources: [.claude/skills/quantization/references/modelopt-fp8.md, docs/.nav.yml, docs/mkdocs/hooks/generate_examples.py, docs/models/supported_models.md, docs/user_guide/examples/online_serving/diffusers_pipeline_adapter.md, examples/online_serving/diffusers_pipeline_adapter/README.md, examples/online_serving/text_to_image/, examples/online_serving/image_to_video/, recipes/README.md, tests/docs/test_generate_examples.py, "PR #5969", "PR #5987", "PR #5998", "PR #6045", "PR #6049", "PR #6074", docs/features/README.md, docs/design/index.md, docs/user_guide/diffusion/startup_and_loading.md, docs/user_guide/diffusion_features.md, docs/user_guide/quantization/overview.md, docs/user_guide/quantization/bitsandbytes.md, docs/user_guide/quantization/gguf.md]
 ---
 
 # Generated docs and supported-model evidence rules
@@ -82,11 +82,14 @@ sources: [.claude/skills/quantization/references/modelopt-fp8.md, docs/.nav.yml,
   启用/兼容入口，recipe 绑定模型/硬件。Communication 留在 Developer Guide；未稳定的 Pipeline
   Parallelism 可 direct-link 但不进入主导航。迁移必须让新页入 nav，并保留旧 heading anchor。
 - 禁止：从任一文档层或 nav presence 单独推出 production support；把 quantization 缩成 diffusion-only；
-  把已迁到 OOT plugin 的 GGUF 重新包装成 core-owned 主导航 feature，或因移除主入口而删除仍由
-  quantization overview 直达的保留 guide；漏掉仍实现/测试且无其他 discoverability 的 BitsAndBytes。
+  把已迁到 OOT plugin 的 GGUF 重新包装成 core-owned 主导航 feature，或因它同时从主导航和 overview
+  消失就宣称 runtime/guide/tests 已删除；漏掉已有 core 实现、测试与 guide 的 BitsAndBytes。BitsAndBytes
+  的 CUDA method presence 不等于所有 NVIDIA 型号或模型都已验证：当前 diffusion 明确验证范围只有
+  Z-Image-Turbo，其他 diffusion、Omni/TTS、多 stage 组合仍按未验证处理。
 - 验收：strict MkDocs + link/nav census；兼容表逐项回 live owner。HunyuanImage3/Helios step 边界分别
   是 grouped 仅 TORCH_SDPA、仅 `max_num_seqs=1`；HSDP 与 Ulysses/CFG 可组合但与 TP 不兼容；local
-  layerwise offload 与 multi-device DLO 分表。docs-only build 不证明 runtime。^[PR #6045]
+  layerwise offload 与 multi-device DLO 分表。docs-only build 不证明 runtime；overview 移除 GGUF 只同步
+  core 导航归属，保留的 GGUF guide、OOT plugin 说明与实现/测试证据仍须独立核查。^[PR #6045] ^[PR #6074]
 
 ## DOCGEN-1d — shared task example 不得把模型默认伪装成通用合同
 
