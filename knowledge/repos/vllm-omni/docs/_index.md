@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-02
 type: index
 tags: [vllm-omni, docs]
-sources: ["PR #5715", README.md, docs/configuration/README.md, docs/getting_started/installation/README.md, docs/getting_started/installation/gpu/cuda.inc.md, docs/getting_started/installation/npu/npu.inc.md]
+sources: ["PR #5715", "PR #6029", .claude/skills/readme.md, README.md, docs/configuration/README.md, docs/contributing/README.md, docs/getting_started/installation/README.md, docs/getting_started/installation/gpu/cuda.inc.md, docs/getting_started/installation/npu/npu.inc.md]
 ---
 
 # vLLM-Omni 文档
@@ -24,6 +24,7 @@ sources: ["PR #5715", README.md, docs/configuration/README.md, docs/getting_star
 | 判断 RFC 是否仍在进行 | [RFC status](rfcs/_index.md) |
 | 找上游官方设计文档与其知识树 owner | [design-doc map](design-doc-map.md) |
 | generated example URL/nav、supported-model recipe 与硬件证据 | [generation and support rules](generation-and-support-rules.md) |
+| contributor agent workflow、repository skill catalog 与信任边界 | [repository skill rules](repository-skills.md) |
 
 ## 发布与安装边界
 
