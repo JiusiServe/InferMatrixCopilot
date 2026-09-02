@@ -4,7 +4,7 @@ created: 2026-08-23
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, ci]
-sources: ["PR #3422", "PR #5074", "PR #5255", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5836", "PR #5845", "PR #5872", "PR #6008", "PR #6048", "PR #6056", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6339", "PR #6343", .buildkite/cuda/test-nightly.yml, .buildkite/npu/test-npu-nightly.yml, .pre-commit-config.yaml, tests/dfx/perf/scripts/run_benchmark.py, tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, tools/pre_commit/check_tts_adapter.py, tests/tools/test_check_tts_adapter.py]
+sources: ["PR #3422", "PR #5074", "PR #5255", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5823", "PR #5836", "PR #5845", "PR #5872", "PR #6008", "PR #6048", "PR #6056", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6339", "PR #6343", .buildkite/cuda/test-nightly.yml, .buildkite/npu/test-npu-nightly.yml, .pre-commit-config.yaml, tests/dfx/perf/scripts/run_benchmark.py, tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_flux_kontext_expansion.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, tests/model_tests/diffusion/diff_model_builders.py, tests/model_tests/diffusion/model_settings.py, tests/model_tests/diffusion/test_alignment.py, tools/pre_commit/check_tts_adapter.py, tests/tools/test_check_tts_adapter.py]
 confidence: high
 ---
 
@@ -21,6 +21,7 @@ confidence: high
 | pre-commit、SPDX、shellcheck、stability marker | `OMNI-CI-2a` | `.pre-commit-config.yaml`、`.buildkite/**`、`tools/**` |
 | xdist、共享 worker、下载 fixture、进程池 | `OMNI-CI-2b` | `tests/conftest.py`、`tests/helpers/**`、`tests/model_tests/**` |
 | 重模型 cold start、共享 engine/server fixture、sleep/wake | `OMNI-CI-2c` | `tests/entrypoints/test_omni_sleep_mode.py`、OmniServer fixture scope/lock |
+| diffusion tiny builder、model settings、alignment exclusion、重模型 OOM | `OMNI-CI-2d` | `tests/model_tests/diffusion/{diff_model_builders,model_settings,test_alignment}.py` → common offline tests |
 | perf baseline、hardware label、DFX result artifact、assert-baseline | `OMNI-CI-3a` | `tests/dfx/conftest.py`、`tests/dfx/perf/scripts/run_benchmark.py`、`run_diffusion_benchmark.py`、`tests/dfx/perf/tests/**` |
 
 ## OMNI-CI-1a — 硬件 lane 必须真实收集并执行目标路径
@@ -104,6 +105,25 @@ collection 意图；没有实际 runtime 结果时，不能证明目标硬件行
 - 验收：分别覆盖 LLM、diffusion 与 multi-stage topology；每个可恢复 case 后下一 case 从 awake
   开始；level-2 terminal case 之后不再复用 server；统计目标 lane 确实只初始化预期数量的
   engine，且 cleanup 后无 worker/device state 遗留。^[PR #5713]
+
+## OMNI-CI-2d — diffusion tiny builder 必须替代资源缩减而不是能力缩减
+
+- 触发：重模型 online E2E 因显存 OOM 迁移到 tiny-model framework，或修改
+  `DIFFUSION_TEST_SETTINGS` / `EXCLUDED_MODELS`。
+- 强制：builder 从真实 pipeline/config 构造缩小 checkpoint，按组件分别收缩 encoder/DiT；
+  attention head dim 改变时同比缩放 `axes_dims_rope`，并保留 architecture 要求的轴数与总维度。
+  settings 必须列出真实 supported tasks 和每个 acceleration group；只有 builder/settings 已接通
+  common tests 后，才从 alignment exclusion 删除模型。
+- 禁止：为消除 OOM 直接删除 TP/CFG/cache/offload coverage；把 online suite 从双卡 parallel cases
+  缩为单卡 base 后仍声称 online lane 覆盖这些组合；从 tiny checkpoint 通过外推 full checkpoint
+  显存、数值质量或吞吐。
+- 验收：alignment 双向断言 registry 中每个非排除 pipeline 有 settings，且 settings 不指向排除项；
+  common offline suite 对每个 task 跑 base，并逐组执行声明的 acceleration。Flux Kontext 当前 tiny
+  contract 是 text-to-image + image-to-image，附加 TP+CPU offload、CFG+CPU offload、以及
+  TP+CPU offload+Cache-DiT；online expansion 只保留单 L4 base smoke，parallel coverage 的所有权迁到
+  common offline suite，不代表 full-model OOM 已被修复。tiny builder 从收缩后的真实组件配置初始化
+  random BF16 weights，只证明 construction、routing 与 control-flow，不证明真实 checkpoint 加载、
+  输出质量、显存或吞吐。^[PR #5823]
 
 ## OMNI-CI-3a — DFX baseline artifact 与性能回归 gate 是两个合同
 
