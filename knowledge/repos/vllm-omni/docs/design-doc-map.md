@@ -4,15 +4,16 @@ created: 2026-07-16
 updated: 2026-09-02
 type: guide
 tags: [vllm-omni, docs]
-sources: [docs/design/index.md, docs/design/architecture_overview.md, docs/design/feature/diffusion_continuous_batching.md, docs/design/feature/omni_async_output_materialization.md, docs/user_guide/diffusion/execution_modes.md]
+sources: ["PR #5833", docs/.nav.yml, docs/design/index.md, docs/design/ar_diffusion_pipeline_capability.md, docs/design/architecture_overview.md, docs/design/feature/diffusion_continuous_batching.md, docs/design/feature/omni_async_output_materialization.md, docs/user_guide/diffusion/execution_modes.md]
 ---
 
 # 官方设计文档地图（docs/design/**）
 
-`main @ 9f978923` 复核。注意：官方 `docs/design/index.md` 只列了子集（Architecture
-Overview、4 篇 feature、metrics、3 篇 module）；**完整树比索引大得多**——
-`feature/` 下还有 async_chunk、cache_dit、teacache、prefix_caching、7 篇并行策略、
-`omni_connectors/` 逐后端 spec 等未入索引的文档，找 spec 时直接 `ls docs/design/feature/`。
+`main @ bc95e741` 复核。官方 `docs/design/index.md` 与 `docs/.nav.yml` 已按 architecture、
+runtime/stage、communication、diffusion acceleration、infrastructure/performance 和 module
+重组，并纳入 connector、缓存、并行、量化及 async diffusion 等现有入口；此次只改导航与
+landing-page 编排，文档路径保持不变，不代表 runtime 或设计合同发生变化。索引仍未列
+`docs/design/ar_diffusion_pipeline_capability.md`；找 spec 时仍须检查 `docs/design/` 实际文件树。
 
 | 官方文档 | 一句话 | 知识树 owner |
 |---|---|---|
