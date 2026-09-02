@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5887", "PR #5891", "PR #5897", vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/data.py, vllm_omni/engine/arg_utils.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/platforms/npu/platform.py, tests/config/test_omni_config.py, tests/diffusion/attention/test_flash_attn.py]
+sources: ["PR #5887", "PR #5891", "PR #5897", "PR #5997", vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/data.py, vllm_omni/engine/arg_utils.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/platforms/npu/platform.py, tests/config/test_omni_config.py, tests/diffusion/attention/test_flash_attn.py, tests/diffusion/cache/test_teacache_extractors.py]
 confidence: high
 ---
 
@@ -50,6 +50,8 @@ confidence: high
 - 验收：CPU/mock 覆盖 resolver 接受/拒绝矩阵、env dispatch、default caller masked path、fallback
   mask/fail-closed、host lists、Laser layout/slice/scaling；真实 NPU 再与 masked FP32/BF16 reference
   对照。target tests 覆盖前者但 mock kernel 不证明 MindIE 数值；NPU SDPA 的同类 `full_qk` churn
-  未改。新增 capability 是 classmethod，所有非 `AttentionBackend` duck-typed doubles 也须兼容；target
-  TeaCache `FakeBackend` 缺该方法并在 cache extractor tests 触发 `AttributeError`，说明 consumer
-  integration 未闭环。^[PR #5891]
+  未改。capability 是 classmethod，所有非 `AttentionBackend` duck-typed doubles/plugins 也须兼容；
+  repo 内 TeaCache `FakeBackend` 已镜像 abstract default，显式返回 false 并恢复 masked-path
+  extractor coverage。该修复只改 test double，没有给 production consumer 加 default-safe access，也
+  没有证明 third-party registry override 或未继承 base class 的 backend 完成了 capability
+  census；这些实现仍须继承合同或显式实现 method。^[PR #5891] ^[PR #5997]
