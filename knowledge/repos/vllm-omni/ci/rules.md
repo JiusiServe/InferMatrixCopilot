@@ -4,7 +4,7 @@ created: 2026-08-23
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, ci]
-sources: ["PR #3422", "PR #5074", "PR #5255", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5836", "PR #5845", "PR #5872", "PR #6008", "PR #6048", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6339", "PR #6343", .pre-commit-config.yaml, tools/pre_commit/check_tts_adapter.py, tests/tools/test_check_tts_adapter.py]
+sources: ["PR #3422", "PR #5074", "PR #5255", "PR #5310", "PR #5402", "PR #5524", "PR #5543", "PR #5670", "PR #5713", "PR #5780", "PR #5836", "PR #5845", "PR #5872", "PR #6008", "PR #6048", "PR #6096", "PR #6102", "PR #6202", "PR #6208", "PR #6273", "PR #6293", "PR #6339", "PR #6343", .buildkite/cuda/test-nightly.yml, .buildkite/npu/test-npu-nightly.yml, .pre-commit-config.yaml, tests/dfx/perf/scripts/run_benchmark.py, tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tools/pre_commit/check_tts_adapter.py, tests/tools/test_check_tts_adapter.py]
 confidence: high
 ---
 
@@ -123,4 +123,8 @@ confidence: high
   Hunyuan 配置只保留 H200 baseline，却仍标记 H100/A3 执行，当前因无阈值断言而被掩盖。
   runtime alias 匹配还应保持最长 token 优先；目标 pin 中 `B200` 早于 `GB200`，会把 GB200 名称
   归一化成 B200，修复前不可把 filename label 当精确设备证据。
+  MiniCPM-o 4.5 的 nightly perf 是这个边界的具体实例：最终 simplex/duplex 配置都是单卡 H100，
+  runner 命令没有阈值开关；simplex 只 gate 完成请求数，duplex 另要求每 session 恰好四个音频
+  response。配置里的 H100 baseline 因此只是结果 artifact，既不能证明回归阈值，也不能外推到
+  A3；PR 文本中的“双卡”描述也不能覆盖最终 lane/YAML 的单卡事实。^[PR #5524]
   ^[PR #5402] ^[PR #5845]

@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #3642", "PR #5165", "PR #5382", "PR #5638", "PR #5792", "PR #5869", "PR #6154", "PR #6170", "PR #6318", vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/cuda_graph_wrapper.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_code2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_tts.py, tests/model_executor/models/minicpmo_4_5/test_audio_chunk_mask.py, tests/model_executor/models/minicpmo_4_5/test_code2wav_batching.py, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_pipeline.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, tests/model_executor/models/minicpmo_4_5/test_vision_flash_attention.py]
+sources: ["PR #3642", "PR #5165", "PR #5382", "PR #5524", "PR #5638", "PR #5792", "PR #5869", "PR #6154", "PR #6170", "PR #6318", tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, vllm_omni/benchmarks/data_modules/seed_tts_dataset.py, vllm_omni/benchmarks/data_modules/seed_tts_eval.py, vllm_omni/benchmarks/patch/patch.py, vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/experimental/fullduplex/client.py, vllm_omni/experimental/fullduplex/openai/chat_fallback.py, vllm_omni/experimental/fullduplex/openai/serving.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/cuda_graph_wrapper.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_code2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_tts.py, tests/model_executor/models/minicpmo_4_5/test_audio_chunk_mask.py, tests/model_executor/models/minicpmo_4_5/test_code2wav_batching.py, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_pipeline.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, tests/model_executor/models/minicpmo_4_5/test_vision_flash_attention.py]
 confidence: high
 ---
 
@@ -27,6 +27,7 @@ confidence: high
 | Talker codec sampling、repetition penalty、request RNG/compaction | MCPMO-3c | `minicpmo_4_5_omni_tts.py::{make_omni_output,_sample_audio_codes,_apply_batched_repetition_penalty}` → `test_talker_batching.py` |
 | native duplex、Stage0 resume、LISTEN/SPEAK、server VAD | MCPMO-4a | `experimental/fullduplex/{minicpmo45,openai}/` → stage input processor |
 | instructions/persona/voice/mode update、prefill slots、context lock | MCPMO-4b | `experimental/fullduplex/minicpmo45/session.py` → runtime adapter/session runner |
+| Daily-Omni/Seed-TTS accuracy、simplex/duplex perf、TTFT/TTFP/RTF | MCPMO-5a | `tests/e2e/accuracy/minicpmo_4_5/`、`tests/dfx/perf/tests/test_minicpmo_4_5*.json` → `run_benchmark.py` |
 
 ## MCPMO-1a — trust_remote_code 服从用户选择
 
@@ -198,6 +199,30 @@ confidence: high
   true→false 绕过 native context lock。
 - 验收：成功更新同时改变派生状态；资源不足时无部分 mutation；buffer/defer/reject 均不锁，
   append 成功才锁，mode flip 明确拒绝。 ^[PR #6318]
+
+## MCPMO-5a — accuracy 与 duplex perf 证据必须绑定协议、硬件和实际 gate
+
+- 触发：修改 MiniCPM-o 4.5 Daily-Omni、Seed-TTS、realtime duplex 数据集/客户端、benchmark
+  配置或 CI lane。Daily-Omni 合同是 `minicpm-interleave`、temperature 0、文本输出、512 tokens，
+  使用 TTS template 与 1 FPS/最多 128 帧 media 配置，准确率下限 0.78；simplex Seed-TTS 同时请求
+  text+audio，WER 上限 0.05。duplex Seed-TTS 走 `openai-realtime-tts`，每 session 四轮、50 prompts，
+  并要求每轮恰好一个音频 response。
+- 强制：多轮数据只把连续有效 row 按 `turns_per_session` 分组，沿用首行 reference audio/text；
+  多轮必须使用 realtime backend，在同一 session 依次发送 item/response create 并做 playback ACK。
+  客户端按轮从共同 measurement origin 单调记录首 text TTFT、首 audio TTFP、逐轮请求起点到末音频的 RTF；
+  PCM 与这些 metrics 必须展开回逐轮 WER 样本。`native_duplex=False` 必须显式走 chat fallback，且在
+  构造 `ChatCompletionRequest` 前移除 `minicpmo45_native_duplex`。
+- 证据边界：accuracy case 标为 H100 或 A3、每 case 一卡，但 nightly 可为第二张卡上的 WER
+  evaluator 分配两卡资源；资源 allocation 不等于模型 stage 用卡数。最终 simplex/duplex perf 是
+  单卡 H100，baseline 只有 H100 bucket，runner 只检查完成数，duplex 再检查四轮 audio count；没有
+  性能阈值 consumer，故 baseline、TTFT/TTFP/RTF 只构成测量 artifact，不能证明回归或 A3 性能。
+- 禁止：把结果 artifact 中存在 baseline 描述成 active performance gate；把 PR 的“双卡”文字覆盖到
+  最终单卡 lane/YAML；或从 H100 bucket 外推 A3 的性能与阈值。
+- 验收：固定上述 collection、阈值、逐轮 cardinality 与 fallback；分别故障注入缺轮、重复音频、
+  非单调时间和错误 backend。PR 报告的 Daily-Omni 78.53%、Seed-TTS WER 0.0332/0.0255 只能绑定其
+  日志环境：数据/模型 revision 未固定，Daily 首次受损坏 decord 失败后重跑，kernel warmup 另有
+  未提交 patch，证据脚本还吞掉 step failure，且把版本号写作 commit。因而不能从这些数字声称
+  merge target 的可复现质量/性能通过。^[PR #5524]
 
 共享 bridge/batch 规则见 [Model Executor rules](../../components/model-executor/rules.md)；
 公开入口完整性见 [model adaptation guardrails](../../review/guides/model-adaptation-guardrails.md)。
