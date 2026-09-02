@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5543", "PR #5737", "PR #5764", "PR #5802", "PR #5848", "PR #5872", "PR #5981", "PR #6094", "PR #6102", "PR #6279", "PR #6385", "PR #6445", vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/offloader/, tests/diffusion/offloader/test_distributed_layerwise_backend.py]
+sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5543", "PR #5737", "PR #5764", "PR #5801", "PR #5802", "PR #5848", "PR #5872", "PR #5981", "PR #6094", "PR #6102", "PR #6279", "PR #6385", "PR #6445", vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/offloader/, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/offloader/test_distributed_layerwise_backend.py]
 confidence: high
 ---
 
@@ -20,7 +20,7 @@ confidence: high
 
 | PR 描述在做什么 | 精确规则组 | 第一批 live 源码 |
 |---|---|---|
-| CUDA Graph、compile、fused solver、eager parity、tensor dtype/device、async output | `execution-parity`：`DIFF-1a`–`1d` | `compile.py::regionally_compile` → runner batch → model denoise/solver/output pump |
+| CUDA Graph、compile、fused solver/norm/RoPE、eager parity、tensor dtype/device、async output | `execution-parity`：`DIFF-1a`–`1e` | `compile.py::regionally_compile` → shared layer/backend → model denoise/solver/output pump |
 | seed、request-local generator、guidance=0、并发 RNG、batched generators | `execution-parity`：`DIFF-1b` | `inputs/data.py::OmniDiffusionSamplingParams` → runner `_initialize_generator` → request-batch generator collate |
 | ModelOpt/checkpoint adapter、weight/scale remap、unknown tensor、resolution path | `checkpoint-distributed`：`DIFF-2a` | `diffusers_loader.py::{_get_checkpoint_adapter,load_weights}` → `modelopt.py::{_resolve_target_and_output_names,adapt}` |
 | host-weight artifact、source identity、layout/dtype、warm restore | `checkpoint-distributed`：`DIFF-2d` | `model_loader/host_weights/{source_identity,contracts,identity_adapter}.py` → policy/restorer |
@@ -33,8 +33,8 @@ confidence: high
 
 | 审查组 | 什么时候触发 | 规则 ID |
 |---|---|---|
-| `core` | 每次共享 diffusion 审查 | `DIFF-1a`, `DIFF-1b`, `DIFF-1c`, `DIFF-1d` |
-| `execution-parity` | graph/eager、solver、RNG、generator、tensor dtype/device、async output readiness | `DIFF-1a`, `DIFF-1b`, `DIFF-1c`, `DIFF-1d` |
+| `core` | 每次共享 diffusion 审查 | `DIFF-1a`, `DIFF-1b`, `DIFF-1c`, `DIFF-1d`, `DIFF-1e` |
+| `execution-parity` | graph/eager、solver、RNG、generator、tensor dtype/device、fused layer、async output readiness | `DIFF-1a`–`1e` |
 | `checkpoint-distributed` | checkpoint、quantization、HSDP/FSDP、artifact identity、distributed offload | `DIFF-2a`, `DIFF-2b`, `DIFF-2c`, `DIFF-2d`, `DIFF-2e` |
 | `quality-evidence` | 质量阈值、offload、A/B case | `DIFF-3a` |
 | `system-runtime` | cache/预算、native/backend/platform、attention layout、异常与并发 | `DIFF-4a`–`4f` |
@@ -83,6 +83,19 @@ confidence: high
   在非 CUDA/step-mode 下证明同步 fallback 仍可构造。首批测试看
   `tests/diffusion/test_async_output_worker.py`、`test_result_pump.py` 和
   `tests/diffusion/test_ipc_async.py`。
+
+### DIFF-1e — fused layer 必须保留精度、布局与平台分派合同
+
+- 触发：共享 norm/RoPE 增加 fused op、平台专用实现、compile 分支或可配置 parameter dtype。
+- 强制：把 parameter 存储 dtype 与 reduction/累加 dtype 分开约束；CUDA/HIP eager 可尝试
+  fused op，但异常必须回退到数值等价的 native 实现，`torch.compile` tracing 直接走 native，
+  NPU/MindIE 等专用 backend 则按其真实参数与频率布局调用。RoPE 适配器必须显式区分 full-dim
+  tiled frequency 与 fused kernel 的 half layout，并保持未旋转 head tail 不变。
+- 禁止：用 platform dispatch 推断所有 backend 接收同一布局；用 CPU/reference 或 mock 参数
+  wiring 测试声称真实 CUDA/HIP/NPU fused kernel 已完成数值 parity。
+- 验收：native reference 覆盖 parameter dtype、FP32 accumulation、旋转维度与 untouched tail；
+  compile 路径断言不调用 fused op，平台 mock 只作为 wiring 证据。声称 fused parity 还需目标
+  硬件上的同输入数值测试。^[PR #5801]
 
 ## Checkpoint 与分布式加载
 
