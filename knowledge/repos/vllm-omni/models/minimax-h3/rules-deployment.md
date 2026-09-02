@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-02
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5723", "PR #5764", "PR #5836", "PR #5896", docs/models/supported_models.md, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/utils/fa.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/offloader/, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/platforms/rocm/platform.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/entrypoints/openai_api/test_video_server.py]
+sources: ["PR #5723", "PR #5764", "PR #5836", "PR #5896", "PR #5946", docs/models/supported_models.md, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/utils/fa.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/offloader/, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/platforms/rocm/platform.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/entrypoints/openai_api/test_video_server.py]
 confidence: high
 ---
 
@@ -98,3 +98,19 @@ measurement；模型输入、执行与加载合同返回 [MiniMax H3 rules](rule
   但 H3 行 AMD cell 仍为空，修正前不能称矩阵已完整发布。新增 SKU/task/topology 逐项记录 immutable
   image/commit、软件栈、warmup/repeats、输入、各阶段时间、输出/质量检查；recipe-only diff 没有 CI
   或可执行测试，外部 gfx942 数据与 gfx950 functional observation 不能冒充持续回归 gate。
+
+## MMH3-3e — GB10 unified memory 容量证据不等于离散 GPU offload 合同
+
+- 触发：引用 DGX Spark/GB10 可运行性、97.7 GiB peak、36 分钟 latency，或推荐 offload/FP8。
+- 强制：只启动一个约 135 GiB FL2VA/Ref2VA partition；约 121 GiB 可用 unified memory 下必须用
+  online FP8（仅 DiT 约 62→31 GiB，encoder/VAE 仍 BF16），禁用 CPU/DLO offload，因为 host/device
+  共用物理池，DLO 观察到启动后 exit -9。用 eager、CUDNN_ATTN，并保持 TP/USP/ring/VAE patch
+  parallel degree 全为 1，同时显式配置长 timeout。
+- 禁止：把 97.7 GiB allocator reserved header 当整机 pool peak（不含 context/非 PyTorch），或把
+  单次 50-step T2VA 写成 throughput。960×576、8 s、50 steps 的 text/denoise/decode/mux/E2E 约
+  0.25/2088/70/4.84/2169.4 s，部分 stage 来自另一次 10-step run；相同 10-step denoise 波动
+  397–490 s，只能绑定该机器/配置。^[PR #5946]
+- 验收：probe 确认 HTTP 200、H.264 geometry/24 FPS 与 32 kHz stereo AAC，并记录 commit、allocator
+  及整机内存。目标仅新增 recipe、无自动测试；正文实测是 T2VA。评论称 Ref2VA“相同”但无命令、
+  输入、峰值或 artifact，FL2VA 也无独立证据，不能升级为已验证模式。recipe 声称 sync timeout
+  默认 1800 s，但 target `api_server.py` 默认是 600 s；2169 s full run 必须显式设置更大值。
