@@ -67,14 +67,7 @@ confidence: high
   到达 consumer。Cosmos3 的落地约束见
   [Cosmos3 规则](../../models/cosmos3/rules.md)。 ^[PR #5001]
 
-### DIFF-1c — 新 tensor 从真实 consumer 派生 dtype 和 device
-
-- 触发：mixed precision pipeline 中新建 mask、index、constant、buffer 或预计算 tensor。
-- 强制：从输入或目标权重派生 device/dtype，整数 index 显式使用 consumer 要求的类型；
-  graph/eager 与 batch 重排后保持 shape、alias 和数值语义。
-- 禁止：依赖 process 默认 fp32/CPU 或隐式 cast/move；只测 shape 而不执行 BF16 consumer。
-- 验收：BF16、错长、batch reorder 和 graph/eager 用例断言 consumer 收到相同 device/dtype、
-  alias 与结果。 ^[PR #5067] ^[PR #5068] ^[PR #5174] ^[PR #5981]
+mixed-precision tensor/parameter dtype 合同见 [DIFF-1c 专页](rules-tensor-dtype.md)。
 async output readiness、per-worker result channel、shutdown 与 constructor cleanup 合同见
 [DIFF-1d/1g/1h/1j 专页](rules-output-lifecycle.md)。
 
