@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5255", "PR #5344", "PR #5543", "PR #5720", "PR #5737", "PR #5764", "PR #5801", "PR #5802", "PR #5838", "PR #5839", "PR #5848", "PR #5872", "PR #5881", "PR #5896", "PR #5981", "PR #6094", "PR #6102", "PR #6279", "PR #6385", "PR #6445", vllm_omni/diffusion/attention/backends/flashinfer_attn.py, vllm_omni/diffusion/attention/backends/ring/ring_kernels.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/offloader/, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/quantization/component_config.py, vllm_omni/quantization/factory.py, tests/diffusion/attention/test_attention_sp.py, tests/diffusion/attention/test_ulysses_uaa.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/offloader/test_distributed_layerwise_backend.py, tests/diffusion/test_diffusion_config_propagation.py, "PR #4755", "PR #5990", "vllm_omni/diffusion/layers/fused_qk_norm_rope.py", "vllm_omni/diffusion/cache/teacache/extractors.py", "vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py", "tests/diffusion/layers/test_fused_qk_norm_rope.py", "PR #6165", "PR #5677", "vllm_omni/diffusion/quantization/hsdp_fp8.py", "tests/diffusion/quantization/test_hsdp_fp8.py", "PR #4845", "PR #6173"]
+sources: ["PR #4341", "PR #5001", "PR #5087", "PR #5088", "PR #5136", "PR #5255", "PR #5344", "PR #5543", "PR #5720", "PR #5737", "PR #5764", "PR #5801", "PR #5802", "PR #5838", "PR #5839", "PR #5848", "PR #5872", "PR #5881", "PR #5896", "PR #5981", "PR #6094", "PR #6102", "PR #6279", "PR #6385", "PR #6445", vllm_omni/diffusion/attention/backends/flashinfer_attn.py, vllm_omni/diffusion/attention/backends/ring/ring_kernels.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/layers/norm.py, vllm_omni/diffusion/layers/rope.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/model_loader/diffusers_loader.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/offloader/, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/quantization/component_config.py, vllm_omni/quantization/factory.py, tests/diffusion/attention/test_attention_sp.py, tests/diffusion/attention/test_ulysses_uaa.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/layers/test_norm.py, tests/diffusion/layers/test_rope_broadcast.py, tests/diffusion/offloader/test_distributed_layerwise_backend.py, tests/diffusion/test_diffusion_config_propagation.py, "PR #4755", "PR #5990", "vllm_omni/diffusion/layers/fused_qk_norm_rope.py", "vllm_omni/diffusion/cache/teacache/extractors.py", "vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py", "tests/diffusion/layers/test_fused_qk_norm_rope.py", "PR #6165", "PR #5677", "vllm_omni/diffusion/quantization/hsdp_fp8.py", "tests/diffusion/quantization/test_hsdp_fp8.py", "PR #4845", "PR #6173", "PR #6070", "vllm_omni/diffusion/models/ltx2/ltx2_components.py", "vllm_omni/diffusion/model_loader/hub_prefetch.py"]
 confidence: high
 ---
 
@@ -115,6 +115,13 @@ async output readiness、per-worker result channel、shutdown 与 constructor cl
 - 禁止：仅凭 SP rank/world size 推断局部 embedding 安全；让 Ring、AllGather-KV、advanced UAA、缺少 hook、非 forward context 或不可整除长度误走局部路径；把模型专属的局部 row 重建合同泛化为所有 diffusion 模型。
 - 验收：覆盖 strict hook 的 rank span、缺 hook、forward context 不可用、SP=1、advanced UAA、Ring、AllGather-KV 和非整除长度 fallback，并回归 TeaCache extractor 的完整 span；当前合同只由 MiniMax-H3 caller 证明，其他模型仍需独立验证。 ^[PR #6173]
 
+### DIFF-1p — LTX-2.5 I2V 必须先执行 CRF conditioning 再 resize
+
+- 触发：LTX-2.5 I2V 修改 reference-image conditioning、`image_crf`、resize 顺序或 PyAV/FFmpeg 依赖。
+- 强制：PIL 输入默认执行 CRF 18，再进行 aspect-preserving resize；非零 `image_crf` 只接受 PIL 图像，tensor 输入必须显式使用 `image_crf=0` opt out；缺少 PyAV/libx264 要返回明确错误，任一尺寸小于 2 时在编码前原样返回。
+- 禁止：在 CRF round trip 前 resize 或 squash 图像；按模型路径名猜版本；把非零 CRF 静默应用到 tensor；将 1-pixel 维度向下取整为零后交给 libx264。
+- 验收：覆盖默认/显式 CRF、PIL/tensor、无 PyAV、缺少 libx264、1xN 图像和非等比例输入，断言 CRF 顺序、错误类型、原图保护以及最终 conditioning shape。^[PR #6070]
+
 ### DIFF-2a — checkpoint remap 必须追到已注册且真实消费的目标
 
 - 触发：增加或修改 weight mapper、scale 名称、quantization adapter 或 key resolution。
@@ -224,6 +231,13 @@ async output readiness、per-worker result channel、shutdown 与 constructor cl
 - 强制：同时识别 `Fp8LinearMethod` 与 `Fp8PerTensorOnlineLinearMethod`；当 FP8 权重是转置形成的非连续 view 时，先将底层 `(out, in)` row-major storage 替换为 contiguous weight 供 FSDP2 接受，再让 kernel 的 `_get_layer_params` 返回对应转置 view，且同一 kernel 只 patch 一次。
 - 禁止：只检查 legacy `Fp8LinearMethod`、把非连续 transpose view 直接交给 `fully_shard`，或因新版 online method 已被识别就宣称所有 FP8 method 和布局均兼容。
 - 验收：legacy 与 `Fp8PerTensorOnlineLinearMethod` 都覆盖 regression test，断言重写层数、weight contiguous、`(out, in)` shape，以及 kernel 返回的转置 view shape/stride；另按 HSDP/FSDP 规则执行真实 `fully_shard` 验证。^[PR #5677]
+
+### DIFF-2q — LTX checkpoint profile 必须贯穿 revision 与 transformer 子目录
+
+- 触发：新增 LTX checkpoint/version profile、Hub `revision`、Full/Distilled transformer 配置或组件加载路径。
+- 强制：显式 `model_version` 优先于结构启发式；`revision` 必须贯穿 metadata detection、prefetch、tokenizer、全部组件、transformer config/weight source、scheduler 和 post-process sample-rate；LTX-2.5 Full/SFT 使用 `transformer_full`，distilled 与旧版本使用 `transformer`，并在缺少 Gemma4 时提示 `transformers>=5.10.1,<5.15`。
+- 禁止：按路径名识别版本；只给 config lookup 传 revision 而让权重加载回到 HEAD；用 `transformer/config.json` 解释 Full checkpoint；把 transient metadata/Hub 异常静默降级为 LTX-2 并宣称 profile 已确定。
+- 验收：固定 revision 的 converted/official split 链路逐项断言所有 loader 调用和输出 metadata；用两个 transformer config marker 验证 Full 子目录选择，覆盖 local/HF、legacy/distilled/Full profile 及缺失 encoder 版本错误。^[PR #6070]
 
 ### DIFF-3a — 质量阈值必须由完全相同的测试 case 产生
 

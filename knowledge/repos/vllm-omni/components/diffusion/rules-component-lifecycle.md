@@ -1,10 +1,10 @@
 ---
 title: "Diffusion component lifecycle 规则"
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5720", "PR #5853", "PR #5884", vllm_omni/diffusion/cache/base.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/models/interface.py, vllm_omni/diffusion/offloader/module_collector.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/sched/interface.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_cache_dit_request_runtime.py, tests/diffusion/test_diffusion_scheduler.py]
+sources: ["PR #5720", "PR #5853", "PR #5884", vllm_omni/diffusion/cache/base.py, vllm_omni/diffusion/cache/cachedit/backend.py, vllm_omni/diffusion/cache/cachedit/runtime.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/models/interface.py, vllm_omni/diffusion/offloader/module_collector.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/sched/interface.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, tests/diffusion/cache/test_cache_backends.py, tests/diffusion/cache/test_cache_dit_request_runtime.py, tests/diffusion/test_diffusion_scheduler.py, "PR #6070", "vllm_omni/diffusion/models/ltx2/ltx2_recipes.py"]
 confidence: high
 ---
 
@@ -79,3 +79,11 @@ residency 留在模型 owner。规则入口与其他共享机制仍见 [Diffusio
   hint 没进入 key，但 H3 `forward` 明确拒绝 `len(prompts) != 1`，不得把该例外推广到 batched adopter。
 - 验收：两套 scheduler 都覆盖 same intent co-batch、accelerated/reference 分离、omitted/explicit 分离；
   每个新 policy input 用 mixed batch 证明 key 完整，或测试 single-request guard。^[PR #5853]
+
+### DIFF-2r — LTX Cache-DiT 支持必须由 recipe 显式限定
+
+- 触发：LTX 修改 Cache-DiT adapter、CFG guidance batching 或 phase recipe 的能力声明。
+- 强制：Cache-DiT 能力由 recipe 的 `supports_cache_dit` 显式声明；LTX guidance 将所有 guidance pass 融合进 batch 并每个 denoise step 只调用一次 Transformer，因此 `has_separate_cfg=False`；当前只有明确声明的 LTX-2/2.3 one-stage 与 positive-only recipe 可启用，LTX-2.5 和多阶段 recipe 必须在组件初始化前拒绝。
+- 禁止：从 one-stage/multi-stage 名称推断 Cache-DiT 支持；沿用 separate-CFG step counter；把 LTX-2.5 distilled/full 或两阶段 schedule 当成已 qualified 的 Cache-DiT 路径。
+- 验收：参数化检查每个 LTX recipe 与 adapter flag，覆盖启用、禁用和 component-init 前 rejection，并验证 fused guidance 每个 denoise step 只推进一次；无真实硬件 Cache-DiT accuracy 证据时不得扩大支持范围。^[PR #6070]
+

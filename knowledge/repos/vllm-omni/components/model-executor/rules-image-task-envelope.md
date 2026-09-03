@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #6049", "PR #6076", vllm_omni/model_extras/]
+sources: ["PR #6049", "PR #6076", vllm_omni/model_extras/, "PR #6070", "vllm_omni/model_extras/registry.py"]
 confidence: high
 ---
 
@@ -33,3 +33,11 @@ confidence: high
 - 验收：registry 测试断言目标模型的 extra-body 参数和 `zero_to_one` 范围、普通 pipeline 的默认范围；覆盖单帧与 list-valued 视频的明确范围、混合正负值的统一转换，以及最终视频导出结果。 ^[PR #6076]
 
 相关执行流见 [model-executor architecture](architecture.md)；跨 stage 合同见 [bridge/batch 规则](rules-bridge-batch.md)。
+
+## EXEC-6c — model_extras resolver 必须承载模型专有版本策略
+
+- 触发：`model_extras` 增加模型版本相关的 request、transformer-config 或 media-processing resolver。
+- 强制：按解析后的 `model_class_name` 在 registry 声明 resolver；公开 accessor 必须把真实 `model` 与 `revision` 传给 model-owned hook；共享 config/serving consumer 只调用 accessor，unknown model 保持安全默认值。
+- 禁止：在共享 serving/data 代码中写 LTX class/version 分支；按 repository basename 猜版本；用 class 名代替 checkpoint metadata；丢弃 pinned revision 或把共享 `LTX2Pipeline` 的策略无条件应用于 2、2.3、2.5。
+- 验收：覆盖 arbitrary local path、2/2.3/2.5 metadata、Full/distilled pipeline class、unknown class 和 pinned revision；断言 extra-body 声明、transformer subfolder 与 reference-image policy 都经 registry accessor 到达真实 consumer。^[PR #6070]
+
