@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741"]
+sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068"]
 ---
 
 # vLLM-Omni 配置开发门禁
@@ -89,6 +89,13 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 - 禁止：只在 YAML 注释或模型内部设置 cache dtype；用 stage 的整体 `dtype` 替代 SSM state dtype；只验证 dataclass 能构造而不验证最终 runtime consumer。
 - 验收：从 deploy/structured/legacy 入口读取非默认值，断言 sync 与 async thinker 的最终 stage config 和 vLLM cache consumer 均得到 `mamba_ssm_cache_dtype=float32`，并覆盖 bf16 模型、fp32 SSM state 的组合。
 ^[PR #5842]
+
+### VOMNI-CFG-1k — 模型专用 attention 子配置必须贯穿 deploy 与 typed projection
+
+- 触发：模型 deploy profile 需要通过 vLLM 顶层 attention backend 下的 `attention_config` 控制具体 decode kernel，或新增该嵌套字段并要求 structured、legacy、typed 路径保持一致。
+- 强制：将 `attention_config` 纳入 `_ModelEngineOverrides` 与 `OmniStageModelConfig`，确保它从 deploy profile 投影到最终 stage engine args。Higgs 的三个 profile 必须在 Stage 0 同时设置 `attention_backend: FLASHINFER` 与 `attention_config.use_trtllm_attention: false`，Stage 1 保持不变。
+- 禁止：把 `FLASHINFER` 视为原生 FlashInfer decode 的保证；依据八个 codebook 推断 attention 为 `q_len=8`；只修改一个 Higgs profile；或把 SM90/XQA capability 通过误认为 BF16 工作负载的性能结论。
+- 验收：配置 schema、structured/legacy projection 测试均能读回 `{"use_trtllm_attention": false}`；解析三个 Higgs YAML 并断言 Stage 0 的 backend 与 nested pin 一致，最终日志为 `flashinfer-native`，并用同一栈 A/B 验证 TTFP/RTF 回到原生 FlashInfer 的范围。 ^[PR #6068]
 
 ### CONF-1a — 多 stage 共卡时 diffusion stage 必须显式设 gpu_memory_utilization
 

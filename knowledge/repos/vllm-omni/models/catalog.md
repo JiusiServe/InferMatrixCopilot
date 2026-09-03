@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ 83d1f114`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ dbc0dd6d`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -45,7 +45,7 @@ OMNI_PIPELINES 46→51，deploy 71→79。新增 AR 家族是 `audex`；diffusio
 `minimax_h3`，同时 LTX-2/LTX-2.3 的五个旧 registry names 合并为两个入口。新增
 pipeline keys 是四个 Audex 模式和 `nemotron_labs_audex` alias；deploy 新增八个
 Audex files 与 `qwen3_omni_moe_thinking.yaml`，删除 `minicpmo_4_5_batching.yaml`。
-本次相对 `4b66f62e` 本轮沉淀了 LTX 两阶段 phase-LoRA、带非等长 Q/K 的 SP attention mask，以及音频 SP padding/Ring 边界规则。不应据此推断所有 diffusion 模型、量化组合或未覆盖硬件后端都具备两阶段支持或质量 parity；CI、文档、recipe 和测试改动未单独形成规则。
+本次相对 `83d1f114` 本轮新增配置规则，记录 `attention_config` 的 typed projection 与 Higgs Stage 0 原生 FlashInfer pin。不要据此推断所有 FlashInfer/SM90 工作负载都应禁用 XQA，也不要推断 Stage 1 或其他模型需要同样设置。
 
 ## AR/omni 模型族（29）
 
@@ -88,8 +88,8 @@ voxtral_tts、wan2_2_ti2v、nemotron_labs_audex、indextts2_5
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from 4b66f62e \
-  --to 83d1f114 \
+  --from 83d1f114 \
+  --to dbc0dd6d \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```
