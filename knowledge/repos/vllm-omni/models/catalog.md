@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ ce6ab0ca`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ 136cb27b`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -45,7 +45,7 @@ OMNI_PIPELINES 46→51，deploy 71→79。新增 AR 家族是 `audex`；diffusio
 `minimax_h3`，同时 LTX-2/LTX-2.3 的五个旧 registry names 合并为两个入口。新增
 pipeline keys 是四个 Audex 模式和 `nemotron_labs_audex` alias；deploy 新增八个
 Audex files 与 `qwen3_omni_moe_thinking.yaml`，删除 `minicpmo_4_5_batching.yaml`。
-本次相对 `f39b8684` 本轮沉淀了 PR #6070 的共享 cuDNN 单 token fallback、LTX BF16 latent/RNG 精度边界、SP audio padding 清理、LTX checkpoint revision/profile 加载合同、Cache-DiT recipe 能力门禁、model_extras resolver seam，以及在线 I2V 的版本化 resize/CRF 委托。未把 CI、文档、recipe、测试 harness、别名注册和依赖变更单独写成规则；官方 parity 数字仍只代表固定 revision、BF16 cuDNN 和指定硬件，不能推断为跨硬件或所有 backend 的通用 parity。
+本次相对 `ce6ab0ca` 本轮将 PR #6023 的 diffusion request-mode async output 可靠性交付约束写入 `rules-output-lifecycle.md`，覆盖 storage-aware IPC packing、batch split/future 竞态、result queue 单写者以及 sleep 前 drain。现有 `_index.md` 已登记该规则页，因此无需新增索引行。该规则不表示 aggregate oversized message 已完全解决，也不表示 HTTP 视频传输或取消 future 问题已修复；docs、tests 和 tooling 变更按 work-topic 路由丢弃。
 
 ## AR/omni 模型族（29）
 
@@ -88,8 +88,8 @@ voxtral_tts、wan2_2_ti2v、nemotron_labs_audex、indextts2_5
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from f39b8684 \
-  --to ce6ab0ca \
+  --from ce6ab0ca \
+  --to 136cb27b \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```
