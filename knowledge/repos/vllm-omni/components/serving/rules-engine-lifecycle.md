@@ -4,7 +4,7 @@ created: 2026-09-03
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/api_server.py, "PR #6121"]
+sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/api_server.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py"]
 confidence: high
 ---
 
@@ -147,3 +147,10 @@ confidence: high
 - 禁止：模型 duration scaling 后再次 resample，或以 HTTP 支持外推 WebSocket parity。
 - 验收：覆盖 token/chat/embed、native/generic、三种 HTTP 输出与 WebSocket。落后后端只用显式
   capability/version shim 并保留 eager fallback，不能让 CUDA 新参数成为全平台前提。^[PR #5957]
+
+### SERV-8a — 本地 stage launch 必须临时应用 runtime.env
+
+- 触发：修改 `StageRuntime` 的本地 LLM/diffusion replica launch、`runtime_cfg.env`、stage device scope 或 launch lock。
+- 强制：本地 LLM launch 必须在现有串行 launch lock 内进入 `stage_runtime_env(stage_id, runtime_cfg)`；diffusion launch 必须将其与 device scope 组合，并保持 `runtime.devices` 作为有效设备选择。scope 只覆盖子进程构造/launch，退出时恢复父进程原值，并删除此前不存在的 key。
+- 禁止：只解析或记录 `runtime.env` 却不应用到本地 launch；把 stage 环境永久污染到父进程；用 runtime env scope 替代 diffusion device scope；将该本地 scope 推广到 remote replica 或 headless worker launcher。
+- 验收：CPU/mock 回归分别覆盖 LLM 和 diffusion launch 看到 stage 值、父环境已有值恢复、原先未设置的 key 在异常后被清理，以及 diffusion launch 同时看到 stage device 值；确认 LLM launch lock 仍覆盖进程创建。^[PR #6214]
