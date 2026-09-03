@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ bbe6ccc5`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ f41451f6`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -45,7 +45,7 @@ OMNI_PIPELINES 46→51，deploy 71→79。新增 AR 家族是 `audex`；diffusio
 `minimax_h3`，同时 LTX-2/LTX-2.3 的五个旧 registry names 合并为两个入口。新增
 pipeline keys 是四个 Audex 模式和 `nemotron_labs_audex` alias；deploy 新增八个
 Audex files 与 `qwen3_omni_moe_thinking.yaml`，删除 `minicpmo_4_5_batching.yaml`。
-本次相对 `bbb709cf` 四个 inventory 均无变化；本次变更不触及任何 component 或 model owner。
+本次相对 `bbe6ccc5` 本轮将 PR #6096 中 NPU KV connector finalize 的 PP 所有权条件，以及 `cudagraph_runtime_mode` 的有效性校验沉淀到 model-executor 规则。Docker 镜像升级属于 ci 范围未写入；`randomize_inputs` 的 dummy-run 合同已由 EXEC-1e 覆盖，未重复新增。不能据此推断所有平台 runner 都采用相同的异步输出合同。
 
 ## AR/omni 模型族（29）
 
@@ -88,8 +88,8 @@ voxtral_tts、wan2_2_ti2v、nemotron_labs_audex、indextts2_5
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from bbb709cf \
-  --to bbe6ccc5 \
+  --from bbe6ccc5 \
+  --to f41451f6 \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```
