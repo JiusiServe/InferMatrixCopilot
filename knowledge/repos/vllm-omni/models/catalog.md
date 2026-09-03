@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ f208f907`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ b4b907e7`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -45,7 +45,7 @@ OMNI_PIPELINES 46→51，deploy 71→79。新增 AR 家族是 `audex`；diffusio
 `minimax_h3`，同时 LTX-2/LTX-2.3 的五个旧 registry names 合并为两个入口。新增
 pipeline keys 是四个 Audex 模式和 `nemotron_labs_audex` alias；deploy 新增八个
 Audex files 与 `qwen3_omni_moe_thinking.yaml`，删除 `minicpmo_4_5_batching.yaml`。
-本次相对 `284e05c8` 本轮将 PR #6320 的 NPU complex64 RoPE 索引约束写入共享 diffusion 规则 `DIFF-1u`。该规则只说明指定 RoPE 路径应使用 `index_select` 规避 NPU 算子限制，不能推断所有 NPU complex64 索引、其他模型或其他硬件后端均已支持。
+本次相对 `f208f907` 本轮新增 DIFF-4r 与 EXEC-14a，分别固化 diffusion vLLM 配置 shim 的 upstream 字段合同，以及复合模型 typed `PretrainedConfig` 的注册与嵌套配置提升。PR 的 tiny CPU 回归不能推断 SenseNova 全链路、跨硬件质量或所有模型的配置 parity；`t_eps` 的请求级迁移仍属 SenseNova 专有行为，未在共享页泛化。
 
 ## AR/omni 模型族（29）
 
@@ -88,8 +88,8 @@ voxtral_tts、wan2_2_ti2v、nemotron_labs_audex、indextts2_5
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from 284e05c8 \
-  --to f208f907 \
+  --from f208f907 \
+  --to b4b907e7 \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```
