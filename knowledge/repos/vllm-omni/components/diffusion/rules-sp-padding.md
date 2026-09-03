@@ -1,10 +1,10 @@
 ---
 title: "Diffusion SP padding 规则"
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #4645", docs/user_guide/diffusion/parallelism/sequence_parallel.md, vllm_omni/config/omni_config.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/distributed/sp_plan.py, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/hooks/sequence_parallel.py, vllm_omni/diffusion/models/flux2/flux2_transformer.py, vllm_omni/diffusion/models/hunyuan_video/hunyuan_video_15_transformer.py]
+sources: ["PR #4645", docs/user_guide/diffusion/parallelism/sequence_parallel.md, vllm_omni/config/omni_config.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/distributed/sp_plan.py, vllm_omni/diffusion/forward_context.py, vllm_omni/diffusion/hooks/sequence_parallel.py, vllm_omni/diffusion/models/flux2/flux2_transformer.py, vllm_omni/diffusion/models/hunyuan_video/hunyuan_video_15_transformer.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_latents.py", "vllm_omni/diffusion/models/ltx2/ltx2_denoise.py", "vllm_omni/diffusion/models/ltx2/ltx2_guidance.py"]
 confidence: high
 ---
 
@@ -49,3 +49,11 @@ confidence: high
   numerical/quality parity；默认 false 仍是明确的近似策略。
 - 验收：性能结论须在目标 SHA 固定硬件/backend、warmup/repeats 与 exact case 重跑；质量结论对
   mask true/false 使用相同 seed/input 并设模型合适的图像/视频 metric gate。^[PR #4645]
+
+## SPPAD-2b — audio SP padding 必须可屏蔽、不可改变 RNG 或 sampler state
+
+- 触发：AV diffusion 请求的 audio latent length 不能被 SP size 整除，或 guidance/rescale 和 attention 同时消费了 SP 补齐后的 audio tensor。
+- 强制：只为逻辑 audio tokens 采样和消费 request RNG，再追加确定性的零 padding；把 valid-token mask 同时传给 audio self-attention 与 audio-to-video cross-attention，rescale 统计只使用原始 token 数，输出前清除 padding。纯 Ulysses 可使用该 mask；Ring degree 大于 1 遇到 padding 必须 fail closed。
+- 禁止：把零 padding 当作 sampler state、让 padding 消耗 request RNG、用 padding 参与 guidance rescale，或在 Ring 无法消费 key mask 时继续执行 unmasked attention。
+- 验收：覆盖 SP=1、非整除 padding、provided/generated latents、RNG 后续状态、零尾部、rescale token count、masked SDPA dispatch 和 Ring rejection；有效 audio/video 输出须与无 padding 的固定 seed 参考保持既定容差。^[PR #5500]
+

@@ -1,10 +1,10 @@
 ---
 title: "Diffusion attention 规则"
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5887", "PR #5891", "PR #5897", "PR #5997", "PR #6000", docs/user_guide/diffusion/attention_backends.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/data.py, vllm_omni/engine/arg_utils.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/platforms/npu/platform.py, tests/config/test_omni_config.py, tests/diffusion/attention/test_flash_attn.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/cache/test_teacache_extractors.py]
+sources: ["PR #5887", "PR #5891", "PR #5897", "PR #5997", "PR #6000", docs/user_guide/diffusion/attention_backends.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/attention/backends/abstract.py, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/rainfusion_attn.py, vllm_omni/diffusion/data.py, vllm_omni/engine/arg_utils.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, vllm_omni/platforms/npu/platform.py, tests/config/test_omni_config.py, tests/diffusion/attention/test_flash_attn.py, tests/diffusion/attention/test_rainfusion_plan.py, tests/diffusion/cache/test_teacache_extractors.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_transformer.py"]
 confidence: high
 ---
 
@@ -76,3 +76,11 @@ confidence: high
   rejection；真实 Ascend + updated MindIE-SD 用 irregular grid 对 dense reference。目标 NPU test
   仅以 `sparsity=0` 证明 protected-tail 几何下全 block 等价，不证明稀疏选择的质量、
   realized sparsity 或加速。^[PR #6000]
+
+## DIFF-1k — 非等长 SP attention 必须保留 K/V mask 并走 mask-safe backend
+
+- 触发：模型在 strict Ulysses/SP 中为 self-attention 或 cross-attention 增加 K/V padding mask，且 Q 与 K 的序列长度可能不同。
+- 强制：保留完整逻辑 K/V mask，并以 `[B, 1, 1, K]` 语义传递；masked LTX attention 必须走支持该 mask 的 SDPA fallback，unmasked 请求才保留 native backend，不能修改通用 Ulysses 的 mask 语义来适配单一模型。
+- 禁止：因为 cross-attention 的 Q/K 长度不同就丢弃 mask；把只匹配 query 长度的二维 mask 交给 Flash varlen；把 backend 的 `supports_attention_mask` 能力等同于支持任意 mask layout。
+- 验收：CPU/mock 覆盖 masked self-attention、masked unequal-length cross-attention 与 unmasked path，分别断言 SDPA/native dispatch 和 mask shape；真实 SP 再以带 padding 的 LTX 输出对照未分片参考。^[PR #5500]
+

@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ 4b66f62e`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ 83d1f114`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -45,7 +45,7 @@ OMNI_PIPELINES 46→51，deploy 71→79。新增 AR 家族是 `audex`；diffusio
 `minimax_h3`，同时 LTX-2/LTX-2.3 的五个旧 registry names 合并为两个入口。新增
 pipeline keys 是四个 Audex 模式和 `nemotron_labs_audex` alias；deploy 新增八个
 Audex files 与 `qwen3_omni_moe_thinking.yaml`，删除 `minicpmo_4_5_batching.yaml`。
-本次相对 `f41451f6` 本轮在 `components/configuration/rules.md` 新增 `CONF-3b`，记录显式 deploy YAML 统一使用 `deploy_config` 的配置边界，并补充 PR #5741 来源。不能据此推断用户文档/模板已完成迁移，也不能推断 `resolve_model_config_path()` 或遗留 YAML loader 的后续清理已经完成。
+本次相对 `4b66f62e` 本轮沉淀了 LTX 两阶段 phase-LoRA、带非等长 Q/K 的 SP attention mask，以及音频 SP padding/Ring 边界规则。不应据此推断所有 diffusion 模型、量化组合或未覆盖硬件后端都具备两阶段支持或质量 parity；CI、文档、recipe 和测试改动未单独形成规则。
 
 ## AR/omni 模型族（29）
 
@@ -88,8 +88,8 @@ voxtral_tts、wan2_2_ti2v、nemotron_labs_audex、indextts2_5
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from f41451f6 \
-  --to 4b66f62e \
+  --from 4b66f62e \
+  --to 83d1f114 \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```

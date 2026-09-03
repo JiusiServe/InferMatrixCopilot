@@ -1,10 +1,10 @@
 ---
 title: "Diffusion LoRA 规则"
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #2783", docs/user_guide/diffusion/lora.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/models/qwen_image/pipeline_qwen_image.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_i2v.py, vllm_omni/diffusion/utils/tf_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, tests/diffusion/lora/test_loader.py, tests/entrypoints/test_async_omni_diffusion_config.py]
+sources: ["PR #2783", docs/user_guide/diffusion/lora.md, vllm_omni/config/omni_config.py, vllm_omni/config/stage_config.py, vllm_omni/diffusion/data.py, vllm_omni/diffusion/lora/loader.py, vllm_omni/diffusion/lora/manager.py, vllm_omni/diffusion/models/qwen_image/pipeline_qwen_image.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2.py, vllm_omni/diffusion/models/wan2_2/pipeline_wan2_2_i2v.py, vllm_omni/diffusion/utils/tf_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/cli/serve.py, tests/diffusion/lora/test_loader.py, tests/entrypoints/test_async_omni_diffusion_config.py, "PR #5500", "vllm_omni/diffusion/models/ltx2/ltx2_adapter_parser.py", "vllm_omni/diffusion/models/ltx2/ltx2_phase_adapter.py"]
 confidence: high
 ---
 
@@ -82,3 +82,11 @@ confidence: high
   单 transformer、多 transformer与缺失 target；high/low 顺序必须另用固定 checkpoint 的模型级
   语义/质量证据验证。目标单测覆盖双 transformer 的 load/unload，但没有真实 Wan checkpoint
   数值或视频质量自动 gate。^[PR #2783]
+
+## DIFF-2o — LTX phase LoRA 必须绑定 recipe 并复用单一 Transformer
+
+- 触发：LTX 多阶段 pipeline 需要在同一 Transformer 上加载官方 raw safetensors refinement LoRA，或需要区分普通两阶段与 merged distilled 两阶段的权重路径。
+- 强制：以 recipe 的 `adapter_slot` 作为唯一 phase switch；普通两阶段使用 `None → ltx_distilled`，full-distilled 两阶段不得加载 LoRA。Sidecar 先查 model root，再按 profile 的官方文件名和仓库回退到 Hub；parser 必须逐一校验 A/B 配对、映射结果、重复目标和 shape。Adapter wrapper 要在 base 权重加载前安装并 remap 到 `base_layer`，保留 Row/Column/QKV 的 rank-local TP slice；未量化 BF16 使用 adapter dtype 中的 layer-fused `B@A`，量化 base 使用 dynamic LoRA。
+- 禁止：为 phase adapter 增加第二个 resident Transformer 或 LTX 专用环境变量；允许 request/static LoRA 与内部 phase adapter 组合；在非 BF16 或量化 base 上声称 layer-fused 可用；对缺失配对、未映射模块或不匹配 shard 静默跳过。
+- 验收：覆盖官方 key mapping、缺失 A/B、unmapped/duplicate target、dynamic 与 fused 精确算术、Row/Column/QKV 本地切片、base 权重不变、phase 进入/退出和 finalize 时机；同时验证 generic `model_paths` sidecar 覆盖与 model-root/Hub fallback。^[PR #5500]
+
