@@ -1,10 +1,10 @@
 ---
 title: "Diffusion paged cache 与系统运行时规则"
 created: 2026-09-03
-updated: 2026-09-03
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5255", "PR #5344", "PR #5543", "PR #5838", "PR #6094", "PR #6102", "PR #6385", vllm_omni/diffusion/attention/backends/flashinfer_attn.py, vllm_omni/diffusion/attention/backends/ring/ring_kernels.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_model_runner.py]
+sources: ["PR #5255", "PR #5344", "PR #5543", "PR #5838", "PR #6094", "PR #6102", "PR #6385", vllm_omni/diffusion/attention/backends/flashinfer_attn.py, vllm_omni/diffusion/attention/backends/ring/ring_kernels.py, vllm_omni/diffusion/attention/parallel/ulysses.py, vllm_omni/diffusion/model_metadata.py, vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_model_runner.py, "PR #5491"]
 confidence: high
 ---
 
@@ -155,3 +155,11 @@ confidence: high
 
 相关执行流见 [Diffusion architecture](architecture.md)；paged attention 的 layout 细节见
 [attention 规则](rules-attention.md)。
+
+## DIFF-4o — AR-Diffusion 容量必须覆盖持久状态，分页图输入必须显式
+
+- 触发：AR-Diffusion runner 修改 paged self-attention KV、resident session capacity、scratch/cross-attention reservation、model-owned CUDA state、commit pruning 或 CUDA Graph 输入。
+- 强制：按有效 resident capacity 完整计算 `sink + recent window`、单个 in-flight block、scratch、cross-attention 和每 session 的 model-owned state；`gpu_memory_fraction` 只能控制额外 residency，至少一个能装入实际空闲显存的 session 必须先被接纳，并在分配 self-KV 前扣除所有持久 reservation。成功 commit 后立即释放 skipped paged blocks；paged attention 将可变 key/value pool 作为显式可变 graph input。worker-local state 仍须保持 `max_num_seqs=1`，多副本必须先具备 session affinity。
+- 禁止：用只覆盖一个 session 的固定 floor 忽略声明 capacity；只为 self-KV 预算而漏算 cross-attention、scratch 或模型自有状态；使用 process-global KV pool registry；让各 TP rank 依据不同的本地 free-memory 计算不同 capacity 后继续 collective；把单次 TP replay 或能启动当作多 session/多 rank 预算正确性的证明。
+- 验收：覆盖 LingBot 两个 resident window、DreamZero 声明 capacity 64 的预算封顶、LRU eviction、失败 forward 清理、commit 后 block 回收和显式 graph pool 输入；真实 TP 还要用统一的 min free-memory/all-reduce 或 rank-0 广播验证所有 rank 得到相同 capacity，并分别验证 paged/direct 数值与单副本路由。^[PR #5491]
+

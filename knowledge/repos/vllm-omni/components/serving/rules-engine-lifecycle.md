@@ -4,7 +4,7 @@ created: 2026-09-03
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/api_server.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676"]
+sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/api_server.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #5491"]
 confidence: high
 ---
 
@@ -99,6 +99,13 @@ confidence: high
 - 强制：在读取 adapter 或 `_adapter` 状态前先检查在两种构造路径上都可用的 `_diffusion_mode`；pure-diffusion 路径必须直接返回 `None` 并保持专用 speech 编码路径，普通 AR 实例继续通过 `resolve_adapter()` 使用既有 adapter-native speed 行为。
 - 禁止：在 diffusion 实例上无条件解析 AR-stage TTS adapter、读取仅由 `__init__` 设置的 `_adapter`，或把 pure-diffusion 请求重新路由到 AR adapter 路径；只覆盖普通构造器而不覆盖 bypass-`__init__` factory。
 - 验收：用 `OmniOpenAIServingSpeech.for_diffusion()` 构造实例，提交公开 `create_speech()` 请求并断言成功的 `200`/`audio/wav` 响应；以 mock 断言 diffusion speed 请求返回原值且 `resolve_adapter()` 未被调用，同时验证普通 AR 实例仍解析并使用其 adapter，所有路径不得出现 `AttributeError`。^[PR #6121]
+
+### SERV-5h — 自定义 AR-Diffusion engine 与 worker-local session lifecycle 必须保持一致
+
+- 触发：默认 stage 构造路径接入自定义 diffusion engine backend，或新增 worker-local AR session 的 reset/close lifecycle RPC 与副本限制。
+- 强制：`load_and_resolve_stage_configs()` 在没有 deploy config 时也必须保留显式 `engine_backend`；runner 选择由选中的 engine/platform owner 负责，不重复注入 `diffusion_model_runner_cls`。session reset、close 和失败清理由选定 stage 的 collective RPC 到达实际 worker，并在所有 worker 支持后才确认成功；在 session-affine routing 尚未实现前，AR stage 必须保持单副本。
+- 禁止：丢弃 `engine_backend` 使 AR 请求静默回退普通 `DiffusionEngine`；通过默认 stage 额外注入 runner class 覆盖 engine-owned 选择；只修改客户端状态而不调用 worker lifecycle；以 request-ID 级 affinity 或 round-robin 路由承载 worker-local session；将清理失败当作已关闭并允许立即复用 session ID。
+- 验收：从真实 default-stage fallback 测试显式断言 `engine_backend` 进入最终 `engine_args`；用选定 stage ID 验证 reset/close RPC、unsupported worker 结果和失败重试；用两副本配置确认初始化前拒绝或证明持续 session affinity，并回归普通 diffusion engine 的既有 runner 选择。^[PR #5491]
 
 ### SERV-6a — full-duplex 首次 stage submit 必须预热 async-chunk topology
 
