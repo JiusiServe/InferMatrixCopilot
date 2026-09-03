@@ -1,10 +1,10 @@
 ---
 title: "HunyuanImage3 开发规则"
 created: 2026-07-13
-updated: 2026-07-31
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, hunyuan-image3]
-sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/diffusion/models/hunyuan_image3/prompt_utils.py, vllm_omni/model_extras/hunyuan_image3.py, vllm_omni/model_extras/registry.py]
+sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/diffusion/models/hunyuan_image3/prompt_utils.py, vllm_omni/model_extras/hunyuan_image3.py, vllm_omni/model_extras/registry.py, "PR #6094", "vllm_omni/diffusion/models/hunyuan_image3/hunyuan_image3_transformer.py"]
 ---
 
 # HunyuanImage3 开发规则
@@ -129,3 +129,10 @@ sources: [incidents/painterly/_index.md, hf-alignment-pitfalls.md, vllm_omni/dif
 - **HY3-7c — 再查 VAE 前的 dtype 边界。** 条件图像素保持官方精度直到真实 VAE 边界；逐点比较进入 VAE 前的 tensor，不能用最终图片“看起来差不多”替代。
 - **HY3-7d — 再查 router 和 top-k 精度。** 输出前缀已对齐后才核对 MoE router、top-k、softmax 和 reduction dtype；只提高某一层精度必须有 logit/token 差异证据，不能全模型盲目 fp32。
 - **HY3-7e — 最后区分可修差异和架构差异。** 已关闭 processor、VAE 和 router 等可修边界后，再评估 TP、paged KV、fused kernel 和 reduction order；没有证据不得承诺 bit-exact，也不能用“架构噪声”掩盖仍可修的差异。
+
+- **HY3-5g — ImageKVCacheManager 必须可被 paged KV discovery 注册且按最大图输入 profile**
+  - 触发：修改 HunyuanImage3 的 `ImageKVCacheManager`、image attention 注册、paged KV role/dtype，或为 `paged_scheduler` 调整启动 memory profile 与参考图数量。
+  - 强制：`ImageKVCacheManager` 必须是 `nn.Module` 并以 `forward` 暴露内部 attention，使其出现在 `named_modules()` 而不把 dense cache state 写入 `state_dict()`；内部 attention 必须显式设置 `paged_kv_cache_role="primary"` 与 `paged_kv_cache_dtype=torch.bfloat16`，该 KV dtype 独立于权重加载 dtype。paged 启动 profile 必须经过模型 owner preprocessing，使用 1024x1024、启用 CFG 和 metadata 声明的最大参考图数量，当前 HunyuanImage3 为 3 张；普通 dense warmup 仍保持独立的 512x512、无 CFG 路径。
+  - 禁止：保持 cache manager 为普通对象而期待 Worker spec discovery 找到嵌套 attention；把 paged KV 标记省略为默认 dense；只用一张参考图或关闭 CFG 生成 profile 后宣称容量覆盖最大请求；把 Scheduler-only `DiffusionKVRequest` 状态发送到 profile Worker execution。
+  - 验收：模型测试断言 manager 是 `nn.Module`、attention identity 可从 `named_modules()` 读回且 `state_dict()` 为空；spec discovery 断言 layer、role、BF16 dtype 与 layout capability；profile 测试断言最大参考图数量、profile envelope 和 dense mode 的旁路行为。 ^[PR #6094]
+

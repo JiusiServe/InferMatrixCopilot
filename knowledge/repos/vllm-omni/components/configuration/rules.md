@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666", "PR #5036", "PR #4222", "PR #5604", "PR #6293"]
+sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666", "PR #5036", "PR #4222", "PR #5604", "PR #6293", "PR #6094", "vllm_omni/diffusion/data.py"]
 ---
 
 # vLLM-Omni 配置开发门禁
@@ -116,6 +116,13 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 - 禁止：继续按轮次“顺手减 0.05” `gpu_memory_utilization`；显式 KV pin 后该比例不再
   决定 KV 大小。
 - 验收：记录 pin、并发、长度与峰值，真实 decode 路径完成；任何吞吐交换都单独测量。
+
+### CONF-2b — paged_scheduler 的 KV sizing 字段必须归一化并保持 dense_legacy 惰性
+
+- 触发：为 diffusion stage 增加或修改 `kv_cache_memory_bytes`、`gpu_memory_utilization`、`max_num_batched_tokens`、`max_model_len`，或改变 `dense_legacy` 与 `paged_scheduler` 的配置投影。
+- 强制：这些字段必须经同一 diffusion owner 归一化；只有 `paged_scheduler` 才能传入 native `VllmConfig` 的 cache/scheduler 配置。正值 `kv_cache_memory_bytes` 固定 KV 预算，`None` 或 `0` 使用自动 sizing；`max_model_len=-1` 必须保留 native auto-fit sentinel，同时为 Scheduler 解析出正的 admission bound。`kv_cache_memory_bytes` 不得为负，`gpu_memory_utilization` 必须在 `(0,1]`，`max_num_batched_tokens` 必须为正，`max_model_len` 必须为正或 `-1`。
+- 禁止：让 `dense_legacy` 因这些字段改变既有 pipeline parallel、cache 或 scheduler 配置；用 truthiness 把 `0` 误判为非法或显式 KV pin；在末端静默丢弃非默认值，或把文本 encoder 的长度字段未经模型语义确认当作 DiT KV 上限。
+- 验收：structured、legacy 和 direct 配置路径覆盖默认、非默认、非法值与显式 `0`；paged 路径断言字段进入 native cache/scheduler consumer，`-1` 触发 auto-fit；dense 路径断言原有并行、显存和 token budget 保持不变。 ^[PR #6094]
 
 ### CONF-3a — 争议以展开后的最终配置为准
 
