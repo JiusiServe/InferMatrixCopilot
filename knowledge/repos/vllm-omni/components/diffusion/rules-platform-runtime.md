@@ -1,10 +1,10 @@
 ---
 title: "Diffusion 平台运行时规则"
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #6058", vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/platforms/musa/platform.py]
+sources: ["PR #6058", vllm_omni/diffusion/registry.py, vllm_omni/diffusion/worker/diffusion_worker.py, vllm_omni/platforms/musa/platform.py, "PR #6267", "vllm_omni/diffusion/models/ltx2/ltx2_phase_adapter.py"]
 confidence: high
 ---
 
@@ -33,3 +33,10 @@ confidence: high
 - 验收：平台单测至少覆盖 Inductor enabled、mode `NONE`、非 Inductor backend，并由 worker
   测试断言 platform default 先于 model hook。PR #6058 没有新增自动测试或 MUSA runtime
   运行，当前证据只证明静态实现与现有 worker consumer 接通。^[PR #6058]
+
+## DIFFPLAT-2a — ROCm host 上的 CPU 输入必须绕过 ROCm GEMM dispatch
+
+- 触发：修改 LTX phase adapter 的 unquantized linear/GEMM dispatch，或出现 ROCm host 与 CPU tensor device 不一致的测试路径。
+- 强制：当 `current_platform.is_rocm()` 且 `input_.device.type == "cpu"` 时，必须使用 `F.linear(input_, weight, bias)`，绕过没有 CPU kernel 的 `rocm_unquantized_gemm`；其他设备路径继续遵循既有 dispatch 和 batch-invariant 逻辑。
+- 禁止：仅因 host platform 是 ROCm 就把 CPU tensor 交给 ROCm GEMM；不得把该 fallback 推广为 ROCm kernel 的通用 CPU 支持或改变其他平台的 dispatch 语义。
+- 验收：ROCm host 的 CPU 输入测试必须断言结果来自 `F.linear` 且未调用 `rocm_unquantized_gemm`；同时回归 ROCm device、CUDA/其他平台及既有 batch-invariant 路径。^[PR #6267]
