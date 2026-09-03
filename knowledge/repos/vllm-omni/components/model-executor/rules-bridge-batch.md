@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #3422", "PR #3642", "PR #4795", "PR #5073", "PR #5074", "PR #5310", "PR #5792", "PR #5842", "PR #5957", "PR #5976", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/sched/output.py, vllm_omni/utils/mm_outputs.py]
+sources: ["PR #3422", "PR #3642", "PR #4795", "PR #5073", "PR #5074", "PR #5310", "PR #5792", "PR #5842", "PR #5957", "PR #5976", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/sched/output.py, vllm_omni/utils/mm_outputs.py, "PR #4765"]
 confidence: high
 ---
 
@@ -110,3 +110,11 @@ Direct 代码快速入口；loader 与 checkpoint 合同留在该页的 `EXEC-2x
 ^[PR #5842]
 
 相关执行流见 [model-executor architecture](architecture.md)；scheduler 侧的对应合同见 [scheduler 规则](../scheduler/rules.md)。
+
+## EXEC-1j — side-channel 停止队列必须按 batch row 保持占位对齐
+
+- 触发：有状态 AR 模型在 mixed prefill/decode batch 中通过 side-channel 队列把逐请求停止信号映射为 batch logits。
+- 强制：每个 batch row 每步都向 `_results_queue` 放入一个位置项；prefill 使用 `(req_id, None)` 占位，`compute_logits` 按原 batch position 消费并在无信号或未越过停止阈值时强制 continue，消费后清空队列。
+- 禁止：省略 prefill/new-request 占位、压缩或重排队列、把 `(continue, stop)` 概率直接当 logits，或依赖全 `-inf` 行的偶然 `argmax` 结果维持对齐。
+- 验收：用同批 prefill+decode、停止阈值以下、空队列和多请求输入测试，分别断言每行的 continue/stop 结果、请求归属与队列耗尽；batch 顺序变化不能改变停止对象。^[PR #4765]
+

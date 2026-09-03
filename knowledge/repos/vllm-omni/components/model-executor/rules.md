@@ -4,7 +4,7 @@ created: 2026-07-10
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/musa/platform.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/utils/mm_outputs.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py, docs/design/feature/omni_async_output_materialization.md, vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/experimental/fullduplex/, tests/e2e/features/fullduplex/, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/model_extras/registry.py, examples/offline_inference/text_to_image/text_to_image.py, examples/offline_inference/image_to_video/image_to_video.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/examples/offline_inference/test_image_task_prompts.py, tests/engine/test_arg_utils.py, "PR #3422", "PR #3642", "PR #4730", "PR #4958", "PR #5073", "PR #5074", "PR #5310", "PR #5610", "PR #5671", "PR #5777", "PR #5792", "PR #5824", "PR #5957", "PR #5976", "PR #6049", vllm_omni/engine/arg_utils.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni_moe_thinker.py, vllm_omni/model_executor/models/qwen2_5_omni/qwen2_5_omni_thinker.py, vllm_omni/model_executor/models/dynin_omni/dynin_omni.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/worker/base.py, vllm_omni/worker/gpu_generation_model_runner.py, tests/model_executor/models/qwen3_omni/test_qwen3_omni_forward_contract.py, "claude-workflow-starter-private@09dca46", "PR #4795", "PR #5842", "vllm_omni/model_executor/stage_input_processors/nemotron_voicechat.py", "vllm_omni/model_executor/models/nemotron_voicechat/nemotron_voicechat_code2wav.py", "PR #5146", "PR #5068", "PR #5174", "PR #6076", "PR #6096"]
+sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/musa/platform.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/utils/mm_outputs.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py, docs/design/feature/omni_async_output_materialization.md, vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/experimental/fullduplex/, tests/e2e/features/fullduplex/, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/model_extras/registry.py, examples/offline_inference/text_to_image/text_to_image.py, examples/offline_inference/image_to_video/image_to_video.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/examples/offline_inference/test_image_task_prompts.py, tests/engine/test_arg_utils.py, "PR #3422", "PR #3642", "PR #4730", "PR #4958", "PR #5073", "PR #5074", "PR #5310", "PR #5610", "PR #5671", "PR #5777", "PR #5792", "PR #5824", "PR #5957", "PR #5976", "PR #6049", vllm_omni/engine/arg_utils.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni_moe_thinker.py, vllm_omni/model_executor/models/qwen2_5_omni/qwen2_5_omni_thinker.py, vllm_omni/model_executor/models/dynin_omni/dynin_omni.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/worker/base.py, vllm_omni/worker/gpu_generation_model_runner.py, tests/model_executor/models/qwen3_omni/test_qwen3_omni_forward_contract.py, "claude-workflow-starter-private@09dca46", "PR #4795", "PR #5842", "vllm_omni/model_executor/stage_input_processors/nemotron_voicechat.py", "vllm_omni/model_executor/models/nemotron_voicechat/nemotron_voicechat_code2wav.py", "PR #5146", "PR #5068", "PR #5174", "PR #6076", "PR #6096", "PR #4765"]
 ---
 
 # Model Executor 规则
@@ -187,6 +187,13 @@ Stage 拓扑错误的最小充分源码证据只有三段：一处最终配置�
   encoder 还须对任何未加载 plain retained parameter 在启动时硬失败；unknown checkpoint key
   可继续告警，因为它不会留下 model parameter 未初始化。^[PR #4958] ^[PR #5777] ^[PR #5824]
 
+### EXEC-2c — 多模块 checkpoint 载入必须按配置块与参数集闭环
+
+- 触发：模型 checkpoint 将主干 LM 与 DiT、patch encoder、vocoder、speaker encoder 等辅助模块拆分到不同配置块、文件或命名空间，或需要额外的 latent statistics 文件。
+- 强制：从 checkpoint 配置块构造并校验各模块尺寸；单次遍历权重迭代器，按每个模块的精确 `state_dict` key 集合路由，并分别处理 `llm.model.*`、辅助模块和非 safetensors 统计文件；记录各模块实际加载数与期望数。
+- 禁止：缺失配置块时静默套用其他 checkpoint 的默认值；以命中一个 target name 代表整组权重完整；让 speaker 权重落入 VAE catch-all；重复消费只能遍历一次的权重迭代器，或用默认初始化掩盖未加载参数。
+- 验收：对已验证 checkpoint 逐模块核对加载计数、无 missing/extra tensor 和预期 dtype；对缺失配置块、架构常量不匹配、部分 shard 及错误命名空间执行 fail-fast 测试，并确认推理前就暴露错误。^[PR #4765]
+
 ### EXEC-6a — shared image example 先建 canonical envelope，model-extra 只做特化变换
 
 - 触发：修改 shared T2I/I2V example、`model_extras` prompt registry 或模型 prompt builder。
@@ -234,3 +241,10 @@ Stage 拓扑错误的最小充分源码证据只有三段：一处最终配置�
 - 强制：平台 override 必须保留共享签名中的 `randomize_inputs` 默认值并将其传给 `maybe_randomize_inputs`；runtime mode 必须调用 `is_valid_runtime_mode()` 判断当前实例是否有效。
 - 禁止：通过实例调用返回集合的 `valid_runtime_modes()` 冒充实例有效性校验，或因共享签名新增可选参数而让平台 override 产生接口漂移。
 - 验收：对 base NPU runner 与 generation override 分别覆盖 `randomize_inputs` 的默认和显式路径，并用包含 `FULL_DECODE_ONLY` 等复合模式的正负用例断言 `is_valid_runtime_mode()` 的校验结果和签名 parity。 ^[PR #6096]
+
+### EXEC-11a — 连续 AR 音频侧路必须保持 fp32、上下文与正常终止
+
+- 触发：vLLM-native AR 模型在每个 token/patch 旁路执行 DiT 或 flow-matching 采样、连续声码器解码，并通过 Omni multimodal output 输出增量音频。
+- 强制：Euler/ODE 累积状态保持 fp32，仅将 DiT matmul 输入置为模型 dtype；跨 patch 保留 causal decoder 的 streaming window，并在模型停止或容量边界通过正常 stop 信号前 flush lookahead；输出按 step 发 delta audio，并保留 `meta.sparse_audio` 等路由标记。
+- 禁止：以 bf16 作为多步积分默认累积 dtype；每个 patch 独立零填充解码；容量耗尽时 raise 使 engine 失效；停止时丢弃 decoder 尾部，或让 scaffold hidden 通过默认 multimodal merge 混入音频。
+- 验收：跨两次 engine restart 做 bit-identical/确定性探针，做跨 patch 首词与边界上下文验证；将容量缩小后确认请求正常截断且同一 engine 的下一次 generate 仍成功，并断言逐步 delta 合并后只有目标音频张量。^[PR #4765]

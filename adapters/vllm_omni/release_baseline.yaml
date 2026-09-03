@@ -2,25 +2,25 @@ schema_version: 1
 
 upstream:
   repository: vllm-project/vllm-omni
-  previous_audited_sha: 83d1f11449a0eaf2910a0a8e34c055df20e4f169
+  previous_audited_sha: dbc0dd6d85272aab507c78b35f837d8651807087
   audited_ref: main
-  audited_sha: dbc0dd6d85272aab507c78b35f837d8651807087
+  audited_sha: 90a08c0edaa15eda9f0b7bc740fd226703b77470
 
 # These fingerprints are generated from sorted registry/deploy inventories.
 # They make the baseline exact without duplicating hundreds of entries here.
 inventories:
   autoregressive:
-    count: 84
-    sha256: 18b2cca9644d8f2054029272c2fc5e3aa3c30e8a63ccf653d5293c1f9312c2a9
+    count: 85
+    sha256: 408a354d13a1f637b91bbf945225621f2b0ccd1ef072276dccfbc6b67b8d085d
   diffusion:
     count: 61
     sha256: f751159bd0647552d405a0481ad582caf8f928787b8d5c7863fe5e863e12ca08
   pipelines:
-    count: 55
-    sha256: 0fb5191131211a863c0f81991bfb24990682cea47d6064f8a781d25ef0eda858
+    count: 56
+    sha256: 0a3d52b792acfa8e77a8a4090b58adfbcfe52368fea9bad99bfbbff70f2983a2
   deploy_yamls:
-    count: 83
-    sha256: 015a788739d95fb9c89223067f3116bd6913e4d38a2fb96d1a25f6bdb9a47e88
+    count: 84
+    sha256: 4644bdac38345b7e34b3585bad19d947dd26a6ace7acb7392b22e9c86ce51e29
 
 # Structural review owners for changed upstream paths. This is deliberately
 # separate from manifest.modules: changing that runtime map alters rebase fan-out.

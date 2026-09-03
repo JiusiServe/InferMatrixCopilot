@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068"]
+sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765"]
 ---
 
 # vLLM-Omni 配置开发门禁
@@ -136,6 +136,13 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 - 强制：将 `deploy_config` 作为唯一显式 deploy YAML 入口；未提供时走模型默认配置解析，并让 CLI、headless、offline、runner 和测试调用方使用同一字段，直到最终逐 stage 配置可读回。
 - 禁止：在该解析链中恢复 `stage_configs_path` 字段、双路径互斥判断、格式探测或 legacy `stage_args` 直接加载分支；不得让旧参数静默改变最终配置。
 - 验收：覆盖显式 `deploy_config`、未提供配置时的模型默认回退，以及标准/headless/offline/runner 传播路径，断言最终 stage config 一致，并确认公开参数与内部 args 不再包含 `stage_configs_path`。 ^[PR #5741]
+
+### CONF-3c — 模型专用 deploy profile 必须真正自动生效
+
+- 触发：新增带模型专用 side-path 或多模态输出标记的 AR pipeline，并同时提供默认 deploy YAML。
+- 强制：让 model config、architecture registry、pipeline registry 与 `default_deploy_config_name` 指向同一模型；对 dots.tts 保持 `enforce_eager: true` 与 `enable_prefix_caching: false`，并从未显式传入 deploy 配置的真实 `Omni` 初始化中核对最终逐 stage 值；在 prefix-cache merge 尚未保留 `sparse_audio` 前，不得移除该 pin。
+- 禁止：以 YAML 文件存在或 pipeline key 存在推断默认配置已经自动加载；只验证原始 YAML 而跳过最终 stage config；覆盖 `enable_prefix_caching` 后仍宣称 dots.tts 输出合同不变。
+- 验收：用 HF `model_type=dots_tts` 的无显式配置启动路径断言 architecture、pipeline、默认 deploy 文件和最终 flags 一致，并完成超过一个 160 ms patch 的离线生成，确认没有 prefix-cache 导致的单 patch 截断。^[PR #4765]
 
 ### CONF-4a — composable strategy 只暴露已经接通的 axis
 
