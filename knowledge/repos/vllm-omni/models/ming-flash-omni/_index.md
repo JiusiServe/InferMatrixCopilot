@@ -1,7 +1,7 @@
 ---
 title: "Ming-flash-omni（BailingMM2,4 拓扑全模态）"
 created: 2026-07-21
-updated: 2026-08-10
+updated: 2026-09-03
 type: index
 tags: [vllm-omni, models, diffusion]
 sources: [vllm_omni/model_executor/models/ming_flash_omni/, vllm_omni/diffusion/models/ming_flash_omni/, vllm_omni/model_executor/stage_input_processors/ming_flash_omni.py, vllm_omni/entrypoints/openai/tts_adapters/__init__.py, vllm_omni/entrypoints/openai/tts_adapters/ming_flash_omni_tts.py, tools/pre_commit/check_tts_adapter.py, "PR #5746", "PR #5843"]
@@ -43,7 +43,7 @@ sources: [vllm_omni/model_executor/models/ming_flash_omni/, vllm_omni/diffusion/
 | 遇到什么 | 查看哪里 | 说明 |
 |---|---|---|
 | 文本桥 vs hidden 桥、CFG 伴随、ByT5 字形路径 | [architecture](architecture.md) | 数据流与 reviewer 陷阱 |
-| speech API 的 detection/adapter union | [Serving SERV-5e](../../components/serving/rules.md#serv-5e-tts-detection-从-adapter-metadata-的有序并集派生) | `ming_tts` 消歧、请求校验和 prompt delegation |
+| speech API 的 detection/adapter union | [Serving SERV-5e](../../components/serving/rules-engine-lifecycle.md#serv-5e-tts-detection-从-adapter-metadata-的有序并集派生) | `ming_tts` 消歧、请求校验和 prompt delegation |
 
 ## 配置与 checkpoint 差异
 

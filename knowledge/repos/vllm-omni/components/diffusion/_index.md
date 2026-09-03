@@ -1,7 +1,7 @@
 ---
 title: "Diffusion"
 created: 2026-07-10
-updated: 2026-09-02
+updated: 2026-09-03
 type: index
 tags: [vllm-omni, components, diffusion]
 sources: []
@@ -42,6 +42,7 @@ sources: []
 | distilled continuous sigma schedule、boundary/step 语义与 modality shift | [sigma schedule rules](sigma-schedules.md) |
 | diffusion step 与 request/continuous batching | [step and batching](step-and-batching.md) |
 | request-wave admission coalescing、stable window、deadline 与 finite config | [admission wait rules](rules-admission-wait.md) |
+| paged KV/cache 预算、native/backend/platform 闭环、GQA/Ring/Ulysses layout、FlashInfer plan、能力 metadata | [paged cache 与系统运行时规则](rules-system-runtime.md) |
 | Scheduler-managed diffusion KV 的请求控制面、Hunyuan layout 与未实现边界 | [paged KV control plane](paged-kv-control-plane.md) |
 | Cache-DiT、TeaCache 和 prefix cache | [cache acceleration](cache-acceleration.md) |
 | TP/PP/SP/CFG/VAE/HSDP 等并行策略 | [parallelism](parallelism.md) |

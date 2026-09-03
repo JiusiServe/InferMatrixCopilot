@@ -1,7 +1,7 @@
 ---
 title: "Serving"
 created: 2026-07-10
-updated: 2026-08-23
+updated: 2026-09-03
 type: index
 tags: [vllm-omni, components, serving]
 sources: []
@@ -32,3 +32,4 @@ sources: []
 | upstream launcher shutdown、renderer warmup 与多 replica compile-cache 隔离 | [upstream 兼容规则](rules-upstream-compat.md) |
 | stage/replica 死亡、request-local failure、readiness/liveness 或驱逐后 cleanup | [fault-isolation rules](rules-fault-isolation.md) |
 | batched chat frontend fan-out、choice cardinality、whole-batch error/cancellation | [batch chat rules](rules-batch-chat.md) |
+| engine startup/shutdown 顺序、stage 生命周期、full-duplex 与 CFG companion | [engine 生命周期规则](rules-engine-lifecycle.md) |

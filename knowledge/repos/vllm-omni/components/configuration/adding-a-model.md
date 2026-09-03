@@ -1,7 +1,7 @@
 ---
 title: "vLLM-Omni 新模型接入路径"
 created: 2026-07-16
-updated: 2026-09-02
+updated: 2026-09-03
 type: guide
 tags: [vllm-omni, components, config, models]
 sources: ["PR #5682", "claude-workflow-starter-private@296ea45", .claude/skills/add-tts-model/SKILL.md, docs/contributing/model/, vllm_omni/entrypoints/openai/tts_adapters/]
@@ -34,7 +34,7 @@ AR TTS 新模型写一个 adapter，并在 `tts_adapters/__init__.py` 底部 imp
 歧义/缺失时才声明 `model_archs`，只有无专有 stage 的 AR entry 才设
 `arch_identifies_entry_stage`。非集合匹配用 `matches()`，部署拓扑能力用
 `stage_serves_speech()`，真实冲突才设 `detect_priority`。详细 detection 不变量见
-[SERV-5e](../serving/rules.md#serv-5e-tts-detection-从-adapter-metadata-的有序并集派生)。纯
+[SERV-5e](../serving/rules-engine-lifecycle.md#serv-5e-tts-detection-从-adapter-metadata-的有序并集派生)。纯
 diffusion TTS 仍走 `for_diffusion()` 直达路径，不能假设 adapter 的 `validate()`/`build()` 可达。
 
 ## 照抄谁

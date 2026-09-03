@@ -1,7 +1,7 @@
 ---
 title: "Serving 规则"
 created: 2026-07-20
-updated: 2026-09-02
+updated: 2026-09-03
 type: rule
 tags: [vllm-omni, components, serving]
 sources: ["Issue #5369", "PR #3576", "PR #4583", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5085", "PR #5157", "PR #5374", "PR #5670", "PR #5682", "PR #5713", "PR #5732", "PR #5746", "PR #5752", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", .pre-commit-config.yaml, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_chat.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/entrypoints/openai/tts_adapters/, vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/engine/cfg_companion_tracker.py, vllm_omni/metrics/prometheus.py, tests/dfx/reliability/test_reliability_qwen3_omni.py, tests/engine/test_orchestrator_error_handling.py, tests/entrypoints/test_async_omni.py, tests/entrypoints/test_omni_entrypoints.py, tests/entrypoints/openai_api/test_audex_serving_guards.py, tests/entrypoints/openai_api/test_omni_sleep_wakeup.py, tests/entrypoints/openai_api/test_tts_detection.py, tests/entrypoints/openai_api/test_video_api_utils.py, tests/entrypoints/openai_api/test_video_server.py, tests/tools/test_check_tts_adapter.py, tools/pre_commit/check_tts_adapter.py]
@@ -42,8 +42,8 @@ confidence: high
 | `artifact-readiness` | artifact/content cache、capability、ready/mark/discard | `SERV-3a`, `SERV-3b`, `SERV-3c` |
 | `chat-multimodal-contract` | chat template kwargs、SDK flatten、text/audio response shape | `SERV-4c` + 命中模型规则 |
 | `endpoint-capability` | endpoint restriction、route/app-state guard、公开 400 | `SERV-4c`, `SERV-4d`, `SERV-5d` |
-| `engine-lifecycle` | sleep/wake、partial stage/tag、ACK、generation admission、factory 状态矩阵、TTS adapter detection、replica fault isolation | `SERV-5a`, `SERV-5b`, `SERV-5c`, `SERV-5e`, `SERV-5f` |
-| `full-duplex` | duplex opt-in、stage prewarm/fence、async-chunk、CFG companion lifecycle | `SERV-6a`–`SERV-6c` |
+| `engine-lifecycle` | sleep/wake、partial stage/tag、ACK、generation admission、factory 状态矩阵、TTS adapter detection、replica fault isolation | `SERV-5a`–`SERV-5e`（见 [engine 生命周期规则](rules-engine-lifecycle.md)）, `SERV-5f` |
+| `full-duplex` | duplex opt-in、stage prewarm/fence、async-chunk、CFG companion lifecycle | `SERV-6a`–`SERV-6d`（见 [engine 生命周期规则](rules-engine-lifecycle.md)） |
 | `request-contract` | 请求字段、来源、冲突、dispatcher、consumer view | `SERV-4a`, `SERV-4b`, `SERV-4c`, `SERV-4d`, `SERV-4e`, `SERV-4f`, `SERV-4g`, `SERV-4h`, `SERV-4l` |
 | `batch-chat-contract` | frontend fan-out、identity、choice cardinality、error/cancellation | `SERV-4i`, `SERV-4j`, `SERV-4k` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `SERV-0a`, `SERV-0b` |
@@ -254,130 +254,3 @@ confidence: high
   `sampling_params_list[i].lora_request` 拥有，默认参数对象不被污染。GPU 验收必须先确认 adapter
   ID 已加载，再证明 deterministic token/logprob 与 base 不同；#5369 另报的 `AsyncOmni.add_lora`
   control-RPC 反序列化成 list 问题不在本修复范围。^[PR #5374]
-
-## Engine 生命周期合同
-
-### SERV-5a — sleep/wake 状态必须保留 stage 和 tag 作用域
-
-- 触发：sleep/wake 接受 `stage_ids`、resource tags 或 partial wake。
-- 强制：状态 key 与公开操作的 stage/tag 作用域一致；只有全部必需 stage/tag 已 warm
-  才放行 generation。
-- 禁止：用一个全局 tag set 表示多 stage 状态；唤醒一个 stage 后清掉其他 stage 的
-  sleeping 状态或把后续定向 wake 当成 already warm。
-- 验收：sleep 两个 stage、只 wake 一个时 generation 仍拒绝，随后 wake 另一个才放行。
-  ^[PR #4834]
-
-### SERV-5b — 只有成功 ACK 和真实 backend capability 才能转为 warm
-
-- 触发：worker ACK 可返回 error，或不同 backend 对 level-2 restore 能力不同。
-- 强制：逐目标确认成功 ACK 后再清状态；level-2 能力按 backend/stage 表达。
-- 禁止：错误 ACK 也清 tag；用 engine 全局禁令误伤已经支持 restore 的 diffusion worker。
-- 验收：失败 ACK 保留 sleeping 状态；支持 level-2 的 diffusion 路径仍能
-  sleep → wake → generate，不支持的 stage 在调用 worker 前明确拒绝。
-  assembled app 对不支持的 level-2 wake 保留 sleeping state，并把既有
-  `NotImplementedError` 映射为 OpenAI-style structured HTTP 501；bare route mock 只证明
-  exception propagation，不能代替这条 live contract。^[PR #4834] ^[PR #4905]
-  ^[PR #4912] ^[PR #5713]
-
-### SERV-5c — 共享服务类重构必须闭合全部构造状态
-
-- 触发：移动 model-specific capability 到 adapter、增加 factory/`__new__` 快路径，或让同一
-  serving class 同时承载普通、无对应 stage、diffusion-only 等实例。
-- 强制：列出每个生产构造入口及其必有/可选属性；所有公共 caller 通过统一 accessor 或显式
-  `None` 状态访问 optional capability，startup warmup 与 request route 使用同一状态合同。
-- 禁止：只测试目标 adapter 的正常构造；在 factory 实例上直接读取未初始化属性；用旧的
-  model-type early return 掩盖无 adapter 状态。
-- 验收：至少覆盖普通 adapter、无 adapter 和 bypass-`__init__` factory 三类实例，并实际调用
-  startup warmup、voice list/upload 与对应 request route；每条路径保持重构前的成功或结构化
-  错误合同，不得出现 `AttributeError`。 ^[PR #6138]
-
-### SERV-5d — 应用 wiring guard 检查可用性而非属性名
-
-- 触发：assembled app 的 route/middleware 依赖 `app.state` handler 或 factory wiring。
-- 强制：mandatory state 同时检查属性存在且非 `None`；guard 测试通过 assembled app/公开 handler
-  观察行为，并覆盖应用实际暴露的方法和 middleware inner-app 调用。
-- 禁止：`hasattr` 接受显式 `None`；测试绑定可搬迁私有 symbol/单 router；用恒真断言证明 wiring。
-- 验收：把 handler 置空、移除 route/method、绕过 inner app 三类 mutation 均使 guard 失败；
-  正常 app 的 HEAD/OPTIONS census 与必需 state key 完整。 ^[PR #6202]
-
-### SERV-5e — TTS detection 从 adapter metadata 的有序并集派生
-
-- 触发：增加/迁移 TTS adapter，修改 `stage_keys`、`model_archs`、stage discovery、检测顺序
-  或 speech-capable deployment topology。
-- 强制：adapter 与显式 `LEGACY_TTS_DETECTORS` 构成完整 detector 并集；按
-  `(detect_priority, name)` 确定性排序，等优先级 detector 不得重叠。stage-key 候选、仅靠
-  architecture 定位的 AR entry stage、最终 model type 都从该并集派生；非集合规则覆写
-  `matches()`，拓扑能力覆写 `stage_serves_speech()`，不要回填 `serving_speech.py` 分支。
-- 边界：VoxCPM2 talker architecture 是高优先级权威匹配；Ming flash adapter 的 `ming_tts`
-  stage-key 以默认 priority 100 先于 Ming dense 的 architecture fallback priority 200；CoVo 的通用 `fused_thinker_talker` 还需
-  architecture 确认；Audex omni 还需同部署的 `audex_code2wav`。纯 diffusion 的
-  `for_diffusion()` 直接绕过 adapter detection，当前 `DiffusionTTSAdapter` 没有生产 subclass。
-- 验收：冻结旧 ladder 作为 oracle，覆盖 in-tree pipeline stage、adapter 声明 architecture、
-  stage 集合等价、entry-arch 范围、无歧义/稳定顺序和 topology guard。`LegacyDetector` 只能缩减；
-  AST ratchet 中超过 branch/legacy budget 失败，等于上限静默通过，少于上限则通过
-  并显示收紧 reminder；下降本身不能让该 pre-commit hook 红灯，但未同步更新的 exact-equality
-  pytest 仍会失败。在人工调低 constant 前存在可回增 slack，table dispatch 也是已固定的漏检形态，
-  不能把 pre-commit 通过解释为不可绕过。
-  `omnivoice_generator` 未被 pipeline 发出，是保留兼容事实而非
-  可达性证据。^[PR #5682]
-- adapter 提取保持共享 dispatcher 单一：Ming Flash 的 `validate()` 原样拒绝空 input、过长/非
-  字符串 instructions、`task_type`/`language`/`x_vector_only_mode`/
-  `initial_codec_chunk_frames`、`ref_audio`/`ref_text` 和非正 `max_new_tokens`；`build()` 继续委托
-  server 的 `_build_ming_flash_omni_prompt()`，并返回空 `tts_params` 与固定 model type。公开校验
-  和 generation preparation 都必须经 `resolve_adapter()`，不要把同一分支加回
-  `serving_speech.py`。`LEGACY_TTS_DETECTORS` 当前为空，branch/legacy AST ratchet 是 27/0；
-  Ming Flash 只由 adapter 的 `ming_tts` stage key 检测，且 legacy 名不得同时注册 adapter。
-  验收仍须证明 `ming_tts` stage key 与 Ming dense architecture fallback 的消歧不变。
-  ^[PR #5746] ^[PR #5843] ^[PR #6008]
-- 证据：CPU oracle/ratchet suite 支撑检测等价；L20X VoxCPM2 只证明 architecture path 到达
-  warmup，随后因基线同样复现的 vLLM skew 退出，未证明成功 speech endpoint/audio E2E。
-
-## Full-duplex 与 CFG companion 生命周期
-
-### SERV-6a — full-duplex 首次 stage submit 必须预热 async-chunk topology
-
-- 触发：full-duplex stage port、双工会话、async-chunk 或 stage fence 发生变化。
-- 强制：stage-0 的首次 `submit_initial` 在 async-chunk 开启时预热后续 stage 的
-  runtime/pool；每个 stage 保留自己的 fence、submit timestamp 和 request state。
-- 禁止：等到 duplex audio/control 事件真正抵达才首次启动下游 stage；用一个全局 fence
-  表示多 stage readiness；prewarm 失败后仍发布 generation-ready。
-- 验收：覆盖首次 stage-0 submit、后续 stage submit、重复 update 和 prewarm failure；
-  CPU/mock 测试必须证明 request state 与 stage pool 生命周期一致。
-
-### SERV-6b — CFG companion 输出要非破坏性聚合并在所有 teardown 路径清理
-
-- 触发：CFG companion、deferred parent、streaming terminal update、abort、stage error
-  或 replica loss。
-- 强制：parent re-submit 前 companion outputs 可重复读取；parent 只在全部 companion
-  完成后释放；companion error/abort 必须给 deferred parent 发送结构化错误，并由统一
-  cleanup 路径清理 parent、companion、tracker 和 stage-pool binding。
-- 禁止：用 destructive `pop` 让第二次 terminal update 丢 companion；只清 parent 不清
-  companion；companion 永久等待时静默挂起 parent。
-- 验收：覆盖正常全量完成、重复读取、companion error、parent abort、companion abort
-  和 replica loss，断言没有遗留 tracker state 或未完成的 deferred parent。
-
-### SERV-6c — duplex capability gate 必须区分未启用与配置失败
-
-- 触发：`session_mode=duplex`、`/v1/realtime?duplex=true`、runtime extension 或
-  duplex deploy configuration 发生变化。
-- 强制：入口只在明确的 duplex opt-in 下建立 handler；能力检查必须保留结构化配置
-  错误与“不支持该模式”的区别，session、request、stage fence、lease 和 ordered
-  mailbox 的生命周期必须在 disconnect、abort、expiry 与 replica loss 时一起终止。
-- 禁止：把所有 config-load exception 折叠成 `duplex unavailable`；用普通 streaming
-  handler 冒充持久 session；用全局 fence 或无界 pending input 替代 per-session bound。
-- 验收：覆盖未 opt-in、有效 opt-in、malformed config、stale fence、lease expiry、
-  disconnect 和 terminal response ordering；控制消息中的 dataclass/enum/tensor 必须
-  在发送前变成 JSON-safe 值。
-
-请求到 engine 的边界见 [Serving architecture](architecture.md)；公开协议通用检查见
-[review contracts](../../../../general/review/guides/reviewer-lens-contracts.md)。
-
-### SERV-6d — tokenizer-free 与 native speed 由 adapter capability 闭环
-
-- 触发：stage 0 跳过 tokenizer，或 TTS adapter 声明 native speed control。
-- 强制：token-only renderer 仅接受 token IDs/prompt embeddings，chat messages 明确失败。HTTP raw、SSE 与
-  non-streaming 由 adapter 校验 native speed，encoder speed 固定 1；generic model 拒绝 `speed != 1`，
-  WebSocket 在 parity 完成前固定 speed=1。
-- 禁止：模型 duration scaling 后再次 resample，或以 HTTP 支持外推 WebSocket parity。
-- 验收：覆盖 token/chat/embed、native/generic、三种 HTTP 输出与 WebSocket。落后后端只用显式
-  capability/version shim 并保留 eager fallback，不能让 CUDA 新参数成为全平台前提。^[PR #5957]
