@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666", "PR #5036", "PR #4222", "PR #5604", "PR #6293", "PR #6094", "vllm_omni/diffusion/data.py", "PR #6050"]
+sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666", "PR #5036", "PR #4222", "PR #5604", "PR #6293", "PR #6094", "vllm_omni/diffusion/data.py", "PR #6050", "PR #6322", "vllm_omni/config/pipeline_registry.py", "vllm_omni/diffusion/models/pi0_pipeline_config.py", "vllm_omni/diffusion/models/pi0/pipeline_pi0.py"]
 ---
 
 # vLLM-Omni 配置开发门禁
@@ -185,3 +185,11 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 - 强制：对会 eagerly 导入 `pipeline_registry`、`StageConfigFactory` 或其他重型 pipeline 依赖的公开配置符号使用模块级延迟解析；首次访问时通过 `importlib` 解析并缓存真实对象，同时保持 `__all__`、`__dir__` 与直接子模块导入的身份一致。导入链测试必须在干净解释器中先验证轻量配置导入不会预加载 registry/PI0，再验证公开导出仍解析到直接实现。
 - 禁止：在 `vllm_omni.config` 包初始化阶段无条件导入会反向加载 `DiffusionOutput` 的 registry；用 import 顺序或已预加载模块掩盖循环；删除公开导出或让 lazy proxy 与直接导入得到不同对象。
 - 验收：静态检查顶层导入不含重型 registry/factory，干净子进程按 `vllm_omni.config.lora` → `vllm_omni.diffusion.data` 顺序导入成功，并断言 `StageConfigFactory`、`register_pipeline` 与直接模块导出的对象相同；覆盖仍需用这些公开符号的调用方。^[PR #6293]
+
+### VOMNI-CFG-2b — pipeline registry 必须只依赖轻量拓扑配置
+
+- 触发：修改 `pipeline_registry.py` 的模型拓扑注册，或配置/插件导入链可能在配置解析期间预加载模型 runtime。
+- 强制：将 registry 所需的静态 `PipelineConfig` 放入无 runtime 副作用的轻量模块；registry 只导入该模块，runtime pipeline 继续 re-export 同一对象以保持既有导入路径，并用干净子进程验证 registry 解析不加载 runtime。
+- 禁止：让 `pipeline_registry` eager import 模型 runtime、依赖已预加载模块或导入顺序掩盖循环；不得因拓扑模块轻量就改变模型 runtime 的实际加载语义。
+- 验收：隔离进程中导入并解析目标 registry key，断言对应 runtime module 不在 `sys.modules` 且返回的 `PipelineConfig` 身份与字段正确；再验证 runtime 的兼容导入路径仍 re-export 同一拓扑对象。^[PR #6322]
+
