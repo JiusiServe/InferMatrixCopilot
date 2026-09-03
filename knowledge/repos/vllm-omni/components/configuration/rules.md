@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156"]
+sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741"]
 ---
 
 # vLLM-Omni 配置开发门禁
@@ -122,6 +122,13 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 - 禁止：拿某一层 YAML 原文当生效值；用默认值脑补缺失字段。
 - 验收：争议字段在最终逐 stage 对象中可读回，并与第一位 consumer 一致；平台 overlay
   必须同时断言受影响 stage 和未覆盖 control，不能只验证 YAML 原文。^[PR #5671]
+
+### CONF-3b — 显式 deploy YAML 统一经 `deploy_config` 解析
+
+- 触发：修改 `Omni`、`AsyncOmni`、`OmniEngineArgs`、orchestrator 参数或阶段解析链中的显式 YAML 配置入口。
+- 强制：将 `deploy_config` 作为唯一显式 deploy YAML 入口；未提供时走模型默认配置解析，并让 CLI、headless、offline、runner 和测试调用方使用同一字段，直到最终逐 stage 配置可读回。
+- 禁止：在该解析链中恢复 `stage_configs_path` 字段、双路径互斥判断、格式探测或 legacy `stage_args` 直接加载分支；不得让旧参数静默改变最终配置。
+- 验收：覆盖显式 `deploy_config`、未提供配置时的模型默认回退，以及标准/headless/offline/runner 传播路径，断言最终 stage config 一致，并确认公开参数与内部 args 不再包含 `stage_configs_path`。 ^[PR #5741]
 
 ### CONF-4a — composable strategy 只暴露已经接通的 axis
 
