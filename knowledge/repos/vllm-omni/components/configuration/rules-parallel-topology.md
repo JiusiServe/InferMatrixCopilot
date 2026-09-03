@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, config]
-sources: [vllm_omni/config/composable_parallel/, vllm_omni/config/config_factory.py, vllm_omni/config/stage_config.py]
+sources: [vllm_omni/config/composable_parallel/, vllm_omni/config/config_factory.py, vllm_omni/config/stage_config.py, "PR #5531"]
 confidence: high
 ---
 
@@ -56,3 +56,11 @@ confidence: high
   load-balancer consumer；策略生效前若设备不足必须 fail fast。
 
 部署 YAML 的展开顺序见 [deploy-yaml](deploy-yaml.md)；stage 执行合同见 [model-executor 规则](../model-executor/rules.md)。
+
+## CONF-4e — WORLD、DP 与 HSDP 拓扑必须在实际设备数上闭合
+
+- 触发：修改 `DiffusionParallelConfig`、`OmniStageDiffusionParallelConfig` 对 `WORLD_SIZE`、DP、HSDP、SP/CFG/TP/PP/EP 的解析，或修改 async stage 的设备展开。
+- 强制：普通并行必须满足 `WORLD_SIZE = TP × SP × PP × CFG × DP`；省略 DP 时保留 `None`，直到获得实际 `num_gpus`/WORLD 后推导，显式 DP 必须与推导值一致。HSDP 必须令普通 DP 为 1，并满足 `WORLD_SIZE = hsdp_replicate_size × hsdp_shard_size`；SP/CFG 只能复用同一 WORLD 拓扑，其乘积必须为 1 或 WORLD。解析 DP 后再生成 devices，并将 `num_gpus` 保留到最终 stage engine args。
+- 禁止：在配置解析期把省略的 DP 固定为 1 后据此生成不足的设备列表；接受与 WORLD 推导值不一致的显式 DP；允许 HSDP 与 TP、普通 DP、PP 或 EP 组合；只用 `num_gpus` 做校验却不传播到 stage 配置。
+- 验收：覆盖 direct、structured 和 async stage 路径；`num_gpus=8`、TP=2、SP=2 必须得到 DP=2、WORLD=8 和 devices `0`–`7`，省略 DP 的配置在运行时解析前仍保持未指定；覆盖 HSDP mesh 不匹配及不支持组合，并确认都在进程组创建前失败。^[PR #5531]
+

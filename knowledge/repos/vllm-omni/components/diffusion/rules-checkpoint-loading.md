@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5087", "PR #5088", "PR #5136", "PR #5677", "PR #5737", "PR #5764", "PR #5802", "PR #5836", "PR #5839", "PR #5848", "PR #5872", "PR #5910", "PR #6070", "PR #6279", "PR #6445", vllm_omni/diffusion/model_loader/, vllm_omni/quantization/, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/offloader/]
+sources: ["PR #5087", "PR #5088", "PR #5136", "PR #5677", "PR #5737", "PR #5764", "PR #5802", "PR #5836", "PR #5839", "PR #5848", "PR #5872", "PR #5910", "PR #6070", "PR #6279", "PR #6445", vllm_omni/diffusion/model_loader/, vllm_omni/quantization/, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/offloader/, "PR #5531"]
 confidence: high
 ---
 
@@ -139,4 +139,11 @@ confidence: high
 - 强制：仅允许 `Fp8PerTensorOnlineLinearMethod` 进入 DLO+AllGather；由于 direct checkpoint mmap 不能生成运行时量化布局，必须先由普通 loader 完成 FP8 权重和 scale，再交给 DLO 按 dtype 分片，并按记录的 shape、stride 重建转置 Cutlass 权重。每个 rank 启动时可能暂存完整 FP8 模型，运行时才保留 DLO shard。
 - 禁止：把该 allowlist 扩展到未经验证的在线量化方法；绕过普通 loader 直接 mmap 在线量化权重；丢失非连续权重的物理 stride；将 transient 完整模型 host memory 峰值描述为运行时常驻开销。此前 DIFF-2s 对所有 runtime-created FP8 的 AllGather 禁止由本规则收窄覆盖。
 - 验收：loader 测试必须证明 allowlist 分支确实执行、普通 loader 在 DLO 前完成权重与 scale 处理，并对未验证 method fail fast；DLO 测试必须验证 FP8 weight/scale 的 dtype、值、shape 和转置 stride 重建。另覆盖 no-AllGather 路径及至少一次真实多 rank AllGather smoke；声明质量或性能 parity 仍需固定模型、硬件和 exact workload 的独立证据。^[PR #6279]
+
+## DIFF-2u — diffusion 并行状态必须保持单一拓扑所有权并原子清理
+
+- 触发：修改 diffusion `parallel_state`、HSDP/FSDP2 `DeviceMesh`、SP/CFG/PP group、VAE patch parallel 或并行状态初始化与销毁。
+- 强制：`RankGenerator` 只表达真实正交的 TP/SP/PP/CFG/DP 轴；HSDP 不得作为额外轴，FSDP2 `DeviceMesh` 独占 replicate/shard 进程组；VAE tile parallel 直接从 WORLD 选 rank。初始化前验证 distributed 已启动且状态为空，组创建失败时必须清理本次已创建的 diffusion 与 vLLM 组；销毁时同时清空 vLLM `_PP` 等引用。
+- 禁止：重新创建冗余 `_DIT` 或 `_FS` 组；把 HSDP shard 当作 `RankGenerator` 的乘法维度；让 HSDP 继续依赖已移除的 fully-shard accessor；清理后保留已销毁的 pipeline group 或允许残留部分状态阻塞下一次初始化。
+- 验收：覆盖 HSDP standalone、HSDP+SP/CFG、VAE WORLD group、mesh 维度与实际 WORLD 不一致、初始化中途异常、重复初始化和销毁后重初始化；断言失败后无残留组，vLLM `_PP` 被置空，MiniMax H3 的 VAE/pipeline caller 使用 `get_world_group().device_group`，并以真实多 rank smoke 验证 DeviceMesh 与 collective 拓扑。^[PR #5531]
 
