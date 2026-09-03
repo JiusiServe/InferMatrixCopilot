@@ -1,10 +1,10 @@
 ---
 title: "Distributed 传输规则"
 created: 2026-08-05
-updated: 2026-09-02
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, distributed]
-sources: ["PR #5744", "PR #5976", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py]
+sources: ["PR #5744", "PR #5976", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146"]
 confidence: high
 ---
 
@@ -58,3 +58,10 @@ confidence: high
   的旧 vLLM 无条件传参；把 TP/EP 配置存在当作 manager 已初始化。
 - 验收：mock 新旧签名分别断言 EP 转发/旧版省略，普通 group 不启用；目标环境用真实 MoE DiT
   TP+EP smoke 验证 manager 非空。^[PR #5976]
+
+## DIST-3a — Omni 输出序列化必须按扁平 dataclass 合同兼容旧线格式
+
+- 触发：修改 `OmniMsgpackEncoder`/`OmniMsgpackDecoder`、`OmniRequestOutput` 字段或跨 stage 输出 wire format。
+- 强制：当前 `OmniRequestOutput` 按其 dataclass 字段重建，不能落入基类 `RequestOutput` 的动态属性编码路径；decoder 只构造已知字段，并在旧 wire format 含嵌套 `request_output` 时完成一次向扁平对象的内容合并。基类 `RequestOutput` 的字段集合必须跟随 pinned upstream 合同。
+- 禁止：让 subclass 走基类序列化而丢失 diffusion/stage 字段或形成递归；不得把未知 key 直接传给 `RequestOutput`/dataclass 构造器；upstream 已移除的 `multi_modal_placeholders` 不得仅为旧动态属性重新作为当前字段恢复。
+- 验收：msgpack round-trip 分别覆盖 pipeline 文本输出和 diffusion 图像输出，保持 request metadata、prompt、token、outputs、finished、stage 字段及图像内容；旧嵌套 wire payload 能解码为扁平对象，编码不递归且解码后的字段可被直接消费。^[PR #5146]
