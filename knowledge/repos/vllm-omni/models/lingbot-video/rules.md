@@ -10,7 +10,7 @@ sources: [vllm_omni/diffusion/models/lingbot_video/request_utils.py, vllm_omni/d
 # LingBot-Video 规则
 
 只有 `LBV-数字字母` 是可审计规则 ID。共享请求传播与错误一致性先应用
-[SERV-4c/4d](../../components/serving/rules.md#serv-4c-入口接受必须闭环到每个生产消费者)，
+[SERV-4c/4d](../../components/serving/rules-request-input.md#serv-4c-入口接受必须闭环到每个生产消费者)，
 本页只写 LingBot 专有语义。
 
 ## Direct 代码快速入口

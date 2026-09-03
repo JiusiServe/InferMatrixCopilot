@@ -1,7 +1,7 @@
 ---
 title: "Serving"
 created: 2026-07-10
-updated: 2026-09-03
+updated: 2026-09-04
 type: index
 tags: [vllm-omni, components, serving]
 sources: []
@@ -33,3 +33,4 @@ sources: []
 | stage/replica 死亡、request-local failure、readiness/liveness 或驱逐后 cleanup | [fault-isolation rules](rules-fault-isolation.md) |
 | batched chat frontend fan-out、choice cardinality、whole-batch error/cancellation | [batch chat rules](rules-batch-chat.md) |
 | engine startup/shutdown 顺序、stage 生命周期、full-duplex 与 CFG companion | [engine 生命周期规则](rules-engine-lifecycle.md) |
+| 公开请求字段的校验、来源冲突、alias/extras 归一与 consumer view | [请求输入合同](rules-request-input.md) |
