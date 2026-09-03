@@ -35,7 +35,9 @@ sources: []
 |---|---|
 | 理解共享职责和阶段边界 | [architecture](architecture.md) |
 | 根据 PR 描述直达 stage config、runner preprocess、stage runtime、bridge/batch 或 loader 的规则组与第一批源码 | [rules 与代码地图](rules.md) |
-
 | runtime info、跨 stage payload、batch 与 request RNG 合同 | [跨 stage bridge 与 batch 合同](rules-bridge-batch.md) |
 | loader 的 dtype/config 获取、fused shard 与多模块 checkpoint 载入 | [loader 合同](rules-loader-contract.md) |
 | shared image example envelope 与 model_extras 参数声明 | [image task envelope 合同](rules-image-task-envelope.md) |
+| Omni 输出类型与字段/复制合同 | [输出类型合同](rules-output-contract.md) |
+| 采样循环不变量、热路径缓存、AR 音频侧路 | [运行时热路径合同](rules-runtime-hot-paths.md) |
+| NPU runner、ROCm 分页注意力、NPU 模型补丁 | [平台后端合同](rules-platform-backends.md) |

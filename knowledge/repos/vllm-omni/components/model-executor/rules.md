@@ -37,6 +37,9 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 | `mtp-graph` | Talker-MTP FULL graph、平台能力与 tri-state fallback | `EXEC-4c` |
 | `image-task-envelope` | shared image task example 或 `model_extras` prompt builder | `EXEC-6a`–`EXEC-6b`，见 [image task envelope 合同](rules-image-task-envelope.md) |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `EXEC-0a`, `EXEC-0b` |
+| `output-contract` | Omni 输出类型与字段/复制合同 | `EXEC-7a`–`EXEC-7b`，见 [输出类型合同](rules-output-contract.md) |
+| `runtime-hot-paths` | 采样循环不变量、固定输入缓存、AR 音频侧路与 codec 帧账本 | `EXEC-8a`, `EXEC-9a`, `EXEC-11a`–`EXEC-11b`，见 [运行时热路径合同](rules-runtime-hot-paths.md) |
+| `platform-backends` | NPU runner 接口、ROCm 分页注意力、NPU 模型补丁注册 | `EXEC-10a`, `EXEC-12a`–`EXEC-13a`，见 [平台后端合同](rules-platform-backends.md) |
 
 ## 严格配置校验
 
@@ -152,68 +155,3 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 当 issue 已提供最终配置和失败堆栈、current source 可读时，先按 [架构职责锚点](architecture.md#当前源码职责锚点) 完成一轮窄调查，目标是在 owner 确定后两分钟内给出首次根因。超时仍未闭环时必须指出缺失证据，不能静默扩大到历史 commit、其他模型或环境猜测。
 
 Stage 拓扑错误的最小充分源码证据只有三段：一处最终配置日志加全局/per-stage 合并函数；一处启动前容量校验及其完整异常控制流；一处与日志一致的 worker 失败点。三段一致即可决定“配置触发 + fail-fast 缺陷”的主要修复位置，不再为首次结论读取 config factory、模型 pipeline、完整 deploy、spawn 实现或 tag diff；只有三段之间发生冲突时才补这些文件。
-
-## 跨 stage bridge 与 batch 合同
-
-### EXEC-7a — Omni 输出必须是扁平的 RequestOutput 子类
-
-- 触发：修改 `OmniRequestOutput`、stage output wrapping、`omni.generate()` 返回对象或其 serving/offline 消费者。
-- 强制：`OmniRequestOutput` 必须继承 vLLM `RequestOutput` 并将继承字段作为 dataclass 字段直接声明；stage 原始输出必须通过 `from_stage_output()` 显式复制 `prompt`、`prompt_token_ids`、`outputs`、`finished` 等生成内容，源对象为 `OmniRequestOutput` 时再复制 diffusion 内容；消费者直接读取扁平字段，列表归一化只在真实列表边界完成。
-- 禁止：重新引入 `request_output` 嵌套字段、动态 pass-through property、修改 dataclass 生成的 `__init__` 或递归 `unwrap` 兼容层；不得在 serving、example 或工具代码中恢复 `output.request_output` 访问。
-- 验收：用真实 `RequestOutput` 和 `OmniRequestOutput` 分别验证 factory 复制的 prompt、token、outputs、finished 及 images/trajectory 内容；覆盖文本、音频、图像和 pipeline stage 的直接字段消费，并确认未完成 stage 的 `finished` 不被包装过程改写。^[PR #5146]
-
-### EXEC-7b — OmniRequestOutput 必须保持 RequestOutput 字段与复制合同
-
-- 触发：修改 `OmniRequestOutput`、升级 vLLM `RequestOutput`，或调整 `from_stage_output()` 的输出复制逻辑时。
-- 强制：对照真实 `RequestOutput.__init__` 设置的全部公开属性，在 `OmniRequestOutput` 中以匹配的类型和默认值声明字段，并同步加入 `_REQUEST_OUTPUT_CONTENT_ATTRS`，确保 `from_stage_output()` 复制非空值。
-- 禁止：只声明新字段而遗漏复制列表，或用手写的静态字段清单代替真实 `RequestOutput` 属性 parity 检查，导致 serving 所需的 connector metadata 或 cache accounting 静默丢失。
-- 验收：用真实 `RequestOutput` 与 `OmniRequestOutput` 做属性 parity 测试；覆盖新字段默认值为 `None`，以及 `ec_transfer_params`、`num_cache_creation_tokens` 等非空值经 `from_stage_output()` 后保持不变。 ^[PR #6152]
-
-### EXEC-8a — DiT Euler 采样循环必须只计算一次不变条件
-
-- 触发：修改 GLM-TTS flow-matching DiT 的 Euler 采样循环、文本 embedding、RoPE、block-causal mask、CFG batch，或新增预计算输入参数。
-- 强制：在每次 `_do_sample` 调用中只计算一次不随 timestep 或采样状态变化的 text embedding、RoPE、attention mask 和 CFG 双 batch 张量，并传入 DiT；同时保持 `seq_len`、设备、dtype 与 `forward()` 的合同一致，缺省参数仍保留原有调用行为。
-- 禁止：在每个 Euler step 重复构造上述固定输入；让预计算 embedding 或 RoPE 在长度不匹配时静默继续；改变原有 mask device、模型 dtype 或 block-causal 语义；把 eager streaming 路径的优化结论外推为 CUDA-graph 路径或其他模型的通用结论。
-- 验收：覆盖 CFG/non-CFG 和 block-causal streaming 路径，验证预计算输入的长度、设备、dtype 与采样序列匹配，并以数值/字节一致性、输出 shape 及 profiling 证明循环内不再重复执行固定计算；确认非 streaming CUDA-graph 和未提供预计算参数的旧调用仍正常。 ^[PR #5068]
-
-### EXEC-9a — OmniVoice 热路径的固定输入缓存与掩码/精度边界
-
-- 触发：修改 OmniVoice 离散扩散生成循环中的 D2H 同步、attention mask、RoPE、文本/音频 embedding、CFG、CUDA graph/eager 路径或 TF32 配置。
-- 强制：将循环不变的文本 embedding、`audio_mask_3d`、RoPE 和 additive attention mask 在循环外缓存；批量取得 `c_lens` 并只在实际消费的 logits slice 上转为 fp32；CUDA graph 与 eager 使用相同的 float mask 语义，bool mask 必须将 True 映射为 `0.0`、False 映射为 `-inf`，已有 float mask 必须原样保留；TF32 只能通过显式配置 opt-in，并在 graph capture 前启用。
-- 禁止：每步重复计算固定输入或执行逐请求 D2H `.item()`；对 float mask 使用布尔反转或把 bool 直接隐式转换进 float buffer；让 graph capture 与 replay 使用不同 mask dtype；默认开启或宣称 TF32 路径 bit-identical；只更新 conditional 或 unconditional 一侧的迭代 token。
-- 验收：覆盖 eager 与 CUDA graph、bool 与 additive float mask、CFG/non-CFG 及不同 batch/concurrency，断言 masked 位置仍为 `-inf`、float mask 数值保留、graph/eager 输出满足既定精度合同、每步无固定输入重算和逐请求同步；单独验证 `enable_tf32` 默认关闭且显式开启前后性能/非 bit-identical 语义有记录。 ^[PR #5174]
-
-### EXEC-10a — NPU 平台 runner 必须保持 runtime mode 与 dummy-run 接口合同
-
-- 触发：平台 runner 覆盖 `dummy_run` 或接收 `cudagraph_runtime_mode`，而共享 runner 新增运行时参数或需要校验复合 runtime mode。
-- 强制：平台 override 必须保留共享签名中的 `randomize_inputs` 默认值并将其传给 `maybe_randomize_inputs`；runtime mode 必须调用 `is_valid_runtime_mode()` 判断当前实例是否有效。
-- 禁止：通过实例调用返回集合的 `valid_runtime_modes()` 冒充实例有效性校验，或因共享签名新增可选参数而让平台 override 产生接口漂移。
-- 验收：对 base NPU runner 与 generation override 分别覆盖 `randomize_inputs` 的默认和显式路径，并用包含 `FULL_DECODE_ONLY` 等复合模式的正负用例断言 `is_valid_runtime_mode()` 的校验结果和签名 parity。 ^[PR #6096]
-
-### EXEC-11a — 连续 AR 音频侧路必须保持 fp32、上下文与正常终止
-
-- 触发：vLLM-native AR 模型在每个 token/patch 旁路执行 DiT 或 flow-matching 采样、连续声码器解码，并通过 Omni multimodal output 输出增量音频。
-- 强制：Euler/ODE 累积状态保持 fp32，仅将 DiT matmul 输入置为模型 dtype；跨 patch 保留 causal decoder 的 streaming window，并在模型停止或容量边界通过正常 stop 信号前 flush lookahead；输出按 step 发 delta audio，并保留 `meta.sparse_audio` 等路由标记。
-- 禁止：以 bf16 作为多步积分默认累积 dtype；每个 patch 独立零填充解码；容量耗尽时 raise 使 engine 失效；停止时丢弃 decoder 尾部，或让 scaffold hidden 通过默认 multimodal merge 混入音频。
-- 验收：跨两次 engine restart 做 bit-identical/确定性探针，做跨 patch 首词与边界上下文验证；将容量缩小后确认请求正常截断且同一 engine 的下一次 generate 仍成功，并断言逐步 delta 合并后只有目标音频张量。^[PR #4765]
-
-### EXEC-11b — codec 音频流必须由逐请求帧账本驱动
-
-- 触发：native-AR 音频模型逐步产生多头 codec codes，按 chunk 解码并通过 sparse multimodal output 交付增量 waveform 时。
-- 强制：按 request id 保存 frame history 与 `emitted_frames` 账本；仅提交有效音频 frame；每个 decode window 带 lookback 并在裁剪后用实际 decode 结果推导 samples-per-frame；以原 request id 排队增量 payload，在 STOP 或预算最后一步、request 仍在输出 batch 时完成最终 flush，并保留 `meta.sparse_audio`。
-- 禁止：在裸 chunk 边界解码、假定标称帧率或固定 hop、每帧解码或每次发送完整历史；把尾部音频放进 finished cleanup；让已离开输出 batch 的 request 继续产生不可路由 payload，或以 pooler/hidden state 充当音频。
-- 验收：CPU codec stand-in 覆盖跨 first/steady chunk 边界的完整帧拼接、lookback 和 partial final chunk；真实 runner 覆盖 mixed requests、sparse routing、预算尾部与 cleanup；GPU smoke 断言 waveform 样本数等于 committed frames 的实际 frame ledger。 ^[PR #5666]
-
-### EXEC-12a — ROCm 分页注意力必须走 packed KV 的兼容 varlen 路径
-
-- 触发：修改 `vllm_omni/experimental/ar_diffusion/kv_cache/paged_attention.py` 的 ROCm 分页注意力、AITER/`flash_attn` varlen kernel、`block_table` 映射或 KV block layout。
-- 强制：ROCm 路径必须避开 CUDA 专用的 `vllm.vllm_flash_attn` 接口，优先解析 AITER、再回退到 `flash_attn`；依据每个请求的 `seq_lens` 构造 `cu_seqlens_k`，在 device 上按 `block_table` gather 可见 KV 为 packed tensors，并使用匹配的 query offsets、最大长度、`softmax_scale` 和 `causal` 参数调用 `flash_attn_varlen_func`。
-- 禁止：复用 CUDA 专用的 `seqused_k`/`fa_version` 参数合同；直接把不兼容的 ROCm paged kernel 用于 AR-Diffusion 的 frame-aligned blocks；依赖 ROCm kernel 对 `block_table` 的隐式支持；丢失逐请求长度或把 KV gather 到 CPU 后再调用 kernel。
-- 验收：在 ROCm GPU 上覆盖不同 history/action 长度、block table、请求长度和 `commit_current` 组合，与 dense reference 校验数值和输出 shape；分别验证 AITER 与 `flash_attn` fallback，确认 HIP 路径不导入 `vllm.vllm_flash_attn`，并确认 CUDA/CPU 路径行为不变。 ^[PR #5886]
-
-### EXEC-13a — NPU 模型补丁必须由生产初始化路径注册并可回归
-
-- 触发：在 NPU platform 初始化中加入模型专有 monkey patch、融合算子或其他必须全局启用的 model hook。
-- 强制：把 hook 封装成幂等的 `apply_*_patch()`，在 `adapt_patch(is_global_patch=True)` 完成后由生产初始化路径显式调用；注册必须只指向目标模型 consumer，并保留非 NPU和其他模型路径。测试必须验证生产注册链，而不只直接调用 helper。
-- 禁止：依赖 import side effect 或手工调用 helper 代替平台注册；只覆盖 patched function 的数值而不验证注册实际生效；把模型专有 patch 扩大到 MiniMax H3 DiT 或所有 NPU 模型。
-- 验收：从 NPU 平台初始化/注册入口运行测试，断言目标 Qwen3-VL text encoder 的 consumer 已替换且重复初始化不重复 patch；随后用真实 consumer 覆盖至少一个 BNSD fast path、一个 BSND fallback 和 batched M-RoPE。^[PR #6061]
