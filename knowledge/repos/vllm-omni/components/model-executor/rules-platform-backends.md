@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #5886", "PR #6061", "PR #6096", vllm_omni/platforms/, "PR #5604"]
+sources: ["PR #5886", "PR #6061", "PR #6096", vllm_omni/platforms/, "PR #5604", "PR #6293"]
 confidence: high
 ---
 
@@ -41,4 +41,11 @@ confidence: high
 - 强制：图缓存 key 必须同时包含 operation、缓存模式、所有输入的完整 shape、dtype 和 device；首次匹配调用先 eager 预热，再使用 vLLM global graph pool 捕获，后续重放前把当前值复制到静态输入，并在请求状态或 streaming cache 接管前 clone 持久化输出。Python metadata、CPU 频率张量、H2D、随机数和动态 state 必须留在 eager 边界；捕获失败后必须停止该 stage 进程。
 - 禁止：捕获整个请求编排或包含动态 Python/RNG 状态的路径；使用无界 shape cache、绕过 global graph pool、在 nested capture 中重放、复用会被下一次重放覆盖的输出，或吞掉 capture、patch setup、SDPA context 的异常后继续运行。
 - 验收：CPU/mock 测试覆盖 exact-signature dispatch、cached/uncached bucket、global graph pool、persistent-output ownership、capture failure fail-stop 和异常传播；A3 硬件测试分别比较 eager 与 uncached/cached NPUGraph 的输出、shape 和 cache，并核对图数量上限与 runtime preconditions。^[PR #5604]
+
+## EXEC-13c — NPU 模型补丁必须避开平台构造期的 diffusion 导入回环
+
+- 触发：NPU 平台注册模型专有 monkey patch，且该 patch 包会导入 diffusion pipeline/data 或依赖已完成初始化的平台状态。
+- 强制：平台构造阶段只完成轻量、全局且无 diffusion 回环的 patch；将会加载模型 encoder/pipeline 的 patch 延迟到 `init_diffusion_model_runner_runtime`，并在 diffusion pipeline 加载前、平台对象已建立后，按既有顺序显式应用所有相关 patch。注册入口仍须幂等且只作用于目标 consumer。
+- 禁止：在 NPU platform `__init__` 中导入或执行会经 `pipeline_registry` → `DiffusionOutput` 回环的模型 patch；依赖 import side effect；只移动一个 patch 而让同一模型的相关 patch 仍在过早阶段加载；把 NPU 时序修复外推为所有平台的通用行为。
+- 验收：静态或子进程测试证明平台构造不会加载 MiniMax-H3 encoder/diffusion data，runtime hook 在 pipeline 加载前调用目标 patch 且保留其他 patch；验证重复初始化不重复 patch，并用真实 NPU consumer 覆盖 patch 生效路径。^[PR #6293]
 

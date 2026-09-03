@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ d7216ef5`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ 3c6648d8`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -45,7 +45,7 @@ OMNI_PIPELINES 46→51，deploy 71→79。新增 AR 家族是 `audex`；diffusio
 `minimax_h3`，同时 LTX-2/LTX-2.3 的五个旧 registry names 合并为两个入口。新增
 pipeline keys 是四个 Audex 模式和 `nemotron_labs_audex` alias；deploy 新增八个
 Audex files 与 `qwen3_omni_moe_thinking.yaml`，删除 `minicpmo_4_5_batching.yaml`。
-本次相对 `2fdbf223` 本轮记录 PR #4499 为非流式 `/v1/audio/speech` 原始音频响应增加 token usage headers 的 serving 规则；文档更新和测试变更不纳入组件知识。不能据此推断 streaming raw-audio 响应支持同样 headers，或 diffusion-mode speech server 会发出这些 headers。
+本次相对 `d7216ef5` 本轮将配置包的延迟导出与 NPU 模型补丁时序写入现有组件规则；测试文件归 CI/testing owner，未写入规则页。不能据此推断所有平台或所有模型都存在相同的导入循环，或仅凭测试通过就证明完整 NPU 启动链路已覆盖。
 
 ## AR/omni 模型族（29）
 
@@ -88,8 +88,8 @@ voxtral_tts、wan2_2_ti2v、nemotron_labs_audex、indextts2_5
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from 2fdbf223 \
-  --to d7216ef5 \
+  --from d7216ef5 \
+  --to 3c6648d8 \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```
