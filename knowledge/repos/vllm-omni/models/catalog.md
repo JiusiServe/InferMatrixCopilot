@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ 208c6776`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ e6773601`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -45,7 +45,7 @@ OMNI_PIPELINES 46→51，deploy 71→79。新增 AR 家族是 `audex`；diffusio
 `minimax_h3`，同时 LTX-2/LTX-2.3 的五个旧 registry names 合并为两个入口。新增
 pipeline keys 是四个 Audex 模式和 `nemotron_labs_audex` alias；deploy 新增八个
 Audex files 与 `qwen3_omni_moe_thinking.yaml`，删除 `minicpmo_4_5_batching.yaml`。
-本次相对 `fcf10853` 本轮将 GLM-TTS 流式/分块因果路径中 Euler 循环的固定条件 hoist 合同收录到 model-executor 规则，新增 EXEC-8a 并补充 PR #5068 来源。该规则不表示所有模型或所有采样路径都应采用相同优化，也不保证不同硬件和并发度下都有相同收益。
+本次相对 `208c6776` 本轮将 Cosmos3 默认启用 guardrails 所需的 `cosmos-guardrail` 依赖与缺包时的 fail-closed 错误合同沉淀到 Cosmos3 规则页。该规则不表示 HF authentication、模型质量、性能或其他 Cosmos3 变体能力已得到验证。
 
 ## AR/omni 模型族（29）
 
@@ -88,8 +88,8 @@ voxtral_tts、wan2_2_ti2v、nemotron_labs_audex、indextts2_5
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from fcf10853 \
-  --to 208c6776 \
+  --from 208c6776 \
+  --to e6773601 \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```

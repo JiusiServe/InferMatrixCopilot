@@ -1,10 +1,10 @@
 ---
 title: "Cosmos3 规则"
 created: 2026-07-20
-updated: 2026-09-02
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #4657", "PR #5001", "PR #5634", "PR #6049", docs/features/session_state_manager.md, recipes/cosmos3/Cosmos3-Nano.md, vllm_omni/diffusion/models/cosmos3/, vllm_omni/model_extras/cosmos3.py, vllm_omni/model_extras/registry.py, vllm_omni/experimental/world_models/adapters/state_cosmos3_adapter.py, vllm_omni/platforms/rocm/platform.py, tests/cosmos3/test_session_memory_equivalence.py, tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py]
+sources: ["PR #4657", "PR #5001", "PR #5634", "PR #6049", docs/features/session_state_manager.md, recipes/cosmos3/Cosmos3-Nano.md, vllm_omni/diffusion/models/cosmos3/, vllm_omni/model_extras/cosmos3.py, vllm_omni/model_extras/registry.py, vllm_omni/experimental/world_models/adapters/state_cosmos3_adapter.py, vllm_omni/platforms/rocm/platform.py, tests/cosmos3/test_session_memory_equivalence.py, tests/diffusion/models/cosmos3/test_cosmos3_pipeline.py, "PR #6107"]
 confidence: high
 ---
 
@@ -103,3 +103,10 @@ confidence: high
 
 共享 RNG/graph 规则见 [Diffusion rules](../../components/diffusion/rules.md)；公开证据分层见
 [model adaptation guardrails](../../review/guides/model-adaptation-guardrails.md)。
+
+## COSMOS-4a — 默认 guardrails 必须具备依赖并在缺包时 fail closed
+
+- 触发：Cosmos3 以默认开启的 guardrails 加载或运行，或修改 Cosmos3 guardrail 依赖与缺包处理。
+- 强制：在公共依赖中声明 `cosmos-guardrail>=0.3.1`，使标准 vLLM-Omni 镜像具备默认 guardrails 所需包；guardrail import 失败时必须立即抛出明确的 `ValueError`，说明 guardrails 已启用但不可用、缺少 `cosmos-guardrail`，并保留 NVIDIA Open Model License Agreement 合规提示。
+- 禁止：依赖用户手动安装额外包才能获得默认行为；缺少 guardrail 包时静默继续、把状态描述为用户主动禁用了 safety checker，或把安装成功外推为 HF authentication、模型质量和其他变体能力已验证。
+- 验收：干净环境安装公共 requirements 后 `cosmos-guardrail` 可导入，Cosmos3 默认 guardrails 路径可进入模型运行；模拟缺少该包时启动/构造 fail fast，错误文本同时包含包名和许可证链接。^[PR #6107]
