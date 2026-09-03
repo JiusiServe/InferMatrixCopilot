@@ -1,10 +1,10 @@
 ---
 title: "Diffusion upstream 兼容规则"
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5976", vllm_omni/diffusion/compile.py, vllm_omni/diffusion/distributed/parallel_state.py, vllm_omni/diffusion/layers/fused_moe.py, vllm_omni/diffusion/models/diffusers_adapter/pipeline_diffusers_adapter.py, vllm_omni/quantization/_copy_missing_attrs.py, tests/diffusion/test_compile.py, tests/e2e/accuracy/test_qwen_image.py]
+sources: ["PR #5976", vllm_omni/diffusion/compile.py, vllm_omni/diffusion/distributed/parallel_state.py, vllm_omni/diffusion/layers/fused_moe.py, vllm_omni/diffusion/models/diffusers_adapter/pipeline_diffusers_adapter.py, vllm_omni/quantization/_copy_missing_attrs.py, tests/diffusion/test_compile.py, tests/e2e/accuracy/test_qwen_image.py, "PR #6287"]
 confidence: high
 ---
 
@@ -31,3 +31,11 @@ confidence: high
   以进程能启动替代 Cache-DiT block discovery 验证。
 - 验收：打开/关闭 Cache-DiT 都能匹配目标 block；测试冻结参数名与 return annotation，并让真实 lazy
   compile error 失败而非静默降级。^[PR #5976]
+
+## DIFF-4q — 内部 diffusion LoRA 导入必须避开兼容包初始化
+
+- 触发：修改 diffusion LoRA 的 `LoRAConfig` 导入、ROCm 启动补丁或可能在 `vllm_omni` 初始化期间加载 diffusion registry 的依赖图。
+- 强制：内部 diffusion 模块必须从 canonical upstream 路径 `vllm.config.lora` 导入 `LoRAConfig`；`vllm_omni.config.lora` 仅保留为对外兼容 re-export，并避免在 diffusion 模块初始化期间触发 `vllm_omni.config.__init__`、pipeline registry 或尚未完成初始化的 diffusion 模块。
+- 禁止：假设导入兼容包的子模块不会执行父包初始化；在 ROCm platform patch 已进入 diffusion registry 时重新引入该兼容导入；把此修复泛化为改变 `LoRAConfig` 类型或配置语义。
+- 验收：ROCm 启动/pytest collection 在 diffusion 模块完成初始化前不再出现 circular-import；断言两个导入路径解析为同一 `LoRAConfig` 类，并回归 LoRA manager/utils 的正常导入及 CUDA/XPU 初始化路径。^[PR #6287]
+
