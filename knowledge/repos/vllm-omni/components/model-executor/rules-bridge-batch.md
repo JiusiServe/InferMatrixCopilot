@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #3422", "PR #3642", "PR #4795", "PR #5073", "PR #5074", "PR #5310", "PR #5792", "PR #5842", "PR #5957", "PR #5976", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/sched/output.py, vllm_omni/utils/mm_outputs.py, "PR #4765", "PR #5666", "PR #5491"]
+sources: ["PR #3422", "PR #3642", "PR #4795", "PR #5073", "PR #5074", "PR #5310", "PR #5792", "PR #5842", "PR #5957", "PR #5976", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/sched/output.py, vllm_omni/utils/mm_outputs.py, "PR #4765", "PR #5666", "PR #5491", "PR #6186"]
 confidence: high
 ---
 
@@ -131,4 +131,11 @@ Direct 代码快速入口；loader 与 checkpoint 合同留在该页的 `EXEC-2x
 - 强制：以不可变且深拷贝隔离的 `ARDiffusionTickRequest` 作为快照；`session_id` 跨 chunk 稳定，`event_id` 在会话内单调，`chunk_index` 连续，`request_id` 只标识一个 chunk。通过 `sampling_params.extra_args["ar_diffusion_tick"]` 传输，输出在 `multimodal_output["metadata"]["ar_diffusion"]` 返回；协议 request ID 必须与 `AsyncOmni` 的内部 engine routing ID 分离。只有输出元数据与提交快照完全一致后，才能提交事件、prompt、controls 和 chunk 状态；模型失败、元数据不匹配或 reducer commit 失败都必须转为 FAILED 并关闭 worker，后续只能显式 reset 或 close。
 - 禁止：用内部 engine request ID 冒充协议 request ID；在模型输出验证前确认事件已应用；原地重试失败 chunk；让通用 session 层解析 LingBot camera/action schema；在没有 session-affine routing 时启用多副本 AR stage；把内部 tick contract 当作公共 HTTP/WebSocket 协议。
 - 验收：覆盖乱序/重复/过期事件、队列背压、交错 `A0 -> B0 -> A1`、ID 分离、缺失或错误元数据、reducer commit 失败、失败后 reset、cleanup 失败 tombstone 与 close retry；同时验证 consumer 对非单副本 stage fail closed，并断言普通 `AsyncOmni` 输出 ID 合同不变。^[PR #5491]
+
+## EXEC-1m — CFG 成对请求必须按 identity 保持 batch 行步进一致
+
+- 触发：模型使用 classifier-free guidance，以 `cond`/`uncond` 两个 engine row 解码，或在 batch compaction、prefill/decode 与 request reorder 下维护成对状态。
+- 强制：通过 `cfg_pair_id` 或注册的 companion suffix 从 external/user request identity 建立 pair；在 Scheduler 构造前安装通用 pairing patch；不完整 pair 必须等待，完整 pair 保持相邻并在每次 schedule 后 equalize progress、一起结束，同时按 pair/request id 保存状态而不是按 batch row 保存。
+- 禁止：用 row adjacency 或 internal UUID 推断 pair；让 prefix-cache 不对称命中、chunked prefill 或单边 preemption 使两行错位；只结束一方、把 per-request seed/position metadata 广播给整批，或让非 CFG stage 被无条件改写。
+- 验收：覆盖 suffix/显式 pair id、companion 缺失与到达、row reorder/compaction、chunked prefill、prefix-cache control、一起 finish、非 CFG no-op 和 patch 安装时序；同批不同 seed 与位置必须保持各自归属。 ^[PR #6186]
 

@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["PR #4222", "PR #4795", "PR #5604", "PR #5842", "PR #6082", vllm_omni/deploy/]
+sources: ["PR #4222", "PR #4795", "PR #5604", "PR #5842", "PR #6082", vllm_omni/deploy/, "PR #6186"]
 confidence: high
 ---
 
@@ -69,3 +69,11 @@ confidence: high
 - 验收：逐一解析三个 profile，断言 connector extra 不含两个 Code2Wav key，NPU 展开结果包含 Stage 0/1 的 `PIECEWISE`、Stage 2 的 `enforce_eager: true`、`code2wav_enable_npu_graph: true` 和 `code2wav_max_npu_graphs: 32`，并覆盖开关关闭和缓存上限为 0 的路径。^[PR #5604]
 
 部署 YAML 的展开顺序见 [deploy-yaml](deploy-yaml.md)；stage 执行合同见 [model-executor 规则](../model-executor/rules.md)。
+
+## CONF-5h — 多组件 checkpoint 必须闭合 root 身份、stage 子目录与默认部署
+
+- 触发：新增由多个子目录组成、root `config.json` 自报 composite architecture，或需要按 stage 加载不同 checkpoint/tokenizer 子目录的模型，并同步新增 pipeline、默认 deploy 或架构注册。
+- 强制：闭合 checkpoint `model_type`、pipeline registry key、`model_arch`、`default_deploy_config_name` 与 registry architecture；每个 stage 明确 `model_subdir`/`tokenizer_subdir` 和实际权重根目录，最终 stage config 保留 CFG 等 engine gate 所需声明。
+- 禁止：只依赖路径 basename、文件存在或 `trust_remote_code` 推断 pipeline；让 root architecture 覆盖 stage architecture；让单卡与多卡 profile 复制不同 topology 或行为合同。
+- 验收：用 bare root config、无显式 deploy 的 startup 和 structured/legacy 路径断言 pipeline、默认 deploy、stage 子目录、architecture 与 sampling-extra key 均进入最终逐 stage config；单卡与双卡配置除设备 placement 外保持一致。 ^[PR #6186]
+

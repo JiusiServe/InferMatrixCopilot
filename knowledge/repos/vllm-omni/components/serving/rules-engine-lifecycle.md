@@ -4,7 +4,7 @@ created: 2026-09-03
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/api_server.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #5491", "PR #6033", "PR #5272"]
+sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/api_server.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #5491", "PR #6033", "PR #5272", "PR #6186"]
 confidence: high
 ---
 
@@ -114,6 +114,13 @@ confidence: high
 - 禁止：把新的 model-type 分支或采样 mutation 加回 `serving_speech.py`；让 adapter 直接污染 engine 的共享默认 sampling 参数；保留没有 adapter 支撑的 legacy detector，或用只验证 dispatch 到达的测试替代最终 `SamplingParams` 结果断言。
 - 验收：覆盖 adapter registry/detection 无歧义、`extra_params -> apply_sampling_overrides -> seed` 顺序、无与有 `max_new_tokens`、CosyVoice3/GLM-TTS 动态边界、Ming stop token、Audex request-id/CFG/TTA 以及共享默认参数不变；测试必须检查传给 engine 的实际 sampling 参数。 ^[PR #5272]
 
+### SERV-5j — TTS adapter 必须承载模型专属请求合同与采样覆盖
+
+- 触发：speech endpoint 接入没有 speaker/reference-audio 的 text-to-music 模型，或模型的必填字段、采样控制和普通 TTS 合同不同。
+- 强制：注册 adapter 并由 adapter metadata 完成 detection；adapter 负责 `validate()`、prompt/token-id 构造和 `apply_sampling_overrides()`，明确 `input` lyrics、`instructions` caption、固定 sampling、长度上限及被拒绝的 TTS 字段，shared serving 只负责公共 dispatch。
+- 禁止：在 `serving_speech.py` 增加 model-type 分支；静默忽略 `voice`、reference audio、temperature 或 `stream` 等不支持字段；把无 speaker 模型套用普通 TTS 的 voice 或 temperature 语义。
+- 验收：通过真实 adapter detection 和 `/v1/audio/speech` 请求覆盖缺失/空 lyrics、缺失/空 caption、unsupported fields、长度边界、tokenizer 校验与非流式输出，并断言送入 engine 的实际 prompt、sampling 参数和 model type。 ^[PR #6186]
+
 ### SERV-6a — full-duplex 首次 stage submit 必须预热 async-chunk topology
 
 - 触发：full-duplex stage port、双工会话、async-chunk 或 stage fence 发生变化。
@@ -168,6 +175,13 @@ confidence: high
 - 强制：prewarm 失败必须发送 request-scoped、non-fatal 的 `ErrorMessage`（400、`BadRequestError`），完成 abort cleanup 并关闭 duplex session；调用方收到失败结果后立即停止，不得继续写 fence、submit timestamp 或重新注册 running counter。
 - 禁止：用 `fatal=True` 将单请求输入错误升级为 engine-wide failure；cleanup 已移除 request state 后仍返回成功或继续 duplex bookkeeping；让一个 request 的 prewarm 失败拖垮同批其他请求。
 - 验收：覆盖缺失 `prompt_token_ids`、downstream submit 失败和 duplex submit fall-through，断言错误只归属目标 request、engine/thread 仍存活、下游未被错误预热，且无 fence、时间戳、counter 或 session 残留。^[PR #6033]
+
+### SERV-6f — 必需 CFG companion 的构造与 admission 必须原子完成
+
+- 触发：engine 为 CFG 请求展开 companion，且 guidance 是模型必需能力，或 companion 需要经过 input processor 才能获得完整 Omni request metadata。
+- 强制：先构造并处理全部 companions，再把 parent 和 companions 一起入队；处理后用 `upgrade_to_omni_request` 恢复 `additional_information`/`global_request_id` 等 Omni 字段；任一构造或处理失败都向调用方传播并保持队列无变化，非 CFG expansion 返回空列表并保留普通 admission。
+- 禁止：先 enqueue parent 再吞掉 companion 异常；只入队一侧、让 companion 丢失 external/global request identity，或在 Scheduler 建立后才安装 CFG pairing gate。
+- 验收：分别模拟 prompt expansion、input processing 和 tokenizer 失败，断言 parent/companion 均未入队；成功路径断言两者 metadata、ID suffix、sampling params 和 pair identity 完整；无 companion 的普通请求仍正常 admission。 ^[PR #6186]
 
 ### SERV-8a — 本地 stage launch 必须临时应用 runtime.env
 
