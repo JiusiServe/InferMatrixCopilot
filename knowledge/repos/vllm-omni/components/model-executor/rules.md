@@ -32,10 +32,10 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 | `core` | 每次 model-executor 审查 | `EXEC-1a` |
 | `strict-stage-config` | stage schema、projection、known fields | `EXEC-3a` |
 | `bridge-batch` | runtime info、跨 stage payload、batch、request RNG | `EXEC-1a`–`EXEC-1i`，见 [跨 stage bridge 与 batch 合同](rules-bridge-batch.md) |
-| `loader-contract` | dtype、checkpoint config 获取、loader、fused shard 拼装 | `EXEC-2a`, `EXEC-2b` |
-| `async-output` | AR async output、snapshot/live state、平台与 guard/fallback | `EXEC-5a` |
+| `loader-contract` | dtype、checkpoint config 获取、loader、fused shard 拼装 | `EXEC-2a`–`EXEC-2c`，见 [loader 合同](rules-loader-contract.md) |
+| `async-output` | AR async output、snapshot/live state、平台与 guard/fallback | `EXEC-5a`, `EXEC-5b` |
 | `mtp-graph` | Talker-MTP FULL graph、平台能力与 tri-state fallback | `EXEC-4c` |
-| `image-task-envelope` | shared image task example 或 `model_extras` prompt builder | `EXEC-6a` |
+| `image-task-envelope` | shared image task example 或 `model_extras` prompt builder | `EXEC-6a`–`EXEC-6b`，见 [image task envelope 合同](rules-image-task-envelope.md) |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `EXEC-0a`, `EXEC-0b` |
 
 ## 严格配置校验
@@ -129,6 +129,13 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
   runner 分开：CUDA/ROCm 已验证，XPU/MUSA 可能进入共享 GPU path 但未验证，Ascend NPU 的
   独立 runner 仍同步 materialize。 ^[PR #5610]
 
+### EXEC-5b — NPU KV connector finalize 必须按 PP 所有权延迟
+
+- 触发：NPU AR 或 generation runner 在 speculative decoding、pipeline parallel 或 `broadcast_pp_output` 场景调用 `maybe_get_kv_connector_output`。
+- 强制：仅当 `self.speculative_config is not None` 且当前 rank 是 `get_pp_group().is_last_rank` 或 `self.broadcast_pp_output` 为真时设置 `defer_finalize=True`；AR 与 generation runner 必须保持相同条件。
+- 禁止：仅依据 speculative decoding 开启状态就在所有 PP rank 延迟 finalize，或继续使用不区分 PP 所有权的 `clear_kv_metadata` 反向条件。
+- 验收：覆盖无 speculative config、speculative config、last rank、非 last rank 和 `broadcast_pp_output` 的组合，断言两个 runner 传入 connector 的 `defer_finalize` 值及最终 finalize 时机一致。 ^[PR #6096]
+
 ## Stage 并行度和设备容量必须一起验收
 
 - 触发条件：修改或排查全局 CLI、per-stage override、deploy YAML、平台 overlay、stage 并行度、`runtime.devices`、设备映射或 worker 启动。
@@ -147,72 +154,6 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 Stage 拓扑错误的最小充分源码证据只有三段：一处最终配置日志加全局/per-stage 合并函数；一处启动前容量校验及其完整异常控制流；一处与日志一致的 worker 失败点。三段一致即可决定“配置触发 + fail-fast 缺陷”的主要修复位置，不再为首次结论读取 config factory、模型 pipeline、完整 deploy、spawn 实现或 tag diff；只有三段之间发生冲突时才补这些文件。
 
 ## 跨 stage bridge 与 batch 合同
-
-### EXEC-5b — NPU KV connector finalize 必须按 PP 所有权延迟
-
-- 触发：NPU AR 或 generation runner 在 speculative decoding、pipeline parallel 或 `broadcast_pp_output` 场景调用 `maybe_get_kv_connector_output`。
-- 强制：仅当 `self.speculative_config is not None` 且当前 rank 是 `get_pp_group().is_last_rank` 或 `self.broadcast_pp_output` 为真时设置 `defer_finalize=True`；AR 与 generation runner 必须保持相同条件。
-- 禁止：仅依据 speculative decoding 开启状态就在所有 PP rank 延迟 finalize，或继续使用不区分 PP 所有权的 `clear_kv_metadata` 反向条件。
-- 验收：覆盖无 speculative config、speculative config、last rank、非 last rank 和 `broadcast_pp_output` 的组合，断言两个 runner 传入 connector 的 `defer_finalize` 值及最终 finalize 时机一致。 ^[PR #6096]
-
-### EXEC-2a — loader 的 dtype 与 config 获取必须显式、最小化
-
-- 触发：模型 loader 构造 text encoder、VAE、transformer 或只读取 checkpoint config。
-- 强制：所有子模块显式接收目标 dtype；读取单个 config 使用精确文件/metadata 获取路径。
-- 禁止：为读取 `config.json` 同步下载整套权重；依赖默认 fp32 后再靠下游 cast 修补。
-- 验收：mock 下载层证明只请求目标 config，loader 测试断言各子模块 dtype；真实 smoke
-  记录峰值显存和 dtype。Krea 2 的具体约束见
-  [Krea 2 规则](../../models/krea2/rules.md)。 ^[PR #4730]
-
-### EXEC-2b — fused shard 必须按 source 完整性与布局数值闭环
-
-> H3 text encoder 当前有 fused QKV 与 gate/up owner；Qwen3 code predictor 仍使用分离
-> projection，其 PR #4958 fusion 已由 PR #5777 回退，不能把 H3 现状外推给 Qwen。
-
-- 触发：准备合并 q/k/v、gate/up 等 projection，修改 HF shard 映射、wrapper/talker
-  loader、packed projection TP plan 或平台 override。
-- 强制：weight 与可选 bias 都按 forward split 的同一顺序数值拼装；部分 shard 和
-  整组 shard 缺失都硬失败。bookkeeping 必须按 source shard id；expected 集合从实际 fused
-  owner 预置，才能捕获零 shard，不能以任一 source 命中的 target name 代表完整。所有声明
-  同一 fused module 的 consumer 必须委托给共享 loader，wrapper 并恢复 returned loaded-name
-  的模型前缀；平台 override 同步使用新
-  fused 属性与共享 split helper。
-- 禁止：不得用逐 tensor `default_weight_loader` 绕过 fused assembler；不得只记录 skipped
-  shard 后让随机初始参数继续；不得只用 shape 或 returned-name 断言顺序正确。GQA
-  下错误偏移仍可形状合法。plain packed `nn.Linear` 不得声明泛化 colwise TP；
-  未有 TP-aware packing/loading/split 与 TP=2 测试时，TP plan 保持空。
-- 验收：数值比较 fused 参数与 `cat([q,k,v])`/`cat([gate,up])`，覆盖 bias、
-  部分/整组缺 shard、每个 consumer 的委托和前缀；以非等 q/KV width 证明 split 能识别
-  GQA 错序。平台测试或静态 guard 证明不再引用已删除的 projection 属性。H3 eager text
-  encoder 还须对任何未加载 plain retained parameter 在启动时硬失败；unknown checkpoint key
-  可继续告警，因为它不会留下 model parameter 未初始化。^[PR #4958] ^[PR #5777] ^[PR #5824]
-
-### EXEC-2c — 多模块 checkpoint 载入必须按配置块与参数集闭环
-
-- 触发：模型 checkpoint 将主干 LM 与 DiT、patch encoder、vocoder、speaker encoder 等辅助模块拆分到不同配置块、文件或命名空间，或需要额外的 latent statistics 文件。
-- 强制：从 checkpoint 配置块构造并校验各模块尺寸；单次遍历权重迭代器，按每个模块的精确 `state_dict` key 集合路由，并分别处理 `llm.model.*`、辅助模块和非 safetensors 统计文件；记录各模块实际加载数与期望数。
-- 禁止：缺失配置块时静默套用其他 checkpoint 的默认值；以命中一个 target name 代表整组权重完整；让 speaker 权重落入 VAE catch-all；重复消费只能遍历一次的权重迭代器，或用默认初始化掩盖未加载参数。
-- 验收：对已验证 checkpoint 逐模块核对加载计数、无 missing/extra tensor 和预期 dtype；对缺失配置块、架构常量不匹配、部分 shard 及错误命名空间执行 fail-fast 测试，并确认推理前就暴露错误。^[PR #4765]
-
-### EXEC-6a — shared image example 先建 canonical envelope，model-extra 只做特化变换
-
-- 触发：修改 shared T2I/I2V example、`model_extras` prompt registry 或模型 prompt builder。
-- 强制：task runner 先构造完整 canonical dict：T2I 含 `prompt`、`modalities=["image"]`；I2V
-  另含 `modalities=["video"]` 与原样 `multi_modal_data`。只有 `negative_prompt is not None` 才写 key，
-  因而显式空字符串必须保留。registry 接收该 dict；无 model-specific builder 时 identity-return，
-  有 builder 时只翻译模型 token/template/mm kwargs。公共 online serving handler 不参与此离线 seam。
-- 禁止：pipeline 已负责 validation/normalization 时复制 generic builder；让 registry 从零重建 task
-  modality；用 truthiness 丢空 negative prompt；为每个模型复制 Python example。
-- 验收：canonical builder 覆盖 omitted/empty/value negative prompt 与 PIL media identity；registry
-  覆盖 Bagel、MammothModa2、Ming、VACE custom path及 unknown identity path；Cosmos3/LingBot
-  pipeline tests继续拥有模型专属 validation。^[PR #6049]
-
-### EXEC-6b — model_extras 必须声明模型专有参数与输出张量范围
-
-- 触发：新增或修改 `model_extras` 中模型专有请求参数、输出张量范围，或共享视频导出对不同 pipeline 输出合同的处理时。
-- 强制：按解析后的 `model_class_name` 在 registry 中声明 `extra_body_params` 与 `output_tensor_range`，通过公开 accessor 提供；消费者按整个视频的声明合同统一转换浮点张量，未声明模型保持 `negative_one_to_one` 默认行为。
-- 禁止：把模型专有选项散落到共享 runner 的通用参数或绕过 registry；按每帧当前最小值推断范围；把已是 `[0, 1]` 的模型输出再次按 `[-1, 1]` 映射。
-- 验收：registry 测试断言目标模型的 extra-body 参数和 `zero_to_one` 范围、普通 pipeline 的默认范围；覆盖单帧与 list-valued 视频的明确范围、混合正负值的统一转换，以及最终视频导出结果。 ^[PR #6076]
 
 ### EXEC-7a — Omni 输出必须是扁平的 RequestOutput 子类
 

@@ -1,7 +1,7 @@
 ---
 title: "Krea 2 规则"
 created: 2026-07-20
-updated: 2026-07-31
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, diffusion]
 sources: ["PR #4730"]
@@ -48,5 +48,5 @@ confidence: high
 - 验收：online e2e 从公开 endpoint 返回图像；capability matrix 每格绑定当前 head 的
   命令、环境和结果。 ^[PR #4730]
 
-共享 loader 合同见 [Model Executor EXEC-2a](../../components/model-executor/rules.md)；
+共享 loader 合同见 [Model Executor EXEC-2a](../../components/model-executor/rules-loader-contract.md#exec-2a-loader-的-dtype-与-config-获取必须显式最小化)；
 证据分层见 [model validation](../../review/guides/model-validation.md)。

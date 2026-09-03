@@ -1,0 +1,35 @@
+---
+title: "image task envelope 合同"
+created: 2026-09-04
+updated: 2026-09-04
+type: rule
+tags: [vllm-omni, components, model-executor]
+sources: ["PR #6049", "PR #6076", vllm_omni/model_extras/]
+confidence: high
+---
+
+# image task envelope 合同
+
+`image-task-envelope` 审查组的 `EXEC-6a`–`EXEC-6b`：shared image example 的 canonical envelope 与 `model_extras` 的模型专有参数声明。触发条件与其余审查组见 [model-executor 共享规则](rules.md) 的 Direct 代码快速入口。
+
+## EXEC-6a — shared image example 先建 canonical envelope，model-extra 只做特化变换
+
+- 触发：修改 shared T2I/I2V example、`model_extras` prompt registry 或模型 prompt builder。
+- 强制：task runner 先构造完整 canonical dict：T2I 含 `prompt`、`modalities=["image"]`；I2V
+  另含 `modalities=["video"]` 与原样 `multi_modal_data`。只有 `negative_prompt is not None` 才写 key，
+  因而显式空字符串必须保留。registry 接收该 dict；无 model-specific builder 时 identity-return，
+  有 builder 时只翻译模型 token/template/mm kwargs。公共 online serving handler 不参与此离线 seam。
+- 禁止：pipeline 已负责 validation/normalization 时复制 generic builder；让 registry 从零重建 task
+  modality；用 truthiness 丢空 negative prompt；为每个模型复制 Python example。
+- 验收：canonical builder 覆盖 omitted/empty/value negative prompt 与 PIL media identity；registry
+  覆盖 Bagel、MammothModa2、Ming、VACE custom path及 unknown identity path；Cosmos3/LingBot
+  pipeline tests继续拥有模型专属 validation。^[PR #6049]
+
+## EXEC-6b — model_extras 必须声明模型专有参数与输出张量范围
+
+- 触发：新增或修改 `model_extras` 中模型专有请求参数、输出张量范围，或共享视频导出对不同 pipeline 输出合同的处理时。
+- 强制：按解析后的 `model_class_name` 在 registry 中声明 `extra_body_params` 与 `output_tensor_range`，通过公开 accessor 提供；消费者按整个视频的声明合同统一转换浮点张量，未声明模型保持 `negative_one_to_one` 默认行为。
+- 禁止：把模型专有选项散落到共享 runner 的通用参数或绕过 registry；按每帧当前最小值推断范围；把已是 `[0, 1]` 的模型输出再次按 `[-1, 1]` 映射。
+- 验收：registry 测试断言目标模型的 extra-body 参数和 `zero_to_one` 范围、普通 pipeline 的默认范围；覆盖单帧与 list-valued 视频的明确范围、混合正负值的统一转换，以及最终视频导出结果。 ^[PR #6076]
+
+相关执行流见 [model-executor architecture](architecture.md)；跨 stage 合同见 [bridge/batch 规则](rules-bridge-batch.md)。

@@ -1,7 +1,7 @@
 ---
 title: "Repository skill contributor rules"
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, docs]
 sources: ["PR #6029", "PR #6046", .claude/skills/readme.md, .claude/skills/add-diffusion-model/SKILL.md, .claude/skills/add-tts-model/SKILL.md, .claude/skills/diffusion-perf-opt/SKILL.md, .claude/skills/precheck-pr/SKILL.md, .claude/skills/precheck-pr/references/checklists.md, .claude/skills/precheck-pr/references/examples-policy.md, .claude/skills/quantization/SKILL.md, .claude/skills/review-pr/SKILL.md, .claude/skills/vllm-omni-npu-upgrade/SKILL.md, .claude/skills/vllm-omni-test/SKILL.md, docs/contributing/README.md]
@@ -60,7 +60,7 @@ confidence: high
   文件名；model、checkpoint、vendor 或 family 专属的 prompt、request/output adaptation 与 launch
   config 必须回 production model module 或 `model_extras`，用户命令和验证证据进 task docs/recipe。
   两个 skill 必须引用同一份 canonical policy；shared image runner 的生产边界继续服从
-  [EXEC-6a](../components/model-executor/rules.md#exec-6a-shared-image-example-先建-canonical-envelopemodel-extra-只做特化变换)。
+  [EXEC-6a](../components/model-executor/rules-image-task-envelope.md#exec-6a-shared-image-example-先建-canonical-envelopemodel-extra-只做特化变换)。
 - 禁止：报告仅修改或删除的既有 model-specific example 债务；因文件名看似 generic 就接受内部只
   实现一个模型合同的脚本；复制 policy 到 reviewer workflow 后分别演化；把 skill blocker 描述为
   已有 CI gate。

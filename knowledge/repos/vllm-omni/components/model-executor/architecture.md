@@ -1,7 +1,7 @@
 ---
 title: "Model Executor 共享架构"
 created: 2026-07-10
-updated: 2026-09-02
+updated: 2026-09-04
 type: architecture
 tags: [vllm-omni, components, model-executor]
 sources: ["PR #5610", "PR #5744", "PR #6058", docs/design/feature/omni_async_output_materialization.md, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/musa/platform.py, vllm_omni/platforms/npu/_310p/patch/qwen3_tts.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/entrypoints/stage_utils.py, tests/worker/test_omni_connector_mixin.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py]
@@ -78,7 +78,7 @@ KV-only sender 可只保留 KV manager，不另外创建无 consumer 的 payload
 和 `gate_proj`/`up_proj`，HF 同名参数由普通 loader 直接写入，TP plan 也指向这些
 分离名称。只有 310P 平台 overlay 在 `prepare_qkv_weights()` 内为本地执行临时拼接
 QKV weight/bias；这不表示共享模型或 checkpoint loader 已改为 fused parameter。未来再引入
-共享 fusion 时的验收门禁见 [EXEC-2b](rules.md#exec-2b-fused-shard-必须按-source-完整性与布局数值闭环)。
+共享 fusion 时的验收门禁见 [EXEC-2b](rules-loader-contract.md#exec-2b-fused-shard-必须按-source-完整性与布局数值闭环)。
 
 ## 怎样判断问题归属
 

@@ -1,7 +1,7 @@
 ---
 title: "LingBot-Video 规则"
 created: 2026-08-10
-updated: 2026-09-02
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, diffusion]
 sources: [vllm_omni/diffusion/models/lingbot_video/request_utils.py, vllm_omni/diffusion/models/lingbot_video/image_condition.py, vllm_omni/diffusion/models/lingbot_video/pipeline_lingbot_video.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/model_extras/lingbot_video.py, vllm_omni/model_extras/registry.py, examples/offline_inference/text_to_image/text_to_image.py, examples/offline_inference/image_to_video/image_to_video.py, tests/diffusion/models/lingbot_video/test_request_utils.py, tests/diffusion/models/lingbot_video/test_image_condition.py, tests/diffusion/models/lingbot_video/test_pipeline_lingbot_video.py, tests/entrypoints/openai_api/test_image_server.py, tests/entrypoints/openai_api/test_video_server.py, "PR #5311", "PR #5976", "PR #6049", "Issue #5883"]
@@ -63,7 +63,7 @@ sources: [vllm_omni/diffusion/models/lingbot_video/request_utils.py, vllm_omni/d
   不对称也必须先统一 omitted 表示再修改。另须用同字段冲突值断言 extra_args 胜过 prompt，并用
   跨表示冲突冻结 merge 后的 `width/height` > `size` > `resolution+ratio`，同时保留只有 prompt 的
   offline control。Canonical envelope 的共享 ownership 与 identity/custom builder 测试见
-  [EXEC-6a](../../components/model-executor/rules.md#exec-6a-shared-image-example-先建-canonical-envelopemodel-extra-只做特化变换)。^[PR #5976] ^[PR #6049]
+  [EXEC-6a](../../components/model-executor/rules-image-task-envelope.md#exec-6a-shared-image-example-先建-canonical-envelopemodel-extra-只做特化变换)。^[PR #5976] ^[PR #6049]
 
 ## LBV-2a — TI2V 的 VLM 与 VAE 必须共享一次几何对齐及同一 RNG 顺序
 

@@ -1,7 +1,7 @@
 ---
 title: "MiniMax H3 加载规则"
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, diffusion]
 sources: ["PR #5706", "PR #5737", "PR #5824", vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py]
@@ -48,4 +48,4 @@ load 完成时 dynamic quantize，text encoder、VAE 和非 eligible projection 
   source 缺失、整组缺失和 plain parameter 缺失。真实 checkpoint 的 index/name coverage 可证明
   映射覆盖，但未执行真实完整加载时，不能声称 shape/dtype/full-load 已回归；本改动本身
   未改变 shape/dtype handling。共享 fused-loader 门禁见
-  [EXEC-2b](../../components/model-executor/rules.md#exec-2b-fused-shard-必须按-source-完整性与布局数值闭环)。^[PR #5824]
+  [EXEC-2b](../../components/model-executor/rules-loader-contract.md#exec-2b-fused-shard-必须按-source-完整性与布局数值闭环)。^[PR #5824]

@@ -27,7 +27,7 @@ confidence: high
 | FL2VA keyframe、Ref2VA mixed reference/时域限界、shape/output matrix | [MMH3-2a](rules-media.md#mmh3-2a-taskreferenceshape-与多输出必须作为一个输入矩阵维护) | `pipeline_minimax_h3.py` → `reference_video.py` |
 | media limit、typed/multipart reference、HTTP 400、temp source | [MMH3-2b](rules-media.md#mmh3-2b-media-ingress-在解码前限界request-错误保持-http-400) | `api_server.py` → `serving_video.py` → `reference_video.py` |
 | conditioned VAE、fixed seed、`fork_rng`、MUSA/device RNG | [MMH3-2c](rules-cache-task.md#mmh3-2c-conditioned-vae-的固定种子必须按实际设备隔离并恢复) | `pipeline_minimax_h3.py` condition encode caller → `vae.py::{encode_image,encode_video}` |
-| modular checkpoint、combined/partition task、两套 DiT、shared component | [MMH3-2d](rules-cache-task.md#mmh3-2d-modular-h3-的-task-selector-必须同步权重、能力与所有-dit-lifecycle) | model index discovery → startup task selection → task-specific transformer/cache lifecycle |
+| modular checkpoint、combined/partition task、两套 DiT、shared component | [MMH3-2d](rules-cache-task.md#mmh3-2d-modular-h3-的-task-selector-必须同步权重能力与所有-dit-lifecycle) | model index discovery → startup task selection → task-specific transformer/cache lifecycle |
 | request `quality`、lossless/high、dynamic Cache-DiT | [MMH3-2e](rules-cache-task.md#mmh3-2e-quality-映射只决定-request-的-cache-dit-目标) | request sampling → quality policy → request Cache-DiT runtime → denoise |
 | force-refresh hint、once/repeat、reinstall key | [MMH3-2f](rules-cache-task.md#mmh3-2f-force-refresh-hint-属于-active-profile-identity) | H3 `extra_args` validation → immutable cache config → installation key/refresh context |
 | TeaCache、FL2VA coefficients、0.17、combined/Ref2VA | [MMH3-2g](rules-cache-task.md#mmh3-2g-h3-teacache-只绑定-fl2va-校准与-request-state) | custom enabler → H3 extractor → module-resident hook state / per-generation reset |
@@ -169,7 +169,7 @@ confidence: high
 ## MMH3-1h — H3 必须预构造 packed RoPE table 并让缓存提取器复用
 
 - 触发：修改 MiniMax H3 的 `MiniMaxH3Rope`、`MiniMaxH3Attention`、SP prepare、TeaCache extractor 或 q/k fused 调用。
-- 强制：H3 先将 `MiniMaxH3Rope` 的 tiled frequency 输出交给 `_build_rope_table`，只从其前半段构造 cos/sin 并生成 BF16 packed table；该 table 必须在完整 packed sequence 上构造一次，经 `sp_prepare` 原样传给所有 DiT blocks 和 attention，TeaCache extractor 复用同一 helper。`rope_table=None` 的 token-refiner 路径继续只做 q/k RMSNorm；H3 的 128 维 head 只旋转前 96 维并保留后 32 维。共享算子边界以 [DIFF-1l](../../components/diffusion/rules.md#diff-1l) 为准。
+- 强制：H3 先将 `MiniMaxH3Rope` 的 tiled frequency 输出交给 `_build_rope_table`，只从其前半段构造 cos/sin 并生成 BF16 packed table；该 table 必须在完整 packed sequence 上构造一次，经 `sp_prepare` 原样传给所有 DiT blocks 和 attention，TeaCache extractor 复用同一 helper。`rope_table=None` 的 token-refiner 路径继续只做 q/k RMSNorm；H3 的 128 维 head 只旋转前 96 维并保留后 32 维。共享算子边界以 [DIFF-1l](../../components/diffusion/rules.md#diff-1l-fused-qk-rmsnorm-与-packed-rope-必须共享布局并保留-eager-fallback) 为准。
 - 禁止：把 H3 已复制的第二个 frequency half 当成独立 sin 输入，向 fused API 传 raw `rope_freqs`，或在每个 block、SP 分支和 TeaCache extractor 内重建不同 table；也不能把 token-refiner 的无 RoPE 路径误接到 fused table 调用。
 - 验收：模型合同测试须断言完整 sequence 的 table shape 与 `[cos, sin]` 数值、SP 透传 identity、DiT q/k 的 96/128 partial rotation 和 32 维 tail preservation，并覆盖 TeaCache extractor 与 `rope_table=None` 分支。当前 PR 新增的仅是独立 fused-kernel BF16 测试，没有 H3 集成或 TeaCache 数值回归，因此不能据此宣称模型端到端 parity。^[PR #5990]
 
