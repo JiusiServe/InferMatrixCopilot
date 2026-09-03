@@ -76,7 +76,7 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
   override 的 AR control，证明 input width 回退到该 stage text hidden size。Qwen2.5-Omni 当前为
   Thinker=`thinker_config`、Talker=`talker_config`、Code2Wav=`thinker_config`，thinker-only 也用
   `thinker_config`。最终 diff 只测 stage 名与 Qwen3 无 override control，未直接单测 Qwen2.5
-  Talker overridden-width runner path；该缺口见 [EXEC-1d](../model-executor/rules.md#exec-1d-cross-stage-embedding-buffer-必须按-ingress-width-分配)。^[PR #5073]
+  Talker overridden-width runner path；该缺口见 [EXEC-1d](../model-executor/rules-bridge-batch.md#exec-1d-cross-stage-embedding-buffer-必须按-ingress-width-分配)。^[PR #5073]
 
 ## 部署配置与资源预算
 

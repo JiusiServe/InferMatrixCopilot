@@ -1,7 +1,7 @@
 ---
 title: "Qwen-Omni 家族拓扑与性能结论"
 created: 2026-07-16
-updated: 2026-09-02
+updated: 2026-09-04
 type: architecture
 tags: [vllm-omni, models, qwen-omni]
 sources: ["PR #5073", "PR #5671", docs/design/qwen3_omni_tts_performance_optimization.md, docs/design/module/engine_orchestration.md, docs/design/module/stage_runtime.md, docs/design/module/archive/async_omni_architecture.md, vllm_omni/config/model.py, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen2_5_omni/pipeline.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/model_executor/models/registry.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/musa/platform.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/worker/gpu_model_runner.py]
@@ -38,7 +38,7 @@ sources: ["PR #5073", "PR #5671", docs/design/qwen3_omni_tts_performance_optimiz
   checkpoint metadata 与排除规则，不能泛化成所有 Qwen2.5 stage 或任意 FP4 checkpoint。
 - Qwen2.5 Talker 的外部 3584 width 在 forward 内投影到内部 896；shared runner 的 buffer 必须按
   `get_inputs_embeds_size()` 分配。Qwen3 在 preprocessing 已投影，未 override 时仍回退 internal
-  hidden size。共享门禁见 [EXEC-1d](../../components/model-executor/rules.md#exec-1d-cross-stage-embedding-buffer-必须按-ingress-width-分配)。
+  hidden size。共享门禁见 [EXEC-1d](../../components/model-executor/rules-bridge-batch.md#exec-1d-cross-stage-embedding-buffer-必须按-ingress-width-分配)。
 - 最终 head 的外部验证只覆盖单张 RTX PRO 6000 Blackwell、TP1、特定 vLLM/PyTorch/
   Transformers/FlashInfer 栈：full three-stage server 启动、仅 Thinker 选 NVFP4 kernel，以及
   deterministic text smoke。accuracy/perf 也是同一硬件上的 text-output workload，且相对 BF16

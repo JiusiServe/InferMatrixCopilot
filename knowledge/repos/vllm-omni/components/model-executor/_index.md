@@ -1,7 +1,7 @@
 ---
 title: "Model Executor"
 created: 2026-07-10
-updated: 2026-08-23
+updated: 2026-09-04
 type: index
 tags: [vllm-omni, components, model-executor]
 sources: []
@@ -35,3 +35,5 @@ sources: []
 |---|---|
 | 理解共享职责和阶段边界 | [architecture](architecture.md) |
 | 根据 PR 描述直达 stage config、runner preprocess、stage runtime、bridge/batch 或 loader 的规则组与第一批源码 | [rules 与代码地图](rules.md) |
+
+| runtime info、跨 stage payload、batch 与 request RNG 合同 | [跨 stage bridge 与 batch 合同](rules-bridge-batch.md) |

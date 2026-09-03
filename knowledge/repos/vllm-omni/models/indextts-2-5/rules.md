@@ -1,7 +1,7 @@
 ---
 title: "IndexTTS 2.5 规则"
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models]
 sources: ["PR #5957", vllm_omni/deploy/indextts2_5.yaml, vllm_omni/model_executor/models/indextts2/, vllm_omni/model_executor/stage_input_processors/indextts2.py, vllm_omni/entrypoints/openai/tts_adapters/indextts2.py, tests/model_executor/models/indextts2/, tests/entrypoints/openai_api/test_tts_adapter.py, tests/entrypoints/openai_api/test_serving_speech.py]
@@ -40,7 +40,7 @@ confidence: high
   uploaded voice 都覆盖。
 
 request-end device buffer 的共享生命周期只由
-[EXEC-1g](../../components/model-executor/rules.md#exec-1g-request-end-payload-延迟-d2h-必须先取得-device-snapshot)
+[EXEC-1g](../../components/model-executor/rules-bridge-batch.md#exec-1g-request-end-payload-延迟-d2h-必须先取得-device-snapshot)
 定义，本 owner 只声明 IndexTTS 2.5 是显式 request-end consumer。
 
 ## ITTS25-1c — 性能与质量证据必须保留可复核边界
