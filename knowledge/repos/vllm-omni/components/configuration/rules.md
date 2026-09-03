@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666", "PR #5036"]
+sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666", "PR #5036", "PR #4222"]
 ---
 
 # vLLM-Omni 配置开发门禁
@@ -235,6 +235,13 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 ### CONF-5e — MiniCPM-o 部署 profile 必须一致传递 CFM Graph 开关
 
 - 触发：修改 MiniCPM-o 4.5 bundled deploy YAML 或 Code2Wav connector extra 中的 CFM CUDA Graph 开关、缓存上限或配置传递。\n- 强制：`minicpmo_4_5.yaml`、`minicpmo_4_5_2gpu.yaml`、`minicpmo_4_5_3gpu.yaml` 和 `minicpmo_4_5_8x4090.yaml` 必须一致声明 `enable_cfm_graph` 与 `cfm_max_graphs`；当前默认值为 `true` 与 `32`，并传入 `MiniCPMO45Code2Wav` 的 `_cfm_graph_config` 和 `BatchedToken2Wav`。非 CUDA 设备仍必须回退 eager。\n- 禁止：只更新一个 deploy profile、依赖未记录的默认值，或把配置存在误认为 graph 已在非 CUDA 环境生效；不得把模型专有开关扩展成所有模型的通用配置合同。\n- 验收：解析四份 deploy 配置并断言开关和上限一致，追踪非默认值到 `_cfm_graph_config` 与 `BatchedToken2Wav`；覆盖开关关闭和非 CUDA fallback，并确认 stage topology 未发生额外变化。\n^[PR #6082]
+
+### CONF-5f — π0 的 checkpoint、registry 与 deploy 必须闭合为单 diffusion stage
+
+- 触发：新增或修改 π0 的 `pipeline_registry.py`、`vllm_omni/deploy/pi0.yaml`、`OmniDiffusionConfig` 的 `type: pi0` autodetect，或 `Pi0Pipeline` 的 stage declaration。
+- 强制：让 `pipeline: pi0`、`OMNI_PIPELINES["pi0"]`、`Pi0Pipeline` 与 checkpoint `type: pi0` resolver 闭合；deploy 配置只能声明一个 diffusion stage，最终输出类型为 `action`，并让 `policy_server_config` 的 `image_resolution`、`action_horizon`、`action_dim`、camera 数量与 `model_config` 保持一致。
+- 禁止：只凭 checkpoint 路径或文件存在推断 pipeline，额外添加 model-executor 层或多 stage topology，或让 OpenPI metadata 与最终 stage/model config 的动作尺寸不一致。
+- 验收：无显式 deploy 配置的 checkpoint autodetect 能解析到 `Pi0Pipeline`；解析最终逐 stage config 断言只有一个 diffusion stage、`final_output_type=action`，并核对 `pi0.yaml` 与 websocket handshake metadata 的关键字段一致。^[PR #4222]
 
 ### CONF-6a — MOSS-TTS-Local 部署必须采用官方采样参数
 

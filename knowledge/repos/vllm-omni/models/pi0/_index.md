@@ -47,3 +47,5 @@ confidence: high
 | 遇到什么 | 查看哪里 |
 |---|---|
 | 该模型的硬门禁规则 | 尚未沉淀；由逐 commit 同步命中该 owner 时在 `rules.md` 建立 |
+
+| 遇到 Pi0 专有的观测预处理、flow-matching、attention、动作输出或 OpenPI parity 问题 | [Pi0 硬门禁规则](rules.md) |

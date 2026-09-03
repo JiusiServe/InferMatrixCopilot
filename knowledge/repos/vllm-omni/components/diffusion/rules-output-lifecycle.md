@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5550", "PR #5864", "PR #5978", vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/inline_stage_diffusion_client.py, vllm_omni/diffusion/ipc.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/utils/media_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, tests/diffusion/test_async_output_worker.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_engine_cleanup.py, tests/diffusion/test_diffusion_ipc.py, tests/diffusion/test_inline_stage_diffusion_client.py, tests/diffusion/test_ipc_async.py, tests/diffusion/test_multiproc_engine_concurrency.py, tests/diffusion/test_result_pump.py, tests/entrypoints/openai_api/test_video_server.py, "PR #6023", "PR #5983"]
+sources: ["PR #5550", "PR #5864", "PR #5978", vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/inline_stage_diffusion_client.py, vllm_omni/diffusion/ipc.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/utils/media_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, tests/diffusion/test_async_output_worker.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_engine_cleanup.py, tests/diffusion/test_diffusion_ipc.py, tests/diffusion/test_inline_stage_diffusion_client.py, tests/diffusion/test_ipc_async.py, tests/diffusion/test_multiproc_engine_concurrency.py, tests/diffusion/test_result_pump.py, tests/entrypoints/openai_api/test_video_server.py, "PR #6023", "PR #5983", "PR #4222"]
 confidence: high
 ---
 
@@ -101,4 +101,11 @@ confidence: high
 ## DIFF-1r — 共享 Future resolve 必须对取消竞态 fail-safe
 
 - 触发：修改 diffusion result pump、共享 `_rpc_futures`/`_output_futures`、`asyncio.wait_for()` 超时、请求 abort 或 shutdown future cleanup。\n- 强制：共享 Future 在 `done()` 检查后仍必须通过 `try_set_result`/`try_set_exception` 解析，并在 helper 内捕获 `concurrent.futures.InvalidStateError`，丢弃取消或已完成 Future 的晚到结果/异常，使 singleton pump 继续运行；仅 freshly-created 且尚未共享的本地 Future 可直接解析。\n- 禁止：把 `not fut.done()` 与 `set_result()`/`set_exception()` 当作原子操作；在共享 Future 上保留未保护的 resolve 调用；让取消竞态异常逃逸并杀死 result pump，随后仍以健康检查通过推断任务会完成。\n- 验收：用 `done()` 固定返回 false 但实际已取消的 racy Future 覆盖 `COMPUTE_DONE`、`OUTPUT_READY`、batch split 与 shutdown cleanup，断言 pump 不抛 `InvalidStateError`、取消 Future 保持取消、同批健康 Future 仍完成，并回归相邻并发测试。\n^[PR #5983]
+
+## DIFF-1s — 非媒体 diffusion 输出必须显式闭合 output type 与 post-process
+
+- 触发：diffusion pipeline 产生 action 等非 image/video 输出，或修改 registry 中的 `final_output_type`、post-process hook 与 multiprocess 传递路径。
+- 强制：topology 的 `final_output_type` 必须与 pipeline 实际产物一致；非媒体输出使用稳定的 `DiffusionOutput.output` key，并注册可跨 orchestrator multiprocess 边界解析的 module-level post-process callable；没有变换时显式使用 identity hook。
+- 禁止：沿用 image 默认类型、用输出 ndarray 形状猜测语义、把 action 路由成 image/video，或把局部 closure 作为跨进程 post-process hook。
+- 验收：registry 能解析 pipeline 与 post-process callable，callable 可被目标进程边界使用，最终 engine output 保留稳定 key，并由端到端测试断言 action shape、dtype 和有限性。^[PR #4222]
 
