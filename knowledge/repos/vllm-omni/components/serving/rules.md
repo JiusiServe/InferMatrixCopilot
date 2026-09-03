@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["Issue #5369", "PR #3576", "PR #4583", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5085", "PR #5157", "PR #5374", "PR #5670", "PR #5682", "PR #5713", "PR #5732", "PR #5746", "PR #5752", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", .pre-commit-config.yaml, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_chat.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/entrypoints/openai/tts_adapters/, vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/engine/cfg_companion_tracker.py, vllm_omni/metrics/prometheus.py, tests/dfx/reliability/test_reliability_qwen3_omni.py, tests/engine/test_orchestrator_error_handling.py, tests/entrypoints/test_async_omni.py, tests/entrypoints/test_omni_entrypoints.py, tests/entrypoints/openai_api/test_audex_serving_guards.py, tests/entrypoints/openai_api/test_omni_sleep_wakeup.py, tests/entrypoints/openai_api/test_tts_detection.py, tests/entrypoints/openai_api/test_video_api_utils.py, tests/entrypoints/openai_api/test_video_server.py, tests/tools/test_check_tts_adapter.py, tools/pre_commit/check_tts_adapter.py, "PR #4795", "PR #4755", "PR #3805", "PR #5878", "PR #6070"]
+sources: ["Issue #5369", "PR #3576", "PR #4583", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5085", "PR #5157", "PR #5374", "PR #5670", "PR #5682", "PR #5713", "PR #5732", "PR #5746", "PR #5752", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", .pre-commit-config.yaml, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_chat.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/entrypoints/openai/tts_adapters/, vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/engine/cfg_companion_tracker.py, vllm_omni/metrics/prometheus.py, tests/dfx/reliability/test_reliability_qwen3_omni.py, tests/engine/test_orchestrator_error_handling.py, tests/entrypoints/test_async_omni.py, tests/entrypoints/test_omni_entrypoints.py, tests/entrypoints/openai_api/test_audex_serving_guards.py, tests/entrypoints/openai_api/test_omni_sleep_wakeup.py, tests/entrypoints/openai_api/test_tts_detection.py, tests/entrypoints/openai_api/test_video_api_utils.py, tests/entrypoints/openai_api/test_video_server.py, tests/tools/test_check_tts_adapter.py, tools/pre_commit/check_tts_adapter.py, "PR #4795", "PR #4755", "PR #3805", "PR #5878", "PR #6070", "PR #6122"]
 confidence: high
 ---
 
@@ -132,6 +132,13 @@ confidence: high
 - 强制：serving 从 active diffusion `od_config` 取得 `model_class_name`、`model` 和 `revision`，通过 model_extras resolver 判断 resize ownership；只有 LTX-2.5 保留 source geometry 交给 pipeline，LTX-2/2.3 继续在 serving 侧 resize，随后由 pipeline 执行其版本化 conditioning。
 - 禁止：以共享 `LTX2Pipeline` class 全局开启 preserve-image-size；按请求目标尺寸或路径名猜版本；跳过 revision；未经版本化回归就让 online 与 legacy offline I2V framing 政策改变。
 - 验收：用 2、2.3、2.5 checkpoint metadata、Full/Distilled class、pinned revision 和 off-aspect image 覆盖 HTTP I2V，断言 legacy resize、2.5 source geometry、CRF 委托及最终尺寸各自符合合同。^[PR #6070]
+
+## SERV-1i — image reference 重定向必须遵循媒体 URL 策略
+
+- 触发：`decode_image_url` 处理 HTTP(S) `image_reference.image_url`，或修改媒体 URL 重定向策略与下载错误映射。
+- 强制：读取 vLLM 的 `envs.VLLM_MEDIA_URL_ALLOW_REDIRECTS` 并传给 HTTPX 的 `follow_redirects`；策略关闭时在收到 3xx 后拒绝请求且不得请求重定向目标；最终非成功 HTTP 状态与网络/请求失败必须分别映射；data URL 继续走本地解码路径。
+- 禁止：硬编码或绕过媒体重定向策略；策略关闭时仍跟随可能跨主机的重定向；把 HTTP 状态错误与连接失败混为同一诊断；为 data URL 创建 HTTP client。
+- 验收：用确定性的 HTTPX transport 覆盖允许重定向并请求原路径和目标路径、禁用重定向且目标未被请求并在错误中指出 `VLLM_MEDIA_URL_ALLOW_REDIRECTS`、最终 404 与连接失败的错误区分，以及 data URL 不创建 HTTP client；再通过公开 `/v1/videos` image reference 回归验证解码图像进入 engine。该验证不覆盖未修改的 video/audio reference 或 image-edit fetcher。 ^[PR #6122]
 
 ## SERV-2a — 指标节流和 gauge 按 scheduler/stage/replica owner 隔离
 
