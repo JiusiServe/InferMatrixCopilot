@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ 8ecd1f6d`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ f7a51460`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -45,7 +45,7 @@ OMNI_PIPELINES 46→51，deploy 71→79。新增 AR 家族是 `audex`；diffusio
 `minimax_h3`，同时 LTX-2/LTX-2.3 的五个旧 registry names 合并为两个入口。新增
 pipeline keys 是四个 Audex 模式和 `nemotron_labs_audex` alias；deploy 新增八个
 Audex files 与 `qwen3_omni_moe_thinking.yaml`，删除 `minicpmo_4_5_batching.yaml`。
-本次相对 `ffd11c18` 本轮新增 MiniMax H3 的 NPU Qwen3-VL 文本 MLP 融合 SwiGLU 规则，并登记 PR #6167 来源。该提交的数值测试不能推断生产 platform hook 已注册成功，也不能外推到其他模型、平台或端到端性能。
+本次相对 `8ecd1f6d` 本轮将 API server 的 CLI 参数规范化与 positional model/model_tag 同步约束补充到 serving 请求合同规则中。该规则不意味着模型 owner 需要变更，也不覆盖 Omni 模式默认值或模型内部加载逻辑。
 
 ## AR/omni 模型族（29）
 
@@ -88,8 +88,8 @@ voxtral_tts、wan2_2_ti2v、nemotron_labs_audex、indextts2_5
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from ffd11c18 \
-  --to 8ecd1f6d \
+  --from 8ecd1f6d \
+  --to f7a51460 \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```
