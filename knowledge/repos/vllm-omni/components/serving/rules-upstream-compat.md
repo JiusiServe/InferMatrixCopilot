@@ -1,10 +1,10 @@
 ---
 title: "Serving upstream 兼容规则"
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #5976", "PR #5957", vllm_omni/engine/stage_engine_startup.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/utils.py, vllm_omni/request.py, tests/engine/test_stage_engine_startup_cache_env.py]
+sources: ["PR #5976", "PR #5957", vllm_omni/engine/stage_engine_startup.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/utils.py, vllm_omni/request.py, tests/engine/test_stage_engine_startup_cache_env.py, "PR #5036"]
 confidence: high
 ---
 
@@ -33,3 +33,11 @@ confidence: high
   长期 public API。
 - 验收：新/旧 renderer、两条 Mistral import 和有/无 stale counter 的 request layout 都能初始化，
   且新版既有 counter 原值不变。^[PR #5957]
+
+## SERV-7c — 对象存储 URI 必须在 serving 入口绕过预下载
+
+- 触发：修改 `omni_snapshot_download()` 或入口侧模型解析，使其处理 Run:AI 对象存储 URI、HF repo id 和本地模型路径。
+- 强制：使用上游 `is_runai_obj_uri` 作为唯一对象存储判断，在 Hugging Face/ModelScope 预下载前原样返回对象存储 URI；本地路径与普通 HF repo id 保持既有分支，并将后续配置读取交给配置层的本地物化逻辑。
+- 禁止：维护与 vLLM streamer 分离的本地 scheme allowlist；将对象存储 URI 当作 HF repo id 下载；让 bucket 或组织路径段参与 basename 模型匹配。
+- 验收：参数化 mock 测试覆盖 `s3://`、`gs://` 及上游支持的 `az://`，断言 HF 下载未调用且返回值未改变；同时覆盖本地路径、HF repo id 和欺骗性 bucket/basename 匹配，确认入口语义没有回归。^[PR #5036]
+

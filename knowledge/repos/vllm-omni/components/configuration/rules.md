@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666"]
+sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666", "PR #5036"]
 ---
 
 # vLLM-Omni 配置开发门禁
@@ -242,3 +242,10 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 - 强制：采用 MOSS-TTS-Local 官方示例参数：`temperature=1.7`、`top_p=0.8`、`top_k=25`、`repetition_penalty=1.0`；如需变更，必须有模型级行为证据支持。
 - 禁止：沿用通用默认采样值，或仅凭经验调整敏感采样参数而不核对官方示例。
 - 验收：解析 `vllm_omni/deploy/moss_tts_local.yaml`，断言上述参数与官方示例一致，并确认最终 stage 配置实际读取这些值。 ^[PR #6156]
+
+### CONF-7a — 对象存储模型解析必须物化配置而保留原始 URI
+
+- 触发：父进程在 stage-specific `ModelConfig` 初始化前，需要从 `s3://`、`gs://` 或上游 `is_runai_obj_uri` 支持的对象存储 URI 推断模型类型、读取 HF 配置或解析 `model_index.json`。
+- 强制：通过 `is_runai_obj_uri` 将对象存储模型的 `*.model`、`*.py`、`*.json` 轻量文件按 URI 缓存一次到确定性的 `model_streamer/<hash>` 目录；`get_config`、`config.json` 和 `model_index.json` 的读取统一使用该本地目录，同时让各 stage 继续接收原始 URI 以保留 `model_weights` 的流式加载语义。
+- 禁止：把原始对象存储 URI 交给 Hugging Face 仓库解析；把临时 `model_streamer/<hash>` 路径传播成 stage 的模型身份；用完整 URI、bucket 或组织名参与模型类型 basename 匹配。
+- 验收：用 mock 覆盖对象存储 URI 的单次物化、配置驱动的 pipeline 选择、`model_index.json` 回退和 basename-only 匹配，并确认欺骗性 bucket 名不能劫持 pipeline；真实对象存储运行另行验证。^[PR #5036]
