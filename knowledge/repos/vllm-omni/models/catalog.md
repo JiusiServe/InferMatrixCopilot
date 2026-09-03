@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ 5358f5db`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ 72a02b49`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -45,7 +45,7 @@ OMNI_PIPELINES 46→51，deploy 71→79。新增 AR 家族是 `audex`；diffusio
 `minimax_h3`，同时 LTX-2/LTX-2.3 的五个旧 registry names 合并为两个入口。新增
 pipeline keys 是四个 Audex 模式和 `nemotron_labs_audex` alias；deploy 新增八个
 Audex files 与 `qwen3_omni_moe_thinking.yaml`，删除 `minicpmo_4_5_batching.yaml`。
-本次相对 `e6773601` 四个 inventory 均无变化；本次变更不改变 runtime registry 或支持范围。
+本次相对 `5358f5db` 本轮为 serving 组件补充纯 diffusion TTS 的 adapter 边界规则，并把 PR #6121 记入该规则页来源。测试文件的归属是 testing/ci，超出本轮允许写入范围；本条规则不能推断 OmniVoice GPU E2E 已通过，或证明所有 bypass-`__init__` 属性都已完整初始化。
 
 ## AR/omni 模型族（29）
 
@@ -88,8 +88,8 @@ voxtral_tts、wan2_2_ti2v、nemotron_labs_audex、indextts2_5
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from e6773601 \
-  --to 5358f5db \
+  --from 5358f5db \
+  --to 72a02b49 \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```

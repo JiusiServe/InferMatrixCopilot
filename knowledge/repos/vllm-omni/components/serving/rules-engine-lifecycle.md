@@ -1,10 +1,10 @@
 ---
 title: "Serving engine 生命周期规则"
 created: 2026-09-03
-updated: 2026-09-03
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/api_server.py]
+sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/api_server.py, "PR #6121"]
 confidence: high
 ---
 
@@ -92,6 +92,13 @@ confidence: high
   warmup，随后因基线同样复现的 vLLM skew 退出，未证明成功 speech endpoint/audio E2E。
 
 ## Full-duplex 与 CFG companion 生命周期
+
+### SERV-5g — pure-diffusion TTS 必须在 AR adapter 解析前短路
+
+- 触发：speech serving 同时支持普通 AR TTS 与 pure-diffusion TTS，且 diffusion factory 通过 `for_diffusion()`/`__new__` 绕过常规 `__init__`，发生 adapter 解析或 native speed handling 变更。
+- 强制：在读取 adapter 或 `_adapter` 状态前先检查在两种构造路径上都可用的 `_diffusion_mode`；pure-diffusion 路径必须直接返回 `None` 并保持专用 speech 编码路径，普通 AR 实例继续通过 `resolve_adapter()` 使用既有 adapter-native speed 行为。
+- 禁止：在 diffusion 实例上无条件解析 AR-stage TTS adapter、读取仅由 `__init__` 设置的 `_adapter`，或把 pure-diffusion 请求重新路由到 AR adapter 路径；只覆盖普通构造器而不覆盖 bypass-`__init__` factory。
+- 验收：用 `OmniOpenAIServingSpeech.for_diffusion()` 构造实例，提交公开 `create_speech()` 请求并断言成功的 `200`/`audio/wav` 响应；以 mock 断言 diffusion speed 请求返回原值且 `resolve_adapter()` 未被调用，同时验证普通 AR 实例仍解析并使用其 adapter，所有路径不得出现 `AttributeError`。^[PR #6121]
 
 ### SERV-6a — full-duplex 首次 stage submit 必须预热 async-chunk topology
 
