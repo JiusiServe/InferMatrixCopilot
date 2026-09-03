@@ -4,7 +4,7 @@ created: 2026-09-03
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/api_server.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #5491"]
+sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/api_server.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #5491", "PR #6033"]
 confidence: high
 ---
 
@@ -154,6 +154,13 @@ confidence: high
 - 禁止：模型 duration scaling 后再次 resample，或以 HTTP 支持外推 WebSocket parity。
 - 验收：覆盖 token/chat/embed、native/generic、三种 HTTP 输出与 WebSocket。落后后端只用显式
   capability/version shim 并保留 eager fallback，不能让 CUDA 新参数成为全平台前提。^[PR #5957]
+
+### SERV-6e — async-chunk prewarm 失败必须保持 request-scoped 并停止 duplex bookkeeping
+
+- 触发：async-chunk duplex 的 stage-0 首次提交需要 downstream prewarm，尤其是缺少 `prompt_token_ids` 或某个 downstream prewarm 提交失败时。
+- 强制：prewarm 失败必须发送 request-scoped、non-fatal 的 `ErrorMessage`（400、`BadRequestError`），完成 abort cleanup 并关闭 duplex session；调用方收到失败结果后立即停止，不得继续写 fence、submit timestamp 或重新注册 running counter。
+- 禁止：用 `fatal=True` 将单请求输入错误升级为 engine-wide failure；cleanup 已移除 request state 后仍返回成功或继续 duplex bookkeeping；让一个 request 的 prewarm 失败拖垮同批其他请求。
+- 验收：覆盖缺失 `prompt_token_ids`、downstream submit 失败和 duplex submit fall-through，断言错误只归属目标 request、engine/thread 仍存活、下游未被错误预热，且无 fence、时间戳、counter 或 session 残留。^[PR #6033]
 
 ### SERV-8a — 本地 stage launch 必须临时应用 runtime.env
 

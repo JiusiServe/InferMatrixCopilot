@@ -4,7 +4,7 @@ created: 2026-08-05
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, distributed]
-sources: ["PR #5744", "PR #5976", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146"]
+sources: ["PR #5744", "PR #5976", vllm_omni/diffusion/distributed/parallel_state.py, tests/diffusion/distributed/test_expert_parallel_layout.py, vllm_omni/distributed/omni_connectors/adapter.py, vllm_omni/distributed/omni_connectors/kv_transfer_manager.py, vllm_omni/distributed/omni_connectors/transfer_adapter/chunk_transfer_adapter.py, vllm_omni/worker/omni_connector_model_runner_mixin.py, tests/distributed/omni_connectors/test_kv_recv_tp_consensus.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/worker/test_omni_connector_mixin.py, "PR #5146", "PR #6033"]
 confidence: high
 ---
 
@@ -48,6 +48,13 @@ confidence: high
   receiver/非 sender+无 hook→创建，并覆盖安全 shutdown。Bagel/Hunyuan KV-only 和
   Qwen3-Omni/MiniCPM-o payload 路径各做真实拓扑 smoke。该矩阵不证明 issue #5595 中独立的
   shutdown/orphan 问题已解决。 ^[PR #5744]
+
+## DIST-1d — async-chunk 发送失败必须保留内部请求身份并可观测
+
+- 触发：async-chunk sender 的队列任务被 `popleft()` 后发送抛异常，或 connector 返回失败但不抛异常。
+- 强制：从 task 内的 `request.request_id` 取得 scheduler 使用的内部请求 ID，在发送线程以锁保护的 ledger 中按请求记录首次失败原因；scheduler sweep 时原子 drain 并分别记录仍存活与已离开 scheduler 的请求。
+- 禁止：读取不存在的 `task["request_id"]`；用 `external_req_id` 代替 `self.requests` 的内部 key；发送失败后静默丢弃，或把已完成/已 abort 请求误当作仍可调度请求。
+- 验收：覆盖发送抛异常、`connector.put` 返回 `False`、内部/外部 ID 不同、同一请求多次失败、并发 record/drain，以及请求在 sweep 前后离开 scheduler；日志必须包含正确 request ID 和失败原因，且 ledger 只被消费一次。^[PR #6033]
 
 ## DIST-2a — diffusion EP group 必须满足运行中 MoE backend 的 communicator 合同
 
