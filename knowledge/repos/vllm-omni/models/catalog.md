@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ 022d7a76`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ 728640f4`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -45,7 +45,7 @@ OMNI_PIPELINES 46→51，deploy 71→79。新增 AR 家族是 `audex`；diffusio
 `minimax_h3`，同时 LTX-2/LTX-2.3 的五个旧 registry names 合并为两个入口。新增
 pipeline keys 是四个 Audex 模式和 `nemotron_labs_audex` alias；deploy 新增八个
 Audex files 与 `qwen3_omni_moe_thinking.yaml`，删除 `minicpmo_4_5_batching.yaml`。
-本次相对 `b300f666` 本轮在 MiniMax H3 媒体规则中新增参考视频按索引选择性解码、容器帧数元数据优先、decord 缺失时的统一 ffmpeg 回退及 RGB 字节数校验。该证据不能推断其他模型、解码器或硬件上的通用性能提升，也不能替代端到端质量验证。
+本次相对 `022d7a76` 本轮将 Qwen Image 复数 RoPE 分量的编译兼容规则归档至模型 owner；不得据此推断所有 diffusion pipeline 都需要相同改动或已获得跨平台 parity。
 
 ## AR/omni 模型族（29）
 
@@ -88,8 +88,8 @@ voxtral_tts、wan2_2_ti2v、nemotron_labs_audex、indextts2_5
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from b300f666 \
-  --to 022d7a76 \
+  --from 022d7a76 \
+  --to 728640f4 \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```
