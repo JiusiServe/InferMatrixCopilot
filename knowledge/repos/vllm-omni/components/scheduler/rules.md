@@ -1,10 +1,10 @@
 ---
 title: "Scheduler 规则"
 created: 2026-07-16
-updated: 2026-09-02
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, scheduler]
-sources: ["PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461"]
+sources: ["PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461", "PR #4795"]
 ---
 
 # Scheduler 规则
@@ -222,6 +222,14 @@ modules=[online_serving, worker_runner]，status=active，run_count=38，2026-06
   请求静默放行；用无限等待掩盖 replica loss 或 abort。
 - 验收：覆盖完整 pair、不同进度、missing/split、parent abort 和 companion abort，
   断言请求不会挂死、错误归属保持 request-local、队列和 connector state 都释放。
+
+## SCHED-5e — pooling output decoder 必须覆盖两个 scheduler 且失败即为 request error
+
+- 触发：pooling stage 配置 per-stage output decoder，或修改 `OmniARScheduler`、`OmniGenerationScheduler` 的 pooling output 完成路径。
+- 强制：两个 scheduler 都经共享 mixin 在 terminal status 处理前调用 decoder；成功时把解码 payload 写入 `EngineCoreOutput`，失败时只将当前 request 置为 `FINISHED_ERROR`、保留错误原因并停止继续调度。
+- 禁止：只在 AR scheduler 接 hook；decoder 异常 fail-open 为空成功；先完成请求再解码；把原始 pooler tensor 或错误 request 的 payload 发送给下游。
+- 验收：分别覆盖 AR/generation scheduler 的成功、decoder 抛异常、无 decoder 和同批健康 request；断言成功 payload、`FinishReason.ERROR`、request-local 错误归属及无跨请求污染。
+^[PR #4795]
 
 ## SCHED-6a — async discard 的计数单位必须与 stale drain 一致
 

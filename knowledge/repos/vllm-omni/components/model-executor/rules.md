@@ -1,10 +1,10 @@
 ---
 title: "Model Executor 规则"
 created: 2026-07-10
-updated: 2026-09-02
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/musa/platform.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/utils/mm_outputs.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py, docs/design/feature/omni_async_output_materialization.md, vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/experimental/fullduplex/, tests/e2e/features/fullduplex/, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/model_extras/registry.py, examples/offline_inference/text_to_image/text_to_image.py, examples/offline_inference/image_to_video/image_to_video.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/examples/offline_inference/test_image_task_prompts.py, tests/engine/test_arg_utils.py, "PR #3422", "PR #3642", "PR #4730", "PR #4958", "PR #5073", "PR #5074", "PR #5310", "PR #5610", "PR #5671", "PR #5777", "PR #5792", "PR #5824", "PR #5957", "PR #5976", "PR #6049", vllm_omni/engine/arg_utils.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni_moe_thinker.py, vllm_omni/model_executor/models/qwen2_5_omni/qwen2_5_omni_thinker.py, vllm_omni/model_executor/models/dynin_omni/dynin_omni.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/worker/base.py, vllm_omni/worker/gpu_generation_model_runner.py, tests/model_executor/models/qwen3_omni/test_qwen3_omni_forward_contract.py, "claude-workflow-starter-private@09dca46"]
+sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/platforms/interface.py, vllm_omni/platforms/musa/platform.py, vllm_omni/platforms/npu/worker/npu_ar_model_runner.py, vllm_omni/engine/stage_init_utils.py, vllm_omni/utils/mm_outputs.py, tests/worker/test_omni_gpu_model_runner.py, tests/worker/test_gpu_ar_model_runner.py, docs/design/feature/omni_async_output_materialization.md, vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/omni_config.py, vllm_omni/engine/stage_runtime.py, vllm_omni/engine/stage_engine_startup.py, vllm_omni/experimental/fullduplex/, tests/e2e/features/fullduplex/, vllm_omni/model_executor/models/common/qwen3_code_predictor.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni.py, vllm_omni/model_executor/models/qwen3_tts/configuration_qwen3_tts.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/model_extras/registry.py, examples/offline_inference/text_to_image/text_to_image.py, examples/offline_inference/image_to_video/image_to_video.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/examples/offline_inference/test_image_task_prompts.py, tests/engine/test_arg_utils.py, "PR #3422", "PR #3642", "PR #4730", "PR #4958", "PR #5073", "PR #5074", "PR #5310", "PR #5610", "PR #5671", "PR #5777", "PR #5792", "PR #5824", "PR #5957", "PR #5976", "PR #6049", vllm_omni/engine/arg_utils.py, vllm_omni/model_executor/models/qwen3_omni/qwen3_omni_moe_thinker.py, vllm_omni/model_executor/models/qwen2_5_omni/qwen2_5_omni_thinker.py, vllm_omni/model_executor/models/dynin_omni/dynin_omni.py, vllm_omni/engine/async_omni_engine.py, vllm_omni/worker/base.py, vllm_omni/worker/gpu_generation_model_runner.py, tests/model_executor/models/qwen3_omni/test_qwen3_omni_forward_contract.py, "claude-workflow-starter-private@09dca46", "PR #4795"]
 ---
 
 # Model Executor 规则
@@ -258,6 +258,14 @@ Stage 拓扑错误的最小充分源码证据只有三段：一处最终配置�
 - 禁止：累计 graph/input-buffer alias，或扩散到普通逐步 payload。
 - 验收：覆盖 source 被下一 step 覆写、ragged list shape/value/alias、普通路径与
   finish/abort 清理。^[PR #5957]
+
+### EXEC-1h — pooling stage 的输入输出必须走显式跨 stage bridge
+
+- 触发：新增非生成 pooling stage，或在 batch pipeline 中跨 stage 传递音频、文本、multimodal payload 与解码结果。
+- 强制：producer 只在上游请求完成后按原 request index 构造输入，分词一次并随音频携带 `aligner_words`、language 和真实 duration；pooling runner 识别 `is_pooling_model`，绕过仅适用于 AR hidden state 的 Omni prefix-cache/mm 提取，decoder 输出固定的 int32 `[n_words, 2]`；最终 consumer 使用同一份 words、duration 和原 batch 映射。
+- 禁止：把 pooling 请求当作 `generate` 或隐式广播单请求 metadata；按 downstream position 压缩原 batch index；重新分词后与 interval 做未验证的 positional zip；把空结果、解码失败或缺失 word metadata 伪装成 `[0, 0]` 的有效对齐；假设真实 `OmniRequestOutput` 暴露测试 fake 才有的 `additional_information`。
+- 验收：用真实 stage wrapper、`PoolingOutput` 和 `OmniRequestOutput` 做 mixed-batch 测试，分别断言音频完成门槛、metadata/shape、duration clamp、原 request 标签和 mismatch→无时间戳；同时验证普通生成 stage 的输入输出不受影响。
+^[PR #4795]
 
 ### EXEC-6a — shared image example 先建 canonical envelope，model-extra 只做特化变换
 
