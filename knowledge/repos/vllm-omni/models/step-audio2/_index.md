@@ -1,10 +1,10 @@
 ---
 title: "Step-Audio2（音频 token 内嵌 LM 词表的语音对话）"
 created: 2026-07-21
-updated: 2026-09-02
+updated: 2026-09-04
 type: index
 tags: [vllm-omni, models]
-sources: ["PR #5067", "PR #5638", "PR #5869", vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/step_audio2/, vllm_omni/deploy/step_audio_2.yaml, vllm_omni/model_executor/stage_input_processors/step_audio2.py, tests/model_executor/models/step_audio2/test_hift_parity.py]
+sources: ["PR #5067", "PR #5638", "PR #5869", vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/step_audio2/, vllm_omni/deploy/step_audio_2.yaml, vllm_omni/model_executor/stage_input_processors/step_audio2.py, tests/model_executor/models/step_audio2/test_hift_parity.py, vllm_omni/platforms/npu/models/step_audio2_token2wav.py, vllm_omni/platforms/npu/models/cosyvoice2_dit_attn.py]
 ---
 
 # Step-Audio2
