@@ -31,8 +31,8 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 | `core` | 每次配置审查 | `VOMNI-CFG-1b`, `VOMNI-CFG-1c` |
 | `strict-normalization` | schema、alias、unknown field、structured/legacy/direct 路径 | `VOMNI-CFG-1a`, `VOMNI-CFG-1b`, `VOMNI-CFG-1c`, `VOMNI-CFG-1d`, `VOMNI-CFG-1e`, `VOMNI-CFG-1f`, `VOMNI-CFG-1g`, `VOMNI-CFG-1h` |
 | `deploy-memory` | 显存预算、KV pin、多 stage 共卡 | `CONF-1a`, `CONF-2a` |
-| `deploy-topology` | deploy、overlay、headless、topology wiring | `CONF-3a`, `CONF-4b`, `CONF-5a` |
-| `composable-strategy` | strategy axis、routing、load balancing | `CONF-4a` |
+| `deploy-topology` | deploy、overlay、headless、topology wiring | `CONF-3a`–`3d`；`CONF-4b` 见 [并行拓扑合同](rules-parallel-topology.md)；`CONF-5a`–`5g` 见 [topology 与部署 profile](rules-topology-profiles.md) |
+| `composable-strategy` | strategy axis、routing、load balancing | `CONF-4a`, `CONF-4c`–`4d`，见 [并行拓扑合同](rules-parallel-topology.md) |
 | `stage-model-config` | HF nested config、stage-specific quantization/text config | `VOMNI-CFG-1i` |
 | `author-routing` | 只供 Direct reviewer 导航，不作为 finding 规则 | `VOMNI-CFG-0a`, `VOMNI-CFG-0b` |
 
@@ -150,105 +150,6 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 - 强制：让 model registry、pipeline registry、`model_arch`、`default_deploy_config_name` 与 deploy stage 的 `hf_overrides.architectures` 闭合指向同一模型；保留 backbone 的 `model_type`，并让无显式配置的入口解析打包的 deploy YAML。
 - 禁止：只注册 pipeline 或放置 YAML 就依赖 `model_type` 推断；用 `hf_overrides.model_type` 替代 stage architecture 路由；要求离线入口额外传参来弥补默认配置未接通。
 - 验收：真实无显式 deploy 配置的初始化能读回最终 pipeline 与 architecture，backbone `get_text_config()` 仍解析为原模型类型，并覆盖 registry、默认 YAML 与最终 stage config 的一致性。 ^[PR #5666]
-
-### CONF-4a — composable strategy 只暴露已经接通的 axis
-
-- 触发：新增 composable parallel strategy、axis、routing/LB policy 或 stage override。
-- 强制：schema 明确区分 wired 与 reserved；translator 对 unsupported/reserved 值显式
-  失败。routing 与 load-balancing policy 只能有一个 owner。
-- 禁止：接受但静默忽略 axis；关键 strategy/deploy 文件缺失时 conditional skip；以
-  可漂移的 stage index 作为长期 identity。
-- 验收：每个公开 axis 都有 spec → translator → final stage config 的正向测试和
-  unsupported fail-fast 测试；stage 使用稳定名称。
-
-### CONF-4c — 新并行轴必须进入最终拓扑并由 consumer 校验
-
-- 触发：新增 diffusion parallel axis、text-encoder TP、CFG/patch parallel 或把
-  `strategy-config` 的声明映射到 stage runtime。
-- 强制：从 strategy spec/CLI 到 `OmniStageDiffusionParallelConfig` 和最终 process
-  group 展开完整链路；记录 `data × cfg × sequence × pipeline × tensor` 的设备乘积，
-  并由实际 consumer 校验 rank/head divisibility、模型不支持的组合和可见设备容量。
-- 禁止：parser 接受字段后在 projection、engine kwargs 或 worker 初始化时丢失；用一个
-  generic upper bound 替代模型自己的约束；用 recipe 示例或单纯 dataclass 构造代替真实
-  topology/consumer 证据。
-- 验收：正向测试断言新值可从最终 stage config 读回；负向测试覆盖不整除的 head/rank、
-  `cfg_parallel_size` 不适用的模型和设备不足，并在 worker 创建前失败。
-
-### CONF-4d — strategy、CLI 与 pipeline-wide load balancing 必须保留唯一 owner
-
-- 触发：`strategy_config`、legacy YAML、`--omni-lb-policy` 或 stage replica/load
-  balancing 同时提供策略。
-- 强制：registry-backed strategy 才进入 translator；legacy 路径明确 warning 并保持
-  原语义；合并顺序固定为 deploy/pipeline → strategy → CLI，CLI 的显式冲突必须可见，
-  pipeline-wide load-balancer 只由 orchestrator 拥有并传入各 stage。
-- 禁止：接受 legacy `strategy_config` 后静默声称已生效；把 CLI 的默认值误当显式覆盖；
-  每个 stage 各自构造一个相互冲突的全局 load balancer。
-- 验收：覆盖 registry、legacy、CLI 非默认值和冲突值，断言最终拓扑、设备乘积和单一
-  load-balancer consumer；策略生效前若设备不足必须 fail fast。
-
-### CONF-5b — `trust_remote_code` 的未指定值必须保留 deploy 优先级
-
-- 触发：CLI、structured factory、legacy stage factory 或 deploy YAML 同时提供
-  `trust_remote_code`。
-- 强制：调用方显式 `True`/`False` 才覆盖 per-stage deploy 值；未指定用 `None` 表示并
-  保留 YAML 值，HF config resolution 才把 `None` 收敛为安全的实际 bool。
-- 禁止：把 `store_true` 的 absent-False 当成显式 False 无条件写入 override；structured
-  与 legacy 各自实现 precedence；在末端用默认值静默覆盖用户明确的 False。
-- 验收：覆盖“未指定、显式 True、显式 False”三态，并从 structured/legacy 两条路径
-  断言最终 stage config；`with_trust_remote_code_override` 是唯一合并入口。
-
-### CONF-4b — 标准与 headless 启动必须解析出同一拓扑
-
-- 触发：CLI、headless serve、offline entrypoint 或 engine factory 新增/转发配置字段。
-- 强制：同一命令语义在所有入口转发相同 override，并比较展开后的逐 stage 配置。
-- 禁止：只测 parser 输出，未证明值到达 engine/config consumer。
-- 验收：标准与 headless 路径对同一 override 生成等价 topology；缺字段时直接失败，
-  不允许用 skip 隐藏路径漂移。
-
-### CONF-5a — 冻结 topology 只保留一份，部署开关决定 wiring
-
-- 触发：同一模型的 sync/async processor、普通/async chunk 或部署加速出现多份近似
-  pipeline/stage YAML。
-- 强制：相同冻结拓扑共用一份 pipeline config，同时声明可选 processor；由 deploy
-  flag 决定 wiring。模型 package `__init__` 保持轻量，FP8 等部署加速留在 deploy 层。
-- 禁止：为一个 runtime flag 复制整套 topology；把无关 payload bug 或平台 cleanup
-  混入 config migration。
-- 验收：两种 wiring 都从同一 topology 展开，配置 diff 只包含预期 deploy 字段；
-  同卡多 stage 的 `gpu_memory_utilization` 总预算不超过可用容量。
-
-### CONF-5c — 可选辅助 pooling stage 必须在最终 topology 中显式注入
-
-- 触发：为现有 pipeline 增加可选辅助 stage，或新增 `--forced-aligner`、`--forced-aligner-config`、`--forced-aligner-device` 这类只由 orchestrator 读取的开关。
-- 强制：在最终 merge 前把 CLI/YAML 解析为一个 canonical stage config；任一 aligner 来源生效时复制 pipeline/deploy，追加连接到前一 stage 的 `runner="pooling"` 终端 stage，并将 `default_pooling_params.task`、设备和 decoder hook 投影到该 stage；无来源时保持原 topology。
-- 禁止：只检查 `forced_aligner` 而忽略 config-only 注入；原地修改调用方的 pipeline/deploy；把 orchestrator-only flags 泄漏为每个 stage 的 engine 参数；用 `execution_type` 猜测应构造 `PoolingParams` 还是生成参数。
-- 验收：覆盖模型参数、config-only、无参数三态；断言原 pipeline/deploy 未改变，最终逐 stage config 含正确模型、`runner`、pooling task、设备和 decoder hook，并证明 stage 初始化按 `runner` 选择 `PoolingParams`。 
-^[PR #4795]
-
-### CONF-5d — 无 `model_type` 的多 stage checkpoint 必须闭合别名与架构路由
-
-- 触发：接入缺少 `model_type` 或 `architectures` 的 NeMo 风格多 stage checkpoint，或新增其 pipeline alias、architecture 路由与默认 deploy 配置。
-- 强制：同时登记所有 stage architecture 到 `_ARCH_TO_MODEL_TYPE`，注册统一 `NemotronVoiceChatConfig`，让 alias、path-basename fallback 与 `default_deploy_config_name` 指向同一 pipeline；不得只依赖路径猜测。
-- 禁止：只注册 thinker 或只提供一个 alias；让空的 `model_arch` 覆盖 checkpoint architecture；让 sync 与 async deploy 配置解析出不同的 stage 拓扑。
-- 验收：用 bare `config.json` 和三个 architecture 分别验证 model type、pipeline、stage config 与默认 deploy 名称；sync/async 配置只切换 processor wiring，并保持三 stage 顺序与 stage architecture 一致。
-^[PR #5842]
-
-### CONF-5e — MiniCPM-o 部署 profile 必须一致传递 CFM Graph 开关
-
-- 触发：修改 MiniCPM-o 4.5 bundled deploy YAML 或 Code2Wav connector extra 中的 CFM CUDA Graph 开关、缓存上限或配置传递。\n- 强制：`minicpmo_4_5.yaml`、`minicpmo_4_5_2gpu.yaml`、`minicpmo_4_5_3gpu.yaml` 和 `minicpmo_4_5_8x4090.yaml` 必须一致声明 `enable_cfm_graph` 与 `cfm_max_graphs`；当前默认值为 `true` 与 `32`，并传入 `MiniCPMO45Code2Wav` 的 `_cfm_graph_config` 和 `BatchedToken2Wav`。非 CUDA 设备仍必须回退 eager。\n- 禁止：只更新一个 deploy profile、依赖未记录的默认值，或把配置存在误认为 graph 已在非 CUDA 环境生效；不得把模型专有开关扩展成所有模型的通用配置合同。\n- 验收：解析四份 deploy 配置并断言开关和上限一致，追踪非默认值到 `_cfm_graph_config` 与 `BatchedToken2Wav`；覆盖开关关闭和非 CUDA fallback，并确认 stage topology 未发生额外变化。\n^[PR #6082]
-
-### CONF-5f — π0 的 checkpoint、registry 与 deploy 必须闭合为单 diffusion stage
-
-- 触发：新增或修改 π0 的 `pipeline_registry.py`、`vllm_omni/deploy/pi0.yaml`、`OmniDiffusionConfig` 的 `type: pi0` autodetect，或 `Pi0Pipeline` 的 stage declaration。
-- 强制：让 `pipeline: pi0`、`OMNI_PIPELINES["pi0"]`、`Pi0Pipeline` 与 checkpoint `type: pi0` resolver 闭合；deploy 配置只能声明一个 diffusion stage，最终输出类型为 `action`，并让 `policy_server_config` 的 `image_resolution`、`action_horizon`、`action_dim`、camera 数量与 `model_config` 保持一致。
-- 禁止：只凭 checkpoint 路径或文件存在推断 pipeline，额外添加 model-executor 层或多 stage topology，或让 OpenPI metadata 与最终 stage/model config 的动作尺寸不一致。
-- 验收：无显式 deploy 配置的 checkpoint autodetect 能解析到 `Pi0Pipeline`；解析最终逐 stage config 断言只有一个 diffusion stage、`final_output_type=action`，并核对 `pi0.yaml` 与 websocket handshake metadata 的关键字段一致。^[PR #4222]
-
-### CONF-5g — MiniCPM-o NPU Code2Wav 开关必须按 Stage 2 传递
-
-- 触发：修改 MiniCPM-o 4.5 bundled deploy YAML，或新增/调整 `code2wav_enable_npu_graph`、`code2wav_max_npu_graphs` 这类 Ascend Code2Wav graph 配置。
-- 强制：`minicpmo_4_5.yaml`、`minicpmo_4_5_2gpu.yaml` 和 `minicpmo_4_5_3gpu.yaml` 必须在 `platforms.npu.stages` 中按 stage 声明配置；Stage 0/1 保持 `compilation_config.cudagraph_mode: PIECEWISE`，Stage 2 只通过 `additional_config` 传递 graph 开关和上限，默认值为 `true` 与 `32`，并保持最终 runner 的 outer eager 语义。所有断言必须基于 `_apply_platform_overrides` 与 `merge_pipeline_deploy` 展开的最终 stage config。
-- 禁止：把 Code2Wav NPU 开关放入 shared connector extra、全局配置或其他 stage；只修改一个 profile；以 YAML 原文或字段存在推断配置已到达 Code2Wav consumer；用全局 eager override 破坏 Stage 0/1 的 `PIECEWISE` 配置。
-- 验收：逐一解析三个 profile，断言 connector extra 不含两个 Code2Wav key，NPU 展开结果包含 Stage 0/1 的 `PIECEWISE`、Stage 2 的 `enforce_eager: true`、`code2wav_enable_npu_graph: true` 和 `code2wav_max_npu_graphs: 32`，并覆盖开关关闭和缓存上限为 0 的路径。^[PR #5604]
 
 ### CONF-6a — MOSS-TTS-Local 部署必须采用官方采样参数
 
