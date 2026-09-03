@@ -1,10 +1,10 @@
 ---
 title: "MiniMax H3 媒体输入与精度规则"
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5752", "PR #5829", "PR #5978", .buildkite/cuda/test-nightly.yml, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/inputs/data.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/e2e/accuracy/minimax_h3/test_minimax_h3_i2va_ref2va_similarity.py, tests/entrypoints/openai_api/test_video_server.py]
+sources: ["PR #5752", "PR #5829", "PR #5978", .buildkite/cuda/test-nightly.yml, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/reference_video.py, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/inputs/data.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, tests/e2e/accuracy/minimax_h3/test_minimax_h3_i2va_ref2va_similarity.py, tests/entrypoints/openai_api/test_video_server.py, "PR #6064"]
 confidence: high
 ---
 
@@ -74,3 +74,11 @@ confidence: high
   nightly 声明 4×H100；PR 的 I2VA 0.975190/35.981286、Ref2VA 0.980577/
   42.650204 来自 4×B300 外部运行，不是 checked-in 结果。T2VA 因严格 gate
   未达标被删除，仅表示无 retained pixel-level gate，不表示功能不支持。^[PR #5978]
+
+## MMH3-2i — 参考视频解码必须按需求索引并闭合 RGB 字节合同
+
+- 触发：修改 MiniMax H3 `reference_video.py` 的参考视频抽帧、`decord` 不可用时的回退、`ffprobe` 帧数探测或 prepared RGB stream 解码路径。
+- 强制：`_probe_video` 优先使用容器提供的 `nb_read_frames`/`nb_frames`，仅在元数据缺失时追加 `-count_frames` 扫描；Qwen 抽样必须将请求的 frame indices 交给一次 ffmpeg raw-video pipe，通过 `select` 只解码这些帧，完整回退也复用同一 ffmpeg RGB24 路径。解码前校验 frame count、宽高和 indices，必须在 reshape 前校验输出字节数等于 `frame_count × width × height × 3`。
+- 禁止：为每个采样帧启动一次 ffmpeg、无条件对高码率 prepared stream 做完整扫描、在 decord 缺失时重新使用逐帧 PyAV 全量解码，或对不完整 raw-video 输出静默 reshape；不得把该 CPU 解码优化扩展成 MUSA/NPU 专用路径或通用 decoder 性能保证。
+- 验收：contract tests 覆盖 selective/full ffmpeg command、`select` indices、decord 缺失回退、容器帧数直读与缺失时的 count-frames fallback、非法 metadata 和 incomplete output；在固定 prepared video 上将 selective 与 full RGB24 数组逐像素对照 PyAV reference，并分别核对 sampled frame 数、尺寸和 timestamps。^[PR #6064]
+
