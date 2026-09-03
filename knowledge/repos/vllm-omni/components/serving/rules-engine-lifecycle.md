@@ -4,7 +4,7 @@ created: 2026-09-03
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/api_server.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #5491", "PR #6033"]
+sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/api_server.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #5491", "PR #6033", "PR #5272"]
 confidence: high
 ---
 
@@ -106,6 +106,13 @@ confidence: high
 - 强制：`load_and_resolve_stage_configs()` 在没有 deploy config 时也必须保留显式 `engine_backend`；runner 选择由选中的 engine/platform owner 负责，不重复注入 `diffusion_model_runner_cls`。session reset、close 和失败清理由选定 stage 的 collective RPC 到达实际 worker，并在所有 worker 支持后才确认成功；在 session-affine routing 尚未实现前，AR stage 必须保持单副本。
 - 禁止：丢弃 `engine_backend` 使 AR 请求静默回退普通 `DiffusionEngine`；通过默认 stage 额外注入 runner class 覆盖 engine-owned 选择；只修改客户端状态而不调用 worker lifecycle；以 request-ID 级 affinity 或 round-robin 路由承载 worker-local session；将清理失败当作已关闭并允许立即复用 session ID。
 - 验收：从真实 default-stage fallback 测试显式断言 `engine_backend` 进入最终 `engine_args`；用选定 stage ID 验证 reset/close RPC、unsupported worker 结果和失败重试；用两副本配置确认初始化前拒绝或证明持续 session affinity，并回归普通 diffusion engine 的既有 runner 选择。^[PR #5491]
+
+### SERV-5i — TTS 模型专属采样覆盖必须归 adapter 所有
+
+- 触发：新增或迁移 TTS 模型专属 sampling 参数、`max_new_tokens`、动态 token 限制、stop token 或 Audex CFG/TTA 参数。
+- 强制：在已注册 adapter 的 `apply_sampling_overrides(sampling_params_list, request, prompt, request_id)` 中实现模型行为；`serving_speech` 仅负责合并 `extra_params`、调用 adapter override，再处理 `seed`。通用 `max_new_tokens` 必须通过共享 helper 深拷贝参数，模型特例保留各自的动态 token、CFG/TTA、stop-token 与 `+1` 语义；最终 detector 必须能解析到注册 adapter。
+- 禁止：把新的 model-type 分支或采样 mutation 加回 `serving_speech.py`；让 adapter 直接污染 engine 的共享默认 sampling 参数；保留没有 adapter 支撑的 legacy detector，或用只验证 dispatch 到达的测试替代最终 `SamplingParams` 结果断言。
+- 验收：覆盖 adapter registry/detection 无歧义、`extra_params -> apply_sampling_overrides -> seed` 顺序、无与有 `max_new_tokens`、CosyVoice3/GLM-TTS 动态边界、Ming stop token、Audex request-id/CFG/TTA 以及共享默认参数不变；测试必须检查传给 engine 的实际 sampling 参数。 ^[PR #5272]
 
 ### SERV-6a — full-duplex 首次 stage submit 必须预热 async-chunk topology
 
