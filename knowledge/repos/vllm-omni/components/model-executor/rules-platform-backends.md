@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #5886", "PR #6061", "PR #6096", vllm_omni/platforms/, "PR #5604", "PR #6293"]
+sources: ["PR #5886", "PR #6061", "PR #6096", vllm_omni/platforms/, "PR #5604", "PR #6293", "PR #5571", "vllm_omni/platforms/xpu/platform.py"]
 confidence: high
 ---
 
@@ -18,6 +18,13 @@ confidence: high
 - 强制：平台 override 必须保留共享签名中的 `randomize_inputs` 默认值并将其传给 `maybe_randomize_inputs`；runtime mode 必须调用 `is_valid_runtime_mode()` 判断当前实例是否有效。
 - 禁止：通过实例调用返回集合的 `valid_runtime_modes()` 冒充实例有效性校验，或因共享签名新增可选参数而让平台 override 产生接口漂移。
 - 验收：对 base NPU runner 与 generation override 分别覆盖 `randomize_inputs` 的默认和显式路径，并用包含 `FULL_DECODE_ONLY` 等复合模式的正负用例断言 `is_valid_runtime_mode()` 的校验结果和签名 parity。 ^[PR #6096]
+
+## EXEC-10b — XPU 异步 D2H 必须记录设备无关的 torch.Event
+
+- 触发：修改 `XPUOmniPlatform.record_device_event()`，或修改使用通用 `torch.Stream.wait_event()` 门控异步 D2H 的 XPU 输出路径。
+- 强制：在当前计算流上记录设备无关的 `torch.Event()`，再由通用 stream 等待该事件，使 accelerator hooks 建立计算流到侧流复制的依赖；保持与 CUDA、ROCm 平台一致。
+- 禁止：向通用 `torch.Stream.wait_event()` 传递 `torch.xpu.Event()`，或通过零散的 `xpu.synchronize()` 掩盖事件类型不兼容造成的复制竞态。
+- 验收：mock 测试断言 `torch.Event()` 被创建并记录且 `torch.xpu.Event()` 未被调用；XPU 硬件测试在计算流完成后让侧流执行 non-blocking D2H，等待侧流同步后断言 host tensor 全部保持预期值、无尾部图像损坏。 ^[PR #5571]
 
 ## EXEC-12a — ROCm 分页注意力必须走 packed KV 的兼容 varlen 路径
 
