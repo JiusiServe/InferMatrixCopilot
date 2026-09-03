@@ -1,10 +1,10 @@
 ---
 title: "MiniCPM-o 4.5 规则"
 created: 2026-07-20
-updated: 2026-09-02
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #3642", "PR #5165", "PR #5382", "PR #5524", "PR #5638", "PR #5792", "PR #5869", "PR #6056", "PR #6154", "PR #6170", "PR #6318", tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, vllm_omni/benchmarks/data_modules/seed_tts_dataset.py, vllm_omni/benchmarks/data_modules/seed_tts_eval.py, vllm_omni/benchmarks/patch/patch.py, vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/experimental/fullduplex/client.py, vllm_omni/experimental/fullduplex/openai/chat_fallback.py, vllm_omni/experimental/fullduplex/openai/serving.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/cuda_graph_wrapper.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_code2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_tts.py, tests/model_executor/models/minicpmo_4_5/test_audio_chunk_mask.py, tests/model_executor/models/minicpmo_4_5/test_code2wav_batching.py, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_pipeline.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, tests/model_executor/models/minicpmo_4_5/test_vision_flash_attention.py]
+sources: ["PR #3642", "PR #5165", "PR #5382", "PR #5524", "PR #5638", "PR #5792", "PR #5869", "PR #6056", "PR #6154", "PR #6170", "PR #6318", tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, vllm_omni/benchmarks/data_modules/seed_tts_dataset.py, vllm_omni/benchmarks/data_modules/seed_tts_eval.py, vllm_omni/benchmarks/patch/patch.py, vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/experimental/fullduplex/client.py, vllm_omni/experimental/fullduplex/openai/chat_fallback.py, vllm_omni/experimental/fullduplex/openai/serving.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/cuda_graph_wrapper.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_code2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_tts.py, tests/model_executor/models/minicpmo_4_5/test_audio_chunk_mask.py, tests/model_executor/models/minicpmo_4_5/test_code2wav_batching.py, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_pipeline.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, tests/model_executor/models/minicpmo_4_5/test_vision_flash_attention.py, "PR #6082"]
 confidence: high
 ---
 
@@ -88,6 +88,10 @@ confidence: high
   证明被上层串行化或增加互斥与重叠调用测试。PR 的单 A800 profile 约 30→5 ms/chunk、
   250→43 ms/request，只绑定部分 graph、
   单 prompt/commit `8fa28d88`，无 repeats/端到端质量，不能泛化为稳定 speedup。^[PR #5869]
+
+## MCPMO-1e — CFM DiT CUDA Graph 必须按 shape 捕获并保持 eager parity
+
+- 触发：修改 MiniCPM-o 4.5 Code2Wav CFM DiT estimator 的 CUDA Graph 开关、`blocks_forward_chunk` graph target、按 shape 捕获/重放、cache eviction 或 eager fallback。\n- 强制：仅在 CUDA 且显式启用时捕获 `estimator.blocks_forward_chunk`；`t_embedder`、`torch.cat`、`expand`、buffer 准备和 10-step Euler loop 保持 eager。graph key 必须包含所有输入的 shape、dtype 和 device，并使用有界 `cfm_max_graphs` LRU；`cnn_cache=None` 与 `att_cache=None` 转为 graph 可接受的零值时，必须保持与 eager `[None] * depth` 的首 chunk 数值语义，重放结果和 cache 输出需 clone。\n- 禁止：捕获整个 `_estimator_step` 或手写替代 graph target；使用无界 shape cache；在 nested capture 中重放；捕获失败后伪装成功；把 CFM graph 的配置、性能或 parity 结论外推到 HiFT、encoder、TRT 或其他模型。\n- 验收：CUDA 测试覆盖 uncached/cached shape 的 graph/eager 数值 parity、`None` cache parity、lazy capture、capture failure eager fallback 和 LRU eviction；同时覆盖 active capture/non-CUDA fallback，并确认 deploy 配置值实际到达 estimator。\n^[PR #6082]
 
 ## MCPMO-2a — registry 使用 4.5 config/version predicate
 
