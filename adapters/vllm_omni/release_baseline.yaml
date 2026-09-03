@@ -118,6 +118,8 @@ ignored_paths:
   reason: repository tooling
 - pattern: .readthedocs.yaml
   reason: documentation tooling
+- pattern: .readthedocs.yml
+  reason: documentation tooling（上游在 PR #6129 改了扩展名）
 - pattern: CODE_OF_CONDUCT.md
   reason: community metadata
 - pattern: CONTRIBUTING.md
