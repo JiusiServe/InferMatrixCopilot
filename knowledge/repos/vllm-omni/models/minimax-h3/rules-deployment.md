@@ -1,10 +1,10 @@
 ---
 title: "MiniMax H3 部署与证据规则"
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5723", "PR #5764", "PR #5836", "PR #5850", "PR #5857", "PR #5863", recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-5000.md, "PR #5891", "PR #5896", "PR #5946", "PR #5969", "PR #5972", docs/models/supported_models.md, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-4090.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/utils/fa.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/offloader/, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/platforms/npu/platform.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/entrypoints/openai_api/test_video_server.py]
+sources: ["PR #5723", "PR #5764", "PR #5836", "PR #5850", "PR #5857", "PR #5863", recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-5000.md, "PR #5891", "PR #5896", "PR #5946", "PR #5969", "PR #5972", docs/models/supported_models.md, recipes/MiniMaxAI/MiniMax-H3.md, recipes/MiniMaxAI/MiniMax-H3-4090.md, recipes/MiniMaxAI/MiniMax-H3-5090.md, recipes/MiniMaxAI/MiniMax-H3-Spark-GB10.md, recipes/MiniMaxAI/MiniMax-H3-RTX-PRO-6000.md, vllm_omni/diffusion/attention/backends/flash_attn.py, vllm_omni/diffusion/attention/backends/utils/fa.py, vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, vllm_omni/diffusion/models/minimax_h3/vae.py, vllm_omni/diffusion/offloader/, vllm_omni/entrypoints/openai/api_server.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/platforms/npu/platform.py, tests/dfx/perf/scripts/run_diffusion_benchmark.py, tests/dfx/perf/tests/test_minimax_h3_vllm_omni.json, tests/entrypoints/openai_api/test_video_server.py, "PR #5910"]
 confidence: high
 ---
 
@@ -210,3 +210,8 @@ measurement；模型输入、执行与加载合同返回 [MiniMax H3 rules](rule
   或可复核 quality artifact，且 PR 只有 markdown/pre-commit。review 明确 Ref2VA 未测试，因此
   `MODEL=Ref2VA` 重启说明只是配置建议。重测仍须记录 exact image/SHA、rank groups、NUMA policy、
   all-rank peak 与 artifact/quality。^[PR #5857]
+
+## MMH3-3i — H3 online FP8 的 layerwise/DLO 组合必须限界并保持 stride
+
+- 触发：MiniMax-H3 同时启用 online FP8 与普通 layerwise offload、distributed layerwise offload、resident layers 或 transposed Cutlass weight replay。\n- 强制：online FP8 可以与 resident/no-offload、普通 layerwise offload 以及 DLO full-weight per-rank no-AllGather 路径组合；DLO 启动必须使用 `--dlo-no-use-allgather`，保留 standard loader 生成的物理布局，并在 streaming、prefetch、resident replay 中保存和恢复真实 stride。\n- 禁止：继续把 online FP8 与所有 layerwise offload一概标记为不兼容；runtime-created FP8 进入 sharded DLO AllGather；用 `.view()` 把物理转置权重恢复成 contiguous 逻辑布局；把单次 B300 的显存或速度观察写成 H3 通用容量/性能保证。\n- 验收：H3 contract 覆盖 resident、普通 layerwise、DLO no-AllGather 与 no-offload 的启动/输出路径；online FP8 + DLO AllGather 在 loader 边界明确报错；转置权重回放逐值核对 stride，并分别记录 exact GPU、shape、steps、checkpoint 和 all-rank 资源结果。^[PR #5910]
+

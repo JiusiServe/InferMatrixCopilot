@@ -1,10 +1,10 @@
 ---
 title: "FLUX.2 规则"
 created: 2026-07-20
-updated: 2026-09-02
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #4645", "PR #5136", vllm_omni/diffusion/models/flux2/flux2_transformer.py]
+sources: ["PR #4645", "PR #5136", vllm_omni/diffusion/models/flux2/flux2_transformer.py, "PR #5910"]
 confidence: high
 ---
 

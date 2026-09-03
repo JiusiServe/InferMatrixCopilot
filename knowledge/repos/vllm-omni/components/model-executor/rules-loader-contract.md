@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #4730", "PR #4765", "PR #4958", "PR #5777", "PR #5824", vllm_omni/model_executor/model_loader/]
+sources: ["PR #4730", "PR #4765", "PR #4958", "PR #5777", "PR #5824", vllm_omni/model_executor/model_loader/, "PR #5910"]
 confidence: high
 ---
 
@@ -52,3 +52,8 @@ confidence: high
 - 验收：对已验证 checkpoint 逐模块核对加载计数、无 missing/extra tensor 和预期 dtype；对缺失配置块、架构常量不匹配、部分 shard 及错误命名空间执行 fail-fast 测试，并确认推理前就暴露错误。^[PR #4765]
 
 相关执行流见 [model-executor architecture](architecture.md)；跨 stage 合同见 [bridge/batch 规则](rules-bridge-batch.md)。
+
+## EXEC-2d — 全局量化配置与组件配置必须明确区分作用域
+
+- 触发：修改共享 quantization factory、pipeline component 配置解析或 `quantization_config` 的全局/按组件语义。\n- 强制：普通 `QuantizationConfig` 必须原样解析到每个由 pipeline 构造且支持量化的组件；只有 `ComponentQuantizationConfig` 的显式 component map 可以缩小作用域。resolver、pipeline 和 quantizable layer 必须使用一致的 runtime prefix namespace，并仅让实际支持的 vLLM quantizable layer 消费配置。\n- 禁止：用 `hasattr(quant_config, "resolve")` 等隐式约定替代共享 resolver；因为组件属于同一模型就自动重写任意 `torch.nn` layer、embedding、norm、VAE 或其他不支持量化的模块；解析到单一组件后仍要求另一套 owner prefix。\n- 验收：CPU/mock 与真实构造测试分别覆盖 global config 同时命中 `transformer`/`text_encoder`、component map 只命中指定组件、未命中返回 `None`、最长 prefix 匹配及 unsupported layer 保持 checkpoint dtype；Flux2 与 MiniMax-H3 的 resolver 必须共同通过该合同。^[PR #5910]
+
