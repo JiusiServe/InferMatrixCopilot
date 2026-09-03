@@ -1,7 +1,7 @@
 ---
 title: "Host Weight Runtime"
 created: 2026-08-23
-updated: 2026-08-23
+updated: 2026-09-04
 type: index
 tags: [vllm-omni, components]
 sources: ["PR #6419", vllm_omni/host_weight_runtime/]
@@ -17,7 +17,7 @@ confidence: high
 ## 什么时候查这里
 
 - 修改 host-weight store、lease/lock、deny/quarantine、locality、fallback 或 restore transaction。
-- 具体 diffusion layout/source identity 同时读取 [Diffusion DIFF-2d](../diffusion/rules.md)。
+- 具体 diffusion layout/source identity 同时读取 [Diffusion DIFF-2d](../diffusion/rules-checkpoint-loading.md)。
 
 ## 目录内容
 

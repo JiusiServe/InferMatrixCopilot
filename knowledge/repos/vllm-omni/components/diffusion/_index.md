@@ -1,7 +1,7 @@
 ---
 title: "Diffusion"
 created: 2026-07-10
-updated: 2026-09-03
+updated: 2026-09-04
 type: index
 tags: [vllm-omni, components, diffusion]
 sources: []
@@ -47,3 +47,4 @@ sources: []
 | Cache-DiT、TeaCache 和 prefix cache | [cache acceleration](cache-acceleration.md) |
 | TP/PP/SP/CFG/VAE/HSDP 等并行策略 | [parallelism](parallelism.md) |
 | 实验性 world-model session 生命周期、LRU 与内存统计边界 | [session state](session-state.md) |
+| checkpoint remap、HSDP/FSDP、component quantization 与在线量化加载 | [checkpoint 与加载合同](rules-checkpoint-loading.md) |

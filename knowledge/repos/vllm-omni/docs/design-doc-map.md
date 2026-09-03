@@ -1,7 +1,7 @@
 ---
 title: "官方设计文档地图（docs/design/**）"
 created: 2026-07-16
-updated: 2026-09-02
+updated: 2026-09-04
 type: guide
 tags: [vllm-omni, docs]
 sources: ["PR #5139", "PR #5833", "PR #5839", "PR #5914", "PR #5958", "PR #6045", docs/features/README.md, docs/user_guide/diffusion/startup_and_loading.md, docs/user_guide/diffusion_features.md, .github/CODEOWNERS, docs/.nav.yml, docs/design/index.md, docs/design/module/, docs/design/module/archive/README.md, docs/design/ar_diffusion_pipeline_capability.md, docs/design/architecture_overview.md, docs/design/feature/diffusion_continuous_batching.md, docs/design/feature/distributed_layerwise_offload.md, docs/design/feature/omni_async_output_materialization.md, docs/design/feature/quantization.md, docs/user_guide/diffusion/execution_modes.md]
@@ -57,8 +57,8 @@ Feature user guide、design contract、recipe 与 support claim 的分层和 nav
 | `feature/async_chunk.md` | 跨 stage 分块流式 | [distributed](../components/distributed/async-chunk.md) |
 | `feature/cache_dit.md`、`teacache.md`、`prefix_caching.md` | 缓存加速 | [diffusion](../components/diffusion/cache-acceleration.md) |
 | `feature/{tensor,pipeline,sequence,expert,cfg,vae}_parallel.md`、`hsdp.md` | 并行策略 | [diffusion](../components/diffusion/parallelism.md) |
-| `feature/distributed_layerwise_offload.md` + `user_guide/diffusion/cpu_offload.md` | DLO 的 DP/SP/TP/HSDP compatibility、AllGather 与 rank-local loader 合同；部分组合仅有配置级验证 | [diffusion rule DIFF-2e](../components/diffusion/rules.md) |
-| `feature/quantization.md` + `user_guide/quantization/overview.md` | diffusion quantization factory、component routing、checkpoint metadata 与验证边界 | [diffusion rule DIFF-2c](../components/diffusion/rules.md) |
+| `feature/distributed_layerwise_offload.md` + `user_guide/diffusion/cpu_offload.md` | DLO 的 DP/SP/TP/HSDP compatibility、AllGather 与 rank-local loader 合同；部分组合仅有配置级验证 | [diffusion rule DIFF-2e](../components/diffusion/rules-checkpoint-loading.md) |
+| `feature/quantization.md` + `user_guide/quantization/overview.md` | diffusion quantization factory、component routing、checkpoint metadata 与验证边界 | [diffusion rule DIFF-2c](../components/diffusion/rules-checkpoint-loading.md) |
 | `metrics.md`、`qwen3_omni_tts_performance_optimization.md` | Prometheus 指标；TTS 性能优化实录 | [qwen-omni](../models/qwen-omni/architecture.md)（perf 部分） |
 | `docs/configuration/*` | 配置 schema spec | [configuration](../components/configuration/architecture.md) |
 | `docs/contributing/ci/*` | L1–L5 与 markers | [ci guides](../ci/guides/test-tiers.md) |
