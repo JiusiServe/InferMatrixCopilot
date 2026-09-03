@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ 3875f8de`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ 9d2bb23f`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -45,7 +45,7 @@ OMNI_PIPELINES 46→51，deploy 71→79。新增 AR 家族是 `audex`；diffusio
 `minimax_h3`，同时 LTX-2/LTX-2.3 的五个旧 registry names 合并为两个入口。新增
 pipeline keys 是四个 Audex 模式和 `nemotron_labs_audex` alias；deploy 新增八个
 Audex files 与 `qwen3_omni_moe_thinking.yaml`，删除 `minicpmo_4_5_batching.yaml`。
-本次相对 `9798bc3a` 本轮新增 diffusion inventory 条目 `LingBotWorldCausalDMDPipeline`，并加入实验性 AR-Diffusion tick/session 执行链；不可据此推断为稳定公开服务、任意多副本路由、超过 10 ticks、广泛硬件/量化支持或官方数值 parity。
+本次相对 `3875f8de` 本轮新增 MiniMax H3 的 loader-owned direct-mmap adapter、TP=1 DLO host-weight plan、rank-local staging 与 ordinary-loader fallback 规则。不得据此推断 TP>1 使用共享 mmap、任意模型具备 direct-mmap 支持，或将一次性硬件 smoke/内存数据视为生产性能保证。
 
 ## AR/omni 模型族（29）
 
@@ -88,8 +88,8 @@ voxtral_tts、wan2_2_ti2v、nemotron_labs_audex、indextts2_5
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from 9798bc3a \
-  --to 3875f8de \
+  --from 3875f8de \
+  --to 9d2bb23f \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```

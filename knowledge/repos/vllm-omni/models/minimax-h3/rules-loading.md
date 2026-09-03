@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5706", "PR #5737", "PR #5824", vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, "PR #5910"]
+sources: ["PR #5706", "PR #5737", "PR #5824", vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, "PR #5910", "PR #6213"]
 confidence: high
 ---
 
@@ -53,4 +53,11 @@ load 完成时 dynamic quantize，text encoder、VAE 和非 eligible projection 
 ## MMH3-1k — H3 global FP8 必须覆盖可量化文本解码器并拒绝预量化 encoder 配置
 
 - 触发：修改 MiniMax-H3 的 `quantization="fp8"`、`diffusion-quantization-config`、Qwen3-VL text encoder linear 构造或其 checkpoint quantization safety filter。\n- 强制：H3 的 plain/global FP8 配置同时提供给 DiT 与已暴露为 `LinearBase` 的 Qwen3-VL text decoder；显式 `transformer`/`text_encoder` component map 只量化指定组件。eligible attention/MLP linears 使用 online FP8，vision tower、embedding、norm、RoPE、VAE 及模型指定 FP32 projection 保持 checkpoint precision；text encoder 仅允许 online FP8，BF16 encoder 必须剥离不兼容的 serialized ModelOpt/pre-quantized 配置。\n- 禁止：把 H3 global FP8 描述成 DiT-only，或据此自动量化任意普通 `torch.nn` encoder；把 serialized FP8/ModelOpt scale 配置直接交给没有对应 checkpoint 参数的 BF16 text encoder；为 H3 另造一套绕过 vLLM factory 的 FP8 method。\n- 验收：覆盖 global、DiT-only、text-encoder-only 与组合配置，断言各组件实际 quant method、未量化边界和 runtime prefix；serialized FP8 必须拒绝，ModelOpt config 必须从 BF16 text encoder 移除而保留 online FP8；text encoder fused shard/load contract 继续通过。^[PR #5910]
+
+## MMH3-1l — H3 直接 mmap 必须由 loader adapter 证明布局等价
+
+- 触发：修改 MiniMax H3 的直接 checkpoint mmap、grouped-QKV 布局转换、custom `weight_loader`、TP 边界或 DLO loader/backend 交接。
+- 强制：由 `DiffusersPipelineLoader` 预检完整的 DiT source coverage、runtime/checkpoint key、shape、dtype、TP topology 与 loader compatibility，并把唯一的 `HostWeightPlan` 交给 DLO；H3 grouped-QKV 的直接 mmap 变换由 loader-side adapter 声明，在 bounded block packing 时执行，普通 loader 路径仍须在 active weight loader 前完成原有 reorder/split。TP=1 才允许该 direct-mmap plan，TP>1、HSDP、online quantization、缺失/未知 custom loader 或 metadata 不匹配必须在模型 mutation 前回退 ordinary loader。
+- 禁止：用 `_supports_mmap_loading` 等 pipeline capability flag 或 parameter-attached transform 代替 adapter proof；让 backend 重扫 checkpoint、重建 runtime name 或绕过 H3 active loader；把 TP>1 ordinary-loader fallback 描述成 shared-mmap host-memory optimization。
+- 验收：adapter sentinel 验证 grouped-QKV 输出顺序且目标 parameter 不携带 mmap transform；preflight 覆盖 TP/HSDP/online quantization、缺 key、shape/dtype mismatch 与未适配 custom loader，并断言回退发生在 mutation 前；exact plan transfer 与 direct-mmap/ordinary-loader 两条路径分别完成 H3 权重完整性检查。^[PR #6213]
 
