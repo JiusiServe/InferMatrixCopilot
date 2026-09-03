@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #3642", "PR #5165", "PR #5382", "PR #5524", "PR #5638", "PR #5792", "PR #5869", "PR #6056", "PR #6154", "PR #6170", "PR #6318", tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, vllm_omni/benchmarks/data_modules/seed_tts_dataset.py, vllm_omni/benchmarks/data_modules/seed_tts_eval.py, vllm_omni/benchmarks/patch/patch.py, vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/experimental/fullduplex/client.py, vllm_omni/experimental/fullduplex/openai/chat_fallback.py, vllm_omni/experimental/fullduplex/openai/serving.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/cuda_graph_wrapper.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_code2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_tts.py, tests/model_executor/models/minicpmo_4_5/test_audio_chunk_mask.py, tests/model_executor/models/minicpmo_4_5/test_code2wav_batching.py, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_pipeline.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, tests/model_executor/models/minicpmo_4_5/test_vision_flash_attention.py, "PR #6082", "PR #5604"]
+sources: ["PR #3642", "PR #5165", "PR #5382", "PR #5524", "PR #5638", "PR #5792", "PR #5869", "PR #6056", "PR #6154", "PR #6170", "PR #6318", tests/dfx/perf/tests/test_minicpmo_4_5.json, tests/dfx/perf/tests/test_minicpmo_4_5_duplex_seed_tts.json, tests/e2e/accuracy/minicpmo_4_5/test_minicpmo_4_5.py, tests/e2e/online_serving/helpers/minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5.py, tests/e2e/online_serving/test_minicpmo_4_5_duplex.py, tests/e2e/online_serving/test_minicpmo_4_5_expansion.py, vllm_omni/benchmarks/data_modules/seed_tts_dataset.py, vllm_omni/benchmarks/data_modules/seed_tts_eval.py, vllm_omni/benchmarks/patch/patch.py, vllm_omni/deploy/minicpmo_4_5.yaml, vllm_omni/experimental/fullduplex/client.py, vllm_omni/experimental/fullduplex/openai/chat_fallback.py, vllm_omni/experimental/fullduplex/openai/serving.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/minicpmo_4_5/batched_token2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/cuda_graph_wrapper.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_code2wav.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_llm.py, vllm_omni/model_executor/models/minicpmo_4_5/minicpmo_4_5_omni_tts.py, tests/model_executor/models/minicpmo_4_5/test_audio_chunk_mask.py, tests/model_executor/models/minicpmo_4_5/test_code2wav_batching.py, tests/model_executor/models/minicpmo_4_5/test_cuda_graph_wrapper.py, tests/model_executor/models/minicpmo_4_5/test_pipeline.py, tests/model_executor/models/minicpmo_4_5/test_talker_batching.py, tests/model_executor/models/minicpmo_4_5/test_vision_flash_attention.py, "PR #6082", "PR #5604", "PR #6274"]
 confidence: high
 ---
 
@@ -100,6 +100,13 @@ confidence: high
 - 禁止：捕获整个 Code2Wav Stage 2 或依赖全局 `--enforce-eager` 代替 stage-scoped 配置；把 graph 开关放进 shared connector extra；让失败捕获继续复用可能已损坏的 allocator/RNG state；把 NPU graph 的 parity、缓存或性能结论外推到 HiFT、TRT、CUDA 或其他模型。
 - 验收：解析 `minicpmo_4_5.yaml`、`minicpmo_4_5_2gpu.yaml` 和 `minicpmo_4_5_3gpu.yaml` 的 NPU 最终 stage config，断言 Stage 0/1 的 `PIECEWISE`、Stage 2 的 outer eager 与 additional config；CPU 测试覆盖 timestep、exact dispatch、cache bucket、clone ownership、runtime precondition、MATH 选择和 fail-stop；A3 测试覆盖 uncached/cached eager parity。任何性能声明还必须记录 exact command、A3 硬件/驱动/torch-npu、warmup、测量轮数、并发、延迟/RTF 和峰值 NPU memory。^[PR #5604]
 
+## MCPMO-1g — Token2Wav 的 eager TorchDynamo 包装必须在流式热路径中移除
+
+- 触发：MiniCPM-o 4.5 的 Token2Wav/CosyVoice 流式路径使用 `torch.compile(backend="eager")` 包装 `forward_chunk`，并在新 chunk shape 上出现首响应停顿。
+- 强制：在 `BatchedToken2Wav` 初始化时，仅当方法存在 `_torchdynamo_orig_callable` 或 `__wrapped__` 时恢复原始 bound method；保留 estimator、encoder、HiFT 的其他路径及其运行时语义。
+- 禁止：让 eager backend 的 tracing/guard 构造进入每个未见 chunk shape 的实时响应；把该解包扩大为所有后端、模型或 CUDA Graph 路径的通用优化。
+- 验收：检查存在包装时初始化后 `forward_chunk` 已指向原始实现、无包装时保持不变；用 cold 与 warm 的多 chunk duplex 回归确认首个响应不再长时间停顿、后续响应持续产出音频，且 steady-state 行为未被改变。 ^[PR #6274]
+
 ## MCPMO-2a — registry 使用 4.5 config/version predicate
 
 - 触发：pipeline auto-detection 看到通用 `MiniCPMO` architecture。
@@ -150,6 +157,13 @@ confidence: high
   当前测试未覆盖 `gradient_checkpointing and training`：新 tuple（两 tensor + Python int）会作为
   位置参数穿过 `_gradient_checkpointing_func`，补该 path 前不能假设训练/checkpoint 兼容。
   ^[PR #5165]
+
+## MCPMO-2d — Whisper 流式音频缓存必须兼容 current 与 legacy Transformers API
+
+- 触发：MiniCPM-o 4.5 Whisper/APM 音频编码器需要在 Transformers 版本变化后复用流式 chunk 的 attention cache。
+- 强制：根据 `self_attn.forward` 签名选择 `past_key_values` 或旧版 `past_key_value`；读取缓存长度时优先支持 `self_attention_cache.get_seq_length()`，兼容需要 layer 参数的实现，并回退到 legacy tuple 的 key shape；当当前 attention 返回值没有 cache 项时保留传入 cache。
+- 禁止：固定传入已被新 API 吞入 `**kwargs` 的旧参数名；调用已移除的 `get_usable_length()`；依赖 experimental 模块的全局 monkey patch 才能读取缓存；把当前 API 返回的两项结果误解为应清空已有 cache。
+- 验收：覆盖 legacy/current attention 参数名、`EncoderDecoderCache`/`DynamicCache`、legacy tuple 和两种 `get_seq_length` 签名；连续编码两个 chunk 时缓存长度正确增长，输出与无缓存编码有可观察差异，并通过 MiniCPM-o 4.5 streaming/duplex 回归验证首响应和中断行为。 ^[PR #6274]
 
 ## MCPMO-3a — TTS stage 的 batch 能力与 runtime_info 消费一致
 
