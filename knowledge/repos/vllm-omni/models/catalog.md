@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ 9b0df390`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ 5be7541d`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -45,7 +45,7 @@ OMNI_PIPELINES 46→51，deploy 71→79。新增 AR 家族是 `audex`；diffusio
 `minimax_h3`，同时 LTX-2/LTX-2.3 的五个旧 registry names 合并为两个入口。新增
 pipeline keys 是四个 Audex 模式和 `nemotron_labs_audex` alias；deploy 新增八个
 Audex files 与 `qwen3_omni_moe_thinking.yaml`，删除 `minicpmo_4_5_batching.yaml`。
-本次相对 `a15b5b4b` 本轮沉淀了可选 forced-aligner pooling stage 的配置注入、跨 stage 输入输出桥接、scheduler 解码失败处理和 TTS 时间戳传输合同。离线示例删除与新增测试/文档未单独沉淀。不能据此推断离线时间戳仍受支持、所有 pooling stage 都具备相同语义，或生产链路已经可靠传递 aligner words；当前实现仍需警惕 words 重分段及测试 fake payload 与真实 OmniRequestOutput 不一致。
+本次相对 `9b0df390` 本轮新增 NVIDIA Nemotron-Labs VoiceChat 的三阶段 pipeline、hybrid-Mamba cache dtype、跨 stage 累积 payload 与 async-chunk 路由事实。不能据此推断已支持 full-duplex serving、batch>1 或 function-calling。
 
 ## AR/omni 模型族（29）
 
@@ -88,8 +88,8 @@ voxtral_tts、wan2_2_ti2v、nemotron_labs_audex、indextts2_5
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from a15b5b4b \
-  --to 9b0df390 \
+  --from 9b0df390 \
+  --to 5be7541d \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```

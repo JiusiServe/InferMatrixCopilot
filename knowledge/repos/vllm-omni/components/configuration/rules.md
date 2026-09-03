@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795"]
+sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842"]
 ---
 
 # vLLM-Omni 配置开发门禁
@@ -81,6 +81,14 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 ## 部署配置与资源预算
 
 只有 `CONF-数字字母` 是本节可审计规则 ID。
+
+### VOMNI-CFG-1j — hybrid-Mamba stage 的 SSM cache dtype 必须贯穿 typed projection
+
+- 触发：hybrid-Mamba stage 新增 SSM cache dtype，或同一模型提供普通与 async-chunk deploy 配置。
+- 强制：把 `mamba_ssm_cache_dtype` 同时声明在 typed shared/stage config 与最终 deploy stage，并投影到 vLLM `CacheConfig`；模型 `dtype` 与 SSM state dtype 分开验收，Nemotron thinker 默认保持 `float32`。
+- 禁止：只在 YAML 注释或模型内部设置 cache dtype；用 stage 的整体 `dtype` 替代 SSM state dtype；只验证 dataclass 能构造而不验证最终 runtime consumer。
+- 验收：从 deploy/structured/legacy 入口读取非默认值，断言 sync 与 async thinker 的最终 stage config 和 vLLM cache consumer 均得到 `mamba_ssm_cache_dtype=float32`，并覆盖 bf16 模型、fp32 SSM state 的组合。
+^[PR #5842]
 
 ### CONF-1a — 多 stage 共卡时 diffusion stage 必须显式设 gpu_memory_utilization
 
@@ -187,4 +195,12 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 - 禁止：只检查 `forced_aligner` 而忽略 config-only 注入；原地修改调用方的 pipeline/deploy；把 orchestrator-only flags 泄漏为每个 stage 的 engine 参数；用 `execution_type` 猜测应构造 `PoolingParams` 还是生成参数。
 - 验收：覆盖模型参数、config-only、无参数三态；断言原 pipeline/deploy 未改变，最终逐 stage config 含正确模型、`runner`、pooling task、设备和 decoder hook，并证明 stage 初始化按 `runner` 选择 `PoolingParams`。 
 ^[PR #4795]
+
+### CONF-5d — 无 `model_type` 的多 stage checkpoint 必须闭合别名与架构路由
+
+- 触发：接入缺少 `model_type` 或 `architectures` 的 NeMo 风格多 stage checkpoint，或新增其 pipeline alias、architecture 路由与默认 deploy 配置。
+- 强制：同时登记所有 stage architecture 到 `_ARCH_TO_MODEL_TYPE`，注册统一 `NemotronVoiceChatConfig`，让 alias、path-basename fallback 与 `default_deploy_config_name` 指向同一 pipeline；不得只依赖路径猜测。
+- 禁止：只注册 thinker 或只提供一个 alias；让空的 `model_arch` 覆盖 checkpoint architecture；让 sync 与 async deploy 配置解析出不同的 stage 拓扑。
+- 验收：用 bare `config.json` 和三个 architecture 分别验证 model type、pipeline、stage config 与默认 deploy 名称；sync/async 配置只切换 processor wiring，并保持三 stage 顺序与 stage architecture 一致。
+^[PR #5842]
 

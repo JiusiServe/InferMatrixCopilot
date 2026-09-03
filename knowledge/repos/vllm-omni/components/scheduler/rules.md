@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, scheduler]
-sources: ["PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461", "PR #4795"]
+sources: ["PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461", "PR #4795", "PR #5842"]
 ---
 
 # Scheduler 规则
@@ -255,3 +255,12 @@ modules=[online_serving, worker_runner]，status=active，run_count=38，2026-06
 
 - 机制与边界见 [architecture](architecture.md)；跨 stage 数据面见
   [Distributed 组件](../distributed/_index.md)。
+
+## SCHED-6c — full-payload allowlist 必须精确绑定最终 consumer 与 async wiring
+
+- 触发：新增 async-chunk processor 或把某个 stage 加入 full-payload input allowlist。
+- 强制：allowlist 使用精确的 `(model_arch, stage_key)` consumer 配对；Nemotron 的 `talker -> code2wav` 才能接收完整 code payload，`thinker -> talker` 保持 token-only；sync full-payload builder 与 async-chunk builder 必须分别接入同一真实 code2wav consumer。
+- 禁止：按模型家族或 stage index 猜测 full-payload 能力；把 token-only 的 thinker→talker hop 放进 full-payload allowlist；让非 async deploy 逐 token搬运完整 code stack，或让 async 终端 chunk 缺少 finished/empty-terminal 语义。
+- 验收：覆盖 allowlisted code2wav 与 non-allowlisted talker 对照，分别验证普通 deploy 的一次 request-end 全 payload、streaming deploy 的累计 chunk/终端 chunk、connector requeue 和 abort cleanup。
+^[PR #5842]
+
