@@ -4,7 +4,7 @@ created: 2026-09-03
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/api_server.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #5491", "PR #6033", "PR #5272", "PR #6186"]
+sources: ["PR #4834", "PR #4905", "PR #4912", "PR #5682", "PR #5713", "PR #5746", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", vllm_omni/engine/async_omni_engine.py, vllm_omni/entrypoints/openai/api_server.py, "PR #6121", "PR #6214", "vllm_omni/engine/stage_runtime.py", "PR #5676", "PR #5491", "PR #6033", "PR #5272", "PR #6186", "PR #6241", "vllm_omni/entrypoints/openai/tts_adapters/moss_tts.py"]
 confidence: high
 ---
 

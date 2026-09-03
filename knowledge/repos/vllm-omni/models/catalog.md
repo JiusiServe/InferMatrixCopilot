@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ a630b0c2`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ 26e00371`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -45,7 +45,7 @@ OMNI_PIPELINES 46→51，deploy 71→79。新增 AR 家族是 `audex`；diffusio
 `minimax_h3`，同时 LTX-2/LTX-2.3 的五个旧 registry names 合并为两个入口。新增
 pipeline keys 是四个 Audex 模式和 `nemotron_labs_audex` alias；deploy 新增八个
 Audex files 与 `qwen3_omni_moe_thinking.yaml`，删除 `minicpmo_4_5_batching.yaml`。
-本次相对 `adf6d0c1` 本轮沉淀了统一模型路径解析合同、Ming-family 共享模块归属，以及 Ming-TTS 说话人抽取在引擎预取与离线预处理间的下载策略。不能据此推断所有调用方都应联网下载、所有 ModelScope 路径都绕过缓存，或模型专有常量也必须立即移动到 common/ming；文档、配方和测试变更不作为规则记录。
+本次相对 `a630b0c2` 本轮在 MOSS-TTS 模型规则中沉淀 Local talker 的固定形状异步输出、单 token prefill、compact top-k 与 Local Depth RoPE cache 合同，并为现有 TTS adapter sampling 规则补充 PR #6241 证据。不能据此推断所有模型都可启用异步输出、compact sampler 与全词表采样 seed/bit 等价，或将 PR 中吞吐与质量数据视为当前树的通用结果。
 
 ## AR/omni 模型族（29）
 
@@ -88,8 +88,8 @@ voxtral_tts、wan2_2_ti2v、nemotron_labs_audex、indextts2_5
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from adf6d0c1 \
-  --to a630b0c2 \
+  --from a630b0c2 \
+  --to 26e00371 \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```

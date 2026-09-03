@@ -1,10 +1,10 @@
 ---
 title: "MOSS-TTS 规则"
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, model-executor]
-sources: ["PR #5635", vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_codec.py, vllm_omni/model_executor/models/moss_tts/audio_tokenizer.py]
+sources: ["PR #5635", vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_codec.py, vllm_omni/model_executor/models/moss_tts/audio_tokenizer.py, "PR #6241", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local.py", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_local_depth.py", "vllm_omni/model_executor/models/moss_tts/modeling_moss_tts_talker.py"]
 confidence: high
 ---
 
@@ -40,3 +40,18 @@ confidence: high
 
 共享 loader 的 dtype/config 最小读取合同见
 [Model Executor rules](../../components/model-executor/rules.md)。
+
+## MOSSTTS-2a — Local talker 异步输出必须保持固定 shape 和 prefill 边界
+
+- 触发：修改 MOSS-TTS Local talker 的 `make_omni_output`、`compute_logits`、`preprocess`、async chunk 或 CUDA Graph/async schedule。
+- 强制：只有在每个 request row 保持固定 shape 且状态更新可在 eager 阶段完成时启用 `use_async_omni_output`；`make_omni_output` 必须按原 batch 顺序保留每个 request 的 code row，包括全 `audio_pad_token_id` 的 stop row，并逐行生成 `_batch_should_continue`，再由 CPU 侧 `talker2codec_raw_async_chunk` 过滤全 pad row。`_omni_is_prefill` 为真时即使 span 只有一个 token 也必须走 embedding prefill，不生成 MTP/audio 输入，并保持 `ref_offset` 与 audio state 的既有更新语义。
+- 禁止：在 GPU 上使用 `codes[should_continue]` 或其他会发现动态输出 shape 的 boolean indexing；在模型侧提前丢弃全 pad row；仅凭 `span_len` 判断单 token prefill；或在 async output 模式下延迟仍会被下一步覆盖的模型状态更新。
+- 验收：mixed batch 同时覆盖有效 row 与 stop row，断言 row 数、shape、原 batch 对齐和 `_batch_should_continue` 值，并确认下游只过滤全 pad row；单 token prefill 断言 embedding 结果、无 `mtp_inputs` 且不推进 audio generation；async output/graph 路径验证不存在 host 动态 shape discovery，状态与输出均可正确交付。 ^[PR #6241]
+
+## MOSSTTS-2b — Local sampler 与 Depth RoPE cache 必须保持直接路径及数值边界
+
+- 触发：修改 MOSS-TTS Local 的 `_sample_token`、Local Depth attention RoPE、`torch.compile`/CUDA Graph capture，或为这些优化增加运行时开关。
+- 强制：在 `_run_prefix` 编译或 talker capture 前，为每个 Local Depth attention 预先构造位置 `0..n_vq-1` 的非持久 RoPE cache（当前 Local v1.5 为 `0..11`），执行时只切片并让较短序列复用既有 allocation；compact top-k 必须在保留的 sorted candidates 上完成 nucleus filtering、softmax 和 multinomial，再将 compact index 映射回原始词表。
+- 禁止：在每个 depth step 内重复执行 `arange`/`einsum`/`cos`/`sin`，在 captured body 中构造或替换 cache，或用环境变量把这些直接实现伪装成可选路径；不得声称 compact sampler 与宽度 1024 的 multinomial 在 seed 或 bit 上等价，也不得忽略 top-k 边界 ties 的有限精度差异。
+- 验收：RoPE 测试与参考公式数值一致，较短 slice 保持 cache storage；capture 前确认完整 cache 已物化且执行体只使用切片。采样测试断言结果属于 retained top-k、极小 `top_p` 选择 argmax，并在无 ties 时核对分布语义；质量或回归记录必须明确 compact width 改变 RNG 映射后的非 seed/bit-equivalence 边界。 ^[PR #6241]
+
