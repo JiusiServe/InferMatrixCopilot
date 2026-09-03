@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5550", "PR #5864", "PR #5978", vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/inline_stage_diffusion_client.py, vllm_omni/diffusion/ipc.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/utils/media_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, tests/diffusion/test_async_output_worker.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_engine_cleanup.py, tests/diffusion/test_diffusion_ipc.py, tests/diffusion/test_inline_stage_diffusion_client.py, tests/diffusion/test_ipc_async.py, tests/diffusion/test_multiproc_engine_concurrency.py, tests/diffusion/test_result_pump.py, tests/entrypoints/openai_api/test_video_server.py, "PR #6023"]
+sources: ["PR #5550", "PR #5864", "PR #5978", vllm_omni/diffusion/diffusion_engine.py, vllm_omni/diffusion/executor/multiproc_executor.py, vllm_omni/diffusion/inline_stage_diffusion_client.py, vllm_omni/diffusion/ipc.py, vllm_omni/diffusion/sched/request_scheduler.py, vllm_omni/diffusion/utils/media_utils.py, vllm_omni/diffusion/worker/diffusion_worker.py, tests/diffusion/test_async_output_worker.py, tests/diffusion/test_diffusion_engine.py, tests/diffusion/test_diffusion_engine_cleanup.py, tests/diffusion/test_diffusion_ipc.py, tests/diffusion/test_inline_stage_diffusion_client.py, tests/diffusion/test_ipc_async.py, tests/diffusion/test_multiproc_engine_concurrency.py, tests/diffusion/test_result_pump.py, tests/entrypoints/openai_api/test_video_server.py, "PR #6023", "PR #5983"]
 confidence: high
 ---
 
@@ -97,4 +97,8 @@ confidence: high
 - 强制：per-request tensor view 的 IPC packing 必须按 `max(view_bytes, storage_bytes)` 判断并只把 view 内容放入 SHM；`execute_batch` 注册 split map 时必须在同一锁下接管早到的 batch output；`result_mq` 的 `COMPUTE_DONE` 与 `OUTPUT_READY` 写入必须串行化；result pump 必须先完成 SHM unpack，再在 `_futures_lock` 下原子 resolve waiter 或缓存 completed output；worker 执行 `sleep`/`handle_sleep_task` 和本地 sleep task 前必须等待 `drain_async_outputs()`，并在 `_ASYNC_OUTPUT_TIMEOUT` 超时日志中输出 executor bookkeeping。
 - 禁止：按 view 大小判断而让共享 batch storage 被 pickle 重复发送；在 split map 建立前缓存一个无人消费的 batch-level output；让多个线程并发写单写者 `MessageQueue`；SHM unpack 期间释放 future 锁导致 waiter orphan；释放 device memory 时仍允许后台 D2H/SHM 线程读取源 tensor；把单 tensor storage-aware packing 当作 aggregate serialized message 已不会溢出的证明，也不得据此推断外部 HTTP 视频传输已优化。
 - 验收：覆盖 per-request shared-storage wire-size regression、早到和晚到的 batch `OUTPUT_READY`、已有 waiter 与缓存 future 的原子 resolution、并发 result queue writer 无 overlap、pending output 的 drain/timeout 及 sleep-before-drain 顺序；同时验证 non-sleep RPC 不 drain、SHM unpack/error path、超时诊断状态和 worker shutdown cleanup。^[PR #6023]
+
+## DIFF-1r — 共享 Future resolve 必须对取消竞态 fail-safe
+
+- 触发：修改 diffusion result pump、共享 `_rpc_futures`/`_output_futures`、`asyncio.wait_for()` 超时、请求 abort 或 shutdown future cleanup。\n- 强制：共享 Future 在 `done()` 检查后仍必须通过 `try_set_result`/`try_set_exception` 解析，并在 helper 内捕获 `concurrent.futures.InvalidStateError`，丢弃取消或已完成 Future 的晚到结果/异常，使 singleton pump 继续运行；仅 freshly-created 且尚未共享的本地 Future 可直接解析。\n- 禁止：把 `not fut.done()` 与 `set_result()`/`set_exception()` 当作原子操作；在共享 Future 上保留未保护的 resolve 调用；让取消竞态异常逃逸并杀死 result pump，随后仍以健康检查通过推断任务会完成。\n- 验收：用 `done()` 固定返回 false 但实际已取消的 racy Future 覆盖 `COMPUTE_DONE`、`OUTPUT_READY`、batch split 与 shutdown cleanup，断言 pump 不抛 `InvalidStateError`、取消 Future 保持取消、同批健康 Future 仍完成，并回归相邻并发测试。\n^[PR #5983]
 
