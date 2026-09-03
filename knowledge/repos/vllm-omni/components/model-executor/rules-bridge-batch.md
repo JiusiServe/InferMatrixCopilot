@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, model-executor]
-sources: ["PR #3422", "PR #3642", "PR #4795", "PR #5073", "PR #5074", "PR #5310", "PR #5792", "PR #5842", "PR #5957", "PR #5976", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/sched/output.py, vllm_omni/utils/mm_outputs.py, "PR #4765"]
+sources: ["PR #3422", "PR #3642", "PR #4795", "PR #5073", "PR #5074", "PR #5310", "PR #5792", "PR #5842", "PR #5957", "PR #5976", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/sched/output.py, vllm_omni/utils/mm_outputs.py, "PR #4765", "PR #5666"]
 confidence: high
 ---
 
@@ -117,4 +117,11 @@ Direct 代码快速入口；loader 与 checkpoint 合同留在该页的 `EXEC-2x
 - 强制：每个 batch row 每步都向 `_results_queue` 放入一个位置项；prefill 使用 `(req_id, None)` 占位，`compute_logits` 按原 batch position 消费并在无信号或未越过停止阈值时强制 continue，消费后清空队列。
 - 禁止：省略 prefill/new-request 占位、压缩或重排队列、把 `(continue, stop)` 概率直接当 logits，或依赖全 `-inf` 行的偶然 `argmax` 结果维持对齐。
 - 验收：用同批 prefill+decode、停止阈值以下、空队列和多请求输入测试，分别断言每行的 continue/stop 结果、请求归属与队列耗尽；batch 顺序变化不能改变停止对象。^[PR #4765]
+
+## EXEC-1k — AR runner 必须传递逐请求预算与内部采样 seed
+
+- 触发：共享 AR runner 把逐请求 metadata 交给 `preprocess`，而模型在 `forward` 内采样或必须在 `max_tokens`/上下文容量的最后一个有效 step 发送 multimodal payload 时。
+- 强制：从每个请求的 `sampling_params` 读取 `max_tokens` 与 `seed`，随 prompt 长度、已计算 token 数和 prefill 状态传入所有 preprocess 路径；模型用 scheduler cursor 与 `max_model_len` 判定最后输出，并将 seed 交给 request-local generator。
+- 禁止：用当前 span 或模型本地计数器猜预算；只让 vLLM 外层 sampler 看到 seed；依赖 `on_requests_finished` 之后再 flush，此时 request 已离开输出 batch，payload 无法路由。
+- 验收：通过真实 runner 的 mixed-batch 路径覆盖停止结束、预算结束和最后一个 in-flight request，断言每个请求的 committed frame 全部送达；覆盖同 seed、异 seed 及有无 batch 邻居的结果与 request 归属。 ^[PR #5666]
 

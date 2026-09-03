@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, config]
-sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765"]
+sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR #5073", "PR #5671", "PR #5678", "zuiho-kai/claude-workflow-starter@c217fc6", vllm_omni/config/model.py, vllm_omni/config/stage_config.py, vllm_omni/config/config_factory.py, vllm_omni/config/omni_config.py, vllm_omni/config/composable_parallel/, vllm_omni/deploy/qwen3_omni_moe.yaml, vllm_omni/engine/stage_init_utils.py, tests/config/test_config_factory.py, tests/engine/test_arg_utils.py, tests/engine/test_stage_engine_args.py, "PR #4795", "PR #5842", "PR #6082", "PR #6156", "PR #5741", "PR #6068", "PR #4765", "PR #5666"]
 ---
 
 # vLLM-Omni 配置开发门禁
@@ -143,6 +143,13 @@ sources: ["claude-workflow-starter-private@296ea45", "PR #4281", "PR #5031", "PR
 - 强制：让 model config、architecture registry、pipeline registry 与 `default_deploy_config_name` 指向同一模型；对 dots.tts 保持 `enforce_eager: true` 与 `enable_prefix_caching: false`，并从未显式传入 deploy 配置的真实 `Omni` 初始化中核对最终逐 stage 值；在 prefix-cache merge 尚未保留 `sparse_audio` 前，不得移除该 pin。
 - 禁止：以 YAML 文件存在或 pipeline key 存在推断默认配置已经自动加载；只验证原始 YAML 而跳过最终 stage config；覆盖 `enable_prefix_caching` 后仍宣称 dots.tts 输出合同不变。
 - 验收：用 HF `model_type=dots_tts` 的无显式配置启动路径断言 architecture、pipeline、默认 deploy 文件和最终 flags 一致，并完成超过一个 160 ms patch 的离线生成，确认没有 prefix-cache 导致的单 patch 截断。^[PR #4765]
+
+### CONF-3d — checkpoint 身份与模型架构路由必须分层闭合
+
+- 触发：checkpoint 的 `config.json` 自报为上游 backbone，但 Omni 需要独立的 model architecture、pipeline 和默认 deploy 配置时。
+- 强制：让 model registry、pipeline registry、`model_arch`、`default_deploy_config_name` 与 deploy stage 的 `hf_overrides.architectures` 闭合指向同一模型；保留 backbone 的 `model_type`，并让无显式配置的入口解析打包的 deploy YAML。
+- 禁止：只注册 pipeline 或放置 YAML 就依赖 `model_type` 推断；用 `hf_overrides.model_type` 替代 stage architecture 路由；要求离线入口额外传参来弥补默认配置未接通。
+- 验收：真实无显式 deploy 配置的初始化能读回最终 pipeline 与 architecture，backbone `get_text_config()` 仍解析为原模型类型，并覆盖 registry、默认 YAML 与最终 stage config 的一致性。 ^[PR #5666]
 
 ### CONF-4a — composable strategy 只暴露已经接通的 axis
 
