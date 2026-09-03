@@ -4,7 +4,7 @@ created: 2026-07-20
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, serving]
-sources: ["Issue #5369", "PR #3576", "PR #4583", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5085", "PR #5157", "PR #5374", "PR #5670", "PR #5682", "PR #5713", "PR #5732", "PR #5746", "PR #5752", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", .pre-commit-config.yaml, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_chat.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/entrypoints/openai/tts_adapters/, vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/engine/cfg_companion_tracker.py, vllm_omni/metrics/prometheus.py, tests/dfx/reliability/test_reliability_qwen3_omni.py, tests/engine/test_orchestrator_error_handling.py, tests/entrypoints/test_async_omni.py, tests/entrypoints/test_omni_entrypoints.py, tests/entrypoints/openai_api/test_audex_serving_guards.py, tests/entrypoints/openai_api/test_omni_sleep_wakeup.py, tests/entrypoints/openai_api/test_tts_detection.py, tests/entrypoints/openai_api/test_video_api_utils.py, tests/entrypoints/openai_api/test_video_server.py, tests/tools/test_check_tts_adapter.py, tools/pre_commit/check_tts_adapter.py, "PR #4795", "PR #4755", "PR #3805"]
+sources: ["Issue #5369", "PR #3576", "PR #4583", "PR #4718", "PR #4834", "PR #4905", "PR #4912", "PR #5085", "PR #5157", "PR #5374", "PR #5670", "PR #5682", "PR #5713", "PR #5732", "PR #5746", "PR #5752", "PR #5843", "PR #5957", "PR #6008", "PR #6138", "PR #6202", "claude-workflow-starter-private@09dca46", "zuiho-kai/claude-workflow-starter@c217fc6", .pre-commit-config.yaml, vllm_omni/entrypoints/async_omni.py, vllm_omni/entrypoints/omni_base.py, vllm_omni/entrypoints/openai/diffusion_request_utils.py, vllm_omni/entrypoints/openai/serving_chat.py, vllm_omni/entrypoints/openai/serving_speech.py, vllm_omni/entrypoints/openai/serving_video.py, vllm_omni/entrypoints/openai/video_api_utils.py, vllm_omni/entrypoints/openai/tts_adapters/, vllm_omni/engine/async_omni_engine.py, vllm_omni/engine/orchestrator.py, vllm_omni/engine/stage_pool.py, vllm_omni/engine/cfg_companion_tracker.py, vllm_omni/metrics/prometheus.py, tests/dfx/reliability/test_reliability_qwen3_omni.py, tests/engine/test_orchestrator_error_handling.py, tests/entrypoints/test_async_omni.py, tests/entrypoints/test_omni_entrypoints.py, tests/entrypoints/openai_api/test_audex_serving_guards.py, tests/entrypoints/openai_api/test_omni_sleep_wakeup.py, tests/entrypoints/openai_api/test_tts_detection.py, tests/entrypoints/openai_api/test_video_api_utils.py, tests/entrypoints/openai_api/test_video_server.py, tests/tools/test_check_tts_adapter.py, tools/pre_commit/check_tts_adapter.py, "PR #4795", "PR #4755", "PR #3805", "PR #5878"]
 confidence: high
 ---
 
@@ -118,6 +118,13 @@ confidence: high
 - 禁止：无 aligner 时静默返回 200 音频；让 `stream=true` 的 HTTP 路径伪装支持该字段；把长 header 静默丢弃；以 in-process sidecar 或离线示例替代 pipeline stage 的真实输出。
 - 验收：覆盖 non-stream、HTTP streaming、WebSocket、无/有 aligner、短/超限 alignment 和多句音频；分别断言 400、header/frame 内容、超限标记，以及音频在时间戳缺失或超限时仍按合同返回。
 ^[PR #4795]
+
+## SERV-1g — TTS voice 输入、占位 default 与可用 speaker 必须闭环
+
+- 触发：修改 OpenAI speech 的 `voice` 输入校验、VoiceID 归一化、可用 voice 列表、上传 speaker 或无 speaker 模型的默认 voice 语义。
+- 强制：协议层同时接受字符串和包含 `id` 的 VoiceID 对象，并在 serving 校验前归一化为小写名称；可用 voice 列表必须统一包含内置 speaker、上传 speaker 和 `default` 占位项。无实际 `default` speaker 时，`default` 请求必须被接受并转换为后端忽略的无 voice 请求；存在同名真实 speaker 时必须优先使用真实 speaker；其他非法名称返回结构化 400。
+- 禁止：要求没有可用 speaker 的模型提供一个实际存在的 voice 名称；让 voice 列表遗漏 `default` 或上传 speaker；把 `default` 占位值传入后端作为真实 speaker；仅支持字符串而拒绝合法 VoiceID 对象。
+- 验收：覆盖无上传 speaker 时的字符串和 `{\"id\": ...}` 请求、未知 voice 的 400、上传前后 `default` 与新增 speaker 的列表和语音请求，以及注册并删除同名 `default` 后占位行为恢复；另需验证同名上传 voice 的实际使用，而不只断言请求成功。 ^[PR #5878]
 
 ## SERV-2a — 指标节流和 gauge 按 scheduler/stage/replica owner 隔离
 
