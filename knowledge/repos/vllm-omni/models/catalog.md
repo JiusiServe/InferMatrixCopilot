@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ c3de04e1`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ 284e05c8`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -45,7 +45,7 @@ OMNI_PIPELINES 46→51，deploy 71→79。新增 AR 家族是 `audex`；diffusio
 `minimax_h3`，同时 LTX-2/LTX-2.3 的五个旧 registry names 合并为两个入口。新增
 pipeline keys 是四个 Audex 模式和 `nemotron_labs_audex` alias；deploy 新增八个
 Audex files 与 `qwen3_omni_moe_thinking.yaml`，删除 `minicpmo_4_5_batching.yaml`。
-本次相对 `4cd66787` 本轮将 PR #6322 的 Pi0 pipeline registry 导入边界沉淀到配置规则：registry 只依赖轻量拓扑模块，避免预加载 Pi0 runtime 形成循环导入。该隔离进程测试不能推断所有模型 runtime 导入链或平台运行时均已验证。
+本次相对 `c3de04e1` 本轮记录了 PR #6279 对 diffusion DLO 加载合同的更新：仅 per-tensor online FP8 支持 DLO AllGather，并通过普通 loader 在分片前完成权重与 scale 的物化。不可据此推断其他在线量化方法、direct checkpoint mmap 或所有模型与硬件组合均已支持。
 
 ## AR/omni 模型族（29）
 
@@ -88,8 +88,8 @@ voxtral_tts、wan2_2_ti2v、nemotron_labs_audex、indextts2_5
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from 4cd66787 \
-  --to c3de04e1 \
+  --from c3de04e1 \
+  --to 284e05c8 \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```

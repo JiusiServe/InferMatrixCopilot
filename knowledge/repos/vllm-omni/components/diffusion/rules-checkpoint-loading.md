@@ -132,3 +132,11 @@ confidence: high
 - 触发：修改在线/runtime quantization 与 layerwise offload、DLO 权重加载、非连续 FP8 权重 flatten/repoint 或加载后处理流程。\n- 强制：在线量化层必须在消费完对应 checkpoint weight 后才可流式移回 CPU，并跳过已完成层的重复 `process_weights_after_loading`；继续加载其他模型权重前释放可复用的量化缓存。对非连续权重按物理 storage 顺序打包，记录 `shape`、`stride` 和实际 storage span，并在普通 layerwise、DLO prefetch 与 resident replay 中用 `torch.as_strided` 重建；runtime-created FP8 与 DLO 组合必须使用 no-AllGather 路径。\n- 禁止：对转置 Cutlass FP8 weight 使用逻辑 `.flatten()` 后再 `.view(shape)`，丢失物理布局；为调用幂等处理而把已量化 CPU 层重新搬回 accelerator；把 runtime-created FP8 宣称支持 sharded DLO AllGather。\n- 验收：CPU/mock 测试验证普通 layerwise、DLO prefetch 和 resident replay 的值与 stride 均保持，覆盖不同 storage span、streaming 顺序、已处理层跳过与缓存释放；online FP8 + DLO AllGather 必须 fail fast，no-AllGather 路径须完成加载并通过对应输出/资源 smoke。^[PR #5910]
 
 相关执行流见 [Diffusion architecture](architecture.md)；component lifecycle 见 [component lifecycle 规则](rules-component-lifecycle.md)。
+
+## DIFF-2t — DLO AllGather 只允许已验证的 per-tensor online FP8 布局
+
+- 触发：修改 DLO+AllGather 与在线量化的兼容门禁、普通 loader fallback，或 FP8 权重/scale 的分片重建。
+- 强制：仅允许 `Fp8PerTensorOnlineLinearMethod` 进入 DLO+AllGather；由于 direct checkpoint mmap 不能生成运行时量化布局，必须先由普通 loader 完成 FP8 权重和 scale，再交给 DLO 按 dtype 分片，并按记录的 shape、stride 重建转置 Cutlass 权重。每个 rank 启动时可能暂存完整 FP8 模型，运行时才保留 DLO shard。
+- 禁止：把该 allowlist 扩展到未经验证的在线量化方法；绕过普通 loader 直接 mmap 在线量化权重；丢失非连续权重的物理 stride；将 transient 完整模型 host memory 峰值描述为运行时常驻开销。此前 DIFF-2s 对所有 runtime-created FP8 的 AllGather 禁止由本规则收窄覆盖。
+- 验收：loader 测试必须证明 allowlist 分支确实执行、普通 loader 在 DLO 前完成权重与 scale 处理，并对未验证 method fail fast；DLO 测试必须验证 FP8 weight/scale 的 dtype、值、shape 和转置 stride 重建。另覆盖 no-AllGather 路径及至少一次真实多 rank AllGather smoke；声明质量或性能 parity 仍需固定模型、硬件和 exact workload 的独立证据。^[PR #6279]
+
