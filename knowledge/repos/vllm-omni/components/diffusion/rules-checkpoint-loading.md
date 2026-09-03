@@ -4,7 +4,7 @@ created: 2026-09-04
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, components, diffusion]
-sources: ["PR #5087", "PR #5088", "PR #5136", "PR #5677", "PR #5737", "PR #5764", "PR #5802", "PR #5836", "PR #5839", "PR #5848", "PR #5872", "PR #5910", "PR #6070", "PR #6279", "PR #6445", vllm_omni/diffusion/model_loader/, vllm_omni/quantization/, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/offloader/, "PR #5531"]
+sources: ["PR #5087", "PR #5088", "PR #5136", "PR #5677", "PR #5737", "PR #5764", "PR #5802", "PR #5836", "PR #5839", "PR #5848", "PR #5872", "PR #5910", "PR #6070", "PR #6279", "PR #6445", vllm_omni/diffusion/model_loader/, vllm_omni/quantization/, vllm_omni/diffusion/distributed/hsdp.py, vllm_omni/diffusion/offloader/, "PR #5531", "PR #4061"]
 confidence: high
 ---
 
@@ -146,4 +146,11 @@ confidence: high
 - 强制：`RankGenerator` 只表达真实正交的 TP/SP/PP/CFG/DP 轴；HSDP 不得作为额外轴，FSDP2 `DeviceMesh` 独占 replicate/shard 进程组；VAE tile parallel 直接从 WORLD 选 rank。初始化前验证 distributed 已启动且状态为空，组创建失败时必须清理本次已创建的 diffusion 与 vLLM 组；销毁时同时清空 vLLM `_PP` 等引用。
 - 禁止：重新创建冗余 `_DIT` 或 `_FS` 组；把 HSDP shard 当作 `RankGenerator` 的乘法维度；让 HSDP 继续依赖已移除的 fully-shard accessor；清理后保留已销毁的 pipeline group 或允许残留部分状态阻塞下一次初始化。
 - 验收：覆盖 HSDP standalone、HSDP+SP/CFG、VAE WORLD group、mesh 维度与实际 WORLD 不一致、初始化中途异常、重复初始化和销毁后重初始化；断言失败后无残留组，vLLM `_PP` 被置空，MiniMax H3 的 VAE/pipeline caller 使用 `get_world_group().device_group`，并以真实多 rank smoke 验证 DeviceMesh 与 collective 拓扑。^[PR #5531]
+
+## DIFF-2v — SANA-WM Stage-1 checkpoint 必须保持标准 Diffusers 布局
+
+- 触发：新增或修改 SANA-WM Stage-1 的 checkpoint resolution、Diffusers component source、HF download allow-pattern、transformer config/weight loading，或尝试直接接入 NVLabs 原始发布布局。
+- 强制：运行时只消费离线转换的标准 Diffusers 树：`model_index.json` 必须解析为 `SanaWmPipeline`，并同时提供 `transformer/config.json`、`transformer/diffusion_pytorch_model.safetensors`、`vae/config.json` 和 `vae/diffusion_pytorch_model.safetensors`；从 transformer config 构造 `SanaWmConfig`，Stage-1 download pattern 只包含这组必要文件，refiner 不进入该路径。
+- 禁止：用运行时 YAML parser、原始 NVLabs key remap、layout sniff 或宽泛下载模式弥补不兼容的 checkpoint；把命名为 `SanaWmTwoStagesPipeline` 的旧两阶段 repo 当作当前 Stage-1 registry 自动发现成功，或静默跳过缺文件、未知/重复/shape 不符权重。
+- 验收：local path 与 HF snapshot 都验证上述文件、`model_index.json` class 和 transformer config 读取；weight loader 对 unknown/duplicate/shape mismatch fail fast 并由 strict coverage 检查 expected keys；Stage-1 smoke 证明不下载/初始化 refiner，旧 layout 只能在显式且兼容的 class override 下运行。^[PR #4061]
 

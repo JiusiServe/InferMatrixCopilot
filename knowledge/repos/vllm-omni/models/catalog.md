@@ -10,7 +10,7 @@ sources: [vllm_omni/model_executor/models/registry.py, vllm_omni/diffusion/regis
 # 模型代码入口与 registry 快照
 
 本页提供模型描述到代码目录的自动定位入口，不维护逐模型 class 映射。下方计数是
-`main @ 14bd8f87`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
+`main @ adf6d0c1`（2026-08-12）快照，数字会漂移，不能凭它断言“不支持”。
 
 ## Direct 模型代码入口
 
@@ -45,7 +45,7 @@ OMNI_PIPELINES 46→51，deploy 71→79。新增 AR 家族是 `audex`；diffusio
 `minimax_h3`，同时 LTX-2/LTX-2.3 的五个旧 registry names 合并为两个入口。新增
 pipeline keys 是四个 Audex 模式和 `nemotron_labs_audex` alias；deploy 新增八个
 Audex files 与 `qwen3_omni_moe_thinking.yaml`，删除 `minicpmo_4_5_batching.yaml`。
-本次相对 `14f2c16f` 本轮新增配置并行拓扑与 diffusion 分布式并行状态门禁：明确 WORLD/DP/HSDP 的解析、设备传播、DeviceMesh 所有权及初始化失败清理。不能据此推断所有 HSDP 组合或真实多卡性能已获验证。
+本次相对 `14bd8f87` 本轮新增 SANA-WM Stage-1 checkpoint 的标准 Diffusers 布局与严格加载门禁。现有 DIFF-4i 已覆盖 registry/能力 metadata 路径；不能由本规则推断 SANA-WM 的 camera/action 请求格式、TP 数值等价、序列并行支持或 Stage-2 refiner 支持。
 
 ## AR/omni 模型族（29）
 
@@ -88,8 +88,8 @@ voxtral_tts、wan2_2_ti2v、nemotron_labs_audex、indextts2_5
 
 ```bash
 python tools/audit_vllm_omni_release.py \
-  --from 14f2c16f \
-  --to 14bd8f87 \
+  --from 14bd8f87 \
+  --to adf6d0c1 \
   --repo <vllm-omni-checkout> \
   --mode report-only
 ```
