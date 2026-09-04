@@ -22,7 +22,7 @@ sources: [vllm_omni/diffusion/models/gr00t/pipeline_gr00t.py, vllm_omni/diffusio
   `DiffusionOutput(output={"actions": dict[str, np.float32 ndarray]})`
   （把动作放进 `output` 以通过引擎空输出守卫——与 DreamZero OpenPI 策略
   同形）。
-- **自加载权重（比 SoulX 更严格）**：`weights_sources=()` 且 `load_weights`
+- **完全自加载权重**：`weights_sources=()` 且 `load_weights`
   喂张量直接 raise——`Gr00tPolicy` 自己 `AutoModel.from_pretrained`（bf16）;
   框架 loader 必须置身事外。
 - backbone `_Qwen3VLBackbone`：`Qwen3VLForConditionalGeneration` 截到
