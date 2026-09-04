@@ -4,7 +4,7 @@ created: 2026-07-16
 updated: 2026-09-05
 type: rule
 tags: [vllm-omni, components, scheduler]
-sources: ["PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, tests/core/sched/test_omni_ar_scheduler_streaming.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/core/sched/test_omni_scheduler_mixin_timeouts.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461", "PR #4795", "PR #5842", "PR #6021", "PR #6033", "PR #6089", "PR #6149", "PR #6360", "PR #6406", "PR #6150", "PR #6619", "PR #6680", "PR #6626"]
+sources: ["PR #5957", "PR #5976", tests/core/sched/test_omni_ar_scheduler_stale_drain.py, tests/core/sched/test_omni_ar_scheduler_streaming.py, "vllm-omni-rebase-agent@122a9468:agent/skills/fix-talker-truncated-prefill-prefix-cache-key-cap/SKILL.md", "vllm-omni-rebase-agent@122a9468:agent/skills/gpu-hang-low-max-num-batched-tokens/SKILL.md", vllm_omni/worker/gpu_ar_model_runner.py, vllm_omni/core/prefix_cache.py, vllm_omni/utils/mm_outputs.py, vllm_omni/core/sched/omni_ar_scheduler.py, vllm_omni/core/sched/omni_generation_scheduler.py, vllm_omni/core/sched/omni_scheduler_mixin.py, vllm_omni/core/sched/omni_scheduling_coordinator.py, vllm_omni/core/sched/output.py, tests/core/test_prefix_cache.py, tests/core/test_prefix_cache_async_write.py, tests/core/sched/test_omni_scheduler_mixin_shared.py, tests/core/sched/test_omni_scheduler_mixin_timeouts.py, tests/distributed/omni_connectors/test_chunk_transfer_adapter.py, tests/utils/test_mm_outputs.py, tests/entrypoints/test_omni_new_request_data.py, "PR #4106", "PR #5310", "PR #5461", "PR #4795", "PR #5842", "PR #6021", "PR #6033", "PR #6089", "PR #6149", "PR #6360", "PR #6406", "PR #6150", "PR #6619", "PR #6680", "PR #6626", "PR #6529", tests/core/sched/test_omni_ar_scheduler_aborted_queue_sweep.py, tests/core/sched/test_omni_scheduler_streaming_input_counter.py, tests/core/sched/test_omni_sched_deferred_free_fence.py]
 ---
 
 # Scheduler 规则
@@ -28,7 +28,7 @@ PR 描述先命中下表，再打开对应规则组和首批源码；changed fil
 | stateful async chunk、full-payload input、KV cleanup | SCHED-5b/5c | `core/sched/omni_generation_scheduler.py`、`omni_scheduling_coordinator.py`、`omni_ar_scheduler.py::_free_request` |
 | KV extraction wait、connector acknowledgement、partial interval cleanup | SCHED-5h | `core/sched/omni_ar_scheduler.py::{_free_request,update_from_output}` → scheduler stats → orchestrator metrics |
 | consumed chunk validation failure、receive ledger、live request termination | SCHED-5i | `core/sched/omni_scheduler_mixin.py::_process_chunk_receive_failures` → `chunk_transfer_adapter.py` |
-| async stop、streaming update、stale token fence、next duplex unit 被吞 | SCHED-6a | `core/sched/omni_ar_scheduler.py::{_handle_stopped_request,update_from_output}` → `test_omni_ar_scheduler_streaming.py` |
+| async stop、streaming update、scheduled/async stale token fence、abort queue/counter drift | SCHED-6a/6f | `core/sched/omni_ar_scheduler.py::{_handle_stopped_request,update_from_output}` → scheduler mixin abort sweep/counter resync → streaming/stale tests |
 
 若描述只写模型症状，先从模型 owner 找到 payload producer/consumer；只有实际断点落在调度、
 prefix cache 或 copy lifetime 时才把 Scheduler 加为 owner。
@@ -331,3 +331,19 @@ modules=[online_serving, worker_runner]，status=active，run_count=38，2026-06
 - 强制：在 `_handle_stopped_request` 及任何会重置 computed-token 状态的 transition 前，从 chunk adapter 取得 confirmed computed-token watermark；将该冻结值显式传给 `save_async`。后续 segment 只能建立自己的 watermark，不能让旧边界任务读取已重置 request。
 - 禁止：在 request replacement 后重新计算旧 segment 的 send watermark；以当前 `num_computed_tokens` 推断已确认旧边界；把模型专用 Code2Wav batching/wait policy 塞进通用 generation scheduler。
 - 验收：模拟 stop handler 将同一 request 重置为新 segment，断言 queued old boundary 使用 transition 前的 confirmed token 数；并验证 generation scheduler 没有新增 MiniCPM/Code2Wav-specific coalescing state。^[PR #6021]
+
+## SCHED-6f — stale output 必须同时耗尽 scheduled 与 async 两类计数
+
+- 触发：streaming segment replacement 后收到 late model frame，或修改 abort queue cleanup、
+  streaming-input admission counter 与 segment-boundary handoff。
+- 强制：同一迟到 frame 必须联合结算 scheduled-token stale window 与
+  `async_tokens_to_discard`；前者按 scheduled-token accounting，后者按该 frame 的 generated-token
+  数递减，任一 fence 命中就不得 append/emit。处理 pending input 前后都从
+  `waiting`、`skipped_waiting` 与 `running` 清除 `FINISHED_ABORTED`，随后按 live queue ownership
+  重算 `num_waiting_for_streaming_input`。
+- 禁止：两个 stale domain 只消费一个；只清普通 waiting/running 而遗留 hidden skipped queue；
+  用增减猜 streaming counter；把 unacknowledged response snapshot 当作有界 lifetime，或把
+  sliding-recompute/后续 playback ACK 修复归因于本提交。
+- 验收：覆盖一个 frame 同时命中两种 fence、仅命中任一 fence、三类 queue 的 abort sweep、
+  pending-input 前后 abort，以及 live-owner counter drift 修复；断言旧 frame 不进入 output，
+  两个 counter 恰好归零且新 segment 首帧保留。^[PR #6529]
