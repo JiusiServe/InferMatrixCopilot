@@ -27,6 +27,7 @@ sources: [vllm_omni/worker/gpu_model_runner.py, vllm_omni/worker/gpu_ar_model_ru
 | async Omni output、background builder、D2H snapshot、connector drain/fallback | `async-output`：`EXEC-5a` | `worker/gpu_ar_model_runner.py::{_should_use_async_omni_output,OmniAsyncGPUModelRunnerOutput}` → platform runner → connector output |
 | Talker-MTP FULL graph、平台 capture 能力、显式 opt-out | `mtp-graph`：`EXEC-4c` | `platforms/interface.py::supports_talker_mtp_graph_capture` → platform override → model `talker_mtp_graph_safe` → `OmniGPUModelRunner._init_talker_mtp` |
 | `model_extras`、shared T2I/I2V example、canonical prompt envelope | `image-task-envelope`：`EXEC-6a` | `examples/offline_inference/{text_to_image/text_to_image.py,image_to_video/image_to_video.py}` → `model_extras/registry.py::{build_text_to_image_prompt,build_image_to_video_prompt}` → model pipeline validation |
+| CosyVoice3 non-module TensorRT CFM、stream/event ownership、raw-pointer buffer lifetime 或 context-pool reuse | [CosyVoice3 TensorRT handoff](../../models/cosyvoice3/rules.md)：`COSYVOICE3-1a` | `code2wav_core/cfm.py::ConditionalCFM.forward_estimator` → `flow_estimator_trt.py::TrtContextWrapper` |
 
 | 审查组 | 什么时候触发 | 规则 ID |
 |---|---|---|

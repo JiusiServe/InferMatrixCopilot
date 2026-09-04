@@ -4,7 +4,7 @@ created: 2026-07-21
 updated: 2026-09-04
 type: architecture
 tags: [vllm-omni, models]
-sources: ["PR #6424", vllm_omni/data_entry_keys.py, vllm_omni/model_executor/models/cosyvoice3/cosyvoice3.py, vllm_omni/model_executor/models/cosyvoice3/cosyvoice3_code2wav.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/cosyvoice3/pipeline.py, vllm_omni/model_executor/stage_input_processors/cosyvoice3.py, vllm_omni/transformers_utils/configs/cosyvoice3.py, vllm_omni/deploy/cosyvoice3.yaml]
+sources: ["PR #5673", "PR #6424", vllm_omni/data_entry_keys.py, vllm_omni/model_executor/models/cosyvoice3/cosyvoice3.py, vllm_omni/model_executor/models/cosyvoice3/cosyvoice3_code2wav.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/cfm.py, vllm_omni/model_executor/models/cosyvoice3/code2wav_core/hifigan.py, vllm_omni/model_executor/models/cosyvoice3/flow_estimator_trt.py, vllm_omni/model_executor/models/cosyvoice3/pipeline.py, vllm_omni/model_executor/stage_input_processors/cosyvoice3.py, vllm_omni/transformers_utils/configs/cosyvoice3.py, vllm_omni/deploy/cosyvoice3.yaml]
 ---
 
 # CosyVoice3 架构
@@ -23,6 +23,16 @@ sources: ["PR #6424", vllm_omni/data_entry_keys.py, vllm_omni/model_executor/mod
 - **TRT 加速（本清单独有）**：campplus 说话人嵌入与 CFM DiT 估计器都可走
   TensorRT（启动时 ONNX→plan,按设备缓存 plan;campplus 有 CPU-ONNX 兜底）,
   统一由 `COSYVOICE3_TRT` 门控,默认开。
+- **CFM TensorRT handoff**：每个 execution context 与一个原始
+  `torch.cuda.Stream` 成对入池；caller stream 先由该 stream 的 `wait_stream`
+  建立 producer→TensorRT 依赖，TRT 在该 stream 的 raw `cuda_stream` handle 上
+  enqueue。返回前 caller 对 estimator stream 再 `wait_stream`，所以后续 CFG
+  buffer 原地写入和 output dtype conversion 在 consumer stream 上发生在 TRT 后。
+  所有供 raw pointer binding 的输入/输出都 record estimator stream；输出还 record
+  caller stream，分别覆盖 enqueue 前后 allocator reuse。context 可在 enqueue 后回池，
+  因为它始终与专属 stream 成对且 TensorRT 已 snapshot 地址；这不是 host synchronize。
+  `torch.nn.Module` estimator 路径和 `COSYVOICE3_TRT` 的既有关闭/CPU fallback
+  不在这个非-module TensorRT 分支中改变。具体改动约束见 [rules](rules.md)。^[PR #5673]
 - 共享：diffusion Attention 层、SharedMemoryConnector、
   [Config 组件](../../components/configuration/architecture.md)。
 
