@@ -4,7 +4,7 @@ created: 2026-09-02
 updated: 2026-09-04
 type: rule
 tags: [vllm-omni, models, diffusion]
-sources: ["PR #5706", "PR #5737", "PR #5824", vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, "PR #5910", "PR #6213"]
+sources: ["PR #5706", "PR #5737", "PR #5824", vllm_omni/diffusion/models/minimax_h3/encoder.py, vllm_omni/diffusion/models/minimax_h3/minimax_h3_transformer.py, vllm_omni/diffusion/models/minimax_h3/pipeline_minimax_h3.py, tests/diffusion/models/minimax_h3/test_minimax_h3_contract.py, "PR #5910", "PR #6213", "PR #6445"]
 confidence: high
 ---
 
@@ -60,4 +60,11 @@ load 完成时 dynamic quantize，text encoder、VAE 和非 eligible projection 
 - 强制：由 `DiffusersPipelineLoader` 预检完整的 DiT source coverage、runtime/checkpoint key、shape、dtype、TP topology 与 loader compatibility，并把唯一的 `HostWeightPlan` 交给 DLO；H3 grouped-QKV 的直接 mmap 变换由 loader-side adapter 声明，在 bounded block packing 时执行，普通 loader 路径仍须在 active weight loader 前完成原有 reorder/split。TP=1 才允许该 direct-mmap plan，TP>1、HSDP、online quantization、缺失/未知 custom loader 或 metadata 不匹配必须在模型 mutation 前回退 ordinary loader。
 - 禁止：用 `_supports_mmap_loading` 等 pipeline capability flag 或 parameter-attached transform 代替 adapter proof；让 backend 重扫 checkpoint、重建 runtime name 或绕过 H3 active loader；把 TP>1 ordinary-loader fallback 描述成 shared-mmap host-memory optimization。
 - 验收：adapter sentinel 验证 grouped-QKV 输出顺序且目标 parameter 不携带 mmap transform；preflight 覆盖 TP/HSDP/online quantization、缺 key、shape/dtype mismatch 与未适配 custom loader，并断言回退发生在 mutation 前；exact plan transfer 与 direct-mmap/ordinary-loader 两条路径分别完成 H3 权重完整性检查。^[PR #6213]
+
+## MMH3-1n — H3 final-layout restore 必须由 dtype-neutral model contract 校验混合精度
+
+- 触发：MiniMax H3 参与 final-layout host-weight artifact 的 identity/restore，或修改 `MiniMaxH3DiTModel` 构造后的 dtype invariants。
+- 强制：`MiniMaxH3DiTModel` 必须声明 dtype-neutral 的 `FinalLayoutModelContract`，固定 schema、`implementation_id` 与 version，并提供 `validate_restored_host_weights()` 在 exact tensor restore 提交后重新执行 H3 的混合精度不变量校验；BF16 只属于具体 artifact policy/producer，模型 contract 不得绑定 BF16 表示。
+- 禁止：用 dtype 字符串代替版本化 model ABI；遗漏 persistent buffer 或模型要求保留的 FP32 parameter/buffer；把 contract 声明或 validator 存在误认为 loader 已启用、DLO 已接入或 artifact 已具备跨拓扑性能保证。
+- 验收：contract test 断言 `vllm-omni.diffusion.final-layout-tensors-v1`、`minimax-h3-dit`、版本与 validator；reduced MiniMax H3 真实 ownership 同时覆盖 BF16 tensor、模型要求的 FP32 tensor 和 persistent buffer，并在 one-shot restore commit 后执行 validator；另以 exact identity、tensor coverage 与 source-change guard 覆盖失败时不变更模型。^[PR #6445]
 
